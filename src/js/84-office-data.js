@@ -1175,6 +1175,16 @@
         else { outTog.setValue(!v); sst.bad(refusal(r, { name: 'Sound outside open hours' })); }
       },
     });
+    // Minutes a dish off the menu for a quality limit waits before the channels hear it, in case it is kept serving.
+    const qMeta = { name: 'Channel update wait', fmt: (v) => v + ' min' };
+    META['service.qualitySyncHoldMin'] = qMeta;
+    const qHold = numField({
+      label: 'Wait before channels hear a quality 86', value: (cur() || {}).settings.service.qualitySyncHoldMin, min: 0, max: 30, step: 1, unit: 'min', meta: qMeta,
+      hint: 'A dish past its quality limit may be tasted and kept. The delivery apps are told it is off only after this wait. A safety lock tells them at once.',
+      // Saves the wait as a service setting and confirms it in words.
+      save: (v) => saveSetting('service.qualitySyncHoldMin', v, 'Saved. Channels wait ' + v + ' min.', qMeta), onSaved: (t) => sst.ok(t),
+    });
+    hgrid.appendChild(qHold.el);
     pn.body.append(hgrid, h('div', { class: 'od-toggle-row' }, outTog), sst.el);
 
     // Sales tax: one rate that is added to every order when it is paid.

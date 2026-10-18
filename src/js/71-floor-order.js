@@ -39,11 +39,12 @@
   // Menu category name for an id, used so a search for 'sides' finds side dishes.
   const catName = (id) => { const c = C.categories.find((x) => x.id === id); return c ? c.name : ''; };
   // The short word on an 86 tile: 86 manual, 86 safety hold or 86 sold out.
-  const eightySixWord = (a) => '86 ' + (a.reason === 'manual' ? 'manual' : a.reason === 'safety' ? 'safety hold' : 'sold out');
+  const eightySixWord = (a) => '86 ' + (a.reason === 'manual' ? 'manual' : a.reason === 'safety' ? 'safety hold' : a.reason === 'quality' ? 'past quality limit' : 'sold out');
   // One plain line saying why an item is 86.
   const eightySixWhy = (a) => {
     if (a.reason === 'manual') return 'Marked 86 by hand';
     if (a.reason === 'safety') return ingName(a.ing) + ' is held for safety';
+    if (a.reason === 'quality') return ingName(a.ing) + ' is held until someone tastes it';
     return ingName(a.ing) + ' is low';
   };
 
@@ -647,7 +648,7 @@
       if (!r.ok) {
         if (r.why === '86') {
           const a = r.a;
-          const why = a.reason === 'manual' ? 'marked 86 by hand' : a.reason === 'safety' ? 'on a safety hold' : 'sold out';
+          const why = a.reason === 'manual' ? 'marked 86 by hand' : a.reason === 'safety' ? 'on a safety hold' : a.reason === 'quality' ? 'past its quality limit' : 'sold out';
           SB.ui.toast(t.mi.name + ' is ' + why + '. Pick something else.', { tone: 'warn' });
           paintTiles();
         } else if (r.why === 'maxQty') SB.ui.toast('Up to ' + L.maxQty + ' of one item per line. Send this ticket and start another.', { tone: 'warn' });

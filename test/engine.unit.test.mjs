@@ -1040,7 +1040,7 @@ test('quality limit: past the limit the batch stays on the board, off the menu, 
   const end = k.tickAt(T0 + 12 * HR + 1);
   assert.equal(end.events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 1);
   // The stored status never leaves the board without a deadline: no re-evaluation storm while it waits.
-  const k2 = qualityKit(); k2.tickAt(T0 + 4 * HR + 1); k2.tickAt(T0 + 4 * HR + 2 * MIN); // lets the simulated 86 sync finish
+  const k2 = qualityKit(); k2.tickAt(T0 + 4 * HR + 1); k2.tickAt(T0 + 4 * HR + 11 * MIN); // lets the simulated 86 sync finish (it starts after the 10-minute quality hold)
   assert.equal(E.tick(k2.s, T0 + 5 * HR).state, k2.s, 'a past batch is stable between ticks');
 });
 
@@ -1107,4 +1107,83 @@ test('endKeepServing: a logged correction puts the batch back past its limit and
   assert.equal(k.b(id).status, 'past');
   assert.ok(E.allEvents(k.s).some((e) => e.id === orig.id && !e.reverted), 'the original entry is still there');
   k.do('endKeepServing', { batchId: id, who: 'AB' }, 'qualityNotDue');
+});
+
+/* ------------------------------------------------ availability reason "quality" and the held channel update ------------------------------------------------ */
+// A ribs batch past its 4-hour quality limit takes ribs_half off the menu. Returns the kit just after the limit.
+const syncsFor = (k, kind) => k.s.syncs.filter((x) => x.menuId === 'ribs_half' && (!kind || x.kind === kind));
+const doneFor = (events) => events.filter((e) => e.type === 'sync_done' && e.menuId === 'ribs_half');
+const ribs86 = (k) => { const e = k.s.avail.ribs_half; return [e.ok, e.reason]; };
+
+test('quality 86: past-quality grams give their own reason, and no sync starts during the hold', () => {
+  const k = qualityKit();
+  k.tickAt(T0 + 4 * HR + 1);
+  assert.deepEqual(ribs86(k), [false, 'quality']);
+  const sy = syncsFor(k, '86');
+  assert.equal(sy.length, 1);
+  assert.equal(sy[0].holdUntil, T0 + 4 * HR + 1 + 10 * MIN);
+  for (const tg of Object.values(sy[0].targets)) assert.ok(tg.dueAt >= sy[0].holdUntil + 2000);
+  assert.equal(doneFor(k.tickAt(T0 + 4 * HR + 9 * MIN).events).length, 0, '0 syncs during the hold');
+});
+
+test('quality 86: not kept, the syncs start at the end of the hold with normal latency', () => {
+  const k = qualityKit();
+  k.tickAt(T0 + 4 * HR + 1);
+  const ev = [...k.tickAt(T0 + 4 * HR + 11 * MIN).events, ...k.tickAt(T0 + 4 * HR + 12 * MIN).events];
+  const done = doneFor(ev);
+  assert.equal(done.length, C.syncTargets.length);
+  for (const d of done) assert.ok(d.latencyMs >= 2000 && d.latencyMs <= 40000, 'latency ' + d.latencyMs);
+});
+
+test('quality 86: keeping inside the hold makes no syncs at all', () => {
+  const k = qualityKit();
+  const before = k.s.syncs.length; // the two start-up syncs from adding the batch
+  k.tickAt(T0 + 4 * HR + 1);
+  k.at(T0 + 4 * HR + 3 * MIN).do('logTemp', { batchId: k.s.batches[0].id, tempF: 150 });
+  k.do('keepServing', { batchIds: [k.s.batches[0].id], who: 'AB', forMin: 30 });
+  assert.equal(k.s.avail.ribs_half.ok, true);
+  assert.equal(k.s.syncs.filter((x) => x.kind === '86').length, 0, 'the held update was dropped');
+  assert.equal(k.s.syncs.length, before, 'and no back sync was made');
+  const ev = [...k.tickAt(T0 + 4 * HR + 20 * MIN).events];
+  assert.equal(doneFor(ev).length, 0);
+});
+
+test('quality 86: a safety lock during the hold starts the sync at once; mixed locks give safety', () => {
+  const k = qualityKit((s) => E.apply(s, 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 3000 }, T0 + 3 * HR).state);
+  // The first batch passes its quality limit at 4 h; the second is still good until 7 h.
+  const [a] = k.s.batches;
+  k.tickAt(T0 + 4 * HR + 1);
+  assert.equal(k.b(a.id).status, 'past');
+  assert.equal(k.s.avail.ribs_half.ok, true, 'the second batch still serves');
+  // Discard the good batch: only past-quality grams remain.
+  k.at(T0 + 4 * HR + 2 * MIN).do('discardBatch', { batchId: k.s.batches[1].id, reason: 'quality' });
+  assert.deepEqual(ribs86(k), [false, 'quality']);
+  const held = syncsFor(k, '86')[0];
+  assert.ok(held.holdUntil > k.now);
+  // The past batch cools below the hot-hold line: now it is a safety lock.
+  const w = E.defaultSettings().safety;
+  k.tickAt(T0 + 4 * HR + 3 * MIN);
+  k.at(T0 + 4 * HR + 3 * MIN).do('logTemp', { batchId: a.id, tempF: w.hotHoldF - 20 });
+  assert.equal(k.s.avail.ribs_half.reason, 'safety', 'mixed or unsafe locks give safety');
+  const after = syncsFor(k, '86')[0];
+  assert.equal(after.holdUntil, k.now, 'the hold ended at once');
+  for (const tg of Object.values(after.targets)) assert.ok(tg.dueAt <= k.now + 40000);
+});
+
+test('quality 86: hold 0 syncs at once as before; the setting is bounded; undo and backup round-trip', () => {
+  const settings = E.defaultSettings(); settings.service.qualitySyncHoldMin = 0;
+  let s = E.newState({ now: T0, empty: true, settings });
+  s = E.apply(s, 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T0).state;
+  const k0 = new K(s, T0); k0.tickAt(T0 + 4 * HR + 1);
+  assert.equal(syncsFor(k0, '86')[0].holdUntil, undefined);
+  // Held sync survives a backup round trip.
+  const k = qualityKit();
+  k.tickAt(T0 + 4 * HR + 1);
+  const back = E.validateBackup(E.serialize(k.s));
+  assert.equal(back.ok, true);
+  assert.equal(back.state.syncs.find((x) => x.kind === '86').holdUntil, k.s.syncs.find((x) => x.kind === '86').holdUntil);
+  // The setting refuses a wait above 30 minutes.
+  k.do('updateSettings', { patch: { service: { qualitySyncHoldMin: 45 } } }, 'outOfBounds');
+  k.do('updateSettings', { patch: { service: { qualitySyncHoldMin: 15 } } });
+  assert.equal(k.s.settings.service.qualitySyncHoldMin, 15);
 });

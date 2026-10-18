@@ -175,7 +175,9 @@
   // sets the real local rate; Smokebox does not know it.
   // soundStartHour is when warning sounds may start (never later than opening, so a pit master who starts at 4 am can
   // hear them); soundOutsideHours lets them sound at any hour. Outside that window the strip shows a note instead.
-  C.service = { dayStartHour: 4, openHour: 11, closeHour: 21, taxRatePct: 0, soundStartHour: 11, soundOutsideHours: false };
+  C.service = { dayStartHour: 4, openHour: 11, closeHour: 21, taxRatePct: 0, soundStartHour: 11, soundOutsideHours: false,
+    // Minutes a sold-out-by-quality-limit dish waits before the channel update starts, in case it is kept serving.
+    qualitySyncHoldMin: 10 };
 
   /* ---------- food safety. Owner-editable inside safetyBounds (hotHoldF can never go below 135, same rule as Pitcall). ---------- */
   // Food-safety limits, in hours, degrees Fahrenheit and minutes. The owner can change them only inside

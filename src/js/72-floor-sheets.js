@@ -951,6 +951,7 @@
     if (!a || a.ok) return { tone: 'ok', icon: 'check-circle', word: 'On the menu' };
     if (a.reason === 'manual') return { tone: 'bad', icon: 'ban', word: '86 manual' };
     if (a.reason === 'safety') return { tone: 'bad', icon: 'ban', word: '86 safety hold' };
+    if (a.reason === 'quality') return { tone: 'bad', icon: 'ban', word: '86 past quality limit' };
     return { tone: 'bad', icon: 'ban', word: '86 sold out' };
   }
   // Where an ingredient stands against its 86 level: plenty, running low (within twice the level) or at it.
@@ -1045,7 +1046,7 @@
       bGo.addEventListener('click', () => {
         const a = SB.store.select.availability(rec.mi.id);
         if (!a || a.ok) return;
-        if (a.reason === 'safety') goHold(); else if (a.reason === 'stock') fixStock(a.ing);
+        if (a.reason === 'safety' || a.reason === 'quality') goHold(); else if (a.reason === 'stock') fixStock(a.ing);
       });
       return rec;
     }
@@ -1058,6 +1059,11 @@
       }
       const ing = ingOf(a.ing);
       if (a.reason === 'safety') return ingName(a.ing) + ' is locked for safety. Reheat or discard the batch in the hold cabinet. It comes back on when a safe batch is in.';
+      if (a.reason === 'quality') {
+        // A channel update still waiting out its hold can be cancelled by keeping the batch serving.
+        const held = (st().syncs || []).filter((sy) => sy.menuId === mi.id && sy.kind === '86' && U.isNum(sy.holdUntil) && sy.holdUntil > now)[0];
+        return ingName(a.ing) + ' is held until someone tastes it. Taste it in the hold cabinet to keep it serving, or throw it out.' + (held ? ' Channels update at ' + U.fmtTime(held.holdUntil) + ' unless kept.' : '');
+      }
       const have = E().servable(st(), a.ing);
       return ingName(a.ing) + ' is low: ' + qtyText(ing, have) + ' left, 86 at ' + qtyText(ing, ing ? ing.thresholdG || 0 : 0) + '.';
     }
@@ -1081,11 +1087,11 @@
         attr(rec.b86, 'aria-label', (a.ok ? '86 it: ' : 'Back on the menu: ') + mi.name);
       }
       // Stock and safety holds cannot be switched off here; the button leads to where each is fixed.
-      const showGo = !a.ok && (a.reason === 'safety' || a.reason === 'stock');
+      const showGo = !a.ok && (a.reason === 'safety' || a.reason === 'quality' || a.reason === 'stock');
       setHidden(rec.bGo, !showGo);
       if (showGo) {
         const ing = ingOf(a.ing);
-        const k = a.reason === 'safety' ? 'hold' : ing && ing.tcs ? 'batch' : 'stock';
+        const k = a.reason === 'safety' || a.reason === 'quality' ? 'hold' : ing && ing.tcs ? 'batch' : 'stock';
         if (rec.gk !== k) {
           rec.gk = k; U.clear(rec.bGo);
           rec.bGo.append(ico(k === 'hold' ? 'thermometer' : k === 'batch' ? 'plus' : 'package', 20), h('span', null, k === 'hold' ? 'Open hold cabinet' : k === 'batch' ? 'Add a batch' : 'Restock'));
@@ -1643,6 +1649,7 @@
         h('ul', { class: 'hp-words' },
           wordRow(stateEl('bad', 'ban', '86 sold out'), 'An ingredient has run down to its 86 level.'),
           wordRow(stateEl('bad', 'ban', '86 safety hold'), 'The only batch is locked for safety: too old, too cold or too warm.'),
+          wordRow(stateEl('bad', 'ban', '86 past quality limit'), 'The only batch is past its quality limit and waits until someone tastes it. Keep it serving or throw it out in the hold cabinet.'),
           wordRow(stateEl('bad', 'ban', '86 manual'), 'Someone marked it 86 on the 86 board.'))),
       h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Hold cabinet'),
         h('ul', { class: 'hp-words' },

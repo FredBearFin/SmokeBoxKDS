@@ -562,7 +562,7 @@
   function ingSums(batches) {
     let s = SUMS.get(batches);
     if (s) return s;
-    const serv = Object.create(null), locked = Object.create(null), newest = Object.create(null);
+    const serv = Object.create(null), locked = Object.create(null), pastq = Object.create(null), newest = Object.create(null);
     for (let i = 0; i < batches.length; i++) {
       const b = batches[i];
       if (!b || b.kind === 'cooling') continue;
@@ -570,9 +570,10 @@
       if (!newest[k] || b.enteredAt >= newest[k].enteredAt) newest[k] = b;
       if (b.status === 'discard') continue;
       const r = b.remainingG > 0 ? b.remainingG : 0;
-      if (servableBatch(b)) serv[k] = (serv[k] || 0) + r; else locked[k] = (locked[k] || 0) + r;
+      // Grams past a quality limit are held apart from the food-safety locks: they only wait for a taste test.
+      if (servableBatch(b)) serv[k] = (serv[k] || 0) + r; else if (b.status === 'past') pastq[k] = (pastq[k] || 0) + r; else locked[k] = (locked[k] || 0) + r;
     }
-    s = { serv, locked, newest };
+    s = { serv, locked, pastq, newest };
     SUMS.set(batches, s);
     return s;
   }
@@ -611,6 +612,11 @@
     for (const ln of bom) {
       const ing = im.get(ln.ing);
       if (ing && ing.tcs && (sums.serv[ing.id] || 0) <= 0 && safetyHeld(sums, ing.id)) return { ok: false, reason: 'safety', ing: ing.id };
+    }
+    // Nothing servable and the food is only waiting for a taste test (no safety lock among it): its own reason.
+    for (const ln of bom) {
+      const ing = im.get(ln.ing);
+      if (ing && ing.tcs && (sums.serv[ing.id] || 0) <= 0 && (sums.pastq[ing.id] || 0) > 0) return { ok: false, reason: 'quality', ing: ing.id };
     }
     for (const ln of bom) {
       const ing = im.get(ln.ing);
@@ -780,12 +786,16 @@
   // Starts a simulated "tell every sales channel" job after a dish goes 86 or comes back: one due time per
   // channel, 2 to 40 seconds from now. Finished jobs are dropped once the list passes 120, down to about
   // 100.
-  function createSync(tx, menuId, kind) {
+  function createSync(tx, menuId, kind, holdMs) {
     const id = 'sy_' + tx.next('sync');
     const targets = {};
-    for (const t of C.syncTargets) targets[t.id] = { dueAt: tx.now + syncDelayMs(id, t.id) };
+    // A held sync starts after the hold: its channels are told holdMs later, and latency counts from then.
+    const startAt = tx.now + (holdMs > 0 ? holdMs : 0);
+    for (const t of C.syncTargets) targets[t.id] = { dueAt: startAt + syncDelayMs(id, t.id) };
     const syncs = tx.mut('syncs');
-    syncs.push({ id, menuId, kind, t: tx.now, targets });
+    const rec = { id, menuId, kind, t: tx.now, targets };
+    if (holdMs > 0) rec.holdUntil = startAt;
+    syncs.push(rec);
     if (syncs.length > 120) {
       // drop completed syncs from the front until <= 100 remain
       const keep = [];
@@ -797,6 +807,31 @@
       tx.ch.syncs = keep; tx.own.add(keep);
     }
   }
+  // The simulated channel updates still waiting out their hold for one dish (a quality hold that may yet be kept).
+  const heldSyncIdx = (syncs, menuId, now) => { const out = []; for (let i = 0; i < syncs.length; i++) { const sy = syncs[i]; if (sy.menuId === menuId && sy.kind === '86' && isNum(sy.holdUntil) && sy.holdUntil > now) out.push(i); } return out; };
+  // Drops the held updates for a dish: it came back before they started, so no channel ever heard it was off.
+  function dropHeldSyncs(tx, menuId) {
+    const cur = tx.get('syncs');
+    const idx = heldSyncIdx(cur, menuId, tx.now);
+    if (!idx.length) return false;
+    const keep = cur.filter((_, i) => idx.indexOf(i) < 0);
+    tx.ch.syncs = keep; tx.own.add(keep);
+    return true;
+  }
+  // Starts the held updates for a dish now: the hold is over because something worse than a quality hold applies.
+  function releaseHeldSyncs(tx, menuId) {
+    const cur = tx.get('syncs');
+    const idx = heldSyncIdx(cur, menuId, tx.now);
+    if (!idx.length) return;
+    const next = cur.slice();
+    for (const i of idx) {
+      const sy = cur[i], targets = {};
+      for (const t of C.syncTargets) targets[t.id] = { dueAt: tx.now + syncDelayMs(sy.id, t.id) };
+      const rec = Object.assign({}, sy, { holdUntil: tx.now, targets });
+      next[i] = rec;
+    }
+    tx.ch.syncs = next; tx.own.add(next);
+  }
   // True when every channel has confirmed this update.
   function syncComplete(sy) {
     for (const k in sy.targets) if (hasOwn(sy.targets, k) && sy.targets[k].doneAt == null) return false;
@@ -807,6 +842,8 @@
   function availInputsChanged(tx) {
     return hasOwn(tx.ch, 'batches') || hasOwn(tx.ch, 'stock') || hasOwn(tx.ch, 'manual86') || hasOwn(tx.ch, 'menu') || hasOwn(tx.ch, 'ingredients') || hasOwn(tx.ch, 'avail');
   }
+  // The quality sync hold in ms, from the service settings (0 to 30 minutes).
+  const qualityHoldMs = (settings) => { const sv = settings && settings.service ? settings.service : C.service; const m = isNum(sv.qualitySyncHoldMin) ? sv.qualitySyncHoldMin : C.service.qualitySyncHoldMin; return Math.max(0, Math.min(30, m)) * MIN; };
   // Recomputes availability for every dish and stores it when it changed. Each change logs avail_changed,
   // and a dish that flips between available and not starts a channel sync. After an undo the old "since"
   // time is put back when the situation matches. Returns the old table and the ids that changed.
@@ -827,7 +864,13 @@
       if (p) {
         changedIds.push(mi.id);
         tx.event('avail_changed', { menuId: mi.id, ok: a.ok, reason: a.reason, ing: a.ing });
-        if (p.ok !== a.ok) createSync(tx, mi.id, a.ok ? 'back' : '86');
+        if (p.ok !== a.ok) {
+          // Back on before a held quality update started: the channels never heard it was off, so nothing to undo.
+          if (a.ok && dropHeldSyncs(tx, mi.id)) continue;
+          // Off for a quality hold: wait out the hold (it may be kept); anything else syncs at once.
+          const hold = !a.ok && a.reason === 'quality' ? qualityHoldMs(tx.get('settings')) : 0;
+          createSync(tx, mi.id, a.ok ? 'back' : '86', hold);
+        } else if (!a.ok && p.reason === 'quality' && a.reason !== 'quality') releaseHeldSyncs(tx, mi.id);
       }
     }
     if (!changed) for (const k in prev) if (hasOwn(prev, k) && !hasOwn(next, k)) { changed = true; break; }
@@ -1873,7 +1916,7 @@
   // Every setting the owner may change, with its rule. Anything not listed is refused (badPatch).
   const SET_SCHEMA = {
     pacing: { enabled: { t: 'bool' }, learnK: R(0, 50), floorSec: R(1, 600), minFactor: R(0.1, 1), maxFactor: R(1, 10), outlierFactor: R(1, 20), qtyFactor: R(0, 2), qtyCap: R(1, 10) },
-    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20), soundStartHour: R(0, 23, true), soundOutsideHours: { t: 'bool' } },
+    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20), soundStartHour: R(0, 23, true), soundOutsideHours: { t: 'bool' }, qualitySyncHoldMin: R(0, 30, true) },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
       defaultMaxHoldH: B('defaultMaxHoldH'), hardCapH: B('hardCapH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
       cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' }, holdWindowV2: { t: 'bool' } },
@@ -2330,7 +2373,7 @@
         if (!x || x.doneAt != null || !(x.dueAt <= now)) continue;
         if (!w) { w = tx.mutIn(tx.mut('syncs'), i); w.targets = Object.assign({}, sy.targets); }
         w.targets[tg.id] = { dueAt: x.dueAt, doneAt: x.dueAt };
-        tx.event('sync_done', { syncId: sy.id, menuId: sy.menuId, target: tg.id, latencyMs: x.dueAt - sy.t });
+        tx.event('sync_done', { syncId: sy.id, menuId: sy.menuId, target: tg.id, latencyMs: x.dueAt - (isNum(sy.holdUntil) ? sy.holdUntil : sy.t) });
       }
     }
     const S = safetyOf(s.settings);
@@ -2954,7 +2997,9 @@
         if (!isObj(sy) || typeof sy.id !== 'string' || !mm.has(sy.menuId) || !isNum(sy.t) || !isObj(sy.targets)) continue;
         const targets = {};
         for (const tg of C.syncTargets) { const x = sy.targets[tg.id]; if (isObj(x) && isNum(x.dueAt)) { targets[tg.id] = { dueAt: x.dueAt }; if (isNum(x.doneAt)) targets[tg.id].doneAt = x.doneAt; } }
-        syncs.push({ id: sy.id, menuId: sy.menuId, kind: sy.kind === 'back' ? 'back' : '86', t: sy.t, targets });
+        const rec = { id: sy.id, menuId: sy.menuId, kind: sy.kind === 'back' ? 'back' : '86', t: sy.t, targets };
+        if (isNum(sy.holdUntil)) rec.holdUntil = sy.holdUntil;
+        syncs.push(rec);
       }
       // seq
       // Counters never fall below the highest id already used, so a new id can never repeat an old one.
@@ -3099,7 +3144,7 @@
       case 'notReheatable': return 'This batch cannot be reheated: only one reheat is allowed, and only within ' + S.belowHotGraceH + ' hours of going below ' + S.hotHoldF + ' °F. Discard it. ' + C.safetyLine;
       case 'notAllDone': return isInt(i.remaining) ? i.remaining + ' ' + U.plural(i.remaining, 'item') + ' not done yet. Finish them, or use Bump anyway to send the ticket out.' : REPORTS.notAllDone;
       case 'itemUnavailable': {
-        const why = i.reason === 'manual' ? 'marked 86 by hand' : i.reason === 'safety' ? 'on a safety hold' : i.reason === 'stock' ? 'sold out' : '86';
+        const why = i.reason === 'manual' ? 'marked 86 by hand' : i.reason === 'safety' ? 'on a safety hold' : i.reason === 'quality' ? 'past its quality limit' : i.reason === 'stock' ? 'sold out' : '86';
         const mi = typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
         return mi + ' is ' + why + '. Take it off the order or pick something else.';
       }
