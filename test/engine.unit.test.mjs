@@ -1242,3 +1242,31 @@ test('planned batches: expire 2 hours after serving time, with an event; backup 
   const bad = JSON.parse(E.serialize(k.s)); bad.planned = [{ id: 'pl_1', ing: 'tea', grams: 5, offAt: 1, readyAt: 2 }, { id: 'pl_2', ing: 'pork', grams: -1, offAt: 1, readyAt: 2 }];
   assert.equal(E.validateBackup(bad).state.planned.length, 0);
 });
+
+/* ------------------------------------------------ editable ladder thresholds (settings.alerts) ------------------------------------------------ */
+test('settings.alerts.ladderThresholds: accepts good lists, refuses bad ones, round-trips a backup', () => {
+  const k = new K(E.newState({ now: T0, empty: true }), T0);
+  const set = (v, exp = 'ok') => k.do('updateSettings', { patch: { alerts: { ladderThresholds: v } } }, exp);
+  assert.equal(k.s.settings.alerts.ladderThresholds, null);
+  set({ default: [45, 20, 10], byIng: { brisket: [180, 60, 15] } });
+  set({ default: [45, 10, 20] }, 'badPatch');                 // not falling
+  set({ default: [45, 45] }, 'badPatch');                     // not strictly falling
+  set({ default: [30, 4] }, 'outOfBounds');                   // the last warning needs 5 minutes or more
+  set({ default: [300, 10] }, 'outOfBounds');
+  set({ default: [60, 50, 40, 30, 20, 10] }, 'badPatch');     // more than 5
+  set({ default: [30.5, 10] }, 'badPatch');
+  set({ default: [] }, 'badPatch');
+  set({ byIng: { tea: [30, 10] } }, 'badPatch');              // not a cooked product
+  set({ byIng: { nope: [30, 10] } }, 'badPatch');
+  set({ extra: 1 }, 'badPatch');
+  set('x', 'badPatch');
+  assert.deepEqual(k.s.settings.alerts.ladderThresholds, { default: [45, 20, 10], byIng: { brisket: [180, 60, 15] } });
+  const back = E.validateBackup(E.serialize(k.s));
+  assert.equal(back.ok, true);
+  assert.deepEqual(back.state.settings.alerts.ladderThresholds, k.s.settings.alerts.ladderThresholds);
+  const bad = JSON.parse(E.serialize(k.s)); bad.settings.alerts.ladderThresholds = { default: [10, 20] };
+  const fixed = E.validateBackup(bad);
+  assert.equal(fixed.state.settings.alerts.ladderThresholds, null, 'a bad list is reset');
+  set(null);
+  assert.equal(k.s.settings.alerts.ladderThresholds, null);
+});

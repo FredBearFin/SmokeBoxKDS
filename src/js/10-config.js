@@ -204,6 +204,8 @@
   // Minutes before a batch's deadline at which each warning rung fires: a soft chime, then a spoken call, then
   // the loud repeating tone. Per-ingredient lists replace the default; long cooks start earlier so there is
   // time to act. Starter values: the owner can tune them.
+  // Editable overrides of the ladder live in settings.alerts.ladderThresholds (null = use C.ladderMin).
+  C.alerts = { ladderThresholds: null };
   C.ladderMin = { defaultMin: [60, 30, 10], byIng: { brisket: [120, 60, 30, 10], ribs: [90, 45, 20, 10] } };
   // How old each demo starter batch is, in minutes, when a fresh demo kitchen opens. Spread out on purpose so the
   // batches do not all expire at once and the first run shows the warnings working: brisket is the one nearest

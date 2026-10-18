@@ -74,6 +74,8 @@ async function runScenario(key) {
     window.__pm = P;
     const st = () => SB.store.getState();
     const COLD = ['slaw', 'potato', 'pudding'];
+    // The last warning rung of a product, in minutes, as configured (10 unless the owner changed the ladder).
+    const lastRungMin = (ing) => { const r = SB.deadlines.rungsFor(ing, st().settings); return r[r.length - 1]; };
     // One minute of the scripted pit master: cook what is due, pull at the scripted pace, taste what is past its limit, log the estimator.
     window.__pmStep = () => {
       const now = SB.store.now();
@@ -95,12 +97,12 @@ async function runScenario(key) {
           if (keep) {
             SB.store.dispatchEx('logTemp', { batchId: b.id, tempF: COLD.includes(b.ing) ? 38 : 150 }, { source: 'ui' });
             const r = SB.store.dispatchEx('keepServing', { batchIds: [b.id], forMin: c.keepPolicy === 'three30' ? 30 : 60, who: 'PM' }, { source: 'ui' });
-            if (r.report === 'ok') { P.keepCount[b.id] = n + 1; const nb = st().batches.find((x) => x.id === b.id); P.keeps.push({ batchId: b.id, tap: now, until: nb.keepUntil }); }
+            if (r.report === 'ok') { P.keepCount[b.id] = n + 1; const nb = st().batches.find((x) => x.id === b.id); P.keeps.push({ batchId: b.id, ing: b.ing, tap: now, until: nb.keepUntil }); }
           } else SB.store.dispatchEx('discardBatch', { batchId: b.id, reason: 'quality' }, { source: 'ui' });
         }
       }
       // Remaining grams when an extension has 10 minutes to run (to decide whether its rung sound is required).
-      for (const k of P.keeps) if (P.remAt[k.batchId + ':' + k.until] === undefined && now >= k.until - 10 * MIN) { const b = st().batches.find((x) => x.id === k.batchId); P.remAt[k.batchId + ':' + k.until] = b && b.status !== 'discard' ? Math.round(b.remainingG) : null; }
+      for (const k of P.keeps) if (P.remAt[k.batchId + ':' + k.until] === undefined && now >= k.until - lastRungMin(k.ing) * MIN) { const b = st().batches.find((x) => x.id === k.batchId); P.remAt[k.batchId + ':' + k.until] = b && b.status !== 'discard' ? Math.round(b.remainingG) : null; }
       // Estimator against realized pace, every 10 virtual minutes (scripted pulls only).
       if (c.pulls && now >= P.nextEst) {
         P.nextEst += 10 * MIN;
@@ -129,6 +131,7 @@ async function runScenario(key) {
       expired: ev.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').map((e) => ({ batchId: e.batchId, ing: e.ing, t: e.t, g: e.g })),
       cooked: s.batches.map((b) => ({ id: b.id, cookedG: b.cookedG })), now: SB.store.now(),
       tickets: s.tickets.length, closeHour: s.settings.service.closeHour,
+      lastRung: Object.fromEntries(s.ingredients.filter((i) => i.tcs).map((i) => { const r = SB.deadlines.rungsFor(i.id, s.settings); return [i.id, r[r.length - 1]]; })),
     };
   });
   const allowedAt = async (t) => page.evaluate((tt) => SB.deadlines.soundsAllowed(SB.store.getState(), tt), t);
@@ -174,7 +177,7 @@ async function score(key, sc, end, allowedAt) {
   const misses = [], closedLimits = [], handled = [];
   for (const l of limits) {
     const atFloor = l.remainingG >= floorOf(l.cookedG);
-    const warned = sounds.some((a) => a.batchId === l.batchId && a.kind === 'expiry' && a.level >= 1 && !a.repeat && a.allowed && a.t <= l.t - 10 * MIN);
+    const warned = sounds.some((a) => a.batchId === l.batchId && a.kind === 'expiry' && a.level >= 1 && !a.repeat && a.allowed && a.t <= l.t - (end.lastRung[l.ing] || 10) * MIN);
     const row = { batchId: l.batchId, ing: l.ing, kind: l.kind, remainingG: l.remainingG, warned10min: warned };
     if (!atFloor) { handled.push(Object.assign(row, { note: 'below the floor' })); continue; }
     if (!(await allowedAt(l.t))) { closedLimits.push(row); continue; }

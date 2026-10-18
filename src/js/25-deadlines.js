@@ -28,9 +28,12 @@
   // Ordering of severities, worst first.
   const SEV_RANK = { bad: 0, warn: 1, info: 2 };
 
-  // Minutes-before-the-deadline at which each warning rung fires, for one ingredient. Brisket starts earlier
-  // because a long cook cannot be replaced in an hour.
-  function rungsFor(ingId) {
+  // Minutes-before-the-deadline at which each warning rung fires, for one ingredient: the owner's list from the settings
+  // (settings.alerts.ladderThresholds, when given), else the built-in one. Brisket starts earlier because a long cook
+  // cannot be replaced in an hour. The settings argument is optional.
+  function rungsFor(ingId, settings) {
+    const o = settings && settings.alerts ? settings.alerts.ladderThresholds : null;
+    if (o) { if (o.byIng && o.byIng[ingId]) return o.byIng[ingId]; if (o.default) return o.default; }
     const L = C.ladderMin || {};
     return (L.byIng && L.byIng[ingId]) || L.defaultMin || [60, 30, 10];
   }
@@ -253,7 +256,7 @@
       const ing = state.ingredients.find((x) => x.id === ingId);
       const name = ing ? ing.name : ingId;
       const list = byIng[ingId].slice().sort((a, b) => a.enteredAt - b.enteredAt);
-      const rungs = rungsFor(ingId), rate = sales.rate[ingId];
+      const rungs = rungsFor(ingId, state.settings), rate = sales.rate[ingId];
       // Only batches that have finished resting can be sold, so the run-out total counts those alone.
       const isReady = (b) => !(U.isNum(b.restUntil) && b.restUntil > now);
       let soldBefore = 0, totalLeft = 0;
@@ -299,7 +302,7 @@
         }
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H) || isLim) {
           const quiet = rung === 0 || trivial;
-          out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length,
+          out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length, rungsMin: rungs,
             sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, planFor: isLim ? { ing: ingId, grams: lim.unmetG, by: lim.runOutAt } : undefined, wasteG: waste, wasteUsd: usd, goes86: lastOne, quality: q, trivial, unknown: rate === undefined });
         }
       });
@@ -414,32 +417,46 @@
   //   Entries for batches that are gone, and entries older than 24 hours, are dropped.
   function makeLadder() {
     const memory = new Map();
-    // Decides the sound for one deadline row, or null.
+    // Decides the sound for one deadline row, or null. The memory per row keeps the smallest threshold (in minutes) that
+    // has been announced, so editing the ladder mid-countdown cannot replay or degrade a warning. Which sound a rung
+    // makes follows its place in the list: the first of several is a chime, the ones between are voice calls, the last
+    // is the loud tone with speech (a one-rung list is just the loud tone).
     function one(d, now) {
       let st = memory.get(d.id);
       if (d.kind === 'expired' || d.kind === 'past') {
         if (st) return null;
-        memory.set(d.id, { rung: 1, ack: 0, loudAt: -Infinity, batchId: d.batchId, born: now });
+        memory.set(d.id, { minAnn: 0, ack: false, loudAt: -Infinity, batchId: d.batchId, born: now, sig: '' });
         return d.trivial ? null : { level: 4, d, repeat: false };
       }
       if (d.kind !== 'expiry' || d.rung < 1) return null;
+      const R = Array.isArray(d.rungsMin) && d.rungsMin.length ? d.rungsMin : rungsFor(d.ing);
+      const sig = R.join(',');
       const fresh = !st;
-      if (fresh) { st = { rung: 0, ack: 0, loudAt: -Infinity, batchId: d.batchId, born: now }; memory.set(d.id, st); }
+      if (fresh) { st = { minAnn: Infinity, ack: false, loudAt: -Infinity, batchId: d.batchId, born: now, sig }; memory.set(d.id, st); }
+      const crossed = R.filter((m) => d.msLeft <= m * MIN);
+      const cur = crossed.length ? Math.min.apply(null, crossed) : Infinity;
+      const lastMin = R[R.length - 1];
       // No sound when it is on pace to sell out in time, or when almost nothing is left in the batch.
-      if (d.trivial || (U.isNum(d.wasteG) && d.wasteG <= 50)) { st.rung = Math.max(st.rung, d.rung); return null; }
+      if (d.trivial || (U.isNum(d.wasteG) && d.wasteG <= 50)) { st.minAnn = Math.min(st.minAnn, cur); st.sig = sig; return null; }
       // A new extension epoch: everything already crossed counts as announced.
-      if (fresh && d.epoch) { st.rung = d.rung; st.ack = d.rung; return null; }
-      const last = d.rung >= d.rungs;
-      if (d.rung > st.rung) {
-        st.rung = d.rung; st.ack = 0;
-        // At the very limit the batch is still alive for one more tick; its own past or expired row sounds next, so this one stays quiet (else the same moment sounds twice).
-        if (d.msLeft <= 0) return null;
+      if (fresh && d.epoch) { st.minAnn = cur; st.ack = true; return null; }
+      // The thresholds were edited since this row was last looked at: rungs already crossed count as announced, except the last, which always sounds in full.
+      if (st.sig !== sig) {
+        st.sig = sig;
+        const earlier = crossed.filter((m) => m !== lastMin);
+        if (earlier.length) st.minAnn = Math.min(st.minAnn, Math.min.apply(null, earlier));
+      }
+      // At the very limit the batch is still alive for one more tick; its own past or expired row sounds next, so this one stays quiet (else the same moment sounds twice).
+      if (d.msLeft <= 0) { st.minAnn = Math.min(st.minAnn, cur); return null; }
+      const last = cur === lastMin;
+      if (cur < st.minAnn) {
+        st.minAnn = cur; st.ack = false;
         if (last) { st.loudAt = now; return { level: 3, d, repeat: false }; }
-        if (d.rung >= 2) return { level: 2, d, repeat: false };
+        if (R.indexOf(cur) >= 1) return { level: 2, d, repeat: false };
         // With no pace to show waste, the first (soft) rung stays silent: it would chime for food that may sell.
         return d.unknown ? null : { level: 1, d, repeat: false };
       }
-      if (last && st.ack < d.rung && d.msLeft > 0 && now - st.loudAt >= LOUD_REPEAT_MS) { st.loudAt = now; return { level: 3, d, repeat: true }; }
+      if (last && !st.ack && now - st.loudAt >= LOUD_REPEAT_MS) { st.loudAt = now; return { level: 3, d, repeat: true }; }
       return null;
     }
     // Drops entries for batches that no longer exist and entries older than 24 hours of kitchen time.
@@ -451,7 +468,7 @@
       memory,
       decide(feed, now, state) { prune(state, now); const calls = []; for (const d of feed) { const c = one(d, now); if (c) calls.push(c); } return calls; },
       // A tap on a row counts as seeing it: the loud tone stops until the next rung.
-      acknowledge(id) { const st = memory.get(id); if (st) st.ack = st.rung; },
+      acknowledge(id) { const st = memory.get(id); if (st) st.ack = st.minAnn < Infinity; },
       // True when the row has been acknowledged.
       isAcked(id) { const st = memory.get(id); return !!(st && st.ack); },
       size: () => memory.size,

@@ -121,3 +121,39 @@ test('ladder: the limit sounds once, from the past row, not twice (expiry row at
   assert.equal(atLimit.length, 1, JSON.stringify(atLimit));
   assert.equal(atLimit[0].kind, 'past');
 });
+
+/* ---------------------------------------- editable thresholds: the memory follows minutes, not rung numbers ---------------------------------------- */
+const setLadder = (k, byIng) => { const r = E.apply(k.s, 'updateSettings', { patch: { alerts: { ladderThresholds: byIng === null ? null : { byIng } } } }, T0 + 1000); assert.equal(r.report, 'ok', r.report); k.s = r.state; };
+
+test('thresholds: shortening the list mid-countdown does not turn the last rung into a speech-less repeat', () => {
+  const k = kit();
+  setLadder(k, { ribs: [60, 30, 10] });
+  run(k, 1, 215);                         // 25 minutes left: the 30-minute rung has sounded
+  assert.deepEqual(k.sounds.map((s) => s.level), [2]);
+  setLadder(k, { ribs: [30, 10] });
+  run(k, 216, 229);
+  assert.equal(k.sounds.length, 1, 'the edit made no sound by itself');
+  step(k, 230);                           // 10 minutes left
+  const last = k.sounds[k.sounds.length - 1];
+  assert.deepEqual([last.level, last.repeat], [3, false], 'the last rung sounds in full, not as a repeat');
+});
+
+test('thresholds: lengthening the list mid-countdown does not sound a warning at the moment it is saved', () => {
+  const k = kit();
+  setLadder(k, { ribs: [60, 30, 10] });
+  run(k, 1, 228);                         // 12 minutes left
+  const before = k.sounds.length;
+  setLadder(k, { ribs: [90, 45, 20, 10] });
+  step(k, 229);
+  assert.equal(k.sounds.length, before, 'no unannounced voice call');
+  run(k, 230, 232);
+  assert.deepEqual(k.sounds.slice(before).map((s) => [s.level, s.repeat]).slice(0, 1), [[3, false]], 'the last rung still sounds in full');
+});
+
+test('thresholds: rung sounds follow the place in the list (one rung is only the loud tone)', () => {
+  const one = kit(); setLadder(one, { ribs: [15] }); run(one, 1, 232);
+  assert.deepEqual(one.sounds.filter((s) => !s.repeat && s.kind === 'expiry').map((s) => s.level), [3]);
+  const five = kit(); setLadder(five, { ribs: [120, 90, 60, 30, 10] }); run(five, 1, 232);
+  // No pace is known, so the first rung is silent; three voice rungs, then the loud tone.
+  assert.deepEqual(five.sounds.filter((s) => !s.repeat && s.kind === 'expiry').map((s) => s.level), [2, 2, 2, 3]);
+});

@@ -1018,7 +1018,41 @@
         (flagged.length ? 'Owner to confirm: ' + flagged.join(', ') + ' start with a quality limit; if you hold them outside temperature control, set their limit kind to safety.' : '');
     };
     paintQ(cur());
-    pn.body.append(status.el, gridA, qLine, sub('Cooling stages'), para('Cooked food that is not going into the cabinet has to be cooled in two stages.', 'od-hint'), gridB);
+    // Batch expiry warnings: when the board warns before a batch reaches its limit, per product. Empty means the built-in list.
+    const ladderMeta = { name: 'Warning times', words: (info) => (info.min != null ? 'Each warning time is a whole number of minutes from ' + info.min + ' to ' + info.max + ', counting down, with at most 5 per product.' : 'Type minutes before the limit, biggest first, like 60, 30, 10. At most 5 times, each smaller than the one before.') };
+    META['alerts.ladderThresholds'] = ladderMeta;
+    const ladderRows = [];
+    const ladderBox = h('div', { class: 'od-fgrid' });
+    // Builds one warning-times row: the owner's list if any, else the built-in list as the hint.
+    const mkLadder = (id, name) => {
+      const input = h('input', { class: 'input', type: 'text', inputmode: 'numeric', autocomplete: 'off', 'aria-label': 'Warning minutes for ' + name, dataset: { ing: id || 'default' } });
+      const field = SB.ui.field({ label: name, control: input, hint: 'Built in: ' + SB.deadlines.rungsFor(id || '', null).join(', ') + ' minutes. Leave empty for the built-in list.' });
+      // Reads the list typed, saves it through the settings (empty clears this row), and says what happened.
+      const commit = () => {
+        const txt = input.value.trim();
+        const list = txt ? txt.split(/[\s,;]+/).filter(Boolean).map(Number) : null;
+        const o = (cur().settings.alerts && cur().settings.alerts.ladderThresholds) || {};
+        const next = { default: o.default, byIng: Object.assign({}, o.byIng) };
+        if (id) { if (list) next.byIng[id] = list; else delete next.byIng[id]; } else next.default = list || undefined;
+        if (!next.default) delete next.default;
+        if (!Object.keys(next.byIng).length) delete next.byIng;
+        const r = saveSetting('alerts.ladderThresholds', Object.keys(next).length ? next : null, 'Saved. ' + name + ' warns ' + (list ? list.join(', ') + ' minutes before the limit.' : 'at the built-in times.'), ladderMeta);
+        if (r.ok) status.ok(r.text); else { status.bad(r.text); paintLadder(cur()); }
+      };
+      input.addEventListener('change', commit);
+      ladderRows.push({ id, input });
+      ladderBox.appendChild(field.el || field);
+    };
+    // Shows the saved lists in the boxes.
+    const paintLadder = (s) => {
+      const o = (s.settings.alerts && s.settings.alerts.ladderThresholds) || {};
+      for (const r of ladderRows) { const v = r.id ? (o.byIng && o.byIng[r.id]) : o.default; if (document.activeElement !== r.input) r.input.value = v ? v.join(', ') : ''; }
+    };
+    mkLadder(null, 'All other products');
+    cur().ingredients.filter((i) => i.tcs).forEach((i) => mkLadder(i.id, i.name));
+    paintLadder(cur());
+    P.syncs.push(paintLadder);
+    pn.body.append(status.el, gridA, qLine, sub('Batch expiry warnings only'), para('How many minutes before a batch reaches its limit the board warns, loudest at the last time. This changes the warnings, never the limits or the food-safety rules: the last warning cannot be under 5 minutes.', 'od-hint'), ladderBox, sub('Cooling stages'), para('Cooked food that is not going into the cabinet has to be cooled in two stages.', 'od-hint'), gridB);
     P.syncs.push((s) => { all.forEach(({ f, path }) => f.sync(getPath(s.settings, path))); paintQ(s); });
     P.disposers.push(() => all.forEach(({ f }) => f.destroy()), () => status.destroy());
     return pn;

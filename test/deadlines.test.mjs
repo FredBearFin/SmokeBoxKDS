@@ -508,3 +508,16 @@ test('planned batch: it is supply only, never stock: no 86 and no ledger movemen
   assert.deepEqual(r.state.ledger, s0.ledger);
   assert.equal(r.state.batches, s0.batches);
 });
+
+test('thresholds: build uses the owner list from settings, and rungsFor still works with one argument', () => {
+  const s = E.newState({ now: T0, empty: true });
+  assert.deepEqual(D.rungsFor('ribs'), [90, 45, 20, 10]);
+  const s2 = E.apply(s, 'updateSettings', { patch: { alerts: { ladderThresholds: { default: [40, 15], byIng: { ribs: [50, 25, 8] } } } } }, T0).state;
+  assert.deepEqual(D.rungsFor('ribs', s2.settings), [50, 25, 8]);
+  assert.deepEqual(D.rungsFor('pork', s2.settings), [40, 15]);
+  assert.deepEqual(D.rungsFor('brisket', s2.settings), [40, 15], 'the owner default replaces the built-in list for products with no entry of their own');
+  const s3 = E.apply(s2, 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T0).state;
+  const f = D.build(s3, T0 + 4 * HR - 20 * MIN).find((x) => x.kind === 'expiry');
+  assert.deepEqual(f.rungsMin, [50, 25, 8]);
+  assert.equal(f.rung, 2, '20 minutes left is past the 50 and 25 minute rungs');
+});

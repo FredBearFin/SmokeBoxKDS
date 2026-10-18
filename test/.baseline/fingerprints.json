@@ -1,8 +1,8 @@
 {
  "src/js/00-util.js": "912daaf96960911be98ac136e3039fc855739846a520219ff8b3ac5625ea9aba",
  "src/js/05-icons.js": "d40033a31194633cf3cad1e0aab9446711a7a22f708355338ec500f25835a4da",
- "src/js/10-config.js": "ce29fef02735ba0ab7078517292edea1917ce27f888f40b2ef45b40077efc7a1",
- "src/js/20-engine.js": "a2b49ece77303d6d83693499bbf1af444bb6a24108e7870d69e1b34f825bd8a9",
+ "src/js/10-config.js": "e792218c4e755dc0539265ff340222d44e155eb9bfdc9c232cc9ccaf0e7427b9",
+ "src/js/20-engine.js": "ca4adcdea4672deaee5a18e810d75a332da4a4b2277a2ca0bbf35c90bec0f78c",
  "src/js/30-store.js": "d4273522d45fda0b8e060cb6c93d9416be5378b681c699d77d717f374cb5d906",
  "src/js/40-metrics.js": "89241950d4c2c44a5a18d952ed9f832401bfd3ec6ed41e64bc10e97ba62066d3",
  "src/js/50-charts.js": "9f351459475786399cf173d1dfa6c87dcece3805caadd36c515891593043f3f5",
@@ -22,7 +22,7 @@
  "src/css/20-floor.css": "9936f307a60b4d2b5908136f776c46df3aeb9e07211723b6459029c04673df21",
  "test/floor.e2e.mjs": "6903287eb790a198f194d645fadf1864bb05365f1f0dc663bf666076683a0502",
  "tools/comment-audit.mjs": "d148fbf29d82eee272fe0d33bb68f9fad9f2f7e848112272240055d7d5da41eb",
- "src/js/84-office-data.js": "a6a537b221b0169318fa49586a8c2b2ad0f38e7b096811641e555d4bc1e127c5",
+ "src/js/84-office-data.js": "8a718a99e4dee0f7d1a93570dc56395fcb8a61c88d7dafbd20cc11e7fb154454",
  "src/css/32-office-data.css": "343a8f7f24f97c6d8cf8146481e19d1cb1e04679e2e497c4579d5effbe921891",
  "src/js/45-sim.js": "73e2157ce429f7e0862300a52fc41f542a0a13ac40a288da46dc90fe48ebc833",
  "src/js/80-office-core.js": "d75eee2ee3d7998b4c0897f86c79803b29f6a73bcbc8ce9ae3b85d630b0663b7",
@@ -44,7 +44,7 @@
  "src/css/22-floor-tour.css": "819a14436e73f6271b7700d46dab2cb08d42c8e30ef386faa8a16a0dfd6abab4",
  "src/js/73-floor-orders.js": "d811da31f86cd73e3081ca8cdd27cc9bcf6c9915527040a90bda51946bc63d2f",
  "src/css/23-floor-orders.css": "d5cdb100e02ec7dbf16457989710fed2a0e6e7ff5d1d2a3321fa26ef22a273d9",
- "src/js/25-deadlines.js": "202cfc4f71bb0f70b4cac652bd3a0d87b551b6a0b7399ac24a3ade8fe51bbb7e",
+ "src/js/25-deadlines.js": "5c5dc18695cebb3a909f7bf8264be204b4f51f5c2c6a9f8a13a047a127389a41",
  "src/js/76-floor-discards.js": "7559de57668c604483588dc3b6bc91c68d8fbd864935f801c173f3676f6086c1",
  "src/js/77-floor-setup.js": "5169a2a8883db33811020fa713c46e74de9b103287365499ea2c304d18687100"
 }

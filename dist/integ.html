@@ -4220,6 +4220,8 @@ a.of-nav:active { background: var(--press); }
   // Minutes before a batch's deadline at which each warning rung fires: a soft chime, then a spoken call, then
   // the loud repeating tone. Per-ingredient lists replace the default; long cooks start earlier so there is
   // time to act. Starter values: the owner can tune them.
+  // Editable overrides of the ladder live in settings.alerts.ladderThresholds (null = use C.ladderMin).
+  C.alerts = { ladderThresholds: null };
   C.ladderMin = { defaultMin: [60, 30, 10], byIng: { brisket: [120, 60, 30, 10], ribs: [90, 45, 20, 10] } };
   // How old each demo starter batch is, in minutes, when a fresh demo kitchen opens. Spread out on purpose so the
   // batches do not all expire at once and the first run shows the warnings working: brisket is the one nearest
@@ -4595,6 +4597,7 @@ a.of-nav:active { background: var(--press); }
       syncTargetSec: C.syncTargetSec,
       ui: { theme: 'day', textSize: 'normal', sound: false },
       office: { theme: 'ember', pinHash: null },
+      alerts: { ladderThresholds: C.alerts ? C.alerts.ladderThresholds : null },
     };
   }
   // Warn and breach seconds for an order channel: the owner's setting if there is one, else the config
@@ -6265,12 +6268,39 @@ a.of-nav:active { background: var(--press); }
     syncTargetSec: R(10, 600),
     ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, sound: { t: 'bool' } },
     office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' } },
+    alerts: { ladderThresholds: { t: 'ladder' } },
   };
   /** Validates one leaf; returns null when fine, else { report, key, min?, max? }. */
+  // Checks one list of warning minutes: 1 to 5 whole numbers, strictly falling, each from 5 to 240 (the last warning
+  // needs time to act on).
+  function checkLadderList(list, key) {
+    if (!Array.isArray(list) || list.length < 1 || list.length > 5) return { report: 'badPatch', key };
+    for (let i = 0; i < list.length; i++) {
+      if (!isInt(list[i])) return { report: 'badPatch', key };
+      if (list[i] < 5 || list[i] > 240) return { report: 'outOfBounds', key, min: 5, max: 240 };
+      if (i > 0 && !(list[i] < list[i - 1])) return { report: 'badPatch', key };
+    }
+    return null;
+  }
+  // Checks the ladder override: null (use the built-in lists) or { default?, byIng? } of minute lists.
+  function checkLadder(v, key) {
+    if (v === null) return null;
+    if (!isObj(v)) return { report: 'badPatch', key };
+    for (const k of Object.keys(v)) if (k !== 'default' && k !== 'byIng') return { report: 'badPatch', key: key + '.' + k };
+    if (v.default !== undefined) { const e = checkLadderList(v.default, key + '.default'); if (e) return e; }
+    if (v.byIng !== undefined) {
+      if (!isObj(v.byIng)) return { report: 'badPatch', key: key + '.byIng' };
+      const ids = Object.keys(v.byIng);
+      if (ids.length > 40) return { report: 'badPatch', key: key + '.byIng' };
+      for (const id of ids) { if (!safeKey(id)) return { report: 'badPatch', key: key + '.byIng' }; const e = checkLadderList(v.byIng[id], key + '.byIng.' + id); if (e) return e; }
+    }
+    return null;
+  }
   function checkLeaf(spec, v, key) {
     if (spec.t === 'bool') return typeof v === 'boolean' ? null : { report: 'badPatch', key };
     if (spec.t === 'enum') return typeof v === 'string' && spec.v.indexOf(v) >= 0 ? null : { report: 'badPatch', key };
     if (spec.t === 'pin') return v === null || (typeof v === 'string' && v.length <= 128) ? null : { report: 'badPatch', key };
+    if (spec.t === 'ladder') return checkLadder(v, key);
     if (spec.t === 'num') {
       if (!isNum(v)) return { report: 'badPatch', key };
       if (v < spec.lo || v > spec.hi || (spec.int && !isInt(v))) return { report: 'outOfBounds', key, min: spec.lo, max: spec.hi };
@@ -6353,6 +6383,10 @@ a.of-nav:active { background: var(--press); }
     const r = mergeSchema(cur, p.patch, SET_SCHEMA, '', keys);
     if (r.report) { tx.info = { key: r.key, min: r.min, max: r.max }; return r.report; }
     const S = r.value;
+    if (S.alerts && S.alerts.ladderThresholds && S.alerts.ladderThresholds.byIng) {
+      const im = ingMap(tx.get('ingredients'));
+      for (const id of Object.keys(S.alerts.ladderThresholds.byIng)) if (!im.has(id) || !im.get(id).tcs) { tx.info = { key: 'alerts.ladderThresholds.byIng.' + id }; return 'badPatch'; }
+    }
     if (!(S.service.openHour < S.service.closeHour)) { tx.info = { key: 'service.closeHour', min: S.service.openHour + 1, max: 30 }; return 'outOfBounds'; }
     if (!(S.safety.cooling.stage1H < S.safety.cooling.totalH)) { tx.info = { key: 'safety.cooling.totalH', min: S.safety.cooling.stage1H, max: 6 }; return 'outOfBounds'; }
     if (!keys.length) return 'nothingToDo';
@@ -7583,9 +7617,12 @@ a.of-nav:active { background: var(--press); }
   // Ordering of severities, worst first.
   const SEV_RANK = { bad: 0, warn: 1, info: 2 };
 
-  // Minutes-before-the-deadline at which each warning rung fires, for one ingredient. Brisket starts earlier
-  // because a long cook cannot be replaced in an hour.
-  function rungsFor(ingId) {
+  // Minutes-before-the-deadline at which each warning rung fires, for one ingredient: the owner's list from the settings
+  // (settings.alerts.ladderThresholds, when given), else the built-in one. Brisket starts earlier because a long cook
+  // cannot be replaced in an hour. The settings argument is optional.
+  function rungsFor(ingId, settings) {
+    const o = settings && settings.alerts ? settings.alerts.ladderThresholds : null;
+    if (o) { if (o.byIng && o.byIng[ingId]) return o.byIng[ingId]; if (o.default) return o.default; }
     const L = C.ladderMin || {};
     return (L.byIng && L.byIng[ingId]) || L.defaultMin || [60, 30, 10];
   }
@@ -7808,7 +7845,7 @@ a.of-nav:active { background: var(--press); }
       const ing = state.ingredients.find((x) => x.id === ingId);
       const name = ing ? ing.name : ingId;
       const list = byIng[ingId].slice().sort((a, b) => a.enteredAt - b.enteredAt);
-      const rungs = rungsFor(ingId), rate = sales.rate[ingId];
+      const rungs = rungsFor(ingId, state.settings), rate = sales.rate[ingId];
       // Only batches that have finished resting can be sold, so the run-out total counts those alone.
       const isReady = (b) => !(U.isNum(b.restUntil) && b.restUntil > now);
       let soldBefore = 0, totalLeft = 0;
@@ -7854,7 +7891,7 @@ a.of-nav:active { background: var(--press); }
         }
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H) || isLim) {
           const quiet = rung === 0 || trivial;
-          out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length,
+          out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length, rungsMin: rungs,
             sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, planFor: isLim ? { ing: ingId, grams: lim.unmetG, by: lim.runOutAt } : undefined, wasteG: waste, wasteUsd: usd, goes86: lastOne, quality: q, trivial, unknown: rate === undefined });
         }
       });
@@ -7969,32 +8006,46 @@ a.of-nav:active { background: var(--press); }
   //   Entries for batches that are gone, and entries older than 24 hours, are dropped.
   function makeLadder() {
     const memory = new Map();
-    // Decides the sound for one deadline row, or null.
+    // Decides the sound for one deadline row, or null. The memory per row keeps the smallest threshold (in minutes) that
+    // has been announced, so editing the ladder mid-countdown cannot replay or degrade a warning. Which sound a rung
+    // makes follows its place in the list: the first of several is a chime, the ones between are voice calls, the last
+    // is the loud tone with speech (a one-rung list is just the loud tone).
     function one(d, now) {
       let st = memory.get(d.id);
       if (d.kind === 'expired' || d.kind === 'past') {
         if (st) return null;
-        memory.set(d.id, { rung: 1, ack: 0, loudAt: -Infinity, batchId: d.batchId, born: now });
+        memory.set(d.id, { minAnn: 0, ack: false, loudAt: -Infinity, batchId: d.batchId, born: now, sig: '' });
         return d.trivial ? null : { level: 4, d, repeat: false };
       }
       if (d.kind !== 'expiry' || d.rung < 1) return null;
+      const R = Array.isArray(d.rungsMin) && d.rungsMin.length ? d.rungsMin : rungsFor(d.ing);
+      const sig = R.join(',');
       const fresh = !st;
-      if (fresh) { st = { rung: 0, ack: 0, loudAt: -Infinity, batchId: d.batchId, born: now }; memory.set(d.id, st); }
+      if (fresh) { st = { minAnn: Infinity, ack: false, loudAt: -Infinity, batchId: d.batchId, born: now, sig }; memory.set(d.id, st); }
+      const crossed = R.filter((m) => d.msLeft <= m * MIN);
+      const cur = crossed.length ? Math.min.apply(null, crossed) : Infinity;
+      const lastMin = R[R.length - 1];
       // No sound when it is on pace to sell out in time, or when almost nothing is left in the batch.
-      if (d.trivial || (U.isNum(d.wasteG) && d.wasteG <= 50)) { st.rung = Math.max(st.rung, d.rung); return null; }
+      if (d.trivial || (U.isNum(d.wasteG) && d.wasteG <= 50)) { st.minAnn = Math.min(st.minAnn, cur); st.sig = sig; return null; }
       // A new extension epoch: everything already crossed counts as announced.
-      if (fresh && d.epoch) { st.rung = d.rung; st.ack = d.rung; return null; }
-      const last = d.rung >= d.rungs;
-      if (d.rung > st.rung) {
-        st.rung = d.rung; st.ack = 0;
-        // At the very limit the batch is still alive for one more tick; its own past or expired row sounds next, so this one stays quiet (else the same moment sounds twice).
-        if (d.msLeft <= 0) return null;
+      if (fresh && d.epoch) { st.minAnn = cur; st.ack = true; return null; }
+      // The thresholds were edited since this row was last looked at: rungs already crossed count as announced, except the last, which always sounds in full.
+      if (st.sig !== sig) {
+        st.sig = sig;
+        const earlier = crossed.filter((m) => m !== lastMin);
+        if (earlier.length) st.minAnn = Math.min(st.minAnn, Math.min.apply(null, earlier));
+      }
+      // At the very limit the batch is still alive for one more tick; its own past or expired row sounds next, so this one stays quiet (else the same moment sounds twice).
+      if (d.msLeft <= 0) { st.minAnn = Math.min(st.minAnn, cur); return null; }
+      const last = cur === lastMin;
+      if (cur < st.minAnn) {
+        st.minAnn = cur; st.ack = false;
         if (last) { st.loudAt = now; return { level: 3, d, repeat: false }; }
-        if (d.rung >= 2) return { level: 2, d, repeat: false };
+        if (R.indexOf(cur) >= 1) return { level: 2, d, repeat: false };
         // With no pace to show waste, the first (soft) rung stays silent: it would chime for food that may sell.
         return d.unknown ? null : { level: 1, d, repeat: false };
       }
-      if (last && st.ack < d.rung && d.msLeft > 0 && now - st.loudAt >= LOUD_REPEAT_MS) { st.loudAt = now; return { level: 3, d, repeat: true }; }
+      if (last && !st.ack && now - st.loudAt >= LOUD_REPEAT_MS) { st.loudAt = now; return { level: 3, d, repeat: true }; }
       return null;
     }
     // Drops entries for batches that no longer exist and entries older than 24 hours of kitchen time.
@@ -8006,7 +8057,7 @@ a.of-nav:active { background: var(--press); }
       memory,
       decide(feed, now, state) { prune(state, now); const calls = []; for (const d of feed) { const c = one(d, now); if (c) calls.push(c); } return calls; },
       // A tap on a row counts as seeing it: the loud tone stops until the next rung.
-      acknowledge(id) { const st = memory.get(id); if (st) st.ack = st.rung; },
+      acknowledge(id) { const st = memory.get(id); if (st) st.ack = st.minAnn < Infinity; },
       // True when the row has been acknowledged.
       isAcked(id) { const st = memory.get(id); return !!(st && st.ack); },
       size: () => memory.size,
@@ -25390,7 +25441,41 @@ a.of-nav:active { background: var(--press); }
         (flagged.length ? 'Owner to confirm: ' + flagged.join(', ') + ' start with a quality limit; if you hold them outside temperature control, set their limit kind to safety.' : '');
     };
     paintQ(cur());
-    pn.body.append(status.el, gridA, qLine, sub('Cooling stages'), para('Cooked food that is not going into the cabinet has to be cooled in two stages.', 'od-hint'), gridB);
+    // Batch expiry warnings: when the board warns before a batch reaches its limit, per product. Empty means the built-in list.
+    const ladderMeta = { name: 'Warning times', words: (info) => (info.min != null ? 'Each warning time is a whole number of minutes from ' + info.min + ' to ' + info.max + ', counting down, with at most 5 per product.' : 'Type minutes before the limit, biggest first, like 60, 30, 10. At most 5 times, each smaller than the one before.') };
+    META['alerts.ladderThresholds'] = ladderMeta;
+    const ladderRows = [];
+    const ladderBox = h('div', { class: 'od-fgrid' });
+    // Builds one warning-times row: the owner's list if any, else the built-in list as the hint.
+    const mkLadder = (id, name) => {
+      const input = h('input', { class: 'input', type: 'text', inputmode: 'numeric', autocomplete: 'off', 'aria-label': 'Warning minutes for ' + name, dataset: { ing: id || 'default' } });
+      const field = SB.ui.field({ label: name, control: input, hint: 'Built in: ' + SB.deadlines.rungsFor(id || '', null).join(', ') + ' minutes. Leave empty for the built-in list.' });
+      // Reads the list typed, saves it through the settings (empty clears this row), and says what happened.
+      const commit = () => {
+        const txt = input.value.trim();
+        const list = txt ? txt.split(/[\s,;]+/).filter(Boolean).map(Number) : null;
+        const o = (cur().settings.alerts && cur().settings.alerts.ladderThresholds) || {};
+        const next = { default: o.default, byIng: Object.assign({}, o.byIng) };
+        if (id) { if (list) next.byIng[id] = list; else delete next.byIng[id]; } else next.default = list || undefined;
+        if (!next.default) delete next.default;
+        if (!Object.keys(next.byIng).length) delete next.byIng;
+        const r = saveSetting('alerts.ladderThresholds', Object.keys(next).length ? next : null, 'Saved. ' + name + ' warns ' + (list ? list.join(', ') + ' minutes before the limit.' : 'at the built-in times.'), ladderMeta);
+        if (r.ok) status.ok(r.text); else { status.bad(r.text); paintLadder(cur()); }
+      };
+      input.addEventListener('change', commit);
+      ladderRows.push({ id, input });
+      ladderBox.appendChild(field.el || field);
+    };
+    // Shows the saved lists in the boxes.
+    const paintLadder = (s) => {
+      const o = (s.settings.alerts && s.settings.alerts.ladderThresholds) || {};
+      for (const r of ladderRows) { const v = r.id ? (o.byIng && o.byIng[r.id]) : o.default; if (document.activeElement !== r.input) r.input.value = v ? v.join(', ') : ''; }
+    };
+    mkLadder(null, 'All other products');
+    cur().ingredients.filter((i) => i.tcs).forEach((i) => mkLadder(i.id, i.name));
+    paintLadder(cur());
+    P.syncs.push(paintLadder);
+    pn.body.append(status.el, gridA, qLine, sub('Batch expiry warnings only'), para('How many minutes before a batch reaches its limit the board warns, loudest at the last time. This changes the warnings, never the limits or the food-safety rules: the last warning cannot be under 5 minutes.', 'od-hint'), ladderBox, sub('Cooling stages'), para('Cooked food that is not going into the cabinet has to be cooled in two stages.', 'od-hint'), gridB);
     P.syncs.push((s) => { all.forEach(({ f, path }) => f.sync(getPath(s.settings, path))); paintQ(s); });
     P.disposers.push(() => all.forEach(({ f }) => f.destroy()), () => status.destroy());
     return pn;

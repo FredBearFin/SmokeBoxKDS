@@ -308,6 +308,7 @@
       syncTargetSec: C.syncTargetSec,
       ui: { theme: 'day', textSize: 'normal', sound: false },
       office: { theme: 'ember', pinHash: null },
+      alerts: { ladderThresholds: C.alerts ? C.alerts.ladderThresholds : null },
     };
   }
   // Warn and breach seconds for an order channel: the owner's setting if there is one, else the config
@@ -1978,12 +1979,39 @@
     syncTargetSec: R(10, 600),
     ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, sound: { t: 'bool' } },
     office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' } },
+    alerts: { ladderThresholds: { t: 'ladder' } },
   };
   /** Validates one leaf; returns null when fine, else { report, key, min?, max? }. */
+  // Checks one list of warning minutes: 1 to 5 whole numbers, strictly falling, each from 5 to 240 (the last warning
+  // needs time to act on).
+  function checkLadderList(list, key) {
+    if (!Array.isArray(list) || list.length < 1 || list.length > 5) return { report: 'badPatch', key };
+    for (let i = 0; i < list.length; i++) {
+      if (!isInt(list[i])) return { report: 'badPatch', key };
+      if (list[i] < 5 || list[i] > 240) return { report: 'outOfBounds', key, min: 5, max: 240 };
+      if (i > 0 && !(list[i] < list[i - 1])) return { report: 'badPatch', key };
+    }
+    return null;
+  }
+  // Checks the ladder override: null (use the built-in lists) or { default?, byIng? } of minute lists.
+  function checkLadder(v, key) {
+    if (v === null) return null;
+    if (!isObj(v)) return { report: 'badPatch', key };
+    for (const k of Object.keys(v)) if (k !== 'default' && k !== 'byIng') return { report: 'badPatch', key: key + '.' + k };
+    if (v.default !== undefined) { const e = checkLadderList(v.default, key + '.default'); if (e) return e; }
+    if (v.byIng !== undefined) {
+      if (!isObj(v.byIng)) return { report: 'badPatch', key: key + '.byIng' };
+      const ids = Object.keys(v.byIng);
+      if (ids.length > 40) return { report: 'badPatch', key: key + '.byIng' };
+      for (const id of ids) { if (!safeKey(id)) return { report: 'badPatch', key: key + '.byIng' }; const e = checkLadderList(v.byIng[id], key + '.byIng.' + id); if (e) return e; }
+    }
+    return null;
+  }
   function checkLeaf(spec, v, key) {
     if (spec.t === 'bool') return typeof v === 'boolean' ? null : { report: 'badPatch', key };
     if (spec.t === 'enum') return typeof v === 'string' && spec.v.indexOf(v) >= 0 ? null : { report: 'badPatch', key };
     if (spec.t === 'pin') return v === null || (typeof v === 'string' && v.length <= 128) ? null : { report: 'badPatch', key };
+    if (spec.t === 'ladder') return checkLadder(v, key);
     if (spec.t === 'num') {
       if (!isNum(v)) return { report: 'badPatch', key };
       if (v < spec.lo || v > spec.hi || (spec.int && !isInt(v))) return { report: 'outOfBounds', key, min: spec.lo, max: spec.hi };
@@ -2066,6 +2094,10 @@
     const r = mergeSchema(cur, p.patch, SET_SCHEMA, '', keys);
     if (r.report) { tx.info = { key: r.key, min: r.min, max: r.max }; return r.report; }
     const S = r.value;
+    if (S.alerts && S.alerts.ladderThresholds && S.alerts.ladderThresholds.byIng) {
+      const im = ingMap(tx.get('ingredients'));
+      for (const id of Object.keys(S.alerts.ladderThresholds.byIng)) if (!im.has(id) || !im.get(id).tcs) { tx.info = { key: 'alerts.ladderThresholds.byIng.' + id }; return 'badPatch'; }
+    }
     if (!(S.service.openHour < S.service.closeHour)) { tx.info = { key: 'service.closeHour', min: S.service.openHour + 1, max: 30 }; return 'outOfBounds'; }
     if (!(S.safety.cooling.stage1H < S.safety.cooling.totalH)) { tx.info = { key: 'safety.cooling.totalH', min: S.safety.cooling.stage1H, max: 6 }; return 'outOfBounds'; }
     if (!keys.length) return 'nothingToDo';
