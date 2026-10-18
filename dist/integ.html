@@ -15460,7 +15460,7 @@ a.of-nav:active { background: var(--press); }
     if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; chime(); }
     return sound;
   };
-  // Whether warnings are spoken aloud.
+  // Tells whether warnings are spoken aloud right now.
   F.speech = () => speech;
   // Switches spoken warnings on or off and remembers it. Speech only plays while sound is on.
   F.setSpeech = function (on) {
@@ -15557,6 +15557,8 @@ a.of-nav:active { background: var(--press); }
     doc.addEventListener('visibilitychange', onVis);
     m.offs.push(() => { doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
     if (sound) hookAudioUnlock();
+    // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
+    if (SB.discards) { SB.discards.persist(); setTimeout(() => { try { SB.discards.remind(); } catch (e) { /* optional */ } }, 4000); }
     if (SB.sim && SB.sim.live && typeof SB.sim.live.onChange === 'function') {
       try { const off = SB.sim.live.onChange(() => { if (m) updateHeader(store().now()); }); if (typeof off === 'function') m.offs.push(off); } catch (e) { /* the simulator is optional */ }
     }
@@ -18045,8 +18047,10 @@ a.of-nav:active { background: var(--press); }
     const emptyBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', onClick: () => tabs.show('new', false) }, ico('plus', 22), h('span', null, 'New batch'));
     const empty = h('div', { class: 'empty hc-empty', hidden: true }, ico('thermometer', 40), h('h3', null, 'The cabinet is empty'), h('p', null, 'Add a batch when food comes out of the smoker or the kitchen. Every batch starts with a temperature reading.'), emptyBtn);
     const recentList = h('div', { class: 'fs-list hc-recents' });
+    // The recent list links to the full discard log, the table an inspector reads.
+    const logBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'discard-log' }, onClick: () => closeThen(sheet, () => SB.sheets.open('discards')) }, ico('receipt', 20), h('span', null, 'Open the discard log'));
     const recentHead = h('h3', { class: 'fs-h' }, 'Discarded recently');
-    const recentBox = h('section', { class: 'fs-section', hidden: true }, recentHead, recentList);
+    const recentBox = h('section', { class: 'fs-section', hidden: true }, recentHead, recentList, logBtn);
     const batchesPanel = h('div', { class: 'hc-panel' }, summary, grid, empty, recentBox);
 
     // New batch panel.
@@ -19510,7 +19514,7 @@ a.of-nav:active { background: var(--press); }
     const officeLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'office' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({}); }) }, ico('gauge', 22), h('span', { class: 'grow' }, 'Back office'), ico('chevron-right', 20));
     // Opens Menu and settings in the back office, where dishes, prices and prep times are edited.
     const menuLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'menu-edit' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }) }, ico('sliders', 22), h('span', { class: 'grow' }, 'Edit the menu'), ico('chevron-right', 20));
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('book', 'Specs', 'specs'), link('play', 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('book', 'Specs', 'specs'), link('play', 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
@@ -20252,6 +20256,189 @@ a.of-nav:active { background: var(--press); }
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 74-floor-tour.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'74-floor-tour.js',message:String(e&&e.message||e)});}
+
+/* ===== 76-floor-discards.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The discard log sheet. Every batch thrown out (expired, too cold, cooling missed, by hand)
+ *    in one table an inspector can read: date, food, amount, times, reason, initials. The owner can rename or
+ *    hide columns to match the local health department's form, add one free-text column, print the log or save
+ *    it as a spreadsheet file, and gets a daily reminder to save a copy.
+ * PARTS: saved settings, rows from the state, table sheet, print and save, daily reminder.
+ * USES: 00-util.js, 05-icons.js, 20-engine.js (through the store), 60-shell.js (sheets, toasts), 72-floor-sheets.js
+ *    (sheet registry). USED BY: the Hold cabinet button, the board menu and the board startup.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util;
+  const doc = g.document;
+  if (!doc || !SB.sheets) return;
+  const h = U.h;
+  // Builds an icon element, or an empty span when icons are missing.
+  const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 20 }); } catch (e) { return doc.createElement('span'); } };
+  const KEY = 'smokebox.v1.dlog';
+  const H1 = 3600e3;
+  // The columns of the log, in order. label is what the owner can rename; on says whether it shows.
+  const DEFAULT_COLS = [
+    { key: 'date', label: 'Date', on: true }, { key: 'food', label: 'Food', on: true }, { key: 'amount', label: 'Amount', on: true },
+    { key: 'since', label: 'In the cabinet since', on: true }, { key: 'out', label: 'Thrown out at', on: true }, { key: 'reason', label: 'Reason', on: true },
+    { key: 'initials', label: 'Initials', on: true }, { key: 'extra', label: 'Notes', on: false },
+  ];
+  // Plain-words reasons for each discard code.
+  const REASON = { expired: 'Hold time ran out', temp: 'Temperature out of range', cooling: 'Cooling missed', manual: 'Thrown out by hand', quality: 'Quality', other: 'Other' };
+
+  // The saved log settings: column labels and visibility, initials and notes per batch, last save time. Always
+  // returns a full, valid record.
+  function load() {
+    const raw = U.storage.get(KEY, null) || {};
+    const cols = DEFAULT_COLS.map((d) => { const s = Array.isArray(raw.cols) ? raw.cols.find((c) => c && c.key === d.key) : null; return { key: d.key, label: s && typeof s.label === 'string' && s.label.trim() ? s.label.slice(0, 40) : d.label, on: s && typeof s.on === 'boolean' ? s.on : d.on }; });
+    return { cols, initials: raw.initials && typeof raw.initials === 'object' ? raw.initials : {}, extra: raw.extra && typeof raw.extra === 'object' ? raw.extra : {}, exportedAt: Number.isFinite(raw.exportedAt) ? raw.exportedAt : 0 };
+  }
+  // Writes the log settings back to the browser's storage.
+  function save(rec) { U.storage.set(KEY, rec); }
+
+  // The discarded batches, newest first, as plain rows ready to show, print or save.
+  function rows(state, rec) {
+    const out = [];
+    for (const b of state.batches) {
+      if (b.status !== 'discard' || !Number.isFinite(b.discardedAt)) continue;
+      out.push({
+        id: b.id, t: b.discardedAt, date: U.fmtDateShort(U.dateKey(b.discardedAt)), food: b.label || b.ing,
+        amount: U.fmtG(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
+        initials: rec.initials[b.id] || '', extra: rec.extra[b.id] || '',
+      });
+    }
+    return out.sort((a, b) => b.t - a.t);
+  }
+  // Escapes text for safe use inside HTML.
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // Builds the log as plain HTML for printing: a heading and one table with the columns that are switched on.
+  function printHtml(list, rec) {
+    const cols = rec.cols.filter((c) => c.on);
+    const head = '<tr>' + cols.map((c) => '<th>' + esc(c.label) + '</th>').join('') + '</tr>';
+    const body = list.map((r) => '<tr>' + cols.map((c) => '<td>' + esc(r[c.key]) + '</td>').join('') + '</tr>').join('');
+    return '<!doctype html><meta charset="utf-8"><title>Discard log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Discard log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p><table>' + head + body + '</table>';
+  }
+  // Builds the log as CSV text with the columns that are switched on.
+  function csv(list, rec) {
+    const cols = rec.cols.filter((c) => c.on);
+    // Wraps one value in quotes, doubling any quotes inside it, as CSV requires.
+    const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
+    return [cols.map((c) => q(c.label)).join(',')].concat(list.map((r) => cols.map((c) => q(r[c.key])).join(','))).join('\r\n') + '\r\n';
+  }
+  // Prints the log through a hidden frame so the board behind the sheet is not printed with it.
+  function printLog(list, rec) {
+    const f = doc.createElement('iframe');
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    doc.body.appendChild(f);
+    f.srcdoc = printHtml(list, rec);
+    // Prints once the hidden frame has loaded its page, then removes it.
+    f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { /* printing is optional */ } setTimeout(() => f.remove(), 2000); };
+  }
+  // Saves the log as a CSV file with the browser's normal download, and notes the save time.
+  function saveCsv(list, rec) {
+    try {
+      const url = URL.createObjectURL(new Blob([csv(list, rec)], { type: 'text/csv' }));
+      const a = doc.createElement('a');
+      a.href = url; a.download = 'smokebox-discard-log-' + new Date().toISOString().slice(0, 10) + '.csv'; a.style.display = 'none';
+      doc.body.appendChild(a); a.click();
+      setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 1000);
+      rec.exportedAt = SB.store.now(); save(rec);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // Opens the discard log sheet and keeps its table in step with the saved data.
+  function openDiscards() {
+    const rec = load();
+    const offs = [];
+    // Stops listening to the store when the sheet closes.
+    const onClose = () => offs.splice(0).forEach((f) => f());
+    const sheet = SB.ui.sheet({ title: 'Discard log', side: 'right', width: 'min(1040px, 96vw)', name: 'discards', onClose });
+    const note = h('p', { class: 'fs-sub' }, 'Every batch thrown out, newest first. Add initials on each row. Copy these to your health department\'s own form if it asks for a different layout. Save a copy every day: this log lives in this browser only.');
+    const status = h('p', { class: 'fs-sub', role: 'status' });
+    const wrap = h('div', { class: 'dlog-wrap', style: 'overflow:auto' });
+    const colsBox = h('div', { class: 'dlog-cols', hidden: true });
+
+    // Draws the table from the current state and column settings.
+    function draw() {
+      U.clear(wrap);
+      const list = rows(SB.store.getState(), rec);
+      const cols = rec.cols.filter((c) => c.on);
+      if (!list.length) { wrap.appendChild(h('div', { class: 'empty' }, ico('trash', 40), h('h3', null, 'Nothing thrown out yet'), h('p', null, 'Discarded batches show up here with their time and reason.'))); return; }
+      const table = h('table', { class: 'dlog-table', style: 'border-collapse:collapse;width:100%' });
+      table.appendChild(h('thead', null, h('tr', null, ...cols.map((c) => h('th', { style: 'text-align:left;padding:8px;border-bottom:2px solid var(--line)' }, c.label)))));
+      const tb = h('tbody');
+      list.forEach((r) => {
+        tb.appendChild(h('tr', null, ...cols.map((c) => {
+          let cell;
+          if (c.key === 'initials' || c.key === 'extra') {
+            const bag = c.key === 'initials' ? rec.initials : rec.extra;
+            cell = h('input', { class: 'input', type: 'text', maxlength: c.key === 'initials' ? 6 : 60, value: bag[r.id] || '', 'aria-label': c.label + ' for ' + r.food, style: 'min-width:' + (c.key === 'initials' ? 80 : 180) + 'px' });
+            // Saves what was typed for this row as soon as the box loses focus or changes.
+            cell.addEventListener('change', () => { bag[r.id] = cell.value.trim(); save(rec); });
+          } else cell = doc.createTextNode(r[c.key]);
+          return h('td', { style: 'padding:8px;border-bottom:1px solid var(--line);vertical-align:middle' }, cell);
+        })));
+      });
+      table.appendChild(tb);
+      wrap.appendChild(table);
+    }
+    // Builds the column editor: show or hide each column and rename it.
+    function drawCols() {
+      U.clear(colsBox);
+      colsBox.appendChild(h('p', { class: 'fs-sub' }, 'Match your local form: show or hide a column and rename it.'));
+      rec.cols.forEach((c) => {
+        const on = h('input', { type: 'checkbox', checked: c.on, 'aria-label': 'Show ' + c.label });
+        const nm = h('input', { class: 'input', type: 'text', value: c.label, maxlength: 40, 'aria-label': 'Name of the ' + c.key + ' column' });
+        // Applies a change to this column and redraws the table.
+        const apply = () => { c.on = on.checked; c.label = nm.value.trim() || DEFAULT_COLS.find((d) => d.key === c.key).label; save(rec); draw(); };
+        on.addEventListener('change', apply); nm.addEventListener('change', apply);
+        colsBox.appendChild(h('label', { style: 'display:flex;gap:12px;align-items:center;margin:6px 0' }, on, nm));
+      });
+    }
+    // Prints the log as it stands.
+    const doPrint = () => printLog(rows(SB.store.getState(), rec), rec);
+    // Saves a spreadsheet copy and says whether it worked.
+    const doCsv = () => { status.textContent = saveCsv(rows(SB.store.getState(), rec), rec) ? 'Saved a copy to your downloads.' : 'The browser blocked the download. Use Print instead.'; };
+    // Shows or hides the column editor.
+    const doCols = () => { colsBox.hidden = !colsBox.hidden; if (!colsBox.hidden) drawCols(); };
+    const bPrint = h('button', { type: 'button', class: 'btn', onClick: doPrint }, ico('receipt', 20), h('span', null, 'Print or save as PDF'));
+    const bCsv = h('button', { type: 'button', class: 'btn btn-primary', onClick: doCsv }, ico('package', 20), h('span', null, 'Save as spreadsheet'));
+    const bCols = h('button', { type: 'button', class: 'btn', onClick: doCols }, ico('sliders', 20), h('span', null, 'Edit columns'));
+    sheet.body.append(note, h('div', { class: 'row', style: 'display:flex;gap:12px;flex-wrap:wrap;margin:12px 0' }, bCsv, bPrint, bCols), status, colsBox, wrap);
+    draw();
+    offs.push(SB.store.subscribe(() => draw()));
+    return sheet;
+  }
+
+  // At the start of a service, reminds the owner to save a copy of the discard log when there are entries not
+  // saved yet. Shows once per page load.
+  let reminded = false;
+  function remind() {
+    if (reminded || !SB.store || !SB.ui) return;
+    const rec = load();
+    const unsaved = rows(SB.store.getState(), rec).filter((r) => r.t > rec.exportedAt).length;
+    if (!unsaved || SB.store.now() - rec.exportedAt < 20 * H1) return;
+    reminded = true;
+    // Opens the discard log from the reminder.
+    const openLog = () => SB.sheets.open('discards');
+    const open = h('button', { type: 'button', class: 'btn', onClick: openLog }, 'Open the log');
+    SB.ui.toast(h('span', null, unsaved + ' discard ' + U.plural(unsaved, 'entry', 'entries') + ' not saved yet. ', open), { tone: 'warn', ms: 12000 });
+  }
+  // Asks the browser to keep this site's saved data even when space runs low. Ignored where unsupported.
+  function persist() { try { if (g.navigator && g.navigator.storage && g.navigator.storage.persist) g.navigator.storage.persist(); } catch (e) { /* optional */ } }
+
+  SB.sheets.register('discards', openDiscards);
+  // Rows for the state, with the saved initials and notes filled in.
+  const rowsFor = (state) => rows(state, load());
+  // The whole log for the state as CSV text.
+  const csvFor = (state) => csv(rows(state, load()), load());
+  SB.discards = { rows: rowsFor, csv: csvFor, remind, persist };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 76-floor-discards.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'76-floor-discards.js',message:String(e&&e.message||e)});}
 
 /* ===== 80-office-core.js ===== */
 ;try{

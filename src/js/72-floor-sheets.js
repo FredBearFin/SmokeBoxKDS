@@ -284,8 +284,10 @@
     const emptyBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', onClick: () => tabs.show('new', false) }, ico('plus', 22), h('span', null, 'New batch'));
     const empty = h('div', { class: 'empty hc-empty', hidden: true }, ico('thermometer', 40), h('h3', null, 'The cabinet is empty'), h('p', null, 'Add a batch when food comes out of the smoker or the kitchen. Every batch starts with a temperature reading.'), emptyBtn);
     const recentList = h('div', { class: 'fs-list hc-recents' });
+    // The recent list links to the full discard log, the table an inspector reads.
+    const logBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'discard-log' }, onClick: () => closeThen(sheet, () => SB.sheets.open('discards')) }, ico('receipt', 20), h('span', null, 'Open the discard log'));
     const recentHead = h('h3', { class: 'fs-h' }, 'Discarded recently');
-    const recentBox = h('section', { class: 'fs-section', hidden: true }, recentHead, recentList);
+    const recentBox = h('section', { class: 'fs-section', hidden: true }, recentHead, recentList, logBtn);
     const batchesPanel = h('div', { class: 'hc-panel' }, summary, grid, empty, recentBox);
 
     // New batch panel.
@@ -1749,7 +1751,7 @@
     const officeLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'office' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({}); }) }, ico('gauge', 22), h('span', { class: 'grow' }, 'Back office'), ico('chevron-right', 20));
     // Opens Menu and settings in the back office, where dishes, prices and prep times are edited.
     const menuLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'menu-edit' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }) }, ico('sliders', 22), h('span', { class: 'grow' }, 'Edit the menu'), ico('chevron-right', 20));
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('book', 'Specs', 'specs'), link('play', 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('book', 'Specs', 'specs'), link('play', 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),

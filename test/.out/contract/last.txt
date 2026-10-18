@@ -1,18 +1,18 @@
-SMOKEBOX CONTRACT CHECK  Sun Oct 18 2026 16:10:51  (run 5, 26 s)
-Files: 22 js, 10 css. Static refs: 1928 (361 distinct paths). Boot: ok, load errors 0, console/page errors 0. Smoke: 9/9 sheets opened, 7/7 office pages rendered clean. Unit: not run.
+SMOKEBOX CONTRACT CHECK  Sun Oct 18 2026 16:13:33  (run 6, 27 s)
+Files: 23 js, 10 css. Static refs: 1959 (364 distinct paths). Boot: ok, load errors 0, console/page errors 0. Smoke: 10/10 sheets opened, 7/7 office pages rendered clean. Unit: not run.
 
 PROBLEMS (0)
 none
 
-NOTES (13)
+NOTES (14)
 - unit (1)
-    test/  Unit suite not due (last run 16 min ago; it runs every 25 min, or use --unit).
+    test/  Unit suite not due (last run 18 min ago; it runs every 25 min, or use --unit).
 - dup-id-cross-file (1)
     74-floor-tour.js:290  id "all" is created at 74-floor-tour.js:147, 74-floor-tour.js:290, 80-office-core.js:972 (several files)
-- class-no-css (11)
+- class-no-css (12)
     05-icons.js:185  1 class name used in JS but defined in no CSS file: bm-wisp:185
     50-charts.js:1124  14 class names used in JS but defined in no CSS file: ch-g-y:1124, ch-g-x:1139, ch-g-ref:1161, ch-g-band:1337, ch-g-marks:1359, ch-g-fill:1360, ch-g-lab:1433, ch-g-over:1445, ch-kbd:1450, ch-g-ann:1517, ch-g-bars:1660, ch-g-vals:1661, ch-g-ov:2008, ch-g-cells:2098
     60-shell.js:391  3 class names used in JS but defined in no CSS file: sb-hosts:391, sheet-close:478, toast-undo:667
-    70-floor-board.js:339  9 class names used in JS but defined in no CSS file: fl-san:339, fl-hl-style:395, fl-bw:730, fl-deck-t:913, fl-cook-t:921, fl-state-i:936, fl-welcome-body:1283, fl-start-tour:1350, fl-start-demo:1351
+    70-floor-board.js:341  9 class names used in JS but defined in no CSS file: fl-san:341, fl-hl-style:397, fl-bw:732, fl-deck-t:915, fl-cook-t:923, fl-state-i:938, fl-welcome-body:1285, fl-start-tour:1352, fl-start-demo:1353
     71-floor-order.js:182  7 class names used in JS but defined in no CSS file: ord-search-clear:182, ord-nomatch-copy:193, ord-tile-86-word:228, ord-repeat:241, ord-clear:242, ord-empty-repeat:316, ord-mod-input:512
-    ... 6 more (use --verbose)
+    ... 7 more (use --verbose)
