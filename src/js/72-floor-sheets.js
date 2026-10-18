@@ -750,9 +750,11 @@
       U.clear(planList);
       setHidden(planBox, !plans.length && !asks.length);
       for (const d of asks) {
+        // Opens the plan dialog for this run-out.
+        const ask = (ev) => openPlan(d, ev.currentTarget);
         planList.appendChild(h('div', { class: 'fs-card fs-card-soft hc-plan-ask', style: 'display:flex;gap:12px;align-items:center;padding:12px' }, ico('alert', 18),
           h('span', { class: 'grow' }, h('strong', null, d.label), h('br'), h('span', { class: 'fs-sub' }, d.consequence + ' ' + d.action)),
-          h('button', { type: 'button', class: 'btn', dataset: { act: 'plan', ing: d.planFor.ing }, onClick: (ev) => openPlan(d, ev.currentTarget) }, ico('flame', 20), h('span', null, 'Comes off the smoker at…'))));
+          h('button', { type: 'button', class: 'btn', dataset: { act: 'plan', ing: d.planFor.ing }, onClick: ask }, ico('flame', 20), h('span', null, 'Comes off the smoker at…'))));
       }
       for (const e of plans) {
         const ing = ingOf(e.ing);

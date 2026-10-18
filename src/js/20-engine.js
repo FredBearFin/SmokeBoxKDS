@@ -1905,7 +1905,7 @@
     tx.info = { planId: entry.id, readyAt };
     return 'ok';
   };
-  // Cancels a planned batch. Undoable.
+  // Cancels a planned batch that is no longer coming. Undoable.
   A.cancelPlan = function (tx, p) {
     const cur = tx.get('planned') || [];
     const i = typeof p.planId === 'string' ? cur.findIndex((e) => e.id === p.planId) : -1;
