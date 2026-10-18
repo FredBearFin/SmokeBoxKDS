@@ -630,6 +630,12 @@
   }
 
   // New batch form: live yield and cost numbers while you type (SPEC 14.3.2).
+  // Browser-storage key for the last batch made of each product, so the next one starts from the same numbers.
+  const KEY_LASTBATCH = 'smokebox.v1.lastbatch';
+  // The numbers used for the last batch of one product, or null when there is none yet.
+  function lastBatchOf(ingId) { const m = U.storage.get(KEY_LASTBATCH, null); const x = m && typeof m === 'object' ? m[ingId] : null; return x && U.isNum(x.rawKg) && x.rawKg > 0 ? x : null; }
+  // Remembers the numbers used for a product's batch so "same as last batch" can start from them.
+  function rememberBatch(ingId, v) { const m = U.storage.get(KEY_LASTBATCH, null); const all = m && typeof m === 'object' ? m : {}; all[ingId] = v; U.storage.set(KEY_LASTBATCH, all); }
   function buildBatchForm(onAdded, opts) {
     const F = { ing: null, rawKg: 8, endC: 85, holdH: 2, weighed: false, cookedKg: 1, tempF: 150, wTouched: false, tTouched: false };
     // Products that can go in the cabinet: the ones that need temperature control.
@@ -653,13 +659,18 @@
     const rawLab = h('div', { class: 'field-label', 'aria-hidden': 'true' });
     // Raw weight in kg for meat, or the amount made for sides.
     const rawStep = SB.ui.stepper({ value: F.rawKg, min: 0.1, max: 1000, step: 0.1, bigStep: 1, unit: 'kg', label: 'Raw weight in kilograms', onChange: (v) => { F.rawKg = v; F.wTouched = true; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
-    const rawFld = h('div', { class: 'hc-fld' }, rawLab, rawStep);
+    const lastNote = h('p', { class: 'hc-hint', hidden: true });
+    const rawFld = h('div', { class: 'hc-fld' }, rawLab, rawStep, lastNote);
 
     // Cook endpoint: the inside temperature the meat reached. Hotter means more weight lost.
-    const endStep = SB.ui.stepper({ value: F.endC, min: 75, max: 90, step: 1, unit: '°C', label: 'Cook endpoint in degrees Celsius', onChange: (v) => { F.endC = v; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
+    const endStep = SB.ui.stepper({ value: F.endC, min: 75, max: 90, step: 1, unit: '°C', label: 'Cook endpoint in degrees Celsius', onChange: (v) => { F.endC = v; paintEndF(); if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
     // Hours the meat rested before slicing; resting also changes the weight.
     const holdStep = SB.ui.stepper({ value: F.holdH, min: 0, max: 3, step: 0.5, unit: 'h', label: 'Hold before slicing in hours', onChange: (v) => { F.holdH = v; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
-    const thermalBox = h('div', { class: 'hc-two' }, vis('Cook endpoint', endStep), vis('Rested before slicing', holdStep));
+    // The cook endpoint is in Celsius (the research model uses it), so the same number is shown in Fahrenheit beside it.
+    const endF = h('p', { class: 'hc-hint' });
+    // Writes the endpoint in Fahrenheit under its stepper.
+    const paintEndF = () => text(endF, '= ' + Math.round(F.endC * 9 / 5 + 32) + ' °F');
+    const thermalBox = h('div', { class: 'hc-two' }, vis('Cook endpoint', endStep, endF), vis('Rested before slicing', holdStep));
 
     // Cooked weight typed by the cook; it replaces the model when 'I weighed it' is on.
     const cookedStep = SB.ui.stepper({ value: F.cookedKg, min: 0.1, max: 1000, step: 0.1, bigStep: 1, unit: 'kg', label: 'Cooked weight in kilograms', onChange: (v) => { F.cookedKg = v; F.cookedTouched = true; calc(); } });
@@ -707,7 +718,13 @@
       const meat = ing.thermal || (U.isNum(ing.yield) && ing.yield < 1);
       text(rawLab, meat ? 'Raw weight before cooking' : 'Weight made');
       relabel(rawStep, meat ? 'Raw weight before cooking, in kilograms' : 'Weight made, in kilograms');
-      F.rawKg = defaultKg(ing); F.wTouched = false; rawStep.setValue(F.rawKg, { silent: true });
+      // The next batch starts from the numbers used for the last one of this product; the first ever uses a typical pan.
+      const lb = lastBatchOf(id);
+      F.rawKg = lb ? lb.rawKg : defaultKg(ing); F.wTouched = false; rawStep.setValue(F.rawKg, { silent: true });
+      if (lb && ing.thermal && U.isNum(lb.endC) && U.isNum(lb.holdH)) { F.endC = lb.endC; F.holdH = lb.holdH; endStep.setValue(F.endC, { silent: true }); holdStep.setValue(F.holdH, { silent: true }); }
+      paintEndF();
+      text(lastNote, lb ? 'Filled in from your last ' + ing.name.toLowerCase() + ' batch. Change anything that is different today.' : '');
+      setHidden(lastNote, !lb);
       setHidden(thermalBox, !ing.thermal);
       setHidden(weighedBox, !meat);
       if (!meat && F.weighed) { F.weighed = false; weighedTog.setValue(false); setHidden(cookedFld, true); }
@@ -775,6 +792,7 @@
       const res = run('addBatch', payload);
       if (res.report !== 'ok') { showErr(say(res)); return; }
       showErr(null);
+      rememberBatch(m.ing.id, { rawKg: F.rawKg, endC: F.endC, holdH: F.holdH });
       const info = res.info || {}, b = st().batches.find((x) => x.id === info.batchId), label = b ? b.label : m.ing.name + ' batch';
       if (info.status === 'ok') toast(label + ' is in the cabinet: ' + U.fmtG(info.cookedG) + ' cooked, first reading ' + F.tempF + ' °F.', 'ok');
       else toast(label + ' is in the cabinet but not being served: ' + (m.ing.hold === 'cold' ? 'above ' + safety().coldHoldF + ' °F, chill it now.' : 'below ' + safety().hotHoldF + ' °F, reheat it to ' + safety().reheatF + ' °F.'), 'warn');
@@ -1751,7 +1769,7 @@
     const officeLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'office' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({}); }) }, ico('gauge', 22), h('span', { class: 'grow' }, 'Back office'), ico('chevron-right', 20));
     // Opens Menu and settings in the back office, where dishes, prices and prep times are edited.
     const menuLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'menu-edit' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }) }, ico('sliders', 22), h('span', { class: 'grow' }, 'Edit the menu'), ico('chevron-right', 20));
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('book', 'Specs', 'specs'), link('play', 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('check-circle', 'Set up this tablet', 'setup'), link('book', 'Specs', 'specs'), link('play', 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),

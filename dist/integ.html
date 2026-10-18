@@ -15559,6 +15559,7 @@ a.of-nav:active { background: var(--press); }
     if (sound) hookAudioUnlock();
     // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
     if (SB.discards) { SB.discards.persist(); setTimeout(() => { try { SB.discards.remind(); } catch (e) { /* optional */ } }, 4000); }
+    if (SB.setup) setTimeout(() => { try { SB.setup.offer(); } catch (e) { /* optional */ } }, 8000);
     if (SB.sim && SB.sim.live && typeof SB.sim.live.onChange === 'function') {
       try { const off = SB.sim.live.onChange(() => { if (m) updateHeader(store().now()); }); if (typeof off === 'function') m.offs.push(off); } catch (e) { /* the simulator is optional */ }
     }
@@ -18393,6 +18394,12 @@ a.of-nav:active { background: var(--press); }
   }
 
   // New batch form: live yield and cost numbers while you type (SPEC 14.3.2).
+  // Browser-storage key for the last batch made of each product, so the next one starts from the same numbers.
+  const KEY_LASTBATCH = 'smokebox.v1.lastbatch';
+  // The numbers used for the last batch of one product, or null when there is none yet.
+  function lastBatchOf(ingId) { const m = U.storage.get(KEY_LASTBATCH, null); const x = m && typeof m === 'object' ? m[ingId] : null; return x && U.isNum(x.rawKg) && x.rawKg > 0 ? x : null; }
+  // Remembers the numbers used for a product's batch so "same as last batch" can start from them.
+  function rememberBatch(ingId, v) { const m = U.storage.get(KEY_LASTBATCH, null); const all = m && typeof m === 'object' ? m : {}; all[ingId] = v; U.storage.set(KEY_LASTBATCH, all); }
   function buildBatchForm(onAdded, opts) {
     const F = { ing: null, rawKg: 8, endC: 85, holdH: 2, weighed: false, cookedKg: 1, tempF: 150, wTouched: false, tTouched: false };
     // Products that can go in the cabinet: the ones that need temperature control.
@@ -18416,7 +18423,8 @@ a.of-nav:active { background: var(--press); }
     const rawLab = h('div', { class: 'field-label', 'aria-hidden': 'true' });
     // Raw weight in kg for meat, or the amount made for sides.
     const rawStep = SB.ui.stepper({ value: F.rawKg, min: 0.1, max: 1000, step: 0.1, bigStep: 1, unit: 'kg', label: 'Raw weight in kilograms', onChange: (v) => { F.rawKg = v; F.wTouched = true; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
-    const rawFld = h('div', { class: 'hc-fld' }, rawLab, rawStep);
+    const lastNote = h('p', { class: 'hc-hint', hidden: true });
+    const rawFld = h('div', { class: 'hc-fld' }, rawLab, rawStep, lastNote);
 
     // Cook endpoint: the inside temperature the meat reached. Hotter means more weight lost.
     const endStep = SB.ui.stepper({ value: F.endC, min: 75, max: 90, step: 1, unit: '°C', label: 'Cook endpoint in degrees Celsius', onChange: (v) => { F.endC = v; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
@@ -18470,7 +18478,12 @@ a.of-nav:active { background: var(--press); }
       const meat = ing.thermal || (U.isNum(ing.yield) && ing.yield < 1);
       text(rawLab, meat ? 'Raw weight before cooking' : 'Weight made');
       relabel(rawStep, meat ? 'Raw weight before cooking, in kilograms' : 'Weight made, in kilograms');
-      F.rawKg = defaultKg(ing); F.wTouched = false; rawStep.setValue(F.rawKg, { silent: true });
+      // The next batch starts from the numbers used for the last one of this product; the first ever uses a typical pan.
+      const lb = lastBatchOf(id);
+      F.rawKg = lb ? lb.rawKg : defaultKg(ing); F.wTouched = false; rawStep.setValue(F.rawKg, { silent: true });
+      if (lb && ing.thermal && U.isNum(lb.endC) && U.isNum(lb.holdH)) { F.endC = lb.endC; F.holdH = lb.holdH; endStep.setValue(F.endC, { silent: true }); holdStep.setValue(F.holdH, { silent: true }); }
+      text(lastNote, lb ? 'Filled in from your last ' + ing.name.toLowerCase() + ' batch. Change anything that is different today.' : '');
+      setHidden(lastNote, !lb);
       setHidden(thermalBox, !ing.thermal);
       setHidden(weighedBox, !meat);
       if (!meat && F.weighed) { F.weighed = false; weighedTog.setValue(false); setHidden(cookedFld, true); }
@@ -18538,6 +18551,7 @@ a.of-nav:active { background: var(--press); }
       const res = run('addBatch', payload);
       if (res.report !== 'ok') { showErr(say(res)); return; }
       showErr(null);
+      rememberBatch(m.ing.id, { rawKg: F.rawKg, endC: F.endC, holdH: F.holdH });
       const info = res.info || {}, b = st().batches.find((x) => x.id === info.batchId), label = b ? b.label : m.ing.name + ' batch';
       if (info.status === 'ok') toast(label + ' is in the cabinet: ' + U.fmtG(info.cookedG) + ' cooked, first reading ' + F.tempF + ' °F.', 'ok');
       else toast(label + ' is in the cabinet but not being served: ' + (m.ing.hold === 'cold' ? 'above ' + safety().coldHoldF + ' °F, chill it now.' : 'below ' + safety().hotHoldF + ' °F, reheat it to ' + safety().reheatF + ' °F.'), 'warn');
@@ -19514,7 +19528,7 @@ a.of-nav:active { background: var(--press); }
     const officeLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'office' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({}); }) }, ico('gauge', 22), h('span', { class: 'grow' }, 'Back office'), ico('chevron-right', 20));
     // Opens Menu and settings in the back office, where dishes, prices and prep times are edited.
     const menuLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'menu-edit' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }) }, ico('sliders', 22), h('span', { class: 'grow' }, 'Edit the menu'), ico('chevron-right', 20));
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('book', 'Specs', 'specs'), link('play', 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('check-circle', 'Set up this tablet', 'setup'), link('book', 'Specs', 'specs'), link('play', 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
@@ -20439,6 +20453,75 @@ a.of-nav:active { background: var(--press); }
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 76-floor-discards.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'76-floor-discards.js',message:String(e&&e.message||e)});}
+
+/* ===== 77-floor-setup.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The tablet setup checklist. A short sheet to run once on each kitchen tablet: warning
+ *    sounds really play, the screen stays on, saved data is protected, the app is installed, the tablet sits
+ *    where the cutter can reach it, and the real products are entered. Opens from the Menu; offered once by a
+ *    small message on the first run.
+ * PARTS: checks, the sheet, the one-time offer.
+ * USES: 00-util.js, 05-icons.js, 60-shell.js (sheets), 70-floor-board.js (sound, speech, wake lock),
+ *    76-floor-discards.js (storage). USED BY: the Menu list and the board startup.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util;
+  const doc = g.document;
+  if (!doc || !SB.sheets) return;
+  const h = U.h;
+  const KEY_OFFERED = 'smokebox.v1.setup.offered';
+  // Builds an icon element, or an empty span when icons are missing.
+  const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 22 }); } catch (e) { return doc.createElement('span'); } };
+
+  // Opens the setup checklist sheet, one step after another with plain words.
+  function openSetup() {
+    const sheet = SB.ui.sheet({ title: 'Set up this tablet', side: 'right', width: 'min(720px, 96vw)', name: 'setup' });
+    const list = h('div', { class: 'setup-list' });
+    // Adds one checklist step: a title, plain words, an optional button and a status line.
+    function step(title, words, action) {
+      const status = h('p', { class: 'fs-sub', role: 'status' });
+      const el = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, title), h('p', { class: 'fs-sub' }, words), action ? action(status) : null, status);
+      list.appendChild(el);
+      return status;
+    }
+    // Runs a step's test and shows what it answers in the step's status line.
+    const runStep = (status, fn) => { status.textContent = fn() || ''; };
+    // Builds a button that runs fn and shows its answer in the step's status line.
+    const btn = (label, icon, fn) => (status) => h('button', { type: 'button', class: 'btn', onClick: () => runStep(status, fn) }, ico(icon, 20), h('span', null, label));
+
+    step('1. Sound', 'Warnings use tones and a spoken voice. Browsers only allow sound after a tap, so test it here. Turn the volume up, or plug in a cheap Bluetooth speaker: a tablet speaker is easy to miss in a loud kitchen.',
+      btn('Play a test warning', 'volume', () => { if (SB.floor && SB.floor.setSound) { SB.floor.setSound(true); if (SB.floor.setSpeech) SB.floor.setSpeech(true); return 'You should have heard a chime and a voice. If not, turn the tablet volume up and tap again.'; } return 'The kitchen board is not loaded.'; }));
+    const wake = SB.floor && SB.floor.wakeLock ? SB.floor.wakeLock() : 'unknown';
+    step('2. Keep the screen on', 'The board asks the browser to keep the screen awake' + (wake === 'on' ? ' (it is on now).' : wake === 'unsupported' ? ', but this browser does not support that.' : ', but this browser has not allowed it.') + ' Also set the tablet itself: Settings, Display, Auto-Lock (iPad) or Screen timeout (Android), to Never. Plug the tablet into power.');
+    const prot = step('3. Protect your data', 'Everything is saved in this browser only. Ask the browser to keep it safe, and save a copy of the discard log every day.',
+      btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Saved data is protected.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save the discard log every day.'; }));
+    step('4. Install as an app', 'On an iPad: Share, then Add to Home Screen. In Chrome on Android or a computer: the menu, then Install app or Add to Home screen. An installed app opens full screen and the browser is less likely to clear its data.');
+    step('5. Where the tablet sits', 'Put the tablet where the person at the cutting board can tap it without walking, within reach of the warmer if you can. If it is out of reach, pulls will not get logged and the waste numbers will be wrong.');
+    // Closes this sheet and opens the Menu and settings page of the back office.
+    const openData = () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); };
+    step('6. Your products', 'Open the Menu and settings page and enter your real cost per kg, the 86 point, and the pull size (one whole brisket, one rack, one pan) for each product. Until then the dollar numbers come from sample data.',
+      () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu and settings')));
+    sheet.body.appendChild(list);
+    return sheet;
+  }
+
+  // On the first run only, offers the setup checklist in a small message.
+  function offer() {
+    if (!SB.ui || U.storage.get(KEY_OFFERED, false)) return;
+    U.storage.set(KEY_OFFERED, true);
+    // Opens the checklist from the first-run message.
+    const go = () => SB.sheets.open('setup');
+    SB.ui.toast(h('span', null, 'New tablet? ', h('button', { type: 'button', class: 'btn', onClick: go }, 'Run the 6-step setup')), { tone: 'info', ms: 15000 });
+  }
+
+  SB.sheets.register('setup', openSetup);
+  SB.setup = { offer };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 77-floor-setup.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'77-floor-setup.js',message:String(e&&e.message||e)});}
 
 /* ===== 80-office-core.js ===== */
 ;try{
@@ -24099,6 +24182,20 @@ a.of-nav:active { background: var(--press); }
       save: (v) => mkPatch({ [costKey]: v }, 'Saved. Costs and margins use ' + money(v) + (pieces ? ' each' : ' per kg') + ' from now on.', costMeta), onSaved: (t) => status.ok(t),
     });
     fields.push(cost);
+    // Pull size: the set amount one Pull button takes out of the hold cabinet (one whole brisket, one rack, one pan).
+    let pull = null;
+    if (ing0.tcs) {
+      const pullMeta = { name: 'The pull size', unit: 'g' };
+      pull = numField({
+        label: 'Pull size (one set unit)', aria: 'Pull size of ' + nm, value: ing0.pullG || 1000, min: 50, max: 50000, step: 100, big: 500, unit: 'g', meta: pullMeta,
+        // Shows the pull size in kilograms next to the field once it reaches a kilogram.
+        read: (u) => U.fmtG(u),
+        hint: 'What one tap on Pull takes out of the cabinet: one whole brisket, one rack, one pan.',
+        // The pull size saves through the engine like the other fields.
+        save: (v) => mkPatch({ pullG: v }, 'Saved. One tap on Pull takes ' + amountText(ing0, v) + ' out of the cabinet.', pullMeta), onSaved: (t) => status.ok(t),
+      });
+      fields.push(pull);
+    }
 
     let yieldBlock = null, yField = null, yConf = null;
     if (ing0.tcs && isNum(ing0.yield)) {
@@ -24138,13 +24235,15 @@ a.of-nav:active { background: var(--press); }
         h('div', { class: 'od-block' }, par.el),
         h('div', { class: 'od-block' }, thr.el),
         yieldBlock,
-        h('div', { class: 'od-block' }, cost.el)),
+        h('div', { class: 'od-block' }, cost.el),
+        pull ? h('div', { class: 'od-block' }, pull.el) : null),
       noteEl, status.el);
     return {
       root, id,
       // Refreshes the fields from the state without disturbing a focused one.
       sync(ing) {
         par.sync(ing.parG); thr.sync(ing.thresholdG); cost.sync(ing[costKey] || 0);
+        if (pull) pull.sync(ing.pullG || 1000);
         if (yField) { yField.sync(ing.yield); yConf.setValue(ing.yieldConfirmed ? 'confirmed' : 'starter'); }
         root.dataset.confirmed = ing.yieldConfirmed ? 'true' : 'false';
       },

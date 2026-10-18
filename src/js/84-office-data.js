@@ -699,6 +699,20 @@
       save: (v) => mkPatch({ [costKey]: v }, 'Saved. Costs and margins use ' + money(v) + (pieces ? ' each' : ' per kg') + ' from now on.', costMeta), onSaved: (t) => status.ok(t),
     });
     fields.push(cost);
+    // Pull size: the set amount one Pull button takes out of the hold cabinet (one whole brisket, one rack, one pan).
+    let pull = null;
+    if (ing0.tcs) {
+      const pullMeta = { name: 'The pull size', unit: 'g' };
+      pull = numField({
+        label: 'Pull size (one set unit)', aria: 'Pull size of ' + nm, value: ing0.pullG || 1000, min: 50, max: 50000, step: 100, big: 500, unit: 'g', meta: pullMeta,
+        // Shows the pull size in kilograms next to the field once it reaches a kilogram.
+        read: (u) => U.fmtG(u),
+        hint: 'What one tap on Pull takes out of the cabinet: one whole brisket, one rack, one pan.',
+        // The pull size saves through the engine like the other fields.
+        save: (v) => mkPatch({ pullG: v }, 'Saved. One tap on Pull takes ' + amountText(ing0, v) + ' out of the cabinet.', pullMeta), onSaved: (t) => status.ok(t),
+      });
+      fields.push(pull);
+    }
 
     let yieldBlock = null, yField = null, yConf = null;
     if (ing0.tcs && isNum(ing0.yield)) {
@@ -738,13 +752,15 @@
         h('div', { class: 'od-block' }, par.el),
         h('div', { class: 'od-block' }, thr.el),
         yieldBlock,
-        h('div', { class: 'od-block' }, cost.el)),
+        h('div', { class: 'od-block' }, cost.el),
+        pull ? h('div', { class: 'od-block' }, pull.el) : null),
       noteEl, status.el);
     return {
       root, id,
       // Refreshes the fields from the state without disturbing a focused one.
       sync(ing) {
         par.sync(ing.parG); thr.sync(ing.thresholdG); cost.sync(ing[costKey] || 0);
+        if (pull) pull.sync(ing.pullG || 1000);
         if (yField) { yField.sync(ing.yield); yConf.setValue(ing.yieldConfirmed ? 'confirmed' : 'starter'); }
         root.dataset.confirmed = ing.yieldConfirmed ? 'true' : 'false';
       },

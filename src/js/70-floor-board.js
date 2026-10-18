@@ -270,6 +270,7 @@
     if (sound) hookAudioUnlock();
     // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
     if (SB.discards) { SB.discards.persist(); setTimeout(() => { try { SB.discards.remind(); } catch (e) { /* optional */ } }, 4000); }
+    if (SB.setup) setTimeout(() => { try { SB.setup.offer(); } catch (e) { /* optional */ } }, 8000);
     if (SB.sim && SB.sim.live && typeof SB.sim.live.onChange === 'function') {
       try { const off = SB.sim.live.onChange(() => { if (m) updateHeader(store().now()); }); if (typeof off === 'function') m.offs.push(off); } catch (e) { /* the simulator is optional */ }
     }
