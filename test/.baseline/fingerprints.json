@@ -18,7 +18,7 @@
  "tools/shot.mjs": "1d0c42be27039a12cbaffdee103bb879ee2ac20628f98c429163445209277bd4",
  "tools/build-artifact.mjs": "9a36c3a2d42d53c6932a4f909cab09667b3647aca8ba55312c716f17bdd35858",
  "tools/charts-gallery.mjs": "1b25f4cfc1078ea9fa72600e10a5adb672aefc2abc23d3b28d3bb59e18e18b02",
- "src/js/70-floor-board.js": "7130be85d066b2b0f10f5d1b8e3e8d8005e665ef60182b2dd5c64ec6da84b99a",
+ "src/js/70-floor-board.js": "1d4d8b0d787d1072b063c6af48a4aaebd02b8a1a294344809c0b24bf8e065ede",
  "src/css/20-floor.css": "9936f307a60b4d2b5908136f776c46df3aeb9e07211723b6459029c04673df21",
  "test/floor.e2e.mjs": "6903287eb790a198f194d645fadf1864bb05365f1f0dc663bf666076683a0502",
  "tools/comment-audit.mjs": "d148fbf29d82eee272fe0d33bb68f9fad9f2f7e848112272240055d7d5da41eb",

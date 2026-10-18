@@ -69,7 +69,7 @@ A sound about a clock deadline when the pace was unknown is not a false alarm by
 
 Results are in the next section once the run is done.
 
-## Phase A replay: results (2026-10-18, after the definitions above were committed)
+## Phase A replay: results (2026-10-18, after the definitions above were committed) (SUPERSEDED by the fake-clock replay below: real clock, not repeatable)
 
 Two runs of `ux-scripts/ux9-service-replay.mjs` at 120x speed (one tick of the board is 2 virtual minutes), 1280x800, 8 virtual hours, the demo crew on and the scripted pit master from the method above. **This is a simulation, not a real service.**
 
@@ -120,6 +120,33 @@ The pit master's policy at a quality limit (A, B, C, E): log a temperature in ra
 - **Lapse misses use the 5-minute rule above**, not the 10-minute rule for first limits, because a 30-minute keep has only the 10-minute rung.
 
 **Reported per scenario and day.** Sounds in total, first sounds at a rung, repeats, false alarms (with their rules), limits reached, misses, lapses, lapses sounded within 2 minutes, extension-end rung sounds, `past` sounds. Each scenario is run twice with the same seed; the two results must be identical (the report prints a fingerprint of the full sound log for each run and compares them). Results are appended below once the runs are done.
+
+## Fake-clock replay (ux10): results (2026-10-18, after the definitions above were committed)
+
+`node ux-scripts/ux10-fake-clock-replay.mjs 20261018 A,B,C,D,E out.json 10`, run **twice with the same seed**. All five scenarios gave identical results both times (same sound log fingerprint: A da1f72b09f30df4f, B e330ed78ce187585, C 2ac941878ac0b06c, D ce43c5d9c4047e68, E 5a295071207479a4). An earlier pair of runs with the first version of scenario E also matched run to run. The earlier ux9 runs (real clock, not repeatable) are **superseded**; their table above is history. **This is a simulation, not a real service.** Repeat counts at 15x are not comparable with the ux9 numbers.
+
+| | A normal | B busy, pulls | C gap, pulls | D kept 3 times | E busy tickets |
+|---|---|---|---|---|---|
+| Removal path | 376 crew tickets | 68 kg of pulls | 26 kg of pulls | none | 1,764 crew tickets |
+| Sounds in total | 45 | 0 | 0 | 90 | 0 |
+| First sounds at a rung | 7 | 0 | 0 | 14 | 0 |
+| Repeats of the loud tone (nobody taps) | 38 | 0 | 0 | 76 | 0 |
+| `past` sounds | 2 | 0 | 0 | 4 | 0 |
+| **False alarms** | 0 | 0 | 0 | 0 | 0 |
+| Sounds at a keep tap | 0 | 0 | 0 | 0 | 0 |
+| Limits reached (at or above the floor) | 3 (0) | 0 | 0 | 1 (1) | 2 (0) |
+| **Misses** | 0 | 0 | 0 | 0 | 0 |
+| Lapses, sounded within 2 virtual minutes | 0 | 0 | 0 | 3 of 3 | 0 |
+| Extension-end rung sounds required, missing | 0 | 0 | 0 | 3 required, 0 missing | 0 |
+| Console or page errors | 0 | 0 | 0 | 0 | 0 |
+
+Pace estimate against the generator's true rate, logged every 10 virtual minutes (all minutes, including the first hour or two before the estimate has settled, so this is harsher than the unit test): B (true 150 g/min) median error 10.9 percent, 90th percentile 33.3, worst 63.9; C (true 75 g/min) median 5.7, 90th percentile 18.5, worst 53.3.
+
+What this says, and what it does not:
+- Scenario D is the one that exercises the fix: a batch kept three times in a row sounded a fresh `past` sound at every lapse within 2 virtual minutes, each extension had its rung sound at least 5 minutes before it ended, and no sound came at a keep tap.
+- **Scenario E did not do its job.** As committed (a batch of each product every 90 minutes) it sold out before any limit: 1,347 tickets, 0 sounds, 0 limits. I changed it before the counted runs to overproduce (10 kg of ten products every 60 minutes for 6 hours). It still produced only 2 limits, both below the floor, and no sounds. The demo crew in rush mode sells the oldest batch first fast enough that overproduction rarely reaches a limit. "Busy demand with many limits" is therefore **not tested**; a different demand shape would be needed. Scenarios B and C also reached no limit (everything sold), so they test the pace estimate and quiet running, not the ladder.
+- The ladder was exercised properly only in A and D. The loud tone repeats every 20 virtual seconds while nobody taps the strip: 76 repeats in D. A real cook who taps the row stops them; the number shows the cost of ignoring a row, not the usual case.
+- Not covered, as before: temperature checks, reheat, cooling, late tickets, the sanitize timer, and anything a real kitchen does that the script does not. Nobody listened to the sounds.
 
 ## Phase A: strip readability and taps (measured 2026-10-18)
 
