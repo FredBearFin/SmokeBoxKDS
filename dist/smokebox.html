@@ -940,6 +940,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   z-index: var(--zi-toast); display: flex; flex-direction: column; gap: var(--sp-2); align-items: stretch;
   width: min(580px, calc(100vw - 2 * var(--gutter))); pointer-events: none;
 }
+/* On a tablet or larger the toasts move to the bottom-left corner and stay narrow, so they never cover the buttons of a sheet (sheets open on the right or in the middle). */
+@media (min-width: 900px) {
+  .toast-host { left: var(--gutter); transform: none; width: min(400px, 34vw); }
+}
 .toast {
   --tc: var(--inv-accent);
   position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); min-width: 0; overflow: hidden; pointer-events: auto;
@@ -1443,15 +1447,20 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
   .fl-chip-w { display: inline; }
 }
 
-/* below 1180 the tools and chips move into the Menu button's list; the tabs and New ticket stay */
-@media (max-width: 1179.98px) {
+/* below 1000 the tools and chips move into the Menu button's list; the tabs and New ticket stay. 1024-wide tablets keep Hold, 86 and Recall in the header. */
+@media (max-width: 999.98px) {
   .fl-status, .fl-tools { display: none; }
 }
 
 /* When the header is too tight for one row, the script sets data-fit: first the tab icons go, then the status chips, then the tool buttons too (all stay in the Menu list). */
 .fl-head[data-fit] .fl-seg .seg-opt .icon { display: none; }
 .fl-head[data-fit] .fl-seg .seg-opt { padding: 0 calc(12px * var(--fl-k)); }
-.fl-head[data-fit="status"] .fl-status, .fl-head[data-fit="tools"] .fl-status, .fl-head[data-fit="tools"] .fl-tools { display: none; }
+.fl-head[data-fit="status"] .fl-status, .fl-head[data-fit="labels"] .fl-status, .fl-head[data-fit="toollabels"] .fl-status, .fl-head[data-fit="tools"] .fl-status, .fl-head[data-fit="tools"] .fl-tools { display: none; }
+/* Next the words on Orders and Back office go, and the Demo button (their icons and counts stay; Demo is still in the Menu). */
+.fl-head[data-fit="labels"] .fl-orders-label, .fl-head[data-fit="labels"] .fl-office-label, .fl-head[data-fit="toollabels"] .fl-orders-label, .fl-head[data-fit="toollabels"] .fl-office-label, .fl-head[data-fit="tools"] .fl-orders-label, .fl-head[data-fit="tools"] .fl-office-label,
+.fl-head[data-fit="labels"] [data-tool="demo"], .fl-head[data-fit="toollabels"] [data-tool="demo"] { display: none; }
+/* Then the words on Recall, Hold and 86 go too: icon and count only, so all three stay on a 1024 px tablet. */
+.fl-head[data-fit="toollabels"] .fl-tools .fl-tool-label { display: none; }
 
 /* phones and small tablets: actions on top, the six station tabs underneath as one wide row (the DOM order is switched to match, see layoutHead) */
 @media (max-width: 900px) {
@@ -15653,7 +15662,7 @@ a.of-nav:active { background: var(--press); }
 
     // New ticket opens the order sheet. Menu opens the full menu, or a short list on a narrow screen.
     const newBtn = h('button', { type: 'button', class: 'btn btn-primary fl-new', 'aria-keyshortcuts': 'N', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket'));
-    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Menu', onClick: (e) => { if (mq('(max-width: 1179px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Menu'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
+    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Menu', onClick: (e) => { if (mq('(max-width: 999px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Menu'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
     // Back office is a plain labeled button for managers: sales, speed, stock and the menu. It asks for the PIN when one is set.
     const officeBtn = h('button', { type: 'button', class: 'btn fl-tool fl-office', 'aria-label': 'Back office', 'aria-keyshortcuts': 'Control+Shift+O', onClick: (e) => openOffice(e.currentTarget) }, ico('gauge', 24), h('span', { class: 'fl-tool-label fl-office-label' }, 'Back office'));
     try { SB.ui.tooltip(officeBtn, 'Back office: sales, speed, stock and your menu'); } catch (e) { /* ignore */ }
@@ -15748,7 +15757,7 @@ a.of-nav:active { background: var(--press); }
     const hd = m.head;
     delete hd.dataset.fit;
     if (!m.narrow) {
-      for (const stage of ['icons', 'status', 'tools']) {
+      for (const stage of ['icons', 'status', 'labels', 'toollabels', 'tools']) {
         if (!headWrapped()) break;
         hd.dataset.fit = stage;
       }
@@ -15760,7 +15769,7 @@ a.of-nav:active { background: var(--press); }
     if (m && m.head && headKey() !== m.fitKey) fitHead();
   }
   // True when the header has moved the status chips or tool buttons into the Menu list.
-  const headSqueezed = () => !!m.head && (m.head.dataset.fit === 'status' || m.head.dataset.fit === 'tools');
+  const headSqueezed = () => !!m.head && (m.head.dataset.fit === 'status' || m.head.dataset.fit === 'labels' || m.head.dataset.fit === 'toollabels' || m.head.dataset.fit === 'tools');
   // Tells the stylesheet how tall the all-day strip is (--fl-lift) so toasts sit above it.
   function measureDock() {
     if (!m) return;
@@ -18622,8 +18631,9 @@ a.of-nav:active { background: var(--press); }
     });
     // Seconds a simulated channel takes to catch up (starter value from config).
     const syncSec = () => (st().settings && st().settings.syncTargetSec) || C.syncTargetSec;
-    const syncBox = h('section', { class: 'fs-section bd-sync', 'aria-label': 'Channel sync' },
-      h('div', { class: 'fs-row' }, h('h3', { class: 'fs-h grow' }, 'Channel sync'), simPill()),
+    // Folded away by default and kept below the menu and stock, so the real controls come first.
+    const syncBox = h('details', { class: 'fs-section bd-sync', 'aria-label': 'Channel sync' },
+      h('summary', { class: 'fs-row', style: 'cursor:pointer' }, h('h3', { class: 'fs-h grow' }, 'Channel sync (simulated)'), simPill()),
       syncGrid,
       h('p', { class: 'fs-sub bd-sync-note' }, 'There is no live POS or delivery app connected. These four chips show how a real 86 would reach each channel. Changes catch up within ' + syncSec() + ' seconds.'));
 
@@ -18851,7 +18861,7 @@ a.of-nav:active { background: var(--press); }
       h('h3', { class: 'fs-h' }, 'Stock'),
       h('p', { class: 'fs-sub' }, 'Par and 86 levels are starter estimates. Cooked meat and cold sides live in the hold cabinet, so they are added as batches.'),
       stockList, safetyNote());
-    sheet.body.append(h('div', { class: 'bd' }, syncBox, h('div', { class: 'bd-cols' }, menuBox, stockBox)));
+    sheet.body.append(h('div', { class: 'bd' }, h('div', { class: 'bd-cols' }, menuBox, stockBox), syncBox));
 
     function update(now) {
       const s = st();

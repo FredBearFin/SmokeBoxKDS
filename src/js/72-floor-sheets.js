@@ -858,8 +858,9 @@
     });
     // Seconds a simulated channel takes to catch up (starter value from config).
     const syncSec = () => (st().settings && st().settings.syncTargetSec) || C.syncTargetSec;
-    const syncBox = h('section', { class: 'fs-section bd-sync', 'aria-label': 'Channel sync' },
-      h('div', { class: 'fs-row' }, h('h3', { class: 'fs-h grow' }, 'Channel sync'), simPill()),
+    // Folded away by default and kept below the menu and stock, so the real controls come first.
+    const syncBox = h('details', { class: 'fs-section bd-sync', 'aria-label': 'Channel sync' },
+      h('summary', { class: 'fs-row', style: 'cursor:pointer' }, h('h3', { class: 'fs-h grow' }, 'Channel sync (simulated)'), simPill()),
       syncGrid,
       h('p', { class: 'fs-sub bd-sync-note' }, 'There is no live POS or delivery app connected. These four chips show how a real 86 would reach each channel. Changes catch up within ' + syncSec() + ' seconds.'));
 
@@ -1087,7 +1088,7 @@
       h('h3', { class: 'fs-h' }, 'Stock'),
       h('p', { class: 'fs-sub' }, 'Par and 86 levels are starter estimates. Cooked meat and cold sides live in the hold cabinet, so they are added as batches.'),
       stockList, safetyNote());
-    sheet.body.append(h('div', { class: 'bd' }, syncBox, h('div', { class: 'bd-cols' }, menuBox, stockBox)));
+    sheet.body.append(h('div', { class: 'bd' }, h('div', { class: 'bd-cols' }, menuBox, stockBox), syncBox));
 
     function update(now) {
       const s = st();

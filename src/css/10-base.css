@@ -382,6 +382,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   z-index: var(--zi-toast); display: flex; flex-direction: column; gap: var(--sp-2); align-items: stretch;
   width: min(580px, calc(100vw - 2 * var(--gutter))); pointer-events: none;
 }
+/* On a tablet or larger the toasts move to the bottom-left corner and stay narrow, so they never cover the buttons of a sheet (sheets open on the right or in the middle). */
+@media (min-width: 900px) {
+  .toast-host { left: var(--gutter); transform: none; width: min(400px, 34vw); }
+}
 .toast {
   --tc: var(--inv-accent);
   position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); min-width: 0; overflow: hidden; pointer-events: auto;

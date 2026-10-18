@@ -364,7 +364,7 @@
 
     // New ticket opens the order sheet. Menu opens the full menu, or a short list on a narrow screen.
     const newBtn = h('button', { type: 'button', class: 'btn btn-primary fl-new', 'aria-keyshortcuts': 'N', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket'));
-    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Menu', onClick: (e) => { if (mq('(max-width: 1179px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Menu'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
+    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Menu', onClick: (e) => { if (mq('(max-width: 999px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Menu'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
     // Back office is a plain labeled button for managers: sales, speed, stock and the menu. It asks for the PIN when one is set.
     const officeBtn = h('button', { type: 'button', class: 'btn fl-tool fl-office', 'aria-label': 'Back office', 'aria-keyshortcuts': 'Control+Shift+O', onClick: (e) => openOffice(e.currentTarget) }, ico('gauge', 24), h('span', { class: 'fl-tool-label fl-office-label' }, 'Back office'));
     try { SB.ui.tooltip(officeBtn, 'Back office: sales, speed, stock and your menu'); } catch (e) { /* ignore */ }
@@ -459,7 +459,7 @@
     const hd = m.head;
     delete hd.dataset.fit;
     if (!m.narrow) {
-      for (const stage of ['icons', 'status', 'tools']) {
+      for (const stage of ['icons', 'status', 'labels', 'toollabels', 'tools']) {
         if (!headWrapped()) break;
         hd.dataset.fit = stage;
       }
@@ -471,7 +471,7 @@
     if (m && m.head && headKey() !== m.fitKey) fitHead();
   }
   // True when the header has moved the status chips or tool buttons into the Menu list.
-  const headSqueezed = () => !!m.head && (m.head.dataset.fit === 'status' || m.head.dataset.fit === 'tools');
+  const headSqueezed = () => !!m.head && (m.head.dataset.fit === 'status' || m.head.dataset.fit === 'labels' || m.head.dataset.fit === 'toollabels' || m.head.dataset.fit === 'tools');
   // Tells the stylesheet how tall the all-day strip is (--fl-lift) so toasts sit above it.
   function measureDock() {
     if (!m) return;

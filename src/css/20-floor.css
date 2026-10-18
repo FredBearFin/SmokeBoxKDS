@@ -182,15 +182,20 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
   .fl-chip-w { display: inline; }
 }
 
-/* below 1180 the tools and chips move into the Menu button's list; the tabs and New ticket stay */
-@media (max-width: 1179.98px) {
+/* below 1000 the tools and chips move into the Menu button's list; the tabs and New ticket stay. 1024-wide tablets keep Hold, 86 and Recall in the header. */
+@media (max-width: 999.98px) {
   .fl-status, .fl-tools { display: none; }
 }
 
 /* When the header is too tight for one row, the script sets data-fit: first the tab icons go, then the status chips, then the tool buttons too (all stay in the Menu list). */
 .fl-head[data-fit] .fl-seg .seg-opt .icon { display: none; }
 .fl-head[data-fit] .fl-seg .seg-opt { padding: 0 calc(12px * var(--fl-k)); }
-.fl-head[data-fit="status"] .fl-status, .fl-head[data-fit="tools"] .fl-status, .fl-head[data-fit="tools"] .fl-tools { display: none; }
+.fl-head[data-fit="status"] .fl-status, .fl-head[data-fit="labels"] .fl-status, .fl-head[data-fit="toollabels"] .fl-status, .fl-head[data-fit="tools"] .fl-status, .fl-head[data-fit="tools"] .fl-tools { display: none; }
+/* Next the words on Orders and Back office go, and the Demo button (their icons and counts stay; Demo is still in the Menu). */
+.fl-head[data-fit="labels"] .fl-orders-label, .fl-head[data-fit="labels"] .fl-office-label, .fl-head[data-fit="toollabels"] .fl-orders-label, .fl-head[data-fit="toollabels"] .fl-office-label, .fl-head[data-fit="tools"] .fl-orders-label, .fl-head[data-fit="tools"] .fl-office-label,
+.fl-head[data-fit="labels"] [data-tool="demo"], .fl-head[data-fit="toollabels"] [data-tool="demo"] { display: none; }
+/* Then the words on Recall, Hold and 86 go too: icon and count only, so all three stay on a 1024 px tablet. */
+.fl-head[data-fit="toollabels"] .fl-tools .fl-tool-label { display: none; }
 
 /* phones and small tablets: actions on top, the six station tabs underneath as one wide row (the DOM order is switched to match, see layoutHead) */
 @media (max-width: 900px) {
