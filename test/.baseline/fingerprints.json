@@ -18,7 +18,7 @@
  "tools/shot.mjs": "1d0c42be27039a12cbaffdee103bb879ee2ac20628f98c429163445209277bd4",
  "tools/build-artifact.mjs": "9a36c3a2d42d53c6932a4f909cab09667b3647aca8ba55312c716f17bdd35858",
  "tools/charts-gallery.mjs": "1b25f4cfc1078ea9fa72600e10a5adb672aefc2abc23d3b28d3bb59e18e18b02",
- "src/js/70-floor-board.js": "2aea91ad8f9424c52c46d815b56b2627ef74a71f790ebaef74e4d153d9b259f3",
+ "src/js/70-floor-board.js": "15889fcc15d46c55d6f94f4ca0eac9568685ccc7f513980d99834193fa8e3da4",
  "src/css/20-floor.css": "76245e6a61372bfa27c8fb3079a297a31c053d014337fafdc1684316559ffe7b",
  "test/floor.e2e.mjs": "6903287eb790a198f194d645fadf1864bb05365f1f0dc663bf666076683a0502",
  "tools/comment-audit.mjs": "d148fbf29d82eee272fe0d33bb68f9fad9f2f7e848112272240055d7d5da41eb",
@@ -44,7 +44,7 @@
  "src/css/22-floor-tour.css": "819a14436e73f6271b7700d46dab2cb08d42c8e30ef386faa8a16a0dfd6abab4",
  "src/js/73-floor-orders.js": "d811da31f86cd73e3081ca8cdd27cc9bcf6c9915527040a90bda51946bc63d2f",
  "src/css/23-floor-orders.css": "d5cdb100e02ec7dbf16457989710fed2a0e6e7ff5d1d2a3321fa26ef22a273d9",
- "src/js/25-deadlines.js": "52ee54968f03f3eee9a60adc0360b258cb052bcd151283b03c7a745dbd944453",
+ "src/js/25-deadlines.js": "13e64c8635704abf95b87391ac7ed5fa735b3d3b0b8aa93cbc14804e00232d34",
  "src/js/76-floor-discards.js": "7559de57668c604483588dc3b6bc91c68d8fbd864935f801c173f3676f6086c1",
  "src/js/77-floor-setup.js": "d4126e8454b292e3d900c510d3ea82d3cad20f6f9261e9ee34fbf9ae693961f1"
 }

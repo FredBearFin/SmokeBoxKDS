@@ -18,6 +18,10 @@
   const RATE_WINDOW_MS = 90 * MIN;
   // Sales pace is trusted only with at least this many grams seen in the window; below it the pace is "no data".
   const RATE_MIN_G = 200;
+  // Under this many grams left a batch is not worth a sounded warning.
+  const TRIVIAL_G = 300;
+  // Projected waste counts as worth a sounded warning only from this many grams, or this share of the batch.
+  const NOTABLE_G = 500, NOTABLE_SHARE = 0.15;
   // Ordering of severities, worst first.
   const SEV_RANK = { bad: 0, warn: 1, info: 2 };
 
@@ -87,6 +91,8 @@
           waste = b.remainingG - sold;
           soldBefore += sold;
         }
+        // A few hundred grams left is not worth a warning: the row still shows but never sounds.
+        const trivial = b.remainingG < TRIVIAL_G || (waste != null && waste < NOTABLE_G && waste < NOTABLE_SHARE * b.remainingG);
         const usd = waste != null && U.isNum(b.costPerCookedKg) ? waste / 1000 * b.costPerCookedKg : null;
         let consequence, action;
         const amount = U.fmtG(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
@@ -97,9 +103,9 @@
         else { consequence = 'On pace to sell all ' + U.fmtG(b.remainingG) + ' in time.'; action = 'Nothing to do.'; }
         // A batch gets a row once a rung is crossed, or earlier when the pace says food will be thrown out within 2 hours.
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H)) {
-          const quiet = rung === 0;
+          const quiet = rung === 0 || trivial;
           out.push({ id: 'expiry:' + b.id, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length,
-            sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, wasteG: waste, wasteUsd: usd, goes86: lastOne, guess: rate === undefined });
+            sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, wasteG: waste, wasteUsd: usd, goes86: lastOne, trivial, guess: rate === undefined });
         }
       });
       // Run-out: when the whole stock of this item will be gone at the current pace.
@@ -137,7 +143,7 @@
   // Rows for batches that expired and were thrown out in the last 30 minutes, so the loss is not silent.
   function expiredRows(state, now, out) {
     for (const b of state.batches) {
-      if (b.status !== 'discard' || b.discardReason !== 'expired' || !U.isNum(b.discardedAt) || now - b.discardedAt > 30 * MIN) continue;
+      if (b.status !== 'discard' || b.discardReason !== 'expired' || !U.isNum(b.discardedAt) || now - b.discardedAt > 30 * MIN || !(b.wasteG >= TRIVIAL_G)) continue;
       const ing = state.ingredients.find((x) => x.id === b.ing);
       const name = ing ? ing.name : b.ing;
       const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');

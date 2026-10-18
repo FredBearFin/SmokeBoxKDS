@@ -1084,25 +1084,53 @@
   // Warning ladder memory: for each deadline id, the rung already announced, the rung the cook acknowledged by
   // tapping it, and when the loud tone last played.
   const ladder = new Map();
-  // Announces a deadline when it reaches a new rung: a soft chime first, then a spoken call, then the loud tone
-  // that repeats until someone taps the row. Expiry has its own sound.
+  // Decides whether a deadline needs a sound right now: when it reaches a new rung, a soft chime first, then a
+  // spoken call, then the loud tone that repeats until someone taps the row. Expiry has its own sound. Returns a
+  // call to be played ({ level, d }) or null, and records what it decided in the ladder memory.
   function announce(d, perfNow) {
     const st = ladder.get(d.id) || { rung: 0, ack: 0, loudAt: 0 };
     ladder.set(d.id, st);
     if (d.kind === 'expired') {
-      if (st.rung < 1) { st.rung = 1; expiryTone(); speak(d.label + ' expired and was thrown out.'); }
-      return;
+      if (st.rung >= 1) return null;
+      st.rung = 1;
+      return alertCall(4, d);
     }
-    if (d.kind !== 'expiry' || d.rung < 1) return;
+    if (d.kind !== 'expiry' || d.rung < 1) return null;
+    // No sound when it is on pace to sell out in time, or when almost nothing is left in the batch.
+    if (d.trivial || (U.isNum(d.wasteG) && d.wasteG <= 50)) { st.rung = Math.max(st.rung, d.rung); return null; }
     const last = d.rung >= d.rungs;
     if (d.rung > st.rung) {
       st.rung = d.rung; st.ack = 0;
-      const mins = Math.max(1, Math.round(d.msLeft / 60e3));
-      if (d.msLeft <= 0) { expiryTone(); speak(d.label + ' has expired.'); }
-      else if (last) { alarmTone(); st.loudAt = perfNow; speak(d.label + (d.goes86 ? ' goes 86' : ' expires') + ' in ' + mins + ' ' + U.plural(mins, 'minute') + '.'); }
-      else if (d.rung >= 2) { chime(); speak(d.label + (d.goes86 ? ' goes 86' : ' expires') + ' in about ' + mins + ' minutes.'); }
-      else chime();
-    } else if (last && st.ack < d.rung && d.msLeft > 0 && perfNow - st.loudAt >= 20000) { st.loudAt = perfNow; alarmTone(); }
+      // With no sales data to show waste, the first (soft) rung stays silent: it would chime for food that may sell.
+      if (d.msLeft <= 0) return alertCall(4, d);
+      if (last) { st.loudAt = perfNow; return alertCall(3, d); }
+      if (d.rung >= 2) return alertCall(2, d);
+      return d.guess ? null : alertCall(1, d);
+    }
+    if (last && st.ack < d.rung && d.msLeft > 0 && perfNow - st.loudAt >= 20000) { st.loudAt = perfNow; return alertCall(3, d, true); }
+    return null;
+  }
+  // Makes one call for the sound ladder and keeps a short record of it, so a test can replay a whole service
+  // and check every alert. level: 1 chime, 2 voice, 3 loud tone, 4 expiry.
+  function alertCall(level, d, repeat) {
+    const lg = F._alerts || (F._alerts = []);
+    lg.push({ t: store().now(), id: d.id, kind: d.kind, level, repeat: !!repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG), guess: !!d.guess });
+    if (lg.length > 500) lg.shift();
+    return { level, d, repeat: !!repeat };
+  }
+  // Plays the calls of one moment together: the strongest sound once, and one short spoken phrase naming the most
+  // urgent item and how many others share the moment, so six batches expiring together are one warning, not six.
+  function playCalls(calls) {
+    if (!calls.length) return;
+    const top = calls.reduce((a, c) => (c.level > a.level ? c : a), calls[0]);
+    if (top.level === 4) expiryTone(); else if (top.level === 3) alarmTone(); else chime();
+    if (top.level < 2 || top.repeat) return;
+    const same = calls.filter((c) => c.level === top.level);
+    const first = same.slice().sort((x, y) => x.d.msLeft - y.d.msLeft)[0].d;
+    const who = first.label + (same.length > 1 ? ' and ' + (same.length - 1) + ' more' : '');
+    if (top.level === 4) { speak(who + (same.length > 1 ? ' expired and were thrown out.' : ' expired and was thrown out.')); return; }
+    const mins = Math.max(1, Math.round(first.msLeft / 60e3));
+    speak(who + (first.goes86 && same.length === 1 ? ' goes 86' : same.length > 1 ? ' expire' : ' expires') + ' in ' + (top.level === 2 ? 'about ' : '') + mins + ' ' + U.plural(mins, 'minute') + '.');
   }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
   function acknowledge(key) { const st = ladder.get(key); if (st) st.ack = st.rung; }
@@ -1111,9 +1139,11 @@
     if (!m || !m.strip || !SB.deadlines) return;
     const all = SB.deadlines.build(store().getState(), now);
     const perfNow = performance.now();
-    all.forEach((d) => announce(d, perfNow));
+    const calls = [];
+    all.forEach((d) => { const c = announce(d, perfNow); if (c) calls.push(c); });
+    playCalls(calls);
     // Info rows only show for batches and run-outs; an expired notice goes away once someone taps it.
-    const feed = all.filter((d) => (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'runout') && !(d.kind === 'expired' && (ladder.get(d.id) || {}).ack));
+    const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'runout') && !(d.kind === 'expired' && (ladder.get(d.id) || {}).ack));
     const top = feed.slice(0, 3);
     const needSound = sound && !audioReady();
     setHidden(m.strip.soundBar, !needSound);
