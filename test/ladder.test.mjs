@@ -113,3 +113,11 @@ test('ladder: memory drops entries for batches that are gone and entries older t
   k2.L.decide([], T0 + 28 * HR, k2.s);
   assert.equal(k2.L.size(), 0, 'old entries are dropped');
 });
+
+test('ladder: the limit sounds once, from the past row, not twice (expiry row at the limit is quiet)', () => {
+  const k = kit();
+  run(k, 1, 241);
+  const atLimit = k.sounds.filter((s) => s.level === 4);
+  assert.equal(atLimit.length, 1, JSON.stringify(atLimit));
+  assert.equal(atLimit[0].kind, 'past');
+});

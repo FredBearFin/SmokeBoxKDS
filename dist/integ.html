@@ -7987,7 +7987,8 @@ a.of-nav:active { background: var(--press); }
       const last = d.rung >= d.rungs;
       if (d.rung > st.rung) {
         st.rung = d.rung; st.ack = 0;
-        if (d.msLeft <= 0) return { level: 4, d, repeat: false };
+        // At the very limit the batch is still alive for one more tick; its own past or expired row sounds next, so this one stays quiet (else the same moment sounds twice).
+        if (d.msLeft <= 0) return null;
         if (last) { st.loudAt = now; return { level: 3, d, repeat: false }; }
         if (d.rung >= 2) return { level: 2, d, repeat: false };
         // With no pace to show waste, the first (soft) rung stays silent: it would chime for food that may sell.
