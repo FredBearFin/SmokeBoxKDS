@@ -208,7 +208,7 @@
       },
     });
     const tempCard = page.card({
-      type: 'meter', span: 4, title: 'Temperature checks on time', sub: 'A reading is on time when it is logged within ' + intervalTemp() + ' minutes of the last one',
+      type: 'meter', span: 4, title: 'Temperature checks on time', sub: 'A reading is on time when it is logged within ' + U.minutesText(intervalTemp()) + ' of the last one',
       caption: 'Whether every pan in the cabinet is being checked as often as you decided. Late checks are the first sign of a slipping night.',
       empty: { title: 'No temperature checks yet', body: 'Readings logged on the line fill this meter.', icon: 'thermometer' },
       // Meter of temperature checks logged on time; empty until a reading is logged.
@@ -402,7 +402,7 @@
           set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'A batch may be reheated one time. If it drops below the limit again it is thrown away. Food Code 3-403.11.');
           set('hold', 'No more than ' + (S.defaultMaxHoldH) + ' hours in the cabinet', 'After that the batch is thrown away, whatever its temperature. Some items carry their own shorter or longer limit.');
           set('grace', 'Grace of ' + S.belowHotGraceH + ' hours below ' + T(S.hotHoldF) + ' (cold food: ' + S.aboveColdGraceH + ' hours above ' + T(S.coldHoldF) + ')', 'The clock starts at the first reading outside the limit. After the grace time the batch is thrown away.');
-          set('checks', 'A temperature reading every ' + S.tempCheckEveryMin + ' minutes', 'A late reading is flagged and counted here. It does not stop service by itself.');
+          set('checks', 'A temperature reading every ' + U.minutesText(S.tempCheckEveryMin), 'A late reading is flagged and counted here. It does not stop service by itself.');
           set('sanitize', 'Sanitize food-contact surfaces every ' + S.sanitizeEveryH + ' hours', 'A late round is a warning on the line and counts against the score. Food Code 4-602.11.');
           // Kept on purpose: the grace clock starts later here than in the research report (finding F-E1).
           B.setText(note, 'Smokebox starts the ' + S.belowHotGraceH + '-hour clock at the first reading below ' + T(S.hotHoldF) + '. The research report it was built from starts it when the food left the heat, which is stricter. Check which one your health department uses.');
@@ -422,7 +422,7 @@
         const after = f.lock.filter((c) => !(c.openMs > 0)).length;
         B.setText(lockNote, after ? after + ' more ' + B.plural(after, 'lockout began', 'lockouts began') + ' after closing and cost no sales, so ' + B.plural(after, 'it is', 'they are') + ' not listed.' : '');
         lockNote.hidden = !after;
-        B.setSub(tempCard, 'A reading is on time when it is logged within ' + intervalTemp() + ' minutes of the last one');
+        B.setSub(tempCard, 'A reading is on time when it is logged within ' + U.minutesText(intervalTemp()) + ' of the last one');
         B.setSub(sanCard, 'A round is on time when it is logged within ' + intervalSan() + ' hours of the last one');
       },
       // Runs when the page is left; drops the card list.

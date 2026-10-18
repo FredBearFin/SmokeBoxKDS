@@ -26,6 +26,8 @@ class K {
   t(i = -1) { return this.s.tickets.at(i); }
   b(id) { return this.s.batches.find((x) => x.id === id); }
 }
+// Settings with the old 30-minute check interval, for the tests that walk the check-due gate by minutes.
+const settings30 = () => { const s = E.defaultSettings(); s.safety.tempCheckEveryMin = 30; return s; };
 const fresh = (opts = {}) => new K(E.newState(Object.assign({ now: T0 }, opts)), T0);
 /** Strip fields that I13 ignores (events, undo stack, rev, id counters, simulated sync records). */
 const canon = (x) => (Array.isArray(x) ? x.map(canon) : x && typeof x === 'object' ? Object.keys(x).sort().reduce((o, k) => { o[k] = canon(x[k]); return o; }, {}) : x);
@@ -332,7 +334,7 @@ test('safety hold after a safety discard; quality discard reads as sold out', ()
 
 /* ------------------------------------------------------------------ gates ------------------------------------------------------------------ */
 test('gate: every hot, cold and cooling branch', () => {
-  const S = C.safety;
+  const S = settings30().safety;
   const hot = { id: 'b', ing: 'brisket', kind: 'hot', enteredAt: T0, remainingG: 100, reheats: 0, lastTempAt: T0, lastTempF: 150, status: 'ok', canServe: true, maxHoldH: 4 };
   const G = (b, t, s = S) => { const g = E.gate(b, t, s); return [g.action, g.canServe, g.reason, g.severity, g.status]; };
   // 1 expiry (strict >)
@@ -376,7 +378,7 @@ test('gate: every hot, cold and cooling branch', () => {
 });
 
 test('gates in the engine: tick discards on expiry (outSince logic), single reheat, logTemp on-time/late', () => {
-  const k = fresh({ empty: true });
+  const k = fresh({ empty: true, settings: settings30() });
   k.do('addBatch', { ing: 'pork', cookedG: 3000, tempF: 160 });
   k.at(T0 + 20 * MIN);
   let r = k.do('logTemp', { batchId: 'b_1', tempF: 150 });
@@ -415,7 +417,7 @@ test('gates in the engine: tick discards on expiry (outSince logic), single rehe
 });
 
 test('tick: CHECK_TEMP after 30 min, expiry discard after 4 h; same reference when nothing is due', () => {
-  const k = fresh();
+  const k = fresh({ settings: settings30() });
   const s0 = k.s;
   assert.equal(E.tick(s0, T0 + 1000).state, s0);
   assert.equal(E.tick(s0, NaN).state, s0);
@@ -943,4 +945,23 @@ test('totality: junk payloads return a closed-set report and the same state', ()
   for (const id of E.REPORT_IDS) assert.equal(typeof E.REPORTS[id], 'string');
   assert.ok(E.REPORTS.tempTooLow.endsWith(C.safetyLine));
   assert.ok(E.describe('itemUnavailable', { menuId: 'mac', reason: 'safety' }).startsWith('Smoked mac and cheese is on a safety hold'));
+});
+
+test('default settings: a temperature check is due every 2 hours and can be set up to 4', () => {
+  assert.equal(C.safety.tempCheckEveryMin, 120);
+  assert.equal(C.safetyBounds.tempCheckEveryMin[1], 240);
+  const k = fresh();
+  assert.equal(k.tickAt(T0 + 119 * MIN).events.filter((e) => e.type === 'batch_status' && e.to === 'check').length, 0);
+  assert.equal(k.tickAt(T0 + 120 * MIN + 1).events.filter((e) => e.type === 'batch_status' && e.to === 'check').length, 10);
+});
+
+test('migration: an old save with the 30-minute default moves to 2 hours once; chosen values and marked saves stay', () => {
+  const mk = (safety) => { const s = JSON.parse(JSON.stringify(E.newState({ now: T0 }))); s.settings.safety = Object.assign({}, s.settings.safety, safety); return s; };
+  const old = mk({ tempCheckEveryMin: 30 }); delete old.settings.safety.tempIntervalV2;
+  const v = E.validateBackup(old);
+  assert.equal(v.state.settings.safety.tempCheckEveryMin, 120);
+  assert.equal(v.state.settings.safety.tempIntervalV2, true);
+  const chosen = mk({ tempCheckEveryMin: 45 }); delete chosen.settings.safety.tempIntervalV2;
+  assert.equal(E.validateBackup(chosen).state.settings.safety.tempCheckEveryMin, 45);
+  assert.equal(E.validateBackup(mk({ tempCheckEveryMin: 30 })).state.settings.safety.tempCheckEveryMin, 30);
 });

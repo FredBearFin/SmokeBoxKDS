@@ -3540,6 +3540,8 @@ a.of-nav:active { background: var(--press); }
   U.round = (n, d = 0) => { const f = Math.pow(10, d); return Math.round(n * f) / f; };
   // Picks the singular or plural word for a count. "many" defaults to the singular plus "s".
   U.plural = (n, one, many) => (n === 1 ? one : many || one + 's');
+  // Words for a number of minutes: "30 minutes", "1 hour", "2 hours", "90 minutes".
+  U.minutesText = (m) => (m >= 60 && m % 60 === 0 ? (m / 60) + ' ' + U.plural(m / 60, 'hour') : m + ' ' + U.plural(m, 'minute'));
   // Makes a fully independent copy of plain data, so changing the copy never changes the original.
   U.clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
   // Wraps fn so a burst of calls becomes one run, ms after the last call.
@@ -4158,8 +4160,9 @@ a.of-nav:active { background: var(--press); }
     aboveColdGraceH: 4,     // above 41F for more than this -> discard
     cooling: { stage1ToF: 70, stage1H: 2, totalH: 6, finalF: 41 }, // 135->70 in 2h, then 70->41 inside 4 more (6h total) (3-501.14)
     defaultMaxHoldH: 4,     // total time in the hold cabinet before discard
-    tempCheckEveryMin: 30,  // a temperature reading is due this often
+    tempCheckEveryMin: 120, // a temperature reading is due this often (2 h; the FDA minimum is 4 h)
     sanitizeEveryH: 4,      // food-contact surfaces (4-602.11)
+    tempIntervalV2: true,   // marks settings made after the check interval default moved from 30 to 120 minutes
   };
   // The allowed range for each owner-editable safety number, as [lowest, highest]. The legal limits are
   // fixed ends: hot hold never below 135 F, cold hold never above 41 F, reheat never below 165 F. The two
@@ -4167,7 +4170,7 @@ a.of-nav:active { background: var(--press); }
   // time and check interval are house settings with wider ranges.
   C.safetyBounds = {
     hotHoldF: [135, 200], coldHoldF: [33, 41], reheatF: [165, 212], belowHotGraceH: [0.5, 2], aboveColdGraceH: [0.5, 4],
-    defaultMaxHoldH: [0.5, 12], tempCheckEveryMin: [10, 120], sanitizeEveryH: [1, 4],
+    defaultMaxHoldH: [0.5, 12], tempCheckEveryMin: [10, 240], sanitizeEveryH: [1, 4],
   };
 
   // Brisket cooked yield, from the Texas A&M AgriLife regression in the research report. Used only for
@@ -5957,7 +5960,7 @@ a.of-nav:active { background: var(--press); }
     service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20) },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
       defaultMaxHoldH: B('defaultMaxHoldH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
-      cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) } },
+      cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' } },
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
     syncTargetSec: R(10, 600),
@@ -6651,7 +6654,7 @@ a.of-nav:active { background: var(--press); }
     // Numbers for the header badges: tickets, ready, overdue and warn counts, per-station counts, batches
     // needing attention, dishes 86, and whether sanitising is overdue.
     counts(state, now) {
-      const c = { all: 0, expo: 0, ready: 0, overdue: 0, warn: 0, zones: {}, overdueByZone: {}, hold: 0, out86: 0, sanitizeDueAt: undefined, sanitizeOverdue: false };
+      const c = { all: 0, expo: 0, ready: 0, overdue: 0, warn: 0, zones: {}, overdueByZone: {}, hold: 0, holdWhy: { check: 0, reheat: 0, chill: 0, discard: 0 }, out86: 0, sanitizeDueAt: undefined, sanitizeOverdue: false };
       for (const z of C.workZones) { c.zones[z] = 0; c.overdueByZone[z] = 0; }
       if (!isState(state)) return c;
       for (const t of views.activeTickets(state)) {
@@ -6671,7 +6674,11 @@ a.of-nav:active { background: var(--press); }
       for (const b of state.batches) {
         if (b.status === 'discard' || !(b.remainingG > 0)) continue;
         const gt = gate(b, now, S);
-        if (gt.action !== 'NONE') c.hold++;
+        if (gt.action !== 'NONE') {
+          c.hold++;
+          const why = gt.action === 'CHECK_TEMP' ? 'check' : gt.action === 'REHEAT_IMMEDIATE' ? 'reheat' : gt.action === 'CHILL_NOW' ? 'chill' : 'discard';
+          c.holdWhy[why]++;
+        }
       }
       for (const mi of state.menu) { const a = state.avail[mi.id]; if (a && !a.ok && !mi.archived) c.out86++; }
       const sz = state.sanitize || {};
@@ -6854,7 +6861,13 @@ a.of-nav:active { background: var(--press); }
       const def = newState({ now: 0, empty: true });
       // settings
       const settings = defaultSettings();
-      repairInto(settings, isObj(st.settings) ? st.settings : {}, SET_SCHEMA, 'settings', repaired);
+      const savedSet = isObj(st.settings) ? st.settings : {};
+      // Saves from before the 2-hour check default still say 30 minutes. Move those to the new default once;
+      // any other value was chosen by the owner and stays.
+      if (isObj(savedSet.safety) && !hasOwn(savedSet.safety, 'tempIntervalV2') && savedSet.safety.tempCheckEveryMin === 30) {
+        savedSet.safety = Object.assign({}, savedSet.safety); delete savedSet.safety.tempCheckEveryMin; repaired.push('settings.safety.tempCheckEveryMin moved to the new default');
+      }
+      repairInto(settings, savedSet, SET_SCHEMA, 'settings', repaired);
       if (!(settings.service.openHour < settings.service.closeHour)) { settings.service = Object.assign({}, C.service); repaired.push('settings.service reset'); }
       if (!(settings.safety.cooling.stage1H < settings.safety.cooling.totalH)) { settings.safety.cooling = Object.assign({}, C.safety.cooling); repaired.push('settings.safety.cooling reset'); }
       // ingredients
@@ -10087,13 +10100,14 @@ a.of-nav:active { background: var(--press); }
     // Finds a pan by id (newest first); null when there is none.
     const batchOf = (id) => { for (let i = st.batches.length - 1; i >= 0; i--) if (st.batches[i].id === id) return st.batches[i]; return null; };
 
-    // Books a pan's next temperature check about 30 minutes out. Some come late and some are skipped, as in
-    // a real kitchen.
+    // Books a pan's next temperature check about one check interval out. Some come late and some are skipped,
+    // as in a real kitchen. The gaps scale with the interval in the safety settings.
     function scheduleTemp(batchId, from) {
-      let gap = 30 - K.range(1.5, 7);
+      const iv = C.safety.tempCheckEveryMin, k = iv / 30;
+      let gap = iv - K.range(1.5, 7) * k;
       const u = K.next();
-      if (u < 0.045) gap = 30 + K.range(3, 22);          // a late check
-      else if (u < 0.065) gap = 60 + K.range(3, 14);     // a missed check: the next reading is an hour later
+      if (u < 0.045) gap = iv + K.range(3, 22) * k;          // a late check
+      else if (u < 0.065) gap = 1.5 * iv + K.range(3, 14) * k; // a missed check: the next reading is half an interval later still
       if (from + gap * MIN > closeMs + 5 * MIN) return;             // the crew stops walking the cabinet once the doors are shut
       Q.push(from + gap * MIN, (t) => tempCheck(batchId, t));
     }
@@ -10515,7 +10529,7 @@ a.of-nav:active { background: var(--press); }
     function act(type, payload) {
       try { return store().dispatchEx(type, payload, { source: 'sim' }).report; } catch (e) { return 'error'; }
     }
-    // The crew logs each pan's temperature about every 30 minutes (5 in 100 times late) and sanitises when
+    // The crew logs each pan's temperature about every check interval (5 in 100 times late) and sanitises when
     // it is due.
     function planChecks(st, n) {
       const state = st.getState();
@@ -16028,7 +16042,7 @@ a.of-nav:active { background: var(--press); }
     // tools with counts
     const recentN = recentCount(S, now);
     toolCount(m.tool.recall, recentN, '', recentN ? recentN + ' recently bumped' : '');
-    toolCount(m.tool.hold, c.hold, 'warn', c.hold ? c.hold + ' ' + U.plural(c.hold, 'batch', 'batches') + ' need attention' : '');
+    toolCount(m.tool.hold, c.hold, 'warn', holdReason(c));
     toolCount(m.tool.board86, c.out86, 'bad', c.out86 ? c.out86 + ' ' + U.plural(c.out86, 'item') + ' off the menu' : '');
     // Orders still open, counted again only when the orders list itself changed.
     const ords = S.getState().orders || [];
@@ -16083,6 +16097,15 @@ a.of-nav:active { background: var(--press); }
     let n = 0;
     for (let i = 0; i < list.length; i++) if (typeof list[i].expeditedAt === 'number' && now - list[i].expeditedAt < 30 * 60e3) n++;
     return n;
+  }
+  // Spells out why the Hold button is lit, for example "2 temperature checks due, 1 to throw out". Empty when nothing is due.
+  function holdReason(c) {
+    const w = c.holdWhy || {}, bits = [];
+    if (w.check) bits.push(w.check + ' temperature ' + U.plural(w.check, 'check') + ' due');
+    if (w.reheat) bits.push(w.reheat + ' to reheat');
+    if (w.chill) bits.push(w.chill + ' to chill now');
+    if (w.discard) bits.push(w.discard + ' to throw out');
+    return bits.join(', ');
   }
   // Updates one header button: count badge, tone and spoken label. A text argument replaces the number.
   function toolCount(t, n, tone, aria, text) {
@@ -17902,7 +17925,7 @@ a.of-nav:active { background: var(--press); }
         onConfirm: (sh) => {
           const res = run('startCooling', { batchId: b.id });
           sh.close('confirm');
-          if (res.report === 'ok') { toast(label + ' is cooling. Log a reading at least every ' + S.tempCheckEveryMin + ' minutes.', 'ok'); update(nowMs()); const rec = cards.get(res.info && res.info.batchId); if (rec) { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); } }
+          if (res.report === 'ok') { toast(label + ' is cooling. Log a reading at least every ' + U.minutesText(S.tempCheckEveryMin) + '.', 'ok'); update(nowMs()); const rec = cards.get(res.info && res.info.batchId); if (rec) { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); } }
           else toast(say(res), 'warn');
         },
       });
@@ -18855,7 +18878,7 @@ a.of-nav:active { background: var(--press); }
       helpList([
         rule('flame', 'Keep hot food hot', 'Hot food stays at ' + S.hotHoldF + ' °F or above.'),
         rule('snow', 'Keep cold food cold', 'Cold food stays at ' + S.coldHoldF + ' °F or below.'),
-        rule('thermometer', 'Log a temperature', 'At least every ' + S.tempCheckEveryMin + ' minutes. A late check shows Check temp and is counted.'),
+        rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + S.hotHoldF + ' °F, reheat to ' + S.reheatF + ' °F within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
         rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + S.hotHoldF + ' °F, not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
         rule('package', 'Hold limit', 'A batch is discarded after ' + S.defaultMaxHoldH + ' hours in the cabinet, or less if its own limit is shorter.'),
@@ -22542,7 +22565,7 @@ a.of-nav:active { background: var(--press); }
       },
     });
     const tempCard = page.card({
-      type: 'meter', span: 4, title: 'Temperature checks on time', sub: 'A reading is on time when it is logged within ' + intervalTemp() + ' minutes of the last one',
+      type: 'meter', span: 4, title: 'Temperature checks on time', sub: 'A reading is on time when it is logged within ' + U.minutesText(intervalTemp()) + ' of the last one',
       caption: 'Whether every pan in the cabinet is being checked as often as you decided. Late checks are the first sign of a slipping night.',
       empty: { title: 'No temperature checks yet', body: 'Readings logged on the line fill this meter.', icon: 'thermometer' },
       // Meter of temperature checks logged on time; empty until a reading is logged.
@@ -22736,7 +22759,7 @@ a.of-nav:active { background: var(--press); }
           set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'A batch may be reheated one time. If it drops below the limit again it is thrown away. Food Code 3-403.11.');
           set('hold', 'No more than ' + (S.defaultMaxHoldH) + ' hours in the cabinet', 'After that the batch is thrown away, whatever its temperature. Some items carry their own shorter or longer limit.');
           set('grace', 'Grace of ' + S.belowHotGraceH + ' hours below ' + T(S.hotHoldF) + ' (cold food: ' + S.aboveColdGraceH + ' hours above ' + T(S.coldHoldF) + ')', 'The clock starts at the first reading outside the limit. After the grace time the batch is thrown away.');
-          set('checks', 'A temperature reading every ' + S.tempCheckEveryMin + ' minutes', 'A late reading is flagged and counted here. It does not stop service by itself.');
+          set('checks', 'A temperature reading every ' + U.minutesText(S.tempCheckEveryMin), 'A late reading is flagged and counted here. It does not stop service by itself.');
           set('sanitize', 'Sanitize food-contact surfaces every ' + S.sanitizeEveryH + ' hours', 'A late round is a warning on the line and counts against the score. Food Code 4-602.11.');
           // Kept on purpose: the grace clock starts later here than in the research report (finding F-E1).
           B.setText(note, 'Smokebox starts the ' + S.belowHotGraceH + '-hour clock at the first reading below ' + T(S.hotHoldF) + '. The research report it was built from starts it when the food left the heat, which is stricter. Check which one your health department uses.');
@@ -22756,7 +22779,7 @@ a.of-nav:active { background: var(--press); }
         const after = f.lock.filter((c) => !(c.openMs > 0)).length;
         B.setText(lockNote, after ? after + ' more ' + B.plural(after, 'lockout began', 'lockouts began') + ' after closing and cost no sales, so ' + B.plural(after, 'it is', 'they are') + ' not listed.' : '');
         lockNote.hidden = !after;
-        B.setSub(tempCard, 'A reading is on time when it is logged within ' + intervalTemp() + ' minutes of the last one');
+        B.setSub(tempCard, 'A reading is on time when it is logged within ' + U.minutesText(intervalTemp()) + ' of the last one');
         B.setSub(sanCard, 'A round is on time when it is logged within ' + intervalSan() + ' hours of the last one');
       },
       // Runs when the page is left; drops the card list.

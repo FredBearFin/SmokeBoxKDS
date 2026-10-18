@@ -585,13 +585,14 @@
     // Finds a pan by id (newest first); null when there is none.
     const batchOf = (id) => { for (let i = st.batches.length - 1; i >= 0; i--) if (st.batches[i].id === id) return st.batches[i]; return null; };
 
-    // Books a pan's next temperature check about 30 minutes out. Some come late and some are skipped, as in
-    // a real kitchen.
+    // Books a pan's next temperature check about one check interval out. Some come late and some are skipped,
+    // as in a real kitchen. The gaps scale with the interval in the safety settings.
     function scheduleTemp(batchId, from) {
-      let gap = 30 - K.range(1.5, 7);
+      const iv = C.safety.tempCheckEveryMin, k = iv / 30;
+      let gap = iv - K.range(1.5, 7) * k;
       const u = K.next();
-      if (u < 0.045) gap = 30 + K.range(3, 22);          // a late check
-      else if (u < 0.065) gap = 60 + K.range(3, 14);     // a missed check: the next reading is an hour later
+      if (u < 0.045) gap = iv + K.range(3, 22) * k;          // a late check
+      else if (u < 0.065) gap = 1.5 * iv + K.range(3, 14) * k; // a missed check: the next reading is half an interval later still
       if (from + gap * MIN > closeMs + 5 * MIN) return;             // the crew stops walking the cabinet once the doors are shut
       Q.push(from + gap * MIN, (t) => tempCheck(batchId, t));
     }
@@ -1013,7 +1014,7 @@
     function act(type, payload) {
       try { return store().dispatchEx(type, payload, { source: 'sim' }).report; } catch (e) { return 'error'; }
     }
-    // The crew logs each pan's temperature about every 30 minutes (5 in 100 times late) and sanitises when
+    // The crew logs each pan's temperature about every check interval (5 in 100 times late) and sanitises when
     // it is due.
     function planChecks(st, n) {
       const state = st.getState();

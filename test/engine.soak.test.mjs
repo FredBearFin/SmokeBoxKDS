@@ -15,7 +15,9 @@ function simulateDays({ days = 4, seed = 42, checkEvery = 400, startKey = '2026-
   const stats = { applies: 0, ticks: 0, reports: {}, tickets: 0, refused86: 0, perDay: [], violations: [] };
   const day0 = U.dateKeyToMs(startKey);
   let now = day0 + 10.5 * HR;
-  let s = E.newState({ now });
+  const settings = E.defaultSettings();
+  settings.safety.tempCheckEveryMin = 30; // the simulated crew walks the cabinet about every 30 minutes
+  let s = E.newState({ now, settings });
   const go = (type, p) => {
     stats.applies++;
     const r = E.apply(s, type, p, now);

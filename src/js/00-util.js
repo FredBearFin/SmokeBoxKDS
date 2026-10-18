@@ -42,6 +42,8 @@
   U.round = (n, d = 0) => { const f = Math.pow(10, d); return Math.round(n * f) / f; };
   // Picks the singular or plural word for a count. "many" defaults to the singular plus "s".
   U.plural = (n, one, many) => (n === 1 ? one : many || one + 's');
+  // Words for a number of minutes: "30 minutes", "1 hour", "2 hours", "90 minutes".
+  U.minutesText = (m) => (m >= 60 && m % 60 === 0 ? (m / 60) + ' ' + U.plural(m / 60, 'hour') : m + ' ' + U.plural(m, 'minute'));
   // Makes a fully independent copy of plain data, so changing the copy never changes the original.
   U.clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
   // Wraps fn so a burst of calls becomes one run, ms after the last call.

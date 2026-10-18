@@ -315,7 +315,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   check('ring: the compliance score is shown and matches', ringTxt.indexOf(Math.round(ref.score * 100) + '%') >= 0, [ringTxt.slice(-120), ref.score]);
   const tsub = await card(page, 'Temperature checks on time').locator('.of-card-sub').textContent();
   const ssub = await card(page, 'Sanitize rounds on time').locator('.of-card-sub').textContent();
-  check('meters: "on time" is explained in words with the interval from settings', /within 30 minutes/.test(tsub) && /within 4 hours/.test(ssub), [tsub, ssub]);
+  check('meters: "on time" is explained in words with the interval from settings', /within 2 hours/.test(tsub) && /within 4 hours/.test(ssub), [tsub, ssub]);
 
   // the timeline: day picker
   const opts = await page.evaluate(() => [...document.querySelectorAll('.of-card [aria-label], .of-card select')].filter((s) => s.tagName === 'SELECT').map((s) => [...s.options].map((o) => [o.value, o.textContent])));
@@ -373,7 +373,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   const rules = await page.evaluate(() => { const c = [...document.querySelectorAll('.of-card')].find((x) => /What the rules are/.test(x.textContent) && x.querySelector('.ob-rules')); return { rows: [...c.querySelectorAll('.ob-rule')].map((r) => r.textContent), last: c.querySelector('.of-card-body').lastElementChild.textContent, note: c.querySelector('.ob-note').textContent, btn: !!c.querySelector('.ob-actions .btn') }; });
   check('rules: seven live rows', rules.rows.length === 7, rules.rows.length);
   const joined = rules.rows.join(' | ');
-  check('rules: hot 135 F, cold 41 F, reheat 165 F once, 4 hour hold, 2 hour grace, 30 minute checks, 4 hour sanitize', ['135', '41', '165', 'once', '4 hours in the cabinet', 'Grace of 2 hours', 'every 30 minutes', 'every 4 hours'].every((w) => joined.indexOf(w) >= 0), joined);
+  check('rules: hot 135 F, cold 41 F, reheat 165 F once, 4 hour hold, 2 hour grace, 2 hour checks, 4 hour sanitize', ['135', '41', '165', 'once', '4 hours in the cabinet', 'Grace of 2 hours', 'every 2 hours', 'every 4 hours'].every((w) => joined.indexOf(w) >= 0), joined);
   check('rules: always ends with the safety line from the config', rules.last.trim() === (await page.evaluate(() => SB.config.safetyLine)), rules.last);
   check('rules: says the grace clock differs from the report (finding F-E1)', /research report/.test(rules.note) && /first reading below/.test(rules.note), rules.note);
   // live from settings

@@ -561,7 +561,7 @@
         onConfirm: (sh) => {
           const res = run('startCooling', { batchId: b.id });
           sh.close('confirm');
-          if (res.report === 'ok') { toast(label + ' is cooling. Log a reading at least every ' + S.tempCheckEveryMin + ' minutes.', 'ok'); update(nowMs()); const rec = cards.get(res.info && res.info.batchId); if (rec) { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); } }
+          if (res.report === 'ok') { toast(label + ' is cooling. Log a reading at least every ' + U.minutesText(S.tempCheckEveryMin) + '.', 'ok'); update(nowMs()); const rec = cards.get(res.info && res.info.batchId); if (rec) { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); } }
           else toast(say(res), 'warn');
         },
       });
@@ -1514,7 +1514,7 @@
       helpList([
         rule('flame', 'Keep hot food hot', 'Hot food stays at ' + S.hotHoldF + ' °F or above.'),
         rule('snow', 'Keep cold food cold', 'Cold food stays at ' + S.coldHoldF + ' °F or below.'),
-        rule('thermometer', 'Log a temperature', 'At least every ' + S.tempCheckEveryMin + ' minutes. A late check shows Check temp and is counted.'),
+        rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + S.hotHoldF + ' °F, reheat to ' + S.reheatF + ' °F within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
         rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + S.hotHoldF + ' °F, not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
         rule('package', 'Hold limit', 'A batch is discarded after ' + S.defaultMaxHoldH + ' hours in the cabinet, or less if its own limit is shorter.'),

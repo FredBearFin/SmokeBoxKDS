@@ -1746,7 +1746,7 @@
     service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20) },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
       defaultMaxHoldH: B('defaultMaxHoldH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
-      cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) } },
+      cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' } },
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
     syncTargetSec: R(10, 600),
@@ -2440,7 +2440,7 @@
     // Numbers for the header badges: tickets, ready, overdue and warn counts, per-station counts, batches
     // needing attention, dishes 86, and whether sanitising is overdue.
     counts(state, now) {
-      const c = { all: 0, expo: 0, ready: 0, overdue: 0, warn: 0, zones: {}, overdueByZone: {}, hold: 0, out86: 0, sanitizeDueAt: undefined, sanitizeOverdue: false };
+      const c = { all: 0, expo: 0, ready: 0, overdue: 0, warn: 0, zones: {}, overdueByZone: {}, hold: 0, holdWhy: { check: 0, reheat: 0, chill: 0, discard: 0 }, out86: 0, sanitizeDueAt: undefined, sanitizeOverdue: false };
       for (const z of C.workZones) { c.zones[z] = 0; c.overdueByZone[z] = 0; }
       if (!isState(state)) return c;
       for (const t of views.activeTickets(state)) {
@@ -2460,7 +2460,11 @@
       for (const b of state.batches) {
         if (b.status === 'discard' || !(b.remainingG > 0)) continue;
         const gt = gate(b, now, S);
-        if (gt.action !== 'NONE') c.hold++;
+        if (gt.action !== 'NONE') {
+          c.hold++;
+          const why = gt.action === 'CHECK_TEMP' ? 'check' : gt.action === 'REHEAT_IMMEDIATE' ? 'reheat' : gt.action === 'CHILL_NOW' ? 'chill' : 'discard';
+          c.holdWhy[why]++;
+        }
       }
       for (const mi of state.menu) { const a = state.avail[mi.id]; if (a && !a.ok && !mi.archived) c.out86++; }
       const sz = state.sanitize || {};
@@ -2643,7 +2647,13 @@
       const def = newState({ now: 0, empty: true });
       // settings
       const settings = defaultSettings();
-      repairInto(settings, isObj(st.settings) ? st.settings : {}, SET_SCHEMA, 'settings', repaired);
+      const savedSet = isObj(st.settings) ? st.settings : {};
+      // Saves from before the 2-hour check default still say 30 minutes. Move those to the new default once;
+      // any other value was chosen by the owner and stays.
+      if (isObj(savedSet.safety) && !hasOwn(savedSet.safety, 'tempIntervalV2') && savedSet.safety.tempCheckEveryMin === 30) {
+        savedSet.safety = Object.assign({}, savedSet.safety); delete savedSet.safety.tempCheckEveryMin; repaired.push('settings.safety.tempCheckEveryMin moved to the new default');
+      }
+      repairInto(settings, savedSet, SET_SCHEMA, 'settings', repaired);
       if (!(settings.service.openHour < settings.service.closeHour)) { settings.service = Object.assign({}, C.service); repaired.push('settings.service reset'); }
       if (!(settings.safety.cooling.stage1H < settings.safety.cooling.totalH)) { settings.safety.cooling = Object.assign({}, C.safety.cooling); repaired.push('settings.safety.cooling reset'); }
       // ingredients

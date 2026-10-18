@@ -191,8 +191,9 @@
     aboveColdGraceH: 4,     // above 41F for more than this -> discard
     cooling: { stage1ToF: 70, stage1H: 2, totalH: 6, finalF: 41 }, // 135->70 in 2h, then 70->41 inside 4 more (6h total) (3-501.14)
     defaultMaxHoldH: 4,     // total time in the hold cabinet before discard
-    tempCheckEveryMin: 30,  // a temperature reading is due this often
+    tempCheckEveryMin: 120, // a temperature reading is due this often (2 h; the FDA minimum is 4 h)
     sanitizeEveryH: 4,      // food-contact surfaces (4-602.11)
+    tempIntervalV2: true,   // marks settings made after the check interval default moved from 30 to 120 minutes
   };
   // The allowed range for each owner-editable safety number, as [lowest, highest]. The legal limits are
   // fixed ends: hot hold never below 135 F, cold hold never above 41 F, reheat never below 165 F. The two
@@ -200,7 +201,7 @@
   // time and check interval are house settings with wider ranges.
   C.safetyBounds = {
     hotHoldF: [135, 200], coldHoldF: [33, 41], reheatF: [165, 212], belowHotGraceH: [0.5, 2], aboveColdGraceH: [0.5, 4],
-    defaultMaxHoldH: [0.5, 12], tempCheckEveryMin: [10, 120], sanitizeEveryH: [1, 4],
+    defaultMaxHoldH: [0.5, 12], tempCheckEveryMin: [10, 240], sanitizeEveryH: [1, 4],
   };
 
   // Brisket cooked yield, from the Texas A&M AgriLife regression in the research report. Used only for

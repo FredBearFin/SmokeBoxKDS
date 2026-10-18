@@ -1007,7 +1007,7 @@
     // tools with counts
     const recentN = recentCount(S, now);
     toolCount(m.tool.recall, recentN, '', recentN ? recentN + ' recently bumped' : '');
-    toolCount(m.tool.hold, c.hold, 'warn', c.hold ? c.hold + ' ' + U.plural(c.hold, 'batch', 'batches') + ' need attention' : '');
+    toolCount(m.tool.hold, c.hold, 'warn', holdReason(c));
     toolCount(m.tool.board86, c.out86, 'bad', c.out86 ? c.out86 + ' ' + U.plural(c.out86, 'item') + ' off the menu' : '');
     // Orders still open, counted again only when the orders list itself changed.
     const ords = S.getState().orders || [];
@@ -1062,6 +1062,15 @@
     let n = 0;
     for (let i = 0; i < list.length; i++) if (typeof list[i].expeditedAt === 'number' && now - list[i].expeditedAt < 30 * 60e3) n++;
     return n;
+  }
+  // Spells out why the Hold button is lit, for example "2 temperature checks due, 1 to throw out". Empty when nothing is due.
+  function holdReason(c) {
+    const w = c.holdWhy || {}, bits = [];
+    if (w.check) bits.push(w.check + ' temperature ' + U.plural(w.check, 'check') + ' due');
+    if (w.reheat) bits.push(w.reheat + ' to reheat');
+    if (w.chill) bits.push(w.chill + ' to chill now');
+    if (w.discard) bits.push(w.discard + ' to throw out');
+    return bits.join(', ');
   }
   // Updates one header button: count badge, tone and spoken label. A text argument replaces the number.
   function toolCount(t, n, tone, aria, text) {
