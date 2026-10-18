@@ -287,6 +287,7 @@
       else if (d.type === 'alert-ack' && typeof d.id === 'string') { ladder.acknowledge(d.id); pending.forget(d.id); }
     });
     const timer = setInterval(() => { syncLeadership(); sayHello(); }, HELLO_MS);
+    // When this tab is shown or hidden, work out leadership again and say so to the others.
     const onVis = () => { syncLeadership(); sayHello(); };
     doc.addEventListener('visibilitychange', onVis);
     syncLeadership(); sayHello();

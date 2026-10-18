@@ -493,12 +493,15 @@
   //   still in the feed, not acknowledged, and for warnings the batch is not past its time) and empties the queue.
   function makePending() {
     const q = new Map(), done = new Map();
+    // The key that names one held sound: its row, its level and its keep epoch.
     const keyOf = (c) => c.d.id + ':' + c.level + ':' + (c.d.epoch || 0);
     return {
       // A sound the leader already played (its message can arrive before this tab has even decided) is not held back.
       add(c, now) { const t = U.isNum(now) ? now : Date.now(), k = keyOf(c); if (done.has(k) && t - done.get(k) < 60000) return; q.set(k, c); },
       played(keys, now) { const t = U.isNum(now) ? now : Date.now(); for (const k of keys || []) { q.delete(k); done.set(k, t); } if (done.size > 200) for (const [k, v] of done) if (t - v > 60000) done.delete(k); },
+      // Forgets every held sound for one row (someone acknowledged it).
       forget(id) { for (const k of Array.from(q.keys())) if (q.get(k).d.id === id) q.delete(k); },
+      // Takes what is still true out of the queue: the one strongest sound, or nothing.
       drain(feed, isAcked) {
         const live = new Map((feed || []).map((d) => [d.id, d]));
         const ok = Array.from(q.values()).filter((c) => { const d = live.get(c.d.id); return d && (d.epoch || 0) === (c.d.epoch || 0) && !isAcked(d.id) && (c.level === 4 || d.msLeft > 0); });
@@ -507,6 +510,7 @@
         ok.sort((a, b) => (b.level - a.level) || (a.d.msLeft - b.d.msLeft));
         return [{ level: ok[0].level, d: live.get(ok[0].d.id), repeat: false }];
       },
+      // How many sounds are held.
       size: () => q.size,
     };
   }
