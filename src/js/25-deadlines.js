@@ -99,7 +99,7 @@
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H)) {
           const quiet = rung === 0;
           out.push({ id: 'expiry:' + b.id, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length,
-            sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, wasteG: waste, wasteUsd: usd, guess: rate === undefined });
+            sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, wasteG: waste, wasteUsd: usd, goes86: lastOne, guess: rate === undefined });
         }
       });
       // Run-out: when the whole stock of this item will be gone at the current pace.
@@ -134,6 +134,18 @@
         consequence: text, action: kind === 'check' ? 'Log a temperature.' : kind === 'reheat' ? 'Reheat it and log the reading.' : kind === 'chill' ? 'Chill it now.' : 'Log a reading as it cools.', guess: false });
     }
   }
+  // Rows for batches that expired and were thrown out in the last 30 minutes, so the loss is not silent.
+  function expiredRows(state, now, out) {
+    for (const b of state.batches) {
+      if (b.status !== 'discard' || b.discardReason !== 'expired' || !U.isNum(b.discardedAt) || now - b.discardedAt > 30 * MIN) continue;
+      const ing = state.ingredients.find((x) => x.id === b.ing);
+      const name = ing ? ing.name : b.ing;
+      const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');
+      const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' ($' + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
+      out.push({ id: 'expired:' + b.id, kind: 'expired', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
+        consequence: 'Expired and thrown out: ' + U.fmtG(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', guess: false });
+    }
+  }
   // Rows for tickets and the sanitize timer.
   function otherRows(state, now, out) {
     const C0 = E().views.counts(state, now);
@@ -154,6 +166,7 @@
     const sales = salesRate(state, now);
     batchRows(state, now, S, sales, out);
     safetyRows(state, now, S, out);
+    expiredRows(state, now, out);
     otherRows(state, now, out);
     out.sort((a, b) => (SEV_RANK[a.sev] - SEV_RANK[b.sev]) || (a.msLeft - b.msLeft) || (a.id < b.id ? -1 : 1));
     return out;

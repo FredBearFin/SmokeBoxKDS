@@ -35,6 +35,8 @@
   const E = () => SB.engine;
   // Browser-storage keys: the sound switch, and whether the all-day strip is folded.
   const KEY_SOUND = 'smokebox.v1.sound';
+  // Whether warnings are also spoken aloud (the tablet's own voice), on by default.
+  const KEY_SPEECH = 'smokebox.v1.speech';
   const KEY_DOCK = 'smokebox.v1.dock';
   // Set to "done" once the welcome card has been dismissed.
   const KEY_WELCOME = 'smokebox.v1.welcome';
@@ -49,7 +51,9 @@
 
   let m = null;          // the mounted instance
   let pendingZone = null;
-  let sound = !!U.storage.get(KEY_SOUND, false);
+  // Sound is on by default: a kitchen that misses a warning loses food. A browser still needs one tap to allow audio.
+  let sound = U.storage.get(KEY_SOUND, true) !== false;
+  let speech = U.storage.get(KEY_SPEECH, true) !== false;
   let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0;
 
   // Small helpers used by every part below.
@@ -167,6 +171,57 @@
     if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; chime(); }
     return sound;
   };
+  // Tells whether warnings are spoken aloud right now.
+  F.speech = () => speech;
+  // Switches spoken warnings on or off and remembers it. Speech only plays while sound is on.
+  F.setSpeech = function (on) {
+    speech = !!on;
+    U.storage.set(KEY_SPEECH, speech);
+    if (speech && sound) speak('Spoken warnings are on.');
+    return speech;
+  };
+  // Says one short fixed phrase with the tablet's voice when sound and speech are both on. Never queues up: a new
+  // phrase replaces an old one.
+  function speak(text) {
+    if (!sound || !speech) return;
+    try {
+      const ss = g.speechSynthesis, U2 = g.SpeechSynthesisUtterance;
+      if (!ss || !U2) return;
+      ss.cancel();
+      const u = new U2(text);
+      u.rate = 0.95; u.volume = 1;
+      ss.speak(u);
+    } catch (e) { /* speech is optional */ }
+  }
+  // Plays the loud warning for the last minutes: three pairs of high and low notes, much louder than the chime.
+  function alarmTone() {
+    if (!sound) return;
+    const a = resumeAudio();
+    if (!a) return;
+    try { const t0 = a.currentTime + 0.01; for (let i = 0; i < 3; i++) { tone(a, 880, t0 + i * 0.5, 0.22, 0.4); tone(a, 1320, t0 + i * 0.5 + 0.24, 0.22, 0.4); } } catch (e) { /* audio is optional */ }
+  }
+  // Plays the falling three-note sound for a batch that has just expired and been thrown out.
+  function expiryTone() {
+    if (!sound) return;
+    const a = resumeAudio();
+    if (!a) return;
+    try { const t0 = a.currentTime + 0.01; tone(a, 660, t0, 0.35, 0.35); tone(a, 494, t0 + 0.3, 0.35, 0.35); tone(a, 330, t0 + 0.6, 0.7, 0.35); } catch (e) { /* audio is optional */ }
+  }
+  // True once the browser has let this page make sound (it needs one tap first).
+  const audioReady = () => !!audio && audio.state === 'running';
+
+  // Screen wake lock: asks the browser to keep the screen on while the board is showing. Not every browser
+  // allows it; F.wakeLock() says what happened.
+  let wakeSentinel = null, wakeState = 'unknown';
+  // Requests the wake lock now, and again whenever the page comes back to the front.
+  function requestWake() {
+    try {
+      if (!g.navigator || !g.navigator.wakeLock) { wakeState = 'unsupported'; return; }
+      g.navigator.wakeLock.request('screen').then((sn) => { wakeSentinel = sn; wakeState = 'on'; sn.addEventListener('release', () => { wakeState = 'released'; }); }, () => { wakeState = 'refused'; });
+    } catch (e) { wakeState = 'refused'; }
+  }
+  // Reports the screen wake lock state: unknown, on, released, refused or unsupported.
+  F.wakeLock = () => wakeState;
 
   // Mounting: the board is built once into the element the shell provides.
 
@@ -207,6 +262,12 @@
     m.offs.push(store().subscribeTick(onTick));
     doc.addEventListener('keydown', onKey);
     m.offs.push(() => doc.removeEventListener('keydown', onKey));
+    // Keep the screen awake while the board shows, and ask again when the page returns to the front.
+    requestWake();
+    const onVis = () => { if (doc.visibilityState === 'visible') requestWake(); };
+    doc.addEventListener('visibilitychange', onVis);
+    m.offs.push(() => { doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
+    if (sound) hookAudioUnlock();
     if (SB.sim && SB.sim.live && typeof SB.sim.live.onChange === 'function') {
       try { const off = SB.sim.live.onChange(() => { if (m) updateHeader(store().now()); }); if (typeof off === 'function') m.offs.push(off); } catch (e) { /* the simulator is optional */ }
     }
@@ -1000,32 +1061,67 @@
   function buildStrip() {
     const rows = [];
     const el = h('section', { class: 'fl-strip', role: 'region', 'aria-label': 'Needs attention', 'aria-live': 'polite', hidden: true });
+    // The sound check: shown while sound is on but the browser has not yet allowed it. One tap allows it and plays a test.
+    const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', hidden: true, onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); chime(); speak('Sound is on.'); } },
+      ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
+    el.appendChild(soundBar);
     for (let i = 0; i < 3; i++) {
       const when = h('span', { class: 'fl-strip-when num' }), what = h('span', { class: 'fl-strip-what' }), why = h('span', { class: 'fl-strip-why' });
-      // Opens the hold cabinet on this row's batch, or just the cabinet when the row is not about one batch.
-      const openRow = () => { const r = rows[i]; if (r && r.key && r.batchId) openHoldFor(r.batchId); else if (r && r.key) openSheet('hold'); };
+      // Acknowledges this row, then opens the hold cabinet on its batch, or just the cabinet when it is not about one batch.
+      const openRow = () => { const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (r.batchId) openHoldFor(r.batchId); else openSheet('hold'); };
       const row = h('button', { type: 'button', class: 'fl-strip-row', hidden: true, onClick: openRow },
         when, h('span', { class: 'fl-strip-text' }, what, why));
       rows.push({ el: row, when, what, why, key: '', batchId: null });
       el.appendChild(row);
     }
-    return { el, rows };
+    return { el, rows, soundBar };
   }
   // Opens the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { if (SB.sheets) SB.sheets.open('hold', { batchId }); } catch (e) { console.error('[smokebox] sheet failed', e); } }
+  // Warning ladder memory: for each deadline id, the rung already announced, the rung the cook acknowledged by
+  // tapping it, and when the loud tone last played.
+  const ladder = new Map();
+  // Announces a deadline when it reaches a new rung: a soft chime first, then a spoken call, then the loud tone
+  // that repeats until someone taps the row. Expiry has its own sound.
+  function announce(d, perfNow) {
+    const st = ladder.get(d.id) || { rung: 0, ack: 0, loudAt: 0 };
+    ladder.set(d.id, st);
+    if (d.kind === 'expired') {
+      if (st.rung < 1) { st.rung = 1; expiryTone(); speak(d.label + ' expired and was thrown out.'); }
+      return;
+    }
+    if (d.kind !== 'expiry' || d.rung < 1) return;
+    const last = d.rung >= d.rungs;
+    if (d.rung > st.rung) {
+      st.rung = d.rung; st.ack = 0;
+      const mins = Math.max(1, Math.round(d.msLeft / 60e3));
+      if (d.msLeft <= 0) { expiryTone(); speak(d.label + ' has expired.'); }
+      else if (last) { alarmTone(); st.loudAt = perfNow; speak(d.label + (d.goes86 ? ' goes 86' : ' expires') + ' in ' + mins + ' ' + U.plural(mins, 'minute') + '.'); }
+      else if (d.rung >= 2) { chime(); speak(d.label + (d.goes86 ? ' goes 86' : ' expires') + ' in about ' + mins + ' minutes.'); }
+      else chime();
+    } else if (last && st.ack < d.rung && d.msLeft > 0 && perfNow - st.loudAt >= 20000) { st.loudAt = perfNow; alarmTone(); }
+  }
+  // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
+  function acknowledge(key) { const st = ladder.get(key); if (st) st.ack = st.rung; }
   // Rewrites the strip from the deadline feed: the top three rows, or hidden when the feed is empty.
   function updateStrip(now) {
     if (!m || !m.strip || !SB.deadlines) return;
-    const feed = SB.deadlines.build(store().getState(), now).filter((d) => d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'runout');
+    const all = SB.deadlines.build(store().getState(), now);
+    const perfNow = performance.now();
+    all.forEach((d) => announce(d, perfNow));
+    // Info rows only show for batches and run-outs; an expired notice goes away once someone taps it.
+    const feed = all.filter((d) => (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'runout') && !(d.kind === 'expired' && (ladder.get(d.id) || {}).ack));
     const top = feed.slice(0, 3);
-    setHidden(m.strip.el, top.length === 0);
+    const needSound = sound && !audioReady();
+    setHidden(m.strip.soundBar, !needSound);
+    setHidden(m.strip.el, top.length === 0 && !needSound);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
       setHidden(r.el, !d);
       if (!d) { r.key = ''; return; }
       r.key = d.id; r.batchId = d.batchId || null;
       setTone(r.el, d.sev);
-      setTxt(r.when, countdownText(d.msLeft));
+      setTxt(r.when, d.kind === 'expired' ? 'OUT' : countdownText(d.msLeft));
       setTxt(r.what, d.label);
       setTxt(r.why, d.consequence + ' ' + d.action);
     });

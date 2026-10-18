@@ -455,7 +455,8 @@ await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (AC) { const orig = AC.prototype.createOscillator; AC.prototype.createOscillator = function () { window.__osc++; return orig.apply(this, arguments); }; }
   });
-  check('sound is off by default', (await page.evaluate(() => SB.floor.sound())) === false);
+  check('sound is on by default', (await page.evaluate(() => SB.floor.sound())) === true);
+  await page.evaluate(() => SB.floor.setSound(false));
   await page.evaluate(() => SB.store.dispatchEx('createTicket', { customer: 'Quiet one', channel: 'takeout', items: [{ menuId: 'mac' }] }, { source: 'ui' }));
   await settle(page, 400);
   check('no chime while sound is off', (await page.evaluate(() => window.__osc)) === 0);
