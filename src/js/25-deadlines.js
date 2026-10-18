@@ -478,6 +478,38 @@
       size: () => memory.size,
     };
   }
+  // Which tab makes the sound when the lock service is missing: from the hellos heard (and this tab), the visible tab wins,
+  // then the lowest tab id, among tabs that can make sound. A tab not heard from for 15 seconds is gone. hellos:
+  // [{ tab, visible, eligible, t }]; the answer is true when selfId is the one.
+  function electLeader(hellos, now, selfId) {
+    const live = (hellos || []).filter((x) => x && x.eligible && (x.tab === selfId || now - x.t <= 15000));
+    if (!live.some((x) => x.tab === selfId)) return false;
+    live.sort((a, b) => ((b.visible ? 1 : 0) - (a.visible ? 1 : 0)) || (a.tab < b.tab ? -1 : a.tab > b.tab ? 1 : 0));
+    return live[0].tab === selfId;
+  }
+  // The sounds a follower tab held back, so a sound is not lost when the tab that should have played it goes away.
+  //   add(call) keeps one (key: row id, level and epoch); played(keys) forgets what the leader played; forget(id) forgets a
+  //   row someone acknowledged; drain(feed, isAcked) returns the one strongest call that is still true now (its row is
+  //   still in the feed, not acknowledged, and for warnings the batch is not past its time) and empties the queue.
+  function makePending() {
+    const q = new Map(), done = new Map();
+    const keyOf = (c) => c.d.id + ':' + c.level + ':' + (c.d.epoch || 0);
+    return {
+      // A sound the leader already played (its message can arrive before this tab has even decided) is not held back.
+      add(c, now) { const t = U.isNum(now) ? now : Date.now(), k = keyOf(c); if (done.has(k) && t - done.get(k) < 60000) return; q.set(k, c); },
+      played(keys, now) { const t = U.isNum(now) ? now : Date.now(); for (const k of keys || []) { q.delete(k); done.set(k, t); } if (done.size > 200) for (const [k, v] of done) if (t - v > 60000) done.delete(k); },
+      forget(id) { for (const k of Array.from(q.keys())) if (q.get(k).d.id === id) q.delete(k); },
+      drain(feed, isAcked) {
+        const live = new Map((feed || []).map((d) => [d.id, d]));
+        const ok = Array.from(q.values()).filter((c) => { const d = live.get(c.d.id); return d && (d.epoch || 0) === (c.d.epoch || 0) && !isAcked(d.id) && (c.level === 4 || d.msLeft > 0); });
+        q.clear();
+        if (!ok.length) return [];
+        ok.sort((a, b) => (b.level - a.level) || (a.d.msLeft - b.d.msLeft));
+        return [{ level: ok[0].level, d: live.get(ok[0].d.id), repeat: false }];
+      },
+      size: () => q.size,
+    };
+  }
   // Builds the feed: every deadline worth showing right now, worst first. Each row has id, kind, label, at,
   // msLeft, rung, sev (bad, warn, info), consequence and action. Batch rows also carry projected waste.
   function build(state, now) {
@@ -495,5 +527,5 @@
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder };
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

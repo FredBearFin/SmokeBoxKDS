@@ -194,3 +194,43 @@ test('snooze: feed rows carry the reminder time and sort after live rows of the 
   assert.equal(rows.length, 2);
   assert.ok(!rows[0].snoozedUntil && rows[1].snoozedUntil > 0, 'the put-off row comes last');
 });
+
+/* ---------------------------------------- sound leader helpers (no browser) ---------------------------------------- */
+test('electLeader: visible beats hidden, lowest id breaks ties, silent or gone tabs do not count, a lone tab leads', () => {
+  const now = 100000, h = (tab, visible, eligible = true, t = now) => ({ tab, visible, eligible, t });
+  assert.equal(D.electLeader([h('b', true), h('a', true)], now, 'a'), true);
+  assert.equal(D.electLeader([h('b', true), h('a', true)], now, 'b'), false);
+  assert.equal(D.electLeader([h('a', false), h('b', true)], now, 'b'), true, 'the visible tab wins over a lower id');
+  assert.equal(D.electLeader([h('a', true, false), h('b', true)], now, 'b'), true, 'a tab that cannot make sound is skipped');
+  assert.equal(D.electLeader([h('a', true, true, now - 20000), h('b', true)], now, 'b'), true, 'a tab not heard from for 15 s is gone');
+  assert.equal(D.electLeader([h('a', true), h('b', true, false)], now, 'b'), false, 'a tab that cannot make sound never leads');
+  assert.equal(D.electLeader([], now, 'a'), false);
+  assert.equal(D.electLeader([h('a', false)], now, 'a'), true, 'a lone hidden tab still leads');
+});
+
+test('pending sounds: forgotten when played or acknowledged; on promotion only what is still true plays, once, the strongest', () => {
+  const k = kit();
+  run(k, 1, 232);
+  const feed = D.build(k.s, T0 + 232 * MIN);
+  const row = feed.find((x) => x.kind === 'expiry');
+  const P = D.makePending();
+  const call = (level, d) => ({ level, d, repeat: false });
+  P.add(call(2, row)); P.add(call(3, row));
+  assert.equal(P.size(), 2);
+  P.played([row.id + ':2:0']);
+  assert.equal(P.size(), 1);
+  let out = P.drain(feed, () => false);
+  assert.deepEqual(out.map((c) => c.level), [3]);
+  assert.equal(P.size(), 0, 'the queue is emptied');
+  // Acknowledged: nothing to play. A row that is gone: nothing to play.
+  P.add(call(3, row));
+  assert.deepEqual(P.drain(feed, (id) => id === row.id), []);
+  P.add(call(3, row)); P.forget(row.id);
+  assert.equal(P.size(), 0);
+  P.add(call(3, row));
+  assert.deepEqual(P.drain([], () => false), [], 'the row is no longer in the feed');
+  // Two rows: the stronger level wins and only one call comes back.
+  const other = Object.assign({}, row, { id: 'expiry:b_x:0', batchId: 'b_x' });
+  P.add(call(2, other)); P.add(call(3, row));
+  assert.equal(P.drain(feed.concat([other]), () => false).length, 1);
+});

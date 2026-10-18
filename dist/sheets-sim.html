@@ -6107,10 +6107,18 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     state = E().tick(replayOnto(theirs), now()).state;
     scheduleNotify();
   }
+  // Listeners for alert messages from other tabs.
+  const bcListeners = new Set();
+  // Sends a message to the other tabs of this browser. Returns false when there is no channel (then each tab acts alone).
+  function broadcast(msg) { if (!bc) return false; try { bc.postMessage(Object.assign({}, msg, { tab: tabId })); return true; } catch (e) { return false; } }
+  // Registers fn for messages from other tabs; returns a function that stops it.
+  function onBroadcast(fn) { bcListeners.add(fn); return () => bcListeners.delete(fn); }
   // Another tab announced a save. With nothing unsaved here, adopt its copy and redraw. With unsaved actions
   // here, replay them on top of its copy and save the merged result. Ignores our own messages.
   function onMessage(ev) {
     const d = ev && ev.data;
+    // Messages about alerts (sound leader, played, acknowledged) go to whoever listens; they are not saves.
+    if (d && d.tab !== tabId && typeof d.type === 'string' && d.type.indexOf('alert-') === 0) { bcListeners.forEach((fn) => { try { fn(d); } catch (e) { /* a listener must not stop the others */ } }); return; }
     if (!d || d.tab === tabId || d.type !== 'saved' || !storage) return;
     if (d.sid && d.sid === baseSid) return;
     if (!d.sid && isNum(d.rev) && state && d.rev <= state.rev) return; // an older build of the app: keep the newer-revision rule
@@ -6471,6 +6479,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
     flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY,
+    // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
+    broadcast, onBroadcast, canBroadcast: () => !!bc, tabId,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 

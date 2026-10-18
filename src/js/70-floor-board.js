@@ -144,7 +144,7 @@
   // Plays the two-note chime for a new ticket when sound is on.
   // WATCH OUT: calls within 600 ms of the last are dropped, so a burst of tickets makes one ding.
   function chime() {
-    if (!sound) return;
+    if (!audible()) return;
     const nowMs = performance.now();
     if (nowMs - lastChime < 600) return; // a burst of tickets is one ding, not twelve
     lastChime = nowMs;
@@ -154,7 +154,7 @@
   }
   // Plays three short high beeps when a dish's time is up (when sound is on). Several dishes at once make one set.
   function checkChime() {
-    if (!sound) return;
+    if (!audible()) return;
     const nowMs = performance.now();
     if (nowMs - lastCheck < 1500) return;
     lastCheck = nowMs;
@@ -168,7 +168,8 @@
   F.setSound = function (on) {
     sound = !!on;
     U.storage.set(KEY_SOUND, sound);
-    if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; chime(); }
+    if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; playHere(chime); }
+    syncLeadership();
     return sound;
   };
   // Tells whether warnings are spoken aloud right now.
@@ -177,13 +178,13 @@
   F.setSpeech = function (on) {
     speech = !!on;
     U.storage.set(KEY_SPEECH, speech);
-    if (speech && sound) speak('Spoken warnings are on.');
+    if (speech && sound) playHere(() => speak('Spoken warnings are on.'));
     return speech;
   };
   // Says one short fixed phrase with the tablet's voice when sound and speech are both on. Never queues up: a new
   // phrase replaces an old one.
   function speak(text) {
-    if (!sound || !speech) return;
+    if (!audible() || !speech) return;
     try {
       const ss = g.speechSynthesis, U2 = g.SpeechSynthesisUtterance;
       if (!ss || !U2) return;
@@ -195,20 +196,102 @@
   }
   // Plays the loud warning for the last minutes: three pairs of high and low notes, much louder than the chime.
   function alarmTone() {
-    if (!sound) return;
+    if (!audible()) return;
     const a = resumeAudio();
     if (!a) return;
     try { const t0 = a.currentTime + 0.01; for (let i = 0; i < 3; i++) { tone(a, 880, t0 + i * 0.5, 0.22, 0.4); tone(a, 1320, t0 + i * 0.5 + 0.24, 0.22, 0.4); } } catch (e) { /* audio is optional */ }
   }
   // Plays the falling three-note sound for a batch that has just expired and been thrown out.
   function expiryTone() {
-    if (!sound) return;
+    if (!audible()) return;
     const a = resumeAudio();
     if (!a) return;
     try { const t0 = a.currentTime + 0.01; tone(a, 660, t0, 0.35, 0.35); tone(a, 494, t0 + 0.3, 0.35, 0.35); tone(a, 330, t0 + 0.6, 0.7, 0.35); } catch (e) { /* audio is optional */ }
   }
   // True once the browser has let this page make sound (it needs one tap first).
   const audioReady = () => !!audio && audio.state === 'running';
+
+  // Sound leader. With several tabs of this app open on one device, only one makes sound; the others still draw the
+  // strip. The tab that holds a Web Lock named smokebox-sound is the leader (a tab that cannot make sound, because
+  // its sound is off or the browser has not let it play yet, does not ask for the lock). Without Web Locks the tabs
+  // send hellos and agree on a leader (visible tab first). Without a way to talk to other tabs every tab is its own
+  // leader. A visible tab takes over from a hidden leader, since hidden tabs get slow timers.
+  const LEAD_LOCK = 'smokebox-sound', HELLO_MS = 5000;
+  const lead = { coordinated: false, isLeader: false, want: false, token: 0, release: null, abort: null, peers: new Map(), hello: 0, needDrain: false, forced: false, off: null };
+  const pending = SB.deadlines.makePending();
+  // What this tab knows about sound leadership (for tests and the office page): whether it leads and whether tabs coordinate.
+  F.leader = () => ({ leader: isLeader(), coordinated: lead.coordinated, pending: pending.size() });
+  // True when this tab should make sound now.
+  const isLeader = () => lead.forced || !lead.coordinated || lead.isLeader;
+  // The one question every sound function asks first: sound is on and this tab is the leader (or the sound is a local test).
+  const audible = () => sound && isLeader();
+  // Runs fn so that the sounds it makes play here whatever the leader is: a tap on "turn sound on" is a local test.
+  function playHere(fn) { lead.forced = true; try { fn(); } finally { lead.forced = false; } }
+  // A tab can lead when the board is showing, sound is on and the browser lets it play.
+  const canLead = () => !!m && sound && audioReady();
+  // Says to the other tabs whether this tab is visible, can lead, and leads.
+  function sayHello() {
+    if (SB.store && SB.store.broadcast) SB.store.broadcast({ type: 'alert-hello', visible: doc.visibilityState !== 'hidden', eligible: canLead(), lead: lead.isLeader });
+  }
+  // Records a change of leader (promotion means any sound held back is checked and played).
+  function setLeader(on) {
+    if (on === lead.isLeader) return;
+    lead.isLeader = on;
+    if (on) lead.needDrain = true;
+    if (g.console && console.debug) console.debug('[smokebox] sound leader:', on ? 'this tab' : 'another tab');
+    sayHello();
+  }
+  // Asks for the lock (steal: take it from a hidden leader). When it is lost or released the request is renewed while still wanted.
+  function takeLock(steal) {
+    lead.want = true;
+    const token = ++lead.token;
+    if (lead.abort) { try { lead.abort.abort(); } catch (e) { /* queued request only */ } }
+    const ac = new g.AbortController(); lead.abort = ac;
+    const opts = steal ? { steal: true } : { signal: ac.signal };
+    g.navigator.locks.request(LEAD_LOCK, opts, () => new Promise((res) => { if (token !== lead.token) { res(); return; } lead.release = res; setLeader(true); }))
+      .catch(() => {})
+      .then(() => { if (token !== lead.token) return; lead.release = null; setLeader(false); if (lead.want && canLead()) takeLock(false); });
+  }
+  // Gives the lock up (sound turned off, or the board left).
+  function dropLock() {
+    lead.want = false; lead.token++;
+    if (lead.release) { lead.release(); lead.release = null; }
+    if (lead.abort) { try { lead.abort.abort(); } catch (e) { /* ignore */ } lead.abort = null; }
+    setLeader(false);
+  }
+  // Keeps leadership in step with what this tab can do; cheap, called every tick.
+  function syncLeadership() {
+    if (!m || !SB.store || !SB.store.canBroadcast || !SB.store.canBroadcast()) { lead.coordinated = false; return; }
+    lead.coordinated = true;
+    const can = canLead();
+    if (g.navigator && g.navigator.locks) {
+      if (can && !lead.want) takeLock(false);
+      else if (!can && lead.want) dropLock();
+      else if (can && !lead.isLeader && doc.visibilityState !== 'hidden') {
+        // A hidden leader is replaced by this visible tab.
+        const hidden = Array.from(lead.peers.values()).some((p) => p.lead && !p.visible && Date.now() - p.t < 3 * HELLO_MS);
+        if (hidden) takeLock(true);
+      }
+    } else if (can) {
+      const hellos = [{ tab: SB.store.tabId, visible: doc.visibilityState !== 'hidden', eligible: true, t: Date.now() }];
+      lead.peers.forEach((p, tab) => hellos.push({ tab, visible: p.visible, eligible: p.eligible, t: p.t }));
+      setLeader(SB.deadlines.electLeader(hellos, Date.now(), SB.store.tabId));
+    } else setLeader(false);
+  }
+  // Starts listening to the other tabs and sending hellos; returns a function that stops it all.
+  function joinLeadership() {
+    if (!SB.store || !SB.store.onBroadcast) return () => {};
+    const off = SB.store.onBroadcast((d) => {
+      if (d.type === 'alert-hello') { lead.peers.set(d.tab, { visible: !!d.visible, eligible: !!d.eligible, lead: !!d.lead, t: Date.now() }); syncLeadership(); }
+      else if (d.type === 'alert-played') pending.played(d.keys);
+      else if (d.type === 'alert-ack' && typeof d.id === 'string') { ladder.acknowledge(d.id); pending.forget(d.id); }
+    });
+    const timer = setInterval(() => { syncLeadership(); sayHello(); }, HELLO_MS);
+    const onVis = () => { syncLeadership(); sayHello(); };
+    doc.addEventListener('visibilitychange', onVis);
+    syncLeadership(); sayHello();
+    return () => { off(); clearInterval(timer); doc.removeEventListener('visibilitychange', onVis); dropLock(); lead.coordinated = false; lead.peers.clear(); };
+  }
 
   // Screen wake lock: asks the browser to keep the screen on while the board is showing. Not every browser
   // allows it; F.wakeLock() says what happened.
@@ -268,6 +351,7 @@
     doc.addEventListener('visibilitychange', onVis);
     m.offs.push(() => { doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
     if (sound) hookAudioUnlock();
+    m.offs.push(joinLeadership());
     // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
     if (SB.discards) { SB.discards.persist(); setTimeout(() => { try { SB.discards.remind(); } catch (e) { /* optional */ } }, 4000); }
     if (SB.setup) setTimeout(() => { try { SB.setup.offer(); } catch (e) { /* optional */ } }, 8000);
@@ -1102,7 +1186,7 @@
     const rows = [];
     const el = h('section', { class: 'fl-strip', role: 'region', 'aria-label': 'Needs attention', 'aria-live': 'polite', hidden: true });
     // The sound check: shown while sound is on but the browser has not yet allowed it. One tap allows it and plays a test.
-    const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', hidden: true, onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); chime(); speak('Sound is on.'); } },
+    const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', hidden: true, onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); playHere(() => { chime(); speak('Sound is on.'); }); } },
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     el.appendChild(soundBar);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
@@ -1137,6 +1221,9 @@
   // urgent item and how many others share the moment, so six batches expiring together are one warning, not six.
   function playCalls(calls) {
     if (!calls.length) return;
+    // Not the leader: hold the sounds back until the leader says it played them (or this tab takes over).
+    if (!isLeader()) { calls.forEach((c) => pending.add(c)); return; }
+    if (lead.coordinated && SB.store.broadcast) SB.store.broadcast({ type: 'alert-played', keys: calls.map((c) => c.d.id + ':' + c.level + ':' + (c.d.epoch || 0)) });
     const top = calls.reduce((a, c) => (c.level > a.level ? c : a), calls[0]);
     if (top.level === 4) expiryTone(); else if (top.level === 3) alarmTone(); else chime();
     if (top.level < 2 || top.repeat) return;
@@ -1149,13 +1236,21 @@
     speak(who + (first.goes86 && same.length === 1 ? ' goes 86' : same.length > 1 ? ' expire' : ' expires') + ' in ' + (top.level === 2 ? 'about ' : '') + mins + ' ' + U.plural(mins, 'minute') + '.');
   }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
-  function acknowledge(key) { ladder.acknowledge(key); }
+  function acknowledge(key) { ladder.acknowledge(key); pending.forget(key); if (lead.coordinated && SB.store.broadcast) SB.store.broadcast({ type: 'alert-ack', id: key }); }
   // Rewrites the strip from the deadline feed: the top three rows, or hidden when the feed is empty.
   function updateStrip(now) {
     if (!m || !m.strip || !SB.deadlines) return;
     const all = SB.deadlines.build(store().getState(), now);
     // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
-    if (SB.deadlines.soundsAllowed(store().getState(), now)) { const calls = ladder.decide(all, now, store().getState()); calls.forEach(logCall); playCalls(calls); }
+    syncLeadership();
+    if (SB.deadlines.soundsAllowed(store().getState(), now)) {
+      const calls = ladder.decide(all, now, store().getState());
+      calls.forEach(logCall);
+      // A tab that has just become the leader first catches up on sounds it held back that are still true.
+      let late = [];
+      if (lead.needDrain && isLeader()) { lead.needDrain = false; late = pending.drain(all, (id) => ladder.isAcked(id)); }
+      playCalls(late.concat(calls));
+    }
     // Info rows only show for batches and run-outs; an expired notice goes away once someone taps it.
     const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)));
     const top = feed.slice(0, 3);
