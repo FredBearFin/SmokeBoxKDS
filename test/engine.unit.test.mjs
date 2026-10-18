@@ -353,7 +353,11 @@ test('gate: every hot, cold and cooling branch', () => {
   assert.deepEqual(G({ ...hot, lastTempAt: undefined }, T0 + 10 * MIN), ['CHECK_TEMP', true, 'noReading', 'warn', 'check']);
   assert.deepEqual(G({ ...hot, lastTempAt: undefined }, T0 + 31 * MIN), ['CHECK_TEMP', true, 'noReading', 'bad', 'check']);
   // the hold limit is the tighter of the batch's own limit and the setting
-  assert.deepEqual(G(hot, T0 + 2 * HR + 1, { ...S, defaultMaxHoldH: 2 }).slice(0, 3), ['DISCARD_LOCKOUT', false, 'expired']);
+  // the hold limit is the batch's own; the default setting is only the fallback for a batch with none, and the hard cap caps both
+  const noOwn = { ...hot }; delete noOwn.maxHoldH;
+  assert.deepEqual(G(noOwn, T0 + 2 * HR + 1, { ...S, defaultMaxHoldH: 2 }).slice(0, 3), ['DISCARD_LOCKOUT', false, 'expired']);
+  assert.deepEqual(G(hot, T0 + 2 * HR + 1, { ...S, defaultMaxHoldH: 2 }).slice(0, 2), ['CHECK_TEMP', true]);
+  assert.deepEqual(G(hot, T0 + 3 * HR + 1, { ...S, hardCapH: 3 }).slice(0, 3), ['DISCARD_LOCKOUT', false, 'expired']);
   // cold
   const cold = { ...hot, ing: 'slaw', kind: 'cold', lastTempF: 38 };
   const S1 = { ...S, aboveColdGraceH: 1 };

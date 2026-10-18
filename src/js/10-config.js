@@ -77,9 +77,9 @@
     { id: 'turkey',   name: 'Smoked turkey',    unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 4, parG: 5000, pullG: 1500,  thresholdG: 500,  costPerKg: 11.00, yield: 0.70, yieldConfirmed: false },
     { id: 'mac',      name: 'Mac and cheese',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 1, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.60,  yield: 1,    yieldConfirmed: false },
     { id: 'beans',    name: 'Pit beans',        unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 2, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.00,  yield: 1,    yieldConfirmed: false },
-    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 7000, pullG: 1500,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
-    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 6000, pullG: 1500,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
-    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 5000, pullG: 1500,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
+    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', confirmBasis: true, cookH: 0.5, parG: 7000, pullG: 1500,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
+    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', confirmBasis: true, cookH: 0.5, parG: 6000, pullG: 1500,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
+    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', confirmBasis: true, cookH: 0.5, parG: 5000, pullG: 1500,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
     { id: 'cornbread', name: 'Cornbread',       unit: 'ea', tcs: false, parG: 120,   thresholdG: 8,   costEach: 0.45 },
     { id: 'buns',     name: 'Buns',             unit: 'ea', tcs: false, parG: 150,   thresholdG: 10,  costEach: 0.38 },
     { id: 'pickles',  name: 'Pickle chips',     unit: 'g',  tcs: false, parG: 6000,  thresholdG: 300,  costPerKg: 4.20 },
@@ -192,7 +192,8 @@
     belowHotGraceH: 2,      // below 135F for more than this -> discard (reheat only allowed inside it)
     aboveColdGraceH: 4,     // above 41F for more than this -> discard
     cooling: { stage1ToF: 70, stage1H: 2, totalH: 6, finalF: 41 }, // 135->70 in 2h, then 70->41 inside 4 more (6h total) (3-501.14)
-    defaultMaxHoldH: 12,    // longest any batch may stay in the cabinet (its maximum, so it no longer caps: each product has its own limit)
+    defaultMaxHoldH: 12,    // the hold limit for a product that has none of its own (every starter product has one)
+    hardCapH: 12,           // the longest any batch of any kind may stay in the cabinet: at this age it is thrown out
     tempCheckEveryMin: 120, // a temperature reading is due this often (2 h; the FDA minimum is 4 h)
     sanitizeEveryH: 4,      // food-contact surfaces (4-602.11)
     holdWindowV2: true,     // marks settings made after the hold limit moved from a flat 4 hours to per-product limits
@@ -212,7 +213,7 @@
   // time and check interval are house settings with wider ranges.
   C.safetyBounds = {
     hotHoldF: [135, 200], coldHoldF: [33, 41], reheatF: [165, 212], belowHotGraceH: [0.5, 2], aboveColdGraceH: [0.5, 4],
-    defaultMaxHoldH: [0.5, 12], tempCheckEveryMin: [10, 240], sanitizeEveryH: [1, 4],
+    defaultMaxHoldH: [0.5, 12], hardCapH: [1, 24], tempCheckEveryMin: [10, 240], sanitizeEveryH: [1, 4],
   };
 
   // Hold window per product (starter placeholders, owner to confirm; no source gives a maximum hold time):
@@ -223,6 +224,8 @@
   // temperature, hot at 135 F or above) or "safety" (time as a public health control, no temperature control).
   // cookH is how long a fresh batch takes from start to ready to rest (starter placeholders, owner to confirm). With restH
   // it tells whether a new batch started now would be ready before close.
+  // confirmBasis marks a starter hold basis the owner should check: cold held salads and pudding are set to a quality limit, but
+  // a place that holds them outside temperature control needs a safety limit instead.
   // pullG on an ingredient is the set amount one Pull button moves out of the cabinet (one whole brisket, one rack,
   // one pan), in grams. Starter estimates: the owner sets the real unit.
   // Brisket cooked yield, from the Texas A&M AgriLife regression in the research report. Used only for

@@ -352,3 +352,63 @@ test('feed: a batch that expires before close is waste in its expiry row, not al
   const exp = f.find((x) => x.kind === 'expiry');
   assert.ok(exp && exp.wasteG > 10000, 'the loss is in the expiry row: ' + (exp && exp.wasteG));
 });
+
+/* ---------------------------------------------------- hard cap and the kept-batch check row ---------------------------------------------------- */
+test('hard cap: its own setting; a limit at or above it has no quality stage; changing it moves the discard', () => {
+  const T = new Date(2026, 9, 12, 11, 0, 0).getTime();
+  const mk = (patch) => { const settings = E.defaultSettings(); Object.assign(settings.safety, patch); const s = E.newState({ now: T, empty: true, settings }); return E.apply(s, 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T).state; };
+  // default cap 12 h: ribs (4 h quality limit) go past, and are thrown out at 12 h
+  let s = mk({});
+  assert.equal(E.tick(s, T + 4 * HR + 1).state.batches[0].status, 'past');
+  // cap 4 h equals the limit: no quality stage, thrown out at the limit
+  s = mk({ hardCapH: 4 });
+  assert.equal(E.tick(s, T + 4 * HR + 1).events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 1);
+  // cap 3 h is below the limit: thrown out at 3 h
+  s = mk({ hardCapH: 3 });
+  assert.equal(E.tick(s, T + 3 * HR - 1).events.filter((e) => e.type === 'batch_discard').length, 0);
+  assert.equal(E.tick(s, T + 3 * HR + 1).events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 1);
+  // keepServing never runs past the cap
+  const open = E.defaultSettings(); open.safety.hardCapH = 6;
+  let k = E.apply(E.newState({ now: T, empty: true, settings: open }), 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T).state;
+  k = E.tick(k, T + 4 * HR + 1).state;
+  k = E.apply(k, 'logTemp', { batchId: k.batches[0].id, tempF: 150 }, T + 4 * HR + 2 * MIN).state;
+  k = E.apply(k, 'keepServing', { batchIds: [k.batches[0].id], who: 'AB', until: T + 20 * HR }, T + 4 * HR + 3 * MIN).state;
+  assert.equal(k.batches[0].keepUntil, T + 6 * HR);
+});
+
+test('hard cap: the list of products with no quality stage, and the setting survives a backup; old saves migrate', () => {
+  const s = E.newState({ now: 0, empty: true });
+  assert.deepEqual(E.noQualityStage(s), [], 'at 12 h every starter product has a quality stage');
+  const settings = E.defaultSettings(); settings.safety.hardCapH = 8;
+  const s8 = E.newState({ now: 0, empty: true, settings });
+  assert.deepEqual(E.noQualityStage(s8).sort(), ['Brisket', 'Pulled pork']);
+  assert.equal(E.validateBackup(E.serialize(s8)).state.settings.safety.hardCapH, 8);
+  const old = JSON.parse(JSON.stringify(s)); delete old.settings.safety.hardCapH; old.settings.safety.defaultMaxHoldH = 6;
+  assert.equal(E.validateBackup(old).state.settings.safety.hardCapH, 6, 'an owner-chosen longest hold time becomes the cap');
+  const old2 = JSON.parse(JSON.stringify(s)); delete old2.settings.safety.hardCapH;
+  assert.equal(E.validateBackup(old2).state.settings.safety.hardCapH, 12);
+  assert.ok(E.validateBackup(Object.assign(JSON.parse(JSON.stringify(s)), {})).ok);
+  assert.equal(E.apply(s, 'updateSettings', { patch: { safety: { hardCapH: 30 } } }, 0).report, 'outOfBounds');
+});
+
+test('keepcheck row: appears 15 minutes before a kept batch lapses or when the reading is stale, is silent, and follows the temperature settings', () => {
+  const T = new Date(2026, 9, 12, 11, 0, 0).getTime();
+  const settings = E.defaultSettings(); settings.safety.hotHoldF = 140;
+  let s = E.newState({ now: T, empty: true, settings });
+  s = E.apply(s, 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T).state;
+  s = E.tick(s, T + 4 * HR + 1).state;
+  s = E.apply(s, 'logTemp', { batchId: s.batches[0].id, tempF: 150 }, T + 4 * HR + 5 * MIN).state;
+  s = E.apply(s, 'keepServing', { batchIds: [s.batches[0].id], who: 'AB', forMin: 60 }, T + 4 * HR + 5 * MIN).state;
+  const at = (m) => T + 4 * HR + m * MIN;
+  const row = (m) => D.build(E.tick(s, at(m)).state, at(m)).find((x) => x.kind === 'keepcheck');
+  assert.equal(row(20), undefined, 'reading fresh and 45 minutes left: no row');
+  const r = row(55);
+  assert.ok(r, '10 minutes left: row');
+  assert.equal(r.sev, 'info');
+  assert.ok(/140 °F or higher/.test(r.consequence), 'reads hotHoldF from settings: ' + r.consequence);
+  // silent: the ladder makes no sound for it
+  const L = D.makeLadder();
+  assert.equal(L.decide([r], at(55), s).length, 0);
+  // gone once the extension has lapsed
+  assert.equal(row(70), undefined);
+});

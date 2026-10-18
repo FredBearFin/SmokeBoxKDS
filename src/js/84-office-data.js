@@ -786,7 +786,7 @@
         yieldBlock,
         h('div', { class: 'od-block' }, cost.el),
         pull ? h('div', { class: 'od-block' }, pull.el) : null,
-        holdF ? h('div', { class: 'od-block' }, holdF.el, basisSeg) : null,
+        holdF ? h('div', { class: 'od-block' }, holdF.el, basisSeg, ing0.confirmBasis ? hintLine('Starter basis, owner to confirm: if ' + lower1(nm) + ' is held outside temperature control, choose Safety limit.') : null) : null,
         restF ? h('div', { class: 'od-block' }, restF.el, cookF.el) : null),
       noteEl, status.el);
     return {
@@ -955,7 +955,8 @@
     { key: 'reheatF', name: 'Reheat to', unit: '°F', step: 1, big: 5, legal: 'min', mean: 'A reheated batch has to reach this reading.' },
     { key: 'belowHotGraceH', name: 'Time allowed below hot hold', unit: 'hours', step: 0.5, legal: 'max', mean: 'Food can sit below hot hold this long before it must be thrown out. A reheat is only allowed inside this window.' },
     { key: 'aboveColdGraceH', name: 'Time allowed above cold hold', unit: 'hours', step: 0.5, legal: 'max', mean: 'Cold food can sit above cold hold this long before it must be thrown out.' },
-    { key: 'defaultMaxHoldH', name: 'Longest time in the hold cabinet', unit: 'hours', step: 0.5, mean: 'No batch stays in the cabinet longer than this, or its own limit if that is shorter.' },
+    { key: 'defaultMaxHoldH', name: 'Hold limit for a product with none of its own', unit: 'hours', step: 0.5, mean: 'Every starter product has its own limit; this is only used for one that has not.' },
+    { key: 'hardCapH', name: 'Hard cap: longest any batch may stay', unit: 'hours', step: 0.5, mean: 'At this age any batch is thrown out, whatever its limit kind. A product whose own limit is at or above it has no quality stage: it is thrown out at the cap.' },
     { key: 'tempCheckEveryMin', name: 'Temperature check every', unit: 'min', step: 5, mean: 'A temperature reading is due this often for every batch.' },
     { key: 'sanitizeEveryH', name: 'Sanitize food-contact surfaces every', unit: 'hours', step: 0.5, legal: 'max', mean: 'The sanitize timer on the line counts down from this.' },
   ];
@@ -1007,8 +1008,18 @@
     const all = [];
     SAFETY_FIELDS.forEach((sp) => { const x = mk(sp, 'safety.' + sp.key, sp.key); gridA.appendChild(x.f.el); all.push(x); });
     COOLING_FIELDS.forEach((sp) => { const x = mk(sp, 'safety.' + sp.key, null); gridB.appendChild(x.f.el); all.push(x); });
-    pn.body.append(status.el, gridA, sub('Cooling stages'), para('Cooked food that is not going into the cabinet has to be cooled in two stages.', 'od-hint'), gridB);
-    P.syncs.push((s) => all.forEach(({ f, path }) => f.sync(getPath(s.settings, path))));
+    // Says which cooked products have no quality stage at the current hard cap, and flags the cold starters to check.
+    const qLine = para('', 'od-hint');
+    // Rewrites that line from the current settings and products.
+    const paintQ = (s) => {
+      const names = SB.engine.noQualityStage(s);
+      const flagged = s.ingredients.filter((i) => i.tcs && i.confirmBasis).map((i) => i.name);
+      qLine.textContent = (names.length ? 'Products with no quality stage at this cap (thrown out when they reach their limit): ' + names.join(', ') + '. ' : 'Every cooked product has a quality stage at this cap. ') +
+        (flagged.length ? 'Owner to confirm: ' + flagged.join(', ') + ' start with a quality limit; if you hold them outside temperature control, set their limit kind to safety.' : '');
+    };
+    paintQ(cur());
+    pn.body.append(status.el, gridA, qLine, sub('Cooling stages'), para('Cooked food that is not going into the cabinet has to be cooled in two stages.', 'od-hint'), gridB);
+    P.syncs.push((s) => { all.forEach(({ f, path }) => f.sync(getPath(s.settings, path))); paintQ(s); });
     P.disposers.push(() => all.forEach(({ f }) => f.destroy()), () => status.destroy());
     return pn;
   }

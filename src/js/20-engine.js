@@ -431,13 +431,15 @@
    * ==================================================================================================== */
   // How long a batch may stay in the cabinet, in ms: the smaller of its own limit and the default
   // hold-limit setting.
-  const holdLimitMs = (b, S) => Math.min(isNum(b.maxHoldH) ? b.maxHoldH : Infinity, S.defaultMaxHoldH) * H;
+  const holdLimitMs = (b, S) => Math.min(isNum(b.maxHoldH) ? b.maxHoldH : S.defaultMaxHoldH, hardCapH(S)) * H;
+  // The hard cap in hours: its own setting, or the old default hold limit for settings made before it existed.
+  const hardCapH = (S) => (isNum(S.hardCapH) ? S.hardCapH : S.defaultMaxHoldH);
   // The hard cap, in ms: no batch of any kind stays in the cabinet longer than the default hold-limit setting.
-  const hardLimitMs = (S) => S.defaultMaxHoldH * H;
+  const hardLimitMs = (S) => hardCapH(S) * H;
   // True for a batch whose own limit is a quality limit with room before the hard cap: past that limit it is
   // held off the menu until someone tastes it, instead of being thrown out. Batches saved before limit kinds
   // existed have no kind and act as safety limits.
-  const hasQualityStage = (b, S) => b.holdBasis === 'quality' && holdLimitMs(b, S) < hardLimitMs(S);
+  const hasQualityStage = (b, S) => b.holdBasis === 'quality' && (isNum(b.maxHoldH) ? b.maxHoldH : S.defaultMaxHoldH) < hardCapH(S);
   // Formats a temperature as whole degrees for messages.
   const f0 = (x) => Math.round(x) + ' °F';
   // Builds the answer card that gate() returns. The status word comes from the action word; nextDeadlineAt
@@ -465,6 +467,13 @@
       return gateOut('CHILL_NOW', false, 'cooling1', 'info', 'Cooling: get it to ' + f0(c.stage1ToF) + ' or below.' + SAFETY, s1);
     }
     return gateOut('CHILL_NOW', false, 'cooling2', 'info', 'Cooling: get it to ' + f0(c.finalF) + ' or below.' + SAFETY, fin);
+  }
+  // The names of the cooked products that have no quality stage at the current hard cap: their own hold limit is at or
+  // above it, so they are thrown out at the cap. Takes the state.
+  function noQualityStage(state) {
+    const S = safetyOf(state.settings), out = [];
+    for (const ing of state.ingredients) if (ing.tcs && (isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH) >= hardCapH(S)) out.push(ing.name);
+    return out;
   }
   /** gate(batch, now, safety) -> { canServe, action, reason, severity, status, nextDeadlineAt?, text } */
   // WATCH OUT: for food that is out of range, the clock runs from the first bad reading (outSince), not
@@ -1866,7 +1875,7 @@
     pacing: { enabled: { t: 'bool' }, learnK: R(0, 50), floorSec: R(1, 600), minFactor: R(0.1, 1), maxFactor: R(1, 10), outlierFactor: R(1, 20), qtyFactor: R(0, 2), qtyCap: R(1, 10) },
     service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20), soundStartHour: R(0, 23, true), soundOutsideHours: { t: 'bool' } },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
-      defaultMaxHoldH: B('defaultMaxHoldH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
+      defaultMaxHoldH: B('defaultMaxHoldH'), hardCapH: B('hardCapH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
       cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' }, holdWindowV2: { t: 'bool' } },
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
@@ -2792,6 +2801,12 @@
       if (holdMigrate && isObj(savedSet.safety) && savedSet.safety.defaultMaxHoldH === 4) {
         savedSet.safety = Object.assign({}, savedSet.safety); delete savedSet.safety.defaultMaxHoldH; repaired.push('settings.safety.defaultMaxHoldH moved to the new default');
       }
+      // Saves from before the hard cap had its own setting: it takes the old longest-hold value if the owner changed it.
+      if (isObj(savedSet.safety) && !hasOwn(savedSet.safety, 'hardCapH')) {
+        const old = savedSet.safety.defaultMaxHoldH;
+        savedSet.safety = Object.assign({}, savedSet.safety, { hardCapH: isNum(old) && old !== C.safety.defaultMaxHoldH ? old : C.safety.hardCapH });
+        repaired.push('settings.safety.hardCapH set from the old longest hold time');
+      }
       repairInto(settings, savedSet, SET_SCHEMA, 'settings', repaired);
       if (!(settings.service.openHour < settings.service.closeHour)) { settings.service = Object.assign({}, C.service); repaired.push('settings.service reset'); }
       if (!(settings.safety.cooling.stage1H < settings.safety.cooling.totalH)) { settings.safety.cooling = Object.assign({}, C.safety.cooling); repaired.push('settings.safety.cooling reset'); }
@@ -3101,7 +3116,7 @@
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, defaultSettings, describe, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, defaultSettings, describe, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.

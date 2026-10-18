@@ -1148,7 +1148,7 @@
     // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
     if (SB.deadlines.soundsAllowed(store().getState(), now)) { const calls = ladder.decide(all, now, store().getState()); calls.forEach(logCall); playCalls(calls); }
     // Info rows only show for batches and run-outs; an expired notice goes away once someone taps it.
-    const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover') && !(d.kind === 'expired' && ladder.isAcked(d.id)));
+    const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)));
     const top = feed.slice(0, 3);
     const needSound = sound && !audioReady();
     setHidden(m.strip.soundBar, !needSound);

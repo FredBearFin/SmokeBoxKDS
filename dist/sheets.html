@@ -2344,9 +2344,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     { id: 'turkey',   name: 'Smoked turkey',    unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 4, parG: 5000, pullG: 1500,  thresholdG: 500,  costPerKg: 11.00, yield: 0.70, yieldConfirmed: false },
     { id: 'mac',      name: 'Mac and cheese',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 1, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.60,  yield: 1,    yieldConfirmed: false },
     { id: 'beans',    name: 'Pit beans',        unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 2, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.00,  yield: 1,    yieldConfirmed: false },
-    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 7000, pullG: 1500,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
-    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 6000, pullG: 1500,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
-    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 5000, pullG: 1500,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
+    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', confirmBasis: true, cookH: 0.5, parG: 7000, pullG: 1500,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
+    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', confirmBasis: true, cookH: 0.5, parG: 6000, pullG: 1500,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
+    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', confirmBasis: true, cookH: 0.5, parG: 5000, pullG: 1500,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
     { id: 'cornbread', name: 'Cornbread',       unit: 'ea', tcs: false, parG: 120,   thresholdG: 8,   costEach: 0.45 },
     { id: 'buns',     name: 'Buns',             unit: 'ea', tcs: false, parG: 150,   thresholdG: 10,  costEach: 0.38 },
     { id: 'pickles',  name: 'Pickle chips',     unit: 'g',  tcs: false, parG: 6000,  thresholdG: 300,  costPerKg: 4.20 },
@@ -2459,7 +2459,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     belowHotGraceH: 2,      // below 135F for more than this -> discard (reheat only allowed inside it)
     aboveColdGraceH: 4,     // above 41F for more than this -> discard
     cooling: { stage1ToF: 70, stage1H: 2, totalH: 6, finalF: 41 }, // 135->70 in 2h, then 70->41 inside 4 more (6h total) (3-501.14)
-    defaultMaxHoldH: 12,    // longest any batch may stay in the cabinet (its maximum, so it no longer caps: each product has its own limit)
+    defaultMaxHoldH: 12,    // the hold limit for a product that has none of its own (every starter product has one)
+    hardCapH: 12,           // the longest any batch of any kind may stay in the cabinet: at this age it is thrown out
     tempCheckEveryMin: 120, // a temperature reading is due this often (2 h; the FDA minimum is 4 h)
     sanitizeEveryH: 4,      // food-contact surfaces (4-602.11)
     holdWindowV2: true,     // marks settings made after the hold limit moved from a flat 4 hours to per-product limits
@@ -2479,7 +2480,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // time and check interval are house settings with wider ranges.
   C.safetyBounds = {
     hotHoldF: [135, 200], coldHoldF: [33, 41], reheatF: [165, 212], belowHotGraceH: [0.5, 2], aboveColdGraceH: [0.5, 4],
-    defaultMaxHoldH: [0.5, 12], tempCheckEveryMin: [10, 240], sanitizeEveryH: [1, 4],
+    defaultMaxHoldH: [0.5, 12], hardCapH: [1, 24], tempCheckEveryMin: [10, 240], sanitizeEveryH: [1, 4],
   };
 
   // Hold window per product (starter placeholders, owner to confirm; no source gives a maximum hold time):
@@ -2490,6 +2491,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // temperature, hot at 135 F or above) or "safety" (time as a public health control, no temperature control).
   // cookH is how long a fresh batch takes from start to ready to rest (starter placeholders, owner to confirm). With restH
   // it tells whether a new batch started now would be ready before close.
+  // confirmBasis marks a starter hold basis the owner should check: cold held salads and pudding are set to a quality limit, but
+  // a place that holds them outside temperature control needs a safety limit instead.
   // pullG on an ingredient is the set amount one Pull button moves out of the cabinet (one whole brisket, one rack,
   // one pan), in grams. Starter estimates: the owner sets the real unit.
   // Brisket cooked yield, from the Texas A&M AgriLife regression in the research report. Used only for
@@ -2964,13 +2967,15 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
    * ==================================================================================================== */
   // How long a batch may stay in the cabinet, in ms: the smaller of its own limit and the default
   // hold-limit setting.
-  const holdLimitMs = (b, S) => Math.min(isNum(b.maxHoldH) ? b.maxHoldH : Infinity, S.defaultMaxHoldH) * H;
+  const holdLimitMs = (b, S) => Math.min(isNum(b.maxHoldH) ? b.maxHoldH : S.defaultMaxHoldH, hardCapH(S)) * H;
+  // The hard cap in hours: its own setting, or the old default hold limit for settings made before it existed.
+  const hardCapH = (S) => (isNum(S.hardCapH) ? S.hardCapH : S.defaultMaxHoldH);
   // The hard cap, in ms: no batch of any kind stays in the cabinet longer than the default hold-limit setting.
-  const hardLimitMs = (S) => S.defaultMaxHoldH * H;
+  const hardLimitMs = (S) => hardCapH(S) * H;
   // True for a batch whose own limit is a quality limit with room before the hard cap: past that limit it is
   // held off the menu until someone tastes it, instead of being thrown out. Batches saved before limit kinds
   // existed have no kind and act as safety limits.
-  const hasQualityStage = (b, S) => b.holdBasis === 'quality' && holdLimitMs(b, S) < hardLimitMs(S);
+  const hasQualityStage = (b, S) => b.holdBasis === 'quality' && (isNum(b.maxHoldH) ? b.maxHoldH : S.defaultMaxHoldH) < hardCapH(S);
   // Formats a temperature as whole degrees for messages.
   const f0 = (x) => Math.round(x) + ' °F';
   // Builds the answer card that gate() returns. The status word comes from the action word; nextDeadlineAt
@@ -2998,6 +3003,13 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       return gateOut('CHILL_NOW', false, 'cooling1', 'info', 'Cooling: get it to ' + f0(c.stage1ToF) + ' or below.' + SAFETY, s1);
     }
     return gateOut('CHILL_NOW', false, 'cooling2', 'info', 'Cooling: get it to ' + f0(c.finalF) + ' or below.' + SAFETY, fin);
+  }
+  // The names of the cooked products that have no quality stage at the current hard cap: their own hold limit is at or
+  // above it, so they are thrown out at the cap. Takes the state.
+  function noQualityStage(state) {
+    const S = safetyOf(state.settings), out = [];
+    for (const ing of state.ingredients) if (ing.tcs && (isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH) >= hardCapH(S)) out.push(ing.name);
+    return out;
   }
   /** gate(batch, now, safety) -> { canServe, action, reason, severity, status, nextDeadlineAt?, text } */
   // WATCH OUT: for food that is out of range, the clock runs from the first bad reading (outSince), not
@@ -4399,7 +4411,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     pacing: { enabled: { t: 'bool' }, learnK: R(0, 50), floorSec: R(1, 600), minFactor: R(0.1, 1), maxFactor: R(1, 10), outlierFactor: R(1, 20), qtyFactor: R(0, 2), qtyCap: R(1, 10) },
     service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20), soundStartHour: R(0, 23, true), soundOutsideHours: { t: 'bool' } },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
-      defaultMaxHoldH: B('defaultMaxHoldH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
+      defaultMaxHoldH: B('defaultMaxHoldH'), hardCapH: B('hardCapH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
       cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' }, holdWindowV2: { t: 'bool' } },
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
@@ -5325,6 +5337,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       if (holdMigrate && isObj(savedSet.safety) && savedSet.safety.defaultMaxHoldH === 4) {
         savedSet.safety = Object.assign({}, savedSet.safety); delete savedSet.safety.defaultMaxHoldH; repaired.push('settings.safety.defaultMaxHoldH moved to the new default');
       }
+      // Saves from before the hard cap had its own setting: it takes the old longest-hold value if the owner changed it.
+      if (isObj(savedSet.safety) && !hasOwn(savedSet.safety, 'hardCapH')) {
+        const old = savedSet.safety.defaultMaxHoldH;
+        savedSet.safety = Object.assign({}, savedSet.safety, { hardCapH: isNum(old) && old !== C.safety.defaultMaxHoldH ? old : C.safety.hardCapH });
+        repaired.push('settings.safety.hardCapH set from the old longest hold time');
+      }
       repairInto(settings, savedSet, SET_SCHEMA, 'settings', repaired);
       if (!(settings.service.openHour < settings.service.closeHour)) { settings.service = Object.assign({}, C.service); repaired.push('settings.service reset'); }
       if (!(settings.safety.cooling.stage1H < settings.safety.cooling.totalH)) { settings.safety.cooling = Object.assign({}, C.safety.cooling); repaired.push('settings.safety.cooling reset'); }
@@ -5634,7 +5652,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, defaultSettings, describe, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, defaultSettings, describe, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.
@@ -10390,7 +10408,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + S.hotHoldF + ' °F, reheat to ' + S.reheatF + ' °F within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
         rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + S.hotHoldF + ' °F, not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
-        rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit (time as a health control) throws the batch out. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + S.defaultMaxHoldH + ' hours. Your local health department\'s rules apply to quality extensions.'),
+        rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit (time as a health control) throws the batch out. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
         rule('snow', 'Cooling', 'From ' + S.hotHoldF + ' °F to ' + c.stage1ToF + ' °F within ' + c.stage1H + ' hours, then to ' + c.finalF + ' °F within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
         rule('lock', 'Locked batches', 'A batch that is not safe to serve is locked. Nothing is taken from it, and menu items that need it show 86 safety hold.'),

@@ -44,7 +44,7 @@
     step('5. Where the tablet sits', 'Put the tablet where the person at the cutting board can tap it without walking, within reach of the warmer if you can. If it is out of reach, pulls will not get logged and the waste numbers will be wrong.');
     // Closes this sheet and opens the Menu and settings page of the back office.
     const openData = () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); };
-    step('6. Your products', 'Open the Menu and settings page and enter your real cost per kg, the 86 point, the pull size (one whole brisket, one rack, one pan), the hold limit, the rest time and whether the limit is a quality or a safety limit for each product. Until then the dollar numbers come from sample data.',
+    step('6. Your products', 'Open the Menu and settings page and enter your real cost per kg, the 86 point, the pull size (one whole brisket, one rack, one pan), the hold limit, the rest time and whether the limit is a quality or a safety limit for each product. Slaw, potato salad and banana pudding start as quality limits: confirm them (cold food held outside temperature control needs a safety limit). Until then the dollar numbers come from sample data.',
       () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu and settings')));
     sheet.body.appendChild(list);
     return sheet;

@@ -179,7 +179,7 @@
     const closeAt = closeAtMs(state, now);
     if (closeAt == null) return;
     const bs = list.filter((b) => b.canServe !== false).map((b) => {
-      const hardAt = b.enteredAt + S.defaultMaxHoldH * H, limAt = b.enteredAt + E()._internal.holdLimitMs(b, S);
+      const hardAt = b.enteredAt + (U.isNum(S.hardCapH) ? S.hardCapH : S.defaultMaxHoldH) * H, limAt = b.enteredAt + E()._internal.holdLimitMs(b, S);
       const q = b.holdBasis === 'quality' && limAt < hardAt;
       return { remainingG: b.remainingG, enteredAt: b.enteredAt, readyAt: b.restUntil, expAt: q && U.isNum(b.keepUntil) && b.keepUntil > now ? Math.min(b.keepUntil, hardAt) : limAt };
     });
@@ -225,7 +225,7 @@
       list.forEach((b, i) => {
         // A quality limit is a house rule: the batch passes it and waits for a taste test. A kept batch counts down
         // to the end of its extension instead.
-        const hardAt = b.enteredAt + S.defaultMaxHoldH * H, limAt = b.enteredAt + E()._internal.holdLimitMs(b, S);
+        const hardAt = b.enteredAt + (U.isNum(S.hardCapH) ? S.hardCapH : S.defaultMaxHoldH) * H, limAt = b.enteredAt + E()._internal.holdLimitMs(b, S);
         const q = b.holdBasis === 'quality' && limAt < hardAt;
         const exp = q && U.isNum(b.keepUntil) && b.keepUntil > now ? Math.min(b.keepUntil, hardAt) : limAt;
         const msLeft = exp - now;
@@ -293,6 +293,19 @@
       const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' ($' + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
       out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
         consequence: 'Expired and thrown out: ' + U.fmtG(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
+    }
+  }
+  // Rows for batches that are being kept serving: shown from 15 minutes before the extension ends, or when the last
+  // reading is older than the check interval, to say what is needed to keep it longer. Information only: no sound.
+  function keepRows(state, now, S, out) {
+    for (const b of state.batches) {
+      if (b.status === 'discard' || !U.isNum(b.keepUntil) || !(b.keepUntil > now)) continue;
+      const stale = !U.isNum(b.lastTempAt) || now - b.lastTempAt > S.tempCheckEveryMin * MIN;
+      if (b.keepUntil - now > 15 * MIN && !stale) continue;
+      const cold = b.kind === 'cold';
+      const need = cold ? S.coldHoldF + ' °F or lower' : S.hotHoldF + ' °F or higher';
+      out.push({ id: 'keepcheck:' + b.id + ':' + b.keepUntil, epoch: b.keepUntil, kind: 'keepcheck', ing: b.ing, batchId: b.id, label: b.label || b.ing, at: b.keepUntil, msLeft: b.keepUntil - now, rung: 0, rungs: 0, sev: 'info',
+        consequence: 'Kept serving until ' + U.fmtTime(b.keepUntil) + '. Log a temperature of ' + need + ' before then to keep it longer.', action: 'Log a temperature.', unknown: false });
     }
   }
   // Rows for tickets and the sanitize timer.
@@ -408,6 +421,7 @@
     batchRows(state, now, S, sales, out);
     safetyRows(state, now, S, out);
     expiredRows(state, now, out);
+    keepRows(state, now, S, out);
     otherRows(state, now, out);
     out.sort((a, b) => (SEV_RANK[a.sev] - SEV_RANK[b.sev]) || (a.msLeft - b.msLeft) || (a.id < b.id ? -1 : 1));
     return out;
