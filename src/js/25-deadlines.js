@@ -130,7 +130,7 @@
     const name = ing ? ing.name : b.ing;
     const left = state.batches.some((x) => x !== b && x.ing === b.ing && x.status !== 'discard' && x.canServe === true && x.remainingG > 0);
     const amount = U.fmtG(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
-    out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
+    out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
       consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or discard it.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
   }
   // The next closing time after now, in ms, from the service hours (a close above 24 means after midnight, so last
@@ -304,7 +304,7 @@
         }
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H) || isLim) {
           const quiet = rung === 0 || trivial;
-          out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length, rungsMin: rungs, snoozedUntil: snoozeOf(state, b.id, now),
+          out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length, rungsMin: rungs, step: rung >= rungs.length ? 'last' : rung <= 1 ? 'first' : 'middle', snoozedUntil: snoozeOf(state, b.id, now),
             sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, planFor: isLim ? { ing: ingId, grams: lim.unmetG, by: lim.runOutAt } : undefined, wasteG: waste, wasteUsd: usd, goes86: lastOne, quality: q, trivial, unknown: rate === undefined });
         }
       });
@@ -341,7 +341,7 @@
       const name = ing ? ing.name : b.ing;
       const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');
       const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' ($' + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
-      out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
+      out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
         consequence: 'Expired and thrown out: ' + U.fmtG(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
     }
   }
@@ -510,7 +510,7 @@
         ok.sort((a, b) => (b.level - a.level) || (a.d.msLeft - b.d.msLeft));
         return [{ level: ok[0].level, d: live.get(ok[0].d.id), repeat: false }];
       },
-      // How many sounds are held.
+      // Says how many sounds are being held back right now.
       size: () => q.size,
     };
   }

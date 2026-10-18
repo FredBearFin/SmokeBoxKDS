@@ -12129,8 +12129,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // Settings (the floor menu, SPEC 14.4).
 
   // One labelled settings block: a heading, a short help line (left out when empty) and the control.
-  function settingBlock(title, help, node, node2) {
-    return h('section', { class: 'fs-section mn-block' }, h('h3', { class: 'fs-h' }, title), help ? h('p', { class: 'fs-sub' }, help) : null, node, node2 || null);
+  function settingBlock(title, help, node, node2, node3) {
+    return h('section', { class: 'fs-section mn-block' }, h('h3', { class: 'fs-h' }, title), help ? h('p', { class: 'fs-sub' }, help) : null, node, node2 || null, node3 || null);
   }
 
   // Builds the Settings sheet (look, text size, sound, station, clock speed, links) and returns it.
@@ -12156,6 +12156,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // Sound: the chime on a new ticket and the beeps when a dish needs checking. It lives in the board module, so it is optional here.
     const floorOk = !!(SB.floor && typeof SB.floor.setSound === 'function');
     const soundTog = SB.ui.toggle({ label: 'Chime for new tickets, dishes to check and batch warnings', checked: floorOk ? !!SB.floor.sound() : false, disabled: !floorOk, onChange: (on) => { if (floorOk) SB.floor.setSound(on); } });
+    // Loudness of this tablet's warnings (20 to 100 percent); the sound switch above is the way to silence.
+    const volIn = h('input', { type: 'range', min: '20', max: '100', step: '10', value: String(Math.round((floorOk && SB.floor.volume ? SB.floor.volume() : 1) * 100)), 'aria-label': 'Warning loudness on this tablet', disabled: !floorOk });
+    volIn.addEventListener('change', () => { if (floorOk && SB.floor.setVolume) SB.floor.setVolume(Number(volIn.value) / 100); });
     const speechOk = floorOk && typeof SB.floor.setSpeech === 'function';
     const speechTog = SB.ui.toggle({ label: 'Speak batch warnings aloud', checked: speechOk ? !!SB.floor.speech() : false, disabled: !speechOk, onChange: (on) => { if (speechOk) SB.floor.setSpeech(on); } });
     const soundHelp = floorOk ? 'On by default, because a missed warning can cost a whole batch. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
@@ -12185,7 +12188,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       settingBlock('Text size', 'Large makes everything 20 percent bigger.', textSeg),
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap START on Hush puppies.', hintsTog),
-      settingBlock('Sound', soundHelp, soundTog, speechTog),
+      settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       settingBlock('Clock speed', 'Only for demos and training. Real service runs at x1.', clockCtl.el),
       settingBlock('More', '', links)));

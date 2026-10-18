@@ -41,7 +41,7 @@ hidden below 1180 px. Nothing tells anyone what to do next about a batch.
 4. **One-person default: toggle between the two views**, strip on both. The last view is remembered. Side by
    side only on TV or wide screens, about 1600 px and up (at 1280 px each half is about 640 px, which breaks the
    big-type goal and the 1024 px floor).
-5. **Sound and speech** play from the tablet, with per-screen toggles. "Sound on one device only" waits for Connected.
+5. **Sound and speech** play from the tablet, with per-screen toggles and a loudness setting per tablet. With several tabs open on one device, one tab (the sound leader, chosen with a Web Lock) makes the sound and the others stay quiet. "Sound on one device only" across devices waits for Connected.
 6. **Tablet placement is part of the test.** The warmer and the cutting board may be meters apart. Put the
    tablet where the cutter can tap it without walking, and record the layout at every visit. Otherwise the gate's
    "under half of cuts get a pull tap" fails for a layout reason, not a product reason.

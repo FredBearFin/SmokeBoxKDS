@@ -1326,6 +1326,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .fl-strip-row + .fl-strip-row { border-top: 1px solid var(--line); }
 .fl-strip-row[data-tone="warn"] { border-left-color: var(--amber); background: var(--tint-warn); }
 .fl-strip-row[data-tone="bad"] { border-left-color: var(--danger); background: var(--tint-bad); }
+.fl-strip-row[data-step="first"] { border-left-width: calc(6px * var(--fl-k)); }
+.fl-strip-row[data-step="last"] { border-left-width: calc(16px * var(--fl-k)); }
+.fl-strip-row[data-step="last"] .fl-strip-what { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 3px; }
+.fl-strip-row[data-snoozed="true"] { border-left-style: dotted; background: transparent; }
 .fl-strip-when { flex: none; min-width: 5.2ch; font-size: calc(34px * var(--fl-k)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 .fl-strip-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
 .fl-strip-what { font-size: calc(22px * var(--fl-k)); font-weight: 700; line-height: 1.15; }
@@ -7782,7 +7786,7 @@ a.of-nav:active { background: var(--press); }
     const name = ing ? ing.name : b.ing;
     const left = state.batches.some((x) => x !== b && x.ing === b.ing && x.status !== 'discard' && x.canServe === true && x.remainingG > 0);
     const amount = U.fmtG(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
-    out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
+    out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
       consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or discard it.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
   }
   // The next closing time after now, in ms, from the service hours (a close above 24 means after midnight, so last
@@ -7956,7 +7960,7 @@ a.of-nav:active { background: var(--press); }
         }
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H) || isLim) {
           const quiet = rung === 0 || trivial;
-          out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length, rungsMin: rungs, snoozedUntil: snoozeOf(state, b.id, now),
+          out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length, rungsMin: rungs, step: rung >= rungs.length ? 'last' : rung <= 1 ? 'first' : 'middle', snoozedUntil: snoozeOf(state, b.id, now),
             sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, planFor: isLim ? { ing: ingId, grams: lim.unmetG, by: lim.runOutAt } : undefined, wasteG: waste, wasteUsd: usd, goes86: lastOne, quality: q, trivial, unknown: rate === undefined });
         }
       });
@@ -7993,7 +7997,7 @@ a.of-nav:active { background: var(--press); }
       const name = ing ? ing.name : b.ing;
       const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');
       const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' ($' + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
-      out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
+      out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
         consequence: 'Expired and thrown out: ' + U.fmtG(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
     }
   }
@@ -8162,7 +8166,7 @@ a.of-nav:active { background: var(--press); }
         ok.sort((a, b) => (b.level - a.level) || (a.d.msLeft - b.d.msLeft));
         return [{ level: ok[0].level, d: live.get(ok[0].d.id), repeat: false }];
       },
-      // How many sounds are held.
+      // Says how many sounds are being held back right now.
       size: () => q.size,
     };
   }
@@ -16084,7 +16088,9 @@ a.of-nav:active { background: var(--press); }
   // Browser-storage keys: the sound switch, and whether the all-day strip is folded.
   const KEY_SOUND = 'smokebox.v1.sound';
   // Whether warnings are also spoken aloud (the tablet's own voice), on by default.
-  const KEY_SPEECH = 'smokebox.v1.speech';
+  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume';
+  // Loudness of this tablet's warnings: 0.2 to 1. It never reaches 0 (the sound toggle is the way to silence); the last warning and the expiry tone never go below half.
+  const VOL_MIN = 0.2;
   const KEY_DOCK = 'smokebox.v1.dock';
   // Set to "done" once the welcome card has been dismissed.
   const KEY_WELCOME = 'smokebox.v1.welcome';
@@ -16103,6 +16109,7 @@ a.of-nav:active { background: var(--press); }
   let sound = U.storage.get(KEY_SOUND, true) !== false;
   let speech = U.storage.get(KEY_SPEECH, true) !== false;
   let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0;
+  let volume = (() => { const v = U.storage.get(KEY_VOLUME, 1); return U.isNum(v) ? Math.min(1, Math.max(VOL_MIN, v)) : 1; })();
 
   // Small helpers used by every part below.
 
@@ -16180,7 +16187,9 @@ a.of-nav:active { background: var(--press); }
     doc.addEventListener('keydown', unlock, true);
   }
   // Plays one soft note: pitch in Hz, start and length in seconds, volume 0 to 1.
-  function tone(a, freq, t, dur, vol) {
+  function tone(a, freq, t, dur, vol0) {
+    // The tablet's loudness setting scales every note; the loud warnings keep at least half of their own level.
+    const vol = Math.max(0.0002, vol0 * (vol0 >= 0.3 ? Math.max(0.5, volume) : volume));
     const o = a.createOscillator(), gn = a.createGain();
     o.type = 'sine'; o.frequency.value = freq;
     gn.gain.setValueAtTime(0.0001, t);
@@ -16219,6 +16228,15 @@ a.of-nav:active { background: var(--press); }
     if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; playHere(chime); }
     syncLeadership();
     return sound;
+  };
+  // This tablet's warning loudness, 0.2 to 1.
+  F.volume = () => volume;
+  // Sets and remembers the loudness (kept between 0.2 and 1) and plays a chime so it can be judged.
+  F.setVolume = function (v) {
+    volume = U.isNum(v) ? Math.min(1, Math.max(VOL_MIN, v)) : volume;
+    U.storage.set(KEY_VOLUME, volume);
+    if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; playHere(chime); }
+    return volume;
   };
   // Tells whether warnings are spoken aloud right now.
   F.speech = () => speech;
@@ -17239,7 +17257,7 @@ a.of-nav:active { background: var(--press); }
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     el.appendChild(soundBar);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
-    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', hidden: true, onClick: () => openSheet('menu') }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
+    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', hidden: true, onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
     el.appendChild(pauseBar);
     for (let i = 0; i < 3; i++) {
       const when = h('span', { class: 'fl-strip-when num' }), what = h('span', { class: 'fl-strip-what' }), why = h('span', { class: 'fl-strip-why' });
@@ -17250,7 +17268,10 @@ a.of-nav:active { background: var(--press); }
       rows.push({ el: row, when, what, why, key: '', batchId: null });
       el.appendChild(row);
     }
-    return { el, rows, soundBar, pauseBar };
+    // A visually hidden live region that changes only when a warning is announced (the leader tab), so a screen reader hears each warning once, never the ticking countdown.
+    const announce = h('span', { class: 'visually-hidden', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
+    el.appendChild(announce);
+    return { el, rows, soundBar, pauseBar, announce };
   }
   // Shows the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { showCabinet(true, { batchId }); } catch (e) { console.error('[smokebox] cabinet failed', e); } }
@@ -17279,10 +17300,12 @@ a.of-nav:active { background: var(--press); }
     const same = calls.filter((c) => c.level === top.level);
     const first = same.slice().sort((x, y) => x.d.msLeft - y.d.msLeft)[0].d;
     const who = first.label + (same.length > 1 ? ' and ' + (same.length - 1) + ' more' : '');
-    if (top.level === 4 && first.kind === 'past') { speak(who + (same.length > 1 ? ' are past their quality limit.' : ' is past its quality limit.')); return; }
-    if (top.level === 4) { speak(who + (same.length > 1 ? ' expired and were thrown out.' : ' expired and was thrown out.')); return; }
+    // Says the phrase aloud and puts it in the hidden live region for screen readers.
+    const tell = (t) => { speak(t); if (m && m.strip && m.strip.announce) m.strip.announce.textContent = t; };
+    if (top.level === 4 && first.kind === 'past') { tell(who + (same.length > 1 ? ' are past their quality limit.' : ' is past its quality limit.')); return; }
+    if (top.level === 4) { tell(who + (same.length > 1 ? ' expired and were thrown out.' : ' expired and was thrown out.')); return; }
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
-    speak(who + (first.goes86 && same.length === 1 ? ' goes 86' : same.length > 1 ? ' expire' : ' expires') + ' in ' + (top.level === 2 ? 'about ' : '') + mins + ' ' + U.plural(mins, 'minute') + '.');
+    tell(who + (first.goes86 && same.length === 1 ? ' goes 86' : same.length > 1 ? ' expire' : ' expires') + ' in ' + (top.level === 2 ? 'about ' : '') + mins + ' ' + U.plural(mins, 'minute') + '.');
   }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
   function acknowledge(key) { ladder.acknowledge(key); pending.forget(key); if (lead.coordinated && SB.store.broadcast) SB.store.broadcast({ type: 'alert-ack', id: key }); }
@@ -17306,7 +17329,8 @@ a.of-nav:active { background: var(--press); }
     const needSound = sound && !audioReady();
     setHidden(m.strip.soundBar, !needSound);
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
-    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) : null;
+    // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
+    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) : 'Sound is off on this tablet: warnings will not be heard. Tap to turn it on.';
     setHidden(m.strip.pauseBar, !note);
     if (note) setTxt(m.strip.pauseBar.querySelector('.fl-strip-pause-t'), note);
     setHidden(m.strip.el, top.length === 0 && !needSound && !note);
@@ -17316,6 +17340,10 @@ a.of-nav:active { background: var(--press); }
       if (!d) { r.key = ''; return; }
       r.key = d.id; r.batchId = d.batchId || null;
       setTone(r.el, d.snoozedUntil ? 'info' : d.sev);
+      // Where the row is on its ladder (first, middle, last) and whether its reminder is put off; the stylesheet draws both.
+      const stp = d.step || '', sn = d.snoozedUntil ? 'true' : 'false';
+      if (r.el.dataset.step !== stp) r.el.dataset.step = stp;
+      if (r.el.dataset.snoozed !== sn) r.el.dataset.snoozed = sn;
       setTxt(r.when, d.kind === 'expired' ? 'OUT' : d.kind === 'past' ? 'PAST' : countdownText(d.msLeft));
       setTxt(r.what, d.label);
       setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action);
@@ -20647,8 +20675,8 @@ a.of-nav:active { background: var(--press); }
   // Settings (the floor menu, SPEC 14.4).
 
   // One labelled settings block: a heading, a short help line (left out when empty) and the control.
-  function settingBlock(title, help, node, node2) {
-    return h('section', { class: 'fs-section mn-block' }, h('h3', { class: 'fs-h' }, title), help ? h('p', { class: 'fs-sub' }, help) : null, node, node2 || null);
+  function settingBlock(title, help, node, node2, node3) {
+    return h('section', { class: 'fs-section mn-block' }, h('h3', { class: 'fs-h' }, title), help ? h('p', { class: 'fs-sub' }, help) : null, node, node2 || null, node3 || null);
   }
 
   // Builds the Settings sheet (look, text size, sound, station, clock speed, links) and returns it.
@@ -20674,6 +20702,9 @@ a.of-nav:active { background: var(--press); }
     // Sound: the chime on a new ticket and the beeps when a dish needs checking. It lives in the board module, so it is optional here.
     const floorOk = !!(SB.floor && typeof SB.floor.setSound === 'function');
     const soundTog = SB.ui.toggle({ label: 'Chime for new tickets, dishes to check and batch warnings', checked: floorOk ? !!SB.floor.sound() : false, disabled: !floorOk, onChange: (on) => { if (floorOk) SB.floor.setSound(on); } });
+    // Loudness of this tablet's warnings (20 to 100 percent); the sound switch above is the way to silence.
+    const volIn = h('input', { type: 'range', min: '20', max: '100', step: '10', value: String(Math.round((floorOk && SB.floor.volume ? SB.floor.volume() : 1) * 100)), 'aria-label': 'Warning loudness on this tablet', disabled: !floorOk });
+    volIn.addEventListener('change', () => { if (floorOk && SB.floor.setVolume) SB.floor.setVolume(Number(volIn.value) / 100); });
     const speechOk = floorOk && typeof SB.floor.setSpeech === 'function';
     const speechTog = SB.ui.toggle({ label: 'Speak batch warnings aloud', checked: speechOk ? !!SB.floor.speech() : false, disabled: !speechOk, onChange: (on) => { if (speechOk) SB.floor.setSpeech(on); } });
     const soundHelp = floorOk ? 'On by default, because a missed warning can cost a whole batch. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
@@ -20703,7 +20734,7 @@ a.of-nav:active { background: var(--press); }
       settingBlock('Text size', 'Large makes everything 20 percent bigger.', textSeg),
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap START on Hush puppies.', hintsTog),
-      settingBlock('Sound', soundHelp, soundTog, speechTog),
+      settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       settingBlock('Clock speed', 'Only for demos and training. Real service runs at x1.', clockCtl.el),
       settingBlock('More', '', links)));

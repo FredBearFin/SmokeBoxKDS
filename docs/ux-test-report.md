@@ -148,6 +148,24 @@ What this says, and what it does not:
 - The ladder was exercised properly only in A and D. The loud tone repeats every 20 virtual seconds while nobody taps the strip: 76 repeats in D. A real cook who taps the row stops them; the number shows the cost of ignoring a row, not the usual case.
 - Not covered, as before: temperature checks, reheat, cooling, late tickets, the sanitize timer, and anything a real kitchen does that the script does not. Nobody listened to the sounds.
 
+## Alert ladder extensions (2026-10-19)
+
+Built on the existing ladder, not beside it: editable warning times, "remind me later", one sound leader per device, strip step styling and per-tablet loudness.
+
+**What was built and how it was checked**
+- **Warning times** (`settings.alerts.ladderThresholds`, office Food safety panel, "Batch expiry warnings only"): 1 to 5 falling whole minutes, last warning at least 5 minutes. The ladder remembers the smallest announced threshold, so editing mid-countdown no longer degrades the last rung to a speech-less repeat or voices an unannounced rung. Unit tests reproduce both faults.
+- **Remind me later**: early rungs only, 10 or 30 minutes, clamped before the limit; never the last rung, past or expired. In the cabinet card, not the strip. Unit tests and a browser check.
+- **Sound leader**: Web Locks (`smokebox-sound`), heartbeat fallback, pending queue so a held sound is not lost. Two real tabs in one browser context, fake clock, counting audio stubs (`test/ux-sound-leader.mjs`): one tab plays, the other is silent, takeover without replay, and a variant with the "played" message lost replays once.
+- **Hidden and restored** (`test/ux-hidden-restore.mjs`): with `runFor` each rung sounds once; with `fastForward` one catch-up sound. Found and fixed a double sound at the limit (expiry row and past row both sounded).
+- **Strip**: rows carry first/middle/last and a snoozed flag (CSS: border width, underline on the last, dotted when put off); a visually hidden live region announces each warning once (no assertive region on the ticking strip); "Sound is off on this tablet" bar when sound is off. Loudness slider per tablet (20 to 100 percent, never 0; loud warnings keep at least half level). Contrast script: 260 of 260 pairs pass.
+- Volume and sound on/off are per tablet (they describe a speaker); warning times are shared (they describe the food). The sound switch is the mute; there is no second mute flag.
+
+**Not tested, and limits to state in the pilot protocol**
+- Real tablet audio and speech, and real hidden-page timer throttling (browsers slow hidden pages to about one timer a second, and to about one a minute after some minutes). **The board warns only while it is in front and the screen is awake**; a locked screen runs no JavaScript at all.
+- A crash or force-kill of the sound leader (only a normal tab close was tested), and Safari and iPad (Web Locks should exist from Safari 15.4; the heartbeat fallback is untested in a real browser).
+- Snooze and leader behaviour across devices: not built; that is the Connected mode, after the gate.
+- The ux10 replay sound counts changed after the limit fix and are re-run in the next section.
+
 ## Phase A: strip readability and taps (measured 2026-10-18)
 
 Screenshots: `docs/ux-shots/strip-1024x768.png`, `strip-1280x800.png`, `strip-1920x1080.png`. At every size the strip shows the two or three most urgent rows above the tickets; at 1024x768 and 1280x800 it uses 175 px of the screen (two rows; a third row is hidden below 820 px height), at 1920x1080 157 px.

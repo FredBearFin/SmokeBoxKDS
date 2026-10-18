@@ -234,3 +234,13 @@ test('pending sounds: forgotten when played or acknowledged; on promotion only w
   P.add(call(2, other)); P.add(call(3, row));
   assert.equal(P.drain(feed.concat([other]), () => false).length, 1);
 });
+
+test('strip rows carry their place on the ladder: first, middle, last; past and expired rows are last', () => {
+  const k = kit();
+  const stepAt = (m) => { const t = T0 + m * MIN; const s = E.tick(k.s, t).state; const r = D.build(s, t).find((x) => x.kind === 'expiry' || x.kind === 'past'); return r && r.step; };
+  assert.equal(stepAt(160), 'first');    // 80 minutes left, rungs 90 45 20 10
+  assert.equal(stepAt(205), 'middle');   // 35 left
+  assert.equal(stepAt(225), 'middle');   // 15 left
+  assert.equal(stepAt(232), 'last');
+  assert.equal(stepAt(241), 'last');     // past
+});

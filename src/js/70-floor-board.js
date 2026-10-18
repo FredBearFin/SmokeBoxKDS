@@ -36,7 +36,9 @@
   // Browser-storage keys: the sound switch, and whether the all-day strip is folded.
   const KEY_SOUND = 'smokebox.v1.sound';
   // Whether warnings are also spoken aloud (the tablet's own voice), on by default.
-  const KEY_SPEECH = 'smokebox.v1.speech';
+  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume';
+  // Loudness of this tablet's warnings: 0.2 to 1. It never reaches 0 (the sound toggle is the way to silence); the last warning and the expiry tone never go below half.
+  const VOL_MIN = 0.2;
   const KEY_DOCK = 'smokebox.v1.dock';
   // Set to "done" once the welcome card has been dismissed.
   const KEY_WELCOME = 'smokebox.v1.welcome';
@@ -55,6 +57,7 @@
   let sound = U.storage.get(KEY_SOUND, true) !== false;
   let speech = U.storage.get(KEY_SPEECH, true) !== false;
   let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0;
+  let volume = (() => { const v = U.storage.get(KEY_VOLUME, 1); return U.isNum(v) ? Math.min(1, Math.max(VOL_MIN, v)) : 1; })();
 
   // Small helpers used by every part below.
 
@@ -132,7 +135,9 @@
     doc.addEventListener('keydown', unlock, true);
   }
   // Plays one soft note: pitch in Hz, start and length in seconds, volume 0 to 1.
-  function tone(a, freq, t, dur, vol) {
+  function tone(a, freq, t, dur, vol0) {
+    // The tablet's loudness setting scales every note; the loud warnings keep at least half of their own level.
+    const vol = Math.max(0.0002, vol0 * (vol0 >= 0.3 ? Math.max(0.5, volume) : volume));
     const o = a.createOscillator(), gn = a.createGain();
     o.type = 'sine'; o.frequency.value = freq;
     gn.gain.setValueAtTime(0.0001, t);
@@ -171,6 +176,15 @@
     if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; playHere(chime); }
     syncLeadership();
     return sound;
+  };
+  // This tablet's warning loudness, 0.2 to 1.
+  F.volume = () => volume;
+  // Sets and remembers the loudness (kept between 0.2 and 1) and plays a chime so it can be judged.
+  F.setVolume = function (v) {
+    volume = U.isNum(v) ? Math.min(1, Math.max(VOL_MIN, v)) : volume;
+    U.storage.set(KEY_VOLUME, volume);
+    if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; playHere(chime); }
+    return volume;
   };
   // Tells whether warnings are spoken aloud right now.
   F.speech = () => speech;
@@ -1191,7 +1205,7 @@
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     el.appendChild(soundBar);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
-    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', hidden: true, onClick: () => openSheet('menu') }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
+    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', hidden: true, onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
     el.appendChild(pauseBar);
     for (let i = 0; i < 3; i++) {
       const when = h('span', { class: 'fl-strip-when num' }), what = h('span', { class: 'fl-strip-what' }), why = h('span', { class: 'fl-strip-why' });
@@ -1202,7 +1216,10 @@
       rows.push({ el: row, when, what, why, key: '', batchId: null });
       el.appendChild(row);
     }
-    return { el, rows, soundBar, pauseBar };
+    // A visually hidden live region that changes only when a warning is announced (the leader tab), so a screen reader hears each warning once, never the ticking countdown.
+    const announce = h('span', { class: 'visually-hidden', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
+    el.appendChild(announce);
+    return { el, rows, soundBar, pauseBar, announce };
   }
   // Shows the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { showCabinet(true, { batchId }); } catch (e) { console.error('[smokebox] cabinet failed', e); } }
@@ -1231,10 +1248,12 @@
     const same = calls.filter((c) => c.level === top.level);
     const first = same.slice().sort((x, y) => x.d.msLeft - y.d.msLeft)[0].d;
     const who = first.label + (same.length > 1 ? ' and ' + (same.length - 1) + ' more' : '');
-    if (top.level === 4 && first.kind === 'past') { speak(who + (same.length > 1 ? ' are past their quality limit.' : ' is past its quality limit.')); return; }
-    if (top.level === 4) { speak(who + (same.length > 1 ? ' expired and were thrown out.' : ' expired and was thrown out.')); return; }
+    // Says the phrase aloud and puts it in the hidden live region for screen readers.
+    const tell = (t) => { speak(t); if (m && m.strip && m.strip.announce) m.strip.announce.textContent = t; };
+    if (top.level === 4 && first.kind === 'past') { tell(who + (same.length > 1 ? ' are past their quality limit.' : ' is past its quality limit.')); return; }
+    if (top.level === 4) { tell(who + (same.length > 1 ? ' expired and were thrown out.' : ' expired and was thrown out.')); return; }
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
-    speak(who + (first.goes86 && same.length === 1 ? ' goes 86' : same.length > 1 ? ' expire' : ' expires') + ' in ' + (top.level === 2 ? 'about ' : '') + mins + ' ' + U.plural(mins, 'minute') + '.');
+    tell(who + (first.goes86 && same.length === 1 ? ' goes 86' : same.length > 1 ? ' expire' : ' expires') + ' in ' + (top.level === 2 ? 'about ' : '') + mins + ' ' + U.plural(mins, 'minute') + '.');
   }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
   function acknowledge(key) { ladder.acknowledge(key); pending.forget(key); if (lead.coordinated && SB.store.broadcast) SB.store.broadcast({ type: 'alert-ack', id: key }); }
@@ -1258,7 +1277,8 @@
     const needSound = sound && !audioReady();
     setHidden(m.strip.soundBar, !needSound);
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
-    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) : null;
+    // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
+    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) : 'Sound is off on this tablet: warnings will not be heard. Tap to turn it on.';
     setHidden(m.strip.pauseBar, !note);
     if (note) setTxt(m.strip.pauseBar.querySelector('.fl-strip-pause-t'), note);
     setHidden(m.strip.el, top.length === 0 && !needSound && !note);
@@ -1268,6 +1288,10 @@
       if (!d) { r.key = ''; return; }
       r.key = d.id; r.batchId = d.batchId || null;
       setTone(r.el, d.snoozedUntil ? 'info' : d.sev);
+      // Where the row is on its ladder (first, middle, last) and whether its reminder is put off; the stylesheet draws both.
+      const stp = d.step || '', sn = d.snoozedUntil ? 'true' : 'false';
+      if (r.el.dataset.step !== stp) r.el.dataset.step = stp;
+      if (r.el.dataset.snoozed !== sn) r.el.dataset.snoozed = sn;
       setTxt(r.when, d.kind === 'expired' ? 'OUT' : d.kind === 'past' ? 'PAST' : countdownText(d.msLeft));
       setTxt(r.what, d.label);
       setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action);

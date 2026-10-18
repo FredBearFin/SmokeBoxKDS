@@ -61,6 +61,10 @@
 .fl-strip-row + .fl-strip-row { border-top: 1px solid var(--line); }
 .fl-strip-row[data-tone="warn"] { border-left-color: var(--amber); background: var(--tint-warn); }
 .fl-strip-row[data-tone="bad"] { border-left-color: var(--danger); background: var(--tint-bad); }
+.fl-strip-row[data-step="first"] { border-left-width: calc(6px * var(--fl-k)); }
+.fl-strip-row[data-step="last"] { border-left-width: calc(16px * var(--fl-k)); }
+.fl-strip-row[data-step="last"] .fl-strip-what { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 3px; }
+.fl-strip-row[data-snoozed="true"] { border-left-style: dotted; background: transparent; }
 .fl-strip-when { flex: none; min-width: 5.2ch; font-size: calc(34px * var(--fl-k)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 .fl-strip-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
 .fl-strip-what { font-size: calc(22px * var(--fl-k)); font-weight: 700; line-height: 1.15; }
