@@ -1,8 +1,8 @@
 # Smokebox UX test report (kitchen use), 2026-10-18
 
-Scope: how the kitchen board works for a cook, not whether the engine is correct. Everything below was measured or replayed in a real browser (Playwright, touch enabled) against the built app. No code was changed. Test scripts live in the session scratchpad (ux1 to ux8).
+Scope: how the kitchen board works for a cook, not whether the engine is correct. Everything below was measured or replayed in a real browser (Playwright, touch enabled) against the built app. Status as of 2026-10-18: the sections down to "Caveats" are the 2026-10-18 baseline, measured on the app as it stood before the Phase A work; code has changed since, and "Status of the original findings" below says what each finding became. Test scripts live in `ux-scripts/`.
 
-## What was tested
+## What was tested (2026-10-18 baseline)
 1. First-run screen and a busy board at 1024x768, 1180x820, 1280x800 and 1920x1080.
 2. Every button and key piece of text on the board: size in CSS pixels, converted to physical size and reading distance.
 3. Real tap counts for the core jobs, by driving the actual buttons.
@@ -10,7 +10,7 @@ Scope: how the kitchen board works for a cook, not whether the engine is correct
 5. A distance simulation (shrink and blur a 1920x1080 and a 1280x800 board).
 6. The "..." menu, the New batch form, the empty-kitchen screen, sound defaults, screen keep-awake.
 
-## Findings, worst first
+## Findings, worst first (2026-10-18 baseline)
 
 ### Critical
 1. **Batch expiry has no warning ladder, and the one existing signal cries wolf.**

@@ -475,9 +475,16 @@
   // Runs every second: refits the header only when its width or chip text changed, so most ticks cost nothing.
   function refit() {
     if (m && m.head && headKey() !== m.fitKey) fitHead();
+    measureToastTop();
   }
   // True when the header has moved the status chips or tool buttons into the Menu list.
   const headSqueezed = () => !!m.head && (m.head.dataset.fit === 'status' || m.head.dataset.fit === 'labels' || m.head.dataset.fit === 'toollabels' || m.head.dataset.fit === 'tools');
+  // In the cabinet view toasts move to the top right, under the header and the attention strip, so they never cover a card's buttons.
+  // This tells the stylesheet where the page below the strip starts (--fl-toast-top).
+  function measureToastTop() {
+    if (!m || !m.main || !m.cabOn) return;
+    doc.documentElement.style.setProperty('--fl-toast-top', Math.round(m.main.getBoundingClientRect().top + 8) + 'px');
+  }
   // Tells the stylesheet how tall the all-day strip is (--fl-lift) so toasts sit above it.
   function measureDock() {
     if (!m) return;
@@ -523,6 +530,8 @@
     } else if (m.cab) { m.cab.destroy(); m.cab = null; }
     m.cabOn = !!on;
     m.root.dataset.cabinet = on ? 'on' : 'off';
+    doc.documentElement.dataset.cabinet = on ? 'on' : 'off';
+    measureToastTop();
     for (const el of [m.grid, m.empty, m.welcome, m.dock]) if (el) el.style.display = on ? 'none' : '';
     setHidden(m.cabEl, !on);
     m.seg.setValue(on ? 'cabinet' : m.zone);

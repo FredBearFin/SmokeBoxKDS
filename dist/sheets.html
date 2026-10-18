@@ -9489,7 +9489,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       input.addEventListener('input', paint);
       not.addEventListener('click', () => { input.value = ''; paint(); input.focus(); });
       paint();
-      return { input, el: h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'Who tasted it'), input, not), get: () => input.value.trim() };
+      // The initials as typed, without spaces at the ends.
+      const get = () => input.value.trim();
+      return { input, el: h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'Who tasted it'), input, not), get };
     }
     // True when a batch has a reading that allows keeping it on the menu: in range and inside the check interval.
     function keepReady(b) {
