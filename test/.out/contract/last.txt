@@ -1,18 +1,16 @@
-SMOKEBOX CONTRACT CHECK  Sun Oct 18 2026 16:33:13  (run 11, 28 s)
-Files: 24 js, 10 css. Static refs: 2004 (372 distinct paths). Boot: ok, load errors 0, console/page errors 0. Smoke: 11/11 sheets opened, 7/7 office pages rendered clean. Unit: not run.
+SMOKEBOX CONTRACT CHECK  Sun Oct 18 2026 17:42:52  (run 12, 38 s)
+Files: 24 js, 10 css. Static refs: 2021 (372 distinct paths). Boot: ok, load errors 0, console/page errors 0. Smoke: 11/11 sheets opened, 7/7 office pages rendered clean. Unit: 324 passed, 0 failed.
 
 PROBLEMS (0)
 none
 
-NOTES (15)
-- unit (1)
-    test/  Unit suite not due (last run 12 min ago; it runs every 25 min, or use --unit).
+NOTES (14)
 - dup-id-cross-file (1)
     74-floor-tour.js:290  id "all" is created at 74-floor-tour.js:147, 74-floor-tour.js:290, 80-office-core.js:972 (several files)
 - class-no-css (13)
     05-icons.js:185  1 class name used in JS but defined in no CSS file: bm-wisp:185
     50-charts.js:1124  14 class names used in JS but defined in no CSS file: ch-g-y:1124, ch-g-x:1139, ch-g-ref:1161, ch-g-band:1337, ch-g-marks:1359, ch-g-fill:1360, ch-g-lab:1433, ch-g-over:1445, ch-kbd:1450, ch-g-ann:1517, ch-g-bars:1660, ch-g-vals:1661, ch-g-ov:2008, ch-g-cells:2098
     60-shell.js:391  3 class names used in JS but defined in no CSS file: sb-hosts:391, sheet-close:478, toast-undo:667
-    70-floor-board.js:342  9 class names used in JS but defined in no CSS file: fl-san:342, fl-hl-style:398, fl-bw:733, fl-deck-t:916, fl-cook-t:924, fl-state-i:939, fl-welcome-body:1317, fl-start-tour:1384, fl-start-demo:1385
+    70-floor-board.js:342  9 class names used in JS but defined in no CSS file: fl-san:342, fl-hl-style:398, fl-bw:733, fl-deck-t:916, fl-cook-t:924, fl-state-i:939, fl-welcome-body:1319, fl-start-tour:1386, fl-start-demo:1387
     71-floor-order.js:182  7 class names used in JS but defined in no CSS file: ord-search-clear:182, ord-nomatch-copy:193, ord-tile-86-word:228, ord-repeat:241, ord-clear:242, ord-empty-repeat:316, ord-mod-input:512
     ... 8 more (use --verbose)

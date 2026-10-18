@@ -424,10 +424,16 @@ test('tick: CHECK_TEMP after 30 min, expiry discard after 4 h; same reference wh
   const r1 = k.tickAt(T0 + 30 * MIN + 1);
   assert.ok(r1.events.filter((e) => e.type === 'batch_status' && e.to === 'check').length === 10);
   assert.equal(E.tick(k.s, T0 + 31 * MIN).state, k.s, 'check status is stable: no re-evaluation storm');
-  // Eight products have the 4-hour limit; brisket and pulled pork have 8 hours.
+  // Starters carry quality limits: eight products have 4 hours, brisket and pulled pork 8. Past its limit a
+  // quality batch is held off the menu (status past), not thrown out; the 12-hour hard cap throws it out.
   const r2 = k.tickAt(T0 + 4 * HR + 1);
-  assert.equal(r2.events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 8);
-  assert.equal(k.tickAt(T0 + 8 * HR + 1).events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 2);
+  assert.equal(r2.events.filter((e) => e.type === 'batch_discard').length, 0);
+  assert.equal(r2.events.filter((e) => e.type === 'batch_status' && e.to === 'past').length, 8);
+  assert.equal(k.s.batches.filter((b) => b.status === 'past').length, 8);
+  assert.equal(k.s.avail.brisket_half.ok, true, 'brisket is still within its 8 hours');
+  assert.equal(k.s.avail.tea.ok, true);
+  assert.equal(k.tickAt(T0 + 8 * HR + 1).events.filter((e) => e.type === 'batch_status' && e.to === 'past').length, 2);
+  assert.equal(k.tickAt(T0 + 12 * HR + 1).events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 10);
   assert.equal(k.s.avail.brisket_half.reason, 'safety');
   assert.equal(k.s.avail.tea.ok, true);
 });
@@ -977,7 +983,7 @@ test('stagger: starter batches get different ages, the oldest nearest its limit,
   assert.deepEqual(E.checkInvariants(s, T0), []);
   const k = new K(s, T0);
   assert.equal(k.tickAt(T0 + 1).events.filter((e) => e.type === 'batch_status').length, 0);
-  assert.equal(k.tickAt(T0 + 26 * MIN).events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 1);
+  assert.equal(k.tickAt(T0 + 26 * MIN).events.filter((e) => e.type === 'batch_status' && e.to === 'past').length, 1, 'brisket goes past its quality limit, it is not thrown out');
   assert.equal(E.newState({ now: T0 }).batches.every((b) => b.enteredAt === T0), true);
 });
 
@@ -1005,4 +1011,96 @@ test('pullBatch: takes grams from the oldest batch first, keeps the books balanc
   k.do('pullBatch', { ing: 'tea', g: 100 }, 'unknownIng');
   k.do('pullBatch', { ing: 'brisket', g: 0 }, 'badWeight');
   k.do('pullBatch', { ing: 'beans', g: 1e9 }, 'badWeight');
+});
+
+/* ------------------------------------------------ quality limit versus safety limit ------------------------------------------------ */
+// Builds a state with one ribs batch (4-hour quality limit) and, when asked, a second pork batch and a legacy batch.
+function qualityKit(extra) {
+  let s = E.newState({ now: T0, empty: true });
+  s = E.apply(s, 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T0).state;
+  if (extra) s = extra(s);
+  return new K(s, T0);
+}
+
+test('quality limit: past the limit the batch stays on the board, off the menu, and is not thrown out; the hard cap throws it out', () => {
+  const k = qualityKit();
+  const id = k.s.batches[0].id;
+  assert.equal(k.s.batches[0].holdBasis, 'quality');
+  const r = k.tickAt(T0 + 4 * HR + 1);
+  assert.equal(r.events.filter((e) => e.type === 'batch_discard').length, 0);
+  assert.deepEqual([k.b(id).status, k.b(id).canServe, k.b(id).action], ['past', false, 'PAST_QUALITY']);
+  assert.equal(k.b(id).remainingG, 6000);
+  // Only ticks, no other activity: still there at 11 hours, thrown out at the 12-hour hard cap.
+  assert.equal(k.tickAt(T0 + 11 * HR).events.filter((e) => e.type === 'batch_discard').length, 0);
+  assert.equal(k.tickAt(T0 + 12 * HR - 1).events.filter((e) => e.type === 'batch_discard').length, 0);
+  const end = k.tickAt(T0 + 12 * HR + 1);
+  assert.equal(end.events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 1);
+  // The stored status never leaves the board without a deadline: no re-evaluation storm while it waits.
+  const k2 = qualityKit(); k2.tickAt(T0 + 4 * HR + 1); k2.tickAt(T0 + 4 * HR + 2 * MIN); // lets the simulated 86 sync finish
+  assert.equal(E.tick(k2.s, T0 + 5 * HR).state, k2.s, 'a past batch is stable between ticks');
+});
+
+test('safety limit and legacy batches: thrown out at the limit as before', () => {
+  const s = E.newState({ now: T0, empty: true });
+  const settings = E.defaultSettings();
+  const ings = s.ingredients.map((i) => (i.id === 'ribs' ? { ...i, holdBasis: 'safety' } : i));
+  let st = E.newState({ now: T0, empty: true, ingredients: ings, settings });
+  st = E.apply(st, 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T0).state;
+  assert.equal(st.batches[0].holdBasis, 'safety');
+  assert.equal(E.tick(st, T0 + 4 * HR + 1).events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 1);
+  // A batch saved before limit kinds existed has no kind and acts as a safety limit.
+  let q = E.apply(E.newState({ now: T0, empty: true }), 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T0).state;
+  q = { ...q, batches: q.batches.map((b) => { const c = { ...b }; delete c.holdBasis; return c; }) };
+  assert.equal(E.tick(q, T0 + 4 * HR + 1).events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 1);
+});
+
+test('keepServing: needs initials and a fresh reading in range; covers several batches; never past the hard cap; lapses', () => {
+  const k = qualityKit((s) => E.apply(s, 'addBatch', { ing: 'pork', tempF: 160, cookedG: 5000 }, T0 + 30 * MIN).state);
+  const [rib, pork] = k.s.batches;
+  k.tickAt(T0 + 4 * HR + 1);
+  assert.equal(k.b(rib.id).status, 'past');
+  const ids = [rib.id, pork.id];
+  k.at(T0 + 4 * HR + 2 * MIN).do('keepServing', { batchIds: ids, who: '' }, 'whoRequired');
+  k.do('keepServing', { batchIds: [rib.id], who: 'AB', forMin: 0 }, 'badUntil');
+  // The last reading was 4 hours ago (older than the 2-hour check interval): refused.
+  k.do('keepServing', { batchIds: [rib.id], who: 'AB' }, 'tempReadingNeeded');
+  // A reading below 135 F does not qualify either.
+  k.do('logTemp', { batchId: rib.id, tempF: 130 });
+  k.do('keepServing', { batchIds: [rib.id], who: 'AB' }, 'tempReadingNeeded');
+  // The pork is not past its limit yet (its limit is 8 hours): not due.
+  k.at(T0 + 4 * HR + 10 * MIN).do('reheatBatch', { batchId: rib.id, tempF: 170 });
+  const r = k.do('keepServing', { batchIds: ids, who: 'AB' });
+  assert.deepEqual(r.info.kept, [rib.id]);
+  assert.deepEqual(r.info.skipped, [{ batchId: pork.id, report: 'qualityNotDue' }]);
+  assert.equal(k.b(rib.id).status, 'ok');
+  assert.equal(k.b(rib.id).canServe, true);
+  const ev = r.events.find((e) => e.type === 'quality_extend');
+  assert.equal(ev.who, 'AB');
+  assert.equal(ev.until, T0 + 4 * HR + 10 * MIN + 30 * MIN);
+  // It lapses after 30 minutes and goes back to past; a repeat needs a fresh reading.
+  const lapse = k.tickAt(T0 + 4 * HR + 41 * MIN);
+  assert.equal(k.b(rib.id).status, 'past');
+  assert.ok(lapse.events.some((e) => e.type === 'batch_status' && e.to === 'past'));
+  k.do('logTemp', { batchId: rib.id, tempF: 150 });
+  const r2 = k.do('keepServing', { batchIds: [rib.id], who: 'AB', until: T0 + 20 * HR });
+  assert.equal(k.b(rib.id).keepUntil, T0 + 12 * HR, 'never past the 12-hour hard cap');
+  assert.equal(r2.info.kept.length, 1);
+  // Not past a quality limit at all: refused.
+  k.do('keepServing', { batchIds: [pork.id], who: 'AB' }, 'qualityNotDue');
+});
+
+test('endKeepServing: a logged correction puts the batch back past its limit and keeps the original entry', () => {
+  const k = qualityKit();
+  const id = k.s.batches[0].id;
+  k.tickAt(T0 + 4 * HR + 1);
+  k.at(T0 + 4 * HR + 5 * MIN).do('logTemp', { batchId: id, tempF: 150 });
+  const kept = k.do('keepServing', { batchIds: [id], who: 'AB', forMin: 60 });
+  const orig = kept.events.find((e) => e.type === 'quality_extend');
+  k.do('endKeepServing', { batchId: id, who: '' }, 'whoRequired');
+  const fix = k.at(T0 + 4 * HR + 10 * MIN).do('endKeepServing', { batchId: id, who: 'AB', note: 'tapped by mistake' });
+  const corr = fix.events.find((e) => e.type === 'quality_extend_corrected');
+  assert.equal(corr.of, orig.id);
+  assert.equal(k.b(id).status, 'past');
+  assert.ok(E.allEvents(k.s).some((e) => e.id === orig.id && !e.reverted), 'the original entry is still there');
+  k.do('endKeepServing', { batchId: id, who: 'AB' }, 'qualityNotDue');
 });

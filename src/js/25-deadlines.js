@@ -65,11 +65,22 @@
     if (rung >= 2 || (rung >= 1 && lastOne)) return 'warn';
     return rung >= 1 ? 'warn' : 'info';
   }
+  // The row for a batch that is past its quality limit: it is off the menu and waits for a taste test.
+  function pastRow(state, b, now, out) {
+    const ing = state.ingredients.find((x) => x.id === b.ing);
+    const name = ing ? ing.name : b.ing;
+    const left = state.batches.some((x) => x !== b && x.ing === b.ing && x.status !== 'discard' && x.canServe === true && x.remainingG > 0);
+    const amount = U.fmtG(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
+    out.push({ id: 'past:' + b.id, kind: 'past', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
+      consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or discard it.', trivial: b.remainingG < TRIVIAL_G, guess: false });
+  }
   // Rows for the cooked batches: expiry with projected waste, and run-out time, per ingredient.
   function batchRows(state, now, S, sales, out) {
     const byIng = Object.create(null);
     for (const b of state.batches) {
       if (b.status === 'discard' || !(b.remainingG > 0) || b.kind === 'cooling') continue;
+      // A batch past its quality limit is off the menu: it cannot sell, so it gets its own row and no projection.
+      if (b.status === 'past') { pastRow(state, b, now, out); continue; }
       (byIng[b.ing] = byIng[b.ing] || []).push(b);
     }
     for (const ingId of Object.keys(byIng)) {
@@ -82,7 +93,11 @@
       let soldBefore = 0, totalLeft = 0;
       for (const b of list) if (isReady(b)) totalLeft += b.remainingG;
       list.forEach((b, i) => {
-        const exp = b.enteredAt + E()._internal.holdLimitMs(b, S);
+        // A quality limit is a house rule: the batch passes it and waits for a taste test. A kept batch counts down
+        // to the end of its extension instead.
+        const hardAt = b.enteredAt + S.defaultMaxHoldH * H, limAt = b.enteredAt + E()._internal.holdLimitMs(b, S);
+        const q = b.holdBasis === 'quality' && limAt < hardAt;
+        const exp = q && U.isNum(b.keepUntil) && b.keepUntil > now ? Math.min(b.keepUntil, hardAt) : limAt;
         const msLeft = exp - now;
         const rung = rungOf(msLeft, rungs);
         const lastOne = list.length === 1;
@@ -101,15 +116,16 @@
         let consequence, action;
         const amount = U.fmtG(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
         const goes86 = lastOne ? ' and ' + name + ' goes 86' : '';
+        const fate = q ? 'pass its quality limit' : 'be thrown out';
         if (msLeft <= 0) { consequence = 'Expired: ' + amount + ' must be thrown out' + goes86 + '.'; action = 'Discard and log it.'; }
-        else if (waste == null) { consequence = amount + ' will be thrown out at expiry' + goes86 + '.'; action = 'Use it first.'; }
-        else if (waste > 50) { consequence = 'About ' + U.fmtG(waste) + ' of ' + U.fmtG(b.remainingG) + ' will be thrown out' + (usd != null ? ' ($' + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
+        else if (waste == null) { consequence = amount + ' will ' + (q ? fate : 'be thrown out at expiry') + goes86 + '.'; action = 'Use it first.'; }
+        else if (waste > 50) { consequence = 'About ' + U.fmtG(waste) + ' of ' + U.fmtG(b.remainingG) + ' will ' + fate + (usd != null ? ' ($' + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
         else { consequence = 'On pace to sell all ' + U.fmtG(b.remainingG) + ' in time.'; action = 'Nothing to do.'; }
         // A batch gets a row once a rung is crossed, or earlier when the pace says food will be thrown out within 2 hours.
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H)) {
           const quiet = rung === 0 || trivial;
           out.push({ id: 'expiry:' + b.id, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length,
-            sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, wasteG: waste, wasteUsd: usd, goes86: lastOne, trivial, guess: rate === undefined });
+            sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, wasteG: waste, wasteUsd: usd, goes86: lastOne, quality: q, trivial, guess: rate === undefined });
         }
       });
       // Run-out: when the whole stock of this item will be gone at the current pace.
@@ -136,7 +152,7 @@
         }
         continue;
       }
-      if (gt.action === 'NONE' || gt.action === 'DISCARD_LOCKOUT') continue;
+      if (gt.action === 'NONE' || gt.action === 'DISCARD_LOCKOUT' || gt.action === 'PAST_QUALITY') continue;
       const at = U.isNum(gt.nextDeadlineAt) && gt.nextDeadlineAt !== Infinity ? gt.nextDeadlineAt : now;
       const kind = gt.action === 'CHECK_TEMP' ? 'check' : gt.action === 'REHEAT_IMMEDIATE' ? 'reheat' : gt.action === 'CHILL_NOW' ? 'chill' : 'cooling';
       const text = (gt.text || '').replace(' ' + C.safetyLine, '');

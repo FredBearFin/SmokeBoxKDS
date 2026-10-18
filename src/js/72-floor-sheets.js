@@ -235,6 +235,7 @@
       case 'CHECK_TEMP': return { tone: gt.severity === 'bad' ? 'bad' : 'warn', icon: 'thermometer', word: 'Check temp' };
       case 'REHEAT_IMMEDIATE': return { tone: 'bad', icon: 'flame', word: 'Reheat now' };
       case 'CHILL_NOW': return { tone: 'bad', icon: 'snow', word: 'Chill now' };
+      case 'PAST_QUALITY': return { tone: 'bad', icon: 'alert', word: 'Past quality limit' };
       default: return { tone: 'bad', icon: 'alert', word: 'Discard' };
     }
   }
@@ -333,23 +334,30 @@
       const bReheat = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'reheat' }, hidden: true }, ico('flame', 20), h('span', null, 'Reheat'));
       const bCool = h('button', { type: 'button', class: 'btn', dataset: { act: 'cool' }, hidden: true }, ico('snow', 20), h('span', null, 'Start cooling'));
       const bDiscard = h('button', { type: 'button', class: 'btn hc-discard', dataset: { act: 'discard' } }, ico('trash', 20), h('span', null, 'Discard'));
+      // Past its quality limit: taste it, then keep serving. While kept, a small link corrects a mistaken tap.
+      const bKeep = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'keep' }, hidden: true }, ico('check-circle', 20), h('span', null, 'Taste it, keep serving'));
+      const bUnkeep = h('button', { type: 'button', class: 'btn', dataset: { act: 'unkeep' }, hidden: true }, ico('x', 20), h('span', null, 'Correct: not kept'));
+      const dtKept = h('dt', null, 'Kept serving'), ddKept = h('dd', { class: 'num' });
+      dtKept.hidden = true; ddKept.hidden = true;
       const pullT = h('span', null, 'Pull');
       const bPull = h('button', { type: 'button', class: 'btn', dataset: { act: 'pull' }, hidden: true }, ico('package', 20), pullT);
-      const actions = h('div', { class: 'hc-actions' }, bPull, bLog, bReheat, bCool, bDiscard);
+      const actions = h('div', { class: 'hc-actions' }, bKeep, bUnkeep, bPull, bLog, bReheat, bCool, bDiscard);
       const editorSlot = h('div', { class: 'hc-editor-slot' });
       // Card layout: heading, ring and facts, message and lock note, cooling steps, then the buttons.
       const el = h('article', { class: 'hc-card', dataset: { batch: b.id, tone: 'ok' }, 'aria-label': 'Batch' },
         h('header', { class: 'hc-head' }, h('div', { class: 'hc-title' }, kindEl, name, srcChip), status),
         h('div', { class: 'hc-body' }, ring,
           h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
-            h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince, dtServe, ddServe, dtRest, ddRest))),
+            h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept))),
         costLine, msg, lock, cool, actions, editorSlot);
-      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, dtServe, ddServe, dtRest, ddRest, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
+      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept, bKeep, bUnkeep, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
       bLog.addEventListener('click', () => toggleEditor(rec, 'log'));
       bReheat.addEventListener('click', () => toggleEditor(rec, 'reheat'));
       bCool.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openCooling(bb, bCool); });
       bDiscard.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openDiscard(bb, bDiscard); });
       bPull.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) pullFrom(bb); });
+      bKeep.addEventListener('click', () => openKeep(rec.id, bKeep));
+      bUnkeep.addEventListener('click', () => openUnkeep(rec.id, bUnkeep));
       return rec;
     }
     // True when this is the oldest batch of its ingredient that can still be served: the one a pull comes from.
@@ -418,6 +426,12 @@
       const resting = U.isNum(b.restUntil) && b.restUntil > now && !coolingNow;
       setHidden(rec.dtRest, !resting); setHidden(rec.ddRest, !resting);
       if (resting) text(rec.ddRest, U.fmtTime(b.restUntil));
+      // A kept batch shows until when and by whom; a past batch shows the keep-serving button.
+      const keptNow = U.isNum(b.keepUntil) && b.keepUntil > now && !coolingNow;
+      setHidden(rec.dtKept, !keptNow); setHidden(rec.ddKept, !keptNow);
+      if (keptNow) text(rec.ddKept, 'until ' + U.fmtTime(b.keepUntil) + (b.keptBy ? ', by ' + b.keptBy : ''));
+      setHidden(rec.bKeep, gt.action !== 'PAST_QUALITY');
+      setHidden(rec.bUnkeep, !keptNow);
       if (gt.action === 'REHEAT_IMMEDIATE' || gt.action === 'CHILL_NOW') {
         if (b.kind === 'cooling') { text(rec.dtNext, 'Next step'); text(rec.ddNext, U.isNum(gt.nextDeadlineAt) ? 'within ' + hmLong(gt.nextDeadlineAt - now) : 'now'); }
         else { text(rec.dtNext, 'Decide within'); text(rec.ddNext, U.isNum(gt.nextDeadlineAt) ? (gt.nextDeadlineAt - now > 0 ? hmLong(gt.nextDeadlineAt - now) : 'now') : 'now'); }
@@ -579,6 +593,79 @@
       paint();
     }
     // Explains the two-stage cooling rule and, on confirm, moves the whole batch into cooling.
+    // Browser-storage key for the initials typed when a batch is kept serving; remembered per tablet.
+    const KEY_WHO = 'smokebox.v1.initials';
+    // True when a batch has a reading that allows keeping it on the menu: in range and inside the check interval.
+    function keepReady(b) {
+      const S = safety();
+      return b.outSince == null && U.isNum(b.lastTempAt) && nowMs() - b.lastTempAt <= S.tempCheckEveryMin * 60000 && U.isNum(b.lastTempF) && (b.kind === 'cold' ? b.lastTempF <= S.coldHoldF : b.lastTempF >= S.hotHoldF);
+    }
+    // The taste-and-keep dialog: every batch that is past its quality limit, each with its last reading, for 30 minutes,
+    // 1 hour or until a time of day. Batches without a fresh reading in range cannot be ticked.
+    function openKeep(startId, opener) {
+      const S = safety();
+      const past = st().batches.filter((x) => x.status === 'past' && x.remainingG > 0);
+      if (!past.length) return;
+      const picks = new Map();
+      const list = h('div', { class: 'fs-list' });
+      past.forEach((x) => {
+        const ok = keepReady(x);
+        const cb = h('input', { type: 'checkbox', checked: ok && (x.id === startId || !startId), disabled: !ok, 'aria-label': 'Keep ' + (x.label || 'batch') + ' serving' });
+        picks.set(x.id, cb);
+        const reading = U.isNum(x.lastTempF) ? 'Last reading ' + fmtF(x.lastTempF) + ', ' + agoText(nowMs() - x.lastTempAt) : 'No reading yet';
+        list.appendChild(h('label', { class: 'fs-card fs-card-soft', style: 'display:flex;gap:12px;align-items:center;padding:12px' }, cb,
+          h('span', { class: 'grow' }, h('strong', null, x.label || 'Batch'), h('br'), h('span', { class: 'fs-sub' }, ok ? reading : reading + '. Log a temperature of ' + (x.kind === 'cold' ? S.coldHoldF + ' °F or lower' : S.hotHoldF + ' °F or higher') + ' first.'))));
+      });
+      const dur = SB.ui.segmented({ label: 'How long', value: '30', options: [{ id: '30', label: '30 minutes' }, { id: '60', label: '1 hour' }, { id: 'until', label: 'Until a time' }] });
+      const untilIn = h('input', { class: 'input', type: 'time', 'aria-label': 'Keep serving until', hidden: true });
+      const who = h('input', { class: 'input', type: 'text', maxlength: '12', autocomplete: 'off', value: U.storage.get(KEY_WHO, '') || '', placeholder: 'Your initials', 'aria-label': 'Your initials' });
+      const err = h('div', { class: 'fs-note', 'data-tone': 'bad', role: 'alert', hidden: true });
+      dur.addEventListener('click', () => setTimeout(() => { untilIn.hidden = dur.getValue() !== 'until'; }, 0));
+      const dl = dialog({
+        title: 'Taste it and keep serving', name: 'keep', opener, confirmLabel: 'Keep serving', icon: 'check-circle',
+        body: [
+          h('p', null, 'Past its quality limit means the food is off the menu until someone tastes it. If it is still good, keep it on the menu for a set time. Your local health department\'s rules apply to quality extensions.'),
+          list, h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'How long'), dur, untilIn), h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'Who tasted it'), who), err,
+        ],
+        // Sends the ticked batches to the engine with the chosen length and the initials, then reports what was kept.
+        onConfirm: (sh) => {
+          const ids = past.filter((x) => picks.get(x.id).checked).map((x) => x.id);
+          if (!ids.length) { err.textContent = 'Tick at least one batch. A batch needs a fresh temperature reading first.'; err.hidden = false; return; }
+          const payload = { batchIds: ids, who: who.value.trim() };
+          const mode = dur.getValue();
+          if (mode === 'until') {
+            const [hh, mm] = (untilIn.value || '').split(':').map(Number);
+            if (!(hh >= 0)) { err.textContent = 'Pick a time of day.'; err.hidden = false; return; }
+            const d = new Date(nowMs()); d.setHours(hh, mm || 0, 0, 0);
+            if (d.getTime() <= nowMs()) d.setDate(d.getDate() + 1);
+            payload.until = d.getTime();
+          } else payload.forMin = Number(mode);
+          const res = run('keepServing', payload);
+          if (res.report !== 'ok') { err.textContent = say(res); err.hidden = false; return; }
+          U.storage.set(KEY_WHO, payload.who);
+          sh.close('confirm');
+          const n = res.info.kept.length, sk = res.info.skipped.length;
+          toast(n + ' ' + plural(n, 'batch') + ' kept serving until ' + U.fmtTime(res.info.until) + '.' + (sk ? ' ' + sk + ' skipped.' : ''), sk ? 'warn' : 'ok');
+          update(nowMs());
+        },
+      });
+      return dl;
+    }
+    // Corrects a mistaken keep-serving: asks for initials and logs the correction; the original entry stays.
+    function openUnkeep(id, opener) {
+      const b = batchOf(id); if (!b) return;
+      const who = h('input', { class: 'input', type: 'text', maxlength: '12', autocomplete: 'off', value: U.storage.get(KEY_WHO, '') || '', placeholder: 'Your initials', 'aria-label': 'Your initials' });
+      dialog({
+        title: 'Correct: not kept serving', name: 'unkeep', opener, confirmLabel: 'Put back past limit', icon: 'x',
+        body: ['This puts ' + (b.label || 'the batch') + ' back past its quality limit. The earlier entry stays in the log, with this correction beside it.', who],
+        // Logs the correction through the engine and closes the dialog.
+        onConfirm: (sh) => {
+          const res = run('endKeepServing', { batchId: id, who: who.value.trim(), note: 'Corrected from the cabinet card' });
+          if (res.report !== 'ok') { toast(say(res), 'warn'); return; }
+          sh.close('confirm'); update(nowMs());
+        },
+      });
+    }
     function openCooling(b, opener) {
       const S = safety(), c = S.cooling || C.safety.cooling, label = b.label || 'Batch', ing = ingOf(b.ing);
       const fx = whatIf('startCooling', { batchId: b.id });
@@ -1570,7 +1657,7 @@
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + S.hotHoldF + ' °F, reheat to ' + S.reheatF + ' °F within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
         rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + S.hotHoldF + ' °F, not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
-        rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by (quality limit for food held at temperature, safety limit for time as a health control). It is thrown out then, and never later than ' + S.defaultMaxHoldH + ' hours.'),
+        rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit (time as a health control) throws the batch out. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + S.defaultMaxHoldH + ' hours. Your local health department\'s rules apply to quality extensions.'),
         rule('snow', 'Cooling', 'From ' + S.hotHoldF + ' °F to ' + c.stage1ToF + ' °F within ' + c.stage1H + ' hours, then to ' + c.finalF + ' °F within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
         rule('lock', 'Locked batches', 'A batch that is not safe to serve is locked. Nothing is taken from it, and menu items that need it show 86 safety hold.'),

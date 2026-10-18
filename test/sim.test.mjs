@@ -212,7 +212,7 @@ test('the hold cabinet: brisket pans with raw weight, temperature logs with late
   assert.ok(A.events.filter((e) => e.type === 'batch_reheat').length >= 2, 'reheats');
   const disc = A.events.filter((e) => e.type === 'batch_discard');
   assert.ok(disc.some((e) => e.reason === 'temp'), 'a pan thrown out for temperature');
-  assert.ok(disc.some((e) => e.reason === 'expired'), 'pans thrown out at the hold limit');
+  assert.ok(disc.some((e) => e.reason === 'expired' || e.reason === 'quality'), 'pans thrown out at the hold limit');
   console.log(`# discards: ${disc.length} (${disc.filter((e) => e.reason === 'temp').length} temperature), ${(disc.reduce((a, e) => a + e.g, 0) / 1000).toFixed(0)} kg of ${(A.batches.reduce((a, b) => a + b.cookedG, 0) / 1000).toFixed(0)} kg cooked`);
   assert.ok(disc.reduce((a, e) => a + e.g, 0) < 0.06 * A.batches.reduce((a, b) => a + b.cookedG, 0), 'waste under 6 percent of food cooked');
   const san = A.events.filter((e) => e.type === 'sanitize_done');

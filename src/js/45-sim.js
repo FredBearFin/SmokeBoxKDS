@@ -356,6 +356,8 @@
       if (t > clock) clock = t;
       const r = eng.tick(st, clock);
       if (r.state !== st) st = r.state;
+      // The crew throws out any pan that has gone past its quality limit rather than leaving it on the board.
+      for (const b of st.batches) if (b.status === 'past') act('discardBatch', { batchId: b.id, reason: 'quality' }, clock);
     }
     // Next time the engine has something due on its own (paced item to show, channel sync to finish, hold
     // limit to pass).

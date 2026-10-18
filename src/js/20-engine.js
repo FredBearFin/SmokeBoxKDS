@@ -54,7 +54,7 @@
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -103,6 +103,10 @@
     orderEmpty: 'There is nothing on this order to pay. Add items first, or void the order.',
     orderNotEmpty: 'That order still has food on it. Void its tickets first, or take payment.',
     badPayment: 'Pick how it was paid (cash, card or other), and enter the tip and discount as dollar amounts.',
+    qualityNotDue: 'That batch is not past a quality limit, so there is nothing to keep serving.',
+    tempReadingNeeded: 'Log a temperature first: a reading in range (hot food at ' + C.safety.hotHoldF + ' °F or higher), taken within the temperature-check interval, is needed before keeping it on the menu.',
+    whoRequired: 'Enter your initials so the extension can be logged with who tasted it.',
+    badUntil: 'Pick a time later than now, or choose 30 minutes or 1 hour.',
   };
 
   // audit:data-end
@@ -129,6 +133,8 @@
     reheatBatch: '{ batchId, tempF }',
     startCooling: '{ batchId, g? }',
     pullBatch: '{ ing, g }',
+    keepServing: '{ batchIds:string[], forMin?, until?, who }',
+    endKeepServing: '{ batchId, who, note? }',
     discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other" }',
     sanitizeDone: '{}',
     updateSettings: '{ patch }',
@@ -163,9 +169,9 @@
   // The three states of an order (the check): open while food is still being added, paid, or voided.
   const ORDER_STATUS = { open: 1, paid: 1, voided: 1 };
   const ITEM_STATUS = { queued: 1, displayed: 1, cooking: 1, done: 1 };
-  const BATCH_STATUS = { ok: 1, check: 1, reheat: 1, chill: 1, discard: 1 };
+  const BATCH_STATUS = { ok: 1, check: 1, reheat: 1, chill: 1, past: 1, discard: 1 };
   const BATCH_KIND = { hot: 1, cold: 1, cooling: 1 };
-  const STATUS_OF = { NONE: 'ok', CHECK_TEMP: 'check', REHEAT_IMMEDIATE: 'reheat', CHILL_NOW: 'chill', DISCARD_LOCKOUT: 'discard' };
+  const STATUS_OF = { NONE: 'ok', CHECK_TEMP: 'check', REHEAT_IMMEDIATE: 'reheat', CHILL_NOW: 'chill', PAST_QUALITY: 'past', DISCARD_LOCKOUT: 'discard' };
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
 
@@ -426,6 +432,12 @@
   // How long a batch may stay in the cabinet, in ms: the smaller of its own limit and the default
   // hold-limit setting.
   const holdLimitMs = (b, S) => Math.min(isNum(b.maxHoldH) ? b.maxHoldH : Infinity, S.defaultMaxHoldH) * H;
+  // The hard cap, in ms: no batch of any kind stays in the cabinet longer than the default hold-limit setting.
+  const hardLimitMs = (S) => S.defaultMaxHoldH * H;
+  // True for a batch whose own limit is a quality limit with room before the hard cap: past that limit it is
+  // held off the menu until someone tastes it, instead of being thrown out. Batches saved before limit kinds
+  // existed have no kind and act as safety limits.
+  const hasQualityStage = (b, S) => b.holdBasis === 'quality' && holdLimitMs(b, S) < hardLimitMs(S);
   // Formats a temperature as whole degrees for messages.
   const f0 = (x) => Math.round(x) + ' °F';
   // Builds the answer card that gate() returns. The status word comes from the action word; nextDeadlineAt
@@ -464,8 +476,15 @@
     // A missing time falls back to the entry time, so a bad call cannot crash or discard by mistake.
     if (!isNum(now)) now = batch.enteredAt;
     if (batch.kind === 'cooling') return coolingGate(batch, now, S);
-    const exp = batch.enteredAt + holdLimitMs(batch, S);
-    if (now > exp) return gateOut('DISCARD_LOCKOUT', false, 'expired', 'bad', 'Past the ' + U.round(holdLimitMs(batch, S) / H, 1) + '-hour hold limit. Discard.' + SAFETY);
+    const lim = holdLimitMs(batch, S), qStage = hasQualityStage(batch, S);
+    const hard = batch.enteredAt + hardLimitMs(S);
+    let exp = batch.enteredAt + lim;
+    // A safety limit, or the hard cap, throws the batch out. A quality limit does not: see the end of this function.
+    if (now > hard || (now > exp && !qStage)) return gateOut('DISCARD_LOCKOUT', false, 'expired', 'bad', 'Past the ' + U.round((now > hard ? hardLimitMs(S) : lim) / H, 1) + '-hour hold limit. Discard.' + SAFETY);
+    const kept = qStage && isNum(batch.keepUntil) && batch.keepUntil > now;
+    const pastQ = qStage && now > exp && !kept;
+    // Past its quality limit the next change is the hard cap; while kept it is the end of the extension.
+    if (qStage && now > exp) exp = kept ? Math.min(batch.keepUntil, hard) : hard;
     // Out of range: hot food gets one reheat inside the grace window, cold food must be chilled; past the
     // grace time it is discarded.
     const hot = batch.kind !== 'cold';
@@ -483,6 +502,8 @@
     // In range, only the periodic temperature check matters. A late check stays servable: warn first, bad
     // after twice the interval.
     const iv = S.tempCheckEveryMin * MIN;
+    // In range but past its quality limit: off the menu, still on the board, waiting for a taste test or a discard.
+    if (pastQ) return gateOut('PAST_QUALITY', false, 'pastQuality', 'bad', 'Past its quality limit. Taste it, then keep serving or discard it.', exp);
     if (batch.lastTempAt == null) return gateOut('CHECK_TEMP', true, 'noReading', now - batch.enteredAt > iv ? 'bad' : 'warn', 'No temperature logged yet. Check it now.' + SAFETY, exp);
     const due = batch.lastTempAt + iv;
     if (now > due) return gateOut('CHECK_TEMP', true, 'checkDue', now > batch.lastTempAt + 2 * iv ? 'bad' : 'warn', 'Temperature check is due. Log a reading.' + SAFETY, exp);
@@ -499,12 +520,21 @@
       if (b.stage1At == null && b.status === 'chill') return st + c.stage1H * H;
       return st + c.totalH * H;
     }
-    const exp = b.enteredAt + holdLimitMs(b, S);
+    const q = hasQualityStage(b, S);
+    const hard = b.enteredAt + hardLimitMs(S);
+    const lim = b.enteredAt + holdLimitMs(b, S);
+    // The next moment the stored status can change on its own. A quality batch changes at its limit (to past),
+    // at the end of a kept extension, and at the hard cap; it must never be left without a deadline (Infinity),
+    // or the hard cap would never fire.
+    const kept = q && isNum(b.keepUntil) && b.keepUntil > lim;
+    const exp = !q ? lim : b.status === 'past' ? hard : kept ? Math.min(b.keepUntil, hard) : lim;
     if (b.outSince != null) {
       const want = b.kind === 'cold' ? 'chill' : 'reheat';
       if (b.status !== want || (b.kind !== 'cold' && b.reheats >= 1)) return -Infinity;
-      return Math.min(exp, b.outSince + (b.kind === 'cold' ? S.aboveColdGraceH : S.belowHotGraceH) * H);
+      return Math.min(q ? hard : exp, b.outSince + (b.kind === 'cold' ? S.aboveColdGraceH : S.belowHotGraceH) * H);
     }
+    // A past batch stays past (a late temperature check does not change it) until the hard cap.
+    if (b.status === 'past') return q ? hard : -Infinity;
     if (b.status === 'check') return exp;
     if (b.status !== 'ok' || b.lastTempAt == null) return -Infinity;
     return Math.min(exp, b.lastTempAt + S.tempCheckEveryMin * MIN);
@@ -1739,6 +1769,60 @@
     return 'ok';
   };
 
+  // Keeps batches that are past their quality limit on the menu for a while, after a person tasted them. Each
+  // listed batch needs a reading in range, taken within the temperature-check interval; the ones that do not
+  // qualify are skipped and listed. The extension never runs past the hard cap. Logged with who and when.
+  A.keepServing = function (tx, p) {
+    const S = safetyOf(tx.get('settings'));
+    const who = typeof p.who === 'string' ? p.who.trim() : '';
+    if (!who || who.length > 12) return 'whoRequired';
+    const ids = Array.isArray(p.batchIds) ? p.batchIds.filter((x) => typeof x === 'string').slice(0, 40) : [];
+    if (!ids.length) return 'unknownBatch';
+    let until = tx.now + 30 * MIN;
+    if (isNum(p.until)) { if (!(p.until > tx.now)) return 'badUntil'; until = p.until; }
+    else if (isNum(p.forMin)) { if (!(p.forMin >= 1 && p.forMin <= 720)) return 'badUntil'; until = tx.now + p.forMin * MIN; }
+    else if (p.forMin !== undefined || p.until !== undefined) return 'badUntil';
+    const kept = [], skipped = [];
+    let firstReason = null;
+    for (const id of ids) {
+      const bi = findBatchIdx(tx.get('batches'), id);
+      const b = bi >= 0 ? tx.get('batches')[bi] : null;
+      let why = null;
+      if (!b) why = 'unknownBatch';
+      else if (!hasQualityStage(b, S) || b.status === 'discard' || !(tx.now > b.enteredAt + holdLimitMs(b, S))) why = 'qualityNotDue';
+      else if (b.outSince != null || !isNum(b.lastTempAt) || tx.now - b.lastTempAt > S.tempCheckEveryMin * MIN || !isNum(b.lastTempF) || (b.kind === 'cold' ? b.lastTempF > S.coldHoldF : b.lastTempF < S.hotHoldF)) why = 'tempReadingNeeded';
+      if (why) { skipped.push({ batchId: id, report: why }); if (!firstReason) firstReason = why; continue; }
+      const keepUntil = Math.min(until, b.enteredAt + hardLimitMs(S));
+      const w = tx.batch(bi);
+      w.keepUntil = keepUntil; w.keptBy = who;
+      tx.event('quality_extend', { batchId: b.id, ing: b.ing, who, until: keepUntil, lastTempF: b.lastTempF, lastTempAt: b.lastTempAt });
+      refreshBatch(tx, bi);
+      kept.push(b.id);
+    }
+    if (!kept.length) { tx.info = { skipped }; return firstReason || 'unknownBatch'; }
+    tx.info = { kept, skipped, until: Math.min(until, Infinity) };
+    return 'ok';
+  };
+  // A logged correction for a mistaken keep-serving: the batch goes back to past its quality limit. The original
+  // log entry stays; the correction points at it.
+  A.endKeepServing = function (tx, p) {
+    const bi = typeof p.batchId === 'string' ? findBatchIdx(tx.get('batches'), p.batchId) : -1;
+    if (bi < 0) return 'unknownBatch';
+    const b = tx.get('batches')[bi];
+    const who = typeof p.who === 'string' ? p.who.trim() : '';
+    if (!who || who.length > 12) return 'whoRequired';
+    if (!(isNum(b.keepUntil) && b.keepUntil > tx.now)) return 'qualityNotDue';
+    const evs = allEvents(tx.state());
+    let of = null;
+    for (let i = evs.length - 1; i >= 0; i--) if (evs[i].type === 'quality_extend' && evs[i].batchId === b.id) { of = evs[i].id; break; }
+    const w = tx.batch(bi);
+    w.keepUntil = tx.now;
+    tx.event('quality_extend_corrected', { batchId: b.id, who, note: typeof p.note === 'string' ? p.note.slice(0, C.limits.maxNoteLen) : '', of });
+    refreshBatch(tx, bi);
+    tx.info = { batchId: b.id };
+    return 'ok';
+  };
+
   // Manual discard with a reason from the list. The grams become waste. Undoable.
   A.discardBatch = function (tx, p) {
     const bs = tx.get('batches');
@@ -2361,7 +2445,7 @@
       const b = {
         id: 'b_' + ++seq.batch, ing: ing.id, label: ing.name + ' batch 1', kind: hot ? 'hot' : 'cold', enteredAt: now - age, cookedG: ing.parG, remainingG: ing.parG,
         costPerCookedKg: round(nominalUnitCost(ing) * 1000, 4), src: 'starter', temps: [{ t: readAt, f }], lastTempF: f, lastTempAt: readAt, reheats: 0,
-        maxHoldH: isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH, status: 'ok', action: 'NONE', canServe: true,
+        maxHoldH: isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH, holdBasis: ing.holdBasis === 'safety' ? 'safety' : 'quality', status: 'ok', action: 'NONE', canServe: true,
       };
       if (ty) b.yieldPct = ty.hotPct; else if (isNum(ing.yield)) b.yieldPct = round(ing.yield * 100, 2);
       batches.push(b);
@@ -2488,7 +2572,7 @@
     // Numbers for the header badges: tickets, ready, overdue and warn counts, per-station counts, batches
     // needing attention, dishes 86, and whether sanitising is overdue.
     counts(state, now) {
-      const c = { all: 0, expo: 0, ready: 0, overdue: 0, warn: 0, zones: {}, overdueByZone: {}, hold: 0, holdWhy: { check: 0, reheat: 0, chill: 0, discard: 0 }, out86: 0, sanitizeDueAt: undefined, sanitizeOverdue: false };
+      const c = { all: 0, expo: 0, ready: 0, overdue: 0, warn: 0, zones: {}, overdueByZone: {}, hold: 0, holdWhy: { check: 0, reheat: 0, chill: 0, past: 0, discard: 0 }, out86: 0, sanitizeDueAt: undefined, sanitizeOverdue: false };
       for (const z of C.workZones) { c.zones[z] = 0; c.overdueByZone[z] = 0; }
       if (!isState(state)) return c;
       for (const t of views.activeTickets(state)) {
@@ -2510,7 +2594,7 @@
         const gt = gate(b, now, S);
         if (gt.action !== 'NONE') {
           c.hold++;
-          const why = gt.action === 'CHECK_TEMP' ? 'check' : gt.action === 'REHEAT_IMMEDIATE' ? 'reheat' : gt.action === 'CHILL_NOW' ? 'chill' : 'discard';
+          const why = gt.action === 'CHECK_TEMP' ? 'check' : gt.action === 'REHEAT_IMMEDIATE' ? 'reheat' : gt.action === 'CHILL_NOW' ? 'chill' : gt.action === 'PAST_QUALITY' ? 'past' : 'discard';
           c.holdWhy[why]++;
         }
       }
@@ -2807,7 +2891,7 @@
         if (!isInt(out.reheats) || out.reheats < 0) out.reheats = 0;
         if (!Array.isArray(out.temps)) out.temps = [];
         out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS);
-        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
+        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
         if (!hasOwn(SRC_BATCH, out.src)) out.src = 'cook';
         bIds.add(b.id);
         batches.push(out);

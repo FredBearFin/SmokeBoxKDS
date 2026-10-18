@@ -1090,8 +1090,8 @@
   function announce(d, perfNow) {
     const st = ladder.get(d.id) || { rung: 0, ack: 0, loudAt: 0 };
     ladder.set(d.id, st);
-    if (d.kind === 'expired') {
-      if (st.rung >= 1) return null;
+    if (d.kind === 'expired' || d.kind === 'past') {
+      if (st.rung >= 1 || d.trivial) return null;
       st.rung = 1;
       return alertCall(4, d);
     }
@@ -1128,6 +1128,7 @@
     const same = calls.filter((c) => c.level === top.level);
     const first = same.slice().sort((x, y) => x.d.msLeft - y.d.msLeft)[0].d;
     const who = first.label + (same.length > 1 ? ' and ' + (same.length - 1) + ' more' : '');
+    if (top.level === 4 && first.kind === 'past') { speak(who + (same.length > 1 ? ' are past their quality limit.' : ' is past its quality limit.')); return; }
     if (top.level === 4) { speak(who + (same.length > 1 ? ' expired and were thrown out.' : ' expired and was thrown out.')); return; }
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
     speak(who + (first.goes86 && same.length === 1 ? ' goes 86' : same.length > 1 ? ' expire' : ' expires') + ' in ' + (top.level === 2 ? 'about ' : '') + mins + ' ' + U.plural(mins, 'minute') + '.');
@@ -1155,7 +1156,7 @@
       if (!d) { r.key = ''; return; }
       r.key = d.id; r.batchId = d.batchId || null;
       setTone(r.el, d.sev);
-      setTxt(r.when, d.kind === 'expired' ? 'OUT' : countdownText(d.msLeft));
+      setTxt(r.when, d.kind === 'expired' ? 'OUT' : d.kind === 'past' ? 'PAST' : countdownText(d.msLeft));
       setTxt(r.what, d.label);
       setTxt(r.why, d.consequence + ' ' + d.action);
     });
@@ -1246,6 +1247,7 @@
     if (w.check) bits.push(w.check + ' temperature ' + U.plural(w.check, 'check') + ' due');
     if (w.reheat) bits.push(w.reheat + ' to reheat');
     if (w.chill) bits.push(w.chill + ' to chill now');
+    if (w.past) bits.push(w.past + ' past quality limit');
     if (w.discard) bits.push(w.discard + ' to throw out');
     return bits.join(', ');
   }

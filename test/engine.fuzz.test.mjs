@@ -70,7 +70,7 @@ function genAction(rng, s) {
   const tcs = s.ingredients.filter((i) => i.tcs);
   const W = [['createTicket', 16], ['advanceItem', 18], ['completeItem', 5], ['fireNow', 5], ['completeZone', 4], ['bumpTicket', 8], ['recallTicket', 3],
     ['voidTicket', 3], ['setRush', 3], ['toggle86', 4], ['restock', 3], ['addBatch', 5], ['logTemp', 5], ['reheatBatch', 2], ['startCooling', 1],
-    ['discardBatch', 2], ['pullBatch', 3], ['sanitizeDone', 2], ['updateSettings', 2], ['updateMenuItem', 1], ['addMenuItem', 0.6], ['payOrder', 4], ['reopenOrder', 1], ['voidOrder', 1], ['updateIngredient', 1], ['undo', 7], ['resetLive', 0.2], ['junkType', 2]];
+    ['discardBatch', 2], ['pullBatch', 3], ['keepServing', 2], ['endKeepServing', 1], ['sanitizeDone', 2], ['updateSettings', 2], ['updateMenuItem', 1], ['addMenuItem', 0.6], ['payOrder', 4], ['reopenOrder', 1], ['voidOrder', 1], ['updateIngredient', 1], ['undo', 7], ['resetLive', 0.2], ['junkType', 2]];
   let r = rng.next() * W.reduce((a, x) => a + x[1], 0);
   let type = W[0][0];
   for (const [k, w] of W) { r -= w; if (r <= 0) { type = k; break; } }
@@ -105,6 +105,8 @@ function genAction(rng, s) {
     case 'logTemp': p = { batchId: b && b.id, tempF: pick([38, 40, 44, 120, 130, 136, 150, 166, 70]) }; break;
     case 'reheatBatch': p = { batchId: b && b.id, tempF: pick([150, 166, 175]) }; break;
     case 'startCooling': p = { batchId: b && b.id, g: rng.next() < 0.5 ? undefined : 500 }; break;
+    case 'keepServing': p = { batchIds: s.batches.filter((x) => x.status === 'past' || rng.next() < 0.3).map((x) => x.id).slice(0, 3), forMin: pick([30, 60, undefined, 0, 'x']), who: pick(['AB', '', 'FW']) }; break;
+    case 'endKeepServing': p = { batchId: b && b.id, who: pick(['AB', '']), note: 'mis-tap' }; break;
     case 'pullBatch': p = { ing: pick(['brisket', 'pork', 'tea', 'beans']), g: pick([500, 1500, 4500, 0, -3]) }; break;
     case 'discardBatch': p = { batchId: b && b.id, reason: pick(['manual', 'quality', 'temp', 'other', 'bad']) }; break;
     case 'sanitizeDone': p = {}; break;
@@ -276,7 +278,8 @@ test('fuzz: 200 random sequences x 60 steps keep I1-I15 after every step', () =>
   const total = Object.values(stats).reduce((a, n) => a + n, 0);
   assert.equal(total, 200 * 60);
   // coverage: every action type succeeded at least once, and a healthy share of steps changed the state
-  for (const type of Object.keys(SB.engine.ACTIONS).filter((x) => x !== 'uiReport')) assert.ok(stats[type + ':ok'] > 0, 'never succeeded: ' + type);
+  // keepServing and endKeepServing need a past-quality batch with a fresh reading; the unit tests cover their success paths.
+  for (const type of Object.keys(SB.engine.ACTIONS).filter((x) => x !== 'uiReport' && x !== 'keepServing' && x !== 'endKeepServing')) assert.ok(stats[type + ':ok'] > 0, 'never succeeded: ' + type);
   assert.ok(ok / total > 0.25, 'ok share ' + ok / total);
   const distinct = new Set(Object.keys(stats).map((k) => k.split(':')[1]));
   assert.ok(distinct.size >= 25, 'reports exercised: ' + distinct.size);

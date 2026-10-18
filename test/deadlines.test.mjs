@@ -85,7 +85,12 @@ test('hold window: brisket logged at 4:00 with the kitchen open 11:00 to 21:00 h
   // The 2-hour rung is crossed at 10:00 but it is silent; it can sound once the kitchen opens, 1 hour before expiry at 12:00.
   const row = D.build(s, at(11)).find((x) => x.kind === 'expiry');
   assert.ok(row && row.rung >= 2 && Math.round(row.msLeft / 60e3) === 60, JSON.stringify(row && [row.rung, row.msLeft]));
-  assert.equal(E.tick(s, at(12, 1)).events.filter((e) => e.type === 'batch_discard').length, 1, 'thrown out at 12:00, 8 hours after it went in');
+  // Brisket has a quality limit: at 12:00, 8 hours after it went in, it is held off the menu (past), not thrown out.
+  const t12 = E.tick(s, at(12, 1));
+  assert.equal(t12.events.filter((e) => e.type === 'batch_discard').length, 0);
+  assert.equal(t12.state.batches[0].status, 'past');
+  // Only the 12-hour hard cap throws it out.
+  assert.equal(E.tick(t12.state, at(16, 1)).events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 1);
 });
 
 test('resting: pulls take the oldest ready batch first and resting batches only when nothing else is left; run-out counts ready stock', () => {
@@ -116,4 +121,16 @@ test('migration: a save with the old flat 4-hour cap moves to per-product limits
   assert.equal(v.state.ingredients.find((i) => i.id === 'brisket').maxHoldH, 8);
   assert.equal(v.state.ingredients.find((i) => i.id === 'ribs').maxHoldH, 4);
   assert.equal(E.validateBackup(mk({ defaultMaxHoldH: 6 })).state.settings.safety.defaultMaxHoldH, 6, 'a value the owner chose stays');
+});
+
+test('feed: a batch past its quality limit gets a past row (off the menu, taste it), and no projection', () => {
+  let s = E.newState({ now: T0, empty: true });
+  s = E.apply(s, 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T0).state;
+  s = E.tick(s, T0 + 4 * HR + 1).state;
+  const f = D.build(s, T0 + 4 * HR + 60e3);
+  const row = f.find((x) => x.kind === 'past');
+  assert.ok(row, f.map((x) => x.id).join());
+  assert.equal(row.sev, 'bad');
+  assert.ok(/quality limit/.test(row.consequence) && /Taste it/.test(row.action), row.consequence + ' / ' + row.action);
+  assert.ok(!f.some((x) => x.kind === 'expiry' && x.batchId === row.batchId), 'no expiry projection for a batch that cannot sell');
 });
