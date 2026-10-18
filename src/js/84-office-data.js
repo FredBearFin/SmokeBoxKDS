@@ -700,7 +700,7 @@
     });
     fields.push(cost);
     // Pull size: the set amount one Pull button takes out of the hold cabinet (one whole brisket, one rack, one pan).
-    let pull = null, holdF = null, restF = null, basisSeg = null;
+    let pull = null, holdF = null, restF = null, cookF = null, basisSeg = null;
     if (ing0.tcs) {
       const pullMeta = { name: 'The pull size', unit: 'g' };
       pull = numField({
@@ -716,15 +716,22 @@
       const holdMeta = { name: 'The hold limit', unit: 'h' }, restMeta = { name: 'The rest time', unit: 'h' };
       holdF = numField({
         label: 'Hold limit (hours in the cabinet)', aria: 'Hold limit of ' + nm, value: ing0.maxHoldH || 4, min: 0.5, max: 12, step: 0.5, big: 1, unit: 'h', meta: holdMeta,
-        hint: 'A batch is thrown out this long after it goes in. Starter limit: owner to confirm.',
+        hint: 'A batch reaches its limit this long after it goes in (a safety limit throws it out, a quality limit takes it off the menu). Starter limit: owner to confirm.',
         // The hold limit saves through the engine like the other fields.
-        save: (v) => mkPatch({ maxHoldH: v }, 'Saved. New batches of ' + lower1(nm) + ' are thrown out ' + v + ' hours after they go in.', holdMeta), onSaved: (t) => status.ok(t),
+        save: (v) => mkPatch({ maxHoldH: v }, 'Saved. New batches of ' + lower1(nm) + ' reach their hold limit ' + v + ' hours after they go in.', holdMeta), onSaved: (t) => status.ok(t),
       });
       restF = numField({
         label: 'Rest before serving (hours)', aria: 'Rest time of ' + nm, value: ing0.restH || 0, min: 0, max: 12, step: 0.5, big: 1, unit: 'h', meta: restMeta,
         hint: 'A fresh batch rests this long before it is ready. Pulls take ready batches first.',
         // The rest time saves the same way.
         save: (v) => mkPatch({ restH: v }, 'Saved. New batches of ' + lower1(nm) + ' rest ' + v + ' hours before they are ready.', restMeta), onSaved: (t) => status.ok(t),
+      });
+      const cookMeta = { name: 'The cook time', unit: 'h' };
+      cookF = numField({
+        label: 'Cook time (hours)', aria: 'Cook time of ' + nm, value: ing0.cookH || 0, min: 0, max: 48, step: 0.5, big: 1, unit: 'h', meta: cookMeta,
+        hint: 'From starting a batch to ready (before its rest). Used to say whether a new batch started now is ready before close. Starter value: owner to confirm.',
+        // The cook time saves through the engine like the other fields.
+        save: (v) => mkPatch({ cookH: v }, 'Saved. A new batch of ' + lower1(nm) + ' takes ' + v + ' hours to cook.', cookMeta), onSaved: (t) => status.ok(t),
       });
       basisSeg = SB.ui.segmented({
         label: 'Kind of hold limit for ' + nm, value: ing0.holdBasis === 'safety' ? 'safety' : 'quality',
@@ -736,7 +743,7 @@
           else { basisSeg.setValue(getIng().holdBasis === 'safety' ? 'safety' : 'quality'); status.bad(refusal(r, null)); }
         },
       });
-      fields.push(holdF, restF);
+      fields.push(holdF, restF, cookF);
     }
 
     let yieldBlock = null, yField = null, yConf = null;
@@ -780,7 +787,7 @@
         h('div', { class: 'od-block' }, cost.el),
         pull ? h('div', { class: 'od-block' }, pull.el) : null,
         holdF ? h('div', { class: 'od-block' }, holdF.el, basisSeg) : null,
-        restF ? h('div', { class: 'od-block' }, restF.el) : null),
+        restF ? h('div', { class: 'od-block' }, restF.el, cookF.el) : null),
       noteEl, status.el);
     return {
       root, id,
@@ -788,7 +795,7 @@
       sync(ing) {
         par.sync(ing.parG); thr.sync(ing.thresholdG); cost.sync(ing[costKey] || 0);
         if (pull) pull.sync(ing.pullG || 1000);
-        if (holdF) { holdF.sync(ing.maxHoldH || 4); restF.sync(ing.restH || 0); basisSeg.setValue(ing.holdBasis === 'safety' ? 'safety' : 'quality'); }
+        if (holdF) { holdF.sync(ing.maxHoldH || 4); restF.sync(ing.restH || 0); cookF.sync(ing.cookH || 0); basisSeg.setValue(ing.holdBasis === 'safety' ? 'safety' : 'quality'); }
         if (yField) { yField.sync(ing.yield); yConf.setValue(ing.yieldConfirmed ? 'confirmed' : 'starter'); }
         root.dataset.confirmed = ing.yieldConfirmed ? 'true' : 'false';
       },

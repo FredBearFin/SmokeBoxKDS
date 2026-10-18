@@ -4069,16 +4069,16 @@ a.of-nav:active { background: var(--press); }
   // pricing.
   // audit:data-start
   C.ingredients = [
-    { id: 'brisket',  name: 'Brisket',          unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 8, holdBasis: 'quality', restH: 3, parG: 14000, pullG: 4500, thresholdG: 700,  costPerKg: 24.36, thermal: true, yield: 0.55, yieldConfirmed: false, note: 'Starter cost: USDA average brisket $11.05/lb for the week ending 2026-09-25 (from the Pitcall notes), about $24.36/kg. Unverified here.' },
-    { id: 'pork',     name: 'Pulled pork',      unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 8, holdBasis: 'quality', restH: 1, parG: 10000, pullG: 2500, thresholdG: 600,  costPerKg: 7.70,  yield: 0.55, yieldConfirmed: false },
-    { id: 'ribs',     name: 'St. Louis ribs',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', restH: 0.5, parG: 12000, pullG: 1200, thresholdG: 900,  costPerKg: 9.90,  yield: 0.62, yieldConfirmed: false },
-    { id: 'sausage',  name: 'Smoked sausage',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', parG: 6000, pullG: 1000,  thresholdG: 400,  costPerKg: 9.00,  yield: 0.90, yieldConfirmed: false },
-    { id: 'turkey',   name: 'Smoked turkey',    unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', parG: 5000, pullG: 1500,  thresholdG: 500,  costPerKg: 11.00, yield: 0.70, yieldConfirmed: false },
-    { id: 'mac',      name: 'Mac and cheese',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.60,  yield: 1,    yieldConfirmed: false },
-    { id: 'beans',    name: 'Pit beans',        unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.00,  yield: 1,    yieldConfirmed: false },
-    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', parG: 7000, pullG: 1500,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
-    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', parG: 6000, pullG: 1500,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
-    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', parG: 5000, pullG: 1500,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
+    { id: 'brisket',  name: 'Brisket',          unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 8, holdBasis: 'quality', cookH: 12, restH: 3, parG: 14000, pullG: 4500, thresholdG: 700,  costPerKg: 24.36, thermal: true, yield: 0.55, yieldConfirmed: false, note: 'Starter cost: USDA average brisket $11.05/lb for the week ending 2026-09-25 (from the Pitcall notes), about $24.36/kg. Unverified here.' },
+    { id: 'pork',     name: 'Pulled pork',      unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 8, holdBasis: 'quality', cookH: 10, restH: 1, parG: 10000, pullG: 2500, thresholdG: 600,  costPerKg: 7.70,  yield: 0.55, yieldConfirmed: false },
+    { id: 'ribs',     name: 'St. Louis ribs',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 5, restH: 0.5, parG: 12000, pullG: 1200, thresholdG: 900,  costPerKg: 9.90,  yield: 0.62, yieldConfirmed: false },
+    { id: 'sausage',  name: 'Smoked sausage',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 1.5, parG: 6000, pullG: 1000,  thresholdG: 400,  costPerKg: 9.00,  yield: 0.90, yieldConfirmed: false },
+    { id: 'turkey',   name: 'Smoked turkey',    unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 4, parG: 5000, pullG: 1500,  thresholdG: 500,  costPerKg: 11.00, yield: 0.70, yieldConfirmed: false },
+    { id: 'mac',      name: 'Mac and cheese',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 1, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.60,  yield: 1,    yieldConfirmed: false },
+    { id: 'beans',    name: 'Pit beans',        unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 2, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.00,  yield: 1,    yieldConfirmed: false },
+    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 7000, pullG: 1500,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
+    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 6000, pullG: 1500,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
+    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 5000, pullG: 1500,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
     { id: 'cornbread', name: 'Cornbread',       unit: 'ea', tcs: false, parG: 120,   thresholdG: 8,   costEach: 0.45 },
     { id: 'buns',     name: 'Buns',             unit: 'ea', tcs: false, parG: 150,   thresholdG: 10,  costEach: 0.38 },
     { id: 'pickles',  name: 'Pickle chips',     unit: 'g',  tcs: false, parG: 6000,  thresholdG: 300,  costPerKg: 4.20 },
@@ -4220,6 +4220,8 @@ a.of-nav:active { background: var(--press); }
   // ready to serve (brisket 3 h, pulled pork 1 h, ribs 30 min; the research gives 2 to 4 h for large cuts and
   // 30 to 60 min for ribs). holdBasis says what the limit is: "quality" (a house limit for food held at
   // temperature, hot at 135 F or above) or "safety" (time as a public health control, no temperature control).
+  // cookH is how long a fresh batch takes from start to ready to rest (starter placeholders, owner to confirm). With restH
+  // it tells whether a new batch started now would be ready before close.
   // pullG on an ingredient is the set amount one Pull button moves out of the cabinet (one whole brisket, one rack,
   // one pan), in grams. Starter estimates: the owner sets the real unit.
   // Brisket cooked yield, from the Texas A&M AgriLife regression in the research report. Used only for
@@ -6250,7 +6252,7 @@ a.of-nav:active { background: var(--press); }
   const ING_PATCH = {
     name: { t: 'text', max: 60 }, thresholdG: R(0, 1e6), parG: R(0, 1e7), yield: R(0.05, 3), yieldConfirmed: { t: 'bool' },
     costPerKg: R(0, 10000), costEach: R(0, 10000), pullG: R(50, 50000),
-    maxHoldH: R(0.5, 12), restH: R(0, 12), holdBasis: { t: 'enum', v: ['quality', 'safety'] },
+    maxHoldH: R(0.5, 12), restH: R(0, 12), cookH: R(0, 48), holdBasis: { t: 'enum', v: ['quality', 'safety'] },
   };
   // Shared editor for menu items and ingredients. Checks each field, ignores unchanged ones (nothingToDo if
   // nothing changed), writes one new copy and logs settings_changed. Changing a starter prep time re-fits
@@ -7482,6 +7484,80 @@ a.of-nav:active { background: var(--press); }
     out.push({ id: 'past:' + b.id, kind: 'past', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
       consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or discard it.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
   }
+  // The next closing time after now, in ms, from the service hours (a close above 24 means after midnight, so last
+  // night's close can still be ahead at 12:30 am). Null once today's close has passed.
+  function closeAtMs(state, now) {
+    const sv = state.settings && state.settings.service ? state.settings.service : C.service;
+    if (!U.isNum(sv.closeHour)) return null;
+    let best = null;
+    for (const day of [-1, 0]) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + day); d.setHours(0, 0, 0, 0);
+      const at = d.getTime() + sv.closeHour * H;
+      if (at > now && (best == null || at < best)) best = at;
+    }
+    return best;
+  }
+  // Walks from now to close in steps between the moments something changes (a resting batch becomes ready, a
+  // batch passes its limit), serving the pace from the oldest ready batch first. Returns the grams left at close in
+  // batches still alive minus any demand nobody could serve (so negative means short), the first moment the
+  // ready stock ran out, and the grams that passed their limit before close. Each batch is { remainingG, enteredAt,
+  // readyAt, expAt }.
+  function sweepToClose(batches, rate, now, closeAt) {
+    const bs = batches.map((b) => ({ rem: b.remainingG, ent: b.enteredAt, ready: Math.max(now, b.readyAt || 0), exp: b.expAt })).sort((x, y) => x.ent - y.ent);
+    const marks = new Set([now, closeAt]);
+    for (const b of bs) for (const t of [b.ready, b.exp]) if (t > now && t < closeAt) marks.add(t);
+    const times = Array.from(marks).sort((x, y) => x - y);
+    let unmet = 0, runOutAt = null, wasteBefore = 0;
+    for (let i = 0; i + 1 < times.length; i++) {
+      const a = times[i], z = times[i + 1], dem = rate * (z - a);
+      let need = dem;
+      for (const b of bs) { if (need <= 0) break; if (b.rem > 0 && b.ready <= a && b.exp > a) { const take = Math.min(need, b.rem); b.rem -= take; need -= take; } }
+      if (need > 1e-6) { if (runOutAt == null) runOutAt = a + (dem - need) / rate; unmet += need; }
+      for (const b of bs) if (b.exp <= z && b.rem > 0) { wasteBefore += b.rem; b.rem = 0; }
+    }
+    const alive = bs.reduce((acc, b) => acc + (b.exp > closeAt ? b.rem : 0), 0);
+    return { leftoverG: alive - unmet, runOutAt, wasteBefore };
+  }
+  // Whether a new batch started now would be ready before close: now + cook time + rest time against closing. Returns
+  // null when the product has no cook time, else { readyAt, fits }.
+  function nextBatchFit(ing, now, closeAt) {
+    if (!ing || !U.isNum(ing.cookH) || !(ing.cookH > 0)) return null;
+    const readyAt = now + (ing.cookH + (U.isNum(ing.restH) ? ing.restH : 0)) * H;
+    return { readyAt, fits: readyAt < closeAt };
+  }
+  // Rows for one ingredient at the current pace: grams left over at close (waste, silent) or a shortfall (it runs out
+  // early, a silent caution with what to do). Only batches that can be served count; a pull counts as sold, so
+  // food already on the block is not counted.
+  function closeRows(state, ing, name, list, rate, now, S, out) {
+    const closeAt = closeAtMs(state, now);
+    if (closeAt == null) return;
+    const bs = list.filter((b) => b.canServe !== false).map((b) => {
+      const hardAt = b.enteredAt + S.defaultMaxHoldH * H, limAt = b.enteredAt + E()._internal.holdLimitMs(b, S);
+      const q = b.holdBasis === 'quality' && limAt < hardAt;
+      return { remainingG: b.remainingG, enteredAt: b.enteredAt, readyAt: b.restUntil, expAt: q && U.isNum(b.keepUntil) && b.keepUntil > now ? Math.min(b.keepUntil, hardAt) : limAt };
+    });
+    if (!bs.length) return;
+    const stock = bs.reduce((acc, b) => acc + b.remainingG, 0);
+    const r = sweepToClose(bs, rate, now, closeAt);
+    const toClose = closeAt - now;
+    if (r.leftoverG >= Math.max(NOTABLE_G, NOTABLE_SHARE * stock)) {
+      out.push({ id: 'leftover:' + ing.id, kind: 'leftover', ing: ing.id, label: name, at: closeAt, msLeft: toClose, rung: 0, rungs: 0, sev: 'info', leftoverG: r.leftoverG,
+        consequence: 'At the current pace about ' + U.fmtG(r.leftoverG) + ' of ' + name + ' will be left at close, not counting what is already on the block.', action: 'Sell it: run a special, tell the front.', unknown: false });
+    } else if (r.leftoverG <= -NOTABLE_G && r.runOutAt != null) {
+      const fit = nextBatchFit(ing, now, closeAt);
+      const next = !fit ? '' : fit.fits ? ' A batch started now is ready at ' + U.fmtTime(fit.readyAt) + '.' : ' A new batch would be ready at ' + U.fmtTime(fit.readyAt) + ', after close.';
+      const early = closeAt - r.runOutAt;
+      out.push({ id: 'shortfall:' + ing.id, kind: 'shortfall', ing: ing.id, label: name, at: r.runOutAt, msLeft: r.runOutAt - now, rung: 0, rungs: 0, sev: 'warn', leftoverG: r.leftoverG, shortG: -r.leftoverG,
+        consequence: 'At the current pace ' + name + ' runs out at ' + U.fmtTime(r.runOutAt) + ', ' + hmText(early) + ' before close, about ' + U.fmtG(-r.leftoverG) + ' short.' + next,
+        action: 'Shorten portions, stop preorders, run a special.' + (fit && fit.fits ? ' Start the next batch now.' : ''), nextBatch: fit, unknown: false });
+    }
+  }
+  // A span of time in words: "45 min", "2 h 10 min".
+  function hmText(ms) {
+    const m = Math.max(0, Math.round(ms / MIN));
+    return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + m % 60 + ' min' : '');
+  }
   // Rows for the cooked batches: expiry with projected waste, and run-out time, per ingredient.
   function batchRows(state, now, S, sales, out) {
     const byIng = Object.create(null);
@@ -7536,15 +7612,8 @@ a.of-nav:active { background: var(--press); }
             sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, wasteG: waste, wasteUsd: usd, goes86: lastOne, quality: q, trivial, unknown: rate === undefined });
         }
       });
-      // Run-out: when the whole stock of this item will be gone at the current pace.
-      if (rate !== undefined && totalLeft > 0) {
-        const ms = totalLeft / rate;
-        if (ms <= 2 * H) {
-          const at = now + ms;
-          out.push({ id: 'runout:' + ingId, kind: 'runout', ing: ingId, label: name, at, msLeft: ms, rung: 0, rungs: 0, sev: ms <= 30 * MIN ? 'warn' : 'info',
-            consequence: name + ' runs out at ' + U.fmtTime(at) + ' at the current pace (' + U.fmtG(totalLeft) + ' left).', action: 'Start the next batch now if there is one coming.', unknown: false });
-        }
-      }
+      // What is left at close, or when it runs out early, at the current pace.
+      if (rate !== undefined) closeRows(state, ing, name, list, rate, now, S, out);
     }
   }
   // Rows for food-safety gates: a temperature check due, a reheat or chill decision, a cooling stage.
@@ -7641,7 +7710,7 @@ a.of-nav:active { background: var(--press); }
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote };
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 25-deadlines.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'25-deadlines.js',message:String(e&&e.message||e)});}
@@ -16644,7 +16713,7 @@ a.of-nav:active { background: var(--press); }
     if (SB.deadlines.soundsAllowed(store().getState(), now)) all.forEach((d) => { const c = announce(d, perfNow); if (c) calls.push(c); });
     playCalls(calls);
     // Info rows only show for batches and run-outs; an expired notice goes away once someone taps it.
-    const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'runout') && !(d.kind === 'expired' && (ladder.get(d.id) || {}).ack));
+    const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover') && !(d.kind === 'expired' && (ladder.get(d.id) || {}).ack));
     const top = feed.slice(0, 3);
     const needSound = sound && !audioReady();
     setHidden(m.strip.soundBar, !needSound);
@@ -24537,7 +24606,7 @@ a.of-nav:active { background: var(--press); }
     });
     fields.push(cost);
     // Pull size: the set amount one Pull button takes out of the hold cabinet (one whole brisket, one rack, one pan).
-    let pull = null, holdF = null, restF = null, basisSeg = null;
+    let pull = null, holdF = null, restF = null, cookF = null, basisSeg = null;
     if (ing0.tcs) {
       const pullMeta = { name: 'The pull size', unit: 'g' };
       pull = numField({
@@ -24553,15 +24622,22 @@ a.of-nav:active { background: var(--press); }
       const holdMeta = { name: 'The hold limit', unit: 'h' }, restMeta = { name: 'The rest time', unit: 'h' };
       holdF = numField({
         label: 'Hold limit (hours in the cabinet)', aria: 'Hold limit of ' + nm, value: ing0.maxHoldH || 4, min: 0.5, max: 12, step: 0.5, big: 1, unit: 'h', meta: holdMeta,
-        hint: 'A batch is thrown out this long after it goes in. Starter limit: owner to confirm.',
+        hint: 'A batch reaches its limit this long after it goes in (a safety limit throws it out, a quality limit takes it off the menu). Starter limit: owner to confirm.',
         // The hold limit saves through the engine like the other fields.
-        save: (v) => mkPatch({ maxHoldH: v }, 'Saved. New batches of ' + lower1(nm) + ' are thrown out ' + v + ' hours after they go in.', holdMeta), onSaved: (t) => status.ok(t),
+        save: (v) => mkPatch({ maxHoldH: v }, 'Saved. New batches of ' + lower1(nm) + ' reach their hold limit ' + v + ' hours after they go in.', holdMeta), onSaved: (t) => status.ok(t),
       });
       restF = numField({
         label: 'Rest before serving (hours)', aria: 'Rest time of ' + nm, value: ing0.restH || 0, min: 0, max: 12, step: 0.5, big: 1, unit: 'h', meta: restMeta,
         hint: 'A fresh batch rests this long before it is ready. Pulls take ready batches first.',
         // The rest time saves the same way.
         save: (v) => mkPatch({ restH: v }, 'Saved. New batches of ' + lower1(nm) + ' rest ' + v + ' hours before they are ready.', restMeta), onSaved: (t) => status.ok(t),
+      });
+      const cookMeta = { name: 'The cook time', unit: 'h' };
+      cookF = numField({
+        label: 'Cook time (hours)', aria: 'Cook time of ' + nm, value: ing0.cookH || 0, min: 0, max: 48, step: 0.5, big: 1, unit: 'h', meta: cookMeta,
+        hint: 'From starting a batch to ready (before its rest). Used to say whether a new batch started now is ready before close. Starter value: owner to confirm.',
+        // The cook time saves through the engine like the other fields.
+        save: (v) => mkPatch({ cookH: v }, 'Saved. A new batch of ' + lower1(nm) + ' takes ' + v + ' hours to cook.', cookMeta), onSaved: (t) => status.ok(t),
       });
       basisSeg = SB.ui.segmented({
         label: 'Kind of hold limit for ' + nm, value: ing0.holdBasis === 'safety' ? 'safety' : 'quality',
@@ -24573,7 +24649,7 @@ a.of-nav:active { background: var(--press); }
           else { basisSeg.setValue(getIng().holdBasis === 'safety' ? 'safety' : 'quality'); status.bad(refusal(r, null)); }
         },
       });
-      fields.push(holdF, restF);
+      fields.push(holdF, restF, cookF);
     }
 
     let yieldBlock = null, yField = null, yConf = null;
@@ -24617,7 +24693,7 @@ a.of-nav:active { background: var(--press); }
         h('div', { class: 'od-block' }, cost.el),
         pull ? h('div', { class: 'od-block' }, pull.el) : null,
         holdF ? h('div', { class: 'od-block' }, holdF.el, basisSeg) : null,
-        restF ? h('div', { class: 'od-block' }, restF.el) : null),
+        restF ? h('div', { class: 'od-block' }, restF.el, cookF.el) : null),
       noteEl, status.el);
     return {
       root, id,
@@ -24625,7 +24701,7 @@ a.of-nav:active { background: var(--press); }
       sync(ing) {
         par.sync(ing.parG); thr.sync(ing.thresholdG); cost.sync(ing[costKey] || 0);
         if (pull) pull.sync(ing.pullG || 1000);
-        if (holdF) { holdF.sync(ing.maxHoldH || 4); restF.sync(ing.restH || 0); basisSeg.setValue(ing.holdBasis === 'safety' ? 'safety' : 'quality'); }
+        if (holdF) { holdF.sync(ing.maxHoldH || 4); restF.sync(ing.restH || 0); cookF.sync(ing.cookH || 0); basisSeg.setValue(ing.holdBasis === 'safety' ? 'safety' : 'quality'); }
         if (yField) { yField.sync(ing.yield); yConf.setValue(ing.yieldConfirmed ? 'confirmed' : 'starter'); }
         root.dataset.confirmed = ing.yieldConfirmed ? 'true' : 'false';
       },

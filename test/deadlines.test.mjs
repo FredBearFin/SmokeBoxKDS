@@ -112,8 +112,7 @@ test('resting: pulls take the oldest ready batch first and resting batches only 
   const ev = E.allEvents(s);
   assert.ok(ev.length > 0);
   const f = D.build(s, now);
-  const run = f.find((x) => x.kind === 'runout');
-  assert.ok(!run || /2\.00 kg/.test(run.consequence), run && run.consequence);
+  assert.ok(!f.some((x) => x.kind === 'runout'), 'the old run-out row is folded into the shortfall row');
 });
 
 test('migration: a save with the old flat 4-hour cap moves to per-product limits once; chosen values stay', () => {
@@ -231,4 +230,88 @@ test('pace: no pulls or a long silence is unknown, never zero; one pull uses the
   s = E.apply(s, 'pullBatch', { ing: 'pork', g: 4500 }, at(130)).state;
   assert.ok(D.salesRate(s, at(200)).rate.pork > 0);
   assert.equal(D.salesRate(s, at(130 + 250)).rate.pork, undefined, 'after 250 minutes of silence the pace is unknown');
+});
+
+/* ---------------------------------------------------- leftover or shortfall at close ---------------------------------------------------- */
+test('close sweep: simple case, a steady pace leaves grams over, a faster one runs out early', () => {
+  const now = 1e12, closeAt = now + 200 * MIN, one = [{ remainingG: 5000, enteredAt: now, readyAt: 0, expAt: now + 10 * HR }];
+  const slow = D.sweepToClose(one, 10 / MIN, now, closeAt);
+  assert.equal(Math.round(slow.leftoverG), 3000);
+  assert.equal(slow.runOutAt, null);
+  const fast = D.sweepToClose(one, 40 / MIN, now, closeAt);
+  assert.equal(Math.round(fast.leftoverG), -3000);
+  assert.equal(Math.round((fast.runOutAt - now) / MIN), 125);
+});
+
+test('close sweep: a resting batch cannot sell before it is ready, so it is a shortfall, not waste', () => {
+  const now = 1e12, closeAt = now + 6 * HR, rate = 1000 / HR;
+  const r = D.sweepToClose([
+    { remainingG: 2000, enteredAt: now - HR, readyAt: 0, expAt: now + 20 * HR },
+    { remainingG: 3000, enteredAt: now, readyAt: now + 2 * HR, expAt: now + 20 * HR },
+  ], rate, now, closeAt);
+  assert.equal(Math.round(r.leftoverG), -1000, 'one kilogram short');
+  assert.equal(Math.round((r.runOutAt - now) / HR * 100) / 100, 5, 'runs out at hour 5');
+});
+
+test('close sweep: a batch that expires before close has its leftover counted as waste once, not as leftover at close', () => {
+  const now = 1e12, closeAt = now + 6 * HR;
+  const r = D.sweepToClose([{ remainingG: 3000, enteredAt: now - HR, readyAt: 0, expAt: now + HR }], 500 / HR, now, closeAt);
+  assert.equal(Math.round(r.wasteBefore), 2500);
+  assert.equal(Math.round(r.leftoverG), -2500, 'after it expires the remaining demand is unmet');
+});
+
+test('next batch: only suggested when cook time plus rest fits before close', () => {
+  const at = (h) => new Date(2026, 9, 12, h, 0, 0).getTime();
+  const ing = (id) => E.newState({ now: at(17), empty: true }).ingredients.find((i) => i.id === id);
+  const mac = D.nextBatchFit(ing('mac'), at(17), at(21));
+  assert.equal(mac.fits, true);
+  assert.equal(mac.readyAt, at(18));
+  const brisket = D.nextBatchFit(ing('brisket'), at(17), at(21));
+  assert.equal(brisket.fits, false, '12 hours of cook plus 3 of rest does not fit before 9 pm');
+  assert.equal(D.nextBatchFit({ id: 'x' }, at(17), at(21)), null, 'no cook time, no suggestion');
+});
+
+test('feed: shortfall row at the current pace names the time, the gap and the three actions; next batch only if it fits', () => {
+  const at = (h, m = 0) => new Date(2026, 9, 12, h, m, 0).getTime();
+  const settings = E.defaultSettings(); settings.service.openHour = 11; settings.service.closeHour = 21;
+  let s = E.newState({ now: at(11), empty: true, settings });
+  s = E.apply(s, 'addBatch', { ing: 'pork', tempF: 160, cookedG: 20000 }, at(11)).state;
+  for (const h of [12, 13, 14, 15]) { const r = E.apply(s, 'pullBatch', { ing: 'pork', g: 3000 }, at(h)); assert.equal(r.report, 'ok'); s = E.tick(r.state, at(h)).state; }
+  s = E.tick(s, at(16)).state;
+  const row = D.build(s, at(16)).find((x) => x.kind === 'shortfall');
+  assert.ok(row, 'a shortfall row');
+  assert.equal(Math.round(row.shortG), 7000);
+  assert.equal(row.at, at(18, 40), 'runs out at 6:40 pm at 50 g/min');
+  assert.ok(/at the current pace/i.test(row.consequence) && /runs out at/.test(row.consequence), row.consequence);
+  assert.ok(/Shorten portions/.test(row.action) && /stop preorders/.test(row.action) && /run a special/.test(row.action), row.action);
+  assert.ok(/after close/.test(row.consequence) && !/Start the next batch/.test(row.action), 'pork takes 10 h to cook: a new batch would be after close');
+  assert.equal(row.sev, 'warn');
+  // Nothing after closing time.
+  assert.equal(D.build(s, at(21, 5)).some((x) => x.kind === 'shortfall' || x.kind === 'leftover'), false);
+});
+
+test('feed: leftover row at the current pace says it does not count what is on the block; unknown pace gives no row', () => {
+  const at = (h, m = 0) => new Date(2026, 9, 12, h, m, 0).getTime();
+  const settings = E.defaultSettings(); settings.service.openHour = 11; settings.service.closeHour = 21;
+  let s = E.newState({ now: at(15), empty: true, settings });
+  s = E.apply(s, 'addBatch', { ing: 'pork', tempF: 160, cookedG: 20000 }, at(15)).state;
+  assert.equal(D.build(s, at(16, 30)).some((x) => x.kind === 'leftover' || x.kind === 'shortfall'), false, 'no pace, no projection');
+  for (const h of [16, 17, 18]) { s = E.apply(s, 'pullBatch', { ing: 'pork', g: 600 }, at(h)).state; s = E.tick(s, at(h)).state; }
+  const row = D.build(s, at(18, 30)).find((x) => x.kind === 'leftover');
+  assert.ok(row, 'a leftover row');
+  assert.equal(Math.round(row.leftoverG), 16700);
+  assert.ok(/not counting what is already on the block/.test(row.consequence), row.consequence);
+  assert.ok(/special/.test(row.action));
+});
+
+test('feed: a batch that expires before close is waste in its expiry row, not also leftover at close', () => {
+  const at = (h, m = 0) => new Date(2026, 9, 12, h, m, 0).getTime();
+  const settings = E.defaultSettings(); settings.service.openHour = 11; settings.service.closeHour = 21;
+  let s = E.newState({ now: at(11), empty: true, settings });
+  s = E.apply(s, 'addBatch', { ing: 'pork', tempF: 160, cookedG: 20000 }, at(11)).state;
+  for (const h of [12, 13, 14, 15, 16, 17]) { s = E.apply(s, 'pullBatch', { ing: 'pork', g: 600 }, at(h)).state; s = E.tick(s, at(h)).state; }
+  const f = D.build(s, at(17, 30));
+  assert.equal(f.some((x) => x.kind === 'leftover'), false);
+  const exp = f.find((x) => x.kind === 'expiry');
+  assert.ok(exp && exp.wasteG > 10000, 'the loss is in the expiry row: ' + (exp && exp.wasteG));
 });
