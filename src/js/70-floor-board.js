@@ -1108,7 +1108,7 @@
       if (d.msLeft <= 0) return alertCall(4, d);
       if (last) { st.loudAt = perfNow; return alertCall(3, d); }
       if (d.rung >= 2) return alertCall(2, d);
-      return d.guess ? null : alertCall(1, d);
+      return d.unknown ? null : alertCall(1, d);
     }
     if (last && st.ack < d.rung && d.msLeft > 0 && perfNow - st.loudAt >= 20000) { st.loudAt = perfNow; return alertCall(3, d, true); }
     return null;
@@ -1117,7 +1117,7 @@
   // and check every alert. level: 1 chime, 2 voice, 3 loud tone, 4 expiry.
   function alertCall(level, d, repeat) {
     const lg = F._alerts || (F._alerts = []);
-    lg.push({ t: store().now(), id: d.id, kind: d.kind, level, repeat: !!repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG), guess: !!d.guess });
+    lg.push({ t: store().now(), id: d.id, kind: d.kind, level, repeat: !!repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG), unknown: !!d.unknown });
     if (lg.length > 500) lg.shift();
     return { level, d, repeat: !!repeat };
   }

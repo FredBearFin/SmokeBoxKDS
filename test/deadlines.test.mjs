@@ -41,11 +41,11 @@ test('feed: projected waste follows the sales pace, oldest batch first, and quie
   const row = f.find((x) => x.kind === 'expiry');
   assert.ok(row, JSON.stringify(f.map((x) => x.id)));
   assert.ok(row.wasteG > 1500 && row.wasteG < 2500, '3000 g left, 1000 g sold in 30 minutes: ' + row.wasteG);
-  assert.equal(row.guess, false);
+  assert.equal(row.unknown, false);
   // A slower pace wastes more.
   const slow = E.apply(E.newState({ now: T0, empty: true }), 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T0).state;
   const slowRow = D.build(slow, T0 + 3.5 * HR).find((x) => x.kind === 'expiry');
-  assert.equal(slowRow.guess, true, 'no sales data is labelled as a guess');
+  assert.equal(slowRow.unknown, true, 'no pulls means the pace is unknown');
 });
 
 test('feed: a temperature check due soon, a late sanitize and late tickets appear; an empty kitchen is empty', () => {
@@ -175,4 +175,60 @@ test('sound settings: the engine accepts and keeps soundStartHour and soundOutsi
   const back = E.validateBackup(E.serialize(r.state));
   assert.equal(back.state.settings.service.soundOutsideHours, true);
   assert.equal(back.state.settings.service.soundStartHour, 4);
+});
+
+/* ---------------------------------------------------- pace estimate with lumpy pulls ---------------------------------------------------- */
+// The old estimator, kept here only to show the problem: grams in the last 90 minutes over 90 minutes, unknown under 200 g.
+const oldRate = (pulls, now) => { const g = pulls.filter((p) => p.t > now - 90 * MIN && p.t <= now).reduce((a, p) => a + p.g, 0); return g >= 200 ? g / (90 * MIN) : undefined; };
+const rank = { info: 0, warn: 1, bad: 2 };
+
+test('pace: 4.5 kg pulls every 100 minutes give a steady pace and a severity that never flaps', () => {
+  const at = (m) => new Date(2026, 9, 12, 11, 0, 0).getTime() + m * MIN;
+  const settings = E.defaultSettings(); settings.service.openHour = 11; settings.service.closeHour = 21;
+  let s = E.newState({ now: at(0), empty: true, settings });
+  s = E.apply(s, 'addBatch', { ing: 'pork', tempF: 160, cookedG: 30000 }, at(0)).state;
+  const pulls = [];
+  let flipsOld = 0, prevOld = false, flipsNew = 0, prevNew = null, sevs = [], rates = [];
+  for (let m = 1; m <= 470; m++) {
+    const t = at(m);
+    if (m % 100 === 0) { const r = E.apply(s, 'pullBatch', { ing: 'pork', g: 4500 }, t); assert.equal(r.report, 'ok'); s = r.state; pulls.push({ t, g: 4500 }); }
+    s = E.tick(s, t).state;
+    const known = oldRate(pulls, t) !== undefined;
+    if (m > 100 && known !== prevOld) flipsOld++;
+    prevOld = known;
+    const sr = D.salesRate(s, t);
+    const knownNew = sr.rate.pork !== undefined;
+    if (m >= 200) { assert.ok(knownNew, 'pace is known at minute ' + m); rates.push(sr.rate.pork * MIN); }
+    if (prevNew !== null && m >= 200 && knownNew !== prevNew) flipsNew++;
+    prevNew = knownNew;
+    const row = D.build(s, t).find((x) => x.kind === 'expiry');
+    if (m >= 200 && row) sevs.push(rank[row.sev]);
+  }
+  assert.ok(flipsOld >= 6, 'the old fixed window flipped between known and unknown ' + flipsOld + ' times');
+  assert.equal(flipsNew, 0);
+  assert.ok(Math.min(...rates) > 40 && Math.max(...rates) < 50, 'steady near 45 g/min: ' + Math.min(...rates).toFixed(1) + ' to ' + Math.max(...rates).toFixed(1));
+  let changes = 0;
+  for (let i = 1; i < sevs.length; i++) { if (sevs[i] < sevs[i - 1]) assert.fail('severity went down at sample ' + i); if (sevs[i] !== sevs[i - 1]) changes++; }
+  assert.ok(changes <= 2, 'severity changed ' + changes + ' times');
+});
+
+test('pace: no pulls or a long silence is unknown, never zero; one pull uses the average since opening', () => {
+  const at = (m) => new Date(2026, 9, 12, 11, 0, 0).getTime() + m * MIN;
+  const settings = E.defaultSettings(); settings.service.openHour = 11; settings.service.closeHour = 21;
+  let s = E.newState({ now: at(0), empty: true, settings });
+  s = E.apply(s, 'addBatch', { ing: 'pork', tempF: 160, cookedG: 30000 }, at(0)).state;
+  assert.equal(D.salesRate(s, at(60)).rate.pork, undefined, 'nothing pulled: unknown');
+  const row0 = D.build(s, at(440)).find((x) => x.kind === 'expiry');
+  assert.equal(row0.unknown, true);
+  assert.equal(row0.wasteG, null, 'no projected waste when the pace is unknown');
+  assert.ok(/Pace unknown/.test(row0.consequence), row0.consequence);
+  // One pull at 11:30: unknown until 45 minutes have passed since opening, then the average since opening.
+  s = E.apply(s, 'pullBatch', { ing: 'pork', g: 4500 }, at(30)).state;
+  assert.equal(D.salesRate(s, at(40)).rate.pork, undefined);
+  assert.ok(Math.abs(D.salesRate(s, at(60)).rate.pork * MIN - 4500 / 60) < 0.01);
+  assert.ok(Math.abs(D.salesRate(s, at(120)).rate.pork * MIN - 4500 / 120) < 0.01);
+  // Two pulls, then a long silence: unknown again, not a slowly falling pace.
+  s = E.apply(s, 'pullBatch', { ing: 'pork', g: 4500 }, at(130)).state;
+  assert.ok(D.salesRate(s, at(200)).rate.pork > 0);
+  assert.equal(D.salesRate(s, at(130 + 250)).rate.pork, undefined, 'after 250 minutes of silence the pace is unknown');
 });
