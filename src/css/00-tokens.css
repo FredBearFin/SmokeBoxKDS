@@ -1,0 +1,461 @@
+/* WHAT THIS FILE IS: every colour, size, spacing, corner, shadow, speed and layer number, in four looks.
+ * A custom property (written --name) is a named value set once here and reused everywhere as var(--name).
+ * PARTS: shared sizes and speeds; big text; floor Day and Night; office Ember and Paper; two re-maps.
+ * Floor looks switch with :root[data-theme]; office looks with .office[data-otheme] (names starting --o-).
+ * Small text uses ink, ink2, ink3, amber-ink, sage-ink or crimson (4.5:1 contrast). Amber, sage, line are for
+ * fills, borders and big shapes (3:1). test/shell.contrast.mjs reads this file and checks every pair.
+ * USED BY: 10-base.css and every other stylesheet. The token NAMES are the contract (SPEC section 16).
+ */
+
+/* ---------- theme-independent tokens ---------- */
+/* Same in every look: fonts, text sizes, spacing, touch sizes, corners, speeds, layer order, slip edge. */
+:root {
+  /* type families (fallbacks must look deliberate when Google Fonts do not load) */
+  --font-body: Barlow, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", "Helvetica Neue Condensed", "DejaVu Sans Condensed", system-ui, sans-serif;
+
+  /* type scale (px, SPEC 16). .text-large swaps these for the x1.2 set. */
+  --fs-1: 13px;
+  --fs-2: 15px;
+  --fs-3: 17px;
+  --fs-4: 20px;
+  --fs-5: 24px;
+  --fs-6: 32px;
+  --fs-7: 44px;
+  --fs-8: 64px;
+  --fs-ticket: 34px;
+  --fs-timer: 30px;
+  --fs-item: 19px;
+  /* line heights (times the text size), font weights, and the widest a line of reading text may be */
+  --lh-tight: 1.05;
+  --lh-snug: 1.2;
+  --lh-body: 1.45;
+  --w-regular: 400;
+  --w-medium: 500;
+  --w-semi: 600;
+  --w-bold: 700;
+  --w-heavy: 800;
+  --measure: 62ch;
+
+  /* spacing, 4-pt scale */
+  --sp-0: 0;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+  --sp-9: 48px;
+  --sp-10: 64px;
+  --gutter: 16px;
+
+  /* touch targets (SPEC 0.6): 48 on the floor, 56 for primary actions, 44 for stepper buttons */
+  --tap: 48px;
+  --tap-lg: 56px;
+  --tap-step: 44px;
+
+  /* radii: each role has its own corner on purpose (slips are not soft cards) */
+  --r-slip: 2px;
+  --r-chip: 4px;
+  --r-field: 6px;
+  --r-btn: 8px;
+  --r-panel: 6px;
+  --r-dialog: 10px;
+  --r-pill: 999px;
+
+  /* border weights */
+  --bw: 2px;
+  --bw-thin: 1px;
+  --bw-focus: 3px;
+
+  /* motion */
+  /* durations in ms (1000 ms = 1 second) and the speed curves used for movements */
+  --dur-fast: 100ms;
+  --dur: 180ms;
+  --dur-slow: 260ms;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.5, 0.05, 0.2, 1);
+  --ease-ignite: cubic-bezier(0.55, 0.06, 0.3, 1);
+
+  /* z-index scale (named --zi-* because --z-* is the station hue family) */
+  /* layer order: a higher number is drawn on top of a lower one (sheets, menus, toasts, tooltips on top) */
+  --zi-base: 0;
+  --zi-rail: 10;
+  --zi-header: 20;
+  --zi-dock: 30;
+  --zi-layer-office: 100;
+  --zi-fx: 150;
+  --zi-backdrop: 200;
+  --zi-sheet: 210;
+  --zi-menu: 300;
+  --zi-toast: 400;
+  --zi-tooltip: 500;
+  --zi-boot-error: 1000;
+
+  /* torn edge geometry for the ticket slip */
+  --tear-h: 8px;
+  --tear-w: 16px;
+}
+
+/* x1.2 type. Redefines the raw sizes so it also works when the class is on an element below :root. */
+.text-large {
+  --fs-1: 15.6px;
+  --fs-2: 18px;
+  --fs-3: 20.4px;
+  --fs-4: 24px;
+  --fs-5: 28.8px;
+  --fs-6: 38.4px;
+  --fs-7: 52.8px;
+  --fs-8: 76.8px;
+  --fs-ticket: 40.8px;
+  --fs-timer: 36px;
+  --fs-item: 22.8px;
+  font-size: var(--fs-3);
+}
+
+/* ---------- FLOOR / DAY (default): anti-glare parchment ---------- */
+/* Day look (the default): parchment board, white cards, charcoal text. Night overrides these names. */
+:root,
+:root[data-theme="day"] {
+  /* tells the browser to draw its own parts (scrollbars, form boxes) in light colours */
+  color-scheme: light;
+  /* board, card and sub-surface colours; three text inks; --line is for borders and structure only */
+  --bg: #F5F2EB;          /* Parchment */
+  --paper: #FFFFFF;       /* Card */
+  --sub: #EFECE6;         /* Sub-surface */
+  --ink: #1E2224;         /* Charcoal */
+  --ink2: #3B4346;
+  --ink3: #566064;        /* darker zinc: small secondary text, passes on --sub too */
+  --line: #656E72;        /* Zinc: borders and structure only */
+  --line-soft: #CFCAC0;   /* decorative dividers */
+  /* amber and sage: the plain colour is for fills, borders and big shapes;
+   * the -ink version is darker so small text reaches 4.5:1 contrast */
+  --amber: #B85C38;       /* Brisket Amber: fills, borders, large glyphs */
+  --amber-ink: #A05031;   /* small amber text */
+  --sage: #5F7466;
+  --sage-ink: #576B5E;
+  --crimson: #9B2C2C;     /* Overdue */
+  /* focus outline colour; shadows for cards, pop-ups and the slip; RUSH stamp ink; dim sheet backdrop */
+  --focus: #1E2224;
+  --shadow: 0 1px 0 rgba(30, 34, 36, 0.10), 0 8px 16px -8px rgba(30, 34, 36, 0.35);
+  --shadow-pop: 0 2px 0 rgba(30, 34, 36, 0.12), 0 14px 28px -10px rgba(30, 34, 36, 0.45);
+  --shadow-slip: drop-shadow(0 1px 0 rgba(30, 34, 36, 0.22)) drop-shadow(0 7px 7px rgba(30, 34, 36, 0.20));
+  --stamp: #9B2C2C;
+  --scrim: rgba(30, 34, 36, 0.56);
+
+  /* station hues (always shown with icon + code) */
+  --z-pit: #A8452B;
+  --z-sides: #7A5C08;
+  --z-fry: #25705F;
+  --z-cold: #346386;
+  --z-expo: #6B5A8A;
+
+  /* state tints */
+  --tint-warn: #FAEBDD;
+  --tint-bad: #F6E1DE;
+  --tint-ok: #E4ECE6;
+
+  /* component roles */
+  /* button fill, label and under-edge colours (main, done, danger), plus hover and pressed backgrounds */
+  --primary: #B85C38;
+  --on-primary: #FFFFFF;
+  --primary-edge: #1E2224;
+  --success: #5F7466;
+  --on-success: #FFFFFF;
+  --success-edge: #1E2224;
+  --danger: #9B2C2C;
+  --on-danger: #FFFFFF;
+  --danger-edge: #1E2224;
+  --hover: #EFECE6;
+  --press: #E6E2D8;
+
+  /* inverse surface: toasts, tooltips */
+  --inv-bg: #1E2224;
+  --inv-ink: #F5F2EB;
+  --inv-ink2: #CBC7BD;
+  --inv-line: #4F595D;
+  --inv-accent: #F2A47F;
+  --inv-ok: #9DC2AB;
+  --inv-warn: #F0B866;
+  --inv-bad: #F28D85;
+  --focus-inv: #F5F2EB;
+
+  /* ticket slip: thermal paper */
+  /* the slip is its own paper with its own inks; its small text colours are dark enough for 4.5:1 */
+  --slip: #FFFFFF;
+  --slip-ink: #1E2224;
+  --slip-ink2: #3B4346;
+  --slip-ink3: #566064;
+  --slip-line: #656E72;
+  --slip-rule: #B9B4A8;
+  --slip-sub: #F3F0E9;
+  --slip-amber: #A05031;
+  --slip-sage: #576B5E;
+  --slip-crimson: #9B2C2C;
+  --slip-tint-warn: #FAEBDD;
+  --slip-tint-bad: #F6E1DE;
+  --slip-tint-ok: #E4ECE6;
+  --slip-press: #EAE6DC;
+  --zp-pit: #A8452B;      /* station hues for paper-coloured surfaces (slips), same in every floor theme */
+  --zp-sides: #7A5C08;
+  --zp-fry: #25705F;
+  --zp-cold: #346386;
+  --zp-expo: #6B5A8A;
+  --notch: #F5F2EB;
+  /* the three metal shades of the clip on top of a slip */
+  --clip-hi: #E4E7E8;
+  --clip-mid: #AEB5B8;
+  --clip-lo: #7C8689;
+
+  /* empty track behind meters and progress bars; the brand flame colour */
+  --meter-track: #E4E0D6;
+  --brand-accent: #B85C38;
+}
+
+/* ---------- FLOOR / NIGHT: charcoal board, the slip stays paper (dimmed) ---------- */
+:root[data-theme="night"] {
+  color-scheme: dark;
+  /* charcoal board and bone-coloured text; the -ink text colours are lighter here so they read on dark */
+  --bg: #15181A;
+  --paper: #20252A;
+  --sub: #1B1F22;
+  --ink: #EDE8DC;
+  --ink2: #CBC6BA;
+  --ink3: #A3A7A2;
+  --line: #7E898D;
+  --line-soft: #343B3F;
+  --amber: #B85C38;
+  --amber-ink: #EC9570;
+  --sage: #5F7466;
+  --sage-ink: #96B8A2;
+  --crimson: #E68078;
+  --focus: #EDE8DC;
+  --shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 8px 16px -8px rgba(0, 0, 0, 0.8);
+  --shadow-pop: 0 2px 0 rgba(0, 0, 0, 0.5), 0 14px 28px -10px rgba(0, 0, 0, 0.9);
+  --shadow-slip: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.6)) drop-shadow(0 7px 7px rgba(0, 0, 0, 0.55));
+  --stamp: #E68078;
+  --scrim: rgba(0, 0, 0, 0.64);
+
+  /* station hues, lightened for the dark board */
+  --z-pit: #E58A67;
+  --z-sides: #D6AE45;
+  --z-fry: #5FB8A2;
+  --z-cold: #72A8D0;
+  --z-expo: #AC9AD3;
+
+  /* dark note backgrounds */
+  --tint-warn: #3A2B22;
+  --tint-bad: #3E2527;
+  --tint-ok: #243229;
+
+  /* buttons keep the same amber and sage; danger red is a little brighter for the dark board */
+  --primary: #B85C38;
+  --on-primary: #FFFFFF;
+  --primary-edge: #0B0D0E;
+  --success: #5F7466;
+  --on-success: #FFFFFF;
+  --success-edge: #0B0D0E;
+  --danger: #B83C3C;
+  --on-danger: #FFFFFF;
+  --danger-edge: #0B0D0E;
+  --hover: #272D31;
+  --press: #2F363B;
+
+  /* toast and tooltip strip: a lighter charcoal than the board so it stands out */
+  --inv-bg: #2E363A;
+  --inv-ink: #EDE8DC;
+  --inv-ink2: #C3BFB4;
+  --inv-line: #5B676C;
+  --inv-accent: #F2A47F;
+  --inv-ok: #9DC2AB;
+  --inv-warn: #F0B866;
+  --inv-bad: #F28D85;
+  --focus-inv: #EDE8DC;
+
+  /* the slip stays paper at night (a little dimmed) so it still looks like a ticket; its inks stay dark */
+  --slip: #E6E1D4;
+  --slip-ink: #1E2224;
+  --slip-ink2: #343C3F;
+  --slip-ink3: #4B5559;
+  --slip-line: #5C666A;
+  --slip-rule: #A39E91;
+  --slip-sub: #DAD5C7;
+  --slip-amber: #8E4426;
+  --slip-sage: #46594D;
+  --slip-crimson: #8F2828;
+  --slip-tint-warn: #EBD8C5;
+  --slip-tint-bad: #E8CFCA;
+  --slip-tint-ok: #D3DDD2;
+  --slip-press: #D2CDBE;
+  /* station hues on the slip paper do not change at night */
+  --zp-pit: #A8452B;
+  --zp-sides: #7A5C08;
+  --zp-fry: #25705F;
+  --zp-cold: #346386;
+  --zp-expo: #6B5A8A;
+  --notch: #15181A;
+  --clip-hi: #C9CDCE;
+  --clip-mid: #9AA2A5;
+  --clip-lo: #687174;
+
+  --meter-track: #2A3135;
+  --brand-accent: #EC9570;
+}
+
+/* ---------- OFFICE frame tokens ---------- */
+/* Ember (default): a warmer, deeper dark than the floor's Night, so the two worlds never blur together. */
+.office,
+.office[data-otheme="ember"] {
+  color-scheme: dark;
+  /* page and card colours, three text inks, divider and control-border lines, accent, status colours */
+  --o-bg: #181513;
+  --o-surface: #211D1A;
+  --o-surface2: #2B2622;
+  --o-ink: #EEE6D6;
+  --o-ink2: #C6BCAB;
+  --o-ink3: #A0958A;
+  --o-line: #3E3630;          /* thin divider */
+  --o-line-strong: #8A7F73;   /* control borders (>= 3:1) */
+  --o-accent: #E8743B;
+  --o-on-accent: #1A120D;
+  --o-good: #8DB59B;
+  --o-on-good: #10201A;
+  --o-warn: #E6AE4D;
+  --o-bad: #E8776E;
+  --o-on-bad: #260F0D;
+  --o-focus: #F4D9A8;
+  /* pale note backgrounds, button under-edge and card shadow */
+  --o-tint-ok: #1F2B24;
+  --o-tint-warn: #33281B;
+  --o-tint-bad: #35211F;
+  --o-edge: #8F3A14;
+  --o-shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 12px 24px -10px rgba(0, 0, 0, 0.85);
+
+  /* station hues, dim backdrop and meter track for the dark office */
+  --z-pit: #E58A67;
+  --z-sides: #D6AE45;
+  --z-fry: #5FB8A2;
+  --z-cold: #72A8D0;
+  --z-expo: #AC9AD3;
+  --scrim: rgba(8, 6, 5, 0.66);
+  --meter-track: #332D28;
+  --brand-accent: #E8743B;
+}
+
+/* Paper: light alternative for the office */
+.office[data-otheme="paper"] {
+  color-scheme: light;
+  /* same names as Ember with light values; accent, good, warn and bad are dark enough for 4.5:1 text */
+  --o-bg: #F0ECE3;
+  --o-surface: #FBF9F4;
+  --o-surface2: #E7E2D7;
+  --o-ink: #1B1F22;
+  --o-ink2: #434A4E;
+  --o-ink3: #596267;
+  --o-line: #D2CCBF;
+  --o-line-strong: #6F787C;
+  --o-accent: #A5441F;
+  --o-on-accent: #FFFFFF;
+  --o-good: #3D6B52;
+  --o-on-good: #FFFFFF;
+  --o-warn: #8A5A00;
+  --o-bad: #9B2C2C;
+  --o-on-bad: #FFFFFF;
+  --o-focus: #1B1F22;
+  --o-tint-ok: #DDE8E0;
+  --o-tint-warn: #F3E4C6;
+  --o-tint-bad: #F1D9D6;
+  --o-edge: #1B1F22;
+  --o-shadow: 0 1px 0 rgba(27, 31, 34, 0.12), 0 10px 22px -10px rgba(27, 31, 34, 0.4);
+
+  /* station hues for a light page */
+  --z-pit: #A8452B;
+  --z-sides: #7A5C08;
+  --z-fry: #25705F;
+  --z-cold: #346386;
+  --z-expo: #6B5A8A;
+  --scrim: rgba(27, 31, 34, 0.5);
+  --meter-track: #DAD4C7;
+  --brand-accent: #A5441F;
+}
+
+/* Inside the office the floor token names point at the office palette, so every base component (buttons, fields, sheets, toasts)
+   renders correctly without knowing which world it is in. Sheets and toasts opened from the office get class "office" too. */
+.office {
+  --bg: var(--o-bg);
+  --paper: var(--o-surface);
+  --sub: var(--o-surface2);
+  --ink: var(--o-ink);
+  --ink2: var(--o-ink2);
+  --ink3: var(--o-ink3);
+  --line: var(--o-line-strong);
+  --line-soft: var(--o-line);
+  /* accent and status colours (text and fills) */
+  --amber: var(--o-accent);
+  --amber-ink: var(--o-accent);
+  --sage: var(--o-good);
+  --sage-ink: var(--o-good);
+  --crimson: var(--o-bad);
+  --focus: var(--o-focus);
+  --shadow: var(--o-shadow);
+  --shadow-pop: var(--o-shadow);
+  --stamp: var(--o-bad);
+  --tint-warn: var(--o-tint-warn);
+  --tint-bad: var(--o-tint-bad);
+  --tint-ok: var(--o-tint-ok);
+
+  /* button colours, hover and pressed backgrounds, then the toast strip colours */
+  --primary: var(--o-accent);
+  --on-primary: var(--o-on-accent);
+  --primary-edge: var(--o-edge);
+  --success: var(--o-good);
+  --on-success: var(--o-on-good);
+  --success-edge: var(--o-edge);
+  --danger: var(--o-bad);
+  --on-danger: var(--o-on-bad);
+  --danger-edge: var(--o-edge);
+  --hover: var(--o-surface2);
+  --press: var(--o-line);
+
+  --inv-bg: var(--o-surface2);
+  --inv-ink: var(--o-ink);
+  --inv-ink2: var(--o-ink2);
+  --inv-line: var(--o-line-strong);
+  --inv-accent: var(--o-accent);
+  --focus-inv: var(--o-focus);
+  --inv-ok: var(--o-good);
+  --inv-warn: var(--o-warn);
+  --inv-bad: var(--o-bad);
+}
+
+/* Inside a ticket slip the floor token names point at the paper palette, so buttons, chips, stamps and meters placed on a slip
+   stay legible in Night (where the board is dark but the slip is still paper). */
+.slip {
+  --paper: var(--slip);
+  --sub: var(--slip-sub);
+  --ink: var(--slip-ink);
+  --ink2: var(--slip-ink2);
+  --ink3: var(--slip-ink3);
+  --line: var(--slip-line);
+  --line-soft: var(--slip-rule);
+  --amber: #B85C38;            /* fills and borders keep the Brisket Amber / Sage of the floor even when the slip sits in the office */
+  --sage: #5F7466;
+  --amber-ink: var(--slip-amber);
+  --sage-ink: var(--slip-sage);
+  --crimson: var(--slip-crimson);
+  --stamp: var(--slip-crimson);
+  --focus: var(--slip-ink);
+  --tint-warn: var(--slip-tint-warn);
+  --tint-bad: var(--slip-tint-bad);
+  --tint-ok: var(--slip-tint-ok);
+  --hover: var(--slip-sub);
+  --press: var(--slip-press);
+  --meter-track: var(--slip-rule);
+  --z-pit: var(--zp-pit);
+  --z-sides: var(--zp-sides);
+  --z-fry: var(--zp-fry);
+  --z-cold: var(--zp-cold);
+  --z-expo: var(--zp-expo);
+}

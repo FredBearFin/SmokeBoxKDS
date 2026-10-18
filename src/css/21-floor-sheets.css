@@ -1,0 +1,521 @@
+/*
+ * WHAT THIS FILE IS: Styles for the sheets built in 71-floor-order.js and 72-floor-sheets.js.
+ * PARTS: shared pieces (fs-), New ticket (ord-), Hold cabinet (hc-), 86 board (bd-), Recall (rc-), Demo (dm-),
+ * Help (hp-), Specs (sp-), Settings (mn-). Touch targets are 48 px, or 56 px for primary actions.
+ * USES / USED BY: tokens from 00-tokens.css and base parts from 10-base.css. Local custom properties: --v is
+ * the hold ring fill (0 to 100), --rc its colour, --tile-min the narrowest menu tile.
+ */
+
+/* Shared pieces: notes, cards, tabs, status words, flash and the definition list. */
+.fs-section { display: grid; gap: var(--sp-3); min-width: 0; }
+.fs-section + .fs-section { margin-top: var(--sp-6); }
+.fs-h { font-size: var(--fs-4); line-height: var(--lh-snug); }
+.fs-sub { color: var(--ink3); font-size: var(--fs-2); max-width: var(--measure); }
+.fs-note { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); background: var(--sub); border-radius: var(--r-panel); font-size: var(--fs-2); color: var(--ink2); min-width: 0; }
+.fs-note .icon { flex: none; margin-top: 2px; color: var(--ink3); }
+.fs-note[data-tone="warn"] { background: var(--tint-warn); color: var(--ink); border: var(--bw-thin) solid var(--amber); }
+.fs-note[data-tone="warn"] .icon { color: var(--amber-ink); }
+.fs-note[data-tone="bad"] { background: var(--tint-bad); color: var(--ink); border: var(--bw-thin) solid var(--crimson); }
+.fs-note[data-tone="bad"] .icon { color: var(--crimson); }
+.fs-note > div, .fs-note > span { min-width: 0; }
+.fs-sim { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font: var(--w-bold) var(--fs-2) / 1.2 var(--font-body); color: var(--amber-ink); background: var(--tint-warn); border: var(--bw) solid var(--amber); border-radius: var(--r-chip); }
+.fs-list { display: grid; gap: var(--sp-2); min-width: 0; }
+.fs-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); min-width: 0; }
+.fs-row > .grow { flex: 1 1 14ch; }
+.fs-card { display: grid; gap: var(--sp-3); padding: var(--sp-4); background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-panel); min-width: 0; }
+.fs-card-soft { border-width: var(--bw-thin); border-color: var(--line-soft); }
+.fs-tabs { display: flex; width: 100%; }
+.fs-tabs .seg-opt { flex: 1 1 auto; white-space: nowrap; }
+.fs-state { display: inline-flex; align-items: center; gap: 6px; font: var(--w-bold) var(--fs-3) / 1.15 var(--font-display); letter-spacing: 0.02em; min-width: 0; }
+.fs-state[data-tone="ok"] { color: var(--sage-ink); }
+.fs-state[data-tone="warn"] { color: var(--amber-ink); }
+.fs-state[data-tone="bad"] { color: var(--crimson); }
+.fs-state[data-tone="muted"] { color: var(--ink3); }
+.fs-flash { animation: fs-flash 1.4s ease-out both; }
+@keyframes fs-flash { 0% { box-shadow: 0 0 0 4px var(--amber); } 100% { box-shadow: 0 0 0 4px transparent; } }
+.fs-readout { font: var(--w-bold) var(--fs-4) / 1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.fs-dl { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 4px var(--sp-4); margin: 0; font-size: var(--fs-2); }
+.fs-dl dt { color: var(--ink3); }
+.fs-dl dd { margin: 0; font-weight: var(--w-semi); text-align: right; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .fs-flash { animation: none; outline: var(--bw) solid var(--amber); } }
+
+/* New ticket sheet (ord-): menu pane on the left, order pane on the right. */
+.sheet-body.ord-host { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.ord {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px);
+}
+.ord-switch { display: none; }
+.ord-menu, .ord-order { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--sp-4); }
+.ord-menu { padding-top: 0; }
+.ord-order { display: flex; flex-direction: column; gap: var(--sp-4); background: var(--paper); border-left: var(--bw) solid var(--line); }
+
+/* menu pane: search and categories stay put while the tiles scroll */
+.ord-sticky {
+  position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-2);
+  margin: 0 calc(var(--sp-4) * -1) var(--sp-3); padding: var(--sp-4) var(--sp-4) var(--sp-2); background: var(--bg);
+  border-bottom: var(--bw-thin) solid var(--line-soft);
+}
+/* The search box is one frame that shows the focus ring when the input inside has focus. */
+.ord-search {
+  display: flex; align-items: center; gap: var(--sp-2); min-height: var(--tap-lg); padding: 0 var(--sp-2) 0 var(--sp-3);
+  color: var(--ink3); background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-field);
+}
+.ord-search:focus-within { border-color: var(--amber); outline: var(--bw-focus) solid var(--focus); outline-offset: 2px; }
+.ord-search .icon { flex: none; }
+.ord-search-input { flex: 1 1 auto; min-width: 0; min-height: 48px; padding: 0; font-size: var(--fs-4); color: var(--ink); background: transparent; border: 0; outline: none; }
+.ord-search-input::placeholder { color: var(--ink3); opacity: 1; }
+.ord-hint { font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink2); padding: 0 var(--sp-1); }
+.ord-cats { display: flex; width: 100%; }
+.ord-cats .seg-opt { flex: 1 1 auto; min-height: 44px; padding: 0 10px; font-size: var(--fs-2); }
+
+/* Combo shortcuts above the tiles. */
+.ord-combos { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.ord-combo {
+  appearance: none; display: grid; gap: 2px; align-content: center; min-height: 64px; padding: 8px var(--sp-3); text-align: left;
+  color: var(--ink); background: var(--sub); border: var(--bw) dashed var(--line); border-radius: var(--r-btn);
+}
+.ord-combo-name { font-weight: var(--w-bold); font-size: var(--fs-3); line-height: 1.15; }
+.ord-combo-sub { font-size: var(--fs-1); color: var(--ink3); }
+.ord-combo-86 { font-size: var(--fs-1); font-weight: var(--w-bold); color: var(--crimson); }
+@media (hover: hover) { .ord-combo:hover { background: var(--hover); } }
+.ord-combo:active { background: var(--press); }
+
+/* Menu tiles. An 86 tile is dashed and hatched and cannot be tapped. */
+.ord-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile-min, 152px)), 1fr)); gap: var(--sp-2); }
+.ord-cat-head { grid-column: 1 / -1; margin-top: var(--sp-3); font-size: var(--fs-3); color: var(--ink2); }
+.ord-cat-head:first-child { margin-top: 0; }
+.ord-tile {
+  appearance: none; position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 6px;
+  min-height: 96px; padding: 10px var(--sp-3); text-align: left; min-width: 0;
+  color: var(--ink); background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-btn);
+  box-shadow: 0 2px 0 var(--line);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), background-color var(--dur-fast);
+}
+.ord-tile-name { font-weight: var(--w-bold); font-size: var(--fs-3); line-height: 1.15; padding-right: 30px; }
+.ord-tile-price { font: var(--w-bold) var(--fs-4) / 1 var(--font-display); color: var(--ink2); }
+@media (hover: hover) { .ord-tile:hover:not(.is-86) { background: var(--hover); } }
+.ord-tile:active:not(.is-86) { transform: translateY(2px); box-shadow: none; background: var(--press); }
+.ord-tile.is-in { border-color: var(--ink); box-shadow: 0 2px 0 var(--ink); }
+.ord-tile-count {
+  position: absolute; top: 8px; right: 8px; min-width: 28px; height: 28px; padding: 0 6px; display: grid; place-items: center;
+  font: var(--w-heavy) var(--fs-3) / 1 var(--font-display); color: var(--bg); background: var(--ink); border-radius: var(--r-pill);
+}
+.ord-tile.is-86 {
+  cursor: not-allowed; border-style: dashed; box-shadow: none; color: var(--ink2);
+  background: repeating-linear-gradient(135deg, var(--sub) 0 7px, var(--paper) 7px 14px);
+}
+.ord-tile-86 { display: flex; align-items: center; gap: 6px; font: var(--w-heavy) var(--fs-3) / 1 var(--font-display); letter-spacing: 0.03em; color: var(--crimson); }
+.ord-tile-86[hidden], .ord-tile-why[hidden] { display: none; }
+.ord-tile-why { font-size: var(--fs-1); color: var(--ink2); line-height: 1.2; }
+.ord-tile.is-86 .ord-tile-price { display: none; }
+.ord-nomatch { padding: var(--sp-6) var(--sp-3); }
+
+/* order pane */
+.ord-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+.ord-title { font-size: var(--fs-5); }
+.ord-count { font: var(--w-bold) var(--fs-3) / 1 var(--font-body); color: var(--ink3); }
+.ord-head .stamp { font-size: var(--fs-3); padding: 4px 10px 3px; margin-left: var(--sp-1); }
+.ord-head-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-left: auto; }
+.ord-notice { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3); background: var(--tint-warn); border: var(--bw-thin) solid var(--amber); border-radius: var(--r-panel); font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink); }
+.ord-notice > .icon { flex: none; color: var(--amber-ink); }
+.ord-notice > span { flex: 1 1 auto; min-width: 0; }
+/* Customer, channel and note fields. */
+.ord-details { display: grid; gap: var(--sp-4); }
+.ord-label { font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink); margin-bottom: 6px; }
+.ord-cust { gap: 8px; }
+.ord-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ord-chips .chip { min-height: 44px; }
+.ord-cust-input { min-height: 48px; }
+.ord-counter { font-size: var(--fs-1); color: var(--ink3); text-align: right; }
+.ord-counter.is-over { color: var(--crimson); font-weight: var(--w-bold); }
+.ord-channel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
+.ord-channel .seg-opt { flex-direction: column; gap: 2px; min-height: 60px; min-width: 0; padding: 4px 2px; font-size: var(--fs-2); line-height: 1.1; }
+.ord-block { min-width: 0; }
+/* Which order this round goes on, and how it is paid: two choices that stay one tap each at touch size. */
+.ord-which { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+.ord-pay { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
+.ord-which .seg-opt, .ord-pay .seg-opt { min-height: 48px; min-width: 0; }
+.ord-order-sel { width: 100%; min-height: 48px; margin-top: var(--sp-2); }
+.ord-order-info, .ord-pay-note { margin: var(--sp-2) 0 0; font-size: var(--fs-2); max-width: var(--measure); }
+.ord-tip { margin-top: var(--sp-3); }
+.ord-tip-input { min-height: 48px; max-width: 12em; }
+/* Adding to an open order: its name and channel are already known, so those two boxes step aside. */
+.ord-details[data-add="true"] .ord-cust, .ord-details[data-add="true"] > .ord-block:not(.ord-orderbox):not(.ord-paybox) { display: none; }
+@media (max-width: 420px) { .ord-pay .seg-opt { padding-left: 4px; padding-right: 4px; font-size: var(--fs-2); } }
+
+/* The order lines, each with a quantity stepper, Mods and remove. */
+.ord-linesbox { border-top: var(--bw) solid var(--line); border-bottom: var(--bw) solid var(--line); padding: var(--sp-1) 0; }
+.ord-lines { display: grid; }
+.ord-line { display: grid; gap: 6px; padding: var(--sp-3) 0; border-top: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-chip); }
+.ord-line:first-child { border-top: 0; }
+.ord-line-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.ord-line-name { font-weight: var(--w-bold); font-size: var(--fs-item); line-height: 1.15; min-width: 0; }
+.ord-line-price { flex: none; font: var(--w-bold) var(--fs-4) / 1 var(--font-display); }
+.ord-line-mods { display: flex; flex-wrap: wrap; gap: 4px; }
+.ord-line-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.ord-line-ctl .stepper { flex: none; }
+.ord-mods-btn { min-height: var(--tap-step); }
+.ord-rm { margin-left: auto; min-width: var(--tap-step); width: var(--tap-step); min-height: var(--tap-step); color: var(--crimson); }
+.ord-line-warn { display: flex; align-items: flex-start; gap: var(--sp-2); padding: 8px 10px; font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink); background: var(--tint-bad); border: var(--bw-thin) solid var(--crimson); border-radius: var(--r-chip); }
+.ord-line-warn .icon { flex: none; color: var(--crimson); margin-top: 1px; }
+.ord-line.is-86 .ord-line-name { text-decoration: line-through; text-decoration-thickness: 2px; }
+.ord-line.is-flash { animation: fs-flash 1.4s ease-out both; }
+/* The Mods editor that opens under a line. */
+.ord-editor { display: grid; gap: var(--sp-2); padding: var(--sp-3); background: var(--sub); border-radius: var(--r-panel); }
+.ord-editor-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ord-editor-chips .chip { min-height: 44px; }
+.ord-editor-free { display: flex; gap: var(--sp-2); }
+.ord-editor-free .input { flex: 1 1 0; min-width: 0; min-height: 44px; }
+.ord-editor-free .btn { flex: none; min-width: 64px; white-space: nowrap; }
+.ord-editor-done { justify-self: end; }
+.ord-empty { display: grid; justify-items: center; gap: var(--sp-2); padding: var(--sp-6) var(--sp-3); text-align: center; color: var(--ink3); }
+.ord-empty-title { font: var(--w-bold) var(--fs-4) / 1.2 var(--font-display); color: var(--ink); }
+.ord-to-menu { display: none; }
+
+/* plan preview: calm, no animation */
+.ord-plan { display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); background: var(--sub); border-radius: var(--r-panel); }
+.ord-plan-title { font-size: var(--fs-3); color: var(--ink2); }
+.ord-plan-sum { font-size: var(--fs-3); font-weight: var(--w-semi); line-height: 1.3; color: var(--ink); max-width: var(--measure); }
+.ord-plan-rows { display: grid; gap: 4px; }
+.ord-plan-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(40px, 1fr) minmax(4.8em, auto); align-items: center; gap: var(--sp-2); min-height: 30px; }
+.ord-plan-who { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ord-plan-zone { flex: none; min-height: 22px; padding: 0 5px 0 5px; gap: 3px; font-size: var(--fs-1); border-left-width: 3px; }
+.ord-plan-name { min-width: 0; font-size: var(--fs-2); font-weight: var(--w-semi); line-height: 1.15; }
+.ord-plan-track { position: relative; display: block; height: 10px; background: var(--meter-track); border-radius: 2px; overflow: hidden; }
+.ord-plan-track > i { position: absolute; top: 0; bottom: 0; background: var(--zc, var(--ink3)); border-radius: 2px; }
+.ord-plan-when { font-size: var(--fs-2); font-weight: var(--w-bold); text-align: right; color: var(--ink2); white-space: nowrap; }
+.ord-plan-note { font-size: var(--fs-1); color: var(--ink3); }
+
+.ord-note { gap: 6px; }
+.ord-note-input { min-height: 72px; }
+.ord-allergy { display: flex; align-items: flex-start; gap: var(--sp-2); font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--amber-ink); }
+.ord-rush { display: grid; gap: 2px; }
+.ord-rush-copy { font-size: var(--fs-2); max-width: var(--measure); }
+
+/* footer: error, total, Send */
+.sheet-foot.ord-foot { align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-4); }
+.ord-error {
+  flex: 1 0 100%; display: flex; align-items: flex-start; gap: var(--sp-2); padding: 10px var(--sp-3);
+  font-size: var(--fs-3); font-weight: var(--w-semi); line-height: 1.3; color: var(--ink);
+  background: var(--tint-bad); border: var(--bw) solid var(--crimson); border-left-width: 6px; border-radius: var(--r-field);
+}
+.ord-error .icon { flex: none; color: var(--crimson); margin-top: 1px; }
+.ord-error-text { min-width: 0; }
+.ord-total { display: grid; margin-right: auto; line-height: 1.1; }
+.ord-total-n { font-size: var(--fs-2); color: var(--ink2); font-weight: var(--w-semi); }
+.ord-total-sum { font: var(--w-heavy) var(--fs-6) / 1.05 var(--font-display); }
+.ord-send { flex: 1 1 260px; max-width: 440px; min-height: 60px; font-size: var(--fs-5); }
+.ord-review { display: none; flex: 1 1 200px; }
+
+/* narrow: one pane at a time, Menu | Order switch on top, a View order button in the footer */
+@media (max-width: 819px) {
+  .ord { display: flex; flex-direction: column; }
+  .ord-switch { display: flex; flex: none; width: auto; margin: var(--sp-2) var(--sp-3) 0; }
+  .ord-switch .seg-opt { flex: 1 1 0; }
+  .ord-menu, .ord-order { flex: 1 1 auto; }
+  .ord-order { border-left: 0; }
+  .ord[data-pane="menu"] .ord-order { display: none; }
+  .ord[data-pane="order"] .ord-menu { display: none; }
+  .ord-foot[data-pane="menu"] .ord-send { display: none; }
+  .ord-foot[data-pane="menu"] .ord-review { display: inline-flex; }
+  .ord-to-menu { display: inline-flex; }
+}
+@media (max-width: 480px) {
+  .ord { --tile-min: 120px; }
+  .ord-menu, .ord-order { padding: var(--sp-3); }
+  .ord-menu { padding-top: 0; }
+  .ord-sticky { margin: 0 calc(var(--sp-3) * -1) var(--sp-2); padding: var(--sp-3) var(--sp-3) var(--sp-2); }
+  .ord-plan-row { grid-template-columns: minmax(0, 1fr) minmax(36px, 0.6fr) auto; }
+  .ord-total-sum { font-size: var(--fs-5); }
+  .ord-send, .ord-review { flex-basis: 100%; max-width: none; }
+  .ord-total { flex: 1 0 100%; grid-auto-flow: column; justify-content: space-between; align-items: baseline; margin: 0; }
+}
+@media (max-width: 360px) {
+  .ord { --tile-min: 100%; }
+  .ord-tile { min-height: 76px; }
+  .ord-send, .ord-review { font-size: var(--fs-4); }
+  .ord-total-sum { font-size: var(--fs-4); }
+}
+
+/* Hold cabinet sheet (hc-), including the New batch form. */
+
+/* The page: safety note, tabs, then the panel, stacked with even gaps. */
+.hc { display: grid; gap: var(--sp-4); min-width: 0; }
+.hc-panel { display: grid; gap: var(--sp-4); min-width: 0; }
+
+/* The count line under the tabs; it turns red when something needs action. */
+.hc-summary { font-weight: var(--w-semi); color: var(--ink2); }
+.hc-summary.is-alert { color: var(--crimson); font-weight: var(--w-bold); }
+
+/* The grid that holds the batch cards: two columns on a wide screen, one on a phone. */
+.hc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: var(--sp-4); }
+
+/* One batch card; the left edge is green, amber or red, and the status word repeats it. */
+.hc-card { display: grid; gap: var(--sp-3); min-width: 0; padding: var(--sp-4); background: var(--paper); border: var(--bw) solid var(--line); border-left-width: 8px; border-radius: var(--r-panel); }
+.hc-card[data-tone="ok"] { border-left-color: var(--sage); }
+.hc-card[data-tone="warn"] { border-left-color: var(--amber); }
+.hc-card[data-tone="bad"] { border-left-color: var(--crimson); }
+
+/* Card top line: batch name on the left, status on the right; wraps on a narrow screen. */
+.hc-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 6px var(--sp-3); }
+.hc-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+.hc-kind { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink3); }
+.hc-name { font-size: var(--fs-4); line-height: var(--lh-snug); overflow-wrap: anywhere; }
+.hc-status { font-size: var(--fs-4); }
+
+/* Card middle: the hold ring on the left, the facts on the right. */
+.hc-body { display: flex; align-items: center; gap: var(--sp-4); }
+.hc-facts { flex: 1 1 auto; min-width: 0; display: grid; gap: var(--sp-2); }
+
+/* The ring fills as a batch nears its hold limit; the number inside says the same in words. */
+.hc-ring {
+  --v: 0; --rc: var(--sage);
+  position: relative; flex: none; display: grid; place-items: center; width: 88px; height: 88px; border-radius: 50%;
+  background: conic-gradient(var(--rc) calc(var(--v) * 1%), var(--meter-track) 0);
+}
+.hc-ring[data-tone="warn"] { --rc: var(--amber); }
+.hc-ring[data-tone="bad"] { --rc: var(--crimson); }
+.hc-ring::before { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: var(--paper); }
+.hc-ring-in { position: relative; display: grid; justify-items: center; line-height: 1.05; }
+.hc-ring-t { font: var(--w-bold) var(--fs-4) / 1 var(--font-display); }
+.hc-ring-s { font-size: var(--fs-1); color: var(--ink3); }
+
+/* How much of the batch is left: a bar and the figure under it. */
+.hc-stock { display: grid; gap: 4px; }
+.hc-stock-t { font-size: var(--fs-2); font-weight: var(--w-semi); }
+
+/* The facts list; a late reading is shown in red text. */
+.hc-dl { gap: 2px var(--sp-3); }
+.hc-dl dd.is-late { color: var(--crimson); font-weight: var(--w-bold); }
+.hc-cost { font-size: var(--fs-1); color: var(--ink3); }
+
+/* The message strip under the facts, built on the shared note look. */
+.hc-msg { align-items: flex-start; }
+.hc-msg-i { flex: none; display: inline-flex; margin-top: 1px; }
+.hc-msg[data-tone="info"] .hc-msg-i { color: var(--ink3); }
+.hc-lock { display: flex; align-items: center; gap: 8px; font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--crimson); }
+
+/* The two cooling steps (reach 70 F, then reach 41 F), one line each with an icon and a word. */
+.hc-cool { display: grid; gap: 6px; padding: var(--sp-3); background: var(--sub); border-radius: var(--r-panel); }
+.hc-cool-t { font: var(--w-bold) var(--fs-3) / 1.1 var(--font-display); color: var(--ink2); }
+.hc-step .fs-state { font-size: var(--fs-2); font-family: var(--font-body); font-weight: var(--w-semi); letter-spacing: 0; }
+
+/* The card button row; it wraps on a phone and Discard is outlined in red so it never looks primary. */
+.hc-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.hc-actions .btn { flex: 1 1 150px; min-height: var(--tap); }
+.hc-discard { color: var(--crimson); border-color: var(--crimson); }
+
+/* The temperature box inside a card: big steppers, because it is used with wet hands. */
+.hc-editor { display: grid; gap: var(--sp-3); padding: var(--sp-3); background: var(--sub); border-radius: var(--r-panel); }
+.hc-ed-t { font: var(--w-bold) var(--fs-4) / 1.1 var(--font-display); }
+.hc-editor .stepper, .hc-form .stepper { justify-self: start; }
+.hc-editor .stepper-btn { min-height: var(--tap-lg); }
+.hc-editor .stepper-input { font-size: var(--fs-6); }
+.hc-hint { font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink2); }
+.hc-hint[data-tone="ok"] { color: var(--sage-ink); }
+.hc-hint[data-tone="warn"] { color: var(--amber-ink); }
+.hc-hint[data-tone="bad"] { color: var(--crimson); }
+.hc-ed-btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.hc-ed-btns .btn { flex: 1 1 auto; white-space: nowrap; }
+.hc-ed-btns .btn-primary { flex-grow: 2; }
+
+/* The empty cabinet message and the short list of recently discarded batches. */
+.hc-empty { padding: var(--sp-8) var(--sp-4); }
+.hc-recent { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-2); }
+
+/* The New batch form: one column of fields, each with its label above it. */
+.hc-form { max-width: 720px; }
+.hc-fld { display: grid; gap: 6px; min-width: 0; }
+.hc-prod { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); width: 100%; }
+.hc-prod .seg-opt { justify-content: flex-start; text-align: left; }
+.hc-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: var(--sp-4); }
+.hc-weighed { display: grid; gap: var(--sp-3); }
+.hc-form .stepper-input { width: 5.2ch; }
+
+/* The live yield and cost box in the New batch form. */
+.hc-calc { display: grid; gap: var(--sp-2); padding: var(--sp-4); background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-panel); }
+.hc-cmp { font-size: var(--fs-2); color: var(--ink2); line-height: var(--lh-body); }
+.hc-honest { margin-top: 2px; }
+
+/* The footer of the New batch tab: the error message (if any) above the big Put in hold cabinet button. */
+.hc-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2) var(--sp-3); width: 100%; }
+.hc-foot .hc-form-err { flex: 1 0 100%; }
+.hc-add { flex: 1 1 280px; max-width: 440px; min-height: 60px; font-size: var(--fs-5); }
+
+/* The reason choices in the Discard dialog: a grid of big buttons, two across where there is room. */
+.hc-reasons { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); width: 100%; }
+.hc-reasons .seg-opt { justify-content: flex-start; padding: 0 var(--sp-4); border: var(--bw-thin) solid var(--line-soft); }
+.hc-reasons .seg-opt:not([aria-checked="true"]) { background: var(--paper); }
+.fs-dialog { display: grid; gap: var(--sp-3); }
+
+/* A phone: the ring sits above the facts so nothing is squeezed, and the card padding shrinks a little. */
+@media (max-width: 480px) {
+  .hc-card { padding: var(--sp-3); }
+  .hc-body { flex-direction: column; align-items: stretch; }
+  .hc-ring { align-self: center; }
+}
+
+/* 86 board and stock sheet (bd-). */
+
+/* The whole 86 board page, and the strip of four simulated channels at the top. */
+.bd { display: grid; gap: var(--sp-5); min-width: 0; }
+.bd-sync-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: var(--sp-2); }
+.bd-chip { display: flex; align-items: flex-start; gap: 10px; min-width: 0; padding: 10px var(--sp-3); background: var(--paper); border: var(--bw) solid var(--line); border-left-width: 6px; border-radius: var(--r-panel); }
+.bd-chip[data-tone="ok"] { border-left-color: var(--sage); }
+.bd-chip[data-tone="warn"] { border-left-color: var(--amber); }
+.bd-chip[data-tone="muted"] { border-left-color: var(--line-soft); }
+.bd-chip-i { flex: none; margin-top: 1px; color: var(--ink3); }
+.bd-chip[data-tone="ok"] .bd-chip-i { color: var(--sage-ink); }
+.bd-chip[data-tone="warn"] .bd-chip-i { color: var(--amber-ink); }
+.bd-chip-t { min-width: 0; display: grid; gap: 1px; }
+.bd-chip-n { font-weight: var(--w-bold); }
+.bd-chip-state { font-weight: var(--w-semi); font-size: var(--fs-2); }
+.bd-chip-sub { font-size: var(--fs-1); color: var(--ink3); overflow-wrap: anywhere; }
+
+/* Menu on the left, stock on the right where there is room. Below 900 px they stack. */
+.bd-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--sp-6); align-items: start; }
+@media (max-width: 900px) { .bd-cols { grid-template-columns: minmax(0, 1fr); } }
+.bd-filter { display: flex; }
+.bd-cat-h { margin: var(--sp-3) 0 6px; font-size: var(--fs-3); color: var(--ink2); }
+.bd-list { display: grid; gap: 6px; }
+
+/* One menu row; a red edge marks an 86 item. */
+.bd-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-3); padding: 10px var(--sp-3); background: var(--paper); border: var(--bw-thin) solid var(--line-soft); border-left-width: 6px; border-radius: var(--r-panel); }
+.bd-row[data-state="ok"] { border-left-color: var(--sage); }
+.bd-row:not([data-state="ok"]) { background: var(--tint-bad); border-color: var(--crimson); }
+.bd-main { flex: 1 1 200px; min-width: 0; display: grid; gap: 2px; }
+.bd-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--sp-2); }
+.bd-name { font-weight: var(--w-bold); font-size: var(--fs-item); line-height: 1.15; overflow-wrap: anywhere; }
+.bd-price { color: var(--ink3); font-size: var(--fs-2); }
+.bd-state { font-size: var(--fs-3); }
+.bd-why { font-size: var(--fs-2); color: var(--ink2); }
+.bd-act { display: flex; flex-wrap: wrap; gap: 6px; }
+.bd-act .btn { min-height: var(--tap); }
+
+/* The stock list: one card per ingredient with a meter that has a tick at the 86 level. */
+.bd-stock-list { display: grid; gap: var(--sp-2); }
+.bd-ing { display: grid; gap: 6px; padding: var(--sp-3); background: var(--paper); border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-panel); }
+.bd-ing-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px var(--sp-3); }
+.bd-ing-n { font-weight: var(--w-bold); font-size: var(--fs-3); }
+.bd-ing-t { font-size: var(--fs-2); color: var(--ink2); }
+.bd-ing-held { font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--amber-ink); }
+.bd-ing-act .btn { min-height: var(--tap); }
+
+/* The small restock box that opens under an ingredient. */
+.bd-restock { display: grid; gap: var(--sp-2); padding: var(--sp-3); background: var(--sub); border-radius: var(--r-panel); }
+.bd-restock .stepper { justify-self: start; }
+.bd-restock-t { font: var(--w-bold) var(--fs-3) / 1.1 var(--font-display); }
+.bd-restock-b { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.bd-restock-b .btn { flex: 1 1 120px; }
+
+/* Recall sheet (rc-). */
+
+/* The Recall page: search box, the two tabs, a count line and the list. */
+.rc { display: grid; gap: var(--sp-3); min-width: 0; }
+.rc-panel { display: grid; gap: var(--sp-3); }
+.rc-list { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.rc-empty { padding: var(--sp-8) var(--sp-4); }
+
+/* One ticket row: the big ticket number, who and what, how long it took, and the Recall button. */
+.rc-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-panel); }
+.rc-num { flex: none; min-width: 3.4ch; font: var(--w-heavy) var(--fs-6) / 1 var(--font-display); }
+.rc-main { flex: 1 1 auto; min-width: 0; display: grid; gap: 4px; }
+.rc-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--sp-2); }
+.rc-who { font-weight: var(--w-bold); font-size: var(--fs-item); overflow-wrap: anywhere; }
+.rc-items { font-size: var(--fs-2); color: var(--ink2); overflow-wrap: anywhere; }
+.rc-meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--sp-2); }
+.rc-meta { font-size: var(--fs-2); color: var(--ink3); }
+.rc-recall { flex: none; min-width: 120px; }
+@media (max-width: 480px) {
+  .rc-row { flex-wrap: wrap; }
+  .rc-recall { flex: 1 1 100%; }
+}
+
+/* Demo and clock sheet (dm-). */
+
+/* The Demo page, the status line at the top, and the choice buttons that share the row. */
+.dm { display: grid; gap: var(--sp-5); min-width: 0; }
+.dm-sim { display: grid; gap: var(--sp-5); }
+.dm-status { align-items: center; }
+.dm-status-i { flex: none; display: inline-flex; }
+.dm-rates, .dm-speed { display: flex; width: 100%; }
+.dm-speed .seg-opt { flex: 1 1 0; min-width: 0; }
+.dm-rates .seg-opt { flex: 1 1 auto; white-space: nowrap; }
+.dm-clockctl { display: grid; gap: var(--sp-3); }
+.dm-burst { justify-self: start; }
+.dm-counts { max-width: 480px; }
+.dm-reset .btn { justify-self: start; }
+
+/* Help sheet (hp-). */
+
+/* The topic tabs and the text under them. */
+.hp { display: grid; gap: var(--sp-4); min-width: 0; }
+.hp-pane { display: grid; gap: var(--sp-5); min-width: 0; }
+.hp-list { display: grid; gap: var(--sp-3); margin: 0; padding: 0; list-style: none; }
+.hp-item { display: flex; gap: var(--sp-3); align-items: flex-start; }
+.hp-item-i { flex: none; display: grid; place-items: center; width: 44px; height: 44px; color: var(--ink); background: var(--sub); border-radius: var(--r-field); }
+.hp-item-t { display: grid; gap: 2px; min-width: 0; max-width: var(--measure); }
+.hp-item-t span { color: var(--ink2); }
+
+/* Words and colours: the real badge on the left, its meaning on the right. */
+.hp-words, .hp-ths, .hp-keys { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.hp-word { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+.hp-word-k { flex: none; min-width: 9.5rem; }
+.hp-word-v { flex: 1 1 14rem; min-width: 0; color: var(--ink2); }
+.hp-th { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+.hp-th-v { color: var(--ink2); font-size: var(--fs-2); }
+
+/* Keyboard keys: the key on the left, what it does on the right. */
+.hp-key { display: flex; align-items: center; gap: var(--sp-3); }
+.hp-key .kbd { flex: none; min-width: 3.2rem; }
+.hp-links { margin-top: var(--sp-2); }
+.hp-tiny { font-size: var(--fs-1); }
+
+/* Specs sheet (sp-). */
+
+/* The Specs page, the pass or fail summary line, and the list of colour pairs. */
+.sp { display: grid; gap: var(--sp-6); min-width: 0; }
+.sp-sec { gap: var(--sp-3); }
+.sp-summary { font-weight: var(--w-bold); font-size: var(--fs-3); }
+.sp-summary[data-tone="bad"] { color: var(--crimson); }
+.sp-summary[data-tone="ok"] { color: var(--sage-ink); }
+.sp-theme { display: flex; }
+.sp-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+
+/* One colour pair: sample, what it is for, and the measured ratio with Pass or Fails. */
+.sp-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-2) var(--sp-3); padding: 8px var(--sp-3); background: var(--paper); border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-panel); }
+.sp-row[data-pass="no"] { border-color: var(--crimson); background: var(--tint-bad); }
+.sp-sample { display: grid; place-items: center; width: 52px; height: 40px; font: var(--w-bold) var(--fs-4) / 1 var(--font-display); border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-chip); }
+.sp-what { display: grid; min-width: 0; }
+.sp-hex { font-size: var(--fs-1); color: var(--ink3); overflow-wrap: anywhere; }
+.sp-result { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-end; gap: 2px var(--sp-3); }
+.sp-ratio { font: var(--w-bold) var(--fs-4) / 1 var(--font-display); }
+.sp-need { font-size: var(--fs-1); color: var(--ink3); }
+@media (max-width: 640px) {
+  .sp-row { grid-template-columns: 52px minmax(0, 1fr); }
+  .sp-result { grid-column: 2; justify-content: flex-start; }
+}
+
+/* Palette swatches, painted in their own colour with a readable ink on top. */
+.sp-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.sp-sw { display: grid; gap: 2px; align-content: end; min-height: 96px; padding: var(--sp-3); border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-panel); }
+.sp-sw-hex { font-size: var(--fs-2); }
+.sp-sw-use { font-size: var(--fs-1); }
+
+/* The type scale: each size printed at its own size. */
+.sp-scale { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-3); font-family: var(--font-display); font-weight: var(--w-bold); }
+
+/* Settings sheet (mn-). */
+
+/* The Settings page: one block per setting, a heading and a short line of help above the control. */
+.mn { display: grid; gap: var(--sp-6); min-width: 0; }
+.mn-block { gap: var(--sp-2); }
+.mn-look, .mn-text { display: flex; width: 100%; }
+.mn-look .seg-opt, .mn-text .seg-opt { flex: 1 1 0; }
+.mn-station { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); width: 100%; }
+.mn-links { display: grid; gap: var(--sp-2); }
+.mn-link { justify-content: flex-start; text-align: left; }
+
+/* Every page grid gets one column that may shrink, so nothing pushes past the edge at 280 px. */
+.hc, .hc-panel, .bd, .rc, .rc-panel, .ox, .ox-panel, .dm, .dm-sim, .hp, .hp-pane, .sp, .mn, .hc-form, .hc-card { grid-template-columns: minmax(0, 1fr); }

@@ -1,0 +1,1593 @@
+/*
+ * WHAT THIS FILE IS: The back office page "Menu and settings": edit the menu, ingredients, ticket time limits,
+ *   pacing, food-safety limits, the PIN and display choices; back up, import or reset the data. Every edit goes
+ *   through the engine, which can refuse it; the refusal shows beside the field and the old value stays.
+ * PARTS: helpers, number field, nine panels (menu to about), then the page itself and its contents list.
+ * USES: util, config, engine, store, shell, office core (00 to 80).   USED BY: the office frame.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util;
+  const doc = g.document;
+  if (!doc || !U || typeof U.h !== 'function') return; // Node (logic tests): nothing to build
+  const h = U.h;
+  const C = SB.config;
+
+  const SAVE_DELAY = 600;           // ms after the last change before a field is written (longer than the stepper's 500 ms hold-repeat gap)
+  const MAX_IMPORT_CHARS = 20e6;    // same ceiling as SB.store.importAll
+  const VERSION = 'Smokebox KDS ' + (C && C.version ? 'v' + C.version : '');
+
+  // Small helpers
+  // Real finite numbers only, and an icon builder that never throws.
+  const isNum = (n) => typeof n === 'number' && isFinite(n);
+  const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 18 }); } catch (e) { return doc.createElement('span'); } };
+  // The current state (null if the store is not ready), and a m:ss clock text.
+  const cur = () => { try { return SB.store.getState(); } catch (e) { return null; } };
+  const mmss = (sec) => { const s = Math.max(0, Math.round(sec)); return Math.floor(s / 60) + ':' + U.pad2(s % 60); };
+  // A trimmed number for display, and how many decimals a step has.
+  const num = (n, d) => (isNum(n) ? String(+n.toFixed(d == null ? 2 : d)) : '-');
+  const decs = (n) => { const s = String(n); const i = s.indexOf('.'); return i < 0 ? 0 : s.length - i - 1; };
+  // A readable size for stored text, and an hour written as clock text.
+  const kbText = (chars) => (chars < 1024 ? chars + ' bytes' : chars < 1048576 ? Math.round(chars / 1024) + ' KB' : (chars / 1048576).toFixed(1) + ' MB');
+  const hourWords = (hr) => U.fmtHour(hr) + (hr >= 24 ? ' (next day)' : '');
+  // Lowercases the first letter, and today's real date for file names.
+  const lower1 = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+  const todayKey = () => U.dateKey(Date.now()); // real calendar date for file names (the demo clock may run ahead)
+  // Reads a dotted path from an object, and builds a nested patch from one.
+  const getPath = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
+  const patchFor = (path, v) => { const ks = path.split('.'); const root = {}; let c = root; ks.forEach((k, i) => { if (i === ks.length - 1) c[k] = v; else c = c[k] = {}; }); return root; };
+  // The unit word for an ingredient, and an amount written with that unit.
+  const unitWord = (ing) => (ing && ing.unit === 'ea' ? 'pieces' : 'g');
+  const amountText = (ing, v) => (ing && ing.unit === 'ea' ? num(v, 1) + ' ' + U.plural(v, 'piece') : U.fmtG(v));
+  // Dollars with cents, as shown in field messages.
+  const money = (v) => U.fmtMoney(v, 2);
+  // An ingredient note from the config may quote a price per pound; show kilograms instead (this app never
+  // shows pounds).
+  function kgNote(t) {
+    const out = String(t).replace(/\$(\d+(?:\.\d+)?)\/lb\b/g, (m, v) => '$' + (v * 2.20462).toFixed(2) + '/kg');
+    return out.replace(/, about (\$\d+(?:\.\d+)?\/kg)/, (m, f) => (out.indexOf(f) < out.indexOf(m) ? '' : m)); // do not say the same price twice
+  }
+
+  /** Send a user edit to the engine. Returns {report, info, events}; never throws. */
+  function send(type, payload) {
+    try { return SB.store.dispatchEx(type, payload, { source: 'ui' }); }
+    catch (e) { return { report: 'badPatch', info: { internalError: String(e) }, events: [] }; }
+  }
+  // True when the engine accepted the action, or had nothing to change.
+  const good = (r) => r.report === 'ok' || r.report === 'nothingToDo';
+
+  // Field meta and refusal wording. A meta describes one editable value for the words around it:
+  // {name, unit, toUi(raw) -> shown, words(info, r)?, legalNote?, text?}
+  const META = {};
+  function showVal(m, raw) {
+    if (m && typeof m.fmt === 'function') return m.fmt(raw);
+    const u = m && m.toUi ? m.toUi(raw) : raw;
+    const one = u === 1 && (m.unit === 'hours' || m.unit === 'timings'); // 1 hour, not 1 hours
+    const unit = m && m.unit ? (m.unit === '%' || m.unit === '\u00d7' ? m.unit : ' ' + (one ? m.unit.replace(/s$/, '') : m.unit)) : '';
+    return num(u, 2) + unit;
+  }
+  // One sentence for a refused edit: what is wrong and what is allowed. `m` is the meta of the field touched.
+  function refusal(r, m) {
+    const info = r.info || {};
+    const words = (cur() || {}).settings;
+    if (r.report === 'outOfBounds') {
+      if (m && typeof m.words === 'function') { const w = m.words(info, r); if (w) return w; } // the touched field knows its cross-field wording
+      const mk = (info.key && META[info.key]) || m || null; // otherwise describe the field the engine named, with its own limits
+      if (mk && isNum(info.min) && isNum(info.max)) {
+        if (mk.text) return mk.name + ' has to be ' + info.min + ' to ' + info.max + ' characters.';
+        return mk.name + ' has to be between ' + showVal(mk, info.min) + ' and ' + showVal(mk, info.max) + '.' + (mk.legalNote ? ' ' + mk.legalNote : '');
+      }
+    }
+    if (r.report === 'badPatch' && m) return m.name + ' needs a valid value. ' + SB.engine.describe('badPatch', info, words);
+    return SB.engine.describe(r.report, info, words);
+  }
+
+  // Row status line: "Saved. ..." for a few seconds, then a quiet "Saved". Errors stay until the next edit.
+  function statusLine() {
+    const el = h('div', { class: 'od-st', role: 'status' });
+    let t = 0;
+    // Paints the status line in one tone, with its icon and text.
+    const set = (tone, text) => { el.dataset.tone = tone; el.replaceChildren(ico(tone === 'bad' ? 'alert-circle' : 'check-circle', 16), h('span', null, text)); };
+    return {
+      el,
+      // Shows a saved message, then settles to a quiet Saved after six seconds.
+      ok(text) { clearTimeout(t); set('ok', text || 'Saved.'); t = setTimeout(() => { if (el.dataset.tone === 'ok') set('ok', 'Saved'); }, 6000); },
+      // Shows an error that stays until the next edit.
+      bad(text) { clearTimeout(t); set('bad', text); },
+      // Empties the status line and stops its timer.
+      clear() { clearTimeout(t); delete el.dataset.tone; el.replaceChildren(); },
+      // Stops the pending timer when the page closes.
+      destroy() { clearTimeout(t); },
+    };
+  }
+
+  // A labelled number field built on SB.ui.stepper. Changes are saved through o.save(v), which returns {ok,
+  // text}. Options: label, value, min, max, step, big, unit, meta (words for refusals), save, onSaved, read,
+  // hint, and toUi / fromUi when the field shows a different scale than the engine stores. Returns {el,
+  // input, stepper, sync, flush, setError, destroy}.
+  function numField(o) {
+    const toUi = o.toUi || ((v) => v), fromUi = o.fromUi || ((u) => u);
+    const step = o.step || 1;
+    const big = o.big && o.big > step && o.max - o.min > o.big * 4 ? o.big : 0;
+    const d = Math.max(decs(step), big ? decs(big) : 0, decs(o.min));
+    let committed = o.value;
+    let timer = 0, pending = null;
+    const stepper = SB.ui.stepper({
+      value: toUi(committed), min: o.min, max: o.max, step, bigStep: big || undefined, unit: o.unit, label: o.aria || o.label,
+      // Remembers the new value and saves it after a short pause (SAVE_DELAY).
+      onChange: (u) => { pending = u; paintRead(u); clearErr(); if (o.onInput) o.onInput(u); clearTimeout(timer); timer = setTimeout(flush, SAVE_DELAY); },
+    });
+    const input = stepper.input;
+    input.id = U.uid('odn');
+    const minCh = 3 + (d ? d + 1 : 0); // short numbers keep a steady box; long ones grow so no digit is clipped
+    // A long value plus long big-step labels (such as +1000) leaves no room on a phone, so the big buttons
+    // hide (CSS) while that holds.
+    const bigLen = big ? String(big).length + 1 : 0;
+    const fit = () => { input.style.width = (Math.max(minCh, input.value.length) + 0.8) + 'ch'; el.classList.toggle('od-nf-wide', big > 0 && input.value.length + bigLen >= 10); };
+    input.addEventListener('input', fit);
+    const lab = h('label', { class: 'od-lab' + (o.hideLabel ? ' visually-hidden' : ''), for: input.id }, o.label);
+    const read = h('span', { class: 'od-read' });
+    const err = h('div', { class: 'od-ferr', role: 'alert', hidden: true, id: input.id + '-err' });
+    const hint = o.hint ? h('div', { class: 'od-hint', id: input.id + '-hint' }, o.hint) : null;
+    const el = h('div', { class: 'od-nf' + (o.cls ? ' ' + o.cls : '') }, lab, h('div', { class: 'od-nf-row' }, stepper, read), hint, err);
+    if (hint) input.setAttribute('aria-describedby', hint.id);
+
+    // Updates the small reading beside the stepper, such as 1:30 for 90 seconds.
+    function paintRead(u) { fit(); read.textContent = o.read ? o.read(u == null ? stepper.getValue() : u) : ''; }
+    // Hides the error text and clears the error marks on the input.
+    function clearErr() { err.hidden = true; err.replaceChildren(); input.removeAttribute('aria-invalid'); if (hint) input.setAttribute('aria-describedby', hint.id); else input.removeAttribute('aria-describedby'); }
+    // Shows an error under the field and marks the input as invalid for screen readers.
+    function setError(text) {
+      err.replaceChildren(ico('alert-circle', 16), h('span', null, text));
+      err.hidden = false;
+      input.setAttribute('aria-invalid', 'true');
+      input.setAttribute('aria-describedby', (hint ? hint.id + ' ' : '') + err.id);
+    }
+    // The sentence ending that says which value was kept after a refusal.
+    const keptWords = () => ' Kept ' + showVal(o.meta, committed) + '.';
+    // Puts the last saved value back into the stepper after a refusal.
+    function revert() { stepper.setValue(toUi(committed), { silent: true }); paintRead(); if (o.onInput) o.onInput(toUi(committed)); }
+    // Tries to save a value. On a refusal the old value comes back and the reason shows. Returns true when
+    // saved.
+    function attempt(v) {
+      const res = o.save(v);
+      if (res.ok) { committed = v; clearErr(); if (o.onSaved) o.onSaved(res.text); }
+      else { revert(); setError(res.text + keptWords()); }
+      return res.ok;
+    }
+    // Saves any waiting change now instead of after the pause.
+    function flush() {
+      clearTimeout(timer); timer = 0;
+      if (pending == null) return;
+      const u = pending; pending = null;
+      attempt(fromUi(u));
+    }
+    // A typed value outside the range would be silently clamped by the stepper. Route it to the engine
+    // instead: the engine refuses it with the key, the refusal is counted as friction, and the field keeps
+    // its old value. Garbage (not a number) is never sent.
+    const parseTyped = () => { const s = input.value.trim().replace(',', '.'); return !s || /[eE]|infinity|nan/i.test(s) || !/^-?\d*\.?\d*$/.test(s) ? NaN : parseFloat(s); };
+    const intercept = (ev) => {
+      const v = parseTyped();
+      if (Number.isNaN(v)) {
+        ev.stopImmediatePropagation(); clearTimeout(timer); pending = null;
+        stepper.setValue(toUi(committed), { silent: true }); paintRead();
+        setError('That is not a number. Type digits only.' + keptWords());
+        return;
+      }
+      if (v < o.min - 1e-9 || v > o.max + 1e-9) {
+        ev.stopImmediatePropagation(); clearTimeout(timer); pending = null;
+        const ok = attempt(fromUi(v));
+        if (ok) stepper.setValue(toUi(committed), { silent: true });
+        paintRead();
+      }
+    };
+    input.addEventListener('change', intercept, true);
+    input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') intercept(ev); }, true);
+    // A value that was typed (then confirmed with Enter or by leaving the box) is saved at once; only the +
+    // and - buttons wait, so holding one writes once.
+    input.addEventListener('change', () => flush());
+    input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') flush(); });
+    paintRead();
+    return {
+      // The handle the page uses to sync, save or remove this field.
+      el, input, stepper, setError, flush, committed: () => committed,
+      sync(v) {
+        committed = v;
+        if (pending != null || stepper.contains(doc.activeElement)) return; // never overwrite a half-typed or focused field
+        const u = toUi(v);
+        stepper.setValue(u, { silent: true });
+        paintRead();
+      },
+      // Saves anything waiting, then removes the stepper.
+      destroy() { flush(); stepper.destroy(); },
+    };
+  }
+
+  /** Save helper for settings fields: updateSettings with a nested patch built from a dotted path. */
+  function saveSetting(path, value, okText, meta) {
+    const r = send('updateSettings', { patch: patchFor(path, value) });
+    return good(r) ? { ok: true, text: okText } : { ok: false, text: refusal(r, meta || META[path]) };
+  }
+
+  // Panels. The sticky table of contents links to them; each panel is a section with a focusable heading.
+  const SECTIONS = [
+    { id: 'menu', label: 'Menu', title: 'Menu and bills of materials' },
+    { id: 'ingredients', label: 'Ingredients', title: 'Ingredients' },
+    { id: 'times', label: 'Time limits', title: 'Ticket time limits by channel' },
+    { id: 'pacing', label: 'Pacing', title: 'Meal pacing' },
+    { id: 'safety', label: 'Food safety', title: 'Food safety limits' },
+    { id: 'pin', label: 'PIN', title: 'Manager PIN' },
+    { id: 'look', label: 'Appearance', title: 'Appearance and service hours' },
+    { id: 'data', label: 'Data', title: 'Data, backup and reset' },
+    { id: 'about', label: 'About', title: 'About this build' },
+  ];
+  // One panel: a section with a focusable heading and an empty body. Returns {el, body, title, def}.
+  function panel(def, intro) {
+    const hid = 'od-h-' + def.id;
+    const title = h('h2', { class: 'od-title', id: hid, tabindex: -1 }, def.title);
+    const body = h('div', { class: 'od-body' });
+    const el = h('section', { class: 'od-panel', id: 'od-' + def.id, 'aria-labelledby': hid }, h('header', { class: 'od-head' }, title), body);
+    if (intro) body.appendChild(h('p', { class: 'od-intro' }, intro));
+    return { el, body, title, def };
+  }
+  // Small builders for a sub-heading and a paragraph.
+  const sub = (text, id) => h('h3', { class: 'od-sub', id }, text);
+  const para = (text, cls) => h('p', { class: cls || 'od-p' }, text);
+  // Builders for a quiet hint line and for a button with an optional icon.
+  const hintLine = (text) => h('p', { class: 'od-hint' }, text);
+  const btn = (label, o) => {
+    o = o || {};
+    const b = h('button', { type: 'button', class: 'btn' + (o.cls ? ' ' + o.cls : '') });
+    if (o.icon) b.appendChild(ico(o.icon, o.size || 18));
+    b.appendChild(h('span', null, label));
+    if (o.onClick) b.addEventListener('click', o.onClick);
+    if (o.aria) b.setAttribute('aria-label', o.aria);
+    return b;
+  };
+  // A small status chip with an optional icon.
+  const chip = (label, tone, icon) => SB.ui.chip({ label, tone, icon });
+
+  // 1. Menu and bills of materials
+  const BOM_META = { name: 'The amount per portion', unit: 'g', words: () => 'The amount per portion has to be more than 0 and at most 100,000.' };
+
+  // The editable ingredient lines of one menu item: add, change or remove, each saved at once. Returns {el,
+  // sync, destroy}.
+  function bomBlock(id, itemName, getMi, status) {
+    const root = h('div', { class: 'od-bom' });
+    const headId = U.uid('odbh');
+    const head = h('div', { class: 'od-lab', id: headId }, 'Ingredients for one portion');
+    const list = h('ul', { class: 'od-bom-list', 'aria-labelledby': headId });
+    const addBtn = btn('Add ingredient', { icon: 'plus', cls: 'btn-sm' });
+    const note = h('p', { class: 'od-hint' });
+    root.append(head, list, h('div', { class: 'od-bom-actions' }, addBtn), note);
+    let lines = [], rendered = null, stale = false, focusIng = null, focusAdd = false;
+    // Reads the item's current bill of materials, and indexes ingredients by id.
+    const bomNow = () => getMi().bom.map((l) => ({ ing: l.ing, qty: l.qty }));
+    const ingMap = (s) => { const m = {}; for (const i of s.ingredients) m[i.id] = i; return m; };
+    // True while someone is typing in this list, so a redraw has to wait.
+    const typing = () => { const a = doc.activeElement; return !!(a && list.contains(a) && (a.tagName === 'INPUT' || a.tagName === 'SELECT')); };
+
+    // Redraws every line of this bill from the state. Never runs while a line field is focused.
+    function build(mi, s) {
+      lines.forEach((l) => l.field.destroy());
+      list.replaceChildren(); lines = [];
+      const ings = ingMap(s);
+      const used = new Set(mi.bom.map((l) => l.ing));
+      mi.bom.forEach((l) => {
+        const ing = ings[l.ing];
+        const name = ing ? ing.name : l.ing;
+        const li = h('li', { class: 'od-bom-line' });
+        const sel = h('select', { class: 'select od-bom-sel', 'aria-label': 'Ingredient for ' + itemName });
+        sel.appendChild(h('option', { value: l.ing }, name));
+        s.ingredients.forEach((o) => { if (!used.has(o.id)) sel.appendChild(h('option', { value: o.id }, o.name)); });
+        sel.value = l.ing;
+        const field = numField({
+          label: unitWord(ing) === 'g' ? 'Grams' : 'Pieces', aria: name + ' in ' + itemName, hideLabel: true, value: l.qty, min: 1, max: 100000, step: 1, big: 10, unit: unitWord(ing), meta: BOM_META,
+          // Writes the new amount for this line through the engine.
+          save: (v) => {
+            const next = bomNow().map((x) => (x.ing === l.ing ? { ing: x.ing, qty: v } : x));
+            const r = send('updateMenuItem', { id, patch: { bom: next } });
+            return good(r) ? { ok: true, text: 'Saved. Each portion now takes ' + amountText(ing, v) + ' of ' + lower1(name) + ' off the stock.' } : { ok: false, text: refusal(r, BOM_META) };
+          },
+          // Shows the engine's confirmation under the row.
+          onSaved: (t) => status.ok(t),
+        });
+        sel.addEventListener('change', () => {
+          const to = sel.value, toIng = ings[to];
+          const next = bomNow().map((x) => (x.ing === l.ing ? { ing: to, qty: toIng && ing && toIng.unit !== ing.unit ? (toIng.unit === 'ea' ? 1 : 100) : x.qty } : x));
+          const r = send('updateMenuItem', { id, patch: { bom: next } });
+          if (good(r)) status.ok('Saved. This item now uses ' + (toIng ? lower1(toIng.name) : to) + ' instead of ' + lower1(name) + '. Check the amount.');
+          else { sel.value = l.ing; status.bad(refusal(r, BOM_META)); }
+        });
+        const rm = h('button', { type: 'button', class: 'btn btn-ghost btn-icon btn-sm od-rm', 'aria-label': 'Remove ' + name + ' from ' + itemName }, ico('x', 18));
+        rm.addEventListener('click', () => {
+          const next = bomNow().filter((x) => x.ing !== l.ing);
+          const r = send('updateMenuItem', { id, patch: { bom: next } });
+          if (good(r)) { focusAdd = true; status.ok('Removed ' + lower1(name) + '. Stock no longer takes it off for this item.'); }
+          else status.bad(refusal(r, BOM_META));
+        });
+        li.append(sel, field.el, rm);
+        list.appendChild(li);
+        lines.push({ ing: l.ing, li, sel, field, rm });
+      });
+      rendered = keyOf(mi, s);
+      stale = false;
+      const full = mi.bom.length >= 12 || mi.bom.length >= s.ingredients.length;
+      addBtn.disabled = full;
+      note.textContent = !mi.bom.length ? 'No ingredients, so stock is not tracked for this item.' : mi.bom.length >= 12 ? 'An item holds up to 12 ingredient lines.' : '';
+      note.hidden = !note.textContent;
+      if (focusIng) { const t = lines.find((x) => x.ing === focusIng); focusIng = null; if (t) t.field.input.focus(); }
+      else if (focusAdd) { focusAdd = false; if (!addBtn.disabled) addBtn.focus(); else if (lines[0]) lines[0].field.input.focus(); }
+    }
+    // A fingerprint of the lines and ingredient names, to tell when a redraw is needed.
+    const keyOf = (mi, s) => mi.bom.map((l) => l.ing).join('|') + '#' + s.ingredients.map((i) => i.id + ':' + i.name + ':' + i.unit).join('|');
+
+    addBtn.addEventListener('click', () => {
+      const s = cur(); if (!s) return;
+      const used = new Set(bomNow().map((l) => l.ing));
+      const cand = s.ingredients.find((i) => !used.has(i.id));
+      if (!cand) return;
+      const q = cand.unit === 'ea' ? 1 : 100;
+      const r = send('updateMenuItem', { id, patch: { bom: bomNow().concat([{ ing: cand.id, qty: q }]) } });
+      if (good(r)) { focusIng = cand.id; status.ok('Added ' + lower1(cand.name) + ' at ' + amountText(cand, q) + '. Set the amount for one portion.'); }
+      else status.bad(refusal(r, BOM_META));
+    });
+    root.addEventListener('focusout', () => { if (stale) setTimeout(() => { if (stale && !typing()) api.sync(getMi(), cur()); }, 0); });
+
+    const api = {
+      el: root,
+      // Redraws only when the list of lines changed; otherwise refreshes the amounts in place.
+      sync(mi, s) {
+        if (rendered !== keyOf(mi, s)) { if (typing()) { stale = true; return; } build(mi, s); return; }
+        lines.forEach((l, i) => { if (mi.bom[i]) l.field.sync(mi.bom[i].qty); });
+      },
+      // Removes the line fields and their pending saves.
+      destroy() { lines.forEach((l) => l.field.destroy()); lines = []; },
+    };
+    return api;
+  }
+
+  // The plain name of a menu category, or Other for one we do not know.
+  const catName = (id) => { const c = C.categories.find((x) => x.id === id); return c ? c.name : 'Other'; };
+
+  // One menu item as an editable row: name, station, category, how it is cooked, price, prep time, ingredients,
+  // archive. Returns {root, sync, destroy}.
+  function menuRow(P, mi0) {
+    const id = mi0.id;
+    // Reads this menu item fresh from the state each time.
+    const getMi = () => { const s = cur(); return (s && s.menu.find((m) => m.id === id)) || mi0; };
+    const status = statusLine();
+    const nm = mi0.name;
+
+    const nameIn = h('input', { class: 'input', type: 'text', maxlength: 60, autocomplete: 'off', value: mi0.name });
+    const nameField = SB.ui.field({ label: 'Name', control: nameIn });
+    nameIn.setAttribute('aria-label', 'Name of ' + nm);
+    const nameMeta = { name: 'The name', text: true };
+    nameIn.addEventListener('change', () => {
+      const v = nameIn.value.replace(/\s+/g, ' ').trim(), before = getMi().name;
+      if (v === before) { nameIn.value = before; nameField.setError(null); return; }
+      const r = send('updateMenuItem', { id, patch: { name: v } });
+      if (good(r)) { nameField.setError(null); status.ok('Saved. New tickets use the new name.'); }
+      else { nameIn.value = before; nameField.setError(refusal(r, nameMeta) + ' Kept "' + before + '".'); }
+    });
+
+    const zoneSel = h('select', { class: 'select' }, C.workZones.map((z) => h('option', { value: z }, C.zoneById[z].name)));
+    zoneSel.value = mi0.zone;
+    const zoneField = SB.ui.field({ label: 'Station', control: zoneSel });
+    zoneSel.setAttribute('aria-label', 'Station for ' + nm);
+    zoneSel.addEventListener('change', () => {
+      const before = getMi().zone, to = zoneSel.value;
+      const r = send('updateMenuItem', { id, patch: { zone: to } });
+      if (good(r)) { zoneField.setError(null); status.ok('Saved. New tickets send this item to ' + C.zoneById[to].name + '.'); }
+      else { zoneSel.value = before; zoneField.setError(refusal(r, { name: 'The station' })); }
+    });
+
+    // Category decides which tab the dish sits under on the order screen.
+    const catSel = h('select', { class: 'select' }, C.categories.map((c) => h('option', { value: c.id }, c.name)));
+    catSel.value = mi0.cat;
+    const catField = SB.ui.field({ label: 'Category on the order screen', control: catSel });
+    catSel.setAttribute('aria-label', 'Category for ' + nm);
+    catSel.addEventListener('change', () => {
+      const before = getMi().cat, to = catSel.value;
+      const r = send('updateMenuItem', { id, patch: { cat: to } });
+      if (good(r)) { catField.setError(null); status.ok('Saved. The order screen now lists this under ' + catName(to) + '.'); }
+      else { catSel.value = before; catField.setError(refusal(r, { name: 'The category' })); }
+    });
+
+    // How the dish is cooked: one tap finishes it, or the cook taps Start and later Done.
+    const trackSeg = SB.ui.segmented({
+      label: 'How ' + nm + ' is cooked', value: mi0.track === 'two' ? 'two' : 'one',
+      options: [{ id: 'one', label: 'One tap' }, { id: 'two', label: 'Start, then done' }],
+      // Saves the new way of cooking it; tickets already on the board keep theirs.
+      onChange: (v) => {
+        const r = send('updateMenuItem', { id, patch: { track: v } });
+        if (good(r)) status.ok(v === 'two' ? 'Saved. New tickets show Start, then Done for this dish.' : 'Saved. New tickets show one Done tap for this dish.');
+        else { trackSeg.setValue(getMi().track === 'two' ? 'two' : 'one'); status.bad(refusal(r, null)); }
+      },
+    });
+    const archChip = h('span', { class: 'od-archived' }, ico('package', 16), h('span', null, 'Archived'));
+    const archBtn = h('button', { type: 'button', class: 'btn btn-sm od-arch' });
+    archBtn.addEventListener('click', () => {
+      const to = !getMi().archived;
+      const r = send('updateMenuItem', { id, patch: { archived: to } });
+      if (good(r)) status.ok(to ? 'Archived. It can no longer be ordered, and past tickets keep it. Unarchive it any time.' : 'Unarchived. It can be ordered again.');
+      else status.bad(refusal(r, null));
+    });
+
+    const priceMeta = { name: 'The price', fmt: money };
+    const price = numField({
+      label: 'Price ($)', aria: 'Price of ' + nm, value: mi0.price, min: 0, max: 1000, step: 0.25, big: 1, meta: priceMeta,
+      // Writes the new price; the confirmation says what it changes.
+      save: (v) => {
+        const r = send('updateMenuItem', { id, patch: { price: v } });
+        return good(r) ? { ok: true, text: 'Saved. New tickets use ' + money(v) + '; tickets already on the board keep theirs.' } : { ok: false, text: refusal(r, priceMeta) };
+      },
+      // Shows the price confirmation under the row.
+      onSaved: (t) => status.ok(t),
+    });
+    // How a prep time is written in refusal messages: minutes and seconds.
+    const prepMeta = { name: 'The prep time', unit: 's', fmt: (v) => mmss(v) };
+    const prep = numField({
+      // The small reading beside the field shows the time as m:ss.
+      label: 'Prep time (seconds)', aria: 'Prep time of ' + nm, value: mi0.prepSec, min: 5, max: 3600, step: 5, big: 30, unit: 's', meta: prepMeta, read: (u) => mmss(u),
+      // Writes the prep time in seconds through the engine.
+      save: (v) => {
+        const r = send('updateMenuItem', { id, patch: { prepSec: v } });
+        return good(r) ? { ok: true, text: 'Saved. New tickets plan with ' + mmss(v) + ' for this item; tickets already on the board keep theirs.' } : { ok: false, text: refusal(r, prepMeta) };
+      },
+      // Shows the prep time confirmation under the row.
+      onSaved: (t) => status.ok(t),
+    });
+    const confSeg = SB.ui.segmented({
+      label: 'Prep time status for ' + nm, value: mi0.prepConfirmed ? 'confirmed' : 'starter',
+      options: [{ id: 'starter', label: 'Starter estimate' }, { id: 'confirmed', label: 'Confirmed' }],
+      // Marks the prep time as a starter estimate or as confirmed.
+      onChange: (v) => {
+        const r = send('updateMenuItem', { id, patch: { prepConfirmed: v === 'confirmed' } });
+        if (good(r)) status.ok(v === 'confirmed' ? 'Saved. Prep time marked as confirmed.' : 'Saved. Prep time marked as a starter estimate.');
+        else { confSeg.setValue(getMi().prepConfirmed ? 'confirmed' : 'starter'); status.bad(refusal(r, null)); }
+      },
+    });
+    const learnedEl = h('p', { class: 'od-hint od-learned', hidden: true });
+    const bom = bomBlock(id, nm, getMi, status);
+
+    const root = h('article', { class: 'od-item', dataset: { id }, 'aria-label': nm },
+      h('div', { class: 'od-item-head' },
+        nameField, zoneField, catField,
+        h('div', { class: 'od-item-actions' }, archChip, archBtn)),
+      h('div', { class: 'od-item-grid' },
+        h('div', { class: 'od-block' }, price.el, h('div', { class: 'od-lab' }, 'How it is cooked'), trackSeg, h('p', { class: 'od-hint' }, 'One tap: done when it is plated, like tea or slaw. Start, then done: the cook taps Start, and Done when it is finished, like brisket or fries.')),
+        h('div', { class: 'od-block' }, prep.el, confSeg, learnedEl),
+        h('div', { class: 'od-block od-block-bom' }, bom.el)),
+      status.el);
+
+    return {
+      root, id,
+      // Refreshes this row from the state without touching a field that has focus.
+      sync(mi, s) {
+        root.dataset.archived = mi.archived ? 'true' : 'false';
+        root.dataset.confirmed = mi.prepConfirmed ? 'true' : 'false';
+        if (doc.activeElement !== nameIn && nameIn.value !== mi.name) nameIn.value = mi.name;
+        if (doc.activeElement !== zoneSel) zoneSel.value = mi.zone;
+        if (doc.activeElement !== catSel) catSel.value = C.categories.some((c) => c.id === mi.cat) ? mi.cat : '';
+        trackSeg.setValue(mi.track === 'two' ? 'two' : 'one');
+        root.dataset.zone = mi.zone;
+        price.sync(mi.price); prep.sync(mi.prepSec);
+        confSeg.setValue(mi.prepConfirmed ? 'confirmed' : 'starter');
+        archChip.hidden = !mi.archived;
+        archBtn.replaceChildren(ico(mi.archived ? 'check' : 'ban', 18), h('span', null, mi.archived ? 'Unarchive' : 'Archive'));
+        archBtn.setAttribute('aria-label', (mi.archived ? 'Unarchive ' : 'Archive ') + mi.name);
+        const l = s.learned && s.learned[id];
+        if (l && isNum(l.est) && l.n >= 1 && mi.prepSec > 0) {
+          const diff = (l.est - mi.prepSec) / mi.prepSec;
+          learnedEl.textContent = 'Learned estimate ' + mmss(l.est) + ' from ' + l.n + ' ' + U.plural(l.n, 'timing') + (Math.abs(diff) >= 0.1 ? ': ' + Math.round(Math.abs(diff) * 100) + '% ' + (diff > 0 ? 'slower' : 'faster') + ' than the starter ' + mmss(mi.prepSec) + '.' : ', close to the starter ' + mmss(mi.prepSec) + '.');
+          learnedEl.hidden = false;
+        } else learnedEl.hidden = true;
+        bom.sync(mi, s);
+      },
+      // Saves anything waiting and clears this row's timers.
+      destroy() { price.destroy(); prep.destroy(); bom.destroy(); status.destroy(); },
+    };
+  }
+
+  // The Add a dish form: name, short name, station, category, price, prep time and how it is cooked. It sends
+  // addMenuItem and says plainly what happened. onAdded(id) lets the list jump to the new dish. Returns {el, open, close}.
+  function addDishForm(onAdded) {
+    const status = statusLine();
+    const nameIn = h('input', { class: 'input', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Brisket plate' });
+    const nameField = SB.ui.field({ label: 'Dish name', control: nameIn });
+    const shortIn = h('input', { class: 'input', type: 'text', maxlength: 24, autocomplete: 'off' });
+    const shortField = SB.ui.field({ label: 'Short name on tickets (optional)', control: shortIn, hint: 'Leave it empty to use the first 24 letters of the name.' });
+    const zoneSel = h('select', { class: 'select' }, C.workZones.map((z) => h('option', { value: z }, C.zoneById[z].name)));
+    const zoneField = SB.ui.field({ label: 'Station that cooks it', control: zoneSel });
+    const catSel = h('select', { class: 'select' }, C.categories.map((c) => h('option', { value: c.id }, c.name)));
+    const catField = SB.ui.field({ label: 'Category on the order screen', control: catSel });
+    const priceIn = h('input', { class: 'input od-add-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00' });
+    const priceField = SB.ui.field({ label: 'Price ($)', control: priceIn });
+    const minIn = h('input', { class: 'input od-add-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', value: '2', 'aria-label': 'Prep time, minutes' });
+    const secIn = h('input', { class: 'input od-add-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', value: '0', 'aria-label': 'Prep time, seconds' });
+    const prepErr = h('div', { class: 'field-error', role: 'alert', hidden: true });
+    const prepField = h('div', { class: 'field od-add-prep' }, h('div', { class: 'field-label' }, 'Prep time'), h('div', { class: 'od-add-row' }, minIn, h('span', null, 'min'), secIn, h('span', null, 'sec')),
+      h('div', { class: 'field-hint' }, 'How long the cook needs from start to plated. A guess is fine; the app learns the real time from your tickets.'), prepErr);
+    const trackSeg = SB.ui.segmented({
+      label: 'How it is cooked', value: 'two', options: [{ id: 'one', label: 'One tap' }, { id: 'two', label: 'Start, then done' }],
+      // Explains the newly chosen way of cooking in plain words.
+      onChange: () => paintTrack(),
+    });
+    const trackHint = h('p', { class: 'od-hint' });
+    // Explains the chosen way of cooking in plain words.
+    function paintTrack() { trackHint.textContent = trackSeg.getValue() === 'two' ? 'The cook taps Start when the dish begins and Done when it is finished. Use it for anything cooked on the line.' : 'The cook taps Done when it is plated. Use it for drinks, cold sides and anything with no cooking step.'; }
+    paintTrack();
+    const addBtn = btn('Add dish', { icon: 'plus', cls: 'btn-primary' });
+    addBtn.type = 'submit'; // Enter in any box sends the form too
+    const cancelBtn = btn('Close', { icon: 'x' });
+    const form = h('form', { class: 'od-add', hidden: true, 'aria-label': 'Add a dish', novalidate: '' },
+      h('h3', { class: 'od-sub' }, 'Add a dish'),
+      h('div', { class: 'od-add-grid' }, nameField, shortField, zoneField, catField, priceField, prepField),
+      h('div', { class: 'od-add-track' }, h('div', { class: 'od-lab' }, 'How it is cooked'), trackSeg, trackHint),
+      h('div', { class: 'od-add-actions' }, addBtn, cancelBtn), status.el);
+    // Clears every error line on the form.
+    const clearErrors = () => { status.clear(); [nameField, shortField, zoneField, catField, priceField].forEach((f) => f.setError(null)); prepErr.hidden = true; prepErr.replaceChildren(); };
+    // Reads the form, checks it, and sends it. Each problem shows beside its own field.
+    form.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      clearErrors();
+      const name = nameIn.value.replace(/\s+/g, ' ').trim();
+      if (!name) { nameField.setError('Type the dish name.'); nameIn.focus(); return; }
+      const rawPrice = priceIn.value.replace(/[$\s]/g, '').replace(',', '.');
+      if (!/^(\d+\.?\d{0,2}|\.\d{1,2})$/.test(rawPrice)) { priceField.setError('Type the price in dollars, like 12.50.'); priceIn.focus(); return; }
+      const price = parseFloat(rawPrice);
+      if (!/^\d{0,3}$/.test(minIn.value.trim()) || !/^\d{0,3}$/.test(secIn.value.trim())) { prepErr.replaceChildren(h('span', null, 'Type the prep time with digits only.')); prepErr.hidden = false; minIn.focus(); return; }
+      const prepSec = (parseInt(minIn.value || '0', 10) || 0) * 60 + (parseInt(secIn.value || '0', 10) || 0);
+      if (prepSec < 5 || prepSec > 3600) { prepErr.replaceChildren(h('span', null, 'Prep time has to be between 0:05 and 60:00.')); prepErr.hidden = false; minIn.focus(); return; }
+      const r = send('addMenuItem', { name, short: shortIn.value.trim(), zone: zoneSel.value, cat: catSel.value, price, prepSec, track: trackSeg.getValue() });
+      if (good(r)) {
+        status.ok('Added ' + name + '. It is on the order screen now. To track stock for it, add its ingredients in its row below.');
+        nameIn.value = ''; shortIn.value = ''; priceIn.value = '';
+        onAdded(r.info && r.info.id);
+        nameIn.focus();
+        return;
+      }
+      const key = (r.info && r.info.key) || '';
+      if (/\.name$/.test(key) && r.report === 'badPatch') { nameField.setError('There is already a dish called ' + name + '. Pick another name.'); nameIn.focus(); }
+      else if (/\.name$/.test(key)) nameField.setError('The name has to be 1 to 60 characters.');
+      else if (/\.short$/.test(key)) shortField.setError('The short name has to be 1 to 24 characters.');
+      else if (/\.price$/.test(key)) priceField.setError(refusal(r, { name: 'The price', fmt: money }));
+      else status.bad(refusal(r, null));
+    });
+    cancelBtn.addEventListener('click', () => { form.hidden = true; });
+    return {
+      el: form,
+      // Shows the form and puts the cursor in the name box.
+      open() { form.hidden = false; nameIn.focus(); },
+      // True while the form is showing.
+      isOpen: () => !form.hidden,
+      // Stops the status line timer when the page closes.
+      destroy() { status.destroy(); },
+    };
+  }
+
+  // Panel 1: filters, and one row per menu item, kept in step with the store.
+  function buildMenu(P) {
+    const pn = panel(SECTIONS[0]);
+    const filter = P.menuFilter;
+    pn.body.append(
+      para('Changes save as you make them. New tickets use the new price, prep time and ingredients; tickets already on the board keep theirs. There is no Undo for settings, so check a value before you move on.', 'od-intro'),
+      para('A prep time is a starter estimate until you have timed it on the line and marked it confirmed. Archived items cannot be ordered, and past tickets keep them.', 'od-intro'));
+
+    // Add a dish, and a one-tap way to drop the made-up starter dishes. The form opens under the buttons.
+    const addForm = addDishForm((id) => {
+      filter.status = 'active'; filter.zone = 'all'; filter.starter = false; applyFilter();
+      // The new row is made when the store tells the page; give it a moment, then show it.
+      setTimeout(() => { const row = rows.get(id); if (row) row.root.scrollIntoView({ block: 'nearest', behavior: U.prefersReducedMotion() ? 'auto' : 'smooth' }); }, 80);
+    });
+    const addOpenBtn = btn('Add a dish', { icon: 'plus', cls: 'btn-primary' });
+    addOpenBtn.addEventListener('click', () => addForm.open());
+    const starterBtn = btn('Use only my own dishes', { icon: 'ban' });
+    const starterBox = h('div', { class: 'od-starter', hidden: true, role: 'group', 'aria-label': 'Archive the starter dishes' });
+    const starterMsg = h('p', { class: 'od-p' });
+    const starterYes = btn('Archive the starter dishes', { icon: 'ban', cls: 'btn-danger' });
+    const starterNo = btn('Keep them', { icon: 'x' });
+    starterBox.append(starterMsg, h('div', { class: 'od-add-actions' }, starterYes, starterNo));
+    const starterStatus = statusLine();
+    // The starter dishes that can still be ordered: the ones that came with the app, not archived yet.
+    const liveStarters = () => { const s = cur(); return s ? s.menu.filter((m) => C.menuById[m.id] && !m.archived) : []; };
+    starterBtn.addEventListener('click', () => {
+      const n = liveStarters().length;
+      starterMsg.textContent = 'This archives the ' + n + ' made-up starter ' + U.plural(n, 'dish', 'dishes') + ' that came with the app, so only the dishes you add can be ordered. Past tickets keep them. You can unarchive any of them later.';
+      starterBox.hidden = false; starterYes.focus();
+    });
+    starterNo.addEventListener('click', () => { starterBox.hidden = true; starterBtn.focus(); });
+    starterYes.addEventListener('click', () => {
+      const list = liveStarters(); let failed = 0;
+      list.forEach((m) => { if (!good(send('updateMenuItem', { id: m.id, patch: { archived: true } }))) failed++; });
+      starterBox.hidden = true;
+      if (failed) starterStatus.bad('Archived ' + (list.length - failed) + ' of ' + list.length + ' starter dishes. ' + failed + ' could not be archived.');
+      else starterStatus.ok('Archived ' + list.length + ' starter ' + U.plural(list.length, 'dish', 'dishes') + '. Add your own with Add a dish.');
+    });
+    pn.body.append(h('div', { class: 'od-add-bar' }, addOpenBtn, starterBtn), starterBox, starterStatus.el, addForm.el);
+    P.syncs.push(() => { const n = liveStarters().length; starterBtn.hidden = n === 0; if (!n) starterBox.hidden = true; });
+    P.disposers.push(() => { addForm.destroy(); starterStatus.destroy(); });
+
+    const segStatus = SB.ui.segmented({
+      label: 'Show items', value: filter.status,
+      options: [{ id: 'active', label: 'Active', count: 0 }, { id: 'archived', label: 'Archived', count: 0 }, { id: 'all', label: 'All', count: 0 }],
+      // Changes which items are listed by status.
+      onChange: (v) => { filter.status = v; applyFilter(); },
+    });
+    const zoneSel = h('select', { class: 'select od-filter-zone', 'aria-label': 'Show one station' }, h('option', { value: 'all' }, 'All stations'), C.workZones.map((z) => h('option', { value: z }, C.zoneById[z].name)));
+    zoneSel.addEventListener('change', () => { filter.zone = zoneSel.value; applyFilter(); });
+    // Switches the filter that lists only starter estimates.
+    const starterChip = SB.ui.chip({ label: 'Starter estimates only', pressed: false, onClick: () => { filter.starter = !filter.starter; applyFilter(); } });
+    starterChip.classList.add('od-fchip');
+    const filters = h('div', { class: 'od-filters' }, segStatus, zoneSel, starterChip);
+    const list = h('div', { class: 'od-list' });
+    const emptyEl = h('div', { class: 'od-empty', hidden: true }, h('strong', null, 'No items match.'), h('span', null, ' Change the filter above to see more.'));
+    list.appendChild(emptyEl);
+    pn.body.append(filters, list);
+
+    const rows = new Map();
+    // Updates the counts and shows only the rows that match the three filters.
+    function applyFilter() {
+      const s = cur(); if (!s) return;
+      let nA = 0, nR = 0, shown = 0;
+      for (const mi of s.menu) { if (mi.archived) nR++; else nA++; }
+      segStatus.setCount('active', nA); segStatus.setCount('archived', nR); segStatus.setCount('all', nA + nR);
+      segStatus.setValue(filter.status); zoneSel.value = filter.zone;
+      starterChip.setAttribute('aria-pressed', filter.starter ? 'true' : 'false');
+      for (const mi of s.menu) {
+        const row = rows.get(mi.id); if (!row) continue;
+        const ok = (filter.status === 'all' || (filter.status === 'archived') === !!mi.archived) && (filter.zone === 'all' || mi.zone === filter.zone) && (!filter.starter || !mi.prepConfirmed);
+        row.root.hidden = !ok; if (ok) shown++;
+      }
+      emptyEl.hidden = shown > 0;
+    }
+    P.syncs.push((s) => {
+      const seen = new Set();
+      for (const mi of s.menu) {
+        seen.add(mi.id);
+        let row = rows.get(mi.id);
+        if (!row) { row = menuRow(P, mi); rows.set(mi.id, row); list.insertBefore(row.root, emptyEl); }
+        row.sync(mi, s);
+      }
+      for (const [rid, row] of rows) if (!seen.has(rid)) { row.destroy(); row.root.remove(); rows.delete(rid); }
+      applyFilter();
+    });
+    P.disposers.push(() => rows.forEach((r) => r.destroy()));
+    // Used by the headline button to jump to the unconfirmed items.
+    P.showStarter = () => { filter.status = 'active'; filter.zone = 'all'; filter.starter = true; applyFilter(); };
+    return pn;
+  }
+
+  // 2. Ingredients
+  // One ingredient as an editable row: par, 86 point, cost and, for cooked meats, the yield. Returns {root,
+  // sync, destroy}.
+  function ingRow(P, ing0) {
+    const id = ing0.id;
+    // Reads this ingredient fresh from the state each time.
+    const getIng = () => { const s = cur(); return (s && s.ingredients.find((i) => i.id === id)) || ing0; };
+    const status = statusLine();
+    const pieces = ing0.unit === 'ea';
+    const nm = ing0.name;
+    const fields = [];
+    // Saves one ingredient change through the engine and returns {ok, text} for the field.
+    const mkPatch = (patch, okText, meta) => {
+      const r = send('updateIngredient', { id, patch });
+      return good(r) ? { ok: true, text: okText } : { ok: false, text: refusal(r, meta) };
+    };
+    const parMeta = { name: 'Par', unit: pieces ? 'pieces' : 'g' };
+    const thrMeta = { name: 'The 86 point', unit: pieces ? 'pieces' : 'g' };
+    const par = numField({
+      label: 'Par (opening stock)', aria: 'Par of ' + nm, value: ing0.parG, min: 0, max: 1e7, step: pieces ? 1 : 100, big: pieces ? 10 : 1000, unit: pieces ? 'pieces' : 'g', meta: parMeta,
+      read: pieces ? null : (u) => U.fmtG(u),
+      // Par saves through the engine; the line under the row confirms it.
+      save: (v) => mkPatch({ parG: v }, 'Saved. Par is ' + amountText(ing0, v) + '. After you reset live data and keep settings, opening stock starts at this amount.', parMeta), onSaved: (t) => status.ok(t),
+    });
+    const thr = numField({
+      label: '86 point', aria: '86 point of ' + nm, value: ing0.thresholdG, min: 0, max: 1e7, step: pieces ? 1 : 50, big: pieces ? 10 : 500, unit: pieces ? 'pieces' : 'g', meta: thrMeta,
+      read: pieces ? null : (u) => U.fmtG(u), hint: 'Items that use this are 86 at or below this amount.',
+      // The 86 point saves the same way.
+      save: (v) => mkPatch({ thresholdG: v }, 'Saved. Items using ' + lower1(nm) + ' go 86 at ' + amountText(ing0, v) + ' or less.', thrMeta), onSaved: (t) => status.ok(t),
+    });
+    fields.push(par, thr);
+    const costKey = pieces ? 'costEach' : 'costPerKg';
+    const costMeta = { name: pieces ? 'The cost each' : 'The cost per kg', fmt: money };
+    const cost = numField({
+      label: pieces ? 'Cost each ($)' : 'Raw cost per kg ($)', aria: (pieces ? 'Cost each of ' : 'Cost per kg of ') + nm, value: ing0[costKey] || 0, min: 0, max: 10000, step: pieces ? 0.05 : 0.25, big: pieces ? 0 : 1, meta: costMeta,
+      // The cost saves the same way, as dollars per kg or each.
+      save: (v) => mkPatch({ [costKey]: v }, 'Saved. Costs and margins use ' + money(v) + (pieces ? ' each' : ' per kg') + ' from now on.', costMeta), onSaved: (t) => status.ok(t),
+    });
+    fields.push(cost);
+
+    let yieldBlock = null, yField = null, yConf = null;
+    if (ing0.tcs && isNum(ing0.yield)) {
+      // Shows a yield fraction as a percentage in messages.
+      const yMeta = { name: 'The yield', unit: '%', toUi: (v) => v * 100 };
+      yField = numField({
+        label: 'Static yield (cooked weight as a share of raw)', aria: 'Static yield of ' + nm, value: ing0.yield, min: 5, max: 300, step: 1, big: 5, unit: '%', meta: yMeta,
+        // The field shows a percentage; the engine stores a fraction.
+        toUi: (v) => Math.round(v * 10000) / 100, fromUi: (u) => Math.round(u * 100) / 10000,
+        // A yield saves as a fraction; the confirmation names the percentage.
+        save: (v) => mkPatch({ yield: v }, 'Saved. New batches use ' + num(v * 100, 1) + '% cooked yield.', yMeta), onSaved: (t) => status.ok(t),
+      });
+      yConf = SB.ui.segmented({
+        label: 'Yield status for ' + nm, value: ing0.yieldConfirmed ? 'confirmed' : 'starter',
+        options: [{ id: 'starter', label: 'Starter estimate' }, { id: 'confirmed', label: 'Confirmed' }],
+        // Marks the yield as a starter estimate or as confirmed.
+        onChange: (v) => {
+          const r = send('updateIngredient', { id, patch: { yieldConfirmed: v === 'confirmed' } });
+          if (good(r)) status.ok(v === 'confirmed' ? 'Saved. Yield marked as confirmed.' : 'Saved. Yield marked as a starter estimate.');
+          else { yConf.setValue(getIng().yieldConfirmed ? 'confirmed' : 'starter'); status.bad(refusal(r, null)); }
+        },
+      });
+      fields.push(yField);
+      const thermal = ing0.thermal ? SB.engine.thermalYield({}) : null;
+      yieldBlock = h('div', { class: 'od-block' }, yField.el, yConf,
+        ing0.thermal ? hintLine(nm + ' is costed with the thermal model (about ' + num(thermal.hotPct, 1) + '% at ' + thermal.endpointC + ' C and ' + thermal.holdH + ' h hold). This static number is what the Sales and money page compares it against.') : null);
+    }
+
+    const holdBits = [];
+    if (ing0.tcs) { holdBits.push(chip(ing0.hold === 'cold' ? 'Cold hold' : 'Hot hold', ing0.hold === 'cold' ? 'info' : 'warn', ing0.hold === 'cold' ? 'snow' : 'flame')); if (isNum(ing0.maxHoldH)) holdBits.push(chip('Max hold ' + ing0.maxHoldH + ' h', 'info', 'clock')); }
+    else holdBits.push(chip(pieces ? 'Counted in pieces' : 'Not temperature controlled', 'info'));
+    const noteEl = ing0.note ? hintLine(kgNote(ing0.note)) : null;
+
+    const root = h('article', { class: 'od-item od-ing', dataset: { id }, 'aria-label': nm },
+      h('div', { class: 'od-ing-head' }, h('h3', { class: 'od-ing-name' }, nm), h('div', { class: 'od-chips' }, holdBits)),
+      h('div', { class: 'od-item-grid od-ing-grid' },
+        h('div', { class: 'od-block' }, par.el),
+        h('div', { class: 'od-block' }, thr.el),
+        yieldBlock,
+        h('div', { class: 'od-block' }, cost.el)),
+      noteEl, status.el);
+    return {
+      root, id,
+      // Refreshes the fields from the state without disturbing a focused one.
+      sync(ing) {
+        par.sync(ing.parG); thr.sync(ing.thresholdG); cost.sync(ing[costKey] || 0);
+        if (yField) { yField.sync(ing.yield); yConf.setValue(ing.yieldConfirmed ? 'confirmed' : 'starter'); }
+        root.dataset.confirmed = ing.yieldConfirmed ? 'true' : 'false';
+      },
+      // Saves anything waiting and clears this row's timers.
+      destroy() { fields.forEach((f) => f.destroy()); status.destroy(); },
+    };
+  }
+
+  // Panel 2: one row per ingredient, kept in step with the store.
+  function buildIngredients(P) {
+    const pn = panel(SECTIONS[1],
+      'Par is the stock you open with. When stock falls to the 86 point or below, every menu item that uses it goes 86. Weights are grams and kilograms; counted items such as buns and cornbread are pieces. Cooked yield is cooked weight divided by raw weight, and stays a starter estimate until you confirm it from weighed batches. Costs are starter numbers too: replace them with your supplier invoices. Changes save as you make them and apply from now on.');
+    const list = h('div', { class: 'od-list' });
+    pn.body.appendChild(list);
+    const rows = new Map();
+    P.syncs.push((s) => {
+      const seen = new Set();
+      for (const ing of s.ingredients) {
+        seen.add(ing.id);
+        let row = rows.get(ing.id);
+        if (!row) { row = ingRow(P, ing); rows.set(ing.id, row); list.appendChild(row.root); }
+        row.sync(ing);
+      }
+      for (const [rid, row] of rows) if (!seen.has(rid)) { row.destroy(); row.root.remove(); rows.delete(rid); }
+    });
+    P.disposers.push(() => rows.forEach((r) => r.destroy()));
+    return pn;
+  }
+
+  // 3. Ticket time limits by channel
+  function buildTimes(P) {
+    const pn = panel(SECTIONS[2],
+      'A ticket turns amber once it has been open this long, and shows as overdue after the second time. Times are minutes and seconds; change them in seconds. The board measures every open ticket against the current limits, so a change shows on the board straight away.');
+    // The channel's current amber and overdue times from the settings.
+    const times = (chId) => SB.engine.channelThresholds((cur() || {}).settings, chId);
+    const list = h('div', { class: 'od-list' });
+    pn.body.appendChild(list);
+    const rows = C.channels.map((ch) => {
+      const wk = 'channels.' + ch.id + '.warnSec', bk = 'channels.' + ch.id + '.breachSec';
+      const status = statusLine();
+      const preview = h('p', { class: 'od-preview' });
+      let warnF, breachF;
+      // Rewrites the live preview sentence from the two fields as they are now.
+      const paint = () => {
+        const w = warnF.stepper.getValue(), b = breachF.stepper.getValue();
+        preview.textContent = 'A ' + ch.name.toLowerCase() + ' ticket turns amber at ' + mmss(w) + ' and overdue at ' + mmss(b) + '.';
+      };
+      // Cross-field wording: amber has to come before overdue, so the person knows which to change first.
+      const wMeta = { name: ch.name + ' amber time', fmt: mmss, words: (info) => (info.key !== wk ? 'Amber has to come before overdue (' + mmss(times(ch.id).breachSec) + '). Raise the overdue time first, then this one.' : null) };
+      // The mirror wording for the overdue field: it has to come after amber.
+      const bMeta = { name: ch.name + ' overdue time', fmt: mmss, words: (info) => (info.key === bk && info.min > 60 ? 'Overdue has to come after amber (' + mmss(times(ch.id).warnSec) + '). Use ' + mmss(info.min) + ' or later.' : null) };
+      META[wk] = wMeta; META[bk] = bMeta;
+      const t = times(ch.id);
+      warnF = numField({
+        // Both time fields show m:ss beside the seconds and repaint the preview while typing.
+        label: 'Turns amber at', aria: ch.name + ' turns amber at (seconds)', value: t.warnSec, min: 30, max: 7200, step: 15, big: 60, unit: 's', meta: wMeta, read: (u) => mmss(u), onInput: paint,
+        // They save as channel settings and refresh the preview once accepted.
+        save: (v) => saveSetting(wk, v, 'Saved. ' + ch.name + ' tickets turn amber at ' + mmss(v) + '.', wMeta), onSaved: (x) => { status.ok(x); paint(); },
+      });
+      breachF = numField({
+        // The overdue field behaves like the amber field above.
+        label: 'Overdue at', aria: ch.name + ' overdue at (seconds)', value: t.breachSec, min: 60, max: 10800, step: 15, big: 60, unit: 's', meta: bMeta, read: (u) => mmss(u), onInput: paint,
+        // It saves the overdue time the same way.
+        save: (v) => saveSetting(bk, v, 'Saved. ' + ch.name + ' tickets show overdue at ' + mmss(v) + '.', bMeta), onSaved: (x) => { status.ok(x); paint(); },
+      });
+      paint();
+      const root = h('article', { class: 'od-item od-chan', dataset: { channel: ch.id }, 'aria-label': ch.name },
+        h('div', { class: 'od-ing-head' }, h('h3', { class: 'od-ing-name' }, ico(ch.icon, 20), h('span', null, ch.name))),
+        h('div', { class: 'od-item-grid od-chan-grid' }, h('div', { class: 'od-block' }, warnF.el), h('div', { class: 'od-block' }, breachF.el)),
+        preview, status.el);
+      list.appendChild(root);
+      return { ch, warnF, breachF, paint, status };
+    });
+    const resetStatus = statusLine();
+    const resetBtn = btn('Reset times to starter values', { icon: 'refresh', cls: 'btn-sm' });
+    resetBtn.addEventListener('click', () => {
+      const patch = { channels: {} };
+      C.channels.forEach((ch) => { patch.channels[ch.id] = { warnSec: ch.warnSec, breachSec: ch.breachSec }; });
+      const r = send('updateSettings', { patch });
+      if (r.report === 'ok') resetStatus.ok('Saved. Every channel is back to the starter times.');
+      else if (r.report === 'nothingToDo') resetStatus.ok('Already at the starter times.');
+      else resetStatus.bad(refusal(r, null));
+    });
+    pn.body.append(h('div', { class: 'od-actions' }, resetBtn), resetStatus.el);
+    P.syncs.push((s) => rows.forEach((r) => { const t = SB.engine.channelThresholds(s.settings, r.ch.id); r.warnF.sync(t.warnSec); r.breachF.sync(t.breachSec); r.paint(); }));
+    P.disposers.push(() => rows.forEach((r) => { r.warnF.destroy(); r.breachF.destroy(); r.status.destroy(); }), () => resetStatus.destroy());
+    return pn;
+  }
+
+  // 4. Meal pacing.
+  // Ranges mirror the engine's SET_SCHEMA.pacing; the e2e test checks both ends of each range against
+  // SB.engine.apply so a drift fails loudly.
+  const PACING = [
+    { key: 'floorSec', name: 'Shortest prep time', min: 1, max: 600, step: 1, big: 15, unit: 's', mean: 'No item is planned for less time than this, even if its prep estimate is shorter.' },
+    { key: 'qtyFactor', name: 'Extra time per extra portion', min: 0, max: 200, step: 5, big: 25, unit: '%', pct: true, mean: 'Each extra portion on the same line adds this much to its prep time.' },
+    { key: 'qtyCap', name: 'Most a big line can grow', min: 1, max: 10, step: 0.5, unit: '×', mean: 'A line is never planned for more than this many times one portion\'s prep time.' },
+    { key: 'learnK', name: 'Learning strength', min: 0, max: 50, step: 1, unit: 'timings', mean: 'How many real timings it takes to count as much as your starter estimate. Higher learns more slowly; 0 trusts the line from the first timing.' },
+    { key: 'minFactor', name: 'Learned time never below', min: 0.1, max: 1, step: 0.05, unit: '× starter', mean: 'The learned prep time cannot fall under this share of your starter estimate.' },
+    { key: 'maxFactor', name: 'Learned time never above', min: 1, max: 10, step: 0.25, unit: '× starter', mean: 'The learned prep time cannot rise over this many times your starter estimate.' },
+    { key: 'outlierFactor', name: 'Trim a very long timing at', min: 1, max: 20, step: 0.5, unit: '× starter', mean: 'A timing longer than this is cut back to this length before it is learned from, so one forgotten tap cannot skew the estimate.' },
+  ];
+
+  // Panel 4: the on/off switch and seven numbers, each inside the engine's range.
+  function buildPacing(P) {
+    const pn = panel(SECTIONS[3], 'Meal pacing times all the items for a plate to finish together: the slowest item starts first, and quicker items are held back until it is time to start them. Rush tickets skip pacing and send every item to its station at once.');
+    const status = statusLine();
+    const on = !!((cur() || {}).settings.pacing || {}).enabled;
+    const tog = SB.ui.toggle({
+      label: 'Pace tickets', checked: on,
+      // Turns pacing on or off; tickets already on the board keep the plan they were made with.
+      onChange: (v) => {
+        const r = send('updateSettings', { patch: { pacing: { enabled: v } } });
+        if (good(r)) status.ok(v ? 'Pacing is on. New tickets are paced; tickets already on the board keep the plan they were made with.' : 'Pacing is off. New tickets send every item to its station at once.');
+        else { tog.setValue(!v); status.bad(refusal(r, { name: 'Pacing' })); }
+      },
+    });
+    tog.id = 'od-pacing-toggle';
+    pn.body.append(h('div', { class: 'od-toggle-row' }, tog), status.el);
+
+    const grid = h('div', { class: 'od-fgrid' });
+    const fields = PACING.map((p) => {
+      const path = 'pacing.' + p.key;
+      const toUi = p.pct ? (v) => Math.round(v * 100) : undefined;
+      const fromUi = p.pct ? (u) => Math.round(u) / 100 : undefined;
+      const meta = { name: p.name, unit: p.unit, toUi };
+      META[path] = meta;
+      const f = numField({
+        label: p.name, value: ((cur() || {}).settings.pacing || {})[p.key], min: p.min, max: p.max, step: p.step, big: p.big, unit: p.unit, meta, toUi, fromUi,
+        hint: p.mean + ' Allowed: ' + num(p.min) + ' to ' + num(p.max) + (p.unit === '%' || p.unit === '\u00d7' ? p.unit : ' ' + p.unit) + '.',
+        // Each pacing number saves as a settings patch and says it applies to new tickets.
+        save: (v) => saveSetting(path, v, 'Saved. ' + p.name + ' is now ' + showVal(meta, v) + '. New tickets use it.', meta), onSaved: (t) => status.ok(t),
+      });
+      grid.appendChild(f.el);
+      return { f, p };
+    });
+    const resetBtn = btn('Reset to starter values', { icon: 'refresh', cls: 'btn-sm' });
+    resetBtn.addEventListener('click', () => {
+      const patch = { pacing: {} };
+      PACING.forEach((p) => { patch.pacing[p.key] = C.pacing[p.key]; });
+      const r = send('updateSettings', { patch });
+      if (r.report === 'ok') status.ok('Saved. The pacing numbers are back to the starter values. The on/off switch is unchanged.');
+      else if (r.report === 'nothingToDo') status.ok('Already at the starter values.');
+      else status.bad(refusal(r, null));
+    });
+    pn.body.append(grid, h('div', { class: 'od-actions' }, resetBtn));
+    P.syncs.push((s) => { tog.setValue(!!s.settings.pacing.enabled); fields.forEach(({ f, p }) => f.sync(s.settings.pacing[p.key])); });
+    P.disposers.push(() => fields.forEach(({ f }) => f.destroy()), () => status.destroy());
+    return pn;
+  }
+
+  // 5. Food safety limits (only inside SB.config.safetyBounds; the engine refuses the rest and names the key)
+  // Safety fields: settings key, label, unit, step, big step (0 = none), whether the legal limit is a minimum or a
+  // maximum, and what it means. The allowed range comes from SB.config.safetyBounds.
+  const SAFETY_FIELDS = [
+    { key: 'hotHoldF', name: 'Hot hold temperature', unit: '°F', step: 1, big: 5, legal: 'min', mean: 'Hot food has to stay at or above this.' },
+    { key: 'coldHoldF', name: 'Cold hold temperature', unit: '°F', step: 1, big: 0, legal: 'max', mean: 'Cold food has to stay at or below this.' },
+    { key: 'reheatF', name: 'Reheat to', unit: '°F', step: 1, big: 5, legal: 'min', mean: 'A reheated batch has to reach this reading.' },
+    { key: 'belowHotGraceH', name: 'Time allowed below hot hold', unit: 'hours', step: 0.5, legal: 'max', mean: 'Food can sit below hot hold this long before it must be thrown out. A reheat is only allowed inside this window.' },
+    { key: 'aboveColdGraceH', name: 'Time allowed above cold hold', unit: 'hours', step: 0.5, legal: 'max', mean: 'Cold food can sit above cold hold this long before it must be thrown out.' },
+    { key: 'defaultMaxHoldH', name: 'Longest time in the hold cabinet', unit: 'hours', step: 0.5, mean: 'No batch stays in the cabinet longer than this, or its own limit if that is shorter.' },
+    { key: 'tempCheckEveryMin', name: 'Temperature check every', unit: 'min', step: 5, mean: 'A temperature reading is due this often for every batch.' },
+    { key: 'sanitizeEveryH', name: 'Sanitize food-contact surfaces every', unit: 'hours', step: 0.5, legal: 'max', mean: 'The sanitize timer on the line counts down from this.' },
+  ];
+  // Cooling fields have no entry in safetyBounds, so they carry their own range (test group 15 checks it against
+  // the engine).
+  const COOLING_FIELDS = [
+    { key: 'cooling.stage1ToF', name: 'First cooling stage: cool to', unit: '°F', min: 41, max: 70, step: 1, mean: 'Hot food has to fall to this temperature in the first stage.' },
+    { key: 'cooling.stage1H', name: 'First cooling stage: within', unit: 'hours', min: 0.5, max: 2, step: 0.5, mean: 'How long the first stage may take.' },
+    { key: 'cooling.totalH', name: 'Total cooling time', unit: 'hours', min: 1, max: 6, step: 0.5, mean: 'Food has to be fully cooled within this time from the start, and longer than the first stage.' },
+    { key: 'cooling.finalF', name: 'Cool all the way to', unit: '°F', min: 33, max: 41, step: 1, mean: 'The final cooling target.' },
+  ];
+  // The legal reason shown under a field and added to its refusal.
+  const LEGAL_NOTE = {
+    hotHoldF: 'Smokebox never lets hot hold go below 135\u00a0°F: that is the food-code minimum.',
+    reheatF: 'A reheat target below 165 °F is not allowed: that is the food-code minimum.',
+    coldHoldF: 'Cold hold cannot go above 41 °F: that is the food-code maximum.',
+    belowHotGraceH: '2 hours is the food-code maximum.', aboveColdGraceH: '4 hours is the food-code maximum.', sanitizeEveryH: '4 hours is the food-code maximum.',
+  };
+
+  // Panel 5: food-safety limits, always inside the legal bounds, with the legal note shown.
+  function buildSafety(P) {
+    const pn = panel(SECTIONS[4]);
+    pn.body.append(
+      h('p', { class: 'od-safetyline' }, ico('shield-check', 20), h('span', null, C.safetyLine)),
+      para('Smokebox never lets hot hold go below 135\u00a0°F, and it refuses any limit outside the range shown under each field, naming the one that is wrong. These limits drive the hold cabinet, the temperature checks and the sanitize timer. A change applies from the next check on; batches already in the cabinet are re-checked against it.', 'od-intro'));
+    const status = statusLine();
+    // Builds one safety field from its spec and the bounds in the config. Returns {f, path}.
+    const mk = (spec, path, legalKey) => {
+      const bounds = C.safetyBounds[spec.key];
+      const lo = spec.min != null ? spec.min : bounds[0], hi = spec.max != null ? spec.max : bounds[1];
+      const unitText = spec.unit === '°F' ? ' °F' : ' ' + spec.unit;
+      const legalNote = LEGAL_NOTE[legalKey];
+      const meta = { name: spec.name, unit: spec.unit, legalNote };
+      // Cross-field wording: the first cooling stage has to be shorter than the total.
+      if (path === 'safety.cooling.stage1H') meta.words = (info) => (info.key !== path ? 'The first stage has to be shorter than the total cooling time (' + num(((cur() || {}).settings.safety.cooling || {}).totalH) + ' hours). Raise the total first.' : null);
+      // Cross-field wording: the total cooling time has to be longer than the first stage.
+      if (path === 'safety.cooling.totalH') meta.words = (info) => (info.min > lo ? 'The total cooling time has to be longer than the first stage (' + num(((cur() || {}).settings.safety.cooling || {}).stage1H) + ' hours): ' + num(info.min) + ' hours or more.' : null);
+      META[path] = meta;
+      const legalWord = spec.legal === 'min' ? ' Legal minimum ' + lo + unitText + '.' : spec.legal === 'max' ? ' Legal maximum ' + hi + unitText + '.' : '';
+      const start = getPath((cur() || {}).settings, path);
+      const f = numField({
+        label: spec.name, value: start, min: lo, max: hi, step: spec.step, big: spec.big || 0, unit: spec.unit, meta, hint: spec.mean + ' Allowed: ' + num(lo) + ' to ' + num(hi) + unitText + '.' + legalWord,
+        // Limits save as settings; the engine enforces the legal bounds and names the field it refused.
+        save: (v) => saveSetting(path, v, 'Saved. ' + spec.name + ' is now ' + num(v) + unitText + '.', meta), onSaved: (t) => status.ok(t),
+      });
+      return { f, path };
+    };
+    const gridA = h('div', { class: 'od-fgrid' }), gridB = h('div', { class: 'od-fgrid' });
+    const all = [];
+    SAFETY_FIELDS.forEach((sp) => { const x = mk(sp, 'safety.' + sp.key, sp.key); gridA.appendChild(x.f.el); all.push(x); });
+    COOLING_FIELDS.forEach((sp) => { const x = mk(sp, 'safety.' + sp.key, null); gridB.appendChild(x.f.el); all.push(x); });
+    pn.body.append(status.el, gridA, sub('Cooling stages'), para('Cooked food that is not going into the cabinet has to be cooled in two stages.', 'od-hint'), gridB);
+    P.syncs.push((s) => all.forEach(({ f, path }) => f.sync(getPath(s.settings, path))));
+    P.disposers.push(() => all.forEach(({ f }) => f.destroy()), () => status.destroy());
+    return pn;
+  }
+
+  // Panel 6: set, change or remove the manager PIN, with an honest note that it is not real security.
+  function buildPin(P) {
+    const pn = panel(SECTIONS[5]);
+    pn.body.append(
+      para('This keeps line cooks out of the back office. It is not real security: anyone with the file or the device can read the data.', 'od-intro'),
+      para('After you leave the back office it stays open for 2 minutes without asking, so a quick return does not need the PIN. A backup file contains the PIN lock too, so restoring a backup also restores its PIN.', 'od-hint'));
+    const stateEl = h('p', { class: 'od-pinstate', role: 'status' });
+    const actions = h('div', { class: 'od-actions' });
+    const formHost = h('div', { class: 'od-pinhost' });
+    pn.body.append(stateEl, actions, formHost);
+    let mode = null;
+
+    // True when a PIN is set; false if the shell cannot say.
+    const hasPin = () => { try { return !!(SB.shell && SB.shell.hasPin && SB.shell.hasPin()); } catch (e) { return false; } };
+    // Builds a four-digit PIN input that drops anything that is not a digit.
+    const mkPin = (label) => {
+      const input = h('input', { class: 'input od-pin-in', type: 'password', inputmode: 'numeric', pattern: '[0-9]*', maxlength: 4, autocomplete: 'off', spellcheck: 'false' });
+      input.addEventListener('input', () => { const v = input.value.replace(/\D/g, '').slice(0, 4); if (v !== input.value) input.value = v; });
+      const field = SB.ui.field({ label, control: input, hint: '4 digits' });
+      return { input, field };
+    };
+    // Closes the PIN form and shows the buttons again.
+    function closeForm() { mode = null; U.clear(formHost); paint(); }
+    // Opens the form for setting, changing or removing the PIN. The shell checks and stores the PIN.
+    function openForm(m) {
+      mode = m; U.clear(formHost);
+      const cur0 = m !== 'set' ? mkPin('Current PIN') : null;
+      const n1 = m !== 'clear' ? mkPin('New PIN') : null;
+      const n2 = m !== 'clear' ? mkPin('Type the new PIN again') : null;
+      const err = h('div', { class: 'od-ferr', role: 'alert', hidden: true });
+      // Shows a message at the bottom of the PIN form.
+      const showErr = (t) => { err.replaceChildren(ico('alert-circle', 16), h('span', null, t)); err.hidden = false; };
+      const submit = btn(m === 'set' ? 'Set PIN' : m === 'change' ? 'Change PIN' : 'Remove PIN', { icon: 'lock', cls: m === 'clear' ? 'btn-danger' : 'btn-primary' });
+      submit.type = 'submit';
+      const cancel = btn('Cancel', { onClick: closeForm });
+      const form = h('form', { class: 'od-pinform', novalidate: true, 'aria-label': m === 'set' ? 'Set a PIN' : m === 'change' ? 'Change the PIN' : 'Remove the PIN' },
+        cur0 && cur0.field, n1 && n1.field, n2 && n2.field, err, h('div', { class: 'od-actions' }, submit, cancel));
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        [cur0, n1, n2].forEach((x) => x && x.field.setError(null)); err.hidden = true;
+        if (cur0) {
+          if (!/^\d{4}$/.test(cur0.input.value)) { cur0.field.setError('Enter the current 4-digit PIN.'); cur0.input.focus(); return; }
+          let ok = false;
+          try { ok = await SB.shell.checkPin(cur0.input.value); } catch (e) { ok = false; }
+          if (!ok) { cur0.field.setError('That is not the current PIN. Nothing was changed.'); cur0.input.value = ''; cur0.input.focus(); return; }
+        }
+        let pin = null;
+        if (m !== 'clear') {
+          if (!/^\d{4}$/.test(n1.input.value)) { n1.field.setError('Use exactly 4 digits.'); n1.input.focus(); return; }
+          if (n1.input.value !== n2.input.value) { n2.field.setError('The two entries do not match. Type the same 4 digits twice.'); n2.input.focus(); return; }
+          pin = n1.input.value;
+        }
+        let res;
+        try { res = await SB.shell.setPin(pin); } catch (e) { res = { ok: false, report: 'error' }; }
+        if (res && res.ok) {
+          closeForm();
+          SB.ui.toast(pin ? (m === 'set' ? 'PIN set. The back office will ask for it next time.' : 'PIN changed. The back office will ask for the new one next time.') : 'PIN removed. The back office opens without asking.', { tone: 'ok' });
+        } else if (res && res.report === 'nothingToDo') showErr('That is already the PIN. Nothing was changed.');
+        else showErr((res && res.message) || (res && res.report && SB.engine.describe(res.report, {}, (cur() || {}).settings)) || 'The PIN could not be saved. Try again.');
+      });
+      formHost.appendChild(form);
+      actions.hidden = true;
+      (cur0 || n1).input.focus();
+    }
+    // Redraws the PIN state text and the buttons that fit it.
+    function paint() {
+      const has = hasPin();
+      stateEl.textContent = has ? 'A PIN is set. The back office asks for it when it opens.' : 'No PIN is set. Anyone who opens the back office sees everything.';
+      stateEl.dataset.tone = has ? 'ok' : 'warn';
+      if (mode) { actions.hidden = true; return; }
+      actions.hidden = false;
+      actions.replaceChildren();
+      // Change and Remove open the form; both ask for the current PIN first.
+      if (has) actions.append(btn('Change PIN', { icon: 'lock', onClick: () => openForm('change') }), btn('Remove PIN', { icon: 'unlock', onClick: () => openForm('clear') }));
+      else actions.append(btn('Set a PIN', { icon: 'lock', cls: 'btn-primary', onClick: () => openForm('set') }));
+    }
+    P.syncs.push(() => { if (mode && (mode === 'set') === hasPin()) { closeForm(); return; } paint(); }); // a PIN set or cleared in another tab invalidates an open form
+    paint();
+    return pn;
+  }
+
+  // Panel 7: themes, text size, sound and service hours.
+  function buildLook(P) {
+    const pn = panel(SECTIONS[6], 'Display choices are remembered on this device only. The floor and the back office have their own light and dark themes.');
+    // Builds the two options of a two-way switch, and one labelled switch with its hint.
+    const themeOpts = (a, b) => [{ id: a[0], label: a[1] }, { id: b[0], label: b[1] }];
+    const mkSeg = (label, hint, opts, get, set) => {
+      // Applies the choice and tells screen readers what changed.
+      const seg = SB.ui.segmented({ label, options: opts, value: get(), onChange: (v) => { set(v); SB.ui.announce(label + ': ' + v); } });
+      const lid = U.uid('odl');
+      const wrap = h('div', { class: 'od-setting' }, h('div', { class: 'od-lab', id: lid }, label), seg, hint ? h('p', { class: 'od-hint' }, hint) : null);
+      seg.setAttribute('aria-labelledby', lid);
+      return { wrap, seg, get };
+    };
+    const segs = [
+      mkSeg('Back office theme', 'Ember is dark and warm, Paper is light. This page and every chart follow it.', themeOpts(['ember', 'Ember'], ['paper', 'Paper']), () => SB.theme.office(), (v) => SB.theme.setOffice(v)),
+      mkSeg('Line theme', 'Day is the anti-glare parchment for bright kitchens, Night is for a dim prep corner.', themeOpts(['day', 'Day'], ['night', 'Night']), () => SB.theme.get(), (v) => SB.theme.set(v)),
+      mkSeg('Text size', 'Large makes all text about 20% bigger on the line and in the back office.', themeOpts(['normal', 'Normal'], ['large', 'Large']), () => SB.theme.textSize(), (v) => SB.theme.setTextSize(v)),
+    ];
+    const status = statusLine();
+    const hasSound = !!(SB.floor && typeof SB.floor.setSound === 'function');
+    // Reads the floor's sound flag; false if the floor cannot say.
+    const soundNow = () => { try { return !!(SB.floor && typeof SB.floor.sound === 'function' && SB.floor.sound()); } catch (e) { return false; } };
+    const sound = hasSound ? SB.ui.toggle({
+      label: 'Sound on the line', checked: soundNow(),
+      // Switches the sound; a failure puts the switch back and says so.
+      onChange: (v) => {
+        try { SB.floor.setSound(v); status.ok(v ? 'Sound is on. You should have heard a chime; alert sounds play for new and overdue tickets.' : 'Sound is off.'); }
+        catch (e) { sound.setValue(!v); status.bad('Could not change the sound. Reload and try again.'); }
+      },
+    }) : null;
+    const grid = h('div', { class: 'od-settings' }, segs.map((x) => x.wrap), sound ? h('div', { class: 'od-setting' }, sound, h('p', { class: 'od-hint' }, 'A chime for each new ticket. Needs speakers or headphones on this device. It is remembered on this device only.')) : null, status.el);
+    pn.body.appendChild(grid);
+
+    pn.body.appendChild(sub('Service hours'));
+    pn.body.appendChild(para('The charts and the sell-out clock measure against these hours. Use whole hours on the 24-hour clock; a closing time past 24 means after midnight.', 'od-hint'));
+    const sst = statusLine();
+    const hours = [
+      { key: 'dayStartHour', name: 'Service day starts at', min: 0, max: 8, mean: 'A sale rung up before this hour counts toward the day before. A 12:45 am sale still belongs to last night.' },
+      { key: 'openHour', name: 'Opens at', min: 0, max: 23, mean: 'The first hour of service.' },
+      { key: 'closeHour', name: 'Closes at', min: 1, max: 30, mean: 'The last hour of service. 25 means 1 am the next day.' },
+    ];
+    const hgrid = h('div', { class: 'od-fgrid' });
+    const hf = hours.map((p) => {
+      const path = 'service.' + p.key;
+      // Shows an hour as clock text in refusal messages.
+      const meta = { name: p.name, fmt: (v) => hourWords(v) };
+      // Cross-field wording: opening has to be before closing, and closing after opening.
+      if (p.key === 'openHour') meta.words = (info) => (info.key !== path ? 'Opening has to be before closing (' + hourWords((cur() || {}).settings.service.closeHour) + '). Move the closing time first.' : null);
+      if (p.key === 'closeHour') meta.words = (info) => (info.min > p.min ? 'Closing has to be after opening (' + hourWords((cur() || {}).settings.service.openHour) + '): ' + hourWords(info.min) + ' or later.' : null);
+      META[path] = meta;
+      const f = numField({
+        // Each hour field shows the clock time beside the number.
+        label: p.name, value: (cur() || {}).settings.service[p.key], min: p.min, max: p.max, step: 1, unit: 'h', meta, read: (u) => hourWords(u), hint: p.mean,
+        // Service hours save as settings and confirm in words.
+        save: (v) => saveSetting(path, v, 'Saved. ' + p.name + ' ' + hourWords(v) + '.', meta), onSaved: (t) => sst.ok(t),
+      });
+      hgrid.appendChild(f.el);
+      return { f, p };
+    });
+    pn.body.append(hgrid, sst.el);
+
+    // Sales tax: one rate that is added to every order when it is paid.
+    pn.body.appendChild(sub('Sales tax'));
+    pn.body.appendChild(para('Added on top of the food when an order is paid, and shown in Takings. Leave it at 0 if your menu prices already include tax, and ask your tax office for the right rate.', 'od-hint'));
+    const tst = statusLine();
+    // How a tax rate is written in a refusal message, like 6.5%.
+    const taxFmt = (v) => v + '%';
+    const taxMeta = { name: 'Sales tax', fmt: taxFmt };
+    META['service.taxRatePct'] = taxMeta;
+    const taxF = numField({
+      label: 'Sales tax rate', value: ((cur() || {}).settings.service.taxRatePct) || 0, min: 0, max: 20, step: 0.25, unit: '%', meta: taxMeta,
+      // The reading beside the box says whether any tax is added.
+      read: (u) => (u > 0 ? 'added to every order' : 'no tax added'),
+      // The rate saves as a setting and confirms in words.
+      save: (v) => saveSetting('service.taxRatePct', v, v > 0 ? 'Saved. Orders now add ' + v + '% sales tax.' : 'Saved. Orders add no sales tax.', taxMeta), onSaved: (t) => tst.ok(t),
+    });
+    pn.body.append(h('div', { class: 'od-fgrid' }, taxF.el), tst.el);
+
+    // Re-reads the theme choices when another tab or the shell changes them.
+    const themeSync = () => segs.forEach((x) => x.seg.setValue(x.get()));
+    const off = SB.theme && SB.theme.onChange ? SB.theme.onChange(themeSync) : null;
+    P.syncs.push((s) => { themeSync(); if (sound) sound.setValue(soundNow()); hf.forEach(({ f, p }) => f.sync(s.settings.service[p.key])); taxF.sync(s.settings.service.taxRatePct || 0); });
+    P.disposers.push(() => { if (off) off(); }, () => hf.forEach(({ f }) => f.destroy()), () => taxF.destroy(), () => status.destroy(), () => sst.destroy(), () => tst.destroy());
+    return pn;
+  }
+
+  // Saves a file: the host's download capability first (Claude artifact viewer), then a plain browser
+  // download. A decline is final and never retried; the caller can always offer copy or paste. Returns {how:
+  // 'host' | 'declined' | 'browser' | 'blocked'}.
+  async function saveFile(filename, text, mime) {
+    let d = null;
+    try { d = g.claude && typeof g.claude.use === 'function' ? await g.claude.use('downloads') : null; } catch (e) { d = null; }
+    if (d) {
+      try { const r = await d.save({ filename, data: text }); return { how: 'host', status: r && r.status }; }
+      catch (e) { if (e && e.code === 'declined') return { how: 'declined' }; /* any other failure falls through to the browser path */ }
+    }
+    try {
+      const blob = new Blob([text], { type: mime || 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = doc.createElement('a');
+      a.href = url; a.download = filename; a.rel = 'noopener'; a.style.display = 'none';
+      doc.body.appendChild(a); a.click();
+      setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 1000);
+      return { how: 'browser' };
+    } catch (e) { return { how: 'blocked' }; }
+  }
+
+  // 8. Data: what is stored, sample history, export, import, reset
+  const SAMPLE_NOTE = 'Sample history is generated by a simulator that runs the real engine; it is not your restaurant\'s data. Days 1 to 5 run without pacing and days 6 to 14 with it so you can see the difference.';
+
+  // Turns a backup check error into a sentence a cook can understand.
+  function backupReason(err) {
+    const e = String(err || '');
+    if (/^not JSON/.test(e)) return 'It is not readable JSON: it is probably not a Smokebox backup, or it was cut off.';
+    if (/^not an object/.test(e)) return 'It is not a Smokebox backup (the top level is not a record).';
+    if (/^unsupported version undefined/.test(e)) return 'It does not say which Smokebox version made it, so it is probably not a backup.';
+    if (/^unsupported version/.test(e)) return 'It was made by a different Smokebox version (' + e.replace('unsupported version ', 'version ') + ').';
+    if (/^missing /.test(e)) return 'It has no ' + e.replace('missing ', '') + ' list, so it is not a Smokebox backup.';
+    if (/^too large/.test(e)) return 'It is bigger than Smokebox can load (20 MB).';
+    if (/^inconsistent/.test(e)) return 'Its records contradict each other (' + e.replace('inconsistent: ', '') + '), so loading it could corrupt the board.';
+    return 'It could not be read (' + e + ').';
+  }
+  // Reads a chosen file as text. Returns a promise.
+  const readFileText = (file) => new Promise((resolve, reject) => {
+    try {
+      const fr = new FileReader();
+      // Resolve with the text, or reject when the file cannot be read.
+      fr.onload = () => resolve(String(fr.result || ''));
+      fr.onerror = () => reject(fr.error || new Error('read failed'));
+      fr.readAsText(file);
+    } catch (e) { reject(e); }
+  });
+  // Checks a backup text without touching the live state. Returns {ok: false, reason} or
+  // {ok: true, text, state, repaired, savedAt, bySrc}.
+  function inspectBackup(text) {
+    if (typeof text !== 'string' || !text.trim()) return { ok: false, reason: 'There is nothing in it. Choose a backup file or paste the backup text.' };
+    if (text.length > MAX_IMPORT_CHARS) return { ok: false, reason: backupReason('too large') };
+    let env;
+    try { env = JSON.parse(text); } catch (e) { return { ok: false, reason: backupReason('not JSON') }; }
+    const v = SB.engine.validateBackup(env);
+    if (!v.ok) return { ok: false, reason: backupReason(v.error) };
+    const bySrc = { live: 0, demo: 0, sample: 0 };
+    for (const t of v.state.tickets) bySrc[t.src] = (bySrc[t.src] || 0) + 1;
+    return { ok: true, text, state: v.state, repaired: v.repaired || [], savedAt: env && isNum(env.savedAt) ? env.savedAt : null, bySrc };
+  }
+
+  // Panel 8: what is stored, sample history, export, import and reset.
+  function buildData(P) {
+    const pn = panel(SECTIONS[7], 'Everything Smokebox knows lives in this browser, on this device. Back it up before you reset, import or clear browser data.');
+
+    // What is stored: counts read from the live state, refreshed on every sync.
+    // One label and value pair for the counts list.
+    const stat = (label) => { const dd = h('dd', { class: 'od-stat-v' }); return { dt: h('dt', null, label), dd }; };
+    const sTickets = stat('Tickets'), sEvents = stat('Logged events'), sBatches = stat('Hold-cabinet batches'), sSize = stat('Stored on this device');
+    const sSample = stat('Sample tickets');
+    pn.body.append(sub('What is stored'), h('dl', { class: 'od-stats' }, [sTickets, sEvents, sBatches, sSize, sSample].map((x) => h('div', { class: 'od-stat' }, x.dt, x.dd))));
+    let lastRev = -1, lastSizeAt = 0;
+    // Size of what is stored on this device, in characters; falls back to the live state.
+    const storedChars = () => {
+      try { const raw = g.localStorage && g.localStorage.getItem(SB.store.KEY); if (raw) return raw.length; } catch (e) { /* fall through */ }
+      try { return JSON.stringify(cur()).length; } catch (e) { return null; }
+    };
+    // The simulator when it can switch sample history, otherwise null (the page then says it is not
+    // loaded).
+    const simOn = () => (SB.sim && typeof SB.sim.sampleEnabled === 'function' && typeof SB.sim.setSampleEnabled === 'function' ? SB.sim : null);
+    function paintCounts(s) {
+      // The first run seeds demo tickets; say so rather than calling them live.
+      const nDemo = s.tickets.filter((t) => t.src === 'demo').length, nLive = s.tickets.length - nDemo;
+      sTickets.dd.textContent = !nDemo ? U.fmtNum(nLive) : !nLive ? U.fmtNum(nDemo) + ' demo' : U.fmtNum(nLive) + ' live, ' + U.fmtNum(nDemo) + ' demo';
+      const ev = SB.engine.allEvents(s).length;
+      sEvents.dd.textContent = U.fmtNum(ev);
+      sBatches.dd.textContent = U.fmtNum(s.batches.length);
+      const now = Date.now();
+      if (s.rev !== lastRev && now - lastSizeAt > 2500) {
+        lastRev = s.rev; lastSizeAt = now;
+        const n = storedChars();
+        sSize.dd.textContent = n == null ? 'unknown' : kbText(n);
+      }
+      let smp = null;
+      if (simOn()) { try { const ds = SB.store.dataset({ sample: true }); smp = ds.hasSample ? ds.counts.sample : 0; } catch (e) { smp = null; } }
+      sSample.dd.textContent = !simOn() ? 'Not loaded' : simOn().sampleEnabled() ? (smp != null ? U.fmtNum(smp) : 'On') : 'Off';
+    }
+
+    // Sample history: the switch exists only when the simulator can turn it on and off.
+    pn.body.appendChild(sub('Sample history'));
+    const sampleBox = h('div', { class: 'od-sample' });
+    pn.body.appendChild(sampleBox);
+    const sampleToggle = simOn() ? SB.ui.toggle({
+      label: 'Show sample history in the back office', checked: !!simOn().sampleEnabled(),
+      onChange: (v) => {
+        try { simOn().setSampleEnabled(v); SB.ui.toast(v ? 'Sample history is on. The back office charts include it.' : 'Sample history is off. The back office charts use live tickets only.', { tone: 'ok' }); }
+        catch (e) { sampleToggle.setValue(!v); SB.ui.toast('Could not change sample history. Reload and try again.', { tone: 'bad' }); }
+        try { paintCounts(cur()); } catch (e) { /* counts repaint on the next sync */ }
+      },
+    }) : null;
+    // The sample-history note from the simulator, or the built-in one.
+    const noteText = () => { try { const i = SB.sim && SB.sim.sampleInfo && SB.sim.sampleInfo(); if (i && typeof i.note === 'string' && i.note) return i.note; } catch (e) { /* default below */ } return SAMPLE_NOTE; };
+    if (sampleToggle) sampleBox.append(sampleToggle, para(noteText(), 'od-p'));
+    else sampleBox.append(h('p', { class: 'od-p od-warnline' }, ico('alert', 18), h('span', null, 'Simulator not loaded. This build has no sample history, so the back office shows only live tickets.')), para(SAMPLE_NOTE, 'od-hint'));
+
+    // Export: JSON backup and CSV tables go through saveFile, with copy as the fallback.
+    pn.body.appendChild(sub('Export'));
+    const exStatus = statusLine();
+    const fbLabelId = U.uid('odfb');
+    const fbText = h('textarea', { class: 'textarea od-fbtext', readonly: true, rows: 6, 'aria-labelledby': fbLabelId, spellcheck: 'false' });
+    // Selects the whole backup text so it can be copied by hand.
+    const fbSelect = btn('Select all', { cls: 'btn-sm', onClick: () => { fbText.focus(); fbText.select(); } });
+    const fb = h('div', { class: 'od-fallback', hidden: true }, h('div', { class: 'od-lab', id: fbLabelId }, 'Backup text: copy all of it'), fbText, h('div', { class: 'od-actions' }, fbSelect));
+    // Shows the backup text selected in a box, for when the browser blocks copy or download.
+    function showFallback(text) { fb.hidden = false; fbText.value = text; fbText.focus(); fbText.select(); }
+    // The current state, read fresh each time.
+    const stateNow = () => cur();
+    // The full backup text, or null after saying why it could not be made.
+    function backupText() {
+      const t = SB.store.exportAll();
+      if (t == null) { const lr = SB.store.lastResult() || {}; exStatus.bad(SB.engine.describe(lr.report || 'invalidBackup', lr.info, (stateNow() || {}).settings) + ' Nothing was saved.'); return null; }
+      return t;
+    }
+    // Saves the backup file and reports what happened.
+    async function downloadBackup() {
+      const text = backupText(); if (!text) return;
+      const fname = 'smokebox-backup-' + todayKey() + '.json';
+      const res = await saveFile(fname, text, 'application/json');
+      reportSave(res, fname, text, 'backup');
+    }
+    // Says in words whether a file was saved, started, declined or blocked.
+    function reportSave(res, fname, text, what) {
+      const size = kbText(text.length);
+      if (res.how === 'host') exStatus.ok('Saved ' + fname + ' (' + size + ').');
+      else if (res.how === 'declined') exStatus.bad('You chose not to save the file, so nothing was written.');
+      else if (res.how === 'browser') exStatus.ok('Download started: ' + fname + ' (' + size + '). If nothing arrives, your browser may be blocking downloads: use Copy backup instead.');
+      else { showFallback(text); exStatus.bad('Your browser blocked the download. The ' + what + ' is selected below: copy it and paste it into a file named ' + fname + '.'); }
+    }
+    // Copies the backup to the clipboard; if the browser blocks that, shows it selected below.
+    function copyBackup() {
+      const text = backupText(); if (!text) return;
+      // Fallback when copying is blocked: show the text selected.
+      const fail = () => { showFallback(text); exStatus.bad('Your browser blocked copying. The backup is selected below: press Ctrl+C (Cmd+C on a Mac) to copy it.'); };
+      try {
+        const p = g.navigator.clipboard.writeText(text);
+        p.then(() => exStatus.ok('Copied ' + kbText(text.length) + ' to the clipboard.'), fail);
+      } catch (e) { fail(); }
+    }
+    // Saves one spreadsheet table and says how many rows it holds.
+    async function downloadCsv(kind, label) {
+      const text = SB.store.exportCsv(kind);
+      if (!text) { exStatus.bad('Could not make the ' + label + ' file. Reload and try again.'); return; }
+      const s = stateNow();
+      const n = kind === 'tickets' ? s.tickets.length : kind === 'items' ? s.tickets.reduce((a, t) => a + t.items.length, 0) : kind === 'events' ? SB.engine.allEvents(s).length : s.batches.length;
+      const fname = 'smokebox-' + kind + '-' + todayKey() + '.csv';
+      const res = await saveFile(fname, text, 'text/csv');
+      if (res.how === 'host' || res.how === 'browser') {
+        const tail = n ? ' (' + U.fmtNum(n) + ' ' + U.plural(n, 'row') + ').' : ': it has only the column names because there is nothing to list yet.';
+        if (res.how === 'host') exStatus.ok('Saved ' + fname + tail); else exStatus.ok('Download started: ' + fname + tail);
+      } else reportSave(res, fname, text, 'table');
+    }
+    const csvBtns = [['tickets', 'Tickets'], ['items', 'Items'], ['orders', 'Orders'], ['events', 'Events'], ['batches', 'Batches']].map(([k, l]) => {
+      // Each spreadsheet button downloads its own table.
+      const b = btn(l, { icon: 'download', cls: 'btn-sm', onClick: () => downloadCsv(k, l.toLowerCase()) });
+      b.setAttribute('aria-label', 'Download ' + l.toLowerCase() + ' as CSV');
+      b.dataset.csv = k;
+      return b;
+    });
+    const dlBtn = btn('Download backup (JSON)', { icon: 'download', cls: 'btn-primary', onClick: downloadBackup });
+    dlBtn.dataset.action = 'backup-download';
+    const cpBtn = btn('Copy backup', { icon: 'copy', onClick: copyBackup });
+    cpBtn.dataset.action = 'backup-copy';
+    pn.body.append(
+      para('A backup is every ticket, event, batch, menu edit and setting in one JSON file. Keep one before you reset or import. Spreadsheet files (CSV) list one kind of record each and cannot be imported back.', 'od-p'),
+      h('div', { class: 'od-actions' }, dlBtn, cpBtn),
+      h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Spreadsheet files'), csvBtns),
+      exStatus.el, fb);
+
+    // Import: a chosen file or pasted text is checked and summarized before anything changes.
+    pn.body.appendChild(sub('Import'));
+    const impHost = h('div', { class: 'od-import' });
+    const impResult = h('div', { class: 'od-impresult', 'aria-live': 'polite' });
+    const fileIn = h('input', { type: 'file', accept: '.json,application/json,text/plain', class: 'visually-hidden', tabindex: -1, 'aria-hidden': 'true', id: U.uid('odfile') });
+    // Opens the system file picker for a backup.
+    const chooseBtn = btn('Choose a backup file', { icon: 'upload', onClick: () => fileIn.click() });
+    chooseBtn.dataset.action = 'import-choose';
+    const pasteLabelId = U.uid('odpl');
+    const pasteArea = h('textarea', { class: 'textarea od-paste', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-labelledby': pasteLabelId, placeholder: 'Paste the whole backup text here' });
+    // Checks pasted text the same way as a chosen file.
+    const pasteBtn = btn('Check pasted backup', { icon: 'check', cls: 'btn-sm', onClick: () => check(pasteArea.value, 'pasted text') });
+    pasteBtn.dataset.action = 'import-check-paste';
+    const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
+    impHost.append(
+      para('Importing checks the backup first and shows what is inside before anything changes. A file that is not a valid backup is refused and nothing is touched.', 'od-p'),
+      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult);
+    pn.body.appendChild(impHost);
+
+    let pending = null;
+    // Throws away the checked backup and clears the result card.
+    function clearImport() { pending = null; impResult.replaceChildren(); }
+    // Shows why a backup was refused; nothing is changed.
+    function showBad(reason, source) {
+      pending = null;
+      impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'bad', role: 'alert' },
+        h('p', { class: 'od-card-h' }, ico('alert-circle', 20), h('span', null, 'That ' + source + ' cannot be used.')),
+        h('p', { class: 'od-p' }, reason + ' Nothing was changed.')));
+    }
+    // Validates backup text and shows a summary card. The live data is not touched.
+    function check(text, source) {
+      const res = inspectBackup(text);
+      if (!res.ok) { showBad(res.reason, source); return; }
+      pending = res;
+      const s = res.state, n = s.tickets.length;
+      const live = stateNow();
+      const archived = s.menu.filter((m) => m.archived).length;
+      const evN = SB.engine.allEvents(s).length;
+      const rows = [
+        ['Tickets', U.fmtNum(n) + (n ? ' (' + [res.bySrc.live ? res.bySrc.live + ' live' : '', res.bySrc.demo ? res.bySrc.demo + ' demo' : '', res.bySrc.sample ? res.bySrc.sample + ' sample' : ''].filter(Boolean).join(', ') + ')' : '')],
+        ['Logged events', U.fmtNum(evN)], ['Batches', U.fmtNum(s.batches.length)],
+        ['Menu items', s.menu.length + (archived ? ' (' + archived + ' archived)' : '')],
+        ['Pacing', s.settings.pacing.enabled ? 'On' : 'Off'], ['PIN', s.settings.office && s.settings.office.pinHash ? 'Set' : 'Not set'],
+      ];
+      if (res.savedAt) rows.unshift(['Saved', U.fmtDateShort(U.dateKey(res.savedAt)) + ', ' + U.fmtTime(res.savedAt)]);
+      const repairs = res.repaired.length;
+      const card = h('div', { class: 'od-card', 'data-tone': 'ok' },
+        h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'This ' + source + ' is a valid Smokebox backup.')),
+        h('dl', { class: 'od-stats od-stats-tight' }, rows.map(([k, v]) => h('div', { class: 'od-stat' }, h('dt', null, k), h('dd', { class: 'od-stat-v' }, v)))),
+        repairs ? h('p', { class: 'od-hint' }, 'Smokebox repaired ' + repairs + ' small ' + U.plural(repairs, 'problem') + ' while reading it: ' + res.repaired.slice(0, 3).join('; ') + (repairs > 3 ? '; and ' + (repairs - 3) + ' more.' : '.')) : null,
+        h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This replaces everything on this device: ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', your menu edits and your settings. Export a backup first.')),
+        h('div', { class: 'od-actions' },
+          btn('Back up what is here first', { icon: 'download', cls: 'btn-sm', onClick: downloadBackup }),
+          // The replace button asks again in a dialog before anything is written.
+          (() => { const b = btn('Replace everything with this backup', { icon: 'upload', cls: 'btn-danger', onClick: () => replaceAll() }); b.dataset.action = 'import-replace'; return b; })(),
+          btn('Cancel', { onClick: clearImport })));
+      impResult.replaceChildren(card);
+    }
+    // After a confirm dialog, replaces everything with the checked backup.
+    async function replaceAll() {
+      if (!pending) return;
+      const p = pending, live = stateNow();
+      const ok = await SB.ui.confirm({
+        title: 'Replace everything on this device?', tone: 'danger', confirmLabel: 'Replace everything', cancelLabel: 'Keep what I have',
+        body: ['This replaces ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', every setting, your menu edits and the PIN with the backup\'s ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.',
+          'There is no undo. If you might want what is here now, cancel and download a backup first.'],
+      });
+      if (!ok) return;
+      const rep = SB.store.importAll(p.text);
+      if (rep === 'ok') {
+        clearImport(); pasteArea.value = ''; fileIn.value = '';
+        impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.'))));
+        SB.ui.toast('Backup restored.', { tone: 'ok' });
+      } else {
+        const lr = SB.store.lastResult() || {};
+        showBad(rep === 'invalidBackup' && lr.info && lr.info.error ? backupReason(lr.info.error) : SB.engine.describe(rep, lr.info, (stateNow() || {}).settings), 'backup');
+      }
+    }
+    fileIn.addEventListener('change', async () => {
+      const f = fileIn.files && fileIn.files[0];
+      if (!f) return;
+      if (f.size > MAX_IMPORT_CHARS * 1.2) { showBad(backupReason('too large'), 'file'); fileIn.value = ''; return; }
+      let text;
+      try { text = await readFileText(f); } catch (e) { showBad('The file could not be read from this device.', 'file'); fileIn.value = ''; return; }
+      check(text, 'file');
+      fileIn.value = ''; // so choosing the same file again re-checks it
+    });
+
+    // Reset: two buttons, each behind a confirm dialog.
+    pn.body.appendChild(sub('Reset'));
+    const resetStatus = statusLine();
+    const keep = SB.ui.toggle({ label: 'Keep my menu, settings and PIN when I reset live data', checked: true });
+    const resetLiveBtn = btn('Reset live data', { icon: 'trash', cls: 'btn-danger' });
+    resetLiveBtn.dataset.action = 'reset-live';
+    const resetAllBtn = btn('Reset everything', { icon: 'trash', cls: 'btn-danger' });
+    resetAllBtn.dataset.action = 'reset-all';
+    // Both reset buttons say what will be cleared, ask in a dialog first, and do nothing without a yes.
+    resetLiveBtn.addEventListener('click', async () => {
+      const s = stateNow(), k = keep.getValue();
+      const ok = await SB.ui.confirm({
+        title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep my data',
+        body: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' logged events and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device and puts the starter stock back.',
+          k ? 'Your menu, ingredient edits, limits, pacing and PIN stay as they are.' : 'It also puts every setting, menu edit and the PIN back to the starter values.',
+          'Sample history is not touched. There is no undo: download a backup first if you might want this data.'],
+      });
+      if (!ok) return;
+      const rep = SB.store.resetLive({ keepSettings: k });
+      if (rep === 'ok') { resetStatus.ok('Live data cleared. The board is empty and starter stock is back' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data cleared.', { tone: 'ok' }); }
+      else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
+    });
+    resetAllBtn.addEventListener('click', async () => {
+      const s = stateNow();
+      const ok = await SB.ui.confirm({
+        title: 'Reset everything?', tone: 'danger', confirmLabel: 'Reset everything', cancelLabel: 'Keep my data',
+        body: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your menu and ingredient edits, every setting and the PIN. The board starts empty.',
+          'Your Day or Night, Ember or Paper and text-size choices, and the sample history switch, are kept. There is no undo: download a backup first if you might want any of it back.'],
+      });
+      if (!ok) return;
+      // Display choices live outside the stored state, so they survive this reset.
+      const rep = SB.store.reset();
+      if (rep === 'ok') { resetStatus.ok('Everything was reset to the starter values.'); SB.ui.toast('Everything was reset.', { tone: 'ok' }); }
+      else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
+    });
+    pn.body.append(
+      para('Reset live data clears tickets, events and batches. Reset everything also puts the menu, ingredients and every setting back to the starter values. Both ask first and cannot be undone.', 'od-p'),
+      h('div', { class: 'od-toggle-row' }, keep),
+      h('div', { class: 'od-actions' }, resetLiveBtn, resetAllBtn), resetStatus.el);
+
+    P.syncs.push((s) => { paintCounts(s); if (sampleToggle && simOn()) sampleToggle.setValue(!!simOn().sampleEnabled()); });
+    P.disposers.push(() => exStatus.destroy(), () => resetStatus.destroy());
+    P.dataTools = { downloadBackup, check };
+    return pn;
+  }
+
+  // Panel 9: what this build is, and what is simulated or untested.
+  function buildAbout() {
+    const pn = panel(SECTIONS[8]);
+    const items = [
+      ['This build', VERSION + '. One file that works offline. Your data stays in this browser, on this device.'],
+      ['What is simulated', 'Order-channel sync is simulated. When an item goes 86, the counter POS, online ordering, drive-thru board and delivery-app feeds are updated after a pretend delay of a few seconds; nothing is sent to a real POS or delivery app. Sample history is generated by a simulator too.'],
+      ['What is a starter estimate', 'Prep times, cooked yields and ingredient costs began as starter numbers. Prep times and yields keep the label "starter estimate" until you confirm them. Costs stay starter numbers until you replace them with your invoices.'],
+      ['What has not been tested', 'It was tested in Chromium at phone, tablet and desktop sizes. Not tested: real sunlight on a real screen, and other devices and browsers. Try the line on the actual tablet before service.'],
+      ['Several devices', 'Separate devices do not share data. Tablets open in the same browser on the same device do, and stay in step.'],
+      ['Pitcall', 'Smokebox is separate from Pitcall; later they can share the sell-out times.'],
+    ];
+    pn.body.appendChild(h('dl', { class: 'od-about' }, items.map(([k, v]) => h('div', { class: 'od-about-row' }, h('dt', null, k), h('dd', null, v)))));
+    return pn;
+  }
+
+  // The page
+  // Counts prep times and cooked yields that are still starter estimates.
+  function starterCount(s) {
+    const prep = s.menu.filter((m) => !m.archived && !m.prepConfirmed).length;
+    const yld = s.ingredients.filter((i) => i.tcs && isNum(i.yield) && !i.yieldConfirmed).length;
+    return { prep, yld, total: prep + yld };
+  }
+
+  // Builds the whole page into the container. Returns {update, destroy} for the frame.
+  function render(container, ctx) {
+    // showStarter is a placeholder until the menu panel installs the real one.
+    const P = { syncs: [], disposers: [], menuFilter: { status: 'active', zone: 'all', starter: false }, ctx, showStarter: () => {} };
+    const root = h('div', { class: 'od', id: 'od-root' });
+    container.appendChild(root);
+
+    // headline
+    const headline = h('p', { class: 'od-headline', role: 'status' });
+    const headSub = h('p', { class: 'od-headsub' });
+    // Shows the unconfirmed items in the menu panel.
+    const showBtn = btn('Show the starter estimates', { cls: 'btn-sm', onClick: () => { P.showStarter(); goTo('menu'); } });
+    const headBox = h('div', { class: 'od-headbox' }, headline, h('div', { class: 'od-headrow' }, headSub, showBtn));
+    // Writes the headline and its second line from the saved state.
+    function paintHeadline(s) {
+      const st = SB.store.status ? SB.store.status() : { persistent: true };
+      const keeping = st.persistent !== false && st.lastSaveOk !== false;
+      const n = starterCount(s);
+      headline.textContent = (keeping ? 'Your settings are saved on this device.' : 'This browser is not keeping your changes, so they will be lost when you close the page. Allow site data for this page.') + ' ' +
+        (n.total ? n.total + ' starter ' + U.plural(n.total, 'estimate is', 'estimates are') + ' not confirmed yet.' : 'Every prep time and yield is confirmed.');
+      headline.dataset.tone = keeping ? 'ok' : 'bad';
+      headSub.textContent = n.total ? n.prep + ' prep ' + U.plural(n.prep, 'time') + ' and ' + n.yld + ' cooked ' + U.plural(n.yld, 'yield') + '. Starter estimates are fine to run on; confirm each one when you have timed or weighed it.' : '';
+      showBtn.hidden = !n.prep;
+    }
+
+    // table of contents
+    const links = [];
+    const toc = h('nav', { class: 'od-toc', 'aria-label': 'On this page' });
+    const tocList = h('ul', { class: 'od-toc-list' });
+    toc.appendChild(tocList);
+    // Scrolls to a panel and moves focus to its heading.
+    function goTo(id) {
+      const el = doc.getElementById('od-' + id);
+      if (!el) return;
+      el.scrollIntoView({ block: 'start', behavior: U.prefersReducedMotion() ? 'auto' : 'smooth' });
+      const t = el.querySelector('.od-title'); if (t) t.focus({ preventScroll: true });
+    }
+    SECTIONS.forEach((sec) => {
+      const a = h('a', { class: 'od-toc-link', href: '#od-' + sec.id, dataset: { target: sec.id } }, sec.label);
+      a.addEventListener('click', (ev) => { ev.preventDefault(); goTo(sec.id); }); // a real hash would be read by the router as "leave the office"
+      links.push(a);
+      tocList.appendChild(h('li', null, a));
+    });
+
+    // panels (one failing panel must not blank the page)
+    const builders = [buildMenu, buildIngredients, buildTimes, buildPacing, buildSafety, buildPin, buildLook, buildData, buildAbout];
+    const panels = builders.map((b, i) => {
+      try { return b(P); }
+      catch (e) {
+        console.error('[smokebox] Data page: ' + SECTIONS[i].title + ' failed', e);
+        const pn = panel(SECTIONS[i]);
+        pn.body.appendChild(SB.ui.errorCard(e, { title: 'This panel could not load', module: '84-office-data.js' }));
+        return pn;
+      }
+    });
+    const content = h('div', { class: 'od-content' }, ...panels.map((p) => p.el));
+    root.append(headBox, h('div', { class: 'od-layout' }, toc, content));
+
+    // the frame keeps its own sticky bar (the data banner) at the top of the scroll area: sit the contents
+    // list just below it
+    let ro = null;
+    const frameBar = () => { const col = root.closest('.of-col'); return col ? col.querySelector('.of-filters') : null; };
+    const fb = frameBar();
+    if (fb) {
+      // Keeps the contents list just under the frame's sticky bar.
+      const setTop = () => { root.style.setProperty('--od-sticky-top', Math.ceil(fb.getBoundingClientRect().height) + 'px'); };
+      setTop();
+      if (typeof g.ResizeObserver === 'function') { ro = new g.ResizeObserver(setTop); ro.observe(fb); }
+    }
+
+    const scroller = root.closest('.of-col') || g;
+    let markT = 0;
+    // Marks the contents link of the panel being read: the last panel whose top has passed a line just under
+    // the sticky bars.
+    function markCurrent() {
+      markT = 0;
+      const bar = frameBar();
+      const line = (bar ? bar.getBoundingClientRect().bottom : 0) + 90;
+      let best = SECTIONS[0].id;
+      panels.forEach((p, i) => { if (p.el.getBoundingClientRect().top <= line) best = SECTIONS[i].id; });
+      const atEnd = scroller === g ? false : scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4; // the last panels are short and never reach the line
+      if (atEnd) best = SECTIONS[SECTIONS.length - 1].id;
+      links.forEach((a) => { if (a.dataset.target === best) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current'); });
+    }
+    // Runs markCurrent at most once per frame.
+    const onScroll = () => { if (!markT) markT = g.requestAnimationFrame ? g.requestAnimationFrame(markCurrent) : setTimeout(markCurrent, 50); };
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+    g.addEventListener('resize', onScroll);
+    onScroll();
+
+    // keep in step with the store, never touching a field that has focus or a pending edit
+    let lastState = null;
+    const doSync = (s) => {
+      if (!s) return;
+      lastState = s;
+      P.syncs.forEach((fn) => { try { fn(s); } catch (e) { console.error('[smokebox] Data page sync failed', e); } });
+      paintHeadline(s);
+    };
+    const unsub = SB.store.subscribe(doSync);
+    doSync(cur());
+    return {
+      // Called by the frame on refresh; redraws only if the state changed.
+      update() { const s = cur(); if (s && s !== lastState) doSync(s); },
+      // Removes listeners, observers and timers, then the page.
+      destroy() {
+        unsub();
+        scroller.removeEventListener('scroll', onScroll);
+        g.removeEventListener('resize', onScroll);
+        if (ro) ro.disconnect();
+        P.disposers.forEach((fn) => { try { fn(); } catch (e) { console.error('[smokebox] Data page cleanup failed', e); } });
+        root.remove();
+      },
+    };
+  }
+
+  SB.dataPage = { saveFile, inspectBackup, backupReason, starterCount, version: 1 };
+  if (SB.office && typeof SB.office.registerPage === 'function') SB.office.registerPage('data', { title: 'Menu and settings', icon: 'sliders', order: 7, render });
+})(typeof globalThis !== 'undefined' ? globalThis : window);

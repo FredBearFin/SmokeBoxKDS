@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<!--
+READ ME FIRST
+
+WHAT SMOKEBOX IS
+  Smokebox is the ticket screen for a barbecue kitchen. An order goes in at the counter, each dish is sent to
+  the station that cooks it (pit, hot sides, fry, cold and drinks), cooks tap when a dish is done, and expo
+  bumps the ticket when the whole plate is ready. It also keeps stock, the hold cabinet and the food-safety
+  timers honest, and quietly records everything, so the owner can open a hidden back office of charts about
+  how fast the line really is. The whole program is inside this one file and works offline.
+
+HOW THIS ONE FILE WAS MADE
+  tools/build.mjs glues about 27 small source files into this page: 8 style files first, then 19 program files,
+  in name order. Each piece starts at a banner line such as  ===== 20-engine.js =====  so you can search for
+  it (this note is the first hit, press Find next for the real one). If a piece fails to load, the screen
+  names it in a plain "Smokebox could not start" card.
+
+THE PROGRAM FILES, IN ORDER
+  00-util          small shared tools: maths, dates, the 4 am service day, number and time text, safe storage
+  05-icons         the drawn icons and the flame logo
+  10-config        the settings: stations, menu, ingredients, pacing, food-safety numbers, brisket yield formula
+  20-engine        the brain: all the rules (routing, pacing, stock, 86, safety gates, undo); draws nothing
+  30-store         the memory and clock: holds the state, ticks every second, saves, syncs tabs, backups
+  40-metrics       the number-cruncher: turns the history into medians, on-time share, waste, margins, tips
+  45-sim           the pretend kitchen: makes 14 days of sample history and live demo traffic
+  50-charts        the picture drawer: line, bar, heat map and other charts, drawn as SVG
+  60-shell         the frame: Day and Night looks, pop-up sheets, toasts with undo, the secret door, PIN pad
+  70-floor-board   the ticket rail: header, station tabs, ticket slips, the all-day strip
+  71-floor-order   the New ticket panel
+  72-floor-sheets  the other pop-up panels: hold cabinet, 86 board, recall, demo, help
+  80-office-core   the back-office frame, filters and building blocks
+  81 to 85         back-office pages: pace, tickets and stations (81), sales and money (82), safety (83),
+                   data and settings (84), stock and 86 (85)
+  99-boot          the start button: starts the store, draws the screen, shows the error card if that fails
+  The style files are 00-tokens (colours, sizes), 10-base (buttons, panels, toasts), 20-floor and
+  21-floor-sheets (the line), 30-office, 31-office-money and 32-office-data (back office), 40-charts.
+
+HOW AN ORDER TRAVELS
+  1. The cashier sends a ticket from the New ticket panel (71). The store (30) hands it to the engine (20).
+  2. The engine checks it (86'd dish? bad quantity?) and sends each dish to its station. With pacing on it holds
+     back the quick dishes so the whole plate finishes together.
+  3. Cooks tap on their station screen (70). Each tap is an action the engine checks; stock comes off when done.
+  4. The store keeps the new state, saves it to the browser and tells the screens, which redraw what changed.
+  5. Expo bumps the ticket. Later the office (80 to 85) reads the history through metrics (40) and charts (50).
+
+THE BACK OFFICE DOOR
+  The Back office button at the top of the board opens it. Two older ways still work: five quick taps on the
+  flame logo, or Ctrl or Cmd with Shift and O. If a PIN is set, a keypad asks first. The PIN keeps line cooks
+  out of the office; it is not real security.
+
+WORDS YOU WILL SEE IN THE CODE
+  state      everything the app knows right now (all tickets, stock, batches, settings)
+  action     one request to change the state, such as createTicket or logTemp
+  report     the engine's answer to an action: the word ok, or the reason it was refused
+  dispatch   hand an action to the engine (through the store)
+  engine     the file that holds the rules; it never draws anything
+  store      the file that keeps the state and the clock
+  subscribe  ask to be told when the state changes
+  array      a list in order, like the tickets on the rail
+  object     a labelled card: labels on the left, facts on the right
+  null       nothing there on purpose (undefined means nobody ever wrote anything)
+  timestamp  a number that names one exact moment, in milliseconds (1000 ms is 1 second)
+  build      gluing the source files into this single page
+-->
+<html lang="en" data-theme="day">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F5F2EB">
+<meta name="application-name" content="Smokebox KDS">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Smokebox">
+<meta name="description" content="Smokebox: a kitchen display for a BBQ line. Works offline from one file.">
+<title>Smokebox KDS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet">
+<!-- Apply the saved theme and text size before first paint so a Night tablet never flashes Day. -->
+<script>
+(function () {
+  try {
+    var r = document.documentElement;
+    var get = function (k) { try { var v = localStorage.getItem(k); return v == null ? null : JSON.parse(v); } catch (e) { return null; } };
+    var t = get('smokebox.v1.theme');
+    if (t === 'night' || t === 'day') r.setAttribute('data-theme', t);
+    if (get('smokebox.v1.textsize') === 'large') r.className += ' text-large';
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m && t === 'night') m.setAttribute('content', '#15181A');
+  } catch (e) { /* storage blocked: the defaults are fine */ }
+})();
+</script>
+<!--SB:CSS-->
+</head>
+<body>
+<a class="skip-link" href="#sb-floor" data-skip="sb-floor">Skip to the board</a>
+<div id="app" aria-live="off"></div>
+<noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
+<!--SB:JS-->
+</body>
+</html>

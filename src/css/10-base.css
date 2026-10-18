@@ -1,0 +1,701 @@
+/* WHAT THIS FILE IS: the look of the parts every screen shares: page basics, focus outline, buttons, chips,
+ * forms, pop-up sheets, toasts, menus, the PIN keypad, screen layers, the ticket slip, the RUSH stamp, motion.
+ * Sizes, colours and speeds come from the var(--name) values in 00-tokens.css. Floor targets: 48 px minimum
+ * (56 px for main actions, 44 px for stepper buttons); nothing may overflow at 280 px wide.
+ * PARTS: reset, focus, buttons, chips, segmented, stepper, fields, surfaces, sheets, toast, menu, keypad,
+ * layers, ignition, slip, stamp, keyframes (movements), scrollbars, reduced motion.
+ * USES: 00-tokens.css. USED BY: 20-floor.css, 21-floor-sheets.css, the 3x-office css files, 60-shell.js.
+ */
+
+/* ---------- reset ---------- */
+/* Page basics: same box sizing everywhere, no page margins, the page fills the window and never scrolls. */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; height: 100%; }
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font: var(--w-regular) var(--fs-3) / var(--lh-body) var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+/* Headings use the tall narrow display font; lists lose bullets; form parts copy the page font. */
+h1, h2, h3, h4, h5, h6, p, figure, blockquote { margin: 0; }
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: var(--w-bold); line-height: var(--lh-snug); letter-spacing: 0.01em; }
+h1 { font-size: var(--fs-6); }
+h2 { font-size: var(--fs-5); }
+h3 { font-size: var(--fs-4); }
+h4 { font-size: var(--fs-3); }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* Links use the readable amber; images and icons never grow wider than their box; [hidden] always hides. */
+a { color: var(--amber-ink); text-underline-offset: 3px; }
+img, svg, canvas { max-width: 100%; }
+svg.icon { display: inline-block; flex: none; vertical-align: -0.2em; }
+[hidden] { display: none !important; }
+::selection { background: var(--amber); color: #fff; }
+table { border-collapse: collapse; }
+
+/* visually-hidden: invisible on screen but still read aloud by a screen reader. */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+/* Small helpers: digits that line up, muted text, a wrapping row, a stacked column, a filler that grows. */
+.num, .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.t-display { font-family: var(--font-display); }
+.t-muted { color: var(--ink3); }
+.t-measure { max-width: var(--measure); }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); min-width: 0; }
+.stack { display: grid; gap: var(--sp-3); min-width: 0; }
+.grow { flex: 1 1 0; min-width: 0; }
+
+/* ---------- focus: 3 px ring, readable on every surface ---------- */
+/* Focus ring: the outline that shows which control the keyboard is on. Shown for keyboard use, not taps. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: var(--bw-focus) solid var(--focus);
+  outline-offset: 2px;
+}
+:where(a, button, input, select, textarea, summary, [tabindex]):focus:not(:focus-visible) { outline: none; }
+[tabindex="-1"]:focus { outline: none; }
+.toast :focus-visible, .tooltip :focus-visible { outline-color: var(--focus-inv); }
+
+/* Skip link: parked above the screen until the keyboard reaches it, then it drops into view. */
+.skip-link {
+  position: fixed; left: var(--sp-2); top: -80px; z-index: var(--zi-boot-error);
+  padding: var(--sp-3) var(--sp-4); background: var(--ink); color: var(--bg);
+  border-radius: var(--r-btn); font-weight: var(--w-semi); text-decoration: none;
+}
+.skip-link:focus { top: var(--sp-2); }
+
+/* ---------- buttons: flat slabs with a hard under-edge that closes when pressed ---------- */
+/* The standard button: a flat slab with a hard under-edge. The --b-* values are what the variants change. */
+.btn {
+  --b-bg: var(--paper);
+  --b-fg: var(--ink);
+  --b-edge: var(--line);
+  --b-lift: 2px;
+  appearance: none;
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: var(--tap); min-width: var(--tap); max-width: 100%;
+  padding: 0 var(--sp-4);
+  font: var(--w-semi) var(--fs-3) / 1.15 var(--font-body);
+  text-align: center; text-decoration: none;
+  color: var(--b-fg); background: var(--b-bg);
+  border: var(--bw) solid var(--b-edge); border-radius: var(--r-btn);
+  box-shadow: 0 var(--b-lift) 0 var(--b-edge);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), background-color var(--dur-fast);
+  user-select: none; -webkit-user-select: none;
+}
+.btn > span { min-width: 0; }
+/* Hover (mouse only; a media query is a rule that applies only on certain devices) darkens a little. */
+@media (hover: hover) { .btn:hover:not(:disabled):not([aria-disabled="true"]) { background: color-mix(in srgb, var(--b-bg) 88%, var(--ink)); } }
+/* Pressed: the button sinks by the height of its under-edge, like pushing a key. */
+.btn:active:not(:disabled):not([aria-disabled="true"]),
+.btn.is-pressed {
+  transform: translateY(var(--b-lift));
+  box-shadow: 0 0 0 var(--b-edge);
+}
+/* A pressed-in (switched on) button turns dark with light text. */
+.btn[aria-pressed="true"] { --b-bg: var(--ink); --b-fg: var(--bg); --b-edge: var(--ink); }
+/* Variants: main action (amber, taller), done (sage), danger (red), ghost (no box), sizes, full width. */
+.btn-primary {
+  --b-bg: var(--primary); --b-fg: var(--on-primary); --b-edge: var(--primary-edge); --b-lift: 3px;
+  min-height: var(--tap-lg); padding: 0 var(--sp-6);
+  font-family: var(--font-display); font-size: var(--fs-4); font-weight: var(--w-bold); letter-spacing: 0.02em;
+}
+.btn-success { --b-bg: var(--success); --b-fg: var(--on-success); --b-edge: var(--success-edge); --b-lift: 3px; font-weight: var(--w-bold); }
+.btn-danger { --b-bg: var(--danger); --b-fg: var(--on-danger); --b-edge: var(--danger-edge); --b-lift: 3px; font-weight: var(--w-bold); }
+.btn-ghost { --b-bg: transparent; --b-fg: var(--ink); --b-edge: transparent; --b-lift: 0px; box-shadow: none; }
+@media (hover: hover) { .btn-ghost:hover:not(:disabled) { background: var(--hover); } }
+.btn-ghost:active:not(:disabled) { background: var(--press); transform: none; }
+.btn-lg { min-height: var(--tap-lg); }
+.btn-sm { min-height: var(--tap-step); min-width: var(--tap-step); padding: 0 var(--sp-3); font-size: var(--fs-2); }
+.btn-icon { padding: 0; width: var(--tap); }
+.btn-icon.btn-sm { width: var(--tap-step); }
+.btn-block { display: flex; width: 100%; }
+/* Disabled buttons go flat and grey. */
+.btn:disabled, .btn[aria-disabled="true"] {
+  --b-bg: var(--sub); --b-fg: var(--ink3); --b-edge: var(--line-soft);
+  box-shadow: none; cursor: not-allowed;
+}
+.btn-ghost:disabled { --b-bg: transparent; }
+.btn .icon { margin: 0 -2px; }
+/* The back office is used with a mouse, so its buttons are a little shorter. */
+.office .btn { min-height: 40px; }
+.office .btn-primary, .office .btn-lg { min-height: 44px; }
+.office .btn-icon { width: 40px; }
+
+/* ---------- chips and badges ---------- */
+/* Chip: a small label. The data-tone value picks the colour: ok, warn, bad or info. */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  min-height: 28px; padding: 2px 10px;
+  font: var(--w-semi) var(--fs-2) / 1.2 var(--font-body);
+  color: var(--ink2); background: var(--sub);
+  border: 1.5px solid var(--line-soft); border-radius: var(--r-chip);
+}
+.chip[data-tone="ok"] { color: var(--sage-ink); background: var(--tint-ok); border-color: var(--sage); }
+.chip[data-tone="warn"] { color: var(--amber-ink); background: var(--tint-warn); border-color: var(--amber); }
+.chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-bad); border-color: var(--crimson); }
+.chip[data-tone="info"] { color: var(--ink); background: var(--sub); border-color: var(--line); }
+/* Chips that can be tapped are full 44 px buttons; .chip-mod is the bold modifier chip. */
+button.chip, .chip-btn {
+  min-height: var(--tap-step); padding: 0 var(--sp-3); border-width: var(--bw); border-color: var(--line); color: var(--ink); background: var(--paper); cursor: pointer;
+}
+button.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip-mod { color: var(--ink); background: var(--paper); border: var(--bw) solid var(--ink); font-weight: var(--w-bold); }
+/* station identity: icon + 3-letter code + hue, never hue alone */
+[data-zone="pit"] { --zc: var(--z-pit); }
+[data-zone="sides"] { --zc: var(--z-sides); }
+[data-zone="fry"] { --zc: var(--z-fry); }
+[data-zone="cold"] { --zc: var(--z-cold); }
+[data-zone="expo"] { --zc: var(--z-expo); }
+/* Station chip: a coloured bar on the left, always with an icon and the 3-letter code. */
+/* The grey default sits in :where() (zero weight) so the [data-zone] hue above always wins, whatever the rule order. */
+:where(.chip-zone) { --zc: var(--ink3); }
+.chip-zone {
+  font-family: var(--font-display); font-weight: var(--w-bold); letter-spacing: 0.04em; color: var(--ink);
+  background: var(--paper); border-color: var(--line-soft); border-left: 4px solid var(--zc); padding-left: 7px;
+}
+.chip-zone .icon { color: var(--zc); }
+
+/* Badge: time status shown as word, icon and colour (ok, warn, breach). */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  padding: 2px 9px 2px 7px; min-height: 28px;
+  font: var(--w-bold) var(--fs-2) / 1.15 var(--font-display); letter-spacing: 0.03em;
+  border: var(--bw) solid currentColor; border-radius: var(--r-chip);
+}
+.badge[data-level="ok"] { color: var(--sage-ink); background: var(--tint-ok); }
+.badge[data-level="warn"] { color: var(--amber-ink); background: var(--tint-warn); }
+.badge[data-level="breach"] { color: var(--crimson); background: var(--tint-bad); }
+
+/* ---------- segmented control (radio group, or tabs with kind:'tabs') ---------- */
+/* Segmented control: a row of options in one box; the chosen one turns dark. Also used as tabs. */
+.seg {
+  display: inline-flex; flex-wrap: wrap; gap: 3px; max-width: 100%; padding: 3px;
+  background: var(--sub); border: var(--bw) solid var(--line); border-radius: var(--r-btn);
+}
+.seg-opt {
+  appearance: none; flex: 1 1 auto; position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: var(--tap); min-width: var(--tap); padding: 0 var(--sp-3);
+  font: var(--w-semi) var(--fs-3) / 1.1 var(--font-body); color: var(--ink);
+  background: transparent; border: 0; border-radius: 5px; text-align: center;
+}
+@media (hover: hover) { .seg-opt:hover { background: var(--hover); } }
+.seg-opt:active { background: var(--press); }
+.seg-opt[aria-checked="true"], .seg-opt[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+.seg-opt:focus-visible { outline-offset: 0; }
+/* The count and the red alert dot shown on a station tab. */
+.seg-count {
+  min-width: 1.5em; padding: 0 5px; font: var(--w-bold) var(--fs-2) / 1.3 var(--font-display); font-variant-numeric: tabular-nums;
+  text-align: center; border-radius: var(--r-chip); background: color-mix(in srgb, currentColor 16%, transparent);
+}
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--crimson); box-shadow: 0 0 0 2px var(--bg); }
+.seg-opt[aria-checked="true"] .seg-dot, .seg-opt[aria-selected="true"] .seg-dot { box-shadow: 0 0 0 2px var(--ink); }
+.office .seg-opt { min-height: 36px; }
+/* On a touch screen or phone the back office gets full thumb-size controls too. */
+@media (pointer: coarse), (max-width: 719px) {
+  .office .btn, .office .seg-opt { min-height: 44px; }
+  .office .btn-icon { width: 44px; }
+}
+
+/* ---------- stepper: 44 px buttons, tabular numerals ---------- */
+/* Stepper: a box with minus and plus buttons around a number. The 44 px buttons are sized for a thumb. */
+.stepper {
+  display: inline-flex; align-items: stretch; max-width: 100%;
+  background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-btn); overflow: hidden;
+}
+.stepper-btn {
+  appearance: none; flex: none; display: inline-grid; place-items: center;
+  width: var(--tap-step); min-height: var(--tap-step); padding: 0;
+  font: var(--w-bold) var(--fs-3) / 1 var(--font-display); color: var(--ink);
+  background: var(--sub); border: 0; touch-action: manipulation;
+}
+.stepper-btn.is-minus { border-right: var(--bw) solid var(--line); }
+.stepper-btn.is-plus { border-left: var(--bw) solid var(--line); }
+.stepper-btn.is-big { width: var(--tap-step); font-size: var(--fs-2); color: var(--ink2); }
+@media (hover: hover) { .stepper-btn:hover:not(:disabled) { background: var(--hover); } }
+.stepper-btn:active:not(:disabled) { background: var(--press); }
+.stepper-btn:disabled { color: var(--ink3); background: var(--sub); cursor: not-allowed; opacity: 0.6; }
+.stepper-btn:focus-visible { outline-offset: -3px; }
+.stepper-field { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 56px; padding: 0 var(--sp-2); }
+.stepper-input {
+  width: 4.2ch; min-width: 0; height: var(--tap-step); padding: 0; text-align: center;
+  font: var(--w-bold) var(--fs-5) / 1 var(--font-display); font-variant-numeric: tabular-nums;
+  background: transparent; color: var(--ink); border: 0; border-radius: 0;
+}
+.stepper-input:focus-visible { outline-offset: 2px; }
+.stepper-unit { font-size: var(--fs-2); color: var(--ink3); white-space: nowrap; }
+.stepper.is-invalid { border-color: var(--crimson); }
+@media (max-width: 340px) { /* five-part steppers (-5 - value + +5) must still show every digit on a 280 px phone */
+  .stepper-btn.is-big { width: 34px; }
+  .stepper-field { padding: 0 var(--sp-1); gap: 2px; min-width: 0; }
+  .stepper-input { width: 4.2ch; font-size: var(--fs-3); }
+}
+
+/* ---------- form fields: 2 px zinc borders, amber focus ---------- */
+/* A field is a label, the box, a hint and an error message stacked together. */
+.field { display: grid; gap: 6px; min-width: 0; }
+.field-label { font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink); }
+.field-hint { font-size: var(--fs-1); color: var(--ink3); }
+.field-error { display: flex; align-items: flex-start; gap: 6px; font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--crimson); }
+.field-error[hidden] { display: none; }
+/* Text box, drop-down and notes box share one look: 2 px border, amber when focused, red when invalid. */
+.input, .select, .textarea {
+  appearance: none; width: 100%; min-width: 0; min-height: var(--tap); padding: 10px 12px;
+  font-size: var(--fs-3); color: var(--ink); background: var(--paper);
+  border: var(--bw) solid var(--line); border-radius: var(--r-field);
+}
+.textarea { min-height: 96px; resize: vertical; line-height: var(--lh-body); }
+.select { appearance: auto; }
+.input::placeholder, .textarea::placeholder { color: var(--ink3); opacity: 1; }
+.input:focus, .select:focus, .textarea:focus { border-color: var(--amber); }
+.input[aria-invalid="true"], .select[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--crimson); }
+.input:disabled, .select:disabled, .textarea:disabled { background: var(--sub); color: var(--ink3); cursor: not-allowed; }
+/* Check boxes and radio buttons are 24 px and amber. */
+input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-color: var(--amber); flex: none; }
+.office .input, .office .select { min-height: 40px; }
+
+/* On/off switch: a track with a round thumb that slides right when on and shows a tick. */
+.toggle {
+  appearance: none; display: inline-flex; align-items: center; gap: var(--sp-3); max-width: 100%;
+  min-height: var(--tap); padding: 0; text-align: left; background: none; border: 0; color: var(--ink);
+  font-weight: var(--w-semi);
+}
+.toggle-track {
+  position: relative; flex: none; width: 56px; height: 32px;
+  background: var(--sub); border: var(--bw) solid var(--line); border-radius: var(--r-pill);
+  transition: background-color var(--dur) var(--ease-out), border-color var(--dur);
+}
+.toggle-thumb {
+  position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; display: grid; place-items: center;
+  color: var(--bg); background: var(--ink); border-radius: 50%;
+  transition: transform var(--dur) var(--ease-out), background-color var(--dur);
+}
+.toggle-thumb .icon { opacity: 0; transition: opacity var(--dur); }
+.toggle[aria-checked="true"] .toggle-track { background: var(--success); border-color: var(--success-edge); }
+.toggle[aria-checked="true"] .toggle-thumb { transform: translateX(24px); background: var(--paper); color: var(--sage-ink); }
+.toggle[aria-checked="true"] .toggle-thumb .icon { opacity: 1; }
+.toggle:disabled { opacity: 0.55; cursor: not-allowed; }
+.toggle-label { min-width: 0; }
+
+/* ---------- surfaces ---------- */
+/* Panels, wells and dividers group content; .kbd is a key cap; .empty is the "nothing here" message. */
+.panel { background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-panel); padding: var(--sp-4); min-width: 0; }
+.panel-soft { background: var(--paper); border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-panel); padding: var(--sp-4); min-width: 0; }
+.well { background: var(--sub); border-radius: var(--r-panel); padding: var(--sp-3) var(--sp-4); min-width: 0; }
+.divider { height: 0; margin: var(--sp-3) 0; border: 0; border-top: var(--bw-thin) solid var(--line-soft); }
+.kbd {
+  display: inline-block; min-width: 1.9em; padding: 1px 7px; text-align: center;
+  font: var(--w-bold) var(--fs-2) / 1.4 var(--font-display); color: var(--ink);
+  background: var(--paper); border: var(--bw-thin) solid var(--line); border-bottom-width: 3px; border-radius: var(--r-chip);
+}
+.empty { display: grid; justify-items: center; gap: var(--sp-3); padding: var(--sp-8) var(--sp-4); text-align: center; color: var(--ink2); }
+.empty h2, .empty h3 { color: var(--ink); }
+.empty p { max-width: 40ch; }
+
+/* meter: relative values (stock, progress) read as length; the figure sits next to it */
+.meter {
+  --v: 0; --thr: 0; --mf: var(--sage);
+  position: relative; height: 14px; min-width: 40px;
+  background: var(--meter-track); border: var(--bw) solid var(--line); border-radius: 3px; overflow: hidden;
+}
+.meter > i { position: absolute; inset: 0 auto 0 0; display: block; width: calc(var(--v) * 1%); background: var(--mf); max-width: 100%; }
+.meter[data-tone="warn"] { --mf: var(--amber); }
+/* A warn meter also gets stripes, so the state is not shown by colour alone. */
+.meter[data-tone="warn"] > i { background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0 4px, transparent 4px 8px); }
+.meter[data-tone="bad"] { --mf: var(--crimson); }
+/* The dark tick marks the threshold on the meter. */
+.meter-tick { position: absolute; top: 0; bottom: 0; left: calc(var(--thr) * 1%); width: 2px; margin-left: -1px; background: var(--ink); }
+.meter-lg { height: 20px; }
+
+/* ---------- sheets: right panel on wide screens, full-screen on phones ---------- */
+/* A sheet is a pop-up panel over the board: the backdrop dims the screen and the panel slides in. */
+.sheet-host, .toast-host, .live-region { font-family: var(--font-body); }
+.sheet-root { position: fixed; inset: 0; z-index: var(--zi-sheet); display: flex; justify-content: flex-end; align-items: stretch; color: var(--ink); }
+.sheet-root[data-side="center"] { justify-content: center; align-items: center; padding: var(--sp-4); }
+.sheet-backdrop { position: absolute; inset: 0; background: var(--scrim); animation: sb-fade-in var(--dur) ease-out both; }
+.sheet {
+  position: relative; z-index: 1; display: flex; flex-direction: column; min-width: 0;
+  width: min(var(--sheet-w, 560px), 100vw); max-width: 100%; height: 100%;
+  background: var(--bg); color: var(--ink); border-left: var(--bw) solid var(--line); box-shadow: var(--shadow-pop);
+  animation: sb-sheet-in var(--dur-slow) var(--ease-out) both;
+}
+.sheet:focus { outline: none; }
+/* The dialog version sits in the middle and fades in; the full version takes the whole screen. */
+.sheet-root[data-side="center"] .sheet {
+  width: min(var(--sheet-w, 480px), 100%); height: auto; max-height: 100%;
+  border: var(--bw) solid var(--line); border-radius: var(--r-dialog);
+  animation: sb-dialog-in var(--dur) var(--ease-out) both;
+}
+.sheet-root[data-side="full"] .sheet { width: 100%; border-left: 0; }
+/* Sheet parts: header (title and close button), scrolling body, footer (buttons). */
+.sheet-head {
+  flex: none; display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4); min-height: 64px;
+  background: var(--sub); border-bottom: var(--bw) solid var(--line);
+}
+.sheet-root[data-side="center"] .sheet-head { border-radius: calc(var(--r-dialog) - 2px) calc(var(--r-dialog) - 2px) 0 0; }
+.sheet-title { flex: 1 1 auto; min-width: 0; font-size: var(--fs-5); font-weight: var(--w-bold); line-height: var(--lh-snug); }
+.sheet-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--sp-4); overscroll-behavior: contain; }
+.sheet-foot {
+  flex: none; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom));
+  background: var(--sub); border-top: var(--bw) solid var(--line);
+}
+.sheet-root[data-side="center"] .sheet-foot { border-radius: 0 0 calc(var(--r-dialog) - 2px) calc(var(--r-dialog) - 2px); }
+.sheet-foot:empty { display: none; }
+/* Closing plays the movement backwards, a little faster. */
+.sheet-root.is-closing .sheet-backdrop { animation: sb-fade-out 140ms ease-in both; }
+.sheet-root.is-closing .sheet { animation: sb-sheet-out 140ms ease-in both; }
+.sheet-root.is-closing[data-side="center"] .sheet { animation: sb-dialog-out 120ms ease-in both; }
+.sheet-copy { max-width: var(--measure); }
+.sheet-copy > * + * { margin-top: var(--sp-3); }
+/* Phones (640 px wide or less): the sheet fills the screen and footer buttons share the row. */
+@media (max-width: 640px) {
+  .sheet-root[data-side="right"] .sheet { width: 100%; border-left: 0; }
+  .sheet-root[data-side="center"] { padding: var(--sp-3); }
+  .sheet-foot > .btn { flex: 1 1 140px; }
+}
+/* Very narrow phones (360 px or less): tighter side space and full-width footer buttons. */
+@media (max-width: 360px) {
+  .sheet-head { padding-left: var(--sp-3); }
+  .sheet-body, .sheet-foot { padding-left: var(--sp-3); padding-right: var(--sp-3); }
+  .sheet-foot > .btn { flex-basis: 100%; }
+}
+
+/* ---------- toast: inverse strip, one action, drain bar flush on the bottom edge ---------- */
+/* Toasts: dark message strips at the bottom centre, each with a tone stripe, one action, a draining bar. */
+.toast-host {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: max(var(--sp-4), env(safe-area-inset-bottom));
+  z-index: var(--zi-toast); display: flex; flex-direction: column; gap: var(--sp-2); align-items: stretch;
+  width: min(580px, calc(100vw - 2 * var(--gutter))); pointer-events: none;
+}
+.toast {
+  --tc: var(--inv-accent);
+  position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); min-width: 0; overflow: hidden; pointer-events: auto;
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4); min-height: 56px;
+  color: var(--inv-ink); background: var(--inv-bg);
+  border: var(--bw) solid var(--inv-line); border-left: 6px solid var(--tc); border-radius: var(--r-btn);
+  box-shadow: var(--shadow-pop);
+  animation: sb-toast-in var(--dur) var(--ease-out) both;
+}
+/* The tone sets the stripe and icon colour. */
+.toast[data-tone="info"] { --tc: var(--inv-ink2); }
+.toast[data-tone="ok"] { --tc: var(--inv-ok); }
+.toast[data-tone="warn"] { --tc: var(--inv-warn); }
+.toast[data-tone="bad"] { --tc: var(--inv-bad); }
+.toast.is-leaving { animation: sb-toast-out 140ms ease-in both; }
+.toast-icon { flex: none; color: var(--tc); }
+.toast-actions { display: flex; align-items: center; gap: var(--sp-1); margin-left: auto; flex: none; }
+.toast-msg { flex: 1 1 14ch; min-width: 0; font-size: var(--fs-3); font-weight: var(--w-semi); line-height: 1.25; }
+/* Buttons inside a toast are outlined in the toast accent colour. */
+.toast .btn {
+  --b-bg: transparent; --b-fg: var(--inv-accent); --b-edge: var(--inv-accent); --b-lift: 0px;
+  min-height: var(--tap); box-shadow: none; font-weight: var(--w-bold); flex: none;
+}
+.toast .btn-ghost { --b-edge: transparent; --b-fg: var(--inv-ink2); min-width: var(--tap); }
+@media (hover: hover) { .toast .btn:hover { background: color-mix(in srgb, var(--inv-ink) 12%, transparent) !important; } }
+/* The bar along the bottom edge; the code shrinks it over the 10 seconds you get to undo. */
+.toast-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--tc); transform-origin: left center; transform: scaleX(1); }
+
+/* ---------- menu and tooltip ---------- */
+/* Pop-up menu: a catch-all layer behind it, the menu box, its rows. On phones it rises from the bottom. */
+.menu-layer { position: fixed; inset: 0; z-index: var(--zi-menu); }
+.menu-backdrop { position: absolute; inset: 0; background: transparent; }
+.menu {
+  position: fixed; z-index: 1; display: flex; flex-direction: column; min-width: 220px; max-width: min(380px, calc(100vw - 16px)); overflow: auto;
+  padding: 4px; color: var(--ink); background: var(--paper);
+  border: var(--bw) solid var(--line); border-radius: var(--r-btn); box-shadow: var(--shadow-pop);
+  animation: sb-menu-in var(--dur-fast) var(--ease-out) both;
+}
+.menu-item {
+  appearance: none; display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-height: var(--tap); padding: 0 var(--sp-3);
+  font: var(--w-semi) var(--fs-3) / 1.2 var(--font-body); text-align: left; color: var(--ink); background: transparent; border: 0; border-radius: 5px;
+}
+.menu-item > .menu-label { flex: 1 1 auto; min-width: 0; }
+.menu-item .menu-check { flex: none; width: 20px; color: var(--sage-ink); }
+@media (hover: hover) { .menu-item:hover:not([aria-disabled="true"]) { background: var(--hover); } }
+.menu-item:focus-visible { outline-offset: -3px; background: var(--hover); }
+.menu-item[data-danger] { color: var(--crimson); }
+.menu-item[aria-disabled="true"] { color: var(--ink3); cursor: not-allowed; }
+.menu-sep { height: 0; margin: 4px 6px; border-top: var(--bw-thin) solid var(--line-soft); }
+.menu-heading { padding: var(--sp-2) var(--sp-3) 2px; font-size: var(--fs-1); font-weight: var(--w-semi); color: var(--ink3); }
+.menu[data-mobile] { left: 0; right: 0; bottom: 0; top: auto; width: 100%; max-width: none; border-radius: var(--r-dialog) var(--r-dialog) 0 0; border-bottom: 0; padding-bottom: max(4px, env(safe-area-inset-bottom)); animation-name: sb-sheet-up; }
+.menu-layer[data-mobile] .menu-backdrop { background: var(--scrim); }
+
+/* Tooltip: a small dark note near a control. It never takes clicks. */
+.tooltip {
+  position: fixed; z-index: var(--zi-tooltip); max-width: 240px; padding: 6px 10px; pointer-events: none;
+  font-size: var(--fs-1); font-weight: var(--w-semi); line-height: 1.3; color: var(--inv-ink); background: var(--inv-bg);
+  border: var(--bw-thin) solid var(--inv-line); border-radius: var(--r-chip); box-shadow: var(--shadow-pop);
+}
+
+/* ---------- PIN keypad ---------- */
+/* PIN entry: dots show how many digits are typed, keys sit in a 3-column grid, a wrong PIN shakes. */
+.pin-dots { display: flex; justify-content: center; gap: var(--sp-4); margin: var(--sp-2) 0 var(--sp-3); }
+.pin-dot { width: 18px; height: 18px; border: var(--bw) solid var(--ink); border-radius: 50%; background: transparent; transition: background-color var(--dur-fast); }
+.pin-dot.is-on { background: var(--ink); }
+.pin-msg { min-height: 2.6em; text-align: center; font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink2); }
+.pin-msg[data-tone="bad"] { color: var(--crimson); }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); max-width: 300px; margin: 0 auto; }
+.key { min-height: 64px; padding: 0; font-family: var(--font-display); font-size: var(--fs-6); font-weight: var(--w-bold); line-height: 1; }
+.key.is-aux { font-size: var(--fs-3); font-family: var(--font-body); font-weight: var(--w-semi); color: var(--ink2); }
+.pin-shake { animation: sb-shake 380ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+.pin-note { margin-top: var(--sp-4); text-align: center; font-size: var(--fs-1); color: var(--ink3); }
+
+/* ---------- shell layers ---------- */
+/* The shell holds two full-screen layers: the floor (always on) and the back office (opens on top). */
+.sb-shell { position: fixed; inset: 0; overflow: hidden; background: var(--bg); color: var(--ink); }
+.layer {
+  position: absolute; inset: 0; display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  overflow: auto; overscroll-behavior: contain; background: var(--bg); color: var(--ink);
+}
+.layer:focus { outline: none; }
+.layer-floor { z-index: var(--zi-base); }
+.layer-office { z-index: var(--zi-layer-office); }
+/* Promote the office to its own compositor layer while its clip-path circle animates. Without this, Chromium culls the floor and the veil
+   beneath the circle's whole bounding box, leaving undimmed or black patches outside the circle (seen in headless Chromium with software raster). */
+.layer-office.is-igniting, .layer-office.is-snuffing { will-change: clip-path; }
+.layer[inert] { pointer-events: none; }
+/* Ignition (floor to office): a dark veil dims the floor, glow sits above it, the office fades in last. */
+.ignite-veil { position: absolute; inset: 0; z-index: calc(var(--zi-layer-office) - 50); background: #0B0907; opacity: 0; pointer-events: none; transition: opacity 180ms ease-out; }
+.sb-shell.is-igniting .ignite-veil, .sb-shell.is-snuffing .ignite-veil { opacity: 0.66; }
+.ignite-fx { position: absolute; inset: 0; z-index: var(--zi-fx); overflow: hidden; pointer-events: none; }
+.layer-office.is-igniting > * { animation: sb-office-in 340ms var(--ease-out) 540ms both; }
+.layer-office.is-snuffing > * { animation: sb-office-out 170ms ease-in both; }
+/* Live region: text read aloud by screen readers, never shown. */
+.live-region { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+
+/* Declares --er as a length so the browser can animate the ring size smoothly. */
+@property --er { syntax: "<length>"; inherits: false; initial-value: 0px; }
+/* The glowing ring on the edge of the opening circle. The code adds it during the ignition only. */
+.ember-ring {
+  position: absolute; inset: 0; pointer-events: none; --er: 0px;
+  background: radial-gradient(circle at var(--ox, 50%) var(--oy, 50%),
+    transparent calc(var(--er) - 120px),
+    rgba(232, 116, 59, 0.24) calc(var(--er) - 26px),
+    rgba(255, 170, 96, 0.9) calc(var(--er) - 6px),
+    #FFF1D6 calc(var(--er) - 2px),
+    #FFF1D6 calc(var(--er) + 1px),
+    rgba(232, 116, 59, 0.6) calc(var(--er) + 6px),
+    rgba(190, 62, 22, 0.24) calc(var(--er) + 44px),
+    transparent calc(var(--er) + 100px));
+}
+/* Wisp: a faint smoke puff that rises and fades. Its place, size and timing are set by the code. */
+.wisp {
+  position: absolute; left: var(--x); top: var(--y); width: var(--w); height: var(--h); margin: calc(var(--h) / -2) 0 0 calc(var(--w) / -2);
+  border-radius: 50%; opacity: 0; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(226, 208, 188, 0.62), rgba(226, 208, 188, 0) 74%);
+  animation: sb-wisp var(--d) var(--delay) ease-out both;
+}
+
+/* brand mark and its flicker (taps 3 and 4 of the secret gesture) */
+.brand {
+  appearance: none; display: inline-flex; align-items: center; gap: var(--sp-2); min-height: var(--tap); padding: 0 var(--sp-3) 0 var(--sp-1);
+  color: var(--ink); background: none; border: 0; border-radius: var(--r-btn);
+  font: var(--w-heavy) var(--fs-5) / 1 var(--font-display); letter-spacing: 0.02em;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.brand-mark { flex: none; }
+.brand-mark .bm-flame { transform-box: fill-box; transform-origin: 50% 100%; }
+.brand-mark.is-flicker .bm-flame { animation: sb-flicker 380ms ease-in-out both; }
+
+/* placeholders (shell testable alone) and error cards */
+.ph { display: grid; gap: var(--sp-3); align-content: start; padding: var(--sp-4); max-width: 880px; width: 100%; margin: 0 auto; }
+.ph-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4); background: var(--sub); border-bottom: var(--bw) solid var(--line); }
+.ph-note { padding: var(--sp-4); border: var(--bw) dashed var(--line); border-radius: var(--r-panel); background: var(--paper); }
+.error-card {
+  max-width: 580px; width: 100%; margin: var(--sp-6) auto; padding: var(--sp-5); display: grid; gap: var(--sp-3);
+  background: var(--paper); color: var(--ink); border: var(--bw) solid var(--crimson); border-left-width: 8px; border-radius: var(--r-panel); box-shadow: var(--shadow);
+}
+.error-card h2 { display: flex; align-items: center; gap: var(--sp-2); color: var(--crimson); }
+.error-detail { max-height: 180px; overflow: auto; padding: var(--sp-3); background: var(--sub); border-radius: var(--r-chip); font-size: var(--fs-1); white-space: pre-wrap; overflow-wrap: anywhere; }
+.boot-error { position: fixed; inset: 0; z-index: var(--zi-boot-error); display: grid; align-items: center; padding: var(--sp-4); overflow: auto; background: var(--bg); color: var(--ink); }
+
+/* ---------- the ticket slip: thermal paper on a clip, perforated under the header, torn along the bottom ----------
+   Markup:  <article class="slip" data-level="ok|warn|breach">
+              <span class="slip-clip"></span>
+              <div class="slip-head"> ... <span class="stamp">Rush</span> </div>
+              <div class="slip-body"> notes + .slip-item rows + .slip-foot </div>
+              <div class="slip-tear"></div>
+            </article>
+   The wrapper carries the drop shadow (a mask would clip a box-shadow), head/body/tear carry paper and mask.            */
+.slip {
+  --sb: var(--slip-line);
+  --notch-r: 9px;
+  position: relative; display: block; min-width: 0; padding-top: 10px; color: var(--ink);
+  filter: var(--shadow-slip);
+}
+.slip[data-level="warn"] { --sb: var(--amber); }
+.slip[data-level="breach"] { --sb: var(--crimson); }
+/* The metal clip at the top of the slip, drawn from a gradient and two small pieces. */
+.slip-clip {
+  position: absolute; z-index: 3; top: 0; left: 50%; width: 50px; height: 20px; margin-left: -25px;
+  background: linear-gradient(180deg, var(--clip-hi) 0, var(--clip-mid) 48%, var(--clip-lo) 100%);
+  border: 1.5px solid rgba(30, 34, 36, 0.62); border-radius: 4px 4px 7px 7px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+.slip-clip::before { content: ""; position: absolute; left: 6px; right: 6px; top: 8px; height: 2px; border-radius: 1px; background: rgba(30, 34, 36, 0.5); }
+.slip-clip::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 18px; height: 5px; margin-left: -9px; border-radius: 0 0 4px 4px; background: var(--clip-lo); border: 1.5px solid rgba(30, 34, 36, 0.62); border-top: 0; }
+/* Head, body and tear are three stacked pieces of paper that share the slip colour and side border. */
+.slip-head, .slip-body, .slip-tear {
+  position: relative; display: block; min-width: 0; color: var(--slip-ink); background: var(--slip);
+  border-style: solid; border-color: var(--sb); border-width: 0 var(--bw);
+}
+/* Header: number, customer, timer. A mask cuts half-circle holes in its bottom corners (the punched edge). */
+.slip-head {
+  padding: var(--sp-4) var(--sp-3) var(--sp-3);
+  border-width: var(--bw) var(--bw) 0; border-radius: var(--r-slip) var(--r-slip) 0 0;
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-1) var(--sp-3);
+  --mask-perf: radial-gradient(circle var(--notch-r) at 0 100%, transparent 98%, #000) left / 51% 100% no-repeat,
+               radial-gradient(circle var(--notch-r) at 100% 100%, transparent 98%, #000) right / 51% 100% no-repeat;
+  -webkit-mask: var(--mask-perf); mask: var(--mask-perf);
+}
+.slip-head::after { /* the perforation: pin-pricked dashed line */
+  content: ""; position: absolute; left: calc(var(--notch-r) + 4px); right: calc(var(--notch-r) + 4px); bottom: 0; height: 0;
+  border-top: var(--bw) dashed var(--slip-rule); pointer-events: none;
+}
+/* Body: matching holes in the top corners; holds the notes and item rows. */
+.slip-body {
+  --mask-perf-top: radial-gradient(circle var(--notch-r) at 0 0, transparent 98%, #000) left / 51% 100% no-repeat,
+                   radial-gradient(circle var(--notch-r) at 100% 0, transparent 98%, #000) right / 51% 100% no-repeat;
+  -webkit-mask: var(--mask-perf-top); mask: var(--mask-perf-top);
+  padding: var(--sp-1) 0 0;
+}
+/* Tear: a short strip masked into 16 px zigzag teeth, the torn bottom edge. */
+.slip-tear {
+  height: var(--tear-h); border-width: 0 var(--bw);
+  --tooth: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 8' preserveAspectRatio='none'%3E%3Cpath d='M0 0H16L8 8Z'/%3E%3C/svg%3E");
+  -webkit-mask: var(--tooth) left bottom / var(--tear-w) var(--tear-h) repeat-x; mask: var(--tooth) left bottom / var(--tear-w) var(--tear-h) repeat-x;
+}
+/* Overdue slips get a red inner line and a slow pulsing border (stopped under reduced motion). */
+.slip[data-level="breach"] .slip-head, .slip[data-level="breach"] .slip-body, .slip[data-level="breach"] .slip-tear {
+  box-shadow: inset 0 0 0 1px var(--crimson);
+  animation: sb-slip-pulse 2s ease-in-out infinite;
+}
+/* Header contents: id (number, customer), time (timer, status), meta line, progress bar. */
+.slip-id { flex: 1 1 8rem; min-width: 0; }
+.slip-time { flex: none; margin-left: auto; text-align: right; display: grid; justify-items: end; gap: var(--sp-1); }
+.slip-num { display: block; font: var(--w-heavy) var(--fs-ticket) / 1 var(--font-display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
+.slip-who { display: block; margin-top: 2px; font-size: var(--fs-3); font-weight: var(--w-semi); color: var(--ink); }
+.slip-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); margin-top: var(--sp-1); font-size: var(--fs-2); color: var(--ink2); }
+.slip-timer { font: var(--w-bold) var(--fs-timer) / 1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--ink); }
+.slip-timer[data-level="warn"] { color: var(--amber-ink); }
+.slip-timer[data-level="breach"] { color: var(--crimson); }
+.slip-progress { flex: 1 0 100%; height: 8px; margin-top: var(--sp-1); background: var(--meter-track); border-radius: 1px; overflow: hidden; }
+.slip-progress > i { display: block; height: 100%; width: calc(var(--v, 0) * 1%); background: var(--sage); }
+/* Allergy and note strip: an amber box, always above the items. */
+.slip-note {
+  display: flex; align-items: flex-start; gap: var(--sp-2); margin: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) var(--sp-3); font-size: var(--fs-3); font-weight: var(--w-semi); line-height: 1.25;
+  color: var(--ink); background: var(--tint-warn); border: var(--bw) solid var(--amber); border-radius: var(--r-chip);
+}
+.slip-note .icon { color: var(--amber-ink); margin-top: 1px; }
+/* Item row: quantity, dish, station chip, modifier chips. Done rows are crossed out, waiting rows grey. */
+.slip-item {
+  --qty-w: 30px;
+  appearance: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3);
+  width: 100%; min-height: var(--tap-lg); padding: var(--sp-2) var(--sp-3);
+  font: var(--w-semi) var(--fs-item) / 1.2 var(--font-body); text-align: left; color: var(--ink);
+  background: transparent; border: 0; border-top: var(--bw-thin) solid var(--slip-rule); border-radius: 0;
+  transition: background-color var(--dur-fast);
+}
+.slip-item:first-child { border-top: 0; }
+.slip-item:active:not(:disabled) { background: var(--press); }
+.slip-item:focus-visible { outline-offset: -3px; }
+.slip-item[data-state="done"] { color: var(--ink3); }
+.slip-item[data-state="done"] .slip-name { text-decoration: line-through; text-decoration-thickness: 2px; }
+.slip-item[data-state="queued"] { color: var(--ink3); }
+.slip-qty { flex: none; width: var(--qty-w); font: var(--w-heavy) var(--fs-5) / 1 var(--font-display); font-variant-numeric: tabular-nums; text-align: right; }
+.slip-name { flex: 1 1 9ch; min-width: 0; }
+.slip-item > .chip { flex: none; margin-left: auto; } /* wraps under the name on a narrow slip instead of squeezing the dish name */
+.slip-mods { flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: var(--sp-1); padding-left: calc(var(--qty-w) + var(--sp-3)); }
+/* Footer buttons (All done here, Bump), and the short slide-in when a new slip prints. */
+.slip-foot { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3) var(--sp-3); }
+.slip-foot > .btn { flex: 1 1 11rem; }
+.is-printing { transform-origin: 50% 0; animation: sb-slip-print 280ms var(--ease-out) both; }
+
+/* ---------- the RUSH stamp: rubber ink, double ring, worn, thumps in once ---------- */
+/* The RUSH stamp: tilted, double ring, ink holes from a noise mask, thumps in once. Colour is --stamp. */
+.stamp {
+  --worn: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='70'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.6 2.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  display: inline-block; flex: none; padding: 7px 13px 6px; transform: rotate(-7deg); transform-origin: 50% 50%;
+  font: var(--w-heavy) var(--fs-4) / 1 var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
+  color: var(--stamp); border: 3px solid currentColor; border-radius: 4px; outline: 1.5px solid currentColor; outline-offset: -6.5px; opacity: 0.94;
+  -webkit-mask: var(--worn) center / 140px 70px; mask: var(--worn) center / 140px 70px;
+  animation: sb-stamp-in 150ms var(--ease-out) both; pointer-events: none;
+}
+.stamp-lg { font-size: var(--fs-6); padding: 9px 18px 8px; }
+/* Inside a slip header the stamp sits on the right, half over the progress bar, like a thumped impression. */
+.slip-head > .stamp, .slip-head > .slip-stamp { margin: calc(var(--sp-1) * -1) var(--sp-2) calc(var(--sp-2) * -1) auto; position: relative; z-index: 2; }
+
+/* ---------- keyframes ---------- */
+/* Keyframes are named movements: they say how a thing looks at the start, along the way and at the end. */
+@keyframes sb-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sb-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes sb-sheet-in { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes sb-sheet-out { from { transform: none; } to { transform: translateX(100%); } }
+@keyframes sb-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sb-dialog-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes sb-dialog-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(6px) scale(0.98); } }
+@keyframes sb-toast-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes sb-toast-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(10px); } }
+@keyframes sb-menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* Wrong-PIN shake. */
+@keyframes sb-shake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(5px); } 30%, 50%, 70% { transform: translateX(-9px); } 40%, 60% { transform: translateX(9px); } }
+@keyframes sb-office-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sb-office-out { from { opacity: 1; } to { opacity: 0; } }
+/* Smoke wisp: rises, grows, fades. */
+@keyframes sb-wisp {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.55); }
+  22% { opacity: var(--o, 0.5); }
+  100% { opacity: 0; transform: translate3d(var(--dx, 0px), calc(var(--rise, 120px) * -1), 0) scale(1.45); }
+}
+/* Flame flicker on the brand mark. */
+@keyframes sb-flicker {
+  0% { transform: scale(1, 1) skewX(0); }
+  18% { transform: scale(0.9, 1.14) skewX(-6deg); }
+  42% { transform: scale(1.07, 0.93) skewX(5deg); }
+  68% { transform: scale(0.94, 1.1) skewX(-3deg); }
+  100% { transform: scale(1, 1) skewX(0); }
+}
+@keyframes sb-flicker-glow { 0%, 100% { opacity: 1; } 40% { opacity: 0.45; } }
+/* Overdue slip pulse, new slip print-in, stamp thump. */
+@keyframes sb-slip-pulse { 0%, 100% { border-color: var(--crimson); } 50% { border-color: var(--amber); } }
+@keyframes sb-slip-print { from { opacity: 0; transform: translateY(-16px) scaleY(0.9); } to { opacity: 1; transform: none; } }
+@keyframes sb-stamp-in { from { opacity: 0; transform: rotate(-14deg) scale(1.7); } to { opacity: 0.94; transform: rotate(-7deg) scale(1); } }
+
+/* ---------- scrollbars: visible, with enough contrast for gloved use ---------- */
+/* Standard properties first (normal-width bar, easy to grab with a glove). Current Chrome ignores the ::-webkit rules
+   once these are set, so the ::-webkit rules are kept only for older Safari that lacks scrollbar-color. */
+* { scrollbar-width: auto; scrollbar-color: var(--line) var(--sub); }
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track { background: var(--sub); }
+  ::-webkit-scrollbar-thumb { background: var(--line); border: 2px solid var(--sub); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ink2); }
+}
+
+/* ---------- reduced motion: no sliding, shaking, pulsing or wiping. State changes stay visible without movement. ---------- */
+/* The person asked for less motion (a device setting): animations finish at once; shake and pulse stop. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  /* The flame flicker becomes a gentle fade; the PIN shake becomes a red outline. */
+  .brand-mark.is-flicker .bm-flame { animation: sb-flicker-glow 320ms ease-in-out 1 both !important; animation-duration: 320ms !important; }
+  .pin-shake { animation: none !important; outline: var(--bw) solid var(--crimson); }
+  /* The overdue pulse, the stamp thump and the print-in stop. */
+  .slip[data-level="breach"] .slip-head, .slip[data-level="breach"] .slip-body, .slip[data-level="breach"] .slip-tear { animation: none !important; }
+  .stamp, .is-printing { animation: none !important; }
+}

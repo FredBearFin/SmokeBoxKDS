@@ -1,0 +1,325 @@
+/*
+ * WHAT THIS FILE IS: Colours (the --ch-* tokens) and styles for the charts 50-charts.js draws, in a dark
+ *   "ember" and a light "paper" set. The script reads only these tokens, so a theme switch repaints
+ *   every chart.
+ * PARTS: tokens (ember, paper) | frame and text | tooltip | table | meter, ring, spark | animation.
+ * WORDS: --name is a named value (a custom property) and var(--name) uses it; px is a screen pixel.
+ * USES / USED BY: read by 50-charts.js; office pages put chart cards on background: var(--ch-surface).
+ */
+
+/* ---------- tokens: ember (default for any .office, dark) ---------- */
+/*
+ * Dark ember theme, the default for any .office page or .ch-scope area (color-scheme: dark makes form
+ *   controls dark too).
+ */
+.office,
+.ch-scope {
+  color-scheme: dark;
+  /* Card surface, text, axis, grid, track and tooltip colours. */
+  --ch-surface: #211D1A;          /* = --o-surface of the ember office, so cards and the 2px gaps between marks are the same colour */
+  --ch-text: #EEE6D6;
+  --ch-text2: #BCB3A4;
+  --ch-axis: #766E66;
+  --ch-grid: #332D28;
+  --ch-muted: #958D83;
+  --ch-track: #332D28;
+  --ch-tip-bg: #2B2622;
+  --ch-tip-line: #4A423B;
+
+  /*
+   * Categorical colours 1 to 8 (ember, slate, sage, brass, berry, teal, smoke violet, clay). The order
+   *   never changes: it keeps neighbouring colours apart for colour-blind readers.
+   */
+  --ch-1: #D26E23;
+  --ch-2: #4A72B6;
+  --ch-3: #5AA87A;
+  --ch-4: #906B02;
+  --ch-5: #9D598A;
+  --ch-6: #07A6A8;
+  --ch-7: #7A6DBC;
+  --ch-8: #CC7168;
+
+  /*
+   * Sequential ramp, one hue: seq-1 is the lowest value and seq-7 the highest. In this theme more is
+   *   brighter.
+   */
+  --ch-seq-1: #804536;
+  --ch-seq-2: #A65438;
+  --ch-seq-3: #C96736;
+  --ch-seq-4: #EA7D2E;
+  --ch-seq-5: #FD9D48;
+  --ch-seq-6: #FEC080;
+  --ch-seq-7: #FEDDB2;
+
+  /*
+   * Diverging ramp around a neutral middle: slate for negative, ember for positive, three steps each
+   *   side.
+   */
+  --ch-div-n3: #5AA4E8;
+  --ch-div-n2: #4982B6;
+  --ch-div-n1: #3F6181;
+  --ch-div-0:  #44403D;
+  --ch-div-p1: #7B533B;
+  --ch-div-p2: #AC6B42;
+  --ch-div-p3: #DB8650;
+
+  /* Status colours. They always appear with a shape and a word, and are never reused as series colours. */
+  --ch-ok: #5AC485;
+  --ch-warn: #EBBE42;
+  --ch-serious: #F28E42;
+  --ch-bad: #F66D67;
+}
+
+/* ---------- tokens: paper (light alternative) ---------- */
+/* Paper (light) theme: the same token names with light-surface values. */
+.office[data-otheme="paper"],
+.ch-scope[data-otheme="paper"] {
+  color-scheme: light;
+  --ch-surface: #FBF9F4;
+  --ch-text: #1E2224;
+  --ch-text2: #596164;
+  --ch-axis: #8A9093;
+  --ch-grid: #E6E2D8;
+  --ch-muted: #7A8285;
+  --ch-track: #E8E4DA;
+  --ch-tip-bg: #FFFFFF;
+  --ch-tip-line: #D3CDBF;
+
+  --ch-1: #C45F29;
+  --ch-2: #0E6B97;
+  --ch-3: #399067;
+  --ch-4: #815B05;
+  --ch-5: #905080;
+  --ch-6: #1199A1;
+  --ch-7: #8179D4;
+  --ch-8: #9D4D46;
+
+  /* Sequential ramp: in paper, more is deeper (rust), so heat-map code never checks the theme. */
+  --ch-seq-1: #D4A875;
+  --ch-seq-2: #CF8D52;
+  --ch-seq-3: #C67234;
+  --ch-seq-4: #B95717;
+  --ch-seq-5: #A84001;
+  --ch-seq-6: #912E03;
+  --ch-seq-7: #791D04;
+
+  --ch-div-n3: #2573B3;
+  --ch-div-n2: #619AD0;
+  --ch-div-n1: #9ABFE3;
+  --ch-div-0:  #E6E2DC;
+  --ch-div-p1: #DFAE98;
+  --ch-div-p2: #C88160;
+  --ch-div-p3: #A85427;
+
+  --ch-ok: #1C7D43;
+  --ch-warn: #8C640A;
+  --ch-serious: #B3510B;
+  --ch-bad: #B02A2A;
+}
+
+/* ---------- card (optional wrapper pages can use) ---------- */
+.ch-card {
+  background: var(--ch-surface);
+  border: 1px solid var(--ch-grid);
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 0;
+}
+
+/* ---------- chart root ---------- */
+/* Root box of every chart: position for the tooltip, font, text colour and aligned digits. */
+.ch {
+  position: relative;
+  display: block;
+  margin: 0;
+  min-width: 0;
+  color: var(--ch-text);
+  font-family: var(--font-body, Barlow, system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+}
+.ch *, .ch *::before, .ch *::after { box-sizing: border-box; }
+.ch[hidden], .ch [hidden] { display: none !important; }
+
+/* Header row: title and subtitle on the left, the View as table button on the right. */
+.ch-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 6px 12px; margin: 0 0 10px; min-width: 0; }
+.ch-head:empty { display: none; }
+.ch-titles { min-width: 0; flex: 1 1 11em; }
+.ch-title { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--ch-text); overflow-wrap: anywhere; }
+.ch-sub { margin: 2px 0 0; font-size: 13px; color: var(--ch-text2); overflow-wrap: anywhere; }
+
+/* The View as table button: a quiet outlined button with hover, pressed and keyboard-focus looks. */
+.ch-tbtn {
+  flex: 0 0 auto;
+  appearance: none;
+  min-height: 32px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ch-text2);
+  background: transparent;
+  border: 1px solid var(--ch-axis);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ch-tbtn:hover { color: var(--ch-text); border-color: var(--ch-text2); }
+.ch-tbtn[aria-pressed="true"] { color: var(--ch-text); background: var(--ch-track); border-color: var(--ch-text2); }
+.ch-tbtn:focus-visible, .ch-lg:focus-visible, .ch-tblwrap:focus-visible { outline: 2px solid var(--ch-text); outline-offset: 2px; }
+
+/* ---------- legend ---------- */
+/* Legend: a wrapping row of entries; each is a button that hides or shows its series. */
+.ch-legend { display: flex; flex-wrap: wrap; gap: 2px 14px; list-style: none; margin: 0 0 8px; padding: 0; }
+.ch-legend li { margin: 0; padding: 0; }
+.ch-lg {
+  appearance: none; display: inline-flex; align-items: center; gap: 7px;
+  min-height: 26px; padding: 2px 4px; margin: 0 -4px;
+  font: inherit; font-size: 13px; color: var(--ch-text); background: transparent; border: 0; border-radius: 4px; cursor: pointer;
+  text-align: left;
+}
+/*
+ * Legend entry states: hover, switched off (struck through) and fixed entries that do nothing on click;
+ *   .ch-sw is the swatch.
+ */
+.ch-lg:hover { background: var(--ch-track); }
+.ch-lg[aria-pressed="false"] { color: var(--ch-text2); text-decoration: line-through; text-decoration-color: var(--ch-axis); }
+.ch-lg[aria-pressed="false"] .ch-sw { opacity: .35; }
+.ch-lg[data-static] { cursor: default; }
+.ch-lg[data-static]:hover { background: transparent; }
+.ch-sw { flex: 0 0 auto; display: block; overflow: visible; }
+
+/* ---------- plot + svg ---------- */
+.ch-plot { position: relative; width: 100%; min-width: 0; }
+.ch-svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+/*
+ * Chart text: small and grey by default. .ch-t axis labels, .ch-v values, .ch-lbl labels, .ch-lbl2 quiet
+ *   labels, .ch-axt axis titles, .ch-in text inside a coloured mark.
+ */
+.ch-svg text { font-family: inherit; font-size: 12px; fill: var(--ch-text2); font-variant-numeric: tabular-nums; }
+.ch-svg .ch-t { fill: var(--ch-text2); }
+.ch-svg .ch-v { fill: var(--ch-text); font-weight: 600; }
+.ch-svg .ch-lbl { fill: var(--ch-text); }
+.ch-svg .ch-lbl2 { fill: var(--ch-text2); }
+.ch-svg .ch-axt { fill: var(--ch-text2); font-size: 12px; }
+.ch-svg .ch-in { font-weight: 600; font-size: 12px; }
+/*
+ * Lines and marks. .ch-halo outlines text in the surface colour so it stays readable over marks; .ch-gl
+ *   is the grid, .ch-ax the axis, .ch-ln a data line, .ch-ring a dot outline, .ch-xh the crosshair,
+ *   .ch-ldr a leader line, .ch-band-x a shaded band, .ch-rf a reference line.
+ */
+.ch-halo { paint-order: stroke; stroke: var(--ch-surface); stroke-width: 3px; stroke-linejoin: round; }
+.ch-gl { stroke: var(--ch-grid); stroke-width: 1; shape-rendering: crispEdges; fill: none; }
+.ch-ax { stroke: var(--ch-axis); stroke-width: 1; shape-rendering: crispEdges; fill: none; }
+.ch-ln { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ch-ring { stroke: var(--ch-surface); stroke-width: 2; }
+.ch-xh { stroke: var(--ch-text2); stroke-width: 1; shape-rendering: crispEdges; opacity: .85; }
+.ch-ldr { stroke: var(--ch-text2); stroke-width: 1; shape-rendering: crispEdges; opacity: .5; }
+.ch-band-x { fill: var(--ch-text); opacity: .06; }
+.ch-rf { stroke-width: 1.5; fill: none; }
+/*
+ * Invisible hover and tap areas, the keyboard focus ring, the hovered mark (slightly brighter) and
+ *   dimmed marks.
+ */
+.ch-hit { fill: transparent; stroke: none; }
+.ch-svg [data-m] { cursor: default; }
+
+.ch-m { outline: none; }
+.ch-m:focus-visible { outline: 2px solid var(--ch-text); outline-offset: 2px; }
+.ch-hot { filter: brightness(1.16); }
+.ch-dim { opacity: .35; }
+
+/* big numbers use the condensed display face, proportional figures */
+.ch-svg .ch-big, .ch-big-h { font-family: var(--font-display, "Barlow Condensed", "Arial Narrow", system-ui, sans-serif); font-weight: 600; fill: var(--ch-text); font-variant-numeric: proportional-nums; letter-spacing: 0; }
+.ch-big-h { color: var(--ch-text); }
+
+/* ---------- tooltip (fixed, one per chart, placed by JS and kept on screen) ---------- */
+.ch-tip {
+  position: fixed; left: 0; top: 0; z-index: 2147483000;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 8px 10px;
+  color: var(--ch-text); background: var(--ch-tip-bg);
+  border: 1px solid var(--ch-tip-line); border-radius: 6px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / .28);
+  font-size: 13px; line-height: 1.35;
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+/* Tooltip parts: heading, a grid of rows (colour key, value, name), a note and a status line. */
+.ch-tip-h { font-weight: 600; margin: 0 0 4px; color: var(--ch-text); }
+.ch-tip-n { margin: 4px 0 0; color: var(--ch-text2); font-size: 12px; }
+.ch-tip-rows { display: grid; grid-template-columns: auto auto 1fr; column-gap: 8px; row-gap: 2px; align-items: center; }
+.ch-tip-rows > * { min-width: 0; }
+.ch-tip-v { font-weight: 700; color: var(--ch-text); text-align: right; font-variant-numeric: tabular-nums; }
+.ch-tip-k { color: var(--ch-text2); }
+/*
+ * Colour keys in tooltip rows: a short line, a square (--box) or a dot (--dot); --ring is at the end of
+ *   the file.
+ */
+.ch-key { display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--k, var(--ch-1)); }
+.ch-key--box { height: 10px; width: 10px; border-radius: 2px; }
+.ch-key--dot { height: 9px; width: 9px; border-radius: 50%; }
+.ch-key svg { display: block; overflow: visible; }
+.ch-tip-st { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+
+/* ---------- empty + error + sr-only ---------- */
+.ch-empty {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 120px; padding: 16px; text-align: center;
+  color: var(--ch-text2); border: 1px solid var(--ch-grid); border-radius: 6px;
+}
+.ch-empty svg { flex: 0 0 auto; stroke: var(--ch-axis); }
+.ch-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* ---------- table twin ---------- */
+/* The data table scrolls in a capped box, keeps its header row in view and right-aligns the numbers. */
+.ch-tblwrap { max-height: 360px; overflow: auto; border: 1px solid var(--ch-grid); border-radius: 6px; background: var(--ch-surface); }
+.ch-tbl { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ch-text); }
+.ch-tbl caption { text-align: left; padding: 8px 10px; color: var(--ch-text2); font-size: 12px; caption-side: bottom; }
+.ch-tbl th, .ch-tbl td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--ch-grid); white-space: nowrap; }
+.ch-tbl th:first-child, .ch-tbl td:first-child { text-align: left; white-space: normal; }
+.ch-tbl thead th { position: sticky; top: 0; z-index: 1; background: var(--ch-surface); color: var(--ch-text2); font-weight: 600; border-bottom-color: var(--ch-axis); }
+.ch-tbl tbody th { font-weight: 500; color: var(--ch-text); }
+.ch-tbl tbody tr:last-child th, .ch-tbl tbody tr:last-child td { border-bottom: 0; }
+
+/* ---------- meter + ring + spark (html parts) ---------- */
+.ch-meter-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 5px; min-width: 0; }
+.ch-meter-l { min-width: 0; color: var(--ch-text); font-weight: 500; overflow-wrap: anywhere; }
+.ch-meter-r { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; color: var(--ch-text); font-weight: 600; text-align: right; }
+.ch-meter-st { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ch-text2); }
+.ch-meter-sub { margin: 4px 0 0; font-size: 12px; color: var(--ch-text2); }
+.ch-ringwrap { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.ch-ring-st { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ch-text); }
+.ch-ring-sub { color: var(--ch-text2); font-size: 13px; max-width: 28ch; }
+.ch--spark { display: inline-block; vertical-align: middle; }
+.ch--spark .ch-plot { width: auto; }
+.ch--spark .ch-svg { width: auto; }
+
+/* ---------- entry animation: a short reveal, first render only, never under reduced motion ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .ch--enter .ch-rv-up    { animation: ch-rv-up .32s cubic-bezier(.2,.7,.2,1) both; }
+  .ch--enter .ch-rv-right { animation: ch-rv-right .36s cubic-bezier(.2,.7,.2,1) both; }
+  .ch--enter .ch-rv-fade  { animation: ch-rv-fade .28s ease-out both; }
+}
+@keyframes ch-rv-up    { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0); } }
+@keyframes ch-rv-right { from { clip-path: inset(-10px 100% -10px -10px); } to { clip-path: inset(-10px); } }
+@keyframes ch-rv-fade  { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- texture: the opt-in identity channel (45 / 135 degrees only). Shown for the a11y setting, print and forced colours ---------- */
+.ch-tex { display: none; pointer-events: none; }
+.ch[data-texture="on"] .ch-tex { display: inline; }
+@media print { .ch-tex { display: inline; } .ch-tip { display: none !important; } .ch-tblwrap { max-height: none; } }
+@media (forced-colors: active) {
+  .ch-svg { forced-color-adjust: none; }
+  .ch-tex { display: inline; }
+  .ch-tbtn, .ch-lg { forced-color-adjust: auto; }
+}
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 480px) {
+  .ch-tbtn { margin-left: auto; }
+  .ch-legend { gap: 0 12px; }
+}
+.ch-key--ring { background: transparent; border: 2px solid var(--k, var(--ch-1)); }

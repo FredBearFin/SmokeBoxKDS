@@ -1,0 +1,59 @@
+/*
+ * WHAT THIS FILE IS: Styles for the "Show me how it works" walkthrough: the pulsing ring and the caption card.
+ * PARTS: the ring, the card, its text and buttons, small screens, reduced motion.
+ * USES: tokens from 00-tokens.css (--amber, --inv-*, --sp-*, --fs-*). Custom properties set by 74-floor-tour.js:
+ *    --tour-top (bottom edge of the header, where a top-docked card starts) and, when the card sits beside the
+ *    ticket, --tour-x, --tour-y, --tour-w. Also reads --fl-lift (height of the all-day strip) so the card sits
+ *    above that strip. Nothing here changes the board layout.
+ */
+
+/* The ring that points at what to tap: an amber outline drawn inside the element so no parent can clip it,
+   plus a soft halo that pulses. Inside is also where the paper slip keeps its own border. */
+.tour-ring {
+  outline: 4px solid var(--amber);
+  outline-offset: -4px;
+  animation: tour-pulse 1.4s var(--ease-in-out) infinite;
+}
+@keyframes tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--amber) 55%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--amber) 0%, transparent); }
+}
+@media (forced-colors: active) { .tour-ring { outline-color: Highlight; } }
+
+/* The caption card: dark so it stands apart from the white paper slips, centered, above the all-day strip
+   (or just under the header when it would cover what it points at). Above the board, below any sheet. */
+.tour-card {
+  position: fixed; z-index: var(--zi-fx); left: 50%; transform: translateX(-50%);
+  box-sizing: border-box; width: var(--tour-w, min(560px, calc(100vw - 2 * var(--sp-3)))); max-height: 60vh; overflow: auto;
+  display: grid; gap: var(--sp-3); padding: var(--sp-4);
+  color: var(--inv-ink); background: var(--inv-bg);
+  border: var(--bw) solid var(--inv-line); border-top: var(--sp-1) solid var(--inv-accent); border-radius: var(--r-dialog);
+  box-shadow: var(--shadow-pop);
+}
+.tour-card[hidden] { display: none; }
+.tour-card[data-dock="bottom"] { bottom: calc(var(--fl-lift, 0px) + var(--sp-3)); }
+.tour-card[data-dock="top"] { top: calc(var(--tour-top, 0px) + var(--sp-3)); }
+/* Beside the ticket (wide screens): left, top and width come from the script so the whole ticket stays clear. */
+.tour-card[data-dock="side"] { left: var(--tour-x, 0px); top: var(--tour-y, 0px); transform: none; }
+
+/* The step label and the plain-language sentence. Both scale with the Large text setting through the tokens. */
+.tour-say { display: grid; gap: var(--sp-1); }
+.tour-step { margin: 0; font: var(--w-semi) var(--fs-2) / var(--lh-snug) var(--font-body); letter-spacing: 0.02em; color: var(--inv-accent); }
+.tour-text { margin: 0; max-width: var(--measure); font: var(--w-medium) var(--fs-4) / var(--lh-snug) var(--font-body); }
+
+/* The buttons: light on the dark card, the main one in amber. Every one is at least the 48 px touch size. */
+.tour-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); }
+.tour-actions > [hidden] { display: none; }
+.tour-card .btn { min-height: var(--tap); }
+.tour-card .btn:not(.btn-primary) { --b-bg: var(--inv-ink); --b-fg: var(--inv-bg); --b-edge: var(--inv-line); }
+.tour-card :focus-visible { outline-color: var(--focus-inv); }
+
+/* Phones: tighter padding, and the buttons share the row so each stays easy to hit. */
+@media (max-width: 520px) {
+  .tour-card { padding: var(--sp-3); gap: var(--sp-2); }
+  .tour-text { font-size: var(--fs-3); }
+  .tour-actions .btn { flex: 1 1 auto; }
+}
+
+/* No pulse for people who asked for less motion; the ring itself stays. */
+@media (prefers-reduced-motion: reduce) { .tour-ring { animation: none; } }

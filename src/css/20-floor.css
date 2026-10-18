@@ -1,0 +1,525 @@
+/*
+ * WHAT THIS FILE IS: Styles for the floor board: the header with station tabs, the paper ticket slips, item
+ * rows, the empty state and the all-day strip. It builds on the shell's slip kit (.slip, .stamp, .chip).
+ * PARTS: scale, header, slip area, empty state, slips, rows, Fire now, narrow slips, strip, toasts, void.
+ * CUSTOM PROPERTIES: --fl-k is the screen scale (1 laptop, 1.2 at 1080p, 1.5 on a 1440p wall screen) and
+ *   --fl-tl is 1.2 under Large text. .fl re-declares the kit sizes (--fs-*, --sp-*, --tap*) times both, so
+ *   the board grows as one while sheets and toasts keep their size. --zc is a station hue, --fl-d a print-in
+ *   delay, --fl-lift the strip height (toasts sit above it) and --v a bar fill in percent.
+ */
+
+/* The scale: size tokens multiplied by screen size and Large text, set once on the board root. */
+.fl {
+  --fl-k: 1;
+  --fl-tl: 1;
+  --fs-1: calc(13px * var(--fl-k) * var(--fl-tl));
+  --fs-2: calc(15px * var(--fl-k) * var(--fl-tl));
+  --fs-3: calc(17px * var(--fl-k) * var(--fl-tl));
+  --fs-4: calc(20px * var(--fl-k) * var(--fl-tl));
+  --fs-5: calc(24px * var(--fl-k) * var(--fl-tl));
+  --fs-6: calc(32px * var(--fl-k) * var(--fl-tl));
+  --fs-7: calc(44px * var(--fl-k) * var(--fl-tl));
+  --fs-8: calc(64px * var(--fl-k) * var(--fl-tl));
+  --fs-ticket: calc(34px * var(--fl-k) * var(--fl-tl));
+  --fs-timer: calc(30px * var(--fl-k) * var(--fl-tl));
+  --fs-item: calc(19px * var(--fl-k) * var(--fl-tl));
+  --sp-1: calc(4px * var(--fl-k));
+  --sp-2: calc(8px * var(--fl-k));
+  --sp-3: calc(12px * var(--fl-k));
+  --sp-4: calc(16px * var(--fl-k));
+  --sp-5: calc(20px * var(--fl-k));
+  --sp-6: calc(24px * var(--fl-k));
+  --sp-7: calc(32px * var(--fl-k));
+  --sp-8: calc(40px * var(--fl-k));
+  --sp-9: calc(48px * var(--fl-k));
+  --sp-10: calc(64px * var(--fl-k));
+  --tap: calc(48px * var(--fl-k));
+  --tap-lg: calc(56px * var(--fl-k));
+  --tap-step: calc(44px * var(--fl-k));
+  --bw: calc(2px * var(--fl-k));
+  --bw-focus: calc(3px * var(--fl-k));
+  --tear-h: calc(8px * var(--fl-k));
+  --tear-w: calc(16px * var(--fl-k));
+  --r-btn: calc(8px * var(--fl-k));
+
+  display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0;
+  background: var(--bg); color: var(--ink);
+  font-size: var(--fs-3);
+}
+.text-large .fl { --fl-tl: 1.2; }
+@media (min-width: 1700px) { .fl { --fl-k: 1.2; } }
+@media (min-width: 2200px) { .fl { --fl-k: 1.5; } }
+
+/* The header: brand, station tabs, status chips, tool buttons, New ticket and Menu. */
+.fl-head {
+  position: relative; z-index: var(--zi-header); flex: none;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) calc(10px * var(--fl-k));
+  padding: calc(13px * var(--fl-k)) var(--sp-4) var(--sp-2);
+  background: var(--sub);
+  border-bottom: calc(6px * var(--fl-k)) solid var(--zc, var(--line)); /* station hue, readable from across the room */
+}
+.fl-brand { flex: none; display: flex; align-items: center; min-width: 0; }
+.fl-brand .brand { min-width: var(--tap); justify-content: center; padding: 0 var(--sp-1); }
+.fl-spacer { flex: 1 1 0; min-width: 0; margin-left: calc(-10px * var(--fl-k)); }
+.fl-status { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
+.fl-tools { display: flex; align-items: center; gap: var(--sp-1); flex: none; }
+
+/* station tabs: paper chips with a hue bar, the selected one lifts and gets an ink frame (inverse colours would bury the hue) */
+.fl-tabs { flex: 0 1 auto; min-width: 0; }
+.fl-seg.seg {
+  display: flex; flex-wrap: nowrap; gap: calc(5px * var(--fl-k)); padding: calc(3px * var(--fl-k)); max-width: 100%;
+  background: transparent; border: 0; border-radius: 0;
+}
+.fl-seg .seg-opt:not([data-zone]) { --zc: var(--ink); }
+.fl-seg .seg-opt {
+  position: relative; flex: 0 0 auto; gap: 5px; min-width: 0; padding: 0 calc(12px * var(--fl-k)) 0 calc(8px * var(--fl-k));
+  font-family: var(--font-display); font-size: calc(var(--fs-4) * 0.95); font-weight: var(--w-bold); letter-spacing: 0.04em; line-height: 1;
+  color: var(--ink); background: var(--paper);
+  border: var(--bw) solid var(--line-soft); border-bottom: calc(5px * var(--fl-k)) solid var(--zc); border-radius: var(--r-btn);
+}
+.fl-seg .seg-opt .icon { color: var(--zc); }
+@media (hover: hover) { .fl-seg .seg-opt:hover { background: var(--hover); } }
+.fl-seg .seg-opt[aria-selected="true"] {
+  background: var(--paper); color: var(--ink);
+  border-color: var(--ink); border-bottom-width: calc(8px * var(--fl-k));
+  box-shadow: var(--shadow); transform: translateY(calc(-2px * var(--fl-k)));
+}
+.fl-seg .seg-opt[aria-selected="true"] .seg-label { font-weight: var(--w-heavy); text-decoration: underline; text-decoration-thickness: calc(2px * var(--fl-k)); text-underline-offset: calc(4px * var(--fl-k)); }
+.fl-seg .seg-count { /* the live count rides on the corner so the tab stays narrow */
+  position: absolute; top: calc(-12px * var(--fl-k)); right: calc(-6px * var(--fl-k)); z-index: 1;
+  display: grid; place-items: center; min-width: calc(26px * var(--fl-k)); height: calc(24px * var(--fl-k)); padding: 0 calc(6px * var(--fl-k));
+  font: var(--w-heavy) var(--fs-3) / 1 var(--font-display); letter-spacing: 0;
+  color: var(--bg); background: var(--ink); border: calc(2px * var(--fl-k)) solid var(--sub); border-radius: calc(13px * var(--fl-k));
+}
+.fl-seg .seg-count[data-zero="true"] { color: var(--ink3); background: var(--sub); border-color: var(--line-soft); font-weight: var(--w-semi); }
+.fl-seg .seg-dot {
+  position: absolute; top: calc(-9px * var(--fl-k)); left: calc(-5px * var(--fl-k)); z-index: 1;
+  width: calc(16px * var(--fl-k)); height: calc(16px * var(--fl-k)); background: var(--crimson); box-shadow: none; border: calc(3px * var(--fl-k)) solid var(--sub);
+}
+
+/* status chips */
+.fl-chip {
+  min-height: var(--tap); padding: 0 calc(10px * var(--fl-k)); gap: calc(6px * var(--fl-k));
+  font-size: var(--fs-2); font-weight: var(--w-bold); line-height: 1.1; white-space: nowrap;
+  border-width: var(--bw); border-radius: var(--r-btn);
+}
+.fl-chip .icon { flex: none; }
+button.fl-chip { min-height: var(--tap); } /* the kit gives button chips 44 px; the header wants the full 48 */
+.fl-chip-w { display: none; }
+button.fl-chip[data-tone="info"] { background: var(--paper); }
+button.fl-chip[data-tone="warn"] { color: var(--amber-ink); background: var(--tint-warn); border-color: var(--amber); }
+button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-bad); border-color: var(--crimson); }
+.fl-chip-t { font-variant-numeric: tabular-nums; }
+@media (hover: hover) { button.fl-chip:hover { background: var(--hover); } }
+
+/* tools: icon over a short label, count badge on the corner */
+.fl-tool {
+  position: relative; flex-direction: column; gap: 1px; min-width: calc(48px * var(--fl-k)); min-height: var(--tap-lg); padding: var(--sp-1) calc(4px * var(--fl-k));
+  font-size: var(--fs-1); font-weight: var(--w-bold); line-height: 1.05;
+}
+.fl-tool-label { max-width: 100%; }
+.fl-tool-n {
+  position: absolute; top: calc(-8px * var(--fl-k)); right: calc(-6px * var(--fl-k));
+  min-width: calc(24px * var(--fl-k)); height: calc(24px * var(--fl-k)); padding: 0 calc(6px * var(--fl-k));
+  display: grid; place-items: center; border-radius: calc(12px * var(--fl-k));
+  font: var(--w-heavy) var(--fs-2) / 1 var(--font-display); color: var(--bg); background: var(--ink); border: calc(2px * var(--fl-k)) solid var(--sub);
+}
+.fl-tool[data-tone="warn"] { --b-bg: var(--tint-warn); --b-edge: var(--amber); --b-fg: var(--amber-ink); }
+.fl-tool[data-tone="warn"] .fl-tool-n { color: var(--on-primary); background: var(--primary); }
+.fl-tool[data-tone="bad"] { --b-bg: var(--tint-bad); --b-edge: var(--crimson); --b-fg: var(--crimson); }
+.fl-tool[data-tone="bad"] .fl-tool-n { color: var(--on-danger); background: var(--danger); }
+
+/* New ticket (the main button) and Menu, with a dot when something in the quick list needs a look. */
+.fl-new { flex: none; padding: 0 calc(14px * var(--fl-k)); font-size: calc(var(--fs-5) * 0.92); }
+.fl-menu { position: relative; flex: none; padding: 0 calc(11px * var(--fl-k)); }
+.fl-menu-label { display: none; }
+/* Back office: a tool-style button (icon over its name) that stays in the header at every width, so a manager never has to know a secret. Icon only on phones. */
+.fl-office { flex: none; min-width: calc(62px * var(--fl-k)); white-space: nowrap; }
+@media (max-width: 700px) {
+  .fl-office-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+  .fl-office { min-width: var(--tap); min-height: var(--tap); }
+}
+.fl-orders { flex: none; min-width: calc(62px * var(--fl-k)); white-space: nowrap; }
+@media (max-width: 700px) {
+  .fl-orders-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+  .fl-orders { min-width: var(--tap); min-height: var(--tap); }
+}
+.fl-menu-dot {
+  position: absolute; top: calc(6px * var(--fl-k)); right: calc(6px * var(--fl-k)); width: calc(14px * var(--fl-k)); height: calc(14px * var(--fl-k));
+  background: var(--amber); border: calc(3px * var(--fl-k)) solid var(--paper); border-radius: 50%;
+}
+/* The demo chip and the brand name stay hidden until the header has room, see the width ranges below. */
+.fl-demo-chip { display: none; }
+.fl-brand .brand > span { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+/* Roomy headers (1420 px of board width or more, once the scale is taken out) also show the demo clock chip.
+   Below that the Demo tool wears the clock speed instead. The three ranges are the three scales (1, 1.2, 1.5). */
+@media (min-width: 1420px) and (max-width: 1699.98px), (min-width: 1704px) and (max-width: 2199.98px), (min-width: 2200px) {
+  .fl-demo-chip { display: inline-flex; }
+}
+/* Roomier still (1670 px): also the brand name and the word "Sanitize". */
+@media (min-width: 1670px) and (max-width: 1699.98px), (min-width: 2004px) and (max-width: 2199.98px), (min-width: 2505px) {
+  .fl-brand .brand > span { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; clip-path: none; }
+  .fl-chip-w { display: inline; }
+}
+
+/* below 1180 the tools and chips move into the Menu button's list; the tabs and New ticket stay */
+@media (max-width: 1179.98px) {
+  .fl-status, .fl-tools { display: none; }
+}
+
+/* When the header is too tight for one row, the script sets data-fit: first the tab icons go, then the status chips, then the tool buttons too (all stay in the Menu list). */
+.fl-head[data-fit] .fl-seg .seg-opt .icon { display: none; }
+.fl-head[data-fit] .fl-seg .seg-opt { padding: 0 calc(12px * var(--fl-k)); }
+.fl-head[data-fit="status"] .fl-status, .fl-head[data-fit="tools"] .fl-status, .fl-head[data-fit="tools"] .fl-tools { display: none; }
+
+/* phones and small tablets: actions on top, the six station tabs underneath as one wide row (the DOM order is switched to match, see layoutHead) */
+@media (max-width: 900px) {
+  .fl-head { padding: var(--sp-2) var(--sp-3); }
+  .fl-tabs { flex: 1 0 100%; padding-top: calc(10px * var(--fl-k)); }
+  .fl-seg.seg { display: flex; width: 100%; }
+  .fl-seg .seg-opt { flex: 1 1 0; min-width: 0; }
+  .fl-new { flex: 1 1 auto; }
+  .fl-spacer { display: none; }
+}
+/* On a phone the four buttons (New ticket, Orders, Back office, Menu) need the whole row, so the logo steps aside and New ticket may shrink to fit. */
+@media (max-width: 520px) {
+  .fl-brand { display: none; }
+  .fl-new { flex: 1 1 0; min-width: 0; padding: 0 var(--sp-3); font-size: var(--fs-3); }
+}
+@media (max-width: 520px) {
+  .fl-seg .seg-opt { flex-direction: column; gap: 2px; padding: calc(3px * var(--fl-k)) 0; font-size: var(--fs-2); letter-spacing: 0.03em; }
+  .fl-seg .seg-count { top: calc(-9px * var(--fl-k)); right: calc(-2px * var(--fl-k)); min-width: calc(22px * var(--fl-k)); height: calc(22px * var(--fl-k)); font-size: var(--fs-2); padding: 0 calc(4px * var(--fl-k)); }
+  .fl-seg .seg-dot { left: calc(-2px * var(--fl-k)); }
+  .fl-new { padding: 0 var(--sp-4); font-size: var(--fs-4); }
+}
+@media (max-width: 380px) {
+  .fl-seg.seg { flex-wrap: wrap; }
+  .fl-seg .seg-opt { flex: 1 1 28%; flex-direction: row; gap: 6px; min-height: var(--tap); }
+  .fl-brand .brand { padding-right: 0; }
+}
+@media (max-width: 340px) {
+  .fl-main { padding-left: 10px; padding-right: 10px; }
+  .fl-head { gap: var(--sp-2) 6px; padding-left: 8px; padding-right: 8px; }
+  .fl-new { padding: 0 10px; gap: 6px; font-size: var(--fs-3); }
+  .fl-menu { padding: 0 10px; min-width: 44px; }
+}
+
+/* The slip area: a scrolling grid with as many columns as fit. */
+.fl-main {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--sp-6) var(--sp-5) var(--sp-7);
+}
+.fl-main:focus { outline: none; }
+.fl-grid {
+  display: grid; align-items: start; flex: none; width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(288px * var(--fl-k) * var(--fl-tl))), 1fr));
+  gap: var(--sp-7) var(--sp-5);
+}
+@media (max-width: 520px) { .fl-main { padding: var(--sp-4) var(--sp-3) var(--sp-6); } .fl-grid { gap: var(--sp-6) var(--sp-3); } }
+
+/* The empty state: a flame mark, a short message and the buttons to get going. */
+.fl-empty { margin: auto; max-width: 34rem; display: grid; justify-items: center; gap: var(--sp-4); padding: var(--sp-8) var(--sp-4); text-align: center; }
+.fl-empty h2 { font-size: var(--fs-7); line-height: 1.05; }
+.fl-empty p { max-width: 34ch; color: var(--ink2); font-size: var(--fs-4); line-height: 1.35; }
+.fl-empty-mark {
+  display: grid; place-items: center; width: calc(132px * var(--fl-k)); height: calc(132px * var(--fl-k)); color: var(--amber-ink);
+  background: var(--paper); border: var(--bw) dashed var(--line); border-radius: 50%;
+}
+.fl-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-2); }
+
+/* The welcome card above the tickets: what this screen is and two ways to learn it. Dismissed for good with the x. */
+.fl-welcome { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: var(--sp-4); width: 100%; margin: 0 0 var(--sp-5); padding: var(--sp-4); background: var(--paper); border: var(--bw) solid var(--line); border-left: calc(6px * var(--fl-k)) solid var(--amber); border-radius: var(--r-panel); }
+.fl-welcome[hidden] { display: none; }
+.fl-welcome-mark { display: grid; place-items: center; width: calc(52px * var(--fl-k)); height: calc(52px * var(--fl-k)); color: var(--amber-ink); background: var(--sub); border-radius: 50%; }
+.fl-welcome h2 { font-size: var(--fs-5); line-height: 1.1; }
+.fl-welcome-p { max-width: 62ch; margin-top: var(--sp-1); color: var(--ink2); font-size: var(--fs-4); line-height: 1.35; }
+.fl-welcome-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-3); }
+.fl-welcome-x { flex: none; }
+@media (max-width: 640px) { .fl-welcome { grid-template-columns: minmax(0, 1fr) auto; } .fl-welcome-mark { display: none; } }
+
+/* The kit's .chip-zone resets --zc after the [data-zone] rules, so the station hue never reached the chip. Re-assert it on the board. */
+.fl .chip-zone[data-zone="pit"] { --zc: var(--z-pit); }
+.fl .chip-zone[data-zone="sides"] { --zc: var(--z-sides); }
+.fl .chip-zone[data-zone="fry"] { --zc: var(--z-fry); }
+.fl .chip-zone[data-zone="cold"] { --zc: var(--z-cold); }
+.fl .chip-zone[data-zone="expo"] { --zc: var(--z-expo); }
+.fl .chip-zone { border-left-width: calc(6px * var(--fl-k)); font-size: var(--fs-2); }
+
+/* The slip: a paper ticket with a clip, a torn edge and a time-colour tint. */
+.fl-slip {
+  --notch-r: calc(9px * var(--fl-k));
+  container-type: inline-size;
+  padding-top: calc(10px * var(--fl-k));
+  content-visibility: auto; contain-intrinsic-block-size: auto calc(420px * var(--fl-k)); /* the browser skips slips that are far off screen */
+}
+.fl-slip .slip-clip { width: calc(50px * var(--fl-k)); height: calc(20px * var(--fl-k)); margin-left: calc(-25px * var(--fl-k)); }
+.fl-slip.is-off { filter: none; } /* off-screen slips do not need their shadow or their pulse */
+.fl-slip.is-off .slip-head, .fl-slip.is-off .slip-body, .fl-slip.is-off .slip-tear { animation: none !important; }
+.fl-slip.is-printing { animation-delay: var(--fl-d, 0ms); }
+.fl-slip.fl-leaving { pointer-events: none; animation: fl-leave 380ms var(--ease-in-out) both; }
+@keyframes fl-leave { 0% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(calc(-14px * var(--fl-k))) scale(0.97); } }
+
+/* Slip head: number and timer on one line, customer and badge under them, then meta and progress. */
+.fl-slip .slip-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--sp-3); row-gap: var(--sp-1);
+  padding-bottom: var(--sp-4);
+}
+.fl-slip .slip-id, .fl-slip .slip-time { display: contents; }
+.fl-numrow { grid-column: 1; grid-row: 1; }
+.fl-slip .slip-timer { grid-column: 2; grid-row: 1; justify-self: end; }
+.fl-slip .slip-who { grid-column: 1; grid-row: 2; align-self: start; }
+.fl-slip .fl-badge { grid-column: 2; grid-row: 2; justify-self: end; align-self: start; }
+.fl-slip .slip-meta { grid-column: 1 / -1; grid-row: 3; }
+.fl-slip .slip-progress { grid-column: 1 / -1; grid-row: 4; }
+/* Late and overdue tint the head; a rush gets a red bar across the top. */
+.fl-slip[data-level="warn"] .slip-head { background: var(--slip-tint-warn); }
+.fl-slip[data-level="breach"] .slip-head { background: var(--slip-tint-bad); }
+.fl-slip[data-rush="true"] .slip-head { box-shadow: inset 0 calc(6px * var(--fl-k)) 0 var(--stamp); padding-top: calc(var(--sp-4) + 4px * var(--fl-k)); }
+/* Number, stamp, customer, channel line and timer. The big text scales with the slip width (cqw). */
+.fl-numrow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); min-width: 0; }
+.fl-slip .slip-num { font-size: clamp(calc(28px * var(--fl-k)), calc(14cqw * var(--fl-tl)), calc(var(--fs-ticket) * 1.45)); letter-spacing: 0; white-space: nowrap; }
+.fl-stamp-slot { display: inline-flex; min-width: 0; }
+.fl-stamp-slot .stamp { font-size: var(--fs-3); padding: calc(5px * var(--fl-k)) calc(10px * var(--fl-k)) calc(4px * var(--fl-k)); }
+.fl-slip .slip-who { font-size: var(--fs-4); font-weight: var(--w-bold); line-height: 1.15; margin-top: var(--sp-1); }
+.fl-slip .slip-meta { margin-top: var(--sp-2); gap: var(--sp-1) var(--sp-3); font-size: var(--fs-2); font-weight: var(--w-semi); }
+.fl-chan { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); }
+.fl-count { color: var(--ink2); }
+.fl-count[data-ready="true"] { color: var(--sage-ink); font-weight: var(--w-heavy); }
+.fl-demo-tag { padding: 0 6px; font-size: var(--fs-1); font-weight: var(--w-bold); color: var(--ink2); border: var(--bw-thin) dashed var(--slip-line); border-radius: var(--r-chip); }
+.fl-slip .slip-time { gap: var(--sp-2); }
+.fl-slip .slip-timer { font-size: clamp(calc(24px * var(--fl-k)), calc(12cqw * var(--fl-tl)), calc(var(--fs-timer) * 1.5)); letter-spacing: 0.01em; white-space: nowrap; }
+.fl-slip .slip-progress { height: calc(10px * var(--fl-k)); margin-top: var(--sp-2); border-radius: 2px; }
+.fl-slip .slip-progress > i { transition: width var(--dur-slow) var(--ease-out); }
+
+/* time-state badge: word + icon + colour (never colour alone) */
+.fl-badge { min-height: calc(32px * var(--fl-k)); font-size: var(--fs-3); padding: 2px 10px 2px 8px; }
+.fl-bi { display: inline-flex; }
+.fl-bi .icon { display: none; }
+.fl-badge[data-level="ok"] .bi-ok, .fl-badge[data-level="warn"] .bi-warn, .fl-badge[data-level="breach"] .bi-breach { display: inline-block; }
+.fl-badge[data-level="breach"] { color: var(--on-danger); background: var(--crimson); border-color: var(--crimson); }
+.fl-slip[data-level="breach"] .slip-timer { text-shadow: 0 0 0 currentColor; }
+
+/* The amber note strip (allergies and special requests). */
+.fl-slip .slip-note { margin: var(--sp-3) var(--sp-3) var(--sp-2); padding: var(--sp-2) var(--sp-3); font-size: var(--fs-3); font-weight: var(--w-bold); }
+.fl-slip .slip-note .icon { flex: none; }
+.fl-slip .slip-note > span { min-width: 0; }
+
+/* The short menu name is for compact tickets only. */
+.nm-short { display: none; }
+
+/* item rows */
+.fl-items { display: block; }
+.fl-row + .fl-row > .slip-item { border-top: var(--bw-thin) solid var(--slip-rule); }
+.fl-row .slip-item { --qty-w: calc(38px * var(--fl-k)); min-height: var(--tap-lg); padding: var(--sp-2) var(--sp-3); gap: var(--sp-1) var(--sp-3); align-items: center; }
+.fl-row .slip-qty { align-self: center; }
+.fl-row .slip-qty::after { content: "\00d7"; margin-left: 1px; font-size: 0.6em; font-weight: var(--w-bold); opacity: 0.8; }
+/* A dish name never breaks inside a word: when the longest word will not fit beside the button, the button drops to its own line. */
+.fl-row .slip-item { flex-wrap: wrap; }
+.fl-row .slip-name { flex: 1 1 0; min-width: min-content; font-size: calc(var(--fs-item) * 1.1); font-weight: var(--w-bold); line-height: 1.15; overflow-wrap: break-word; }
+button.slip-item.fl-item { cursor: pointer; }
+.fl-sub { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); padding-left: calc(var(--qty-w) + var(--sp-3)); min-width: 0; }
+.fl-sub .chip { min-height: calc(28px * var(--fl-k)); font-size: var(--fs-2); }
+.fl-sub .chip-mod { font-weight: var(--w-bold); }
+.fl-row[data-state="displayed"] > .slip-item { box-shadow: inset calc(6px * var(--fl-k)) 0 0 var(--ink); }
+.fl-row[data-state="cooking"] > .slip-item { box-shadow: inset calc(6px * var(--fl-k)) 0 0 var(--amber); background: var(--tint-warn); }
+.fl-row[data-state="queued"] > .slip-item { box-shadow: inset calc(6px * var(--fl-k)) 0 0 var(--slip-rule); }
+.fl-row[data-state="queued"] .slip-name { font-weight: var(--w-semi); }
+.fl-row[data-state="done"] .slip-name { font-weight: var(--w-semi); }
+
+/* the tap tile: what the thumb sees as the control. Start = outline, Done = sage outline, cooking = amber fill with the running timer */
+.fl-act {
+  flex: none; margin-left: auto; display: grid; justify-items: center; align-content: center; gap: 1px;
+  min-width: calc(80px * var(--fl-k)); min-height: calc(48px * var(--fl-k)); padding: calc(4px * var(--fl-k)) var(--sp-3);
+  font-family: var(--font-display); color: var(--ink); background: var(--slip);
+  border: var(--bw) solid var(--ink); border-radius: var(--r-btn); box-shadow: 0 calc(3px * var(--fl-k)) 0 var(--ink);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.fl-act-top { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-5); font-weight: var(--w-heavy); line-height: 1; font-variant-numeric: tabular-nums; }
+.fl-act-word { font-size: var(--fs-1); font-weight: var(--w-bold); letter-spacing: 0.1em; text-transform: uppercase; line-height: 1; }
+.fl-act-time:empty { display: none; }
+.fl-act[data-act="start"] .i-check, .fl-act[data-act="finish"] .i-play, .fl-act[data-act="cook"] .i-play { display: none; }
+.fl-act[data-act="finish"] { color: var(--sage-ink); background: var(--tint-ok); border-color: var(--sage); box-shadow: 0 calc(3px * var(--fl-k)) 0 var(--sage); }
+.fl-act[data-act="cook"] { color: #fff; background: var(--amber); border-color: var(--slip-amber); box-shadow: 0 calc(3px * var(--fl-k)) 0 var(--slip-amber); }
+.fl-item:active .fl-act { transform: translateY(calc(3px * var(--fl-k))); box-shadow: none; }
+@media (hover: hover) { button.fl-item:hover { background: var(--slip-sub); } .fl-row[data-state="cooking"] > button.fl-item:hover { background: var(--tint-warn); } }
+
+/* read-only status (Expo, and done rows in All) */
+.fl-state { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-3); font-weight: var(--w-bold); color: var(--ink2); }
+.fl-state[data-state="done"] { color: var(--sage-ink); }
+.fl-state[data-state="cooking"] { color: var(--amber-ink); }
+.fl-state-w { font-variant-numeric: tabular-nums; }
+
+/* waiting: dim, with a countdown and a visible Start now */
+.fl-deck { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink2); font-variant-numeric: tabular-nums; }
+.fl-fire { flex: none; margin-left: auto; min-height: var(--tap); padding: 0 var(--sp-3); font-size: var(--fs-2); }
+.fl-fire .icon { color: var(--amber-ink); }
+
+/* "Check it": a cooking dish whose usual time is up. The tile and the row flash until someone taps the row. */
+/* A cooking dish's countdown sits in the line under its name, where a waiting dish shows its start time. */
+.fl-cook { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-3); font-weight: var(--w-heavy); color: var(--amber-ink); font-variant-numeric: tabular-nums; }
+.fl-cook[hidden] { display: none; }
+.fl-row[data-cook="check"] .fl-cook { color: var(--stamp); }
+.fl-row[data-cook="check"] > .slip-item { box-shadow: inset calc(6px * var(--fl-k)) 0 0 var(--stamp); background: var(--tint-bad); animation: fl-check-row 1.1s ease-in-out infinite; }
+.fl-row[data-cook="check"] .fl-act[data-act="cook"] { color: var(--bg); background: var(--stamp); border-color: var(--stamp); box-shadow: 0 calc(3px * var(--fl-k)) 0 var(--stamp); animation: fl-check-tile 1.1s ease-in-out infinite; }
+@keyframes fl-check-row { 0%, 100% { background-color: var(--tint-bad); } 50% { background-color: var(--tint-warn); } }
+@keyframes fl-check-tile { 0%, 100% { transform: none; } 50% { transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .fl-row[data-cook="check"] > .slip-item, .fl-row[data-cook="check"] .fl-act[data-act="cook"] { animation: none; } }
+
+/* The "do this next" line under a ticket's header. */
+.fl-main[data-hints="off"] .slip-next { display: none; }
+.slip-next { display: flex; align-items: flex-start; gap: var(--sp-2); margin: var(--sp-2) var(--sp-3) 0; padding: var(--sp-2) var(--sp-3); font-size: var(--fs-3); font-weight: var(--w-bold); line-height: 1.25; color: var(--ink); background: var(--slip-sub); border-radius: var(--r-chip); }
+.slip-next[hidden] { display: none; }
+.slip-next .icon { flex: none; margin-top: 1px; }
+.slip-next .sn-t { min-width: 0; overflow-wrap: break-word; }
+.slip-next[data-tone="wait"] { color: var(--ink2); font-weight: var(--w-semi); }
+.slip-next[data-tone="go"] { color: var(--sage-ink); background: var(--tint-ok); }
+.slip-next[data-tone="check"] { color: var(--stamp); background: var(--tint-bad); }
+.fl-main[data-density="compact"] .slip-next { margin: 4px var(--sp-2) 0; padding: 3px var(--sp-2); font-size: var(--fs-2); gap: 6px; }
+.fl-main[data-density="compact"] .slip-next .icon { width: 16px; height: 16px; }
+
+/* slip foot */
+.fl-slip .slip-foot { flex-wrap: nowrap; align-items: stretch; justify-content: flex-end; gap: var(--sp-2); padding: var(--sp-3); }
+.fl-slip .slip-foot > .btn { flex: 1 1 auto; min-height: var(--tap-lg); }
+.fl-slip .slip-foot > .fl-more { flex: none; width: var(--tap-lg); min-width: var(--tap-lg); }
+.fl-zone, .fl-bump { font-size: var(--fs-3); font-weight: var(--w-bold); }
+.fl-bump.btn-success { font-family: var(--font-display); font-size: var(--fs-5); letter-spacing: 0.04em; }
+
+/* narrow slips (about 280 px of screen): the tap tile becomes a full-width bar under the dish name, nothing is squeezed */
+@container (max-width: 270px) {  /* compact tickets lay themselves out below, so this is for full-size tickets only */
+  .fl-main:not([data-density="compact"]) .fl-slip .fl-badge { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+  .fl-main:not([data-density="compact"]) .fl-slip .slip-who { grid-column: 1 / -1; grid-row: 3; }
+  .fl-main:not([data-density="compact"]) .fl-slip .slip-meta { grid-row: 4; }
+  .fl-main:not([data-density="compact"]) .fl-slip .slip-progress { grid-row: 5; }
+  .fl-main:not([data-density="compact"]) .fl-row .slip-item { flex-wrap: wrap; }
+  .fl-main:not([data-density="compact"]) .fl-row .slip-name { flex: 1 1 calc(100% - var(--qty-w) - var(--sp-3)); }
+  .fl-main:not([data-density="compact"]) .fl-act, .fl-main:not([data-density="compact"]) .fl-fire, .fl-main:not([data-density="compact"]) .fl-state { flex: 1 0 100%; margin-left: 0; }
+  .fl-main:not([data-density="compact"]) .fl-act { grid-auto-flow: column; justify-content: center; gap: var(--sp-3); min-height: var(--tap); }
+  .fl-main:not([data-density="compact"]) .fl-fire { justify-content: center; }
+}
+
+/* Compact tickets. They are used once the open tickets would not fit in one row at full size, so a rush stays on one
+   screen. Tap tiles stay 44 px or more, and words are never dropped, only tightened. */
+.fl-main[data-density="compact"] {
+  --fs-1: calc(11px * var(--fl-k) * var(--fl-tl));
+  --fs-2: calc(12.5px * var(--fl-k) * var(--fl-tl));
+  --fs-3: calc(14px * var(--fl-k) * var(--fl-tl));
+  --fs-4: calc(16px * var(--fl-k) * var(--fl-tl));
+  --fs-5: calc(19px * var(--fl-k) * var(--fl-tl));
+  --fs-item: calc(16px * var(--fl-k) * var(--fl-tl));
+  --sp-2: calc(5px * var(--fl-k));
+  --sp-3: calc(8px * var(--fl-k));
+  --sp-4: calc(10px * var(--fl-k));
+  --tap: max(44px, calc(44px * var(--fl-k)));
+  --tap-lg: max(46px, calc(46px * var(--fl-k)));
+  padding: var(--sp-4) var(--sp-3) var(--sp-6);
+}
+.fl-main[data-density="compact"] .fl-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(228px * var(--fl-k) * var(--fl-tl))), 1fr));
+  gap: calc(14px * var(--fl-k)) calc(10px * var(--fl-k));
+}
+.fl-main[data-density="compact"] .fl-slip { padding-top: calc(7px * var(--fl-k)); contain-intrinsic-block-size: auto calc(290px * var(--fl-k)); }
+.fl-main[data-density="compact"] .fl-slip .slip-clip { width: calc(34px * var(--fl-k)); height: calc(13px * var(--fl-k)); margin-left: calc(-17px * var(--fl-k)); }
+.fl-main[data-density="compact"] .fl-slip .slip-head { padding-bottom: var(--sp-2); row-gap: 0; }
+.fl-main[data-density="compact"] .fl-slip[data-rush="true"] .slip-head { box-shadow: inset 0 calc(4px * var(--fl-k)) 0 var(--stamp); padding-top: calc(var(--sp-2) + 3px * var(--fl-k)); }
+.fl-main[data-density="compact"] .fl-slip .slip-num { font-size: clamp(calc(22px * var(--fl-k)), calc(10cqw * var(--fl-tl)), calc(30px * var(--fl-k) * var(--fl-tl))); }
+.fl-main[data-density="compact"] .fl-slip .slip-timer { font-size: clamp(calc(20px * var(--fl-k)), calc(9cqw * var(--fl-tl)), calc(26px * var(--fl-k) * var(--fl-tl))); }
+.fl-main[data-density="compact"] .fl-stamp-slot .stamp { font-size: var(--fs-1); padding: calc(2px * var(--fl-k)) calc(6px * var(--fl-k)) calc(1px * var(--fl-k)); }
+.fl-main[data-density="compact"] .fl-slip .slip-who { margin-top: 0; line-height: 1.1; }
+.fl-main[data-density="compact"] .fl-slip .slip-meta { margin-top: 2px; gap: 2px var(--sp-3); }
+.fl-main[data-density="compact"] .fl-badge { min-height: calc(24px * var(--fl-k)); padding: 1px 8px 1px 6px; font-size: var(--fs-2); }
+.fl-main[data-density="compact"] .fl-slip .slip-progress { display: none; } /* the "1 of 3 done" count says the same */
+.fl-main[data-density="compact"] .fl-slip .fl-demo-tag { font-size: calc(10px * var(--fl-k) * var(--fl-tl)); padding: 0 calc(4px * var(--fl-k)); }
+.fl-main[data-density="compact"] .fl-chan { gap: 3px; }
+.fl-main[data-density="compact"] .dt-more { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.fl-main[data-density="compact"] .fl-numrow { flex-wrap: nowrap; gap: var(--sp-2); }
+.fl-main[data-density="compact"] .fl-stamp-slot .stamp { transform: none; letter-spacing: 0; border-width: calc(2px * var(--fl-k)); }
+.fl-main[data-density="compact"] .fl-slip { --tear-h: calc(5px * var(--fl-k)); }
+.fl-main[data-density="compact"] .fl-grid { row-gap: calc(10px * var(--fl-k)); }
+.fl-main[data-density="compact"] .fl-slip .slip-note { margin: var(--sp-2) var(--sp-2) 2px; padding: 3px var(--sp-2); font-size: var(--fs-2); }
+/* A row is a small grid: quantity, name and the station chips on the left, the tap tile spanning both lines on the right. */
+.fl-main[data-density="compact"] .fl-row .slip-item {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "q n a" "q s a";
+  align-items: center; column-gap: var(--sp-2); row-gap: 1px; min-height: var(--tap); padding: calc(4px * var(--fl-k)) var(--sp-2);
+}
+.fl-main[data-density="compact"] .fl-row .slip-qty { grid-area: q; font-size: calc(var(--fs-item) * 1.05); min-width: calc(24px * var(--fl-k)); }
+.fl-main[data-density="compact"] .fl-row .slip-name { grid-area: n; min-width: 0; font-size: var(--fs-item); }
+.fl-main[data-density="compact"] .nm-short { display: inline; }
+.fl-main[data-density="compact"] .nm-full { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* still read aloud */
+.fl-main[data-density="compact"] .fl-row .fl-act, .fl-main[data-density="compact"] .fl-row .fl-fire, .fl-main[data-density="compact"] .fl-row .fl-state { grid-area: a; margin-left: 0; }
+.fl-main[data-density="compact"] .fl-row .fl-sub { grid-area: s; padding-left: 0; flex: none; gap: 2px var(--sp-1); }
+.fl-main[data-density="compact"] .fl-sub .chip { min-height: calc(20px * var(--fl-k)); padding-block: 0; font-size: var(--fs-1); }
+.fl-main[data-density="compact"] .fl-act { min-width: calc(64px * var(--fl-k)); min-height: max(44px, calc(44px * var(--fl-k))); padding: 2px var(--sp-2); box-shadow: 0 calc(2px * var(--fl-k)) 0 var(--ink); }
+.fl-main[data-density="compact"] .fl-act[data-act="finish"] { box-shadow: 0 calc(2px * var(--fl-k)) 0 var(--sage); }
+.fl-main[data-density="compact"] .fl-act[data-act="cook"] { box-shadow: 0 calc(2px * var(--fl-k)) 0 var(--slip-amber); }
+.fl-main[data-density="compact"] .fl-act-top { font-size: var(--fs-4); }
+.fl-main[data-density="compact"] .fl-fire { min-height: var(--tap); padding: 0 var(--sp-2); }
+.fl-main[data-density="compact"] .fl-slip .slip-foot { padding: calc(6px * var(--fl-k)) var(--sp-2); gap: var(--sp-2); }
+.fl-main[data-density="compact"] .fl-slip .slip-foot > .btn { min-height: var(--tap); }
+.fl-main[data-density="compact"] .fl-slip .slip-foot > .fl-more { width: var(--tap); min-width: var(--tap); }
+
+/* The all-day strip pinned under the slips: a fold button, the total, and a scrolling row of dish chips. */
+.fl-dock {
+  position: relative; z-index: var(--zi-dock); flex: none; display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4); padding-bottom: max(var(--sp-2), env(safe-area-inset-bottom));
+  background: var(--sub); border-top: var(--bw) solid var(--line);
+}
+/* Fold button with the total of items still to make. */
+.fl-dock-toggle {
+  appearance: none; flex: none; display: inline-flex; align-items: center; gap: var(--sp-2); min-height: var(--tap); padding: 0 var(--sp-3) 0 var(--sp-2);
+  font: var(--w-heavy) var(--fs-4) / 1 var(--font-display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink);
+  background: transparent; border: var(--bw) solid transparent; border-radius: var(--r-btn);
+}
+@media (hover: hover) { .fl-dock-toggle:hover { background: var(--hover); } }
+.fl-dock-toggle .icon { transition: transform var(--dur) var(--ease-out); }
+.fl-dock[data-collapsed="true"] .fl-dock-toggle .icon { transform: rotate(-90deg); }
+.fl-dock-sum { padding: 2px 8px; font-size: var(--fs-3); letter-spacing: 0; text-transform: none; color: var(--ink2); background: var(--paper); border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-chip); }
+.fl-dock-sum:empty { display: none; }
+.fl-dock-clear { flex: none; min-height: var(--tap); }
+/* The scrolling row of dish chips. */
+.fl-dock-list {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: var(--sp-2);
+  overflow-x: auto; overflow-y: hidden; padding: calc(3px * var(--fl-k)) calc(3px * var(--fl-k)) calc(6px * var(--fl-k));
+  scrollbar-width: thin; overscroll-behavior-x: contain;
+}
+.fl-dock-empty { flex: 1 1 auto; color: var(--ink3); font-size: var(--fs-3); font-weight: var(--w-semi); }
+.fl-dock[data-collapsed="true"] .fl-dock-list, .fl-dock[data-collapsed="true"] .fl-dock-empty { display: none; }
+.fl-dock[data-collapsed="true"] { justify-content: flex-start; }
+/* One dish chip: name, count to make and a done bar. Pressed means highlighted on the board. */
+.fl-dchip {
+  appearance: none; position: relative; flex: none; display: inline-flex; align-items: center; gap: var(--sp-2);
+  min-height: var(--tap); padding: 0 var(--sp-3) calc(5px * var(--fl-k)); overflow: hidden;
+  font: var(--w-semi) var(--fs-3) / 1.1 var(--font-body); color: var(--ink); text-align: left;
+  background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-btn);
+}
+@media (hover: hover) { .fl-dchip:hover { background: var(--hover); } }
+.fl-dchip:active { background: var(--press); }
+.fl-dchip-name { white-space: nowrap; }
+.fl-dchip-x { font: var(--w-heavy) var(--fs-5) / 1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--amber-ink); }
+.fl-dchip-bar { position: absolute; left: 0; right: 0; bottom: 0; height: calc(5px * var(--fl-k)); background: var(--meter-track); }
+.fl-dchip-bar > i { display: block; height: 100%; width: calc(var(--v, 0) * 1%); background: var(--sage); }
+.fl-dchip[aria-pressed="true"] { color: var(--bg); background: var(--ink); border-color: var(--ink); }
+.fl-dchip[aria-pressed="true"] .fl-dchip-x { color: var(--bg); }
+.fl-dchip[aria-pressed="true"] .fl-dchip-bar { background: color-mix(in srgb, var(--bg) 30%, transparent); }
+/* Phones: the strip title becomes screen-reader text and Clear highlight shrinks to an icon. */
+@media (max-width: 520px) {
+  .fl-dock { gap: var(--sp-2); padding-left: var(--sp-2); padding-right: var(--sp-2); }
+  .fl-dock-title { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+  .fl-dock-toggle { padding: 0 var(--sp-2); }
+  .fl-dock-clear > span { display: none; }
+  .fl-dock-clear { min-width: var(--tap); padding: 0; }
+}
+
+/* Toasts sit above the strip while the line is showing (--fl-lift is its height). */
+.sb-shell[data-view="floor"] .toast-host { bottom: calc(max(var(--sp-4, 16px), env(safe-area-inset-bottom)) + var(--fl-lift, 0px)); }
+
+/* The void sheet's reason chips. */
+.fl-reasons { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); margin: var(--sp-3, 12px) 0; }
+.fl-reasons .chip { min-height: 48px; font-size: var(--fs-3); }
+
+/* Reduced motion: no slide-out, no tab lift, no transitions. */
+@media (prefers-reduced-motion: reduce) {
+  .fl-slip.fl-leaving { animation: none; opacity: 0; }
+  .fl-seg .seg-opt[aria-selected="true"] { transform: none; }
+  .fl-dock-toggle .icon, .fl-act, .fl-slip .slip-progress > i { transition: none; }
+}

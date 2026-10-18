@@ -1,0 +1,1759 @@
+/*
+ * WHAT THIS FILE IS: The seven helper screens of the line: Hold cabinet, 86 board and stock, Recall, Demo and
+ * clock, Help, Specs and Settings. Each is a sheet (a panel that slides over the board) opened by name.
+ * PARTS: shared helpers, tab helper, Hold cabinet (with the New batch form), 86 board, Recall, Demo, Help,
+ * Specs, Settings.
+ * USES / USED BY: 10-config.js, 20-engine.js, 30-store.js, 60-shell.js; SB.sim and SB.floor are optional.
+ * Opened by 70-floor-board.js and 71-floor-order.js through SB.sheets.open(name).
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const doc = g.document;
+  if (!doc) return; // Node: these sheets are DOM only
+
+  const U = SB.util, C = SB.config, h = U.h;
+  // Engine looked up late, so this file still loads if the engine module comes after it.
+  const E = () => SB.engine;
+  // Builds an icon picture by name; a missing icon gives an empty span so the screen still draws.
+  const ico = (name, size, o) => { try { return SB.icons.svg(name, Object.assign({ size: size || 20 }, o || {})); } catch (e) { return doc.createElement('span'); } };
+  // The current state (everything the app knows right now).
+  const st = () => SB.store.getState();
+  // The kitchen clock in milliseconds. In a demo it can run faster than real time.
+  const nowMs = () => SB.store.now();
+  // Writes text only when it changed, so nothing is redrawn for no reason.
+  const text = (el, s) => { if (el && el.textContent !== s) el.textContent = s; };
+  // Sets an attribute only when its value changed.
+  const attr = (el, k, v) => { if (el && el.getAttribute(k) !== String(v)) el.setAttribute(k, String(v)); };
+  // Shows or hides a piece of the screen only when its state really changed.
+  const setHidden = (el, on) => { if (el && el.hidden !== !!on) el.hidden = !!on; };
+  // Adds or removes a style class only when needed.
+  const cls = (el, name, on) => { if (el && el.classList.contains(name) !== !!on) el.classList.toggle(name, !!on); };
+  const pad2 = U.pad2;
+  // Sends an action to the store as the person using the screen and returns the full answer.
+  const run = (type, payload) => SB.store.dispatchEx(type, payload, { source: 'ui' });
+  // Turns an engine answer into the plain-words message for the screen.
+  const say = (res) => E().describe(res.report, res.info, st().settings);
+  // The food-safety limits in force: the owner's settings if present, else the starter values.
+  const safety = () => (st().settings && st().settings.safety) || C.safety;
+  // Shows a short message at the bottom; tone is ok, warn, bad or info.
+  const toast = (msg, tone, extra) => SB.ui.toast(msg, Object.assign({ tone: tone || 'info' }, extra || {}));
+  // Removes the standard safety line from a message, because the screen already shows it once.
+  const stripSafety = (s) => String(s || '').split(' ' + C.safetyLine).join('').split(C.safetyLine).join('').trim();
+  // True on a mouse or stylus screen. A touch screen must not pop up its keyboard by itself.
+  const fineAny = () => { try { return g.matchMedia('(pointer: fine)').matches; } catch (e) { return false; } };
+  // A fresh id used to link a tab to its panel.
+  const uid = (p) => U.uid(p || 'fs');
+
+  // A temperature in words, like 155 degrees F, or 'no reading'.
+  const fmtF = (f) => (U.isNum(f) ? Math.round(f) + ' °F' : 'no reading');
+  // 7500 s -> "2 h 05 min"; 90 s -> "2 min"; 20 s -> "20 s" (always rounded up to
+  // the minute from a minute on, so a countdown never reads 0 early).
+  function hmLong(ms) {
+    const s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return s + ' s';
+    const m = Math.ceil(s / 60), hh = Math.floor(m / 60);
+    if (hh > 0) return hh + ' h ' + pad2(m % 60) + ' min';
+    return m + ' min';
+  }
+  // Elapsed time, floored: "2h 10m" or "45m".
+  function hmShort(ms) {
+    const m = Math.max(0, Math.floor(ms / 60000)), hh = Math.floor(m / 60);
+    return hh > 0 ? hh + 'h ' + pad2(m % 60) + 'm' : m + 'm';
+  }
+  // How long ago, in plain words (just now, 5 min ago).
+  const agoText = (ms) => (ms < 45e3 ? 'just now' : hmLong(ms) + ' ago');
+  // A percentage rounded to d decimals, without a trailing zero.
+  const pctText = (x, d) => { const f = Math.pow(10, d || 0); return Math.round(x * f) / f + '%'; };
+  const plural = U.plural;
+
+  // Finds an ingredient by id in the current state, or null.
+  const ingOf = (id) => { const a = st().ingredients; for (let i = 0; i < a.length; i++) if (a[i].id === id) return a[i]; return null; };
+  // Name of an ingredient for messages; an unknown id is shown as it is.
+  const ingName = (id) => { const i = ingOf(id); return i ? i.name : id || 'That ingredient'; };
+  // Finds a menu item by id in the current state, or null.
+  const menuOf = (id) => { const a = st().menu; for (let i = 0; i < a.length; i++) if (a[i].id === id) return a[i]; return null; };
+  // An amount in words: pieces for counted items (cornbread), otherwise grams or kilograms.
+  const qtyText = (ing, gm) => (ing && ing.unit === 'ea' ? Math.round(gm) + ' ' + plural(Math.round(gm), 'piece') : U.fmtG(gm));
+  // Station details for an id, with a safe fallback so an unknown station still shows.
+  const zoneOf = (id) => C.zoneById[id] || { name: id, code: String(id || '').slice(0, 3).toUpperCase(), icon: 'flame' };
+  // Order channel details for an id, with a safe fallback.
+  const channelOf = (id) => C.channelById[id] || { name: id || 'Order', icon: 'plate' };
+
+  // Briefly highlights an element so the eye finds what changed.
+  function flash(el) {
+    if (!el) return;
+    el.classList.remove('fs-flash'); void el.offsetWidth; el.classList.add('fs-flash');
+    // Removes the highlight when its animation ends.
+    const done = () => { el.classList.remove('fs-flash'); el.removeEventListener('animationend', done); };
+    el.addEventListener('animationend', done);
+  }
+  function stateEl(tone, icon, word) {
+    return h('span', { class: 'fs-state', dataset: { tone } }, ico(icon, 20), h('span', null, word));
+  }
+  // Replace the contents of a status span only when the icon or word changed.
+  function setState(el, tone, icon, word) {
+    const key = tone + '|' + icon + '|' + word;
+    if (el._key === key) return;
+    el._key = key; el.setAttribute('data-tone', tone);
+    U.clear(el); el.append(ico(icon, 20), h('span', null, word));
+  }
+  // The standard food-safety guidance box; extra text can go above the line.
+  function safetyNote(extra) {
+    return h('div', { class: 'fs-note fs-safety' }, ico('shield-check', 20), h('div', null, extra ? h('p', null, extra) : null, h('p', null, C.safetyLine)));
+  }
+  function simPill() { return h('span', { class: 'fs-sim' }, ico('info', 16), h('span', null, 'Simulated: no live POS connected')); }
+
+  // Keep `parent`'s children in the order of `items`. New keys are created
+  // with make(item); existing nodes are never replaced and only
+  // move when the order changed; keys that are gone are removed. Returns
+  // nothing: the Map holds the records ({el, destroy?}).
+  function reconcile(parent, map, items, keyOf, make, update) {
+    const seen = new Set();
+    let ref = parent.firstElementChild;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i], k = keyOf(it);
+      seen.add(k);
+      let rec = map.get(k);
+      if (!rec) { rec = make(it); map.set(k, rec); }
+      if (update) update(rec, it);
+      if (rec.el === ref) ref = ref.nextElementSibling;
+      else parent.insertBefore(rec.el, ref);
+    }
+    map.forEach((rec, k) => { if (!seen.has(k)) { rec.el.remove(); if (rec.destroy) rec.destroy(); map.delete(k); } });
+  }
+
+  // Subscribe helper: offs collects every unsubscribe so a sheet cleans up in one place.
+  function watch(offs, fn, tickFn) {
+    offs.push(SB.store.subscribe(fn));
+    if (tickFn) offs.push(SB.store.subscribeTick(tickFn));
+  }
+
+  // What would change on the menu if this action ran now? apply()
+  // is pure, so the live state is never touched.
+  function whatIf(type, payload) {
+    try {
+      const s0 = st(), r = E().apply(s0, type, payload, nowMs());
+      if (r.report !== 'ok') return null;
+      const off = [], on = [];
+      s0.menu.forEach((m) => {
+        if (m.archived) return;
+        const a = s0.avail[m.id], b = r.state.avail[m.id];
+        if (!a || !b) return;
+        if (a.ok && !b.ok) off.push(m.short || m.name); else if (!a.ok && b.ok) on.push(m.short || m.name);
+      });
+      return { off, on };
+    } catch (e) { return null; }
+  }
+  // A short list in words: up to three names, then 'and N more'.
+  // Ends a sentence with one period, even when the last word is an abbreviation that already has one.
+  const endDot = (s) => (/[.!?]$/.test(s) ? s : s + '.');
+  const listWords = (a) => (a.length <= 3 ? a.join(', ') : a.slice(0, 3).join(', ') + ' and ' + (a.length - 3) + ' more');
+
+  // Toast with Undo that runs the engine's own undo.
+  function undoToast(msg, tone) {
+    toast(msg, tone || 'ok', {
+      // Undo asks the engine to undo its newest action (only the newest one can be undone).
+      undo: () => {
+        const r = run('undo', {});
+        if (r.report !== 'ok') toast(say(r), 'warn'); else SB.ui.announce('Undone.');
+      },
+    });
+  }
+
+  // A small centered dialog with a body, a confirm button and Cancel. Returns the sheet api.
+  function dialog(o) {
+    const sh = SB.ui.sheet({ title: o.title, side: 'center', width: o.width || 480, name: o.name || 'dialog', role: o.role, opener: o.opener, onClose: o.onClose });
+    const copy = h('div', { class: 'sheet-copy fs-dialog' });
+    (Array.isArray(o.body) ? o.body : [o.body]).forEach((p) => { if (p != null) copy.appendChild(p.nodeType ? p : h('p', null, String(p))); });
+    sh.body.appendChild(copy);
+    // Cancel closes the dialog and changes nothing.
+    const cancel = h('button', { type: 'button', class: 'btn', onClick: () => sh.close('cancel') }, o.cancelLabel || 'Cancel');
+    // The confirm button; the caller decides what confirming does.
+    const ok = h('button', { type: 'button', class: 'btn ' + (o.tone === 'danger' ? 'btn-danger' : 'btn-primary'), onClick: () => o.onConfirm(sh, ok) }, ico(o.icon || (o.tone === 'danger' ? 'trash' : 'check'), 20), h('span', null, o.confirmLabel || 'Confirm'));
+    sh.footer.append(cancel, ok);
+    return { sheet: sh, ok, cancel, copy };
+  }
+
+  // Close a sheet, then do something one frame later (so the history entry
+  // of the closing sheet is gone before a new one is pushed).
+  function closeThen(sheet, fn) { sheet.close('link'); setTimeout(fn, 60); }
+
+  // Run a tab-style segmented control with panels. Returns {seg, show(id)}.
+  function tabsWithPanels(label, defs, start, onShow) {
+    const seg = SB.ui.segmented({ kind: 'tabs', label, class: 'fs-tabs', options: defs.map((d) => ({ id: d.id, label: d.label, icon: d.icon, count: d.count, alert: d.alert, alertLabel: d.alertLabel })), value: start, onChange: (id) => show(id, true) });
+    const panels = {};
+    defs.forEach((d) => {
+      const pid = uid('panel');
+      d.panel.id = pid; d.panel.setAttribute('role', 'tabpanel'); d.panel.setAttribute('tabindex', '-1');
+      const tab = seg.querySelector('[data-id="' + d.id + '"]');
+      if (tab) { tab.setAttribute('aria-controls', pid); if (!tab.id) tab.id = pid + '-tab'; d.panel.setAttribute('aria-labelledby', tab.id); }
+      panels[d.id] = d.panel;
+    });
+    // Shows one panel and hides the others; user is true when the person tapped the tab.
+    function show(id, user) {
+      Object.keys(panels).forEach((k) => setHidden(panels[k], k !== id));
+      if (!user) seg.setValue(id);
+      if (onShow) onShow(id, !!user);
+    }
+    show(start, false);
+    return { seg, show, panels };
+  }
+
+  // Words for each waste reason the engine can record (reason id on the left).
+  // audit:data-start
+  const REASON_WORDS = {
+    expired: 'Past its hold time', temp: 'Temperature out of range', cooling: 'Cooling missed',
+    manual: 'Cleared by hand', quality: 'Quality', other: 'Other',
+  };
+  // audit:data-end
+
+  // Hold cabinet.
+  // Word and icon for each kind of batch in the cabinet.
+  // audit:data-start
+  const KIND_WORD = { hot: 'Hot hold', cold: 'Cold hold', cooling: 'Cooling' };
+  const KIND_ICON = { hot: 'flame', cold: 'snow', cooling: 'snow' };
+  // audit:data-end
+  const H1 = 3600e3;
+
+  // How long a batch may stay in the cabinet: its own limit or the shop limit, whichever is shorter.
+  const holdLimitMs = (b) => Math.min(U.isNum(b.maxHoldH) ? b.maxHoldH : Infinity, safety().defaultMaxHoldH) * H1;
+  // A number with at most one decimal, like 1.5 or 2.
+  const trimNum = (n) => String(Math.round(n * 10) / 10);
+
+  // Picks the word, icon and colour for a batch from the engine's verdict.
+  // WATCH OUT: colour is never the only signal, the word is always shown too.
+  function statusView(b, gt) {
+    if (b.kind === 'cooling') {
+      if (gt.reason === 'cooled') return { tone: 'ok', icon: 'check-circle', word: 'Cooled' };
+      if (gt.action === 'DISCARD_LOCKOUT') return { tone: 'bad', icon: 'alert', word: 'Discard' };
+      if (gt.action === 'REHEAT_IMMEDIATE') return { tone: 'bad', icon: 'flame', word: 'Reheat or discard' };
+      return { tone: 'warn', icon: 'snow', word: 'Cooling' };
+    }
+    switch (gt.action) {
+      case 'NONE': return { tone: 'ok', icon: 'check-circle', word: 'Holding fine' };
+      case 'CHECK_TEMP': return { tone: gt.severity === 'bad' ? 'bad' : 'warn', icon: 'thermometer', word: 'Check temp' };
+      case 'REHEAT_IMMEDIATE': return { tone: 'bad', icon: 'flame', word: 'Reheat now' };
+      case 'CHILL_NOW': return { tone: 'bad', icon: 'snow', word: 'Chill now' };
+      default: return { tone: 'bad', icon: 'alert', word: 'Discard' };
+    }
+  }
+
+  // The one-line verdict under the temperature stepper, so the cook
+  // sees what a reading will mean before saving it.
+  function tempHint(b, mode, f) {
+    const S = safety();
+    if (mode === 'reheat') {
+      return f >= S.reheatF
+        ? { tone: 'ok', text: f + ' °F counts as a reheat. The batch can be served again.' }
+        : { tone: 'warn', text: 'A reheat needs at least ' + S.reheatF + ' °F. Keep heating, then log it.' };
+    }
+    if (b.kind === 'cooling') {
+      const c = S.cooling || C.safety.cooling;
+      if (b.stage1At == null) return f <= c.stage1ToF ? { tone: 'ok', text: f + ' °F reaches stage 1 (' + c.stage1ToF + ' °F or below).' } : { tone: 'warn', text: 'Stage 1 needs ' + c.stage1ToF + ' °F or below. Keep chilling.' };
+      return f <= c.finalF ? { tone: 'ok', text: f + ' °F finishes the cooling (' + c.finalF + ' °F or below).' } : { tone: 'warn', text: 'Stage 2 needs ' + c.finalF + ' °F or below. Keep chilling.' };
+    }
+    if (b.kind === 'cold') {
+      return f > S.coldHoldF ? { tone: 'bad', text: 'Above ' + S.coldHoldF + ' °F. The batch goes on Chill now and stops being served.' } : { tone: 'ok', text: 'In range (' + S.coldHoldF + ' °F or below).' };
+    }
+    if (f < S.hotHoldF) return { tone: 'bad', text: 'Below ' + S.hotHoldF + ' °F. The batch goes on Reheat now and stops being served.' };
+    if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1)) return { tone: 'ok', text: f + ' °F counts as the reheat (one reheat only).' };
+    return { tone: 'ok', text: 'In range (' + S.hotHoldF + ' °F or above).' };
+  }
+  // The temperature the editor starts at: the last reading, or a typical value for that kind of batch.
+  const defaultTemp = (b) => (U.isNum(b.lastTempF) ? b.lastTempF : b.kind === 'cold' ? 38 : b.kind === 'cooling' ? 70 : 150);
+
+  // Builds the Hold cabinet: one card per batch plus the New batch form.
+  // opts can pick the New batch tab, a product, or a batch to highlight.
+  function openHold(opts) {
+    opts = opts || {};
+    const offs = [];
+    const cards = new Map();
+    const recents = new Map();
+    let tabs = null, form = null;
+    const sheet = SB.ui.sheet({
+      title: 'Hold cabinet', side: 'right', width: 'min(1040px, 96vw)', name: 'hold',
+      // The form is destroyed with the sheet so its number boxes stop listening.
+      onClose: () => { offs.splice(0).forEach((f) => f()); if (form) form.destroy(); },
+    });
+
+    // Batches panel.
+    const summary = h('p', { class: 'hc-summary', role: 'status' });
+    const grid = h('div', { class: 'hc-grid' });
+    // An empty cabinet offers a button straight to the New batch tab.
+    const emptyBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', onClick: () => tabs.show('new', false) }, ico('plus', 22), h('span', null, 'New batch'));
+    const empty = h('div', { class: 'empty hc-empty', hidden: true }, ico('thermometer', 40), h('h3', null, 'The cabinet is empty'), h('p', null, 'Add a batch when food comes out of the smoker or the kitchen. Every batch starts with a temperature reading.'), emptyBtn);
+    const recentList = h('div', { class: 'fs-list hc-recents' });
+    const recentHead = h('h3', { class: 'fs-h' }, 'Discarded recently');
+    const recentBox = h('section', { class: 'fs-section', hidden: true }, recentHead, recentList);
+    const batchesPanel = h('div', { class: 'hc-panel' }, summary, grid, empty, recentBox);
+
+    // New batch panel.
+    form = buildBatchForm((batchId) => {
+      tabs.show('batches', false); update(nowMs());
+      const rec = cards.get(batchId);
+      if (rec) { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); }
+    }, opts);
+    const newPanel = form.el;
+
+    tabs = tabsWithPanels('Hold cabinet', [
+      { id: 'batches', label: 'In the cabinet', icon: 'thermometer', count: 0, panel: batchesPanel },
+      { id: 'new', label: 'New batch', icon: 'plus', panel: newPanel },
+    ], opts.tab === 'new' ? 'new' : 'batches', (id) => { setHidden(sheet.footer, id !== 'new'); if (id === 'new') form.shown(); });
+
+    sheet.body.append(h('div', { class: 'hc' }, safetyNote(), tabs.seg, batchesPanel, newPanel));
+    sheet.footer.append(form.footer);
+    setHidden(sheet.footer, tabs.seg.getValue() !== 'new');
+
+    // Builds one batch card once (ring, meter, facts, message, cooling steps, buttons).
+    // updateCard fills it in and keeps it current.
+    function makeCard(b) {
+      const rec = { id: b.id, mode: null, ed: null, el: null };
+      const name = h('h3', { class: 'hc-name' });
+      const kindEl = h('span', { class: 'hc-kind' });
+      const srcChip = h('span', { class: 'chip', hidden: true });
+      const status = h('span', { class: 'fs-state hc-status' });
+      const ringT = h('span', { class: 'hc-ring-t num' }), ringS = h('span', { class: 'hc-ring-s' });
+      const ring = h('div', { class: 'hc-ring', role: 'img' }, h('span', { class: 'hc-ring-in' }, ringT, ringS));
+      const meter = SB.ui.meter({ value: 0, max: 1, label: 'Left in this batch' });
+      const stockT = h('div', { class: 'hc-stock-t num' });
+      const ddLast = h('dd', { class: 'num' }), dtNext = h('dt'), ddNext = h('dd', { class: 'num' }), ddSince = h('dd', { class: 'num' });
+      const costLine = h('p', { class: 'hc-cost', hidden: true });
+      const msgIcon = h('span', { class: 'hc-msg-i' }), msgT = h('span', { class: 'hc-msg-t' });
+      const msg = h('div', { class: 'fs-note hc-msg', hidden: true }, msgIcon, h('div', null, msgT));
+      const lock = h('div', { class: 'hc-lock', hidden: true }, ico('ban', 18), h('span', null, 'Not being served. Menu items made from it are 86 until it is fixed.'));
+      const step1 = h('div', { class: 'hc-step' }), step2 = h('div', { class: 'hc-step' });
+      const cool = h('div', { class: 'hc-cool', hidden: true }, h('div', { class: 'hc-cool-t' }, 'Two-stage cooling'), step1, step2);
+      const bLog = h('button', { type: 'button', class: 'btn', dataset: { act: 'log' } }, ico('thermometer', 20), h('span', null, 'Log temp'));
+      const bReheat = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'reheat' }, hidden: true }, ico('flame', 20), h('span', null, 'Reheat'));
+      const bCool = h('button', { type: 'button', class: 'btn', dataset: { act: 'cool' }, hidden: true }, ico('snow', 20), h('span', null, 'Start cooling'));
+      const bDiscard = h('button', { type: 'button', class: 'btn hc-discard', dataset: { act: 'discard' } }, ico('trash', 20), h('span', null, 'Discard'));
+      const actions = h('div', { class: 'hc-actions' }, bLog, bReheat, bCool, bDiscard);
+      const editorSlot = h('div', { class: 'hc-editor-slot' });
+      // Card layout: heading, ring and facts, message and lock note, cooling steps, then the buttons.
+      const el = h('article', { class: 'hc-card', dataset: { batch: b.id, tone: 'ok' }, 'aria-label': 'Batch' },
+        h('header', { class: 'hc-head' }, h('div', { class: 'hc-title' }, kindEl, name, srcChip), status),
+        h('div', { class: 'hc-body' }, ring,
+          h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
+            h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince))),
+        costLine, msg, lock, cool, actions, editorSlot);
+      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bLog, bReheat, bCool, bDiscard, editorSlot });
+      bLog.addEventListener('click', () => toggleEditor(rec, 'log'));
+      bReheat.addEventListener('click', () => toggleEditor(rec, 'reheat'));
+      bCool.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openCooling(bb, bCool); });
+      bDiscard.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openDiscard(bb, bDiscard); });
+      return rec;
+    }
+    // Looks a batch up by id in the current state.
+    const batchOf = (id) => st().batches.find((x) => x.id === id) || null;
+
+    // Writes one cooling step: done (green), missed (red) or still open (amber).
+    function stepLine(el, done, missed, doneText, openText, missedText) {
+      if (done) setState(el, 'ok', 'check-circle', doneText);
+      else if (missed) setState(el, 'bad', 'alert', missedText);
+      else setState(el, 'warn', 'clock', openText);
+    }
+
+    // Refreshes one card from the batch and the engine's verdict. Only text and classes that changed are
+    // touched, so a card is never rebuilt under a finger.
+    function updateCard(rec, b, now) {
+      const S = safety();
+      const gt = E().gate(b, now, S);
+      const sv = statusView(b, gt);
+      text(rec.name, b.label || 'Batch');
+      attr(rec.el, 'aria-label', (b.label || 'Batch') + ': ' + sv.word);
+      if (rec.kindKey !== b.kind) { rec.kindKey = b.kind; U.clear(rec.kindEl); rec.kindEl.append(ico(KIND_ICON[b.kind] || 'flame', 18), h('span', null, KIND_WORD[b.kind] || 'Hold')); }
+      const srcWord = b.src === 'sample' ? 'Sample batch' : b.src === 'starter' ? 'Starter stock' : '';
+      setHidden(rec.srcChip, !srcWord); if (srcWord) { text(rec.srcChip, srcWord); attr(rec.srcChip, 'data-tone', 'info'); }
+      setState(rec.status, sv.tone, sv.icon, sv.word);
+      attr(rec.el, 'data-tone', sv.tone); attr(rec.el, 'data-status', gt.status);
+
+      // time in hold: a ring that fills towards the limit (the number inside says the same thing in words)
+      let limitMs = holdLimitMs(b), since = b.enteredAt;
+      if (b.kind === 'cooling') { const c = S.cooling || C.safety.cooling; limitMs = c.totalH * H1; since = U.isNum(b.coolStartAt) ? b.coolStartAt : b.enteredAt; }
+      const elapsed = Math.max(0, now - since), frac = limitMs > 0 ? elapsed / limitMs : 0;
+      const v = Math.min(100, frac * 100).toFixed(1);
+      if (rec.ring._v !== v) { rec.ring._v = v; rec.ring.style.setProperty('--v', v); }
+      attr(rec.ring, 'data-tone', frac >= 1 ? 'bad' : frac >= 0.75 ? 'warn' : 'ok');
+      text(rec.ringT, hmShort(elapsed)); text(rec.ringS, 'of ' + trimNum(limitMs / H1) + ' h');
+      attr(rec.ring, 'aria-label', (b.kind === 'cooling' ? 'Time cooling: ' : 'Time in the cabinet: ') + hmLong(elapsed) + ' of ' + trimNum(limitMs / H1) + ' hours');
+
+      // what is left
+      const left = b.cookedG > 0 ? Math.max(0, Math.min(1, b.remainingG / b.cookedG)) : 0;
+      const lv = (left * 100).toFixed(1);
+      if (rec.meter._v !== lv) { rec.meter._v = lv; rec.meter.style.setProperty('--v', lv); attr(rec.meter, 'aria-valuenow', left.toFixed(3)); attr(rec.meter, 'aria-valuemax', 1); }
+      text(rec.stockT, U.fmtG(b.remainingG) + ' left of ' + U.fmtG(b.cookedG));
+
+      // facts
+      text(rec.ddLast, U.isNum(b.lastTempF) ? fmtF(b.lastTempF) + ', ' + agoText(now - b.lastTempAt) : 'No reading yet');
+      text(rec.ddSince, U.fmtTime(b.enteredAt));
+      if (gt.action === 'REHEAT_IMMEDIATE' || gt.action === 'CHILL_NOW') {
+        if (b.kind === 'cooling') { text(rec.dtNext, 'Next step'); text(rec.ddNext, U.isNum(gt.nextDeadlineAt) ? 'within ' + hmLong(gt.nextDeadlineAt - now) : 'now'); }
+        else { text(rec.dtNext, 'Decide within'); text(rec.ddNext, U.isNum(gt.nextDeadlineAt) ? (gt.nextDeadlineAt - now > 0 ? hmLong(gt.nextDeadlineAt - now) : 'now') : 'now'); }
+      } else if (gt.action === 'DISCARD_LOCKOUT') { text(rec.dtNext, 'Next reading'); text(rec.ddNext, 'Not needed, discard it'); }
+      else if (b.kind === 'cooling') { text(rec.dtNext, 'Next reading'); text(rec.ddNext, gt.reason === 'cooled' ? 'Done' : 'Log one as it cools'); }
+      else {
+        const due = (U.isNum(b.lastTempAt) ? b.lastTempAt : b.enteredAt) + S.tempCheckEveryMin * 60000;
+        text(rec.dtNext, 'Next reading');
+        text(rec.ddNext, due - now >= 0 ? 'due in ' + hmLong(due - now) : 'overdue by ' + hmLong(now - due));
+        cls(rec.ddNext, 'is-late', due - now < 0);
+      }
+
+      // cost line (honest: starter numbers say so)
+      const ing = ingOf(b.ing);
+      const bits = [];
+      if (U.isNum(b.yieldPct)) bits.push('Yield ' + pctText(b.yieldPct, 1));
+      if (U.isNum(b.costPerCookedKg)) bits.push('cost ' + U.fmtMoney(b.costPerCookedKg) + ' per cooked kg');
+      const costWord = bits.length ? bits.join(', ') + '.' + (ing && ing.yieldConfirmed ? '' : ' Starter estimate.') : '';
+      setHidden(rec.costLine, !costWord); text(rec.costLine, costWord);
+
+      // gate message and lock note
+      const m = gt.action === 'NONE' && gt.reason !== 'cooled' ? '' : stripSafety(gt.text);
+      setHidden(rec.msg, !m);
+      if (m) {
+        text(rec.msgT, m);
+        const tone = gt.severity === 'bad' ? 'bad' : gt.severity === 'warn' ? 'warn' : 'info';
+        attr(rec.msg, 'data-tone', tone);
+        const ic = tone === 'info' ? 'info' : 'alert';
+        if (rec.msgIconKey !== ic) { rec.msgIconKey = ic; U.clear(rec.msgIcon); rec.msgIcon.appendChild(ico(ic, 20)); }
+      }
+      setHidden(rec.lock, gt.canServe || b.kind === 'cooling' || gt.action === 'DISCARD_LOCKOUT');
+
+      // cooling steps
+      setHidden(rec.cool, b.kind !== 'cooling');
+      if (b.kind === 'cooling') {
+        const c = S.cooling || C.safety.cooling;
+        const s1 = since + c.stage1H * H1, fin = since + c.totalH * H1;
+        stepLine(rec.step1, b.stage1At != null, b.stage1At == null && now > s1,
+          'Stage 1 done: ' + c.stage1ToF + ' °F reached at ' + U.fmtTime(b.stage1At || 0),
+          'Stage 1: reach ' + c.stage1ToF + ' °F within ' + trimNum(c.stage1H) + ' h (' + hmLong(s1 - now) + ' left)',
+          'Stage 1 missed: ' + c.stage1ToF + ' °F was not reached within ' + trimNum(c.stage1H) + ' h');
+        stepLine(rec.step2, b.finalAt != null, b.finalAt == null && now > fin,
+          'Stage 2 done: ' + c.finalF + ' °F reached at ' + U.fmtTime(b.finalAt || 0),
+          'Stage 2: reach ' + c.finalF + ' °F by ' + trimNum(c.totalH) + ' h in all (' + hmLong(fin - now) + ' left)',
+          'Stage 2 missed: ' + c.finalF + ' °F was not reached within ' + trimNum(c.totalH) + ' h');
+      }
+
+      // buttons
+      cls(rec.bLog, 'btn-primary', gt.action === 'CHECK_TEMP');
+      setHidden(rec.bReheat, gt.action !== 'REHEAT_IMMEDIATE');
+      setHidden(rec.bCool, !(b.kind === 'hot' && b.remainingG > 0 && gt.action !== 'DISCARD_LOCKOUT'));
+      if (rec.ed && rec.mode) refreshHint(rec, b);
+      return gt;
+    }
+
+    // Builds the inline temperature box once per card. Log temp and Reheat both use it.
+    function buildEditor(rec) {
+      const ed = { err: h('div', { class: 'fs-note', 'data-tone': 'bad', role: 'alert', hidden: true }), hint: h('p', { class: 'hc-hint', role: 'status' }) };
+      ed.title = h('div', { class: 'hc-ed-t' });
+      // Wide range on purpose: a reading of 40 or 250 degrees must be
+      // typeable so it can be recorded and flagged.
+      ed.stepper = SB.ui.stepper({ value: 150, min: 32, max: 300, step: 1, bigStep: 5, unit: '°F', label: 'Temperature in degrees Fahrenheit', onChange: () => { const b = batchOf(rec.id); if (b) refreshHint(rec, b); setHidden(ed.err, true); } });
+      // Saves the reading through the engine.
+      ed.save = h('button', { type: 'button', class: 'btn btn-primary btn-lg', onClick: () => saveReading(rec) }, ico('check', 22), h('span', null, 'Save reading'));
+      // Closes the box without saving anything.
+      ed.cancel = h('button', { type: 'button', class: 'btn btn-lg', onClick: () => closeEditor(rec, true) }, 'Cancel');
+      ed.el = h('div', { class: 'hc-editor', role: 'group', 'aria-label': 'Temperature reading' }, ed.title, ed.stepper, ed.hint, ed.err, h('div', { class: 'hc-ed-btns' }, ed.save, ed.cancel));
+      // Keyboard: Enter saves and Esc cancels, so no mouse is needed.
+      ed.el.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); closeEditor(rec, true); }
+        else if (e.key === 'Enter' && e.target === ed.stepper.input) { e.preventDefault(); ed.stepper.input.dispatchEvent(new Event('change')); saveReading(rec); }
+      });
+      return ed;
+    }
+    // Opens the temperature box on a card, or closes it if it is already open in the same mode.
+    function toggleEditor(rec, mode) {
+      if (rec.ed && rec.mode === mode && !rec.ed.el.hidden) { closeEditor(rec, true); return; }
+      const b = batchOf(rec.id); if (!b) return;
+      if (!rec.ed) { rec.ed = buildEditor(rec); rec.editorSlot.appendChild(rec.ed.el); }
+      rec.mode = mode;
+      const S = safety();
+      text(rec.ed.title, mode === 'reheat' ? 'Reheated to' : b.kind === 'cooling' ? 'Cooling reading' : 'Temperature now');
+      text(rec.ed.save.querySelector('span'), mode === 'reheat' ? 'Log reheat' : 'Save reading');
+      rec.ed.stepper.setValue(mode === 'reheat' ? S.reheatF : defaultTemp(b), { silent: true });
+      setHidden(rec.ed.err, true); setHidden(rec.ed.el, false);
+      refreshHint(rec, b);
+      rec.bLog.setAttribute('aria-expanded', mode === 'log' ? 'true' : 'false'); rec.bReheat.setAttribute('aria-expanded', mode === 'reheat' ? 'true' : 'false');
+      rec.ed.el.scrollIntoView({ block: 'nearest' });
+      (fineAny() ? rec.ed.stepper.input : rec.ed.save).focus({ preventScroll: true });
+    }
+    // Hides the box and returns focus to the button that opened it, so keyboard users keep their place.
+    function closeEditor(rec, refocus) {
+      if (!rec.ed) return;
+      setHidden(rec.ed.el, true); const was = rec.mode; rec.mode = null;
+      rec.bLog.setAttribute('aria-expanded', 'false'); rec.bReheat.setAttribute('aria-expanded', 'false');
+      if (refocus) (was === 'reheat' && !rec.bReheat.hidden ? rec.bReheat : rec.bLog).focus({ preventScroll: true });
+    }
+    // Updates the one-line verdict under the stepper to match the number in it.
+    function refreshHint(rec, b) {
+      const hnt = tempHint(b, rec.mode, rec.ed.stepper.getValue());
+      text(rec.ed.hint, hnt.text); attr(rec.ed.hint, 'data-tone', hnt.tone);
+    }
+    // Saves the reading (or the reheat) through the engine. A refusal is shown inside the box in plain words.
+    function saveReading(rec) {
+      const b = batchOf(rec.id); if (!b) { closeEditor(rec, false); return; }
+      const f = rec.ed.stepper.getValue(), mode = rec.mode;
+      const res = run(mode === 'reheat' ? 'reheatBatch' : 'logTemp', { batchId: b.id, tempF: f });
+      if (res.report !== 'ok') {
+        U.clear(rec.ed.err); rec.ed.err.append(ico('alert-circle', 20), h('span', null, say(res))); setHidden(rec.ed.err, false);
+        return;
+      }
+      const label = b.label || 'Batch', info = res.info || {};
+      if (mode === 'reheat' || info.reheated) toast(label + ' reheated to ' + f + ' °F. It is being served again.', 'ok');
+      else if (info.status === 'reheat') toast(label + ' is below ' + safety().hotHoldF + ' °F. Reheat it to ' + safety().reheatF + ' °F now, or discard it.', 'warn');
+      else if (info.status === 'chill') toast(label + ' is above ' + safety().coldHoldF + ' °F. Chill it now.', 'warn');
+      else toast(label + ' logged at ' + f + ' °F.' + (info.onTime === false ? ' That check was ' + hmLong(info.lateMs) + ' late.' : ''), info.onTime === false ? 'warn' : 'ok');
+      closeEditor(rec, true);
+      update(nowMs());
+      flash(rec.el);
+    }
+
+    // Asks why a batch is thrown out, shows which menu items would go 86 because of it, then discards.
+    // The waste is counted under the chosen reason, and Undo stays available.
+    function openDiscard(b, opener) {
+      const ing = ingOf(b.ing), label = b.label || 'Batch';
+      const gt = E().gate(b, nowMs(), safety());
+      const order = b.kind === 'cooling' ? ['cooling', 'temp', 'expired', 'quality', 'other'] : ['expired', 'temp', 'quality', 'manual', 'other'];
+      // When the engine already locked the batch, its reason is preselected so waste is labelled correctly.
+      let reason = gt.action === 'DISCARD_LOCKOUT' && order.indexOf(gt.reason) >= 0 ? gt.reason : null;
+      if (reason == null && gt.action === 'DISCARD_LOCKOUT') reason = gt.reason === 'expired' ? 'expired' : 'temp';
+      const fx = whatIf('discardBatch', { batchId: b.id, reason: 'quality' });
+      // An empty value means nothing is picked yet (null would select the first reason).
+      const seg = SB.ui.segmented({ label: 'Why is it being thrown out?', class: 'hc-reasons', value: reason == null ? '' : reason, options: order.map((id) => ({ id, label: REASON_WORDS[id] })), onChange: (id) => { reason = id; paint(); } });
+      const effect = fx
+        ? (fx.off.length ? 'These menu items go 86: ' + endDot(listWords(fx.off)) : 'No menu item goes 86: other stock still covers them.')
+        : '';
+      // Discard batch stays off until a reason is chosen.
+      const d = dialog({
+        title: 'Discard ' + label + '?', name: 'discard', opener, tone: 'danger', confirmLabel: 'Discard batch',
+        body: [
+          h('p', null, qtyText(ing, b.remainingG) + ' of ' + label + ' is thrown out and counted as waste.'),
+          h('p', { class: 'fs-sub' }, 'Pick the reason. It goes into the waste figures.'), seg,
+          effect ? h('div', { class: 'fs-note', 'data-tone': fx.off.length ? 'warn' : 'info' }, ico(fx.off.length ? 'alert' : 'info', 20), h('div', null, effect)) : null,
+          h('p', { class: 'fs-sub' }, 'You can undo for ' + Math.round((st().settings.undoMs || C.undoMs) / 1000) + ' seconds.'),
+        ],
+        // Discards through the engine; the toast offers Undo and the waste is counted under the reason.
+        onConfirm: (sh) => {
+          const res = run('discardBatch', { batchId: b.id, reason });
+          sh.close('confirm');
+          if (res.report === 'ok') { undoToast(label + ' discarded. ' + U.fmtG(res.info && res.info.g) + ' counted as waste.', 'ok'); update(nowMs()); }
+          else toast(say(res), 'warn');
+        },
+      });
+      // Keeps the Discard batch button off until a reason is chosen.
+      function paint() { d.ok.disabled = !reason; d.ok.setAttribute('aria-disabled', reason ? 'false' : 'true'); }
+      paint();
+    }
+    // Explains the two-stage cooling rule and, on confirm, moves the whole batch into cooling.
+    function openCooling(b, opener) {
+      const S = safety(), c = S.cooling || C.safety.cooling, label = b.label || 'Batch', ing = ingOf(b.ing);
+      const fx = whatIf('startCooling', { batchId: b.id });
+      // Confirm dialog for cooling; it also lists any menu items that go 86 while the food is cooling.
+      dialog({
+        title: 'Start cooling ' + label + '?', name: 'cooling', opener, confirmLabel: 'Start cooling', icon: 'snow',
+        body: [
+          h('p', null, 'All ' + qtyText(ing, b.remainingG) + ' moves to cooling and stops being served.'),
+          h('p', null, 'Get it from ' + S.hotHoldF + ' °F to ' + c.stage1ToF + ' °F within ' + trimNum(c.stage1H) + ' hours, then to ' + c.finalF + ' °F within ' + trimNum(c.totalH - c.stage1H) + ' more hours (' + trimNum(c.totalH) + ' hours in all). Log a reading as it cools.'),
+          fx && fx.off.length ? h('div', { class: 'fs-note', 'data-tone': 'warn' }, ico('alert', 20), h('div', null, 'These menu items go 86: ' + endDot(listWords(fx.off)))) : null,
+          h('p', { class: 'fs-sub' }, C.safetyLine),
+        ],
+        // The engine moves the food into a new cooling batch, so the card to highlight is found by the new id.
+        onConfirm: (sh) => {
+          const res = run('startCooling', { batchId: b.id });
+          sh.close('confirm');
+          if (res.report === 'ok') { toast(label + ' is cooling. Log a reading at least every ' + S.tempCheckEveryMin + ' minutes.', 'ok'); update(nowMs()); const rec = cards.get(res.info && res.info.batchId); if (rec) { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); } }
+          else toast(say(res), 'warn');
+        },
+      });
+    }
+
+    // Builds one line of the recently discarded list.
+    function makeRecent(b) {
+      const t = h('span', { class: 'grow' }), when = h('span', { class: 'fs-sub num' });
+      const el = h('div', { class: 'fs-card fs-card-soft hc-recent' }, ico('trash', 18), t, when);
+      return { el, t, when };
+    }
+    // Refreshes one recently discarded line: what, why, how much and when.
+    function updateRecent(rec, b, now) {
+      text(rec.t, (b.label || 'Batch') + ': ' + (REASON_WORDS[b.discardReason] || 'Discarded').toLowerCase() + ', ' + U.fmtG(b.wasteG || 0) + ' wasted');
+      text(rec.when, agoText(now - (b.discardedAt || now)));
+    }
+
+    // The one update path: membership on store change, text on the 1 Hz tick.
+    function update(now) {
+      const s = st();
+      const live = s.batches.filter((b) => b.status !== 'discard' && b.remainingG > 0).sort((a, b) => a.enteredAt - b.enteredAt || (a.id < b.id ? -1 : 1));
+      reconcile(grid, cards, live, (b) => b.id, makeCard, null);
+      let check = 0, act = 0;
+      live.forEach((b) => {
+        const rec = cards.get(b.id), gt = updateCard(rec, b, now);
+        if (gt.action === 'CHECK_TEMP') check++; else if (gt.action !== 'NONE' && gt.reason !== 'cooled' && !(b.kind === 'cooling' && gt.action === 'CHILL_NOW')) act++;
+      });
+      setHidden(grid, !live.length); setHidden(empty, live.length > 0);
+      setHidden(summary, !live.length);
+      if (live.length) {
+        const bits = [];
+        if (act) bits.push(act + ' ' + plural(act, 'needs', 'need') + ' action now');
+        if (check) bits.push(check + ' ' + plural(check, 'needs', 'need') + ' a temperature reading');
+        text(summary, live.length + ' ' + plural(live.length, 'batch', 'batches') + ' in the cabinet. ' + (bits.length ? bits.join('. ') + '.' : 'All are holding fine.'));
+        cls(summary, 'is-alert', act > 0);
+      }
+      tabs.seg.setCount('batches', live.length, { alert: act + check > 0 });
+      const dis = s.batches.filter((b) => b.status === 'discard' && U.isNum(b.discardedAt)).sort((a, b) => b.discardedAt - a.discardedAt).slice(0, 5);
+      reconcile(recentList, recents, dis, (b) => b.id, makeRecent, (rec, b) => updateRecent(rec, b, now));
+      setHidden(recentBox, !dis.length);
+    }
+    update(nowMs());
+    watch(offs, () => update(nowMs()), (now) => update(now));
+    if (opts.batchId) { const rec = cards.get(opts.batchId); if (rec) setTimeout(() => { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); }, 80); }
+    return sheet;
+  }
+
+  // New batch form: live yield and cost numbers while you type (SPEC 14.3.2).
+  function buildBatchForm(onAdded, opts) {
+    const F = { ing: null, rawKg: 8, endC: 85, holdH: 2, weighed: false, cookedKg: 1, tempF: 150, wTouched: false, tTouched: false };
+    // Products that can go in the cabinet: the ones that need temperature control.
+    const list = () => st().ingredients.filter((i) => i.tcs && !i.archived);
+    const first = list()[0];
+    F.ing = opts && opts.ing && ingOf(opts.ing) && ingOf(opts.ing).tcs ? opts.ing : first ? first.id : null;
+    // Gives a stepper and its number box the same spoken label.
+    const relabel = (stepper, label) => { attr(stepper, 'aria-label', label); attr(stepper.input, 'aria-label', label); };
+    // A labelled field; the visible label is hidden from screen
+    // readers because the control has its own label.
+    const vis = (label, node, hint) => h('div', { class: 'hc-fld' }, h('div', { class: 'field-label', 'aria-hidden': 'true' }, label), node, hint || null);
+
+    // Choosing a product also changes the default weight, the hint and which steppers show.
+    const prodSeg = SB.ui.segmented({
+      label: 'Product', class: 'hc-prod', value: F.ing,
+      options: list().map((i) => ({ id: i.id, label: i.name, icon: i.hold === 'cold' ? 'snow' : 'flame', iconSize: 18 })),
+      // Picking a product resets the weight defaults and the hint.
+      onChange: (id) => setIng(id),
+    });
+
+    const rawLab = h('div', { class: 'field-label', 'aria-hidden': 'true' });
+    // Raw weight in kg for meat, or the amount made for sides.
+    const rawStep = SB.ui.stepper({ value: F.rawKg, min: 0.1, max: 1000, step: 0.1, bigStep: 1, unit: 'kg', label: 'Raw weight in kilograms', onChange: (v) => { F.rawKg = v; F.wTouched = true; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
+    const rawFld = h('div', { class: 'hc-fld' }, rawLab, rawStep);
+
+    // Cook endpoint: the inside temperature the meat reached. Hotter means more weight lost.
+    const endStep = SB.ui.stepper({ value: F.endC, min: 75, max: 90, step: 1, unit: '°C', label: 'Cook endpoint in degrees Celsius', onChange: (v) => { F.endC = v; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
+    // Hours the meat rested before slicing; resting also changes the weight.
+    const holdStep = SB.ui.stepper({ value: F.holdH, min: 0, max: 3, step: 0.5, unit: 'h', label: 'Hold before slicing in hours', onChange: (v) => { F.holdH = v; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
+    const thermalBox = h('div', { class: 'hc-two' }, vis('Cook endpoint', endStep), vis('Rested before slicing', holdStep));
+
+    // Cooked weight typed by the cook; it replaces the model when 'I weighed it' is on.
+    const cookedStep = SB.ui.stepper({ value: F.cookedKg, min: 0.1, max: 1000, step: 0.1, bigStep: 1, unit: 'kg', label: 'Cooked weight in kilograms', onChange: (v) => { F.cookedKg = v; F.cookedTouched = true; calc(); } });
+    const cookedFld = h('div', { class: 'hc-fld', hidden: true }, h('div', { class: 'field-label', 'aria-hidden': 'true' }, 'Cooked weight'), cookedStep);
+    // When on, the cook's own scale numbers replace the model's estimate.
+    const weighedTog = SB.ui.toggle({ label: 'I weighed it after cooking', onChange: (on) => { F.weighed = on; F.cookedTouched = false; setHidden(cookedFld, !on); if (on) syncCooked(); calc(); } });
+    const weighedBox = h('div', { class: 'hc-weighed' }, weighedTog, cookedFld);
+
+    // The first temperature reading; it starts the batch's clock.
+    const tempStep = SB.ui.stepper({ value: F.tempF, min: 32, max: 300, step: 1, bigStep: 5, unit: '°F', label: 'First temperature reading in degrees Fahrenheit', onChange: (v) => { F.tempF = v; F.tTouched = true; tempHintPaint(); } });
+    const tempHintEl = h('p', { class: 'hc-hint', role: 'status' });
+    const tempFld = h('div', { class: 'hc-fld' }, h('div', { class: 'field-label', 'aria-hidden': 'true' }, 'First temperature reading'), tempStep, tempHintEl);
+
+    const labelInput = h('input', { class: 'input', type: 'text', maxlength: '40', autocomplete: 'off', placeholder: 'Leave empty for an automatic name' });
+    const labelField = SB.ui.field({ label: 'Label (optional)', control: labelInput, hint: 'Up to 40 characters, for example "Brisket, second pit".' });
+
+    // The live numbers box: yield, cooked weight, cost, and the comparison with the flat 50 percent rule.
+    const dYield = h('dd', { class: 'num' }), dCooked = h('dd', { class: 'num' }), dCost = h('dd', { class: 'num' });
+    const dtYield = h('dt'), dtCost = h('dt');
+    const cmpLine = h('p', { class: 'hc-cmp', hidden: true });
+    const honest = h('p', { class: 'fs-sub hc-honest' });
+    const calcBox = h('section', { class: 'hc-calc', 'aria-label': 'Expected result' },
+      h('h3', { class: 'fs-h' }, 'What you should get'),
+      h('dl', { class: 'fs-dl hc-dl' }, dtYield, dYield, h('dt', null, 'Cooked weight'), dCooked, dtCost, dCost),
+      cmpLine, honest);
+
+    const err = h('div', { class: 'fs-note hc-form-err', 'data-tone': 'bad', role: 'alert', hidden: true });
+    // Put in hold cabinet: adds the batch through the engine.
+    const addBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg hc-add', onClick: () => add() }, ico('plus', 22), h('span', null, 'Put in hold cabinet'));
+    const footer = h('div', { class: 'hc-foot' }, err, addBtn);
+
+    const el = h('div', { class: 'hc-panel hc-form' },
+      h('h3', { class: 'fs-h' }, 'New batch'),
+      h('p', { class: 'fs-sub' }, 'Log a pan when it goes into the cabinet. The first temperature starts its clock, so enter what your thermometer says.'),
+      vis('Product', prodSeg), rawFld, thermalBox, weighedBox, tempFld, labelField, calcBox);
+
+    // A starting weight of about half the par level, so the box opens near a typical pan.
+    function defaultKg(ing) { return Math.max(0.5, Math.round((ing.parG || 4000) / 2 / 100) / 10); }
+
+    // Switches product: relabels the weight box, resets defaults the cook has not touched,
+    // and shows or hides the cook-model steppers.
+    function setIng(id) {
+      F.ing = id;
+      const ing = ingOf(id); if (!ing) return;
+      const meat = ing.thermal || (U.isNum(ing.yield) && ing.yield < 1);
+      text(rawLab, meat ? 'Raw weight before cooking' : 'Weight made');
+      relabel(rawStep, meat ? 'Raw weight before cooking, in kilograms' : 'Weight made, in kilograms');
+      F.rawKg = defaultKg(ing); F.wTouched = false; rawStep.setValue(F.rawKg, { silent: true });
+      setHidden(thermalBox, !ing.thermal);
+      setHidden(weighedBox, !meat);
+      if (!meat && F.weighed) { F.weighed = false; weighedTog.setValue(false); setHidden(cookedFld, true); }
+      if (!F.tTouched) { F.tempF = ing.hold === 'cold' ? 38 : 150; tempStep.setValue(F.tempF, { silent: true }); }
+      if (F.weighed) { F.cookedTouched = false; syncCooked(); }
+      tempHintPaint(); calc();
+    }
+    // Shows what the first reading will mean (in range, below the hot limit, above the cold limit).
+    function tempHintPaint() {
+      const ing = ingOf(F.ing); if (!ing) return;
+      const hnt = tempHint({ kind: ing.hold === 'cold' ? 'cold' : 'hot' }, 'log', F.tempF);
+      text(tempHintEl, hnt.text); attr(tempHintEl, 'data-tone', hnt.tone);
+    }
+
+    // Works out cooked weight, yield and cost per cooked kg from the form.
+    // It uses the cook's own weights if given, else the cook-loss model for brisket, else the starter yield.
+    function model() {
+      const ing = ingOf(F.ing); if (!ing) return null;
+      const rawG = Math.round(F.rawKg * 1000), rawCost = U.isNum(ing.costPerKg) ? ing.costPerKg : 0;
+      let cookedG, yieldPct, kind, cmp = null;
+      if (F.weighed && F.cookedKg > 0) { cookedG = Math.round(F.cookedKg * 1000); yieldPct = rawG > 0 ? (cookedG / rawG) * 100 : 0; kind = 'weighed'; }
+      else if (ing.thermal) { const ty = E().thermalYield({ endpointC: F.endC, holdH: F.holdH, rawG, costPerKgRaw: rawCost }); cookedG = ty.cookedG; yieldPct = ty.hotPct; kind = 'model'; }
+      else { const y = U.isNum(ing.yield) && ing.yield > 0 ? ing.yield : 1; cookedG = Math.round(rawG * y); yieldPct = y * 100; kind = 'static'; }
+      if (ing.thermal && kind === 'model') cmp = E().staticYieldComparison({ endpointC: F.endC, holdH: F.holdH, rawG, costPerKgRaw: rawCost, staticPct: 50 });
+      const costPerKg = cookedG > 0 ? ((rawG / 1000) * rawCost) / (cookedG / 1000) : 0;
+      return { ing, rawG, rawCost, cookedG, yieldPct, kind, cmp, costPerKg };
+    }
+    // Pre-fills the cooked weight with the model's number until the cook types their own.
+    function syncCooked() { const m = model(); if (!m) return; const base = E().thermalYield({ endpointC: F.endC, holdH: F.holdH, rawG: m.rawG }); const kg = m.ing.thermal ? base.cookedG / 1000 : (m.rawG * (m.ing.yield || 1)) / 1000; F.cookedKg = Math.max(0.1, Math.round(kg * 10) / 10); cookedStep.setValue(F.cookedKg, { silent: true }); }
+
+    // Redraws the numbers box, including the plain comparison with the old flat 50 percent rule.
+    function calc() {
+      showErr(null);
+      const m = model(); if (!m) return;
+      const meat = m.ing.thermal || (U.isNum(m.ing.yield) && m.ing.yield < 1);
+      text(dtYield, m.kind === 'weighed' ? 'Yield from your weights' : meat ? 'Expected yield' : 'Yield');
+      text(dYield, pctText(m.yieldPct, 1) + (m.kind === 'model' ? ' (cook-loss model)' : m.kind === 'static' && meat ? ' (starter estimate)' : ''));
+      text(dCooked, U.fmtG(m.cookedG));
+      text(dtCost, 'Cost per cooked kg');
+      text(dCost, U.fmtMoney(m.costPerKg) + ' (starter cost)');
+      if (m.cmp) {
+        const c = m.cmp;
+        const wTxt = Math.abs(Math.round(c.weightErrorPct)) + '% too ' + (c.weightErrorPct < 0 ? 'little' : 'much');
+        const cTxt = Math.abs(Math.round(c.costErrorPct)) + '% too ' + (c.costErrorPct > 0 ? 'high' : 'low');
+        text(cmpLine, 'The flat ' + c.staticPct + '% rule would plan ' + U.fmtG(c.staticCookedG) + ' of cooked meat (' + wTxt + ') and price it at ' + U.fmtMoney(c.staticCostPerKg) + ' per kg (' + cTxt + '). This model says ' + U.fmtG(c.modelCookedG) + ' at ' + U.fmtMoney(c.modelCostPerKg) + ' per kg.');
+        setHidden(cmpLine, false);
+      } else if (m.ing.thermal && m.kind === 'weighed') {
+        const staticCost = m.rawCost / 0.5;
+        text(cmpLine, 'The flat 50% rule would have priced this at ' + U.fmtMoney(staticCost) + ' per kg and planned ' + U.fmtG(m.rawG * 0.5) + '. Your weights say ' + U.fmtG(m.cookedG) + ' at ' + U.fmtMoney(m.costPerKg) + ' per kg.');
+        setHidden(cmpLine, false);
+      } else setHidden(cmpLine, true);
+      text(honest, (m.ing.thermal ? 'Brisket yield comes from the Texas A&M cook-loss model. ' : 'Yield is a starter estimate until you weigh a batch. ') + 'Raw cost of ' + U.fmtMoney(m.rawCost) + ' per kg is a starter estimate.');
+    }
+
+    // Shows or clears the error above the Put in hold cabinet button.
+    function showErr(msg) { U.clear(err); if (msg) { err.append(ico('alert-circle', 20), h('span', null, msg)); } setHidden(err, !msg); }
+    // Sends the new batch to the engine. Success shows a toast and returns to the cabinet;
+    // a refusal is shown in the engine's own words.
+    function add() {
+      const m = model(); if (!m) return;
+      const payload = { ing: m.ing.id, tempF: F.tempF, rawG: m.rawG };
+      if (m.ing.thermal) { payload.endpointC = F.endC; payload.holdH = F.holdH; }
+      if (F.weighed && F.cookedKg > 0) payload.cookedG = Math.round(F.cookedKg * 1000);
+      const lab = labelInput.value.trim(); if (lab) payload.label = lab;
+      const res = run('addBatch', payload);
+      if (res.report !== 'ok') { showErr(say(res)); return; }
+      showErr(null);
+      const info = res.info || {}, b = st().batches.find((x) => x.id === info.batchId), label = b ? b.label : m.ing.name + ' batch';
+      if (info.status === 'ok') toast(label + ' is in the cabinet: ' + U.fmtG(info.cookedG) + ' cooked, first reading ' + F.tempF + ' °F.', 'ok');
+      else toast(label + ' is in the cabinet but not being served: ' + (m.ing.hold === 'cold' ? 'above ' + safety().coldHoldF + ' °F, chill it now.' : 'below ' + safety().hotHoldF + ' °F, reheat it to ' + safety().reheatF + ' °F.'), 'warn');
+      labelInput.value = ''; F.tTouched = false; setIng(F.ing);
+      onAdded(info.batchId);
+    }
+    labelInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+    [rawStep, endStep, holdStep, cookedStep, tempStep].forEach((s) => s.addEventListener('input', () => showErr(null)));
+
+    setIng(F.ing);
+    // The form's public parts: its page, its footer button, and hooks for when it is shown or destroyed.
+    return {
+      el, footer,
+      // Called when the tab is shown: refresh the numbers and focus the first box on a mouse screen.
+      shown() { calc(); tempHintPaint(); if (fineAny()) { try { rawStep.input.focus({ preventScroll: true }); } catch (e) { /* ignore */ } } },
+      // Removes the steppers' listeners; the sheet calls this when it closes.
+      destroy() { [rawStep, endStep, holdStep, cookedStep, tempStep].forEach((s) => s.destroy()); },
+    };
+  }
+
+  // 86 board and stock.
+  // Icon for each simulated sales channel.
+  // audit:data-start
+  const SYNC_ICON = { pos: 'receipt', online: 'phone', drive: 'car', delivery: 'bag' };
+  // audit:data-end
+
+  // The word, icon and colour for a menu item's availability: on the
+  // menu, 86 manual, 86 safety hold or 86 sold out.
+  function stateOf86(a) {
+    if (!a || a.ok) return { tone: 'ok', icon: 'check-circle', word: 'On the menu' };
+    if (a.reason === 'manual') return { tone: 'bad', icon: 'ban', word: '86 manual' };
+    if (a.reason === 'safety') return { tone: 'bad', icon: 'ban', word: '86 safety hold' };
+    return { tone: 'bad', icon: 'ban', word: '86 sold out' };
+  }
+  // Where an ingredient stands against its 86 level: plenty, running low (within twice the level) or at it.
+  function stockLevel(ing, have) {
+    const thr = ing.thresholdG || 0;
+    if (have <= thr) return { tone: 'bad', icon: 'ban', word: '86 level', meter: 'bad' };
+    if (have <= thr * 2) return { tone: 'warn', icon: 'alert', word: 'Running low', meter: 'warn' };
+    return { tone: 'ok', icon: 'check-circle', word: 'Plenty', meter: null };
+  }
+
+  // Builds the 86 board: the simulated channel strip, the menu rows (86 it, Back on) and the stock list.
+  function openBoard86(opts) {
+    opts = opts || {};
+    const offs = [];
+    const rows = new Map();          // menuId -> record
+    const cats = new Map();          // category id -> { el, list, map, head }
+    const ingRows = new Map();       // ingredient id -> record
+    let filter = opts.filter === 'off' ? 'off' : 'all';
+    // Wide, so the menu and the stock sit side by side on a big screen.
+    const sheet = SB.ui.sheet({ title: '86 board and stock', side: 'right', width: 'min(1060px, 96vw)', name: 'board86', onClose: () => offs.splice(0).forEach((f) => f()) });
+
+    // The sync strip: one chip per simulated channel. Nothing is really sent to any outside system.
+    const syncMap = new Map();
+    const syncGrid = h('div', { class: 'bd-sync-grid' });
+    C.syncTargets.forEach((t) => {
+      const st1 = h('div', { class: 'bd-chip-state' }), st2 = h('div', { class: 'bd-chip-sub' });
+      const icon = h('span', { class: 'bd-chip-i' });
+      const el = h('div', { class: 'bd-chip', dataset: { target: t.id, tone: 'muted' } }, icon, h('div', { class: 'bd-chip-t' }, h('div', { class: 'bd-chip-n' }, t.name), st1, st2));
+      syncMap.set(t.id, { el, st1, st2, icon, key: '' });
+      syncGrid.appendChild(el);
+    });
+    // Seconds a simulated channel takes to catch up (starter value from config).
+    const syncSec = () => (st().settings && st().settings.syncTargetSec) || C.syncTargetSec;
+    const syncBox = h('section', { class: 'fs-section bd-sync', 'aria-label': 'Channel sync' },
+      h('div', { class: 'fs-row' }, h('h3', { class: 'fs-h grow' }, 'Channel sync'), simPill()),
+      syncGrid,
+      h('p', { class: 'fs-sub bd-sync-note' }, 'There is no live POS or delivery app connected. These four chips show how a real 86 would reach each channel. Changes catch up within ' + syncSec() + ' seconds.'));
+
+    // Updates the channel chips: syncing, synced after N seconds, or no changes yet.
+    function paintSync() {
+      const syncs = st().syncs || [];
+      const target = syncSec();
+      C.syncTargets.forEach((t) => {
+        const rec = syncMap.get(t.id);
+        let pending = 0, latest = null;
+        for (let i = syncs.length - 1; i >= 0; i--) {
+          const x = syncs[i].targets && syncs[i].targets[t.id];
+          if (!x) continue;
+          if (x.doneAt == null) pending++; else if (!latest) latest = { sy: syncs[i], x };
+        }
+        let tone, icon, line1, line2 = '';
+        if (pending) { tone = 'warn'; icon = 'clock'; line1 = 'Syncing...'; line2 = pending > 1 ? pending + ' changes on the way' : '1 change on the way'; }
+        else if (latest) {
+          const secs = Math.max(0, Math.round((latest.x.doneAt - latest.sy.t) / 1000));
+          const late = secs > target;
+          tone = late ? 'warn' : 'ok'; icon = late ? 'alert' : 'check-circle';
+          line1 = 'Synced ' + secs + ' s after ' + (latest.sy.kind === 'back' ? 'back on' : '86');
+          const mi = menuOf(latest.sy.menuId);
+          line2 = (mi ? mi.short || mi.name : '') + (late ? ', over the ' + target + ' s target' : '');
+        } else { tone = 'muted'; icon = 'info'; line1 = 'No changes yet'; line2 = 'Nothing has been 86\'d'; }
+        const key = tone + '|' + icon + '|' + line1 + '|' + line2;
+        if (rec.key === key) return;
+        rec.key = key; attr(rec.el, 'data-tone', tone);
+        U.clear(rec.icon); rec.icon.appendChild(ico(icon, 22));
+        text(rec.st1, line1); text(rec.st2, line2); setHidden(rec.st2, !line2);
+      });
+    }
+
+    // Filter: all items, or only the ones that are off the menu.
+    const filterSeg = SB.ui.segmented({ label: 'Show', class: 'bd-filter', value: filter, options: [{ id: 'all', label: 'All items', count: 0 }, { id: 'off', label: 'Off the menu', count: 0 }], onChange: (id) => { filter = id; applyFilter(); } });
+    const menuBox = h('section', { class: 'fs-section bd-menu', 'aria-label': 'Menu availability' }, h('div', { class: 'fs-row' }, h('h3', { class: 'fs-h grow' }, 'Menu'), filterSeg));
+    const catHost = h('div', { class: 'bd-cats' });
+    const noneOff = h('div', { class: 'empty bd-none', hidden: true }, ico('check-circle', 36), h('h3', null, 'Everything is on the menu'), h('p', null, 'Nothing is 86 right now. Tap 86 it on an item that has run out.'));
+    menuBox.append(catHost, noneOff);
+
+    // Builds one menu row (name, price, state, reason, buttons) once; updateRow keeps it current.
+    function makeRow(mi) {
+      const name = h('div', { class: 'bd-name' }), price = h('span', { class: 'bd-price num' });
+      const state = h('span', { class: 'fs-state bd-state' });
+      const why = h('div', { class: 'bd-why' });
+      const b86 = h('button', { type: 'button', class: 'btn bd-toggle', dataset: { act: 'toggle' } });
+      const bGo = h('button', { type: 'button', class: 'btn bd-go', dataset: { act: 'go' } });
+      const el = h('div', { class: 'bd-row', dataset: { menu: mi.id, state: 'ok' } },
+        h('div', { class: 'bd-main' }, h('div', { class: 'bd-top' }, name, price), state, why),
+        h('div', { class: 'bd-act' }, b86, bGo));
+      const rec = { el, name, price, state, why, b86, bGo, mi, key: '' };
+      b86.addEventListener('click', () => {
+        const a = SB.store.select.availability(rec.mi.id);
+        if (a && a.reason === 'manual') toggle(rec.mi, false); else if (a && a.ok) toggle(rec.mi, true);
+      });
+      bGo.addEventListener('click', () => {
+        const a = SB.store.select.availability(rec.mi.id);
+        if (!a || a.ok) return;
+        if (a.reason === 'safety') goHold(); else if (a.reason === 'stock') fixStock(a.ing);
+      });
+      return rec;
+    }
+    // The plain reason an item is off the menu: who marked it 86 and when, a safety lock, or low stock.
+    function whyLine(a, mi, now) {
+      if (!a || a.ok) return '';
+      if (a.reason === 'manual') {
+        const m = st().manual86 && st().manual86[mi.id];
+        return 'Marked 86 by hand' + (m && U.isNum(m.since) ? ', ' + agoText(now - m.since) : '') + '.';
+      }
+      const ing = ingOf(a.ing);
+      if (a.reason === 'safety') return ingName(a.ing) + ' is locked for safety. Reheat or discard the batch in the hold cabinet. It comes back on when a safe batch is in.';
+      const have = E().servable(st(), a.ing);
+      return ingName(a.ing) + ' is low: ' + qtyText(ing, have) + ' left, 86 at ' + qtyText(ing, ing ? ing.thresholdG || 0 : 0) + '.';
+    }
+    // Refreshes one menu row and picks the button it needs: 86 it,
+    // Back on, Add a batch, Restock or Open hold cabinet.
+    function updateRow(rec, mi, now) {
+      rec.mi = mi;
+      const a = SB.store.select.availability(mi.id) || { ok: false, reason: null };
+      const sv = stateOf86(a);
+      text(rec.name, mi.name); text(rec.price, U.fmtMoney(mi.price));
+      setState(rec.state, sv.tone, sv.icon, sv.word);
+      attr(rec.el, 'data-state', a.ok ? 'ok' : a.reason || 'off');
+      const w = whyLine(a, mi, now); text(rec.why, w); setHidden(rec.why, !w);
+      // toggle: 86 it, or Back on for a manual 86; stock and safety holds fix themselves another way
+      const showToggle = a.ok || a.reason === 'manual';
+      setHidden(rec.b86, !showToggle);
+      if (showToggle) {
+        const k = a.ok ? '86' : 'back';
+        if (rec.tk !== k) { rec.tk = k; U.clear(rec.b86); rec.b86.append(ico(a.ok ? 'ban' : 'check-circle', 20), h('span', null, a.ok ? '86 it' : 'Back on')); }
+        cls(rec.b86, 'btn-primary', !a.ok);
+        attr(rec.b86, 'aria-label', (a.ok ? '86 it: ' : 'Back on the menu: ') + mi.name);
+      }
+      // Stock and safety holds cannot be switched off here; the button leads to where each is fixed.
+      const showGo = !a.ok && (a.reason === 'safety' || a.reason === 'stock');
+      setHidden(rec.bGo, !showGo);
+      if (showGo) {
+        const ing = ingOf(a.ing);
+        const k = a.reason === 'safety' ? 'hold' : ing && ing.tcs ? 'batch' : 'stock';
+        if (rec.gk !== k) {
+          rec.gk = k; U.clear(rec.bGo);
+          rec.bGo.append(ico(k === 'hold' ? 'thermometer' : k === 'batch' ? 'plus' : 'package', 20), h('span', null, k === 'hold' ? 'Open hold cabinet' : k === 'batch' ? 'Add a batch' : 'Restock'));
+        }
+        attr(rec.bGo, 'aria-label', (k === 'hold' ? 'Open the hold cabinet for ' : k === 'batch' ? 'Add a batch of ' : 'Restock ') + (k === 'hold' ? mi.name : ingName(a.ing)));
+      }
+      rec.off = !a.ok;
+    }
+    // 86 it or Back on, through the engine, with an Undo toast.
+    // If a manual 86 is removed but stock is still low, the message says the item stays 86.
+    function toggle(mi, on) {
+      const res = run('toggle86', { menuId: mi.id, on });
+      if (res.report !== 'ok') { toast(say(res), 'warn'); return; }
+      const a = SB.store.select.availability(mi.id), nm = mi.short || mi.name;
+      if (on) undoToast(nm + ' is 86. The sync strip shows the simulated channels catching up.', 'ok');
+      else if (a && a.ok) undoToast(nm + ' is back on.', 'ok');
+      else toast('Manual 86 removed, but ' + nm + ' is still ' + stateOf86(a).word.toLowerCase() + '. ' + whyLine(a, mi, nowMs()), 'warn');
+      update(nowMs());
+      const rec = rows.get(mi.id); if (rec) flash(rec.el);
+    }
+    // Closes this sheet and opens the hold cabinet (one sheet at a time keeps the Back button tidy).
+    function goHold() { closeThen(sheet, () => SB.sheets.open('hold')); }
+    // Takes the cook to where low stock is fixed: a new batch for
+    // temperature-controlled food, the restock box for the rest.
+    function fixStock(ingId) {
+      const ing = ingOf(ingId); if (!ing) return;
+      if (ing.tcs) closeThen(sheet, () => SB.sheets.open('hold', { tab: 'new', ing: ingId }));
+      else openRestock(ingId);
+    }
+    // Applies the All items or Off the menu filter to the rows and hides empty categories.
+    function applyFilter() {
+      let shown = 0;
+      rows.forEach((rec) => { const hide = filter === 'off' && !rec.off; setHidden(rec.el, hide); if (!hide) shown++; });
+      cats.forEach((c) => { let any = false; c.map.forEach((r) => { if (!r.el.hidden) any = true; }); setHidden(c.el, !any); });
+      setHidden(noneOff, !(filter === 'off' && shown === 0));
+    }
+
+    // Builds one ingredient stock row once.
+    function makeIngRow(ing) {
+      const name = h('div', { class: 'bd-ing-n' });
+      const state = h('span', { class: 'fs-state bd-state' });
+      const meter = SB.ui.meter({ value: 0, max: 1, thr: 0, label: 'Stock left' });
+      const line = h('div', { class: 'bd-ing-t num' }), held = h('div', { class: 'bd-ing-held', hidden: true });
+      const btn = h('button', { type: 'button', class: 'btn bd-ing-btn' });
+      const panel = h('div', { class: 'bd-restock', hidden: true });
+      const el = h('div', { class: 'bd-ing', dataset: { ing: ing.id } }, h('div', { class: 'bd-ing-top' }, name, state), meter, line, held, h('div', { class: 'bd-ing-act' }, btn), panel);
+      const rec = { el, name, state, meter, line, held, btn, panel, ing, ed: null };
+      btn.addEventListener('click', () => { const g1 = ingOf(rec.ing.id); if (!g1) return; if (g1.tcs) fixStock(g1.id); else toggleRestock(rec); });
+      return rec;
+    }
+    // Refreshes an ingredient row: meter with a tick at the 86 level,
+    // amounts, and food held back by a safety lock.
+    function updateIng(rec, ing) {
+      rec.ing = ing;
+      const s = st(), have = E().servable(s, ing.id), thr = ing.thresholdG || 0, par = ing.parG || 0;
+      const lv = stockLevel(ing, have);
+      text(rec.name, ing.name);
+      setState(rec.state, lv.tone, lv.icon, lv.word);
+      const max = Math.max(par, have, 1);
+      const v = ((Math.min(have, max) / max) * 100).toFixed(1), t = ((Math.min(thr, max) / max) * 100).toFixed(1);
+      if (rec.meter._v !== v) { rec.meter._v = v; rec.meter.style.setProperty('--v', v); attr(rec.meter, 'aria-valuenow', Math.round(have)); attr(rec.meter, 'aria-valuemax', Math.round(max)); }
+      if (rec.meter._t !== t) { rec.meter._t = t; rec.meter.style.setProperty('--thr', t); }
+      if (lv.meter) attr(rec.meter, 'data-tone', lv.meter); else if (rec.meter.hasAttribute('data-tone')) rec.meter.removeAttribute('data-tone');
+      text(rec.line, qtyText(ing, have) + ' left. Par ' + qtyText(ing, par) + ', 86 at ' + qtyText(ing, thr) + '.');
+      if (ing.tcs) {
+        let locked = 0;
+        s.batches.forEach((b) => { if (b.ing === ing.id && b.status !== 'discard' && b.kind !== 'cooling' && !b.canServe && b.remainingG > 0) locked += b.remainingG; });
+        text(rec.held, qtyText(ing, locked) + ' held in the cabinet and not servable.'); setHidden(rec.held, !(locked > 0));
+      }
+      const k = ing.tcs ? 'batch' : 'restock';
+      if (rec.bk !== k) { rec.bk = k; U.clear(rec.btn); rec.btn.append(ico(ing.tcs ? 'plus' : 'package', 20), h('span', null, ing.tcs ? 'Add a batch' : 'Restock')); }
+      attr(rec.btn, 'aria-label', (ing.tcs ? 'Add a batch of ' : 'Restock ') + ing.name);
+    }
+    // Opens or closes the small restock box under an ingredient.
+    function toggleRestock(rec) {
+      if (!rec.ed) rec.ed = buildRestock(rec);
+      const open = rec.panel.hidden;
+      setHidden(rec.panel, !open); attr(rec.btn, 'aria-expanded', open ? 'true' : 'false');
+      if (open) { rec.el.scrollIntoView({ block: 'nearest' }); (fineAny() ? rec.ed.stepper.input : rec.ed.add).focus({ preventScroll: true }); }
+    }
+    // Opens the restock box for an ingredient and highlights its row.
+    function openRestock(ingId) {
+      const rec = ingRows.get(ingId); if (!rec) return;
+      if (rec.panel.hidden) toggleRestock(rec); else (fineAny() ? rec.ed.stepper.input : rec.ed.add).focus({ preventScroll: true });
+      rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el);
+    }
+    // Builds the restock box: an amount stepper (kg, or pieces for counted items), Add stock and Cancel.
+    function buildRestock(rec) {
+      const ing = rec.ing, each = ing.unit === 'ea';
+      const par = ing.parG || 0;
+      const start = each ? Math.max(6, Math.round(par / 4 / 6) * 6) : Math.max(0.5, Math.round(par / 4 / 100) / 10);
+      const stepper = SB.ui.stepper({ value: start, min: each ? 1 : 0.1, max: each ? 100000 : 1000, step: each ? 1 : 0.1, bigStep: each ? 12 : 1, unit: each ? 'pieces' : 'kg', label: 'Amount to add to ' + ing.name });
+      const err = h('div', { class: 'fs-note', 'data-tone': 'bad', role: 'alert', hidden: true });
+      // Adds the typed amount to stock.
+      const add = h('button', { type: 'button', class: 'btn btn-primary', onClick: () => doRestock(rec, stepper, err) }, ico('plus', 20), h('span', null, 'Add stock'));
+      // Closes the box with no change.
+      const cancel = h('button', { type: 'button', class: 'btn', onClick: () => toggleRestock(rec) }, 'Cancel');
+      rec.panel.append(h('div', { class: 'bd-restock-t' }, 'Add to ' + ing.name), stepper, err, h('div', { class: 'bd-restock-b' }, add, cancel));
+      rec.panel.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); toggleRestock(rec); rec.btn.focus({ preventScroll: true }); }
+        else if (e.key === 'Enter' && e.target === stepper.input) { e.preventDefault(); stepper.input.dispatchEvent(new Event('change')); doRestock(rec, stepper, err); }
+      });
+      stepper.addEventListener('input', () => setHidden(err, true));
+      return { stepper, add, err };
+    }
+    // Adds stock through the engine. WATCH OUT: restocking cannot be undone, so an amount over
+    // three times the par level asks first.
+    async function doRestock(rec, stepper, err) {
+      const ing = ingOf(rec.ing.id); if (!ing) return;
+      const v = stepper.getValue(), gm = ing.unit === 'ea' ? v : Math.round(v * 1000);
+      if (ing.parG && gm > ing.parG * 3) {
+        const ok = await SB.ui.confirm({ title: 'Add that much ' + ing.name.toLowerCase() + '?', body: qtyText(ing, gm) + ' is more than three times the par level of ' + qtyText(ing, ing.parG) + '. Restocking cannot be undone.', confirmLabel: 'Add it', cancelLabel: 'Change the amount' });
+        if (!ok) return;
+      }
+      const fx = whatIf('restock', { ing: ing.id, g: gm });
+      const res = run('restock', { ing: ing.id, g: gm });
+      if (res.report !== 'ok') { U.clear(err); err.append(ico('alert-circle', 20), h('span', null, say(res))); setHidden(err, false); return; }
+      toast('Added ' + qtyText(ing, gm) + ' of ' + ing.name.toLowerCase() + '.' + (fx && fx.on.length ? ' ' + listWords(fx.on) + ' can be ordered again.' : ''), 'ok');
+      setHidden(rec.panel, true); attr(rec.btn, 'aria-expanded', 'false');
+      update(nowMs()); flash(rec.el);
+    }
+
+    // Layout.
+    const stockList = h('div', { class: 'bd-stock-list' });
+    const stockBox = h('section', { class: 'fs-section bd-stock', 'aria-label': 'Stock' },
+      h('h3', { class: 'fs-h' }, 'Stock'),
+      h('p', { class: 'fs-sub' }, 'Par and 86 levels are starter estimates. Cooked meat and cold sides live in the hold cabinet, so they are added as batches.'),
+      stockList, safetyNote());
+    sheet.body.append(h('div', { class: 'bd' }, syncBox, h('div', { class: 'bd-cols' }, menuBox, stockBox)));
+
+    function update(now) {
+      const s = st();
+      const menu = s.menu.filter((m) => !m.archived);
+      // categories keep a stable order; a category appears the first time one of its items does
+      const order = C.categories.map((c) => c.id);
+      menu.forEach((m) => { if (order.indexOf(m.cat) < 0) order.push(m.cat); });
+      order.forEach((cid) => {
+        const items = menu.filter((m) => m.cat === cid);
+        if (!items.length) return;
+        let c = cats.get(cid);
+        if (!c) {
+          const cat = C.categories.find((x) => x.id === cid);
+          const list = h('div', { class: 'bd-list' });
+          c = { el: h('div', { class: 'bd-cat' }, h('h4', { class: 'bd-cat-h' }, cat ? cat.name : 'Other'), list), list, map: new Map() };
+          cats.set(cid, c); catHost.appendChild(c.el);
+        }
+        reconcile(c.list, c.map, items, (m) => m.id, makeRow, (rec, m) => updateRow(rec, m, now));
+        c.map.forEach((rec, id) => rows.set(id, rec));
+      });
+      rows.forEach((rec, id) => { if (!menu.some((m) => m.id === id)) rows.delete(id); });
+      reconcile(stockList, ingRows, s.ingredients.filter((i) => !i.archived), (i) => i.id, makeIngRow, updateIng);
+      let off = 0; rows.forEach((r) => { if (r.off) off++; });
+      filterSeg.setCount('all', rows.size); filterSeg.setCount('off', off, { alert: off > 0 });
+      applyFilter();
+      paintSync();
+    }
+    update(nowMs());
+    watch(offs, () => update(nowMs()), (now) => update(now));
+    return sheet;
+  }
+
+  // Recall.
+  // A short 'what is on this ticket' line: up to five items, then 'and N more'.
+  function itemsSummary(t) {
+    const parts = t.items.map((it) => ((C.menuById[it.menuId] && C.menuById[it.menuId].short) || it.name) + (it.qty > 1 ? ' x' + it.qty : ''));
+    return parts.length <= 5 ? parts.join(', ') : parts.slice(0, 5).join(', ') + ' and ' + (parts.length - 5) + ' more';
+  }
+  // On time, warning or overdue for a ticket at a moment, from the engine's timing rules.
+  const levelOf = (t, now) => E().ticketTiming(t, now, st().settings);
+
+  // Builds the Recall sheet: search, Bumped and Voided tabs, and rows that are updated in place.
+  function openRecall(opts) {
+    opts = opts || {};
+    const offs = [];
+    const bumpedRows = new Map(), voidRows = new Map();
+    let query = '', tabs = null; // tabs is set a few lines below; the tab builder calls applyFilter once before that
+
+    // The search box gets focus only on a mouse or keyboard
+    // screen, so a touch tablet keeps its keyboard down.
+    const sheet = SB.ui.sheet({ title: 'Recall', side: 'right', width: 'min(760px, 96vw)', name: 'recall', initialFocus: () => (fineAny() ? search : null), onClose: () => offs.splice(0).forEach((f) => f()) });
+
+    const search = h('input', { class: 'ord-search-input rc-search-input', type: 'search', inputmode: 'search', autocomplete: 'off', placeholder: 'Ticket number or name', 'aria-label': 'Find a ticket by number or name', enterkeyhint: 'search' });
+    const searchBox = h('div', { class: 'ord-search rc-search' }, ico('search', 22), search);
+    const count = h('p', { class: 'fs-sub rc-count', role: 'status' });
+    const bumpedList = h('ul', { class: 'rc-list' }), voidedList = h('ul', { class: 'rc-list' });
+    const bumpedEmpty = h('div', { class: 'empty rc-empty', hidden: true }, ico('history', 40), h('h3', null, 'Nothing bumped yet'), h('p', null, 'When a ticket is bumped it shows up here, newest first, so you can bring it back.'));
+    const voidedEmpty = h('div', { class: 'empty rc-empty', hidden: true }, ico('trash', 40), h('h3', null, 'Nothing voided'), h('p', null, 'Voided tickets and the reason given show up here.'));
+    const noMatch = h('div', { class: 'empty rc-empty', hidden: true }, ico('search', 40), h('h3', null, 'No ticket matches'), h('p'));
+    const voidNote = h('p', { class: 'fs-sub' }, 'A voided ticket cannot be recalled. If it was a mistake, send a new ticket.');
+    const bumpedPanel = h('div', { class: 'rc-panel' }, bumpedList, bumpedEmpty);
+    const voidedPanel = h('div', { class: 'rc-panel' }, voidNote, voidedList, voidedEmpty);
+    tabs = tabsWithPanels('Tickets', [
+      { id: 'bumped', label: 'Bumped', icon: 'history', count: 0, panel: bumpedPanel },
+      { id: 'voided', label: 'Voided', icon: 'trash', count: 0, panel: voidedPanel },
+    ], opts.tab === 'voided' ? 'voided' : 'bumped', () => applyFilter());
+    sheet.body.append(h('div', { class: 'rc' }, searchBox, tabs.seg, count, bumpedPanel, voidedPanel, noMatch));
+
+    // Builds one ticket row once; a voided row has no Recall button.
+    function makeRow(t, voided) {
+      const num = h('div', { class: 'rc-num num' }), who = h('span', { class: 'rc-who' });
+      const ch = h('span', { class: 'chip rc-ch' }), demo = h('span', { class: 'chip', hidden: true, dataset: { tone: 'info' } }, 'Demo');
+      const items = h('div', { class: 'rc-items' }), meta = h('div', { class: 'rc-meta' });
+      const badge = h('span', { class: 'rc-badge' });
+      const recall = voided ? null : h('button', { type: 'button', class: 'btn rc-recall', dataset: { act: 'recall' } }, ico('history', 20), h('span', null, 'Recall'));
+      const el = h('li', { class: 'rc-row', dataset: { ticket: t.id, num: String(t.num) } },
+        num, h('div', { class: 'rc-main' }, h('div', { class: 'rc-top' }, who, ch, demo), items, h('div', { class: 'rc-meta-row' }, meta, badge)), recall);
+      const rec = { el, num, who, ch, demo, items, meta, badge, recall, t, text: '' };
+      if (recall) recall.addEventListener('click', () => doRecall(rec.t.id, recall));
+      return rec;
+    }
+    // Refreshes one ticket row (name, items, how long ago, on-time badge) and applies the search.
+    function updateRow(rec, t, now, voided) {
+      rec.t = t;
+      text(rec.num, '#' + t.num); text(rec.who, t.customer || 'No name');
+      const ch = channelOf(t.channel);
+      if (rec.chKey !== t.channel) { rec.chKey = t.channel; U.clear(rec.ch); rec.ch.append(ico(ch.icon, 16), h('span', null, ch.name)); }
+      setHidden(rec.demo, t.src !== 'demo');
+      text(rec.items, itemsSummary(t));
+      const tm = levelOf(t, now);
+      if (voided) {
+        text(rec.meta, 'Voided ' + agoText(now - (t.voidedAt || now)) + '. Reason: ' + (t.voidReason || 'none given') + '.');
+        setHidden(rec.badge, true);
+      } else {
+        const extra = (t.forced ? ' Bumped with items not done.' : '') + (t.recalls > 0 ? ' Recalled ' + t.recalls + (t.recalls === 1 ? ' time.' : ' times.') : '');
+        text(rec.meta, 'Bumped ' + agoText(now - (t.expeditedAt || now)) + '. Took ' + U.fmtDur(tm.elapsedMs) + '.' + extra);
+        setHidden(rec.badge, false);
+        if (rec.lv !== tm.level) { rec.lv = tm.level; U.clear(rec.badge); rec.badge.appendChild(SB.ui.badge(tm.level)); }
+      }
+      const q = query.trim().toLowerCase().replace(/^#/, '');
+      rec.match = !q || String(t.num).indexOf(q) >= 0 || String(t.customer || '').toLowerCase().indexOf(q) >= 0;
+      setHidden(rec.el, !rec.match);
+    }
+
+    // Brings a bumped ticket back to the board through the engine, closes this sheet and says so.
+    // WATCH OUT: the engine has no undo for Recall, so the toast's Undo bumps the ticket again.
+    async function doRecall(ticketId, opener) {
+      const t = st().tickets.find((x) => x.id === ticketId);
+      const forced = !!(t && t.forced);
+      const res = run('recallTicket', { ticketId });
+      if (res.report !== 'ok') { toast(say(res), 'warn'); update(nowMs()); return; }
+      sheet.close('recall');
+      const num = t ? t.num : '';
+      // A ticket that was bumped with items not done is bumped with
+      // force again, so Undo behaves the same way.
+      toast('Ticket #' + num + ' is back on the board. It shows on Expo and All, and on a station while that station still has items to finish.', 'ok', {
+        undo: () => {
+          const r = run('bumpTicket', forced ? { ticketId, force: true } : { ticketId });
+          if (r.report !== 'ok') toast(say(r), 'warn'); else SB.ui.announce('Ticket #' + num + ' bumped again.');
+        },
+      });
+    }
+
+    // Applies the search to the rows, shows the empty or no-match message and the count line.
+    function applyFilter() {
+      if (!tabs) return;
+      const showing = tabs.seg.getValue();
+      const map = showing === 'voided' ? voidRows : bumpedRows;
+      let total = 0, shown = 0;
+      map.forEach((rec) => { total++; if (rec.match !== false) shown++; });
+      const q = query.trim();
+      setHidden(bumpedEmpty, !(showing === 'bumped' && total === 0));
+      setHidden(voidedEmpty, !(showing === 'voided' && total === 0));
+      const miss = total > 0 && shown === 0;
+      setHidden(noMatch, !miss);
+      if (miss) text(noMatch.querySelector('p'), 'Nothing in ' + (showing === 'voided' ? 'voided' : 'bumped') + ' tickets matches "' + q + '". Check the number or clear the search.');
+      text(count, !total ? '' : q ? shown + ' of ' + total + ' ' + plural(total, 'ticket') + ' match' + (shown === 1 ? 'es' : '') + '.' : total + ' ' + plural(total, 'ticket') + ', newest first.');
+      setHidden(count, !total);
+    }
+
+    // Keeps both lists in step with the store, then re-applies the search. Rows are reused, never rebuilt.
+    function update(now) {
+      const bumped = SB.store.select.recent(30), voided = SB.store.select.voided(30);
+      reconcile(bumpedList, bumpedRows, bumped, (t) => t.id, (t) => makeRow(t, false), (rec, t) => updateRow(rec, t, now, false));
+      reconcile(voidedList, voidRows, voided, (t) => t.id, (t) => makeRow(t, true), (rec, t) => updateRow(rec, t, now, true));
+      tabs.seg.setCount('bumped', bumped.length); tabs.seg.setCount('voided', voided.length);
+      applyFilter();
+    }
+    search.addEventListener('input', () => { query = search.value; bumpedRows.forEach((r) => { r.match = undefined; }); update(nowMs()); });
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && search.value) { e.preventDefault(); search.value = ''; query = ''; update(nowMs()); }
+      else if (e.key === 'Enter') {
+        // one match left: Enter recalls it
+        const map = tabs.seg.getValue() === 'bumped' ? bumpedRows : null;
+        if (!map) return;
+        const hit = Array.from(map.values()).filter((r) => !r.el.hidden);
+        if (hit.length === 1 && query.trim()) { e.preventDefault(); hit[0].recall.focus(); }
+      }
+    });
+    update(nowMs());
+    watch(offs, () => update(nowMs()), (now) => update(now));
+    return sheet;
+  }
+
+  // Demo and clock.
+  // Clock speed choices, demo order rates, and the word shown for a running rate.
+  // audit:data-start
+  const SPEEDS = [{ id: '1', label: 'x1', aria: 'Real time' }, { id: '5', label: 'x5', aria: 'Five times faster' }, { id: '15', label: 'x15', aria: 'Fifteen times faster' }, { id: '30', label: 'x30', aria: 'Thirty times faster' }];
+  const RATES = [{ id: 'off', label: 'Off' }, { id: 'slow', label: 'Slow' }, { id: 'normal', label: 'Normal' }, { id: 'rush', label: 'Lunch rush' }];
+  const RATE_WORD = { slow: 'Slow', normal: 'Normal', rush: 'Lunch rush' };
+  // audit:data-end
+  // The simulator's demo-traffic part, or null when the simulator is not in this build.
+  const simLive = () => (SB.sim && SB.sim.live ? SB.sim.live : null);
+  // What the simulator says it is doing (running, rate, crew), or an empty answer if it cannot say.
+  const simStatus = () => { const l = simLive(); try { return l && typeof l.status === 'function' ? l.status() || {} : {}; } catch (e) { return {}; } };
+  const simDo = (what, fn) => { try { return fn(); } catch (e) { console.error('[smokebox] simulator ' + what + ' failed', e); toast('The simulator hit a problem (' + what + '). Try again, or reset live data.', 'bad'); return undefined; } };
+  // The kitchen clock speed (1 is real time).
+  const speedNow = () => (SB.store.speed ? SB.store.speed() : 1);
+
+  // Build the clock-speed control. Shared by the Demo sheet and the Settings sheet. Returns { el, paint }.
+  function clockControl(label) {
+    const seg = SB.ui.segmented({ label: label || 'Clock speed', class: 'dm-speed', value: String(speedNow()), options: SPEEDS.map((s) => ({ id: s.id, label: s.label, ariaLabel: s.aria })), onChange: (id) => {
+      const ok = SB.store.setSpeed(Number(id));
+      if (!ok) toast('That clock speed is not allowed.', 'warn'); else SB.ui.announce(id === '1' ? 'Clock back to real time.' : 'Clock running ' + id + ' times faster.');
+      paint();
+    } });
+    const warn = h('div', { class: 'fs-note', 'data-tone': 'warn', hidden: true }, ico('alert', 20), h('div', null, h('strong', { class: 'dm-warn-t' }), h('p', { class: 'dm-warn-p' }, 'Every ticket timer and every food-safety deadline runs faster too, including the hold-cabinet clocks. Set it back to x1 before real service.')));
+    const clock = h('p', { class: 'fs-sub dm-clock num' });
+    const el = h('div', { class: 'dm-clockctl' }, seg, clock, warn);
+    // Redraws the speed buttons, the clock line and the warning from the store.
+    function paint() {
+      const sp = speedNow();
+      const id = String(sp);
+      if (seg.getValue() !== id) seg.setValue(SPEEDS.some((s) => s.id === id) ? id : '');
+      text(clock, 'Kitchen clock ' + U.fmtTime(nowMs()) + (sp === 1 ? ', real time.' : ', running ' + (Math.round(sp * 100) / 100) + ' times faster than real time.'));
+      setHidden(warn, sp === 1);
+      text(warn.querySelector('.dm-warn-t'), 'The clock is running x' + (Math.round(sp * 100) / 100) + '.');
+    }
+    paint();
+    return { el, paint, seg };
+  }
+
+  // Builds the Demo and clock sheet. Without the simulator it says so plainly and keeps the clock and Reset.
+  function openDemo() {
+    const offs = [];
+    // Listeners are removed when the sheet closes, so nothing keeps updating a screen that is gone.
+    const sheet = SB.ui.sheet({ title: 'Demo and clock', side: 'right', width: 'min(640px, 96vw)', name: 'demo', onClose: () => offs.splice(0).forEach((f) => f()) });
+    const live = simLive();
+
+    // status line
+    const statusIcon = h('span', { class: 'dm-status-i' }), statusT = h('div', { class: 'dm-status-t' });
+    const statusBox = h('div', { class: 'fs-note dm-status', role: 'status' }, statusIcon, statusT);
+
+    // simulator controls (only when the simulator is in the build)
+    let ordersSeg = null, crewTog = null, burstBtn = null, sampleTog = null, sampleLine = null, sampleInfoBox = null;
+    const simBox = h('div', { class: 'dm-sim' });
+    if (live) {
+      // Automatic orders: Off stops the simulator, the other choices start it at that rate.
+      ordersSeg = SB.ui.segmented({ label: 'Automatic orders', class: 'dm-rates', value: 'off', options: RATES, onChange: (id) => {
+        simDo('orders', () => { if (typeof live.stop === 'function') live.stop(); if (id !== 'off') live.start({ rate: id }); });
+        paint();
+        SB.ui.announce(id === 'off' ? 'Automatic orders off.' : 'Automatic orders: ' + RATE_WORD[id] + '.');
+      } });
+      // Auto crew: the simulated crew taps items done, bumps tickets and logs temperatures.
+      crewTog = SB.ui.toggle({ label: 'Auto crew taps items done, bumps tickets and logs temperatures', checked: false, onChange: (on) => { simDo('crew', () => live.crew(on)); paint(); } });
+      // Sends twelve demo tickets at once, like a lunch rush.
+      burstBtn = h('button', { type: 'button', class: 'btn btn-lg dm-burst', onClick: () => {
+        const n = simDo('rush', () => live.burst(12));
+        toast((typeof n === 'number' ? n : 12) + ' demo tickets sent to the board.', 'ok'); paint();
+      } }, ico('zap', 22), h('span', null, 'Add 12-ticket rush'));
+      simBox.append(
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Automatic orders'), h('p', { class: 'fs-sub' }, 'Made-up tickets arrive on the kitchen clock, so a faster clock means faster orders. They are labeled Demo.'), ordersSeg),
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A pretend cook who works while automatic orders run. Turn it off to practice by hand.'), crewTog),
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Rush'), h('p', { class: 'fs-sub' }, 'Twelve tickets at once, like a lunch rush.'), burstBtn));
+    } else {
+      simBox.append(h('div', { class: 'fs-note', 'data-tone': 'warn', role: 'status' }, ico('alert', 20),
+        h('div', null, h('strong', null, 'Simulator not loaded.'), h('p', null, 'Automatic orders, the auto crew, the 12-ticket rush and sample history come from a separate simulator module that is not in this build. The clock speed and Reset live data below still work.'))));
+    }
+
+    // clock
+    const clockCtl = clockControl('Clock speed');
+    const clockBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Clock speed'), h('p', { class: 'fs-sub' }, 'Speeds up the whole kitchen so you can watch a busy night in a minute.'), clockCtl.el);
+
+    // sample history
+    const sampleBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Data counts'));
+    const countsDl = h('dl', { class: 'fs-dl dm-counts' });
+    const dLive = h('dd', { class: 'num' }), dDemo = h('dd', { class: 'num' }), dSample = h('dd', { class: 'num' });
+    countsDl.append(h('dt', null, 'Live tickets on this device'), dLive, h('dt', null, 'Demo tickets on this device'), dDemo, h('dt', null, 'Sample history'), dSample);
+    sampleBox.append(countsDl);
+    const sim = SB.sim;
+    if (sim && typeof sim.setSampleEnabled === 'function' && typeof sim.sampleEnabled === 'function') {
+      // Whether the back office includes the made-up sample history.
+      sampleTog = SB.ui.toggle({ label: 'Include sample history in the back office', checked: !!sim.sampleEnabled(), onChange: (on) => { simDo('sample history', () => sim.setSampleEnabled(on)); paintCounts(); } });
+      sampleBox.append(sampleTog);
+    }
+    sampleInfoBox = h('p', { class: 'fs-sub dm-sample-note' }, 'Sample history is generated by the simulator, not recorded in your kitchen. It is clearly labeled wherever it appears.');
+    sampleBox.append(sampleInfoBox);
+
+    // Reset live data asks first (see doReset).
+    const resetBtn = h('button', { type: 'button', class: 'btn btn-danger btn-lg', onClick: () => doReset() }, ico('trash', 22), h('span', null, 'Reset live data'));
+    const resetBox = h('section', { class: 'fs-section dm-reset' }, h('h3', { class: 'fs-h' }, 'Start fresh'), h('p', { class: 'fs-sub' }, 'Clears every ticket, batch and event on this device and puts starter stock back. Settings stay. Sample history is not touched.'), resetBtn);
+
+    // Restart demo: start over with fresh tickets, the way the app looks on its first day.
+    const restartBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg dm-restart', onClick: () => doRestart() }, ico('refresh', 22), h('span', null, 'Restart demo'));
+    const tourBtn = h('button', { type: 'button', class: 'btn btn-lg', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', null, 'Show me how it works'));
+    const startBox = h('section', { class: 'fs-section dm-start' }, h('h3', { class: 'fs-h' }, 'Start over'),
+      h('p', { class: 'fs-sub' }, 'Puts three fresh pretend tickets on the board, as on the first day. Nothing runs by itself: you tap START and DONE, and the timers show when each dish should begin.'),
+      h('div', { class: 'fs-row' }, restartBtn, tourBtn));
+
+    sheet.body.append(h('div', { class: 'dm' }, statusBox, startBox, simBox, clockBox, sampleBox, resetBox));
+
+    // Clears the board after a confirm and puts the fresh demo tickets back. Settings stay.
+    async function doRestart() {
+      const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length, real = s.tickets.length - demo;
+      const ok = await SB.ui.confirm({
+        title: 'Restart the demo?', confirmLabel: 'Restart demo', cancelLabel: 'Keep everything', tone: real ? 'danger' : undefined,
+        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (real ? ' (' + real + ' not from the demo)' : '') + ' and everything logged on this device, then puts three fresh pretend tickets on the board. Settings stay.'],
+      });
+      if (!ok) return;
+      if (SB.tour && SB.tour.running && SB.tour.running() && SB.tour.stop) SB.tour.stop();
+      const n = SB.sim && SB.sim.restartDemo ? SB.sim.restartDemo() : -1;
+      if (n < 0) { toast('The demo could not be restarted.', 'warn'); return; }
+      if (SB.floor && SB.floor.setWelcome) SB.floor.setWelcome(true);
+      toast('Demo restarted. Three fresh tickets are on the board.', 'ok');
+      closeThen(sheet, () => { if (SB.router && SB.router.go) SB.router.go({ kind: 'floor', zone: 'all' }); });
+    }
+
+    // Clears tickets, batches and events on this device after a confirm. Settings and sample history stay.
+    async function doReset() {
+      const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length;
+      const ok = await SB.ui.confirm({
+        title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep everything',
+        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and puts the starter stock back.', 'Settings and sample history stay. This cannot be undone.'],
+      });
+      if (!ok) return;
+      if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
+      const rep = SB.store.resetLive({ keepSettings: true });
+      if (rep === 'ok') toast('Live data cleared. Starter stock is back.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
+      paint();
+    }
+
+    // Writes the status line: demo running or off, how many tickets sent and finished, and the clock speed.
+    function paintStatus() {
+      const sp = speedNow(), s = simStatus();
+      let tone = 'info', icon = 'info', words;
+      if (!live) { tone = 'warn'; icon = 'alert'; words = 'The simulator is not loaded, so there are no automatic orders.'; }
+      else if (s.running) { tone = 'ok'; icon = 'play'; words = 'Demo running: ' + (RATE_WORD[s.rate] || 'orders') + '. ' + (U.isNum(s.sent) ? s.sent + ' sent, ' + (s.completed || 0) + ' finished.' : '') + (s.crew ? ' Auto crew on.' : ' Auto crew off.'); }
+      else { words = 'Demo is off. The board shows only real tickets' + (st().tickets.some((t) => t.src === 'demo') ? ' and the demo tickets already on it.' : '.'); }
+      if (sp !== 1) words += ' Clock x' + (Math.round(sp * 100) / 100) + '.';
+      setHidden(statusBox, !live); // without the simulator the warning box below already says so
+      attr(statusBox, 'data-tone', tone);
+      if (statusIcon._k !== icon) { statusIcon._k = icon; U.clear(statusIcon); statusIcon.appendChild(ico(icon, 20)); }
+      text(statusT, words);
+    }
+    // Fills in the data counts. WATCH OUT: the sample count is worked out a moment after opening,
+    // because building the sample takes noticeable time and must not freeze the sheet.
+    function paintCounts() {
+      const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length;
+      text(dLive, String(s.tickets.length - demo)); text(dDemo, String(demo));
+      if (!sim || typeof sim.sampleInfo !== 'function') { text(dSample, 'Not loaded'); return; }
+      if (sim.sampleEnabled && !sim.sampleEnabled()) { text(dSample, 'Switched off'); return; }
+      if (paintCounts.info) { text(dSample, U.fmtNum(paintCounts.info.tickets) + ' tickets over ' + paintCounts.info.days + ' days'); return; }
+      text(dSample, 'Counting...');
+      if (!paintCounts.asked) {
+        paintCounts.asked = true;
+        setTimeout(() => {
+          try { paintCounts.info = sim.sampleInfo(); } catch (e) { paintCounts.info = null; text(dSample, 'Could not be counted'); return; }
+          if (sheet.isOpen()) paintCounts();
+        }, 60);
+      }
+    }
+    // Refreshes every control from the simulator and the clock, so a change made elsewhere shows here too.
+    function paint() {
+      paintStatus(); clockCtl.paint(); paintCounts();
+      if (live) {
+        const s = simStatus();
+        const rate = s.running && RATES.some((r) => r.id === s.rate) ? s.rate : 'off';
+        if (ordersSeg.getValue() !== rate) ordersSeg.setValue(rate);
+        // The crew only works while automatic orders run, so the switch reads off (and locked) until then.
+        const crewOn = !!(s.running && s.crew);
+        if (crewTog.getValue() !== crewOn) crewTog.setValue(crewOn);
+        crewTog.disabled = !s.running;
+      }
+      if (sampleTog && sim.sampleEnabled && sampleTog.getValue() !== !!sim.sampleEnabled()) sampleTog.setValue(!!sim.sampleEnabled());
+    }
+    paint();
+    watch(offs, () => paint(), () => paint());
+    if (live && typeof live.onChange === 'function') { try { const off = live.onChange(() => paint()); if (typeof off === 'function') offs.push(off); } catch (e) { /* the simulator is optional */ } }
+    return sheet;
+  }
+
+  // Help and about.
+  // Shortcut list (key, what it does) used when the board does not supply its own.
+  // audit:data-start
+  const FALLBACK_KEYS = [
+    { key: 'N', label: 'New ticket' }, { key: 'R', label: 'Recall a bumped ticket' }, { key: 'H', label: 'Hold cabinet' }, { key: '8', label: '86 board' },
+    { key: 'D', label: 'Demo' }, { key: '1 to 6', label: 'Station: All, PIT, HOT, FRY, CLD, EXP' }, { key: 'Z', label: 'Undo the last action (10 seconds)' },
+    { key: '?', label: 'Help' }, { key: 'Esc', label: 'Close a screen' },
+  ];
+  // audit:data-end
+
+  // Starts the guided walkthrough when it is part of this build, otherwise says so.
+  function runTour() {
+    if (SB.tour && typeof SB.tour.start === 'function') SB.tour.start();
+    else SB.ui.toast('The walkthrough is not available in this build.', { tone: 'info' });
+  }
+
+  // One help entry: an icon, a bold title and one sentence.
+  function helpItem(icon, title, body) {
+    return h('li', { class: 'hp-item' }, h('span', { class: 'hp-item-i', 'aria-hidden': 'true' }, ico(icon, 24)), h('div', { class: 'hp-item-t' }, h('strong', null, title), h('span', null, body)));
+  }
+  // A list of the help entries shown on one tab.
+  function helpList(items) { return h('ul', { class: 'hp-list' }, ...items); }
+  // One row of the words and colours list: the real badge on the left, its meaning on the right.
+  function wordRow(node, body) { return h('li', { class: 'hp-word' }, h('span', { class: 'hp-word-k' }, node), h('span', { class: 'hp-word-v' }, body)); }
+  // Seconds as minutes for the plain-words help text.
+  const mins = (sec) => (sec % 60 === 0 ? sec / 60 + ' min' : Math.floor(sec / 60) + ' min ' + (sec % 60) + ' s');
+
+  // The Basics tab: what each button on the board does.
+  function helpBasics(sheet) {
+    const undoS = Math.round(((st().settings && st().settings.undoMs) || C.undoMs) / 1000);
+    return h('div', { class: 'hp-pane' },
+      h('p', { class: 'fs-sub' }, 'Smokebox shows every order as a paper ticket. Each station sees only its own items, timed so the whole order finishes together.'),
+      // Help closes first, so the walkthrough has the whole board to itself.
+      h('div', { class: 'fs-row hp-links' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'tour' }, onClick: () => closeThen(sheet, runTour) }, ico('play', 20), h('span', null, 'Show me how it works'))),
+      helpList([
+        helpItem('plus', 'Send a ticket', 'Tap New ticket, tap the items, tap Send to kitchen. Four lines take fewer than ten taps.'),
+        helpItem('check', 'Tap an item to work it', 'Tap an item row. A one-step item is done on that tap. A two-step item starts on the first tap, counts down from its usual cooking time, and finishes on the second.'),
+        helpItem('bell', 'Check it', 'When a dish reaches its usual cooking time, its row flashes Check it (and chimes if Sound is on). Smokebox never marks a dish done for you: look at the food, then tap the row.'),
+        helpItem('arrow-right', 'The line under each ticket', 'Says what to do next, such as Tap START on Hush puppies. You can turn it off in Settings.'),
+        helpItem('check-circle', 'All done here', 'Finishes every item your station still has on that ticket.'),
+        helpItem('zap', 'Start now', 'Starts a waiting item before its planned time. Waiting items are dimmed and show Start in 2:08, so the slow dishes start first and the whole order finishes together.'),
+        helpItem('receipt', 'Bump', 'Sends the ticket out when everything is done. If items are not done, Smokebox asks first.'),
+        helpItem('undo', 'Undo', 'After a bump, done, void, 86 or discard, an Undo button stays for ' + undoS + ' seconds. The Z key does the same.'),
+        helpItem('history', 'Recall', 'Brings a bumped ticket back. Open Recall, find the ticket and tap Recall.'),
+        helpItem('list', 'The all-day bar', 'Counts what is still to make across every ticket. Tap an item to highlight it on the board.'),
+        helpItem('thermometer', 'Hold cabinet', 'Log a temperature when food goes in and at every check. Smokebox warns before a batch is unsafe and locks one that is.'),
+        helpItem('ban', '86 board', 'Marks an item sold out. It also goes 86 by itself when stock runs low or a batch is locked for safety.'),
+      ]));
+  }
+
+  // The Words and colours tab: the real badges, chips and stamps next to what they mean.
+  function helpWords() {
+    const s = st();
+    const rows = C.channels.map((c) => {
+      const th = E().channelThresholds(s.settings, c.id);
+      return h('li', { class: 'hp-th' }, h('span', { class: 'chip' }, ico(c.icon, 16), h('span', null, c.name)), h('span', { class: 'hp-th-v' }, 'Running late after ' + mins(th.warnSec) + ', overdue after ' + mins(th.breachSec)));
+    });
+    return h('div', { class: 'hp-pane' },
+      h('p', { class: 'fs-sub' }, 'Color is never the only signal. Every color comes with a word and an icon.'),
+      h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'How late is a ticket'),
+        h('ul', { class: 'hp-words' },
+          wordRow(SB.ui.badge('ok'), 'Inside the time limit for its channel.'),
+          wordRow(SB.ui.badge('warn'), 'Past the first limit. Look at it soon.'),
+          wordRow(SB.ui.badge('breach'), 'Past the second limit. The border pulses unless motion is reduced.')),
+        h('p', { class: 'fs-sub' }, 'The clock runs from when the ticket was sent. Each channel has its own limits:'), h('ul', { class: 'hp-ths' }, ...rows)),
+      h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Stations'),
+        h('ul', { class: 'hp-words' }, ...C.zones.map((z) => wordRow(h('span', { class: 'chip chip-zone', dataset: { zone: z.id } }, ico(z.icon, 16), h('span', null, z.code)), z.long + (z.id === 'expo' ? '. Sees whole tickets and packs them.' : '.'))))),
+      h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Items and tickets'),
+        h('ul', { class: 'hp-words' },
+          wordRow(h('span', { class: 'stamp' }, 'RUSH'), 'Pacing is skipped: every item is ready to start now and the ticket goes to the front.'),
+          wordRow(h('span', { class: 'chip' }, ico('clock', 16), h('span', null, 'Start in 2:10')), 'Waiting. Planned to start later so the order finishes together. Start now starts it early.'),
+          wordRow(h('span', { class: 'chip chip-mod' }, 'No pickles'), 'A modifier. Read these before you cook.'),
+          wordRow(h('span', { class: 'chip', dataset: { tone: 'warn' } }, ico('alert', 16), h('span', null, 'Allergy')), 'A ticket note. It sits above the items in an amber strip.'))),
+      h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Availability'),
+        h('ul', { class: 'hp-words' },
+          wordRow(stateEl('bad', 'ban', '86 sold out'), 'An ingredient has run down to its 86 level.'),
+          wordRow(stateEl('bad', 'ban', '86 safety hold'), 'The only batch is locked for safety: too old, too cold or too warm.'),
+          wordRow(stateEl('bad', 'ban', '86 manual'), 'Someone marked it 86 on the 86 board.'))),
+      h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Hold cabinet'),
+        h('ul', { class: 'hp-words' },
+          wordRow(stateEl('ok', 'check-circle', 'Holding fine'), 'In range and checked on time.'),
+          wordRow(stateEl('warn', 'thermometer', 'Check temp'), 'A reading is due. Still being served.'),
+          wordRow(stateEl('bad', 'flame', 'Reheat now'), 'Below the hot-hold limit. Not served until it is reheated once, or discarded.'),
+          wordRow(stateEl('bad', 'snow', 'Chill now'), 'Above the cold-hold limit. Not served until it is back in range, or discarded.'),
+          wordRow(stateEl('bad', 'alert', 'Discard'), 'Out of time or out of range for too long. Locked, and discarded automatically.'))));
+  }
+
+  // The Keys tab. The shortcuts come from the board, with a built-in list if the board is not loaded.
+  function helpKeys() {
+    const list = (SB.floor && Array.isArray(SB.floor.shortcuts) && SB.floor.shortcuts.length ? SB.floor.shortcuts : FALLBACK_KEYS);
+    return h('div', { class: 'hp-pane' },
+      h('p', { class: 'fs-sub' }, 'On the board, these keys work when no screen is open and you are not typing in a field.'),
+      h('ul', { class: 'hp-keys' }, ...list.map((k) => h('li', { class: 'hp-key' }, h('span', { class: 'kbd' }, k.key), h('span', null, k.label)))),
+      h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Inside New ticket'),
+        h('ul', { class: 'hp-keys' },
+          h('li', { class: 'hp-key' }, h('span', { class: 'kbd' }, 'Enter'), h('span', null, 'In the search box: add the first match.')),
+          h('li', { class: 'hp-key' }, h('span', { class: 'kbd' }, 'Ctrl + Enter'), h('span', null, 'Send to kitchen. On a Mac, use Cmd + Enter.')),
+          h('li', { class: 'hp-key' }, h('span', { class: 'kbd' }, 'Esc'), h('span', null, 'Close. If the order is not empty, it asks first and the order is kept.')))));
+  }
+
+  // The Food safety tab: the limits in force right now, read from
+  // the settings so it never disagrees with the app.
+  // It also explains where the two-hour clock starts.
+  function helpSafety() {
+    const S = safety(), c = S.cooling || C.safety.cooling;
+    // One rule line with its icon.
+    const rule = (icon, title, body) => helpItem(icon, title, body);
+    return h('div', { class: 'hp-pane' },
+      safetyNote(),
+      h('p', { class: 'fs-sub' }, 'These are the limits Smokebox is using right now. They start from the FDA Food Code (3-501.14, 3-501.16, 3-403.11 and 4-602.11) and are starter values until the owner confirms them.'),
+      helpList([
+        rule('flame', 'Keep hot food hot', 'Hot food stays at ' + S.hotHoldF + ' °F or above.'),
+        rule('snow', 'Keep cold food cold', 'Cold food stays at ' + S.coldHoldF + ' °F or below.'),
+        rule('thermometer', 'Log a temperature', 'At least every ' + S.tempCheckEveryMin + ' minutes. A late check shows Check temp and is counted.'),
+        rule('refresh', 'Reheat once', 'Below ' + S.hotHoldF + ' °F, reheat to ' + S.reheatF + ' °F within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
+        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + S.hotHoldF + ' °F, not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
+        rule('package', 'Hold limit', 'A batch is discarded after ' + S.defaultMaxHoldH + ' hours in the cabinet, or less if its own limit is shorter.'),
+        rule('snow', 'Cooling', 'From ' + S.hotHoldF + ' °F to ' + c.stage1ToF + ' °F within ' + c.stage1H + ' hours, then to ' + c.finalF + ' °F within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
+        rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
+        rule('lock', 'Locked batches', 'A batch that is not safe to serve is locked. Nothing is taken from it, and menu items that need it show 86 safety hold.'),
+      ]));
+  }
+
+  // The About tab: what Smokebox is, what is simulated, and the small manager hint.
+  function helpAbout(sheet) {
+    return h('div', { class: 'hp-pane' },
+      helpList([
+        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for a BBQ line: tickets, paced start times, a hold cabinet and an 86 board. It is a separate app from Pitcall, the cook-count app.'),
+        helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
+        helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
+        helpItem('info', 'Channel sync is simulated', 'There is no live POS or delivery app connected. The 86 board shows how a real sync would look and says so.'),
+        helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
+        helpItem('sparkle', 'Demo and sample data', 'Demo tickets and the sample history are made up by a simulator. They are labeled wherever they appear.'),
+      ]),
+      h('div', { class: 'fs-row hp-links' },
+        // All three buttons close Help first, so only one sheet is ever open.
+        h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, runTour) }, ico('play', 20), h('span', null, 'Replay the walkthrough')),
+        // The specs open after Help closes.
+        h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, () => SB.sheets.open('specs')) }, ico('book', 20), h('span', null, 'See the specs')),
+        // The demo sheet opens after Help closes.
+        h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, () => SB.sheets.open('demo')) }, ico('play', 20), h('span', null, 'Demo and clock'))),
+      h('p', { class: 'fs-sub hp-tiny' }, 'Smokebox version ' + C.version + '. Managers: tap Back office at the top of the board, or press Ctrl+Shift+O. To add a dish or change a price, open Back office, then Menu and settings.'));
+  }
+
+  // Builds the Help sheet with its five tabs. opts.tab can pick the tab to open on.
+  function openHelp(opts) {
+    opts = opts || {};
+    const sheet = SB.ui.sheet({ title: 'Help and about', side: 'right', width: 'min(720px, 96vw)', name: 'help' });
+    const defs = [
+      { id: 'basics', label: 'Basics', panel: h('div', null, helpBasics(sheet)) },
+      { id: 'words', label: 'Words and colors', panel: h('div', null, helpWords()) },
+      { id: 'keys', label: 'Keys', panel: h('div', null, helpKeys()) },
+      { id: 'safety', label: 'Food safety', panel: h('div', null, helpSafety()) },
+      { id: 'about', label: 'About', panel: h('div', null, helpAbout(sheet)) },
+    ];
+    const start = defs.some((d) => d.id === opts.tab) ? opts.tab : 'basics';
+    const tabs = tabsWithPanels('Help topics', defs, start);
+    sheet.body.append(h('div', { class: 'hp' }, tabs.seg, ...defs.map((d) => d.panel)));
+    return sheet;
+  }
+
+  // Specs: the palette with contrast computed from the live tokens.
+  // Minimum contrast ratios (WCAG AA): 4.5 for text, 3 for borders and focus rings.
+  const TEXT_MIN = 4.5, UI_MIN = 3;
+  // Colour pairs to check: [foreground token, background token, minimum, what it is].
+  // audit:data-start
+  const SPEC_PAIRS = [
+    ['ink', 'bg', TEXT_MIN, 'Body text on the board'], ['ink', 'paper', TEXT_MIN, 'Body text on a card'], ['ink', 'sub', TEXT_MIN, 'Body text on a panel'],
+    ['ink2', 'bg', TEXT_MIN, 'Secondary text'], ['ink3', 'bg', TEXT_MIN, 'Quiet text on the board'], ['ink3', 'sub', TEXT_MIN, 'Quiet text on a panel'],
+    ['amber-ink', 'bg', TEXT_MIN, 'Small amber text'], ['sage-ink', 'bg', TEXT_MIN, 'Small sage text'], ['crimson', 'bg', TEXT_MIN, 'Overdue text'],
+    ['on-primary', 'primary', TEXT_MIN, 'Label on the amber button'], ['on-success', 'success', TEXT_MIN, 'Label on the sage button'], ['on-danger', 'danger', TEXT_MIN, 'Label on the red button'],
+    ['z-pit', 'paper', TEXT_MIN, 'PIT code on a ticket'], ['z-sides', 'paper', TEXT_MIN, 'HOT code on a ticket'], ['z-fry', 'paper', TEXT_MIN, 'FRY code on a ticket'], ['z-cold', 'paper', TEXT_MIN, 'CLD code on a ticket'], ['z-expo', 'paper', TEXT_MIN, 'EXP code on a ticket'],
+    ['stamp', 'paper', TEXT_MIN, 'RUSH stamp'],
+    ['line', 'bg', UI_MIN, 'Borders and edges'], ['amber', 'bg', UI_MIN, 'Amber borders and fills'], ['focus', 'bg', UI_MIN, 'Keyboard focus ring'],
+  ];
+  // Palette swatches: [token, colour name, what it is used for].
+  const SWATCHES = [
+    ['bg', 'Parchment', 'the board'], ['ink', 'Charcoal', 'text and button edges'], ['line', 'Zinc', 'borders and structure'], ['amber', 'Brisket amber', 'fills and large shapes'],
+    ['sage', 'Sage', 'done and success'], ['crimson', 'Overdue', 'overdue and danger'], ['paper', 'Card', 'tickets and fields'], ['sub', 'Sub', 'panels and wells'],
+  ];
+  // audit:data-end
+  // Every token the contrast check needs, read once per theme.
+  const SPEC_TOKENS = Array.from(new Set(SPEC_PAIRS.reduce((a, p) => a.concat([p[0], p[1]]), []).concat(SWATCHES.map((s) => s[0]))));
+
+  // Read token values for a theme. The attribute swap happens inside
+  // one synchronous block, so nothing paints in between.
+  function readTokens(theme, names) {
+    const root = doc.documentElement, prev = root.getAttribute('data-theme');
+    const swap = theme !== (prev || 'day');
+    if (swap) root.setAttribute('data-theme', theme);
+    const out = {};
+    try { const cs = g.getComputedStyle(root); names.forEach((n) => { out[n] = cs.getPropertyValue('--' + n).trim(); }); }
+    finally { if (swap) { if (prev == null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', prev); } }
+    return out;
+  }
+  // True for a six-digit colour code like #1E2224.
+  const isHex = (s) => /^#[0-9a-f]{6}$/i.test(s || '');
+  // A contrast ratio as text, like 4.52:1.
+  const ratioText = (r) => r.toFixed(2) + ':1';
+
+  // Builds the Specs sheet. Every contrast ratio is computed here from the colours the app is using,
+  // never typed in by hand.
+  function openSpecs() {
+    let off = null;
+    // The listener on the theme is removed when the sheet closes.
+    const sheet = SB.ui.sheet({ title: 'Specs', side: 'right', width: 'min(820px, 96vw)', name: 'specs', onClose: () => { if (off) off(); } });
+    let theme = SB.theme.get();
+    const summary = h('p', { class: 'sp-summary', role: 'status' });
+    const list = h('ul', { class: 'sp-list' });
+    const swatches = h('ul', { class: 'sp-swatches' });
+    // Which theme to check. This changes the numbers only, not the look of the app.
+    const themeSeg = SB.ui.segmented({ label: 'Theme to check', class: 'sp-theme', value: theme, options: [{ id: 'day', label: 'Day', icon: 'sun' }, { id: 'night', label: 'Night', icon: 'moon' }], onChange: (id) => { theme = id; paint(); } });
+
+    // Reads the chosen theme's colours and rebuilds the contrast list, the summary line and the swatches.
+    function paint() {
+      const t = readTokens(theme, SPEC_TOKENS);
+      U.clear(list); U.clear(swatches);
+      let pass = 0, total = 0, low = null;
+      SPEC_PAIRS.forEach(([fg, bg, min, what]) => {
+        const a = t[fg], b = t[bg];
+        const ok = isHex(a) && isHex(b);
+        const ratio = ok ? U.contrast(a, b) : NaN;
+        const good = ok && ratio + 1e-9 >= min;
+        total++; if (good) pass++;
+        if (ok && (!low || ratio < low.ratio)) low = { ratio, what };
+        const sample = h('span', { class: 'sp-sample', style: ok ? 'color:' + a + ';background:' + b : '', 'aria-hidden': 'true' }, 'Aa');
+        list.appendChild(h('li', { class: 'sp-row', dataset: { fg, bg, ratio: ok ? ratio.toFixed(2) : '', pass: good ? 'yes' : 'no' } },
+          sample,
+          h('span', { class: 'sp-what' }, h('strong', null, what), h('span', { class: 'sp-hex' }, fg + ' ' + (a || 'unknown') + ' on ' + bg + ' ' + (b || 'unknown'))),
+          h('span', { class: 'sp-result' },
+            h('span', { class: 'sp-ratio num' }, ok ? ratioText(ratio) : 'n/a'),
+            h('span', { class: 'sp-need num' }, 'needs ' + min + ':1'),
+            stateEl(good ? 'ok' : 'bad', good ? 'check-circle' : 'alert', good ? 'Pass' : 'Fails'))));
+      });
+      text(summary, pass + ' of ' + total + ' pairs pass in ' + (theme === 'night' ? 'Night' : 'Day') + '.' + (low ? ' Lowest: ' + ratioText(low.ratio) + ', ' + low.what.toLowerCase() + '.' : ''));
+      attr(summary, 'data-tone', pass === total ? 'ok' : 'bad');
+      SWATCHES.forEach(([tok, name, use]) => {
+        const hex = t[tok];
+        const ink = isHex(hex) ? (U.contrast(hex, '#FFFFFF') >= U.contrast(hex, '#000000') ? '#FFFFFF' : '#000000') : 'inherit';
+        swatches.appendChild(h('li', { class: 'sp-sw', style: isHex(hex) ? 'background:' + hex + ';color:' + ink : '' }, h('strong', null, name), h('span', { class: 'sp-sw-hex num' }, hex || 'unknown'), h('span', { class: 'sp-sw-use' }, use)));
+      });
+    }
+
+    const tokenVals = readTokens(SB.theme.get(), ['tap', 'tap-lg', 'tap-step', 'fs-1', 'fs-2', 'fs-3', 'fs-4', 'fs-5', 'fs-6', 'fs-7', 'fs-8']);
+    const scale = ['fs-1', 'fs-2', 'fs-3', 'fs-4', 'fs-5', 'fs-6', 'fs-7', 'fs-8'].map((k) => parseFloat(tokenVals[k]) || 0).filter(Boolean);
+    // One titled section of the page.
+    const sec = (title, ...kids) => h('section', { class: 'fs-section sp-sec' }, h('h3', { class: 'fs-h' }, title), ...kids);
+
+    sheet.body.append(h('div', { class: 'sp' },
+      sec('Contrast, computed live', h('p', { class: 'fs-sub' }, 'Each ratio is worked out on this device from the color tokens the app is using, with the WCAG formula. Text needs 4.5:1. Borders, focus rings and large shapes need 3:1.'), themeSeg, summary, list),
+      sec('Palette', h('p', { class: 'fs-sub' }, 'The palette is fixed by the brief. Small text uses the darker amber and sage inks so it passes on parchment.'), swatches),
+      sec('Type and touch targets',
+        h('p', { class: 'fs-sub' }, 'Barlow Condensed for numbers, timers and headings. Barlow for everything else. Without internet the app falls back to system condensed fonts, so letter widths differ from the screenshots.'),
+        h('p', { class: 'sp-scale' }, ...scale.map((px) => h('span', { class: 'sp-scale-i', style: 'font-size:' + px + 'px' }, Math.round(px)))),
+        h('dl', { class: 'fs-dl' }, h('dt', null, 'Buttons and rows'), h('dd', { class: 'num' }, parseFloat(tokenVals.tap) + ' px'), h('dt', null, 'Primary actions'), h('dd', { class: 'num' }, parseFloat(tokenVals['tap-lg']) + ' px'), h('dt', null, 'Stepper buttons'), h('dd', { class: 'num' }, parseFloat(tokenVals['tap-step']) + ' px'))),
+      sec('What changed from the original file',
+        helpList([
+          helpItem('refresh', 'No whole-board redraw each second', 'The original rebuilt the board every second, so a tap could land on a node that was about to be replaced. Now only timer text changes each second.'),
+          helpItem('eye', 'Contrast is measured, not typed in', 'The original printed a fixed 7.8:1. Its small amber text was 4.06:1, under the 4.5:1 minimum. Small amber text now uses a darker ink, and this screen does the maths.'),
+          helpItem('clock', 'Paced start times', 'Each line starts so the whole order finishes together. Prep times are learned from real tickets and start as estimates.'),
+          helpItem('thermometer', 'A hold cabinet with safety rules', 'Temperature logs, reheat once, discard on time, and automatic 86 when a batch is locked. The two-hour clock starts at the first low reading (see Help, Food safety).'),
+          helpItem('undo', 'Undo, keys and themes', 'Ten seconds of undo, keyboard shortcuts, Day and Night, and a large text option.'),
+          helpItem('scale', 'Weights in grams and kilograms', 'Never cups.'),
+        ])),
+      sec('Honest notes',
+        helpList([
+          helpItem('sun', 'Not tested in real sunlight', 'Contrast is calculated from colors. It has not been measured on a screen in daylight, on a greasy glass, or through gloves.'),
+          helpItem('info', 'Simulated channels', 'There is no live POS or delivery connection. The 86 sync strip is a simulation and says so.'),
+          helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
+          helpItem('sparkle', 'Made-up data', 'Demo tickets and the sample history come from a simulator.'),
+          helpItem('shield', 'Local rules win', C.safetyLine),
+        ]))));
+
+    paint();
+    off = SB.theme.onChange((what) => { if (what === 'theme') { theme = SB.theme.get(); themeSeg.setValue(theme); paint(); } });
+    return sheet;
+  }
+
+  // Settings (the floor menu, SPEC 14.4).
+
+  // One labelled settings block: a heading, a short help line (left out when empty) and the control.
+  function settingBlock(title, help, node) {
+    return h('section', { class: 'fs-section mn-block' }, h('h3', { class: 'fs-h' }, title), help ? h('p', { class: 'fs-sub' }, help) : null, node);
+  }
+
+  // Builds the Settings sheet (look, text size, sound, station, clock speed, links) and returns it.
+  // WATCH OUT: without SB.floor the sound switch is shown off and
+  // locked; business settings are never changed here.
+  function openMenu() {
+    // Each entry stops one listener when the sheet closes.
+    const offs = [];
+    const sheet = SB.ui.sheet({ title: 'Settings', side: 'right', width: 'min(480px, 96vw)', name: 'menu', onClose: () => offs.splice(0).forEach((f) => f()) });
+
+    // Look: Day is the bright anti-glare board, Night is the charcoal one. Saved by the theme module.
+    const themeSeg = SB.ui.segmented({ label: 'Look', class: 'mn-look', value: SB.theme.get(), options: [{ id: 'day', label: 'Day', icon: 'sun' }, { id: 'night', label: 'Night', icon: 'moon' }], onChange: (id) => SB.theme.set(id) });
+
+    // Text size: Large makes every size 20 percent bigger.
+    const textSeg = SB.ui.segmented({ label: 'Text size', class: 'mn-text', value: SB.theme.textSize(), options: [{ id: 'normal', label: 'Normal' }, { id: 'large', label: 'Large' }], onChange: (id) => SB.theme.setTextSize(id) });
+
+    // Ticket size: Auto draws full-size tickets while they fit in one row, then compact ones.
+    const sizeSeg = SB.ui.segmented({ label: 'Ticket size', class: 'mn-size', value: SB.theme.density(), options: [{ id: 'auto', label: 'Auto' }, { id: 'large', label: 'Full size' }, { id: 'compact', label: 'Compact' }], onChange: (id) => SB.theme.setDensity(id) });
+
+    // The "do this next" line under each ticket.
+    const hintsTog = SB.ui.toggle({ label: 'Show the next step on each ticket', checked: SB.theme.hints(), onChange: (on) => SB.theme.setHints(on) });
+
+    // Sound: the chime on a new ticket and the beeps when a dish needs checking. It lives in the board module, so it is optional here.
+    const floorOk = !!(SB.floor && typeof SB.floor.setSound === 'function');
+    const soundTog = SB.ui.toggle({ label: 'Chime for new tickets and dishes to check', checked: floorOk ? !!SB.floor.sound() : false, disabled: !floorOk, onChange: (on) => { if (floorOk) SB.floor.setSound(on); } });
+    const soundHelp = floorOk ? 'Off by default. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
+
+    // Station: the board opens on this station and reopens on it after a reload.
+    const stations = [{ id: 'all', label: 'All', icon: 'grid' }].concat(C.zones.map((z) => ({ id: z.id, label: z.name, icon: z.icon })));
+    const view0 = SB.router.view();
+    const stationSeg = SB.ui.segmented({ label: 'Station on this tablet', class: 'mn-station', value: view0.kind === 'floor' ? view0.zone : SB.router.lastZone(), options: stations, onChange: (id) => {
+      // Close first, then move, so no extra browser-history entry is left behind.
+      closeThen(sheet, () => SB.router.go({ kind: 'floor', zone: id }));
+    } });
+
+    // Clock speed shortcut: the same control as the Demo sheet, so both always agree.
+    const clockCtl = clockControl('Clock speed');
+
+    // Links to the other support sheets. Each closes this one first.
+    const link = (icon, label, name) => h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, () => SB.sheets.open(name)) }, ico(icon, 22), h('span', { class: 'grow' }, label), ico('chevron-right', 20));
+    const tourLink = h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', { class: 'grow' }, 'Show me how it works'), ico('chevron-right', 20));
+    // Back office closes this sheet first, then opens the manager pages (the shell asks for the PIN if one is set).
+    const officeLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'office' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({}); }) }, ico('gauge', 22), h('span', { class: 'grow' }, 'Back office'), ico('chevron-right', 20));
+    // Opens Menu and settings in the back office, where dishes, prices and prep times are edited.
+    const menuLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'menu-edit' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }) }, ico('sliders', 22), h('span', { class: 'grow' }, 'Edit the menu'), ico('chevron-right', 20));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('book', 'Specs', 'specs'), link('play', 'Demo and clock', 'demo'));
+
+    sheet.body.append(h('div', { class: 'mn' },
+      settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
+      settingBlock('Text size', 'Large makes everything 20 percent bigger.', textSeg),
+      settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
+      settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap START on Hush puppies.', hintsTog),
+      settingBlock('Sound', soundHelp, soundTog),
+      settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
+      settingBlock('Clock speed', 'Only for demos and training. Real service runs at x1.', clockCtl.el),
+      settingBlock('More', '', links)));
+
+    // Keep every control in step when something else changes the look, the station or the clock.
+    offs.push(SB.theme.onChange(() => { themeSeg.setValue(SB.theme.get()); textSeg.setValue(SB.theme.textSize()); sizeSeg.setValue(SB.theme.density()); hintsTog.setValue(SB.theme.hints()); }));
+    offs.push(SB.router.onChange((v) => { if (v.kind === 'floor') stationSeg.setValue(v.zone); }));
+    offs.push(SB.store.subscribeTick(() => clockCtl.paint()));
+    return sheet;
+  }
+
+  // Registration: the board, the header and the keyboard open these by name with SB.sheets.open(name).
+  SB.sheets.register('hold', openHold);
+  SB.sheets.register('board86', openBoard86);
+  SB.sheets.register('recall', openRecall);
+  SB.sheets.register('demo', openDemo);
+  SB.sheets.register('help', openHelp);
+  SB.sheets.register('specs', openSpecs);
+  SB.sheets.register('menu', openMenu);
+})(typeof globalThis !== 'undefined' ? globalThis : window);

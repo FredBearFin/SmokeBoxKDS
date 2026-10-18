@@ -1,0 +1,61 @@
+/*
+ * WHAT THIS FILE IS: Styles for the Orders screen and the Take payment box built in 73-floor-orders.js.
+ * PARTS: the Orders sheet (ox-), its rows, the paid summary, and the Take payment box (ox-pay-).
+ * USES / USED BY: tokens from 00-tokens.css, base parts from 10-base.css, the shared tab style fs-tabs from
+ * 21-floor-sheets.css. Touch targets are 48 px, or 56 px for the main action.
+ */
+
+.ox { display: grid; gap: var(--sp-3); min-width: 0; }
+.ox-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.ox-bar .fs-tabs { flex: 1 1 260px; width: auto; }
+.ox-new { flex: none; min-height: var(--tap-lg); }
+.ox-panel { display: grid; gap: var(--sp-3); min-width: 0; }
+.ox-panel[hidden] { display: none; }
+.ox-empty { padding: var(--sp-8) var(--sp-4); }
+.ox-sum { margin: 0; font-size: var(--fs-3); color: var(--ink); max-width: var(--measure); }
+.ox-drawer { font-size: var(--fs-2); color: var(--ink2); }
+.ox-sum[hidden] { display: none; }
+
+/* One order: who and what on the left, the amount, then the buttons. */
+.ox-list { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.ox-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-2) var(--sp-4); align-items: start; padding: var(--sp-3); background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-panel); }
+.ox-main { display: grid; gap: 4px; min-width: 0; }
+.ox-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--sp-2); }
+.ox-who { font-weight: var(--w-bold); font-size: var(--fs-item); overflow-wrap: anywhere; }
+.ox-items { font-size: var(--fs-2); color: var(--ink2); overflow-wrap: anywhere; }
+.ox-meta { font-size: var(--fs-2); color: var(--ink3); }
+.ox-money { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.ox-total { font: var(--w-heavy) var(--fs-6) / 1 var(--font-display); }
+.ox-sub { font-size: var(--fs-1); color: var(--ink3); }
+.ox-acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); }
+.ox-acts .btn { min-height: 48px; }
+.ox-acts .ox-take { min-width: 160px; }
+.ox-acts [hidden] { display: none; }
+
+/* The Take payment box. */
+.ox-pay { display: grid; gap: var(--sp-4); min-width: 0; }
+.ox-pay-who { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin: 0; font-size: var(--fs-4); }
+.ox-pay-items { margin: 0; font-size: var(--fs-2); color: var(--ink2); overflow-wrap: anywhere; }
+.ox-calc { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--sp-4); margin: 0; padding: var(--sp-3); background: var(--sub); border-radius: var(--r-panel); font-size: var(--fs-3); }
+.ox-calc dt, .ox-calc dd { margin: 0; }
+.ox-calc dd { text-align: right; }
+.ox-calc .is-last { font-weight: var(--w-heavy); font-size: var(--fs-4); }
+.ox-pay-block { display: grid; gap: var(--sp-2); min-width: 0; }
+.ox-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ox-chips .chip { min-height: 44px; }
+.ox-pay-input { min-height: 48px; max-width: 12em; }
+.ox-method { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.ox-method .seg-opt { min-height: 52px; min-width: 0; }
+.ox-change { margin: 0; font-size: var(--fs-4); font-weight: var(--w-bold); }
+.ox-change[data-short="true"] { color: var(--crimson); }
+.ox-change[hidden], .ox-pay-err[hidden] { display: none; }
+.ox-pay-err { margin: 0; padding: var(--sp-2) var(--sp-3); color: var(--crimson); background: var(--tint-bad); border-radius: var(--r-panel); font-weight: var(--w-semi); }
+.ox-pay-go { min-width: 220px; }
+
+@media (max-width: 520px) {
+  .ox-row { grid-template-columns: minmax(0, 1fr); }
+  .ox-money { justify-items: start; text-align: left; }
+  .ox-acts { justify-content: stretch; }
+  .ox-acts .btn { flex: 1 1 100%; }
+  .ox-pay-go { min-width: 0; flex: 1 1 auto; }
+}
