@@ -1863,7 +1863,7 @@
   // Every setting the owner may change, with its rule. Anything not listed is refused (badPatch).
   const SET_SCHEMA = {
     pacing: { enabled: { t: 'bool' }, learnK: R(0, 50), floorSec: R(1, 600), minFactor: R(0.1, 1), maxFactor: R(1, 10), outlierFactor: R(1, 20), qtyFactor: R(0, 2), qtyCap: R(1, 10) },
-    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20) },
+    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20), soundStartHour: R(0, 23, true), soundOutsideHours: { t: 'bool' } },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
       defaultMaxHoldH: B('defaultMaxHoldH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
       cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' }, holdWindowV2: { t: 'bool' } },

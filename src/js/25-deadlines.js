@@ -183,14 +183,40 @@
         consequence: late ? 'Food-contact surfaces are overdue for sanitizing.' : 'Food-contact surfaces are due for sanitizing at ' + U.fmtTime(C0.sanitizeDueAt) + '.', action: 'Sanitize and tick it off.', guess: false });
     }
   }
-  // True when warning sounds may play: the kitchen is open. Before opening and after closing the strip still
-  // shows the rows, but nothing beeps or speaks into an empty kitchen. Rungs missed while closed sound once at opening.
+  // The hour of day (0 to 24 and a fraction) that warning sounds may start: the sound start hour, or opening if that
+  // is earlier. Returns the service settings with it.
+  function soundWindow(state) {
+    const sv = state && state.settings && state.settings.service ? state.settings.service : C.service;
+    const start = Math.min(U.isNum(sv.soundStartHour) ? sv.soundStartHour : sv.openHour, sv.openHour);
+    return { start, end: sv.closeHour, all: sv.soundOutsideHours === true };
+  }
+  // True when warning sounds may play: from the sound start hour (opening unless set earlier) to closing, or any
+  // hour when the owner allows sound outside open hours. Before that and after closing the strip still shows the
+  // rows, but nothing beeps or speaks into an empty kitchen. Rungs missed while quiet sound once when it opens.
   function soundsAllowed(state, now) {
     if (!state || !U.isNum(now)) return false;
-    const sv = state.settings && state.settings.service ? state.settings.service : C.service;
+    const w = soundWindow(state);
+    if (w.all) return true;
     const d = new Date(now);
     const hr = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
-    return (hr >= sv.openHour && hr < sv.closeHour) || (hr + 24 >= sv.openHour && hr + 24 < sv.closeHour);
+    return (hr >= w.start && hr < w.end) || (hr + 24 >= w.start && hr + 24 < w.end);
+  }
+  // The next moment warning sounds start, or null when they may sound now.
+  function nextOpenAt(state, now) {
+    if (!state || !U.isNum(now) || soundsAllowed(state, now)) return null;
+    const w = soundWindow(state);
+    const whole = Math.floor(w.start), mins = Math.round((w.start - whole) * 60);
+    for (let day = 0; day < 3; day++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + day); d.setHours(whole, mins, 0, 0);
+      if (d.getTime() > now) return d.getTime();
+    }
+    return null;
+  }
+  // The words for the strip while sounds are paused, for example "Sound paused: kitchen closed until 11:00 am", or null.
+  function pauseNote(state, now) {
+    const at = nextOpenAt(state, now);
+    return at == null ? null : 'Sound paused: kitchen closed until ' + U.fmtTime(at);
   }
   // Builds the feed: every deadline worth showing right now, worst first. Each row has id, kind, label, at,
   // msLeft, rung, sev (bad, warn, info), consequence and action. Batch rows also carry projected waste.
@@ -207,5 +233,5 @@
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed };
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

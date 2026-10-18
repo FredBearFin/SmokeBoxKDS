@@ -1330,9 +1330,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .fl-strip-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
 .fl-strip-what { font-size: calc(22px * var(--fl-k)); font-weight: 700; line-height: 1.15; }
 .fl-strip-why { font-size: calc(17px * var(--fl-k)); line-height: 1.25; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-@media (max-height: 820px) { .fl-strip-row:nth-child(n+3) { display: none; } .fl-strip-when { font-size: calc(28px * var(--fl-k)); } }
+@media (max-height: 820px) { .fl-strip-row[data-i="2"] { display: none; } .fl-strip-when { font-size: calc(28px * var(--fl-k)); } }
 .fl-strip-sound { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 8px var(--sp-4); border: 0; background: var(--ink); color: var(--bg); font: inherit; font-size: calc(18px * var(--fl-k)); font-weight: 700; text-align: left; cursor: pointer; }
 .fl-strip-sound[hidden] { display: none; }
+.fl-strip-pause { background: var(--sub); color: var(--ink); border-bottom: 1px solid var(--line); font-weight: 600; }
 .fl-strip-row:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -4px; }
 
 /* The header: brand, station tabs, status chips, tool buttons, New ticket and Menu. */
@@ -4171,7 +4172,9 @@ a.of-nav:active { background: var(--press); }
   // compares 86 times with closeHour.
   // taxRatePct is the sales tax in percent added to an order when it is paid. 0 means no tax is added. The owner
   // sets the real local rate; Smokebox does not know it.
-  C.service = { dayStartHour: 4, openHour: 11, closeHour: 21, taxRatePct: 0 };
+  // soundStartHour is when warning sounds may start (never later than opening, so a pit master who starts at 4 am can
+  // hear them); soundOutsideHours lets them sound at any hour. Outside that window the strip shows a note instead.
+  C.service = { dayStartHour: 4, openHour: 11, closeHour: 21, taxRatePct: 0, soundStartHour: 11, soundOutsideHours: false };
 
   /* ---------- food safety. Owner-editable inside safetyBounds (hotHoldF can never go below 135, same rule as Pitcall). ---------- */
   // Food-safety limits, in hours, degrees Fahrenheit and minutes. The owner can change them only inside
@@ -6123,7 +6126,7 @@ a.of-nav:active { background: var(--press); }
   // Every setting the owner may change, with its rule. Anything not listed is refused (badPatch).
   const SET_SCHEMA = {
     pacing: { enabled: { t: 'bool' }, learnK: R(0, 50), floorSec: R(1, 600), minFactor: R(0.1, 1), maxFactor: R(1, 10), outlierFactor: R(1, 20), qtyFactor: R(0, 2), qtyCap: R(1, 10) },
-    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20) },
+    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20), soundStartHour: R(0, 23, true), soundOutsideHours: { t: 'bool' } },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
       defaultMaxHoldH: B('defaultMaxHoldH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
       cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' }, holdWindowV2: { t: 'bool' } },
@@ -7560,14 +7563,40 @@ a.of-nav:active { background: var(--press); }
         consequence: late ? 'Food-contact surfaces are overdue for sanitizing.' : 'Food-contact surfaces are due for sanitizing at ' + U.fmtTime(C0.sanitizeDueAt) + '.', action: 'Sanitize and tick it off.', guess: false });
     }
   }
-  // True when warning sounds may play: the kitchen is open. Before opening and after closing the strip still
-  // shows the rows, but nothing beeps or speaks into an empty kitchen. Rungs missed while closed sound once at opening.
+  // The hour of day (0 to 24 and a fraction) that warning sounds may start: the sound start hour, or opening if that
+  // is earlier. Returns the service settings with it.
+  function soundWindow(state) {
+    const sv = state && state.settings && state.settings.service ? state.settings.service : C.service;
+    const start = Math.min(U.isNum(sv.soundStartHour) ? sv.soundStartHour : sv.openHour, sv.openHour);
+    return { start, end: sv.closeHour, all: sv.soundOutsideHours === true };
+  }
+  // True when warning sounds may play: from the sound start hour (opening unless set earlier) to closing, or any
+  // hour when the owner allows sound outside open hours. Before that and after closing the strip still shows the
+  // rows, but nothing beeps or speaks into an empty kitchen. Rungs missed while quiet sound once when it opens.
   function soundsAllowed(state, now) {
     if (!state || !U.isNum(now)) return false;
-    const sv = state.settings && state.settings.service ? state.settings.service : C.service;
+    const w = soundWindow(state);
+    if (w.all) return true;
     const d = new Date(now);
     const hr = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
-    return (hr >= sv.openHour && hr < sv.closeHour) || (hr + 24 >= sv.openHour && hr + 24 < sv.closeHour);
+    return (hr >= w.start && hr < w.end) || (hr + 24 >= w.start && hr + 24 < w.end);
+  }
+  // The next moment warning sounds start, or null when they may sound now.
+  function nextOpenAt(state, now) {
+    if (!state || !U.isNum(now) || soundsAllowed(state, now)) return null;
+    const w = soundWindow(state);
+    const whole = Math.floor(w.start), mins = Math.round((w.start - whole) * 60);
+    for (let day = 0; day < 3; day++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + day); d.setHours(whole, mins, 0, 0);
+      if (d.getTime() > now) return d.getTime();
+    }
+    return null;
+  }
+  // The words for the strip while sounds are paused, for example "Sound paused: kitchen closed until 11:00 am", or null.
+  function pauseNote(state, now) {
+    const at = nextOpenAt(state, now);
+    return at == null ? null : 'Sound paused: kitchen closed until ' + U.fmtTime(at);
   }
   // Builds the feed: every deadline worth showing right now, worst first. Each row has id, kind, label, at,
   // msLeft, rung, sev (bad, warn, info), consequence and action. Batch rows also carry projected waste.
@@ -7584,7 +7613,7 @@ a.of-nav:active { background: var(--press); }
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed };
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 25-deadlines.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'25-deadlines.js',message:String(e&&e.message||e)});}
@@ -16507,16 +16536,19 @@ a.of-nav:active { background: var(--press); }
     const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', hidden: true, onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); chime(); speak('Sound is on.'); } },
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     el.appendChild(soundBar);
+    // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
+    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', hidden: true, onClick: () => openSheet('menu') }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
+    el.appendChild(pauseBar);
     for (let i = 0; i < 3; i++) {
       const when = h('span', { class: 'fl-strip-when num' }), what = h('span', { class: 'fl-strip-what' }), why = h('span', { class: 'fl-strip-why' });
       // Acknowledges this row, then opens the hold cabinet on its batch, or just the cabinet when it is not about one batch.
       const openRow = () => { const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (r.batchId) openHoldFor(r.batchId); else openSheet('hold'); };
-      const row = h('button', { type: 'button', class: 'fl-strip-row', hidden: true, onClick: openRow },
+      const row = h('button', { type: 'button', class: 'fl-strip-row', hidden: true, dataset: { i: String(i) }, onClick: openRow },
         when, h('span', { class: 'fl-strip-text' }, what, why));
       rows.push({ el: row, when, what, why, key: '', batchId: null });
       el.appendChild(row);
     }
-    return { el, rows, soundBar };
+    return { el, rows, soundBar, pauseBar };
   }
   // Opens the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { if (SB.sheets) SB.sheets.open('hold', { batchId }); } catch (e) { console.error('[smokebox] sheet failed', e); } }
@@ -16588,7 +16620,11 @@ a.of-nav:active { background: var(--press); }
     const top = feed.slice(0, 3);
     const needSound = sound && !audioReady();
     setHidden(m.strip.soundBar, !needSound);
-    setHidden(m.strip.el, top.length === 0 && !needSound);
+    // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
+    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) : null;
+    setHidden(m.strip.pauseBar, !note);
+    if (note) setTxt(m.strip.pauseBar.querySelector('.fl-strip-pause-t'), note);
+    setHidden(m.strip.el, top.length === 0 && !needSound && !note);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
       setHidden(r.el, !d);
@@ -24900,6 +24936,7 @@ a.of-nav:active { background: var(--press); }
       { key: 'dayStartHour', name: 'Service day starts at', min: 0, max: 8, mean: 'A sale rung up before this hour counts toward the day before. A 12:45 am sale still belongs to last night.' },
       { key: 'openHour', name: 'Opens at', min: 0, max: 23, mean: 'The first hour of service.' },
       { key: 'closeHour', name: 'Closes at', min: 1, max: 30, mean: 'The last hour of service. 25 means 1 am the next day.' },
+      { key: 'soundStartHour', name: 'Warnings start at', min: 0, max: 23, mean: 'Warning sounds start at this hour, or at opening if that is earlier. Set it to when the pit master starts. Before it the strip says sound is paused.' },
     ];
     const hgrid = h('div', { class: 'od-fgrid' });
     const hf = hours.map((p) => {
@@ -24919,7 +24956,17 @@ a.of-nav:active { background: var(--press); }
       hgrid.appendChild(f.el);
       return { f, p };
     });
-    pn.body.append(hgrid, sst.el);
+    // Lets warning sounds play at any hour, not only between the start hour and closing.
+    const outTog = SB.ui.toggle({
+      label: 'Warnings may sound outside open hours', checked: !!((cur() || {}).settings.service || {}).soundOutsideHours,
+      // Saves the choice as a service setting and confirms it in words.
+      onChange: (v) => {
+        const r = send('updateSettings', { patch: { service: { soundOutsideHours: v } } });
+        if (good(r)) sst.ok(v ? 'Warnings may now sound at any hour.' : 'Warnings sound only from the start hour to closing.');
+        else { outTog.setValue(!v); sst.bad(refusal(r, { name: 'Sound outside open hours' })); }
+      },
+    });
+    pn.body.append(hgrid, h('div', { class: 'od-toggle-row' }, outTog), sst.el);
 
     // Sales tax: one rate that is added to every order when it is paid.
     pn.body.appendChild(sub('Sales tax'));

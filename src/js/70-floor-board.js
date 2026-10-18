@@ -1068,16 +1068,19 @@
     const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', hidden: true, onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); chime(); speak('Sound is on.'); } },
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     el.appendChild(soundBar);
+    // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
+    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', hidden: true, onClick: () => openSheet('menu') }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
+    el.appendChild(pauseBar);
     for (let i = 0; i < 3; i++) {
       const when = h('span', { class: 'fl-strip-when num' }), what = h('span', { class: 'fl-strip-what' }), why = h('span', { class: 'fl-strip-why' });
       // Acknowledges this row, then opens the hold cabinet on its batch, or just the cabinet when it is not about one batch.
       const openRow = () => { const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (r.batchId) openHoldFor(r.batchId); else openSheet('hold'); };
-      const row = h('button', { type: 'button', class: 'fl-strip-row', hidden: true, onClick: openRow },
+      const row = h('button', { type: 'button', class: 'fl-strip-row', hidden: true, dataset: { i: String(i) }, onClick: openRow },
         when, h('span', { class: 'fl-strip-text' }, what, why));
       rows.push({ el: row, when, what, why, key: '', batchId: null });
       el.appendChild(row);
     }
-    return { el, rows, soundBar };
+    return { el, rows, soundBar, pauseBar };
   }
   // Opens the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { if (SB.sheets) SB.sheets.open('hold', { batchId }); } catch (e) { console.error('[smokebox] sheet failed', e); } }
@@ -1149,7 +1152,11 @@
     const top = feed.slice(0, 3);
     const needSound = sound && !audioReady();
     setHidden(m.strip.soundBar, !needSound);
-    setHidden(m.strip.el, top.length === 0 && !needSound);
+    // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
+    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) : null;
+    setHidden(m.strip.pauseBar, !note);
+    if (note) setTxt(m.strip.pauseBar.querySelector('.fl-strip-pause-t'), note);
+    setHidden(m.strip.el, top.length === 0 && !needSound && !note);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
       setHidden(r.el, !d);

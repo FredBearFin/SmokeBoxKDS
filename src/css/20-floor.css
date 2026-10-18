@@ -65,9 +65,10 @@
 .fl-strip-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
 .fl-strip-what { font-size: calc(22px * var(--fl-k)); font-weight: 700; line-height: 1.15; }
 .fl-strip-why { font-size: calc(17px * var(--fl-k)); line-height: 1.25; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-@media (max-height: 820px) { .fl-strip-row:nth-child(n+3) { display: none; } .fl-strip-when { font-size: calc(28px * var(--fl-k)); } }
+@media (max-height: 820px) { .fl-strip-row[data-i="2"] { display: none; } .fl-strip-when { font-size: calc(28px * var(--fl-k)); } }
 .fl-strip-sound { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 8px var(--sp-4); border: 0; background: var(--ink); color: var(--bg); font: inherit; font-size: calc(18px * var(--fl-k)); font-weight: 700; text-align: left; cursor: pointer; }
 .fl-strip-sound[hidden] { display: none; }
+.fl-strip-pause { background: var(--sub); color: var(--ink); border-bottom: 1px solid var(--line); font-weight: 600; }
 .fl-strip-row:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -4px; }
 
 /* The header: brand, station tabs, status chips, tool buttons, New ticket and Menu. */

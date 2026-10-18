@@ -173,7 +173,9 @@
   // compares 86 times with closeHour.
   // taxRatePct is the sales tax in percent added to an order when it is paid. 0 means no tax is added. The owner
   // sets the real local rate; Smokebox does not know it.
-  C.service = { dayStartHour: 4, openHour: 11, closeHour: 21, taxRatePct: 0 };
+  // soundStartHour is when warning sounds may start (never later than opening, so a pit master who starts at 4 am can
+  // hear them); soundOutsideHours lets them sound at any hour. Outside that window the strip shows a note instead.
+  C.service = { dayStartHour: 4, openHour: 11, closeHour: 21, taxRatePct: 0, soundStartHour: 11, soundOutsideHours: false };
 
   /* ---------- food safety. Owner-editable inside safetyBounds (hotHoldF can never go below 135, same rule as Pitcall). ---------- */
   // Food-safety limits, in hours, degrees Fahrenheit and minutes. The owner can change them only inside
