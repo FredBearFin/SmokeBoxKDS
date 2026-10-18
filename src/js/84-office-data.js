@@ -700,7 +700,7 @@
     });
     fields.push(cost);
     // Pull size: the set amount one Pull button takes out of the hold cabinet (one whole brisket, one rack, one pan).
-    let pull = null;
+    let pull = null, holdF = null, restF = null, basisSeg = null;
     if (ing0.tcs) {
       const pullMeta = { name: 'The pull size', unit: 'g' };
       pull = numField({
@@ -712,6 +712,31 @@
         save: (v) => mkPatch({ pullG: v }, 'Saved. One tap on Pull takes ' + amountText(ing0, v) + ' out of the cabinet.', pullMeta), onSaved: (t) => status.ok(t),
       });
       fields.push(pull);
+      // Hold window: how long a batch may stay, how long it rests first, and what kind of limit it is.
+      const holdMeta = { name: 'The hold limit', unit: 'h' }, restMeta = { name: 'The rest time', unit: 'h' };
+      holdF = numField({
+        label: 'Hold limit (hours in the cabinet)', aria: 'Hold limit of ' + nm, value: ing0.maxHoldH || 4, min: 0.5, max: 12, step: 0.5, big: 1, unit: 'h', meta: holdMeta,
+        hint: 'A batch is thrown out this long after it goes in. Starter limit: owner to confirm.',
+        // The hold limit saves through the engine like the other fields.
+        save: (v) => mkPatch({ maxHoldH: v }, 'Saved. New batches of ' + lower1(nm) + ' are thrown out ' + v + ' hours after they go in.', holdMeta), onSaved: (t) => status.ok(t),
+      });
+      restF = numField({
+        label: 'Rest before serving (hours)', aria: 'Rest time of ' + nm, value: ing0.restH || 0, min: 0, max: 12, step: 0.5, big: 1, unit: 'h', meta: restMeta,
+        hint: 'A fresh batch rests this long before it is ready. Pulls take ready batches first.',
+        // The rest time saves the same way.
+        save: (v) => mkPatch({ restH: v }, 'Saved. New batches of ' + lower1(nm) + ' rest ' + v + ' hours before they are ready.', restMeta), onSaved: (t) => status.ok(t),
+      });
+      basisSeg = SB.ui.segmented({
+        label: 'Kind of hold limit for ' + nm, value: ing0.holdBasis === 'safety' ? 'safety' : 'quality',
+        options: [{ id: 'quality', label: 'Quality limit' }, { id: 'safety', label: 'Safety limit' }],
+        // Marks the limit as a house quality limit or as time as a public health control.
+        onChange: (v) => {
+          const r = send('updateIngredient', { id, patch: { holdBasis: v } });
+          if (good(r)) status.ok('Saved. The limit is a ' + v + ' limit.');
+          else { basisSeg.setValue(getIng().holdBasis === 'safety' ? 'safety' : 'quality'); status.bad(refusal(r, null)); }
+        },
+      });
+      fields.push(holdF, restF);
     }
 
     let yieldBlock = null, yField = null, yConf = null;
@@ -753,7 +778,9 @@
         h('div', { class: 'od-block' }, thr.el),
         yieldBlock,
         h('div', { class: 'od-block' }, cost.el),
-        pull ? h('div', { class: 'od-block' }, pull.el) : null),
+        pull ? h('div', { class: 'od-block' }, pull.el) : null,
+        holdF ? h('div', { class: 'od-block' }, holdF.el, basisSeg) : null,
+        restF ? h('div', { class: 'od-block' }, restF.el) : null),
       noteEl, status.el);
     return {
       root, id,
@@ -761,6 +788,7 @@
       sync(ing) {
         par.sync(ing.parG); thr.sync(ing.thresholdG); cost.sync(ing[costKey] || 0);
         if (pull) pull.sync(ing.pullG || 1000);
+        if (holdF) { holdF.sync(ing.maxHoldH || 4); restF.sync(ing.restH || 0); basisSeg.setValue(ing.holdBasis === 'safety' ? 'safety' : 'quality'); }
         if (yField) { yField.sync(ing.yield); yConf.setValue(ing.yieldConfirmed ? 'confirmed' : 'starter'); }
         root.dataset.confirmed = ing.yieldConfirmed ? 'true' : 'false';
       },

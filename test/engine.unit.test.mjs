@@ -424,8 +424,10 @@ test('tick: CHECK_TEMP after 30 min, expiry discard after 4 h; same reference wh
   const r1 = k.tickAt(T0 + 30 * MIN + 1);
   assert.ok(r1.events.filter((e) => e.type === 'batch_status' && e.to === 'check').length === 10);
   assert.equal(E.tick(k.s, T0 + 31 * MIN).state, k.s, 'check status is stable: no re-evaluation storm');
+  // Eight products have the 4-hour limit; brisket and pulled pork have 8 hours.
   const r2 = k.tickAt(T0 + 4 * HR + 1);
-  assert.equal(r2.events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 10);
+  assert.equal(r2.events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 8);
+  assert.equal(k.tickAt(T0 + 8 * HR + 1).events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 2);
   assert.equal(k.s.avail.brisket_half.reason, 'safety');
   assert.equal(k.s.avail.tea.ok, true);
 });
@@ -969,7 +971,7 @@ test('migration: an old save with the 30-minute default moves to 2 hours once; c
 test('stagger: starter batches get different ages, the oldest nearest its limit, and no check is due at open', () => {
   const s = E.newState({ now: T0, stagger: true });
   const age = (id) => (T0 - s.batches.find((b) => b.ing === id).enteredAt) / MIN;
-  assert.equal(age('brisket'), 215);
+  assert.equal(age('brisket'), 455);
   assert.equal(age('pudding'), 20);
   assert.equal(new Set(s.batches.map((b) => b.enteredAt)).size, 10);
   assert.deepEqual(E.checkInvariants(s, T0), []);

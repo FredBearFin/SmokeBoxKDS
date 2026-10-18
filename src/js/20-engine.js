@@ -826,8 +826,8 @@
     for (let i = 0; i < bs.length; i++) if (bs[i].status !== 'discard') refreshBatch(tx, i);
   }
 
-  // Takes up to `need` grams of a TCS ingredient from the oldest servable batches first (FIFO). Locked and
-  // cooling batches are never used (I8). Returns the records of what was taken, its cost, and what is still
+  // Takes up to `need` grams of a TCS ingredient from the oldest ready batch first (FIFO), and from batches still
+  // resting only when nothing ready is left. Locked and cooling batches are never used (I8). Returns the records of what was taken, its cost, and what is still
   // missing.
   function takeFifoInto(tx, ing, need) {
     const recs = [];
@@ -836,7 +836,9 @@
     const cand = [];
     for (let i = 0; i < bs.length; i++) { const b = bs[i]; if (b.ing === ing.id && servableBatch(b)) cand.push(i); }
     // Oldest batch first; equal times go to the earlier position in the list.
-    cand.sort((a, b2) => (bs[a].enteredAt - bs[b2].enteredAt) || (a - b2));
+    // Batches still resting come after every ready batch, whatever their age; each group is oldest first.
+    const resting = (b) => (isNum(b.restUntil) && b.restUntil > tx.now ? 1 : 0);
+    cand.sort((a, b2) => (resting(bs[a]) - resting(bs[b2])) || (bs[a].enteredAt - bs[b2].enteredAt) || (a - b2));
     for (const bi of cand) {
       if (need <= EPS) break;
       const b = tx.get('batches')[bi];
@@ -1518,6 +1520,8 @@
       enteredAt: tx.now, cookedG: o.cookedG, remainingG: o.cookedG, src: o.src, temps: [], reheats: 0,
       maxHoldH: isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH, status: 'ok', action: 'NONE', canServe: true,
     };
+    b.holdBasis = ing.holdBasis === 'safety' ? 'safety' : 'quality';
+    if (isNum(ing.restH) && ing.restH > 0) b.restUntil = tx.now + ing.restH * H;
     if (isNum(o.rawG)) b.rawG = o.rawG;
     if (isNum(o.yieldPct)) b.yieldPct = o.yieldPct;
     if (isNum(o.costPerCookedKg)) b.costPerCookedKg = o.costPerCookedKg;
@@ -1778,7 +1782,7 @@
     service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20) },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
       defaultMaxHoldH: B('defaultMaxHoldH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
-      cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' } },
+      cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' }, holdWindowV2: { t: 'bool' } },
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
     syncTargetSec: R(10, 600),
@@ -1899,6 +1903,7 @@
   const ING_PATCH = {
     name: { t: 'text', max: 60 }, thresholdG: R(0, 1e6), parG: R(0, 1e7), yield: R(0.05, 3), yieldConfirmed: { t: 'bool' },
     costPerKg: R(0, 10000), costEach: R(0, 10000), pullG: R(50, 50000),
+    maxHoldH: R(0.5, 12), restH: R(0, 12), holdBasis: { t: 'enum', v: ['quality', 'safety'] },
   };
   // Shared editor for menu items and ingredients. Checks each field, ignores unchanged ones (nothingToDo if
   // nothing changed), writes one new copy and logs settings_changed. Changing a starter prep time re-fits
@@ -2696,6 +2701,12 @@
       if (isObj(savedSet.safety) && !hasOwn(savedSet.safety, 'tempIntervalV2') && savedSet.safety.tempCheckEveryMin === 30) {
         savedSet.safety = Object.assign({}, savedSet.safety); delete savedSet.safety.tempCheckEveryMin; repaired.push('settings.safety.tempCheckEveryMin moved to the new default');
       }
+      // Saves from before per-product hold limits cap every batch at a flat 4 hours. Lift that cap once, and give
+      // brisket and pulled pork their longer limit if they still have the old 4; values the owner chose stay.
+      const holdMigrate = !(isObj(savedSet.safety) && hasOwn(savedSet.safety, 'holdWindowV2'));
+      if (holdMigrate && isObj(savedSet.safety) && savedSet.safety.defaultMaxHoldH === 4) {
+        savedSet.safety = Object.assign({}, savedSet.safety); delete savedSet.safety.defaultMaxHoldH; repaired.push('settings.safety.defaultMaxHoldH moved to the new default');
+      }
       repairInto(settings, savedSet, SET_SCHEMA, 'settings', repaired);
       if (!(settings.service.openHour < settings.service.closeHour)) { settings.service = Object.assign({}, C.service); repaired.push('settings.service reset'); }
       if (!(settings.safety.cooling.stage1H < settings.safety.cooling.totalH)) { settings.safety.cooling = Object.assign({}, C.safety.cooling); repaired.push('settings.safety.cooling reset'); }
@@ -2709,6 +2720,8 @@
         // For known ingredients the safety class, unit and hold type always come from the config, so an
         // edited file cannot turn a TCS food into an unchecked one.
         if (base) { out.tcs = base.tcs; out.unit = base.unit; out.hold = base.hold; out.thermal = base.thermal; }
+        if (out.tcs && out.holdBasis !== 'safety') out.holdBasis = 'quality';
+        if (holdMigrate && base && x.maxHoldH === 4 && isNum(base.maxHoldH) && base.maxHoldH > 4) out.maxHoldH = base.maxHoldH;
         if (typeof out.tcs !== 'boolean' || (out.unit !== 'g' && out.unit !== 'ea') || typeof out.name !== 'string') { repaired.push('dropped ingredient ' + x.id); continue; }
         for (const k of Object.keys(ING_PATCH)) if (ING_PATCH[k].t === 'num' && out[k] !== undefined && checkLeaf(ING_PATCH[k], out[k], k)) { out[k] = base && base[k] !== undefined ? base[k] : undefined; if (out[k] === undefined) delete out[k]; repaired.push('ingredient ' + x.id + '.' + k + ' reset'); }
         if (out.tcs && out.hold !== 'hot' && out.hold !== 'cold') out.hold = 'hot';

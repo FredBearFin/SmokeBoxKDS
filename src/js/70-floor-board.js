@@ -1140,7 +1140,8 @@
     const all = SB.deadlines.build(store().getState(), now);
     const perfNow = performance.now();
     const calls = [];
-    all.forEach((d) => { const c = announce(d, perfNow); if (c) calls.push(c); });
+    // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
+    if (SB.deadlines.soundsAllowed(store().getState(), now)) all.forEach((d) => { const c = announce(d, perfNow); if (c) calls.push(c); });
     playCalls(calls);
     // Info rows only show for batches and run-outs; an expired notice goes away once someone taps it.
     const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'runout') && !(d.kind === 'expired' && (ladder.get(d.id) || {}).ack));

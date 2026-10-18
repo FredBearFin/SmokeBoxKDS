@@ -77,8 +77,10 @@
       const name = ing ? ing.name : ingId;
       const list = byIng[ingId].slice().sort((a, b) => a.enteredAt - b.enteredAt);
       const rungs = rungsFor(ingId), rate = sales.rate[ingId];
+      // Only batches that have finished resting can be sold, so the run-out total counts those alone.
+      const isReady = (b) => !(U.isNum(b.restUntil) && b.restUntil > now);
       let soldBefore = 0, totalLeft = 0;
-      for (const b of list) totalLeft += b.remainingG;
+      for (const b of list) if (isReady(b)) totalLeft += b.remainingG;
       list.forEach((b, i) => {
         const exp = b.enteredAt + E()._internal.holdLimitMs(b, S);
         const msLeft = exp - now;
@@ -87,7 +89,9 @@
         // How much of this batch the sales pace will clear before it expires, after the older batches took theirs.
         let sold = 0, waste = null;
         if (rate !== undefined) {
-          sold = Math.max(0, Math.min(b.remainingG, rate * Math.max(0, msLeft) - soldBefore));
+          // A batch that is still resting can only sell from the moment it is ready.
+          const sellMs = Math.max(0, exp - Math.max(now, isReady(b) ? now : b.restUntil));
+          sold = Math.max(0, Math.min(b.remainingG, rate * sellMs - soldBefore));
           waste = b.remainingG - sold;
           soldBefore += sold;
         }
@@ -109,7 +113,7 @@
         }
       });
       // Run-out: when the whole stock of this item will be gone at the current pace.
-      if (rate !== undefined) {
+      if (rate !== undefined && totalLeft > 0) {
         const ms = totalLeft / rate;
         if (ms <= 2 * H) {
           const at = now + ms;
@@ -163,6 +167,15 @@
         consequence: late ? 'Food-contact surfaces are overdue for sanitizing.' : 'Food-contact surfaces are due for sanitizing at ' + U.fmtTime(C0.sanitizeDueAt) + '.', action: 'Sanitize and tick it off.', guess: false });
     }
   }
+  // True when warning sounds may play: the kitchen is open. Before opening and after closing the strip still
+  // shows the rows, but nothing beeps or speaks into an empty kitchen. Rungs missed while closed sound once at opening.
+  function soundsAllowed(state, now) {
+    if (!state || !U.isNum(now)) return false;
+    const sv = state.settings && state.settings.service ? state.settings.service : C.service;
+    const d = new Date(now);
+    const hr = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+    return (hr >= sv.openHour && hr < sv.closeHour) || (hr + 24 >= sv.openHour && hr + 24 < sv.closeHour);
+  }
   // Builds the feed: every deadline worth showing right now, worst first. Each row has id, kind, label, at,
   // msLeft, rung, sev (bad, warn, info), consequence and action. Batch rows also carry projected waste.
   function build(state, now) {
@@ -177,6 +190,6 @@
     out.sort((a, b) => (SEV_RANK[a.sev] - SEV_RANK[b.sev]) || (a.msLeft - b.msLeft) || (a.id < b.id ? -1 : 1));
     return out;
   }
-  // Public API: build(state, now) gives the sorted feed; rungOf and rungsFor are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate };
+  // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

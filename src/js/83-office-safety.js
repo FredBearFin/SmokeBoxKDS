@@ -400,7 +400,7 @@
           set('hot', 'Hot food stays at ' + T(S.hotHoldF) + ' or above', 'A pan reading below ' + T(S.hotHoldF) + ' must be reheated or thrown away. Food Code 3-501.16.');
           set('cold', 'Cold food stays at ' + T(S.coldHoldF) + ' or below', 'A pan reading above ' + T(S.coldHoldF) + ' must be chilled again or thrown away.');
           set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'A batch may be reheated one time. If it drops below the limit again it is thrown away. Food Code 3-403.11.');
-          set('hold', 'No more than ' + (S.defaultMaxHoldH) + ' hours in the cabinet', 'After that the batch is thrown away, whatever its temperature. Some items carry their own shorter or longer limit.');
+          set('hold', 'Each product has its own hold limit, never more than ' + (S.defaultMaxHoldH) + ' hours', 'After that the batch is thrown away, whatever its temperature. A quality limit is a house rule for food held at temperature; a safety limit is time as a health control. Brisket and pulled pork starter limits are placeholders for the owner to confirm.');
           set('grace', 'Grace of ' + S.belowHotGraceH + ' hours below ' + T(S.hotHoldF) + ' (cold food: ' + S.aboveColdGraceH + ' hours above ' + T(S.coldHoldF) + ')', 'The clock starts at the first reading outside the limit. After the grace time the batch is thrown away.');
           set('checks', 'A temperature reading every ' + U.minutesText(S.tempCheckEveryMin), 'A late reading is flagged and counted here. It does not stop service by itself.');
           set('sanitize', 'Sanitize food-contact surfaces every ' + S.sanitizeEveryH + ' hours', 'A late round is a warning on the line and counts against the score. Food Code 4-602.11.');

@@ -319,6 +319,9 @@
       const ring = h('div', { class: 'hc-ring', role: 'img' }, h('span', { class: 'hc-ring-in' }, ringT, ringS));
       const meter = SB.ui.meter({ value: 0, max: 1, label: 'Left in this batch' });
       const stockT = h('div', { class: 'hc-stock-t num' });
+      // Two extra facts: when to serve it by (and what kind of limit that is), and when it finishes resting.
+      const dtServe = h('dt', null, 'Serve by'), ddServe = h('dd', { class: 'num' }), dtRest = h('dt', null, 'Resting until'), ddRest = h('dd', { class: 'num' });
+      dtRest.hidden = true; ddRest.hidden = true;
       const ddLast = h('dd', { class: 'num' }), dtNext = h('dt'), ddNext = h('dd', { class: 'num' }), ddSince = h('dd', { class: 'num' });
       const costLine = h('p', { class: 'hc-cost', hidden: true });
       const msgIcon = h('span', { class: 'hc-msg-i' }), msgT = h('span', { class: 'hc-msg-t' });
@@ -339,9 +342,9 @@
         h('header', { class: 'hc-head' }, h('div', { class: 'hc-title' }, kindEl, name, srcChip), status),
         h('div', { class: 'hc-body' }, ring,
           h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
-            h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince))),
+            h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince, dtServe, ddServe, dtRest, ddRest))),
         costLine, msg, lock, cool, actions, editorSlot);
-      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
+      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, dtServe, ddServe, dtRest, ddRest, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
       bLog.addEventListener('click', () => toggleEditor(rec, 'log'));
       bReheat.addEventListener('click', () => toggleEditor(rec, 'reheat'));
       bCool.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openCooling(bb, bCool); });
@@ -352,7 +355,11 @@
     // True when this is the oldest batch of its ingredient that can still be served: the one a pull comes from.
     function isPullSource(b) {
       if (!(b.remainingG > 0) || b.canServe !== true || b.status === 'discard' || b.kind === 'cooling') return false;
-      return !st().batches.some((x) => x !== b && x.ing === b.ing && x.remainingG > 0 && x.canServe === true && x.status !== 'discard' && x.kind !== 'cooling' && x.enteredAt < b.enteredAt);
+      const now = nowMs();
+      // 1 while a batch is still resting, 0 once it is ready to serve.
+      const rest = (x) => (U.isNum(x.restUntil) && x.restUntil > now ? 1 : 0);
+      // The source is the first in line: ready batches before resting ones, then the oldest.
+      return !st().batches.some((x) => x !== b && x.ing === b.ing && x.remainingG > 0 && x.canServe === true && x.status !== 'discard' && x.kind !== 'cooling' && (rest(x) < rest(b) || (rest(x) === rest(b) && x.enteredAt < b.enteredAt)));
     }
     // Takes one set unit (the product's pull size) out of the cabinet, oldest batch first, with Undo.
     function pullFrom(b) {
@@ -404,6 +411,13 @@
       // facts
       text(rec.ddLast, U.isNum(b.lastTempF) ? fmtF(b.lastTempF) + ', ' + agoText(now - b.lastTempAt) : 'No reading yet');
       text(rec.ddSince, U.fmtTime(b.enteredAt));
+      // Serve-by time with the kind of limit it is: quality (house limit, held at temperature) or safety (time as a health control).
+      const coolingNow = b.kind === 'cooling';
+      setHidden(rec.dtServe, coolingNow); setHidden(rec.ddServe, coolingNow);
+      if (!coolingNow) text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b)) + ', ' + (b.holdBasis === 'safety' ? 'safety limit' : 'quality limit'));
+      const resting = U.isNum(b.restUntil) && b.restUntil > now && !coolingNow;
+      setHidden(rec.dtRest, !resting); setHidden(rec.ddRest, !resting);
+      if (resting) text(rec.ddRest, U.fmtTime(b.restUntil));
       if (gt.action === 'REHEAT_IMMEDIATE' || gt.action === 'CHILL_NOW') {
         if (b.kind === 'cooling') { text(rec.dtNext, 'Next step'); text(rec.ddNext, U.isNum(gt.nextDeadlineAt) ? 'within ' + hmLong(gt.nextDeadlineAt - now) : 'now'); }
         else { text(rec.dtNext, 'Decide within'); text(rec.ddNext, U.isNum(gt.nextDeadlineAt) ? (gt.nextDeadlineAt - now > 0 ? hmLong(gt.nextDeadlineAt - now) : 'now') : 'now'); }
@@ -1556,7 +1570,7 @@
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + S.hotHoldF + ' °F, reheat to ' + S.reheatF + ' °F within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
         rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + S.hotHoldF + ' °F, not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
-        rule('package', 'Hold limit', 'A batch is discarded after ' + S.defaultMaxHoldH + ' hours in the cabinet, or less if its own limit is shorter.'),
+        rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by (quality limit for food held at temperature, safety limit for time as a health control). It is thrown out then, and never later than ' + S.defaultMaxHoldH + ' hours.'),
         rule('snow', 'Cooling', 'From ' + S.hotHoldF + ' °F to ' + c.stage1ToF + ' °F within ' + c.stage1H + ' hours, then to ' + c.finalF + ' °F within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
         rule('lock', 'Locked batches', 'A batch that is not safe to serve is locked. Nothing is taken from it, and menu items that need it show 86 safety hold.'),

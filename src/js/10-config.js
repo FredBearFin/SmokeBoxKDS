@@ -70,16 +70,16 @@
   // pricing.
   // audit:data-start
   C.ingredients = [
-    { id: 'brisket',  name: 'Brisket',          unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 14000, pullG: 4500, thresholdG: 700,  costPerKg: 24.36, thermal: true, yield: 0.55, yieldConfirmed: false, note: 'Starter cost: USDA average brisket $11.05/lb for the week ending 2026-09-25 (from the Pitcall notes), about $24.36/kg. Unverified here.' },
-    { id: 'pork',     name: 'Pulled pork',      unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 10000, pullG: 2500, thresholdG: 600,  costPerKg: 7.70,  yield: 0.55, yieldConfirmed: false },
-    { id: 'ribs',     name: 'St. Louis ribs',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 12000, pullG: 1200, thresholdG: 900,  costPerKg: 9.90,  yield: 0.62, yieldConfirmed: false },
-    { id: 'sausage',  name: 'Smoked sausage',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 6000, pullG: 1000,  thresholdG: 400,  costPerKg: 9.00,  yield: 0.90, yieldConfirmed: false },
-    { id: 'turkey',   name: 'Smoked turkey',    unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 5000, pullG: 1500,  thresholdG: 500,  costPerKg: 11.00, yield: 0.70, yieldConfirmed: false },
-    { id: 'mac',      name: 'Mac and cheese',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.60,  yield: 1,    yieldConfirmed: false },
-    { id: 'beans',    name: 'Pit beans',        unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.00,  yield: 1,    yieldConfirmed: false },
-    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 7000, pullG: 1500,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
-    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 6000, pullG: 1500,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
-    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 5000, pullG: 1500,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
+    { id: 'brisket',  name: 'Brisket',          unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 8, holdBasis: 'quality', restH: 3, parG: 14000, pullG: 4500, thresholdG: 700,  costPerKg: 24.36, thermal: true, yield: 0.55, yieldConfirmed: false, note: 'Starter cost: USDA average brisket $11.05/lb for the week ending 2026-09-25 (from the Pitcall notes), about $24.36/kg. Unverified here.' },
+    { id: 'pork',     name: 'Pulled pork',      unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 8, holdBasis: 'quality', restH: 1, parG: 10000, pullG: 2500, thresholdG: 600,  costPerKg: 7.70,  yield: 0.55, yieldConfirmed: false },
+    { id: 'ribs',     name: 'St. Louis ribs',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', restH: 0.5, parG: 12000, pullG: 1200, thresholdG: 900,  costPerKg: 9.90,  yield: 0.62, yieldConfirmed: false },
+    { id: 'sausage',  name: 'Smoked sausage',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', parG: 6000, pullG: 1000,  thresholdG: 400,  costPerKg: 9.00,  yield: 0.90, yieldConfirmed: false },
+    { id: 'turkey',   name: 'Smoked turkey',    unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', parG: 5000, pullG: 1500,  thresholdG: 500,  costPerKg: 11.00, yield: 0.70, yieldConfirmed: false },
+    { id: 'mac',      name: 'Mac and cheese',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.60,  yield: 1,    yieldConfirmed: false },
+    { id: 'beans',    name: 'Pit beans',        unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.00,  yield: 1,    yieldConfirmed: false },
+    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', parG: 7000, pullG: 1500,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
+    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', parG: 6000, pullG: 1500,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
+    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', parG: 5000, pullG: 1500,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
     { id: 'cornbread', name: 'Cornbread',       unit: 'ea', tcs: false, parG: 120,   thresholdG: 8,   costEach: 0.45 },
     { id: 'buns',     name: 'Buns',             unit: 'ea', tcs: false, parG: 150,   thresholdG: 10,  costEach: 0.38 },
     { id: 'pickles',  name: 'Pickle chips',     unit: 'g',  tcs: false, parG: 6000,  thresholdG: 300,  costPerKg: 4.20 },
@@ -190,9 +190,10 @@
     belowHotGraceH: 2,      // below 135F for more than this -> discard (reheat only allowed inside it)
     aboveColdGraceH: 4,     // above 41F for more than this -> discard
     cooling: { stage1ToF: 70, stage1H: 2, totalH: 6, finalF: 41 }, // 135->70 in 2h, then 70->41 inside 4 more (6h total) (3-501.14)
-    defaultMaxHoldH: 4,     // total time in the hold cabinet before discard
+    defaultMaxHoldH: 12,    // longest any batch may stay in the cabinet (its maximum, so it no longer caps: each product has its own limit)
     tempCheckEveryMin: 120, // a temperature reading is due this often (2 h; the FDA minimum is 4 h)
     sanitizeEveryH: 4,      // food-contact surfaces (4-602.11)
+    holdWindowV2: true,     // marks settings made after the hold limit moved from a flat 4 hours to per-product limits
     tempIntervalV2: true,   // marks settings made after the check interval default moved from 30 to 120 minutes
   };
   // Minutes before a batch's deadline at which each warning rung fires: a soft chime, then a spoken call, then
@@ -202,7 +203,7 @@
   // How old each demo starter batch is, in minutes, when a fresh demo kitchen opens. Spread out on purpose so the
   // batches do not all expire at once and the first run shows the warnings working: brisket is the one nearest
   // its 4-hour limit. Ingredients not listed start fresh.
-  C.starterAgeMin = { brisket: 215, pork: 190, slaw: 160, ribs: 150, sausage: 120, potato: 100, turkey: 95, mac: 70, beans: 45, pudding: 20 };
+  C.starterAgeMin = { brisket: 455, pork: 410, slaw: 160, ribs: 150, sausage: 120, potato: 100, turkey: 95, mac: 70, beans: 45, pudding: 20 };
   // The allowed range for each owner-editable safety number, as [lowest, highest]. The legal limits are
   // fixed ends: hot hold never below 135 F, cold hold never above 41 F, reheat never below 165 F. The two
   // grace periods and the sanitise interval can be shortened but never lengthened past their defaults. Hold
@@ -212,6 +213,12 @@
     defaultMaxHoldH: [0.5, 12], tempCheckEveryMin: [10, 240], sanitizeEveryH: [1, 4],
   };
 
+  // Hold window per product (starter placeholders, owner to confirm; no source gives a maximum hold time):
+  // maxHoldH is how long a batch may stay in the cabinet before it is thrown out, counted from when it goes in.
+  // Brisket and pulled pork get 8 hours, everything else 4. restH is how long a fresh batch rests before it is
+  // ready to serve (brisket 3 h, pulled pork 1 h, ribs 30 min; the research gives 2 to 4 h for large cuts and
+  // 30 to 60 min for ribs). holdBasis says what the limit is: "quality" (a house limit for food held at
+  // temperature, hot at 135 F or above) or "safety" (time as a public health control, no temperature control).
   // pullG on an ingredient is the set amount one Pull button moves out of the cabinet (one whole brisket, one rack,
   // one pan), in grams. Starter estimates: the owner sets the real unit.
   // Brisket cooked yield, from the Texas A&M AgriLife regression in the research report. Used only for
