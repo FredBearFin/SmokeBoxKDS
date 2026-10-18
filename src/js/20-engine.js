@@ -1981,7 +1981,6 @@
     office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' } },
     alerts: { ladderThresholds: { t: 'ladder' } },
   };
-  /** Validates one leaf; returns null when fine, else { report, key, min?, max? }. */
   // Checks one list of warning minutes: 1 to 5 whole numbers, strictly falling, each from 5 to 240 (the last warning
   // needs time to act on).
   function checkLadderList(list, key) {
@@ -2007,6 +2006,7 @@
     }
     return null;
   }
+  // Validates one leaf of the settings; returns null when fine, else { report, key, min?, max? }.
   function checkLeaf(spec, v, key) {
     if (spec.t === 'bool') return typeof v === 'boolean' ? null : { report: 'badPatch', key };
     if (spec.t === 'enum') return typeof v === 'string' && spec.v.indexOf(v) >= 0 ? null : { report: 'badPatch', key };
