@@ -596,6 +596,37 @@
     // Explains the two-stage cooling rule and, on confirm, moves the whole batch into cooling.
     // Browser-storage key for the initials typed when a batch is kept serving; remembered per tablet.
     const KEY_WHO = 'smokebox.v1.initials';
+    // Initials stay on the tablet for 2 hours of the app clock after their last use, so a shared tablet does not carry one person's name into the next shift.
+    const WHO_IDLE_MS = 2 * 3600e3;
+    // The remembered initials, or empty when none are saved or they have sat idle for more than 2 hours.
+    function savedWho() {
+      const v = U.storage.get(KEY_WHO, null);
+      if (!v || typeof v !== 'object' || typeof v.who !== 'string' || !U.isNum(v.at)) return '';
+      const age = nowMs() - v.at;
+      return age >= 0 && age <= WHO_IDLE_MS ? v.who : '';
+    }
+    // Remembers the initials just used, with the time of use.
+    function saveWho(who) { U.storage.set(KEY_WHO, { who, at: nowMs() }); }
+    // The initials box for a confirm dialog: prefilled from the tablet's memory, with a "Not FW?" link that clears it.
+    // The confirm button reads "<verb> as FW" and stays disabled while the box is empty.
+    function whoField(dl, verb) {
+      const pre = savedWho();
+      const input = h('input', { class: 'input', type: 'text', maxlength: '12', autocomplete: 'off', value: pre, placeholder: 'Your initials', 'aria-label': 'Your initials' });
+      const not = h('button', { type: 'button', class: 'btn btn-ghost', dataset: { act: 'not-me' } });
+      const label = dl.ok.querySelector('span');
+      // Keeps the button wording, its enabled state and the link in step with the box.
+      const paint = () => {
+        const w = input.value.trim();
+        text(label, w ? verb + ' as ' + w : verb);
+        dl.ok.disabled = !w;
+        text(not, 'Not ' + pre + '?');
+        setHidden(not, !pre || input.value !== pre);
+      };
+      input.addEventListener('input', paint);
+      not.addEventListener('click', () => { input.value = ''; paint(); input.focus(); });
+      paint();
+      return { input, el: h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'Who tasted it'), input, not), get: () => input.value.trim() };
+    }
     // True when a batch has a reading that allows keeping it on the menu: in range and inside the check interval.
     function keepReady(b) {
       const S = safety();
@@ -619,20 +650,20 @@
       });
       const dur = SB.ui.segmented({ label: 'How long', value: '30', options: [{ id: '30', label: '30 minutes' }, { id: '60', label: '1 hour' }, { id: 'until', label: 'Until a time' }] });
       const untilIn = h('input', { class: 'input', type: 'time', 'aria-label': 'Keep serving until', hidden: true });
-      const who = h('input', { class: 'input', type: 'text', maxlength: '12', autocomplete: 'off', value: U.storage.get(KEY_WHO, '') || '', placeholder: 'Your initials', 'aria-label': 'Your initials' });
       const err = h('div', { class: 'fs-note', 'data-tone': 'bad', role: 'alert', hidden: true });
+      let wf = null;
       dur.addEventListener('click', () => setTimeout(() => { untilIn.hidden = dur.getValue() !== 'until'; }, 0));
       const dl = dialog({
         title: 'Taste it and keep serving', name: 'keep', opener, confirmLabel: 'Keep serving', icon: 'check-circle',
         body: [
           h('p', null, 'Past its quality limit means the food is off the menu until someone tastes it. If it is still good, keep it on the menu for a set time. Your local health department\'s rules apply to quality extensions.'),
-          list, h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'How long'), dur, untilIn), h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'Who tasted it'), who), err,
+          list, h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'How long'), dur, untilIn), err,
         ],
         // Sends the ticked batches to the engine with the chosen length and the initials, then reports what was kept.
         onConfirm: (sh) => {
           const ids = past.filter((x) => picks.get(x.id).checked).map((x) => x.id);
           if (!ids.length) { err.textContent = 'Tick at least one batch. A batch needs a fresh temperature reading first.'; err.hidden = false; return; }
-          const payload = { batchIds: ids, who: who.value.trim() };
+          const payload = { batchIds: ids, who: wf.get() };
           const mode = dur.getValue();
           if (mode === 'until') {
             const [hh, mm] = (untilIn.value || '').split(':').map(Number);
@@ -643,29 +674,34 @@
           } else payload.forMin = Number(mode);
           const res = run('keepServing', payload);
           if (res.report !== 'ok') { err.textContent = say(res); err.hidden = false; return; }
-          U.storage.set(KEY_WHO, payload.who);
+          saveWho(payload.who);
           sh.close('confirm');
           const n = res.info.kept.length, sk = res.info.skipped.length;
           toast(n + ' ' + plural(n, 'batch') + ' kept serving until ' + U.fmtTime(res.info.until) + '.' + (sk ? ' ' + sk + ' skipped.' : ''), sk ? 'warn' : 'ok');
           update(nowMs());
         },
       });
+      wf = whoField(dl, 'Keep serving');
+      dl.copy.insertBefore(wf.el, err);
       return dl;
     }
     // Corrects a mistaken keep-serving: asks for initials and logs the correction; the original entry stays.
     function openUnkeep(id, opener) {
       const b = batchOf(id); if (!b) return;
-      const who = h('input', { class: 'input', type: 'text', maxlength: '12', autocomplete: 'off', value: U.storage.get(KEY_WHO, '') || '', placeholder: 'Your initials', 'aria-label': 'Your initials' });
-      dialog({
+      let wf = null;
+      const dl = dialog({
         title: 'Correct: not kept serving', name: 'unkeep', opener, confirmLabel: 'Put back past limit', icon: 'x',
-        body: ['This puts ' + (b.label || 'the batch') + ' back past its quality limit. The earlier entry stays in the log, with this correction beside it.', who],
+        body: ['This puts ' + (b.label || 'the batch') + ' back past its quality limit. The earlier entry stays in the log, with this correction beside it.'],
         // Logs the correction through the engine and closes the dialog.
         onConfirm: (sh) => {
-          const res = run('endKeepServing', { batchId: id, who: who.value.trim(), note: 'Corrected from the cabinet card' });
+          const res = run('endKeepServing', { batchId: id, who: wf.get(), note: 'Corrected from the cabinet card' });
           if (res.report !== 'ok') { toast(say(res), 'warn'); return; }
+          saveWho(wf.get());
           sh.close('confirm'); update(nowMs());
         },
       });
+      wf = whoField(dl, 'Put back past limit');
+      dl.copy.appendChild(wf.el);
     }
     function openCooling(b, opener) {
       const S = safety(), c = S.cooling || C.safety.cooling, label = b.label || 'Batch', ing = ingOf(b.ing);
