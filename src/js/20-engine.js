@@ -3010,6 +3010,6 @@
     findOrder: (state, id) => (isState(state) && Array.isArray(state.orders) ? state.orders[findOrderIdx(state.orders, id)] : undefined),
     REPORTS, REPORT_IDS, ACTIONS, UNDOABLE, DISCARD_REASONS,
     helpers: { stampAfter, hashStr, qtyScale, estimate, syncDelayMs, nominalUnitCost },
-    _internal: { statusDeadline, nextDue, activeIdx, ledgerCheck, EVENT_CHUNK },
+    _internal: { statusDeadline, nextDue, activeIdx, ledgerCheck, holdLimitMs, EVENT_CHUNK },
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);

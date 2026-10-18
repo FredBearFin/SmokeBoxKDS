@@ -1311,6 +1311,24 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 @media (min-width: 1700px) { .fl { --fl-k: 1.2; } }
 @media (min-width: 2200px) { .fl { --fl-k: 1.5; } }
 
+/* The attention strip: the most urgent deadlines, big enough to read from across the kitchen. */
+.fl-strip { flex: none; display: flex; flex-direction: column; background: var(--sub); border-bottom: 2px solid var(--line); }
+.fl-strip[hidden], .fl-strip-row[hidden] { display: none; }
+.fl-strip-row {
+  display: flex; align-items: center; gap: calc(16px * var(--fl-k)); width: 100%; min-height: 56px; text-align: left;
+  padding: calc(8px * var(--fl-k)) var(--sp-4); border: 0; border-left: calc(10px * var(--fl-k)) solid var(--line);
+  background: transparent; color: var(--ink); font: inherit; cursor: pointer;
+}
+.fl-strip-row + .fl-strip-row { border-top: 1px solid var(--line); }
+.fl-strip-row[data-tone="warn"] { border-left-color: var(--amber); background: var(--tint-warn); }
+.fl-strip-row[data-tone="bad"] { border-left-color: var(--danger); background: var(--tint-bad); }
+.fl-strip-when { flex: none; min-width: 5.2ch; font-size: calc(34px * var(--fl-k)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.fl-strip-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.fl-strip-what { font-size: calc(22px * var(--fl-k)); font-weight: 700; line-height: 1.15; }
+.fl-strip-why { font-size: calc(17px * var(--fl-k)); line-height: 1.25; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+@media (max-height: 820px) { .fl-strip-row:nth-child(n+3) { display: none; } .fl-strip-when { font-size: calc(28px * var(--fl-k)); } }
+.fl-strip-row:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -4px; }
+
 /* The header: brand, station tabs, status chips, tool buttons, New ticket and Menu. */
 .fl-head {
   position: relative; z-index: var(--zi-header); flex: none;
@@ -3540,6 +3558,8 @@ a.of-nav:active { background: var(--press); }
   U.round = (n, d = 0) => { const f = Math.pow(10, d); return Math.round(n * f) / f; };
   // Picks the singular or plural word for a count. "many" defaults to the singular plus "s".
   U.plural = (n, one, many) => (n === 1 ? one : many || one + 's');
+  // Words for a number of minutes: "30 minutes", "1 hour", "2 hours", "90 minutes".
+  U.minutesText = (m) => (m >= 60 && m % 60 === 0 ? (m / 60) + ' ' + U.plural(m / 60, 'hour') : m + ' ' + U.plural(m, 'minute'));
   // Makes a fully independent copy of plain data, so changing the copy never changes the original.
   U.clone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
   // Wraps fn so a burst of calls becomes one run, ms after the last call.
@@ -4037,16 +4057,16 @@ a.of-nav:active { background: var(--press); }
   // pricing.
   // audit:data-start
   C.ingredients = [
-    { id: 'brisket',  name: 'Brisket',          unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 14000, thresholdG: 700,  costPerKg: 24.36, thermal: true, yield: 0.55, yieldConfirmed: false, note: 'Starter cost: USDA average brisket $11.05/lb for the week ending 2026-09-25 (from the Pitcall notes), about $24.36/kg. Unverified here.' },
-    { id: 'pork',     name: 'Pulled pork',      unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 10000, thresholdG: 600,  costPerKg: 7.70,  yield: 0.55, yieldConfirmed: false },
-    { id: 'ribs',     name: 'St. Louis ribs',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 12000, thresholdG: 900,  costPerKg: 9.90,  yield: 0.62, yieldConfirmed: false },
-    { id: 'sausage',  name: 'Smoked sausage',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 6000,  thresholdG: 400,  costPerKg: 9.00,  yield: 0.90, yieldConfirmed: false },
-    { id: 'turkey',   name: 'Smoked turkey',    unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 5000,  thresholdG: 500,  costPerKg: 11.00, yield: 0.70, yieldConfirmed: false },
-    { id: 'mac',      name: 'Mac and cheese',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 8000,  thresholdG: 500,  costPerKg: 3.60,  yield: 1,    yieldConfirmed: false },
-    { id: 'beans',    name: 'Pit beans',        unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 8000,  thresholdG: 500,  costPerKg: 3.00,  yield: 1,    yieldConfirmed: false },
-    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 7000,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
-    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 6000,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
-    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 5000,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
+    { id: 'brisket',  name: 'Brisket',          unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 14000, pullG: 4500, thresholdG: 700,  costPerKg: 24.36, thermal: true, yield: 0.55, yieldConfirmed: false, note: 'Starter cost: USDA average brisket $11.05/lb for the week ending 2026-09-25 (from the Pitcall notes), about $24.36/kg. Unverified here.' },
+    { id: 'pork',     name: 'Pulled pork',      unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 10000, pullG: 2500, thresholdG: 600,  costPerKg: 7.70,  yield: 0.55, yieldConfirmed: false },
+    { id: 'ribs',     name: 'St. Louis ribs',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 12000, pullG: 1200, thresholdG: 900,  costPerKg: 9.90,  yield: 0.62, yieldConfirmed: false },
+    { id: 'sausage',  name: 'Smoked sausage',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 6000, pullG: 1000,  thresholdG: 400,  costPerKg: 9.00,  yield: 0.90, yieldConfirmed: false },
+    { id: 'turkey',   name: 'Smoked turkey',    unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 5000, pullG: 1500,  thresholdG: 500,  costPerKg: 11.00, yield: 0.70, yieldConfirmed: false },
+    { id: 'mac',      name: 'Mac and cheese',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.60,  yield: 1,    yieldConfirmed: false },
+    { id: 'beans',    name: 'Pit beans',        unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.00,  yield: 1,    yieldConfirmed: false },
+    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 7000, pullG: 1500,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
+    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 6000, pullG: 1500,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
+    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 5000, pullG: 1500,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
     { id: 'cornbread', name: 'Cornbread',       unit: 'ea', tcs: false, parG: 120,   thresholdG: 8,   costEach: 0.45 },
     { id: 'buns',     name: 'Buns',             unit: 'ea', tcs: false, parG: 150,   thresholdG: 10,  costEach: 0.38 },
     { id: 'pickles',  name: 'Pickle chips',     unit: 'g',  tcs: false, parG: 6000,  thresholdG: 300,  costPerKg: 4.20 },
@@ -4158,18 +4178,29 @@ a.of-nav:active { background: var(--press); }
     aboveColdGraceH: 4,     // above 41F for more than this -> discard
     cooling: { stage1ToF: 70, stage1H: 2, totalH: 6, finalF: 41 }, // 135->70 in 2h, then 70->41 inside 4 more (6h total) (3-501.14)
     defaultMaxHoldH: 4,     // total time in the hold cabinet before discard
-    tempCheckEveryMin: 30,  // a temperature reading is due this often
+    tempCheckEveryMin: 120, // a temperature reading is due this often (2 h; the FDA minimum is 4 h)
     sanitizeEveryH: 4,      // food-contact surfaces (4-602.11)
+    tempIntervalV2: true,   // marks settings made after the check interval default moved from 30 to 120 minutes
   };
+  // Minutes before a batch's deadline at which each warning rung fires: a soft chime, then a spoken call, then
+  // the loud repeating tone. Per-ingredient lists replace the default; long cooks start earlier so there is
+  // time to act. Starter values: the owner can tune them.
+  C.ladderMin = { defaultMin: [60, 30, 10], byIng: { brisket: [120, 60, 30, 10], ribs: [90, 45, 20, 10] } };
+  // How old each demo starter batch is, in minutes, when a fresh demo kitchen opens. Spread out on purpose so the
+  // batches do not all expire at once and the first run shows the warnings working: brisket is the one nearest
+  // its 4-hour limit. Ingredients not listed start fresh.
+  C.starterAgeMin = { brisket: 215, pork: 190, slaw: 160, ribs: 150, sausage: 120, potato: 100, turkey: 95, mac: 70, beans: 45, pudding: 20 };
   // The allowed range for each owner-editable safety number, as [lowest, highest]. The legal limits are
   // fixed ends: hot hold never below 135 F, cold hold never above 41 F, reheat never below 165 F. The two
   // grace periods and the sanitise interval can be shortened but never lengthened past their defaults. Hold
   // time and check interval are house settings with wider ranges.
   C.safetyBounds = {
     hotHoldF: [135, 200], coldHoldF: [33, 41], reheatF: [165, 212], belowHotGraceH: [0.5, 2], aboveColdGraceH: [0.5, 4],
-    defaultMaxHoldH: [0.5, 12], tempCheckEveryMin: [10, 120], sanitizeEveryH: [1, 4],
+    defaultMaxHoldH: [0.5, 12], tempCheckEveryMin: [10, 240], sanitizeEveryH: [1, 4],
   };
 
+  // pullG on an ingredient is the set amount one Pull button moves out of the cabinet (one whole brisket, one rack,
+  // one pan), in grams. Starter estimates: the owner sets the real unit.
   // Brisket cooked yield, from the Texas A&M AgriLife regression in the research report. Used only for
   // ingredients marked thermal. hot percent = base - perDegC x (T - 75) - perHoldH x holdH, where T is the
   // finishing temperature in C and holdH the hours held hot. chilled percent = the larger of chilledFloor
@@ -4226,7 +4257,7 @@ a.of-nav:active { background: var(--press); }
  * Public API (other modules code against these names; see docs/smokebox.z.md for the formal statement):
  *   apply(state, type, payload, now)      -> { state, report, events, info }      (ACTIONS lists every type + payload)
  *   tick(state, now)                      -> { state, events }   same ref when nothing is due
- *   newState({ now, empty?, settings?, menu?, ingredients?, learned?, seq? }) -> state
+ *   newState({ now, empty?, stagger?, settings?, menu?, ingredients?, learned?, seq? }) -> state
  *   availability(state, menuId)           -> { ok, reason: null|'manual'|'safety'|'stock', ing }
  *   computeAvail(state)                   -> { [menuId]: { ok, reason, ing } }
  *   servable(state, ingId)                -> grams (or 'ea') that can be served now
@@ -4339,6 +4370,7 @@ a.of-nav:active { background: var(--press); }
     logTemp: '{ batchId, tempF }',
     reheatBatch: '{ batchId, tempF }',
     startCooling: '{ batchId, g? }',
+    pullBatch: '{ ing, g }',
     discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other" }',
     sanitizeDone: '{}',
     updateSettings: '{ patch }',
@@ -4351,7 +4383,7 @@ a.of-nav:active { background: var(--press); }
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'discardBatch', 'sanitizeDone'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -5036,6 +5068,31 @@ a.of-nav:active { background: var(--press); }
     for (let i = 0; i < bs.length; i++) if (bs[i].status !== 'discard') refreshBatch(tx, i);
   }
 
+  // Takes up to `need` grams of a TCS ingredient from the oldest servable batches first (FIFO). Locked and
+  // cooling batches are never used (I8). Returns the records of what was taken, its cost, and what is still
+  // missing.
+  function takeFifoInto(tx, ing, need) {
+    const recs = [];
+    let cost = 0;
+    const bs = tx.get('batches');
+    const cand = [];
+    for (let i = 0; i < bs.length; i++) { const b = bs[i]; if (b.ing === ing.id && servableBatch(b)) cand.push(i); }
+    // Oldest batch first; equal times go to the earlier position in the list.
+    cand.sort((a, b2) => (bs[a].enteredAt - bs[b2].enteredAt) || (a - b2));
+    for (const bi of cand) {
+      if (need <= EPS) break;
+      const b = tx.get('batches')[bi];
+      const take = Math.min(need, b.remainingG);
+      if (!(take > 0)) continue;
+      const w = tx.batch(bi);
+      w.remainingG = b.remainingG - take <= EPS ? 0 : b.remainingG - take;
+      need = need - take <= EPS ? 0 : need - take;
+      recs.push({ ing: ing.id, g: take, batchId: b.id });
+      cost += take * (isNum(b.costPerCookedKg) ? b.costPerCookedKg / 1000 : nominalUnitCost(ing));
+    }
+    return { recs, cost, left: need };
+  }
+
   /* ======================================================================================================
    * 10. Depletion (FIFO from servable batches, never negative) and learning
    * ==================================================================================================== */
@@ -5056,22 +5113,10 @@ a.of-nav:active { background: var(--press); }
       // TCS food comes from the oldest servable batches first (FIFO). Locked and cooling batches are never
       // used (I8).
       if (ing.tcs) {
-        const bs = tx.get('batches');
-        const cand = [];
-        for (let i = 0; i < bs.length; i++) { const b = bs[i]; if (b.ing === ing.id && servableBatch(b)) cand.push(i); }
-        // Oldest batch first; equal times go to the earlier position in the list.
-        cand.sort((a, b2) => (bs[a].enteredAt - bs[b2].enteredAt) || (a - b2));
-        for (const bi of cand) {
-          if (need <= EPS) break;
-          const b = tx.get('batches')[bi];
-          const take = Math.min(need, b.remainingG);
-          if (!(take > 0)) continue;
-          const w = tx.batch(bi);
-          w.remainingG = b.remainingG - take <= EPS ? 0 : b.remainingG - take;
-          need = need - take <= EPS ? 0 : need - take;
-          recs.push({ ing: ing.id, g: take, batchId: b.id });
-          cost += take * (isNum(b.costPerCookedKg) ? b.costPerCookedKg / 1000 : nominalUnitCost(ing));
-        }
+        const took = takeFifoInto(tx, ing, need);
+        for (const r of took.recs) recs.push(r);
+        cost += took.cost;
+        need = took.left;
       } else {
         // Everything else comes from the plain stock count.
         const stock = tx.get('stock');
@@ -5758,6 +5803,24 @@ a.of-nav:active { background: var(--press); }
     return 'ok';
   };
 
+  // Takes a set amount of a cooked ingredient out of the hold cabinet by hand, oldest batch first. Beside a
+  // POS this is how sales reach the books. If the cabinet holds less than asked, it takes what is there and
+  // says how much was short.
+  A.pullBatch = function (tx, p) {
+    const ing = typeof p.ing === 'string' ? ingMap(tx.get('ingredients')).get(p.ing) : undefined;
+    if (!ing || !ing.tcs) return 'unknownIng';
+    if (!isNum(p.g) || p.g <= 0 || p.g > 1e6) return 'badWeight';
+    const took = takeFifoInto(tx, ing, p.g);
+    if (!took.recs.length) return 'batchNotServable';
+    const g = took.recs.reduce((a, r) => a + r.g, 0);
+    const L = tx.ledger(ing.id);
+    L.pulled = (L.pulled || 0) + g;
+    tx.event('cabinet_pull', { ing: ing.id, g, batchIds: took.recs.map((r) => r.batchId), short: took.left > EPS ? took.left : 0 });
+    pushUndo(tx, 'pull', 'Pulled ' + Math.round(g) + ' g of ' + ing.name, { ing: ing.id, recs: took.recs });
+    tx.info = { ing: ing.id, g, short: took.left > EPS ? took.left : 0, batchIds: took.recs.map((r) => r.batchId) };
+    return 'ok';
+  };
+
   // Logs a cooked batch. Needs a TCS ingredient, a first temperature (32 to 300 F) and a weight (rawG or
   // cookedG). Cooked grams come from what was entered, else the brisket yield model, else the ingredient's
   // starter yield.
@@ -5957,7 +6020,7 @@ a.of-nav:active { background: var(--press); }
     service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20) },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
       defaultMaxHoldH: B('defaultMaxHoldH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
-      cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) } },
+      cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' } },
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
     syncTargetSec: R(10, 600),
@@ -6077,7 +6140,7 @@ a.of-nav:active { background: var(--press); }
   const MENU_MAX = 150;
   const ING_PATCH = {
     name: { t: 'text', max: 60 }, thresholdG: R(0, 1e6), parG: R(0, 1e7), yield: R(0.05, 3), yieldConfirmed: { t: 'bool' },
-    costPerKg: R(0, 10000), costEach: R(0, 10000),
+    costPerKg: R(0, 10000), costEach: R(0, 10000), pullG: R(50, 50000),
   };
   // Shared editor for menu items and ingredients. Checks each field, ignores unchanged ones (nothingToDo if
   // nothing changed), writes one new copy and logs settings_changed. Changing a starter prep time re-fits
@@ -6306,6 +6369,14 @@ a.of-nav:active { background: var(--press); }
     refreshBatch(tx, bi);
     return 'ok';
   };
+  // Undo of a hand pull: puts the grams back into the same batches. Grams whose batch is gone are booked as dropped.
+  UNDO.pull = function (tx, d) {
+    const recs = Array.isArray(d.recs) ? d.recs : [];
+    restoreInto(tx, recs);
+    const L = tx.ledger(d.ing);
+    L.pulled = Math.max(0, (L.pulled || 0) - recs.reduce((a, r) => a + (r.g > 0 ? r.g : 0), 0));
+    return 'ok';
+  };
   // Undo of a sanitise log: only if it is still the latest one.
   UNDO.sanitize = function (tx, d) {
     const cur = tx.get('sanitize') || {};
@@ -6514,16 +6585,19 @@ a.of-nav:active { background: var(--press); }
     // One ledger entry per ingredient. Plain ingredients start at par stock; TCS ones start as a batch
     // (below).
     for (const ing of ingredients) {
-      ledger[ing.id] = { open: 0, in: 0, prunedUsed: 0, prunedWaste: 0, prunedRemain: 0, dropped: 0 };
+      ledger[ing.id] = { open: 0, in: 0, pulled: 0, prunedUsed: 0, prunedWaste: 0, prunedRemain: 0, dropped: 0 };
       if (!ing.tcs) { stock[ing.id] = opts.empty ? 0 : isNum(ing.parG) && ing.parG > 0 ? ing.parG : 0; ledger[ing.id].open = stock[ing.id]; continue; }
       if (opts.empty || !(ing.parG > 0)) continue;
       // starter batches: labelled src 'starter' (demo opening stock) with a starter reading so the line can open
       const hot = ing.hold !== 'cold';
       const f = hot ? 155 : 38;
       const ty = ing.thermal ? thermalYield({ costPerKgRaw: ing.costPerKg }) : null;
+      // With stagger on, each starter batch is already some time old (config) and its last reading was at most 40 minutes ago.
+      const age = opts.stagger === true && isNum(C.starterAgeMin[ing.id]) ? C.starterAgeMin[ing.id] * MIN : 0;
+      const readAt = now - Math.min(age, 40 * MIN);
       const b = {
-        id: 'b_' + ++seq.batch, ing: ing.id, label: ing.name + ' batch 1', kind: hot ? 'hot' : 'cold', enteredAt: now, cookedG: ing.parG, remainingG: ing.parG,
-        costPerCookedKg: round(nominalUnitCost(ing) * 1000, 4), src: 'starter', temps: [{ t: now, f }], lastTempF: f, lastTempAt: now, reheats: 0,
+        id: 'b_' + ++seq.batch, ing: ing.id, label: ing.name + ' batch 1', kind: hot ? 'hot' : 'cold', enteredAt: now - age, cookedG: ing.parG, remainingG: ing.parG,
+        costPerCookedKg: round(nominalUnitCost(ing) * 1000, 4), src: 'starter', temps: [{ t: readAt, f }], lastTempF: f, lastTempAt: readAt, reheats: 0,
         maxHoldH: isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH, status: 'ok', action: 'NONE', canServe: true,
       };
       if (ty) b.yieldPct = ty.hotPct; else if (isNum(ing.yield)) b.yieldPct = round(ing.yield * 100, 2);
@@ -6651,7 +6725,7 @@ a.of-nav:active { background: var(--press); }
     // Numbers for the header badges: tickets, ready, overdue and warn counts, per-station counts, batches
     // needing attention, dishes 86, and whether sanitising is overdue.
     counts(state, now) {
-      const c = { all: 0, expo: 0, ready: 0, overdue: 0, warn: 0, zones: {}, overdueByZone: {}, hold: 0, out86: 0, sanitizeDueAt: undefined, sanitizeOverdue: false };
+      const c = { all: 0, expo: 0, ready: 0, overdue: 0, warn: 0, zones: {}, overdueByZone: {}, hold: 0, holdWhy: { check: 0, reheat: 0, chill: 0, discard: 0 }, out86: 0, sanitizeDueAt: undefined, sanitizeOverdue: false };
       for (const z of C.workZones) { c.zones[z] = 0; c.overdueByZone[z] = 0; }
       if (!isState(state)) return c;
       for (const t of views.activeTickets(state)) {
@@ -6671,7 +6745,11 @@ a.of-nav:active { background: var(--press); }
       for (const b of state.batches) {
         if (b.status === 'discard' || !(b.remainingG > 0)) continue;
         const gt = gate(b, now, S);
-        if (gt.action !== 'NONE') c.hold++;
+        if (gt.action !== 'NONE') {
+          c.hold++;
+          const why = gt.action === 'CHECK_TEMP' ? 'check' : gt.action === 'REHEAT_IMMEDIATE' ? 'reheat' : gt.action === 'CHILL_NOW' ? 'chill' : 'discard';
+          c.holdWhy[why]++;
+        }
       }
       for (const mi of state.menu) { const a = state.avail[mi.id]; if (a && !a.ok && !mi.archived) c.out86++; }
       const sz = state.sanitize || {};
@@ -6701,7 +6779,7 @@ a.of-nav:active { background: var(--press); }
       // Reads one ledger counter; a missing or bad number counts as 0.
       const n = (k) => (isNum(L[k]) ? L[k] : 0);
       const have = ing.tcs ? phys[ing.id] || 0 : hasOwn(state.stock, ing.id) && isNum(state.stock[ing.id]) ? state.stock[ing.id] : 0;
-      const expect = n('open') + n('in') - (used[ing.id] || 0) - n('prunedUsed') - (waste[ing.id] || 0) - n('prunedWaste') - n('prunedRemain') - n('dropped');
+      const expect = n('open') + n('in') - (used[ing.id] || 0) - n('pulled') - n('prunedUsed') - (waste[ing.id] || 0) - n('prunedWaste') - n('prunedRemain') - n('dropped');
       if (Math.abs(expect - have) > 0.5) out.push({ ing: ing.id, expect, have });
     }
     return out;
@@ -6854,7 +6932,13 @@ a.of-nav:active { background: var(--press); }
       const def = newState({ now: 0, empty: true });
       // settings
       const settings = defaultSettings();
-      repairInto(settings, isObj(st.settings) ? st.settings : {}, SET_SCHEMA, 'settings', repaired);
+      const savedSet = isObj(st.settings) ? st.settings : {};
+      // Saves from before the 2-hour check default still say 30 minutes. Move those to the new default once;
+      // any other value was chosen by the owner and stays.
+      if (isObj(savedSet.safety) && !hasOwn(savedSet.safety, 'tempIntervalV2') && savedSet.safety.tempCheckEveryMin === 30) {
+        savedSet.safety = Object.assign({}, savedSet.safety); delete savedSet.safety.tempCheckEveryMin; repaired.push('settings.safety.tempCheckEveryMin moved to the new default');
+      }
+      repairInto(settings, savedSet, SET_SCHEMA, 'settings', repaired);
       if (!(settings.service.openHour < settings.service.closeHour)) { settings.service = Object.assign({}, C.service); repaired.push('settings.service reset'); }
       if (!(settings.safety.cooling.stage1H < settings.safety.cooling.totalH)) { settings.safety.cooling = Object.assign({}, C.safety.cooling); repaired.push('settings.safety.cooling reset'); }
       // ingredients
@@ -7032,7 +7116,7 @@ a.of-nav:active { background: var(--press); }
         const L0 = isObj(st.ledger) && hasOwn(st.ledger, ing.id) && isObj(st.ledger[ing.id]) ? st.ledger[ing.id] : {};
         const L = {};
         for (const k of Object.keys(def.ledger[ing.id] || { open: 0 })) L[k] = isNum(L0[k]) && L0[k] >= 0 ? L0[k] : 0;
-        for (const k of ['open', 'in', 'prunedUsed', 'prunedWaste', 'prunedRemain', 'dropped']) if (!isNum(L[k])) L[k] = 0;
+        for (const k of ['open', 'in', 'pulled', 'prunedUsed', 'prunedWaste', 'prunedRemain', 'dropped']) if (!isNum(L[k])) L[k] = 0;
         ledger[ing.id] = L;
       }
       out.ledger = ledger;
@@ -7168,11 +7252,179 @@ a.of-nav:active { background: var(--press); }
     findOrder: (state, id) => (isState(state) && Array.isArray(state.orders) ? state.orders[findOrderIdx(state.orders, id)] : undefined),
     REPORTS, REPORT_IDS, ACTIONS, UNDOABLE, DISCARD_REASONS,
     helpers: { stampAfter, hashStr, qtyScale, estimate, syncDelayMs, nominalUnitCost },
-    _internal: { statusDeadline, nextDue, activeIdx, ledgerCheck, EVENT_CHUNK },
+    _internal: { statusDeadline, nextDue, activeIdx, ledgerCheck, holdLimitMs, EVENT_CHUNK },
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 20-engine.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'20-engine.js',message:String(e&&e.message||e)});}
+
+/* ===== 25-deadlines.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The deadline feed (SB.deadlines). One list of everything about to go wrong in the kitchen,
+ *    sorted by urgency, each with what happens if nobody acts and what to do. It reads the whole state and the
+ *    time and changes nothing.
+ * PARTS: warning rungs, sales rate, batch rows (expiry with projected waste, run-out), safety rows (checks,
+ *    reheat, chill, cooling), ticket and sanitize rows, the sorted list.
+ * USES: 00-util.js, 10-config.js, 20-engine.js. USED BY: the attention strip and the warning ladder in the
+ *    kitchen screens.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util, C = SB.config;
+  const MIN = 60e3, H = 3600e3;
+  // The engine, looked up each time so tests can swap it.
+  const E = () => SB.engine;
+  // How far back sales count toward the current pace: 90 minutes.
+  const RATE_WINDOW_MS = 90 * MIN;
+  // Sales pace is trusted only with at least this many grams seen in the window; below it the pace is "no data".
+  const RATE_MIN_G = 200;
+  // Ordering of severities, worst first.
+  const SEV_RANK = { bad: 0, warn: 1, info: 2 };
+
+  // Minutes-before-the-deadline at which each warning rung fires, for one ingredient. Brisket starts earlier
+  // because a long cook cannot be replaced in an hour.
+  function rungsFor(ingId) {
+    const L = C.ladderMin || {};
+    return (L.byIng && L.byIng[ingId]) || L.defaultMin || [60, 30, 10];
+  }
+  // Which rung a deadline is on: 0 means none yet, 1 to n means that many thresholds have been crossed, and
+  // n + 1 means the deadline has passed.
+  function rungOf(msLeft, rungsMin) {
+    if (msLeft <= 0) return rungsMin.length + 1;
+    let r = 0;
+    for (const m of rungsMin) if (msLeft <= m * MIN) r++;
+    return r;
+  }
+  // Grams per millisecond taken out of the cabinet for each cooked ingredient over the recent window, from
+  // finished tickets and hand pulls. Returns { rate: {ingId: g per ms}, seenG: {ingId: grams} }.
+  function salesRate(state, now) {
+    const from = now - RATE_WINDOW_MS, seen = Object.create(null);
+    // Finished items carry the grams they used; walk back from the newest tickets and stop once they are old.
+    for (let i = state.tickets.length - 1; i >= 0; i--) {
+      const t = state.tickets[i];
+      if (t.createdAt < from - 12 * H) break;
+      for (const it of t.items) {
+        if (it.status !== 'done' || !(it.doneAt >= from) || !it.depleted) continue;
+        for (const r of it.depleted) if (r.g > 0 && r.batchId) seen[r.ing] = (seen[r.ing] || 0) + r.g;
+      }
+    }
+    for (const e of E().allEvents(state)) if (e.type === 'cabinet_pull' && e.t >= from && !e.reverted) seen[e.ing] = (seen[e.ing] || 0) + e.g;
+    const rate = Object.create(null);
+    for (const k of Object.keys(seen)) if (seen[k] >= RATE_MIN_G) rate[k] = seen[k] / RATE_WINDOW_MS;
+    return { rate, seenG: seen };
+  }
+  // Picks the severity for a countdown: the last rung or expiry is bad, the middle rungs are warnings, and it is
+  // one step worse when no other batch of that food is left to take over.
+  function sevOf(rung, n, lastOne) {
+    if (rung >= n) return 'bad';
+    if (lastOne && rung >= 2) return 'bad';
+    if (rung >= 2 || (rung >= 1 && lastOne)) return 'warn';
+    return rung >= 1 ? 'warn' : 'info';
+  }
+  // Rows for the cooked batches: expiry with projected waste, and run-out time, per ingredient.
+  function batchRows(state, now, S, sales, out) {
+    const byIng = Object.create(null);
+    for (const b of state.batches) {
+      if (b.status === 'discard' || !(b.remainingG > 0) || b.kind === 'cooling') continue;
+      (byIng[b.ing] = byIng[b.ing] || []).push(b);
+    }
+    for (const ingId of Object.keys(byIng)) {
+      const ing = state.ingredients.find((x) => x.id === ingId);
+      const name = ing ? ing.name : ingId;
+      const list = byIng[ingId].slice().sort((a, b) => a.enteredAt - b.enteredAt);
+      const rungs = rungsFor(ingId), rate = sales.rate[ingId];
+      let soldBefore = 0, totalLeft = 0;
+      for (const b of list) totalLeft += b.remainingG;
+      list.forEach((b, i) => {
+        const exp = b.enteredAt + E()._internal.holdLimitMs(b, S);
+        const msLeft = exp - now;
+        const rung = rungOf(msLeft, rungs);
+        const lastOne = list.length === 1;
+        // How much of this batch the sales pace will clear before it expires, after the older batches took theirs.
+        let sold = 0, waste = null;
+        if (rate !== undefined) {
+          sold = Math.max(0, Math.min(b.remainingG, rate * Math.max(0, msLeft) - soldBefore));
+          waste = b.remainingG - sold;
+          soldBefore += sold;
+        }
+        const usd = waste != null && U.isNum(b.costPerCookedKg) ? waste / 1000 * b.costPerCookedKg : null;
+        let consequence, action;
+        const amount = U.fmtG(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
+        const goes86 = lastOne ? ' and ' + name + ' goes 86' : '';
+        if (msLeft <= 0) { consequence = 'Expired: ' + amount + ' must be thrown out' + goes86 + '.'; action = 'Discard and log it.'; }
+        else if (waste == null) { consequence = amount + ' will be thrown out at expiry' + goes86 + '.'; action = 'Use it first.'; }
+        else if (waste > 50) { consequence = 'About ' + U.fmtG(waste) + ' of ' + U.fmtG(b.remainingG) + ' will be thrown out' + (usd != null ? ' ($' + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
+        else { consequence = 'On pace to sell all ' + U.fmtG(b.remainingG) + ' in time.'; action = 'Nothing to do.'; }
+        // A batch gets a row once a rung is crossed, or earlier when the pace says food will be thrown out within 2 hours.
+        if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H)) {
+          const quiet = rung === 0;
+          out.push({ id: 'expiry:' + b.id, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length,
+            sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, wasteG: waste, wasteUsd: usd, guess: rate === undefined });
+        }
+      });
+      // Run-out: when the whole stock of this item will be gone at the current pace.
+      if (rate !== undefined) {
+        const ms = totalLeft / rate;
+        if (ms <= 2 * H) {
+          const at = now + ms;
+          out.push({ id: 'runout:' + ingId, kind: 'runout', ing: ingId, label: name, at, msLeft: ms, rung: 0, rungs: 0, sev: ms <= 30 * MIN ? 'warn' : 'info',
+            consequence: name + ' runs out at ' + U.fmtTime(at) + ' at the current pace (' + U.fmtG(totalLeft) + ' left).', action: 'Start the next batch now if there is one coming.', guess: false });
+        }
+      }
+    }
+  }
+  // Rows for food-safety gates: a temperature check due, a reheat or chill decision, a cooling stage.
+  function safetyRows(state, now, S, out) {
+    for (const b of state.batches) {
+      if (b.status === 'discard' || !(b.remainingG > 0)) continue;
+      const gt = E().gate(b, now, S);
+      if (gt.action === 'NONE' && !(b.kind === 'cooling')) {
+        const due = gt.nextDeadlineAt;
+        if (U.isNum(due) && due !== Infinity && due - now <= 15 * MIN && b.enteredAt + E()._internal.holdLimitMs(b, S) > due) {
+          out.push({ id: 'check:' + b.id, kind: 'check', ing: b.ing, batchId: b.id, label: b.label || b.ing, at: due, msLeft: due - now, rung: 0, rungs: 0, sev: 'info',
+            consequence: 'A temperature reading is due at ' + U.fmtTime(due) + '.', action: 'Log a temperature.', guess: false });
+        }
+        continue;
+      }
+      if (gt.action === 'NONE' || gt.action === 'DISCARD_LOCKOUT') continue;
+      const at = U.isNum(gt.nextDeadlineAt) && gt.nextDeadlineAt !== Infinity ? gt.nextDeadlineAt : now;
+      const kind = gt.action === 'CHECK_TEMP' ? 'check' : gt.action === 'REHEAT_IMMEDIATE' ? 'reheat' : gt.action === 'CHILL_NOW' ? 'chill' : 'cooling';
+      const text = (gt.text || '').replace(' ' + C.safetyLine, '');
+      out.push({ id: kind + ':' + b.id, kind, ing: b.ing, batchId: b.id, label: b.label || b.ing, at, msLeft: at - now, rung: 0, rungs: 0, sev: gt.severity === 'bad' ? 'bad' : 'warn',
+        consequence: text, action: kind === 'check' ? 'Log a temperature.' : kind === 'reheat' ? 'Reheat it and log the reading.' : kind === 'chill' ? 'Chill it now.' : 'Log a reading as it cools.', guess: false });
+    }
+  }
+  // Rows for tickets and the sanitize timer.
+  function otherRows(state, now, out) {
+    const C0 = E().views.counts(state, now);
+    if (C0.overdue > 0) out.push({ id: 'late', kind: 'late', label: 'Late tickets', at: now, msLeft: 0, rung: 0, rungs: 0, sev: 'warn',
+      consequence: C0.overdue + ' ' + U.plural(C0.overdue, 'ticket is', 'tickets are') + ' past ' + U.plural(C0.overdue, 'its', 'their') + ' time limit.', action: 'Clear the oldest ticket first.', guess: false });
+    if (U.isNum(C0.sanitizeDueAt) && C0.sanitizeDueAt - now <= 15 * MIN) {
+      const late = C0.sanitizeDueAt < now;
+      out.push({ id: 'sanitize', kind: 'sanitize', label: 'Sanitize surfaces', at: C0.sanitizeDueAt, msLeft: C0.sanitizeDueAt - now, rung: 0, rungs: 0, sev: late && now - C0.sanitizeDueAt > 15 * MIN ? 'warn' : 'info',
+        consequence: late ? 'Food-contact surfaces are overdue for sanitizing.' : 'Food-contact surfaces are due for sanitizing at ' + U.fmtTime(C0.sanitizeDueAt) + '.', action: 'Sanitize and tick it off.', guess: false });
+    }
+  }
+  // Builds the feed: every deadline worth showing right now, worst first. Each row has id, kind, label, at,
+  // msLeft, rung, sev (bad, warn, info), consequence and action. Batch rows also carry projected waste.
+  function build(state, now) {
+    const out = [];
+    if (!state || !U.isNum(now)) return out;
+    const S = state.settings && state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety;
+    const sales = salesRate(state, now);
+    batchRows(state, now, S, sales, out);
+    safetyRows(state, now, S, out);
+    otherRows(state, now, out);
+    out.sort((a, b) => (SEV_RANK[a.sev] - SEV_RANK[b.sev]) || (a.msLeft - b.msLeft) || (a.id < b.id ? -1 : 1));
+    return out;
+  }
+  // Public API: build(state, now) gives the sorted feed; rungOf and rungsFor are shared with the sound ladder.
+  SB.deadlines = { build, rungOf, rungsFor, salesRate };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 25-deadlines.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'25-deadlines.js',message:String(e&&e.message||e)});}
 
 /* ===== 30-store.js ===== */
 ;try{
@@ -7460,7 +7712,7 @@ a.of-nav:active { background: var(--press); }
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
     if (loaded) atLeast(lastStamp(loaded));
-    state = loaded || E().newState({ now: now() });
+    state = loaded || E().newState({ now: now(), stagger: true });
     // Catch up anything that became due while the page was closed.
     const t = E().tick(state, now());
     state = t.state;
@@ -7627,7 +7879,7 @@ a.of-nav:active { background: var(--press); }
   function reset() {
     rebaseClock();
     const old = state;
-    const ns = E().newState({ now: now(), seq: old ? old.seq : undefined });
+    const ns = E().newState({ now: now(), stagger: true, seq: old ? old.seq : undefined });
     ns.rev = (old ? old.rev : 0) + 1;
     commit(ns, true);
     skipRebase = true; pending = [];
@@ -10087,13 +10339,14 @@ a.of-nav:active { background: var(--press); }
     // Finds a pan by id (newest first); null when there is none.
     const batchOf = (id) => { for (let i = st.batches.length - 1; i >= 0; i--) if (st.batches[i].id === id) return st.batches[i]; return null; };
 
-    // Books a pan's next temperature check about 30 minutes out. Some come late and some are skipped, as in
-    // a real kitchen.
+    // Books a pan's next temperature check about one check interval out. Some come late and some are skipped,
+    // as in a real kitchen. The gaps scale with the interval in the safety settings.
     function scheduleTemp(batchId, from) {
-      let gap = 30 - K.range(1.5, 7);
+      const iv = C.safety.tempCheckEveryMin, k = iv / 30;
+      let gap = iv - K.range(1.5, 7) * k;
       const u = K.next();
-      if (u < 0.045) gap = 30 + K.range(3, 22);          // a late check
-      else if (u < 0.065) gap = 60 + K.range(3, 14);     // a missed check: the next reading is an hour later
+      if (u < 0.045) gap = iv + K.range(3, 22) * k;          // a late check
+      else if (u < 0.065) gap = 1.5 * iv + K.range(3, 14) * k; // a missed check: the next reading is half an interval later still
       if (from + gap * MIN > closeMs + 5 * MIN) return;             // the crew stops walking the cabinet once the doors are shut
       Q.push(from + gap * MIN, (t) => tempCheck(batchId, t));
     }
@@ -10515,7 +10768,7 @@ a.of-nav:active { background: var(--press); }
     function act(type, payload) {
       try { return store().dispatchEx(type, payload, { source: 'sim' }).report; } catch (e) { return 'error'; }
     }
-    // The crew logs each pan's temperature about every 30 minutes (5 in 100 times late) and sanitises when
+    // The crew logs each pan's temperature about every check interval (5 in 100 times late) and sanitises when
     // it is due.
     function planChecks(st, n) {
       const state = st.getState();
@@ -15349,7 +15602,9 @@ a.of-nav:active { background: var(--press); }
     dock.addEventListener('pointerenter', () => { m.dockHover = true; });
     dock.addEventListener('pointerleave', () => { m.dockHover = false; });
 
-    root.append(head, main, dock);
+    // The attention strip sits under the header and lists the most urgent deadlines; it is hidden when nothing is due.
+    const strip = buildStrip();
+    root.append(head, strip.el, main, dock);
     const hlStyle = h('style', { class: 'fl-hl-style' });
     root.appendChild(hlStyle);
     m.el.appendChild(root);
@@ -15357,7 +15612,7 @@ a.of-nav:active { background: var(--press); }
     m.tabParts = {};
     TABS.forEach((id) => { const b = seg.querySelector('[data-id="' + id + '"]'); if (b) m.tabParts[id] = { count: b.querySelector('.seg-count'), n: -1 }; });
     m.sanText = sanChip.querySelector('.fl-chip-t');
-    Object.assign(m, { head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, main, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
+    Object.assign(m, { head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, strip, main, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
 
     grid.addEventListener('click', onGridClick);
     dockList.addEventListener('click', (e) => {
@@ -16006,6 +16261,50 @@ a.of-nav:active { background: var(--press); }
   }
   const setTxt = put;
 
+  // Words for a countdown: "NOW", "9:30" under ten minutes, "25 min" under an hour, "1 h 05 min" above.
+  function countdownText(ms) {
+    if (ms <= 0) return 'NOW';
+    const s = Math.ceil(ms / 1000);
+    if (s < 600) return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    const min = Math.ceil(s / 60);
+    return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h ' + String(min % 60).padStart(2, '0') + ' min';
+  }
+  // Builds the attention strip: three rows made once and rewritten in place. Each row says when, what, what
+  // happens if nothing is done, and what to do. Tapping a batch row opens that batch in the hold cabinet.
+  function buildStrip() {
+    const rows = [];
+    const el = h('section', { class: 'fl-strip', role: 'region', 'aria-label': 'Needs attention', 'aria-live': 'polite', hidden: true });
+    for (let i = 0; i < 3; i++) {
+      const when = h('span', { class: 'fl-strip-when num' }), what = h('span', { class: 'fl-strip-what' }), why = h('span', { class: 'fl-strip-why' });
+      // Opens the hold cabinet on this row's batch, or just the cabinet when the row is not about one batch.
+      const openRow = () => { const r = rows[i]; if (r && r.key && r.batchId) openHoldFor(r.batchId); else if (r && r.key) openSheet('hold'); };
+      const row = h('button', { type: 'button', class: 'fl-strip-row', hidden: true, onClick: openRow },
+        when, h('span', { class: 'fl-strip-text' }, what, why));
+      rows.push({ el: row, when, what, why, key: '', batchId: null });
+      el.appendChild(row);
+    }
+    return { el, rows };
+  }
+  // Opens the hold cabinet with one batch scrolled into view and flashed.
+  function openHoldFor(batchId) { try { if (SB.sheets) SB.sheets.open('hold', { batchId }); } catch (e) { console.error('[smokebox] sheet failed', e); } }
+  // Rewrites the strip from the deadline feed: the top three rows, or hidden when the feed is empty.
+  function updateStrip(now) {
+    if (!m || !m.strip || !SB.deadlines) return;
+    const feed = SB.deadlines.build(store().getState(), now).filter((d) => d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'runout');
+    const top = feed.slice(0, 3);
+    setHidden(m.strip.el, top.length === 0);
+    m.strip.rows.forEach((r, i) => {
+      const d = top[i];
+      setHidden(r.el, !d);
+      if (!d) { r.key = ''; return; }
+      r.key = d.id; r.batchId = d.batchId || null;
+      setTone(r.el, d.sev);
+      setTxt(r.when, countdownText(d.msLeft));
+      setTxt(r.what, d.label);
+      setTxt(r.why, d.consequence + ' ' + d.action);
+    });
+  }
+
   // Refreshes what depends on data or time: tab counts and overdue dots, button counts, sanitize and
   // demo chips. Runs after every draw and tick. WATCH OUT: edits text and attributes only, no new nodes.
   function updateHeader(now) {
@@ -16013,6 +16312,7 @@ a.of-nav:active { background: var(--press); }
     const S = store();
     const c = S.select.counts();
     m.counts = c;
+    updateStrip(now);
     // station tabs
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
     const tabCount = (id, n, alert) => {
@@ -16028,7 +16328,7 @@ a.of-nav:active { background: var(--press); }
     // tools with counts
     const recentN = recentCount(S, now);
     toolCount(m.tool.recall, recentN, '', recentN ? recentN + ' recently bumped' : '');
-    toolCount(m.tool.hold, c.hold, 'warn', c.hold ? c.hold + ' ' + U.plural(c.hold, 'batch', 'batches') + ' need attention' : '');
+    toolCount(m.tool.hold, c.hold, 'warn', holdReason(c));
     toolCount(m.tool.board86, c.out86, 'bad', c.out86 ? c.out86 + ' ' + U.plural(c.out86, 'item') + ' off the menu' : '');
     // Orders still open, counted again only when the orders list itself changed.
     const ords = S.getState().orders || [];
@@ -16083,6 +16383,15 @@ a.of-nav:active { background: var(--press); }
     let n = 0;
     for (let i = 0; i < list.length; i++) if (typeof list[i].expeditedAt === 'number' && now - list[i].expeditedAt < 30 * 60e3) n++;
     return n;
+  }
+  // Spells out why the Hold button is lit, for example "2 temperature checks due, 1 to throw out". Empty when nothing is due.
+  function holdReason(c) {
+    const w = c.holdWhy || {}, bits = [];
+    if (w.check) bits.push(w.check + ' temperature ' + U.plural(w.check, 'check') + ' due');
+    if (w.reheat) bits.push(w.reheat + ' to reheat');
+    if (w.chill) bits.push(w.chill + ' to chill now');
+    if (w.discard) bits.push(w.discard + ' to throw out');
+    return bits.join(', ');
   }
   // Updates one header button: count badge, tone and spoken label. A text argument replaces the number.
   function toolCount(t, n, tone, aria, text) {
@@ -17669,7 +17978,9 @@ a.of-nav:active { background: var(--press); }
       const bReheat = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'reheat' }, hidden: true }, ico('flame', 20), h('span', null, 'Reheat'));
       const bCool = h('button', { type: 'button', class: 'btn', dataset: { act: 'cool' }, hidden: true }, ico('snow', 20), h('span', null, 'Start cooling'));
       const bDiscard = h('button', { type: 'button', class: 'btn hc-discard', dataset: { act: 'discard' } }, ico('trash', 20), h('span', null, 'Discard'));
-      const actions = h('div', { class: 'hc-actions' }, bLog, bReheat, bCool, bDiscard);
+      const pullT = h('span', null, 'Pull');
+      const bPull = h('button', { type: 'button', class: 'btn', dataset: { act: 'pull' }, hidden: true }, ico('package', 20), pullT);
+      const actions = h('div', { class: 'hc-actions' }, bPull, bLog, bReheat, bCool, bDiscard);
       const editorSlot = h('div', { class: 'hc-editor-slot' });
       // Card layout: heading, ring and facts, message and lock note, cooling steps, then the buttons.
       const el = h('article', { class: 'hc-card', dataset: { batch: b.id, tone: 'ok' }, 'aria-label': 'Batch' },
@@ -17678,12 +17989,25 @@ a.of-nav:active { background: var(--press); }
           h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
             h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince))),
         costLine, msg, lock, cool, actions, editorSlot);
-      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bLog, bReheat, bCool, bDiscard, editorSlot });
+      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
       bLog.addEventListener('click', () => toggleEditor(rec, 'log'));
       bReheat.addEventListener('click', () => toggleEditor(rec, 'reheat'));
       bCool.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openCooling(bb, bCool); });
       bDiscard.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openDiscard(bb, bDiscard); });
+      bPull.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) pullFrom(bb); });
       return rec;
+    }
+    // True when this is the oldest batch of its ingredient that can still be served: the one a pull comes from.
+    function isPullSource(b) {
+      if (!(b.remainingG > 0) || b.canServe !== true || b.status === 'discard' || b.kind === 'cooling') return false;
+      return !st().batches.some((x) => x !== b && x.ing === b.ing && x.remainingG > 0 && x.canServe === true && x.status !== 'discard' && x.kind !== 'cooling' && x.enteredAt < b.enteredAt);
+    }
+    // Takes one set unit (the product's pull size) out of the cabinet, oldest batch first, with Undo.
+    function pullFrom(b) {
+      const ing = ingOf(b.ing), g = ing && U.isNum(ing.pullG) ? ing.pullG : 1000;
+      const res = run('pullBatch', { ing: b.ing, g });
+      if (res.report === 'ok') { undoToast('Pulled ' + qtyText(ing, res.info.g) + ' of ' + (ing ? ing.name : b.ing) + '.' + (res.info.short > 0 ? ' The cabinet had ' + qtyText(ing, res.info.short) + ' less than a full unit.' : ''), 'ok'); update(nowMs()); }
+      else toast(say(res), 'warn');
     }
     // Looks a batch up by id in the current state.
     const batchOf = (id) => st().batches.find((x) => x.id === id) || null;
@@ -17776,6 +18100,9 @@ a.of-nav:active { background: var(--press); }
       }
 
       // buttons
+      const showPull = isPullSource(b);
+      setHidden(rec.bPull, !showPull);
+      if (showPull) { const pg = ingOf(b.ing); text(rec.pullT, 'Pull ' + qtyText(pg, Math.min(b.remainingG, pg && U.isNum(pg.pullG) ? pg.pullG : 1000))); }
       cls(rec.bLog, 'btn-primary', gt.action === 'CHECK_TEMP');
       setHidden(rec.bReheat, gt.action !== 'REHEAT_IMMEDIATE');
       setHidden(rec.bCool, !(b.kind === 'hot' && b.remainingG > 0 && gt.action !== 'DISCARD_LOCKOUT'));
@@ -17902,7 +18229,7 @@ a.of-nav:active { background: var(--press); }
         onConfirm: (sh) => {
           const res = run('startCooling', { batchId: b.id });
           sh.close('confirm');
-          if (res.report === 'ok') { toast(label + ' is cooling. Log a reading at least every ' + S.tempCheckEveryMin + ' minutes.', 'ok'); update(nowMs()); const rec = cards.get(res.info && res.info.batchId); if (rec) { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); } }
+          if (res.report === 'ok') { toast(label + ' is cooling. Log a reading at least every ' + U.minutesText(S.tempCheckEveryMin) + '.', 'ok'); update(nowMs()); const rec = cards.get(res.info && res.info.batchId); if (rec) { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); } }
           else toast(say(res), 'warn');
         },
       });
@@ -18855,7 +19182,7 @@ a.of-nav:active { background: var(--press); }
       helpList([
         rule('flame', 'Keep hot food hot', 'Hot food stays at ' + S.hotHoldF + ' °F or above.'),
         rule('snow', 'Keep cold food cold', 'Cold food stays at ' + S.coldHoldF + ' °F or below.'),
-        rule('thermometer', 'Log a temperature', 'At least every ' + S.tempCheckEveryMin + ' minutes. A late check shows Check temp and is counted.'),
+        rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + S.hotHoldF + ' °F, reheat to ' + S.reheatF + ' °F within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
         rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + S.hotHoldF + ' °F, not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
         rule('package', 'Hold limit', 'A batch is discarded after ' + S.defaultMaxHoldH + ' hours in the cabinet, or less if its own limit is shorter.'),
@@ -22542,7 +22869,7 @@ a.of-nav:active { background: var(--press); }
       },
     });
     const tempCard = page.card({
-      type: 'meter', span: 4, title: 'Temperature checks on time', sub: 'A reading is on time when it is logged within ' + intervalTemp() + ' minutes of the last one',
+      type: 'meter', span: 4, title: 'Temperature checks on time', sub: 'A reading is on time when it is logged within ' + U.minutesText(intervalTemp()) + ' of the last one',
       caption: 'Whether every pan in the cabinet is being checked as often as you decided. Late checks are the first sign of a slipping night.',
       empty: { title: 'No temperature checks yet', body: 'Readings logged on the line fill this meter.', icon: 'thermometer' },
       // Meter of temperature checks logged on time; empty until a reading is logged.
@@ -22736,7 +23063,7 @@ a.of-nav:active { background: var(--press); }
           set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'A batch may be reheated one time. If it drops below the limit again it is thrown away. Food Code 3-403.11.');
           set('hold', 'No more than ' + (S.defaultMaxHoldH) + ' hours in the cabinet', 'After that the batch is thrown away, whatever its temperature. Some items carry their own shorter or longer limit.');
           set('grace', 'Grace of ' + S.belowHotGraceH + ' hours below ' + T(S.hotHoldF) + ' (cold food: ' + S.aboveColdGraceH + ' hours above ' + T(S.coldHoldF) + ')', 'The clock starts at the first reading outside the limit. After the grace time the batch is thrown away.');
-          set('checks', 'A temperature reading every ' + S.tempCheckEveryMin + ' minutes', 'A late reading is flagged and counted here. It does not stop service by itself.');
+          set('checks', 'A temperature reading every ' + U.minutesText(S.tempCheckEveryMin), 'A late reading is flagged and counted here. It does not stop service by itself.');
           set('sanitize', 'Sanitize food-contact surfaces every ' + S.sanitizeEveryH + ' hours', 'A late round is a warning on the line and counts against the score. Food Code 4-602.11.');
           // Kept on purpose: the grace clock starts later here than in the research report (finding F-E1).
           B.setText(note, 'Smokebox starts the ' + S.belowHotGraceH + '-hour clock at the first reading below ' + T(S.hotHoldF) + '. The research report it was built from starts it when the food left the heat, which is stricter. Check which one your health department uses.');
@@ -22756,7 +23083,7 @@ a.of-nav:active { background: var(--press); }
         const after = f.lock.filter((c) => !(c.openMs > 0)).length;
         B.setText(lockNote, after ? after + ' more ' + B.plural(after, 'lockout began', 'lockouts began') + ' after closing and cost no sales, so ' + B.plural(after, 'it is', 'they are') + ' not listed.' : '');
         lockNote.hidden = !after;
-        B.setSub(tempCard, 'A reading is on time when it is logged within ' + intervalTemp() + ' minutes of the last one');
+        B.setSub(tempCard, 'A reading is on time when it is logged within ' + U.minutesText(intervalTemp()) + ' of the last one');
         B.setSub(sanCard, 'A round is on time when it is logged within ' + intervalSan() + ' hours of the last one');
       },
       // Runs when the page is left; drops the card list.

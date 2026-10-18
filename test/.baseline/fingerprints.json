@@ -1,8 +1,8 @@
 {
  "src/js/00-util.js": "912daaf96960911be98ac136e3039fc855739846a520219ff8b3ac5625ea9aba",
  "src/js/05-icons.js": "d40033a31194633cf3cad1e0aab9446711a7a22f708355338ec500f25835a4da",
- "src/js/10-config.js": "f72d9e6bf8ce3fd11ea2d97a846f612b0814938d6537557a26499b7042ae703c",
- "src/js/20-engine.js": "c8b017c3edcce35968155bc8e254e2b569823643fc4eeb1b4a6deaacc45079d2",
+ "src/js/10-config.js": "f1b007901a2af0d871d5c6a1ef30d348c2e590c2db0edca37a298bd7db62f45b",
+ "src/js/20-engine.js": "79383a445313f40d9cc6ed9843b562f9448face879594c6bc7da791198f204e2",
  "src/js/30-store.js": "d4273522d45fda0b8e060cb6c93d9416be5378b681c699d77d717f374cb5d906",
  "src/js/40-metrics.js": "89241950d4c2c44a5a18d952ed9f832401bfd3ec6ed41e64bc10e97ba62066d3",
  "src/js/50-charts.js": "9f351459475786399cf173d1dfa6c87dcece3805caadd36c515891593043f3f5",
@@ -18,8 +18,8 @@
  "tools/shot.mjs": "1d0c42be27039a12cbaffdee103bb879ee2ac20628f98c429163445209277bd4",
  "tools/build-artifact.mjs": "9a36c3a2d42d53c6932a4f909cab09667b3647aca8ba55312c716f17bdd35858",
  "tools/charts-gallery.mjs": "1b25f4cfc1078ea9fa72600e10a5adb672aefc2abc23d3b28d3bb59e18e18b02",
- "src/js/70-floor-board.js": "fd5e0c237f2115fe27f0f385bd7e12089c9494a962f1478d9721b92ba02fab92",
- "src/css/20-floor.css": "cb9814794ccdb2e5685e8bc16dd845def3b7f6346773437b2c40e35bc3b8f7b9",
+ "src/js/70-floor-board.js": "6f16f97b5c3f2e53fa628b2742a19235a36a5053e8b4627778aa205da9985f0e",
+ "src/css/20-floor.css": "10a0a8e806334efa5b466cbde4166affabaf39bcb5735a3b09a5499633538523",
  "test/floor.e2e.mjs": "6903287eb790a198f194d645fadf1864bb05365f1f0dc663bf666076683a0502",
  "tools/comment-audit.mjs": "d148fbf29d82eee272fe0d33bb68f9fad9f2f7e848112272240055d7d5da41eb",
  "src/js/84-office-data.js": "e0a49b55be619592a475670f00eb2bf95f66c5edb1b408c5daa1a97c37bb11df",
@@ -43,5 +43,6 @@
  "src/js/74-floor-tour.js": "57407283e92ef60a8f678b993c64709df79eaf9ad412ced7f2b8553ec602f793",
  "src/css/22-floor-tour.css": "819a14436e73f6271b7700d46dab2cb08d42c8e30ef386faa8a16a0dfd6abab4",
  "src/js/73-floor-orders.js": "d811da31f86cd73e3081ca8cdd27cc9bcf6c9915527040a90bda51946bc63d2f",
- "src/css/23-floor-orders.css": "d5cdb100e02ec7dbf16457989710fed2a0e6e7ff5d1d2a3321fa26ef22a273d9"
+ "src/css/23-floor-orders.css": "d5cdb100e02ec7dbf16457989710fed2a0e6e7ff5d1d2a3321fa26ef22a273d9",
+ "src/js/25-deadlines.js": "24b1a295f2998338a5b2c4ffda1a66dba46f813a2338edce3e9b402ffac73ed5"
 }

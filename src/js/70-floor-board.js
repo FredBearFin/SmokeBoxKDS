@@ -328,7 +328,9 @@
     dock.addEventListener('pointerenter', () => { m.dockHover = true; });
     dock.addEventListener('pointerleave', () => { m.dockHover = false; });
 
-    root.append(head, main, dock);
+    // The attention strip sits under the header and lists the most urgent deadlines; it is hidden when nothing is due.
+    const strip = buildStrip();
+    root.append(head, strip.el, main, dock);
     const hlStyle = h('style', { class: 'fl-hl-style' });
     root.appendChild(hlStyle);
     m.el.appendChild(root);
@@ -336,7 +338,7 @@
     m.tabParts = {};
     TABS.forEach((id) => { const b = seg.querySelector('[data-id="' + id + '"]'); if (b) m.tabParts[id] = { count: b.querySelector('.seg-count'), n: -1 }; });
     m.sanText = sanChip.querySelector('.fl-chip-t');
-    Object.assign(m, { head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, main, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
+    Object.assign(m, { head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, strip, main, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
 
     grid.addEventListener('click', onGridClick);
     dockList.addEventListener('click', (e) => {
@@ -985,6 +987,50 @@
   }
   const setTxt = put;
 
+  // Words for a countdown: "NOW", "9:30" under ten minutes, "25 min" under an hour, "1 h 05 min" above.
+  function countdownText(ms) {
+    if (ms <= 0) return 'NOW';
+    const s = Math.ceil(ms / 1000);
+    if (s < 600) return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    const min = Math.ceil(s / 60);
+    return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h ' + String(min % 60).padStart(2, '0') + ' min';
+  }
+  // Builds the attention strip: three rows made once and rewritten in place. Each row says when, what, what
+  // happens if nothing is done, and what to do. Tapping a batch row opens that batch in the hold cabinet.
+  function buildStrip() {
+    const rows = [];
+    const el = h('section', { class: 'fl-strip', role: 'region', 'aria-label': 'Needs attention', 'aria-live': 'polite', hidden: true });
+    for (let i = 0; i < 3; i++) {
+      const when = h('span', { class: 'fl-strip-when num' }), what = h('span', { class: 'fl-strip-what' }), why = h('span', { class: 'fl-strip-why' });
+      // Opens the hold cabinet on this row's batch, or just the cabinet when the row is not about one batch.
+      const openRow = () => { const r = rows[i]; if (r && r.key && r.batchId) openHoldFor(r.batchId); else if (r && r.key) openSheet('hold'); };
+      const row = h('button', { type: 'button', class: 'fl-strip-row', hidden: true, onClick: openRow },
+        when, h('span', { class: 'fl-strip-text' }, what, why));
+      rows.push({ el: row, when, what, why, key: '', batchId: null });
+      el.appendChild(row);
+    }
+    return { el, rows };
+  }
+  // Opens the hold cabinet with one batch scrolled into view and flashed.
+  function openHoldFor(batchId) { try { if (SB.sheets) SB.sheets.open('hold', { batchId }); } catch (e) { console.error('[smokebox] sheet failed', e); } }
+  // Rewrites the strip from the deadline feed: the top three rows, or hidden when the feed is empty.
+  function updateStrip(now) {
+    if (!m || !m.strip || !SB.deadlines) return;
+    const feed = SB.deadlines.build(store().getState(), now).filter((d) => d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'runout');
+    const top = feed.slice(0, 3);
+    setHidden(m.strip.el, top.length === 0);
+    m.strip.rows.forEach((r, i) => {
+      const d = top[i];
+      setHidden(r.el, !d);
+      if (!d) { r.key = ''; return; }
+      r.key = d.id; r.batchId = d.batchId || null;
+      setTone(r.el, d.sev);
+      setTxt(r.when, countdownText(d.msLeft));
+      setTxt(r.what, d.label);
+      setTxt(r.why, d.consequence + ' ' + d.action);
+    });
+  }
+
   // Refreshes what depends on data or time: tab counts and overdue dots, button counts, sanitize and
   // demo chips. Runs after every draw and tick. WATCH OUT: edits text and attributes only, no new nodes.
   function updateHeader(now) {
@@ -992,6 +1038,7 @@
     const S = store();
     const c = S.select.counts();
     m.counts = c;
+    updateStrip(now);
     // station tabs
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
     const tabCount = (id, n, alert) => {
