@@ -328,7 +328,9 @@
       const bReheat = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'reheat' }, hidden: true }, ico('flame', 20), h('span', null, 'Reheat'));
       const bCool = h('button', { type: 'button', class: 'btn', dataset: { act: 'cool' }, hidden: true }, ico('snow', 20), h('span', null, 'Start cooling'));
       const bDiscard = h('button', { type: 'button', class: 'btn hc-discard', dataset: { act: 'discard' } }, ico('trash', 20), h('span', null, 'Discard'));
-      const actions = h('div', { class: 'hc-actions' }, bLog, bReheat, bCool, bDiscard);
+      const pullT = h('span', null, 'Pull');
+      const bPull = h('button', { type: 'button', class: 'btn', dataset: { act: 'pull' }, hidden: true }, ico('package', 20), pullT);
+      const actions = h('div', { class: 'hc-actions' }, bPull, bLog, bReheat, bCool, bDiscard);
       const editorSlot = h('div', { class: 'hc-editor-slot' });
       // Card layout: heading, ring and facts, message and lock note, cooling steps, then the buttons.
       const el = h('article', { class: 'hc-card', dataset: { batch: b.id, tone: 'ok' }, 'aria-label': 'Batch' },
@@ -337,12 +339,25 @@
           h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
             h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince))),
         costLine, msg, lock, cool, actions, editorSlot);
-      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bLog, bReheat, bCool, bDiscard, editorSlot });
+      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
       bLog.addEventListener('click', () => toggleEditor(rec, 'log'));
       bReheat.addEventListener('click', () => toggleEditor(rec, 'reheat'));
       bCool.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openCooling(bb, bCool); });
       bDiscard.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openDiscard(bb, bDiscard); });
+      bPull.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) pullFrom(bb); });
       return rec;
+    }
+    // True when this is the oldest batch of its ingredient that can still be served: the one a pull comes from.
+    function isPullSource(b) {
+      if (!(b.remainingG > 0) || b.canServe !== true || b.status === 'discard' || b.kind === 'cooling') return false;
+      return !st().batches.some((x) => x !== b && x.ing === b.ing && x.remainingG > 0 && x.canServe === true && x.status !== 'discard' && x.kind !== 'cooling' && x.enteredAt < b.enteredAt);
+    }
+    // Takes one set unit (the product's pull size) out of the cabinet, oldest batch first, with Undo.
+    function pullFrom(b) {
+      const ing = ingOf(b.ing), g = ing && U.isNum(ing.pullG) ? ing.pullG : 1000;
+      const res = run('pullBatch', { ing: b.ing, g });
+      if (res.report === 'ok') { undoToast('Pulled ' + qtyText(ing, res.info.g) + ' of ' + (ing ? ing.name : b.ing) + '.' + (res.info.short > 0 ? ' The cabinet had ' + qtyText(ing, res.info.short) + ' less than a full unit.' : ''), 'ok'); update(nowMs()); }
+      else toast(say(res), 'warn');
     }
     // Looks a batch up by id in the current state.
     const batchOf = (id) => st().batches.find((x) => x.id === id) || null;
@@ -435,6 +450,9 @@
       }
 
       // buttons
+      const showPull = isPullSource(b);
+      setHidden(rec.bPull, !showPull);
+      if (showPull) { const pg = ingOf(b.ing); text(rec.pullT, 'Pull ' + qtyText(pg, Math.min(b.remainingG, pg && U.isNum(pg.pullG) ? pg.pullG : 1000))); }
       cls(rec.bLog, 'btn-primary', gt.action === 'CHECK_TEMP');
       setHidden(rec.bReheat, gt.action !== 'REHEAT_IMMEDIATE');
       setHidden(rec.bCool, !(b.kind === 'hot' && b.remainingG > 0 && gt.action !== 'DISCARD_LOCKOUT'));

@@ -128,6 +128,7 @@
     logTemp: '{ batchId, tempF }',
     reheatBatch: '{ batchId, tempF }',
     startCooling: '{ batchId, g? }',
+    pullBatch: '{ ing, g }',
     discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other" }',
     sanitizeDone: '{}',
     updateSettings: '{ patch }',
@@ -140,7 +141,7 @@
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'discardBatch', 'sanitizeDone'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -825,6 +826,31 @@
     for (let i = 0; i < bs.length; i++) if (bs[i].status !== 'discard') refreshBatch(tx, i);
   }
 
+  // Takes up to `need` grams of a TCS ingredient from the oldest servable batches first (FIFO). Locked and
+  // cooling batches are never used (I8). Returns the records of what was taken, its cost, and what is still
+  // missing.
+  function takeFifoInto(tx, ing, need) {
+    const recs = [];
+    let cost = 0;
+    const bs = tx.get('batches');
+    const cand = [];
+    for (let i = 0; i < bs.length; i++) { const b = bs[i]; if (b.ing === ing.id && servableBatch(b)) cand.push(i); }
+    // Oldest batch first; equal times go to the earlier position in the list.
+    cand.sort((a, b2) => (bs[a].enteredAt - bs[b2].enteredAt) || (a - b2));
+    for (const bi of cand) {
+      if (need <= EPS) break;
+      const b = tx.get('batches')[bi];
+      const take = Math.min(need, b.remainingG);
+      if (!(take > 0)) continue;
+      const w = tx.batch(bi);
+      w.remainingG = b.remainingG - take <= EPS ? 0 : b.remainingG - take;
+      need = need - take <= EPS ? 0 : need - take;
+      recs.push({ ing: ing.id, g: take, batchId: b.id });
+      cost += take * (isNum(b.costPerCookedKg) ? b.costPerCookedKg / 1000 : nominalUnitCost(ing));
+    }
+    return { recs, cost, left: need };
+  }
+
   /* ======================================================================================================
    * 10. Depletion (FIFO from servable batches, never negative) and learning
    * ==================================================================================================== */
@@ -845,22 +871,10 @@
       // TCS food comes from the oldest servable batches first (FIFO). Locked and cooling batches are never
       // used (I8).
       if (ing.tcs) {
-        const bs = tx.get('batches');
-        const cand = [];
-        for (let i = 0; i < bs.length; i++) { const b = bs[i]; if (b.ing === ing.id && servableBatch(b)) cand.push(i); }
-        // Oldest batch first; equal times go to the earlier position in the list.
-        cand.sort((a, b2) => (bs[a].enteredAt - bs[b2].enteredAt) || (a - b2));
-        for (const bi of cand) {
-          if (need <= EPS) break;
-          const b = tx.get('batches')[bi];
-          const take = Math.min(need, b.remainingG);
-          if (!(take > 0)) continue;
-          const w = tx.batch(bi);
-          w.remainingG = b.remainingG - take <= EPS ? 0 : b.remainingG - take;
-          need = need - take <= EPS ? 0 : need - take;
-          recs.push({ ing: ing.id, g: take, batchId: b.id });
-          cost += take * (isNum(b.costPerCookedKg) ? b.costPerCookedKg / 1000 : nominalUnitCost(ing));
-        }
+        const took = takeFifoInto(tx, ing, need);
+        for (const r of took.recs) recs.push(r);
+        cost += took.cost;
+        need = took.left;
       } else {
         // Everything else comes from the plain stock count.
         const stock = tx.get('stock');
@@ -1547,6 +1561,24 @@
     return 'ok';
   };
 
+  // Takes a set amount of a cooked ingredient out of the hold cabinet by hand, oldest batch first. Beside a
+  // POS this is how sales reach the books. If the cabinet holds less than asked, it takes what is there and
+  // says how much was short.
+  A.pullBatch = function (tx, p) {
+    const ing = typeof p.ing === 'string' ? ingMap(tx.get('ingredients')).get(p.ing) : undefined;
+    if (!ing || !ing.tcs) return 'unknownIng';
+    if (!isNum(p.g) || p.g <= 0 || p.g > 1e6) return 'badWeight';
+    const took = takeFifoInto(tx, ing, p.g);
+    if (!took.recs.length) return 'batchNotServable';
+    const g = took.recs.reduce((a, r) => a + r.g, 0);
+    const L = tx.ledger(ing.id);
+    L.pulled = (L.pulled || 0) + g;
+    tx.event('cabinet_pull', { ing: ing.id, g, batchIds: took.recs.map((r) => r.batchId), short: took.left > EPS ? took.left : 0 });
+    pushUndo(tx, 'pull', 'Pulled ' + Math.round(g) + ' g of ' + ing.name, { ing: ing.id, recs: took.recs });
+    tx.info = { ing: ing.id, g, short: took.left > EPS ? took.left : 0, batchIds: took.recs.map((r) => r.batchId) };
+    return 'ok';
+  };
+
   // Logs a cooked batch. Needs a TCS ingredient, a first temperature (32 to 300 F) and a weight (rawG or
   // cookedG). Cooked grams come from what was entered, else the brisket yield model, else the ingredient's
   // starter yield.
@@ -1866,7 +1898,7 @@
   const MENU_MAX = 150;
   const ING_PATCH = {
     name: { t: 'text', max: 60 }, thresholdG: R(0, 1e6), parG: R(0, 1e7), yield: R(0.05, 3), yieldConfirmed: { t: 'bool' },
-    costPerKg: R(0, 10000), costEach: R(0, 10000),
+    costPerKg: R(0, 10000), costEach: R(0, 10000), pullG: R(50, 50000),
   };
   // Shared editor for menu items and ingredients. Checks each field, ignores unchanged ones (nothingToDo if
   // nothing changed), writes one new copy and logs settings_changed. Changing a starter prep time re-fits
@@ -2095,6 +2127,14 @@
     refreshBatch(tx, bi);
     return 'ok';
   };
+  // Undo of a hand pull: puts the grams back into the same batches. Grams whose batch is gone are booked as dropped.
+  UNDO.pull = function (tx, d) {
+    const recs = Array.isArray(d.recs) ? d.recs : [];
+    restoreInto(tx, recs);
+    const L = tx.ledger(d.ing);
+    L.pulled = Math.max(0, (L.pulled || 0) - recs.reduce((a, r) => a + (r.g > 0 ? r.g : 0), 0));
+    return 'ok';
+  };
   // Undo of a sanitise log: only if it is still the latest one.
   UNDO.sanitize = function (tx, d) {
     const cur = tx.get('sanitize') || {};
@@ -2303,7 +2343,7 @@
     // One ledger entry per ingredient. Plain ingredients start at par stock; TCS ones start as a batch
     // (below).
     for (const ing of ingredients) {
-      ledger[ing.id] = { open: 0, in: 0, prunedUsed: 0, prunedWaste: 0, prunedRemain: 0, dropped: 0 };
+      ledger[ing.id] = { open: 0, in: 0, pulled: 0, prunedUsed: 0, prunedWaste: 0, prunedRemain: 0, dropped: 0 };
       if (!ing.tcs) { stock[ing.id] = opts.empty ? 0 : isNum(ing.parG) && ing.parG > 0 ? ing.parG : 0; ledger[ing.id].open = stock[ing.id]; continue; }
       if (opts.empty || !(ing.parG > 0)) continue;
       // starter batches: labelled src 'starter' (demo opening stock) with a starter reading so the line can open
@@ -2497,7 +2537,7 @@
       // Reads one ledger counter; a missing or bad number counts as 0.
       const n = (k) => (isNum(L[k]) ? L[k] : 0);
       const have = ing.tcs ? phys[ing.id] || 0 : hasOwn(state.stock, ing.id) && isNum(state.stock[ing.id]) ? state.stock[ing.id] : 0;
-      const expect = n('open') + n('in') - (used[ing.id] || 0) - n('prunedUsed') - (waste[ing.id] || 0) - n('prunedWaste') - n('prunedRemain') - n('dropped');
+      const expect = n('open') + n('in') - (used[ing.id] || 0) - n('pulled') - n('prunedUsed') - (waste[ing.id] || 0) - n('prunedWaste') - n('prunedRemain') - n('dropped');
       if (Math.abs(expect - have) > 0.5) out.push({ ing: ing.id, expect, have });
     }
     return out;
@@ -2834,7 +2874,7 @@
         const L0 = isObj(st.ledger) && hasOwn(st.ledger, ing.id) && isObj(st.ledger[ing.id]) ? st.ledger[ing.id] : {};
         const L = {};
         for (const k of Object.keys(def.ledger[ing.id] || { open: 0 })) L[k] = isNum(L0[k]) && L0[k] >= 0 ? L0[k] : 0;
-        for (const k of ['open', 'in', 'prunedUsed', 'prunedWaste', 'prunedRemain', 'dropped']) if (!isNum(L[k])) L[k] = 0;
+        for (const k of ['open', 'in', 'pulled', 'prunedUsed', 'prunedWaste', 'prunedRemain', 'dropped']) if (!isNum(L[k])) L[k] = 0;
         ledger[ing.id] = L;
       }
       out.ledger = ledger;

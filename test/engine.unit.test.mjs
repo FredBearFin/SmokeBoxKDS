@@ -978,3 +978,29 @@ test('stagger: starter batches get different ages, the oldest nearest its limit,
   assert.equal(k.tickAt(T0 + 26 * MIN).events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 1);
   assert.equal(E.newState({ now: T0 }).batches.every((b) => b.enteredAt === T0), true);
 });
+
+test('pullBatch: takes grams from the oldest batch first, keeps the books balanced, and undo puts them back', () => {
+  const k = fresh({ stagger: true });
+  const old = k.s.batches.find((b) => b.ing === 'brisket');
+  k.do('addBatch', { ing: 'brisket', tempF: 150, cookedG: 6000 });
+  const fresher = k.s.batches.filter((b) => b.ing === 'brisket' && b.id !== old.id)[0];
+  let r = k.do('pullBatch', { ing: 'brisket', g: 1500 });
+  assert.equal(r.info.g, 1500);
+  assert.deepEqual(r.info.batchIds, [old.id]);
+  assert.equal(k.b(old.id).remainingG, old.remainingG - 1500);
+  assert.equal(k.b(fresher.id).remainingG, 6000);
+  assert.deepEqual(E.checkInvariants(k.s, k.now), []);
+  // a pull bigger than the oldest batch spills into the next one
+  r = k.do('pullBatch', { ing: 'brisket', g: old.remainingG });
+  assert.equal(k.b(old.id).remainingG, 0);
+  assert.equal(r.info.batchIds.length, 2);
+  assert.deepEqual(E.checkInvariants(k.s, k.now), []);
+  k.do('undo', {});
+  assert.equal(k.b(old.id).remainingG, old.remainingG - 1500);
+  assert.equal(k.b(fresher.id).remainingG, 6000);
+  assert.deepEqual(E.checkInvariants(k.s, k.now), []);
+  // bad input
+  k.do('pullBatch', { ing: 'tea', g: 100 }, 'unknownIng');
+  k.do('pullBatch', { ing: 'brisket', g: 0 }, 'badWeight');
+  k.do('pullBatch', { ing: 'beans', g: 1e9 }, 'badWeight');
+});

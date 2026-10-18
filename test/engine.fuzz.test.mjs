@@ -70,7 +70,7 @@ function genAction(rng, s) {
   const tcs = s.ingredients.filter((i) => i.tcs);
   const W = [['createTicket', 16], ['advanceItem', 18], ['completeItem', 5], ['fireNow', 5], ['completeZone', 4], ['bumpTicket', 8], ['recallTicket', 3],
     ['voidTicket', 3], ['setRush', 3], ['toggle86', 4], ['restock', 3], ['addBatch', 5], ['logTemp', 5], ['reheatBatch', 2], ['startCooling', 1],
-    ['discardBatch', 2], ['sanitizeDone', 2], ['updateSettings', 2], ['updateMenuItem', 1], ['addMenuItem', 0.6], ['payOrder', 4], ['reopenOrder', 1], ['voidOrder', 1], ['updateIngredient', 1], ['undo', 7], ['resetLive', 0.2], ['junkType', 2]];
+    ['discardBatch', 2], ['pullBatch', 3], ['sanitizeDone', 2], ['updateSettings', 2], ['updateMenuItem', 1], ['addMenuItem', 0.6], ['payOrder', 4], ['reopenOrder', 1], ['voidOrder', 1], ['updateIngredient', 1], ['undo', 7], ['resetLive', 0.2], ['junkType', 2]];
   let r = rng.next() * W.reduce((a, x) => a + x[1], 0);
   let type = W[0][0];
   for (const [k, w] of W) { r -= w; if (r <= 0) { type = k; break; } }
@@ -105,6 +105,7 @@ function genAction(rng, s) {
     case 'logTemp': p = { batchId: b && b.id, tempF: pick([38, 40, 44, 120, 130, 136, 150, 166, 70]) }; break;
     case 'reheatBatch': p = { batchId: b && b.id, tempF: pick([150, 166, 175]) }; break;
     case 'startCooling': p = { batchId: b && b.id, g: rng.next() < 0.5 ? undefined : 500 }; break;
+    case 'pullBatch': p = { ing: pick(['brisket', 'pork', 'tea', 'beans']), g: pick([500, 1500, 4500, 0, -3]) }; break;
     case 'discardBatch': p = { batchId: b && b.id, reason: pick(['manual', 'quality', 'temp', 'other', 'bad']) }; break;
     case 'sanitizeDone': p = {}; break;
     case 'updateSettings': p = { patch: pick([{ pacing: { enabled: rng.next() < 0.5 } }, { safety: { tempCheckEveryMin: pick([10, 30, 60]) } }, { safety: { hotHoldF: pick([135, 140, 120]) } },
