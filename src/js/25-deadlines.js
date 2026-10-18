@@ -243,6 +243,8 @@
     const m = Math.max(0, Math.round(ms / MIN));
     return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + m % 60 + ' min' : '');
   }
+  // When a batch's early warnings are put off until, or 0 when they are not.
+  function snoozeOf(state, batchId, now) { const t = state.alertSnoozes ? state.alertSnoozes[batchId] : 0; return U.isNum(t) && t > now ? t : 0; }
   // Rows for the cooked batches: expiry with projected waste, and run-out time, per ingredient.
   function batchRows(state, now, S, sales, out) {
     const byIng = Object.create(null);
@@ -302,7 +304,7 @@
         }
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H) || isLim) {
           const quiet = rung === 0 || trivial;
-          out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length, rungsMin: rungs,
+          out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length, rungsMin: rungs, snoozedUntil: snoozeOf(state, b.id, now),
             sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, planFor: isLim ? { ing: ingId, grams: lim.unmetG, by: lim.runOutAt } : undefined, wasteG: waste, wasteUsd: usd, goes86: lastOne, quality: q, trivial, unknown: rate === undefined });
         }
       });
@@ -450,6 +452,8 @@
       if (d.msLeft <= 0) { st.minAnn = Math.min(st.minAnn, cur); return null; }
       const last = cur === lastMin;
       if (cur < st.minAnn) {
+        // Put off with "remind me later": the chime and voice rungs wait (and sound when the time is up); the last rung never does.
+        if (d.snoozedUntil > now && !last) return null;
         st.minAnn = cur; st.ack = false;
         if (last) { st.loudAt = now; return { level: 3, d, repeat: false }; }
         if (R.indexOf(cur) >= 1) return { level: 2, d, repeat: false };
@@ -486,7 +490,8 @@
     expiredRows(state, now, out);
     keepRows(state, now, S, out);
     otherRows(state, now, out);
-    out.sort((a, b) => (SEV_RANK[a.sev] - SEV_RANK[b.sev]) || (a.msLeft - b.msLeft) || (a.id < b.id ? -1 : 1));
+    // Rows whose reminder was put off come after the others of the same severity, so they do not take a strip slot from a live one.
+    out.sort((a, b) => (SEV_RANK[a.sev] - SEV_RANK[b.sev]) || ((a.snoozedUntil ? 1 : 0) - (b.snoozedUntil ? 1 : 0)) || (a.msLeft - b.msLeft) || (a.id < b.id ? -1 : 1));
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.

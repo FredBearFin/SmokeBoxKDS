@@ -157,3 +157,40 @@ test('thresholds: rung sounds follow the place in the list (one rung is only the
   // No pace is known, so the first rung is silent; three voice rungs, then the loud tone.
   assert.deepEqual(five.sounds.filter((s) => !s.repeat && s.kind === 'expiry').map((s) => s.level), [2, 2, 2, 3]);
 });
+
+/* ---------------------------------------- remind me later: early rungs only ---------------------------------------- */
+test('snooze: the early warning waits and sounds when the time is up; the last rung and the limit are never put off', () => {
+  const k = kit();
+  run(k, 1, 149);                                   // 91 minutes left: nothing yet (90-minute rung is silent without a pace anyway)
+  step(k, 150);                                     // 90 left
+  run(k, 151, 194);                                 // 45 minutes left is at minute 195
+  const before = k.sounds.length;
+  const r = E.apply(k.s, 'snoozeAlert', { batchId: k.s.batches[0].id, forMin: 30 }, T0 + 194 * MIN);
+  assert.equal(r.report, 'ok'); k.s = r.state;
+  run(k, 195, 223);                                 // the 45 and 20 minute rungs fall inside the snooze (until minute 224)
+  assert.equal(k.sounds.length, before, 'nothing sounds while the reminder is put off');
+  step(k, 224);                                     // 16 minutes left, snooze over: the pending rung sounds once
+  assert.deepEqual(k.sounds.slice(before).map((s) => s.level), [2]);
+  run(k, 225, 229);
+  step(k, 230);                                     // 10 minutes left: the last rung
+  assert.equal(k.sounds[k.sounds.length - 1].level, 3);
+  // Put off again during the last stretch: it does not silence the last rung or the limit.
+  const k2 = kit();
+  run(k2, 1, 228);
+  const r2 = E.apply(k2.s, 'snoozeAlert', { batchId: k2.s.batches[0].id, forMin: 10 }, T0 + 228 * MIN);
+  k2.s = r2.state;
+  assert.equal(r2.report, 'ok');
+  step(k2, 230);
+  assert.equal(k2.sounds.filter((s) => s.level === 3 && !s.repeat).length, 1, 'the loud last rung sounds although a reminder was put off');
+  run(k2, 231, 242);
+  assert.equal(k2.sounds.filter((s) => s.level === 4).length, 1, 'and so does the limit');
+});
+
+test('snooze: feed rows carry the reminder time and sort after live rows of the same severity', () => {
+  const k = kit();
+  let s = E.apply(k.s, 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T0 + MIN).state;
+  s = E.apply(s, 'snoozeAlert', { batchId: s.batches[0].id, forMin: 20 }, T0 + 200 * MIN).state;
+  const rows = D.build(E.tick(s, T0 + 201 * MIN).state, T0 + 201 * MIN).filter((x) => x.kind === 'expiry');
+  assert.equal(rows.length, 2);
+  assert.ok(!rows[0].snoozedUntil && rows[1].snoozedUntil > 0, 'the put-off row comes last');
+});

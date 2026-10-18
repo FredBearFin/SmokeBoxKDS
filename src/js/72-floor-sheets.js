@@ -340,7 +340,12 @@
       dtKept.hidden = true; ddKept.hidden = true;
       const pullT = h('span', null, 'Pull');
       const bPull = h('button', { type: 'button', class: 'btn', dataset: { act: 'pull' }, hidden: true }, ico('package', 20), pullT);
-      const actions = h('div', { class: 'hc-actions' }, bKeep, bUnkeep, bPull, bLog, bReheat, bCool, bDiscard);
+      // Early warnings can be put off ("remind me later") while a batch is still on the menu and its last warning is not yet due.
+      const snoozeT = h('span', null, 'Remind me in 10 min');
+      const bSnooze = h('button', { type: 'button', class: 'btn', dataset: { act: 'snooze' }, hidden: true }, ico('clock', 20), snoozeT);
+      const unsnoozeT = h('span', null, 'Cancel reminder');
+      const bUnsnooze = h('button', { type: 'button', class: 'btn', dataset: { act: 'unsnooze' }, hidden: true }, ico('x', 20), unsnoozeT);
+      const actions = h('div', { class: 'hc-actions' }, bKeep, bUnkeep, bSnooze, bUnsnooze, bPull, bLog, bReheat, bCool, bDiscard);
       const editorSlot = h('div', { class: 'hc-editor-slot' });
       // Card layout: heading, ring and facts, message and lock note, cooling steps, then the buttons.
       const el = h('article', { class: 'hc-card', dataset: { batch: b.id, tone: 'ok' }, 'aria-label': 'Batch' },
@@ -349,7 +354,7 @@
           h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
             h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept))),
         costLine, msg, lock, cool, actions, editorSlot);
-      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept, bKeep, bUnkeep, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
+      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept, bKeep, bUnkeep, bSnooze, bUnsnooze, unsnoozeT, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
       bLog.addEventListener('click', () => toggleEditor(rec, 'log'));
       bReheat.addEventListener('click', () => toggleEditor(rec, 'reheat'));
       bCool.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openCooling(bb, bCool); });
@@ -357,6 +362,9 @@
       bPull.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) pullFrom(bb); });
       bKeep.addEventListener('click', () => openKeep(rec.id, bKeep));
       bUnkeep.addEventListener('click', () => openUnkeep(rec.id, bUnkeep));
+      // Puts the early warnings off for 10 minutes, or cancels that, and says what happened.
+      bSnooze.addEventListener('click', () => { const res = run('snoozeAlert', { batchId: rec.id, forMin: 10 }); if (res.report !== 'ok') toast(say(res), 'warn'); else toast('Reminder at ' + U.fmtTime(res.info.until) + '. The last warning still sounds on time.', 'ok'); update(nowMs()); });
+      bUnsnooze.addEventListener('click', () => { const res = run('clearSnooze', { batchId: rec.id }); if (res.report !== 'ok') toast(say(res), 'warn'); update(nowMs()); });
       return rec;
     }
     // True when this is the oldest batch of its ingredient that can still be served: the one a pull comes from.
@@ -387,6 +395,8 @@
 
     // Refreshes one card from the batch and the engine's verdict. Only text and classes that changed are
     // touched, so a card is never rebuilt under a finger.
+    // The expiry rows of the deadline feed by batch, rebuilt once per update.
+    let feedByBatch = new Map();
     function updateCard(rec, b, now) {
       const S = safety();
       const gt = E().gate(b, now, S);
@@ -431,6 +441,12 @@
       if (keptNow) text(rec.ddKept, 'until ' + U.fmtTime(b.keepUntil) + (b.keptBy ? ', by ' + b.keptBy : ''));
       setHidden(rec.bKeep, gt.action !== 'PAST_QUALITY');
       setHidden(rec.bUnkeep, !keptNow);
+      // The reminder buttons follow this batch's row in the deadline feed.
+      const row = feedByBatch.get(b.id);
+      const snoozed = !!(row && row.snoozedUntil);
+      setHidden(rec.bSnooze, !(row && row.rung >= 1 && row.rung < row.rungs && !snoozed && gt.action !== 'PAST_QUALITY'));
+      setHidden(rec.bUnsnooze, !snoozed);
+      if (snoozed) text(rec.unsnoozeT, 'Reminder at ' + U.fmtTime(row.snoozedUntil) + ': cancel');
       if (gt.action === 'REHEAT_IMMEDIATE' || gt.action === 'CHILL_NOW') {
         if (b.kind === 'cooling') { text(rec.dtNext, 'Next step'); text(rec.ddNext, U.isNum(gt.nextDeadlineAt) ? 'within ' + hmLong(gt.nextDeadlineAt - now) : 'now'); }
         else { text(rec.dtNext, 'Decide within'); text(rec.ddNext, U.isNum(gt.nextDeadlineAt) ? (gt.nextDeadlineAt - now > 0 ? hmLong(gt.nextDeadlineAt - now) : 'now') : 'now'); }
@@ -778,9 +794,9 @@
       });
     }
     // Keeps the "Batches still to come" box current: rebuilt only when the plans or the open asks change, so a typed time is never lost.
-    function updatePlans(now) {
+    function updatePlans(now, feed) {
       const s = st();
-      const asks = SB.deadlines.build(s, now).filter((d) => d.planFor);
+      const asks = feed.filter((d) => d.planFor);
       const plans = s.planned || [];
       const sig = plans.map((e) => e.id).join() + '|' + asks.map((d) => d.planFor.ing + ':' + Math.round(d.planFor.by / 60000)).join();
       if (sig === planSig) return;
@@ -804,6 +820,8 @@
     // The one update path: membership on store change, text on the 1 Hz tick.
     function update(now) {
       const s = st();
+      const feed = SB.deadlines.build(s, now);
+      feedByBatch = new Map(feed.filter((d) => d.kind === 'expiry').map((d) => [d.batchId, d]));
       const live = s.batches.filter((b) => b.status !== 'discard' && b.remainingG > 0).sort((a, b) => a.enteredAt - b.enteredAt || (a.id < b.id ? -1 : 1));
       reconcile(grid, cards, live, (b) => b.id, makeCard, null);
       let check = 0, act = 0;
@@ -824,7 +842,7 @@
       const dis = s.batches.filter((b) => b.status === 'discard' && U.isNum(b.discardedAt)).sort((a, b) => b.discardedAt - a.discardedAt).slice(0, 5);
       reconcile(recentList, recents, dis, (b) => b.id, makeRecent, (rec, b) => updateRecent(rec, b, now));
       setHidden(recentBox, !dis.length);
-      updatePlans(now);
+      updatePlans(now, feed);
     }
     update(nowMs());
     watch(offs, () => update(nowMs()), (now) => update(now));

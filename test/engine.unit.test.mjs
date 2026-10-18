@@ -1270,3 +1270,43 @@ test('settings.alerts.ladderThresholds: accepts good lists, refuses bad ones, ro
   set(null);
   assert.equal(k.s.settings.alerts.ladderThresholds, null);
 });
+
+/* ------------------------------------------------ put-off reminders (snoozeAlert) ------------------------------------------------ */
+test('snoozeAlert: 1 to 30 minutes, clamped before the last warning, refused for past or gone batches; undo, clear, prune, backup', () => {
+  const k = qualityKit();
+  const id = k.s.batches[0].id;
+  k.at(T0 + 2 * HR);
+  k.do('snoozeAlert', { batchId: id, forMin: 0 }, 'badSnooze');
+  k.do('snoozeAlert', { batchId: id, forMin: 31 }, 'badSnooze');
+  k.do('snoozeAlert', { batchId: id, forMin: 'x' }, 'badSnooze');
+  k.do('snoozeAlert', { batchId: 'b_99', forMin: 10 }, 'unknownBatch');
+  const r = k.do('snoozeAlert', { batchId: id, forMin: 10 });
+  assert.equal(r.info.until, T0 + 2 * HR + 10 * MIN);
+  assert.deepEqual(k.s.alertSnoozes, { [id]: T0 + 2 * HR + 10 * MIN });
+  k.do('undo', {});
+  assert.deepEqual(k.s.alertSnoozes, {});
+  k.do('snoozeAlert', { batchId: id, forMin: 10 });
+  const back = E.validateBackup(E.serialize(k.s));
+  assert.deepEqual(back.state.alertSnoozes, k.s.alertSnoozes);
+  // Cleared by hand, then undone.
+  k.do('clearSnooze', { batchId: id });
+  assert.deepEqual(k.s.alertSnoozes, {});
+  k.do('clearSnooze', { batchId: id }, 'unknownBatch');
+  k.do('undo', {});
+  assert.equal(Object.keys(k.s.alertSnoozes).length, 1);
+  // It runs out by itself.
+  const t = k.tickAt(T0 + 2 * HR + 11 * MIN);
+  assert.deepEqual(k.s.alertSnoozes, {});
+  // The limit is 4 h: 10 minutes before it a 30-minute reminder is clamped to 5 minutes before the limit.
+  k.at(T0 + 3 * HR + 50 * MIN);
+  const c = k.do('snoozeAlert', { batchId: id, forMin: 30 });
+  assert.equal(c.info.until, T0 + 4 * HR - 5 * MIN);
+  k.at(T0 + 3 * HR + 56 * MIN).do('snoozeAlert', { batchId: id, forMin: 10 }, 'badSnooze');
+  // Past its limit: refused. A discarded batch drops its reminder.
+  k.tickAt(T0 + 4 * HR + 1);
+  k.do('snoozeAlert', { batchId: id, forMin: 10 }, 'badSnooze');
+  const k2 = qualityKit(); k2.at(T0 + HR).do('snoozeAlert', { batchId: k2.s.batches[0].id, forMin: 20 });
+  k2.do('discardBatch', { batchId: k2.s.batches[0].id, reason: 'manual' });
+  k2.tickAt(T0 + HR + MIN);
+  assert.deepEqual(k2.s.alertSnoozes, {});
+});

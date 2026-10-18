@@ -1171,10 +1171,10 @@
       setHidden(r.el, !d);
       if (!d) { r.key = ''; return; }
       r.key = d.id; r.batchId = d.batchId || null;
-      setTone(r.el, d.sev);
+      setTone(r.el, d.snoozedUntil ? 'info' : d.sev);
       setTxt(r.when, d.kind === 'expired' ? 'OUT' : d.kind === 'past' ? 'PAST' : countdownText(d.msLeft));
       setTxt(r.what, d.label);
-      setTxt(r.why, d.consequence + ' ' + d.action);
+      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action);
     });
   }
 

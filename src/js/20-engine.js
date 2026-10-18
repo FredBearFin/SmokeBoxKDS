@@ -54,7 +54,7 @@
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -109,6 +109,7 @@
     badUntil: 'Pick a time later than now, or choose 30 minutes or 1 hour.',
     badPlanTime: 'Pick a time when the batch comes off the smoker: within the next day and a half, and not already past its serving time.',
     unknownPlan: 'That planned batch is gone. It may have been used, cancelled or expired.',
+    badSnooze: 'A reminder can be put off for 1 to 30 minutes, only for a batch still on the menu, and never past 5 minutes before its last warning. The last warning, a past-quality batch and a thrown-out batch cannot be put off.',
   };
 
   // audit:data-end
@@ -139,6 +140,8 @@
     endKeepServing: '{ batchId, who, note? }',
     planBatch: '{ ing, grams, offAt }',
     cancelPlan: '{ planId }',
+    snoozeAlert: '{ batchId, forMin }',
+    clearSnooze: '{ batchId }',
     discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other" }',
     sanitizeDone: '{}',
     updateSettings: '{ patch }',
@@ -151,7 +154,7 @@
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -1919,6 +1922,39 @@
     tx.info = { planId: entry.id };
     return 'ok';
   };
+  // Puts off the early warnings (chime and voice) for one batch: "remind me later". Never the last warning, a past-quality
+  // batch or a thrown-out one, at most 30 minutes, and never past 5 minutes before the last warning could be due (the
+  // ladder also ignores a snooze once the last rung is reached). Undoable.
+  A.snoozeAlert = function (tx, p) {
+    const bs = tx.get('batches');
+    const bi = typeof p.batchId === 'string' ? findBatchIdx(bs, p.batchId) : -1;
+    if (bi < 0) return 'unknownBatch';
+    const b = bs[bi];
+    if (!isInt(p.forMin) || p.forMin < 1 || p.forMin > 30) return 'badSnooze';
+    if (b.status === 'discard' || b.status === 'past' || !(b.remainingG > 0) || b.canServe === false) return 'badSnooze';
+    const S = safetyOf(tx.get('settings'));
+    const end = hasQualityStage(b, S) && isNum(b.keepUntil) && b.keepUntil > tx.now ? Math.min(b.keepUntil, b.enteredAt + hardLimitMs(S)) : b.enteredAt + holdLimitMs(b, S);
+    const until = Math.min(tx.now + p.forMin * MIN, end - 5 * MIN);
+    if (!(until > tx.now)) return 'badSnooze';
+    const cur = tx.get('alertSnoozes') || {};
+    const next = Object.assign({}, cur); next[b.id] = until;
+    tx.own.add(next); tx.set('alertSnoozes', next);
+    tx.event('alert_snoozed', { batchId: b.id, ing: b.ing, until, forMin: p.forMin });
+    pushUndo(tx, 'snooze', 'Reminder put off', { batchId: b.id, before: isNum(cur[b.id]) ? cur[b.id] : null });
+    tx.info = { batchId: b.id, until };
+    return 'ok';
+  };
+  // Ends a put-off reminder early. Undoable.
+  A.clearSnooze = function (tx, p) {
+    const cur = tx.get('alertSnoozes') || {};
+    if (typeof p.batchId !== 'string' || !isNum(cur[p.batchId])) return 'unknownBatch';
+    const next = Object.assign({}, cur); const was = next[p.batchId]; delete next[p.batchId];
+    tx.own.add(next); tx.set('alertSnoozes', next);
+    tx.event('alert_snooze_cleared', { batchId: p.batchId });
+    pushUndo(tx, 'unsnooze', 'Reminder back on', { batchId: p.batchId, until: was });
+    tx.info = { batchId: p.batchId };
+    return 'ok';
+  };
   // The real batch of a product replaces the earliest planned one for it.
   function consumePlanInto(tx, ingId, batchId) {
     const cur = tx.get('planned') || [];
@@ -2362,6 +2398,21 @@
     L.pulled = Math.max(0, (L.pulled || 0) - recs.reduce((a, r) => a + (r.g > 0 ? r.g : 0), 0));
     return 'ok';
   };
+  // Undo of a put-off reminder: back to what it was.
+  UNDO.snooze = function (tx, d) {
+    const cur = tx.get('alertSnoozes') || {};
+    const next = Object.assign({}, cur);
+    if (isNum(d.before)) next[d.batchId] = d.before; else delete next[d.batchId];
+    tx.own.add(next); tx.set('alertSnoozes', next);
+    return 'ok';
+  };
+  // Undo of an ended put-off reminder: puts it back if it has not run out meanwhile.
+  UNDO.unsnooze = function (tx, d) {
+    if (!isNum(d.until) || d.until <= tx.now || findBatchIdx(tx.get('batches'), d.batchId) < 0) return 'undoConflict';
+    const next = Object.assign({}, tx.get('alertSnoozes') || {}); next[d.batchId] = d.until;
+    tx.own.add(next); tx.set('alertSnoozes', next);
+    return 'ok';
+  };
   // Undo of a planned batch: takes it out again, if it is still there.
   UNDO.plan = function (tx, d) {
     const cur = tx.get('planned') || [];
@@ -2447,6 +2498,7 @@
     }
     for (const sy of state.syncs) for (const t of C.syncTargets) { const x = sy.targets[t.id]; if (x && x.doneAt == null && x.dueAt < fs) fs = x.dueAt; }
     for (const e of state.planned || []) { const x = planExpiresAt(e); if (x < fs) fs = x; }
+    for (const k of Object.keys(state.alertSnoozes || {})) if (state.alertSnoozes[k] < fs) fs = state.alertSnoozes[k];
     const S = safetyOf(state.settings);
     for (const b of state.batches) if (b.status !== 'discard' && (b.remainingG > 0 || b.kind === 'cooling')) { const x = statusDeadline(b, S); if (x < bd) bd = x; }
     d = { fs, bd };
@@ -2487,6 +2539,14 @@
       const keep = pl.filter((e) => now < planExpiresAt(e));
       for (const e of pl) if (now >= planExpiresAt(e)) tx.event('plan_expired', { planId: e.id, ing: e.ing });
       tx.own.add(keep); tx.set('planned', keep);
+    }
+    const sn = s.alertSnoozes || {};
+    const snIds = Object.keys(sn);
+    if (snIds.length) {
+      const live = new Set(s.batches.filter((b) => b.status !== 'discard' && b.remainingG > 0).map((b) => b.id));
+      const keepS = {}; let dropped = false;
+      for (const id of snIds) if (sn[id] > now && live.has(id)) keepS[id] = sn[id]; else dropped = true;
+      if (dropped) { tx.own.add(keepS); tx.set('alertSnoozes', keepS); }
     }
     const S = safetyOf(s.settings);
     const bs = s.batches;
@@ -2618,7 +2678,7 @@
     }
     // The whole state. The clock is not stored here; the store keeps it.
     const st = {
-      v: 1, rev: 0, settings, menu, ingredients, tickets: [], orders: [], batches, stock, manual86: {}, avail: {}, syncs: [], planned: [],
+      v: 1, rev: 0, settings, menu, ingredients, tickets: [], orders: [], batches, stock, manual86: {}, avail: {}, syncs: [], planned: [], alertSnoozes: {},
       learned: isObj(opts.learned) ? opts.learned : {}, sanitize: { dueAt: now }, seq, events: [], eventArchive: [], undo: [], ledger,
     };
     const av = computeAvail(st);
@@ -3075,6 +3135,9 @@
         if (planned.length < MAX_PLANNED && ig && ig.tcs && typeof e.id === 'string' && isNum(e.grams) && e.grams > 0 && e.grams <= 1e6 && isNum(e.offAt) && isNum(e.readyAt) && e.readyAt >= e.offAt) planned.push({ id: e.id, ing: e.ing, grams: e.grams, offAt: e.offAt, readyAt: e.readyAt });
         else repaired.push('dropped planned batch');
       }
+      // put-off reminders: only for batches that are in the file, with a time
+      const alertSnoozes = {};
+      if (isObj(st.alertSnoozes)) for (const id of Object.keys(st.alertSnoozes)) { if (safeKey(id) && batches.some((b) => b.id === id) && isNum(st.alertSnoozes[id])) alertSnoozes[id] = st.alertSnoozes[id]; else repaired.push('dropped reminder'); }
       // stock
       const stock = {};
       for (const ing of ingredients) {
@@ -3145,7 +3208,7 @@
       if (isNum(sz.lastAt)) sanitize.lastAt = sz.lastAt;
       sanitize.dueAt = isNum(sz.dueAt) ? sz.dueAt : isNum(sanitize.lastAt) ? sanitize.lastAt + settings.safety.sanitizeEveryH * H : 0;
       const out = {
-        v: 1, rev: isInt(st.rev) && st.rev >= 0 ? st.rev : 0, settings, menu, ingredients, tickets, orders, batches, stock, manual86, avail: {}, syncs, planned, learned, sanitize, seq,
+        v: 1, rev: isInt(st.rev) && st.rev >= 0 ? st.rev : 0, settings, menu, ingredients, tickets, orders, batches, stock, manual86, avail: {}, syncs, planned, alertSnoozes, learned, sanitize, seq,
         events, eventArchive: archive, undo: [], ledger: {},
       };
       // ledger: keep stored counters; if they do not balance, re-open the books at the current physical stock
