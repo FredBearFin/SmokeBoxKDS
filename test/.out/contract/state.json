@@ -1,16 +1,16 @@
 {
- "run": 37,
+ "run": 38,
  "p": {
   "missing-api|70-floor-board.js|SB.floor._alerts.push": {
-   "runs": 7,
-   "last": 37,
+   "runs": 8,
+   "last": 38,
    "what": "SB.floor._alerts.push (call) does not exist at run time; defined nowhere in src/js; 1 site, 1 unguarded",
    "file": "70-floor-board.js",
    "messaged": false
   },
   "missing-api|70-floor-board.js|SB.floor._alerts.length": {
-   "runs": 7,
-   "last": 37,
+   "runs": 8,
+   "last": 38,
    "what": "SB.floor._alerts.length (read) does not exist at run time; defined nowhere in src/js; 1 site, 1 unguarded",
    "file": "70-floor-board.js",
    "messaged": false

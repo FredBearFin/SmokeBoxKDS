@@ -166,6 +166,10 @@ Built on the existing ladder, not beside it: editable warning times, "remind me 
 - Snooze and leader behaviour across devices: not built; that is the Connected mode, after the gate.
 - The ux10 replay sound counts changed after the limit fix and are re-run in the next section.
 
+### ux10 re-run after the alert-ladder extensions (2026-10-19)
+
+Same seed (20261018), two runs, identical fingerprints both times (A 41321ea781a4fe03, B e330ed78ce187585, C 2ac941878ac0b06c, D 7ba6e8e06916ca34, E 5a295071207479a4). **Only A and D changed** from the earlier counted runs, and only because the limit no longer sounds twice (the expiry row at the limit is quiet; the past row sounds): A 45 to 43 sounds (first sounds 7 to 5), D 90 to 89 (14 to 13). B, C and E are unchanged. False alarms 0 and misses 0 in every scenario; D still sounded 3 of 3 lapses within 2 virtual minutes with all 3 extension rungs present and no sound at a keep tap. The sound-leader gate does not affect the alert log the replay reads (a single tab), so it is not exercised here. The limits stated for scenario E and the untested items above still apply.
+
 ## Phase A: strip readability and taps (measured 2026-10-18)
 
 Screenshots: `docs/ux-shots/strip-1024x768.png`, `strip-1280x800.png`, `strip-1920x1080.png`. At every size the strip shows the two or three most urgent rows above the tickets; at 1024x768 and 1280x800 it uses 175 px of the screen (two rows; a third row is hidden below 820 px height), at 1920x1080 157 px.
