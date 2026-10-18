@@ -18647,6 +18647,8 @@ a.of-nav:active { background: var(--press); }
       // When the engine already locked the batch, its reason is preselected so waste is labelled correctly.
       let reason = gt.action === 'DISCARD_LOCKOUT' && order.indexOf(gt.reason) >= 0 ? gt.reason : null;
       if (reason == null && gt.action === 'DISCARD_LOCKOUT') reason = gt.reason === 'expired' ? 'expired' : 'temp';
+      // Past its quality limit the reason is already known, so discarding takes no extra tap.
+      if (reason == null && gt.action === 'PAST_QUALITY') reason = 'quality';
       const fx = whatIf('discardBatch', { batchId: b.id, reason: 'quality' });
       // An empty value means nothing is picked yet (null would select the first reason).
       const seg = SB.ui.segmented({ label: 'Why is it being thrown out?', class: 'hc-reasons', value: reason == null ? '' : reason, options: order.map((id) => ({ id, label: REASON_WORDS[id] })), onChange: (id) => { reason = id; paint(); } });

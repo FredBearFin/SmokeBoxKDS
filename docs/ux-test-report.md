@@ -68,3 +68,64 @@ A sound about a clock deadline when the pace was unknown is not a false alarm by
 **Method.** 8 virtual hours of service starting at the current hour, closing at the end of them (service hours set in the replay), 240x speed, 1280x800, demo crew on, a scripted pit master cooking new batches every 2 to 3 hours and, when a batch goes past its quality limit, logging a temperature and keeping it serving for an hour if more than 1 kg is left (otherwise discarding it). Run twice. Alerts are read from the board's own alert log (`SB.floor._alerts`), which records the batch, the grams left and whether sound was allowed at the moment of each sound.
 
 Results are in the next section once the run is done.
+
+## Phase A replay: results (2026-10-18, after the definitions above were committed)
+
+Two runs of `ux-scripts/ux9-service-replay.mjs` at 120x speed (one tick of the board is 2 virtual minutes), 1280x800, 8 virtual hours, the demo crew on and the scripted pit master from the method above. **This is a simulation, not a real service.**
+
+| | Run A | Run B |
+|---|---|---|
+| Sounds in total (first sound at a rung plus repeats) | 16 | 20 |
+| Sounds per hour | 2 | 2.5 |
+| Repeats of the loud tone | 0 | 1 |
+| **False alarms** (rules 1 to 4) | 0 | 0 |
+| Limits reached (a batch passed its limit) | 7 | 5 |
+| Of those, at or above the floor | 4 | 3 |
+| **Misses** | 0 | 0 |
+| Limits reached while the kitchen was closed | 0 | 0 |
+| Informational: sounds for batches whose real waste at the limit was below the floor | 0 | 3 |
+| First-sound lead before the limit, minutes (batches at or above the floor) | [28, 31, 61, 61] | [28, 62, 61] |
+| Console errors or page errors | 0 | 0 |
+
+Two earlier runs are not counted: the first version of the script logged a hot temperature (150 F) for cold-hold food, which sent a batch to "chill", and it cleared the alert log after start-up, which dropped the starter brisket's first warning. Both were script faults, fixed before the runs above. The code under test did not change between them.
+
+What the runs say, and what they do not:
+- No false alarm and no miss in either run. Every batch that reached its limit with real food left (4 in run A, 3 in run B) had a sound at least 28 minutes before the limit.
+- Run B had 3 sounds about batches that ended with less than the floor left. The definition does not count them (the app projected more waste than came true), but they show a projection can overstate; they are listed as information, not hidden.
+- The quality limit worked as designed in the replay: every limit reached was a quality limit, so the batch went to "past quality limit", the scripted cook tasted it and kept it an hour or threw it out, and nothing was thrown out by the app on its own.
+- **Not covered:** the replay only exercises batch deadlines. Temperature checks, reheat and chill, cooling, late tickets and the sanitize timer are not scored. The loud repeat tone (every 20 real seconds) barely runs at 120x, so its annoyance is untested (1 repeat in run B, 0 in run A). Safety limits and the hard cap were never reached. Demand comes from the demo crew and hand pulls scripted by me, so it is steadier than a real rush. Nobody listened to the sounds.
+
+## Phase A: strip readability and taps (measured 2026-10-18)
+
+Screenshots: `docs/ux-shots/strip-1024x768.png`, `strip-1280x800.png`, `strip-1920x1080.png`. At every size the strip shows the two or three most urgent rows above the tickets; at 1024x768 and 1280x800 it uses 175 px of the screen (two rows; a third row is hidden below 820 px height), at 1920x1080 157 px.
+
+Text sizes in the strip (CSS px): countdown 28 (40.8 at 1920 wide), batch name 22 (26.4), what-happens line 17 (20.4). Reading distance with the same assumptions as the table above (cap height 0.72 times font size; 0.4 degrees comfortable, 0.2 barely legible):
+
+| Screen | Countdown | Batch name | What-happens line |
+|---|---|---|---|
+| 10.1 in tablet, 1280x800 | 1.6 ft / 3.2 ft | 1.3 ft / 2.5 ft | 1.0 ft / 2.0 ft |
+| 24 in monitor, 1920x1080 | 3.8 ft / 7.6 ft | 2.5 ft / 4.9 ft | 1.9 ft / 3.8 ft |
+| 32 in TV, 1920x1080 | 5.1 ft / 10.2 ft | 3.3 ft / 6.6 ft | 2.5 ft / 5.1 ft |
+| 43 in TV, 1920x1080 | 6.8 ft / 13.7 ft | 4.4 ft / 8.9 ft | 3.4 ft / 6.9 ft |
+
+(comfortable / barely legible)
+
+**The acceptance test is not met yet.** The test was: from 10 feet, in 10 seconds, with no taps, know which batch is about to go and what to do. On a 43 in TV the countdown is comfortable to 6.8 ft and barely legible at 10 ft; the batch name is comfortable to 4.4 ft; the line that says what happens is barely legible at 7 ft. On a tablet nothing in the strip reads from across a kitchen. The strip says the right thing, but not yet at the size it needs. Far-display type (the line board's big-type mode and a bigger strip) is the next step and is planned after the real-service gate unless the pilot decides otherwise.
+
+Taps (counted by driving the buttons on a 1280x800 touch screen, 2026-10-18): pulling a unit from the cabinet 2 taps (Hold, Pull); keeping a past-quality batch serving 3 taps once initials are remembered (Hold, Keep, confirm) when a fresh reading already exists, plus the usual 3 taps to log one if it does not; discarding a past-quality batch 3 taps (Hold, Discard, confirm; the reason is now pre-filled). The Cabinet tab will take one tap off each.
+
+## Status of the original findings
+
+| # | Finding | Status |
+|---|---|---|
+| 1 | No warning ladder, cry-wolf badge | Built: strip, ladder, grouped sounds, badge says why. Replayed in simulation (above). |
+| 2 | Sound off, nothing spoken, no wake lock | Built: on by default with a tap-to-allow bar, spoken calls, wake lock request (refused in headless Chromium; untested on a real tablet). |
+| 3 | Hold, 86, Recall hidden below 1180 px | Fixed at 1024 px (words drop before buttons). Not checked on a real 1024-wide Android tablet. |
+| 4 | Text too small | Strip measured above: not enough for a TV across a room. Open. |
+| 5 | Too many taps | Pull and keep are 2 and 3 taps. Clean-hands bump, inferred items: open (phase C). |
+| 6 | All-pink board, "On time" chips | Open. |
+| 7 | Uneven ticket heights, fold, counts strip | Open. |
+| 8 | Toasts cover buttons | Moved bottom-left on tablets and up. Not re-checked against every sheet. |
+| 9 | Channel sync block on the 86 board | Folded below the menu and stock. |
+| 10 | Mixed units | Open: the cook endpoint now also shows F; no units setting. |
+| 11 | New batch form | Starts from the last batch of each product. Fewer inputs: open. |
