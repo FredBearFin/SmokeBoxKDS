@@ -145,25 +145,37 @@
     return best;
   }
   // Walks from now to close in steps between the moments something changes (a resting batch becomes ready, a
-  // batch passes its limit), serving the pace from the oldest ready batch first. Returns the grams left at close in
-  // batches still alive minus any demand nobody could serve (so negative means short), the first moment the
-  // ready stock ran out, and the grams that passed their limit before close. Each batch is { remainingG, enteredAt,
-  // readyAt, expAt }.
+  // batch passes its limit), serving the pace from the oldest ready batch first. Each batch is { remainingG,
+  // enteredAt, readyAt, expAt, id?, quality? }. Returns two separate numbers, since either can matter and one
+  // ingredient can have both: leftoverG (grams in batches still alive at close) and unmetG (demand nobody could
+  // serve). Also runOutAt (the first moment demand went unserved), runOutCause ('rest-gap' when a batch is still
+  // resting and ready later, gapEndAt; 'limit' when a batch passing its limit ended the supply, limitBatchId and
+  // limitQuality; else 'stock'), and wasteBefore (grams that passed their limit before close).
   function sweepToClose(batches, rate, now, closeAt) {
-    const bs = batches.map((b) => ({ rem: b.remainingG, ent: b.enteredAt, ready: Math.max(now, b.readyAt || 0), exp: b.expAt })).sort((x, y) => x.ent - y.ent);
+    const bs = batches.map((b) => ({ rem: b.remainingG, ent: b.enteredAt, ready: Math.max(now, b.readyAt || 0), exp: b.expAt, id: b.id, quality: !!b.quality })).sort((x, y) => x.ent - y.ent);
     const marks = new Set([now, closeAt]);
     for (const b of bs) for (const t of [b.ready, b.exp]) if (t > now && t < closeAt) marks.add(t);
     const times = Array.from(marks).sort((x, y) => x - y);
-    let unmet = 0, runOutAt = null, wasteBefore = 0;
+    let unmet = 0, gapUnmet = 0, runOutAt = null, wasteBefore = 0, cause = null, gapEndAt = null, limitBatchId = null, limitQuality = false, lastLimit = null;
     for (let i = 0; i + 1 < times.length; i++) {
       const a = times[i], z = times[i + 1], dem = rate * (z - a);
       let need = dem;
       for (const b of bs) { if (need <= 0) break; if (b.rem > 0 && b.ready <= a && b.exp > a) { const take = Math.min(need, b.rem); b.rem -= take; need -= take; } }
-      if (need > 1e-6) { if (runOutAt == null) runOutAt = a + (dem - need) / rate; unmet += need; }
-      for (const b of bs) if (b.exp <= z && b.rem > 0) { wasteBefore += b.rem; b.rem = 0; }
+      if (need > 1e-6) {
+        if (runOutAt == null) {
+          runOutAt = a + (dem - need) / rate;
+          const gap = bs.filter((b) => b.rem > 0 && b.ready > runOutAt && b.ready < closeAt && b.exp > b.ready).sort((x, y) => x.ready - y.ready)[0];
+          if (gap) { cause = 'rest-gap'; gapEndAt = gap.ready; }
+          else if (lastLimit && Math.abs(lastLimit.exp - runOutAt) < 1000) { cause = 'limit'; limitBatchId = lastLimit.id; limitQuality = lastLimit.quality; }
+          else cause = 'stock';
+        }
+        unmet += need;
+        if (cause === 'rest-gap' && z <= gapEndAt) gapUnmet += need;
+      }
+      for (const b of bs) if (b.exp <= z && b.rem > 0) { wasteBefore += b.rem; b.rem = 0; if (!lastLimit || b.exp >= lastLimit.exp) lastLimit = { exp: b.exp, id: b.id, quality: b.quality }; }
     }
     const alive = bs.reduce((acc, b) => acc + (b.exp > closeAt ? b.rem : 0), 0);
-    return { leftoverG: alive - unmet, runOutAt, wasteBefore };
+    return { leftoverG: alive, unmetG: unmet, gapUnmetG: gapUnmet, runOutAt, runOutCause: cause, gapEndAt, limitBatchId, limitQuality, wasteBefore };
   }
   // Whether a new batch started now would be ready before close: now + cook time + rest time against closing. Returns
   // null when the product has no cook time, else { readyAt, fits }.
@@ -172,32 +184,50 @@
     const readyAt = now + (ing.cookH + (U.isNum(ing.restH) ? ing.restH : 0)) * H;
     return { readyAt, fits: readyAt < closeAt };
   }
-  // Rows for one ingredient at the current pace: grams left over at close (waste, silent) or a shortfall (it runs out
-  // early, a silent caution with what to do). Only batches that can be served count; a pull counts as sold, so
-  // food already on the block is not counted.
-  function closeRows(state, ing, name, list, rate, now, S, out) {
+  // The sweep to close for one ingredient at the current pace, or null (closed, nothing servable). Only batches that
+  // can be served count; a pull counts as sold, so food already on the block is not counted.
+  function closeInfo(state, ing, list, rate, now, S) {
     const closeAt = closeAtMs(state, now);
-    if (closeAt == null) return;
+    if (closeAt == null) return null;
     const bs = list.filter((b) => b.canServe !== false).map((b) => {
       const hardAt = b.enteredAt + (U.isNum(S.hardCapH) ? S.hardCapH : S.defaultMaxHoldH) * H, limAt = b.enteredAt + E()._internal.holdLimitMs(b, S);
       const q = b.holdBasis === 'quality' && limAt < hardAt;
-      return { remainingG: b.remainingG, enteredAt: b.enteredAt, readyAt: b.restUntil, expAt: q && U.isNum(b.keepUntil) && b.keepUntil > now ? Math.min(b.keepUntil, hardAt) : limAt };
+      return { id: b.id, quality: q, remainingG: b.remainingG, enteredAt: b.enteredAt, readyAt: b.restUntil, expAt: q && U.isNum(b.keepUntil) && b.keepUntil > now ? Math.min(b.keepUntil, hardAt) : limAt };
     });
-    if (!bs.length) return;
-    const stock = bs.reduce((acc, b) => acc + b.remainingG, 0);
-    const r = sweepToClose(bs, rate, now, closeAt);
-    const toClose = closeAt - now;
+    if (!bs.length) return null;
+    return { closeAt, stock: bs.reduce((acc, b) => acc + b.remainingG, 0), r: sweepToClose(bs, rate, now, closeAt) };
+  }
+  // What to do about a run-out at runOutAt: start a new batch by a time that is still ahead, or say it is too late.
+  // Null when the product has no cook time. The text never counts anything still on the smoker.
+  function startBy(ing, now, runOutAt, unmetG) {
+    if (!ing || !U.isNum(ing.cookH) || !(ing.cookH > 0)) return null;
+    const latest = runOutAt - (ing.cookH + (U.isNum(ing.restH) ? ing.restH : 0)) * H;
+    if (latest > now) return { ahead: true, latestStart: latest, text: 'Start the next batch by ' + U.fmtTime(latest) + ', not counting anything still on the smoker.' };
+    return { ahead: false, latestStart: latest, text: 'Too late for a new batch to cover it: about ' + U.fmtG(unmetG) + ' of demand with nothing to sell. Shorten portions, stop preorders, run a special.' };
+  }
+  // Rows for one ingredient from its close sweep: grams left over at close (waste, silent) and demand with nothing to
+  // sell (a silent caution with what to do). Either can raise a row. A shortfall that a quality limit causes has no row
+  // of its own: the batch's expiry row says it and carries the start-by line.
+  function closeRows(info, ing, name, now, out) {
+    if (!info) return;
+    const { closeAt, stock, r } = info;
     if (r.leftoverG >= Math.max(NOTABLE_G, NOTABLE_SHARE * stock)) {
-      out.push({ id: 'leftover:' + ing.id, kind: 'leftover', ing: ing.id, label: name, at: closeAt, msLeft: toClose, rung: 0, rungs: 0, sev: 'info', leftoverG: r.leftoverG,
+      out.push({ id: 'leftover:' + ing.id, kind: 'leftover', ing: ing.id, label: name, at: closeAt, msLeft: closeAt - now, rung: 0, rungs: 0, sev: 'info', leftoverG: r.leftoverG,
         consequence: 'At the current pace about ' + U.fmtG(r.leftoverG) + ' of ' + name + ' will be left at close, not counting what is already on the block.', action: 'Sell it: run a special, tell the front.', unknown: false });
-    } else if (r.leftoverG <= -NOTABLE_G && r.runOutAt != null) {
-      const fit = nextBatchFit(ing, now, closeAt);
-      const next = !fit ? '' : fit.fits ? ' A batch started now is ready at ' + U.fmtTime(fit.readyAt) + '.' : ' A new batch would be ready at ' + U.fmtTime(fit.readyAt) + ', after close.';
-      const early = closeAt - r.runOutAt;
-      out.push({ id: 'shortfall:' + ing.id, kind: 'shortfall', ing: ing.id, label: name, at: r.runOutAt, msLeft: r.runOutAt - now, rung: 0, rungs: 0, sev: 'warn', leftoverG: r.leftoverG, shortG: -r.leftoverG,
-        consequence: 'At the current pace ' + name + ' runs out at ' + U.fmtTime(r.runOutAt) + ', ' + hmText(early) + ' before close, about ' + U.fmtG(-r.leftoverG) + ' short.' + next,
-        action: 'Shorten portions, stop preorders, run a special.' + (fit && fit.fits ? ' Start the next batch now.' : ''), nextBatch: fit, unknown: false });
     }
+    if ((r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG) < NOTABLE_G || r.runOutAt == null || (r.runOutCause === 'limit' && r.limitQuality)) return;
+    let consequence, action, sb = null;
+    if (r.runOutCause === 'rest-gap') {
+      consequence = 'At the current pace ' + name + ' runs out at ' + U.fmtTime(r.runOutAt) + ', next batch ready at ' + U.fmtTime(r.gapEndAt) + ', about ' + U.fmtG(r.gapUnmetG) + ' of demand with nothing to sell in between.';
+      action = 'Shorten portions, stop preorders, run a special until then.';
+    } else {
+      sb = startBy(ing, now, r.runOutAt, r.unmetG);
+      const verb = r.runOutCause === 'limit' ? ' is thrown out at ' : ' runs out at ';
+      consequence = 'At the current pace ' + name + verb + U.fmtTime(r.runOutAt) + '.' + (sb && !sb.ahead ? ' ' + sb.text.split(' Shorten')[0] : sb ? '' : ' About ' + U.fmtG(r.unmetG) + ' of demand will have nothing to sell.');
+      action = sb && sb.ahead ? sb.text : 'Shorten portions, stop preorders, run a special.';
+    }
+    out.push({ id: 'shortfall:' + ing.id, kind: 'shortfall', ing: ing.id, label: name, at: r.runOutAt, msLeft: r.runOutAt - now, rung: 0, rungs: 0, sev: 'warn', leftoverG: r.leftoverG, shortG: r.unmetG, unmetG: r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG,
+      runOutCause: r.runOutCause, gapEndAt: r.gapEndAt, startBy: sb ? sb.latestStart : null, consequence, action, unknown: false });
   }
   // A span of time in words: "45 min", "2 h 10 min".
   function hmText(ms) {
@@ -222,6 +252,10 @@
       const isReady = (b) => !(U.isNum(b.restUntil) && b.restUntil > now);
       let soldBefore = 0, totalLeft = 0;
       for (const b of list) if (isReady(b)) totalLeft += b.remainingG;
+      // The close sweep first: a quality limit that ends the supply is told in that batch's own expiry row.
+      const ci = rate !== undefined ? closeInfo(state, ing, list, rate, now, S) : null;
+      const lim = ci && ci.r.runOutCause === 'limit' && ci.r.limitQuality && ci.r.unmetG >= NOTABLE_G ? ci.r : null;
+      const limSb = lim ? startBy(ing, now, lim.runOutAt, lim.unmetG) : null;
       list.forEach((b, i) => {
         // A quality limit is a house rule: the batch passes it and waits for a taste test. A kept batch counts down
         // to the end of its extension instead.
@@ -252,14 +286,19 @@
         else if (waste > 50) { consequence = 'About ' + U.fmtG(waste) + ' of ' + U.fmtG(b.remainingG) + ' will ' + fate + (usd != null ? ' ($' + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
         else { consequence = 'On pace to sell all ' + U.fmtG(b.remainingG) + ' in time.'; action = 'Nothing to do.'; }
         // A batch gets a row once a rung is crossed, or earlier when the pace says food will be thrown out within 2 hours.
-        if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H)) {
+        const isLim = !!lim && lim.limitBatchId === b.id;
+        if (isLim) {
+          consequence = name + ' passes its quality limit at ' + U.fmtTime(exp) + ', with about ' + U.fmtG(lim.unmetG) + ' of demand after it' + (waste != null && waste > 50 ? ' and about ' + U.fmtG(waste) + ' of this batch unsold' : '') + '.';
+          action = limSb ? limSb.text : 'Shorten portions, stop preorders, run a special.';
+        }
+        if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H) || isLim) {
           const quiet = rung === 0 || trivial;
           out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length,
             sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, wasteG: waste, wasteUsd: usd, goes86: lastOne, quality: q, trivial, unknown: rate === undefined });
         }
       });
       // What is left at close, or when it runs out early, at the current pace.
-      if (rate !== undefined) closeRows(state, ing, name, list, rate, now, S, out);
+      closeRows(ci, ing, name, now, out);
     }
   }
   // Rows for food-safety gates: a temperature check due, a reheat or chill decision, a cooling stage.

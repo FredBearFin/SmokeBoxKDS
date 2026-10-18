@@ -274,9 +274,12 @@ test('close sweep: simple case, a steady pace leaves grams over, a faster one ru
   const now = 1e12, closeAt = now + 200 * MIN, one = [{ remainingG: 5000, enteredAt: now, readyAt: 0, expAt: now + 10 * HR }];
   const slow = D.sweepToClose(one, 10 / MIN, now, closeAt);
   assert.equal(Math.round(slow.leftoverG), 3000);
+  assert.equal(slow.unmetG, 0);
   assert.equal(slow.runOutAt, null);
   const fast = D.sweepToClose(one, 40 / MIN, now, closeAt);
-  assert.equal(Math.round(fast.leftoverG), -3000);
+  assert.equal(Math.round(fast.unmetG), 3000, 'the shortfall is its own number');
+  assert.equal(Math.round(fast.leftoverG), 0);
+  assert.equal(fast.runOutCause, 'stock');
   assert.equal(Math.round((fast.runOutAt - now) / MIN), 125);
 });
 
@@ -286,7 +289,8 @@ test('close sweep: a resting batch cannot sell before it is ready, so it is a sh
     { remainingG: 2000, enteredAt: now - HR, readyAt: 0, expAt: now + 20 * HR },
     { remainingG: 3000, enteredAt: now, readyAt: now + 2 * HR, expAt: now + 20 * HR },
   ], rate, now, closeAt);
-  assert.equal(Math.round(r.leftoverG), -1000, 'one kilogram short');
+  assert.equal(Math.round(r.unmetG), 1000, 'one kilogram short');
+  assert.equal(Math.round(r.leftoverG), 0);
   assert.equal(Math.round((r.runOutAt - now) / HR * 100) / 100, 5, 'runs out at hour 5');
 });
 
@@ -294,7 +298,9 @@ test('close sweep: a batch that expires before close has its leftover counted as
   const now = 1e12, closeAt = now + 6 * HR;
   const r = D.sweepToClose([{ remainingG: 3000, enteredAt: now - HR, readyAt: 0, expAt: now + HR }], 500 / HR, now, closeAt);
   assert.equal(Math.round(r.wasteBefore), 2500);
-  assert.equal(Math.round(r.leftoverG), -2500, 'after it expires the remaining demand is unmet');
+  assert.equal(Math.round(r.unmetG), 2500, 'after it expires the remaining demand is unmet');
+  assert.equal(r.leftoverG, 0);
+  assert.equal(r.runOutCause, 'limit', 'the limit ended the supply');
 });
 
 test('next batch: only suggested when cook time plus rest fits before close', () => {
@@ -317,11 +323,11 @@ test('feed: shortfall row at the current pace names the time, the gap and the th
   s = E.tick(s, at(16)).state;
   const row = D.build(s, at(16)).find((x) => x.kind === 'shortfall');
   assert.ok(row, 'a shortfall row');
-  assert.equal(Math.round(row.shortG), 7000);
   assert.equal(row.at, at(18, 40), 'runs out at 6:40 pm at 50 g/min');
   assert.ok(/at the current pace/i.test(row.consequence) && /runs out at/.test(row.consequence), row.consequence);
   assert.ok(/Shorten portions/.test(row.action) && /stop preorders/.test(row.action) && /run a special/.test(row.action), row.action);
-  assert.ok(/after close/.test(row.consequence) && !/Start the next batch/.test(row.action), 'pork takes 10 h to cook: a new batch would be after close');
+  assert.ok(/Too late for a new batch to cover it: about [\d.]+ kg of demand with nothing to sell/.test(row.consequence) && !/Start the next batch/.test(row.action), 'pork takes 10 h plus 1 h rest: too late');
+  assert.ok(!/before close/.test(row.consequence), 'never "N h before close"');
   assert.equal(row.sev, 'warn');
   // Nothing after closing time.
   assert.equal(D.build(s, at(21, 5)).some((x) => x.kind === 'shortfall' || x.kind === 'leftover'), false);
@@ -411,4 +417,67 @@ test('keepcheck row: appears 15 minutes before a kept batch lapses or when the r
   assert.equal(L.decide([r], at(55), s).length, 0);
   // gone once the extension has lapsed
   assert.equal(row(70), undefined);
+});
+
+/* ---------------------------------------------------- close rows: separate numbers, rescue, quality limit, start by ---------------------------------------------------- */
+const closeAt = (h, m = 0) => new Date(2026, 9, 12, h, m, 0).getTime();
+// A kitchen open 11 to 21 with one ingredient batch, pulls, and the feed rows for it at the time given.
+function closeKit(ing, cooked, enter, pulls, extra) {
+  const settings = E.defaultSettings(); settings.service.openHour = 11; settings.service.closeHour = 21;
+  let s = E.newState({ now: closeAt(11), empty: true, settings });
+  s = E.apply(s, 'addBatch', { ing, tempF: 160, cookedG: cooked }, enter).state;
+  for (const [t, g] of pulls) { s = E.apply(s, 'pullBatch', { ing, g }, t).state; s = E.tick(s, t).state; }
+  if (extra) s = extra(s);
+  return s;
+}
+const closeFeed = (s, t) => D.build(E.tick(s, t).state, t).filter((x) => x.kind === 'shortfall' || x.kind === 'leftover' || x.kind === 'expiry');
+
+test('close rows: a gap with a batch coming has its own rescue wording, and leftover and shortfall are separate numbers', () => {
+  const r = D.sweepToClose([
+    { remainingG: 1000, enteredAt: 0, readyAt: 0, expAt: 1e12 },
+    { remainingG: 20000, enteredAt: 1, readyAt: 1e9 + 2 * HR, expAt: 1e12 },
+  ], 1000 / HR, 1e9, 1e9 + 8 * HR);
+  assert.equal(r.runOutCause, 'rest-gap');
+  assert.equal(r.gapEndAt, 1e9 + 2 * HR);
+  assert.equal(Math.round(r.gapUnmetG), 1000, 'one hour of demand with nothing to sell');
+  assert.equal(Math.round(r.leftoverG), 20000 - 6000, 'and the batch still leaves grams at close');
+  assert.equal(Math.round(r.unmetG), 1000);
+  const s = closeKit('pork', 6000, closeAt(11), [[closeAt(12), 2000], [closeAt(12, 30), 2000], [closeAt(13), 1500]], (st) => E.apply(st, 'addBatch', { ing: 'pork', tempF: 160, cookedG: 8000 }, closeAt(13, 5)).state);
+  const rows = closeFeed(s, closeAt(13, 10));
+  const sf = rows.find((x) => x.kind === 'shortfall');
+  assert.ok(sf && /runs out at 1:18 pm, next batch ready at 2:05 pm, about [\d.]+ kg of demand with nothing to sell/.test(sf.consequence), sf && sf.consequence);
+  assert.ok(!/before close/.test(sf.consequence));
+});
+
+test('close rows: an ingredient can have a leftover row and a shortfall row at once', () => {
+  const s = closeKit('pork', 6000, closeAt(11), [[closeAt(12), 2000], [closeAt(12, 30), 2000], [closeAt(13), 1500]], (st) => E.apply(st, 'addBatch', { ing: 'pork', tempF: 160, cookedG: 40000 }, closeAt(13, 5)).state);
+  const rows = closeFeed(s, closeAt(13, 10));
+  assert.ok(rows.some((x) => x.kind === 'shortfall'), 'the gap');
+  assert.ok(rows.some((x) => x.kind === 'leftover'), 'and the grams left at close');
+});
+
+test('close rows: a quality limit that ends supply gives one row, the expiry row, with the start-by line and no "runs out"', () => {
+  const s = closeKit('ribs', 12000, closeAt(11), [[closeAt(11, 30), 1000], [closeAt(12), 1000], [closeAt(12, 30), 1000], [closeAt(13), 1000]]);
+  const rows = closeFeed(s, closeAt(13, 10));
+  assert.equal(rows.filter((x) => x.kind === 'shortfall').length, 0, 'no second row');
+  const exp = rows.filter((x) => x.kind === 'expiry');
+  assert.equal(exp.length, 1);
+  assert.ok(/passes its quality limit at 3:00 pm/.test(exp[0].consequence) && !/runs out/.test(exp[0].consequence), exp[0].consequence);
+  assert.ok(/Too late for a new batch to cover it|Start the next batch by/.test(exp[0].action), exp[0].action);
+});
+
+test('close rows: start by is a time that is still ahead, or says it is too late with the demand that has nothing to sell', () => {
+  // Mac and cheese cooks 1 h with no rest: at 4:40 pm, running out at 6:10 pm, the latest start is 5:10 pm.
+  const ahead = closeKit('mac', 12000, closeAt(15), [[closeAt(15, 30), 2000], [closeAt(16), 2000], [closeAt(16, 30), 2000]]);
+  const a = closeFeed(ahead, closeAt(16, 40)).find((x) => x.kind === 'shortfall');
+  assert.equal(a.at, closeAt(18, 10));
+  assert.equal(a.startBy, closeAt(17, 10));
+  assert.equal(a.action, 'Start the next batch by 5:10 pm, not counting anything still on the smoker.');
+  assert.ok(!/kg/.test(a.consequence), 'the kilograms short are not shown while there is time');
+  // A kitchen selling faster is already behind: the latest start has passed.
+  const late = closeKit('mac', 12000, closeAt(15), [[closeAt(15, 30), 3000], [closeAt(16), 3000], [closeAt(16, 30), 3000]]);
+  const b = closeFeed(late, closeAt(16, 40)).find((x) => x.kind === 'shortfall');
+  assert.ok(b.startBy < closeAt(16, 40), 'the latest start has passed');
+  assert.ok(/Too late for a new batch to cover it: about [\d.]+ kg of demand with nothing to sell/.test(b.consequence), b.consequence);
+  assert.equal(b.action, 'Shorten portions, stop preorders, run a special.');
 });
