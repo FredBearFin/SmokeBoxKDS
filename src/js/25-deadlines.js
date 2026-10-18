@@ -127,7 +127,7 @@
     const name = ing ? ing.name : b.ing;
     const left = state.batches.some((x) => x !== b && x.ing === b.ing && x.status !== 'discard' && x.canServe === true && x.remainingG > 0);
     const amount = U.fmtG(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
-    out.push({ id: 'past:' + b.id, kind: 'past', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
+    out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
       consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or discard it.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
   }
   // The next closing time after now, in ms, from the service hours (a close above 24 means after midnight, so last
@@ -254,7 +254,7 @@
         // A batch gets a row once a rung is crossed, or earlier when the pace says food will be thrown out within 2 hours.
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H)) {
           const quiet = rung === 0 || trivial;
-          out.push({ id: 'expiry:' + b.id, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length,
+          out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length,
             sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, wasteG: waste, wasteUsd: usd, goes86: lastOne, quality: q, trivial, unknown: rate === undefined });
         }
       });
@@ -291,7 +291,7 @@
       const name = ing ? ing.name : b.ing;
       const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');
       const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' ($' + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
-      out.push({ id: 'expired:' + b.id, kind: 'expired', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
+      out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
         consequence: 'Expired and thrown out: ' + U.fmtG(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
     }
   }
@@ -341,6 +341,63 @@
     const at = nextOpenAt(state, now);
     return at == null ? null : 'Sound paused: kitchen closed until ' + U.fmtTime(at);
   }
+  // How long a loud tone waits before repeating while nobody has tapped the row: 20 seconds of kitchen time.
+  const LOUD_REPEAT_MS = 20e3;
+  // Ladder memory entries older than this (kitchen time) are dropped.
+  const LADDER_KEEP_MS = 24 * H;
+  // The warning ladder as a pure object, so it can be tested without a screen. It remembers, per deadline id, the
+  // rung already announced, the rung a person acknowledged by tapping, and when the loud tone last played.
+  //   decide(feed, now, state) returns the sounds due right now as [{ level, d, repeat }] (level 1 chime, 2 voice,
+  //   3 loud tone, 4 expiry or past) and updates the memory. now is kitchen time (the app clock), so the loud-tone
+  //   spacing follows the same clock as everything else.
+  //   A row whose id carries a new epoch (a keep that changed keepUntil) starts a fresh entry with every rung
+  //   already crossed marked announced and acknowledged, so tapping "keep serving" never beeps by itself; the later
+  //   rungs, the end of the extension and each lapse sound as usual. Past and expired notices always sound once.
+  //   Entries for batches that are gone, and entries older than 24 hours, are dropped.
+  function makeLadder() {
+    const memory = new Map();
+    // Decides the sound for one deadline row, or null.
+    function one(d, now) {
+      let st = memory.get(d.id);
+      if (d.kind === 'expired' || d.kind === 'past') {
+        if (st) return null;
+        memory.set(d.id, { rung: 1, ack: 0, loudAt: -Infinity, batchId: d.batchId, born: now });
+        return d.trivial ? null : { level: 4, d, repeat: false };
+      }
+      if (d.kind !== 'expiry' || d.rung < 1) return null;
+      const fresh = !st;
+      if (fresh) { st = { rung: 0, ack: 0, loudAt: -Infinity, batchId: d.batchId, born: now }; memory.set(d.id, st); }
+      // No sound when it is on pace to sell out in time, or when almost nothing is left in the batch.
+      if (d.trivial || (U.isNum(d.wasteG) && d.wasteG <= 50)) { st.rung = Math.max(st.rung, d.rung); return null; }
+      // A new extension epoch: everything already crossed counts as announced.
+      if (fresh && d.epoch) { st.rung = d.rung; st.ack = d.rung; return null; }
+      const last = d.rung >= d.rungs;
+      if (d.rung > st.rung) {
+        st.rung = d.rung; st.ack = 0;
+        if (d.msLeft <= 0) return { level: 4, d, repeat: false };
+        if (last) { st.loudAt = now; return { level: 3, d, repeat: false }; }
+        if (d.rung >= 2) return { level: 2, d, repeat: false };
+        // With no pace to show waste, the first (soft) rung stays silent: it would chime for food that may sell.
+        return d.unknown ? null : { level: 1, d, repeat: false };
+      }
+      if (last && st.ack < d.rung && d.msLeft > 0 && now - st.loudAt >= LOUD_REPEAT_MS) { st.loudAt = now; return { level: 3, d, repeat: true }; }
+      return null;
+    }
+    // Drops entries for batches that no longer exist and entries older than 24 hours of kitchen time.
+    function prune(state, now) {
+      const alive = new Set(state && Array.isArray(state.batches) ? state.batches.map((b) => b.id) : []);
+      for (const [id, st] of memory) if ((state && st.batchId && !alive.has(st.batchId)) || now - st.born > LADDER_KEEP_MS) memory.delete(id);
+    }
+    return {
+      memory,
+      decide(feed, now, state) { prune(state, now); const calls = []; for (const d of feed) { const c = one(d, now); if (c) calls.push(c); } return calls; },
+      // A tap on a row counts as seeing it: the loud tone stops until the next rung.
+      acknowledge(id) { const st = memory.get(id); if (st) st.ack = st.rung; },
+      // True when the row has been acknowledged.
+      isAcked(id) { const st = memory.get(id); return !!(st && st.ack); },
+      size: () => memory.size,
+    };
+  }
   // Builds the feed: every deadline worth showing right now, worst first. Each row has id, kind, label, at,
   // msLeft, rung, sev (bad, warn, info), consequence and action. Batch rows also carry projected waste.
   function build(state, now) {
@@ -356,5 +413,5 @@
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit };
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

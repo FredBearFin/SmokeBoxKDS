@@ -1112,44 +1112,17 @@
   }
   // Shows the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { showCabinet(true, { batchId }); } catch (e) { console.error('[smokebox] cabinet failed', e); } }
-  // Warning ladder memory: for each deadline id, the rung already announced, the rung the cook acknowledged by
-  // tapping it, and when the loud tone last played.
-  const ladder = new Map();
-  // Decides whether a deadline needs a sound right now: when it reaches a new rung, a soft chime first, then a
-  // spoken call, then the loud tone that repeats until someone taps the row. Expiry has its own sound. Returns a
-  // call to be played ({ level, d }) or null, and records what it decided in the ladder memory.
-  function announce(d, perfNow) {
-    const st = ladder.get(d.id) || { rung: 0, ack: 0, loudAt: 0 };
-    ladder.set(d.id, st);
-    if (d.kind === 'expired' || d.kind === 'past') {
-      if (st.rung >= 1 || d.trivial) return null;
-      st.rung = 1;
-      return alertCall(4, d);
-    }
-    if (d.kind !== 'expiry' || d.rung < 1) return null;
-    // No sound when it is on pace to sell out in time, or when almost nothing is left in the batch.
-    if (d.trivial || (U.isNum(d.wasteG) && d.wasteG <= 50)) { st.rung = Math.max(st.rung, d.rung); return null; }
-    const last = d.rung >= d.rungs;
-    if (d.rung > st.rung) {
-      st.rung = d.rung; st.ack = 0;
-      // With no sales data to show waste, the first (soft) rung stays silent: it would chime for food that may sell.
-      if (d.msLeft <= 0) return alertCall(4, d);
-      if (last) { st.loudAt = perfNow; return alertCall(3, d); }
-      if (d.rung >= 2) return alertCall(2, d);
-      return d.unknown ? null : alertCall(1, d);
-    }
-    if (last && st.ack < d.rung && d.msLeft > 0 && perfNow - st.loudAt >= 20000) { st.loudAt = perfNow; return alertCall(3, d, true); }
-    return null;
-  }
-  // Makes one call for the sound ladder and keeps a short record of it, so a test can replay a whole service
-  // and check every alert. level: 1 chime, 2 voice, 3 loud tone, 4 expiry.
-  function alertCall(level, d, repeat) {
+  // The warning ladder: what was announced for each deadline, and what to sound now (see 25-deadlines.js).
+  const ladder = SB.deadlines.makeLadder();
+  // Keeps a short record of one sound the ladder asked for, so a test can replay a whole service and check every
+  // alert. level: 1 chime, 2 voice, 3 loud tone, 4 expiry or past.
+  function logCall(c) {
+    const d = c.d;
     const lg = F._alerts || (F._alerts = []);
     const b = d.batchId ? (store().getState().batches.find((x) => x.id === d.batchId) || null) : null;
-    lg.push({ t: store().now(), id: d.id, kind: d.kind, batchId: d.batchId || null, level, repeat: !!repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG),
+    lg.push({ t: store().now(), id: d.id, kind: d.kind, batchId: d.batchId || null, level: c.level, repeat: !!c.repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG),
       remainingG: b ? Math.round(b.remainingG) : null, cookedG: b ? Math.round(b.cookedG) : null, allowed: SB.deadlines.soundsAllowed(store().getState(), store().now()), unknown: !!d.unknown });
     if (lg.length > 500) lg.shift();
-    return { level, d, repeat: !!repeat };
   }
   // Plays the calls of one moment together: the strongest sound once, and one short spoken phrase naming the most
   // urgent item and how many others share the moment, so six batches expiring together are one warning, not six.
@@ -1167,18 +1140,15 @@
     speak(who + (first.goes86 && same.length === 1 ? ' goes 86' : same.length > 1 ? ' expire' : ' expires') + ' in ' + (top.level === 2 ? 'about ' : '') + mins + ' ' + U.plural(mins, 'minute') + '.');
   }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
-  function acknowledge(key) { const st = ladder.get(key); if (st) st.ack = st.rung; }
+  function acknowledge(key) { ladder.acknowledge(key); }
   // Rewrites the strip from the deadline feed: the top three rows, or hidden when the feed is empty.
   function updateStrip(now) {
     if (!m || !m.strip || !SB.deadlines) return;
     const all = SB.deadlines.build(store().getState(), now);
-    const perfNow = performance.now();
-    const calls = [];
     // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
-    if (SB.deadlines.soundsAllowed(store().getState(), now)) all.forEach((d) => { const c = announce(d, perfNow); if (c) calls.push(c); });
-    playCalls(calls);
+    if (SB.deadlines.soundsAllowed(store().getState(), now)) { const calls = ladder.decide(all, now, store().getState()); calls.forEach(logCall); playCalls(calls); }
     // Info rows only show for batches and run-outs; an expired notice goes away once someone taps it.
-    const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover') && !(d.kind === 'expired' && (ladder.get(d.id) || {}).ack));
+    const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover') && !(d.kind === 'expired' && ladder.isAcked(d.id)));
     const top = feed.slice(0, 3);
     const needSound = sound && !audioReady();
     setHidden(m.strip.soundBar, !needSound);

@@ -1816,7 +1816,8 @@
     let of = null;
     for (let i = evs.length - 1; i >= 0; i--) if (evs[i].type === 'quality_extend' && evs[i].batchId === b.id) { of = evs[i].id; break; }
     const w = tx.batch(bi);
-    w.keepUntil = tx.now;
+    // Back to the state before the keep (no extension), so the warning ladder sees the same batch it already announced.
+    w.keepUntil = 0;
     tx.event('quality_extend_corrected', { batchId: b.id, who, note: typeof p.note === 'string' ? p.note.slice(0, C.limits.maxNoteLen) : '', of });
     refreshBatch(tx, bi);
     tx.info = { batchId: b.id };
