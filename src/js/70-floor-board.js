@@ -1130,7 +1130,7 @@
     const lg = F._alerts || (F._alerts = []);
     const b = d.batchId ? (store().getState().batches.find((x) => x.id === d.batchId) || null) : null;
     lg.push({ t: store().now(), id: d.id, kind: d.kind, batchId: d.batchId || null, level: c.level, repeat: !!c.repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG),
-      remainingG: b ? Math.round(b.remainingG) : null, cookedG: b ? Math.round(b.cookedG) : null, allowed: SB.deadlines.soundsAllowed(store().getState(), store().now()), unknown: !!d.unknown });
+      remainingG: b ? Math.round(b.remainingG) : null, cookedG: b ? Math.round(b.cookedG) : null, status: b ? b.status : null, allowed: SB.deadlines.soundsAllowed(store().getState(), store().now()), unknown: !!d.unknown });
     if (lg.length > 500) lg.shift();
   }
   // Plays the calls of one moment together: the strongest sound once, and one short spoken phrase naming the most
