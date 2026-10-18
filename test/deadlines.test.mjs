@@ -211,7 +211,7 @@ test('pace: 4.5 kg pulls every 100 minutes give a steady pace and a severity tha
   assert.ok(changes <= 2, 'severity changed ' + changes + ' times');
 });
 
-test('pace: no pulls or a long silence is unknown, never zero; one pull uses the average since opening', () => {
+test('pace: no pulls is unknown, never zero; a lone pull is not a pace until 120 minutes since opening; a long silence is unknown again', () => {
   const at = (m) => new Date(2026, 9, 12, 11, 0, 0).getTime() + m * MIN;
   const settings = E.defaultSettings(); settings.service.openHour = 11; settings.service.closeHour = 21;
   let s = E.newState({ now: at(0), empty: true, settings });
@@ -221,15 +221,52 @@ test('pace: no pulls or a long silence is unknown, never zero; one pull uses the
   assert.equal(row0.unknown, true);
   assert.equal(row0.wasteG, null, 'no projected waste when the pace is unknown');
   assert.ok(/Pace unknown/.test(row0.consequence), row0.consequence);
-  // One pull at 11:30: unknown until 45 minutes have passed since opening, then the average since opening.
+  // One pull at 11:30: not a pace before 120 minutes since opening, then the average since opening.
   s = E.apply(s, 'pullBatch', { ing: 'pork', g: 4500 }, at(30)).state;
-  assert.equal(D.salesRate(s, at(40)).rate.pork, undefined);
-  assert.ok(Math.abs(D.salesRate(s, at(60)).rate.pork * MIN - 4500 / 60) < 0.01);
+  assert.equal(D.salesRate(s, at(60)).rate.pork, undefined);
+  assert.equal(D.salesRate(s, at(119)).rate.pork, undefined);
   assert.ok(Math.abs(D.salesRate(s, at(120)).rate.pork * MIN - 4500 / 120) < 0.01);
   // Two pulls, then a long silence: unknown again, not a slowly falling pace.
   s = E.apply(s, 'pullBatch', { ing: 'pork', g: 4500 }, at(130)).state;
   assert.ok(D.salesRate(s, at(200)).rate.pork > 0);
   assert.equal(D.salesRate(s, at(130 + 250)).rate.pork, undefined, 'after 250 minutes of silence the pace is unknown');
+});
+
+test('pace: one pull at 11:05 gives no shortfall or leftover row at 11:45; pulls 5 minutes apart merge into one removal', () => {
+  const at = (h, m = 0) => new Date(2026, 9, 12, h, m, 0).getTime();
+  const settings = E.defaultSettings(); settings.service.openHour = 11; settings.service.closeHour = 21;
+  let s = E.newState({ now: at(11), empty: true, settings });
+  s = E.apply(s, 'addBatch', { ing: 'pork', tempF: 160, cookedG: 30000 }, at(11)).state;
+  s = E.apply(s, 'pullBatch', { ing: 'pork', g: 4500 }, at(11, 5)).state;
+  s = E.tick(s, at(11, 45)).state;
+  const f = D.build(s, at(11, 45));
+  assert.equal(f.some((x) => x.kind === 'shortfall' || x.kind === 'leftover'), false, 'a single pull is not a pace');
+  assert.equal(D.salesRate(s, at(11, 45)).rate.pork, undefined);
+  // Two pulls of 2.5 kg and 2 kg at 11:05 and 11:10 are one removal: still no pace, even at 12:30 (90 minutes since opening).
+  let m = E.newState({ now: at(11), empty: true, settings });
+  m = E.apply(m, 'addBatch', { ing: 'pork', tempF: 160, cookedG: 30000 }, at(11)).state;
+  m = E.apply(m, 'pullBatch', { ing: 'pork', g: 2500 }, at(11, 5)).state;
+  m = E.apply(m, 'pullBatch', { ing: 'pork', g: 2000 }, at(11, 10)).state;
+  assert.equal(D.salesRate(m, at(12, 30)).rate.pork, undefined);
+  // A third pull at 12:40 gives a second removal, so the pace is known.
+  m = E.apply(m, 'pullBatch', { ing: 'pork', g: 4500 }, at(12, 40)).state;
+  assert.ok(D.salesRate(m, at(12, 41)).rate.pork > 0);
+});
+
+test('pace: with the pace unknown the 10-minute expiry rung is still due for a batch with 4 kg left (time is a fact)', () => {
+  const at = (h, m = 0) => new Date(2026, 9, 12, h, m, 0).getTime();
+  const settings = E.defaultSettings(); settings.service.openHour = 14; settings.service.closeHour = 22;
+  let s = E.newState({ now: at(11), empty: true, settings });
+  s = E.apply(s, 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 8500 }, at(11)).state;
+  s = E.apply(s, 'pullBatch', { ing: 'ribs', g: 2500 }, at(14, 5)).state;
+  s = E.apply(s, 'pullBatch', { ing: 'ribs', g: 2000 }, at(14, 10)).state;
+  s = E.tick(s, at(14, 50)).state;
+  const row = D.build(s, at(14, 50)).find((x) => x.kind === 'expiry');
+  assert.ok(row, 'an expiry row');
+  assert.equal(row.unknown, true);
+  assert.equal(row.rung, row.rungs, 'the last rung (10 minutes) is reached');
+  assert.equal(row.trivial, false, '4 kg left is not trivial');
+  assert.equal(row.sev, 'bad');
 });
 
 /* ---------------------------------------------------- leftover or shortfall at close ---------------------------------------------------- */

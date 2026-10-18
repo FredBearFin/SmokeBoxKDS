@@ -17,7 +17,10 @@
   // Sales pace is trusted only with at least this many grams seen in the window; below it the pace is "no data".
   const RATE_MIN_G = 200;
   // How far back removals count (6 hours), at most how many of them, and the shortest span a pace is worked over.
-  const RECENT_MS = 6 * H, MAX_REMOVALS = 12, MIN_SPAN_MS = 45 * MIN;
+  const RECENT_MS = 6 * H, MIN_SPAN_MS = 30 * MIN;
+  // Pace tuning: removals closer than 15 minutes merge; dense needs 5 merged removals in 2 hours; a lone removal counts only
+  // after 120 minutes since opening; the sparse span never counts for less than 90 minutes.
+  const MERGE_MS = 15 * MIN, DENSE_WINDOW_MS = 2 * H, DENSE_MIN = 5, SINGLE_PULL_MS = 120 * MIN, SPARSE_FLOOR_MS = 90 * MIN;
   // Under this many grams left a batch is not worth a sounded warning.
   const TRIVIAL_G = 300;
   // Projected waste counts as worth a sounded warning only from this many grams, or this share of the batch.
@@ -48,13 +51,26 @@
     if (d.getTime() > now) d.setDate(d.getDate() - 1);
     return d.getTime();
   }
-  // Each cooked ingredient's grams per millisecond leaving the cabinet, from finished tickets and hand pulls.
-  // Pulls are lumpy (a whole brisket every 100 minutes), so a fixed short window would see a big pull, then
-  // nothing, and flip back and forth. Instead the pace is the grams taken after the first removal divided by the
-  // span between the first and the latest one, so every complete interval counts the same wherever we are in it;
-  // once the next removal is overdue by more than an interval the pace eases down, and after a silence of more than two intervals it is unknown again. With a single removal the
-  // average since opening is used. No removals, or too little food moved, means the pace is UNKNOWN: the
-  // ingredient is simply missing from `rate`, which is not the same as zero. Returns { rate, seenG }.
+  // Merges removals that fall inside one 15-minute stretch (counted from the first of them) into a single event: grams
+  // summed, time of the last. A burst of small items, or two pulls a few minutes apart, is one removal for pacing.
+  function mergeRemovals(list) {
+    const out = [];
+    let start = null;
+    for (const x of list.slice().sort((p, q) => p.t - q.t)) {
+      if (start !== null && x.t - start < MERGE_MS) { const l = out[out.length - 1]; l.g += x.g; l.t = x.t; } else { out.push({ t: x.t, g: x.g }); start = x.t; }
+    }
+    return out;
+  }
+  // Each cooked ingredient's grams per millisecond leaving the cabinet, from finished tickets and hand pulls. A pure
+  // function of the state: no memory between calls.
+  //   Removals are merged (see mergeRemovals). Dense: 5 or more merged removals in the last 2 hours, the pace is the
+  //   grams in that window over the time it covers (since opening if that is shorter, never under 30 minutes).
+  //   Sparse: fewer, the pace is a renewal estimate, total grams over the span from the first to the latest removal plus
+  //   one average interval (never under 90 minutes), which reads a lumpy cadence such as a whole brisket every 100
+  //   minutes steadily. After a silence of more than two intervals (and 90 minutes) it is unknown again.
+  //   A pace needs 2 removals, or 120 minutes since opening for a single removal. No removals, or too little food
+  //   moved, means the pace is UNKNOWN: the ingredient is missing from `rate`, which is not the same as zero.
+  // Returns { rate: {ingId: g per ms}, seenG: {ingId: grams} }.
   function salesRate(state, now) {
     const from = now - RECENT_MS, list = Object.create(null);
     // Finished items carry the grams they used; walk back from the newest tickets and stop once they are old.
@@ -70,20 +86,32 @@
     const openAt = lastOpenAt(state, now), sinceOpen = openAt == null ? 0 : now - openAt;
     const rate = Object.create(null), seen = Object.create(null);
     for (const k of Object.keys(list)) {
-      const ev = list[k].sort((x, y) => x.t - y.t).slice(-MAX_REMOVALS);
+      const ev = mergeRemovals(list[k]);
       const total = ev.reduce((a, x) => a + x.g, 0);
       seen[k] = total;
       if (total < RATE_MIN_G) continue;
-      if (ev.length >= 2) {
-        // Grams after the first removal over the span from the first to the latest, eased down once overdue.
-        const span0 = ev[ev.length - 1].t - ev[0].t, mean = span0 / (ev.length - 1);
-        // A silence longer than two intervals (and 90 minutes) is not a pace of zero: pulls may simply not be logged.
-        if (now - ev[ev.length - 1].t > Math.max(2 * mean, 90 * MIN)) continue;
-        const end = Math.max(ev[ev.length - 1].t, now - mean);
-        rate[k] = (total - ev[0].g) / Math.max(end - ev[0].t, MIN_SPAN_MS);
-      } else if (sinceOpen >= MIN_SPAN_MS) rate[k] = total / Math.max(sinceOpen, MIN_SPAN_MS);
+      const r = estimateRate(ev, total, now, openAt, sinceOpen);
+      if (r !== undefined) rate[k] = r;
     }
     return { rate, seenG: seen };
+  }
+  // The pace for one ingredient from its merged removals, or undefined when unknown. See salesRate.
+  function estimateRate(ev, total, now, openAt, sinceOpen) {
+    const win = ev.filter((x) => x.t >= now - DENSE_WINDOW_MS);
+    if (ev.length < 2 && sinceOpen < SINGLE_PULL_MS) return undefined;
+    if (win.length >= DENSE_MIN) {
+      const g = win.reduce((a, x) => a + x.g, 0);
+      const covered = openAt == null ? now - win[0].t : Math.min(DENSE_WINDOW_MS, now - openAt);
+      return g / Math.max(covered, MIN_SPAN_MS);
+    }
+    if (ev.length < 2) return total / Math.max(sinceOpen, SPARSE_FLOOR_MS);
+    const span = ev[ev.length - 1].t - ev[0].t, mean = span / (ev.length - 1);
+    // A silence longer than two intervals (and 90 minutes) is not a pace of zero: pulls may simply not be logged.
+    if (now - ev[ev.length - 1].t > Math.max(2 * mean, SPARSE_FLOOR_MS)) return undefined;
+    // The floor is 90 minutes, or the time since opening when that is shorter (never under 30 minutes), so a busy
+    // start is not diluted by time before the doors opened.
+    const floor = Math.max(MIN_SPAN_MS, Math.min(SPARSE_FLOOR_MS, openAt == null ? SPARSE_FLOOR_MS : sinceOpen));
+    return total / Math.max(span + mean, floor);
   }
   // Picks the severity for a countdown: the last rung or expiry is bad, the middle rungs are warnings, and it is
   // one step worse when no other batch of that food is left to take over.

@@ -1,5 +1,5 @@
-SMOKEBOX CONTRACT CHECK  Sun Oct 18 2026 18:16:35  (run 16, 39 s)
-Files: 24 js, 10 css. Static refs: 2037 (375 distinct paths). Boot: ok, load errors 0, console/page errors 0. Smoke: 11/11 sheets opened, 7/7 office pages rendered clean. Unit: 335 passed, 0 failed.
+SMOKEBOX CONTRACT CHECK  Sun Oct 18 2026 18:55:51  (run 17, 43 s)
+Files: 24 js, 10 css. Static refs: 2037 (375 distinct paths). Boot: ok, load errors 0, console/page errors 0. Smoke: 11/11 sheets opened, 7/7 office pages rendered clean. Unit: 342 passed, 0 failed.
 
 PROBLEMS (0)
 none
