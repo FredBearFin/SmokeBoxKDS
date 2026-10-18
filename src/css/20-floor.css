@@ -549,3 +549,17 @@ button.slip-item.fl-item { cursor: pointer; }
   .fl-seg .seg-opt[aria-selected="true"] { transform: none; }
   .fl-dock-toggle .icon, .fl-act, .fl-slip .slip-progress > i { transition: none; }
 }
+
+/* The Cabinet view: the hold cabinet shown in the page, in place of the tickets. The strip and header stay above it.
+   Text is scaled with --fl-k (1.2 from 1700 px wide, 1.5 from 2200 px), so a TV reads it from further away. */
+.fl-cabinet { flex: 1 1 auto; min-width: 0; }
+.fl-cabinet[hidden] { display: none; }
+.fl-cabinet .hc { max-width: none; }
+.fl-cabinet .hc-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(420px * var(--fl-k))), 1fr)); }
+.fl-cabinet .hc-name { font-size: calc(var(--fs-4) * var(--fl-k)); }
+.fl-cabinet .hc-status { font-size: calc(var(--fs-4) * var(--fl-k)); }
+.fl-cabinet .hc-stock-t, .fl-cabinet .hc-dl, .fl-cabinet .hc-msg { font-size: calc(var(--fs-3) * var(--fl-k)); }
+.fl-cabinet .hc-actions .btn { min-height: calc(var(--tap) * var(--fl-k)); font-size: calc(var(--fs-3) * var(--fl-k)); }
+.hc-page-foot { position: sticky; bottom: 0; padding: var(--sp-3) 0; background: var(--bg); }
+.hc-page-foot[hidden] { display: none; }
+.fl[data-cabinet="on"] .fl-dock { display: none; }

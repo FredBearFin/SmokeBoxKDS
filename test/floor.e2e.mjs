@@ -142,7 +142,7 @@ await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
 
   // header contents
   const hd = await page.evaluate(() => ({ new: !!document.querySelector('.fl-new'), tools: Array.from(document.querySelectorAll('.fl-tools .fl-tool')).map((b) => b.dataset.tool), office: !!document.querySelector('.fl-head .fl-office'), san: document.querySelector('.fl-san').textContent, menu: !!document.querySelector('.fl-menu'), newTxt: document.querySelector('.fl-new').textContent.trim() }));
-  check('header has New ticket, Recall, Hold, 86, Demo, Menu and the sanitize chip', hd.new && hd.newTxt === 'New ticket' && hd.tools.join() === 'recall,hold,board86,demo' && hd.menu && /Sanitize|not logged|overdue|\d/.test(hd.san), hd);
+  check('header has New ticket, Recall, 86, Demo, Menu, the sanitize chip and the Cabinet tab (the Hold button is now that tab)', hd.new && hd.newTxt === 'New ticket' && hd.tools.join() === 'recall,board86,demo' && await page.evaluate(() => !!document.querySelector('.fl-seg [data-id="cabinet"]')) && hd.menu && /Sanitize|not logged|overdue|\d/.test(hd.san), hd);
   const head = await rect(page, '.fl-head');
   const parts = await page.evaluate(() => ['.fl-brand', '.fl-seg', '.fl-san', '.fl-tools', '.fl-new', '.fl-menu'].map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return [s, Math.round(r.top), Math.round(r.bottom), Math.round(r.left), Math.round(r.right)]; }));
   const tops = parts.map((p) => p[1]);
@@ -162,10 +162,12 @@ await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
   const hold0 = await page.evaluate(() => SB.store.select.counts().hold);
   await page.evaluate(() => { SB.store.dispatchEx('addBatch', { ing: 'brisket', tempF: 110, cookedG: 4000, rawG: 7000 }, { source: 'ui' }); });
   await settle(page);
-  const hold1 = await page.evaluate(() => ({ n: SB.store.select.counts().hold, shown: document.querySelector('[data-tool="hold"] .fl-tool-n').textContent, hidden: document.querySelector('[data-tool="hold"] .fl-tool-n').hidden }));
-  check('hold cabinet attention count follows the store', (hold1.n > hold0) === !hold1.hidden && (!hold1.hidden ? hold1.shown === String(hold1.n) : true), { hold0, hold1 });
-  await page.locator('[data-tool="hold"]').click(); await settle(page);
-  check('Hold button opens the hold sheet', await page.evaluate(() => SB.sheets.isOpen('hold'))); await page.evaluate(() => SB.sheets.closeAll());
+  const hold1 = await page.evaluate(() => { const c = document.querySelector('.fl-seg [data-id="cabinet"] .seg-count'); return { n: SB.store.select.counts().hold, shown: c.textContent, dim: c.dataset.zero === 'true' }; });
+  check('cabinet tab attention count follows the store', hold1.n >= hold0 && hold1.shown === String(hold1.n), { hold0, hold1 });
+  await page.locator('.fl-seg [data-id="cabinet"]').click(); await settle(page);
+  check('Cabinet tab shows the hold cabinet in the page, not in a sheet', await page.evaluate(() => !document.querySelector('.fl-cabinet').hidden && !SB.sheets.isOpen('hold') && document.querySelectorAll('.fl-cabinet .hc-card').length > 0));
+  await page.locator('.fl-seg [data-id="all"]').click(); await settle(page);
+  check('a station tab brings the tickets back', await page.evaluate(() => document.querySelector('.fl-cabinet').hidden));
   for (const [sel, name] of [['[data-tool="recall"]', 'recall'], ['[data-tool="board86"]', 'board86'], ['[data-tool="demo"]', 'demo'], ['.fl-new', 'order']]) {
     await page.locator(sel).click(); await settle(page, 60);
     check(sel + ' opens the ' + name + ' sheet', await page.evaluate((n) => SB.sheets.isOpen(n), name));
@@ -421,7 +423,7 @@ await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
   }
   await page.keyboard.press('n'); await settle(page, 80);
   await page.keyboard.press('h'); await settle(page, 80);
-  check('shortcuts are ignored while a sheet is open', !(await page.evaluate(() => SB.sheets.isOpen('hold'))));
+  check('shortcuts are ignored while a sheet is open', await page.evaluate(() => document.querySelector('.fl-cabinet').hidden));
   await page.evaluate(() => SB.sheets.closeAll()); await settle(page, 80);
   await page.evaluate(() => { const i = document.createElement('input'); i.id = 'typing'; document.body.appendChild(i); i.focus(); });
   await page.keyboard.type('nrh8d1'); await settle(page, 80);
@@ -780,7 +782,7 @@ if (FULL) {
     const f = await page.evaluate(() => ({ slips: document.querySelectorAll('.fl-slip').length, sim: !!SB.sim, sheets: SB.sheets.names() }));
     check('first run: the board is alive (seeded demo tickets) when SB.sim exists', !f.sim || f.slips >= 3, f);
     await shot(page, 'full-first-run-1280x800');
-    for (const k of ['n', 'r', 'h', '8', 'd']) { await page.keyboard.press(k); await settle(page, 200); await page.evaluate(() => SB.sheets.closeAll()); }
+    for (const k of ['n', 'r', 'h', 'h', '8', 'd']) { await page.keyboard.press(k); await settle(page, 200); await page.evaluate(() => SB.sheets.closeAll()); }
     noErrors('full build', logs);
   });
 }

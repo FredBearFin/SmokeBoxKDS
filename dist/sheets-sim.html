@@ -2337,16 +2337,16 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // pricing.
   // audit:data-start
   C.ingredients = [
-    { id: 'brisket',  name: 'Brisket',          unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 14000, pullG: 4500, thresholdG: 700,  costPerKg: 24.36, thermal: true, yield: 0.55, yieldConfirmed: false, note: 'Starter cost: USDA average brisket $11.05/lb for the week ending 2026-09-25 (from the Pitcall notes), about $24.36/kg. Unverified here.' },
-    { id: 'pork',     name: 'Pulled pork',      unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 10000, pullG: 2500, thresholdG: 600,  costPerKg: 7.70,  yield: 0.55, yieldConfirmed: false },
-    { id: 'ribs',     name: 'St. Louis ribs',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 12000, pullG: 1200, thresholdG: 900,  costPerKg: 9.90,  yield: 0.62, yieldConfirmed: false },
-    { id: 'sausage',  name: 'Smoked sausage',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 6000, pullG: 1000,  thresholdG: 400,  costPerKg: 9.00,  yield: 0.90, yieldConfirmed: false },
-    { id: 'turkey',   name: 'Smoked turkey',    unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 5000, pullG: 1500,  thresholdG: 500,  costPerKg: 11.00, yield: 0.70, yieldConfirmed: false },
-    { id: 'mac',      name: 'Mac and cheese',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.60,  yield: 1,    yieldConfirmed: false },
-    { id: 'beans',    name: 'Pit beans',        unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.00,  yield: 1,    yieldConfirmed: false },
-    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 7000, pullG: 1500,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
-    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 6000, pullG: 1500,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
-    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, parG: 5000, pullG: 1500,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
+    { id: 'brisket',  name: 'Brisket',          unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 8, holdBasis: 'quality', cookH: 12, restH: 3, parG: 14000, pullG: 4500, thresholdG: 700,  costPerKg: 24.36, thermal: true, yield: 0.55, yieldConfirmed: false, note: 'Starter cost: USDA average brisket $11.05/lb for the week ending 2026-09-25 (from the Pitcall notes), about $24.36/kg. Unverified here.' },
+    { id: 'pork',     name: 'Pulled pork',      unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 8, holdBasis: 'quality', cookH: 10, restH: 1, parG: 10000, pullG: 2500, thresholdG: 600,  costPerKg: 7.70,  yield: 0.55, yieldConfirmed: false },
+    { id: 'ribs',     name: 'St. Louis ribs',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 5, restH: 0.5, parG: 12000, pullG: 1200, thresholdG: 900,  costPerKg: 9.90,  yield: 0.62, yieldConfirmed: false },
+    { id: 'sausage',  name: 'Smoked sausage',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 1.5, parG: 6000, pullG: 1000,  thresholdG: 400,  costPerKg: 9.00,  yield: 0.90, yieldConfirmed: false },
+    { id: 'turkey',   name: 'Smoked turkey',    unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 4, parG: 5000, pullG: 1500,  thresholdG: 500,  costPerKg: 11.00, yield: 0.70, yieldConfirmed: false },
+    { id: 'mac',      name: 'Mac and cheese',   unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 1, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.60,  yield: 1,    yieldConfirmed: false },
+    { id: 'beans',    name: 'Pit beans',        unit: 'g',  tcs: true,  hold: 'hot',  maxHoldH: 4, holdBasis: 'quality', cookH: 2, parG: 8000, pullG: 2000,  thresholdG: 500,  costPerKg: 3.00,  yield: 1,    yieldConfirmed: false },
+    { id: 'slaw',     name: 'Jalapeno slaw',    unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 7000, pullG: 1500,  thresholdG: 400,  costPerKg: 2.40,  yield: 0.88, yieldConfirmed: false },
+    { id: 'potato',   name: 'Potato salad',     unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 6000, pullG: 1500,  thresholdG: 400,  costPerKg: 3.40,  yield: 1,    yieldConfirmed: false },
+    { id: 'pudding',  name: 'Banana pudding',   unit: 'g',  tcs: true,  hold: 'cold', maxHoldH: 4, holdBasis: 'quality', cookH: 0.5, parG: 5000, pullG: 1500,  thresholdG: 400,  costPerKg: 5.20,  yield: 1,    yieldConfirmed: false },
     { id: 'cornbread', name: 'Cornbread',       unit: 'ea', tcs: false, parG: 120,   thresholdG: 8,   costEach: 0.45 },
     { id: 'buns',     name: 'Buns',             unit: 'ea', tcs: false, parG: 150,   thresholdG: 10,  costEach: 0.38 },
     { id: 'pickles',  name: 'Pickle chips',     unit: 'g',  tcs: false, parG: 6000,  thresholdG: 300,  costPerKg: 4.20 },
@@ -2440,7 +2440,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // compares 86 times with closeHour.
   // taxRatePct is the sales tax in percent added to an order when it is paid. 0 means no tax is added. The owner
   // sets the real local rate; Smokebox does not know it.
-  C.service = { dayStartHour: 4, openHour: 11, closeHour: 21, taxRatePct: 0 };
+  // soundStartHour is when warning sounds may start (never later than opening, so a pit master who starts at 4 am can
+  // hear them); soundOutsideHours lets them sound at any hour. Outside that window the strip shows a note instead.
+  C.service = { dayStartHour: 4, openHour: 11, closeHour: 21, taxRatePct: 0, soundStartHour: 11, soundOutsideHours: false };
 
   /* ---------- food safety. Owner-editable inside safetyBounds (hotHoldF can never go below 135, same rule as Pitcall). ---------- */
   // Food-safety limits, in hours, degrees Fahrenheit and minutes. The owner can change them only inside
@@ -2457,9 +2459,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     belowHotGraceH: 2,      // below 135F for more than this -> discard (reheat only allowed inside it)
     aboveColdGraceH: 4,     // above 41F for more than this -> discard
     cooling: { stage1ToF: 70, stage1H: 2, totalH: 6, finalF: 41 }, // 135->70 in 2h, then 70->41 inside 4 more (6h total) (3-501.14)
-    defaultMaxHoldH: 4,     // total time in the hold cabinet before discard
+    defaultMaxHoldH: 12,    // longest any batch may stay in the cabinet (its maximum, so it no longer caps: each product has its own limit)
     tempCheckEveryMin: 120, // a temperature reading is due this often (2 h; the FDA minimum is 4 h)
     sanitizeEveryH: 4,      // food-contact surfaces (4-602.11)
+    holdWindowV2: true,     // marks settings made after the hold limit moved from a flat 4 hours to per-product limits
     tempIntervalV2: true,   // marks settings made after the check interval default moved from 30 to 120 minutes
   };
   // Minutes before a batch's deadline at which each warning rung fires: a soft chime, then a spoken call, then
@@ -2469,7 +2472,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // How old each demo starter batch is, in minutes, when a fresh demo kitchen opens. Spread out on purpose so the
   // batches do not all expire at once and the first run shows the warnings working: brisket is the one nearest
   // its 4-hour limit. Ingredients not listed start fresh.
-  C.starterAgeMin = { brisket: 215, pork: 190, slaw: 160, ribs: 150, sausage: 120, potato: 100, turkey: 95, mac: 70, beans: 45, pudding: 20 };
+  C.starterAgeMin = { brisket: 455, pork: 410, slaw: 160, ribs: 150, sausage: 120, potato: 100, turkey: 95, mac: 70, beans: 45, pudding: 20 };
   // The allowed range for each owner-editable safety number, as [lowest, highest]. The legal limits are
   // fixed ends: hot hold never below 135 F, cold hold never above 41 F, reheat never below 165 F. The two
   // grace periods and the sanitise interval can be shortened but never lengthened past their defaults. Hold
@@ -2479,6 +2482,14 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     defaultMaxHoldH: [0.5, 12], tempCheckEveryMin: [10, 240], sanitizeEveryH: [1, 4],
   };
 
+  // Hold window per product (starter placeholders, owner to confirm; no source gives a maximum hold time):
+  // maxHoldH is how long a batch may stay in the cabinet before it is thrown out, counted from when it goes in.
+  // Brisket and pulled pork get 8 hours, everything else 4. restH is how long a fresh batch rests before it is
+  // ready to serve (brisket 3 h, pulled pork 1 h, ribs 30 min; the research gives 2 to 4 h for large cuts and
+  // 30 to 60 min for ribs). holdBasis says what the limit is: "quality" (a house limit for food held at
+  // temperature, hot at 135 F or above) or "safety" (time as a public health control, no temperature control).
+  // cookH is how long a fresh batch takes from start to ready to rest (starter placeholders, owner to confirm). With restH
+  // it tells whether a new batch started now would be ready before close.
   // pullG on an ingredient is the set amount one Pull button moves out of the cabinet (one whole brisket, one rack,
   // one pan), in grams. Starter estimates: the owner sets the real unit.
   // Brisket cooked yield, from the Texas A&M AgriLife regression in the research report. Used only for
@@ -2576,7 +2587,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -2625,6 +2636,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     orderEmpty: 'There is nothing on this order to pay. Add items first, or void the order.',
     orderNotEmpty: 'That order still has food on it. Void its tickets first, or take payment.',
     badPayment: 'Pick how it was paid (cash, card or other), and enter the tip and discount as dollar amounts.',
+    qualityNotDue: 'That batch is not past a quality limit, so there is nothing to keep serving.',
+    tempReadingNeeded: 'Log a temperature first: a reading in range (hot food at ' + C.safety.hotHoldF + ' °F or higher), taken within the temperature-check interval, is needed before keeping it on the menu.',
+    whoRequired: 'Enter your initials so the extension can be logged with who tasted it.',
+    badUntil: 'Pick a time later than now, or choose 30 minutes or 1 hour.',
   };
 
   // audit:data-end
@@ -2651,6 +2666,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     reheatBatch: '{ batchId, tempF }',
     startCooling: '{ batchId, g? }',
     pullBatch: '{ ing, g }',
+    keepServing: '{ batchIds:string[], forMin?, until?, who }',
+    endKeepServing: '{ batchId, who, note? }',
     discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other" }',
     sanitizeDone: '{}',
     updateSettings: '{ patch }',
@@ -2685,9 +2702,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // The three states of an order (the check): open while food is still being added, paid, or voided.
   const ORDER_STATUS = { open: 1, paid: 1, voided: 1 };
   const ITEM_STATUS = { queued: 1, displayed: 1, cooking: 1, done: 1 };
-  const BATCH_STATUS = { ok: 1, check: 1, reheat: 1, chill: 1, discard: 1 };
+  const BATCH_STATUS = { ok: 1, check: 1, reheat: 1, chill: 1, past: 1, discard: 1 };
   const BATCH_KIND = { hot: 1, cold: 1, cooling: 1 };
-  const STATUS_OF = { NONE: 'ok', CHECK_TEMP: 'check', REHEAT_IMMEDIATE: 'reheat', CHILL_NOW: 'chill', DISCARD_LOCKOUT: 'discard' };
+  const STATUS_OF = { NONE: 'ok', CHECK_TEMP: 'check', REHEAT_IMMEDIATE: 'reheat', CHILL_NOW: 'chill', PAST_QUALITY: 'past', DISCARD_LOCKOUT: 'discard' };
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
 
@@ -2948,6 +2965,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // How long a batch may stay in the cabinet, in ms: the smaller of its own limit and the default
   // hold-limit setting.
   const holdLimitMs = (b, S) => Math.min(isNum(b.maxHoldH) ? b.maxHoldH : Infinity, S.defaultMaxHoldH) * H;
+  // The hard cap, in ms: no batch of any kind stays in the cabinet longer than the default hold-limit setting.
+  const hardLimitMs = (S) => S.defaultMaxHoldH * H;
+  // True for a batch whose own limit is a quality limit with room before the hard cap: past that limit it is
+  // held off the menu until someone tastes it, instead of being thrown out. Batches saved before limit kinds
+  // existed have no kind and act as safety limits.
+  const hasQualityStage = (b, S) => b.holdBasis === 'quality' && holdLimitMs(b, S) < hardLimitMs(S);
   // Formats a temperature as whole degrees for messages.
   const f0 = (x) => Math.round(x) + ' °F';
   // Builds the answer card that gate() returns. The status word comes from the action word; nextDeadlineAt
@@ -2986,8 +3009,15 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // A missing time falls back to the entry time, so a bad call cannot crash or discard by mistake.
     if (!isNum(now)) now = batch.enteredAt;
     if (batch.kind === 'cooling') return coolingGate(batch, now, S);
-    const exp = batch.enteredAt + holdLimitMs(batch, S);
-    if (now > exp) return gateOut('DISCARD_LOCKOUT', false, 'expired', 'bad', 'Past the ' + U.round(holdLimitMs(batch, S) / H, 1) + '-hour hold limit. Discard.' + SAFETY);
+    const lim = holdLimitMs(batch, S), qStage = hasQualityStage(batch, S);
+    const hard = batch.enteredAt + hardLimitMs(S);
+    let exp = batch.enteredAt + lim;
+    // A safety limit, or the hard cap, throws the batch out. A quality limit does not: see the end of this function.
+    if (now > hard || (now > exp && !qStage)) return gateOut('DISCARD_LOCKOUT', false, 'expired', 'bad', 'Past the ' + U.round((now > hard ? hardLimitMs(S) : lim) / H, 1) + '-hour hold limit. Discard.' + SAFETY);
+    const kept = qStage && isNum(batch.keepUntil) && batch.keepUntil > now;
+    const pastQ = qStage && now > exp && !kept;
+    // Past its quality limit the next change is the hard cap; while kept it is the end of the extension.
+    if (qStage && now > exp) exp = kept ? Math.min(batch.keepUntil, hard) : hard;
     // Out of range: hot food gets one reheat inside the grace window, cold food must be chilled; past the
     // grace time it is discarded.
     const hot = batch.kind !== 'cold';
@@ -3005,6 +3035,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // In range, only the periodic temperature check matters. A late check stays servable: warn first, bad
     // after twice the interval.
     const iv = S.tempCheckEveryMin * MIN;
+    // In range but past its quality limit: off the menu, still on the board, waiting for a taste test or a discard.
+    if (pastQ) return gateOut('PAST_QUALITY', false, 'pastQuality', 'bad', 'Past its quality limit. Taste it, then keep serving or discard it.', exp);
     if (batch.lastTempAt == null) return gateOut('CHECK_TEMP', true, 'noReading', now - batch.enteredAt > iv ? 'bad' : 'warn', 'No temperature logged yet. Check it now.' + SAFETY, exp);
     const due = batch.lastTempAt + iv;
     if (now > due) return gateOut('CHECK_TEMP', true, 'checkDue', now > batch.lastTempAt + 2 * iv ? 'bad' : 'warn', 'Temperature check is due. Log a reading.' + SAFETY, exp);
@@ -3021,12 +3053,21 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       if (b.stage1At == null && b.status === 'chill') return st + c.stage1H * H;
       return st + c.totalH * H;
     }
-    const exp = b.enteredAt + holdLimitMs(b, S);
+    const q = hasQualityStage(b, S);
+    const hard = b.enteredAt + hardLimitMs(S);
+    const lim = b.enteredAt + holdLimitMs(b, S);
+    // The next moment the stored status can change on its own. A quality batch changes at its limit (to past),
+    // at the end of a kept extension, and at the hard cap; it must never be left without a deadline (Infinity),
+    // or the hard cap would never fire.
+    const kept = q && isNum(b.keepUntil) && b.keepUntil > lim;
+    const exp = !q ? lim : b.status === 'past' ? hard : kept ? Math.min(b.keepUntil, hard) : lim;
     if (b.outSince != null) {
       const want = b.kind === 'cold' ? 'chill' : 'reheat';
       if (b.status !== want || (b.kind !== 'cold' && b.reheats >= 1)) return -Infinity;
-      return Math.min(exp, b.outSince + (b.kind === 'cold' ? S.aboveColdGraceH : S.belowHotGraceH) * H);
+      return Math.min(q ? hard : exp, b.outSince + (b.kind === 'cold' ? S.aboveColdGraceH : S.belowHotGraceH) * H);
     }
+    // A past batch stays past (a late temperature check does not change it) until the hard cap.
+    if (b.status === 'past') return q ? hard : -Infinity;
     if (b.status === 'check') return exp;
     if (b.status !== 'ok' || b.lastTempAt == null) return -Infinity;
     return Math.min(exp, b.lastTempAt + S.tempCheckEveryMin * MIN);
@@ -3348,8 +3389,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     for (let i = 0; i < bs.length; i++) if (bs[i].status !== 'discard') refreshBatch(tx, i);
   }
 
-  // Takes up to `need` grams of a TCS ingredient from the oldest servable batches first (FIFO). Locked and
-  // cooling batches are never used (I8). Returns the records of what was taken, its cost, and what is still
+  // Takes up to `need` grams of a TCS ingredient from the oldest ready batch first (FIFO), and from batches still
+  // resting only when nothing ready is left. Locked and cooling batches are never used (I8). Returns the records of what was taken, its cost, and what is still
   // missing.
   function takeFifoInto(tx, ing, need) {
     const recs = [];
@@ -3358,7 +3399,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const cand = [];
     for (let i = 0; i < bs.length; i++) { const b = bs[i]; if (b.ing === ing.id && servableBatch(b)) cand.push(i); }
     // Oldest batch first; equal times go to the earlier position in the list.
-    cand.sort((a, b2) => (bs[a].enteredAt - bs[b2].enteredAt) || (a - b2));
+    // Batches still resting come after every ready batch, whatever their age; each group is oldest first.
+    const resting = (b) => (isNum(b.restUntil) && b.restUntil > tx.now ? 1 : 0);
+    cand.sort((a, b2) => (resting(bs[a]) - resting(bs[b2])) || (bs[a].enteredAt - bs[b2].enteredAt) || (a - b2));
     for (const bi of cand) {
       if (need <= EPS) break;
       const b = tx.get('batches')[bi];
@@ -4040,6 +4083,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       enteredAt: tx.now, cookedG: o.cookedG, remainingG: o.cookedG, src: o.src, temps: [], reheats: 0,
       maxHoldH: isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH, status: 'ok', action: 'NONE', canServe: true,
     };
+    b.holdBasis = ing.holdBasis === 'safety' ? 'safety' : 'quality';
+    if (isNum(ing.restH) && ing.restH > 0) b.restUntil = tx.now + ing.restH * H;
     if (isNum(o.rawG)) b.rawG = o.rawG;
     if (isNum(o.yieldPct)) b.yieldPct = o.yieldPct;
     if (isNum(o.costPerCookedKg)) b.costPerCookedKg = o.costPerCookedKg;
@@ -4257,6 +4302,60 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     return 'ok';
   };
 
+  // Keeps batches that are past their quality limit on the menu for a while, after a person tasted them. Each
+  // listed batch needs a reading in range, taken within the temperature-check interval; the ones that do not
+  // qualify are skipped and listed. The extension never runs past the hard cap. Logged with who and when.
+  A.keepServing = function (tx, p) {
+    const S = safetyOf(tx.get('settings'));
+    const who = typeof p.who === 'string' ? p.who.trim() : '';
+    if (!who || who.length > 12) return 'whoRequired';
+    const ids = Array.isArray(p.batchIds) ? p.batchIds.filter((x) => typeof x === 'string').slice(0, 40) : [];
+    if (!ids.length) return 'unknownBatch';
+    let until = tx.now + 30 * MIN;
+    if (isNum(p.until)) { if (!(p.until > tx.now)) return 'badUntil'; until = p.until; }
+    else if (isNum(p.forMin)) { if (!(p.forMin >= 1 && p.forMin <= 720)) return 'badUntil'; until = tx.now + p.forMin * MIN; }
+    else if (p.forMin !== undefined || p.until !== undefined) return 'badUntil';
+    const kept = [], skipped = [];
+    let firstReason = null;
+    for (const id of ids) {
+      const bi = findBatchIdx(tx.get('batches'), id);
+      const b = bi >= 0 ? tx.get('batches')[bi] : null;
+      let why = null;
+      if (!b) why = 'unknownBatch';
+      else if (!hasQualityStage(b, S) || b.status === 'discard' || !(tx.now > b.enteredAt + holdLimitMs(b, S))) why = 'qualityNotDue';
+      else if (b.outSince != null || !isNum(b.lastTempAt) || tx.now - b.lastTempAt > S.tempCheckEveryMin * MIN || !isNum(b.lastTempF) || (b.kind === 'cold' ? b.lastTempF > S.coldHoldF : b.lastTempF < S.hotHoldF)) why = 'tempReadingNeeded';
+      if (why) { skipped.push({ batchId: id, report: why }); if (!firstReason) firstReason = why; continue; }
+      const keepUntil = Math.min(until, b.enteredAt + hardLimitMs(S));
+      const w = tx.batch(bi);
+      w.keepUntil = keepUntil; w.keptBy = who;
+      tx.event('quality_extend', { batchId: b.id, ing: b.ing, who, until: keepUntil, lastTempF: b.lastTempF, lastTempAt: b.lastTempAt });
+      refreshBatch(tx, bi);
+      kept.push(b.id);
+    }
+    if (!kept.length) { tx.info = { skipped }; return firstReason || 'unknownBatch'; }
+    tx.info = { kept, skipped, until: Math.min(until, Infinity) };
+    return 'ok';
+  };
+  // A logged correction for a mistaken keep-serving: the batch goes back to past its quality limit. The original
+  // log entry stays; the correction points at it.
+  A.endKeepServing = function (tx, p) {
+    const bi = typeof p.batchId === 'string' ? findBatchIdx(tx.get('batches'), p.batchId) : -1;
+    if (bi < 0) return 'unknownBatch';
+    const b = tx.get('batches')[bi];
+    const who = typeof p.who === 'string' ? p.who.trim() : '';
+    if (!who || who.length > 12) return 'whoRequired';
+    if (!(isNum(b.keepUntil) && b.keepUntil > tx.now)) return 'qualityNotDue';
+    const evs = allEvents(tx.state());
+    let of = null;
+    for (let i = evs.length - 1; i >= 0; i--) if (evs[i].type === 'quality_extend' && evs[i].batchId === b.id) { of = evs[i].id; break; }
+    const w = tx.batch(bi);
+    w.keepUntil = tx.now;
+    tx.event('quality_extend_corrected', { batchId: b.id, who, note: typeof p.note === 'string' ? p.note.slice(0, C.limits.maxNoteLen) : '', of });
+    refreshBatch(tx, bi);
+    tx.info = { batchId: b.id };
+    return 'ok';
+  };
+
   // Manual discard with a reason from the list. The grams become waste. Undoable.
   A.discardBatch = function (tx, p) {
     const bs = tx.get('batches');
@@ -4297,10 +4396,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // Every setting the owner may change, with its rule. Anything not listed is refused (badPatch).
   const SET_SCHEMA = {
     pacing: { enabled: { t: 'bool' }, learnK: R(0, 50), floorSec: R(1, 600), minFactor: R(0.1, 1), maxFactor: R(1, 10), outlierFactor: R(1, 20), qtyFactor: R(0, 2), qtyCap: R(1, 10) },
-    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20) },
+    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20), soundStartHour: R(0, 23, true), soundOutsideHours: { t: 'bool' } },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
       defaultMaxHoldH: B('defaultMaxHoldH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
-      cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' } },
+      cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' }, holdWindowV2: { t: 'bool' } },
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
     syncTargetSec: R(10, 600),
@@ -4421,6 +4520,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   const ING_PATCH = {
     name: { t: 'text', max: 60 }, thresholdG: R(0, 1e6), parG: R(0, 1e7), yield: R(0.05, 3), yieldConfirmed: { t: 'bool' },
     costPerKg: R(0, 10000), costEach: R(0, 10000), pullG: R(50, 50000),
+    maxHoldH: R(0.5, 12), restH: R(0, 12), cookH: R(0, 48), holdBasis: { t: 'enum', v: ['quality', 'safety'] },
   };
   // Shared editor for menu items and ingredients. Checks each field, ignores unchanged ones (nothingToDo if
   // nothing changed), writes one new copy and logs settings_changed. Changing a starter prep time re-fits
@@ -4878,7 +4978,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       const b = {
         id: 'b_' + ++seq.batch, ing: ing.id, label: ing.name + ' batch 1', kind: hot ? 'hot' : 'cold', enteredAt: now - age, cookedG: ing.parG, remainingG: ing.parG,
         costPerCookedKg: round(nominalUnitCost(ing) * 1000, 4), src: 'starter', temps: [{ t: readAt, f }], lastTempF: f, lastTempAt: readAt, reheats: 0,
-        maxHoldH: isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH, status: 'ok', action: 'NONE', canServe: true,
+        maxHoldH: isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH, holdBasis: ing.holdBasis === 'safety' ? 'safety' : 'quality', status: 'ok', action: 'NONE', canServe: true,
       };
       if (ty) b.yieldPct = ty.hotPct; else if (isNum(ing.yield)) b.yieldPct = round(ing.yield * 100, 2);
       batches.push(b);
@@ -5005,7 +5105,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // Numbers for the header badges: tickets, ready, overdue and warn counts, per-station counts, batches
     // needing attention, dishes 86, and whether sanitising is overdue.
     counts(state, now) {
-      const c = { all: 0, expo: 0, ready: 0, overdue: 0, warn: 0, zones: {}, overdueByZone: {}, hold: 0, holdWhy: { check: 0, reheat: 0, chill: 0, discard: 0 }, out86: 0, sanitizeDueAt: undefined, sanitizeOverdue: false };
+      const c = { all: 0, expo: 0, ready: 0, overdue: 0, warn: 0, zones: {}, overdueByZone: {}, hold: 0, holdWhy: { check: 0, reheat: 0, chill: 0, past: 0, discard: 0 }, out86: 0, sanitizeDueAt: undefined, sanitizeOverdue: false };
       for (const z of C.workZones) { c.zones[z] = 0; c.overdueByZone[z] = 0; }
       if (!isState(state)) return c;
       for (const t of views.activeTickets(state)) {
@@ -5027,7 +5127,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
         const gt = gate(b, now, S);
         if (gt.action !== 'NONE') {
           c.hold++;
-          const why = gt.action === 'CHECK_TEMP' ? 'check' : gt.action === 'REHEAT_IMMEDIATE' ? 'reheat' : gt.action === 'CHILL_NOW' ? 'chill' : 'discard';
+          const why = gt.action === 'CHECK_TEMP' ? 'check' : gt.action === 'REHEAT_IMMEDIATE' ? 'reheat' : gt.action === 'CHILL_NOW' ? 'chill' : gt.action === 'PAST_QUALITY' ? 'past' : 'discard';
           c.holdWhy[why]++;
         }
       }
@@ -5218,6 +5318,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       if (isObj(savedSet.safety) && !hasOwn(savedSet.safety, 'tempIntervalV2') && savedSet.safety.tempCheckEveryMin === 30) {
         savedSet.safety = Object.assign({}, savedSet.safety); delete savedSet.safety.tempCheckEveryMin; repaired.push('settings.safety.tempCheckEveryMin moved to the new default');
       }
+      // Saves from before per-product hold limits cap every batch at a flat 4 hours. Lift that cap once, and give
+      // brisket and pulled pork their longer limit if they still have the old 4; values the owner chose stay.
+      const holdMigrate = !(isObj(savedSet.safety) && hasOwn(savedSet.safety, 'holdWindowV2'));
+      if (holdMigrate && isObj(savedSet.safety) && savedSet.safety.defaultMaxHoldH === 4) {
+        savedSet.safety = Object.assign({}, savedSet.safety); delete savedSet.safety.defaultMaxHoldH; repaired.push('settings.safety.defaultMaxHoldH moved to the new default');
+      }
       repairInto(settings, savedSet, SET_SCHEMA, 'settings', repaired);
       if (!(settings.service.openHour < settings.service.closeHour)) { settings.service = Object.assign({}, C.service); repaired.push('settings.service reset'); }
       if (!(settings.safety.cooling.stage1H < settings.safety.cooling.totalH)) { settings.safety.cooling = Object.assign({}, C.safety.cooling); repaired.push('settings.safety.cooling reset'); }
@@ -5231,6 +5337,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
         // For known ingredients the safety class, unit and hold type always come from the config, so an
         // edited file cannot turn a TCS food into an unchecked one.
         if (base) { out.tcs = base.tcs; out.unit = base.unit; out.hold = base.hold; out.thermal = base.thermal; }
+        if (out.tcs && out.holdBasis !== 'safety') out.holdBasis = 'quality';
+        if (holdMigrate && base && x.maxHoldH === 4 && isNum(base.maxHoldH) && base.maxHoldH > 4) out.maxHoldH = base.maxHoldH;
         if (typeof out.tcs !== 'boolean' || (out.unit !== 'g' && out.unit !== 'ea') || typeof out.name !== 'string') { repaired.push('dropped ingredient ' + x.id); continue; }
         for (const k of Object.keys(ING_PATCH)) if (ING_PATCH[k].t === 'num' && out[k] !== undefined && checkLeaf(ING_PATCH[k], out[k], k)) { out[k] = base && base[k] !== undefined ? base[k] : undefined; if (out[k] === undefined) delete out[k]; repaired.push('ingredient ' + x.id + '.' + k + ' reset'); }
         if (out.tcs && out.hold !== 'hot' && out.hold !== 'cold') out.hold = 'hot';
@@ -5316,7 +5424,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
         if (!isInt(out.reheats) || out.reheats < 0) out.reheats = 0;
         if (!Array.isArray(out.temps)) out.temps = [];
         out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS);
-        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
+        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
         if (!hasOwn(SRC_BATCH, out.src)) out.src = 'cook';
         bIds.add(b.id);
         batches.push(out);
@@ -6475,6 +6583,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       if (t > clock) clock = t;
       const r = eng.tick(st, clock);
       if (r.state !== st) st = r.state;
+      // The crew throws out any pan that has gone past its quality limit rather than leaving it on the board.
+      for (const b of st.batches) if (b.status === 'past') act('discardBatch', { batchId: b.id, reason: 'quality' }, clock);
     }
     // Next time the engine has something due on its own (paced item to show, channel sync to finish, hold
     // limit to pass).
@@ -10013,6 +10123,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       case 'CHECK_TEMP': return { tone: gt.severity === 'bad' ? 'bad' : 'warn', icon: 'thermometer', word: 'Check temp' };
       case 'REHEAT_IMMEDIATE': return { tone: 'bad', icon: 'flame', word: 'Reheat now' };
       case 'CHILL_NOW': return { tone: 'bad', icon: 'snow', word: 'Chill now' };
+      case 'PAST_QUALITY': return { tone: 'bad', icon: 'alert', word: 'Past quality limit' };
       default: return { tone: 'bad', icon: 'alert', word: 'Discard' };
     }
   }
@@ -10043,17 +10154,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
   // Builds the Hold cabinet: one card per batch plus the New batch form.
   // opts can pick the New batch tab, a product, or a batch to highlight.
-  function openHold(opts) {
+  function buildHold(sheet, opts) {
     opts = opts || {};
     const offs = [];
     const cards = new Map();
     const recents = new Map();
     let tabs = null, form = null;
-    const sheet = SB.ui.sheet({
-      title: 'Hold cabinet', side: 'right', width: 'min(1040px, 96vw)', name: 'hold',
-      // The form is destroyed with the sheet so its number boxes stop listening.
-      onClose: () => { offs.splice(0).forEach((f) => f()); if (form) form.destroy(); },
-    });
 
     // Batches panel.
     const summary = h('p', { class: 'hc-summary', role: 'status' });
@@ -10097,6 +10203,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       const ring = h('div', { class: 'hc-ring', role: 'img' }, h('span', { class: 'hc-ring-in' }, ringT, ringS));
       const meter = SB.ui.meter({ value: 0, max: 1, label: 'Left in this batch' });
       const stockT = h('div', { class: 'hc-stock-t num' });
+      // Two extra facts: when to serve it by (and what kind of limit that is), and when it finishes resting.
+      const dtServe = h('dt', null, 'Serve by'), ddServe = h('dd', { class: 'num' }), dtRest = h('dt', null, 'Resting until'), ddRest = h('dd', { class: 'num' });
+      dtRest.hidden = true; ddRest.hidden = true;
       const ddLast = h('dd', { class: 'num' }), dtNext = h('dt'), ddNext = h('dd', { class: 'num' }), ddSince = h('dd', { class: 'num' });
       const costLine = h('p', { class: 'hc-cost', hidden: true });
       const msgIcon = h('span', { class: 'hc-msg-i' }), msgT = h('span', { class: 'hc-msg-t' });
@@ -10108,29 +10217,40 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       const bReheat = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'reheat' }, hidden: true }, ico('flame', 20), h('span', null, 'Reheat'));
       const bCool = h('button', { type: 'button', class: 'btn', dataset: { act: 'cool' }, hidden: true }, ico('snow', 20), h('span', null, 'Start cooling'));
       const bDiscard = h('button', { type: 'button', class: 'btn hc-discard', dataset: { act: 'discard' } }, ico('trash', 20), h('span', null, 'Discard'));
+      // Past its quality limit: taste it, then keep serving. While kept, a small link corrects a mistaken tap.
+      const bKeep = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'keep' }, hidden: true }, ico('check-circle', 20), h('span', null, 'Taste it, keep serving'));
+      const bUnkeep = h('button', { type: 'button', class: 'btn', dataset: { act: 'unkeep' }, hidden: true }, ico('x', 20), h('span', null, 'Correct: not kept'));
+      const dtKept = h('dt', null, 'Kept serving'), ddKept = h('dd', { class: 'num' });
+      dtKept.hidden = true; ddKept.hidden = true;
       const pullT = h('span', null, 'Pull');
       const bPull = h('button', { type: 'button', class: 'btn', dataset: { act: 'pull' }, hidden: true }, ico('package', 20), pullT);
-      const actions = h('div', { class: 'hc-actions' }, bPull, bLog, bReheat, bCool, bDiscard);
+      const actions = h('div', { class: 'hc-actions' }, bKeep, bUnkeep, bPull, bLog, bReheat, bCool, bDiscard);
       const editorSlot = h('div', { class: 'hc-editor-slot' });
       // Card layout: heading, ring and facts, message and lock note, cooling steps, then the buttons.
       const el = h('article', { class: 'hc-card', dataset: { batch: b.id, tone: 'ok' }, 'aria-label': 'Batch' },
         h('header', { class: 'hc-head' }, h('div', { class: 'hc-title' }, kindEl, name, srcChip), status),
         h('div', { class: 'hc-body' }, ring,
           h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
-            h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince))),
+            h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept))),
         costLine, msg, lock, cool, actions, editorSlot);
-      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
+      Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept, bKeep, bUnkeep, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
       bLog.addEventListener('click', () => toggleEditor(rec, 'log'));
       bReheat.addEventListener('click', () => toggleEditor(rec, 'reheat'));
       bCool.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openCooling(bb, bCool); });
       bDiscard.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openDiscard(bb, bDiscard); });
       bPull.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) pullFrom(bb); });
+      bKeep.addEventListener('click', () => openKeep(rec.id, bKeep));
+      bUnkeep.addEventListener('click', () => openUnkeep(rec.id, bUnkeep));
       return rec;
     }
     // True when this is the oldest batch of its ingredient that can still be served: the one a pull comes from.
     function isPullSource(b) {
       if (!(b.remainingG > 0) || b.canServe !== true || b.status === 'discard' || b.kind === 'cooling') return false;
-      return !st().batches.some((x) => x !== b && x.ing === b.ing && x.remainingG > 0 && x.canServe === true && x.status !== 'discard' && x.kind !== 'cooling' && x.enteredAt < b.enteredAt);
+      const now = nowMs();
+      // 1 while a batch is still resting, 0 once it is ready to serve.
+      const rest = (x) => (U.isNum(x.restUntil) && x.restUntil > now ? 1 : 0);
+      // The source is the first in line: ready batches before resting ones, then the oldest.
+      return !st().batches.some((x) => x !== b && x.ing === b.ing && x.remainingG > 0 && x.canServe === true && x.status !== 'discard' && x.kind !== 'cooling' && (rest(x) < rest(b) || (rest(x) === rest(b) && x.enteredAt < b.enteredAt)));
     }
     // Takes one set unit (the product's pull size) out of the cabinet, oldest batch first, with Undo.
     function pullFrom(b) {
@@ -10182,6 +10302,19 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       // facts
       text(rec.ddLast, U.isNum(b.lastTempF) ? fmtF(b.lastTempF) + ', ' + agoText(now - b.lastTempAt) : 'No reading yet');
       text(rec.ddSince, U.fmtTime(b.enteredAt));
+      // Serve-by time with the kind of limit it is: quality (house limit, held at temperature) or safety (time as a health control).
+      const coolingNow = b.kind === 'cooling';
+      setHidden(rec.dtServe, coolingNow); setHidden(rec.ddServe, coolingNow);
+      if (!coolingNow) text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b)) + ', ' + (b.holdBasis === 'safety' ? 'safety limit' : 'quality limit'));
+      const resting = U.isNum(b.restUntil) && b.restUntil > now && !coolingNow;
+      setHidden(rec.dtRest, !resting); setHidden(rec.ddRest, !resting);
+      if (resting) text(rec.ddRest, U.fmtTime(b.restUntil));
+      // A kept batch shows until when and by whom; a past batch shows the keep-serving button.
+      const keptNow = U.isNum(b.keepUntil) && b.keepUntil > now && !coolingNow;
+      setHidden(rec.dtKept, !keptNow); setHidden(rec.ddKept, !keptNow);
+      if (keptNow) text(rec.ddKept, 'until ' + U.fmtTime(b.keepUntil) + (b.keptBy ? ', by ' + b.keptBy : ''));
+      setHidden(rec.bKeep, gt.action !== 'PAST_QUALITY');
+      setHidden(rec.bUnkeep, !keptNow);
       if (gt.action === 'REHEAT_IMMEDIATE' || gt.action === 'CHILL_NOW') {
         if (b.kind === 'cooling') { text(rec.dtNext, 'Next step'); text(rec.ddNext, U.isNum(gt.nextDeadlineAt) ? 'within ' + hmLong(gt.nextDeadlineAt - now) : 'now'); }
         else { text(rec.dtNext, 'Decide within'); text(rec.ddNext, U.isNum(gt.nextDeadlineAt) ? (gt.nextDeadlineAt - now > 0 ? hmLong(gt.nextDeadlineAt - now) : 'now') : 'now'); }
@@ -10315,6 +10448,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       // When the engine already locked the batch, its reason is preselected so waste is labelled correctly.
       let reason = gt.action === 'DISCARD_LOCKOUT' && order.indexOf(gt.reason) >= 0 ? gt.reason : null;
       if (reason == null && gt.action === 'DISCARD_LOCKOUT') reason = gt.reason === 'expired' ? 'expired' : 'temp';
+      // Past its quality limit the reason is already known, so discarding takes no extra tap.
+      if (reason == null && gt.action === 'PAST_QUALITY') reason = 'quality';
       const fx = whatIf('discardBatch', { batchId: b.id, reason: 'quality' });
       // An empty value means nothing is picked yet (null would select the first reason).
       const seg = SB.ui.segmented({ label: 'Why is it being thrown out?', class: 'hc-reasons', value: reason == null ? '' : reason, options: order.map((id) => ({ id, label: REASON_WORDS[id] })), onChange: (id) => { reason = id; paint(); } });
@@ -10343,6 +10478,79 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       paint();
     }
     // Explains the two-stage cooling rule and, on confirm, moves the whole batch into cooling.
+    // Browser-storage key for the initials typed when a batch is kept serving; remembered per tablet.
+    const KEY_WHO = 'smokebox.v1.initials';
+    // True when a batch has a reading that allows keeping it on the menu: in range and inside the check interval.
+    function keepReady(b) {
+      const S = safety();
+      return b.outSince == null && U.isNum(b.lastTempAt) && nowMs() - b.lastTempAt <= S.tempCheckEveryMin * 60000 && U.isNum(b.lastTempF) && (b.kind === 'cold' ? b.lastTempF <= S.coldHoldF : b.lastTempF >= S.hotHoldF);
+    }
+    // The taste-and-keep dialog: every batch that is past its quality limit, each with its last reading, for 30 minutes,
+    // 1 hour or until a time of day. Batches without a fresh reading in range cannot be ticked.
+    function openKeep(startId, opener) {
+      const S = safety();
+      const past = st().batches.filter((x) => x.status === 'past' && x.remainingG > 0);
+      if (!past.length) return;
+      const picks = new Map();
+      const list = h('div', { class: 'fs-list' });
+      past.forEach((x) => {
+        const ok = keepReady(x);
+        const cb = h('input', { type: 'checkbox', checked: ok && (x.id === startId || !startId), disabled: !ok, 'aria-label': 'Keep ' + (x.label || 'batch') + ' serving' });
+        picks.set(x.id, cb);
+        const reading = U.isNum(x.lastTempF) ? 'Last reading ' + fmtF(x.lastTempF) + ', ' + agoText(nowMs() - x.lastTempAt) : 'No reading yet';
+        list.appendChild(h('label', { class: 'fs-card fs-card-soft', style: 'display:flex;gap:12px;align-items:center;padding:12px' }, cb,
+          h('span', { class: 'grow' }, h('strong', null, x.label || 'Batch'), h('br'), h('span', { class: 'fs-sub' }, ok ? reading : reading + '. Log a temperature of ' + (x.kind === 'cold' ? S.coldHoldF + ' °F or lower' : S.hotHoldF + ' °F or higher') + ' first.'))));
+      });
+      const dur = SB.ui.segmented({ label: 'How long', value: '30', options: [{ id: '30', label: '30 minutes' }, { id: '60', label: '1 hour' }, { id: 'until', label: 'Until a time' }] });
+      const untilIn = h('input', { class: 'input', type: 'time', 'aria-label': 'Keep serving until', hidden: true });
+      const who = h('input', { class: 'input', type: 'text', maxlength: '12', autocomplete: 'off', value: U.storage.get(KEY_WHO, '') || '', placeholder: 'Your initials', 'aria-label': 'Your initials' });
+      const err = h('div', { class: 'fs-note', 'data-tone': 'bad', role: 'alert', hidden: true });
+      dur.addEventListener('click', () => setTimeout(() => { untilIn.hidden = dur.getValue() !== 'until'; }, 0));
+      const dl = dialog({
+        title: 'Taste it and keep serving', name: 'keep', opener, confirmLabel: 'Keep serving', icon: 'check-circle',
+        body: [
+          h('p', null, 'Past its quality limit means the food is off the menu until someone tastes it. If it is still good, keep it on the menu for a set time. Your local health department\'s rules apply to quality extensions.'),
+          list, h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'How long'), dur, untilIn), h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'Who tasted it'), who), err,
+        ],
+        // Sends the ticked batches to the engine with the chosen length and the initials, then reports what was kept.
+        onConfirm: (sh) => {
+          const ids = past.filter((x) => picks.get(x.id).checked).map((x) => x.id);
+          if (!ids.length) { err.textContent = 'Tick at least one batch. A batch needs a fresh temperature reading first.'; err.hidden = false; return; }
+          const payload = { batchIds: ids, who: who.value.trim() };
+          const mode = dur.getValue();
+          if (mode === 'until') {
+            const [hh, mm] = (untilIn.value || '').split(':').map(Number);
+            if (!(hh >= 0)) { err.textContent = 'Pick a time of day.'; err.hidden = false; return; }
+            const d = new Date(nowMs()); d.setHours(hh, mm || 0, 0, 0);
+            if (d.getTime() <= nowMs()) d.setDate(d.getDate() + 1);
+            payload.until = d.getTime();
+          } else payload.forMin = Number(mode);
+          const res = run('keepServing', payload);
+          if (res.report !== 'ok') { err.textContent = say(res); err.hidden = false; return; }
+          U.storage.set(KEY_WHO, payload.who);
+          sh.close('confirm');
+          const n = res.info.kept.length, sk = res.info.skipped.length;
+          toast(n + ' ' + plural(n, 'batch') + ' kept serving until ' + U.fmtTime(res.info.until) + '.' + (sk ? ' ' + sk + ' skipped.' : ''), sk ? 'warn' : 'ok');
+          update(nowMs());
+        },
+      });
+      return dl;
+    }
+    // Corrects a mistaken keep-serving: asks for initials and logs the correction; the original entry stays.
+    function openUnkeep(id, opener) {
+      const b = batchOf(id); if (!b) return;
+      const who = h('input', { class: 'input', type: 'text', maxlength: '12', autocomplete: 'off', value: U.storage.get(KEY_WHO, '') || '', placeholder: 'Your initials', 'aria-label': 'Your initials' });
+      dialog({
+        title: 'Correct: not kept serving', name: 'unkeep', opener, confirmLabel: 'Put back past limit', icon: 'x',
+        body: ['This puts ' + (b.label || 'the batch') + ' back past its quality limit. The earlier entry stays in the log, with this correction beside it.', who],
+        // Logs the correction through the engine and closes the dialog.
+        onConfirm: (sh) => {
+          const res = run('endKeepServing', { batchId: id, who: who.value.trim(), note: 'Corrected from the cabinet card' });
+          if (res.report !== 'ok') { toast(say(res), 'warn'); return; }
+          sh.close('confirm'); update(nowMs());
+        },
+      });
+    }
     function openCooling(b, opener) {
       const S = safety(), c = S.cooling || C.safety.cooling, label = b.label || 'Batch', ing = ingOf(b.ing);
       const fx = whatIf('startCooling', { batchId: b.id });
@@ -10403,9 +10611,37 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     }
     update(nowMs());
     watch(offs, () => update(nowMs()), (now) => update(now));
-    if (opts.batchId) { const rec = cards.get(opts.batchId); if (rec) setTimeout(() => { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); }, 80); }
+    // Scrolls a batch card into view and flashes it.
+    function highlight(batchId) { const rec = cards.get(batchId); if (rec) setTimeout(() => { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); }, 80); }
+    if (opts.batchId) highlight(opts.batchId);
+    // Stops listening to the store and the clock, and lets the New batch form drop its listeners.
+    function destroy() { offs.splice(0).forEach((f) => f()); if (form) form.destroy(); }
+    return { destroy, highlight };
+  }
+  // Opens the Hold cabinet as a sheet on the right.
+  function openHold(opts) {
+    let api = null;
+    const sheet = SB.ui.sheet({
+      title: 'Hold cabinet', side: 'right', width: 'min(1040px, 96vw)', name: 'hold',
+      // The form is destroyed with the sheet so its number boxes stop listening.
+      onClose: () => { if (api) api.destroy(); },
+    });
+    api = buildHold(sheet, opts);
     return sheet;
   }
+  // Builds the Hold cabinet inside a page element instead of a sheet (the kitchen board's Cabinet view). Returns
+  // { destroy, highlight(batchId) }.
+  function mountHold(parent, opts) {
+    const body = h('div', { class: 'hc-page-body' });
+    const footer = h('div', { class: 'hc-page-foot', hidden: true });
+    parent.append(body, footer);
+    // A page has nothing to close, so links to other sheets just open them.
+    const api = buildHold({ body, footer, close: () => {} }, opts);
+    // Stops the cabinet page and takes it off the screen.
+    const destroy = () => { api.destroy(); body.remove(); footer.remove(); };
+    return { destroy, highlight: api.highlight };
+  }
+  SB.hold = { mount: mountHold };
 
   // New batch form: live yield and cost numbers while you type (SPEC 14.3.2).
   // Browser-storage key for the last batch made of each product, so the next one starts from the same numbers.
@@ -10437,7 +10673,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const rawLab = h('div', { class: 'field-label', 'aria-hidden': 'true' });
     // Raw weight in kg for meat, or the amount made for sides.
     const rawStep = SB.ui.stepper({ value: F.rawKg, min: 0.1, max: 1000, step: 0.1, bigStep: 1, unit: 'kg', label: 'Raw weight in kilograms', onChange: (v) => { F.rawKg = v; F.wTouched = true; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
-    const lastNote = h('p', { class: 'hc-hint', hidden: true });
+    const lastNote = h('p', { class: 'fs-sub hc-sub', hidden: true });
     const rawFld = h('div', { class: 'hc-fld' }, rawLab, rawStep, lastNote);
 
     // Cook endpoint: the inside temperature the meat reached. Hotter means more weight lost.
@@ -10445,7 +10681,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // Hours the meat rested before slicing; resting also changes the weight.
     const holdStep = SB.ui.stepper({ value: F.holdH, min: 0, max: 3, step: 0.5, unit: 'h', label: 'Hold before slicing in hours', onChange: (v) => { F.holdH = v; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
     // The cook endpoint is in Celsius (the research model uses it), so the same number is shown in Fahrenheit beside it.
-    const endF = h('p', { class: 'hc-hint' });
+    const endF = h('p', { class: 'fs-sub hc-sub' });
     // Writes the endpoint in Fahrenheit under its stepper.
     const paintEndF = () => text(endF, '= ' + Math.round(F.endC * 9 / 5 + 32) + ' °F');
     const thermalBox = h('div', { class: 'hc-two' }, vis('Cook endpoint', endStep, endF), vis('Rested before slicing', holdStep));
@@ -11334,7 +11570,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + S.hotHoldF + ' °F, reheat to ' + S.reheatF + ' °F within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
         rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + S.hotHoldF + ' °F, not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
-        rule('package', 'Hold limit', 'A batch is discarded after ' + S.defaultMaxHoldH + ' hours in the cabinet, or less if its own limit is shorter.'),
+        rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit (time as a health control) throws the batch out. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + S.defaultMaxHoldH + ' hours. Your local health department\'s rules apply to quality extensions.'),
         rule('snow', 'Cooling', 'From ' + S.hotHoldF + ' °F to ' + c.stage1ToF + ' °F within ' + c.stage1H + ' hours, then to ' + c.finalF + ' °F within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
         rule('lock', 'Locked batches', 'A batch that is not safe to serve is locked. Nothing is taken from it, and menu items that need it show 86 safety hold.'),

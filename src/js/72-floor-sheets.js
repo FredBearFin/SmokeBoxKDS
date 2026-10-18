@@ -266,17 +266,12 @@
 
   // Builds the Hold cabinet: one card per batch plus the New batch form.
   // opts can pick the New batch tab, a product, or a batch to highlight.
-  function openHold(opts) {
+  function buildHold(sheet, opts) {
     opts = opts || {};
     const offs = [];
     const cards = new Map();
     const recents = new Map();
     let tabs = null, form = null;
-    const sheet = SB.ui.sheet({
-      title: 'Hold cabinet', side: 'right', width: 'min(1040px, 96vw)', name: 'hold',
-      // The form is destroyed with the sheet so its number boxes stop listening.
-      onClose: () => { offs.splice(0).forEach((f) => f()); if (form) form.destroy(); },
-    });
 
     // Batches panel.
     const summary = h('p', { class: 'hc-summary', role: 'status' });
@@ -728,9 +723,37 @@
     }
     update(nowMs());
     watch(offs, () => update(nowMs()), (now) => update(now));
-    if (opts.batchId) { const rec = cards.get(opts.batchId); if (rec) setTimeout(() => { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); }, 80); }
+    // Scrolls a batch card into view and flashes it.
+    function highlight(batchId) { const rec = cards.get(batchId); if (rec) setTimeout(() => { rec.el.scrollIntoView({ block: 'nearest' }); flash(rec.el); }, 80); }
+    if (opts.batchId) highlight(opts.batchId);
+    // Stops listening to the store and the clock, and lets the New batch form drop its listeners.
+    function destroy() { offs.splice(0).forEach((f) => f()); if (form) form.destroy(); }
+    return { destroy, highlight };
+  }
+  // Opens the Hold cabinet as a sheet on the right.
+  function openHold(opts) {
+    let api = null;
+    const sheet = SB.ui.sheet({
+      title: 'Hold cabinet', side: 'right', width: 'min(1040px, 96vw)', name: 'hold',
+      // The form is destroyed with the sheet so its number boxes stop listening.
+      onClose: () => { if (api) api.destroy(); },
+    });
+    api = buildHold(sheet, opts);
     return sheet;
   }
+  // Builds the Hold cabinet inside a page element instead of a sheet (the kitchen board's Cabinet view). Returns
+  // { destroy, highlight(batchId) }.
+  function mountHold(parent, opts) {
+    const body = h('div', { class: 'hc-page-body' });
+    const footer = h('div', { class: 'hc-page-foot', hidden: true });
+    parent.append(body, footer);
+    // A page has nothing to close, so links to other sheets just open them.
+    const api = buildHold({ body, footer, close: () => {} }, opts);
+    // Stops the cabinet page and takes it off the screen.
+    const destroy = () => { api.destroy(); body.remove(); footer.remove(); };
+    return { destroy, highlight: api.highlight };
+  }
+  SB.hold = { mount: mountHold };
 
   // New batch form: live yield and cost numbers while you type (SPEC 14.3.2).
   // Browser-storage key for the last batch made of each product, so the next one starts from the same numbers.
@@ -762,7 +785,7 @@
     const rawLab = h('div', { class: 'field-label', 'aria-hidden': 'true' });
     // Raw weight in kg for meat, or the amount made for sides.
     const rawStep = SB.ui.stepper({ value: F.rawKg, min: 0.1, max: 1000, step: 0.1, bigStep: 1, unit: 'kg', label: 'Raw weight in kilograms', onChange: (v) => { F.rawKg = v; F.wTouched = true; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
-    const lastNote = h('p', { class: 'hc-hint', hidden: true });
+    const lastNote = h('p', { class: 'fs-sub hc-sub', hidden: true });
     const rawFld = h('div', { class: 'hc-fld' }, rawLab, rawStep, lastNote);
 
     // Cook endpoint: the inside temperature the meat reached. Hotter means more weight lost.
@@ -770,7 +793,7 @@
     // Hours the meat rested before slicing; resting also changes the weight.
     const holdStep = SB.ui.stepper({ value: F.holdH, min: 0, max: 3, step: 0.5, unit: 'h', label: 'Hold before slicing in hours', onChange: (v) => { F.holdH = v; if (F.weighed && !F.cookedTouched) syncCooked(); calc(); } });
     // The cook endpoint is in Celsius (the research model uses it), so the same number is shown in Fahrenheit beside it.
-    const endF = h('p', { class: 'hc-hint' });
+    const endF = h('p', { class: 'fs-sub hc-sub' });
     // Writes the endpoint in Fahrenheit under its stepper.
     const paintEndF = () => text(endF, '= ' + Math.round(F.endC * 9 / 5 + 32) + ' °F');
     const thermalBox = h('div', { class: 'hc-two' }, vis('Cook endpoint', endStep, endF), vis('Rested before slicing', holdStep));

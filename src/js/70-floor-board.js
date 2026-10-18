@@ -288,6 +288,7 @@
     m = null;
     i.offs.forEach((fn) => { try { fn(); } catch (e) { /* ignore */ } });
     clearTimeout(i.sayT);
+    if (i.cab) { try { i.cab.destroy(); } catch (e) { /* ignore */ } }
     if (i.io) i.io.disconnect();
     if (i.ro) i.ro.disconnect();
     cancelAnimationFrame(i.raf);
@@ -299,6 +300,7 @@
   F.setZone = function (zone) {
     const z = TABS.indexOf(zone) >= 0 ? zone : 'all';
     if (!m) { pendingZone = z; return z; }
+    if (m.cabOn) showCabinet(false);
     if (z === m.zone) return z;
     m.zone = z;
     clearBoard();
@@ -327,6 +329,8 @@
       const z = zoneById(id);
       return { id, label: z.code, icon: z.icon, iconSize: 20, count: 0, alert: false, alertLabel: 'has overdue tickets' };
     });
+    // The Cabinet tab is not a station: it swaps the tickets for the hold cabinet, on the same screen.
+    tabOptions.push({ id: 'cabinet', label: 'Cabinet', icon: 'thermometer', iconSize: 20, count: 0, alert: false, alertLabel: 'needs attention' });
     const seg = SB.ui.segmented({ kind: 'tabs', label: 'Station', options: tabOptions, value: m.zone, onChange: goZone, class: 'fl-seg' });
     // Screen readers get the full station name and what the count means; the eye sees an icon and a code.
     TABS.forEach((id) => {
@@ -348,15 +352,16 @@
       const n = h('span', { class: 'fl-tool-n num', hidden: true });
       const lab = h('span', { class: 'fl-tool-label' }, short);
       // A tool button opens its sheet; the key in brackets in the tooltip is the shortcut.
-      const b = h('button', { type: 'button', class: 'btn fl-tool', dataset: { tool: id }, 'aria-keyshortcuts': key, onClick: () => openSheet(sheet) }, ico(icon, 24), lab, n);
+      const b = h('button', { type: 'button', class: 'btn fl-tool', dataset: { tool: id }, 'aria-keyshortcuts': key, onClick: () => (typeof sheet === 'function' ? sheet() : openSheet(sheet)) }, ico(icon, 24), lab, n);
       try { SB.ui.tooltip(b, label + ' (' + key + ')'); } catch (e) { /* ignore */ }
       return { b, n, lab, label };
     };
     const tRecall = tool('recall', 'history', 'Recall', 'Recall', 'R', 'recall');
-    const tHold = tool('hold', 'thermometer', 'Hold cabinet', 'Hold', 'H', 'hold');
+    const tHold = tool('hold', 'thermometer', 'Hold cabinet', 'Hold', 'H', toggleCabinet);
     const t86 = tool('board86', 'ban', '86 board', '86', '8', 'board86');
     const tDemo = tool('demo', 'play', 'Demo', 'Demo', 'D', 'demo');
-    const tools = h('div', { class: 'fl-tools' }, tRecall.b, tHold.b, t86.b, tDemo.b);
+    // The Hold button is not in the header any more: the Cabinet tab next to the stations is that button, with its count.
+    const tools = h('div', { class: 'fl-tools' }, tRecall.b, t86.b, tDemo.b);
     // Orders is a main button, not a tool: it stays in the header at every width, next to New ticket, because the counter
     // lives in it (open orders, add a round, take payment). The badge counts the orders still open.
     const tOrders = tool('orders', 'receipt', 'Open orders', 'Orders', 'O', 'orders');
@@ -378,7 +383,8 @@
     const grid = h('div', { class: 'fl-grid' });
     const empty = h('div', { class: 'fl-empty', hidden: true });
     const welcome = buildWelcome();
-    const main = h('main', { class: 'fl-main', id: 'fl-board', tabindex: -1, 'aria-label': 'Tickets' }, h('h1', { class: 'visually-hidden' }, 'Smokebox kitchen board'), welcome, grid, empty);
+    const cabEl = h('section', { class: 'fl-cabinet', hidden: true, 'aria-label': 'Hold cabinet' });
+    const main = h('main', { class: 'fl-main', id: 'fl-board', tabindex: -1, 'aria-label': 'Tickets' }, h('h1', { class: 'visually-hidden' }, 'Smokebox kitchen board'), welcome, grid, empty, cabEl);
 
     // ----- dock
     const dockToggle = h('button', { type: 'button', class: 'fl-dock-toggle', 'aria-expanded': 'true', 'aria-controls': 'fl-dock-list', onClick: toggleDock },
@@ -402,7 +408,7 @@
     m.tabParts = {};
     TABS.forEach((id) => { const b = seg.querySelector('[data-id="' + id + '"]'); if (b) m.tabParts[id] = { count: b.querySelector('.seg-count'), n: -1 }; });
     m.sanText = sanChip.querySelector('.fl-chip-t');
-    Object.assign(m, { head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, strip, main, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
+    Object.assign(m, { head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
 
     grid.addEventListener('click', onGridClick);
     dockList.addEventListener('click', (e) => {
@@ -506,8 +512,30 @@
     title.textContent = m.zone === 'all' || m.zone === 'expo' ? 'All day' : 'All day, ' + zoneById(m.zone).name;
     dockName();
   }
+  // Shows the hold cabinet in the page in place of the tickets (on), or goes back to the tickets (off). The strip and
+  // header stay. opts.batchId scrolls to one batch. Opened from the Cabinet tab, the Hold button, H and the strip rows.
+  function showCabinet(on, opts) {
+    if (!m || !SB.hold) { if (on) openSheet('hold'); return; }
+    if (on) {
+      if (!m.cab) m.cab = SB.hold.mount(m.cabEl, opts && opts.tab ? { tab: opts.tab } : {});
+      else if (opts && opts.batchId) m.cab.highlight(opts.batchId);
+      if (opts && opts.batchId && m.cab && !m.cabOn) m.cab.highlight(opts.batchId);
+    } else if (m.cab) { m.cab.destroy(); m.cab = null; }
+    m.cabOn = !!on;
+    m.root.dataset.cabinet = on ? 'on' : 'off';
+    for (const el of [m.grid, m.empty, m.welcome, m.dock]) if (el) el.style.display = on ? 'none' : '';
+    setHidden(m.cabEl, !on);
+    m.seg.setValue(on ? 'cabinet' : m.zone);
+    m.main.setAttribute('aria-label', on ? 'Hold cabinet' : m.zone === 'all' ? 'Tickets for all stations' : 'Tickets for ' + zoneById(m.zone).name);
+    if (!on) { m.dock.hidden = false; measureDock(); }
+    if (on) { const lift = doc.documentElement.style; lift.setProperty('--fl-lift', '0px'); }
+  }
+  // Switches between the tickets and the cabinet (the Hold button and the H key).
+  function toggleCabinet() { showCabinet(!(m && m.cabOn)); }
   // Called when a tab is chosen: asks the router to change the address (so Back works), then switches.
   function goZone(id) {
+    if (id === 'cabinet') { showCabinet(true); return; }
+    if (m && m.cabOn) showCabinet(false);
     if (SB.router && SB.router.go) { try { SB.router.go({ kind: 'floor', zone: id }); } catch (e) { /* fall through */ } }
     if (m && m.zone !== id) F.setZone(id);
   }
@@ -1074,7 +1102,7 @@
     for (let i = 0; i < 3; i++) {
       const when = h('span', { class: 'fl-strip-when num' }), what = h('span', { class: 'fl-strip-what' }), why = h('span', { class: 'fl-strip-why' });
       // Acknowledges this row, then opens the hold cabinet on its batch, or just the cabinet when it is not about one batch.
-      const openRow = () => { const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (r.batchId) openHoldFor(r.batchId); else openSheet('hold'); };
+      const openRow = () => { const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (r.batchId) openHoldFor(r.batchId); else showCabinet(true); };
       const row = h('button', { type: 'button', class: 'fl-strip-row', hidden: true, dataset: { i: String(i) }, onClick: openRow },
         when, h('span', { class: 'fl-strip-text' }, what, why));
       rows.push({ el: row, when, what, why, key: '', batchId: null });
@@ -1082,8 +1110,8 @@
     }
     return { el, rows, soundBar, pauseBar };
   }
-  // Opens the hold cabinet with one batch scrolled into view and flashed.
-  function openHoldFor(batchId) { try { if (SB.sheets) SB.sheets.open('hold', { batchId }); } catch (e) { console.error('[smokebox] sheet failed', e); } }
+  // Shows the hold cabinet with one batch scrolled into view and flashed.
+  function openHoldFor(batchId) { try { showCabinet(true, { batchId }); } catch (e) { console.error('[smokebox] cabinet failed', e); } }
   // Warning ladder memory: for each deadline id, the rung already announced, the rung the cook acknowledged by
   // tapping it, and when the loud tone last played.
   const ladder = new Map();
@@ -1195,6 +1223,7 @@
     const recentN = recentCount(S, now);
     toolCount(m.tool.recall, recentN, '', recentN ? recentN + ' recently bumped' : '');
     toolCount(m.tool.hold, c.hold, 'warn', holdReason(c));
+    m.seg.setCount('cabinet', c.hold, { alert: c.hold > 0 });
     toolCount(m.tool.board86, c.out86, 'bad', c.out86 ? c.out86 + ' ' + U.plural(c.out86, 'item') + ' off the menu' : '');
     // Orders still open, counted again only when the orders list itself changed.
     const ords = S.getState().orders || [];
@@ -1277,7 +1306,7 @@
     SB.ui.menu(anchor, [
       // Logging a check goes through run(), so it can be undone like any action.
       { label: 'Mark surfaces sanitized', icon: 'check-circle', onClick: () => run('sanitizeDone', {}) },
-      { label: 'Open the hold cabinet', icon: 'thermometer', onClick: () => openSheet('hold') },
+      { label: 'Open the hold cabinet', icon: 'thermometer', onClick: () => showCabinet(true) },
     ], { label: 'Sanitize timer' });
   }
   // On a narrow screen the Menu button opens this list: the buttons that no longer fit, plus settings.
@@ -1293,7 +1322,7 @@
       { label: 'Orders' + (m.openOrders ? ' (' + m.openOrders + ' open)' : ''), icon: 'receipt', onClick: () => openSheet('orders') },
       // Recall and Hold open the same sheets as their header buttons, with the same counts.
       { label: 'Recall' + (recentCount(store(), store().now()) ? ' (' + recentCount(store(), store().now()) + ')' : ''), icon: 'history', onClick: () => openSheet('recall') },
-      { label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => openSheet('hold') },
+      { label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
       // 86 and Demo open their sheets too.
       { label: '86 board' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
       { label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
@@ -1651,7 +1680,7 @@
     if (k === 'n') openSheet('order');
     else if (k === 'o') openSheet('orders');
     else if (k === 'r') openSheet('recall');
-    else if (k === 'h') openSheet('hold');
+    else if (k === 'h') toggleCabinet();
     else if (k === '8') openSheet('board86');
     else if (k === 'd') openSheet('demo');
     else if (k === '?') openSheet('help');

@@ -63,3 +63,6 @@ hidden below 1180 px. Nothing tells anyone what to do next about a batch.
 - Where is the warmer relative to the cutting board, and where could a tablet sit within one-hand reach of both?
 - Do cutters pull whole units from the warmer, or portion directly from it?
 - Who looks at a screen during a rush today, and how often?
+
+## Built: the Cabinet view (2026-10-18)
+Decision 1 above is built as a view on the same screen rather than a router zone: the **Cabinet** tab (after the station tabs) swaps the tickets for the hold cabinet, mounted from the same builder as the Hold sheet (`SB.hold.mount`). The strip stays on both views. The Hold button left the header; the tab carries its count. Deviations from the sketch: no URL route (a reload returns to the tickets), and no separate "Cutting board" view yet.

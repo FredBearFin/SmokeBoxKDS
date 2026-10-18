@@ -112,7 +112,7 @@ Text sizes in the strip (CSS px): countdown 28 (40.8 at 1920 wide), batch name 2
 
 **The acceptance test is not met yet.** The test was: from 10 feet, in 10 seconds, with no taps, know which batch is about to go and what to do. On a 43 in TV the countdown is comfortable to 6.8 ft and barely legible at 10 ft; the batch name is comfortable to 4.4 ft; the line that says what happens is barely legible at 7 ft. On a tablet nothing in the strip reads from across a kitchen. The strip says the right thing, but not yet at the size it needs. Far-display type (the line board's big-type mode and a bigger strip) is the next step and is planned after the real-service gate unless the pilot decides otherwise.
 
-Taps (counted by driving the buttons on a 1280x800 touch screen, 2026-10-18): pulling a unit from the cabinet 2 taps (Hold, Pull); keeping a past-quality batch serving 3 taps once initials are remembered (Hold, Keep, confirm) when a fresh reading already exists, plus the usual 3 taps to log one if it does not; discarding a past-quality batch 3 taps (Hold, Discard, confirm; the reason is now pre-filled). The Cabinet tab will take one tap off each.
+Taps (counted by driving the buttons on a 1280x800 touch screen, 2026-10-18): pulling a unit from the cabinet 2 taps (Hold, Pull); keeping a past-quality batch serving 3 taps once initials are remembered (Hold, Keep, confirm) when a fresh reading already exists, plus the usual 3 taps to log one if it does not; discarding a past-quality batch 3 taps (Hold, Discard, confirm; the reason is now pre-filled). With the Cabinet view left open on a pit tablet (it replaces the tickets on that screen, see below) they are 1, 2 and 2.
 
 ## Status of the original findings
 
@@ -120,7 +120,7 @@ Taps (counted by driving the buttons on a 1280x800 touch screen, 2026-10-18): pu
 |---|---|---|
 | 1 | No warning ladder, cry-wolf badge | Built: strip, ladder, grouped sounds, badge says why. Replayed in simulation (above). |
 | 2 | Sound off, nothing spoken, no wake lock | Built: on by default with a tap-to-allow bar, spoken calls, wake lock request (refused in headless Chromium; untested on a real tablet). |
-| 3 | Hold, 86, Recall hidden below 1180 px | Fixed at 1024 px (words drop before buttons). Not checked on a real 1024-wide Android tablet. |
+| 3 | Hold, 86, Recall hidden below 1180 px | Fixed at 1024 px (words drop before buttons; the Hold button became the Cabinet tab). Not checked on a real 1024-wide Android tablet. |
 | 4 | Text too small | Strip measured above: not enough for a TV across a room. Open. |
 | 5 | Too many taps | Pull and keep are 2 and 3 taps. Clean-hands bump, inferred items: open (phase C). |
 | 6 | All-pink board, "On time" chips | Open. |
@@ -129,3 +129,7 @@ Taps (counted by driving the buttons on a 1280x800 touch screen, 2026-10-18): pu
 | 9 | Channel sync block on the 86 board | Folded below the menu and stock. |
 | 10 | Mixed units | Open: the cook endpoint now also shows F; no units setting. |
 | 11 | New batch form | Starts from the last batch of each product. Fewer inputs: open. |
+
+## Cabinet view (built after the replay)
+
+The hold cabinet is now a page view as well as a sheet: the **Cabinet** tab sits after the station tabs (with the count of batches needing attention) and replaces the tickets on the same screen; the strip and header stay above it. The Hold button left the header (the tab is that button), which is also what keeps Recall and 86 visible on a 1024 px tablet: header fit at 1024x768 measured with the Cabinet tab in place: tab, 86 and Recall visible, Orders and Back office words dropped. `H` toggles it; tapping a strip row opens it on that batch; a station tab brings the tickets back. At 1920 wide its text scales with the board's large-screen factor (1.2). Screenshots: `docs/ux-shots/cabinet-1024x768.png`, `cabinet-1920x1080.png`. It is the same builder as the sheet, so both stay in step. Checked in a real browser at 1024x768 and 1920x1080: opens in one tap, Pull works in one tap from it, the tickets come back, `H` toggles, no console errors. Not yet checked: a real tablet, and the type is still not large enough for a TV across a room (see the readability section).
