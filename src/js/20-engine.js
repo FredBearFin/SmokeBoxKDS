@@ -15,7 +15,7 @@
  * Public API (other modules code against these names; see docs/smokebox.z.md for the formal statement):
  *   apply(state, type, payload, now)      -> { state, report, events, info }      (ACTIONS lists every type + payload)
  *   tick(state, now)                      -> { state, events }   same ref when nothing is due
- *   newState({ now, empty?, settings?, menu?, ingredients?, learned?, seq? }) -> state
+ *   newState({ now, empty?, stagger?, settings?, menu?, ingredients?, learned?, seq? }) -> state
  *   availability(state, menuId)           -> { ok, reason: null|'manual'|'safety'|'stock', ing }
  *   computeAvail(state)                   -> { [menuId]: { ok, reason, ing } }
  *   servable(state, ingId)                -> grams (or 'ea') that can be served now
@@ -2310,9 +2310,12 @@
       const hot = ing.hold !== 'cold';
       const f = hot ? 155 : 38;
       const ty = ing.thermal ? thermalYield({ costPerKgRaw: ing.costPerKg }) : null;
+      // With stagger on, each starter batch is already some time old (config) and its last reading was at most 40 minutes ago.
+      const age = opts.stagger === true && isNum(C.starterAgeMin[ing.id]) ? C.starterAgeMin[ing.id] * MIN : 0;
+      const readAt = now - Math.min(age, 40 * MIN);
       const b = {
-        id: 'b_' + ++seq.batch, ing: ing.id, label: ing.name + ' batch 1', kind: hot ? 'hot' : 'cold', enteredAt: now, cookedG: ing.parG, remainingG: ing.parG,
-        costPerCookedKg: round(nominalUnitCost(ing) * 1000, 4), src: 'starter', temps: [{ t: now, f }], lastTempF: f, lastTempAt: now, reheats: 0,
+        id: 'b_' + ++seq.batch, ing: ing.id, label: ing.name + ' batch 1', kind: hot ? 'hot' : 'cold', enteredAt: now - age, cookedG: ing.parG, remainingG: ing.parG,
+        costPerCookedKg: round(nominalUnitCost(ing) * 1000, 4), src: 'starter', temps: [{ t: readAt, f }], lastTempF: f, lastTempAt: readAt, reheats: 0,
         maxHoldH: isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH, status: 'ok', action: 'NONE', canServe: true,
       };
       if (ty) b.yieldPct = ty.hotPct; else if (isNum(ing.yield)) b.yieldPct = round(ing.yield * 100, 2);

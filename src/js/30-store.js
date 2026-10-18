@@ -282,7 +282,7 @@
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
     if (loaded) atLeast(lastStamp(loaded));
-    state = loaded || E().newState({ now: now() });
+    state = loaded || E().newState({ now: now(), stagger: true });
     // Catch up anything that became due while the page was closed.
     const t = E().tick(state, now());
     state = t.state;
@@ -449,7 +449,7 @@
   function reset() {
     rebaseClock();
     const old = state;
-    const ns = E().newState({ now: now(), seq: old ? old.seq : undefined });
+    const ns = E().newState({ now: now(), stagger: true, seq: old ? old.seq : undefined });
     ns.rev = (old ? old.rev : 0) + 1;
     commit(ns, true);
     skipRebase = true; pending = [];

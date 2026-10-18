@@ -195,6 +195,10 @@
     sanitizeEveryH: 4,      // food-contact surfaces (4-602.11)
     tempIntervalV2: true,   // marks settings made after the check interval default moved from 30 to 120 minutes
   };
+  // How old each demo starter batch is, in minutes, when a fresh demo kitchen opens. Spread out on purpose so the
+  // batches do not all expire at once and the first run shows the warnings working: brisket is the one nearest
+  // its 4-hour limit. Ingredients not listed start fresh.
+  C.starterAgeMin = { brisket: 215, pork: 190, slaw: 160, ribs: 150, sausage: 120, potato: 100, turkey: 95, mac: 70, beans: 45, pudding: 20 };
   // The allowed range for each owner-editable safety number, as [lowest, highest]. The legal limits are
   // fixed ends: hot hold never below 135 F, cold hold never above 41 F, reheat never below 165 F. The two
   // grace periods and the sanitise interval can be shortened but never lengthened past their defaults. Hold

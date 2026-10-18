@@ -965,3 +965,16 @@ test('migration: an old save with the 30-minute default moves to 2 hours once; c
   assert.equal(E.validateBackup(chosen).state.settings.safety.tempCheckEveryMin, 45);
   assert.equal(E.validateBackup(mk({ tempCheckEveryMin: 30 })).state.settings.safety.tempCheckEveryMin, 30);
 });
+
+test('stagger: starter batches get different ages, the oldest nearest its limit, and no check is due at open', () => {
+  const s = E.newState({ now: T0, stagger: true });
+  const age = (id) => (T0 - s.batches.find((b) => b.ing === id).enteredAt) / MIN;
+  assert.equal(age('brisket'), 215);
+  assert.equal(age('pudding'), 20);
+  assert.equal(new Set(s.batches.map((b) => b.enteredAt)).size, 10);
+  assert.deepEqual(E.checkInvariants(s, T0), []);
+  const k = new K(s, T0);
+  assert.equal(k.tickAt(T0 + 1).events.filter((e) => e.type === 'batch_status').length, 0);
+  assert.equal(k.tickAt(T0 + 26 * MIN).events.filter((e) => e.type === 'batch_discard' && e.reason === 'expired').length, 1);
+  assert.equal(E.newState({ now: T0 }).batches.every((b) => b.enteredAt === T0), true);
+});

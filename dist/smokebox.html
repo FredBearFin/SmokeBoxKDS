@@ -4164,6 +4164,10 @@ a.of-nav:active { background: var(--press); }
     sanitizeEveryH: 4,      // food-contact surfaces (4-602.11)
     tempIntervalV2: true,   // marks settings made after the check interval default moved from 30 to 120 minutes
   };
+  // How old each demo starter batch is, in minutes, when a fresh demo kitchen opens. Spread out on purpose so the
+  // batches do not all expire at once and the first run shows the warnings working: brisket is the one nearest
+  // its 4-hour limit. Ingredients not listed start fresh.
+  C.starterAgeMin = { brisket: 215, pork: 190, slaw: 160, ribs: 150, sausage: 120, potato: 100, turkey: 95, mac: 70, beans: 45, pudding: 20 };
   // The allowed range for each owner-editable safety number, as [lowest, highest]. The legal limits are
   // fixed ends: hot hold never below 135 F, cold hold never above 41 F, reheat never below 165 F. The two
   // grace periods and the sanitise interval can be shortened but never lengthened past their defaults. Hold
@@ -4229,7 +4233,7 @@ a.of-nav:active { background: var(--press); }
  * Public API (other modules code against these names; see docs/smokebox.z.md for the formal statement):
  *   apply(state, type, payload, now)      -> { state, report, events, info }      (ACTIONS lists every type + payload)
  *   tick(state, now)                      -> { state, events }   same ref when nothing is due
- *   newState({ now, empty?, settings?, menu?, ingredients?, learned?, seq? }) -> state
+ *   newState({ now, empty?, stagger?, settings?, menu?, ingredients?, learned?, seq? }) -> state
  *   availability(state, menuId)           -> { ok, reason: null|'manual'|'safety'|'stock', ing }
  *   computeAvail(state)                   -> { [menuId]: { ok, reason, ing } }
  *   servable(state, ingId)                -> grams (or 'ea') that can be served now
@@ -6524,9 +6528,12 @@ a.of-nav:active { background: var(--press); }
       const hot = ing.hold !== 'cold';
       const f = hot ? 155 : 38;
       const ty = ing.thermal ? thermalYield({ costPerKgRaw: ing.costPerKg }) : null;
+      // With stagger on, each starter batch is already some time old (config) and its last reading was at most 40 minutes ago.
+      const age = opts.stagger === true && isNum(C.starterAgeMin[ing.id]) ? C.starterAgeMin[ing.id] * MIN : 0;
+      const readAt = now - Math.min(age, 40 * MIN);
       const b = {
-        id: 'b_' + ++seq.batch, ing: ing.id, label: ing.name + ' batch 1', kind: hot ? 'hot' : 'cold', enteredAt: now, cookedG: ing.parG, remainingG: ing.parG,
-        costPerCookedKg: round(nominalUnitCost(ing) * 1000, 4), src: 'starter', temps: [{ t: now, f }], lastTempF: f, lastTempAt: now, reheats: 0,
+        id: 'b_' + ++seq.batch, ing: ing.id, label: ing.name + ' batch 1', kind: hot ? 'hot' : 'cold', enteredAt: now - age, cookedG: ing.parG, remainingG: ing.parG,
+        costPerCookedKg: round(nominalUnitCost(ing) * 1000, 4), src: 'starter', temps: [{ t: readAt, f }], lastTempF: f, lastTempAt: readAt, reheats: 0,
         maxHoldH: isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH, status: 'ok', action: 'NONE', canServe: true,
       };
       if (ty) b.yieldPct = ty.hotPct; else if (isNum(ing.yield)) b.yieldPct = round(ing.yield * 100, 2);
@@ -7473,7 +7480,7 @@ a.of-nav:active { background: var(--press); }
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
     if (loaded) atLeast(lastStamp(loaded));
-    state = loaded || E().newState({ now: now() });
+    state = loaded || E().newState({ now: now(), stagger: true });
     // Catch up anything that became due while the page was closed.
     const t = E().tick(state, now());
     state = t.state;
@@ -7640,7 +7647,7 @@ a.of-nav:active { background: var(--press); }
   function reset() {
     rebaseClock();
     const old = state;
-    const ns = E().newState({ now: now(), seq: old ? old.seq : undefined });
+    const ns = E().newState({ now: now(), stagger: true, seq: old ? old.seq : undefined });
     ns.rev = (old ? old.rev : 0) + 1;
     commit(ns, true);
     skipRebase = true; pending = [];
