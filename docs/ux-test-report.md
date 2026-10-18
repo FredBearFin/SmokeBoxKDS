@@ -95,6 +95,32 @@ What the runs say, and what they do not:
 - The quality limit worked as designed in the replay: every limit reached was a quality limit, so the batch went to "past quality limit", the scripted cook tasted it and kept it an hour or threw it out, and nothing was thrown out by the app on its own.
 - **Not covered:** the replay only exercises batch deadlines. Temperature checks, reheat and chill, cooling, late tickets and the sanitize timer are not scored. The loud repeat tone (every 20 real seconds) barely runs at 120x, so its annoyance is untested (1 repeat in run B, 0 in run A). Safety limits and the hard cap were never reached. Demand comes from the demo crew and hand pulls scripted by me, so it is steadier than a real rush. Nobody listened to the sounds.
 
+## Fake-clock replay (ux10): definitions (written before the first run, 2026-10-18)
+
+This extends the definitions above and is committed before `ux-scripts/ux10-fake-clock-replay.mjs` is run, so the result cannot shape them. It replaces the earlier replay (ux9) for counting: the ux9 runs used the real clock, were not repeatable, and are **superseded** (their numbers above stay as history only). It is still a **simulation**, not a real service.
+
+**Method.** Playwright's fake clock (`page.clock.install`, then `runFor` in 1 second steps) with the app's demo speed at 15x, so one step is 15 virtual seconds and a board tick is 15 virtual seconds. `Math.random` is replaced before the app loads by a seeded generator (the seed is a command-line argument and is printed). The clock install time of each scenario is the demo crew's seed, so each scenario day has its own crew. Each scenario starts from a reset kitchen with service hours 11:00 to 21:00 and runs open to close (10 virtual hours). Every demand scenario uses **exactly one removal path**: tickets from the demo crew, or scripted pulls, never both.
+
+| Scenario | Removal path | What happens |
+|---|---|---|
+| A, normal day | demo crew tickets, normal rate | the scripted pit master cooks the ux9 schedule (brisket, pork, ribs, mac, beans, sausage) |
+| B, busy day at 150 g/min | scripted pulls of pork, jittered (interval 8 to 12 min, 1,500 g give or take 30 percent) | pork cooked in three batches |
+| C, late batch with a gap | scripted pulls of pork at about 75 g/min | one 12 kg batch at 11:00, the next at 14:30, so the first runs out while the second rests |
+| D, one batch kept three times | none (nothing is sold) | one ribs batch at 11:00; at its quality limit the cook logs a temperature and keeps it 30 minutes, three times in a row, then discards it |
+| E, busy demand with many limits | demo crew tickets, rush rate | a new batch of a protein or side every 90 minutes; keep policy as in A |
+
+The pit master's policy at a quality limit (A, B, C, E): log a temperature in range, then keep the batch serving for an hour if more than 1 kg is left, else discard it. In B and C the scripted pulls log the estimator's pace against the realized pace every 10 virtual minutes (the realized pace is the grams pulled in the last 2 hours over the elapsed time, floored at 30 minutes, and the generator's true rate is printed beside it).
+
+**Definitions kept from above.** False alarm rules 1 to 4 and the miss rule are unchanged. A repeat of the loud tone is counted as its own sound but takes the verdict of the first sound of its rung (it is a false alarm only if that first sound was). Nobody taps the strip in the simulation, so loud tones repeat every 20 virtual seconds until the row goes away, and **repeat counts at 15x are not comparable with the ux9 numbers** (those counted real seconds).
+
+**Added for kept batches.**
+- **Lapse.** A batch returning to past its quality limit after a keep (its extension ended). Every lapse must get a `past` sound within 2 virtual minutes of the lapse, for its own row (a fresh id, not the one from the first limit). A lapse with no such sound is a miss, whatever the grams.
+- **Every `past` sound is scored.** A past sound is a false alarm if the batch was not in the past state at that moment, or under 300 g remained (rule 2), or the kitchen was closed with the setting off (rule 3).
+- **Extension end rung.** For every kept batch with at least 300 g left when its extension has 10 minutes to run, the extension must get a rung sound (a non-repeat expiry sound for that extension's row) at least 5 virtual minutes before the extension ends. No sound for the new row may come at the keep tap (within 1 virtual minute of the tap). A missing rung sound is a miss; a sound at the tap is a false alarm.
+- **Lapse misses use the 5-minute rule above**, not the 10-minute rule for first limits, because a 30-minute keep has only the 10-minute rung.
+
+**Reported per scenario and day.** Sounds in total, first sounds at a rung, repeats, false alarms (with their rules), limits reached, misses, lapses, lapses sounded within 2 minutes, extension-end rung sounds, `past` sounds. Each scenario is run twice with the same seed; the two results must be identical (the report prints a fingerprint of the full sound log for each run and compares them). Results are appended below once the runs are done.
+
 ## Phase A: strip readability and taps (measured 2026-10-18)
 
 Screenshots: `docs/ux-shots/strip-1024x768.png`, `strip-1280x800.png`, `strip-1920x1080.png`. At every size the strip shows the two or three most urgent rows above the tickets; at 1024x768 and 1280x800 it uses 175 px of the screen (two rows; a third row is hidden below 820 px height), at 1920x1080 157 px.
