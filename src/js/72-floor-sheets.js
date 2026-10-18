@@ -284,7 +284,11 @@
     const logBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'discard-log' }, onClick: () => closeThen(sheet, () => SB.sheets.open('discards')) }, ico('receipt', 20), h('span', null, 'Open the discard log'));
     const recentHead = h('h3', { class: 'fs-h' }, 'Discarded recently');
     const recentBox = h('section', { class: 'fs-section', hidden: true }, recentHead, recentList, logBtn);
-    const batchesPanel = h('div', { class: 'hc-panel' }, summary, grid, empty, recentBox);
+    // Batches still to come: a run-out with no batch planned asks when one comes off the smoker; plans can be cancelled.
+    const planList = h('div', { class: 'fs-list hc-plans' });
+    const planBox = h('section', { class: 'fs-section hc-planbox', hidden: true }, h('h3', { class: 'fs-h' }, 'Batches still to come'), planList);
+    let planSig = '';
+    const batchesPanel = h('div', { class: 'hc-panel' }, summary, planBox, grid, empty, recentBox);
 
     // New batch panel.
     form = buildBatchForm((batchId) => {
@@ -697,6 +701,66 @@
       text(rec.when, agoText(now - (b.discardedAt || now)));
     }
 
+    // "HH:MM" for a time input.
+    const timeValue = (ms) => { const d = new Date(ms); return U.pad2(d.getHours()) + ':' + U.pad2(d.getMinutes()); };
+    // The moment a time-of-day input names: today, or tomorrow when it is already well past.
+    function timeFromInput(v) {
+      const [hh, mm] = (v || '').split(':').map(Number);
+      if (!(hh >= 0)) return null;
+      const now = nowMs(), d = new Date(now); d.setHours(hh, mm || 0, 0, 0);
+      if (d.getTime() < now - 30 * 60000) d.setDate(d.getDate() + 1);
+      return d.getTime();
+    }
+    // Asks when a batch comes off the smoker and how much, then records it as planned supply. The rest time is added by the engine.
+    function openPlan(d, opener) {
+      const ing = ingOf(d.planFor.ing); if (!ing) return;
+      const rest = U.isNum(ing.restH) && ing.restH > 0 ? ing.restH : 0;
+      const kgIn = h('input', { class: 'input', type: 'number', min: '0.5', max: '1000', step: '0.5', inputmode: 'decimal', value: String(Math.max(0.5, Math.ceil(d.planFor.grams / 500) / 2)), 'aria-label': 'Kilograms in the batch' });
+      const at0 = Math.max(nowMs() + 15 * 60000, d.planFor.by - rest * 3600000);
+      const timeIn = h('input', { class: 'input', type: 'time', value: timeValue(at0), 'aria-label': 'Comes off the smoker at' });
+      const line = h('p', { class: 'fs-sub', role: 'status' });
+      const err = h('div', { class: 'fs-note', 'data-tone': 'bad', role: 'alert', hidden: true });
+      // Shows when the batch will be ready to serve once it has rested.
+      const paint = () => { const t = timeFromInput(timeIn.value); text(line, t == null ? '' : 'Comes off the smoker at ' + U.fmtTime(t) + (rest ? ', ready to serve about ' + U.fmtTime(t + rest * 3600000) + ' after resting' : ', ready to serve then') + '.'); };
+      timeIn.addEventListener('input', paint); paint();
+      dialog({
+        title: 'Comes off the smoker', name: 'plan', opener, confirmLabel: 'Plan this batch', icon: 'flame',
+        body: [h('p', null, 'Tell the board a batch of ' + ing.name + ' is coming. It counts as supply from when it is ready to serve, not as stock, and the real batch replaces it when you add it.'),
+          h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'How much (kg, cooked)'), kgIn), h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'Comes off the smoker at'), timeIn), line, err],
+        // Sends the plan to the engine and reports when it will be ready to serve.
+        onConfirm: (sh) => {
+          const t = timeFromInput(timeIn.value), kg = Number(kgIn.value);
+          if (t == null || !(kg > 0)) { err.textContent = 'Enter the kilograms and a time of day.'; err.hidden = false; return; }
+          const res = run('planBatch', { ing: ing.id, grams: Math.round(kg * 1000), offAt: t });
+          if (res.report !== 'ok') { err.textContent = say(res); err.hidden = false; return; }
+          sh.close('confirm');
+          toast(ing.name + ' planned: off the smoker at ' + U.fmtTime(t) + '.', 'ok');
+          update(nowMs());
+        },
+      });
+    }
+    // Keeps the "Batches still to come" box current: rebuilt only when the plans or the open asks change, so a typed time is never lost.
+    function updatePlans(now) {
+      const s = st();
+      const asks = SB.deadlines.build(s, now).filter((d) => d.planFor);
+      const plans = s.planned || [];
+      const sig = plans.map((e) => e.id).join() + '|' + asks.map((d) => d.planFor.ing + ':' + Math.round(d.planFor.by / 60000)).join();
+      if (sig === planSig) return;
+      planSig = sig;
+      U.clear(planList);
+      setHidden(planBox, !plans.length && !asks.length);
+      for (const d of asks) {
+        planList.appendChild(h('div', { class: 'fs-card fs-card-soft hc-plan-ask', style: 'display:flex;gap:12px;align-items:center;padding:12px' }, ico('alert', 18),
+          h('span', { class: 'grow' }, h('strong', null, d.label), h('br'), h('span', { class: 'fs-sub' }, d.consequence + ' ' + d.action)),
+          h('button', { type: 'button', class: 'btn', dataset: { act: 'plan', ing: d.planFor.ing }, onClick: (ev) => openPlan(d, ev.currentTarget) }, ico('flame', 20), h('span', null, 'Comes off the smoker at…'))));
+      }
+      for (const e of plans) {
+        const ing = ingOf(e.ing);
+        planList.appendChild(h('div', { class: 'fs-card fs-card-soft hc-plan', dataset: { plan: e.id }, style: 'display:flex;gap:12px;align-items:center;padding:12px' }, ico('flame', 18),
+          h('span', { class: 'grow' }, h('strong', null, (ing ? ing.name : e.ing) + ', ' + U.fmtG(e.grams)), h('br'), h('span', { class: 'fs-sub' }, 'Comes off the smoker at ' + U.fmtTime(e.offAt) + (e.readyAt > e.offAt ? ', ready to serve about ' + U.fmtTime(e.readyAt) : '') + '.')),
+          h('button', { type: 'button', class: 'btn', dataset: { act: 'cancel-plan' }, onClick: () => { const res = run('cancelPlan', { planId: e.id }); if (res.report !== 'ok') toast(say(res), 'warn'); else { toast('Plan cancelled.', 'ok'); update(nowMs()); } } }, ico('x', 20), h('span', null, 'Cancel'))));
+      }
+    }
     // The one update path: membership on store change, text on the 1 Hz tick.
     function update(now) {
       const s = st();
@@ -720,6 +784,7 @@
       const dis = s.batches.filter((b) => b.status === 'discard' && U.isNum(b.discardedAt)).sort((a, b) => b.discardedAt - a.discardedAt).slice(0, 5);
       reconcile(recentList, recents, dis, (b) => b.id, makeRecent, (rec, b) => updateRecent(rec, b, now));
       setHidden(recentBox, !dis.length);
+      updatePlans(now);
     }
     update(nowMs());
     watch(offs, () => update(nowMs()), (now) => update(now));

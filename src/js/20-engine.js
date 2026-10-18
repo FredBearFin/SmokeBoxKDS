@@ -54,7 +54,7 @@
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -107,6 +107,8 @@
     tempReadingNeeded: 'Log a temperature first: a reading in range (hot food at ' + C.safety.hotHoldF + ' °F or higher), taken within the temperature-check interval, is needed before keeping it on the menu.',
     whoRequired: 'Enter your initials so the extension can be logged with who tasted it.',
     badUntil: 'Pick a time later than now, or choose 30 minutes or 1 hour.',
+    badPlanTime: 'Pick a time when the batch comes off the smoker: within the next day and a half, and not already past its serving time.',
+    unknownPlan: 'That planned batch is gone. It may have been used, cancelled or expired.',
   };
 
   // audit:data-end
@@ -135,6 +137,8 @@
     pullBatch: '{ ing, g }',
     keepServing: '{ batchIds:string[], forMin?, until?, who }',
     endKeepServing: '{ batchId, who, note? }',
+    planBatch: '{ ing, grams, offAt }',
+    cancelPlan: '{ planId }',
     discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other" }',
     sanitizeDone: '{}',
     updateSettings: '{ patch }',
@@ -147,7 +151,7 @@
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -1622,6 +1626,7 @@
     const L = tx.ledger(ing.id);
     L.in = (L.in || 0) + o.cookedG;
     tx.event('batch_in', { batchId: id, ing: ing.id, cookedG: o.cookedG, yieldPct: b.yieldPct, src: o.src });
+    if (o.src === 'cook') consumePlanInto(tx, ing.id, id);
     pruneBatchesInto(tx);
     return b;
   }
@@ -1875,6 +1880,54 @@
     tx.info = { batchId: b.id };
     return 'ok';
   };
+
+  // Planned batches: "this comes off the smoker at HH:MM". Supply for the close projection from the moment it has
+  // rested, never stock: it creates no 86 and counts in no ledger. The real batch of the same product used
+  // replaces the earliest plan; a plan nobody used goes 2 hours after its serving time.
+  const MAX_PLANNED = 20, PLAN_GRACE_MS = 2 * H;
+  const planExpiresAt = (e) => e.readyAt + PLAN_GRACE_MS;
+  // Records that a batch will come off the smoker at offAt. Its serving time adds the product's rest time. Undoable.
+  A.planBatch = function (tx, p) {
+    const ing = typeof p.ing === 'string' ? ingMap(tx.get('ingredients')).get(p.ing) : undefined;
+    if (!ing || !ing.tcs) return 'unknownIng';
+    if (!isNum(p.grams) || p.grams <= 0 || p.grams > 1e6) return 'badWeight';
+    if (!isNum(p.offAt) || p.offAt < tx.now - 12 * H || p.offAt > tx.now + 36 * H) return 'badPlanTime';
+    const cur = tx.get('planned') || [];
+    if (cur.length >= MAX_PLANNED) { tx.info.key = 'planned'; return 'badPatch'; }
+    const readyAt = p.offAt + (isNum(ing.restH) && ing.restH > 0 ? ing.restH : 0) * H;
+    if (readyAt + PLAN_GRACE_MS <= tx.now) return 'badPlanTime';
+    const entry = { id: 'pl_' + tx.next('plan'), ing: ing.id, grams: p.grams, offAt: p.offAt, readyAt };
+    tx.own.add(entry);
+    const next = cur.concat([entry]);
+    tx.own.add(next); tx.set('planned', next);
+    tx.event('plan_added', { planId: entry.id, ing: ing.id, grams: p.grams, offAt: p.offAt, readyAt });
+    pushUndo(tx, 'plan', 'Planned batch', { planId: entry.id });
+    tx.info = { planId: entry.id, readyAt };
+    return 'ok';
+  };
+  // Cancels a planned batch. Undoable.
+  A.cancelPlan = function (tx, p) {
+    const cur = tx.get('planned') || [];
+    const i = typeof p.planId === 'string' ? cur.findIndex((e) => e.id === p.planId) : -1;
+    if (i < 0) return 'unknownPlan';
+    const entry = cur[i];
+    const next = cur.filter((_, j) => j !== i);
+    tx.own.add(next); tx.set('planned', next);
+    tx.event('plan_cancelled', { planId: entry.id, ing: entry.ing });
+    pushUndo(tx, 'unplan', 'Plan cancelled', { entry, index: i });
+    tx.info = { planId: entry.id };
+    return 'ok';
+  };
+  // The real batch of a product replaces the earliest planned one for it.
+  function consumePlanInto(tx, ingId, batchId) {
+    const cur = tx.get('planned') || [];
+    let bi = -1;
+    for (let i = 0; i < cur.length; i++) if (cur[i].ing === ingId && (bi < 0 || cur[i].readyAt < cur[bi].readyAt)) bi = i;
+    if (bi < 0) return;
+    const e = cur[bi], next = cur.filter((_, j) => j !== bi);
+    tx.own.add(next); tx.set('planned', next);
+    tx.event('plan_consumed', { planId: e.id, ing: ingId, batchId });
+  }
 
   // Manual discard with a reason from the list. The grams become waste. Undoable.
   A.discardBatch = function (tx, p) {
@@ -2277,6 +2330,26 @@
     L.pulled = Math.max(0, (L.pulled || 0) - recs.reduce((a, r) => a + (r.g > 0 ? r.g : 0), 0));
     return 'ok';
   };
+  // Undo of a planned batch: takes it out again, if it is still there.
+  UNDO.plan = function (tx, d) {
+    const cur = tx.get('planned') || [];
+    if (!cur.some((e) => e.id === d.planId)) return 'undoConflict';
+    const next = cur.filter((e) => e.id !== d.planId);
+    tx.own.add(next); tx.set('planned', next);
+    return 'ok';
+  };
+  // Undo of a cancelled plan: puts the entry back, if its id is free and it has not expired.
+  UNDO.unplan = function (tx, d) {
+    const cur = tx.get('planned') || [];
+    const e = d.entry;
+    if (!isObj(e) || cur.some((x) => x.id === e.id) || tx.now >= planExpiresAt(e)) return 'undoConflict';
+    const entry = Object.assign({}, e);
+    tx.own.add(entry);
+    const next = cur.slice();
+    next.splice(Math.max(0, Math.min(next.length, isInt(d.index) ? d.index : next.length)), 0, entry);
+    tx.own.add(next); tx.set('planned', next);
+    return 'ok';
+  };
   // Undo of a sanitise log: only if it is still the latest one.
   UNDO.sanitize = function (tx, d) {
     const cur = tx.get('sanitize') || {};
@@ -2341,6 +2414,7 @@
       for (let i = 0; i < items.length; i++) if (items[i].status === 'queued' && items[i].fireAt < fs) fs = items[i].fireAt;
     }
     for (const sy of state.syncs) for (const t of C.syncTargets) { const x = sy.targets[t.id]; if (x && x.doneAt == null && x.dueAt < fs) fs = x.dueAt; }
+    for (const e of state.planned || []) { const x = planExpiresAt(e); if (x < fs) fs = x; }
     const S = safetyOf(state.settings);
     for (const b of state.batches) if (b.status !== 'discard' && (b.remainingG > 0 || b.kind === 'cooling')) { const x = statusDeadline(b, S); if (x < bd) bd = x; }
     d = { fs, bd };
@@ -2375,6 +2449,12 @@
         w.targets[tg.id] = { dueAt: x.dueAt, doneAt: x.dueAt };
         tx.event('sync_done', { syncId: sy.id, menuId: sy.menuId, target: tg.id, latencyMs: x.dueAt - (isNum(sy.holdUntil) ? sy.holdUntil : sy.t) });
       }
+    }
+    const pl = s.planned || [];
+    if (pl.some((e) => now >= planExpiresAt(e))) {
+      const keep = pl.filter((e) => now < planExpiresAt(e));
+      for (const e of pl) if (now >= planExpiresAt(e)) tx.event('plan_expired', { planId: e.id, ing: e.ing });
+      tx.own.add(keep); tx.set('planned', keep);
     }
     const S = safetyOf(s.settings);
     const bs = s.batches;
@@ -2506,7 +2586,7 @@
     }
     // The whole state. The clock is not stored here; the store keeps it.
     const st = {
-      v: 1, rev: 0, settings, menu, ingredients, tickets: [], orders: [], batches, stock, manual86: {}, avail: {}, syncs: [],
+      v: 1, rev: 0, settings, menu, ingredients, tickets: [], orders: [], batches, stock, manual86: {}, avail: {}, syncs: [], planned: [],
       learned: isObj(opts.learned) ? opts.learned : {}, sanitize: { dueAt: now }, seq, events: [], eventArchive: [], undo: [], ledger,
     };
     const av = computeAvail(st);
@@ -2956,6 +3036,13 @@
         batches.push(out);
       }
       batches.sort((a, b) => a.enteredAt - b.enteredAt);
+      // planned batches: only known cooked products, sane numbers, at most the cap
+      const planned = [];
+      if (Array.isArray(st.planned)) for (const e of st.planned) {
+        const ig = isObj(e) ? im.get(e.ing) : undefined;
+        if (planned.length < MAX_PLANNED && ig && ig.tcs && typeof e.id === 'string' && isNum(e.grams) && e.grams > 0 && e.grams <= 1e6 && isNum(e.offAt) && isNum(e.readyAt) && e.readyAt >= e.offAt) planned.push({ id: e.id, ing: e.ing, grams: e.grams, offAt: e.offAt, readyAt: e.readyAt });
+        else repaired.push('dropped planned batch');
+      }
       // stock
       const stock = {};
       for (const ing of ingredients) {
@@ -3015,6 +3102,9 @@
         undo: isInt(so.undo) ? so.undo : 0,
         byDate: {},
       };
+      // The plan counter exists once a plan was made, like the other counters' first use.
+      const planN = Math.max(isInt(so.plan) ? so.plan : 0, maxId(planned, 'pl_'));
+      if (planN > 0) seq.plan = planN;
       if (isObj(so.byDate)) for (const k of Object.keys(so.byDate)) if (/^\d{4}-\d{2}-\d{2}$/.test(k) && isInt(so.byDate[k])) seq.byDate[k] = so.byDate[k];
       for (const t of tickets) if (!(seq.byDate[t.serviceDate] >= t.num)) seq.byDate[t.serviceDate] = t.num;
       // sanitize
@@ -3023,7 +3113,7 @@
       if (isNum(sz.lastAt)) sanitize.lastAt = sz.lastAt;
       sanitize.dueAt = isNum(sz.dueAt) ? sz.dueAt : isNum(sanitize.lastAt) ? sanitize.lastAt + settings.safety.sanitizeEveryH * H : 0;
       const out = {
-        v: 1, rev: isInt(st.rev) && st.rev >= 0 ? st.rev : 0, settings, menu, ingredients, tickets, orders, batches, stock, manual86, avail: {}, syncs, learned, sanitize, seq,
+        v: 1, rev: isInt(st.rev) && st.rev >= 0 ? st.rev : 0, settings, menu, ingredients, tickets, orders, batches, stock, manual86, avail: {}, syncs, planned, learned, sanitize, seq,
         events, eventArchive: archive, undo: [], ledger: {},
       };
       // ledger: keep stored counters; if they do not balance, re-open the books at the current physical stock

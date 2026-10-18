@@ -34,7 +34,7 @@ const canon = (x) => (Array.isArray(x) ? x.map(canon) : x && typeof x === 'objec
 function strip(s) {
   const o = canon(JSON.parse(JSON.stringify(s)));
   delete o.events; delete o.eventArchive; delete o.undo; delete o.rev; delete o.syncs;
-  delete o.seq.event; delete o.seq.sync; delete o.seq.undo;
+  delete o.seq.event; delete o.seq.sync; delete o.seq.undo; delete o.seq.plan;
   return o;
 }
 
@@ -1186,4 +1186,59 @@ test('quality 86: hold 0 syncs at once as before; the setting is bounded; undo a
   k.do('updateSettings', { patch: { service: { qualitySyncHoldMin: 45 } } }, 'outOfBounds');
   k.do('updateSettings', { patch: { service: { qualitySyncHoldMin: 15 } } });
   assert.equal(k.s.settings.service.qualitySyncHoldMin, 15);
+});
+
+/* ------------------------------------------------ planned batches ------------------------------------------------ */
+test('planBatch: adds a plan with the rest time on top, refuses nonsense, undo and cancel both come back', () => {
+  const k = new K(E.newState({ now: T0, empty: true }), T0);
+  k.do('planBatch', { ing: 'tea', grams: 5000, offAt: T0 + HR }, 'unknownIng');
+  k.do('planBatch', { ing: 'pork', grams: 0, offAt: T0 + HR }, 'badWeight');
+  k.do('planBatch', { ing: 'pork', grams: 5000, offAt: T0 + 50 * HR }, 'badPlanTime');
+  k.do('planBatch', { ing: 'pork', grams: 5000, offAt: T0 - 20 * HR }, 'badPlanTime');
+  k.do('cancelPlan', { planId: 'pl_9' }, 'unknownPlan');
+  const r = k.do('planBatch', { ing: 'pork', grams: 5000, offAt: T0 + 2 * HR });
+  const e = k.s.planned[0];
+  assert.deepEqual([e.ing, e.grams, e.offAt, e.readyAt], ['pork', 5000, T0 + 2 * HR, T0 + 3 * HR], 'pork rests 1 hour');
+  assert.equal(r.info.planId, e.id);
+  k.do('undo', {});
+  assert.equal(k.s.planned.length, 0, 'undo takes the plan out');
+  k.do('planBatch', { ing: 'pork', grams: 5000, offAt: T0 + 2 * HR });
+  k.do('planBatch', { ing: 'ribs', grams: 3000, offAt: T0 + 3 * HR });
+  const ids = k.s.planned.map((x) => x.id);
+  k.do('cancelPlan', { planId: ids[0] });
+  assert.deepEqual(k.s.planned.map((x) => x.id), [ids[1]]);
+  k.do('undo', {});
+  assert.deepEqual(k.s.planned.map((x) => x.id), ids, 'undo puts the cancelled plan back in its place');
+});
+
+test('planned batches: the real batch of that product takes the earliest plan; other products leave it alone', () => {
+  const k = new K(E.newState({ now: T0, empty: true }), T0);
+  k.do('planBatch', { ing: 'pork', grams: 5000, offAt: T0 + 5 * HR });
+  k.do('planBatch', { ing: 'pork', grams: 6000, offAt: T0 + 2 * HR });
+  k.do('planBatch', { ing: 'ribs', grams: 3000, offAt: T0 + 2 * HR });
+  const first = k.s.planned.find((x) => x.grams === 6000).id;
+  k.do('addBatch', { ing: 'pork', tempF: 160, cookedG: 4000 });
+  assert.equal(k.s.planned.length, 2);
+  assert.equal(k.s.planned.some((x) => x.id === first), false, 'the earliest pork plan went');
+  k.do('addBatch', { ing: 'mac', tempF: 160, cookedG: 4000 });
+  assert.equal(k.s.planned.length, 2, 'another product does not consume a plan');
+  k.do('addBatch', { ing: 'pork', tempF: 160, cookedG: 4000, src: 'sample' });
+  assert.equal(k.s.planned.length, 2, 'a sample batch is not a real one');
+});
+
+test('planned batches: expire 2 hours after serving time, with an event; backup round trip', () => {
+  const k = new K(E.newState({ now: T0, empty: true }), T0);
+  k.do('planBatch', { ing: 'pork', grams: 5000, offAt: T0 + HR });
+  const back = E.validateBackup(E.serialize(k.s));
+  assert.equal(back.ok, true);
+  assert.deepEqual(back.state.planned, k.s.planned);
+  assert.equal(back.state.seq.plan, 1);
+  // Ready at T0+2h; still there until T0+4h.
+  assert.equal(k.tickAt(T0 + 4 * HR - 1).state.planned.length, 1);
+  const r = k.tickAt(T0 + 4 * HR);
+  assert.equal(k.s.planned.length, 0);
+  assert.equal(r.events.filter((e) => e.type === 'plan_expired').length, 1);
+  // Junk in a backup is dropped, not kept.
+  const bad = JSON.parse(E.serialize(k.s)); bad.planned = [{ id: 'pl_1', ing: 'tea', grams: 5, offAt: 1, readyAt: 2 }, { id: 'pl_2', ing: 'pork', grams: -1, offAt: 1, readyAt: 2 }];
+  assert.equal(E.validateBackup(bad).state.planned.length, 0);
 });

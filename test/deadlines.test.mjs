@@ -481,3 +481,30 @@ test('close rows: start by is a time that is still ahead, or says it is too late
   assert.ok(/Too late for a new batch to cover it: about [\d.]+ kg of demand with nothing to sell/.test(b.consequence), b.consequence);
   assert.equal(b.action, 'Shorten portions, stop preorders, run a special.');
 });
+
+/* ---------------------------------------------------- planned batches ---------------------------------------------------- */
+test('planned batch: the shortfall row switches to the rescue wording, and back when the plan is cancelled', () => {
+  const s0 = closeKit('mac', 12000, closeAt(15), [[closeAt(15, 30), 2000], [closeAt(16), 2000], [closeAt(16, 30), 2000]]);
+  const now = closeAt(16, 40);
+  const plain = closeFeed(s0, now).find((x) => x.kind === 'shortfall');
+  assert.ok(plain && /runs out at 6:10 pm\./.test(plain.consequence) && plain.planFor.ing === 'mac', plain && plain.consequence);
+  const r = E.apply(s0, 'planBatch', { ing: 'mac', grams: 8000, offAt: closeAt(18, 30) }, now);
+  assert.equal(r.report, 'ok');
+  const rescued = closeFeed(r.state, now).find((x) => x.kind === 'shortfall');
+  assert.ok(rescued && /runs out at 6:10 pm, next batch ready at 6:30 pm/.test(rescued.consequence), rescued && rescued.consequence);
+  assert.equal(rescued.runOutCause, 'rest-gap');
+  // A plan that is ready before the run-out covers it: no shortfall row at all.
+  const early = E.apply(s0, 'planBatch', { ing: 'mac', grams: 30000, offAt: closeAt(17, 30) }, now);
+  assert.equal(closeFeed(early.state, now).some((x) => x.kind === 'shortfall'), false);
+  const c = E.apply(r.state, 'cancelPlan', { planId: r.info.planId }, now);
+  assert.equal(c.report, 'ok');
+  assert.ok(/runs out at 6:10 pm\./.test(closeFeed(c.state, now).find((x) => x.kind === 'shortfall').consequence));
+});
+
+test('planned batch: it is supply only, never stock: no 86 and no ledger movement', () => {
+  const s0 = closeKit('mac', 12000, closeAt(15), [[closeAt(15, 30), 2000]]);
+  const r = E.apply(s0, 'planBatch', { ing: 'mac', grams: 8000, offAt: closeAt(18, 30) }, closeAt(16));
+  assert.deepEqual(r.state.avail, s0.avail);
+  assert.deepEqual(r.state.ledger, s0.ledger);
+  assert.equal(r.state.batches, s0.batches);
+});

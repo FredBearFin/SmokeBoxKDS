@@ -46,7 +46,7 @@ const canon = (x) => (Array.isArray(x) ? x.map(canon) : x && typeof x === 'objec
 function strip(s) {
   const o = canon(JSON.parse(JSON.stringify(s)));
   delete o.events; delete o.eventArchive; delete o.undo; delete o.rev; delete o.syncs;
-  delete o.seq.event; delete o.seq.sync; delete o.seq.undo;
+  delete o.seq.event; delete o.seq.sync; delete o.seq.undo; delete o.seq.plan;
   return o;
 }
 const servableIndependent = (b) => !!b && b.canServe === true && b.status !== 'discard' && b.kind !== 'cooling' && b.remainingG > 0;
@@ -70,7 +70,7 @@ function genAction(rng, s) {
   const tcs = s.ingredients.filter((i) => i.tcs);
   const W = [['createTicket', 16], ['advanceItem', 18], ['completeItem', 5], ['fireNow', 5], ['completeZone', 4], ['bumpTicket', 8], ['recallTicket', 3],
     ['voidTicket', 3], ['setRush', 3], ['toggle86', 4], ['restock', 3], ['addBatch', 5], ['logTemp', 5], ['reheatBatch', 2], ['startCooling', 1],
-    ['discardBatch', 2], ['pullBatch', 3], ['keepServing', 2], ['endKeepServing', 1], ['sanitizeDone', 2], ['updateSettings', 2], ['updateMenuItem', 1], ['addMenuItem', 0.6], ['payOrder', 4], ['reopenOrder', 1], ['voidOrder', 1], ['updateIngredient', 1], ['undo', 7], ['resetLive', 0.2], ['junkType', 2]];
+    ['discardBatch', 2], ['pullBatch', 3], ['keepServing', 2], ['endKeepServing', 1], ['planBatch', 1.5], ['cancelPlan', 0.7], ['sanitizeDone', 2], ['updateSettings', 2], ['updateMenuItem', 1], ['addMenuItem', 0.6], ['payOrder', 4], ['reopenOrder', 1], ['voidOrder', 1], ['updateIngredient', 1], ['undo', 7], ['resetLive', 0.2], ['junkType', 2]];
   let r = rng.next() * W.reduce((a, x) => a + x[1], 0);
   let type = W[0][0];
   for (const [k, w] of W) { r -= w; if (r <= 0) { type = k; break; } }
@@ -107,6 +107,8 @@ function genAction(rng, s) {
     case 'startCooling': p = { batchId: b && b.id, g: rng.next() < 0.5 ? undefined : 500 }; break;
     case 'keepServing': p = { batchIds: s.batches.filter((x) => x.status === 'past' || rng.next() < 0.3).map((x) => x.id).slice(0, 3), forMin: pick([30, 60, undefined, 0, 'x']), who: pick(['AB', '', 'FW']) }; break;
     case 'endKeepServing': p = { batchId: b && b.id, who: pick(['AB', '']), note: 'mis-tap' }; break;
+    case 'planBatch': p = { ing: pick(['brisket', 'pork', 'ribs', 'mac', 'tea']), grams: pick([3000, 8000, 0, -5]), offAt: (s.events.length ? s.events[s.events.length - 1].t : T0) + pick([0, 3600e3, 5 * 3600e3, -1e9]) }; break;
+    case 'cancelPlan': p = { planId: (s.planned && s.planned.length ? pick(s.planned).id : 'pl_0') }; break;
     case 'pullBatch': p = { ing: pick(['brisket', 'pork', 'tea', 'beans']), g: pick([500, 1500, 4500, 0, -3]) }; break;
     case 'discardBatch': p = { batchId: b && b.id, reason: pick(['manual', 'quality', 'temp', 'other', 'bad']) }; break;
     case 'sanitizeDone': p = {}; break;

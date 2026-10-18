@@ -361,3 +361,28 @@ test('unreadable saved text (not JSON at all) is parked and reported, not silent
   assert.equal(storage.m.get('smokebox.v1.corrupt'), JSON.stringify('{not json at all'), 'a copy of the damaged text is kept');
   S.destroy();
 });
+
+test('two tabs each planning a batch at the same moment keep both plans', async () => {
+  if (typeof globalThis.BroadcastChannel !== 'function') return;
+  const storage = memStorage();
+  let real = T0;
+  S.init({ now: () => real, storage, noTimers: true });
+  const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, BroadcastChannel: globalThis.BroadcastChannel };
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  for (const f of ['00-util.js', '10-config.js', '20-engine.js', '30-store.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js', f), 'utf8'), ctx, { filename: f });
+  const B = ctx.SB.store;
+  B.init({ now: () => real, storage, noTimers: true });
+  real += 1000; assert.equal(S.dispatch('planBatch', { ing: 'pork', grams: 5000, offAt: real + 3600e3 }), 'ok');
+  real += 1000; assert.equal(B.dispatch('planBatch', { ing: 'ribs', grams: 3000, offAt: real + 3600e3 }), 'ok');
+  S.flush(); B.flush();
+  await sleep(80);
+  S.flush(); B.flush();
+  await sleep(80);
+  const names = (st) => JSON.stringify(st.getState().planned.map((x) => x.ing).sort());
+  assert.equal(names(S), '["pork","ribs"]');
+  assert.equal(names(B), '["pork","ribs"]');
+  assert.equal(new Set(S.getState().planned.map((x) => x.id)).size, 2, 'the two plans have different ids');
+  B.destroy();
+  S.destroy();
+});

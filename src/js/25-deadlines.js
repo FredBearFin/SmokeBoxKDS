@@ -195,7 +195,13 @@
       return { id: b.id, quality: q, remainingG: b.remainingG, enteredAt: b.enteredAt, readyAt: b.restUntil, expAt: q && U.isNum(b.keepUntil) && b.keepUntil > now ? Math.min(b.keepUntil, hardAt) : limAt };
     });
     if (!bs.length) return null;
-    return { closeAt, stock: bs.reduce((acc, b) => acc + b.remainingG, 0), r: sweepToClose(bs, rate, now, closeAt) };
+    // Planned batches are supply from the moment they have rested. They are not stock, so they stay out of the stock total.
+    const stock0 = bs.reduce((acc, b) => acc + b.remainingG, 0);
+    for (const e of state.planned || []) {
+      if (e.ing !== ing.id || now >= e.readyAt + 2 * H) continue;
+      bs.push({ id: 'plan:' + e.id, quality: false, remainingG: e.grams, enteredAt: e.offAt, readyAt: e.readyAt, expAt: e.offAt + E()._internal.holdLimitMs({ maxHoldH: ing.maxHoldH }, S) });
+    }
+    return { closeAt, stock: stock0, r: sweepToClose(bs, rate, now, closeAt) };
   }
   // What to do about a run-out at runOutAt: start a new batch by a time that is still ahead, or say it is too late.
   // Null when the product has no cook time. The text never counts anything still on the smoker.
@@ -227,7 +233,7 @@
       action = sb && sb.ahead ? sb.text : 'Shorten portions, stop preorders, run a special.';
     }
     out.push({ id: 'shortfall:' + ing.id, kind: 'shortfall', ing: ing.id, label: name, at: r.runOutAt, msLeft: r.runOutAt - now, rung: 0, rungs: 0, sev: 'warn', leftoverG: r.leftoverG, shortG: r.unmetG, unmetG: r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG,
-      runOutCause: r.runOutCause, gapEndAt: r.gapEndAt, startBy: sb ? sb.latestStart : null, consequence, action, unknown: false });
+      runOutCause: r.runOutCause, gapEndAt: r.gapEndAt, startBy: sb ? sb.latestStart : null, planFor: { ing: ing.id, grams: r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG, by: r.runOutAt }, consequence, action, unknown: false });
   }
   // A span of time in words: "45 min", "2 h 10 min".
   function hmText(ms) {
@@ -294,7 +300,7 @@
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H) || isLim) {
           const quiet = rung === 0 || trivial;
           out.push({ id: 'expiry:' + b.id + ':' + (q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0), epoch: q && U.isNum(b.keepUntil) && b.keepUntil > now ? b.keepUntil : 0, kind: 'expiry', ing: ingId, batchId: b.id, label: b.label || name, at: exp, msLeft, rung, rungs: rungs.length,
-            sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, wasteG: waste, wasteUsd: usd, goes86: lastOne, quality: q, trivial, unknown: rate === undefined });
+            sev: quiet ? 'info' : sevOf(rung, rungs.length, lastOne), consequence, action, planFor: isLim ? { ing: ingId, grams: lim.unmetG, by: lim.runOutAt } : undefined, wasteG: waste, wasteUsd: usd, goes86: lastOne, quality: q, trivial, unknown: rate === undefined });
         }
       });
       // What is left at close, or when it runs out early, at the current pace.
