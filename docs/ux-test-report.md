@@ -49,3 +49,22 @@ Scope: how the kitchen board works for a cook, not whether the engine is correct
 - All tests are simulated. No real cook has used this through a real service.
 - The reading-distance angles are my assumptions (0.4 and 0.2 degrees), stated so they can be checked.
 - The sample cost numbers come from the sample menu, not a real kitchen.
+
+## Phase A replay: what counts as a false alarm and a miss (written before the run)
+
+This section was committed before the replay was run, so the result cannot shape the definition. The replay is a **simulation**: a scripted pit master and the app's demo crew in a headless browser at 240 times real speed. It is not a real service, and no cook has used the app. It can find noisy or silent warnings in the app's own logic; it cannot say how a real kitchen behaves.
+
+**Sound.** One sounded alert: the first sound at each rung of the warning ladder, each expiry or past-quality sound, and the loud tone repeating while it is unacknowledged (a repeat is counted as its own sound but is only scored as a false alarm if its rung was). The report gives the total number of sounds, and sounds per hour.
+
+**False alarm.** A sound where, at the moment it sounded, any of these held:
+1. projected waste was known and below the floor (under 500 g and under 15 percent of the batch);
+2. under 300 g remained in the batch;
+3. the kitchen was closed and the "sound outside open hours" setting was off (should be impossible; the check proves it);
+4. fewer than 60 seconds remained before the deadline, so nobody could have acted.
+A sound about a clock deadline when the pace was unknown is not a false alarm by rule 1: the deadline is a fact about time, and no waste estimate was claimed.
+
+**Miss.** A batch with waste at or above the floor (500 g, or 15 percent of the batch, whichever is lower) at its limit that got no sound for that batch at least 10 minutes earlier while the kitchen was open. Limits reached while the kitchen was closed are listed separately and are not counted as misses.
+
+**Method.** 8 virtual hours of service starting at the current hour, closing at the end of them (service hours set in the replay), 240x speed, 1280x800, demo crew on, a scripted pit master cooking new batches every 2 to 3 hours and, when a batch goes past its quality limit, logging a temperature and keeping it serving for an hour if more than 1 kg is left (otherwise discarding it). Run twice. Alerts are read from the board's own alert log (`SB.floor._alerts`), which records the batch, the grams left and whether sound was allowed at the moment of each sound.
+
+Results are in the next section once the run is done.

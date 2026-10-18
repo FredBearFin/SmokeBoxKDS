@@ -16682,7 +16682,9 @@ a.of-nav:active { background: var(--press); }
   // and check every alert. level: 1 chime, 2 voice, 3 loud tone, 4 expiry.
   function alertCall(level, d, repeat) {
     const lg = F._alerts || (F._alerts = []);
-    lg.push({ t: store().now(), id: d.id, kind: d.kind, level, repeat: !!repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG), unknown: !!d.unknown });
+    const b = d.batchId ? (store().getState().batches.find((x) => x.id === d.batchId) || null) : null;
+    lg.push({ t: store().now(), id: d.id, kind: d.kind, batchId: d.batchId || null, level, repeat: !!repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG),
+      remainingG: b ? Math.round(b.remainingG) : null, cookedG: b ? Math.round(b.cookedG) : null, allowed: SB.deadlines.soundsAllowed(store().getState(), store().now()), unknown: !!d.unknown });
     if (lg.length > 500) lg.shift();
     return { level, d, repeat: !!repeat };
   }
