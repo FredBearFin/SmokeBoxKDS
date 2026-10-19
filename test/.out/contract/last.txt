@@ -1,16 +1,18 @@
-SMOKEBOX CONTRACT CHECK  Mon Oct 19 2026 05:22:12  (run 39, 42 s)
-Files: 25 js, 10 css. Static refs: 2150 (399 distinct paths). Boot: ok, load errors 0, console/page errors 0. Smoke: 11/11 sheets opened, 7/7 office pages rendered clean. Unit: 381 passed, 0 failed.
+SMOKEBOX CONTRACT CHECK  Mon Oct 19 2026 05:24:08  (run 40, 29 s)
+Files: 25 js, 10 css. Static refs: 2150 (399 distinct paths). Boot: ok, load errors 0, console/page errors 0. Smoke: 11/11 sheets opened, 7/7 office pages rendered clean. Unit: not run.
 
 PROBLEMS (2)
 | # | kind | where | owner | what | suggested fix | seen |
 |---|---|---|---|---|---|---|
-| 1 | missing-api | 70-floor-board.js:1236 (file edited 2 min ago) | Floor board | SB.floor._alerts.push (call) does not exist at run time; defined nowhere in src/js; 1 site, 1 unguarded | 70-floor-board.js (Floor board) must add SB.floor._alerts.push, or 70-floor-board.js must guard/rename it. | 9x |
-| 2 | missing-api | 70-floor-board.js:1237 (file edited 2 min ago) | Floor board | SB.floor._alerts.length (read) does not exist at run time; defined nowhere in src/js; 1 site, 1 unguarded | 70-floor-board.js (Floor board) must add SB.floor._alerts.length, or 70-floor-board.js must guard/rename it. | 9x |
+| 1 | missing-api | 70-floor-board.js:1236 (file edited 3 min ago) | Floor board | SB.floor._alerts.push (call) does not exist at run time; defined nowhere in src/js; 1 site, 1 unguarded | 70-floor-board.js (Floor board) must add SB.floor._alerts.push, or 70-floor-board.js must guard/rename it. | 10x |
+| 2 | missing-api | 70-floor-board.js:1237 (file edited 3 min ago) | Floor board | SB.floor._alerts.length (read) does not exist at run time; defined nowhere in src/js; 1 site, 1 unguarded | 70-floor-board.js (Floor board) must add SB.floor._alerts.length, or 70-floor-board.js must guard/rename it. | 10x |
 
-NOTES (16)
+NOTES (17)
 - guarded-missing (2)
     70-floor-board.js:1232  SB.floor._alerts (read) does not exist at run time; assigned in 70-floor-board.js but not present at run time; 1 site, all guarded [test]
     70-floor-board.js:1237  SB.floor._alerts.shift (call) does not exist at run time; defined nowhere in src/js; 1 site, all guarded [if]
+- unit (1)
+    test/  Unit suite not due (last run 2 min ago; it runs every 25 min, or use --unit).
 - dup-id-cross-file (1)
     74-floor-tour.js:290  id "all" is created at 74-floor-tour.js:147, 74-floor-tour.js:290, 80-office-core.js:972 (several files)
 - class-no-css (13)

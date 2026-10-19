@@ -1431,8 +1431,10 @@
       const csv = SB.pilot.toCsv(rep);
       reportSave(await saveFile(fname, csv, 'text/csv'), fname, csv, 'report');
     }
+    // The two report buttons: show it on screen, or save the CSV.
+    const showReport = () => makeReport(false), saveReport = () => makeReport(true);
     const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn),
-      btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: () => makeReport(false) }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: () => makeReport(true) }));
+      btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: showReport }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: saveReport }));
     repRow.dataset.pilot = 'report';
     const csvBtns = [['tickets', 'Tickets'], ['items', 'Items'], ['orders', 'Orders'], ['events', 'Events'], ['batches', 'Batches']].map(([k, l]) => {
       // Each spreadsheet button downloads its own table.

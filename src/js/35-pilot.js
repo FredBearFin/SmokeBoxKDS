@@ -13,10 +13,11 @@
   const U = SB.util;
   const C = SB.config;
   const MIN = 60e3, H = 3600e3;
+  // The engine, looked up when used so tests can swap it.
   const E = () => SB.engine;
 
-  /* ---------- 1. helpers ---------- */
-  // Rounds to one decimal.
+  // ---------- 1. helpers ----------
+  // Rounds a number to one decimal place for the report.
   const r1 = (n) => Math.round(n * 10) / 10;
   // A count per hour over a window, or null when the window is empty.
   const perHour = (n, hours) => (hours > 0 ? r1(n / hours) : null);
@@ -35,7 +36,7 @@
     return d.getTime();
   }
 
-  /* ---------- 2. the report ---------- */
+  // ---------- 2. the report ----------
   // Builds the report for the window opts.from to opts.to (default: since opening, until now). opts.alerts is the
   // saved sound log, opts.cutsCounted the number of cuts an observer counted by eye (or null). Events that were
   // undone and tickets or batches made by the demo or the sample data are left out and counted.
@@ -44,6 +45,7 @@
     const to = U.isNum(opts.to) ? opts.to : (U.isNum(opts.now) ? opts.now : Date.now());
     const from = U.isNum(opts.from) ? opts.from : defaultFrom(state, to);
     const hours = Math.max(0, (to - from) / H);
+    // True when a time falls inside the report window.
     const inWin = (t) => U.isNum(t) && t >= from && t <= to;
     const all = E().allEvents(state).filter((e) => inWin(e.t));
     const ev = all.filter((e) => !e.reverted);
@@ -135,12 +137,13 @@
     return out;
   }
 
-  /* ---------- 3. text and CSV ---------- */
-  // Money in dollars with cents.
+  // ---------- 3. text and CSV ----------
+  // Writes a money amount in dollars with two cents digits.
   const usd = (n) => '$' + (U.isNum(n) ? n.toFixed(2) : '0.00');
   // Plain-words summary of a report, one line per fact, for the screen and for pasting into notes.
   function toText(r) {
     const L = [];
+    // Writes a time in the reader's own date format.
     const when = (t) => new Date(t).toLocaleString();
     L.push('Pilot report: ' + when(r.window.from) + ' to ' + when(r.window.to) + ' (' + r.window.hours + ' hours).');
     if (r.excluded.demoClock) L.push('WARNING: the demo clock or demo orders were on; demo pulls cannot be told apart, so do not trust these numbers.');
@@ -158,6 +161,7 @@
   // CSV text of the report in a long layout (section, name, value, unit): easy to open in a spreadsheet and to paste into notes.
   function toCsv(r) {
     const rows = [['section', 'name', 'value', 'unit']];
+    // Adds one fact as a line of the table.
     const add = (s, n, v, u) => rows.push([s, n, v == null ? '' : v, u || '']);
     add('window', 'from', new Date(r.window.from).toISOString()); add('window', 'to', new Date(r.window.to).toISOString()); add('window', 'hours', r.window.hours, 'h');
     for (const k of Object.keys(r.excluded)) add('excluded', k, r.excluded[k]);
