@@ -1416,6 +1416,24 @@
         if (res.how === 'host') exStatus.ok('Saved ' + fname + tail); else exStatus.ok('Download started: ' + fname + tail);
       } else reportSave(res, fname, text, 'table');
     }
+    // Pilot report: the numbers for a real watched service, from the event log and the saved sound log.
+    const cutsIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Cuts the observer counted', style: 'width:7em' });
+    const whenSel = h('select', { class: 'input', 'aria-label': 'Report window' }, h('option', { value: 'open' }, 'Since opening'), h('option', { value: '4' }, 'Last 4 hours'), h('option', { value: '24' }, 'Last 24 hours'));
+    const repBox = h('pre', { class: 'od-report', hidden: true, style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
+    // Builds the report for the chosen window and shows it; with download true it also saves the CSV.
+    async function makeReport(download) {
+      const s = stateNow(), now = SB.store.now();
+      const from = whenSel.value === 'open' ? SB.pilot.defaultFrom(s, now) : now - Number(whenSel.value) * 3600e3;
+      const rep = SB.pilot.build(s, { from, to: now, now, alerts: SB.floor && SB.floor.alertLog ? SB.floor.alertLog() : [], cutsCounted: cutsIn.value === '' ? null : Number(cutsIn.value), demoClock: SB.store.speed() > 1 });
+      repBox.textContent = SB.pilot.toText(rep); repBox.hidden = false;
+      if (!download) { exStatus.ok('Report made for ' + rep.window.hours + ' hours.'); return; }
+      const fname = 'smokebox-pilot-report-' + todayKey() + '.csv';
+      const csv = SB.pilot.toCsv(rep);
+      reportSave(await saveFile(fname, csv, 'text/csv'), fname, csv, 'report');
+    }
+    const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn),
+      btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: () => makeReport(false) }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: () => makeReport(true) }));
+    repRow.dataset.pilot = 'report';
     const csvBtns = [['tickets', 'Tickets'], ['items', 'Items'], ['orders', 'Orders'], ['events', 'Events'], ['batches', 'Batches']].map(([k, l]) => {
       // Each spreadsheet button downloads its own table.
       const b = btn(l, { icon: 'download', cls: 'btn-sm', onClick: () => downloadCsv(k, l.toLowerCase()) });
@@ -1431,6 +1449,7 @@
       para('A backup is every ticket, event, batch, menu edit and setting in one JSON file. Keep one before you reset or import. Spreadsheet files (CSV) list one kind of record each and cannot be imported back.', 'od-p'),
       h('div', { class: 'od-actions' }, dlBtn, cpBtn),
       h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Spreadsheet files'), csvBtns),
+      repRow, repBox,
       exStatus.el, fb);
 
     // Import: a chosen file or pasted text is checked and summarized before anything changes.

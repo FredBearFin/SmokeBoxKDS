@@ -1231,10 +1231,18 @@
     const d = c.d;
     const lg = F._alerts || (F._alerts = []);
     const b = d.batchId ? (store().getState().batches.find((x) => x.id === d.batchId) || null) : null;
-    lg.push({ t: store().now(), id: d.id, kind: d.kind, batchId: d.batchId || null, level: c.level, repeat: !!c.repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG),
-      remainingG: b ? Math.round(b.remainingG) : null, cookedG: b ? Math.round(b.cookedG) : null, status: b ? b.status : null, allowed: SB.deadlines.soundsAllowed(store().getState(), store().now()), unknown: !!d.unknown });
+    const rec = { t: store().now(), id: d.id, kind: d.kind, batchId: d.batchId || null, level: c.level, repeat: !!c.repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG),
+      remainingG: b ? Math.round(b.remainingG) : null, cookedG: b ? Math.round(b.cookedG) : null, status: b ? b.status : null, allowed: SB.deadlines.soundsAllowed(store().getState(), store().now()), unknown: !!d.unknown, leader: isLeader() };
+    lg.push(rec);
     if (lg.length > 500) lg.shift();
+    saveAlertRecord(rec);
   }
+  // Keeps the last 400 sound records in storage (the pilot report reads them after a reload). A full or blocked storage is ignored.
+  function saveAlertRecord(rec) {
+    try { const cur = U.storage.get(SB.pilot.KEY_ALERTLOG, []); const arr = Array.isArray(cur) ? cur : []; arr.push(rec); U.storage.set(SB.pilot.KEY_ALERTLOG, arr.slice(-SB.pilot.LOG_MAX)); } catch (e) { /* the log is optional */ }
+  }
+  // The saved sound records, oldest first.
+  F.alertLog = () => { try { const v = U.storage.get(SB.pilot.KEY_ALERTLOG, []); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
   // Plays the calls of one moment together: the strongest sound once, and one short spoken phrase naming the most
   // urgent item and how many others share the moment, so six batches expiring together are one warning, not six.
   function playCalls(calls) {
@@ -1256,7 +1264,7 @@
     tell(who + (first.goes86 && same.length === 1 ? ' goes 86' : same.length > 1 ? ' expire' : ' expires') + ' in ' + (top.level === 2 ? 'about ' : '') + mins + ' ' + U.plural(mins, 'minute') + '.');
   }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
-  function acknowledge(key) { ladder.acknowledge(key); pending.forget(key); if (lead.coordinated && SB.store.broadcast) SB.store.broadcast({ type: 'alert-ack', id: key }); }
+  function acknowledge(key) { saveAlertRecord({ t: store().now(), id: key, ack: true }); ladder.acknowledge(key); pending.forget(key); if (lead.coordinated && SB.store.broadcast) SB.store.broadcast({ type: 'alert-ack', id: key }); }
   // Rewrites the strip from the deadline feed: the top three rows, or hidden when the feed is empty.
   function updateStrip(now) {
     if (!m || !m.strip || !SB.deadlines) return;
