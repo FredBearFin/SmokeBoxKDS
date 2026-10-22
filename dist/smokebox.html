@@ -1277,6 +1277,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .fl {
   --fl-k: 1;
   --fl-tl: 1;
+  --fl-far: 1;
   --fs-1: calc(13px * var(--fl-k) * var(--fl-tl));
   --fs-2: calc(15px * var(--fl-k) * var(--fl-tl));
   --fs-3: calc(17px * var(--fl-k) * var(--fl-tl));
@@ -1312,6 +1313,11 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   font-size: var(--fs-3);
 }
 .text-large .fl { --fl-tl: 1.2; }
+/* Far display (a per-tablet setting for a screen read from across the kitchen): bigger type, a quiet board (no "On time" badge), two strip rows. */
+.fl[data-far="on"] { --fl-far: 1.8; --fl-tl: 1.35; }
+.fl[data-far="on"] .fl-badge[data-level="ok"] { display: none; }
+.fl[data-far="on"] .fl-strip-row[data-i="2"] { display: none; }
+.fl[data-far="on"] .fl-slip[data-level="breach"] { outline: calc(6px * var(--fl-k)) solid var(--crimson); outline-offset: -3px; }
 @media (min-width: 1700px) { .fl { --fl-k: 1.2; } }
 @media (min-width: 2200px) { .fl { --fl-k: 1.5; } }
 
@@ -1330,11 +1336,11 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .fl-strip-row[data-step="last"] { border-left-width: calc(16px * var(--fl-k)); }
 .fl-strip-row[data-step="last"] .fl-strip-what { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 3px; }
 .fl-strip-row[data-snoozed="true"] { border-left-style: dotted; background: transparent; }
-.fl-strip-when { flex: none; min-width: 5.2ch; font-size: calc(34px * var(--fl-k)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.fl-strip-when { flex: none; min-width: 5.2ch; font-size: calc(34px * var(--fl-k) * var(--fl-far)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 .fl-strip-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
-.fl-strip-what { font-size: calc(22px * var(--fl-k)); font-weight: 700; line-height: 1.15; }
-.fl-strip-why { font-size: calc(17px * var(--fl-k)); line-height: 1.25; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-@media (max-height: 820px) { .fl-strip-row[data-i="2"] { display: none; } .fl-strip-when { font-size: calc(28px * var(--fl-k)); } }
+.fl-strip-what { font-size: calc(22px * var(--fl-k) * var(--fl-far)); font-weight: 700; line-height: 1.15; }
+.fl-strip-why { font-size: calc(17px * var(--fl-k) * var(--fl-far)); line-height: 1.25; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+@media (max-height: 820px) { .fl-strip-row[data-i="2"] { display: none; } .fl-strip-when { font-size: calc(28px * var(--fl-k) * var(--fl-far)); } }
 .fl-strip-sound { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 8px var(--sp-4); border: 0; background: var(--ink); color: var(--bg); font: inherit; font-size: calc(18px * var(--fl-k)); font-weight: 700; text-align: left; cursor: pointer; }
 .fl-strip-sound[hidden] { display: none; }
 .fl-strip-pause { background: var(--sub); color: var(--ink); border-bottom: 1px solid var(--line); font-weight: 600; }
@@ -16278,7 +16284,7 @@ a.of-nav:active { background: var(--press); }
   // Browser-storage keys: the sound switch, and whether the all-day strip is folded.
   const KEY_SOUND = 'smokebox.v1.sound';
   // Whether warnings are also spoken aloud (the tablet's own voice), on by default.
-  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume';
+  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume', KEY_FAR = 'smokebox.v1.far';
   // Loudness of this tablet's warnings: 0.2 to 1. It never reaches 0 (the sound toggle is the way to silence); the last warning and the expiry tone never go below half.
   const VOL_MIN = 0.2;
   const KEY_DOCK = 'smokebox.v1.dock';
@@ -16298,6 +16304,8 @@ a.of-nav:active { background: var(--press); }
   // Sound is on by default: a kitchen that misses a warning loses food. A browser still needs one tap to allow audio.
   let sound = U.storage.get(KEY_SOUND, true) !== false;
   let speech = U.storage.get(KEY_SPEECH, true) !== false;
+  // Far display is off by default and belongs to this tablet (it describes how far away the screen is read).
+  let far = U.storage.get(KEY_FAR, false) === true;
   let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0;
   let volume = (() => { const v = U.storage.get(KEY_VOLUME, 1); return U.isNum(v) ? Math.min(1, Math.max(VOL_MIN, v)) : 1; })();
 
@@ -16427,6 +16435,15 @@ a.of-nav:active { background: var(--press); }
     U.storage.set(KEY_VOLUME, volume);
     if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; playHere(chime); }
     return volume;
+  };
+  // Tells whether this tablet is in far display mode (bigger type, quiet board, two strip rows).
+  F.farDisplay = () => far;
+  // Switches far display on or off, remembers it, and repaints the open board at once.
+  F.setFarDisplay = function (on) {
+    far = !!on;
+    U.storage.set(KEY_FAR, far);
+    if (m.root) m.root.dataset.far = far ? 'on' : 'off';
+    return far;
   };
   // Tells whether warnings are spoken aloud right now.
   F.speech = () => speech;
@@ -16661,7 +16678,7 @@ a.of-nav:active { background: var(--press); }
   // Builds the whole page once. WATCH OUT: nothing built here is replaced later; updates change
   // text and attributes only.
   function buildDom() {
-    const root = h('div', { class: 'fl', dataset: { zone: m.zone, mode: modeOf(m.zone) } });
+    const root = h('div', { class: 'fl', dataset: { zone: m.zone, mode: modeOf(m.zone), far: far ? 'on' : 'off' } });
     m.root = root;
     // ----- header
     const brand = SB.shell && SB.shell.brand ? SB.shell.brand() : h('span', null, 'Smokebox');
@@ -20907,6 +20924,9 @@ a.of-nav:active { background: var(--press); }
     const speechTog = SB.ui.toggle({ label: 'Speak batch warnings aloud', checked: speechOk ? !!SB.floor.speech() : false, disabled: !speechOk, onChange: (on) => { if (speechOk) SB.floor.setSpeech(on); } });
     const soundHelp = floorOk ? 'On by default, because a missed warning can cost a whole batch. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
 
+    // Far display: for a screen read from across the kitchen. Per tablet; needs the board module.
+    const farTog = SB.ui.toggle({ label: 'Far display (big type, quiet board)', checked: floorOk && SB.floor.farDisplay ? SB.floor.farDisplay() : false, disabled: !(floorOk && SB.floor.setFarDisplay), onChange: (on) => { if (floorOk && SB.floor.setFarDisplay) SB.floor.setFarDisplay(on); } });
+
     // Station: the board opens on this station and reopens on it after a reload.
     const stations = [{ id: 'all', label: 'All', icon: 'grid' }].concat(C.zones.map((z) => ({ id: z.id, label: z.name, icon: z.icon })));
     const view0 = SB.router.view();
@@ -20933,6 +20953,7 @@ a.of-nav:active { background: var(--press); }
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap START on Hush puppies.', hintsTog),
       settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
+      settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       settingBlock('Clock speed', 'Only for demos and training. Real service runs at x1.', clockCtl.el),
       settingBlock('More', '', links)));

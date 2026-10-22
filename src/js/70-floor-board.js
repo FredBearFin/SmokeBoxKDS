@@ -36,7 +36,7 @@
   // Browser-storage keys: the sound switch, and whether the all-day strip is folded.
   const KEY_SOUND = 'smokebox.v1.sound';
   // Whether warnings are also spoken aloud (the tablet's own voice), on by default.
-  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume';
+  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume', KEY_FAR = 'smokebox.v1.far';
   // Loudness of this tablet's warnings: 0.2 to 1. It never reaches 0 (the sound toggle is the way to silence); the last warning and the expiry tone never go below half.
   const VOL_MIN = 0.2;
   const KEY_DOCK = 'smokebox.v1.dock';
@@ -56,6 +56,8 @@
   // Sound is on by default: a kitchen that misses a warning loses food. A browser still needs one tap to allow audio.
   let sound = U.storage.get(KEY_SOUND, true) !== false;
   let speech = U.storage.get(KEY_SPEECH, true) !== false;
+  // Far display is off by default and belongs to this tablet (it describes how far away the screen is read).
+  let far = U.storage.get(KEY_FAR, false) === true;
   let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0;
   let volume = (() => { const v = U.storage.get(KEY_VOLUME, 1); return U.isNum(v) ? Math.min(1, Math.max(VOL_MIN, v)) : 1; })();
 
@@ -185,6 +187,15 @@
     U.storage.set(KEY_VOLUME, volume);
     if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; playHere(chime); }
     return volume;
+  };
+  // Tells whether this tablet is in far display mode (bigger type, quiet board, two strip rows).
+  F.farDisplay = () => far;
+  // Switches far display on or off, remembers it, and repaints the open board at once.
+  F.setFarDisplay = function (on) {
+    far = !!on;
+    U.storage.set(KEY_FAR, far);
+    if (m.root) m.root.dataset.far = far ? 'on' : 'off';
+    return far;
   };
   // Tells whether warnings are spoken aloud right now.
   F.speech = () => speech;
@@ -419,7 +430,7 @@
   // Builds the whole page once. WATCH OUT: nothing built here is replaced later; updates change
   // text and attributes only.
   function buildDom() {
-    const root = h('div', { class: 'fl', dataset: { zone: m.zone, mode: modeOf(m.zone) } });
+    const root = h('div', { class: 'fl', dataset: { zone: m.zone, mode: modeOf(m.zone), far: far ? 'on' : 'off' } });
     m.root = root;
     // ----- header
     const brand = SB.shell && SB.shell.brand ? SB.shell.brand() : h('span', null, 'Smokebox');
