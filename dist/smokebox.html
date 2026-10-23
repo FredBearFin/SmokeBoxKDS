@@ -2621,11 +2621,11 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 
 .hc-who { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0; color: var(--ink2); font-size: var(--fs-2); }
 .dp-ptable { display: grid; gap: var(--sp-2); }
-.dp-prow { display: grid; grid-template-columns: 44px minmax(0, 2fr) 9ch minmax(0, 1.2fr); gap: var(--sp-2); align-items: center; padding-bottom: var(--sp-2); border-bottom: var(--bw-thin) solid var(--line-soft); }
+.dp-prow { display: grid; grid-template-columns: 44px minmax(0, 2fr) minmax(9ch, 15ch) minmax(0, 1.2fr); gap: var(--sp-2); align-items: center; padding-bottom: var(--sp-2); border-bottom: var(--bw-thin) solid var(--line-soft); }
 .dp-prow[data-ok="false"] { background: var(--tint-warn); }
 .dp-prow .dp-prob { grid-column: 2 / -1; margin: 0; }
 .dp-prob:empty { display: none; }
-@media (max-width: 640px) { .dp-prow { grid-template-columns: 44px minmax(0, 1fr) 8ch; } .dp-prow select { grid-column: 2 / -1; } }
+@media (max-width: 640px) { .dp-prow { grid-template-columns: 44px minmax(0, 1fr) minmax(8ch, 14ch); } .dp-prow select { grid-column: 2 / -1; } }
 .btn-link { background: none; border: 0; text-decoration: underline; min-height: 44px; padding-inline: 0; }
 
 
@@ -2672,6 +2672,7 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .rc-code { font: var(--w-bold) 34px / 1.2 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.12em; text-align: center; padding: var(--sp-4); background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-panel); user-select: all; overflow-wrap: anywhere; }
 .pin-recover { display: grid; gap: var(--sp-2); }
 .pin-recover label { display: grid; gap: 4px; }
+.dp-prcell { display: grid; gap: 2px; min-width: 0; } .dp-readas { font-size: var(--fs-1, 0.75rem); }
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -4503,7 +4504,7 @@ a.of-nav:active { background: var(--press); }
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.serveSkipped', 'setup.serveAnswer', 'setup.lastCategory', 'setup.cookAheadSkipped', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -4985,7 +4986,7 @@ a.of-nav:active { background: var(--press); }
   /* ---------- food safety. Owner-editable inside safetyBounds (hotHoldF can never go below 135, same rule as Pitcall). ---------- */
   // Food-safety limits, in hours, degrees Fahrenheit and minutes. The owner can change them only inside
   // C.safetyBounds, and hot hold can never go below 135 F. The 135, 41 and 165 F limits, the cooling stages
-  // and the 4-hour sanitise interval are FDA Food Code rules (sections shown on each line). The grace
+  // and the 4-hour sanitise interval follow the FDA model Food Code (sections shown on each line); local codes can differ. The grace
   // periods run from the first out-of-range READING, not from when the food left the heat (finding F-E1, a
   // deliberate change from the research report). belowHotGraceH 2 is the research report's limit;
   // aboveColdGraceH 4 mirrors it for cold food (starter estimate). defaultMaxHoldH and tempCheckEveryMin are
@@ -4999,7 +5000,7 @@ a.of-nav:active { background: var(--press); }
     cooling: { stage1ToF: 70, stage1H: 2, totalH: 6, finalF: 41 }, // 135->70 in 2h, then 70->41 inside 4 more (6h total) (3-501.14)
     defaultMaxHoldH: 12,    // the hold limit for a product that has none of its own (every starter product has one)
     hardCapH: 12,           // the longest any batch of any kind may stay in the cabinet: at this age it is thrown out
-    tempCheckEveryMin: 120, // a temperature reading is due this often (2 h; the FDA minimum is 4 h)
+    tempCheckEveryMin: 120, // a temperature reading is due this often (2 h is our default; check what your health department asks)
     sanitizeEveryH: 4,      // food-contact surfaces (4-602.11)
     holdWindowV2: true,     // marks settings made after the hold limit moved from a flat 4 hours to per-product limits
     tempIntervalV2: true,   // marks settings made after the check interval default moved from 30 to 120 minutes
@@ -5250,12 +5251,18 @@ a.of-nav:active { background: var(--press); }
 
   // Header words for each field, compared after lower-casing and removing spaces and punctuation.
   const WORDS = {
-    name: ['name', 'item', 'itemname', 'dish', 'product', 'title', 'menuitem', 'itemtitle', 'dishname', 'productname'],
-    price: ['price', 'amount', 'baseprice', 'sellprice', 'unitprice', 'saleprice', 'menuprice', 'cost'],
-    station: ['station', 'zone', 'prepstation', 'kitchen', 'kitchenstation', 'madein', 'wheremade'],
-    category: ['category', 'group', 'menugroup', 'section', 'type', 'menucategory', 'reportingcategory'],
+    name: ['name', 'item', 'itemname', 'dish', 'product', 'title', 'menuitem', 'itemtitle', 'dishname', 'productname', 'menuitemname', 'food', 'foodname', 'dishes', 'items', 'nombre', 'menu'],
+    price: ['price', 'amount', 'baseprice', 'sellprice', 'unitprice', 'saleprice', 'menuprice', 'itemprice', 'priceusd', 'pricedollars', 'regularprice', 'prices', 'precio', 'pricecents', 'pricecent', 'amountcents', 'unitpricecents', 'cost'],
+    station: ['station', 'zone', 'prepstation', 'kitchen', 'kitchenstation', 'madein', 'wheremade', 'printerlabels', 'printerlabel', 'preparea', 'preplocation'],
+    category: ['category', 'categories', 'group', 'menugroup', 'section', 'menucategory', 'accountinggroup', 'reportingcategory', 'screen', 'screens', 'type'],
     description: ['description', 'desc', 'details', 'notes'],
   };
+  // Header names that say outright the prices are in cents ("Price (cents)", "Amount Cents").
+  const CENTS_HEADER = /cents?$/;
+  // The words a Lightspeed style "Type" column holds; such a column says what the row is, not which menu section it is in.
+  const ITEM_KINDS = new Set(['item', 'items', 'subitem', 'subitems', 'group', 'groups', 'combo', 'combos', 'modifier', 'modifiers', 'modifiergroup', 'menuitem', 'product', 'products']);
+  // The row kinds that are parts of another dish or only containers, skipped when a Type column names them.
+  const PART_KINDS = new Set(['subitem', 'subitems', 'group', 'groups', 'modifier', 'modifiers', 'modifiergroup']);
   // A header made comparable: lower case, letters and digits only.
   const norm = (h) => String(h == null ? '' : h).toLowerCase().replace(/[^a-z0-9]/g, '');
   // The column number whose header is one of the words, or -1. "cost" only counts as a price when no better word exists.
@@ -5271,13 +5278,14 @@ a.of-nav:active { background: var(--press); }
     const has = (x) => h.indexOf(x) >= 0;
     if (has('itemname') && (has('variationname') || has('token') || has('sku')) && has('price')) return 'square';
     if (has('cloverid') || (has('name') && has('pricetype') && (has('alternatename') || has('producecode') || has('productcode')))) return 'clover';
-    if ((has('menugroup') || has('menu') || has('menuitem') || has('menuitemname')) && (has('price') || has('baseprice') || has('basepricedollars') || has('itemprice'))) return 'toast';
+    if ((has('menugroup') || has('menuitem') || has('menuitemname')) && (has('price') || has('baseprice') || has('basepricedollars') || has('itemprice'))) return 'toast';
+    if (has('accountinggroup') && has('name') && has('price')) return 'lightspeed';
     const nameOk = WORDS.name.some((w) => has(w)), priceOk = WORDS.price.some((w) => has(w));
     return nameOk && priceOk ? 'csv' : null;
   }
   const FORMAT_LABEL = {
     square: 'Square item library export', toast: 'Toast menu export', clover: 'Clover items export',
-    csv: 'spreadsheet table (CSV, TSV or pasted from Excel or Google Sheets)', lines: 'typed or pasted lines',
+    lightspeed: 'Lightspeed items export', csv: 'spreadsheet table (CSV, TSV or pasted from Excel or Google Sheets)', lines: 'typed or pasted lines',
   };
 
   /* ---------- station and category words from the live config ---------- */
@@ -5363,7 +5371,7 @@ a.of-nav:active { background: var(--press); }
     else if (pr === 'bad') P.push(prob('badPrice', 'error', 'The price "' + row.priceText + '" is not a number.', 'Use digits only, for example 9.50.'));
     else if (typeof row.price === 'number') {
       if (row.price < 0) P.push(prob('negativePrice', 'error', 'The price ' + row.price + ' is below zero.', 'Enter the price as a positive amount.'));
-      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above ' + cs() + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "Prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950.'));
+      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above ' + cs() + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "Prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950. If the file is in cents, choose "Prices are in cents".'));
       else if (row.price === 0) P.push(prob('freeItem', 'warn', 'The price is ' + cs() + '0.00.', 'Keep it if the dish is free, or enter a price.'));
       if (row.rounded) P.push(prob('priceRounded', 'warn', 'The price had more than two decimals and was rounded to the cent.', 'Check the price shown.'));
     }
@@ -5396,14 +5404,28 @@ a.of-nav:active { background: var(--press); }
     row.station = zoneFrom(row.stationText, opts); row.category = catFrom(row.categoryText, opts);
   }
 
-  // Rows from the typed-lines format.
-  function parseLines(text, opts) {
+  // True when a first line is column titles: two or more cells, no digits, none is a known station, and a later line has a price.
+  function looksLikeTitles(raw, rest, opts) {
+    if (/\d/.test(raw)) return false;
+    const f = readLine(raw.trim());
+    const cells = [f.name].concat(f.priceText ? [f.priceText] : [], f.extras).filter(Boolean);
+    if (cells.length < 2 || cells.some((c) => zoneFrom(c, opts) || catFrom(c, opts))) return false;
+    return rest.some((l) => { if (!clean(l)) return false; const g = readLine(l.trim()); return PRICE_TOKEN.test(g.priceText || ''); });
+  }
+  // Rows from the typed-lines format. summary, when given, receives a note for anything skipped.
+  function parseLines(text, opts, summary) {
     const out = [];
     const lines = text.split(/\r\n|\r|\n/);
+    let first = true;
     for (let i = 0; i < lines.length && out.length < LIMITS.rowsRead; i++) {
       const raw = lines[i];
       if (!clean(raw)) continue;
       if (/^\s*(#|\/\/)/.test(raw)) continue;
+      // A first line of column titles ("Dish, Cost") is not a dish: no digits, two or more words, and a priced line follows.
+      if (first) {
+        first = false;
+        if (looksLikeTitles(raw, lines.slice(i + 1), opts)) { if (summary) summary.notes.push('The first line looked like column titles ("' + clean(raw) + '"), so it was skipped.'); continue; }
+      }
       const f = readLine(raw.trim());
       const row = newRow(i + 1);
       row.name = clean(unguard(f.name));
@@ -5421,26 +5443,38 @@ a.of-nav:active { background: var(--press); }
   function parseTable(table, format, opts, summary) {
     const headers = table[0].map(norm);
     const col = {
-      name: findCol(headers, format === 'toast' ? ['itemname', 'menuitem', 'menuitemname', 'name'] : WORDS.name),
+      name: findCol(headers, format === 'toast' ? ['itemname', 'menuitem', 'menuitemname', 'name'].concat(WORDS.name) : WORDS.name),
       price: findCol(headers, format === 'toast' ? ['price', 'baseprice', 'basepricedollars', 'itemprice'] : WORDS.price.filter((w) => w !== 'cost')),
       station: findCol(headers, WORDS.station),
-      category: findCol(headers, format === 'toast' ? ['menugroup', 'category', 'menucategory'] : WORDS.category),
+      category: findCol(headers, format === 'toast' ? ['menugroup', 'category', 'menucategory'].concat(WORDS.category) : WORDS.category),
       description: findCol(headers, WORDS.description),
       variation: format === 'square' ? headers.indexOf('variationname') : -1,
       priceType: format === 'clover' ? headers.indexOf('pricetype') : -1,
-      hidden: Math.max(headers.indexOf('hidden'), headers.indexOf('archived'), headers.indexOf('visibility')),
+      hidden: headers.reduce((a, h, i) => (['hidden', 'archived', 'visibility', 'squareonlineitemvisibility'].indexOf(h) >= 0 ? a.concat(i) : a), []),
+      kind: -1,
     };
     if (col.price < 0) col.price = findCol(headers, ['cost']);
+    // A "Type" column that only says Item, Sub-item, Group or Combo is a row kind, not a menu section.
+    const typeAt = headers.indexOf('type');
+    if (typeAt >= 0) {
+      const vals = table.slice(1).map((r) => norm(r[typeAt])).filter(Boolean);
+      if (vals.length && vals.every((v) => ITEM_KINDS.has(v))) { col.kind = typeAt; if (col.category === typeAt) col.category = -1; }
+    }
     // Columns the importer does not use are named, so a screen can say what was left out ("Ignored column: Notes").
-    const usedCols = new Set([col.name, col.price, col.station, col.category, col.description, col.variation, col.priceType, col.hidden].filter((x) => x >= 0));
+    const usedCols = new Set([col.name, col.price, col.station, col.category, col.description, col.variation, col.priceType, col.kind].concat(col.hidden).filter((x) => x >= 0));
     if (summary) summary.ignoredColumns = table[0].map((h, i) => [clean(h), i]).filter(([h, i]) => h && !usedCols.has(i)).map(([h]) => h);
-    const cents = opts.priceUnit === 'cents' || (opts.priceUnit !== 'dollars' && format === 'clover');
+    // Prices are dollars unless the owner chose cents or the price column is itself named in cents. Never guessed from the brand.
+    const cents = opts.priceUnit === 'cents' || (opts.priceUnit !== 'dollars' && col.price >= 0 && CENTS_HEADER.test(headers[col.price]));
+    if (summary) summary.priceUnit = cents ? 'cents' : 'dollars';
     const data = [];
+    let skippedParts = 0;
     for (let i = 1; i < table.length && data.length < LIMITS.rowsRead; i++) {
       const r = table[i];
       if (r.every((c) => !clean(c))) continue;
+      if (col.kind >= 0 && PART_KINDS.has(norm(r[col.kind]))) { skippedParts++; continue; }
       data.push({ cells: r, line: i + 1 });
     }
+    if (summary && skippedParts) summary.notes.push(skippedParts + ' ' + (skippedParts === 1 ? 'row' : 'rows') + ' marked Sub-item, Group or Modifier ' + (skippedParts === 1 ? 'was' : 'were') + ' left out; they are parts of other dishes.');
     // Square lists one row per variation; the variation name is added to the dish name when an item has more than one.
     const count = {};
     if (col.variation >= 0) for (const d of data) { const k = key(d.cells[col.name]); count[k] = (count[k] || 0) + 1; }
@@ -5456,7 +5490,7 @@ a.of-nav:active { background: var(--press); }
       }
       row.name = name;
       const typ = col.priceType >= 0 ? clean(c(col.priceType)).toUpperCase() : '';
-      if (typ === 'VARIABLE' || typ === 'PER_UNIT') { row.priceText = clean(c(col.price)) || typ.toLowerCase(); row.priceError = 'variable'; } else setPrice(row, c(col.price), cents);
+      if (/^(VARIABLE|PER[ _]?UNIT)$/.test(typ)) { row.priceText = clean(c(col.price)) || typ.toLowerCase(); row.priceError = 'variable'; } else setPrice(row, c(col.price), cents);
       setWhere(row, c(col.station), c(col.category), opts);
       // More filled cells than the header has columns: a comma inside an unquoted value pushed the rest along.
       let used = d.cells.length;
@@ -5468,7 +5502,7 @@ a.of-nav:active { background: var(--press); }
       }
       const desc = clean(c(col.description));
       if (desc) row.description = desc;
-      if (col.hidden >= 0 && /^(true|yes|y|1|hidden|archived)$/i.test(clean(c(col.hidden)))) row.hidden = true;
+      if (col.hidden.some((ix) => /^(true|yes|y|1|hidden|archived|unavailable)$/i.test(clean(c(ix))))) row.hidden = true;
       out.push(row);
     }
     return out;
@@ -5496,10 +5530,10 @@ a.of-nav:active { background: var(--press); }
         else if (format === 'csv' && found === null) format = 'lines';
       }
       res.format = format; res.label = FORMAT_LABEL[format] || format;
-      if (format === 'lines') res.rows = parseLines(text, opts);
+      if (format === 'lines') res.rows = parseLines(text, opts, res.summary);
       else {
         if (table.length < 2) { res.summary.notes.push('The file has a header row but no dishes under it.'); res.rows = []; } else res.rows = parseTable(table, format, opts, res.summary);
-        if (format === 'clover' && opts.priceUnit !== 'dollars') res.summary.notes.push('Clover prices are read as cents (1400 is ' + cs() + '14.00). If the first rows look wrong, read the file again with prices in dollars.');
+        if (res.summary.priceUnit === 'cents') res.summary.notes.push('Prices are read as cents (1400 is ' + cs() + '14.00). If the first rows look wrong, read the file again with prices in dollars.');
       }
       if (res.rows.length >= LIMITS.rowsRead) res.summary.notes.push('Only the first ' + LIMITS.rowsRead + ' rows were read.');
       const existing = new Set(((opts.existing) || []).map((m) => key(m && m.name)));
@@ -5516,6 +5550,14 @@ a.of-nav:active { background: var(--press); }
       }
       const S = res.summary;
       S.total = res.rows.length;
+      if (!S.priceUnit) S.priceUnit = opts.priceUnit === 'cents' ? 'cents' : 'dollars';
+      // What each price was read as, in the owner's words, so the preview can show "Read as $12.00".
+      for (const r of res.rows) r.readAs = typeof r.price === 'number' ? cs() + r.price.toFixed(2) : '';
+      // Whole numbers that are too big to be dollars: the file is probably in cents, so say so once.
+      const whole = res.rows.filter((r) => r.priceText && /^[+-]?\d+$/.test(r.priceText.replace(/[$€£\s]/g, '')));
+      S.maybeCents = S.priceUnit === 'dollars' && whole.length > 0 && whole.length === res.rows.filter((r) => r.priceText).length && whole.some((r) => r.price > LIMITS.priceMax);
+      if (S.maybeCents) S.notes.push('Every price is a whole number and some are above ' + cs() + LIMITS.priceMax + '. If the file is in cents (1400 is ' + cs() + '14.00), read it again with prices in cents.');
+      S.ignoredText = S.ignoredColumns.length ? 'Ignored: ' + S.ignoredColumns.join(', ') : '';
       for (const r of res.rows) { if (r.ok) S.ok++; if (r.problems.some((p) => p.level === 'error')) S.errors++; if (r.problems.some((p) => p.level === 'warn')) S.warnings++; }
       // Station and category words the file used that match none of the kitchen's, so a screen can offer to add them.
       S.unmatched = { stations: [], categories: [] };
@@ -5672,7 +5714,7 @@ a.of-nav:active { background: var(--press); }
     reasonRequired: 'Pick a reason first (for example: wrong order, customer left, dropped).',
     badTemp: 'Enter a temperature between 32 and 300 °F.',
     tempTooLow: 'A reheat needs a reading of at least ' + C.safety.reheatF + ' °F. Keep heating and log it again.' + SAFETY,
-    notReheatable: 'This batch cannot be reheated: only one reheat is allowed, and only within ' + C.safety.belowHotGraceH + ' hours of going below ' + C.safety.hotHoldF + ' °F. Discard it.' + SAFETY,
+    notReheatable: 'This batch cannot be reheated: Smokebox allows one reheat per batch, and only within ' + C.safety.belowHotGraceH + ' hours of going below ' + C.safety.hotHoldF + ' °F. Discard it.' + SAFETY,
     notEnoughData: 'Not enough data yet. Run a few more tickets first.',
     batchNotServable: 'That batch is locked or already discarded, so it cannot be used.' + SAFETY,
     badWeight: 'Enter a weight above 0 g (up to 1,000 kg).',
@@ -5793,7 +5835,7 @@ a.of-nav:active { background: var(--press); }
   // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
   // safetyKeep bucket instead of being dropped.
   const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, cooling_started: 1, sanitize_done: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
-  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months, the minimum to keep).
+  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months). This is our own choice; no source gives a minimum, so ask your health department how long to keep records.
   const SAFETY_KEEP_MS = 190 * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
@@ -6147,10 +6189,10 @@ a.of-nav:active { background: var(--press); }
     const hot = batch.kind !== 'cold';
     if (batch.outSince != null) {
       if (hot) {
-        if (batch.reheats >= 1) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Below ' + f0(S.hotHoldF) + ' again after its one reheat. Discard.' + SAFETY);
+        if (batch.reheats >= 1) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Below ' + f0(S.hotHoldF) + ' again after its one reheat (Smokebox allows one per batch). Discard.' + SAFETY);
         const lim = batch.outSince + S.belowHotGraceH * H;
         if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Below ' + f0(S.hotHoldF) + ' for more than ' + S.belowHotGraceH + ' hours. Discard.' + SAFETY);
-        return gateOut('REHEAT_IMMEDIATE', false, 'belowHot', 'bad', 'Below ' + f0(S.hotHoldF) + '. Reheat to ' + f0(S.reheatF) + ' now (one reheat only) or discard.' + SAFETY, Math.min(lim, exp));
+        return gateOut('REHEAT_IMMEDIATE', false, 'belowHot', 'bad', 'Below ' + f0(S.hotHoldF) + '. Reheat to ' + f0(S.reheatF) + ' now (Smokebox allows one reheat per batch) or discard.' + SAFETY, Math.min(lim, exp));
       }
       const lim = batch.outSince + S.aboveColdGraceH * H;
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
@@ -9477,7 +9519,7 @@ a.of-nav:active { background: var(--press); }
     const i = isObj(info) ? info : {};
     switch (report) {
       case 'tempTooLow': return 'A reheat needs a reading of at least ' + S.reheatF + ' °F. Keep heating and log it again. ' + C.safetyLine;
-      case 'notReheatable': return 'This batch cannot be reheated: only one reheat is allowed, and only within ' + S.belowHotGraceH + ' hours of going below ' + S.hotHoldF + ' °F. Discard it. ' + C.safetyLine;
+      case 'notReheatable': return 'This batch cannot be reheated: Smokebox allows one reheat per batch, and only within ' + S.belowHotGraceH + ' hours of going below ' + S.hotHoldF + ' °F. Discard it. ' + C.safetyLine;
       case 'notAllDone': return isInt(i.remaining) ? i.remaining + ' ' + U.plural(i.remaining, 'item') + ' not done yet. Finish them, or use Bump anyway to send the ticket out.' : REPORTS.notAllDone;
       case 'itemUnavailable': {
         const why = i.reason === 'manual' ? 'marked 86 by hand' : i.reason === 'safety' ? 'on a safety hold' : i.reason === 'quality' ? 'past its quality limit' : i.reason === 'stock' ? 'sold out' : '86';
@@ -10240,8 +10282,8 @@ a.of-nav:active { background: var(--press); }
   const RECOVERY_KEY = 'smokebox.v1.pinrecovery', RECOVERY_TRIES = 5, RECOVERY_LOCK_MS = 15 * 60e3;
   // Letters and digits for a recovery code, leaving out I, O, 0 and 1 so a handwritten card is not misread. 32 characters, 10 in a code: 50 bits.
   const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const START_OVER_KEYS = ['smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.serveSkipped', 'smokebox.v1.setup.serveAnswer', 'smokebox.v1.setup.lastCategory',
-    'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
+  const START_OVER_KEYS = ['smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
+    'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.setup.serveSkipped', 'smokebox.v1.setup.serveAnswer', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
   // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
@@ -26436,9 +26478,11 @@ a.of-nav:active { background: var(--press); }
     // The station used for a row that names none: the first station still in use.
     const defaultZone = () => visibleStations()[0].id;
     // Runs the importer on the text and draws the preview, or says plainly what is wrong with the text.
-    function check(text, from) {
+    let unitChoice = ''; // '' lets the importer decide; 'cents' or 'dollars' when the owner chose
+    function check(text, from, unit) {
       U.clear(preview); tell(status, '');
-      const res = M.parse(text, { existing: SB.store.getState().menu });
+      if (unit !== undefined) unitChoice = unit;
+      const res = M.parse(text, unitChoice ? { existing: SB.store.getState().menu, priceUnit: unitChoice } : { existing: SB.store.getState().menu });
       if (res.error) { tell(status, res.error); parsed = null; return; }
       parsed = res; rows = res.rows.map((r) => Object.assign({ keep: r.ok && !r.hidden }, r));
       // A category that is only digits usually means a price like 4,50 was split at its comma: warn, and leave the row unticked.
@@ -26470,6 +26514,13 @@ a.of-nav:active { background: var(--press); }
       (sm.notes || []).forEach((n) => preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, n)));
       // Columns the importer did not use (like Notes), named once so nothing is dropped without a word.
       const ign = Array.isArray(sm.ignoredColumns) ? sm.ignoredColumns : [];
+      // Prices that look like cents (whole numbers, some over $1,000): offer to read them as cents; and when read as cents, offer the way back.
+      if (sm.maybeCents) preview.appendChild(h('div', { class: 'fs-note', 'data-tone': 'warn' }, h('div', null, h('p', null, 'Every price in this file is a whole number and some are very large. Are the prices in cents (1400 meaning $14.00)?'),
+        // Reads the same text again with prices in cents.
+        h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'prices-cents' }, onClick: () => check(area.value, from, 'cents') }, 'These prices are in cents'))));
+      if (sm.priceUnit === 'cents') preview.appendChild(h('div', { class: 'fs-note', 'data-tone': 'warn' }, h('div', null, h('p', null, 'Prices are being read as cents (1400 is $14.00).'),
+        // Goes back to reading prices as dollars.
+        h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'prices-dollars' }, onClick: () => check(area.value, from, 'dollars') }, 'These prices are in dollars'))));
       // Notes or descriptions are read but not stored with a dish, so say that too.
       if (rows.some((r) => r.description)) preview.appendChild(h('p', { class: 'fs-sub dp-ignored', dataset: { act: 'notes-ignored' } }, 'Notes and descriptions in your file are not kept: Smokebox stores only the name, price, station and section.'));
       if (ign.length) preview.appendChild(h('p', { class: 'fs-sub dp-ignored', dataset: { act: 'ignored-columns' } }, (ign.length === 1 ? 'Ignored column: ' : 'Ignored columns: ') + ign.join(', ') + '. Smokebox does not keep ' + (ign.length === 1 ? 'it' : 'them') + '.'));
@@ -26506,9 +26557,11 @@ a.of-nav:active { background: var(--press); }
         const keepWrap = h('label', { class: 'dp-check' }, keepBox);
         const nm = h('input', { class: 'input', type: 'text', maxlength: 60, value: r.name || '', 'aria-label': 'Name, line ' + r.line });
         const pr = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: typeof r.price === 'number' ? r.price.toFixed(2) : '', 'aria-label': 'Price, line ' + r.line });
+        const readAs = h('span', { class: 'fs-sub dp-readas', dataset: { act: 'read-as' } }, r.readAs ? 'Read as ' + r.readAs : '');
+        const prCell = h('div', { class: 'dp-prcell' }, pr, readAs);
         const zs = h('select', { class: 'select', 'aria-label': 'Station, line ' + r.line }, stations().map((z) => h('option', { value: z.id, selected: (r.station || defaultZone()) === z.id }, z.name)));
         const prob = h('div', { class: 'fs-sub dp-prob' });
-        const rowEl = h('div', { class: 'dp-prow', role: 'row', dataset: { ok: r.ok ? 'true' : 'false' } }, keepWrap, nm, pr, zs, prob);
+        const rowEl = h('div', { class: 'dp-prow', role: 'row', dataset: { ok: r.ok ? 'true' : 'false' } }, keepWrap, nm, prCell, zs, prob);
         // Redraws this row's plain problems and its tick after any edit.
         const redo = () => {
           r.ok = rowOk(r); if (!r.ok) r.keep = false;
@@ -26520,7 +26573,7 @@ a.of-nav:active { background: var(--press); }
         // Selecting a row in or out changes only whether it is imported.
         keep.addEventListener('change', () => { r.keep = keep.checked && (r.ok = rowOk(r)); keep.checked = r.keep; paintGo(); });
         // Typing a new name or price re-checks the row and ticks it in when it has become valid.
-        const edit = () => { r.name = nm.value.replace(/\s+/g, ' ').trim(); const p = SB.menuImport.readPrice(pr.value); r.price = p && typeof p.value === 'number' ? p.value : null; r.station = zs.value; r.ok = rowOk(r); r.keep = r.ok; redo(); };
+        const edit = () => { r.name = nm.value.replace(/\s+/g, ' ').trim(); const p = SB.menuImport.readPrice(pr.value); r.price = p && typeof p.value === 'number' ? p.value : null; readAs.textContent = r.price == null ? '' : 'Read as ' + U.fmtMoney(r.price); r.station = zs.value; r.ok = rowOk(r); r.keep = r.ok; redo(); };
         nm.addEventListener('change', edit); pr.addEventListener('change', edit); zs.addEventListener('change', () => { r.station = zs.value; });
         prob.textContent = (r.problems || []).filter((p) => p.code !== 'unknownCategory' && p.code !== 'unknownStation').map((p) => p.message + (p.fix ? ' ' + p.fix : '')).join(' ');
         body.appendChild(rowEl);
@@ -26551,13 +26604,13 @@ a.of-nav:active { background: var(--press); }
       if (f.size > M.limits.textMax) { tell(status, 'That file is too big to read. Use a file under 1 MB.'); return; }
       const rd = new g.FileReader();
       // When the file is read, check its text; a failed read says so.
-      rd.onload = () => { area.value = String(rd.result || ''); check(area.value, 'the file'); };
+      rd.onload = () => { area.value = String(rd.result || ''); check(area.value, 'the file', ''); };
       rd.onerror = () => { tell(status, 'That file could not be read.'); };
       rd.readAsText(f);
     });
     const checkBtn = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'import-check' } }, ico('check', 20), h('span', null, 'Check it'));
     // Checks the pasted text.
-    checkBtn.addEventListener('click', () => check(area.value, 'the pasted text'));
+    checkBtn.addEventListener('click', () => check(area.value, 'the pasted text', ''));
     // Export: the menu as a spreadsheet file, so it can be edited elsewhere or kept as a copy.
     const exp = h('button', { type: 'button', class: 'btn', dataset: { act: 'export-menu' } }, ico('download', 20), h('span', null, 'Export my menu'));
     // Builds the menu CSV and starts a download; says so if the browser blocks it.
@@ -26570,7 +26623,7 @@ a.of-nav:active { background: var(--press); }
         tell(status, 'Saved smokebox-menu.csv. Open it in a spreadsheet, or import it again later.');
       } catch (e) { area.value = text; tell(status, 'Your browser blocked the download. The menu is in the box above: copy it into a file named smokebox-menu.csv.'); }
     });
-    root.append(h('p', { class: 'fs-sub' }, 'Optional. Choose a spreadsheet (CSV) or an item export from Square, Toast or Clover, or paste a list. You will see every dish and can fix or clear any before anything is added. Adding dishes by hand in Dishes and prices is just as good.'),
+    root.append(h('p', { class: 'fs-sub' }, 'Optional. Choose a spreadsheet (CSV) or an item export from Square, Toast, Clover or Lightspeed, or paste a list. You will see every dish and can fix or clear any before anything is added. Adding dishes by hand in Dishes and prices is just as good.'),
       h('div', { class: 'fs-row' }, fileIn), area, h('div', { class: 'fs-row' }, checkBtn, exp), status, preview);
     sheet.body.appendChild(root); keepInView(sheet.body);
     return sheet;
