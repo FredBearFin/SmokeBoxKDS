@@ -617,7 +617,14 @@
     // Wall mode panes: orders and payments on the left, the manager glance on the right. Built once here and only
     // patched later; the stylesheet shows them when data-wall is on.
     const wl = buildWallOrders(), wr = buildWallGlance();
-    root.append(head, strip.el, wl.el, main, dock, wr.el);
+    // A small pill that says how many tickets are out of sight below the screen; one tap scrolls down a screen.
+    const belowT = h('span', null, '');
+    const below = h('button', { type: 'button', class: 'btn fl-below', hidden: true, onClick: () => { main.scrollBy({ top: Math.round(main.clientHeight * 0.85), behavior: reduced() ? 'auto' : 'smooth' }); } }, ico('chevron-down', 20), belowT);
+    root.append(head, strip.el, wl.el, main, dock, wr.el, below);
+    m.below = below; m.belowT = belowT;
+    // Scrolling the board refreshes the pill once per animation frame at most.
+    let belowRaf = 0;
+    main.addEventListener('scroll', () => { if (!belowRaf) belowRaf = requestAnimationFrame(() => { belowRaf = 0; updateBelow(); }); }, { passive: true });
     const hlStyle = h('style', { class: 'fl-hl-style' });
     root.appendChild(hlStyle);
     m.el.appendChild(root);
@@ -1023,6 +1030,20 @@
     el.addEventListener('animationend', (e) => { if (e.target === el) done(); });
     // Backup in case animationend never fires, for example in a hidden tab.
     setTimeout(done, 900 + Math.min(i, 9) * 55);
+  }
+
+  // Counts the tickets that start below the visible board and shows or hides the "N more tickets below" pill.
+  // WATCH OUT: reads the position of every ticket, so it runs on scroll and about once a second, not on every change.
+  function updateBelow() {
+    if (!m || !m.below) return;
+    const main = m.main;
+    let n = 0;
+    if (!m.cabOn && main.clientHeight > 0 && main.scrollHeight > main.clientHeight + 4) {
+      const bottom = main.getBoundingClientRect().bottom;
+      for (const c of m.grid.children) { if (!c.classList.contains('fl-leaving') && c.getBoundingClientRect().top >= bottom - 8) n++; }
+    }
+    setHidden(m.below, n === 0);
+    if (n) put(m.belowT, n + (n === 1 ? ' more ticket below' : ' more tickets below'));
   }
 
   // Gives an element one soft highlight so a changed ticket or dish catches the eye, then removes the hook.
@@ -1584,6 +1605,7 @@
     const c = S.select.counts();
     m.counts = c;
     applyCook(cookOn());
+    if (!m.belowAt || now - m.belowAt > 1000 || now < m.belowAt) { m.belowAt = now; updateBelow(); }
     paintRole();
     updateStrip(now);
     driveCallouts(now);
@@ -1758,7 +1780,10 @@
     // Once any ticket or order exists the first-steps card is finished for good, even if the board is cleared later.
     if ((s.tickets.length || (s.orders && s.orders.length)) && !welcomeDone()) U.storage.set(KEY_WELCOME, 'done');
     const show = !welcomeDone() && m.zone === 'all' && n > 0;
+    const wasShown = !m.welcome.hidden;
     setHidden(m.welcome, !show);
+    // The empty board leaves out its own walkthrough button while the card (which has one) is up, so there is only one.
+    if (wasShown !== show && m.empty && m.empty.dataset.sig) paintEmpty(store().select.counts());
     if (!show) return;
     put(m.wText, 'Your menu has ' + n + ' ' + U.plural(n, 'dish', 'dishes') + '. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices.');
   }
@@ -1802,7 +1827,8 @@
     const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
       : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
-    const sig = title + '|' + text;
+    const cardUp = !!(m.welcome && !m.welcome.hidden);
+    const sig = title + '|' + text + '|' + cardUp;
     if (e.dataset.sig === sig) return;
     e.dataset.sig = sig;
     U.clear(e);
@@ -1818,9 +1844,9 @@
     // A quiet station while others are busy offers a way back; New ticket is always there.
     if (stationBusy) actions.appendChild(h('button', { type: 'button', class: 'btn btn-lg', onClick: () => goZone('all') }, ico('grid', 22), h('span', null, 'Show all stations')));
     actions.appendChild(h('button', { type: 'button', class: 'btn btn-primary', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket')));
-    if (!stationBusy) actions.append(
-      h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
-      h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, store().isDemo && store().isDemo() ? 'Busy-night crew' : 'Try the demo')));
+    if (!stationBusy) actions.append(...[
+      cardUp ? null : h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
+      h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, store().isDemo && store().isDemo() ? 'Busy-night crew' : 'Try the demo'))].filter(Boolean));
     e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
   }
 

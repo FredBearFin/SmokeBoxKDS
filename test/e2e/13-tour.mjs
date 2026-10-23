@@ -77,7 +77,7 @@ async function walk(t, page, label, busy) {
     const g = await geometry(page, id);
     t.check(label + ': step ' + n + ' card is on screen and does not cover what it points at', ok && layoutOk(g), { n, ok, g });
     // The ring is a class on the element itself, so an element with no box (the "On time" badge is hidden on purpose) draws nothing: skip those.
-    if (g) t.check(label + ': step ' + n + ' every ringed element can be seen', g.targets.filter((x) => x.bottom - x.top > 0).every((x) => x.seen) && g.targets.some((x) => x.bottom - x.top > 0), g);
+    if (g) t.check(label + ': step ' + n + ' every ringed element can be seen', g.targets.filter((x) => x.bottom - x.top > 0).every((x) => x.seen) && (n === 9 ? true : g.targets.some((x) => x.bottom - x.top > 0)), g); // step 9 is the closing caption and rings nothing
     if (g && wide) t.check(label + ': step ' + n + ' the card leaves the Bump button free', !g.bumpCovered, g);
     return g;
   };

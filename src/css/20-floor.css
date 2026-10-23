@@ -748,3 +748,8 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl[data-far="on"] .fl-slip .fl-badge .icon { width: 1.2em; height: 1.2em; }
 .fl[data-far="on"] .fl-slip .slip-meta { grid-row: 4; }
 .fl[data-far="on"] .fl-slip .slip-progress { grid-row: 5; }
+/* On a phone seven tabs share the width: tighter padding so "Cabinet" never sticks out of its tab, even with Large text. */
+@media (max-width: 420px) { .fl-seg .seg-opt { padding-inline: 3px; } .fl-seg .seg-label { letter-spacing: -0.03em; } }
+/* "N more tickets below": a small pill at the bottom right of the board, just above the all-day strip. Not shown in wall mode or the cabinet. */
+.fl-below { position: fixed; right: var(--sp-5); bottom: calc(var(--fl-lift, 0px) + 12px); z-index: 4; min-height: var(--tap); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3); background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.fl-below[hidden], .fl[data-wall="on"] .fl-below { display: none; }

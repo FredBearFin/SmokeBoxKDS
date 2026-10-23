@@ -19,7 +19,7 @@ const PAGE_OWNER = { pace: 'officeA', tickets: 'officeA', stations: 'officeA', m
 
 // Reported, owned and not yet fixed (see docs/audit/e2e-triage.md, B3, owner A1/A2): small touch targets that the audit lists once as a note
 // instead of failing every scene. Remove a pattern here when the control is fixed.
-const KNOWN_SMALL = /Set up your kitchen|Show me how it works|Clear this notice|Sound paused|Warning loudness|Channel sync/;
+const KNOWN_SMALL = /(?!)/; // nothing is excused any more: all those controls are 44 px now
 const knownSmall = new Set();
 const dropKnown = (list) => list.filter((x) => { if (!KNOWN_SMALL.test(x)) return true; knownSmall.add(x.replace(/\s*\d+px.*$/, '').replace(/\d+x\d+$/, '').trim().slice(0, 70)); return false; });
 

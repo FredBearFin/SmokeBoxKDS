@@ -155,8 +155,13 @@
     }
   }
 
-  // The elements the ring should point at for this step.
+  // The elements the ring should point at for this step, leaving out any that have no box on screen (a hidden badge).
   function targets(t) {
+    return rawTargets(t).filter((e) => e.getClientRects().length > 0);
+  }
+
+  // Every element that could carry the ring for this step, visible or not.
+  function rawTargets(t) {
     const sl = slip();
     if (!sl) return [];
     // Every element inside the slip that matches a selector.

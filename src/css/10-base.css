@@ -729,3 +729,5 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .pin-forgot p { margin: var(--sp-2) 0; }
 /* On a 4K screen the reminder bar grows with the board, so the demo or backup notice is readable from across the room. */
 @media (min-width: 3000px) { .sb-banner { min-height: 64px; font-size: 28px; } .sb-banner .btn { min-height: 52px; font-size: 24px; } }
+/* On touch-sized screens the buttons in the reminder and demo bars are full 44 px targets. */
+@media (max-width: 1024px), (pointer: coarse) { .sb-banner .btn { min-height: 44px; } }
