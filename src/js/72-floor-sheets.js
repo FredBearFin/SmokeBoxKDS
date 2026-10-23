@@ -37,7 +37,7 @@
   // The food-safety limits in force: the owner's settings if present, else the starter values.
   const safety = () => (st().settings && st().settings.safety) || C.safety;
   // True when the cook-ahead part should show: the module is on (absent means on) or a batch still holds food.
-  const cookOn = () => !E().moduleOn || E().moduleOn(st(), 'cookAhead') || st().batches.some((b) => b.status !== 'discard' && b.remainingG > 0);
+  const cookOn = () => (E().cookAheadActive ? E().cookAheadActive(st()) : !E().moduleOn || E().moduleOn(st(), 'cookAhead') || st().batches.some((b) => b.status !== 'discard' && b.remainingG > 0));
   // Shows a short message at the bottom; tone is ok, warn, bad or info.
   const toast = (msg, tone, extra) => SB.ui.toast(msg, Object.assign({ tone: tone || 'info' }, extra || {}));
   // Removes the standard safety line from a message, because the screen already shows it once.
@@ -177,6 +177,59 @@
     return { sheet: sh, ok, cancel, copy };
   }
 
+  // Browser-storage key for the initials of whoever is working the cabinet; remembered per tablet.
+  const KEY_WHO = 'smokebox.v1.initials';
+  // Initials stay on the tablet for 2 hours of the app clock after their last use, so a shared tablet does not carry one person's name into the next shift.
+  const WHO_IDLE_MS = 2 * 3600e3;
+  // The remembered initials, or empty when none are saved or they have sat idle for more than 2 hours.
+  function savedWho() {
+    const v = U.storage.get(KEY_WHO, null);
+    if (!v || typeof v !== 'object' || typeof v.who !== 'string' || !U.isNum(v.at)) return '';
+    const age = nowMs() - v.at;
+    return age >= 0 && age <= WHO_IDLE_MS ? v.who : '';
+  }
+  // Remembers the initials just used, with the time of use (an empty string forgets them).
+  function saveWho(who) { U.storage.set(KEY_WHO, { who, at: nowMs() }); }
+  // Runs then(who) with the initials for a safety action. Asked once per tablet (and again after 2 idle hours); a
+  // person can skip, and the action still goes ahead without initials. With the cook-ahead part off nothing is asked.
+  function askWho(opener, verb, then) {
+    if (!cookOn()) { then(''); return; }
+    const pre = savedWho();
+    if (pre) { saveWho(pre); then(pre); return; }
+    const input = h('input', { class: 'input', type: 'text', maxlength: '12', autocomplete: 'off', placeholder: 'Your initials, like JM', 'aria-label': 'Your initials' });
+    let dl = null, done = false;
+    // Finishes once: closes the box and carries on with the given initials.
+    const go = (w) => { if (done) return; done = true; if (w) saveWho(w); dl.sheet.close('confirm'); then(w); };
+    dl = dialog({ title: 'Who is this?', name: 'who', opener, confirmLabel: verb, icon: 'check',
+      body: [h('p', null, 'Your initials go next to this entry in the log. You are asked once on this tablet. Tap Switch person in the cabinet to change them.'), h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'Your initials'), input)],
+      // Confirming carries on with the initials as typed.
+      onConfirm: () => go(input.value.trim()) });
+    dl.ok.disabled = true;
+    input.addEventListener('input', () => { dl.ok.disabled = !input.value.trim(); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && input.value.trim()) go(input.value.trim()); });
+    // Skip carries on without initials, so a missing name never blocks a temperature check or a discard.
+    const skipWho = () => go('');
+    dl.sheet.footer.insertBefore(h('button', { type: 'button', class: 'btn btn-ghost', dataset: { act: 'skip-who' }, onClick: skipWho }, 'Skip'), dl.ok);
+    setTimeout(() => input.focus(), 50);
+  }
+  // The last temperature check of each batch, "JM 2:40 pm", worked out once per change of the event list (not every second).
+  let checkMemo = { key: null, map: new Map() };
+  // Names who last logged a temperature on a batch and when (initials first when known); empty if nothing is logged.
+  function lastCheckBy(batchId) {
+    const evs = st().events;
+    const key = evs && evs.length + ':' + (evs.length ? evs[evs.length - 1].id : '');
+    if (checkMemo.key !== key) {
+      const map = new Map();
+      for (const row of E().safetyLog ? E().safetyLog(st()) : []) {
+        const e = row.event;
+        if (e.batchId && (e.type === 'temp_logged' || e.type === 'batch_reheat')) map.set(e.batchId, (e.who ? e.who + ' ' : '') + U.fmtTime(e.t));
+      }
+      checkMemo = { key, map };
+    }
+    return checkMemo.map.get(batchId) || '';
+  }
+  SB.who = { get: savedWho, set: saveWho, ask: askWho };
+
   // Close a sheet, then do something one frame later (so the history entry
   // of the closing sheet is gone before a new one is pushed).
   function closeThen(sheet, fn) { sheet.close('link'); setTimeout(fn, 60); }
@@ -305,7 +358,18 @@
       { id: 'new', label: 'New batch', icon: 'plus', panel: newPanel },
     ], opts.tab === 'new' ? 'new' : 'batches', (id) => { setHidden(sheet.footer, id !== 'new' || !st().ingredients.some((i) => i.tcs && !i.archived)); if (id === 'new') form.shown(); });
 
-    sheet.body.append(h('div', { class: 'hc' }, safetyNote(), tabs.seg, batchesPanel, newPanel));
+    if (sheet.header && SB.ui.sheetHelp) SB.ui.sheetHelp(sheet, 'hold-cabinet-and-warnings', 'the hold cabinet');
+    // Who is working the cabinet: the remembered initials with a one-tap Switch person (asked again at the next entry).
+    const whoText = h('span', null, '');
+    const whoBtn = h('button', { type: 'button', class: 'btn btn-sm btn-ghost', dataset: { act: 'switch-who' }, onClick: () => { saveWho(''); paintWho(); } }, 'Switch person');
+    const whoLine = h('div', { class: 'hc-who', hidden: true }, ico('check-circle', 18), whoText, whoBtn);
+    // Shows the line only while initials are remembered.
+    function paintWho() { const w = savedWho(); setHidden(whoLine, !w); text(whoText, 'Entries are saved as ' + w + '.'); }
+    paintWho();
+    const hcNote = safetyNote();
+    // The cabinet page (no sheet header) carries the "?" inside its note line instead.
+    if (!sheet.header && SB.guide && SB.guide.link) hcNote.appendChild(SB.guide.link('hold-cabinet-and-warnings', 'the hold cabinet'));
+    sheet.body.append(h('div', { class: 'hc' }, hcNote, whoLine, tabs.seg, batchesPanel, newPanel));
     sheet.footer.append(form.footer);
     setHidden(sheet.footer, tabs.seg.getValue() !== 'new' || !st().ingredients.some((i) => i.tcs && !i.archived));
 
@@ -428,7 +492,7 @@
       text(rec.stockT, U.fmtG(b.remainingG) + ' left of ' + U.fmtG(b.cookedG));
 
       // facts
-      text(rec.ddLast, U.isNum(b.lastTempF) ? fmtF(b.lastTempF) + ', ' + agoText(now - b.lastTempAt) : 'No reading yet');
+      text(rec.ddLast, U.isNum(b.lastTempF) ? fmtF(b.lastTempF) + ', ' + agoText(now - b.lastTempAt) + (lastCheckBy(b.id) ? ', checked by ' + lastCheckBy(b.id) : '') : 'No reading yet');
       text(rec.ddSince, U.fmtTime(b.enteredAt));
       // Serve-by time with the kind of limit it is: quality (house limit, held at temperature) or safety (time as a health control).
       const coolingNow = b.kind === 'cooling';
@@ -558,7 +622,12 @@
     function saveReading(rec) {
       const b = batchOf(rec.id); if (!b) { closeEditor(rec, false); return; }
       const f = rec.ed.stepper.getValue(), mode = rec.mode;
-      const res = run(mode === 'reheat' ? 'reheatBatch' : 'logTemp', { batchId: b.id, tempF: f });
+      // Initials are asked once on this tablet; the reading is then saved with them.
+      askWho(null, 'Save reading', (who) => saveReadingAs(rec, b, f, mode, who));
+    }
+    // Saves the reading with the given initials and shows the plain-words result.
+    function saveReadingAs(rec, b, f, mode, who) {
+      const res = run(mode === 'reheat' ? 'reheatBatch' : 'logTemp', who ? { batchId: b.id, tempF: f, who } : { batchId: b.id, tempF: f });
       if (res.report !== 'ok') {
         U.clear(rec.ed.err); rec.ed.err.append(ico('alert-circle', 20), h('span', null, say(res))); setHidden(rec.ed.err, false);
         return;
@@ -601,10 +670,13 @@
         ],
         // Discards through the engine; the toast offers Undo and the waste is counted under the reason.
         onConfirm: (sh) => {
-          const res = run('discardBatch', { batchId: b.id, reason });
           sh.close('confirm');
-          if (res.report === 'ok') { undoToast(label + ' discarded. ' + U.fmtG(res.info && res.info.g) + ' counted as waste.', 'ok'); update(nowMs()); }
-          else toast(say(res), 'warn');
+          // Initials are asked once on this tablet; the discard is then logged with them.
+          setTimeout(() => askWho(opener, 'Discard batch', (who) => {
+            const res = run('discardBatch', who ? { batchId: b.id, reason, who } : { batchId: b.id, reason });
+            if (res.report === 'ok') { undoToast(label + ' discarded. ' + U.fmtG(res.info && res.info.g) + ' counted as waste.', 'ok'); update(nowMs()); }
+            else toast(say(res), 'warn');
+          }), 60);
         },
       });
       // Keeps the Discard batch button off until a reason is chosen.
@@ -612,19 +684,6 @@
       paint();
     }
     // Explains the two-stage cooling rule and, on confirm, moves the whole batch into cooling.
-    // Browser-storage key for the initials typed when a batch is kept serving; remembered per tablet.
-    const KEY_WHO = 'smokebox.v1.initials';
-    // Initials stay on the tablet for 2 hours of the app clock after their last use, so a shared tablet does not carry one person's name into the next shift.
-    const WHO_IDLE_MS = 2 * 3600e3;
-    // The remembered initials, or empty when none are saved or they have sat idle for more than 2 hours.
-    function savedWho() {
-      const v = U.storage.get(KEY_WHO, null);
-      if (!v || typeof v !== 'object' || typeof v.who !== 'string' || !U.isNum(v.at)) return '';
-      const age = nowMs() - v.at;
-      return age >= 0 && age <= WHO_IDLE_MS ? v.who : '';
-    }
-    // Remembers the initials just used, with the time of use.
-    function saveWho(who) { U.storage.set(KEY_WHO, { who, at: nowMs() }); }
     // The initials box for a confirm dialog: prefilled from the tablet's memory, with a "Not FW?" link that clears it.
     // The confirm button reads "<verb> as FW" and stays disabled while the box is empty.
     function whoField(dl, verb) {
@@ -824,6 +883,7 @@
       const s = st();
       const feed = SB.deadlines.build(s, now);
       feedByBatch = new Map(feed.filter((d) => d.kind === 'expiry').map((d) => [d.batchId, d]));
+      paintWho();
       const live = s.batches.filter((b) => b.status !== 'discard' && b.remainingG > 0).sort((a, b) => a.enteredAt - b.enteredAt || (a.id < b.id ? -1 : 1));
       reconcile(grid, cards, live, (b) => b.id, makeCard, null);
       let check = 0, act = 0;
@@ -1353,11 +1413,17 @@
       h('h3', { class: 'fs-h' }, 'Stock'),
       h('p', { class: 'fs-sub' }, cookOn() ? 'Par and 86 levels are starter estimates. Cooked meat and cold sides live in the hold cabinet, so they are added as batches.' : 'Par and 86 levels are starter estimates.'),
       stockList, cookOn() ? safetyNote() : null);
-    sheet.body.append(h('div', { class: 'bd' }, h('div', { class: 'bd-cols' }, menuBox, stockBox), syncBox));
+    // With no dishes yet there is nothing to mark sold out: one friendly line and the one next step.
+    const noDishBtn = h('button', { type: 'button', class: 'btn btn-primary', onClick: () => closeThen(sheet, () => SB.sheets.open('dishes')) }, ico('plus', 20), h('span', null, 'Add your first dish'));
+    const noDishBox = h('div', { class: 'empty bd-nodishes', hidden: true }, ico('ban', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your first dish. Then you can mark it sold out here, and Smokebox marks it for you when stock runs low.'), noDishBtn);
+    const bdCols = h('div', { class: 'bd-cols' }, menuBox, stockBox);
+    sheet.body.append(h('div', { class: 'bd' }, noDishBox, bdCols, syncBox));
 
+    // Repaints the dish rows and stock rows, and swaps in the no-dishes message when the menu is empty.
     function update(now) {
       const s = st();
       const menu = s.menu.filter((m) => !m.archived);
+      setHidden(noDishBox, menu.length > 0); setHidden(bdCols, menu.length === 0); setHidden(syncBox, menu.length === 0);
       // categories keep a stable order; a category appears the first time one of its items does
       const order = C.categories.map((c) => c.id);
       menu.forEach((m) => { if (order.indexOf(m.cat) < 0) order.push(m.cat); });
@@ -1750,7 +1816,7 @@
         helpItem('plus', 'Send a ticket', 'Tap New ticket, tap the items, tap Send to kitchen. Four lines take fewer than ten taps.'),
         helpItem('check', 'Tap an item to work it', 'Tap an item row. A one-step item is done on that tap. A two-step item starts on the first tap, counts down from its usual cooking time, and finishes on the second.'),
         helpItem('bell', 'Check it', 'When a dish reaches its usual cooking time, its row flashes Check it (and chimes if Sound is on). Smokebox never marks a dish done for you: look at the food, then tap the row.'),
-        helpItem('arrow-right', 'The line under each ticket', 'Says what to do next, such as Tap START on Hush puppies. You can turn it off in Settings.'),
+        helpItem('arrow-right', 'The line under each ticket', 'Says what to do next, such as Tap Start on a dish. You can turn it off in Settings.'),
         helpItem('check-circle', 'All done here', 'Finishes every item your station still has on that ticket.'),
         helpItem('zap', 'Start now', 'Starts a waiting item before its planned time. Waiting items are dimmed and show Start in 2:08, so the slow dishes start first and the whole order finishes together.'),
         helpItem('receipt', 'Bump', 'Sends the ticket out when everything is done. If items are not done, Smokebox asks first.'),
@@ -2020,7 +2086,7 @@
 
     // Sound: the chime on a new ticket and the beeps when a dish needs checking. It lives in the board module, so it is optional here.
     const floorOk = !!(SB.floor && typeof SB.floor.setSound === 'function');
-    const soundTog = SB.ui.toggle({ label: 'Chime for new tickets, dishes to check and batch warnings', checked: floorOk ? !!SB.floor.sound() : false, disabled: !floorOk, onChange: (on) => { if (floorOk) SB.floor.setSound(on); } });
+    const soundTog = SB.ui.toggle({ label: cookOn() ? 'Chime for new tickets, dishes to check and batch warnings' : 'Chime for new tickets and dishes to check', checked: floorOk ? !!SB.floor.sound() : false, disabled: !floorOk, onChange: (on) => { if (floorOk) SB.floor.setSound(on); } });
     // Loudness of this tablet's warnings (20 to 100 percent); the sound switch above is the way to silence.
     const volIn = h('input', { type: 'range', min: '20', max: '100', step: '10', value: String(Math.round((floorOk && SB.floor.volume ? SB.floor.volume() : 1) * 100)), 'aria-label': 'Warning loudness on this tablet', class: 'mn-volume', disabled: !floorOk });
     volIn.addEventListener('change', () => { if (floorOk && SB.floor.setVolume) SB.floor.setVolume(Number(volIn.value) / 100); });
@@ -2068,7 +2134,7 @@
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
       settingBlock('Text size', 'Large makes everything 20 percent bigger.', textSeg),
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
-      settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap START on Hush puppies.', hintsTog),
+      settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap Start on a dish.', hintsTog),
       settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
       settingBlock('Voice call-outs', 'A chef calls the line out loud. Light: "Fire brisket now! Ticket 12!" and "Ticket 12 is up! Ring it out!". Normal: adds "Order up!" for new tickets and one reminder if a dish is not started or a ticket not rung out. Full: keeps reminding until you start the dish or ring out the ticket. At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Not tried on a real tablet yet.', coTog, levelSeg),

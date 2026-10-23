@@ -209,6 +209,7 @@
       onClose: () => { if (built) built.teardown(); },
     });
     built = buildOrder({ body: sheet.body, footer: sheet.footer, el: sheet.el, close: sheet.close, isPage: false }, opts);
+    SB.ui.sheetHelp(sheet, 'taking-an-order', 'taking an order');
     return sheet;
   }
 
@@ -221,7 +222,7 @@
     const page = h('div', { class: 'ord-page', dataset: { name: 'order' } });
     // The page's own back button asks first when the order has items, like Esc does.
     const backBtn = h('button', { type: 'button', class: 'btn btn-ghost ord-page-back', 'aria-label': 'Back to the board' }, ico('chevron-left', 22), h('span', null, 'Board'));
-    const bar = h('header', { class: 'ord-page-bar' }, backBtn, h('h1', { class: 'ord-page-title' }, 'New ticket'));
+    const bar = h('header', { class: 'ord-page-bar' }, backBtn, h('h1', { class: 'ord-page-title' }, 'New ticket'), SB.guide && SB.guide.link ? SB.guide.link('taking-an-order', 'taking an order') : null);
     const body = h('div', { class: 'sheet-body ord-host' }), footer = h('footer', { class: 'sheet-foot' });
     page.append(bar, body, footer);
     host.appendChild(page);
@@ -289,7 +290,12 @@
     menuPane.append(sticky, combosEl, tilesEl, noMatch);
 
     /* combos */
-    C.combos.forEach((cb) => {
+    // A combo only appears when every dish in it is on this kitchen's menu (a blank or own-menu kitchen shows none).
+    // True when the dish with this id is on the menu and not archived.
+    const comboDishLive = (id) => st().menu.some((x) => x.id === id && !x.archived);
+    const combosNow = C.combos.filter((cb) => cb.lines.every((ln) => comboDishLive(ln.menu)));
+    setHidden(combosEl, combosNow.length === 0);
+    combosNow.forEach((cb) => {
       // Combo price from today's menu prices, so an edited price shows at once.
       const total = () => cb.lines.reduce((s, ln) => { const mi = menuById(ln.menu); return s + (mi ? mi.price * ln.qty : 0); }, 0);
       const n = cb.lines.reduce((s, ln) => s + ln.qty, 0);
@@ -329,8 +335,9 @@
 
     // A kitchen with no dishes yet gets a friendly first step instead of a blank menu: the same setup wizard the welcome card opens.
     if (!menuNow.length) {
+      setHidden(sticky, true); // no search box or category tabs for a menu with nothing in it
       const firstDish = h('button', { type: 'button', class: 'btn btn-primary ord-first-dish' }, ico('plus', 20), h('span', null, 'Add your first dish'));
-      firstDish.addEventListener('click', () => { host.close('setup'); try { SB.sheets.open('wizard'); } catch (e) { console.error('[smokebox] setup failed', e); } });
+      firstDish.addEventListener('click', () => { host.close('setup'); try { SB.sheets.open('dishes'); } catch (e) { console.error('[smokebox] setup failed', e); } });
       tilesEl.appendChild(h('div', { class: 'empty ord-nodishes' }, ico('receipt', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your first dish and it shows up here, ready to tap.'), firstDish));
     }
 
