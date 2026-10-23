@@ -32,4 +32,4 @@ There is no undo. To go back, restore the backup file. Left-over old demo ticket
 
 ## Erasing
 
-The Danger zone has **Erase live data** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either.
+The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either.

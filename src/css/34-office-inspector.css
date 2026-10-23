@@ -9,6 +9,8 @@
 .si-table { width: 100%; border-collapse: collapse; font-size: var(--fs-2); }
 .si-table th, .si-table td { padding: 6px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft, var(--line)); }
 .si-corr { font-style: italic; }
+.si-fact { color: var(--ink3); font-size: var(--fs-2); }
+.si-notcovered { color: var(--ink3); }
 .si-preview { overflow-x: auto; }
 @media print {
   body:has(.sb-printroot) > *:not(.sb-printroot) { display: none !important; }

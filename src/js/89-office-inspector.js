@@ -15,9 +15,9 @@
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const KIND = {
     temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
-    sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
+    batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
   };
-  const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other' };
+  const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit' };
 
   // ---- 1. Pure rows ----
 
@@ -42,11 +42,59 @@
       case 'temp_logged': return (isNum(e.f) ? U.tempText(e.f) : '') + (lateWords(e) ? ', ' + lateWords(e) : '');
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
       case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '');
+      case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
       case 'cooling_started': return isNum(e.g) ? U.weightText(e.g) : '';
       case 'sanitize_done': return lateWords(e);
       case 'quality_extend': return isNum(e.until) ? 'Until ' + U.fmtTime(e.until) : '';
       default: return e.note || '';
     }
+  }
+
+  // How long a span is, in plain words: "45 min" under two hours, else "2.5 h".
+  function spanWords(ms) {
+    const min = Math.max(0, Math.round(ms / 60000));
+    return min < 120 ? min + ' min' : Math.round(min / 6) / 10 + ' h';
+  }
+
+  // The plain facts about the batch an entry is about: when it was made, days since for cold food, and for cooling
+  // the readings so far against the owner's own cooling limits. Words only, never a rule; empty when the batch is gone.
+  function factsOf(state, e) {
+    const b = (state.batches || []).find((x) => x && x.id === e.batchId);
+    if (!b || !isNum(b.enteredAt)) return [];
+    const out = [];
+    const made = isNum(b.coolStartAt) ? b.coolStartAt : b.enteredAt;
+    const S = (state.settings || {}).safety || {};
+    if (b.kind === 'cooling') {
+      out.push('Cooling began ' + U.fmtDateShort(U.dateKey(made)) + ' ' + U.fmtTime(made));
+      if (isNum(e.t) && e.type === 'temp_logged' && e.t >= made) out.push(spanWords(e.t - made) + ' into cooling');
+      const c = S.cooling || {};
+      if (isNum(c.stage1ToF) && isNum(c.stage1H) && isNum(c.finalF) && isNum(c.totalH)) out.push('Your limit: ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' h, ' + U.tempText(c.finalF) + ' within ' + c.totalH + ' h');
+      if (e.type === 'cooling_started') return out.concat(readingsOf(b, made));
+      return out;
+    }
+    out.push(b.fridge && b.madeOn ? 'Made ' + madeWords(b.madeOn) : 'Made ' + U.fmtDateShort(U.dateKey(b.enteredAt)) + ' ' + U.fmtTime(b.enteredAt));
+    if (b.fridge) {
+      if (isNum(b.fridgeDays) && b.madeOn) out.push('Your fridge limit: ' + b.fridgeDays + ' ' + U.plural(b.fridgeDays, 'day', 'days') + ', last day ' + madeWords(U.addDays(b.madeOn, b.fridgeDays - 1)));
+      const ci = isNum(e.t) && SB.engine && SB.engine.coldInfo ? SB.engine.coldInfo(b, e.t) : null;
+      const outMs = isNum(e.outMs) ? e.outMs : ci ? ci.outMs : isNum(b.lineMs) ? b.lineMs : null;
+      if (isNum(outMs)) out.push('Out of the fridge so far: ' + spanWords(outMs) + (isNum(b.outHours) ? ' (your limit ' + b.outHours + ' h)' : ''));
+      return out;
+    }
+    if (b.kind === 'cold' && isNum(e.t) && e.t >= b.enteredAt) {
+      const days = Math.floor((e.t - b.enteredAt) / 86400e3);
+      out.push(days + ' ' + U.plural(days, 'day', 'days') + ' in the fridge');
+    }
+    if (isNum(b.maxHoldH) && (e.type === 'batch_discard' || e.type === 'quality_extend')) out.push('Your limit: ' + U.plural(b.maxHoldH, b.maxHoldH + ' hour', b.maxHoldH + ' hours'));
+    return out;
+  }
+
+  // A made-on day key as short words, like "Sat 10/17".
+  function madeWords(key) { return U.fmtDateShort(key); }
+
+  // The cooling readings of a batch as short words, oldest first, at most six.
+  function readingsOf(b, from) {
+    const t = (b.temps || []).filter((r) => r && isNum(r.t) && isNum(r.f)).slice(0, 6);
+    return t.length ? ['Readings: ' + t.map((r) => U.fmtTime(r.t) + ' ' + U.tempText(r.f) + ' (' + spanWords(r.t - from) + ')').join(', ')] : [];
   }
 
   // Safety log rows from `from` up to (not including) `to`, oldest first:
@@ -55,7 +103,7 @@
     if (!state || !SB.engine || !SB.engine.safetyLog) return [];
     const rows = SB.engine.safetyLog(state).filter((r) => r.event.type !== 'safety_correction' && isNum(r.event.t) && r.event.t >= from && r.event.t < to);
     return rows.map((r) => ({
-      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), who: r.event.who || '',
+      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), facts: factsOf(state, r.event), who: r.event.who || '',
       corrections: r.corrections.map((c) => ({ at: c.t, who: c.who || '', note: c.note || '' })),
     }));
   }
@@ -72,7 +120,7 @@
     return { from: at(first), to: at(next), label: r.days === 1 ? U.fmtDateShort(today) : U.fmtDateShort(first) + ' to ' + U.fmtDateShort(today) };
   }
 
-  O.inspectorPure = { inspectorRows, rangeFor, RANGES };
+  O.inspectorPure = { inspectorRows, factsOf, rangeFor, RANGES };
   if (!g.document) return; // Node: the pure rows are all the tests need
 
   // ---- 2. The sheet and printing ----
@@ -84,12 +132,15 @@
   // Builds the printable table for a window as an element (used for both the preview and the print block).
   function recordTable(rows) {
     const body = rows.map((r) => h('tr', null,
-      h('td', null, U.fmtDateShort(U.dateKey(r.at)) + ' ' + U.fmtTime(r.at)), h('td', null, r.kind), h('td', null, r.food), h('td', null, r.detail), h('td', null, r.who || 'not recorded'),
+      h('td', null, U.fmtDateShort(U.dateKey(r.at)) + ' ' + U.fmtTime(r.at)), h('td', null, r.kind), h('td', null, r.food), h('td', null, r.detail, (r.facts || []).map((f) => h('div', { class: 'si-fact' }, f))), h('td', null, r.who || 'not recorded'),
       h('td', null, r.corrections.map((c) => h('div', { class: 'si-corr' }, 'Correction ' + U.fmtDateShort(U.dateKey(c.at)) + ' ' + U.fmtTime(c.at) + (c.who ? ' by ' + c.who : '') + ': ' + c.note)))));
     return h('table', { class: 'si-table' },
       h('thead', null, h('tr', null, ['When', 'What', 'Food', 'Detail', 'Logged by', 'Corrections added later'].map((t) => h('th', null, t)))),
       h('tbody', null, body.length ? body : h('tr', null, h('td', { colspan: 6 }, 'No safety entries in this range.'))));
   }
+
+  // The honest line about what this record does not hold, so nobody reads it as the whole paperwork.
+  const NOT_COVERED = 'This record covers batches only. It has no cooler or freezer readings, sanitizer strip readings or thermometer checks; keep those on your own sheet and ask your health department what to keep and for how long.';
 
   // Opens the sheet: pick a date range, see the record, print it.
   function openInspectorLog() {
@@ -112,6 +163,7 @@
     const doPrint = () => printRecord(rangeId);
     sheet.body.append(
       h('p', { class: 'si-lead' }, 'This is your own record of readings, reheats, cooling, sanitize rounds and thrown-out food. It is not an inspection result. Entries are never edited; if something was wrong, a correction is added under it.'),
+      h('p', { class: 'si-lead si-notcovered' }, NOT_COVERED),
       h('div', { class: 'si-actions' }, h('label', null, 'Range ', sel), h('button', { type: 'button', class: 'btn btn-primary', onClick: doPrint }, 'Print')), preview);
     paint();
     return sheet;
@@ -129,6 +181,7 @@
       h('p', { class: 'si-note' }, 'The owner\'s own record of what was logged in this kitchen. It is not an inspection result. Entries are never edited; corrections are added under the entry they correct.'),
       demo ? h('p', { class: 'si-note' }, 'This is a demo kitchen, so these entries are demo entries.') : null,
       recordTable(rows),
+      h('p', { class: 'si-note' }, NOT_COVERED),
       h('p', { class: 'si-note' }, 'Printed ' + U.fmtDateShort(U.dateKey(Date.now())) + ' ' + U.fmtTime(Date.now()) + '. Reviewed by: ______________   Date: ________'));
     document.body.appendChild(root);
     // Removes the print-only block once the print dialog is done (or at once when printing is unavailable).
