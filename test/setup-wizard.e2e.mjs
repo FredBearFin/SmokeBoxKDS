@@ -143,6 +143,9 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.click('[data-act=log-first-batch]'); await page.waitForTimeout(600);
   check('Log a first batch opens the cabinet on the new batch form with Brisket', await page.locator('.hc-form .hc-prod').isVisible() && await page.locator('.hc-form .hc-prod:has-text("Brisket")').count() === 1);
   await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(400);
+  // The later steps use a dish called Coleslaw: make sure it is on the menu (the example menu once supplied it).
+  await page.evaluate(() => { const s = SB.store.getState(); const have = s.menu.find((x) => x.name === 'Coleslaw'); if (!have) SB.store.dispatchEx('addMenuItem', { name: 'Coleslaw', zone: 'cold', cat: 'cold', price: 3, prepSec: 60, track: 'one' }, { source: 'ui' }); else if (have.archived) SB.store.dispatchEx('updateMenuItem', { id: have.id, patch: { archived: false } }, { source: 'ui' }); });
+  await page.waitForTimeout(300);
   // A cold item end to end: set up with days and hours out, make a batch, Take out, Put back, Undo (A1's cabinet card).
   await page.evaluate(() => SB.sheets.open('cookahead')); await page.waitForTimeout(400);
   const csh = '.sheet:has-text("Cooked-ahead food")';

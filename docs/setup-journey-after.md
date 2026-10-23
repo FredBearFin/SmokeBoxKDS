@@ -246,3 +246,17 @@ Built on A5's cold-item fields (`night/a5-r14`: `fridge`, `fridgeDays` 1 to 30 w
 - **Re-runs not done in round 13:** first-time-owners (0 page errors for all three owners) and second-run (12 of 12 checks).
 
 Not checked: a real tablet; showing the "made on" date or the limits anywhere other than the form and list (batch screens are A1's); what a health department's limits look like in practice (no numbers were chosen).
+
+## Round 15: final checks (branch night/a2-r15)
+
+- **Real flows added to the tests.** `test/serve.e2e.mjs` now runs counter service end to end (counter on, an order paid in cash, the ticket is finished at once and no slip is left on the board; counter off, the same order leaves a ticket). `test/setup-wizard.e2e.mjs` now runs a cold item end to end with the cabinet card: create "Chicken salad" with 3 days and 2 hours out, make a batch (it copies the limits and a made-on date), see the fridge date and the 2 h limit on the card, Take out (initials asked once), Put back, then Undo. The wizard test has 60 checks.
+- **Sweep of every screen I own** at 390x844, 768x1024, 1024x768 and 1920x1080 in Day, Night and Large text (216 screens, plus the bottom of each long sheet at the smallest and widest sizes; shots in `docs/ux-shots/night/a2/audit/`). The audit found nothing small, clipped or scrolling sideways. Reading the pictures by eye, I found and fixed:
+  1. The dish name box example was "Brisket plate" and the cooked-ahead example was "Brisket": barbecue words in a neutral kitchen. Now "House salad" and "Soup".
+  2. The Fryer station tile said "Fryer" twice (title and hint). Now "Fried foods".
+  3. The example menu (hidden fold) was barbecue dishes with made-up prices. Now Chicken plate, Club sandwich, Mac and cheese, Green beans, French fries, Onion rings, Coleslaw, Iced tea.
+  4. The "Set up this tablet" help line showed two bare round "?" icons side by side. Each now has words ("setting up", "no sound").
+  5. The Try the demo sheet repeated "Try the demo" as its title and again as a heading. The heading is gone.
+  6. At 1920 wide the Dishes sheet was narrow and the Remove button wrapped to a second line. The sheet is wider (880 px).
+  7. The "Full menu editor (ingredients, prep times)" button wrapped with its icon off to one side. Shortened to "Full menu editor".
+- **Seen but not mine:** the "Tap here to turn on warning sounds" bar is the biggest thing on the first-run phone screen (A1's board); the "Sanitize not logged" button appears as soon as cooking ahead is on (A1's board).
+- **Final journey numbers (re-run):** A 13 taps / 6 typed fields / about 1.4 min; D (one station) 10 taps; E (cook-ahead) 14 taps / 3 typed fields / about 0.9 min. See `docs/setup-timing.md`. `docs/try-this-first.md` now has steps 11 to 16 for How you serve, counter service, cold items, the PIN recovery code, Start over and the import cents choice.

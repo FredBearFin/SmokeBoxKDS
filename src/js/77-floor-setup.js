@@ -23,7 +23,9 @@
     const list = h('div', { class: 'setup-list' });
     // A small "?" help line at the top: the guide pages about setting up and about sound trouble, when the guide is in this build.
     const gl = SB.guide && typeof SB.guide.link === 'function' ? [SB.guide.link('getting-started', 'setting up'), SB.guide.link('troubleshooting', 'no sound')].filter(Boolean) : [];
-    if (gl.length) list.appendChild(h('p', { class: 'fs-sub' }, 'Help: ', ...gl.flatMap((a, i) => (i ? [' · ', a] : [a]))));
+    // Each help link gets words beside its round ? so it is clear what it opens.
+    const glWords = ['setting up', 'no sound'];
+    if (gl.length) list.appendChild(h('p', { class: 'fs-sub' }, 'Help: ', ...gl.flatMap((a, i) => [i ? '   ' : '', glWords[i] + ' ', a])));
     // Adds one checklist step: a title, plain words, an optional button and a status line.
     function step(title, words, action) {
       const status = h('p', { class: 'fs-sub', role: 'status' });
@@ -95,14 +97,14 @@
   // Section names that fit each station best, in the old and the new starter names (lower case).
   const SECTION_WORDS = { pit: ['meats', 'mains'], sides: ['hot sides', 'sides'], fry: ['fried', 'snacks'], cold: ['cold and drinks', 'drinks'] };
   // A short plain line under each station name on its tile.
-  const ZONE_HINT = { pit: 'Grill, oven or main line', sides: 'Prep and sides', fry: 'Fryer', cold: 'No cooking: drinks, cold items' };
+  const ZONE_HINT = { pit: 'Grill, oven or main line', sides: 'Prep and sides', fry: 'Fried foods', cold: 'No cooking: drinks, cold items' };
   // The example menu. Columns: name, price in dollars, station id, category id. Made-up prices, owner to replace.
   // audit:data-start
   const EXAMPLES = [
-    ['Pulled pork plate', 12.5, 'pit', 'meat'], ['Brisket sandwich', 11, 'pit', 'sandwich'],
-    ['Mac and cheese', 4.5, 'sides', 'side'], ['Baked beans', 3.5, 'sides', 'side'],
-    ['Fried pickles', 6, 'fry', 'fried'], ['Hush puppies', 5, 'fry', 'fried'],
-    ['Coleslaw', 3, 'cold', 'cold'], ['Sweet tea', 3, 'cold', 'cold'],
+    ['Chicken plate', 12.5, 'pit', 'meat'], ['Club sandwich', 11, 'pit', 'sandwich'],
+    ['Mac and cheese', 4.5, 'sides', 'side'], ['Green beans', 3.5, 'sides', 'side'],
+    ['French fries', 4.5, 'fry', 'fried'], ['Onion rings', 5.5, 'fry', 'fried'],
+    ['Coleslaw', 3, 'cold', 'cold'], ['Iced tea', 3, 'cold', 'cold'],
   ];
   // audit:data-end
 
@@ -248,7 +250,7 @@
   }
   // The body of the Demo sheet in a real kitchen: what the demo is, and one button that opens it.
   function demoIntro() {
-    return h('div', { class: 'dm' }, h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Try the demo'),
+    return h('div', { class: 'dm' }, h('section', { class: 'fs-section' },
       h('p', { class: 'fs-sub' }, 'A demo kitchen with a sample menu, sample tickets and a crew that sends orders, so you can see Smokebox busy. Nothing in it is your kitchen, and nothing you do there reaches your real dishes, orders or numbers.'),
       h('p', { class: 'fs-sub' }, 'A bar at the top of every demo screen says so and has a Back to my kitchen button. Leaving erases the demo.'),
       // Opens the demo after the plain-words question.
@@ -259,13 +261,13 @@
 
   // Opens "Dishes and prices": the add form on top, the dishes added so far, and a small fold of extra ways to start.
   function openDishes() {
-    const sheet = SB.ui.sheet({ title: 'Dishes and prices', side: 'right', width: 'min(720px, 96vw)', name: 'dishes', onClose: () => offs.splice(0).forEach((f) => f()) });
+    const sheet = SB.ui.sheet({ title: 'Dishes and prices', side: 'right', width: 'min(880px, 96vw)', name: 'dishes', onClose: () => offs.splice(0).forEach((f) => f()) });
     const offs = [];
     const root = h('div', { class: 'dp' });
     const lead = h('p', { class: 'fs-sub dp-lead' });
 
     // The form: name, price, where it is made. Station tiles are big buttons that behave like radio buttons.
-    const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Brisket plate', autocapitalize: 'words', spellcheck: 'false', enterkeyhint: 'next' });
+    const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'House salad', autocapitalize: 'words', spellcheck: 'false', enterkeyhint: 'next' });
     const nameField = SB.ui.field({ label: 'What is it called?', control: nameIn });
     const priceIn = h('input', { class: 'input dp-price', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '12.50' });
     const priceField = SB.ui.field({ label: 'Price in dollars', control: priceIn });
@@ -655,7 +657,7 @@
 
     // Links to the other small settings and to the full menu editor in the back office.
     const shopBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('shop'), 60); } }, ico('sliders', 20), h('span', null, 'Tax, hours and PIN'));
-    const fullBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); } }, ico('gauge', 20), h('span', null, 'Full menu editor (ingredients, prep times)'));
+    const fullBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); } }, ico('gauge', 20), h('span', null, 'Full menu editor'));
     root.append(lead, form, dishesHead, undoBar, listBox, goneFold, caBox, svBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
     sheet.body.appendChild(root); keepInView(root);
 
@@ -675,7 +677,7 @@
   function openCookAhead(opts) {
     const editing = opts && opts.id ? SB.store.getState().ingredients.find((i) => i.id === opts.id && i.tcs) : null;
     const sheet = SB.ui.sheet({ title: editing ? 'Edit cooked-ahead food' : 'Cooked-ahead food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
-    const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Brisket' });
+    const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Soup' });
     const nameField = SB.ui.field({ label: 'What do you cook ahead?', control: nameIn });
     const kind = SB.ui.segmented({ label: 'Is it kept hot or cold?', value: 'hot', options: [{ id: 'hot', label: 'Hot' }, { id: 'cold', label: 'Cold' }],
       // Shows the boxes that fit hot or cold food.

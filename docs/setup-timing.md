@@ -1,6 +1,6 @@
 # Setup timing summary (SCRIPTED, not human)
 
-Every number here comes from `ux-scripts/setup-journey.mjs` driving the built app in headless Chromium at 1280x800 from an empty browser. **No person did this, and nothing was tried on a real tablet.** Modeled time = 1.2 s per tap + 3 s per typed field + 0.25 s per character typed + 4 s of reading each new screen. A real first-timer will be slower: this is a best case with no hesitation, typos or wrong turns. Measured on the merged build e7e9c93 plus round 8.
+Every number here comes from `ux-scripts/setup-journey.mjs` driving the built app in headless Chromium at 1280x800 from an empty browser. **No person did this, and nothing was tried on a real tablet.** Modeled time = 1.2 s per tap + 3 s per typed field + 0.25 s per character typed + 4 s of reading each new screen. A real first-timer will be slower: this is a best case with no hesitation, typos or wrong turns. Re-measured in round 15 on the final build (night/a2-r15): the numbers did not change from round 8 even with the new questions and screens, because every new card is optional and the script skips them.
 
 | Path | Taps | Typed fields | Characters | Screens read | Modeled time |
 |---|---|---|---|---|---|
@@ -27,3 +27,11 @@ Do this on the real tablet, from a freshly cleared browser (Settings, site data,
 6. Record on one line each: `person, device, total m:ss, lap1, lap2, lap3, lap4, wrong taps, questions asked, words they did not understand`.
 7. Targets to compare: three dishes under 2:00; fresh start to first paid ticket under 10:00. Anything over target, write which lap it was in.
 8. Also time "come back the next day": reload, then change a dish price. Expect under 30 seconds.
+
+## Round 15 additions (still scripted, not human)
+
+- **Optional cards cost nothing when skipped.** The "How do you serve?" question and the "Do you cook food ahead?" question sit under the dishes; the journey script never taps them, so runs A, D and E are unchanged (13, 10 and 14 taps). Answering "How do you serve?" is one tap; answering the cook-ahead question No or Not sure is one tap.
+- **Screens read at four sizes** (390x844, 768x1024, 1024x768, 1920x1080) in Day, Night and Large text: 216 screens with no small, clipped or sideways-scrolling items.
+- **Four other kitchens** (pizza, bakery, taco truck, bar) each reach a first paid ticket with no barbecue words on the screens the owner works in.
+- **Still to time with a person:** everything above. See the checklist in this file and `docs/try-this-first.md`, steps 1 to 16.
+
