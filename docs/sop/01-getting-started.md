@@ -12,7 +12,7 @@ Change dishes and prices later: tap **Settings** (the three-line button at the t
 
 The arrow buttons beside each dish change the order they appear in. The menu section list on a dish's row moves it to another menu section.
 
-Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything. New menu sections in the file? Tap **Add these sections**.
+Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything, and says which columns it ignored. New menu sections in the file? Tap **Add these sections**.
 
 ## 2. Set your tax and hours
 

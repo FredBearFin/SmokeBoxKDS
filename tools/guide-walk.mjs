@@ -195,6 +195,9 @@ async function settings(browser) {
   await p.evaluate(() => SB.shell.setPin('1234')); await p.waitForTimeout(300);
   await tap(p, 'Back office'); await p.waitForTimeout(1000);
   for (const t of ['Manager PIN', 'Forgot the PIN?']) check('pin pad: ' + t, await seen(p, t));
+  await p.evaluate(() => { const d = [...document.querySelectorAll('details')].find((x) => /Forgot the PIN/.test(x.textContent)); if (d) d.open = true; });
+  await p.waitForTimeout(300);
+  for (const t of ['Recovery code', 'Reset the PIN with my code']) check('pin pad: ' + t, await has(p, t) || await p.evaluate((t) => [...document.querySelectorAll('input, button')].some((e) => e.getClientRects().length && ((e.getAttribute('aria-label') || '') + (e.placeholder || '') + e.textContent).indexOf(t) >= 0), t));
   await p.evaluate(() => SB.shell.setPin(''));
   await p.close();
   const q = await fresh(browser);
@@ -319,6 +322,24 @@ async function recipes(browser) {
   await p.close();
 }
 
+// Setting a PIN shows the recovery code once: Copy, Print, "I saved it", then Done.
+async function pinCode(browser) {
+  console.log('PIN recovery code');
+  const p = await fresh(browser);
+  await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  await p.click('button.fl-menu'); await p.waitForTimeout(400);
+  check('settings: Tax, hours and PIN', await tap(p, 'Tax, hours and PIN')); await p.waitForTimeout(500);
+  await p.fill('.sheet-root:last-of-type input[aria-label*="PIN"]', '1234');
+  await tap(p, 'Set PIN'); await p.waitForTimeout(900);
+  const rc = '.sheet-root:last-of-type';
+  for (const t of ['Write down your recovery code', 'Copy', 'Print', 'I saved it', 'Done']) check('recovery code: ' + t, await has(p, t, rc));
+  const off = await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-root:last-of-type button')].find((e) => e.textContent.trim() === 'Done'); return !!b && b.disabled; });
+  check('recovery code: Done stays off until I saved it is selected', off);
+  await p.evaluate(() => document.querySelector('#rc-saved').click()); await p.waitForTimeout(200);
+  check('recovery code: Done works after the box is selected', await tap(p, 'Done')); await p.waitForTimeout(400);
+  await p.close();
+}
+
 // The demo walk: a fresh browser context opened with ?demo has sample dishes and tickets, and a normal tab in the same context stays empty.
 async function demoMode(browser) {
   console.log('Demo mode (?demo)');
@@ -334,7 +355,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);

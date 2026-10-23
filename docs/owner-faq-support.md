@@ -44,7 +44,7 @@ No. The demo is a barbecue kitchen. A new Smokebox is empty. You add your own di
 
 ## 11. I forgot my PIN. What now?
 
-There is no forgot-PIN button. The PIN keeps cooks out of the back office, and it is not strong security. The only way in is to clear the site's saved data in the browser, which erases everything on that device. Do that only if you have a backup. Use one made before the PIN was set, because a backup brings its PIN back.
+When you set a PIN, Smokebox shows a recovery code once. Keep it away from the tablet. On the PIN pad, Forgot the PIN? asks for the code and a new PIN. The PIN keeps cooks out of the back office and is not strong security. With no code, the only way in is to clear the site's saved data in the browser, which erases everything on that device, so do that only if you have a backup. A backup made after the PIN was set brings the PIN back.
 
 ## 12. Will I hear warnings when the tablet is asleep?
 

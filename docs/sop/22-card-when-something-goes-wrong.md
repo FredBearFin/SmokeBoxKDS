@@ -9,4 +9,4 @@ Print this card and keep it by the tablet.
 - [ ] Wrong ticket: cancel it with Void ticket in its small menu, and give a reason
 - [ ] Dish missing: check the 86 board and Dishes and prices
 - [ ] Opened empty: restore the last backup (Back office, Menu and settings)
-- [ ] Forgot the PIN: see Empty, lost or locked in the Guide. There is no reset button
+- [ ] Forgot the PIN: use your recovery code (Guide, Empty, lost or locked)

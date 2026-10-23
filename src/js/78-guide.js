@@ -44,7 +44,7 @@
      },
      {
       "t": "p",
-      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything. New menu sections in the file? Tap **Add these sections**."
+      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything, and says which columns it ignored. New menu sections in the file? Tap **Add these sections**."
      },
      {
       "t": "h",
@@ -375,7 +375,7 @@
      {
       "t": "ol",
       "x": [
-       "In **Dishes and prices**, find \"Do you cook any of this ahead and hold it?\" and tap **Yes, I cook ahead**. Then tap **Add a cooked-ahead item**.",
+       "In **Dishes and prices**, find \"Do you cook food ahead?\" and tap **Yes, I cook ahead**. The cooked-ahead sheet opens.",
        "Type what you cook ahead and choose Hot or Cold.",
        "Set how long it may stay. Set the limit your local health department gives you.",
        "Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.",
@@ -704,11 +704,15 @@
      },
      {
       "t": "p",
-      "x": "Smokebox has no forgot-PIN button. The PIN is a door latch kept on this device, not real security. Five wrong tries lock the pad for 30 seconds."
+      "x": "When you set a PIN, Smokebox shows a recovery code once. Tap **Copy** or **Print**, keep it away from the tablet, select **I saved it**, then tap **Done**. On the PIN pad, open **Forgot the PIN?**, type the recovery code and a new PIN (or leave it empty to remove the PIN), and tap **Reset the PIN with my code**. A PIN from before codes existed can get one: **Settings**, **Tax, hours and PIN**, **Make a recovery code**."
      },
      {
       "t": "p",
-      "x": "The only way back in is to clear this site's saved data in your browser settings. That erases everything Smokebox saved on this device, including today's tickets and your menu. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before the PIN was set."
+      "x": "No code? The only way back is to clear this site's saved data in your browser settings. That erases everything on this device, including today's tickets and your menu. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before the PIN was set."
+     },
+     {
+      "t": "p",
+      "x": "Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not real security."
      },
      {
       "t": "h",
@@ -930,7 +934,7 @@
        "Wrong ticket: cancel it with Void ticket in its small menu, and give a reason",
        "Dish missing: check the 86 board and Dishes and prices",
        "Opened empty: restore the last backup (Back office, Menu and settings)",
-       "Forgot the PIN: see Empty, lost or locked in the Guide. There is no reset button"
+       "Forgot the PIN: use your recovery code (Guide, Empty, lost or locked)"
       ]
      }
     ]
