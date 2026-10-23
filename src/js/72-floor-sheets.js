@@ -2048,8 +2048,8 @@
     const tourLink = h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', { class: 'grow' }, 'Show me how it works'), ico('chevron-right', 20));
     // Back office closes this sheet first, then opens the manager pages (the shell asks for the PIN if one is set).
     const officeLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'office' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({}); }) }, ico('gauge', 22), h('span', { class: 'grow' }, 'Back office'), ico('chevron-right', 20));
-    // Opens Menu and settings in the back office, where dishes, prices and prep times are edited.
-    const menuLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'menu-edit' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }) }, ico('sliders', 22), h('span', { class: 'grow' }, 'Edit the menu'), ico('chevron-right', 20));
+    // Opens Dishes and prices: add, rename, reprice or remove dishes without going to the back office.
+    const menuLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'menu-edit' }, onClick: () => closeThen(sheet, () => SB.sheets.open('dishes')) }, ico('sliders', 22), h('span', { class: 'grow' }, 'Dishes and prices'), ico('chevron-right', 20));
     const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },

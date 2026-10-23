@@ -475,7 +475,6 @@
     m.offs.push(joinLeadership());
     // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
     if (SB.discards) { SB.discards.persist(); setTimeout(() => { try { SB.discards.remind(); } catch (e) { /* optional */ } }, 4000); }
-    if (SB.setup) setTimeout(() => { try { SB.setup.offer(); } catch (e) { /* optional */ } }, 8000);
     if (SB.sim && SB.sim.live && typeof SB.sim.live.onChange === 'function') {
       try { const off = SB.sim.live.onChange(() => { if (m) updateHeader(store().now()); }); if (typeof off === 'function') m.offs.push(off); } catch (e) { /* the simulator is optional */ }
     }
@@ -1687,29 +1686,28 @@
   function buildWelcome() {
     m.wText = h('p', { class: 'fl-welcome-p' });
     // Opens the "Set up your kitchen" wizard; the card stays until the wizard is finished or it is closed.
-    m.wBlank = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'setup' }, onClick: () => openSheet('wizard') }, ico('sliders', 22), h('span', null, 'Set up your kitchen'));
+    m.wBlank = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'setup' }, onClick: () => openSheet('dishes') }, ico('plus', 22), h('span', null, 'Add more dishes'));
     // Starting the walkthrough also puts this card away for good.
     const tour = h('button', { type: 'button', class: 'btn btn-lg', dataset: { act: 'tour' }, onClick: () => { F.setWelcome(false); startTour(); } }, ico('play', 22), h('span', null, 'Show me how it works'));
     // The x puts the card away for good.
     const close = h('button', { type: 'button', class: 'btn btn-icon fl-welcome-x', 'aria-label': 'Hide this welcome', onClick: () => F.setWelcome(false) }, ico('x', 22));
     m.welcome = h('section', { class: 'fl-welcome', hidden: true, 'aria-labelledby': 'fl-welcome-h' },
       h('span', { class: 'fl-welcome-mark', 'aria-hidden': 'true' }, ico('flame', 34, { stroke: 1.8 })),
-      h('div', { class: 'fl-welcome-body' }, h('h2', { id: 'fl-welcome-h' }, 'Welcome to your kitchen screen'), m.wText,
+      h('div', { class: 'fl-welcome-body' }, h('h2', { id: 'fl-welcome-h' }, 'Your menu is ready'), m.wText,
         h('div', { class: 'fl-welcome-actions' }, m.wBlank, tour)),
       close);
     return m.welcome;
   }
-  // Shows or hides the welcome card. It shows on the All tab while tickets are on the board and it has not
-  // been dismissed. The empty-board button only appears when nothing but pretend tickets are on the board.
+  // Shows or hides the next-step card. It shows on the All tab once there is at least one dish, until the first
+  // ticket exists or someone closes it. With no dishes the empty board's own button does the job instead.
   function paintWelcome() {
     if (!m || !m.welcome) return;
-    const tickets = store().getState().tickets.filter((t) => t.status === 'active');
-    const demoOnly = tickets.length > 0 && tickets.every((t) => t.src === 'demo');
-    const show = !welcomeDone() && m.zone === 'all';
+    const s = store().getState();
+    const n = SB.setup ? SB.setup.dishCount() : 0;
+    const show = !welcomeDone() && m.zone === 'all' && n > 0 && s.tickets.length === 0 && !(s.orders && s.orders.length);
     setHidden(m.welcome, !show);
     if (!show) return;
-    const txt = 'Set up your kitchen first: sales tax, hours, your dishes and the food already cooked. Then each paper ticket is an order: tap START when you begin a dish and DONE when it is ready.' + (demoOnly ? ' The tickets on the board are pretend.' : '');
-    put(m.wText, txt);
+    put(m.wText, 'Your menu has ' + n + ' ' + U.plural(n, 'dish', 'dishes') + '. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices.');
   }
   // Hides the card for good, or shows it again (a restarted demo starts with it).
   F.setWelcome = function (on) {
@@ -1747,8 +1745,9 @@
   function paintEmpty(c) {
     const e = m.empty;
     const zone = m.zone, stationBusy = modeOf(zone) === 'station' && c && c.all > 0;
-    const title = stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
-    const text = stationBusy
+    const firstRun = !stationBusy && SB.setup && SB.setup.noDishes();
+    const title = firstRun ? 'Welcome. Let\'s build your menu.' : stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
+    const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
       : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or run the busy-night demo. Demo orders are pretend.';
     const sig = title + '|' + text;
@@ -1756,6 +1755,14 @@
     e.dataset.sig = sig;
     U.clear(e);
     const actions = h('div', { class: 'fl-empty-actions' });
+    // First run: one big friendly button, then two quiet links. No New ticket or demo button competes with it.
+    if (firstRun) {
+      actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'Add your first dish')),
+        h('button', { type: 'button', class: 'btn fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
+        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Try the busy-night demo (pretend)')));
+      e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
+      return;
+    }
     // A quiet station while others are busy offers a way back; New ticket is always there.
     if (stationBusy) actions.appendChild(h('button', { type: 'button', class: 'btn btn-lg', onClick: () => goZone('all') }, ico('grid', 22), h('span', null, 'Show all stations')));
     actions.appendChild(h('button', { type: 'button', class: 'btn btn-primary', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket')));
