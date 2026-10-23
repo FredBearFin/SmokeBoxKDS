@@ -1555,13 +1555,13 @@
       const s = stateNow(), k = keep.getValue();
       const ok = await SB.ui.confirm({
         title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep my data',
-        body: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' logged events and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device and puts the starter stock back.',
+        body: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' logged events and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any demo orders, and sets the clock back to real time.',
           k ? 'Your menu, ingredient edits, limits, pacing and PIN stay as they are.' : 'It also puts every setting, menu edit and the PIN back to the starter values.',
           'Sample history is not touched. There is no undo: download a backup first if you might want this data.'],
       });
       if (!ok) return;
       const rep = SB.store.resetLive({ keepSettings: k, starter: false });
-      if (rep === 'ok') { resetStatus.ok('Live data cleared. The board is empty and starter stock is back' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data cleared.', { tone: 'ok' }); }
+      if (rep === 'ok') { resetStatus.ok('Live data cleared. The board and the pit are empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data cleared.', { tone: 'ok' }); }
       else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
     });
     resetAllBtn.addEventListener('click', async () => {
