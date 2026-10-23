@@ -11,7 +11,7 @@ Close the day when the last order is paid. It saves the day's totals and gives y
 5. Tap **Close the day**.
 6. Tap **Back up today's data now** and **Print today's summary**.
 
-Closing does not lock anything. You can still take orders, and closing again later includes them. The app's day turns over at 4 am.
+Closing does not lock new orders, and closing again later includes them. A paid order from a day you already closed cannot be opened again. The app's day turns over at 4 am.
 
 ## Also
 

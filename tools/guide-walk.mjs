@@ -242,13 +242,24 @@ async function startOver(browser) {
   const sh = '.sheet-root:last-of-type';
   for (const t of ['What happens', 'Keep my tax, hours, PIN and station names', 'Next: about your backup']) check('start over step 1: ' + t, await has(p, t, sh));
   await tap(p, 'Next: about your backup'); await p.waitForTimeout(500);
-  check('start over step 2: the backup is made at the moment of erasing', await seen(p, 'The moment you confirm', sh));
+  for (const t of ['Save my backup file now', 'I saved the backup file and I can find it', 'Next: confirm']) check('start over step 2: ' + t, await has(p, t, sh));
+  check('start over step 2: Next: confirm waits for the saved box', await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-root:last-of-type button')].find((e) => e.textContent.trim() === 'Next: confirm'); return !!b && b.disabled; }));
+  await tap(p, 'Save my backup file now'); await p.waitForTimeout(800);
+  await p.evaluate(() => document.querySelector('#so-saw').click()); await p.waitForTimeout(300);
   await tap(p, 'Next: confirm'); await p.waitForTimeout(500);
   check('start over step 3: Erase everything and start over', await has(p, 'Erase everything and start over', sh));
   await p.fill(sh + ' input[type=text]', 'erase'); await tap(p, 'Erase everything and start over'); await p.waitForTimeout(1500);
   for (const t of ['Done. Your kitchen is empty.', 'Go to the first screen', 'Save the backup again']) check('start over done: ' + t, await has(p, t, sh));
   check('start over: the kitchen is empty afterwards', (await p.evaluate(() => SB.store.getState().menu.length)) === 0);
   await p.close();
+  // With a PIN set the PIN pad comes first.
+  const q = await fresh(browser);
+  await addDish(q, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  await q.evaluate(() => SB.shell.setPin('1234')); await q.waitForTimeout(300);
+  await q.click('button.fl-menu'); await q.waitForTimeout(500);
+  await tap(q, 'Start over with an empty menu'); await q.waitForTimeout(800);
+  check('start over with a PIN: the PIN pad opens first', await q.evaluate(() => /Manager PIN/.test(document.body.innerText)));
+  await q.close();
 }
 
 // The Setup recipes walk: the four recipes on the Setup recipes page, each checked against the real screens.
@@ -445,7 +456,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'readings') await readingsAndChecks(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await readingsAndChecks(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'startover') await startOver(browser); else if (process.env.WALK_ONLY === 'readings') await readingsAndChecks(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await readingsAndChecks(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);

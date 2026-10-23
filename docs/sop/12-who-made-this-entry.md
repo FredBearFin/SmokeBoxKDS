@@ -10,7 +10,7 @@ Initials go next to temperature readings and thrown-out batches, so the log show
 
 ## Fix an entry
 
-1. Open the thrown-out log from the board's menu.
+1. Open the thrown-out log from the board's menu. It says which period it covers.
 2. Tap **Fix this entry** on the row.
 3. Say what was wrong, add your initials and tap **Save the fix**.
 
