@@ -201,7 +201,7 @@ test('rounding: totals are exact cents and tax is within half a cent of the exac
 
 // KNOWN ENGINE ISSUE (reported to the engine owner): the engine rounds tax with Math.round(v * 100) / 100, so an exact half
 // cent can round down because of binary floating point ($2.00 at 7.25 percent is 14.5 cents and comes out 14, not 15).
-test('rounding: an exact half cent of tax rounds up', { todo: 'engine cents() rounds 0.145 down; see 20-engine.js cents' }, () => {
+test('rounding: an exact half cent of tax rounds up', () => {
   assert.equal(c100(payOne(2, 1, 7.25).tax), 15);
   assert.equal(c100(payOne(0.4, 1, 8.875).tax), 4);
 });

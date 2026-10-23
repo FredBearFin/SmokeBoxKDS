@@ -1289,6 +1289,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .pin-forgot p { margin: var(--sp-2) 0; }
 /* On a 4K screen the reminder bar grows with the board, so the demo or backup notice is readable from across the room. */
 @media (min-width: 3000px) { .sb-banner { min-height: 64px; font-size: 28px; } .sb-banner .btn { min-height: 52px; font-size: 24px; } }
+/* On touch-sized screens the buttons in the reminder and demo bars are full 44 px targets. */
+@media (max-width: 1024px), (pointer: coarse) { .sb-banner .btn { min-height: 44px; } }
 
 /* ===== 20-floor.css ===== */
 /*
@@ -2041,6 +2043,14 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl[data-far="on"] .fl-slip .fl-badge .icon { width: 1.2em; height: 1.2em; }
 .fl[data-far="on"] .fl-slip .slip-meta { grid-row: 4; }
 .fl[data-far="on"] .fl-slip .slip-progress { grid-row: 5; }
+/* On a phone seven tabs share the width: tighter padding so "Cabinet" never sticks out of its tab, even with Large text. */
+@media (max-width: 420px) { .fl-seg .seg-opt { padding-inline: 3px; } .fl-seg .seg-label { letter-spacing: -0.03em; } }
+/* "N more tickets below": a small pill at the bottom right of the board, just above the all-day strip. Not shown in wall mode or the cabinet. */
+.fl-below { position: fixed; right: var(--sp-5); bottom: calc(var(--fl-lift, 0px) + 12px); z-index: 4; min-height: var(--tap); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3); background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.fl-below[hidden], .fl[data-wall="on"] .fl-below { display: none; }
+/* Wall list: a long customer name wraps onto up to two lines instead of being cut to a few letters. */
+.fl-wall-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.fl-wall-row { align-items: center; }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -2907,8 +2917,10 @@ ul.gd-list { list-style: disc; }
 .gd-check li::before { content: ""; position: absolute; left: 0; top: 0.15em; width: 22px; height: 22px; border: 2px solid var(--ink2); border-radius: 4px; background: var(--paper); box-sizing: border-box; }
 .gd-legend { padding-left: var(--sp-6); }
 /* The small round ? that other screens place beside a heading or button (SB.guide.link). */
-.gd-help { display: inline-grid; place-items: center; width: 28px; height: 28px; min-width: 28px; border-radius: var(--r-pill); border: var(--bw) solid var(--line); background: var(--paper); color: var(--ink); font: var(--w-bold) var(--fs-2)/1 var(--font-display); text-decoration: none; }
-.gd-help:hover { background: var(--hover); }
+.gd-help { position: relative; isolation: isolate; display: inline-grid; place-items: center; width: 44px; height: 44px; min-width: 44px; border: 0; background: transparent; color: var(--ink); font: var(--w-bold) var(--fs-2)/1 var(--font-display); text-decoration: none; }
+/* The visible "?" is a 28 px circle; the link around it is 44 px so a thumb or a glove finds it. */
+.gd-help::before { content: ""; position: absolute; z-index: -1; width: 28px; height: 28px; border-radius: var(--r-pill); border: var(--bw) solid var(--line); background: var(--paper); }
+.gd-help:hover::before { background: var(--hover); }
 .gd-help:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: 2px; }
 
 /* ---------- Previous and Next ---------- */
@@ -3333,6 +3345,12 @@ a.of-nav:active { background: var(--press); }
 .of-page[data-coach="on"] > .of-headline { display: none; }
 .of-wdrow { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .of .of-wd { min-height: 34px; padding: 0 10px; }
+
+/* The one-tap "How is this worked out?" note under a page headline. */
+.of-how { margin: calc(-1 * var(--sp-4)) 0 var(--sp-5); max-width: 44em; color: var(--ink2); font-size: var(--fs-2); }
+.of-how summary { cursor: pointer; display: inline-block; padding: 6px 0; min-height: 32px; color: var(--ink2); text-decoration: underline; text-underline-offset: 3px; }
+.of-how p { margin: var(--sp-1) 0 0; line-height: 1.5; }
+.of-page[data-coach="on"] > .of-how { display: none; }
 
 /* ===== 31-office-money.css ===== */
 /*
@@ -4395,7 +4413,14 @@ a.of-nav:active { background: var(--press); }
   U.dateKey = (ts) => { const d = new Date(ts); return d.getFullYear() + '-' + U.pad2(d.getMonth() + 1) + '-' + U.pad2(d.getDate()); };
   // The service day a moment belongs to. 12:45 am on the 18th gives the 17th, because the day only
   // turns over at dayStartHour (4 am unless given).
-  U.serviceDate = (ts, dayStartHour) => U.dateKey(ts - (dayStartHour == null ? U.DAY_START_HOUR : dayStartHour) * 3600e3);
+  // WATCH OUT: it goes by the clock on the wall, not by subtracting hours, so on the two daylight-saving nights the day still
+  // turns over at 4 am by the wall clock (subtracting 4 hours of real time moved the turn-over to 3 am or 5 am).
+  U.serviceDate = (ts, dayStartHour) => {
+    const h = dayStartHour == null ? U.DAY_START_HOUR : dayStartHour;
+    const d = new Date(ts);
+    const early = d.getHours() + d.getMinutes() / 60 < h;
+    return U.dateKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() - (early ? 1 : 0), 12).getTime());
+  };
   // Turns "YYYY-MM-DD" back into the moment of local midnight starting that date.
   U.dateKeyToMs = (key) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d).getTime(); };
   // Date text n days later (earlier if n is negative). It steps from midday so a daylight-saving change
@@ -6871,16 +6896,21 @@ a.of-nav:active { background: var(--press); }
    * Orders (the check): one per table, tab or customer. Food is sent in rounds, and each round is one ticket
    * on the kitchen screen. The order keeps the money; the tickets keep the timing.
    * ==================================================================================================== */
-  // Dollars rounded to whole cents.
-  const cents = (v) => Math.round(v * 100) / 100;
-  // Builds the money lines of an order from its food total (in whole cents), a discount and a tax rate.
+  // Dollars as a whole number of cents (half a cent rounds up). The tiny addition makes a typed 1.005 count as 101 cents
+  // although the number is stored as 1.00499999999999989...; all money below is worked in whole cents.
+  const toCents = (v) => Math.round(v * 100 + (v >= 0 ? 1e-7 : -1e-7));
+  // A dollar amount rounded to whole cents, with half a cent rounding up.
+  const cents = (v) => toCents(v) / 100;
+  // Builds the money lines of an order from its food total (in whole cents), a discount (dollars) and a tax rate (percent).
+  // Everything is whole cents: the discount cannot exceed the food, tax is the taxable cents times the rate (to four decimals
+  // of a percent) rounded half up to a cent, and total = food - discount + tax exactly.
+  // Example: 1480.75 dollars at 10 percent: 148075 x 100000 / 1e6 = 14807.5 cents, which rounds up to 14808 (a float sum gave 14807).
   function totalsFrom(subCents, qty, rounds, discount, taxRatePct) {
-    const subtotal = subCents / 100;
-    const disc = Math.min(cents(Math.max(0, isNum(discount) ? discount : 0)), subtotal);
-    const taxable = cents(subtotal - disc);
+    const discC = Math.min(toCents(Math.max(0, isNum(discount) ? discount : 0)), subCents);
+    const taxableC = subCents - discC;
     const rate = isNum(taxRatePct) && taxRatePct > 0 ? taxRatePct : 0;
-    const tax = cents(taxable * rate / 100);
-    return { subtotal, discount: disc, taxRate: rate, tax, total: cents(taxable + tax), qty, rounds };
+    const taxC = Math.floor((taxableC * Math.round(rate * 1e4) + 500000) / 1e6);
+    return { subtotal: subCents / 100, discount: discC / 100, taxRate: rate, tax: taxC / 100, total: (taxableC + taxC) / 100, qty, rounds };
   }
   // The sales tax rate in force now, in percent (0 when none is set).
   const taxRateOf = (settings) => (settings && settings.service && isNum(settings.service.taxRatePct) ? settings.service.taxRatePct : 0);
@@ -6893,7 +6923,7 @@ a.of-nav:active { background: var(--press); }
     for (const t of state.tickets) {
       if (t.orderId !== order.id || t.status === 'voided') continue;
       rounds++;
-      for (const it of t.items) { sub += Math.round((isNum(it.price) ? it.price : 0) * 100) * it.qty; qty += it.qty; }
+      for (const it of t.items) { sub += toCents(isNum(it.price) ? it.price : 0) * it.qty; qty += it.qty; }
     }
     return totalsFrom(sub, qty, rounds, opts && opts.discount, taxRateOf(state.settings));
   }
@@ -6908,7 +6938,7 @@ a.of-nav:active { background: var(--press); }
         const a = t.orderId !== undefined && t.status !== 'voided' ? acc.get(t.orderId) : undefined;
         if (!a) continue;
         a.rounds++;
-        for (const it of t.items) { a.sub += Math.round((isNum(it.price) ? it.price : 0) * 100) * it.qty; a.qty += it.qty; }
+        for (const it of t.items) { a.sub += toCents(isNum(it.price) ? it.price : 0) * it.qty; a.qty += it.qty; }
       }
     }
     const rate = taxRateOf(state.settings);
@@ -7930,6 +7960,7 @@ a.of-nav:active { background: var(--press); }
         const e = checkLeaf(spec, v, key);
         if (e) { tx.info = { key: e.key, min: e.min, max: e.max }; return e.report; }
         if (k === 'prepSec') nv = Math.round(v);
+        if (k === 'price') nv = cents(v); // a price is whole cents, so what is shown is what is charged
       }
       if (JSON.stringify(cur[k]) !== JSON.stringify(nv)) { out[k] = nv; keys.push(key); }
     }
@@ -7971,7 +8002,7 @@ a.of-nav:active { background: var(--press); }
     let id = base, n = 2;
     while (taken.has(id) || hasOwn(C.menuById, id) || !safeKey(id)) id = base + '_' + n++;
     const w = tx.mut('menu');
-    w.push({ id, name, short, zone: p.zone, cat: p.cat, price: p.price, prepSec: Math.round(p.prepSec), track: p.track, bom: [], prepConfirmed: p.prepGuess !== true, archived: false });
+    w.push({ id, name, short, zone: p.zone, cat: p.cat, price: cents(p.price), prepSec: Math.round(p.prepSec), track: p.track, bom: [], prepConfirmed: p.prepGuess !== true, archived: false });
     tx.event('settings_changed', { keys: ['menu.' + id + '.added'] });
     tx.info = { id, keys: ['menu.' + id + '.added'] };
     return 'ok';
@@ -8900,9 +8931,10 @@ a.of-nav:active { background: var(--press); }
         const T = o.totals;
         if (!hasOwn(C.payMethodById, o.method)) add('I16 ' + o.id + ' paid without a valid method');
         else if (!isObj(T) || !['subtotal', 'discount', 'tax', 'total'].every((k) => isNum(T[k]) && T[k] >= 0)) add('I16 ' + o.id + ' paid without totals');
-        else if (T.discount > T.subtotal + 1e-9 || Math.abs(T.total - cents(cents(T.subtotal - T.discount) + T.tax)) > 0.006) add('I16 ' + o.id + ' totals do not add up');
+        else if (T.discount > T.subtotal + 1e-9 || toCents(T.total) !== toCents(T.subtotal) - toCents(T.discount) + toCents(T.tax)) add('I16 ' + o.id + ' totals do not add up (in whole cents)');
+        else if (['subtotal', 'discount', 'tax', 'total'].some((k) => Math.abs(T[k] * 100 - Math.round(T[k] * 100)) > 1e-6)) add('I16 ' + o.id + ' totals are not whole cents');
         if (!isNum(o.paidAt) || o.paidAt < o.createdAt) add('I16 ' + o.id + ' paidAt before createdAt');
-        if (!isNum(o.tip) || o.tip < 0) add('I16 ' + o.id + ' tip ' + o.tip);
+        if (!isNum(o.tip) || o.tip < 0 || Math.abs(o.tip * 100 - Math.round(o.tip * 100)) > 1e-6) add('I16 ' + o.id + ' tip ' + o.tip);
       } else if (o.paidAt !== undefined || o.totals !== undefined || o.method !== undefined) add('I16 ' + o.id + ' ' + o.status + ' with payment fields');
       if (o.status === 'voided' && !(typeof o.voidReason === 'string' && o.voidReason.trim())) add('I16 ' + o.id + ' voided without reason');
     }
@@ -10091,6 +10123,8 @@ a.of-nav:active { background: var(--press); }
   const KEPT_KEY = 'smokebox.v1.demoLeftoversKept';
   // The word that must be typed to start over with an empty menu, and the setup-progress keys that start over clears.
   const START_OVER_WORD = 'ERASE';
+  // Neutral starter names for a new empty kitchen. The ids (pit, meat ...) never change, only what people read.
+  const STARTER_NAMES = { rename: { zones: { pit: 'Kitchen', sides: 'Prep', fry: 'Fryer' }, categories: { meat: 'Mains', sandwich: 'Sides', side: 'Snacks', fried: 'Desserts', cold: 'Drinks' } }, add: {} };
   const START_OVER_KEYS = ['smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone',
     'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
@@ -10993,6 +11027,23 @@ a.of-nav:active { background: var(--press); }
     reloadPage();
     return true;
   }
+  // Gives a brand-new empty kitchen neutral station and menu-section names instead of the barbecue ones (Pit, Meats ...),
+  // through the owner-names mechanism, so they are saved with the kitchen and carried in backups. Does nothing in the demo,
+  // in a kitchen that has dishes or began from the sample, or when the owner already chose names. Returns true when applied.
+  function applyStarterNames() {
+    const C = SB.config;
+    if (!state || mode === 'demo' || state.catalog !== 'own' || !C || typeof C.applyCustom !== 'function' || typeof C.customSpec !== 'function') return false;
+    if (state.menu.some((m) => !m.archived)) return false;
+    try {
+      const cur = C.customSpec();
+      // True when a part of the saved names holds at least one rename or added entry.
+      const used = (o) => o && typeof o === 'object' && Object.keys(o).some((k) => (Array.isArray(o[k]) ? o[k].length : o[k] && typeof o[k] === 'object' && Object.keys(o[k]).length));
+      if (used(cur.rename) || used(cur.add)) return false;
+      const res = C.applyCustom(STARTER_NAMES);
+      if (res.rejected.length) { C.applyCustom(cur); return false; }
+      return C.saveCustom(STARTER_NAMES) !== false;
+    } catch (e) { return false; }
+  }
   // Starts the real kitchen over with an empty menu. Needs opts.confirm to be the typed word (SB.store.START_OVER_WORD, any case),
   // refuses in the demo, and takes a full backup first: if the backup cannot be made nothing is cleared. Then it clears dishes,
   // ingredients, stock, batches, tickets, orders and history (resetLive, catalog 'blank') and the setup-progress choices, so the
@@ -11019,6 +11070,7 @@ a.of-nav:active { background: var(--press); }
     if (!keep && SB.config && typeof SB.config.applyCustom === 'function') {
       try { SB.config.applyCustom({}); SB.config.saveCustom({ rename: {}, add: {} }); } catch (e) { /* the names stay as they were */ }
     }
+    if (!keep) applyStarterNames();
     last = { type: 'startOver', report: 'ok', info: { keepSettings: keep }, events: [] };
     const d = new Date(savedAt);
     // Two-digit number for the file name.
@@ -11062,7 +11114,7 @@ a.of-nav:active { background: var(--press); }
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
@@ -12579,10 +12631,11 @@ a.of-nav:active { background: var(--press); }
   }
   // Adds up a list of paid-order rows into checks, net sales, tax, tips and what was collected in all.
   function addUp(rows) {
-    const t = { checks: rows.length, gross: 0, discounts: 0, net: 0, tax: 0, tips: 0, total: 0, collected: 0 };
-    for (const r of rows) { t.gross += r.gross; t.discounts += r.discount; t.net += r.net; t.tax += r.tax; t.tips += r.tip; t.total += r.total; }
-    t.collected = t.total + t.tips;
-    return t;
+    // Money is added in whole cents and turned back into dollars at the end, so long lists never pick up a stray cent.
+    const c = (v) => Math.round(v * 100);
+    const k = { gross: 0, discounts: 0, net: 0, tax: 0, tips: 0, total: 0 };
+    for (const r of rows) { k.gross += c(r.gross); k.discounts += c(r.discount); k.net += c(r.gross) - c(r.discount); k.tax += c(r.tax); k.tips += c(r.tip); k.total += c(r.gross) - c(r.discount) + c(r.tax); }
+    return { checks: rows.length, gross: k.gross / 100, discounts: k.discounts / 100, net: k.net / 100, tax: k.tax / 100, tips: k.tips / 100, total: k.total / 100, collected: (k.total + k.tips) / 100 };
   }
 
   /**
@@ -19446,7 +19499,14 @@ a.of-nav:active { background: var(--press); }
     // Wall mode panes: orders and payments on the left, the manager glance on the right. Built once here and only
     // patched later; the stylesheet shows them when data-wall is on.
     const wl = buildWallOrders(), wr = buildWallGlance();
-    root.append(head, strip.el, wl.el, main, dock, wr.el);
+    // A small pill that says how many tickets are out of sight below the screen; one tap scrolls down a screen.
+    const belowT = h('span', null, '');
+    const below = h('button', { type: 'button', class: 'btn fl-below', hidden: true, onClick: () => { main.scrollBy({ top: Math.round(main.clientHeight * 0.85), behavior: reduced() ? 'auto' : 'smooth' }); } }, ico('chevron-down', 20), belowT);
+    root.append(head, strip.el, wl.el, main, dock, wr.el, below);
+    m.below = below; m.belowT = belowT;
+    // Scrolling the board refreshes the pill once per animation frame at most.
+    let belowRaf = 0;
+    main.addEventListener('scroll', () => { if (!belowRaf) belowRaf = requestAnimationFrame(() => { belowRaf = 0; updateBelow(); }); }, { passive: true });
     const hlStyle = h('style', { class: 'fl-hl-style' });
     root.appendChild(hlStyle);
     m.el.appendChild(root);
@@ -19852,6 +19912,20 @@ a.of-nav:active { background: var(--press); }
     el.addEventListener('animationend', (e) => { if (e.target === el) done(); });
     // Backup in case animationend never fires, for example in a hidden tab.
     setTimeout(done, 900 + Math.min(i, 9) * 55);
+  }
+
+  // Counts the tickets that start below the visible board and shows or hides the "N more tickets below" pill.
+  // WATCH OUT: reads the position of every ticket, so it runs on scroll and about once a second, not on every change.
+  function updateBelow() {
+    if (!m || !m.below) return;
+    const main = m.main;
+    let n = 0;
+    if (!m.cabOn && main.clientHeight > 0 && main.scrollHeight > main.clientHeight + 4) {
+      const bottom = main.getBoundingClientRect().bottom;
+      for (const c of m.grid.children) { if (!c.classList.contains('fl-leaving') && c.getBoundingClientRect().top >= bottom - 8) n++; }
+    }
+    setHidden(m.below, n === 0);
+    if (n) put(m.belowT, n + (n === 1 ? ' more ticket below' : ' more tickets below'));
   }
 
   // Gives an element one soft highlight so a changed ticket or dish catches the eye, then removes the hook.
@@ -20413,6 +20487,7 @@ a.of-nav:active { background: var(--press); }
     const c = S.select.counts();
     m.counts = c;
     applyCook(cookOn());
+    if (!m.belowAt || now - m.belowAt > 1000 || now < m.belowAt) { m.belowAt = now; updateBelow(); }
     paintRole();
     updateStrip(now);
     driveCallouts(now);
@@ -20587,7 +20662,10 @@ a.of-nav:active { background: var(--press); }
     // Once any ticket or order exists the first-steps card is finished for good, even if the board is cleared later.
     if ((s.tickets.length || (s.orders && s.orders.length)) && !welcomeDone()) U.storage.set(KEY_WELCOME, 'done');
     const show = !welcomeDone() && m.zone === 'all' && n > 0;
+    const wasShown = !m.welcome.hidden;
     setHidden(m.welcome, !show);
+    // The empty board leaves out its own walkthrough button while the card (which has one) is up, so there is only one.
+    if (wasShown !== show && m.empty && m.empty.dataset.sig) paintEmpty(store().select.counts());
     if (!show) return;
     put(m.wText, 'Your menu has ' + n + ' ' + U.plural(n, 'dish', 'dishes') + '. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices.');
   }
@@ -20612,6 +20690,17 @@ a.of-nav:active { background: var(--press); }
       const keep = hid.indexOf(id) < 0 || id === m.zone || (c.zones[id] || 0) > 0;
       b.style.display = keep ? '' : 'none';
     });
+    // A one-station kitchen (a taco truck) has nothing to switch between: All, its one station and Expo would show the same tickets,
+    // so those tabs go. The Cabinet tab stays when cooking ahead is on; with nothing left to pick the whole tab row hides.
+    const shown = TABS.filter((id) => id !== 'all' && id !== 'expo' && sg.querySelector('[data-id="' + id + '"]') && sg.querySelector('[data-id="' + id + '"]').style.display !== 'none');
+    const single = m.zone === 'all' && shown.length <= 1 && hid.length > 0;
+    const cab = sg.querySelector('[data-id="cabinet"]');
+    const cabOn = !!cab && !cab.hidden;
+    ['expo'].concat(shown).forEach((id) => { const b = sg.querySelector('[data-id="' + id + '"]'); if (b) b.style.display = single ? 'none' : (id === 'expo' ? '' : b.style.display); });
+    const all = sg.querySelector('[data-id="all"]');
+    if (all) all.style.display = single && !cabOn ? 'none' : '';
+    const row = sg.closest('.fl-tabs');
+    if (row) row.hidden = single && !cabOn;
   };
   // Starts the guided walkthrough when it is part of this build; otherwise opens the Help sheet instead.
   function startTour() {
@@ -20631,7 +20720,8 @@ a.of-nav:active { background: var(--press); }
     const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
       : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
-    const sig = title + '|' + text;
+    const cardUp = !!(m.welcome && !m.welcome.hidden);
+    const sig = title + '|' + text + '|' + cardUp;
     if (e.dataset.sig === sig) return;
     e.dataset.sig = sig;
     U.clear(e);
@@ -20647,9 +20737,9 @@ a.of-nav:active { background: var(--press); }
     // A quiet station while others are busy offers a way back; New ticket is always there.
     if (stationBusy) actions.appendChild(h('button', { type: 'button', class: 'btn btn-lg', onClick: () => goZone('all') }, ico('grid', 22), h('span', null, 'Show all stations')));
     actions.appendChild(h('button', { type: 'button', class: 'btn btn-primary', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket')));
-    if (!stationBusy) actions.append(
-      h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
-      h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, store().isDemo && store().isDemo() ? 'Busy-night crew' : 'Try the demo')));
+    if (!stationBusy) actions.append(...[
+      cardUp ? null : h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
+      h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, store().isDemo && store().isDemo() ? 'Busy-night crew' : 'Try the demo'))].filter(Boolean));
     e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
   }
 
@@ -21943,7 +22033,9 @@ a.of-nav:active { background: var(--press); }
         resetDraft();
         host.close('sent');
         const where = addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent to ' : ' sent to ';
-        SB.ui.toast('Ticket #' + info.num + where + zones + ' ' + U.plural(zones, 'station') + '.' + (info.paid ? ' Paid ' + U.fmtMoney(info.total) + ' by ' + payWord + '.' : ''), { tone: 'ok' });
+        // A one-station kitchen has no stations to count, so the message just says the ticket went to the kitchen.
+        const oneStation = zones <= 1 && !!(SB.setup && SB.setup.hiddenStations && SB.setup.hiddenStations().length);
+        SB.ui.toast('Ticket #' + info.num + (oneStation ? (addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent' : ' sent') : where + zones + ' ' + U.plural(zones, 'station')) + '.' + (info.paid ? ' Paid ' + U.fmtMoney(info.total) + ' by ' + payWord + '.' : ''), { tone: 'ok' });
         return;
       }
       const words = SB.engine.describe(res.report, res.info, st().settings);
@@ -24910,8 +25002,13 @@ a.of-nav:active { background: var(--press); }
     }
   }
 
-  // The elements the ring should point at for this step.
+  // The elements the ring should point at for this step, leaving out any that have no box on screen (a hidden badge).
   function targets(t) {
+    return rawTargets(t).filter((e) => e.getClientRects().length > 0);
+  }
+
+  // Every element that could carry the ring for this step, visible or not.
+  function rawTargets(t) {
     const sl = slip();
     if (!sl) return [];
     // Every element inside the slip that matches a selector.
@@ -26327,7 +26424,7 @@ a.of-nav:active { background: var(--press); }
       "t": "ol",
       "x": [
        "A new Smokebox starts empty on purpose. Tap **Add your first dish** on the welcome screen.",
-       "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made: Pit, Hot sides, Fry or Cold and drinks.",
+       "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made: Kitchen, Prep, Fryer or Cold and drinks.",
        "Tap **Save and add another** until your menu is in. Then tap **Save and finish**."
       ]
      },
@@ -27662,7 +27759,8 @@ a.of-nav:active { background: var(--press); }
     }
     if (pageId === 'money') {
       // the thrown-away ledger on this page needs no sales, so a discard also counts as data here
-      if (f.tickets > 0 || f.discards > 0) return null;
+      if (isNum(f.paid) ? f.paid > 0 || f.discards > 0 : f.tickets > 0 || f.discards > 0) return null;
+      if (isNum(f.paid) && f.tickets > 0) return { title: 'Nothing to show yet', body: 'The orders so far are not paid. Pay an order from Orders and the money shows up here.' };
       return !f.anyLive
         ? { title: 'Take your first order', body: 'Sales come from your own orders. Take an order on the kitchen board and pay it from Orders, and the money shows up here.' }
         : { title: 'No sales' + where, body: 'Nothing was sold in this range. Use the arrows or the range buttons to look at a day you were open.' };
@@ -28263,6 +28361,12 @@ a.of-nav:active { background: var(--press); }
 
     const page = {
       el: root, grid,
+      // how adds a one-tap "How is this worked out?" note under the headline, in plain words.
+      how(text) {
+        const d = h('details', { class: 'of-how' }, h('summary', null, 'How is this worked out?'), h('p', null, text));
+        headEl.after(d);
+        return page;
+      },
       // headline switches the headline sentence on and draws it. _paintHeadline redraws it from the
       // metrics handle p.
       headline() { state.headline = true; headEl.hidden = false; paintCoach(); this._paintHeadline(ctx.prepared()); return page; },
@@ -28359,12 +28463,12 @@ a.of-nav:active { background: var(--press); }
     // Counts what falls inside the range (tickets, batches, safety records) for the empty-state coach.
     function coachFacts() {
       const ds = ctx.dataset(), r = ctx.filters.range, inR = (t) => isNum(t) && t >= r.from && t < r.to;
-      let tickets = 0, batches = 0, records = 0, discards = 0, finished = 0;
+      let tickets = 0, batches = 0, records = 0, discards = 0, finished = 0, paid = 0;
       for (const t of ds.tickets || []) if (inR(t.createdAt)) { tickets++; if (t.status !== 'active' && t.status !== 'voided') finished++; }
-      for (const o of ds.orders || []) if (inR(o.createdAt)) tickets++;
+      for (const o of ds.orders || []) { if (inR(o.createdAt)) tickets++; if (o.status === 'paid' && inR(o.paidAt)) paid++; }
       for (const b of ds.batches || []) if (b.src !== 'starter' && inR(b.enteredAt)) batches++;
       for (const e of ds.events || []) if (e && (e.type === 'temp_logged' || e.type === 'sanitize_done' || e.type === 'batch_discard') && inR(e.t)) { records++; if (e.type === 'batch_discard') discards++; }
-      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, finished, batches, records, discards, label: r.label };
+      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, finished, paid, batches, records, discards, label: r.label };
     }
     // Shows the "what to do next" message in place of blank tiles and charts when the range has no data.
     function paintCoach() {
@@ -29116,6 +29220,7 @@ a.of-nav:active { background: var(--press); }
       container.insertBefore(glanceHost, page.el);
       const glance = typeof O.glance === 'function' ? O.glance(glanceHost) : null;
       page.headline();
+      page.how('These numbers come from tickets that were sent out in the range above. Ticket time runs from when the ticket was entered until it was sent out, and the median is the middle one: half the tickets were faster. Slowest 1 in 10 is the time that nine in ten tickets beat. On time means a ticket finished before its warning time, which depends on the order type (Menu and settings, Time limits). Tickets per hour is tickets placed divided by the hours in which at least one ticket was placed.');
       page.tiles(paceTiles());
 
       page.card({
@@ -29289,6 +29394,7 @@ a.of-nav:active { background: var(--press); }
     render(container, ctx) {
       const page = K.page(container, ctx, { id: 'tickets' });
       page.headline();
+      page.how('Finished tickets are tickets that were sent out and not voided, counted on the day they were placed. Ticket time runs from when the ticket was entered until it was sent out; the median is the middle ticket. Overdue means a ticket took longer than the overdue limit for its order type. Voided tickets were cancelled before they were sent out. The arrows compare with the same number of days just before this range.');
       page.tiles([
         { id: 'count', kpi: 'count', label: 'Finished tickets' },
         { id: 'median', kpi: 'medianMs', label: 'Median ticket time' },
@@ -29427,6 +29533,7 @@ a.of-nav:active { background: var(--press); }
     render(container, ctx) {
       const page = K.page(container, ctx, { id: 'stations' });
       page.headline();
+      page.how('Each item on a ticket belongs to one station. A ticket counts at the station whose item finished last. Waiting means the time between an item being sent to the station and a cook starting it; work is the time the cook spent on it. Prep times are compared with the starter estimates in Menu and settings, and only items with at least 5 finished lines are judged.');
       page.tiles([
         { id: 'overdue', kpi: 'overdue', label: 'Overdue tickets' },
         { id: 'spread', kpi: 'avgSpreadMs', label: 'First to last item' },
@@ -29897,6 +30004,7 @@ a.of-nav:active { background: var(--press); }
 
     const salesOf = B.memoP((p) => M.sales(p));
     page.headline();
+    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day turns over at the hour set in Menu and settings (4 am to start). Open and voided orders are not counted. Average order is sales divided by paid orders. Every figure is added up in whole cents from the paid orders themselves.');
 
     page.tiles([
       // The one main money figure: sales after discounts from paid orders (blank until an order is paid).
@@ -33734,8 +33842,8 @@ a.of-nav:active { background: var(--press); }
     const t = v == null ? '' : String(v);
     return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
   }
-  // Dollars as plain digits with two decimals ("12.40"), with no dollar sign or thousands commas, so a spreadsheet adds them up.
-  const plainMoney = (v) => (isNum(v) ? (Math.round(v * 100) / 100).toFixed(2) : '0.00');
+  // Whole cents as plain digits with two decimals (1240 gives "12.40"), with no dollar sign or thousands commas, so a spreadsheet adds them up.
+  const plainMoney = (v) => (isNum(v) ? (Math.round(v) / 100).toFixed(2) : '0.00');
 
   // The sales-by-day CSV for an accountant, from the saved state: one row per service day with paid orders, then a Total row.
   // Columns: Date, Orders paid, Sales (after discounts), Discounts given, Tax, Tips, Total collected, then collected by Cash, Card and Other.
@@ -33748,9 +33856,11 @@ a.of-nav:active { background: var(--press); }
       if (!o || o.status !== 'paid' || !isNum(o.paidAt) || !o.totals) return;
       const day = U.serviceDate(o.paidAt, dsh);
       const d = days[day] || (days[day] = { orders: 0, sales: 0, discounts: 0, tax: 0, tips: 0, total: 0, cash: 0, card: 0, other: 0 });
-      const T = o.totals, tip = isNum(o.tip) ? o.tip : 0;
-      const collected = (isNum(T.total) ? T.total : 0) + tip;
-      d.orders++; d.sales += (T.subtotal || 0) - (T.discount || 0); d.discounts += T.discount || 0; d.tax += T.tax || 0; d.tips += tip; d.total += collected;
+      // Every amount is added in whole cents so a long list never picks up a stray cent.
+      const cc = (v) => Math.round((isNum(v) ? v : 0) * 100);
+      const T = o.totals, tip = cc(o.tip);
+      const collected = cc(T.total) + tip;
+      d.orders++; d.sales += cc(T.subtotal) - cc(T.discount); d.discounts += cc(T.discount); d.tax += cc(T.tax); d.tips += tip; d.total += collected;
       d[o.method === 'cash' ? 'cash' : o.method === 'card' ? 'card' : 'other'] += collected;
     });
     const head = ['Date', 'Orders paid', 'Sales (after discounts)', 'Discounts given', 'Tax', 'Tips', 'Total collected', 'Collected in cash', 'Collected by card', 'Collected other'];
@@ -33842,8 +33952,8 @@ a.of-nav:active { background: var(--press); }
     const r = RANGES.find((x) => x.id === id) || RANGES[1];
     const today = U.serviceDate(now, dayStartHour);
     const first = U.addDays(today, -(r.days - 1)), next = U.addDays(today, 1);
-    // The moment a service day starts: local midnight plus the day-start hour.
-    const at = (key) => U.dateKeyToMs(key) + dayStartHour * 3600e3;
+    // The moment a service day starts on the wall clock (the day-start hour that morning), even on a daylight-saving day.
+    const at = (key) => { const p = key.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2], dayStartHour, 0, 0, 0).getTime(); };
     return { from: at(first), to: at(next), label: r.days === 1 ? U.fmtDateShort(today) : U.fmtDateShort(first) + ' to ' + U.fmtDateShort(today) };
   }
 
@@ -34016,6 +34126,8 @@ a.of-nav:active { background: var(--press); }
       stage = 'store';
       if (SB.store && typeof SB.store.init === 'function') SB.store.init({ blank: true, mode: SB.util.mode() }); // a brand-new install starts empty; saved data is never changed
       // The demo (its own saved data) opens with its sample tickets the first time.
+      // A brand-new empty kitchen gets neutral station and menu-section names (saved with it); old kitchens and the demo keep theirs.
+      if (SB.store && SB.store.isBlank && SB.store.isBlank() && SB.store.applyStarterNames) SB.store.applyStarterNames();
       if (SB.store && SB.store.isDemo && SB.store.isDemo() && SB.store.status().firstRun && SB.sim && SB.sim.seedFirstRun) SB.sim.seedFirstRun();
       // A first run is a real, empty kitchen: the demo tickets and batches only load when the user asks for the demo.
       stage = 'shell';

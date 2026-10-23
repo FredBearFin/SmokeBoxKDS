@@ -45,7 +45,7 @@ async function blank(browser) {
   check('welcome: Show me how it works', await seen(p, 'Show me how it works'));
   await p.click('[data-act="first-dish"]'); await p.waitForTimeout(500);
   const sh = '.sheet-root';
-  for (const t of ['Dishes and prices', 'What is it called?', 'Price in dollars', 'Where is it made?', 'Pit', 'Hot sides', 'Fry', 'Cold and drinks', 'Save and add another', 'Save and finish', 'Tax, hours and PIN']) check('dishes sheet: ' + t, await seen(p, t, sh));
+  for (const t of ['Dishes and prices', 'What is it called?', 'Price in dollars', 'Where is it made?', 'Kitchen', 'Prep', 'Fryer', 'Cold and drinks', 'Save and add another', 'Save and finish', 'Tax, hours and PIN']) check('dishes sheet: ' + t, await seen(p, t, sh));
   await p.fill(sh + ' input >> nth=0', 'Hush puppies'); await p.fill(sh + ' input >> nth=1', '5.50');
   check('price read-back: Reads as', await has(p, 'Reads as $5.50', sh));
   check('dishes sheet: Have a menu file? Import it', await seen(p, 'Have a menu file? Import it', sh));

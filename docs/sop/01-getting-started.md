@@ -5,7 +5,7 @@ Add dishes, send a test order, take payment and save a backup. About ten minutes
 ## 1. Add your first dish
 
 1. A new Smokebox starts empty on purpose. Tap **Add your first dish** on the welcome screen.
-2. Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like "Reads as $12.50". Tap where it is made: Pit, Hot sides, Fry or Cold and drinks.
+2. Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like "Reads as $12.50". Tap where it is made: Kitchen, Prep, Fryer or Cold and drinks.
 3. Tap **Save and add another** until your menu is in. Then tap **Save and finish**.
 
 Change dishes and prices later: tap **Menu**, then **Dishes and prices**. A dish you remove goes to **Removed dishes**. Tap **Bring it back** to put it back.

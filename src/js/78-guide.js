@@ -30,7 +30,7 @@
       "t": "ol",
       "x": [
        "A new Smokebox starts empty on purpose. Tap **Add your first dish** on the welcome screen.",
-       "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made: Pit, Hot sides, Fry or Cold and drinks.",
+       "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made: Kitchen, Prep, Fryer or Cold and drinks.",
        "Tap **Save and add another** until your menu is in. Then tap **Save and finish**."
       ]
      },
