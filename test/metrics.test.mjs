@@ -1267,3 +1267,78 @@ describe('parseDollars: typed money in the pay box', () => {
     for (const v of ['abc', '-2', '1.234', '100000', '1,000', '.', '1e3', '$$2', '2 5']) assert.ok(Number.isNaN(U.parseDollars(v)), 'should refuse ' + JSON.stringify(v));
   });
 });
+
+describe('discardWeeks: dollars thrown away, this week against last week', () => {
+  const D = (n) => at(0) + n * 864e5; // BASE is Fri 2026-10-16 12:00, so D(0) is a Friday noon
+  const disc = (id, ing, g, reason, cost, t) => event({ t, type: 'batch_discard', batchId: id, ing, g, reason, cost });
+  const mk = (events, batches = []) => dataset({ events, batches });
+  it('adds grams times cost per cooked kg by product and by reason, week against week', () => {
+    const d = mk([
+      disc('b1', 'brisket', 2000, 'expired', 24, D(0)),       // this week
+      disc('b2', 'brisket', 1000, 'temp', 12, D(-2)),         // this week
+      disc('b3', 'pork', 500, 'quality', 4, D(-1)),           // this week
+      disc('b4', 'brisket', 3000, 'cooling', 36, D(-8)),      // last week
+    ]);
+    const w = M.discardWeeks(d, { now: D(0) + 3600e3 });
+    assert.equal(w.thisWeek.total.cost, 40);
+    assert.equal(w.thisWeek.total.g, 3500);
+    assert.equal(w.thisWeek.total.count, 3);
+    assert.equal(w.lastWeek.total.cost, 36);
+    assert.deepEqual(w.thisWeek.byProduct.map((r) => [r.ing, r.cost]), [['brisket', 36], ['pork', 4]]);
+    assert.deepEqual(w.thisWeek.byReason.map((r) => [r.reason, r.cost]), [['expired', 24], ['quality', 4], ['temp', 12]]);
+    assert.deepEqual(w.lastWeek.byReason.map((r) => r.reason), ['cooling']);
+  });
+  it('folds manual and unknown reasons into Other and never counts a missing cost as zero dollars', () => {
+    const d = mk([disc('b1', 'brisket', 1000, 'manual', null, D(0)), disc('b2', 'brisket', 1000, 'expired', 10, D(0))]);
+    const w = M.discardWeeks(d, { now: D(0) + 3600e3 }).thisWeek;
+    assert.equal(w.total.count, 2);
+    assert.equal(w.total.cost, 10);
+    assert.equal(w.total.noCostCount, 1);
+    assert.deepEqual(w.byReason.map((r) => r.label), ['Expired', 'Other']);
+  });
+  it('puts a 1 am discard in the service day before, across the week edge', () => {
+    // 1 am Saturday (D(1) is Sat noon, minus 11 h) still belongs to Friday's service day
+    const t = D(1) - 11 * 3600e3;
+    const d = mk([disc('b1', 'brisket', 1000, 'expired', 5, t)]);
+    // at 1:30 am Saturday "today" is still Friday, so the week runs Sat Oct 10 to Fri Oct 16 and holds it
+    const lateNight = M.discardWeeks(d, { now: t + 30 * 60e3 });
+    assert.equal(lateNight.thisWeek.total.count, 1);
+    assert.equal(lateNight.thisWeek.label, 'This week');
+    // a week later the same discard is last week
+    assert.equal(M.discardWeeks(d, { now: t + 7 * 864e5 }).lastWeek.total.count, 1);
+    // and a discard at 3:59 am Fri-a-week-ago is last week, 4:00 am is this week
+    const edge = new Date(2026, 9, 10, 4, 0, 0).getTime();         // Sat Oct 10 4 am: first moment of this week when today is Fri Oct 16
+    const e = mk([disc('x', 'brisket', 1000, 'temp', 1, edge - 1), disc('y', 'brisket', 1000, 'temp', 1, edge)]);
+    const w = M.discardWeeks(e, { now: D(0) });
+    assert.equal(w.thisWeek.total.count, 1);
+    assert.equal(w.lastWeek.total.count, 1);
+  });
+  it('counts sample-batch discards separately so the page can label them', () => {
+    const d = mk([disc('s1', 'brisket', 1000, 'expired', 5, D(0))], [batch({ id: 's1', src: 'sample' })]);
+    assert.equal(M.discardWeeks(d, { now: D(0) }).thisWeek.total.sampleCount, 1);
+  });
+  it('is quiet and well formed with no data', () => {
+    const w = M.discardWeeks(dataset({}), { now: D(0) });
+    assert.deepEqual([w.thisWeek.total.count, w.thisWeek.byProduct.length, w.lastWeek.byReason.length], [0, 0, 0]);
+  });
+});
+
+describe('discardSentence: the plain line above the weekly ledger', () => {
+  const win = (cost, g, count, extra = {}) => ({ total: Object.assign({ count, g, cost, noCostCount: 0, sampleCount: 0 }, extra.total),
+    byProduct: extra.byProduct || [], byReason: extra.byReason || [] });
+  it('says dollars, the change from last week, the biggest product and reason', () => {
+    const tw = win(40, 3500, 3, { byProduct: [{ name: 'Brisket', cost: 36, g: 3000 }], byReason: [{ label: 'Expired', cost: 24, g: 2000 }, { label: 'Temperature', cost: 12, g: 1000 }] });
+    const s = M.discardSentence({ thisWeek: tw, lastWeek: win(30, 2000, 1) });
+    assert.match(s, /You threw away \$40\.00 of food this week \(3\.50 kg\), up \$10\.00 from last week's \$30\.00\./);
+    assert.match(s, /Most of it was brisket \(\$36\.00\), and the biggest reason was expired\./);
+  });
+  it('does not turn an unknown cost into zero dollars', () => {
+    const s = M.discardSentence({ thisWeek: win(0, 1000, 1, { byProduct: [{ name: 'Brisket', cost: 0, g: 1000 }], byReason: [{ label: 'Other', cost: 0, g: 1000 }] }), lastWeek: win(0, 0, 0) });
+    assert.match(s, /no cost is recorded/);
+    assert.doesNotMatch(s, /\$0\.00/);
+  });
+  it('flags sample data and says when nothing was thrown away', () => {
+    assert.match(M.discardSentence({ thisWeek: win(5, 500, 1, { total: { sampleCount: 1 } }), lastWeek: win(0, 0, 0) }), /sample data, not your kitchen/);
+    assert.equal(M.discardSentence({ thisWeek: win(0, 0, 0), lastWeek: win(0, 0, 0) }), 'Nothing was thrown away this week or last week.');
+  });
+});

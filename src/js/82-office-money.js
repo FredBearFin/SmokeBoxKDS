@@ -567,6 +567,46 @@
 
     noCost.el.style.alignSelf = 'start'; // a short list should not stretch to the height of the margin chart
 
+    /* ---------------------------------------------------------------- dollars thrown away */
+    page.section('Dollars thrown away', 'Food that was discarded, at the cost per cooked kg recorded on each batch. Always the last 7 days against the 7 days before, whatever range is picked above.');
+    const weeksOf = B.memoP((p) => M.discardWeeks(p, { now: ctx.now() }));
+    page.panel({
+      span: 12, title: 'This week against last week',
+      caption: 'Look at the biggest line. If one product or one reason keeps showing up, cook less of it, check temperatures sooner, or cool it faster.',
+      // Builds the sentence and the two lists (by product, by reason) once; update repaints them only when
+      // the figures changed.
+      render: (body, p0) => {
+        const line = h('p', { class: 'ob-note ob-note--accent' });
+        const prodList = h('ul', { class: 'ob-list', 'aria-label': 'Thrown away by product' });
+        const reasonList = h('ul', { class: 'ob-list', 'aria-label': 'Thrown away by reason' });
+        const cols = h('div', { class: 'ob-twocol' }, h('div', null, h('h3', { class: 'ob-h3' }, 'By product'), prodList), h('div', null, h('h3', { class: 'ob-h3' }, 'By reason'), reasonList));
+        const sampleTag = h('span', { class: 'ob-tag', dataset: { tone: 'warn' }, hidden: true }, 'Includes sample data');
+        body.append(line, sampleTag, cols);
+        let last = '';
+        // One list row: the name, this week's dollars (or "cost not recorded") and last week's for comparison.
+        const row = (name, a, b) => h('li', { class: 'ob-li' },
+          h('span', { class: 'ob-li-n' }, name),
+          h('span', { class: 'ob-li-v' }, h('span', { class: 'num' }, a.cost > 0 ? fmt.money(a.cost, 2) : 'cost not recorded'), h('span', { class: 'num ob-li-s' }, fmt.g(a.g) + ' this week, ' + (b ? (b.cost > 0 ? fmt.money(b.cost, 2) : fmt.g(b.g)) : 'none') + ' last week')));
+        // Fills one list from this week's rows, matching each to the same key last week.
+        const fill = (ul, rows, lastRows, key, nameOf, none) => {
+          U.clear(ul);
+          if (!rows.length) { ul.appendChild(h('li', { class: 'ob-li' }, h('span', { class: 'ob-li-n' }, none))); return; }
+          rows.forEach((r) => ul.appendChild(row(nameOf(r), r, lastRows.find((x) => x[key] === r[key]))));
+        };
+        // Redraws the sentence and lists from the discard ledger when it changed.
+        const paint = (p) => {
+          const w = weeksOf(p), sig = JSON.stringify(w);
+          if (sig === last) return; last = sig;
+          setText(line, M.discardSentence(w));
+          fill(prodList, w.thisWeek.byProduct, w.lastWeek.byProduct, 'ing', (r) => r.name, 'Nothing thrown away this week.');
+          fill(reasonList, w.thisWeek.byReason, w.lastWeek.byReason, 'reason', (r) => r.label, 'Nothing thrown away this week.');
+          sampleTag.hidden = !(w.thisWeek.total.sampleCount || w.lastWeek.total.sampleCount);
+        };
+        paint(p0);
+        return { update: paint };
+      },
+    });
+
     /* ---------------------------------------------------------------- yield */
     page.section('Brisket yield', 'Brisket loses weight in the smoker and the hold cabinet. Pricing it at a fixed yield can quietly under- or over-charge every plate.');
 

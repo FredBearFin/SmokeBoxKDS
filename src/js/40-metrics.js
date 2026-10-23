@@ -1117,6 +1117,78 @@
     });
   };
 
+  // Plain names for the discard reasons, in the order the ledger lists them. "manual" and "other" are
+  // folded into one "Other" line.
+  const DISCARD_WORDS = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', other: 'Other' };
+  const DISCARD_ORDER = ['expired', 'quality', 'temp', 'cooling', 'other'];
+  // Adds up one window of discards: total, by product and by reason. Dollars are grams x the batch's
+  // recorded cost per cooked kg, so a discard with no recorded cost counts in grams but never as $0.
+  function discardWindow(raw, from, to, label) {
+    const w = makeCtx(raw, { from, to }), im = w.ingMap();
+    const sampleIds = new Set(arr(raw.batches).filter((b) => b && b.src === 'sample').map((b) => b.id));
+    const list = discardList(w), byIng = {}, byReason = {};
+    const tot = { count: 0, g: 0, cost: 0, noCostCount: 0, sampleCount: 0 };
+    // Adds one discard into a bucket's count, grams, dollars and no-cost count.
+    const add = (b, d) => { b.count++; b.g += d.g; if (d.cost !== null) b.cost += d.cost; else b.noCostCount++; };
+    for (const d of list) {
+      const r = DISCARD_WORDS[d.reason] && d.reason !== 'other' ? d.reason : 'other';
+      add(tot, d);
+      if (sampleIds.has(d.batchId)) tot.sampleCount++;
+      add(byIng[d.ing] || (byIng[d.ing] = { ing: d.ing, name: im[d.ing] ? im[d.ing].name : d.ing, count: 0, g: 0, cost: 0, noCostCount: 0 }), d);
+      add(byReason[r] || (byReason[r] = { reason: r, label: DISCARD_WORDS[r], count: 0, g: 0, cost: 0, noCostCount: 0 }), d);
+    }
+    // Rounds a dollar amount to whole cents.
+    const money = (x) => Math.round(x * 100) / 100;
+    // Rounds a bucket's dollars to cents and its grams to whole grams.
+    const fin = (o) => Object.assign(o, { cost: money(o.cost), g: Math.round(o.g) });
+    return { label, from, to, total: fin(tot),
+      byProduct: Object.keys(byIng).map((k) => fin(byIng[k])).sort((a, b) => b.cost - a.cost || b.g - a.g || (a.ing < b.ing ? -1 : 1)),
+      byReason: DISCARD_ORDER.filter((k) => byReason[k]).map((k) => fin(byReason[k])) };
+  }
+  /**
+   * "Dollars thrown away": this week against last week. A week is 7 service days ending with today, so
+   * the windows follow the day-start hour; "last week" is the 7 days before that. Needs opts.now.
+   * Dollars come only from discards with a recorded cost (noCostCount says how many had none).
+   * @returns {{thisWeek, lastWeek}} each {label,from,to,total:{count,g,cost,noCostCount,sampleCount},byProduct:Array,byReason:Array}
+   */
+  M.discardWeeks = (ds, opts) => {
+    const raw = unwrap(ds) || {}, ctx = makeCtx(raw, {}); opts = opts && typeof opts === 'object' ? opts : {};
+    const now = num(opts.now) ? opts.now : ctx.nowMs();
+    const today = U.serviceDate(now, ctx.dsh);
+    // The moment a service day starts, n days from today (0 is today, 1 is tomorrow).
+    const edge = (n) => dayStartMs(U.addDays(today, n), ctx.dsh);
+    return { thisWeek: discardWindow(raw, edge(-6), edge(1), 'This week'), lastWeek: discardWindow(raw, edge(-13), edge(-6), 'Last week') };
+  };
+
+  /**
+   * One plain sentence about the weekly discard ledger (the result of M.discardWeeks). Says dollars only
+   * where a cost is recorded, names the biggest product and reason, and flags sample rows.
+   * @returns {string}
+   */
+  M.discardSentence = (weeks) => {
+    const tw = weeks && weeks.thisWeek, lw = weeks && weeks.lastWeek;
+    if (!tw || !lw) return 'No discard figures yet.';
+    const a = tw.total, b = lw.total;
+    // Picks the singular or plural word for a count.
+    const plural = (n, one, many) => (n === 1 ? one : many);
+    if (!a.count && !b.count) return 'Nothing was thrown away this week or last week.';
+    if (!a.count) return 'Nothing was thrown away this week. Last week ' + U.fmtMoney(b.cost) + ' of food went in the trash (' + U.fmtG(b.g) + ').';
+    const parts = [];
+    if (a.cost > 0) {
+      let vs = '';
+      if (b.count && b.cost > 0) {
+        const diff = Math.round((a.cost - b.cost) * 100) / 100;
+        vs = diff === 0 ? ', the same as last week' : ', ' + (diff > 0 ? 'up ' : 'down ') + U.fmtMoney(Math.abs(diff)) + ' from last week\'s ' + U.fmtMoney(b.cost);
+      } else if (!b.count) vs = ', and nothing was thrown away last week';
+      parts.push('You threw away ' + U.fmtMoney(a.cost) + ' of food this week (' + U.fmtG(a.g) + ')' + vs + '.');
+    } else parts.push(a.count + ' ' + plural(a.count, 'batch was', 'batches were') + ' thrown away this week (' + U.fmtG(a.g) + '), but no cost is recorded for ' + plural(a.count, 'it', 'them') + ', so the dollars are not known.');
+    const top = tw.byProduct.filter((r) => r.cost > 0)[0] || tw.byProduct[0], why = tw.byReason.slice().sort((x, y) => y.cost - x.cost || y.g - x.g)[0];
+    if (top && why && a.cost > 0) parts.push('Most of it was ' + top.name.toLowerCase() + ' (' + U.fmtMoney(top.cost) + '), and the biggest reason was ' + why.label.toLowerCase() + '.');
+    if (a.cost > 0 && a.noCostCount > 0) parts.push(a.noCostCount + ' ' + plural(a.noCostCount, 'discard has', 'discards have') + ' no recorded cost, so the real figure is higher.');
+    if (a.sampleCount > 0) parts.push(a.sampleCount === a.count ? 'These figures come from sample data, not your kitchen.' : 'Some of these figures come from sample data.');
+    return parts.join(' ');
+  };
+
   // Maps a batch status to the colour name the timeline chart uses (chill is drawn as reheat).
   const TONE = { ok: 'ok', check: 'check', reheat: 'reheat', chill: 'reheat', discard: 'discard' };
   /**
