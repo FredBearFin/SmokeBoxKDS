@@ -27,7 +27,7 @@
  *   planFor(state, lines, now, rush?)     -> same as pacingPlan, using the state's settings/learned/menu
  *   ticketTiming(ticket, now, settings)   -> { elapsedMs, level: 'ok'|'warn'|'breach', warnMs, breachMs, pct }
  *   ticketProgress(ticket)                -> { total, done, queued, displayed, cooking, qtyTotal, qtyDone, pct, ready, byZone }
- *   checkInvariants(state, now?)          -> string[] (empty = healthy; I1-I17 of SPEC 10, structural parts)
+ *   checkInvariants(state, now?)          -> string[] (empty = healthy; I1-I19 of SPEC 10, structural parts)
  *   validateBackup(objOrText)             -> { ok, state?, error?, repaired: string[] }
  *   serialize(state) -> string             deserialize(text) -> validateBackup result
  *   allEvents(state)                      -> Event[] (archive chunks + recent window, oldest first; memoised)
@@ -54,7 +54,7 @@
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -111,6 +111,8 @@
     unknownPlan: 'That planned batch is gone. It may have been used, cancelled or expired.',
     ordersStillOpen: 'The day cannot be closed while orders are still open. Take payment on each open order, or void it, then close the day again.',
     badLeftovers: 'Choose what happens to the batches still in the cabinet: keep them for tomorrow, or discard them.',
+    badWho: 'Initials must be 1 to 12 characters. Shorten them, or leave them blank if the screen allows.',
+    unknownSafetyEntry: 'That safety log entry is not here, or it is not a temperature, discard, cooling, reheat, sanitize or keep-serving entry. Pick one from the safety log.',
     badSnooze: 'A reminder can be put off for 1 to 30 minutes, only for a batch still on the menu, and never past 5 minutes before its last warning. The last warning, a past-quality batch and a thrown-out batch cannot be put off.',
   };
 
@@ -135,9 +137,10 @@
     toggle86: '{ menuId, on:boolean }',
     restock: '{ ing, g }',
     addBatch: '{ ing, tempF, rawG?, cookedG?, endpointC?, holdH?, label?, src?:"cook"|"sample"|"starter" }',
-    logTemp: '{ batchId, tempF }',
-    reheatBatch: '{ batchId, tempF }',
-    startCooling: '{ batchId, g? }',
+    logTemp: '{ batchId, tempF, who? }',
+    reheatBatch: '{ batchId, tempF, who? }',
+    startCooling: '{ batchId, g?, who? }',
+    correctSafety: '{ eventId, note, who }',
     pullBatch: '{ ing, g }',
     keepServing: '{ batchIds:string[], forMin?, until?, who }',
     endKeepServing: '{ batchId, who, note? }',
@@ -145,8 +148,8 @@
     cancelPlan: '{ planId }',
     snoozeAlert: '{ batchId, forMin }',
     clearSnooze: '{ batchId }',
-    discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other" }',
-    sanitizeDone: '{}',
+    discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other", who? }',
+    sanitizeDone: '{ who? }',
     updateSettings: '{ patch }',
     updateMenuItem: '{ id, patch }',
     addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two" }',
@@ -182,6 +185,12 @@
   const BATCH_STATUS = { ok: 1, check: 1, reheat: 1, chill: 1, past: 1, discard: 1 };
   const BATCH_KIND = { hot: 1, cold: 1, cooling: 1 };
   const STATUS_OF = { NONE: 'ok', CHECK_TEMP: 'check', REHEAT_IMMEDIATE: 'reheat', CHILL_NOW: 'chill', PAST_QUALITY: 'past', DISCARD_LOCKOUT: 'discard' };
+  // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
+  // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
+  // safetyKeep bucket instead of being dropped.
+  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, cooling_started: 1, sanitize_done: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months, the minimum to keep).
+  const SAFETY_KEEP_MS = 190 * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
 
@@ -666,6 +675,18 @@
     if (ar && ar.length) { const c = ar[ar.length - 1]; if (c.length) return c[c.length - 1].t; }
     return undefined;
   }
+  // Only the safety-log events from a list of events.
+  function safetyOnly(list) { return list.filter((e) => hasOwn(SAFETY_EVENT, e.type)); }
+  // Adds newly dropped safety events to the retention bucket and lets go of entries older than 190 days
+  // (measured from refT, the newest time known). The bucket is never trimmed by size, only by age.
+  function keepSafety(prev, dropped, refT) {
+    const all = (Array.isArray(prev) ? prev : []).concat(dropped);
+    if (!isNum(refT)) return all;
+    const cut = refT - SAFETY_KEEP_MS;
+    let i = 0;
+    while (i < all.length && all[i].t < cut) i++;
+    return i ? all.slice(i) : all;
+  }
   // Adds new events to the log and keeps it small. When the recent window reaches 2048 events, the oldest
   // 1024 move into a frozen archive chunk (F-E2). The whole log is capped at the maxEvents limit by
   // dropping the oldest. owned says the window array is already our private copy. Returns the new window
@@ -680,12 +701,14 @@
     }
     const max = C.limits.maxEvents;
     let total = ev.length; for (const c of ar) total += c.length;
+    // Safety entries among the dropped events are handed back, so the caller can move them to safetyKeep.
+    let dropped = [];
     if (total > max) {
       ar = ar === archive ? ar.slice() : ar;
-      while (total > max && ar.length) { total -= ar[0].length; ar.shift(); }
-      if (total > max) ev = ev.slice(total - max);
+      while (total > max && ar.length) { total -= ar[0].length; dropped = dropped.concat(safetyOnly(ar[0])); ar.shift(); }
+      if (total > max) { dropped = dropped.concat(safetyOnly(ev.slice(0, total - max))); ev = ev.slice(total - max); }
     }
-    return { events: ev, archive: ar };
+    return { events: ev, archive: ar, dropped };
   }
   const FLAT = new WeakMap();
   // Every event, oldest first: archive chunks, then the recent window. The joined list is remembered, so
@@ -774,6 +797,7 @@
       const ev = this.get('events');
       const r = appendEvents(ev, this.get('eventArchive') || [], this.evs, this.own.has(ev));
       s.events = r.events; s.eventArchive = r.archive;
+      if (r.dropped.length) s.safetyKeep = keepSafety(this.get('safetyKeep'), r.dropped, this.evs[this.evs.length - 1].t);
     }
     if (s.tickets !== this.s0.tickets && !this.pruned) {
       const old = ACTIVE.get(this.s0.tickets);
@@ -902,7 +926,7 @@
     tx.event('batch_status', { batchId: b.id, from: b.status, to: gt.status, action: gt.action });
   }
   // Throws a batch out: its grams become waste, it can never be served again, and the lost cost is logged.
-  function discardInto(tx, bi, reason) {
+  function discardInto(tx, bi, reason, who) {
     const b = tx.get('batches')[bi];
     const w = tx.batch(bi);
     const g0 = b.remainingG > 0 ? b.remainingG : 0;
@@ -911,7 +935,7 @@
     const ing = ingMap(tx.get('ingredients')).get(b.ing);
     const unit = isNum(b.costPerCookedKg) ? b.costPerCookedKg / 1000 : nominalUnitCost(ing);
     tx.event('batch_status', { batchId: b.id, from: b.status, to: 'discard', action: 'DISCARD_LOCKOUT' });
-    tx.event('batch_discard', { batchId: b.id, ing: b.ing, g: g0, reason, cost: round(g0 * unit, 4) });
+    tx.event('batch_discard', whoField({ batchId: b.id, ing: b.ing, g: g0, reason, cost: round(g0 * unit, 4) }, who));
   }
   // Re-runs the gate on every batch that is not already discarded (used when the safety settings change).
   function refreshAllBatches(tx) {
@@ -1770,6 +1794,14 @@
     return 'ok';
   };
 
+  // Reads the optional initials on a safety action. Returns '' when none were given (old screens and old saves
+  // have none), the trimmed initials, or null when they are unusable (not text, or over 12 characters).
+  function readWho(p) {
+    if (p.who === undefined || p.who === null) return '';
+    if (typeof p.who !== 'string') return null;
+    const w = p.who.trim();
+    return w.length > 12 ? null : w;
+  }
   // Records a temperature reading, then re-runs the gate. A hot reading below the hot-hold limit, or a cold
   // one above its limit, starts the out-of-range clock (outSince); an in-range cold reading clears it. A
   // cooling batch records stage 1 and final. Also logs whether the check was on time.
@@ -1778,6 +1810,8 @@
     const bi = findBatchIdx(bs, p.batchId);
     if (bi < 0) return 'unknownBatch';
     if (!isNum(p.tempF) || p.tempF < 32 || p.tempF > 300) return 'badTemp';
+    const who = readWho(p);
+    if (who === null) return 'badWho';
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
     const S = safetyOf(tx.get('settings'));
@@ -1787,7 +1821,7 @@
     const lateMs = Math.max(0, tx.now - dueAt);
     const w = tx.batch(bi);
     const t = stampAfter(b.lastTempAt, stampAfter(b.enteredAt, tx.now));
-    const temps = (b.temps || []).concat([{ t, f }]);
+    const temps = (b.temps || []).concat([who ? { t, f, who } : { t, f }]);
     w.temps = temps.length > MAX_TEMPS ? temps.slice(temps.length - MAX_TEMPS) : temps;
     w.lastTempF = f; w.lastTempAt = t;
     // What a reading means depends on the kind of batch: cooling, cold or hot.
@@ -1804,8 +1838,8 @@
       // a logged reading at reheat temperature inside the grace window IS the reheat (honest input is never refused)
       delete w.outSince; w.reheats = (b.reheats || 0) + 1; reheated = true;
     }
-    tx.event('temp_logged', { batchId: b.id, f, onTime: lateMs === 0, lateMs });
-    if (reheated) tx.event('batch_reheat', { batchId: b.id, f });
+    tx.event('temp_logged', whoField({ batchId: b.id, f, onTime: lateMs === 0, lateMs }, who));
+    if (reheated) tx.event('batch_reheat', whoField({ batchId: b.id, f }, who));
     refreshBatch(tx, bi);
     const nb = tx.get('batches')[bi];
     tx.info = { batchId: b.id, status: nb.status, canServe: nb.canServe, onTime: lateMs === 0, lateMs, reheated };
@@ -1820,6 +1854,8 @@
     const bi = findBatchIdx(bs, p.batchId);
     if (bi < 0) return 'unknownBatch';
     if (!isNum(p.tempF) || p.tempF < 32 || p.tempF > 300) return 'badTemp';
+    const who = readWho(p);
+    if (who === null) return 'badWho';
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
     const S = safetyOf(tx.get('settings'));
@@ -1837,10 +1873,10 @@
       delete w.outSince;
     }
     w.reheats = (b.reheats || 0) + 1;
-    const temps = (b.temps || []).concat([{ t, f: p.tempF }]);
+    const temps = (b.temps || []).concat([who ? { t, f: p.tempF, who } : { t, f: p.tempF }]);
     w.temps = temps.length > MAX_TEMPS ? temps.slice(temps.length - MAX_TEMPS) : temps;
     w.lastTempF = p.tempF; w.lastTempAt = t;
-    tx.event('batch_reheat', { batchId: b.id, f: p.tempF });
+    tx.event('batch_reheat', whoField({ batchId: b.id, f: p.tempF }, who));
     refreshBatch(tx, bi);
     const nb = tx.get('batches')[bi];
     tx.info = { batchId: b.id, status: nb.status, canServe: nb.canServe };
@@ -1859,6 +1895,8 @@
     if (!(b.remainingG > 0)) return 'nothingToDo';
     let gm = p.g == null ? b.remainingG : p.g;
     if (!isNum(gm) || gm <= 0 || gm > b.remainingG + 0.5) return 'badWeight';
+    const who = readWho(p);
+    if (who === null) return 'badWho';
     gm = Math.min(gm, b.remainingG);
     const w = tx.batch(bi);
     w.remainingG = b.remainingG - gm <= EPS ? 0 : b.remainingG - gm;
@@ -1874,7 +1912,7 @@
     tx.own.add(nb);
     tx.mut('batches').push(nb);
     tx.batchTouched = true;
-    tx.event('cooling_started', { batchId: id, from: b.id, ing: b.ing, g: gm });
+    tx.event('cooling_started', whoField({ batchId: id, from: b.id, ing: b.ing, g: gm }, who));
     refreshBatch(tx, tx.get('batches').length - 1);
     tx.info = { batchId: id, g: gm };
     return 'ok';
@@ -1934,6 +1972,42 @@
     tx.info = { batchId: b.id };
     return 'ok';
   };
+
+  // Adds the initials to an event's fields only when there are some, so old-style events keep their exact shape.
+  function whoField(fields, who) { if (who) fields.who = who; return fields; }
+  // Adds a correction to the safety log: a note and the initials of the person making it, pointing at an
+  // earlier entry. WATCH OUT: the original entry is never edited or removed; corrections are new entries, and
+  // an entry can be corrected more than once.
+  A.correctSafety = function (tx, p) {
+    const who = typeof p.who === 'string' ? p.who.trim() : '';
+    if (!who || who.length > 12) return 'whoRequired';
+    if (typeof p.note !== 'string' || p.note.length > 4 * C.limits.maxNoteLen) return 'noteTooLong';
+    const note = cleanText(p.note);
+    if (!note) return 'reasonRequired';
+    if (note.length > C.limits.maxNoteLen) return 'noteTooLong';
+    if (typeof p.eventId !== 'string') return 'unknownSafetyEntry';
+    const evs = allEvents(tx.state());
+    let hit = null;
+    for (let i = evs.length - 1; i >= 0; i--) if (evs[i].id === p.eventId) { hit = evs[i]; break; }
+    if (!hit || !hasOwn(SAFETY_EVENT, hit.type)) return 'unknownSafetyEntry';
+    const f = { of: hit.id, ofType: hit.type, who, note };
+    if (typeof hit.batchId === 'string') f.batchId = hit.batchId;
+    tx.event('safety_correction', f);
+    tx.info = { of: hit.id };
+    return 'ok';
+  };
+  // The safety log, oldest first: each entry is { event, corrections } where corrections are the later
+  // safety_correction entries that point at it. Read-only; nothing here changes the state.
+  function safetyLog(state) {
+    const out = [], byId = new Map();
+    if (!isState(state)) return out;
+    for (const e of (Array.isArray(state.safetyKeep) ? state.safetyKeep : []).concat(allEvents(state))) {
+      // A correction hangs under the entry it points at; every other safety entry is a row of its own.
+      if (e.type === 'safety_correction' && byId.has(e.of)) byId.get(e.of).corrections.push(e);
+      else if (hasOwn(SAFETY_EVENT, e.type)) { const row = { event: e, corrections: [] }; out.push(row); byId.set(e.id, row); }
+    }
+    return out;
+  }
 
   // Planned batches: "this comes off the smoker at HH:MM". Supply for the close projection from the moment it has
   // rested, never stock: it creates no 86 and counts in no ledger. The real batch of the same product used
@@ -2024,7 +2098,9 @@
     if (typeof p.reason !== 'string' || DISCARD_REASONS.indexOf(p.reason) < 0) return 'reasonRequired';
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
-    discardInto(tx, bi, p.reason);
+    const who = readWho(p);
+    if (who === null) return 'badWho';
+    discardInto(tx, bi, p.reason, who);
     const nb = tx.get('batches')[bi];
     pushUndo(tx, 'discard', (b.label || 'Batch') + ' discarded', { batchId: b.id, before: b, discardedAt: nb.discardedAt });
     tx.info = { batchId: b.id, g: nb.wasteG };
@@ -2033,14 +2109,16 @@
 
   // Logs that food-contact surfaces were sanitised and sets the next due time. Records whether it was on
   // time. Overdue is a warning only, never a block.
-  A.sanitizeDone = function (tx) {
+  A.sanitizeDone = function (tx, p) {
+    const who = readWho(p || {});
+    if (who === null) return 'badWho';
     const S = safetyOf(tx.get('settings'));
     const cur = tx.get('sanitize') || {};
     const due = sanitizeDueEff(tx.get('settings'), cur, tx.now);
     const lateMs = isNum(due) ? Math.max(0, tx.now - due) : 0;
     const lastAt = stampAfter(cur.lastAt, tx.now);
     tx.set('sanitize', { lastAt, dueAt: lastAt + S.sanitizeEveryH * H });
-    tx.event('sanitize_done', { onTime: lateMs === 0, lateMs });
+    tx.event('sanitize_done', whoField({ onTime: lateMs === 0, lateMs }, who));
     pushUndo(tx, 'sanitize', 'Sanitize logged', { before: cur, afterLastAt: lastAt });
     tx.info = { onTime: lateMs === 0, lateMs };
     return 'ok';
@@ -2524,6 +2602,8 @@
     if (isInt(lim.maxEvents) && lim.maxEvents >= 0) {
       let flat = allEvents(state);
       if (flat.length > lim.maxEvents) {
+        const gone = safetyOnly(flat.slice(0, flat.length - lim.maxEvents));
+        if (gone.length) tx.set('safetyKeep', keepSafety(state.safetyKeep, gone, flat[flat.length - 1].t));
         flat = flat.slice(flat.length - lim.maxEvents);
         const ar = [];
         while (flat.length >= 2 * EVENT_CHUNK) { ar.push(flat.slice(0, EVENT_CHUNK)); flat = flat.slice(EVENT_CHUNK); }
@@ -2733,7 +2813,7 @@
     // The whole state. The clock is not stored here; the store keeps it.
     const st = {
       v: 1, rev: 0, settings, menu, ingredients, tickets: [], orders: [], batches, stock, manual86: {}, avail: {}, syncs: [], planned: [], alertSnoozes: {},
-      learned: isObj(opts.learned) ? opts.learned : {}, sanitize: { dueAt: now }, seq, events: [], eventArchive: [], undo: [], ledger,
+      learned: isObj(opts.learned) ? opts.learned : {}, sanitize: { dueAt: now }, seq, events: [], eventArchive: [], safetyKeep: [], undo: [], ledger,
     };
     const av = computeAvail(st);
     for (const k of Object.keys(av)) av[k].since = now;
@@ -3022,6 +3102,23 @@
       const lc = state.lastClose;
       if (!isObj(lc) || typeof lc.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(lc.day) || !isNum(lc.at) || (lc.leftovers !== 'keep' && lc.leftovers !== 'discard')) add('I17 lastClose is malformed');
     }
+    // I19: the safety bucket holds only safety entries, oldest first.
+    if (state.safetyKeep !== undefined) {
+      if (!Array.isArray(state.safetyKeep)) add('I19 safetyKeep is not a list');
+      else {
+        let pt = -Infinity;
+        for (const e of state.safetyKeep) {
+          if (!isObj(e) || typeof e.id !== 'string' || !isNum(e.t) || !hasOwn(SAFETY_EVENT, e.type)) { add('I19 safetyKeep holds a non-safety entry'); break; }
+          if (e.t < pt) { add('I19 safetyKeep goes backwards at ' + e.id); break; }
+          pt = e.t;
+        }
+      }
+    }
+    // I18: initials on a safety entry are 1 to 12 characters; a correction names who, says why and points at an earlier entry.
+    for (const e of allEvents(state)) {
+      if (e.who !== undefined && !(typeof e.who === 'string' && e.who.length >= 1 && e.who.length <= 12)) { add('I18 event ' + e.id + ' bad initials'); break; }
+      if (e.type === 'safety_correction' && !(typeof e.who === 'string' && typeof e.note === 'string' && e.note && typeof e.of === 'string')) { add('I18 correction ' + e.id + ' incomplete'); break; }
+    }
     // I14
     const mm = menuMap(state.menu);
     for (const id of Object.keys(state.learned || {})) {
@@ -3181,7 +3278,8 @@
         if (typeof out.canServe !== 'boolean' || out.kind === 'cooling') out.canServe = out.kind === 'cooling' ? false : !!out.canServe;
         if (!isInt(out.reheats) || out.reheats < 0) out.reheats = 0;
         if (!Array.isArray(out.temps)) out.temps = [];
-        out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS);
+        out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS)
+          .map((x) => (typeof x.who === 'string' && x.who.length >= 1 && x.who.length <= 12 ? { t: x.t, f: x.f, who: x.who } : { t: x.t, f: x.f }));
         for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
         if (!hasOwn(SRC_BATCH, out.src)) out.src = 'cook';
         bIds.add(b.id);
@@ -3230,6 +3328,12 @@
       for (const e of flat) { if (!evOk(e)) { bad++; continue; } if (goodEv.length && e.t < goodEv[goodEv.length - 1].t) unsorted = true; goodEv.push(e); }
       if (bad) repaired.push('dropped ' + bad + ' bad events');
       if (unsorted) { goodEv.sort((a, b) => a.t - b.t); repaired.push('events re-sorted by time'); }
+      // Safety entries pushed out by the event cap, and any saved safetyKeep bucket, stay in the bucket.
+      const overflow = goodEv.length > C.limits.maxEvents ? safetyOnly(goodEv.slice(0, goodEv.length - C.limits.maxEvents)) : [];
+      const evIds = new Set(goodEv.map((e) => e.id));
+      const savedKeep = Array.isArray(st.safetyKeep) ? st.safetyKeep.filter((e) => evOk(e) && hasOwn(SAFETY_EVENT, e.type) && !evIds.has(e.id)) : [];
+      savedKeep.sort((a, b) => a.t - b.t);
+      const keepList = keepSafety(savedKeep, overflow, goodEv.length ? goodEv[goodEv.length - 1].t : undefined);
       let rest = goodEv.length > C.limits.maxEvents ? goodEv.slice(goodEv.length - C.limits.maxEvents) : goodEv;
       while (rest.length >= 2 * EVENT_CHUNK) { archive.push(rest.slice(0, EVENT_CHUNK)); rest = rest.slice(EVENT_CHUNK); }
       events = rest;
@@ -3247,7 +3351,7 @@
       // Counters never fall below the highest id already used, so a new id can never repeat an old one.
       const so = isObj(st.seq) ? st.seq : {};
       const maxId = (arr, pre) => { let m = 0; for (const x of arr) { const id = x && x.id; if (typeof id === 'string' && id.indexOf(pre) === 0) { const n = Number(id.slice(pre.length)); if (isInt(n) && n > m) m = n; } } return m; };
-      const allEv = archive.reduce((a, c) => a.concat(c), []).concat(events);
+      const allEv = keepList.concat(archive.reduce((a, c) => a.concat(c), [])).concat(events);
       const seq = {
         ticket: Math.max(isInt(so.ticket) ? so.ticket : 0, maxId(tickets, 't_')),
         order: Math.max(isInt(so.order) ? so.order : 0, maxId(orders, 'o_')),
@@ -3269,7 +3373,7 @@
       sanitize.dueAt = isNum(sz.dueAt) ? sz.dueAt : isNum(sanitize.lastAt) ? sanitize.lastAt + settings.safety.sanitizeEveryH * H : 0;
       const out = {
         v: 1, rev: isInt(st.rev) && st.rev >= 0 ? st.rev : 0, settings, menu, ingredients, tickets, orders, batches, stock, manual86, avail: {}, syncs, planned, alertSnoozes, learned, sanitize, seq,
-        events, eventArchive: archive, undo: [], ledger: {},
+        events, eventArchive: archive, safetyKeep: keepList, undo: [], ledger: {},
       };
       // ledger: keep stored counters; if they do not balance, re-open the books at the current physical stock
       const ledger = {};
@@ -3411,7 +3515,7 @@
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, defaultSettings, describe, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, defaultSettings, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.

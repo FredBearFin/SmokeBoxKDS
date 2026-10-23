@@ -69,7 +69,7 @@ function genAction(rng, s) {
   const anyOrder = pick(rng.next() < 0.8 && openOrders.length ? openOrders : orders);
   const tcs = s.ingredients.filter((i) => i.tcs);
   const W = [['createTicket', 16], ['advanceItem', 18], ['completeItem', 5], ['fireNow', 5], ['completeZone', 4], ['bumpTicket', 8], ['recallTicket', 3],
-    ['voidTicket', 3], ['setRush', 3], ['toggle86', 4], ['restock', 3], ['addBatch', 5], ['logTemp', 5], ['reheatBatch', 2], ['startCooling', 1],
+    ['voidTicket', 3], ['setRush', 3], ['toggle86', 4], ['restock', 3], ['addBatch', 5], ['logTemp', 5], ['correctSafety', 1], ['reheatBatch', 2], ['startCooling', 1],
     ['discardBatch', 2], ['pullBatch', 3], ['keepServing', 2], ['endKeepServing', 1], ['planBatch', 1.5], ['cancelPlan', 2], ['snoozeAlert', 2], ['clearSnooze', 1.5], ['sanitizeDone', 2], ['updateSettings', 2], ['updateMenuItem', 1], ['addMenuItem', 0.6], ['payOrder', 4], ['reopenOrder', 1], ['voidOrder', 1], ['closeDay', 0.6], ['updateIngredient', 1], ['undo', 7], ['resetLive', 0.2], ['junkType', 2]];
   let r = rng.next() * W.reduce((a, x) => a + x[1], 0);
   let type = W[0][0];
@@ -102,7 +102,8 @@ function genAction(rng, s) {
         : { ing: ti.id, cookedG: pick([800, 2000, 5000]), tempF: pick([150, 160, 120, 38, 44]) };
       break;
     }
-    case 'logTemp': p = { batchId: b && b.id, tempF: pick([38, 40, 44, 120, 130, 136, 150, 166, 70]) }; break;
+    case 'logTemp': p = { batchId: b && b.id, tempF: pick([38, 40, 44, 120, 130, 136, 150, 166, 70]), who: pick([undefined, undefined, 'AB', 'ABCDEFGHIJKLMNO']) }; break;
+    case 'correctSafety': { const se = s.events.filter((e) => e.type === 'temp_logged' || e.type === 'batch_discard'); p = { eventId: (pick(se) || {}).id, note: pick(['wrong probe', '', 'typo']), who: pick(['AB', '']) }; break; }
     case 'reheatBatch': p = { batchId: b && b.id, tempF: pick([150, 166, 175]) }; break;
     case 'startCooling': p = { batchId: b && b.id, g: rng.next() < 0.5 ? undefined : 500 }; break;
     case 'keepServing': p = { batchIds: s.batches.filter((x) => x.status === 'past' || rng.next() < 0.3).map((x) => x.id).slice(0, 3), forMin: pick([30, 60, undefined, 0, 'x']), who: pick(['AB', '', 'FW']) }; break;
