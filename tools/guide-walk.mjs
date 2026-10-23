@@ -420,7 +420,7 @@ async function severalScreens(browser) {
     await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
     check('settings: Use one kitchen on several tablets', await tap(p, 'Use one kitchen on several tablets')); await p.waitForTimeout(500);
     const fs = '.sheet-root:last-of-type';
-    for (const t of ['Show only', 'Use this hub for orders on this tablet', 'a small program called the hub']) check('several tablets sheet: ' + t, await has(p, t, fs));
+    for (const t of ['Show only', 'Use the main computer for orders on this tablet', 'a small program']) check('several tablets sheet: ' + t, await has(p, t, fs));
     check('several tablets: tapping Show only', await tap(p, 'Show only')); await p.waitForTimeout(400);
     for (const t of ['Address of the kitchen', 'Connect']) check('show only: ' + t, await has(p, t, fs));
     await p.fill('#fw-url', H); await p.fill('#fw-code', 'abc123');
@@ -442,18 +442,18 @@ async function severalScreens(browser) {
     await q.goto(H + '/'); await q.waitForTimeout(900);
     await q.evaluate(() => document.querySelector('button.fl-menu').click()); await q.waitForTimeout(400);
     await tap(q, 'Use one kitchen on several tablets'); await q.waitForTimeout(500);
-    check('join: Use this hub for orders on this tablet', await tap(q, 'Use this hub for orders on this tablet')); await q.waitForTimeout(400);
+    check('join: Use the main computer for orders on this tablet', await tap(q, 'Use the main computer for orders on this tablet')); await q.waitForTimeout(400);
     const js = '.sheet-root:last-of-type';
-    for (const t of ['Address of the hub', 'Name for this screen', 'Check the hub', 'Join the hub']) check('join form: ' + t, await has(q, t, js));
+    for (const t of ['Address of the main computer', 'Name for this screen', 'Check the main computer', 'Join this kitchen']) check('join form: ' + t, await has(q, t, js));
     await q.fill('#hu-url', H); await q.fill('#hu-code', 'abc123'); await q.fill('#hu-name', 'Pass');
-    await tap(q, 'Check the hub'); await q.waitForTimeout(1500);
-    for (const t of ["Show the hub's kitchen on this tablet", "Send this tablet's kitchen to the hub", 'Stop: the hub already has a kitchen']) check('join choice: ' + t, await has(q, t, js));
+    await tap(q, 'Check the main computer'); await q.waitForTimeout(1500);
+    for (const t of ["Show the shared kitchen on this tablet", "Send this tablet's kitchen to the main computer", 'Stop: the main computer already has a kitchen']) check('join choice: ' + t, await has(q, t, js));
     await q.evaluate(() => document.querySelector('input[name="hu-choice"][value="adopt"]').click()); await q.waitForTimeout(300);
-    check('join: Join the hub', await tap(q, 'Join the hub')); await q.waitForTimeout(2000);
-    check('join: Joined. This tablet now uses the hub.', await has(q, 'Joined. This tablet now uses the hub.', js));
-    check('join: Leave the hub', await has(q, 'Leave the hub', js));
-    check('join: leaving works', await tap(q, 'Leave the hub')); await q.waitForTimeout(1200);
-    check('join: You left the hub.', await has(q, 'You left the hub.', js));
+    check('join: Join this kitchen', await tap(q, 'Join this kitchen')); await q.waitForTimeout(2000);
+    check('join: Joined. This tablet now uses the main computer.', await has(q, 'Joined. This tablet now uses the main computer.', js));
+    check('join: Leave the shared kitchen', await has(q, 'Leave the shared kitchen', js));
+    check('join: leaving works', await tap(q, 'Leave the shared kitchen')); await q.waitForTimeout(1200);
+    check('join: You left the shared kitchen.', await has(q, 'You left the shared kitchen.', js));
     await q.close();
     // A writing tablet: undo only while nobody else has acted, the offline card, then the last known kitchen after the hub is gone.
     const r = await fresh(browser);
@@ -483,6 +483,44 @@ async function severalScreens(browser) {
   } finally { try { hub.kill(); } catch (e) { /* already stopped */ } }
 }
 
+// The pairing walk: a main computer that needs pairing refuses an unpaired tablet, the owner command makes a code, the tablet pairs and joins.
+async function pairing(browser) {
+  console.log('Pairing');
+  const { spawn, execFileSync } = await import('node:child_process');
+  const os = await import('node:os'); const fsp = await import('node:fs');
+  const dir = fsp.mkdtempSync(path.join(os.tmpdir(), 'sb-pair-'));
+  const data = path.join(dir, 'hub.json');
+  const PORT = '8792', H = 'http://127.0.0.1:' + PORT;
+  const hub = spawn('node', [path.join(ROOT, 'server', 'server.mjs')], { env: Object.assign({}, process.env, { PORT, SMOKEBOX_DATA: data, SMOKEBOX_REQUIRE_TOKENS: '1', SMOKEBOX_STARTER: '1' }), cwd: ROOT, stdio: 'ignore' });
+  try {
+    await new Promise((r) => setTimeout(r, 1800));
+    const p = await fresh(browser);
+    await p.goto(H + '/'); await p.waitForTimeout(900);
+    await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
+    await tap(p, 'Use one kitchen on several tablets'); await p.waitForTimeout(500);
+    await tap(p, 'Use the main computer for orders on this tablet'); await p.waitForTimeout(400);
+    await p.fill('#hu-url', H); await p.fill('#hu-name', 'Pass');
+    await tap(p, 'Check the main computer'); await p.waitForTimeout(1500);
+    const js = '.sheet-root:last-of-type';
+    for (const t of ['The main computer needs a pairing code', 'Pairing code', 'Pair this tablet']) check('pairing: ' + t, await has(p, t, js));
+    const out = execFileSync('node', [path.join(ROOT, 'server', 'server.mjs'), 'admin', 'pair', '--port', PORT, '--data', data], { encoding: 'utf8' });
+    const code = (/Pairing code: ([A-Z0-9]+)/.exec(out) || [])[1] || '';
+    check('pairing: the owner command makes a code that works once for 10 minutes', !!code && /works once/.test(out) && /10 minutes/.test(out), out);
+    await p.fill('#hu-pair', code); await tap(p, 'Pair this tablet'); await p.waitForTimeout(2000);
+    check('pairing: after pairing the choice appears', await has(p, 'Join this kitchen', js));
+    await p.evaluate(() => document.querySelector('input[name="hu-choice"][value="adopt"]').click()); await p.waitForTimeout(300);
+    await tap(p, 'Join this kitchen'); await p.waitForTimeout(2000);
+    const lst = execFileSync('node', [path.join(ROOT, 'server', 'server.mjs'), 'admin', 'list', '--port', PORT, '--data', data], { encoding: 'utf8' });
+    const sid = (/^([a-z0-9]+)\s+Pass/m.exec(lst) || [])[1] || '';
+    check('pairing: the owner list shows the paired screen', !!sid, lst);
+    execFileSync('node', [path.join(ROOT, 'server', 'server.mjs'), 'admin', 'revoke', sid, '--port', PORT, '--data', data], { encoding: 'utf8' });
+    await p.waitForTimeout(4000);
+    check('pairing: a removed tablet says so', await p.evaluate(() => /This tablet has been removed from the kitchen/.test(document.body.innerText)));
+    check('pairing: Leave and pair again', await has(p, 'Leave and pair again', js));
+    await p.close();
+  } finally { try { hub.kill(); } catch (e) { /* already stopped */ } }
+}
+
 // The demo walk: a fresh browser context opened with ?demo has sample dishes and tickets, and a normal tab in the same context stays empty.
 async function demoMode(browser) {
   console.log('Demo mode (?demo)');
@@ -498,7 +536,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'screens') await severalScreens(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await severalScreens(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'screens') await severalScreens(browser); else if (process.env.WALK_ONLY === 'pairing') await pairing(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await severalScreens(browser); await pairing(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);
