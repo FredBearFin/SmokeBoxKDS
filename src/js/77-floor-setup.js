@@ -1386,12 +1386,12 @@
     if (st.state === 'sending') return { tone: undefined, text: 'Using the hub. Sending your last taps...' + wait + when };
     if (st.state === 'connecting') return { tone: undefined, text: 'Connecting to the hub...' };
     if (st.state === 'offline') return { tone: 'bad', text: 'Lost the hub. What you see may be out of date.' + wait + ' Trying again.' + when };
-    if (st.state === 'error') return { tone: 'bad', text: hubErrorWords(st.error) };
+    if (st.state === 'error') return { tone: 'bad', text: st.error === 'revoked' ? 'This tablet has been removed from the hub. Ask the owner for a new pairing code to pair it again.' : hubErrorWords(st.error) };
     return { tone: undefined, text: 'Not using a hub.' };
   }
   // Plain words for each hub error code (the same codes as the show-only screen, plus a hub that is not empty).
   function hubErrorWords(code) {
-    return { badCode: 'The access code was not accepted. Check it with whoever runs the hub.', notFound: 'Nothing at that address is a Smokebox hub. Check the address.', unreachable: 'Could not reach that address. Check the Wi-Fi and the address, then try again.', wrongVersion: 'This page and the hub are different versions. Reload this page, or ask whoever runs the hub to update it.', tooMany: 'The hub already has as many screens as it allows.', notEmpty: 'The hub already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Nothing was changed.' }[code] || 'Could not use the hub.';
+    return { badCode: 'The access code was not accepted. Check it with whoever runs the hub.', notFound: 'Nothing at that address is a Smokebox hub. Check the address.', unreachable: 'Could not reach that address. Check the Wi-Fi and the address, then try again.', wrongVersion: 'This page and the hub are different versions. Reload this page, or ask whoever runs the hub to update it.', tooMany: 'The hub already has as many screens as it allows.', unpaired: 'This tablet is not paired with the hub. Ask the person who runs the hub for a pairing code.', revoked: 'This tablet has been removed from the hub. Ask the owner for a new pairing code to pair it again.', badPairCode: 'That pairing code did not work. A code works once and only for 10 minutes. Ask for a new one.', tooManyTries: 'Too many tries. Wait a few minutes, then ask for a new code.', badName: 'That screen name cannot be used. Use letters, numbers and spaces, up to 20 characters.', notEmpty: 'The hub already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Nothing was changed.' }[code] || 'Could not use the hub.';
   }
   // Opens "Use one kitchen on several tablets": what it is, what is not set up, and the form for the other screen.
   function openFollow() {
@@ -1442,6 +1442,7 @@
     const hUrl = h('input', { type: 'text', class: 'input', id: 'hu-url', inputmode: 'url', autocomplete: 'off', autocapitalize: 'off', placeholder: 'https://kitchen.example.com', 'aria-label': 'Address of the hub', dataset: { field: 'hub-url' } });
     const hCode = h('input', { type: 'text', class: 'input', id: 'hu-code', autocomplete: 'off', autocapitalize: 'characters', maxlength: 12, placeholder: 'ABC123 (if asked)', 'aria-label': 'Access code, if the hub asks for one', dataset: { field: 'hub-code' } });
     const hName = h('input', { type: 'text', class: 'input', id: 'hu-name', autocomplete: 'off', maxlength: 20, placeholder: 'Pass, Front counter...', 'aria-label': 'Name for this screen', dataset: { field: 'hub-name' } });
+    const hPair = h('input', { type: 'text', class: 'input', id: 'hu-pair', autocomplete: 'off', autocapitalize: 'characters', maxlength: 16, placeholder: 'ABC234', 'aria-label': 'Pairing code', dataset: { field: 'hub-pair' } });
     const hMsg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'hub-msg' } });
     const choiceBox = h('div', { class: 'fw-choice', dataset: { role: 'choice' }, hidden: true });
     const hStatus = h('p', { class: 'fs-sub fw-hubstatus', role: 'status', dataset: { role: 'hub-status' } });
@@ -1453,6 +1454,27 @@
       const n = String(hName.value || '').trim().replace(/\s+/g, ' ');
       if (!n) { tell(hMsg, 'Give this screen a name, like Pass or Front counter, so you can tell the tablets apart.', 'bad'); hName.focus(); return null; }
       return { url: a.url, code: c.code, name: n.slice(0, 20) };
+    }
+    // Pairing: the hub gives each tablet its own pass in exchange for a one-time code. The old shared access code is only for hubs that do not need passes.
+    // Pair box: shown only when the hub asked for pairing.
+    const pairBtn = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'hub-pair' }, onClick: () => doPair() }, 'Pair this tablet');
+    const pairBox = h('div', { class: 'fw-pairbox', hidden: true, dataset: { role: 'pair-box' } },
+      h('p', null, h('strong', null, 'This hub needs a pairing code. '), 'Ask the person who runs the hub for a pairing code. It works once and for 10 minutes.'),
+      h('label', { class: 'fs-label', for: 'hu-pair' }, 'Pairing code'), hPair, h('div', { class: 'fs-row' }, pairBtn));
+    // Hides or shows the old access code field and the pairing box, depending on what the hub asked for.
+    function showPairing(needs) { pairBox.hidden = !needs; accessBox.hidden = !!needs; }
+    // Exchanges the pairing code for this tablet's own pass, then looks at the hub again.
+    function doPair() {
+      const a = checkHubAddress(hUrl.value); if (!a.ok) { tell(hMsg, a.why, 'bad'); hUrl.focus(); return; }
+      const code = String(hPair.value || '').toUpperCase().replace(/[\s-]+/g, '');
+      if (code.length < 6) { tell(hMsg, 'Type the 6-character pairing code.', 'bad'); hPair.focus(); return; }
+      const n = String(hName.value || '').trim().replace(/\s+/g, ' ');
+      if (!n) { tell(hMsg, 'Give this screen a name, like Pass or Front counter, so you can tell the tablets apart.', 'bad'); hName.focus(); return; }
+      tell(hMsg, 'Pairing...');
+      Promise.resolve(SB.store.pairHub({ url: a.url, code, name: n.slice(0, 20) })).then((r) => {
+        if (!r || !r.ok) { tell(hMsg, hubErrorWords(r && r.error), 'bad'); return; }
+        hPair.value = ''; tell(hMsg, 'Paired as ' + (r.name || n) + '.', 'ok'); lookAtHub();
+      }, () => tell(hMsg, hubErrorWords('unreachable'), 'bad'));
     }
     // Draws the explicit choice after the hub was looked at: use the hub's kitchen, or send this tablet's kitchen (only into an empty hub).
     function paintChoice() {
@@ -1466,15 +1488,18 @@
         opt('seed', 'Send this tablet\'s kitchen to the hub', empty ? 'The hub is empty, so this works. The hub then holds your kitchen and every tablet shows it.' : 'Only works if the hub is empty.', !empty),
         empty ? null : h('p', { class: 'fw-stop', dataset: { role: 'stop' }, role: 'alert' }, 'Stop: the hub already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Smokebox will not mix two kitchens. Show the hub\'s kitchen here, or leave this screen.'));
     }
-    // Looks at the hub without joining it, then shows the choice.
-    const check = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'hub-check' }, onClick: () => {
+    // Looks at the hub without joining it, then shows the choice (or asks for a pairing code first).
+    function lookAtHub() {
       const f = hubFields(); if (!f) return;
       lastFields = f; probed = null; picked = ''; join.disabled = true; paintChoice(); tell(hMsg, 'Looking at the hub...');
       Promise.resolve(SB.store.probeHub({ url: f.url, code: f.code })).then((r) => {
+        if (r && (r.error === 'unpaired' || (!r.ok && r.tokensRequired))) { showPairing(true); tell(hMsg, hubErrorWords('unpaired'), 'bad'); return; }
         if (!r || !r.ok) { tell(hMsg, hubErrorWords(r && r.error), 'bad'); return; }
+        showPairing(!!r.tokensRequired);
         probed = { empty: !!r.empty }; tell(hMsg, 'The hub answered. Choose below.', 'ok'); paintChoice();
       }, () => tell(hMsg, hubErrorWords('unreachable'), 'bad'));
-    } }, 'Check the hub');
+    }
+    const check = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'hub-check' }, onClick: lookAtHub }, 'Check the hub');
     // Joins with the chosen option only; refuses to go on if no choice was made.
     const join = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'hub-join' }, disabled: true, onClick: () => {
       if (!picked || !lastFields) { tell(hMsg, 'Choose one of the two options first.', 'bad'); return; }
@@ -1499,14 +1524,21 @@
     }
     // The second leave button: leaves even though some taps were never answered.
     const leaveAnyway = h('button', { type: 'button', class: 'btn', hidden: true, dataset: { act: 'hub-leave-anyway' }, onClick: () => doLeave(true) }, 'Leave anyway, lose those taps');
+    // The old shared access code, kept only for hubs that do not need pairing.
+    const accessBox = h('div', { class: 'fw-accessbox', dataset: { role: 'access-box' } }, h('label', { class: 'fs-label', for: 'hu-code' }, 'Access code (only if the hub asks)'), hCode);
     const hubForm = h('div', { class: 'fw-hubform', dataset: { role: 'hub-form' } },
       h('label', { class: 'fs-label', for: 'hu-url' }, 'Address of the hub'), hUrl,
-      h('label', { class: 'fs-label', for: 'hu-code' }, 'Access code (only if the hub asks)'), hCode,
+      accessBox,
       h('label', { class: 'fs-label', for: 'hu-name' }, 'Name for this screen'), hName,
-      h('div', { class: 'fs-row' }, check), choiceBox, h('div', { class: 'fs-row' }, join));
+      pairBox, h('div', { class: 'fs-row' }, check), choiceBox, h('div', { class: 'fs-row' }, join));
+    // After this tablet was removed from the hub: forget the pass here and go back to the form, to be paired again.
+    const forget = h('button', { type: 'button', class: 'btn', hidden: true, dataset: { act: 'hub-forget' }, onClick: () => {
+      const a = checkHubAddress(hUrl.value); try { if (a.ok && SB.store.unpair) SB.store.unpair(a.url); } catch (e) { /* nothing to forget */ }
+      Promise.resolve(SB.store.leaveHub ? SB.store.leaveHub({ force: true }) : null).then(() => { tell(hMsg, 'This tablet shows its own kitchen again. Ask for a new pairing code to join again.', 'ok'); paintHub(); });
+    } }, 'Leave and pair again');
     const hubJoined = h('div', { class: 'fw-hubjoined', dataset: { role: 'hub-joined' } }, hStatus,
       h('p', { class: 'fs-sub' }, 'Your own saved kitchen stays on this tablet, untouched, and comes back when you leave the hub. The hub\'s kitchen stays on the hub. If you reload this page, the tablet goes back to its own kitchen and you join again.'),
-      h('div', { class: 'fs-row' }, leave, leaveAnyway));
+      h('div', { class: 'fs-row' }, leave, leaveAnyway, forget));
     const hubCard = h('section', { class: 'fs-card fw-hub', dataset: { part: 'hub' } },
       h('h3', { class: 'fs-h' }, 'Use this hub for orders on this tablet'),
       h('p', { class: 'fs-sub' }, 'This tablet takes orders and the hub shares them with every other tablet on it. This is a test feature. It needs the hub computer running somewhere (this version does not start one), and it has not been tried in a real kitchen.'),
@@ -1514,7 +1546,7 @@
     // Shows either the join form or the joined state, depending on whether this tablet is using a hub.
     function paintHub() {
       const on = inHub(); hubForm.hidden = on; hubJoined.hidden = !on;
-      if (on) { const w = hubWords(SB.store.hubStatus ? SB.store.hubStatus() : { state: 'connecting' }); tell(hStatus, w.text, w.tone); }
+      if (on) { const hs = SB.store.hubStatus ? SB.store.hubStatus() : { state: 'connecting' }; const w = hubWords(hs); tell(hStatus, w.text, w.tone); forget.hidden = !(hs && (hs.error === 'revoked' || hs.error === 'unpaired')); }
     }
     // Builds one big choice button for the two ways of using another screen.
     const modeBtn = (id, title, line) => h('button', { type: 'button', class: 'fs-card fw-mode', dataset: { mode: id }, 'aria-pressed': 'false', onClick: () => setMode(id) }, h('strong', null, title), h('span', { class: 'fs-sub' }, line));

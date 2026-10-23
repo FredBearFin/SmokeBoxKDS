@@ -10,7 +10,9 @@ let fails = 0;
 function ok(c, m) { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; }
 const stubs = () => {
   window.__calls = []; window.__hub = { empty: true, error: null, joined: false };
-  SB.store.probeHub = (o) => { window.__calls.push(['probe', o]); return Promise.resolve(window.__hub.error ? { ok: false, error: window.__hub.error } : { ok: true, empty: window.__hub.empty }); };
+  SB.store.probeHub = (o) => { window.__calls.push(['probe', o]); if (window.__hub.tokens && !window.__hub.paired) return Promise.resolve({ ok: false, error: 'unpaired', tokensRequired: true }); return Promise.resolve(window.__hub.error ? { ok: false, error: window.__hub.error } : { ok: true, empty: window.__hub.empty }); };
+  SB.store.pairHub = (o) => { window.__calls.push(['pair', o]); if (window.__hub.pairError) return Promise.resolve({ ok: false, error: window.__hub.pairError }); window.__hub.paired = true; return Promise.resolve({ ok: true, name: o.name }); };
+  SB.store.unpair = (u) => { window.__calls.push(['unpair', u]); window.__hub.paired = false; };
   SB.store.initHubClient = (o) => { window.__calls.push(['join', o]); if (window.__hub.joinError) return Promise.resolve({ ok: false, error: window.__hub.joinError }); window.__hub.joined = true; return Promise.resolve({ ok: true }); };
   SB.store.isHubClient = () => window.__hub.joined;
   SB.store.hubStatus = () => ({ state: window.__hub.state || 'connected', queued: window.__hub.queued || 0, lastUpdate: Date.now() });
@@ -90,6 +92,37 @@ await withPage({ w: 1024, h: 768 }, async (page, logs) => {
   await page.waitForFunction(() => /cannot be sent/.test(document.querySelector('[data-role="hub-msg"]').textContent), null, { timeout: 3000 });
   ok(await page.locator('[data-role="hub-form"]').isVisible(), 'refused join: stays on the form, nothing changed');
   ok(logs.pageErrors.length === 0, 'no page errors ' + logs.pageErrors.join('|').slice(0, 200));
+});
+// A hub that needs pairing: the pairing box shows, the access code field hides, errors are plain, and a removed tablet can start over.
+await withPage({ w: 1024, h: 768 }, async (page) => {
+  await page.evaluate(stubs);
+  await page.evaluate(() => { __hub.tokens = true; SB.sheets.open('follow'); });
+  await page.waitForSelector('[data-mode="orders"]'); await page.click('[data-mode="orders"]');
+  ok(await page.locator('[data-role="access-box"]').isVisible() && !(await page.locator('[data-role="pair-box"]').isVisible()), 'before looking: access code field shows, no pairing box');
+  await page.fill('[data-field="hub-url"]', 'kitchen.example.com'); await page.fill('[data-field="hub-name"]', 'Pass');
+  await page.click('[data-act="hub-check"]');
+  await page.waitForSelector('[data-role="pair-box"]:not([hidden])');
+  ok(/Ask the person who runs the hub for a pairing code. It works once and for 10 minutes./.test(await page.locator('[data-role="pair-box"]').innerText()), 'pairing box uses the agreed words');
+  ok(!(await page.locator('[data-role="access-box"]').isVisible()), 'hub needs tokens: old access code field is hidden');
+  await page.click('[data-act="hub-pair"]');
+  ok(/6-character/.test(await page.locator('[data-role="hub-msg"]').innerText()), 'empty pairing code: plain message');
+  await page.evaluate(() => { __hub.pairError = 'badPairCode'; });
+  await page.fill('[data-field="hub-pair"]', 'abc-234'); await page.click('[data-act="hub-pair"]');
+  await page.waitForFunction(() => /works once/.test(document.querySelector('[data-role="hub-msg"]').textContent), null, { timeout: 3000 });
+  ok(true, 'wrong or used code: plain error');
+  await page.evaluate(() => { __hub.pairError = null; });
+  await page.click('[data-act="hub-pair"]');
+  await page.waitForSelector('[data-opt="adopt"]');
+  const pc = await page.evaluate(() => __calls.filter((c) => c[0] === 'pair').at(-1)[1]);
+  ok(pc.code === 'ABC234' && pc.name === 'Pass' && pc.url === 'https://kitchen.example.com', 'pairHub got a clean code, name and address');
+  await page.check('[data-choice="adopt"]'); await page.click('[data-act="hub-join"]');
+  await page.waitForSelector('[data-role="hub-joined"]:not([hidden])');
+  await page.evaluate(() => { SB.store.hubStatus = () => ({ state: 'error', error: 'revoked' }); });
+  await page.waitForFunction(() => /removed from the hub/.test(document.querySelector('[data-role="hub-status"]').textContent), null, { timeout: 5000 });
+  ok(true, 'removed tablet: plain state');
+  await page.click('[data-act="hub-forget"]');
+  await page.waitForSelector('[data-role="hub-form"]:not([hidden])');
+  ok((await page.evaluate(() => __calls.some((c) => c[0] === 'unpair'))), 'Leave and pair again forgets the pass on this tablet');
 });
 // Without the store calls, the hub card says so plainly.
 await withPage({ w: 1024, h: 768 }, async (page) => {

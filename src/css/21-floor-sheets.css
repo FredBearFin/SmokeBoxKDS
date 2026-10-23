@@ -663,3 +663,4 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 @media (max-width: 560px) { .fw-modes { grid-template-columns: 1fr; } }
 .fw [hidden] { display: none !important; }
 .fw .fs-row { margin-block: var(--sp-2); }
+.rd-state { white-space: nowrap; }
