@@ -112,8 +112,10 @@ ul.gd-list { list-style: disc; }
 .gd-check li::before { content: ""; position: absolute; left: 0; top: 0.15em; width: 22px; height: 22px; border: 2px solid var(--ink2); border-radius: 4px; background: var(--paper); box-sizing: border-box; }
 .gd-legend { padding-left: var(--sp-6); }
 /* The small round ? that other screens place beside a heading or button (SB.guide.link). */
-.gd-help { display: inline-grid; place-items: center; width: 28px; height: 28px; min-width: 28px; border-radius: var(--r-pill); border: var(--bw) solid var(--line); background: var(--paper); color: var(--ink); font: var(--w-bold) var(--fs-2)/1 var(--font-display); text-decoration: none; }
-.gd-help:hover { background: var(--hover); }
+.gd-help { position: relative; isolation: isolate; display: inline-grid; place-items: center; width: 44px; height: 44px; min-width: 44px; border: 0; background: transparent; color: var(--ink); font: var(--w-bold) var(--fs-2)/1 var(--font-display); text-decoration: none; }
+/* The visible "?" is a 28 px circle; the link around it is 44 px so a thumb or a glove finds it. */
+.gd-help::before { content: ""; position: absolute; z-index: -1; width: 28px; height: 28px; border-radius: var(--r-pill); border: var(--bw) solid var(--line); background: var(--paper); }
+.gd-help:hover::before { background: var(--hover); }
 .gd-help:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: 2px; }
 
 /* ---------- Previous and Next ---------- */
