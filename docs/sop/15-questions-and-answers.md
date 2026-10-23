@@ -32,7 +32,7 @@ A number that came with the app, such as a prep time or a cost. It is a guess un
 
 ## Why is there no Cabinet tab?
 
-The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Menu**, then **Dishes and prices**, and tap **Yes, I cook ahead**.
+The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Settings**, then **Dishes and prices**, and tap **Yes, I cook ahead**.
 
 ## Can I try it without risking my data?
 

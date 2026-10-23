@@ -17,7 +17,7 @@ Smokebox is a kitchen screen and a simple order screen for a small restaurant or
 2. Tap **New ticket**, add a dish and tap **Send to kitchen**. Then tap Start, Done and Bump on the ticket, and take payment from **Orders**.
 3. Save a backup: **Back office**, **Menu and settings**, **Back up now**. Do it every day at close.
 
-The in-app **Guide** (Menu, then Guide) has short pages and printable checklist cards. Your data stays on the device unless you save or send a backup.
+The in-app **Guide** (Settings, then Guide) has short pages and printable checklist cards. Your data stays on the device unless you save or send a backup.
 
 Questions first-time owners ask (internet, a dead tablet, two tablets, cost, food-safety records) are answered in docs/owner-faq-support.md.
 

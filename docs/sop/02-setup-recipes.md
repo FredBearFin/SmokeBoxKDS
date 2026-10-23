@@ -4,15 +4,15 @@ Four ways to set up Smokebox. Pick the one closest to your place. Each uses only
 
 ## Counter cafe or bakery
 
-Smokebox has no setting to skip kitchen tickets. Every order makes one, so here a ticket is a quick receipt you clear with one tap.
-- Stations: tap **Menu**, **Dishes and prices**, then **Change stations**. Rename one to "Counter" and tap **Not used** on the others.
-- Settings: set tax and hours in **Tax, hours and PIN**. Choose **No, skip this** for cooking ahead. For a batch you bake, like 24 croissants, tap **I count what I made**.
-- The board: with one station in use there are no station tabs. A ticket shows at once. Tap **Done**, then **Bump**.
+Every order makes a ticket. With Counter service on, a paid order's ticket clears itself.
+- Stations: tap **Settings**, **Dishes and prices**, then **Change stations**. Rename one to "Counter" and tap **Not used** on the others.
+- Settings: set tax and hours in **Tax, hours and PIN**. Answer **No** to cooking ahead. For a batch you bake, like 24 croissants, tap **I count what I made**. In **Settings**, **How you serve**, turn on **Counter service**.
+- The board: one list of orders, no station tabs. Pay with **Cash** or **Card** as you send, and the ticket clears itself. With **Pay later**, tap **Bump** or pay from **Orders**.
 
 ## Food truck on one tablet
 
 - Stations: keep two, like "Grill" and "Window". Tap **Not used** on the rest.
-- Settings: enter your tax. Set a PIN if others use the tablet. Tap **Takeout** on each order. Tap **Cash** or **Card** before **Send to kitchen**.
+- Settings: enter your tax. Set a PIN if others use the tablet. For How do you serve?, tap **Food truck / one person** to keep two order buttons, Walk-up and Pickup. Tap **Takeout** on each order. Tap **Cash** or **Card** before **Send to kitchen**.
 - The board: tabs for All stations, your two stations and Expo. One tablet does both jobs. **New ticket** takes the order and All stations shows what to cook. **Orders** lists unpaid orders.
 
 ## Restaurant with a line and an expo

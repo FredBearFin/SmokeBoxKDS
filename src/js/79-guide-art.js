@@ -124,7 +124,7 @@
 
   /* ---------- 3. food in the hold cabinet ---------- */
 
-  // The cabinet picture: a batch goes in, is checked, is taken out as you serve, then ends by reheating once or being thrown out.
+  // The cabinet picture: a batch goes in, is checked, is taken out as you serve, then ends by reheating or being thrown out.
   function cabinet(alt) {
     const k = [];
     k.push(rect(0, 0, 560, 640, 'ga-bg', 12));
@@ -148,7 +148,7 @@
     k.push(rect(20, 388, 254, 236, 'ga-card', 10));
     k.push(badge(54, 424, 4));
     k.push(text(80, 431, 'Too cool', { size: 23, weight: 700 }));
-    ['Reheat once, then', 'log the new', 'reading. One reheat', 'per batch.'].forEach((t, i) => k.push(text(36, 466 + i * 24, t, { size: 19, cls: 'ga-ink2' })));
+    ['Reheat, then', 'log the new', 'reading. Smokebox', 'allows one.'].forEach((t, i) => k.push(text(36, 466 + i * 24, t, { size: 19, cls: 'ga-ink2' })));
     k.push(text(36, 590, 'Dishes pause meanwhile.', { size: 17, weight: 700, cls: 'ga-warn-t' }));
     k.push(rect(286, 388, 254, 236, 'ga-card ga-card-bad', 10));
     k.push(badge(320, 424, 5, 'ga-badge-bad'));

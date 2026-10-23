@@ -12,9 +12,11 @@ Your data lives only in the browser on one device. Clearing the browser data, us
 
 ## I forgot the PIN
 
-Smokebox has no forgot-PIN button. The PIN is a door latch kept on this device, not real security. Five wrong tries lock the pad for 30 seconds.
+When you set a PIN, Smokebox shows a recovery code once. Tap **Copy** or **Print**, keep it away from the tablet, select **I saved it**, then tap **Done**. On the PIN pad, open **Forgot the PIN?**, type the recovery code and a new PIN (or leave it empty to remove the PIN), and tap **Reset the PIN with my code**. A PIN from before codes existed can get one: **Settings**, **Tax, hours and PIN**, **Make a recovery code**.
 
-The only way back in is to clear this site's saved data in your browser settings. That erases everything Smokebox saved on this device, including today's tickets and your menu. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before the PIN was set.
+No code? The only way back is to clear this site's saved data in your browser settings. That erases everything on this device, including today's tickets and your menu. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before the PIN was set.
+
+Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not real security.
 
 ## Smokebox opens empty
 
