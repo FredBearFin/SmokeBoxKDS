@@ -340,16 +340,16 @@ group('3. Ingredients', async () => {
     const ing = (id) => st(page, (x) => SB.store.getState().ingredients.find((i) => i.id === x), id);
     const n = await st(page, () => SB.store.getState().ingredients.length);
     check('every ingredient has a row (' + n + ')', (await page.locator('#od-ingredients .od-ing').count()) === n);
-    await typeNum(page, 'Par of Brisket', '16000');
+    await typeNum(page, 'Opening amount of Brisket', '16000');
     await waitFor(page, () => SB.store.getState().ingredients.find((i) => i.id === 'brisket').parG === 16000);
     check('par saved in grams; the field also reads it as kilograms', (await text(page, '#od-ingredients .od-ing[data-id="brisket"] .od-read')).includes('16.00 kg'));
-    await typeNum(page, '86 point of Brisket', '800');
+    await typeNum(page, 'Sold out at, Brisket', '800');
     await waitFor(page, () => SB.store.getState().ingredients.find((i) => i.id === 'brisket').thresholdG === 800);
     check('86 point saved', true);
-    await typeNum(page, 'Static yield of Brisket', '58');
+    await typeNum(page, 'Cooked yield of Brisket', '58');
     await waitFor(page, () => Math.abs(SB.store.getState().ingredients.find((i) => i.id === 'brisket').yield - 0.58) < 1e-9);
     check('static yield typed as a percentage is stored as a fraction (0.58)', true);
-    await typeNum(page, 'Static yield of Brisket', '900');
+    await typeNum(page, 'Cooked yield of Brisket', '900');
     await page.waitForTimeout(150);
     check('a yield of 900% is refused in words', /between 5% and 300%/.test(await text(page, '#od-ingredients .od-ing[data-id="brisket"] .od-ferr:not([hidden])')), await text(page, '#od-ingredients .od-ing[data-id="brisket"] .od-ferr:not([hidden])'));
     await page.locator('#od-ingredients .od-ing[data-id="brisket"] .seg [data-id="confirmed"]').click();
@@ -429,7 +429,7 @@ group('5. Pacing', async () => {
     check('and says what it does for new tickets', /Pacing is (on|off)\./.test(await text(page, '#od-pacing .od-st')), await text(page, '#od-pacing .od-st'));
     await page.locator('#od-pacing-toggle').click();
     await waitFor(page, (v) => SB.store.getState().settings.pacing.enabled === v, on0);
-    const specs = [['Shortest prep time', '20', 'floorSec', 20], ['Extra time per extra portion', '30', 'qtyFactor', 0.3], ['Most a big line can grow', '3', 'qtyCap', 3], ['Learning strength', '8', 'learnK', 8], ['Learned time never below', '0.6', 'minFactor', 0.6], ['Learned time never above', '3', 'maxFactor', 3], ['Trim a very long timing at', '4', 'outlierFactor', 4]];
+    const specs = [['Shortest prep time', '20', 'floorSec', 20], ['Extra time per extra portion', '30', 'qtyFactor', 0.3], ['Most a big line can grow', '3', 'qtyCap', 3], ['How fast it learns your real times', '8', 'learnK', 8], ['Learned time never below', '0.6', 'minFactor', 0.6], ['Learned time never above', '3', 'maxFactor', 3], ['Ignore a timing longer than', '4', 'outlierFactor', 4]];
     for (const [label, typed, key, want] of specs) {
       await typeNum(page, label, typed);
       await waitFor(page, ([k, w]) => Math.abs(SB.store.getState().settings.pacing[k] - w) < 1e-9, [key, want]);
@@ -437,7 +437,7 @@ group('5. Pacing', async () => {
     }
     check('each pacing field carries a one-line plain meaning and its allowed range', await st(page, () => Array.from(document.querySelectorAll('#od-pacing .od-nf')).every((n) => /Allowed: /.test(n.querySelector('.od-hint') ? n.querySelector('.od-hint').textContent : ''))));
     // out of bounds, named in words
-    const refusals = [['Shortest prep time', '900', /Shortest prep time has to be between 1 s and 600 s\./], ['Extra time per extra portion', '500', /Extra time per extra portion has to be between 0% and 200%\./], ['Most a big line can grow', '11', /Most a big line can grow has to be between 1× and 10×\./], ['Learning strength', '99', /Learning strength has to be between 0 timings and 50 timings\./], ['Learned time never below', '2', /Learned time never below has to be between 0\.1 × starter and 1 × starter\./]];
+    const refusals = [['Shortest prep time', '900', /Shortest prep time has to be between 1 s and 600 s\./], ['Extra time per extra portion', '500', /Extra time per extra portion has to be between 0% and 200%\./], ['Most a big line can grow', '11', /Most a big line can grow has to be between 1× and 10×\./], ['How fast it learns your real times', '99', /How fast it learns your real times has to be between 0 timings and 50 timings\./], ['Learned time never below', '2', /Learned time never below has to be between 0\.1 times the starter time and 1 times the starter time\./]];
     for (const [label, typed, re] of refusals) {
       await typeNum(page, label, typed);
       await page.waitForTimeout(120);
@@ -452,7 +452,7 @@ group('5. Pacing', async () => {
     const p2 = await st(page, () => { const p = SB.store.getState().settings.pacing; return Object.keys(SB.config.pacing).filter((k) => k !== 'enabled').every((k) => p[k] === SB.config.pacing[k]); });
     check('reset puts every pacing number back to the starter value', p2);
     check('reset leaves the on/off switch alone', (await pc()).enabled === on0);
-    check('the fields show the starter values again', (await input(page, 'Learning strength').inputValue()) === '3');
+    check('the fields show the starter values again', (await input(page, 'How fast it learns your real times').inputValue()) === '3');
     noErrors('pacing panel', logs);
   });
 });
@@ -465,9 +465,9 @@ group('6. Food safety limits', async () => {
     const sf = () => st(page, () => SB.store.getState().settings.safety);
     const sline = await text(page, '#od-safety .od-safetyline');
     check('the safety line is shown word for word', sline === await st(page, () => SB.config.safetyLine), sline);
-    check('the panel says the app never lets hot hold go below 135 °F', /never lets hot hold go below 135 °F/.test(await text(page, '#od-safety')));
+    check('the panel says the FDA Food Code minimum for hot hold is 135 °F', /refuses a hot-hold limit below 135 °F/.test(await text(page, '#od-safety')));
     const hint = await text(page, '#od-safety .od-nf:has(input[aria-label="Hot hold temperature"]) .od-hint');
-    check('legal limits are printed under the field (min 135 °F)', /Legal minimum 135 °F/.test(hint) && /Allowed: 135 to 200 °F/.test(hint), hint);
+    check('legal limits are printed under the field (min 135 °F)', /FDA Food Code minimum 135 °F/.test(hint) && /Allowed: 135 to 200 °F/.test(hint), hint);
     const f0 = await eventsOf(page, 'ui_report');
     await typeNum(page, 'Hot hold temperature', '120');
     await page.waitForTimeout(150);
@@ -770,8 +770,8 @@ group('9c. Data: import', async () => {
     // refusals: nothing changes, the reason is given
     const before = await stateJson(page);
     const bad = [
-      ['garbage text', 'hello, this is not a backup', /not readable JSON/],
-      ['truncated JSON', backup.slice(0, backup.length >> 1), /not readable JSON/],
+      ['garbage text', 'hello, this is not a backup', /could not be read/],
+      ['truncated JSON', backup.slice(0, backup.length >> 1), /could not be read/],
       ['empty file', '', /nothing in it/],
       ['an unrelated JSON object', '{"a":1,"b":[1,2,3]}', /does not say which Smokebox version|not a Smokebox backup/],
       ['a JSON list', '[1,2,3]', /not a Smokebox backup|top level/],
@@ -797,7 +797,7 @@ group('9c. Data: import', async () => {
     await page.locator('#od-data .od-paste').fill('{"v":1,');
     await page.locator('[data-action="import-check-paste"]').click();
     await page.waitForTimeout(150);
-    check('pasting a broken backup is refused with the reason', /cannot be used/.test(await text(page, '#od-data .od-impresult')) && /not readable JSON/.test(await text(page, '#od-data .od-impresult')));
+    check('pasting a broken backup is refused with the reason', /cannot be used/.test(await text(page, '#od-data .od-impresult')) && /could not be read/.test(await text(page, '#od-data .od-impresult')));
     await page.locator('#od-data .od-paste').fill('   ');
     await page.locator('[data-action="import-check-paste"]').click();
     check('pasting nothing says so', /nothing in it/.test(await text(page, '#od-data .od-impresult')));
@@ -871,7 +871,7 @@ group('10. About and wording', async () => {
     check('About says what is a starter estimate', /starter estimate/.test(about));
     check('About says what has not been tested (real sunlight, other devices)', /real sunlight/.test(about) && /other devices/.test(about));
     check('About says separate devices do not share data and same-browser tablets do', /Separate devices do not share data\. Tablets open in the same browser on the same device do/.test(about));
-    check('About says Smokebox is separate from Pitcall and may share sell-out times later', /Smokebox is separate from Pitcall; later they can share the sell-out times\./.test(about));
+    check('About does not mention Pitcall', !/Pitcall/.test(about));
     const copy = await st(page, () => {
       const els = Array.from(document.querySelectorAll('.od button, .od .od-lab, .od h2, .od h3, .od dt, .od .toggle-label, .od .seg-opt, .od .od-toc-link, .od summary')).filter((e) => e.offsetParent !== null);
       return els.map((e) => (e.textContent || '').trim()).filter(Boolean);
@@ -920,7 +920,7 @@ group('11. Reload, two tabs, half-typed values', async () => {
     await page2.waitForTimeout(300);
     check('a price edited in tab 1 shows up in tab 2 without a reload', (await input(page2, 'Price of ' + MENU.name).inputValue()) === '11.50', await input(page2, 'Price of ' + MENU.name).inputValue());
     // half-typed value in tab 2 survives tab 1 editing something else
-    const pinput = input(page2, 'Learning strength');
+    const pinput = input(page2, 'How fast it learns your real times');
     await pinput.scrollIntoViewIfNeeded();
     await pinput.click();
     await pinput.fill('17');
@@ -1099,7 +1099,7 @@ group('15. UI ranges match the engine (min, max, just outside)', async () => {
       }
       const map = {
         'Shortest prep time': (v) => ({ pacing: { floorSec: v } }), 'Extra time per extra portion': (v) => ({ pacing: { qtyFactor: v / 100 } }), 'Most a big line can grow': (v) => ({ pacing: { qtyCap: v } }),
-        'Learning strength': (v) => ({ pacing: { learnK: v } }), 'Learned time never below': (v) => ({ pacing: { minFactor: v } }), 'Learned time never above': (v) => ({ pacing: { maxFactor: v } }), 'Trim a very long timing at': (v) => ({ pacing: { outlierFactor: v } }),
+        'How fast it learns your real times': (v) => ({ pacing: { learnK: v } }), 'Learned time never below': (v) => ({ pacing: { minFactor: v } }), 'Learned time never above': (v) => ({ pacing: { maxFactor: v } }), 'Ignore a timing longer than': (v) => ({ pacing: { outlierFactor: v } }),
         'Hot hold temperature': (v) => ({ safety: { hotHoldF: v } }), 'Cold hold temperature': (v) => ({ safety: { coldHoldF: v } }), 'Reheat to': (v) => ({ safety: { reheatF: v } }),
         'Time allowed below hot hold': (v) => ({ safety: { belowHotGraceH: v } }), 'Time allowed above cold hold': (v) => ({ safety: { aboveColdGraceH: v } }), 'Longest time in the hold cabinet': (v) => ({ safety: { defaultMaxHoldH: v } }),
         'Temperature check every': (v) => ({ safety: { tempCheckEveryMin: v } }), 'Sanitize food-contact surfaces every': (v) => ({ safety: { sanitizeEveryH: v } }),

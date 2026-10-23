@@ -9,7 +9,7 @@ const now = new Date(2026, 9, 16, 18, 0, 0).getTime();
 const card = (m, id) => m.cards.find((c) => c.id === id);
 
 test('with no brisket on hand it says so and does not guess a time', () => {
-  const r = runOutLine({ onHandG: 0, shortfallAt: null, rateKnown: false }, now);
+  const r = runOutLine({ name: 'Brisket', onHandG: 0, shortfallAt: null, rateKnown: false }, now);
   assert.equal(r.tone, 'bad');
   assert.match(r.text, /No brisket is ready/);
 });
@@ -34,16 +34,16 @@ test('no pace yet says there is not enough data, never a made-up time', () => {
   assert.doesNotMatch(r.text, /\d:\d\d/);
 });
 
-test('the five cards: money, open orders, late tickets, 86 list and brisket', () => {
-  const m = glanceModel({ now, collected: 412.5, paidOrders: 1, openOrders: 3, openValue: 58.25, tickets: 2, late: 1, nearLate: 2, out86: ['Brisket plate', 'Slaw'], brisket: { onHandG: 4000, shortfallAt: now + 3600e3, rateKnown: true } });
-  assert.deepEqual(m.cards.map((c) => c.id), ['money', 'open', 'late', 'out86', 'brisket']);
+test('the five cards: money, open orders, late tickets, 86 list and the run-out item', () => {
+  const m = glanceModel({ now, collected: 412.5, paidOrders: 1, openOrders: 3, openValue: 58.25, tickets: 2, late: 1, nearLate: 2, out86: ['Brisket plate', 'Slaw'], runout: { name: 'Brisket', onHandG: 4000, shortfallAt: now + 3600e3, rateKnown: true } });
+  assert.deepEqual(m.cards.map((c) => c.id), ['money', 'open', 'late', 'out86', 'runout']);
   assert.equal(card(m, 'money').value, '$412.50');
   assert.equal(card(m, 'money').sub, '1 paid order, with tax and tips');
   assert.equal(card(m, 'open').value, '3');
   assert.match(card(m, 'open').sub, /\$58\.25 not paid yet\. 2 tickets on the line/);
   assert.equal(card(m, 'late').tone, 'bad');
   assert.equal(card(m, 'out86').sub, 'Brisket plate, Slaw');
-  assert.equal(card(m, 'brisket').value, '7:00 pm');
+  assert.equal(card(m, 'runout').value, '7:00 pm');
 });
 
 test('a quiet kitchen reads calmly and a missing input never shows NaN', () => {
@@ -67,9 +67,16 @@ test('a long 86 list shows four names and the count of the rest', () => {
 });
 
 test('a fresh kitchen shows no 86 list and no red brisket warning', () => {
-  const m = glanceModel({ now, fresh: true, out86: ['Brisket', 'Slaw'], brisket: { onHandG: 0 } });
+  const m = glanceModel({ now, fresh: true, out86: ['Brisket', 'Slaw'], runout: { name: 'Brisket', onHandG: 0 } });
   const by = (id) => m.cards.find((c) => c.id === id);
   assert.equal(by('out86').value, '0');
   assert.match(by('out86').sub, /Nothing cooked yet/);
-  assert.equal(by('brisket').tone, 'info');
+  assert.equal(by('runout').tone, 'info');
+});
+
+test('no cook-ahead item means no run-out card, and another item names itself', () => {
+  assert.deepEqual(glanceModel({ now }).cards.map((c) => c.id), ['money', 'open', 'late', 'out86']);
+  const m = glanceModel({ now, runout: { name: 'Pulled pork', onHandG: 0 } });
+  assert.equal(card(m, 'runout').label, 'Pulled pork');
+  assert.match(card(m, 'runout').sub, /No pulled pork is ready/);
 });
