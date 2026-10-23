@@ -1857,7 +1857,7 @@
     let lastGroup = '';
     ORDER.forEach((i) => {
       const sec = SECTIONS[i];
-      if (sec.group !== lastGroup) { lastGroup = sec.group; tocList.appendChild(h('li', { class: 'od-toc-group', role: 'presentation' }, sec.group)); }
+      if (sec.group !== lastGroup) { lastGroup = sec.group; tocList.appendChild(h('li', { class: 'od-toc-group' }, sec.group)); }
       const a = h('a', { class: 'od-toc-link', href: '#od-' + sec.id, dataset: { target: sec.id } }, sec.label);
       a.addEventListener('click', (ev) => { ev.preventDefault(); goTo(sec.id); }); // a real hash would be read by the router as "leave the office"
       links.push(a);
