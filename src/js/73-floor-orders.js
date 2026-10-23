@@ -315,7 +315,8 @@
       const state = st(), now = nowMs();
       const sd = U.serviceDate(now, state.settings.service.dayStartHour);
       const open = (state.orders || []).filter((o) => o.status === 'open').sort((a, b) => a.createdAt - b.createdAt);
-      const paid = (state.orders || []).filter((o) => o.status === 'paid' && o.serviceDate === sd).sort((a, b) => b.paidAt - a.paidAt);
+      // An order counts on the day it was paid, like close-the-day, not the day it was opened.
+      const paid = (state.orders || []).filter((o) => o.status === 'paid' && U.isNum(o.paidAt) && U.serviceDate(o.paidAt, state.settings.service.dayStartHour) === sd).sort((a, b) => b.paidAt - a.paidAt);
       const totals = E().openOrderTotals(state);
       reconcile(openList, openRows, open, makeOpenRow, (rec, o) => updateOpenRow(rec, o, state, totals, now));
       reconcile(paidList, paidRows, paid.slice(0, 80), makePaidRow, (rec, o) => updatePaidRow(rec, o, state));

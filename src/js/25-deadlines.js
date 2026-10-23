@@ -790,12 +790,14 @@
   function wallOrders(state, now) {
     const out = { paidCount: 0, open: [], paid: [] };
     if (!state || !U.isNum(now)) return out;
-    const day = U.serviceDate(now, state.settings && state.settings.service ? state.settings.service.dayStartHour : undefined);
+    const dsh = state.settings && state.settings.service ? state.settings.service.dayStartHour : undefined;
+    const day = U.serviceDate(now, dsh);
+    // WATCH OUT: an order counts on the day it was paid, like close-the-day, not the day it was opened (o.serviceDate).
     const totals = E().openOrderTotals(state);
     for (const o of Array.isArray(state.orders) ? state.orders : []) {
       const t = totals.get(o.id);
       if (o.status === 'open') out.open.push({ id: o.id, name: o.customer, rounds: t ? t.rounds : 0, total: t ? t.total : 0, at: o.createdAt });
-      else if (o.status === 'paid' && o.serviceDate === day && o.totals) { out.paidCount++; out.paid.push({ id: o.id, name: o.customer, total: o.totals.total, method: o.method, at: o.paidAt }); }
+      else if (o.status === 'paid' && U.isNum(o.paidAt) && U.serviceDate(o.paidAt, dsh) === day && o.totals) { out.paidCount++; out.paid.push({ id: o.id, name: o.customer, total: o.totals.total, method: o.method, at: o.paidAt }); }
     }
     out.open.sort((a, b) => a.at - b.at);
     out.paid.sort((a, b) => b.at - a.at);

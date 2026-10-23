@@ -33,3 +33,14 @@ test('orders pane: an order paid on an earlier service day is not listed', () =>
   s = E.apply(s, 'payOrder', { orderId: s.orders[0].id, method: 'cash' }, T0 + 2 * MIN).state;
   assert.equal(D.wallOrders(s, T0 + 48 * 60 * MIN).paidCount, 0);
 });
+
+test('orders pane: a tab opened yesterday and paid today counts as paid today, like close-the-day', () => {
+  let s = E.newState({ now: T0, stagger: true });
+  const mi = SB.config.menu.slice(0, 1).map((m) => ({ menuId: m.id, qty: 1 }));
+  s = E.apply(s, 'createTicket', { customer: 'Late tab', channel: 'dine_in', items: mi }, T0 + MIN).state;
+  const r = E.apply(s, 'payOrder', { orderId: s.orders[0].id, method: 'cash' }, T0 + 24 * 60 * MIN);
+  assert.equal(r.report, 'ok'); s = r.state;
+  const g = D.wallOrders(s, T0 + 24 * 60 * MIN + MIN);
+  assert.equal(g.paidCount, 1, 'paid today, opened yesterday');
+  assert.equal(D.wallOrders(s, T0 + 2 * MIN).paidCount, 0, 'not on the day it was opened');
+});
