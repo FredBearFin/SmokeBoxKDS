@@ -99,3 +99,11 @@ test('a fridge-kept cold item shows its made day, its own fridge and out-of-frid
   const f = factsOf(state, { type: 'batch_back', batchId: 'f1', t: T0 + 86400e3, outMs: 90 * MIN });
   assert.deepEqual(f, ['Made Sat 10/17', 'Your fridge limit: 3 days, last day Mon 10/19', 'Out of the fridge so far: 90 min (your limit 4 h)']);
 });
+
+test('equipment, thermometer, strip and date-mark entries have plain words, and cooling marks are named', () => {
+  const { factsOf } = SB.office.inspectorPure;
+  const state = { settings: {}, batches: [{ id: 'k2', kind: 'cooling', enteredAt: T0, coolStartAt: T0, stage1At: T0 + 90 * MIN, stage1F: 68, temps: [] }] };
+  const f = factsOf(state, { type: 'temp_logged', batchId: 'k2', t: T0 + 90 * MIN });
+  assert.ok(f.includes('First cooling mark reached'), f.join('|'));
+  assert.ok(!factsOf(state, { type: 'temp_logged', batchId: 'k2', t: T0 + 60 * MIN }).includes('First cooling mark reached'));
+});

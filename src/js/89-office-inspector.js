@@ -15,9 +15,11 @@
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const KIND = {
     temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
-    batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
+    equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
   };
-  const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit' };
+  const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit', datemark: 'Past the date mark' };
+  const UNIT = { cooler: 'Cooler', freezer: 'Freezer', display: 'Display case', other: 'Equipment' };
+  const METHOD = { ice: 'ice water', boiling: 'boiling water', other: 'other method' };
 
   // ---- 1. Pure rows ----
 
@@ -41,10 +43,12 @@
     switch (e.type) {
       case 'temp_logged': return (isNum(e.f) ? U.tempText(e.f) : '') + (lateWords(e) ? ', ' + lateWords(e) : '');
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
-      case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '');
+      case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
+      case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '');
+      case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '');
       case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
       case 'cooling_started': return isNum(e.g) ? U.weightText(e.g) : '';
-      case 'sanitize_done': return lateWords(e);
+      case 'sanitize_done': return [lateWords(e), isNum(e.ppm) ? 'strip ' + e.ppm + ' ppm' : '', e.product || '', e.where ? 'at ' + e.where : ''].filter(Boolean).join(', ');
       case 'quality_extend': return isNum(e.until) ? 'Until ' + U.fmtTime(e.until) : '';
       default: return e.note || '';
     }
@@ -66,6 +70,8 @@
     const S = (state.settings || {}).safety || {};
     if (b.kind === 'cooling') {
       out.push('Cooling began ' + U.fmtDateShort(U.dateKey(made)) + ' ' + U.fmtTime(made));
+      if (e.type === 'temp_logged' && isNum(e.t) && isNum(b.stage1At) && e.t === b.stage1At) out.push('First cooling mark reached');
+      if (e.type === 'temp_logged' && isNum(e.t) && isNum(b.finalAt) && e.t === b.finalAt) out.push('Final cooling mark reached');
       if (isNum(e.t) && e.type === 'temp_logged' && e.t >= made) out.push(spanWords(e.t - made) + ' into cooling');
       const c = S.cooling || {};
       if (isNum(c.stage1ToF) && isNum(c.stage1H) && isNum(c.finalF) && isNum(c.totalH)) out.push('Your limit: ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' h, ' + U.tempText(c.finalF) + ' within ' + c.totalH + ' h');
@@ -140,7 +146,7 @@
   }
 
   // The honest line about what this record does not hold, so nobody reads it as the whole paperwork.
-  const NOT_COVERED = 'This record covers batches only. It has no cooler or freezer readings, sanitizer strip readings or thermometer checks; keep those on your own sheet and ask your health department what to keep and for how long.';
+  const NOT_COVERED = 'Cooler, freezer, thermometer-check and sanitizer strip entries appear here only if someone logged them in Smokebox; keep anything else on your own sheet and ask your health department what to keep and for how long.';
 
   // Opens the sheet: pick a date range, see the record, print it.
   function openInspectorLog() {
