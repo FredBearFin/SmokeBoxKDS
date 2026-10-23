@@ -229,11 +229,9 @@
 .ch-m { outline: none; }
 .ch-m:focus-visible { outline: 2px solid var(--ch-text); outline-offset: 2px; }
 .ch-hot { filter: brightness(1.16); }
-.ch-dim { opacity: .35; }
 
 /* big numbers use the condensed display face, proportional figures */
-.ch-svg .ch-big, .ch-big-h { font-family: var(--font-display, "Barlow Condensed", "Arial Narrow", system-ui, sans-serif); font-weight: 600; fill: var(--ch-text); font-variant-numeric: proportional-nums; letter-spacing: 0; }
-.ch-big-h { color: var(--ch-text); }
+.ch-svg .ch-big { font-family: var(--font-display, "Barlow Condensed", "Arial Narrow", system-ui, sans-serif); font-weight: 600; fill: var(--ch-text); font-variant-numeric: proportional-nums; letter-spacing: 0; }
 
 /* ---------- tooltip (fixed, one per chart, placed by JS and kept on screen) ---------- */
 .ch-tip {
@@ -284,15 +282,7 @@
 .ch-tbl tbody th { font-weight: 500; color: var(--ch-text); }
 .ch-tbl tbody tr:last-child th, .ch-tbl tbody tr:last-child td { border-bottom: 0; }
 
-/* ---------- meter + ring + spark (html parts) ---------- */
-.ch-meter-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 5px; min-width: 0; }
-.ch-meter-l { min-width: 0; color: var(--ch-text); font-weight: 500; overflow-wrap: anywhere; }
-.ch-meter-r { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; color: var(--ch-text); font-weight: 600; text-align: right; }
-.ch-meter-st { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ch-text2); }
-.ch-meter-sub { margin: 4px 0 0; font-size: 12px; color: var(--ch-text2); }
-.ch-ringwrap { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
-.ch-ring-st { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ch-text); }
-.ch-ring-sub { color: var(--ch-text2); font-size: 13px; max-width: 28ch; }
+/* ---------- spark (html part) ---------- */
 .ch--spark { display: inline-block; vertical-align: middle; }
 .ch--spark .ch-plot { width: auto; }
 .ch--spark .ch-svg { width: auto; }

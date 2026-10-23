@@ -27,6 +27,13 @@
     const hint = U.h('p', { class: 'od-hint od-cm-hint', hidden: true });
     // The day the preview counts back from: the first of this month (the same default as the guarded flow); the store still keeps the last days.
     const opts = () => ({ before: U.serviceDate(SB.store.now(), (SB.store.getState().settings.service || {}).dayStartHour).slice(0, 8) + '01' });
+    // Why some old days are not offered: sales after the day's last close (the store lists them in lateSaleDays) or no close at all.
+    function skipped(p) {
+      const late = (p.lateSaleDays || []).length, never = (p.uncoveredDays || []).length - late, out = [];
+      if (late > 0) out.push(late + ' ' + (late === 1 ? 'day was' : 'days were') + ' not cleared: ' + (late === 1 ? 'it has' : 'they have') + ' sales after the last end-of-day close');
+      if (never > 0) out.push(never + ' ' + (never === 1 ? 'day has' : 'days have') + ' no end-of-day close, so ' + (never === 1 ? 'it was' : 'they were') + ' kept');
+      return out.join('. ') + (out.length ? '.' : '');
+    }
     // Asks the store what Close the month would clear now and writes it in plain words (nothing changes).
     function paint() {
       try { paintNow(); } catch (e) { start.disabled = true; sum.textContent = 'The preview is not available right now. Nothing was changed.'; notes.textContent = ''; }
@@ -44,7 +51,7 @@
       // A count with its unit word, such as "3 days" or "1 order".
       const n = (k, one, many) => U.fmtNum(k) + ' ' + U.plural(k, one, many || one + 's');
       sum.textContent = 'Ready to save and clear ' + n(p.days.length, 'day') + ' (' + U.fmtDateShort(p.from) + ' to ' + U.fmtDateShort(U.addDays(p.before, -1)) + '): ' + n(p.tickets, 'ticket') + ', ' + n(p.orders, 'order') + ' and ' + n(p.events, 'activity record') + '. Those orders took in ' + U.fmtMoney(p.paidTotal) + '.';
-      notes.textContent = 'Stays on this tablet: ' + n(p.safetyEventsKept, 'safety record') + ', ' + n(p.dayRecordsKept, 'end-of-day total') + (p.openOrdersKept ? ', ' + n(p.openOrdersKept, 'open order') : '') + (p.uncoveredDays && p.uncoveredDays.length ? '. ' + n(p.uncoveredDays.length, 'older day') + ' never closed, so ' + (p.uncoveredDays.length === 1 ? 'it stays' : 'they stay') + '.' : '.');
+      notes.textContent = 'Stays on this tablet: ' + n(p.safetyEventsKept, 'safety record') + ', ' + n(p.dayRecordsKept, 'end-of-day total') + (p.openOrdersKept ? ', ' + n(p.openOrdersKept, 'open order') : '') + (skipped(p) ? '. ' + skipped(p) : '.');
     }
     start.addEventListener('click', async () => {
       if (!SB.setup || typeof SB.setup.openCloseMonth !== 'function') { hint.textContent = 'The step-by-step Close the month is not available in this build. Nothing was changed.'; hint.hidden = false; return; }
@@ -1426,6 +1433,292 @@
     return { ok: true, text, state: v.state, repaired: v.repaired || [], savedAt: env && isNum(env.savedAt) ? env.savedAt : null, mode: env && env.mode === 'demo' ? 'demo' : 'real', bySrc };
   }
 
+  // Builds the Danger zone of the Data page (the two erase buttons and the typed-word box that guards them) into the panel; it makes the pieces the page cleans up and returns the two status lines.
+  function buildDangerZone(env) {
+    const { pn, stateNow } = env;
+    // Danger zone: two reset buttons, each opening a box that asks for a typed word before it will act.
+    pn.body.appendChild(h('h3', { class: 'od-sub od-danger-h', id: undefined }, 'Danger zone: erase data'));
+    const resetStatus = statusLine();
+    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I erase tickets and records', checked: true });
+    const resetLiveBtn = btn('Erase tickets and records', { icon: 'trash', cls: 'btn-danger' });
+    resetLiveBtn.dataset.action = 'reset-live';
+    const resetAllBtn = btn('Erase everything', { icon: 'trash', cls: 'btn-danger' });
+    resetAllBtn.dataset.action = 'reset-all';
+    const dangerBox = h('div', { class: 'od-danger-box', hidden: true, role: 'group', 'aria-label': 'Confirm erasing data' });
+    // Shows the confirm box: what will be erased, a field to type the word into, and a button that stays off until it matches.
+    function askTyped(o) {
+      const BPr = SB.office && SB.office.backupPure;
+      const input = h('input', { class: 'input od-danger-in', type: 'text', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Type ' + o.word + ' to confirm' });
+      const go = btn(o.label, { icon: 'trash', cls: 'btn-danger' });
+      go.disabled = true;
+      // Turns the confirm button on only when the word was typed.
+      const sync = () => { go.disabled = !(BPr ? BPr.resetWordOk(input.value, o.word) : input.value.trim().toLowerCase() === o.word.toLowerCase()); };
+      input.addEventListener('input', sync);
+      // Closes the box without doing anything.
+      const cancel = () => { dangerBox.hidden = true; dangerBox.replaceChildren(); if (o.opener && o.opener.focus) o.opener.focus(); };
+      // Runs the erase once, then closes the box.
+      const run = () => { if (go.disabled) return; cancel(); o.run(); };
+      go.addEventListener('click', run);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); if (e.key === 'Escape') cancel(); });
+      const descId = U.uid('oddesc');
+      input.setAttribute('aria-describedby', descId);
+      dangerBox.replaceChildren(h('p', { class: 'od-danger-t' }, ico('alert', 20), h('strong', null, o.title)), h('div', { id: descId }, ...o.lines.map((t) => h('p', { class: 'od-p' }, t))),
+        h('label', { class: 'od-danger-l' }, 'Type ', h('strong', null, o.word), ' to confirm', input),
+        h('div', { class: 'od-actions' }, go, btn('Keep my data', { onClick: cancel })));
+      dangerBox.hidden = false;
+      input.focus();
+    }
+    // Opens the typed confirm box for clearing live data.
+    resetLiveBtn.addEventListener('click', () => {
+      const s = stateNow(), k = keep.getValue();
+      askTyped({
+        opener: resetLiveBtn, title: 'Erase tickets and records?', word: 'ERASE', label: 'Erase tickets and records',
+        lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any demo orders, and sets the clock back to real time.',
+          k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
+          'There is no undo. Back up first if you might want this data.'],
+        // Clears the live data after the word was typed.
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
+          const rep = SB.store.resetLive({ keepSettings: k, starter: false });
+          if (rep === 'ok') { resetStatus.ok('Live data erased. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data erased.', { tone: 'ok' }); }
+          else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
+        },
+      });
+    });
+    // Opens the typed confirm box for erasing everything.
+    resetAllBtn.addEventListener('click', () => {
+      const s = stateNow();
+      askTyped({
+        opener: resetAllBtn, title: 'Erase everything on this device?', word: 'ERASE', label: 'Erase everything',
+        lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
+          'Your display choices (themes and text size) are kept.', 'There is no undo. Back up first if you might want any of it back.'],
+        // Erases everything after the word was typed.
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
+          const rep = SB.store.reset();
+          if (rep === 'ok') { resetStatus.ok('Everything was reset to the starter values.'); SB.ui.toast('Everything was reset.', { tone: 'ok' }); }
+          else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
+        },
+      });
+    });
+    pn.body.append(
+      para('Erasing tickets and records removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
+      h('div', { class: 'od-toggle-row' }, keep),
+      h('div', { class: 'od-actions' }, resetLiveBtn, resetAllBtn), dangerBox, resetStatus.el);
+    return { resetStatus };
+  }
+
+  // Builds the restore card's working parts on the Data page (choose a file or paste text, check it, show what is inside, replace everything after a confirm and the PIN, and the way back from a restore) and returns what the page needs afterwards.
+  function buildImportCard(env) {
+    const { stateNow, card2, card3, downloadBackup } = env;
+    // Import: a chosen file or pasted text is checked and summarized before anything changes.
+    const impResult = h('div', { class: 'od-impresult', 'aria-live': 'polite' });
+    const fileIn = h('input', { type: 'file', accept: '.json,application/json,text/plain', class: 'visually-hidden', tabindex: -1, 'aria-hidden': 'true', id: U.uid('odfile') });
+    // Opens the system file picker for a backup.
+    const chooseBtn = btn('Choose a backup file', { icon: 'upload', onClick: () => fileIn.click() });
+    chooseBtn.dataset.action = 'import-choose';
+    const undoBox = h('div', { class: 'od-undo-restore', 'data-region': 'undo-restore' });
+    // Shows the way back from a restore: how long the old kitchen is kept and a button to put it back (PIN-guarded like the restore).
+    function paintUndo() {
+      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
+      if (!info) { undoBox.replaceChildren(); undoBox.hidden = true; return; }
+      undoBox.hidden = false;
+      const days = Math.max(1, Math.round((info.expiresAt - info.takenAt) / 86400e3));
+      // The button asks first, then puts the old kitchen back.
+      const b = btn('Undo this restore', { icon: 'history', cls: 'btn-sm', onClick: () => undoRestoreNow() });
+      b.dataset.action = 'undo-restore';
+      undoBox.replaceChildren(
+        h('p', { class: 'od-p od-undo-line' }, 'Your kitchen before this restore is kept for ' + days + ' ' + U.plural(days, 'day') + ' (until ' + U.fmtDateShort(U.dateKey(info.expiresAt)) + ' ' + U.fmtTime(info.expiresAt) + '). It was saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + '.'),
+        h('div', { class: 'od-actions' }, b));
+    }
+    // After a confirm dialog and the PIN, puts the kitchen from before the restore back. Nothing changes if the PIN is not entered.
+    async function undoRestoreNow() {
+      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
+      if (!info) { paintUndo(); return; }
+      const ok = await SB.ui.confirm({ title: 'Undo this restore?', tone: 'danger', confirmLabel: 'Put my old kitchen back', cancelLabel: 'Keep what I have',
+        body: ['This puts back the kitchen you had before the restore (saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + ') and replaces what is here now. What is here now is kept for the same time, so this can be undone once too.'] });
+      if (!ok) return;
+      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
+      const rep = SB.store.undoRestore();
+      if (rep === 'ok') SB.ui.toast('Your kitchen from before the restore is back.', { tone: 'ok' });
+      else SB.ui.toast(rep === 'noCopy' ? 'The copy from before the restore is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings), { tone: 'warn' });
+      paintUndo();
+    }
+    const pasteLabelId = U.uid('odpl');
+    const pasteArea = h('textarea', { class: 'textarea od-paste', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-labelledby': pasteLabelId, placeholder: 'Paste the whole backup text here' });
+    // Checks pasted text the same way as a chosen file.
+    const pasteBtn = btn('Check pasted backup', { icon: 'check', cls: 'btn-sm', onClick: () => check(pasteArea.value, 'pasted text') });
+    pasteBtn.dataset.action = 'import-check-paste';
+    const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
+    card2.body.append(
+      para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
+      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
+    card3.body.append(
+      h('ol', { class: 'od-steps' },
+        h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
+        h('li', null, 'On the new device: copy the same smokebox.html file onto it and open it. Install it as an app (Share, then Add to Home Screen, or Install app).'),
+        h('li', null, 'Run Menu, then Set up this tablet. Sound, screen-on and loudness are per device and are redone here.'),
+        h('li', null, 'Open Back office, then Menu and settings, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.'),
+        h('li', null, 'Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.')),
+      h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
+
+    paintUndo();
+    let pending = null;
+    // Throws away the checked backup and clears the result card.
+    function clearImport() { pending = null; impResult.replaceChildren(); }
+    // Shows why a backup was refused; nothing is changed.
+    function showBad(reason, source) {
+      pending = null;
+      impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'bad', role: 'alert' },
+        h('p', { class: 'od-card-h' }, ico('alert-circle', 20), h('span', null, 'That ' + source + ' cannot be used.')),
+        h('p', { class: 'od-p' }, reason + ' Nothing was changed.')));
+    }
+    // Validates backup text and shows a summary card. The live data is not touched.
+    function check(text, source) {
+      const res = inspectBackup(text);
+      if (!res.ok) { showBad(res.reason, source); return; }
+      pending = res;
+      const s = res.state, n = s.tickets.length;
+      const live = stateNow();
+      const archived = s.menu.filter((m) => m.archived).length;
+      const BPd = SB.office && SB.office.backupPure;
+      const desc = BPd ? BPd.describeBackup(res, SB.store.mode ? SB.store.mode() : null) : { rows: [['Tickets', U.fmtNum(n)]], wrongKitchen: false, refusal: '' };
+      const rows = desc.rows;
+      if (desc.wrongKitchen) { showBad(desc.refusal, source); pending = null; return; }
+      const repairs = res.repaired.length;
+      const card = h('div', { class: 'od-card', 'data-tone': 'ok' },
+        h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'This ' + source + ' is a valid Smokebox backup.')),
+        h('dl', { class: 'od-stats od-stats-tight' }, rows.map(([k, v]) => h('div', { class: 'od-stat' }, h('dt', null, k), h('dd', { class: 'od-stat-v' }, v)))),
+        repairs ? h('p', { class: 'od-hint' }, 'Smokebox repaired ' + repairs + ' small ' + U.plural(repairs, 'problem') + ' while reading it: ' + res.repaired.slice(0, 3).join('; ') + (repairs > 3 ? '; and ' + (repairs - 3) + ' more.' : '.')) : null,
+        h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This replaces everything on this device: ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', your menu edits and your settings. Back up first if you might want what is here.')),
+        h('div', { class: 'od-actions' },
+          btn('Back up what is here first', { icon: 'download', cls: 'btn-sm', onClick: downloadBackup }),
+          // The replace button asks again in a dialog before anything is written.
+          (() => { const b = btn('Replace everything with this backup', { icon: 'upload', cls: 'btn-danger', onClick: () => replaceAll() }); b.dataset.action = 'import-replace'; return b; })(),
+          btn('Cancel', { onClick: clearImport })));
+      impResult.replaceChildren(card);
+    }
+    // After a confirm dialog, replaces everything with the checked backup.
+    async function replaceAll() {
+      if (!pending) return;
+      const p = pending, live = stateNow();
+      const ok = await SB.ui.confirm({
+        title: 'Replace everything on this device?', tone: 'danger', confirmLabel: 'Replace everything', cancelLabel: 'Keep what I have',
+        body: ['This replaces ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', every setting, your menu edits and the PIN with the backup\'s ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.',
+          'There is no undo. If you might want what is here now, cancel and download a backup first.'],
+      });
+      if (!ok) return;
+      // With a PIN set, restoring a backup asks for it again, even inside the back office grace period.
+      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was restored.', { tone: 'warn' }); return; }
+      const rep = SB.store.importAll(p.text);
+      if (rep === 'ok') {
+        clearImport(); pasteArea.value = ''; fileIn.value = '';
+        impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.'))));
+        SB.ui.toast('Backup restored.', { tone: 'ok' });
+        paintUndo();
+      } else {
+        const lr = SB.store.lastResult() || {};
+        showBad(rep === 'invalidBackup' && lr.info && lr.info.error ? backupReason(lr.info.error) : SB.engine.describe(rep, lr.info, (stateNow() || {}).settings), 'backup');
+      }
+    }
+    fileIn.addEventListener('change', async () => {
+      const f = fileIn.files && fileIn.files[0];
+      if (!f) return;
+      if (f.size > MAX_IMPORT_CHARS * 1.2) { showBad(backupReason('too large'), 'file'); fileIn.value = ''; return; }
+      let text;
+      try { text = await readFileText(f); } catch (e) { showBad('The file could not be read from this device.', 'file'); fileIn.value = ''; return; }
+      check(text, 'file');
+      fileIn.value = ''; // so choosing the same file again re-checks it
+    });
+    return { check };
+  }
+
+  // Builds the backup card's working parts on the Data page (pilot report, spreadsheet files, how fresh the last backup is, and the Back up now card with its download, copy and print buttons).
+  function buildExportCard(env) {
+    const { stateNow, exStatus, reportSave, downloadCsv, downloadBackup, copyBackup, card1, fb, pn, P } = env;
+    // Pilot report: the numbers for a real watched service, from the event log and the saved sound log.
+    const cutsIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Cuts the observer counted', style: 'width:7em' });
+    const batchesIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Batches the observer counted', style: 'width:7em' });
+    const whenSel = h('select', { class: 'input', 'aria-label': 'Report window' }, h('option', { value: 'open' }, 'Since opening'), h('option', { value: '4' }, 'Last 4 hours'), h('option', { value: '24' }, 'Last 24 hours'));
+    const repBox = h('pre', { class: 'od-report', hidden: true, role: 'region', 'aria-label': 'Pilot report', tabindex: '0', 'aria-live': 'polite', style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
+    // Builds the report for the chosen window and shows it; with download true it also saves the CSV.
+    async function makeReport(download) {
+      const s = stateNow(), now = SB.store.now();
+      const from = whenSel.value === 'open' ? SB.pilot.defaultFrom(s, now) : now - Number(whenSel.value) * 3600e3;
+      const rep = SB.pilot.build(s, { from, to: now, now, alerts: SB.floor && SB.floor.alertLog ? SB.floor.alertLog() : [], cutsCounted: cutsIn.value === '' ? null : Number(cutsIn.value), demoClock: SB.store.speed() > 1, demo: SB.store.isDemo && SB.store.isDemo(), batchesCounted: batchesIn.value === '' ? null : Number(batchesIn.value) });
+      repBox.textContent = SB.pilot.toText(rep) + (SB.office && SB.office.archivedWords ? (function (w) { return w ? '\n\n' + w : ''; })(SB.office.archivedWords(s.archivedBefore, from, ((s.settings || {}).service || {}).dayStartHour)) : ''); repBox.hidden = false;
+      if (!download) { exStatus.ok('Report made for ' + rep.window.hours + ' hours.'); return; }
+      const fname = (rep.demo ? 'smokebox-demo-pilot-report-' : 'smokebox-pilot-report-') + todayKey() + '.csv';
+      const csv = SB.pilot.toCsv(rep);
+      reportSave(await saveFile(fname, csv, 'text/csv'), fname, csv, 'report');
+    }
+    // The two report buttons: show it on screen, or save the CSV.
+    const showReport = () => makeReport(false), saveReport = () => makeReport(true);
+    // Prints the report text as one page: builds a print-only block, prints it, and removes it again.
+    async function printReport() {
+      await makeReport(false);
+      const root = h('div', { class: 'sb-printroot pr-printroot' }, h('h1', null, 'Pilot report'), h('pre', { style: 'white-space:pre-wrap;font-size:13px' }, repBox.textContent));
+      document.body.appendChild(root);
+      // Removes the print-only block again.
+      const done = () => { try { root.remove(); } catch (e) { /* already gone */ } };
+      window.addEventListener('afterprint', done, { once: true });
+      try { window.print(); } catch (e) { done(); }
+      setTimeout(done, 60000);
+    }
+    const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn), h('label', { class: 'od-inline' }, 'Batches counted ', batchesIn),
+      btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: showReport }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: saveReport }), btn('Print', { cls: 'btn-sm', onClick: printReport }));
+    repRow.dataset.pilot = 'report';
+    // Saves the sales-by-day file for an accountant: one row per day with sales, tax, tips and how it was paid.
+    async function downloadSalesCsv() {
+      const BPs = SB.office && SB.office.backupPure;
+      if (!BPs) { exStatus.bad('Could not make the sales file. Reload and try again.'); return; }
+      const s = stateNow();
+      const text = BPs.salesCsv(s, s.settings.service && s.settings.service.dayStartHour);
+      const fname = 'smokebox-sales-by-day' + (SB.store.mode && SB.store.mode() === 'demo' ? '-demo' : '') + '-' + todayKey() + '.csv';
+      const days = Math.max(0, text.split('\r\n').length - 3);
+      // With no paid orders there is nothing to hand over: say so instead of saving a file that only has column names.
+      if (!days) { exStatus.bad('No order has been paid yet, so there is no sales file to save. Pay an order first.'); return; }
+      const res = await saveFile(fname, text, 'text/csv');
+      if (res.how === 'host' || res.how === 'browser') exStatus.ok((res.how === 'host' ? 'Saved ' : 'Download started: ') + fname + (days ? ' (' + days + ' ' + U.plural(days, 'day') + ' of sales).' : ': it has only the column names because no order has been paid yet.'));
+      else reportSave(res, fname, text, 'sales file');
+    }
+    const csvBtns = [['tickets', 'Tickets'], ['items', 'Items'], ['orders', 'Orders'], ['events', 'Events'], ['batches', 'Batches']].map(([k, l]) => {
+      // Each spreadsheet button downloads its own table.
+      const b = btn(l, { icon: 'download', cls: 'btn-sm', onClick: () => downloadCsv(k, l.toLowerCase()) });
+      b.setAttribute('aria-label', 'Download ' + l.toLowerCase() + ' as CSV');
+      b.dataset.csv = k;
+      return b;
+    });
+    const salesBtn = btn('Sales by day (for your accountant)', { icon: 'download', cls: 'btn-sm', onClick: downloadSalesCsv });
+    salesBtn.dataset.csv = 'sales';
+    csvBtns.unshift(salesBtn);
+    // Says when the last backup was made on this device, so a stale one is easy to spot.
+    const BP = SB.office && SB.office.backupPure;
+    const lastLine = para('', 'od-p od-lastbackup');
+    // Writes how fresh the last backup is, with a colour tone for never or old.
+    const paintLast = () => {
+      const t = SB.shell && SB.shell.lastBackupAt ? SB.shell.lastBackupAt() : null;
+      const f = BP ? BP.backupFreshness(t, Date.now()) : { tone: t ? 'ok' : 'bad', text: t ? 'Last backup: ' + U.fmtDateShort(U.dateKey(t)) + ', ' + U.fmtTime(t) + '.' : 'No backup has been made from this device yet.' };
+      lastLine.textContent = f.text; lastLine.dataset.tone = f.tone;
+    };
+    paintLast(); P.syncs.push(paintLast);
+    const dlBtn = btn('Download backup (JSON)', { icon: 'download', cls: 'btn-primary', onClick: downloadBackup });
+    dlBtn.dataset.action = 'backup-download';
+    const cpBtn = btn('Copy backup', { icon: 'copy', onClick: copyBackup });
+    cpBtn.dataset.action = 'backup-copy';
+    card1.body.append(
+      lastLine,
+      para('A backup is one file with your dishes, orders, settings and records. Back up at the end of every day, and keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
+      para('The starting cash you type on Close the day is remembered on this device only. It is not in a backup.', 'od-hint'),
+      h('div', { class: 'od-actions' }, dlBtn, cpBtn), exStatus.el, fb);
+    // The spreadsheet files and the pilot report are less common, so they sit in a closed group below the flow.
+    pn.body.appendChild(h('details', { class: 'od-paste-det od-more' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Spreadsheet files and the pilot report')),
+      para('Spreadsheet files (CSV) list one kind of record each and cannot be restored from.', 'od-hint'),
+      h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Spreadsheet files'), csvBtns), repRow, repBox));
+  }
+
   // Panel 8: what is stored, sample history, export, import and reset.
   function buildData(P) {
     const pn = panel(SECTIONS[7], 'Everything Smokebox knows lives in this browser, on this device. Back it up before you reset, import or clear browser data.');
@@ -1559,278 +1852,11 @@
         if (res.how === 'host') exStatus.ok('Saved ' + fname + tail); else exStatus.ok('Download started: ' + fname + tail);
       } else reportSave(res, fname, text, 'table');
     }
-    // Pilot report: the numbers for a real watched service, from the event log and the saved sound log.
-    const cutsIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Cuts the observer counted', style: 'width:7em' });
-    const batchesIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Batches the observer counted', style: 'width:7em' });
-    const whenSel = h('select', { class: 'input', 'aria-label': 'Report window' }, h('option', { value: 'open' }, 'Since opening'), h('option', { value: '4' }, 'Last 4 hours'), h('option', { value: '24' }, 'Last 24 hours'));
-    const repBox = h('pre', { class: 'od-report', hidden: true, role: 'region', 'aria-label': 'Pilot report', tabindex: '0', 'aria-live': 'polite', style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
-    // Builds the report for the chosen window and shows it; with download true it also saves the CSV.
-    async function makeReport(download) {
-      const s = stateNow(), now = SB.store.now();
-      const from = whenSel.value === 'open' ? SB.pilot.defaultFrom(s, now) : now - Number(whenSel.value) * 3600e3;
-      const rep = SB.pilot.build(s, { from, to: now, now, alerts: SB.floor && SB.floor.alertLog ? SB.floor.alertLog() : [], cutsCounted: cutsIn.value === '' ? null : Number(cutsIn.value), demoClock: SB.store.speed() > 1, demo: SB.store.isDemo && SB.store.isDemo(), batchesCounted: batchesIn.value === '' ? null : Number(batchesIn.value) });
-      repBox.textContent = SB.pilot.toText(rep) + (SB.office && SB.office.archivedWords ? (function (w) { return w ? '\n\n' + w : ''; })(SB.office.archivedWords(s.archivedBefore, from, ((s.settings || {}).service || {}).dayStartHour)) : ''); repBox.hidden = false;
-      if (!download) { exStatus.ok('Report made for ' + rep.window.hours + ' hours.'); return; }
-      const fname = (rep.demo ? 'smokebox-demo-pilot-report-' : 'smokebox-pilot-report-') + todayKey() + '.csv';
-      const csv = SB.pilot.toCsv(rep);
-      reportSave(await saveFile(fname, csv, 'text/csv'), fname, csv, 'report');
-    }
-    // The two report buttons: show it on screen, or save the CSV.
-    const showReport = () => makeReport(false), saveReport = () => makeReport(true);
-    // Prints the report text as one page: builds a print-only block, prints it, and removes it again.
-    async function printReport() {
-      await makeReport(false);
-      const root = h('div', { class: 'sb-printroot pr-printroot' }, h('h1', null, 'Pilot report'), h('pre', { style: 'white-space:pre-wrap;font-size:13px' }, repBox.textContent));
-      document.body.appendChild(root);
-      // Removes the print-only block again.
-      const done = () => { try { root.remove(); } catch (e) { /* already gone */ } };
-      window.addEventListener('afterprint', done, { once: true });
-      try { window.print(); } catch (e) { done(); }
-      setTimeout(done, 60000);
-    }
-    const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn), h('label', { class: 'od-inline' }, 'Batches counted ', batchesIn),
-      btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: showReport }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: saveReport }), btn('Print', { cls: 'btn-sm', onClick: printReport }));
-    repRow.dataset.pilot = 'report';
-    // Saves the sales-by-day file for an accountant: one row per day with sales, tax, tips and how it was paid.
-    async function downloadSalesCsv() {
-      const BPs = SB.office && SB.office.backupPure;
-      if (!BPs) { exStatus.bad('Could not make the sales file. Reload and try again.'); return; }
-      const s = stateNow();
-      const text = BPs.salesCsv(s, s.settings.service && s.settings.service.dayStartHour);
-      const fname = 'smokebox-sales-by-day' + (SB.store.mode && SB.store.mode() === 'demo' ? '-demo' : '') + '-' + todayKey() + '.csv';
-      const days = Math.max(0, text.split('\r\n').length - 3);
-      // With no paid orders there is nothing to hand over: say so instead of saving a file that only has column names.
-      if (!days) { exStatus.bad('No order has been paid yet, so there is no sales file to save. Pay an order first.'); return; }
-      const res = await saveFile(fname, text, 'text/csv');
-      if (res.how === 'host' || res.how === 'browser') exStatus.ok((res.how === 'host' ? 'Saved ' : 'Download started: ') + fname + (days ? ' (' + days + ' ' + U.plural(days, 'day') + ' of sales).' : ': it has only the column names because no order has been paid yet.'));
-      else reportSave(res, fname, text, 'sales file');
-    }
-    const csvBtns = [['tickets', 'Tickets'], ['items', 'Items'], ['orders', 'Orders'], ['events', 'Events'], ['batches', 'Batches']].map(([k, l]) => {
-      // Each spreadsheet button downloads its own table.
-      const b = btn(l, { icon: 'download', cls: 'btn-sm', onClick: () => downloadCsv(k, l.toLowerCase()) });
-      b.setAttribute('aria-label', 'Download ' + l.toLowerCase() + ' as CSV');
-      b.dataset.csv = k;
-      return b;
-    });
-    const salesBtn = btn('Sales by day (for your accountant)', { icon: 'download', cls: 'btn-sm', onClick: downloadSalesCsv });
-    salesBtn.dataset.csv = 'sales';
-    csvBtns.unshift(salesBtn);
-    // Says when the last backup was made on this device, so a stale one is easy to spot.
-    const BP = SB.office && SB.office.backupPure;
-    const lastLine = para('', 'od-p od-lastbackup');
-    // Writes how fresh the last backup is, with a colour tone for never or old.
-    const paintLast = () => {
-      const t = SB.shell && SB.shell.lastBackupAt ? SB.shell.lastBackupAt() : null;
-      const f = BP ? BP.backupFreshness(t, Date.now()) : { tone: t ? 'ok' : 'bad', text: t ? 'Last backup: ' + U.fmtDateShort(U.dateKey(t)) + ', ' + U.fmtTime(t) + '.' : 'No backup has been made from this device yet.' };
-      lastLine.textContent = f.text; lastLine.dataset.tone = f.tone;
-    };
-    paintLast(); P.syncs.push(paintLast);
-    const dlBtn = btn('Download backup (JSON)', { icon: 'download', cls: 'btn-primary', onClick: downloadBackup });
-    dlBtn.dataset.action = 'backup-download';
-    const cpBtn = btn('Copy backup', { icon: 'copy', onClick: copyBackup });
-    cpBtn.dataset.action = 'backup-copy';
-    card1.body.append(
-      lastLine,
-      para('A backup is one file with your dishes, orders, settings and records. Back up at the end of every day, and keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
-      para('The starting cash you type on Close the day is remembered on this device only. It is not in a backup.', 'od-hint'),
-      h('div', { class: 'od-actions' }, dlBtn, cpBtn), exStatus.el, fb);
-    // The spreadsheet files and the pilot report are less common, so they sit in a closed group below the flow.
-    pn.body.appendChild(h('details', { class: 'od-paste-det od-more' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Spreadsheet files and the pilot report')),
-      para('Spreadsheet files (CSV) list one kind of record each and cannot be restored from.', 'od-hint'),
-      h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Spreadsheet files'), csvBtns), repRow, repBox));
+    buildExportCard({ stateNow, exStatus, reportSave, downloadCsv, downloadBackup, copyBackup, card1, fb, pn, P });
 
-    // Import: a chosen file or pasted text is checked and summarized before anything changes.
-    const impResult = h('div', { class: 'od-impresult', 'aria-live': 'polite' });
-    const fileIn = h('input', { type: 'file', accept: '.json,application/json,text/plain', class: 'visually-hidden', tabindex: -1, 'aria-hidden': 'true', id: U.uid('odfile') });
-    // Opens the system file picker for a backup.
-    const chooseBtn = btn('Choose a backup file', { icon: 'upload', onClick: () => fileIn.click() });
-    chooseBtn.dataset.action = 'import-choose';
-    const undoBox = h('div', { class: 'od-undo-restore', 'data-region': 'undo-restore' });
-    // Shows the way back from a restore: how long the old kitchen is kept and a button to put it back (PIN-guarded like the restore).
-    function paintUndo() {
-      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
-      if (!info) { undoBox.replaceChildren(); undoBox.hidden = true; return; }
-      undoBox.hidden = false;
-      const days = Math.max(1, Math.round((info.expiresAt - info.takenAt) / 86400e3));
-      // The button asks first, then puts the old kitchen back.
-      const b = btn('Undo this restore', { icon: 'history', cls: 'btn-sm', onClick: () => undoRestoreNow() });
-      b.dataset.action = 'undo-restore';
-      undoBox.replaceChildren(
-        h('p', { class: 'od-p od-undo-line' }, 'Your kitchen before this restore is kept for ' + days + ' ' + U.plural(days, 'day') + ' (until ' + U.fmtDateShort(U.dateKey(info.expiresAt)) + ' ' + U.fmtTime(info.expiresAt) + '). It was saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + '.'),
-        h('div', { class: 'od-actions' }, b));
-    }
-    // After a confirm dialog and the PIN, puts the kitchen from before the restore back. Nothing changes if the PIN is not entered.
-    async function undoRestoreNow() {
-      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
-      if (!info) { paintUndo(); return; }
-      const ok = await SB.ui.confirm({ title: 'Undo this restore?', tone: 'danger', confirmLabel: 'Put my old kitchen back', cancelLabel: 'Keep what I have',
-        body: ['This puts back the kitchen you had before the restore (saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + ') and replaces what is here now. What is here now is kept for the same time, so this can be undone once too.'] });
-      if (!ok) return;
-      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
-      const rep = SB.store.undoRestore();
-      if (rep === 'ok') SB.ui.toast('Your kitchen from before the restore is back.', { tone: 'ok' });
-      else SB.ui.toast(rep === 'noCopy' ? 'The copy from before the restore is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings), { tone: 'warn' });
-      paintUndo();
-    }
-    const pasteLabelId = U.uid('odpl');
-    const pasteArea = h('textarea', { class: 'textarea od-paste', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-labelledby': pasteLabelId, placeholder: 'Paste the whole backup text here' });
-    // Checks pasted text the same way as a chosen file.
-    const pasteBtn = btn('Check pasted backup', { icon: 'check', cls: 'btn-sm', onClick: () => check(pasteArea.value, 'pasted text') });
-    pasteBtn.dataset.action = 'import-check-paste';
-    const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
-    card2.body.append(
-      para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
-      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
-    card3.body.append(
-      h('ol', { class: 'od-steps' },
-        h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
-        h('li', null, 'On the new device: copy the same smokebox.html file onto it and open it. Install it as an app (Share, then Add to Home Screen, or Install app).'),
-        h('li', null, 'Run Menu, then Set up this tablet. Sound, screen-on and loudness are per device and are redone here.'),
-        h('li', null, 'Open Back office, then Menu and settings, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.'),
-        h('li', null, 'Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.')),
-      h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
+    const { check } = buildImportCard({ stateNow, card2, card3, downloadBackup });
 
-    paintUndo();
-    let pending = null;
-    // Throws away the checked backup and clears the result card.
-    function clearImport() { pending = null; impResult.replaceChildren(); }
-    // Shows why a backup was refused; nothing is changed.
-    function showBad(reason, source) {
-      pending = null;
-      impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'bad', role: 'alert' },
-        h('p', { class: 'od-card-h' }, ico('alert-circle', 20), h('span', null, 'That ' + source + ' cannot be used.')),
-        h('p', { class: 'od-p' }, reason + ' Nothing was changed.')));
-    }
-    // Validates backup text and shows a summary card. The live data is not touched.
-    function check(text, source) {
-      const res = inspectBackup(text);
-      if (!res.ok) { showBad(res.reason, source); return; }
-      pending = res;
-      const s = res.state, n = s.tickets.length;
-      const live = stateNow();
-      const archived = s.menu.filter((m) => m.archived).length;
-      const evN = SB.engine.allEvents(s).length;
-      const BPd = SB.office && SB.office.backupPure;
-      const desc = BPd ? BPd.describeBackup(res, SB.store.mode ? SB.store.mode() : null) : { rows: [['Tickets', U.fmtNum(n)]], wrongKitchen: false, refusal: '' };
-      const rows = desc.rows;
-      if (desc.wrongKitchen) { showBad(desc.refusal, source); pending = null; return; }
-      const repairs = res.repaired.length;
-      const card = h('div', { class: 'od-card', 'data-tone': 'ok' },
-        h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'This ' + source + ' is a valid Smokebox backup.')),
-        h('dl', { class: 'od-stats od-stats-tight' }, rows.map(([k, v]) => h('div', { class: 'od-stat' }, h('dt', null, k), h('dd', { class: 'od-stat-v' }, v)))),
-        repairs ? h('p', { class: 'od-hint' }, 'Smokebox repaired ' + repairs + ' small ' + U.plural(repairs, 'problem') + ' while reading it: ' + res.repaired.slice(0, 3).join('; ') + (repairs > 3 ? '; and ' + (repairs - 3) + ' more.' : '.')) : null,
-        h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This replaces everything on this device: ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', your menu edits and your settings. Back up first if you might want what is here.')),
-        h('div', { class: 'od-actions' },
-          btn('Back up what is here first', { icon: 'download', cls: 'btn-sm', onClick: downloadBackup }),
-          // The replace button asks again in a dialog before anything is written.
-          (() => { const b = btn('Replace everything with this backup', { icon: 'upload', cls: 'btn-danger', onClick: () => replaceAll() }); b.dataset.action = 'import-replace'; return b; })(),
-          btn('Cancel', { onClick: clearImport })));
-      impResult.replaceChildren(card);
-    }
-    // After a confirm dialog, replaces everything with the checked backup.
-    async function replaceAll() {
-      if (!pending) return;
-      const p = pending, live = stateNow();
-      const ok = await SB.ui.confirm({
-        title: 'Replace everything on this device?', tone: 'danger', confirmLabel: 'Replace everything', cancelLabel: 'Keep what I have',
-        body: ['This replaces ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', every setting, your menu edits and the PIN with the backup\'s ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.',
-          'There is no undo. If you might want what is here now, cancel and download a backup first.'],
-      });
-      if (!ok) return;
-      // With a PIN set, restoring a backup asks for it again, even inside the back office grace period.
-      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was restored.', { tone: 'warn' }); return; }
-      const rep = SB.store.importAll(p.text);
-      if (rep === 'ok') {
-        clearImport(); pasteArea.value = ''; fileIn.value = '';
-        impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.'))));
-        SB.ui.toast('Backup restored.', { tone: 'ok' });
-        paintUndo();
-      } else {
-        const lr = SB.store.lastResult() || {};
-        showBad(rep === 'invalidBackup' && lr.info && lr.info.error ? backupReason(lr.info.error) : SB.engine.describe(rep, lr.info, (stateNow() || {}).settings), 'backup');
-      }
-    }
-    fileIn.addEventListener('change', async () => {
-      const f = fileIn.files && fileIn.files[0];
-      if (!f) return;
-      if (f.size > MAX_IMPORT_CHARS * 1.2) { showBad(backupReason('too large'), 'file'); fileIn.value = ''; return; }
-      let text;
-      try { text = await readFileText(f); } catch (e) { showBad('The file could not be read from this device.', 'file'); fileIn.value = ''; return; }
-      check(text, 'file');
-      fileIn.value = ''; // so choosing the same file again re-checks it
-    });
-
-    // Danger zone: two reset buttons, each opening a box that asks for a typed word before it will act.
-    pn.body.appendChild(h('h3', { class: 'od-sub od-danger-h', id: undefined }, 'Danger zone: erase data'));
-    const resetStatus = statusLine();
-    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I erase tickets and records', checked: true });
-    const resetLiveBtn = btn('Erase tickets and records', { icon: 'trash', cls: 'btn-danger' });
-    resetLiveBtn.dataset.action = 'reset-live';
-    const resetAllBtn = btn('Erase everything', { icon: 'trash', cls: 'btn-danger' });
-    resetAllBtn.dataset.action = 'reset-all';
-    const dangerBox = h('div', { class: 'od-danger-box', hidden: true, role: 'group', 'aria-label': 'Confirm erasing data' });
-    // Shows the confirm box: what will be erased, a field to type the word into, and a button that stays off until it matches.
-    function askTyped(o) {
-      const BPr = SB.office && SB.office.backupPure;
-      const input = h('input', { class: 'input od-danger-in', type: 'text', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Type ' + o.word + ' to confirm' });
-      const go = btn(o.label, { icon: 'trash', cls: 'btn-danger' });
-      go.disabled = true;
-      // Turns the confirm button on only when the word was typed.
-      const sync = () => { go.disabled = !(BPr ? BPr.resetWordOk(input.value, o.word) : input.value.trim().toLowerCase() === o.word.toLowerCase()); };
-      input.addEventListener('input', sync);
-      // Closes the box without doing anything.
-      const cancel = () => { dangerBox.hidden = true; dangerBox.replaceChildren(); if (o.opener && o.opener.focus) o.opener.focus(); };
-      // Runs the erase once, then closes the box.
-      const run = () => { if (go.disabled) return; cancel(); o.run(); };
-      go.addEventListener('click', run);
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); if (e.key === 'Escape') cancel(); });
-      const descId = U.uid('oddesc');
-      input.setAttribute('aria-describedby', descId);
-      dangerBox.replaceChildren(h('p', { class: 'od-danger-t' }, ico('alert', 20), h('strong', null, o.title)), h('div', { id: descId }, ...o.lines.map((t) => h('p', { class: 'od-p' }, t))),
-        h('label', { class: 'od-danger-l' }, 'Type ', h('strong', null, o.word), ' to confirm', input),
-        h('div', { class: 'od-actions' }, go, btn('Keep my data', { onClick: cancel })));
-      dangerBox.hidden = false;
-      input.focus();
-    }
-    // Opens the typed confirm box for clearing live data.
-    resetLiveBtn.addEventListener('click', () => {
-      const s = stateNow(), k = keep.getValue();
-      askTyped({
-        opener: resetLiveBtn, title: 'Erase tickets and records?', word: 'ERASE', label: 'Erase tickets and records',
-        lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any demo orders, and sets the clock back to real time.',
-          k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
-          'There is no undo. Back up first if you might want this data.'],
-        // Clears the live data after the word was typed.
-        run: async () => {
-          // With a PIN set, erasing asks for it again, even inside the back office grace period.
-          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
-          const rep = SB.store.resetLive({ keepSettings: k, starter: false });
-          if (rep === 'ok') { resetStatus.ok('Live data erased. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data erased.', { tone: 'ok' }); }
-          else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
-        },
-      });
-    });
-    // Opens the typed confirm box for erasing everything.
-    resetAllBtn.addEventListener('click', () => {
-      const s = stateNow();
-      askTyped({
-        opener: resetAllBtn, title: 'Erase everything on this device?', word: 'ERASE', label: 'Erase everything',
-        lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
-          'Your display choices (themes and text size) are kept.', 'There is no undo. Back up first if you might want any of it back.'],
-        // Erases everything after the word was typed.
-        run: async () => {
-          // With a PIN set, erasing asks for it again, even inside the back office grace period.
-          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
-          const rep = SB.store.reset();
-          if (rep === 'ok') { resetStatus.ok('Everything was reset to the starter values.'); SB.ui.toast('Everything was reset.', { tone: 'ok' }); }
-          else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
-        },
-      });
-    });
-    pn.body.append(
-      para('Erasing tickets and records removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
-      h('div', { class: 'od-toggle-row' }, keep),
-      h('div', { class: 'od-actions' }, resetLiveBtn, resetAllBtn), dangerBox, resetStatus.el);
+    const { resetStatus } = buildDangerZone({ pn, stateNow });
 
     P.syncs.push((s) => { paintCounts(s); if (sampleToggle && simOn()) sampleToggle.setValue(!!simOn().sampleEnabled()); });
     P.disposers.push(() => exStatus.destroy(), () => resetStatus.destroy());

@@ -1658,11 +1658,9 @@
     vis.forEach((s) => m.order.forEach((c) => { if (isNum(val(s, c))) allVals.push(val(s, c)); }));
     const widestVal = Math.max.apply(null, [0].concat(allVals.map((v) => pxText(fmt0.full(v)))), stacked ? Math.max.apply(null, [0].concat(stackL.pos.map((v, ci) => pxText(fmt0.full(percent ? m.total(m.order[ci]) : v))))) : 0);
     const catLabelW = Math.max.apply(null, [0].concat(m.order.map((c) => chart.tw(m.cats[c], 12))));
-    const fontPx = 12;
     let H0, l, r, top, bot, plotW, plotH;
     const g1 = S('g', { class: 'ch-g-bars ' + (orient === 'v' ? 'ch-rv-up' : 'ch-rv-right') });
     const gl = S('g', { class: 'ch-g-vals ch-rv-fade' });
-    const marksOut = [];                                    // { c, s, x,y,w,h ...} for post labelling
     // Thickness of one bar in a slot of width band holding kk bars: up to 24 px, 2 px apart, at least 2 px.
     const thick = (band, kk) => Math.max(Math.min(2, band * 0.85), Math.min(24, (band * (kk > 1 ? 0.84 : 0.7) - (kk - 1) * 2) / kk));
     // The status tone chosen for category c, if any.
@@ -1715,7 +1713,6 @@
       const Y = M.linear(ax.d0, ax.d1, bot, top);
       const y0 = Y(Math.max(ax.d0, Math.min(0, ax.d1)));
       // decide labels before drawing the axis (axis is dropped when every bar is labelled)
-      const groupSlot = catW;
       const bw = thick(catW, stacked ? 1 : k);
       const wantVal = labelsMode === 'all' || (labelsMode === 'auto' && !stacked && k === 1 && widestVal + 4 <= catW);
       const wantTotal = stacked && labelsMode !== 'none' && widestVal + 4 <= catW;
@@ -1979,7 +1976,6 @@
     svg.appendChild(g1);
     const showBase = m.counts && m.counts.length;
     const baseKey = visOv.length ? 'muted' : 'cat1';
-    const binW = (r - l) / b.n;
     const total = b.total;
     // Tooltip for bin i: count and share of the total, each overlay's count, and a note when values above
     // the maximum were piled into the last bin.
@@ -2524,7 +2520,6 @@
     const vW = chart.tw(valT, 13, 700), wW = m.st ? chart.tw(word, 12, 600) + 18 : 0;
     const rightW = vW + (m.st ? wW + 10 : 0);
     const barY = label || m.st || m.v != null ? 24 : 4;
-    const hasText = true;
     svg.appendChild(txt(chart.fit(label, Math.max(30, W - rightW - 14), 13, 500), 0, 13, 'ch-lbl', 'start', { style: 'font-size:13px;font-weight:500' }));
     svg.appendChild(txt(valT, W, 13, 'ch-v', 'end', { style: 'font-size:13px;font-weight:700' }));
     if (m.st) {
