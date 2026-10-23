@@ -97,7 +97,24 @@
   let m = null;          // the mounted instance
   let pendingZone = null;
   // Sound is on by default: a kitchen that misses a warning loses food. A browser still needs one tap to allow audio.
-  let sound = U.storage.get(KEY_SOUND, true) !== false;
+  // Follower address: ?follow=<hub address>&code=<code>. A bare ?follow means the hub that served this page.
+  function readFollow() {
+    const q = g.location && typeof g.location.search === 'string' ? g.location.search : '';
+    const hit = /[?&]follow(?:=([^&]*))?(?=&|$)/.exec(q);
+    if (!hit) return { on: false, url: '', code: '' };
+    // Decodes one part of the address, empty when it is damaged.
+    const dec = (v) => { try { return decodeURIComponent(v || ''); } catch (e) { return ''; } };
+    const c = /[?&]code=([^&]*)/.exec(q);
+    return { on: true, url: dec(hit[1]).replace(/\/+$/, ''), code: c ? dec(c[1]) : '' };
+  }
+  const FOLLOW = readFollow();
+  // Says whether this page is a read-only follower screen, and which hub it follows.
+  SB.followMode = () => FOLLOW;
+  const following = FOLLOW.on;
+  if (following) doc.documentElement.dataset.follow = 'on';
+  // A follower screen is silent unless the owner turns sound on for this screen (its own switch, off by default).
+  const KEY_FSOUND = 'smokebox.v1.follow.sound';
+  let sound = following ? U.storage.get(KEY_FSOUND, false) === true : U.storage.get(KEY_SOUND, true) !== false;
   let speech = U.storage.get(KEY_SPEECH, true) !== false;
   // Far display is off by default and belongs to this tablet (it describes how far away the screen is read).
   let far = U.storage.get(KEY_FAR, false) === true;
@@ -228,7 +245,7 @@
   // Switches the chime on or off and remembers it; switching on plays one chime as a test.
   F.setSound = function (on) {
     sound = !!on;
-    U.storage.set(KEY_SOUND, sound);
+    U.storage.set(following ? KEY_FSOUND : KEY_SOUND, sound);
     if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; playHere(chime); }
     syncLeadership();
     return sound;
@@ -583,7 +600,7 @@
   // Builds the whole page once. WATCH OUT: nothing built here is replaced later; updates change
   // text and attributes only.
   function buildDom() {
-    const root = h('div', { class: 'fl', dataset: { zone: m.zone, mode: modeOf(m.zone), far: far ? 'on' : 'off' } });
+    const root = h('div', { class: 'fl', dataset: { zone: m.zone, mode: modeOf(m.zone), far: far ? 'on' : 'off', follow: following ? 'on' : 'off' } });
     m.root = root;
     // ----- header
     const brand = SB.shell && SB.shell.brand ? SB.shell.brand() : h('span', null, 'Smokebox');
@@ -632,7 +649,7 @@
 
     // New ticket opens the order sheet. Menu opens the full menu, or a short list on a narrow screen.
     const newBtn = h('button', { type: 'button', class: 'btn btn-primary fl-new', 'aria-keyshortcuts': 'N', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket'));
-    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Settings', onClick: (e) => { if (mq('(max-width: 999px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Settings'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
+    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Settings', onClick: (e) => { if (following) followMenu(e.currentTarget); else if (mq('(max-width: 999px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Settings'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
     // Back office is a plain labeled button for managers: sales, speed, stock and the menu. It asks for the PIN when one is set.
     const officeBtn = h('button', { type: 'button', class: 'btn fl-tool fl-office', 'aria-label': 'Back office', 'aria-keyshortcuts': 'Control+Shift+O', onClick: (e) => openOffice(e.currentTarget) }, ico('gauge', 24), h('span', { class: 'fl-tool-label fl-office-label' }, 'Back office'));
     try { SB.ui.tooltip(officeBtn, 'Back office: sales, speed, stock and your menu'); } catch (e) { /* ignore */ }
@@ -672,7 +689,10 @@
     // A small pill that says how many tickets are out of sight below the screen; one tap scrolls down a screen.
     const belowT = h('span', null, '');
     const below = h('button', { type: 'button', class: 'btn fl-below', hidden: true, onClick: () => { main.scrollBy({ top: Math.round(main.clientHeight * 0.85), behavior: reduced() ? 'auto' : 'smooth' }); } }, ico('chevron-down', 20), belowT);
-    root.append(head, strip.el, wl.el, main, dock, wr.el, below);
+    // A follower screen has a bar under the header: the connection chip, the out-of-date banner and the "only shows" line.
+    const fbar = following ? buildFollowBar() : null;
+    if (fbar) m.fbar = fbar;
+    root.append(...[head, fbar ? fbar.el : null, strip.el, wl.el, main, dock, wr.el, below].filter(Boolean));
     m.below = below; m.belowT = belowT;
     // Scrolling the board refreshes the pill once per animation frame at most.
     let belowRaf = 0;
@@ -1652,7 +1672,7 @@
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
     const health = awayNote() || awakeNote();
-    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
+    const note = following ? health : sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
     const showNote = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note) && (note === health || (needSound ? m.dis.has('snd') : true));
@@ -1704,6 +1724,7 @@
       if (co === 'on' && m.zone !== 'all') F.setZone('all'); }
     if (!m.belowAt || now - m.belowAt > 1000 || now < m.belowAt) { m.belowAt = now; updateBelow(); }
     paintRole();
+    if (following) paintFollow();
     updateStrip(now);
     driveCallouts(now);
     if (m.root.dataset.wall === 'on') updateWall(now);
@@ -1941,6 +1962,7 @@
     const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
       : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
+    if (following) { const sg = 'follow|' + zone + '|' + stationBusy; if (e.dataset.sig === sg) return; e.dataset.sig = sg; U.clear(e); e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.')); return; }
     const cardUp = !!(m.welcome && !m.welcome.hidden);
     const sig = title + '|' + text + '|' + cardUp;
     if (e.dataset.sig === sig) return;
@@ -1962,6 +1984,62 @@
       cardUp ? null : h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
       h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, store().isDemo && store().isDemo() ? 'Busy-night crew' : 'Try the demo'))].filter(Boolean));
     e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
+  }
+
+  /* ---------- follower screen: a read-only second screen that mirrors the hub ---------- */
+  // What the follower store says about the connection, in the three words the chip uses: ok, wait or bad.
+  function followView() {
+    const st = SB.store && typeof SB.store.followStatus === 'function' ? SB.store.followStatus() : null;
+    if (!st || st.mode !== 'follower') return { tone: 'bad', text: 'Not connected', sub: 'The hub could not be reached.', stale: false };
+    const at = st.staleSince || st.lastUpdate || 0;
+    const since = at ? U.fmtTime(at) : '';
+    if (st.state === 'following') return { tone: 'ok', text: 'Connected', sub: st.lastUpdate ? 'Updated ' + U.fmtTime(st.lastUpdate) : '', stale: false };
+    if (st.state === 'connecting') return { tone: 'wait', text: 'Connecting...', sub: '', stale: false };
+    if (st.state === 'reconnecting') return { tone: 'wait', text: 'Reconnecting...', sub: since ? 'Last update ' + since : '', stale: false };
+    if (st.state === 'stale') return { tone: 'bad', text: 'Out of date since ' + since, sub: 'Looking for the hub again.', stale: true, since };
+    return { tone: 'bad', text: 'Not connected', sub: st.reason || 'The hub could not be reached.', stale: !!at, since };
+  }
+  // Builds the bar under the header: connection chip (big enough for a TV), the calm "only shows" line and the out-of-date banner.
+  function buildFollowBar() {
+    const dot = h('span', { class: 'fl-fdot', 'aria-hidden': 'true' });
+    const word = h('span', { class: 'fl-fword' }), sub = h('span', { class: 'fl-fsub' });
+    const chip = h('div', { class: 'fl-fchip', role: 'status', 'aria-live': 'polite', dataset: { tone: 'wait' } }, dot, word, sub);
+    const note = h('span', { class: 'fl-fnote' }, 'This screen only shows the kitchen.');
+    const stale = h('div', { class: 'fl-fstale', role: 'alert', hidden: true });
+    const el = h('div', { class: 'fl-follow' }, h('div', { class: 'fl-frow' }, chip, note), stale);
+    return { el, chip, word, sub, stale };
+  }
+  // Updates the chip and the out-of-date banner (text only when it changes).
+  function paintFollow() {
+    const f = m && m.fbar;
+    if (!f) return;
+    const v = followView();
+    if (f.chip.dataset.tone !== v.tone) f.chip.dataset.tone = v.tone;
+    if (f.word.textContent !== v.text) f.word.textContent = v.text;
+    if (f.sub.textContent !== v.sub) f.sub.textContent = v.sub;
+    const msg = v.stale ? 'Out of date since ' + (v.since || 'a while ago') + '. What you see here may not be what is happening in the kitchen.' : '';
+    if (f.stale.textContent !== msg) f.stale.textContent = msg;
+    setHidden(f.stale, !msg);
+    const st = v.stale ? 'on' : 'off';
+    if (m.root.dataset.stale !== st) m.root.dataset.stale = st;
+  }
+  // The menu of a follower screen: only what changes this screen (look, size, sound for this screen), and the way back.
+  function followMenu(anchor) {
+    // Each row switches one thing on this screen only; none of them changes the kitchen.
+    const items = [
+      // Tapping 'Wall mode' changes this screen only.
+      { label: 'Wall mode', icon: 'grid', checked: F.wall(), disabled: (g.innerWidth || 0) < 1700, onClick: () => F.setWall(!F.wall()) },
+      // Tapping 'Far display' changes this screen only.
+      { label: 'Far display', icon: 'eye', checked: F.farDisplay(), onClick: () => F.setFarDisplay(!F.farDisplay()) },
+      // Tapping 'Night colors' changes this screen only.
+      { label: 'Night colors', icon: 'moon', checked: SB.theme && SB.theme.get && SB.theme.get() === 'night', onClick: () => { if (SB.theme && SB.theme.set) SB.theme.set(SB.theme.get() === 'night' ? 'day' : 'night'); } },
+      // Tapping 'Warning sounds on this screen' changes this screen only.
+      { label: 'Warning sounds on this screen', icon: 'volume', checked: sound, onClick: () => F.setSound(!sound) },
+      { separator: true },
+      // Tapping 'Back to my own kitchen' changes this screen only.
+      { label: 'Back to my own kitchen', icon: 'chevron-left', onClick: () => { try { if (SB.setup && SB.setup.leaveFollow) SB.setup.leaveFollow(); else g.location.href = g.location.pathname; } catch (e) { g.location.href = g.location.pathname; } } },
+    ];
+    SB.ui.menu(anchor, items, { label: 'This screen' });
   }
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.
@@ -1990,6 +2068,7 @@
   // WATCH OUT: a second tap on the same item within 450 ms is ignored, so a gloved double tap cannot start
   // and finish it.
   function onGridClick(e) {
+    if (following) return;
     const btn = e.target.closest('button[data-act]');
     if (!btn || !m.grid.contains(btn)) return;
     const slip = btn.closest('.fl-slip');
@@ -2064,6 +2143,8 @@
   // own label; anything else gets one plain sentence. Returns the store's result.
   function run(type, payload, o) {
     o = o || {};
+    // A follower screen changes nothing: it says so calmly and does not ask the store.
+    if (following) { toast('This screen only shows the kitchen.', { tone: 'info' }); return { report: 'followerReadOnly', info: {}, events: [] }; }
     const S = store();
     const r = S.dispatchEx(type, payload, { source: 'ui' });
     if (r.report === 'ok') {
@@ -2265,6 +2346,7 @@
   // Handles the shortcut keys in F.shortcuts. WATCH OUT: ignored while typing, with a sheet or menu
   // open, in the office, or with Ctrl, Cmd or Alt held, so it never steals a key from a form.
   function onKey(e) {
+    if (following) return;
     if (!m || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.isComposing || e.repeat) return;
     const tgt = e.target;
     if (tgt && (tgt.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName))) return;
