@@ -23,9 +23,26 @@
     { key: 'D', keys: ['D'], label: 'Demo' },
     { key: '1 to 6', keys: ['1', '2', '3', '4', '5', '6'], label: 'Station: All, PIT, HOT, FRY, CLD, EXP' },
     { key: 'Z', keys: ['Z'], label: 'Undo the last action (10 seconds)' },
+    // Ticket keys for a USB bump bar (it types like a keyboard): pick a ticket, then act on it.
+    { key: 'J or Right', keys: ['J', 'Right'], label: 'Bump bar: select the next ticket (the first press selects the first)' },
+    { key: 'K or Left', keys: ['K', 'Left'], label: 'Bump bar: select the previous ticket' },
+    { key: 'S', keys: ['S'], label: 'Bump bar: start the next dish on the selected ticket' },
+    { key: 'F', keys: ['F'], label: 'Bump bar: finish (done) the next cooking dish on the selected ticket' },
+    { key: 'B or Enter', keys: ['B', 'Enter'], label: 'Bump bar: bump the selected ticket (asks first if dishes are not done)' },
+    { key: 'L', keys: ['L'], label: 'Bump bar: bring back the ticket bumped last' },
     { key: '?', keys: ['?'], label: 'Help' },
     { key: 'Esc', keys: ['Esc'], label: 'Close a screen, or clear the all-day highlight' },
   ];
+  // Which dish a bump-bar key acts on for one ticket. items are the ticket's dishes; what is "start" (a two-step dish that is
+  // ready to start) or "done" (a dish being cooked, or a one-step dish ready to finish). A dish whose time is up comes
+  // first, then the one that has waited longest. Returns the item or null when there is nothing to do.
+  F.pickItem = function (items, what, now) {
+    const list = (items || []).filter((it) => it && (what === 'start' ? it.status === 'displayed' && it.track === 'two' : (it.status === 'cooking' || (it.status === 'displayed' && it.track !== 'two'))));
+    // How far past its usual time a cooking dish is; 0 for any other dish.
+    const over = (it) => (it.status === 'cooking' && it.prepSec > 0 && it.startedAt != null ? (now - it.startedAt) / 1000 - it.prepSec : 0);
+    list.sort((a, b) => (over(b) - over(a)) || ((a.firedAt || 0) - (b.firedAt || 0)));
+    return list[0] || null;
+  };
   // With no page (loaded under plain Node) every call does nothing, so loading never throws.
   if (!doc) { F.mount = F.unmount = F.setZone = F.highlight = F.setSound = () => {}; F.sound = () => false; return; }
 
@@ -58,6 +75,8 @@
   let speech = U.storage.get(KEY_SPEECH, true) !== false;
   // Far display is off by default and belongs to this tablet (it describes how far away the screen is read).
   let far = U.storage.get(KEY_FAR, false) === true;
+  // The ticket picked with the bump-bar keys (by id); null until a key picks one.
+  let selId = null, selIdx = 0;
   let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0;
   let volume = (() => { const v = U.storage.get(KEY_VOLUME, 1); return U.isNum(v) ? Math.min(1, Math.max(VOL_MIN, v)) : 1; })();
 
@@ -808,6 +827,7 @@
       say(brandNew.length === 1 ? 'Ticket #' + brandNew[0].num + ' added for ' + brandNew[0].customer + '.' : brandNew.length + ' new tickets.');
     }
     m.quiet = false; // the first render after mount is silent
+    paintSelection();
     m.stats.renders++;
     m.stats.lastRenderMs = performance.now() - t0;
   }
@@ -1587,6 +1607,55 @@
     else if (act === 'more') moreMenu(rec, btn);
   }
 
+  // Bump-bar keys: pick a ticket, then start, finish or bump it without touching the screen.
+
+  // The slips on screen in board order, without any that are sliding out.
+  const liveSlips = () => Array.from(m.grid.children).filter((c) => c.classList.contains('fl-slip') && !c.classList.contains('fl-leaving'));
+  // Marks the picked slip (data-sel) and scrolls it into view; clears the mark from any other. Attribute edits only.
+  function paintSelection() {
+    if (!m) return;
+    const slips = liveSlips();
+    // The picked ticket left (bumped or voided): the pick moves to the ticket now in its place, so the next press acts on that one.
+    const at = slips.findIndex((el) => el.dataset.ticket === selId);
+    if (selId && at < 0) selId = slips.length ? slips[Math.min(selIdx, slips.length - 1)].dataset.ticket : null;
+    else if (at >= 0) selIdx = at;
+    for (const el of slips) { const on = el.dataset.ticket === selId; if ((el.dataset.sel === 'true') !== on) { if (on) el.dataset.sel = 'true'; else delete el.dataset.sel; } }
+  }
+  // Moves the pick by one ticket (dir 1 next, -1 previous) and says which ticket it is. The first press picks the first.
+  function selectTicket(dir) {
+    const slips = liveSlips();
+    if (!slips.length) { selId = null; return; }
+    const at = slips.findIndex((el) => el.dataset.ticket === selId);
+    const to = at < 0 ? (dir > 0 ? 0 : slips.length - 1) : (at + dir + slips.length) % slips.length;
+    selId = slips[to].dataset.ticket;
+    paintSelection();
+    const rec = m.slips.get(selId);
+    try { slips[to].scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' }); } catch (e) { /* ignore */ }
+    if (rec) say('Ticket #' + rec.num + ' selected.');
+  }
+  // Does one bump-bar action on the picked ticket: start, done or bump. With nothing picked the first ticket is picked
+  // first. WATCH OUT: the same 450 ms guard as a tap applies, so a bar that bounces cannot start and finish a dish.
+  function barAct(what) {
+    if (!liveSlips().length) return;
+    if (!selId || !m.slips.has(selId)) selectTicket(1);
+    const rec = m.slips.get(selId);
+    if (!rec) return;
+    if (what === 'bump') { bump(rec); return; }
+    const t = E().findTicket(store().getState(), rec.id);
+    const it = t ? F.pickItem(rec.mode === 'station' ? t.items.filter((x) => x.zone === rec.zone) : t.items, what, store().now()) : null;
+    if (!it) { toast(what === 'start' ? 'Nothing ready to start on ticket #' + rec.num + '.' : 'Nothing cooking or ready to finish on ticket #' + rec.num + '.', { tone: 'info' }); return; }
+    const key = 'item:' + it.id, nowMs = performance.now();
+    if (nowMs - (m.lastTap.get(key) || 0) < 450) return;
+    m.lastTap.set(key, nowMs);
+    run('advanceItem', { ticketId: rec.id, itemId: it.id });
+  }
+  // Brings back the ticket bumped most recently (the bump-bar recall key). Says so when there is none.
+  function recallLast() {
+    const last = store().select.recent(1)[0];
+    if (!last) { toast('No bumped ticket to bring back.', { tone: 'info' }); return; }
+    run('recallTicket', { ticketId: last.id }, { okText: 'Ticket #' + last.num + ' is back on the board.' });
+  }
+
   // Sends one action to the store. A success that can be undone raises an Undo toast with the engine's
   // own label; anything else gets one plain sentence. Returns the store's result.
   function run(type, payload, o) {
@@ -1805,6 +1874,12 @@
     else if (k === 'd') openSheet('demo');
     else if (k === '?') openSheet('help');
     else if (k === 'z') undoLast();
+    else if (k === 'j' || k === 'ArrowRight' || k === 'ArrowDown') selectTicket(1);
+    else if (k === 'k' || k === 'ArrowLeft' || k === 'ArrowUp') selectTicket(-1);
+    else if (k === 's') barAct('start');
+    else if (k === 'f') barAct('done');
+    else if (k === 'b' || (k === 'Enter' && !(tgt && tgt.closest && tgt.closest('button,a,[role="button"]')))) barAct('bump');
+    else if (k === 'l') recallLast();
     else if (/^[1-6]$/.test(k)) goZone(TABS[Number(k) - 1]);
     else if (k === 'Escape' && m.hl) F.highlight(null);
     else used = false;
