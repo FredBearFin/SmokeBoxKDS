@@ -86,6 +86,7 @@
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
       case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
       case 'safety_setting_changed': return changeLine(e);
+      case 'month_closed': return 'Saved ' + (isNum(e.days) ? e.days + ' ' + (e.days === 1 ? 'day' : 'days') : 'old days') + ' before ' + (e.before ? U.fmtDateShort(e.before) : 'a set date') + ' to a backup and cleared them from this tablet' + (isNum(e.tickets) ? ' (' + e.tickets + ' tickets, ' + (isNum(e.orders) ? e.orders : 0) + ' orders)' : '');
       case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '');
       case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '');
       case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';

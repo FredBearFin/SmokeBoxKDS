@@ -290,3 +290,11 @@
 @media (min-width: 1700px) { .od-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .od-fcard .od-steps { list-style: decimal; padding-left: 1.4em; display: grid; gap: var(--sp-2); }
 .od-fcard .od-steps li { display: list-item; }
+
+/* The pilot report on paper: hidden on screen, the only thing on the page when printing, black on white with wrapped lines. */
+.pr-printroot { display: none; }
+@media print {
+  .pr-printroot { display: block !important; position: static; color: #000; background: #fff; font: 12px/1.4 system-ui, sans-serif; }
+  .pr-printroot h1 { font-size: 20px; margin: 0 0 8px; color: #000; }
+  .pr-printroot pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; color: #000; margin: 0; }
+}
