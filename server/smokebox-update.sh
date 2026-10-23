@@ -107,6 +107,7 @@ rollback() {
 healthy=0
 for _ in $(seq 1 "$HEALTH_TRIES"); do
   if curl -fsS --max-time 3 "$HEALTH_URL" -o "$WORK/health.txt" 2>/dev/null; then
+    case "$HEALTH_URL" in */health) ;; *) : > "$WORK/health.txt" ;; esac   # only the hub's /health answer is read; a page is not
     if grep -q '"dataProblem"' "$WORK/health.txt"; then rollback "the new build could not read the saved data: $(head -c 300 "$WORK/health.txt")"; fi
     healthy=1; break
   fi
