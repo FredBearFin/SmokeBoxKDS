@@ -1879,7 +1879,11 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl-wall { display: none; }
 @media (min-width: 1700px) {
   .fl[data-wall="on"] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.6fr) minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }
-  .fl[data-wall="on"] > .fl-head, .fl[data-wall="on"] > .fl-strip { grid-column: 1 / -1; }
+  .fl[data-wall="on"][data-follow="on"] { grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
+  .fl[data-wall="on"][data-follow="on"] > .fl-main { grid-row: 4; }
+  .fl[data-wall="on"][data-follow="on"] > .fl-dock { grid-row: 5; }
+  .fl[data-wall="on"][data-follow="on"] > .fl-wall-orders, .fl[data-wall="on"][data-follow="on"] > .fl-wall-glance { grid-row: 4 / 6; }
+  .fl[data-wall="on"] > .fl-head, .fl[data-wall="on"] > .fl-strip, .fl[data-wall="on"] > .fl-follow { grid-column: 1 / -1; }
   .fl[data-wall="on"] > .fl-main { grid-column: 2; grid-row: 3; }
   .fl[data-wall="on"] > .fl-dock { grid-column: 2; grid-row: 4; }
   .fl[data-wall="on"] > .fl-wall-orders { grid-column: 1; grid-row: 3 / 5; }
@@ -2063,6 +2067,29 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 /* The last-checked stamp sits at the right end of the all-day strip, quiet and small. */
 .fl-checked { flex: none; margin-left: auto; padding: 0 var(--sp-3); font-size: var(--fs-1); color: var(--ink2); white-space: nowrap; }
 .mn-test { display: grid; gap: var(--sp-2); }
+/* Follower screen (?follow): a read-only second screen. Nothing that changes the kitchen is shown or can be tapped. */
+.fl[data-follow="on"] .fl-new, .fl[data-follow="on"] .fl-tool, .fl[data-follow="on"] .fl-tools, .fl[data-follow="on"] .fl-san,
+.fl[data-follow="on"] .fl-demo-chip, .fl[data-follow="on"] .fl-welcome, .fl[data-follow="on"] .slip-foot, .fl[data-follow="on"] .slip-next,
+.fl[data-follow="on"] [data-act="fire"], .fl[data-follow="on"] [data-act="zone"], .fl[data-follow="on"] .fl-first-dish { display: none !important; }
+.fl[data-follow="on"] .fl-slip button { pointer-events: none; }
+.fl[data-follow="on"] .fl-empty-actions { display: none; }
+html[data-follow="on"] .hc-actions, html[data-follow="on"] .hc-editor-slot, html[data-follow="on"] .hc .seg-opt[data-id="new"], html[data-follow="on"] .hc-who { display: none !important; }
+.fl-follow { flex: none; display: grid; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4); background: var(--paper); border-bottom: var(--bw) solid var(--line-soft); }
+.fl-frow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); min-width: 0; }
+.fl-fchip { display: inline-flex; align-items: center; gap: calc(10px * var(--fl-k)); min-height: calc(48px * var(--fl-k)); padding: 0 calc(16px * var(--fl-k)); border-radius: 999px; border: calc(3px * var(--fl-k)) solid var(--line); background: var(--bg); font: var(--w-heavy) calc(22px * var(--fl-k)) / 1.1 var(--font-display); letter-spacing: 0.02em; }
+.fl-fdot { flex: none; width: calc(16px * var(--fl-k)); height: calc(16px * var(--fl-k)); border-radius: 50%; background: var(--ink3); }
+.fl-fsub { font: var(--w-semi) calc(16px * var(--fl-k)) / 1.1 var(--font-body); color: var(--ink2); letter-spacing: 0; }
+.fl-fchip[data-tone="ok"] { border-color: var(--sage); }
+.fl-fchip[data-tone="ok"] .fl-fdot { background: var(--sage); }
+.fl-fchip[data-tone="wait"] { border-color: var(--amber); }
+.fl-fchip[data-tone="wait"] .fl-fdot { background: var(--amber); }
+.fl-fchip[data-tone="bad"] { border-color: var(--crimson); background: var(--tint-bad); }
+.fl-fchip[data-tone="bad"] .fl-fdot { background: var(--crimson); }
+.fl-fnote { font: var(--w-semi) calc(18px * var(--fl-k)) / 1.2 var(--font-body); color: var(--ink2); }
+.fl-fstale { padding: var(--sp-2) var(--sp-3); border-radius: var(--r-panel); background: var(--tint-bad); color: var(--ink); border-left: calc(8px * var(--fl-k)) solid var(--crimson); font: var(--w-bold) calc(20px * var(--fl-k)) / 1.25 var(--font-body); }
+.fl-fstale[hidden] { display: none; }
+.fl[data-stale="on"] .fl-main { filter: grayscale(0.6); opacity: 0.8; }
+.follow-fail { max-width: 520px; margin: 18vh auto 0; padding: var(--sp-5); display: grid; gap: var(--sp-4); }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -4548,7 +4575,7 @@ a.of-nav:active { background: var(--press); }
   // The settings that belong to the device, not to a kitchen (look, sound, which station this tablet shows). They
   // are the same in the demo and the real kitchen. Every other smokebox.v1 key is kitchen data and gets its own
   // copy in the demo (smokebox.demo.<name>), so the demo can never read or write the real kitchen's data.
-  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'callouts', 'far', 'wall', 'dock'].map((k) => 'smokebox.v1.' + k);
+  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'callouts', 'far', 'wall', 'dock', 'follow.sound'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
@@ -11475,7 +11502,7 @@ a.of-nav:active { background: var(--press); }
     const url = opts.url.replace(/\/+$/, '');
     const f = fol = { url, code: typeof opts.code === 'string' ? opts.code : '', staleMs: isNum(opts.staleMs) && opts.staleMs > 0 ? opts.staleMs : 45000, offset: 0, seq: null, hubId: null, connected: false, everConnected: false,
       error: null, lastMsgAt: null, goodSince: null, retryInMs: 0, retryStep: 0, closed: false, gen: 0, ctrl: null, retryTimer: null, timer: null, lastKey: '', resolve: null, resyncs: 0,
-      fetchFn: opts.fetch || g.fetch, Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
+      fetchFn: opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null), Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
     f.timer = opts.noTimers ? null : setInterval(folTick, 1000);
     const p = new Promise((resolve) => { f.resolve = resolve; });
     folConnect();
@@ -19558,6 +19585,8 @@ a.of-nav:active { background: var(--press); }
   function bannerWanted() {
     const store = SB.store;
     if (!store || !store.status || !store.getState) return null;
+    // A follower screen keeps nothing on this device, so it never nags about saving or backups.
+    if (SB.followMode && SB.followMode().on) return null;
     const ss = store.status(), s = store.getState();
     // In the demo this strip always shows, above every other message, and always has the Back button.
     if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
@@ -19820,7 +19849,24 @@ a.of-nav:active { background: var(--press); }
   let m = null;          // the mounted instance
   let pendingZone = null;
   // Sound is on by default: a kitchen that misses a warning loses food. A browser still needs one tap to allow audio.
-  let sound = U.storage.get(KEY_SOUND, true) !== false;
+  // Follower address: ?follow=<hub address>&code=<code>. A bare ?follow means the hub that served this page.
+  function readFollow() {
+    const q = g.location && typeof g.location.search === 'string' ? g.location.search : '';
+    const hit = /[?&]follow(?:=([^&]*))?(?=&|$)/.exec(q);
+    if (!hit) return { on: false, url: '', code: '' };
+    // Decodes one part of the address, empty when it is damaged.
+    const dec = (v) => { try { return decodeURIComponent(v || ''); } catch (e) { return ''; } };
+    const c = /[?&]code=([^&]*)/.exec(q);
+    return { on: true, url: dec(hit[1]).replace(/\/+$/, ''), code: c ? dec(c[1]) : '' };
+  }
+  const FOLLOW = readFollow();
+  // Says whether this page is a read-only follower screen, and which hub it follows.
+  SB.followMode = () => FOLLOW;
+  const following = FOLLOW.on;
+  if (following) doc.documentElement.dataset.follow = 'on';
+  // A follower screen is silent unless the owner turns sound on for this screen (its own switch, off by default).
+  const KEY_FSOUND = 'smokebox.v1.follow.sound';
+  let sound = following ? U.storage.get(KEY_FSOUND, false) === true : U.storage.get(KEY_SOUND, true) !== false;
   let speech = U.storage.get(KEY_SPEECH, true) !== false;
   // Far display is off by default and belongs to this tablet (it describes how far away the screen is read).
   let far = U.storage.get(KEY_FAR, false) === true;
@@ -19951,7 +19997,7 @@ a.of-nav:active { background: var(--press); }
   // Switches the chime on or off and remembers it; switching on plays one chime as a test.
   F.setSound = function (on) {
     sound = !!on;
-    U.storage.set(KEY_SOUND, sound);
+    U.storage.set(following ? KEY_FSOUND : KEY_SOUND, sound);
     if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; playHere(chime); }
     syncLeadership();
     return sound;
@@ -20306,7 +20352,7 @@ a.of-nav:active { background: var(--press); }
   // Builds the whole page once. WATCH OUT: nothing built here is replaced later; updates change
   // text and attributes only.
   function buildDom() {
-    const root = h('div', { class: 'fl', dataset: { zone: m.zone, mode: modeOf(m.zone), far: far ? 'on' : 'off' } });
+    const root = h('div', { class: 'fl', dataset: { zone: m.zone, mode: modeOf(m.zone), far: far ? 'on' : 'off', follow: following ? 'on' : 'off' } });
     m.root = root;
     // ----- header
     const brand = SB.shell && SB.shell.brand ? SB.shell.brand() : h('span', null, 'Smokebox');
@@ -20355,7 +20401,7 @@ a.of-nav:active { background: var(--press); }
 
     // New ticket opens the order sheet. Menu opens the full menu, or a short list on a narrow screen.
     const newBtn = h('button', { type: 'button', class: 'btn btn-primary fl-new', 'aria-keyshortcuts': 'N', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket'));
-    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Settings', onClick: (e) => { if (mq('(max-width: 999px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Settings'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
+    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Settings', onClick: (e) => { if (following) followMenu(e.currentTarget); else if (mq('(max-width: 999px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Settings'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
     // Back office is a plain labeled button for managers: sales, speed, stock and the menu. It asks for the PIN when one is set.
     const officeBtn = h('button', { type: 'button', class: 'btn fl-tool fl-office', 'aria-label': 'Back office', 'aria-keyshortcuts': 'Control+Shift+O', onClick: (e) => openOffice(e.currentTarget) }, ico('gauge', 24), h('span', { class: 'fl-tool-label fl-office-label' }, 'Back office'));
     try { SB.ui.tooltip(officeBtn, 'Back office: sales, speed, stock and your menu'); } catch (e) { /* ignore */ }
@@ -20395,7 +20441,10 @@ a.of-nav:active { background: var(--press); }
     // A small pill that says how many tickets are out of sight below the screen; one tap scrolls down a screen.
     const belowT = h('span', null, '');
     const below = h('button', { type: 'button', class: 'btn fl-below', hidden: true, onClick: () => { main.scrollBy({ top: Math.round(main.clientHeight * 0.85), behavior: reduced() ? 'auto' : 'smooth' }); } }, ico('chevron-down', 20), belowT);
-    root.append(head, strip.el, wl.el, main, dock, wr.el, below);
+    // A follower screen has a bar under the header: the connection chip, the out-of-date banner and the "only shows" line.
+    const fbar = following ? buildFollowBar() : null;
+    if (fbar) m.fbar = fbar;
+    root.append(...[head, fbar ? fbar.el : null, strip.el, wl.el, main, dock, wr.el, below].filter(Boolean));
     m.below = below; m.belowT = belowT;
     // Scrolling the board refreshes the pill once per animation frame at most.
     let belowRaf = 0;
@@ -21375,7 +21424,7 @@ a.of-nav:active { background: var(--press); }
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
     const health = awayNote() || awakeNote();
-    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
+    const note = following ? health : sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
     const showNote = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note) && (note === health || (needSound ? m.dis.has('snd') : true));
@@ -21427,6 +21476,7 @@ a.of-nav:active { background: var(--press); }
       if (co === 'on' && m.zone !== 'all') F.setZone('all'); }
     if (!m.belowAt || now - m.belowAt > 1000 || now < m.belowAt) { m.belowAt = now; updateBelow(); }
     paintRole();
+    if (following) paintFollow();
     updateStrip(now);
     driveCallouts(now);
     if (m.root.dataset.wall === 'on') updateWall(now);
@@ -21664,6 +21714,7 @@ a.of-nav:active { background: var(--press); }
     const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
       : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
+    if (following) { const sg = 'follow|' + zone + '|' + stationBusy; if (e.dataset.sig === sg) return; e.dataset.sig = sg; U.clear(e); e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.')); return; }
     const cardUp = !!(m.welcome && !m.welcome.hidden);
     const sig = title + '|' + text + '|' + cardUp;
     if (e.dataset.sig === sig) return;
@@ -21685,6 +21736,62 @@ a.of-nav:active { background: var(--press); }
       cardUp ? null : h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
       h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, store().isDemo && store().isDemo() ? 'Busy-night crew' : 'Try the demo'))].filter(Boolean));
     e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
+  }
+
+  /* ---------- follower screen: a read-only second screen that mirrors the hub ---------- */
+  // What the follower store says about the connection, in the three words the chip uses: ok, wait or bad.
+  function followView() {
+    const st = SB.store && typeof SB.store.followStatus === 'function' ? SB.store.followStatus() : null;
+    if (!st || st.mode !== 'follower') return { tone: 'bad', text: 'Not connected', sub: 'The hub could not be reached.', stale: false };
+    const at = st.staleSince || st.lastUpdate || 0;
+    const since = at ? U.fmtTime(at) : '';
+    if (st.state === 'following') return { tone: 'ok', text: 'Connected', sub: st.lastUpdate ? 'Updated ' + U.fmtTime(st.lastUpdate) : '', stale: false };
+    if (st.state === 'connecting') return { tone: 'wait', text: 'Connecting...', sub: '', stale: false };
+    if (st.state === 'reconnecting') return { tone: 'wait', text: 'Reconnecting...', sub: since ? 'Last update ' + since : '', stale: false };
+    if (st.state === 'stale') return { tone: 'bad', text: 'Out of date since ' + since, sub: 'Looking for the hub again.', stale: true, since };
+    return { tone: 'bad', text: 'Not connected', sub: st.reason || 'The hub could not be reached.', stale: !!at, since };
+  }
+  // Builds the bar under the header: connection chip (big enough for a TV), the calm "only shows" line and the out-of-date banner.
+  function buildFollowBar() {
+    const dot = h('span', { class: 'fl-fdot', 'aria-hidden': 'true' });
+    const word = h('span', { class: 'fl-fword' }), sub = h('span', { class: 'fl-fsub' });
+    const chip = h('div', { class: 'fl-fchip', role: 'status', 'aria-live': 'polite', dataset: { tone: 'wait' } }, dot, word, sub);
+    const note = h('span', { class: 'fl-fnote' }, 'This screen only shows the kitchen.');
+    const stale = h('div', { class: 'fl-fstale', role: 'alert', hidden: true });
+    const el = h('div', { class: 'fl-follow' }, h('div', { class: 'fl-frow' }, chip, note), stale);
+    return { el, chip, word, sub, stale };
+  }
+  // Updates the chip and the out-of-date banner (text only when it changes).
+  function paintFollow() {
+    const f = m && m.fbar;
+    if (!f) return;
+    const v = followView();
+    if (f.chip.dataset.tone !== v.tone) f.chip.dataset.tone = v.tone;
+    if (f.word.textContent !== v.text) f.word.textContent = v.text;
+    if (f.sub.textContent !== v.sub) f.sub.textContent = v.sub;
+    const msg = v.stale ? 'Out of date since ' + (v.since || 'a while ago') + '. What you see here may not be what is happening in the kitchen.' : '';
+    if (f.stale.textContent !== msg) f.stale.textContent = msg;
+    setHidden(f.stale, !msg);
+    const st = v.stale ? 'on' : 'off';
+    if (m.root.dataset.stale !== st) m.root.dataset.stale = st;
+  }
+  // The menu of a follower screen: only what changes this screen (look, size, sound for this screen), and the way back.
+  function followMenu(anchor) {
+    // Each row switches one thing on this screen only; none of them changes the kitchen.
+    const items = [
+      // Tapping 'Wall mode' changes this screen only.
+      { label: 'Wall mode', icon: 'grid', checked: F.wall(), disabled: (g.innerWidth || 0) < 1700, onClick: () => F.setWall(!F.wall()) },
+      // Tapping 'Far display' changes this screen only.
+      { label: 'Far display', icon: 'eye', checked: F.farDisplay(), onClick: () => F.setFarDisplay(!F.farDisplay()) },
+      // Tapping 'Night colors' changes this screen only.
+      { label: 'Night colors', icon: 'moon', checked: SB.theme && SB.theme.get && SB.theme.get() === 'night', onClick: () => { if (SB.theme && SB.theme.set) SB.theme.set(SB.theme.get() === 'night' ? 'day' : 'night'); } },
+      // Tapping 'Warning sounds on this screen' changes this screen only.
+      { label: 'Warning sounds on this screen', icon: 'volume', checked: sound, onClick: () => F.setSound(!sound) },
+      { separator: true },
+      // Tapping 'Back to my own kitchen' changes this screen only.
+      { label: 'Back to my own kitchen', icon: 'chevron-left', onClick: () => { try { if (SB.setup && SB.setup.leaveFollow) SB.setup.leaveFollow(); else g.location.href = g.location.pathname; } catch (e) { g.location.href = g.location.pathname; } } },
+    ];
+    SB.ui.menu(anchor, items, { label: 'This screen' });
   }
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.
@@ -21713,6 +21820,7 @@ a.of-nav:active { background: var(--press); }
   // WATCH OUT: a second tap on the same item within 450 ms is ignored, so a gloved double tap cannot start
   // and finish it.
   function onGridClick(e) {
+    if (following) return;
     const btn = e.target.closest('button[data-act]');
     if (!btn || !m.grid.contains(btn)) return;
     const slip = btn.closest('.fl-slip');
@@ -21787,6 +21895,8 @@ a.of-nav:active { background: var(--press); }
   // own label; anything else gets one plain sentence. Returns the store's result.
   function run(type, payload, o) {
     o = o || {};
+    // A follower screen changes nothing: it says so calmly and does not ask the store.
+    if (following) { toast('This screen only shows the kitchen.', { tone: 'info' }); return { report: 'followerReadOnly', info: {}, events: [] }; }
     const S = store();
     const r = S.dispatchEx(type, payload, { source: 'ui' });
     if (r.report === 'ok') {
@@ -21988,6 +22098,7 @@ a.of-nav:active { background: var(--press); }
   // Handles the shortcut keys in F.shortcuts. WATCH OUT: ignored while typing, with a sheet or menu
   // open, in the office, or with Ctrl, Cmd or Alt held, so it never steals a key from a form.
   function onKey(e) {
+    if (following) return;
     if (!m || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.isComposing || e.repeat) return;
     const tgt = e.target;
     if (tgt && (tgt.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName))) return;
@@ -36237,6 +36348,8 @@ a.of-nav:active { background: var(--press); }
     let stage = 'start';
     try {
       stage = 'store';
+      // A follower screen (?follow=<hub address>) shows the hub's kitchen and never touches this device's own saved one.
+      if (SB.followMode && SB.followMode().on) { bootFollower(); return; }
       if (SB.store && typeof SB.store.init === 'function') SB.store.init({ blank: true, mode: SB.util.mode() }); // a brand-new install starts empty; saved data is never changed
       // The demo (its own saved data) opens with its sample tickets the first time.
       // A brand-new empty kitchen gets neutral station and menu-section names (saved with it); old kitchens and the demo keep theirs.
@@ -36253,6 +36366,39 @@ a.of-nav:active { background: var(--press); }
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });
     } catch (e) { showBootError(e, stage); }
+  }
+
+  // Starts a follower screen: connects to the hub, then shows the board. A hub that is only unreachable still opens the board
+  // (it keeps trying); a wrong code, a wrong address or a hub of another version shows a plain message instead.
+  function bootFollower() {
+    const f = SB.followMode();
+    // Mounts the shell once the store has something (or is retrying in the background).
+    const show = () => {
+      try {
+        SB.shell.mount(doc.getElementById('app') || doc.body);
+        SB.booted = true;
+      } catch (e) { showBootError(e, 'shell'); }
+    };
+    // Shows a plain message when the hub refuses this screen, with a way back to the device's own kitchen.
+    const fail = (res) => {
+      const words = { noFollower: 'This version of Smokebox cannot show another screen. Update it and try again.', badCode: 'The access code was not accepted. Check it and try again.', notFound: 'This address is not a Smokebox hub.', wrongVersion: 'This hub runs another version of Smokebox. Update this page and try again.', tooMany: 'The hub has too many screens connected right now. Try again in a minute.' };
+      const wrap = doc.createElement('div');
+      wrap.className = 'follow-fail';
+      wrap.setAttribute('role', 'alert');
+      const h2 = doc.createElement('h2'); h2.textContent = 'This screen could not follow the kitchen';
+      const p = doc.createElement('p'); p.textContent = words[res.error] || 'The hub could not be reached or answered with an error.';
+      const back = doc.createElement('button'); back.type = 'button'; back.className = 'btn btn-primary btn-lg'; back.textContent = 'Back to my own kitchen';
+      back.addEventListener('click', () => { try { if (SB.setup && SB.setup.leaveFollow) SB.setup.leaveFollow(); else g.location.href = g.location.pathname; } catch (e) { g.location.href = g.location.pathname; } });
+      wrap.append(h2, p, back);
+      (doc.getElementById('app') || doc.body).appendChild(wrap);
+      SB.booted = true;
+    };
+    // A page that cannot follow (an older store) never falls back to opening a kitchen of its own.
+    if (!SB.store || typeof SB.store.initFollower !== 'function') { fail({ error: 'noFollower' }); return; }
+    let p;
+    // The browser's own fetch must be called on the page, so it is handed over wrapped.
+    try { p = SB.store.initFollower({ url: f.url, code: f.code, fetch: (u, o) => g.fetch(u, o), AbortController: g.AbortController, TextDecoder: g.TextDecoder }); } catch (e) { fail({ error: 'unreachable' }); return; }
+    Promise.resolve(p).then((res) => { if (res && res.ok === false && res.error && res.error !== 'unreachable') fail(res); else show(); }, () => show());
   }
 
   // Exposed so tests can run the start-up again or show the error card on purpose.
