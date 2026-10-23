@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# One-line installer for a fresh or existing Smokebox server: installs the app, HTTPS and the nightly self-update.
+# One-line installer for a fresh or existing Smokebox server: installs the app, HTTPS and the nightly self-update. On an existing server it
+# installs the latest build and restarts the service (a few seconds offline); data and the extras from beta.sh and harden.sh are kept.
 # Usage (as root): bash go.sh <login name> <password> [time zone]   (time zone defaults to America/New_York)
 set -euo pipefail
 LOGIN="${1:?login name}"
