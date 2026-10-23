@@ -24,6 +24,25 @@ function sale() {
 }
 const histDays = (b) => (b.get('smokebox.v1.histtrim', null) || { days: 0 }).days;
 
+test('Cleo 2: while a before-restore copy is kept, the 6-hour copy still refreshes, and a damaged save comes back from the newer one', () => {
+  clock = T;
+  const b = backend();
+  start(b);
+  S.dispatch('updateSettings', { patch: { service: { taxRatePct: 5 } } });
+  const backup = S.exportAll();
+  S.dispatch('updateSettings', { patch: { service: { taxRatePct: 9 } } });
+  assert.equal(S.importAll(backup), 'ok');                    // keeps the tax-9 kitchen as the before-restore copy
+  clock += 8 * 3600e3; S.dispatch('updateSettings', { patch: { service: { taxRatePct: 6 } } }); S.flush();
+  assert.equal(b.get('smokebox.v1.lastgood', null).reason, 'before restore', 'the way back is untouched');
+  assert.equal(b.get('smokebox.v1.lastgood2', null).state.settings.service.taxRatePct, 6, 'the rolling copy is fresh');
+  S.destroy && S.destroy();
+  b.m.set('smokebox.v1.state', '{"damaged": true');               // the live save is damaged
+  clock += 3600e3;
+  start(b);
+  assert.equal(S.getState().settings.service.taxRatePct, 6, 'recovered from the copy taken 1 hour ago, not the one from before the restore');
+  S.destroy && S.destroy();
+});
+
 test('Cleo 3: start over also removes the copy kept from before a repair at load (it holds the whole old kitchen)', () => {
   clock = T;
   const b = backend({ 'smokebox.v1.dropped': JSON.stringify('{"old":"kitchen"}'), 'smokebox.v1.droppedat': JSON.stringify(T - DAY) });

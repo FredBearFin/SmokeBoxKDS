@@ -22,6 +22,9 @@
   const DROPPED_AT_KEY = 'smokebox.v1.droppedat';
   // One small rolling copy of the last good state (menu, ingredients, settings, PIN, safety records, recent history).
   const LASTGOOD_KEY = 'smokebox.v1.lastgood';
+  // While a 'before restore' or 'before month close' copy holds the last-good slot, the 6-hour rolling copy goes here instead,
+  // so a damaged save is never recovered from a copy that is days old.
+  const ROLLING_KEY = 'smokebox.v1.lastgood2';
   // The owner's answer to the one-time offer to clear old demo tickets: true once they chose to keep them.
   const KEPT_KEY = 'smokebox.v1.demoLeftoversKept';
   // The word that must be typed to start over with an empty menu, and the setup-progress keys that start over clears.
@@ -271,7 +274,7 @@
   function savedChars() {
     if (!storage || typeof storage.raw !== 'function') return 0;
     let n = 0;
-    try { for (const k of [KEY, LASTGOOD_KEY]) { const t = storage.raw(k); if (typeof t === 'string') n += t.length; } } catch (e) { return 0; }
+    try { for (const k of [KEY, LASTGOOD_KEY, ROLLING_KEY]) { const t = storage.raw(k); if (typeof t === 'string') n += t.length; } } catch (e) { return 0; }
     return n;
   }
   // How full the saved history is, as a percent of the tightest of three limits (tickets, events, browser space), and what the owner can be told.
@@ -368,7 +371,7 @@
       } catch (e) { ok = false; }
       if (ok) { st.trimmed = !!lim; kept2 = s2; break; }
       // Under pressure the rolling copy goes first: it is only a convenience, the live save is the data.
-      if (!snapDropped && strict) { snapDropped = true; snapAt = 0; try { storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } tries--; continue; }
+      if (!snapDropped && strict) { snapDropped = true; snapAt = 0; try { storage.remove(ROLLING_KEY); storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } tries--; continue; }
       // History is already tiny: trimming further will not help, so give up and report the failed save.
       if (nt < 20 && ne < 200) break;
       lim = { maxTickets: nt, maxEvents: ne };
@@ -398,8 +401,9 @@
   function maybeSnapshot(r) {
     if (!strict || mode !== 'real' || !storage || !state) return false;
     if (!snapWanted && r - snapAt < SNAP_EVERY_MS) return false;
-    // A 'before restore' copy is the owner's way back from a wrong restore: the 6-hour refresh leaves it alone for 7 days.
-    if (!snapWanted) { const g = beforeRestoreCopy(r); if (g) return false; }
+    // A 'before restore' copy is the owner's way back from a wrong restore: the 6-hour refresh leaves it alone for 7 days
+    // and writes to the second slot meanwhile.
+    const slot = !snapWanted && beforeRestoreCopy(r) ? ROLLING_KEY : LASTGOOD_KEY;
     try {
       // When the saved kitchen already fills half the browser's space, the rolling copy shrinks to a few tickets (menu, settings, PIN and safety records
       // stay): a fat copy is what pushes the live save over the limit and gets the copy dropped anyway.
@@ -407,7 +411,8 @@
       const env = { v: 1, takenAt: r, reason: snapWanted || 'interval', rev: state.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
       const text = JSON.stringify(env);
       if (!E().validateBackup(text).ok) return false; // never keep a copy that would not load
-      if (storage.set(LASTGOOD_KEY, env) === false) { storage.remove(LASTGOOD_KEY); return false; }
+      if (storage.set(slot, env) === false) { storage.remove(slot); return false; }
+      if (slot === LASTGOOD_KEY) storage.remove(ROLLING_KEY);   // the second slot is older now
       snapAt = r; snapWanted = null;
       st.lastGoodAt = r;
       return true;
@@ -475,14 +480,19 @@
     if (!v || typeof v !== 'object') { last = { type: 'restoreParked', report: 'noCopy', info: {}, events: [] }; return 'noCopy'; }
     return importAll(JSON.stringify(openSaved(v)));
   }
-  // Reads the rolling copy and returns { state, takenAt } if it is whole, else null.
+  // Reads the newest whole copy of the two last-good slots and returns { state, takenAt, repaired }, else null.
   function readSnapshot() {
-    try {
-      const env = openSaved(storage.get(LASTGOOD_KEY, null));
-      if (!env || typeof env !== 'object') return null;
-      const v = E().validateBackup(env);
-      return v.ok ? { state: v.state, takenAt: isNum(env.takenAt) ? env.takenAt : 0, repaired: v.repaired } : null;
-    } catch (e) { return null; }
+    let best = null;
+    for (const k of [LASTGOOD_KEY, ROLLING_KEY]) {
+      try {
+        const env = openSaved(storage.get(k, null));
+        if (!env || typeof env !== 'object') continue;
+        const v = E().validateBackup(env);
+        const at = isNum(env.takenAt) ? env.takenAt : 0;
+        if (v.ok && (!best || at > best.takenAt)) best = { state: v.state, takenAt: at, repaired: v.repaired };
+      } catch (e) { /* try the other slot */ }
+    }
+    return best;
   }
   // Public name for saving right now.
   function flush() { return persistNow(); }
@@ -836,7 +846,8 @@
         if (isNum(da) && r - da > CORRUPT_KEEP_MS && !st.droppedCount) { storage.remove(DROPPED_KEY); storage.remove(DROPPED_AT_KEY); }
       } catch (e) { /* ignore */ }
     }
-    try { const g0 = storage.get(LASTGOOD_KEY, null); snapAt = g0 && isNum(g0.takenAt) ? g0.takenAt : 0; } catch (e) { snapAt = 0; }
+    snapAt = 0;
+    for (const k of [LASTGOOD_KEY, ROLLING_KEY]) { try { const g0 = storage.get(k, null); if (g0 && isNum(g0.takenAt) && g0.takenAt > snapAt) snapAt = g0.takenAt; } catch (e) { /* none */ } }
     snapWanted = null;
     // History fill bookkeeping, and a request that the browser keeps this site's data (real kitchens only; where the browser cannot, nothing happens).
     quotaChars = isNum(opts.quotaBytes) && opts.quotaBytes > 0 ? opts.quotaBytes : 5e6;
@@ -1549,7 +1560,7 @@
     // Only now that the erase went in: the rolling last-good copy and any set-aside damaged copy still hold the old kitchen's
     // customers and orders, so both are dropped and the last-good copy is retaken from the new empty kitchen.
     // The copy kept from before a repair at load holds the whole old kitchen too, and the dropped-history count belongs to it.
-    try { for (const k of [LASTGOOD_KEY, CORRUPT_KEY, CORRUPT_AT_KEY, DROPPED_KEY, DROPPED_AT_KEY, HIST_KEY, HIST_NOTICE_KEY]) storage.remove(k); } catch (e) { /* ignore */ }
+    try { for (const k of [LASTGOOD_KEY, ROLLING_KEY, CORRUPT_KEY, CORRUPT_AT_KEY, DROPPED_KEY, DROPPED_AT_KEY, HIST_KEY, HIST_NOTICE_KEY]) storage.remove(k); } catch (e) { /* ignore */ }
     st.corrupt = null; st.droppedCount = null;
     hist = { oldest: null, days: 0, at: 0, droppedBefore: null }; hn = { warnAt: 0, trimAck: 0 };
     // Actions queued for a hub that it never confirmed belong to the erased kitchen: they are dropped (and marked, so another
