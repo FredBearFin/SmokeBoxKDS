@@ -20,8 +20,8 @@ cafe: import link visible after opening "More ways to add dishes": true
 cafe: format line: Read the file as: spreadsheet table (CSV, TSV or pasted from Excel or Google Sheets). 22 of 25 dishes are ready to add; 3 need a fix or will be skipped.
 cafe: rows: 25, problem rows: 3
 cafe: problem lines: ["Cappuccino => This row has 1 more column than the header, so a value may have been split at a comma. The price may be 4.50, not 4. Put quotes around a price with a comma (for example \"4,50\"), or use a dot (4.50), then read the file again.","Latte => \"Latte\" appears again; line 4 already has it. Keep one of the two rows, or rename this one."," => This row has no dish name. Type a name in the first column, or delete the row.","Brownie => This row has no price. Enter the price in dollars, for example 9.50. A price is never guessed."]
-cafe: stations chosen in the preview: ["Pit"]
-cafe: file-level notes: ["Your file has categories that are not set up here: Coffee, Tea, Other drinks, Pastry, Lunch. Until you add them, those dishes go in \"Meats\".Add these categories"]
+cafe: stations chosen in the preview: ["Kitchen"]
+cafe: file-level notes: ["Your file has categories that are not set up here: Coffee, Tea, Other drinks, Pastry, Lunch. Until you add them, those dishes go in \"Mains\".Add these categories"]
 cafe: after "Add these categories": ["Added 5 categories. Each dish now sits in its own."]; rows 25
 cafe: import button reads: Import 21 dishes
 cafe: categories the imported dishes landed in: {"Coffee":4,"Tea":2,"Other drinks":2,"Pastry":6,"Lunch":7}
@@ -31,7 +31,7 @@ cafe: toast: ["Ticket #101 sent to 1 station. Paid $11.50 by cash."]
 cafe: stock/86 badge on the board: ["86"]
 cafe: page errors: 0
 diner: dishes: 7
-diner: question card text: Do you cook any of this ahead and hold it?Chili in a warmer, potato salad in a cooler. If you do, Smokebox can track each batch and warn you before it runs out 
+diner: question card text: Do you cook any of this ahead and hold it?Soup in a warmer, salads in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time
 diner: hours "4 hrs" -> ["Saved Coffee at $1.75.","Type hours from 0.5 to 12."]
 diner: hours "13" -> ["Saved Coffee at $1.75.","Type hours from 0.5 to 12."]
 diner: batch "6 kg" -> ["Saved Coffee at $1.75.","Batch size: type kilograms like 4, or leave it empty."]

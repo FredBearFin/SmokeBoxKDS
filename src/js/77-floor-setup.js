@@ -79,6 +79,8 @@
   const KEY_DRAFT = 'smokebox.v1.setup.draft'; // the half-typed dish {name, price, zone}, kept so a closed tab loses nothing
   const KEY_LAST = 'smokebox.v1.setup.lastZone'; // the station chosen for the last saved dish
   const KEY_CASKIP = 'smokebox.v1.setup.cookAheadSkipped'; // true once the owner said no to the cooked-ahead question
+  const KEY_HIDDENCAT = 'smokebox.v1.setup.hiddenCategories'; // category ids the owner marked Not used
+  const KEY_LASTCAT = 'smokebox.v1.setup.lastCategory'; // the category the owner last chose by hand (not a guess)
   const KEY_HIDDEN = 'smokebox.v1.setup.hiddenStations'; // station ids the owner hid from the Where is it made? tiles
   const KEY_EXAMPLES = 'smokebox.v1.setup.examples'; // ids of dishes that came from the example menu
 
@@ -88,8 +90,10 @@
     pit: { cat: 'meat', sec: 300, track: 'two' }, sides: { cat: 'side', sec: 180, track: 'two' },
     fry: { cat: 'fried', sec: 240, track: 'two' }, cold: { cat: 'cold', sec: 60, track: 'one' },
   };
+  // Section names that fit each station best, in the old and the new starter names (lower case).
+  const SECTION_WORDS = { pit: ['meats', 'mains'], sides: ['hot sides', 'sides'], fry: ['fried', 'snacks'], cold: ['cold and drinks', 'drinks'] };
   // A short plain line under each station name on its tile.
-  const ZONE_HINT = { pit: 'Smoker, grill or oven', sides: 'Stove and sides', fry: 'Fryer', cold: 'No cooking: drinks, cold sides' };
+  const ZONE_HINT = { pit: 'Grill, oven or main line', sides: 'Prep and sides', fry: 'Fryer', cold: 'No cooking: drinks, cold items' };
   // The example menu. Columns: name, price in dollars, station id, category id. Made-up prices, owner to replace.
   // audit:data-start
   const EXAMPLES = [
@@ -139,11 +143,19 @@
     const all = stations(), shown = all.filter((z) => hid.indexOf(z.id) < 0);
     return shown.length ? shown : all.slice(0, 1);
   }
+  // The categories still in use: all of them except the ones the owner marked Not used. At least one always stays.
+  function visibleCategories() {
+    const hid = U.storage.get(KEY_HIDDENCAT, []);
+    const all = SB.config.categories, shown = all.filter((c) => hid.indexOf(c.id) < 0);
+    return shown.length ? shown : all.slice(0, 1);
+  }
   // The guessed category, prep seconds and tap style for a station, with safe values for a custom station.
   function defaultsFor(zoneId) {
     const d = ZONE_DEFAULT[zoneId];
-    if (d && SB.config.categoryById[d.cat]) return d;
-    return { cat: (SB.config.categories[0] || {}).id, sec: 180, track: 'two' };
+    if (!d || !SB.config.categoryById[d.cat]) return { cat: (SB.config.categories[0] || {}).id, sec: 180, track: 'two' };
+    // The section is found by its NAME first (the starter names changed from Meats, Hot sides, Fried to Mains, Sides, Snacks), then by id.
+    const byName = SECTION_WORDS[zoneId] ? SB.config.categories.find((c) => SECTION_WORDS[zoneId].indexOf(c.name.toLowerCase()) >= 0) : null;
+    return byName ? Object.assign({}, d, { cat: byName.id }) : d;
   }
   // Reads a typed price the way a person writes it: "12.50", "12,50", "$14", "14.", "USD 12", "1 200". Gives {value, rounded}
   // in dollars, or null when it is not one price. Uses the menu importer's reader when it is in this build.
@@ -252,6 +264,22 @@
     // Shows what Smokebox understood from the typed price before anything is saved, so "12,50" is never a surprise.
     priceIn.addEventListener('input', () => { const i = priceInfo(priceIn.value); tell(priceEcho, i ? 'Reads as ' + U.fmtMoney(i.value) + (i.rounded ? ' (rounded to the cent)' : '') : '', 'ok'); });
     let zone = '';
+    // Menu section: where the dish sits on the order screen. It starts from the station's guess until the owner picks one by hand;
+    // after that their last hand pick is used for the next dish (a pizza shop picks "Pizzas" once).
+    const catSel = h('select', { class: 'select dp-menusec', 'aria-label': 'Menu section' });
+    let catTouched = false;
+    // Fills the Menu section list from the categories still in use and chooses the starting value.
+    function paintCats() {
+      const cur = catSel.value, vis = visibleCategories();
+      U.clear(catSel);
+      vis.forEach((c) => catSel.appendChild(h('option', { value: c.id }, c.name)));
+      const mine = U.storage.get(KEY_LASTCAT, '');
+      const guess = zone ? defaultsFor(zone).cat : '';
+      const want = catTouched ? cur : (mine && vis.some((c) => c.id === mine) ? mine : (vis.some((c) => c.id === guess) ? guess : vis[0].id));
+      catSel.value = vis.some((c) => c.id === want) ? want : vis[0].id;
+    }
+    // Picking a section by hand is remembered for the next dish.
+    catSel.addEventListener('change', () => { catTouched = true; U.storage.set(KEY_LASTCAT, catSel.value); saveDraft(); });
     const tiles = h('div', { class: 'dp-tiles', role: 'radiogroup', 'aria-label': 'Where it is made' });
     const zoneErr = h('div', { class: 'field-error', role: 'alert', hidden: true });
     const whereLabel = h('div', { class: 'field-label' }, 'Where is it made?');
@@ -275,7 +303,7 @@
     }
     // Shows which station tile is chosen and clears the "tap where it is made" message.
     function pickZone(id) {
-      zone = id; zoneErr.hidden = true;
+      zone = id; zoneErr.hidden = true; if (!catTouched) paintCats();
       tiles.querySelectorAll('.dp-tile').forEach((b) => b.setAttribute('aria-checked', b.dataset.zone === id ? 'true' : 'false'));
     }
     // Change stations: rename, hide or add one, using the same saved names the board and tickets read.
@@ -322,22 +350,63 @@
     const stFold = h('details', { class: 'dp-fold dp-stfold' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Change stations')),
       h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'Name the places in your kitchen the way your cooks say them. Tap Not used on any you do not have. If you only have one, you will not be asked.'), stList, stSt, stReload));
     paintStations(); paintTiles();
+    // Change menu sections: rename, mark Not used or add one, using the same saved names the order screen reads.
+    const caSt = h('p', { class: 'fs-sub', role: 'status' });
+    const caList = h('div', { class: 'dp-stlist' });
+    // Saves a change to the owner's category names through SB.config (checked first); the order screen reads them at once.
+    function commitCats(mutate) {
+      const C = SB.config;
+      const spec = JSON.parse(JSON.stringify(C.customSpec()));
+      spec.rename = spec.rename || {}; spec.add = spec.add || {};
+      mutate(spec);
+      const before = C.customSpec(), res = C.applyCustom(spec);
+      if (res.rejected.length) { C.applyCustom(before); tell(caSt, 'That name cannot be used: it is empty, longer than ' + C.customLimits.name + ' letters, or already taken.', 'bad'); return false; }
+      if (!C.saveCustom(spec)) { tell(caSt, 'This browser would not save the change.', 'bad'); return false; }
+      tell(caSt, 'Saved. The order screen shows the new name.', 'ok');
+      paintCatRows(); paintCats();
+      return true;
+    }
+    // Rebuilds the section rows: a name box, Not used or Use again, and an add box at the end.
+    function paintCatRows() {
+      U.clear(caList);
+      const hid = U.storage.get(KEY_HIDDENCAT, []);
+      SB.config.categories.forEach((c) => {
+        const inp = h('input', { class: 'input', type: 'text', maxlength: SB.config.customLimits.name, value: c.name, 'aria-label': 'Name of section ' + c.name });
+        // Saves the new name when the box is left.
+        inp.addEventListener('change', () => { if (inp.value.trim() !== c.name) commitCats((sp) => { sp.rename.categories = Object.assign({}, sp.rename.categories, { [c.id]: inp.value }); }); });
+        const isHid = hid.indexOf(c.id) >= 0;
+        // Marks this section Not used (it leaves the pick list), or brings it back, keeping at least one in use.
+        const hideBtn = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => {
+          const now = U.storage.get(KEY_HIDDENCAT, []).filter((x) => x !== c.id);
+          if (!isHid) now.push(c.id);
+          if (SB.config.categories.every((s) => now.indexOf(s.id) >= 0)) { tell(caSt, 'Keep at least one section in use.', 'bad'); return; }
+          U.storage.set(KEY_HIDDENCAT, now);
+          tell(caSt, isHid ? c.name + ' is in use again.' : c.name + ' is marked not used: it leaves the pick list. Dishes already in it keep it.', 'ok');
+          paintCatRows(); paintCats();
+        } }, isHid ? 'Use again' : 'Not used');
+        caList.appendChild(h('div', { class: 'dp-strow' }, inp, hideBtn));
+      });
+      const addIn = h('input', { class: 'input', type: 'text', maxlength: SB.config.customLimits.name, placeholder: 'New section, like Pizzas', 'aria-label': 'New menu section name' });
+      // Adds a new menu section with the typed name.
+      caList.appendChild(h('div', { class: 'dp-strow' }, addIn, h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { if (addIn.value.trim()) commitCats((sp) => { sp.add.categories = (sp.add.categories || []).concat([{ name: addIn.value }]); }); } }, ico('plus', 18), h('span', null, 'Add section'))));
+    }
+    const catFold = h('details', { class: 'dp-fold dp-catfold' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Change menu sections')),
+      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'The sections on your order screen. Rename them to match your menu (Pizzas, Pastries, Tacos). Tap Not used on any you do not need.'), caList, caSt));
+    paintCatRows(); paintCats();
     const whereBlock = h('div', { class: 'field' }, whereLabel, tiles, zoneErr, stFold);
 
     // More options, folded shut: prep time, category and a short ticket name. Nothing here is needed.
     const minIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', placeholder: 'auto', 'aria-label': 'Prep time in minutes' });
-    const catSel = h('select', { class: 'select' }, h('option', { value: '' }, 'Choose for me'), SB.config.categories.map((c) => h('option', { value: c.id }, c.name)));
     const shortIn = h('input', { class: 'input', type: 'text', maxlength: 24, autocomplete: 'off', placeholder: 'Same as the name' });
     const more = h('details', { class: 'dp-fold' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'More options')),
       h('div', { class: 'dp-more' },
         SB.ui.field({ label: 'Minutes to make one', control: minIn, hint: 'Leave empty and Smokebox guesses from the station, then learns from your tickets.' }),
-        SB.ui.field({ label: 'Category on the order screen', control: catSel }),
         SB.ui.field({ label: 'Short name on tickets', control: shortIn })));
 
     const status = h('p', { class: 'fs-sub dp-status', role: 'status' });
     const again = h('button', { type: 'submit', class: 'btn btn-primary btn-lg dp-again', dataset: { act: 'save-again' } }, ico('plus', 22), h('span', null, 'Save and add another'));
     const done = h('button', { type: 'button', class: 'btn btn-lg dp-done', dataset: { act: 'save-done' } }, ico('check', 22), h('span', null, 'Save and finish'));
-    const form = h('form', { class: 'dp-form', novalidate: '', 'aria-label': 'Add a dish' }, nameField, priceField, whereBlock, more, h('div', { class: 'fs-row dp-actions' }, again, done), status);
+    const form = h('form', { class: 'dp-form', novalidate: '', 'aria-label': 'Add a dish' }, nameField, priceField, whereBlock, SB.ui.field({ label: 'Menu section', control: catSel, hint: 'Where it sits on the order screen. Change the section names under Change menu sections.' }), catFold, more, h('div', { class: 'fs-row dp-actions' }, again, done), status);
 
     // Keeps what has been typed so far, so a closed tab or a stray tap loses nothing.
     function saveDraft() { U.storage.set(KEY_DRAFT, { name: nameIn.value, price: priceIn.value, zone }); }
@@ -374,7 +443,7 @@
         if (mins == null || mins < 0.1 || mins > 60) { tell(status, 'Minutes to make one: type a number from 1 to 60, or leave it empty.'); more.open = true; minIn.focus(); return false; }
         prepSec = Math.round(mins * 60);
       }
-      const r = addDish(name, price, zone, { prepSec, cat: catSel.value, short: shortIn.value.trim() });
+      const r = addDish(name, price, zone, { prepSec, cat: catSel.value || undefined, short: shortIn.value.trim() });
       if (!r.ok) {
         const gone = removedDishes().find((m) => m.name.toLowerCase() === name.toLowerCase());
         if (gone) showBringBack(gone, price);
@@ -383,7 +452,7 @@
         return false;
       }
       tell(status, 'Saved ' + name + ' at ' + U.fmtMoney(price) + '.');
-      nameIn.value = ''; priceIn.value = ''; tell(priceEcho, ''); minIn.value = ''; catSel.value = ''; shortIn.value = '';
+      nameIn.value = ''; priceIn.value = ''; tell(priceEcho, ''); minIn.value = ''; shortIn.value = ''; if (!catTouched) paintCats();
       saveDraft();
       return true;
     }
@@ -491,7 +560,7 @@
       } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Add a cooked-ahead item' : 'Yes, I cook ahead'));
       if (!items.length) {
         caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook any of this ahead and hold it?'),
-          h('p', { class: 'fs-sub' }, 'Chili in a warmer, potato salad in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. You can skip this and still take orders.'),
+          h('p', { class: 'fs-sub' }, 'Soup in a warmer, salads in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. You can skip this and still take orders.'),
           // Remembers the owner said no, so the question goes away.
           h('div', { class: 'fs-row' }, add, h('button', { type: 'button', class: 'btn', dataset: { act: 'skip-cooked' }, onClick: () => { U.storage.set(KEY_CASKIP, true); paintCook(); } }, 'No, skip this')));
       } else {
@@ -677,6 +746,11 @@
       // One station for every dish that came with none, so a cafe does not pick it 22 times.
       const bulk = h('select', { class: 'select', 'aria-label': 'Put every dish at this station' }, h('option', { value: '' }, 'Choose a station'), stations().map((z) => h('option', { value: z.id }, z.name)));
       preview.appendChild(h('div', { class: 'fs-row dp-bulk' }, h('label', null, 'Put all these dishes at: '), bulk));
+      // One menu section for every dish that came with none (a bakery file has no category column).
+      const bulkCat = h('select', { class: 'select', 'aria-label': 'Put every dish in this menu section' }, h('option', { value: '' }, 'Choose a section'), visibleCategories().map((c) => h('option', { value: c.id }, c.name)));
+      if (rows.some((r) => !r.category)) preview.appendChild(h('div', { class: 'fs-row dp-bulk' }, h('label', null, 'Put all these dishes in: '), bulkCat));
+      // Choosing a section sets it on every row that has none of its own.
+      bulkCat.addEventListener('change', () => { if (bulkCat.value) rows.forEach((r) => { if (!r.categoryText) r.category = bulkCat.value; }); });
       const body = h('div', { class: 'dp-ptable', role: 'table', 'aria-label': 'Dishes found' });
       const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'import-go' } }, 'Import');
       // Updates the Import button's count and enabled state from the ticked, valid rows.

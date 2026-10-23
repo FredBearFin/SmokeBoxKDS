@@ -1,0 +1,30 @@
+{
+ "pizza": {
+  "paid": true,
+  "errors": 0,
+  "bbq": [],
+  "setupBbq": [],
+  "pass": true
+ },
+ "bakery": {
+  "paid": true,
+  "errors": 0,
+  "bbq": [],
+  "setupBbq": [],
+  "pass": true
+ },
+ "taco": {
+  "paid": true,
+  "errors": 0,
+  "bbq": [],
+  "setupBbq": [],
+  "pass": true
+ },
+ "bar": {
+  "paid": true,
+  "errors": 0,
+  "bbq": [],
+  "setupBbq": [],
+  "pass": true
+ }
+}

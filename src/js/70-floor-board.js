@@ -1802,10 +1802,13 @@
     if (!sg) return;
     const hid = SB.setup && SB.setup.hiddenStations ? SB.setup.hiddenStations() : [];
     const c = store().select.counts();
+    const menuNow = store().getState().menu.filter((d) => !d.archived);
     TABS.forEach((id) => {
       const b = sg.querySelector('[data-id="' + id + '"]');
       if (!b || id === 'all' || id === 'expo') return;
-      const keep = hid.indexOf(id) < 0 || id === m.zone || (c.zones[id] || 0) > 0;
+      // A station no dish is made at has nothing to show, so its tab waits until a dish is added there (once the menu has dishes).
+      const unused = menuNow.length > 0 && !menuNow.some((d) => d.zone === id);
+      const keep = (hid.indexOf(id) < 0 && !unused) || id === m.zone || (c.zones[id] || 0) > 0;
       b.style.display = keep ? '' : 'none';
     });
     // A one-station kitchen (a taco truck) has nothing to switch between: All, its one station and Expo would show the same tickets,
