@@ -552,31 +552,126 @@
     const bits = items.slice(0, 3).map((it) => (it.qty > 1 ? it.qty + ' ' : '') + spokenName(it));
     return bits.join(', ') + (items.length > 3 ? ' and ' + (items.length - 3) + ' more' : '');
   }
+  /* ---------- making text speakable: numbers, units, times and symbols the way a person says them ---------- */
+  const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  // A whole number in words ("twenty-eight", "four hundred fifty"); numbers over a million stay as digits.
+  function numWords(n) {
+    n = Math.floor(Math.abs(Number(n)) || 0);
+    if (n < 20) return ONES[n];
+    if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? '-' + ONES[n % 10] : '');
+    if (n < 1000) return ONES[Math.floor(n / 100)] + ' hundred' + (n % 100 ? ' ' + numWords(n % 100) : '');
+    if (n < 1e6) return numWords(Math.floor(n / 1000)) + ' thousand' + (n % 1000 ? ' ' + numWords(n % 1000) : '');
+    return String(n);
+  }
+  // A number that may have a fraction, in words: 4.5 is "four and a half", 0.25 is "a quarter", 4.2 is "four point two".
+  function amountWords(x) {
+    const neg = x < 0 ? 'minus ' : '', a = Math.abs(x), whole = Math.floor(a + 1e-9), frac = Math.round((a - whole) * 100) / 100;
+    if (!frac) return neg + numWords(whole);
+    const word = frac === 0.5 ? 'a half' : frac === 0.25 ? 'a quarter' : frac === 0.75 ? 'three quarters' : null;
+    if (word) return neg + (whole ? numWords(whole) + ' and ' + word : word === 'a half' ? 'half' : word);
+    const digits = String(frac).slice(2).split('').map((c) => ONES[Number(c)]).join(' ');
+    return neg + numWords(whole) + ' point ' + digits;
+  }
+  // A count of one unit in words ("one hour", "twenty minutes"); the unit is singular only for exactly one.
+  const unitWords = (n, one, many) => amountWords(n) + ' ' + (Math.abs(n) === 1 ? one : many);
+  // Turns a line meant for the screen into one a speech voice reads well: no raw abbreviations, digits or symbols. Pure; the same text
+  // always gives the same words. "4.50 kg" is "four and a half kilograms", "1:20" is "one minute twenty seconds", "#12" is "ticket twelve".
+  function spoken(text) {
+    let t = ' ' + String(text == null ? '' : text) + ' ';
+    t = t.replace(/(\d),(\d{3})\b/g, '$1$2');
+    // clock times first: 2:41 pm
+    t = t.replace(/\b(\d{1,2}):(\d{2})\s*([ap])\.?m\.?/gi, (m, h, mi, ap) => { const mm = Number(mi); return ' ' + numWords(Number(h)) + (mm === 0 ? '' : mm < 10 ? ' oh ' + numWords(mm) : ' ' + numWords(mm)) + (ap.toLowerCase() === 'a' ? ' A M' : ' P M') + ' '; });
+    // timer forms: 1:20 is one minute twenty seconds, 0:45 is forty-five seconds, 10:00 is ten minutes
+    t = t.replace(/\b(\d{1,2}):(\d{2})\b/g, (m, a, b) => { const mn = Number(a), sc = Number(b); return ' ' + (mn ? unitWords(mn, 'minute', 'minutes') : '') + (mn && sc ? ' ' : '') + (sc || !mn ? unitWords(sc, 'second', 'seconds') : '') + ' '; });
+    // durations: 1 h 20 min, 2h 10m, 25 min, 1 hour
+    t = t.replace(/\b(\d+)\s*h(?:ours?|rs?)?\s*(\d+)\s*m(?:ins?|inutes?)?\b/gi, (m, h, mi) => ' ' + unitWords(Number(h), 'hour', 'hours') + ' ' + unitWords(Number(mi), 'minute', 'minutes') + ' ');
+    t = t.replace(/\b(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b/gi, (m, h) => ' ' + unitWords(Number(h), 'hour', 'hours') + ' ');
+    t = t.replace(/\b(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m)\b/gi, (m, v) => ' ' + unitWords(Number(v), 'minute', 'minutes') + ' ');
+    t = t.replace(/\b(\d+)\s*(?:seconds?|secs?|s)\b/gi, (m, v) => ' ' + unitWords(Number(v), 'second', 'seconds') + ' ');
+    // temperatures, weights, money, percent
+    t = t.replace(/(-?\d+(?:\.\d+)?)\s*°\s*([FC])?/g, (m, v, u) => ' ' + amountWords(Number(v)) + ' degrees' + (u ? (u === 'F' ? ' Fahrenheit' : ' Celsius') : '') + ' ');
+    t = t.replace(/(\d+(?:\.\d+)?)\s*(kg|g|lbs?|oz)\b/gi, (m, v, u) => { const k = u.toLowerCase(), n = Number(v); const nm = k === 'kg' ? ['kilogram', 'kilograms'] : k === 'g' ? ['gram', 'grams'] : k === 'oz' ? ['ounce', 'ounces'] : ['pound', 'pounds']; return ' ' + (n === 0.5 ? 'half a ' + nm[0] : unitWords(n, nm[0], nm[1])) + ' '; });
+    t = t.replace(/\$\s*(\d+)(?:\.(\d{2}))?/g, (m, d, c) => ' ' + unitWords(Number(d), 'dollar', 'dollars') + (c && Number(c) ? ' ' + numWords(Number(c)) : '') + ' ');
+    t = t.replace(/(\d+(?:\.\d+)?)\s*%/g, (m, v) => ' ' + amountWords(Number(v)) + ' percent ');
+    // tickets, counts and fractions
+    t = t.replace(/#\s*(\d+)/g, (m, v) => ' ticket ' + numWords(Number(v)) + ' ');
+    t = t.replace(/\+\s*(\d+)\s+more\b/gi, (m, v) => ' and ' + numWords(Number(v)) + ' more');
+    t = t.replace(/(?:\b|\s)[x×]\s*(\d+)\b/g, (m, v) => ' ' + numWords(Number(v)) + ' of them ');
+    t = t.replace(/\b(\d+)\s*[x×](?=\s|$|[,.!])/g, (m, v) => ' ' + numWords(Number(v)) + ' ');
+    t = t.replace(/\b1\/2\b/g, ' half ').replace(/\b1\/4\b/g, ' quarter ').replace(/\b3\/4\b/g, ' three quarters ');
+    // names and symbols
+    t = t.replace(/\bsand\./gi, 'sandwich').replace(/\bapprox\.?/gi, 'about').replace(/&/g, ' and ').replace(/\bvs\.?\b/gi, ' versus ');
+    t = t.replace(/(\d+(?:\.\d+)?)/g, (m, v) => ' ' + amountWords(Number(v)) + ' ');
+    t = t.replace(/[#*_~^|<>\[\]{}()\\/]/g, ' ').replace(/[+=]/g, ' plus ');
+    t = t.replace(/\s+/g, ' ').replace(/\s+([,.!?;:])/g, '$1').trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  // Keeps a spoken line short (about 14 words): cuts at the last sentence end inside the limit, else at the limit, and ends it with a stop.
+  function clipWords(text, max) {
+    const lim = max || 14, words = String(text).split(' ');
+    if (words.length <= lim) return text;
+    const cut = words.slice(0, lim).join(' ');
+    const stop = Math.max(cut.lastIndexOf('! '), cut.lastIndexOf('. '), cut.lastIndexOf('? '));
+    return (stop > 8 ? cut.slice(0, stop + 1) : cut.replace(/[,;:]$/, '') + '.');
+  }
+  // How a line is delivered: calm for a heads-up, brisk for a new ticket, fast and loud for "fire now" and past quality. rate and pitch are
+  // multiples of normal speech, volume is 0 to 1. kind is the phrase kind.
+  const DELIVERY = {
+    expire: { rate: 1.0, pitch: 1.0, volume: 0.85 }, new_all: { rate: 1.1, pitch: 1.05, volume: 0.9 }, new_zone: { rate: 1.1, pitch: 1.05, volume: 0.9 },
+    summary: { rate: 1.1, pitch: 1.05, volume: 0.9 }, ready: { rate: 1.1, pitch: 1.05, volume: 0.9 }, start: { rate: 1.2, pitch: 1.15, volume: 1 },
+    start_again: { rate: 1.25, pitch: 1.2, volume: 1 }, ready_again: { rate: 1.2, pitch: 1.15, volume: 1 }, past: { rate: 1.2, pitch: 1.15, volume: 1 },
+    expired: { rate: 1.25, pitch: 1.2, volume: 1 },
+  };
+  // The rate, pitch and volume for one kind of line (a plain heads-up if the kind is unknown).
+  function delivery(kind) { return DELIVERY[kind] || DELIVERY.expire; }
   // The kitchen's voice is one fixed style: a fast, sharp chef calling the line. Rate and pitch for the speech engine.
   const CHEF_VOICE = { rate: 1.15, pitch: 1.1 };
   // One spoken line in the chef's voice. kind is new_all, new_zone, start, expire, past or expired; d holds the numbers
   // and names. Short, loud and to the point, the way a chef calls the pass.
   function phrase(kind, d) {
-    if (kind === 'new_all') return 'Order up! Ticket ' + d.num + '! ' + d.count + ' ' + U.plural(d.count, 'item') + '!';
-    if (kind === 'new_zone') return 'Order up, ticket ' + d.num + '! ' + d.names + '!';
-    if (kind === 'start') return 'Fire ' + d.name + ' now! Ticket ' + d.num + '!';
-    if (kind === 'start_again') return 'Still waiting on ' + d.name + '! Fire it now! Ticket ' + d.num + '!';
-    if (kind === 'ready') return 'Ticket ' + d.num + ' is up! Ring it out!';
-    if (kind === 'ready_again') return 'Ticket ' + d.num + ' is waiting! Ring it out now!';
-    if (kind === 'past') return d.who + (d.many ? ' are past quality!' : ' is past quality!') + ' Check it now!';
-    if (kind === 'expired') return d.who + ' expired! Pull it and log it now!';
-    return 'Heads up! ' + d.who + (d.goes86 && !d.many ? ' goes 86' : d.many ? ' expire' : ' expires') + ' in ' + (d.approx ? 'about ' : '') + d.mins + ' ' + U.plural(d.mins, 'minute') + '! Act now!';
+    // A length of time for a heads-up: minutes under an hour, else hours and minutes.
+    const dur = (mins) => (mins < 60 ? mins + ' ' + U.plural(mins, 'minute') : Math.floor(mins / 60) + ' h ' + (mins % 60 ? (mins % 60) + ' min' : '')).trim();
+    let t;
+    if (kind === 'new_all') t = 'Order up! Ticket ' + d.num + '! ' + d.count + ' ' + U.plural(d.count, 'item') + '!';
+    else if (kind === 'new_zone') t = 'Order up, ticket ' + d.num + '! ' + d.names + '!';
+    else if (kind === 'summary') t = d.count + ' new tickets. First up, ticket ' + d.first + '.';
+    else if (kind === 'start') t = 'Fire ' + d.name + ' now! Ticket ' + d.num + '!';
+    else if (kind === 'start_again') t = 'Still waiting on ' + d.name + '! Fire it now! Ticket ' + d.num + '!';
+    else if (kind === 'ready') t = 'Ticket ' + d.num + ' is up! Ring it out!';
+    else if (kind === 'ready_again') t = 'Ticket ' + d.num + ' is waiting! Ring it out now!';
+    else if (kind === 'past') t = d.who + (d.many ? ' are past quality!' : ' is past quality!') + ' Check it now!';
+    else if (kind === 'expired') t = d.who + ' expired! Pull it and log it now!';
+    else t = 'Heads up! ' + d.who + (d.goes86 && !d.many ? ' goes 86' : d.many ? ' expire' : ' expires') + ' in ' + (d.approx ? 'about ' : '') + dur(d.mins) + '! Act now!';
+    return clipWords(spoken(t), 14);
   }
   // Picks the best-sounding English voice the device has: the natural, neural or online ones first, then premium, Google
   // and well-known named voices; null when there is none, so the device default is used.
   function pickVoice(voices) {
-    const en = (voices || []).filter((v) => v && /^en/i.test(String(v.lang || '')));
-    // How good a voice sounds for a kitchen call: higher is better.
-    const score = (v) => (/natural|neural|online/i.test(v.name) ? 40 : 0) + (/premium|enhanced/i.test(v.name) ? 30 : 0) + (/google/i.test(v.name) ? 20 : 0)
-      + (/samantha|aria|jenny|guy|ava|allison|karen|daniel|zira|david/i.test(v.name) ? 10 : 0) + (/^en[-_]US/i.test(v.lang) ? 5 : 0);
-    let best = null, bs = -1;
+    const NOVELTY = /bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|albert|fred|junior|ralph|kathy|princess|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley/i;
+    const en = (voices || []).filter((v) => v && /^en/i.test(String(v.lang || '').replace('_', '-')) && !NOVELTY.test(String(v.name || '')));
+    // How good a voice sounds for a kitchen call, higher is better. Voices stored on the tablet come first (a kitchen may be offline and
+    // a network voice can stall); then the better-sounding names; novelty voices are avoided.
+    const score = (v) => {
+      const n = String(v.name || '');
+      let sc = 0;
+      if (v.localService === true) sc += 50; else if (v.localService === false) sc -= 5;
+      if (/premium|enhanced|siri/i.test(n)) sc += 30;
+      if (/natural|neural/i.test(n)) sc += 12;
+      if (/google/i.test(n)) sc += 14;
+      if (/samantha|daniel|aaron|nicky|karen|moira|alex|aria|jenny|guy|ava|allison|zira|david|mark|susan|tessa|arthur|serena/i.test(n)) sc += 10;
+      if (/en[-_]us/i.test(String(v.lang))) sc += 5; else if (/en[-_](gb|au|ie|ca)/i.test(String(v.lang))) sc += 3;
+      if (/^en-us-x-[a-z]{3}#(female|male)_\d-local$/i.test(n)) sc += 8;
+      return sc;
+    };
+    let best = null, bs = -Infinity;
     for (const v of en) { const sc = score(v); if (sc > bs) { best = v; bs = sc; } }
     return best;
+  }
+  // Which voice would speak right now and whether it lives on the tablet, for the Test the voice line: { name, lang, local } or null.
+  function voiceInfo(voices) {
+    const v = pickVoice(voices);
+    return v ? { name: String(v.name || 'Default'), lang: String(v.lang || ''), local: v.localService !== false } : null;
   }
   // How much the voice talks, per level. repeatStartSec is the gap between "still waiting" reminders for a dish that is
   // due and not started, up to startRepeats of them; readyRepeats is how many "ring it out" reminders follow a finished
@@ -603,10 +698,10 @@
       if (t.items.every((it) => it.status === 'done')) {
         if (z !== 'all' && z !== 'expo') continue;
         const readyAt = t.items.reduce((m, it) => Math.max(m, U.isNum(it.doneAt) ? it.doneAt : 0), 0) || t.createdAt;
-        out.push({ id: 'r:' + t.id, kind: 'ready', at: readyAt, text: phrase('ready', { num: t.num }), ticketNum: t.num });
+        out.push({ id: 'r:' + t.id, kind: 'ready', style: 'ready', at: readyAt, text: phrase('ready', { num: t.num }), ticketNum: t.num });
         for (let k = 1; k <= cfg.readyRepeats; k++) {
           const at = readyAt + k * cfg.readyRepeatSec * 1000;
-          if (now >= at) out.push({ id: 'r:' + t.id + ':' + k, kind: 'ready', at, text: phrase('ready_again', { num: t.num }), ticketNum: t.num });
+          if (now >= at) out.push({ id: 'r:' + t.id + ':' + k, kind: 'ready', style: 'ready_again', at, text: phrase('ready_again', { num: t.num }), ticketNum: t.num });
         }
         continue;
       }
@@ -614,7 +709,7 @@
       if (!mine.length) continue;
       if (cfg.newTicket) {
         const text = z === 'all' || z === 'expo' ? phrase('new_all', { num: t.num, count: t.items.length }) : phrase('new_zone', { num: t.num, names: nameList(mine) });
-        out.push({ id: 'n:' + t.id, kind: 'new', at: t.createdAt, text, ticketNum: t.num });
+        out.push({ id: 'n:' + t.id, kind: 'new', style: z === 'all' || z === 'expo' ? 'new_all' : 'new_zone', at: t.createdAt, text, ticketNum: t.num });
       }
       if (z === 'expo') continue;
       // Dishes that are due and not started, grouped by the second they became due so one ticket makes one call.
@@ -628,10 +723,10 @@
       }
       for (const [key, its] of groups) {
         const at = key * 1000, name = nameList(its);
-        out.push({ id: 's:' + t.id + ':' + key, kind: 'start', at, text: phrase('start', { name, num: t.num }), ticketNum: t.num });
+        out.push({ id: 's:' + t.id + ':' + key, kind: 'start', style: 'start', at, text: phrase('start', { name, num: t.num }), ticketNum: t.num });
         for (let k = 1; k <= cfg.startRepeats; k++) {
           const rat = at + k * cfg.repeatStartSec * 1000;
-          if (now >= rat) out.push({ id: 's:' + t.id + ':' + key + ':' + k, kind: 'start', at: rat, text: phrase('start_again', { name, num: t.num }), ticketNum: t.num });
+          if (now >= rat) out.push({ id: 's:' + t.id + ':' + key + ':' + k, kind: 'start', style: 'start_again', at: rat, text: phrase('start_again', { name, num: t.num }), ticketNum: t.num });
         }
       }
     }
@@ -642,7 +737,7 @@
   // the oldest call still fresh, or null. prime(wants) marks what is already true as heard, for a fresh start.
   function makeCallouts(o) {
     const staleMs = o && U.isNum(o.staleMs) ? o.staleMs : CALL_STALE_MS, maxWait = o && U.isNum(o.maxWait) ? o.maxWait : CALL_MAX_WAIT;
-    const seen = new Set(), q = [];
+    const seen = new Set(), q = [], lostNew = [];
     let dropped = 0;
     // Remembers a call id as handled; the memory is trimmed to the latest 600.
     const mark = (id) => { seen.add(id); if (seen.size > 600) seen.delete(seen.values().next().value); };
@@ -660,12 +755,24 @@
           q.push(w);
         }
         q.sort((a, b) => (a.at - b.at) || (a.id < b.id ? -1 : 1));
-        while (q.length > maxWait) { q.shift(); dropped++; }
+        while (q.length > maxWait) { const lost = q.shift(); dropped++; if (lost.kind === 'new') lostNew.push(lost); }
       },
       // Hands out the oldest call that is still fresh, or null when none is left.
       next(now) {
-        while (q.length) { const c = q.shift(); if (now - c.at <= staleMs) return c; dropped++; }
-        return null;
+        for (let i = q.length - 1; i >= 0; i--) if (now - q[i].at > staleMs) { q.splice(i, 1); dropped++; }
+        if (!q.length) return null;
+        // Three or more new-ticket calls waiting become one summary line, so a burst is not a wall of speech.
+        const news = lostNew.filter((c) => now - c.at <= staleMs).concat(q.filter((c) => c.kind === 'new')).sort((a, b) => a.at - b.at);
+        if (news.length >= 3 && !q.some((c) => c.kind === 'start' && c.at <= news[0].at)) {
+          for (const c of news) { const i = q.indexOf(c); if (i >= 0) q.splice(i, 1); }
+          lostNew.length = 0;
+          return { id: 'burst:' + news[0].id, kind: 'new', style: 'summary', at: news[0].at, ticketNum: news[0].ticketNum, text: phrase('summary', { count: news.length, first: news[0].ticketNum }) };
+        }
+        // Dishes to fire come before a finished ticket, and a finished ticket before a new one; oldest first inside each.
+        const rank = (c) => (c.kind === 'start' ? 0 : c.kind === 'ready' ? 1 : 2);
+        let bi = 0;
+        for (let i = 1; i < q.length; i++) if (rank(q[i]) < rank(q[bi])) bi = i;
+        return q.splice(bi, 1)[0];
       },
       // How many calls are waiting to be spoken right now.
       size: () => q.length,
@@ -711,5 +818,5 @@
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
+  SB.deadlines = { spoken, clipWords, delivery, numWords, voiceInfo, build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

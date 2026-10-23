@@ -297,7 +297,7 @@
   let voiceFreeAt = 0;
   // Says one short phrase with the tablet's voice when sound and speech are both on. A warning replaces whatever is
   // being said; a call-out (queued) waits its turn instead and never cuts anything off.
-  function speak(text, queued) {
+  function speak(text, queued, kind) {
     if (!audible() || !speech) return false;
     try {
       const ss = g.speechSynthesis, U2 = g.SpeechSynthesisUtterance;
@@ -306,12 +306,14 @@
       const u = new U2(text);
       // The chef voice: fast and sharp, on the best-sounding English voice this device has.
       const cv = SB.deadlines && SB.deadlines.CHEF_VOICE ? SB.deadlines.CHEF_VOICE : { rate: 1.1, pitch: 1 };
-      u.rate = cv.rate; u.pitch = cv.pitch; u.volume = 1;
+      // Calm for a heads-up, brisk for a new ticket, fast and loud for "fire now": the style of the line sets rate, pitch and volume.
+      const dl = SB.deadlines && SB.deadlines.delivery ? SB.deadlines.delivery(kind) : null;
+      u.rate = dl ? dl.rate : cv.rate; u.pitch = dl ? dl.pitch : cv.pitch; u.volume = dl ? dl.volume : 1;
       const pv = SB.deadlines && SB.deadlines.pickVoice && ss.getVoices ? SB.deadlines.pickVoice(ss.getVoices()) : null;
       if (pv) { u.voice = pv; if (pv.lang) u.lang = pv.lang; }
       ss.speak(u);
       // About 70 ms a letter plus a short gap; speech end events are not reliable on every tablet.
-      voiceFreeAt = performance.now() + 600 + text.length * 70;
+      voiceFreeAt = performance.now() + 700 + String(text).split(' ').length * 340 / (u.rate || 1);
       return true;
     } catch (e) { return false; /* speech is optional */ }
   }
@@ -329,7 +331,7 @@
     m.co.sync(wants, now);
     if (performance.now() < voiceFreeAt) return;
     const c = m.co.next(now);
-    if (c) speak(c.text, true);
+    if (c) speak(c.text, true, c.style);
   }
   // Plays the loud warning for the last minutes: three pairs of high and low notes, much louder than the chime.
   function alarmTone() {
@@ -465,6 +467,23 @@
     const a = resumeAudio();
     playHere(() => { chime(); speak('Sound is on. This is a test.'); });
     return F.audioState();
+  };
+  // Which voice would speak a call on this tablet: { supported, name, lang, local } (name empty when only the default voice is there).
+  F.voiceInfo = function () {
+    const ss = g.speechSynthesis;
+    if (!ss || !g.SpeechSynthesisUtterance) return { supported: false };
+    let info = null;
+    try { info = SB.deadlines && SB.deadlines.voiceInfo ? SB.deadlines.voiceInfo(ss.getVoices()) : null; } catch (e) { info = null; }
+    return info ? Object.assign({ supported: true }, info) : { supported: true, name: '', lang: '', local: true };
+  };
+  // Speaks a sample ticket call in the chef voice and says which voice did it, so a cook can hear and see what this tablet will use.
+  F.testVoice = function () {
+    if (!sound) F.setSound(true);
+    if (!speech) F.setSpeech(true);
+    hookAudioUnlock();
+    resumeAudio();
+    playHere(() => speak(SB.deadlines.phrase('new_all', { num: 12, count: 3 }), false, 'new_all'));
+    return F.voiceInfo();
   };
   // Whether this tablet can make sound right now: running, suspended (needs a tap), unsupported or off.
   F.audioState = () => (!sound ? 'off' : !(g.AudioContext || g.webkitAudioContext) ? 'unsupported' : audio && audio.state === 'running' ? 'running' : 'needs-tap');
@@ -1595,12 +1614,12 @@
     const first = same.slice().sort((x, y) => x.d.msLeft - y.d.msLeft)[0].d;
     const who = first.label + (same.length > 1 ? ' and ' + (same.length - 1) + ' more' : '');
     // Says the phrase aloud and puts it in the hidden live region for screen readers.
-    const tell = (t) => { speak(t); if (m && m.strip && m.strip.announce) m.strip.announce.textContent = t; };
+    const tell = (t, kind) => { speak(t, false, kind); if (m && m.strip && m.strip.announce) m.strip.announce.textContent = t; };
     const PH = SB.deadlines.phrase, many = same.length > 1;
-    if (top.level === 4 && first.kind === 'past') { tell(PH('past', { who, many })); return; }
-    if (top.level === 4) { tell(PH('expired', { who, many })); return; }
+    if (top.level === 4 && first.kind === 'past') { tell(PH('past', { who, many }), 'past'); return; }
+    if (top.level === 4) { tell(PH('expired', { who, many }), 'expired'); return; }
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
-    tell(PH('expire', { who, many, mins, goes86: first.goes86, approx: top.level === 2 }));
+    tell(PH('expire', { who, many, mins, goes86: first.goes86, approx: top.level === 2 }), top.level >= 3 ? 'start' : 'expire');
   }
   // Says a cold item's low-time row once when it first shows (or gets worse), in plain words that name the owner's limit.
   // The first pass after the board opens only remembers what is already there, so a reload does not read old news aloud.
@@ -1621,7 +1640,7 @@
     const text = d.kind === 'coldOut'
       ? d.label + (d.msLeft > 0 ? ': ' + mins + (mins === 1 ? ' minute' : ' minutes') + ' left of your out-of-fridge limit.' : ' is past your out-of-fridge limit.')
       : d.label + ': the last day of your fridge limit ends at midnight.';
-    chime(); speak(text);
+    chime(); speak(SB.deadlines.spoken ? SB.deadlines.spoken(text) : text, false, 'expire');
     if (m.strip && m.strip.announce) m.strip.announce.textContent = text;
   }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.

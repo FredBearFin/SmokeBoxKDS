@@ -2139,7 +2139,13 @@
       const r = SB.floor.testSound ? SB.floor.testSound() : 'unsupported';
       text(testSay, r === 'running' ? 'You should have heard a chime and a voice. If not, turn the tablet volume up.' : r === 'unsupported' ? 'This browser cannot play sound. Warnings will only show on screen.' : 'The browser has not let the board play sound yet. Tap the button once more.');
     } }, ico('volume', 20), h('span', null, 'Test the sound'));
-    const testRow = h('div', { class: 'mn-test' }, testBtn, testSay);
+    // Test the voice: speaks a sample call and names the voice picked and where it lives (on the tablet or over the internet).
+    const voiceSay = h('p', { class: 'fs-sub mn-test-voice', role: 'status' });
+    const voiceBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'test-voice' }, disabled: !floorOk, onClick: () => {
+      const v = SB.floor.testVoice ? SB.floor.testVoice() : { supported: false };
+      text(voiceSay, !v.supported ? 'This tablet cannot speak. Warnings will be tones only.' : v.name ? 'Voice: ' + v.name + (v.local ? ', stored on this tablet.' : ', needs the internet.') : 'Voice: the tablet\'s own default voice.');
+    } }, ico('volume', 20), h('span', null, 'Test the voice'));
+    const testRow = h('div', { class: 'mn-test' }, testBtn, testSay, voiceBtn, voiceSay);
     const soundHelp = floorOk ? 'On by default, because a missed warning can cost a whole batch. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
 
     // Far display: for a screen read from across the kitchen. Per tablet; needs the board module.
