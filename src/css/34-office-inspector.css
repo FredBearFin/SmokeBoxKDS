@@ -11,7 +11,7 @@
 .si-corr { font-style: italic; }
 .si-preview { overflow-x: auto; }
 @media print {
-  body > *:not(.sb-printroot) { display: none !important; }
+  body:has(.sb-printroot) > *:not(.sb-printroot) { display: none !important; }
   .si-printroot { display: block !important; position: static; color: #000; background: #fff; font: 12px/1.4 system-ui, sans-serif; }
   .si-printroot h1 { font-size: 20px; margin: 0 0 8px; }
   .si-note { margin: 6px 0; font-size: 11px; }
