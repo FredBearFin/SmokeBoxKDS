@@ -29395,7 +29395,7 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "On the old device, if it still works, download a backup (see Backup and restore). Copy the file somewhere else: email it to yourself or use a USB drive.",
        "On the new device, copy the same smokebox.html file onto it and open it. Install it as an app: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app.",
-       "Tap **Settings**, then **Set up this tablet**. Sound and keeping the screen on are set on each device, so do them again here.",
+       "Tap **Settings**, then **Set up this tablet: first steps**. Sound and keeping the screen on are set on each device, so do them again here.",
        "Tap **Back office**, then **Menu and settings**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
        "Check the board and your menu. Save a fresh backup from the new device, then retire the old one."
       ]
@@ -29426,7 +29426,7 @@ a.of-nav:active { background: var(--press); }
        "If the board says \"Tap here to turn on warning sounds\", tap it. Browsers need one tap first.",
        "Turn the tablet volume up and check its silent switch.",
        "Tap **Settings** and check that Sound is on and the loudness is not low.",
-       "Tap **Settings**, then **Set up this tablet**, then **Play a test warning**.",
+       "Tap **Settings**, then **Set up this tablet: first steps**, then **Play a test warning**.",
        "If the bar says \"Sound paused\", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.",
        "Close any second Smokebox tab. Only the tab on screen makes sound."
       ]
@@ -29680,59 +29680,67 @@ a.of-nav:active { background: var(--press); }
     "id": "several-screens",
     "group": "guide",
     "title": "Several screens (test feature)",
-    "summary": "A second screen that shows your kitchen. This is a test feature. It is not part of the normal install.",
+    "summary": "Show your kitchen on a second screen, or let more than one tablet take orders into one kitchen. Both are test features. They are not part of the normal install, and nothing has been tried on real tablets.",
     "blocks": [
-     {
-      "t": "h",
-      "x": "What it is"
-     },
-     {
-      "t": "p",
-      "x": "A second screen, like a TV above the pass or a phone, can show what the kitchen board shows. It only shows. Buttons on it do nothing to the kitchen, and it has no New ticket button."
-     },
-     {
-      "t": "h",
-      "x": "What it cannot do"
-     },
-     {
-      "t": "ul",
-      "x": [
-       "Take orders, start dishes, bump tickets or change anything.",
-       "Work by itself. Smokebox does not start the program that feeds it. That program is called the hub, and someone has to run it on a laptop or a server.",
-       "Share your own tablet's kitchen. The screen shows the hub's kitchen. Your tablet's saved kitchen is not sent anywhere and is not changed."
-      ]
-     },
      {
       "t": "h",
       "x": "What you need"
      },
      {
       "t": "p",
-      "x": "A hub that someone is running, its address, and its access code if it has one. Nothing here has been tried on real tablets."
+      "x": "A hub: a small program that keeps the kitchen in one place. Someone has to run it by hand on a laptop or a server. Smokebox never starts one. You also need its address, and its access code if it has one. Then tap **Settings**, then **Use one kitchen on several tablets**."
      },
      {
       "t": "h",
-      "x": "Connect"
+      "x": "Show only"
      },
      {
       "t": "p",
-      "x": "On the second screen, tap **Settings**, then **Show this kitchen on another screen**. Type the **Address of the kitchen**, type the access code if asked, and tap **Connect**. The screen then says \"Connected\" and \"This screen only shows the kitchen.\""
+      "x": "For a TV or a phone. Tap **Show only**, type the **Address of the kitchen** and the code, and tap **Connect**. The screen says \"Connected\" and \"This screen only shows the kitchen.\" It cannot take or change orders, and it does not touch the tablet's own saved kitchen."
      },
      {
       "t": "h",
-      "x": "Out of date"
+      "x": "Use this hub for orders"
      },
      {
       "t": "p",
-      "x": "If the screen cannot reach the hub, it says \"Reconnecting...\". After a short while a red banner says \"Out of date since\" a time, and that what you see may not be what is happening in the kitchen. Do not rely on the screen until it says \"Connected\" again."
+      "x": "For a tablet that takes orders too. Tap **Use this hub for orders on this tablet**. Type the address, the code and a name for this screen, like Pass. Tap **Check the hub**, then choose one:"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "Show the hub's kitchen on this tablet. Your own saved kitchen stays untouched and comes back when you leave.",
+       "Send this tablet's kitchen to the hub. This works only if the hub is empty. Smokebox never mixes two kitchens."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "Then tap **Join the hub**. If you reload the page, the tablet goes back to its own kitchen and you join again."
      },
      {
       "t": "h",
-      "x": "Go back to your own kitchen"
+      "x": "What the board tells you"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "\"Connected\": your taps are reaching the hub.",
+       "\"Offline: your taps are saved and will be sent\": the link is down. Taps wait on this tablet.",
+       "\"Not confirmed yet\" on a ticket: the hub has not answered that change.",
+       "\"Not done:\" and a reason: the hub refused a tap, for example because another tablet got there first."
+      ]
      },
      {
       "t": "p",
-      "x": "Tap the menu button at the top right, then **Back to my own kitchen**. Your own saved kitchen was never touched."
+      "x": "A Show only screen says \"Reconnecting...\" when the link drops. After a short while a red banner says \"Out of date since\" a time. Do not rely on it until it says \"Connected\"."
+     },
+     {
+      "t": "h",
+      "x": "Leave"
+     },
+     {
+      "t": "p",
+      "x": "On a Show only screen, tap the menu button at the top right, then **Back to my own kitchen**. On a tablet using the hub, tap **Leave the hub**. If some taps have not reached the hub, Smokebox warns you first; **Leave anyway, lose those taps** loses them."
      }
     ]
    },
@@ -29747,7 +29755,7 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "Tablet plugged in, and set to never sleep",
        "Volume up. Smokebox open on the kitchen board",
-       "Tap the warning bar once, or use Play a test warning under Set up this tablet",
+       "Tap the warning bar once, or use Play a test warning under Set up this tablet: first steps",
        "Check the 86 board: what is out today?",
        "Counted dishes: how many did you make today?",
        "Hand sink works and is stocked. Anyone unwell? Tell the manager",
@@ -29790,7 +29798,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "check",
       "x": [
-       "No sound: tap the warning bar, turn the volume up, then Settings, Set up this tablet, Play a test warning",
+       "No sound: tap the warning bar, turn the volume up, then Settings, Set up this tablet: first steps, Play a test warning",
        "Screen asleep: wake it and check the times on the cards. Set it to never sleep",
        "Wrong tap: Undo, within 10 seconds",
        "Bumped by mistake: Recall it from the board header",
@@ -29866,7 +29874,7 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "Open Smokebox and add it to the home screen: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app",
        "Keep it awake: set Auto-Lock (iPad) or Screen timeout (Android) to Never, and plug it in",
-       "Turn the volume up. Tap Settings, Set up this tablet, then Play a test warning",
+       "Turn the volume up. Tap Settings, Set up this tablet: first steps, then Play a test warning",
        "Wifi: not needed. Smokebox works without internet",
        "Backups go where you save them: the Downloads folder, or an email to yourself. Smokebox does not send them anywhere",
        "Keep a copy of every backup off this tablet",
