@@ -149,7 +149,14 @@
         v = susp.base + Math.max(0, r - susp.r0);
       } else if (susp) { susp = null; st.clockSuspect = null; }
     }
-    if (v < lastNow) v = lastNow;
+    // WATCH OUT: a real step back of the device clock (more than a second) re-bases the clock at the last time, so time keeps
+    // moving at its real pace from there. Only repeating the last time would freeze every hold, cooling and discard timer
+    // until the device caught up (an hour for a one-hour correction). The kitchen's clock then runs that much ahead of the
+    // device, which is the careful side: deadlines come early, never late.
+    if (v < lastNow) {
+      if (lastNow - v > 1000 && !susp) clk = { base: lastNow, realBase: r, speed: clk.speed };
+      v = lastNow;
+    }
     lastNow = v;
     return v;
   }

@@ -452,11 +452,12 @@
     raw(key) {
       try { const raw = ls ? ls.getItem(key) : mem.get(key); return raw == null ? null : String(raw); } catch (e) { return null; }
     },
-    // Saves a value as text. Returns false if the value cannot be turned into text or the browser refused it
-    // (then it is kept in memory only, so the page still works until it is closed).
+    // Saves a value as text. Returns false if the value cannot be turned into text or the browser refused it.
+    // WATCH OUT: a refused value is NOT readable back through get(); the caller keeps its own copy (the store keeps the
+    // kitchen in memory and shows the failed save), and the last value the browser accepted stays what get() returns.
     set(key, val) {
       let raw; try { raw = JSON.stringify(val); } catch (e) { return false; }
-      try { if (ls) ls.setItem(key, raw); else mem.set(key, raw); return true; } catch (e) { mem.set(key, raw); return false; }
+      try { if (ls) ls.setItem(key, raw); else mem.set(key, raw); return true; } catch (e) { return false; }
     },
     // Deletes a saved value from the browser and from memory.
     remove(key) { try { if (ls) ls.removeItem(key); } catch (e) { /* ignore */ } mem.delete(key); },

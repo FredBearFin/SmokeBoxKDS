@@ -276,8 +276,9 @@
   // choices are kept in this browser (not in the saved kitchen state) under CUSTOM_KEY and applied right
   // here, while this file loads, so the engine, the board and the office all see the same lists. Ids never
   // change: a rename only changes what people read. A change made in the app takes effect after a reload.
-  // WATCH OUT: a backup file does not carry these names. Restoring on a device without them would drop
-  // tickets that sit on an added station, so copy the names too (Data page) when moving devices.
+  // WATCH OUT: they live outside the kitchen state, so only a backup file carries them to another device (the store
+  // writes them into the backup and puts them in place before a restore checks the tickets). An older backup has none,
+  // and restoring it on a device without the names would drop tickets that sit on an added station.
   const CUSTOM_KEY = 'smokebox.v1.names';
   // Size limits so a typing slip cannot grow the screen without end: names up to 24 letters.
   const CUSTOM_MAX = { zones: 8, categories: 12, channels: 8, name: 24 };

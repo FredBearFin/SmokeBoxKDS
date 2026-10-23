@@ -54,6 +54,19 @@ test('Cleo 7: a second damaged save does not wipe the first damaged copy before 
   S.destroy && S.destroy();
 });
 
+test('Cleo 5: after the device clock steps back an hour, the kitchen clock keeps moving instead of freezing for that hour', () => {
+  clock = T;
+  const b = backend();
+  start(b);
+  clock += 10 * MIN;
+  const before = S.now();
+  clock -= 3600e3;                                      // the device corrects its clock by an hour
+  assert.equal(S.now(), before, 'never backwards');
+  clock += 5 * MIN;
+  assert.equal(S.now(), before + 5 * MIN, 'five real minutes later it is five minutes later');
+  S.destroy && S.destroy();
+});
+
 test('Cleo 3: start over also removes the copy kept from before a repair at load (it holds the whole old kitchen)', () => {
   clock = T;
   const b = backend({ 'smokebox.v1.dropped': JSON.stringify('{"old":"kitchen"}'), 'smokebox.v1.droppedat': JSON.stringify(T - DAY) });
