@@ -54,7 +54,7 @@
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'confirmWord', 'notInDemo'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -114,6 +114,8 @@
     badWho: 'Initials must be 1 to 12 characters. Shorten them, or leave them blank if the screen allows.',
     unknownSafetyEntry: 'That safety log entry is not here, or it is not a temperature, discard, cooling, reheat, sanitize or keep-serving entry. Pick one from the safety log.',
     wrongBackupMode: 'That backup does not belong to this kitchen (one is from the demo, the other from a real kitchen). Nothing was changed. Choose a backup made from this kitchen.',
+    confirmWord: 'Type the confirmation word exactly as shown to go ahead. Nothing was changed.',
+    notInDemo: 'This only works in your own kitchen, not in the demo. Nothing was changed.',
     moduleOff: 'Cook-ahead tracking (batches, the hold cabinet, temperature checks and sanitizing) is switched off. Turn it on under Dishes and prices: Yes, I cook ahead.',
     nameTaken: 'Another ingredient already has that name. Pick a different name, or use the one that exists.',
     tooManyIngredients: 'The ingredient list is full (' + 80 + ' ingredients). Archive one you no longer use, then add this one.',
@@ -160,6 +162,7 @@
     addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two", prepGuess?:boolean }',
     updateIngredient: '{ id, patch }',
     moveMenuItem: '{ id, toIndex }',
+    clearDemoTickets: '{}',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety" }',
     setPortions: '{ menuId, on:boolean, count? }',
     resetLive: '{ keepSettings?=true, starter?, stagger?, catalog?: "sample"|"blank", replaceOwn? }',
@@ -2431,6 +2434,66 @@
     return 'ok';
   };
 
+  // Works out exactly what clearing the old demo and sample tickets would remove, without changing anything: tickets made by the
+  // old in-place demo or the sample history (src demo or sample) whose order holds only such tickets; those orders; and the
+  // events that belong to them. An order that also holds a real ticket is left alone, with all its tickets (mixedOrders).
+  // Returns { ticketIds, orderIds, tickets, orders, paidOrders, openOrders, mixedOrders, events } (events counted in the log).
+  function planDemoLeftovers(state) {
+    const out = { ticketIds: new Set(), orderIds: new Set(), tickets: 0, orders: 0, paidOrders: 0, openOrders: 0, mixedOrders: 0, events: 0 };
+    if (!isState(state)) return out;
+    // True for a ticket or order made by the old in-place demo or the sample history.
+    const fake = (x) => x && (x.src === 'demo' || x.src === 'sample');
+    const byOrder = new Map();
+    for (const t of state.tickets) if (t.orderId !== undefined) { let g = byOrder.get(t.orderId); if (!g) byOrder.set(t.orderId, g = []); g.push(t); }
+    const mixed = new Set();
+    for (const [oid, g] of byOrder) if (g.some(fake) && g.some((t) => !fake(t))) mixed.add(oid);
+    const orders = Array.isArray(state.orders) ? state.orders : [];
+    for (const o of orders) {
+      if (!fake(o)) continue;
+      const g = byOrder.get(o.id) || [];
+      if (g.some((t) => !fake(t))) { out.mixedOrders++; continue; }
+      out.orderIds.add(o.id); out.orders++;
+      if (o.status === 'paid') out.paidOrders++; else if (o.status === 'open') out.openOrders++;
+    }
+    for (const t of state.tickets) {
+      if (!fake(t) || (t.orderId !== undefined && mixed.has(t.orderId))) continue;
+      // A demo ticket whose order is a real one (src live) stays with that order.
+      if (t.orderId !== undefined && orders.some((o) => o.id === t.orderId && !fake(o) && !out.orderIds.has(o.id))) continue;
+      out.ticketIds.add(t.id); out.tickets++;
+    }
+    if (out.ticketIds.size || out.orderIds.size) for (const e of allEvents(state)) if ((e.ticketId && out.ticketIds.has(e.ticketId)) || (e.orderId && out.orderIds.has(e.orderId))) out.events++;
+    return out;
+  }
+  // How many old demo or sample tickets, orders and events sit in this kitchen's real reports. Pure: changes nothing.
+  // { tickets, orders, paidOrders, openOrders, mixedOrders, events }. Real (live) tickets and the orders that hold them are never counted.
+  function demoLeftovers(state) {
+    const p = planDemoLeftovers(state);
+    return { tickets: p.tickets, orders: p.orders, paidOrders: p.paidOrders, openOrders: p.openOrders, mixedOrders: p.mixedOrders, events: p.events };
+  }
+  // Removes the old demo and sample tickets found by demoLeftovers, with their orders and events. Used grams of the removed
+  // tickets move into the books so stock still balances. Real tickets and real paid orders are never touched. nothingToDo when
+  // there is nothing to remove.
+  A.clearDemoTickets = function (tx) {
+    const st = tx.state();
+    const p = planDemoLeftovers(st);
+    if (!p.ticketIds.size && !p.orderIds.size) return 'nothingToDo';
+    const keepT = [];
+    for (const t of tx.get('tickets')) {
+      if (!p.ticketIds.has(t.id)) { keepT.push(t); continue; }
+      for (const it of t.items) for (const r of it.depleted || []) if (r.g > 0) { const L = tx.ledger(r.ing); L.prunedUsed = (L.prunedUsed || 0) + r.g; }
+    }
+    tx.own.add(keepT); tx.set('tickets', keepT);
+    const keepO = (Array.isArray(st.orders) ? st.orders : []).filter((o) => !p.orderIds.has(o.id));
+    tx.own.add(keepO); tx.set('orders', keepO);
+    let flat = allEvents(st).filter((e) => !((e.ticketId && p.ticketIds.has(e.ticketId)) || (e.orderId && p.orderIds.has(e.orderId))));
+    const ar = [];
+    while (flat.length >= 2 * EVENT_CHUNK) { ar.push(flat.slice(0, EVENT_CHUNK)); flat = flat.slice(EVENT_CHUNK); }
+    tx.set('eventArchive', ar); tx.set('events', flat);
+    tx.set('undo', []);
+    tx.event('demo_tickets_cleared', { tickets: p.tickets, orders: p.orders });
+    tx.info = { tickets: p.tickets, orders: p.orders, paidOrders: p.paidOrders, events: p.events };
+    return 'ok';
+  };
   // Moves one dish to a new place in the menu list (0 is first). The order is what the order screen and the lists show
   // inside each category. toIndex must be a whole number from 0 to the last place (outOfBounds otherwise); the same place
   // gives nothingToDo. Undo puts it back while the dish is still where this move left it.
@@ -3756,7 +3819,7 @@
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, defaultSettings, blankSettings, moduleOn, cookAheadActive, describe, safetyLog, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.
