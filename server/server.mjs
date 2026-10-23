@@ -232,13 +232,14 @@ export async function createHub(opts = {}) {
   function handleFollow(req, res) {
     const q = new URL(req.url, 'http://x').searchParams;
     const cors = followCode ? { 'access-control-allow-origin': '*' } : {};
+    // Answers a refused follower with a status and a short reason in JSON, then closes the connection.
     const fail = (code, error, extra) => { res.writeHead(code, Object.assign({ 'content-type': 'application/json', connection: 'close' }, cors, extra || {})); res.end(JSON.stringify({ error })); };
     const who = req.socket.remoteAddress || '?';
     if (followCode) {
       const f = failures.get(who);
       if (f && f.until > Date.now()) return fail(429, 'tooManyTries', { 'retry-after': '60' });
       if (!codeOk(q.get('code'))) {
-        const n = ((f && f.until <= Date.now() ? 0 : f && f.n) || 0) + 1;
+        const n = (f ? (f.until && f.until <= Date.now() ? 0 : f.n) : 0) + 1;
         failures.set(who, { n, until: n >= FAIL_MAX ? Date.now() + FAIL_LOCK_MS : 0 });
         if (failures.size > 1000) failures.delete(failures.keys().next().value);
         return fail(403, 'badCode');
