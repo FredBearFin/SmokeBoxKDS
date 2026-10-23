@@ -17,6 +17,8 @@
   // The dish form fields the importer uses when the file does not say: one tap to finish, a 5 minute guess.
   const DEFAULTS = { prepSec: 300, track: 'one' };
 
+  // The money symbol in use (the owner's, or $), for messages.
+  const cs = () => (SB.util && SB.util.currencySymbol ? SB.util.currencySymbol() : '$');
   // Collapses runs of white space and trims, as the engine does to a dish name.
   const clean = (s) => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
   // The name compared for duplicates: lower case, single spaces.
@@ -31,7 +33,10 @@
     if (!t) return { error: 'missing' };
     if (/^(mp|m\/p|market( price)?|varies|variable|ask|tbd|\?+)$/i.test(t)) return { error: 'variable' };
     if (/\d\s*(-|to|–|—)\s*\$?\s*\d/i.test(t.replace(/^\$/, ''))) return { error: 'range' };
-    t = t.replace(/usd|us\$|[$€£]/gi, '').replace(/\s+/g, '');
+    t = t.replace(/usd|us\$|\p{Sc}/giu, '');
+    const sym = cs();
+    if (sym && /^\p{L}+$/u.test(sym) && t.toLowerCase().indexOf(sym.toLowerCase()) === 0) t = t.slice(sym.length);   // a lettered symbol such as KSh
+    t = t.replace(/\s+/g, '');
     if (!/^[+-]?[\d.,]+$/.test(t)) return { error: 'bad' };
     let neg = false;
     if (t[0] === '-') { neg = true; t = t.slice(1); } else if (t[0] === '+') t = t.slice(1);
@@ -204,15 +209,15 @@
     else if (pr === 'bad') P.push(prob('badPrice', 'error', 'The price "' + row.priceText + '" is not a number.', 'Use digits only, for example 9.50.'));
     else if (typeof row.price === 'number') {
       if (row.price < 0) P.push(prob('negativePrice', 'error', 'The price ' + row.price + ' is below zero.', 'Enter the price as a positive amount.'));
-      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above $' + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "Prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950.'));
-      else if (row.price === 0) P.push(prob('freeItem', 'warn', 'The price is $0.00.', 'Keep it if the dish is free, or enter a price.'));
+      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above ' + cs() + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "Prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950.'));
+      else if (row.price === 0) P.push(prob('freeItem', 'warn', 'The price is ' + cs() + '0.00.', 'Keep it if the dish is free, or enter a price.'));
       if (row.rounded) P.push(prob('priceRounded', 'warn', 'The price had more than two decimals and was rounded to the cent.', 'Check the price shown.'));
     }
     if (row.extraCells) P.push(prob('extraColumns', 'warn', 'This row has ' + row.extraCells + ' more ' + (row.extraCells === 1 ? 'column' : 'columns') + ' than the header, so a value may have been split at a comma.' + (row.maybePrice ? ' The price may be ' + row.maybePrice + ', not ' + row.price + '.' : ''), 'Put quotes around a price with a comma (for example "4,50"), or use a dot (4.50), then read the file again.'));
     else if (/^\d+([.,]\d+)?$/.test(row.categoryText || '')) P.push(prob('numericCategory', 'warn', 'The category "' + row.categoryText + '" is a number, which usually means a price was split in two.', 'Check the price and the category in the file.'));
     if (row.stationText && !row.station) P.push(prob('unknownStation', 'warn', 'The station "' + row.stationText + '" is not one of yours, so the default station is used.', 'Pick the station after adding the dish.'));
     if (row.categoryText && !row.category) P.push(prob('unknownCategory', 'warn', 'The category "' + row.categoryText + '" is not one of yours, so the default category is used.', 'Change the category after adding the dish.'));
-    if (row.fromCents) P.push(prob('centsConverted', 'warn', 'The price was read in cents (' + row.priceText + ' becomes $' + (row.price != null ? row.price.toFixed(2) : '?') + ').', 'If this is wrong, choose "Prices are in dollars".'));
+    if (row.fromCents) P.push(prob('centsConverted', 'warn', 'The price was read in cents (' + row.priceText + ' becomes ' + cs() + (row.price != null ? row.price.toFixed(2) : '?') + ').', 'If this is wrong, choose "Prices are in dollars".'));
     row.ok = !P.some((p) => p.level === 'error');
   }
 
@@ -259,7 +264,7 @@
   }
 
   // Rows from a table with a header row. cols tells where each field is; square joins the variation name when an item has several.
-  function parseTable(table, format, opts) {
+  function parseTable(table, format, opts, summary) {
     const headers = table[0].map(norm);
     const col = {
       name: findCol(headers, format === 'toast' ? ['itemname', 'menuitem', 'menuitemname', 'name'] : WORDS.name),
@@ -272,6 +277,9 @@
       hidden: Math.max(headers.indexOf('hidden'), headers.indexOf('archived'), headers.indexOf('visibility')),
     };
     if (col.price < 0) col.price = findCol(headers, ['cost']);
+    // Columns the importer does not use are named, so a screen can say what was left out ("Ignored column: Notes").
+    const usedCols = new Set([col.name, col.price, col.station, col.category, col.description, col.variation, col.priceType, col.hidden].filter((x) => x >= 0));
+    if (summary) summary.ignoredColumns = table[0].map((h, i) => [clean(h), i]).filter(([h, i]) => h && !usedCols.has(i)).map(([h]) => h);
     const cents = opts.priceUnit === 'cents' || (opts.priceUnit !== 'dollars' && format === 'clover');
     const data = [];
     for (let i = 1; i < table.length && data.length < LIMITS.rowsRead; i++) {
@@ -317,7 +325,7 @@
   // zones and categories (override the config lists). Returns { format, label, rows, summary, error? }; never throws.
   M.parse = function parse(text, opts) {
     opts = opts || {};
-    const res = { format: null, label: '', rows: [], summary: { total: 0, ok: 0, errors: 0, warnings: 0, notes: [] } };
+    const res = { format: null, label: '', rows: [], summary: { total: 0, ok: 0, errors: 0, warnings: 0, notes: [], ignoredColumns: [] } };
     try {
       if (typeof text !== 'string') { res.error = 'No text to read.'; return res; }
       text = stripBom(text);
@@ -336,8 +344,8 @@
       res.format = format; res.label = FORMAT_LABEL[format] || format;
       if (format === 'lines') res.rows = parseLines(text, opts);
       else {
-        if (table.length < 2) { res.summary.notes.push('The file has a header row but no dishes under it.'); res.rows = []; } else res.rows = parseTable(table, format, opts);
-        if (format === 'clover' && opts.priceUnit !== 'dollars') res.summary.notes.push('Clover prices are read as cents (1400 is $14.00). If the first rows look wrong, read the file again with prices in dollars.');
+        if (table.length < 2) { res.summary.notes.push('The file has a header row but no dishes under it.'); res.rows = []; } else res.rows = parseTable(table, format, opts, res.summary);
+        if (format === 'clover' && opts.priceUnit !== 'dollars') res.summary.notes.push('Clover prices are read as cents (1400 is ' + cs() + '14.00). If the first rows look wrong, read the file again with prices in dollars.');
       }
       if (res.rows.length >= LIMITS.rowsRead) res.summary.notes.push('Only the first ' + LIMITS.rowsRead + ' rows were read.');
       const existing = new Set(((opts.existing) || []).map((m) => key(m && m.name)));

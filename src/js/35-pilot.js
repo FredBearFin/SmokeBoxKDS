@@ -139,7 +139,7 @@
 
   // ---------- 3. text and CSV ----------
   // Writes a money amount in dollars with two cents digits.
-  const usd = (n) => '$' + (U.isNum(n) ? n.toFixed(2) : '0.00');
+  const usd = (n) => U.currencySymbol() + (U.isNum(n) ? n.toFixed(2) : '0.00');
   // Plain-words summary of a report, one line per fact, for the screen and for pasting into notes.
   function toText(r) {
     const L = [];
