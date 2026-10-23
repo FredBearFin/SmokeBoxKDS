@@ -21,3 +21,7 @@ Smokebox writes down what you type. It does not know what a good reading is and 
 ## Fix a wrong entry
 
 Open the entry in **Recent readings** and tap **Save fix**. The old entry stays, with your fix next to it.
+
+## The safety record
+
+In **Back office**, open **Safety** and tap **Print the safety record**. It lists thrown-out batches, your readings and checks, and changes to limits, like "Changed the cold limit from X to Y". A cold reading says "above the cold limit" and how many minutes above it the batch has already used. The record says how long Smokebox keeps entries; ask your health department how long you must.

@@ -576,6 +576,14 @@
      {
       "t": "p",
       "x": "Open the entry in **Recent readings** and tap **Save fix**. The old entry stays, with your fix next to it."
+     },
+     {
+      "t": "h",
+      "x": "The safety record"
+     },
+     {
+      "t": "p",
+      "x": "In **Back office**, open **Safety** and tap **Print the safety record**. It lists thrown-out batches, your readings and checks, and changes to limits, like \"Changed the cold limit from X to Y\". A cold reading says \"above the cold limit\" and how many minutes above it the batch has already used. The record says how long Smokebox keeps entries; ask your health department how long you must."
      }
     ]
    },
@@ -645,7 +653,7 @@
      {
       "t": "ol",
       "x": [
-       "Open the thrown-out log from the board's menu. It says which period it covers.",
+       "Open the thrown-out log from the board's menu. It starts by saying how far back it goes, like \"Showing every batch thrown out since\" a date.",
        "Tap **Fix this entry** on the row.",
        "Say what was wrong, add your initials and tap **Save the fix**."
       ]
@@ -690,6 +698,10 @@
        "If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN. There is no undo, so back up what is here first if you might want it.",
        "Open the board and check your menu and your food. Sound and loudness are set per device, so test them again."
       ]
+     },
+     {
+      "t": "p",
+      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. What was here is kept too, so you can undo once more."
      },
      {
       "t": "p",
