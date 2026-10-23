@@ -102,3 +102,47 @@ test('pilot report: CSV has one line per fact, safe cells, and an empty window i
   assert.ok(/Pulls: 0 taps/.test(P.toText(empty)));
   assert.equal(P.build(s, { from: T0 + HR, to: T0 }).window.hours, 0, 'a backwards window is empty, not an error');
 });
+
+test('pilot report: a 3-day simulated pilot answers the gate questions in plain words', () => {
+  const DAY = 24 * HR;
+  const settings = E.defaultSettings(); settings.service.openHour = 11; settings.service.closeHour = 21;
+  let s = E.newState({ now: T0, empty: true, settings });
+  s.ingredients = s.ingredients.map((i) => (i.id === 'ribs' ? Object.assign({}, i, { costPerKg: 0 }) : i));
+  const go = (type, p, t) => { const r = E.apply(s, type, p, t); assert.equal(r.report, 'ok', type + ' ' + r.report); s = r.state; return r; };
+  for (let d = 0; d < 3; d++) {
+    const t = T0 + d * DAY;
+    go('addBatch', { ing: 'pork', tempF: 160, cookedG: 20000 }, t);
+    go('addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, t + MIN);
+    const mi = s.menu.find((m) => E.apply(s, 'createTicket', { items: [{ menuId: m.id }] }, t + 30 * MIN).report === 'ok');
+    go('createTicket', { items: [{ menuId: mi.id }] }, t + 30 * MIN);
+    for (let k = 0; k < 4; k++) go('pullBatch', { ing: 'pork', g: 1500 }, t + (60 + 20 * k) * MIN);
+    s = E.tick(s, t + 4 * HR + 1).state;
+    go('discardBatch', { batchId: s.batches.find((b) => b.ing === 'ribs' && b.status !== 'discard').id, reason: 'quality' }, t + 5 * HR);
+  }
+  const alerts = [{ t: T0 + 3 * HR, id: 'expiry:b:0', kind: 'expiry', level: 2, repeat: false, leader: true }, { t: T0 + 3 * HR + 20000, ack: true, id: 'expiry:b:0' }];
+  const r = P.build(s, { from: T0, to: T0 + 3 * DAY, cutsCounted: 30, batchesCounted: 8, alerts });
+  assert.equal(r.batches.n, 6);
+  assert.equal(r.batches.rate, 75);
+  assert.equal(r.gate.pullTap.pass, false, '12 pulls of 30 cuts is 40 percent');
+  assert.equal(r.costs.discardsWithoutCost, 3);
+  assert.deepEqual(r.costs.ingredientsWithoutCost, ['St. Louis ribs']);
+  assert.equal(r.sounds.firstSounds, 1);
+  assert.equal(r.sounds.acknowledged, 1);
+  assert.equal(r.firstTicket.minutes, 30);
+  const t = P.toText(r);
+  for (const re of [/THE GATES/, /below the 50 percent gate/, /6 batches logged of 8 the observer counted \(75 percent\)/, /1 shown \(sounded\), 1 tapped/, /cannot know a warning was heard/, /St\. Louis ribs/, /30 minutes after the first record/, /WHAT THE APP CANNOT MEASURE/]) assert.ok(re.test(t), String(re));
+  const csv = P.toCsv(r);
+  assert.ok(/^batches,logged,6,$/m.test(csv) && /^warnings,heard,,observer writes this down$/m.test(csv));
+  assert.ok(/DEMO KITCHEN/.test(P.toText(P.build(s, { from: T0, to: T0 + DAY, demo: true }))));
+  assert.ok(/cook-ahead is turned off/.test(P.toText(Object.assign(P.build(s, { from: T0, to: T0 + DAY }), { batches: { n: 0, cookAheadOn: false } }))));
+});
+
+test('pilot report: counter-service auto tickets give no ticket time, and a fresh kitchen after Start over reads calmly', () => {
+  const s = Object.assign({}, service(), { tickets: [{ id: 't1', createdAt: T0 + MIN, expeditedAt: T0 + 2 * MIN, auto: true }, { id: 't2', createdAt: T0 + 3 * MIN, expeditedAt: T0 + 9 * MIN }] });
+  const r = P.build(s, { from: T0, to: T0 + 5 * HR });
+  assert.equal(r.tickets.n, 2);
+  assert.equal(r.tickets.medianSec, 360, 'only the hand-finished ticket is timed');
+  const fresh = E.newState({ now: T0, empty: true });
+  const t = P.toText(P.build(fresh, { from: T0, to: T0 + HR, batchesCounted: 4 }));
+  assert.ok(/0 batches logged of 4/.test(t) && /Tickets: Smokebox tickets were not used/.test(t), t);
+});
