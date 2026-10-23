@@ -49,6 +49,21 @@ const sheet = (name, opts) => async (page) => { await page.evaluate(([n, o]) => 
 const hash = (h) => async (page) => { await page.evaluate((x) => { location.hash = x; }, h); await page.waitForTimeout(700); };
 const click = (sel) => async (page) => { await page.locator(sel).first().click(); await page.waitForTimeout(500); };
 
+// Stands in for the store's Close the month calls so the screens show realistic counts and files (the real ones need 60 days of history).
+const monthStubs = () => {
+  SB.store.closeMonthPreview = () => ({ ok: true, report: 'ok', preview: { tickets: 412, orders: 398, events: 3120, days: Array.from({ length: 28 }, (_, i) => '2026-08-' + String(i + 1).padStart(2, '0')), from: '2026-08-01', before: '2026-08-29', safetyEventsKept: 640, openTicketsKept: 2, openOrdersKept: 1, uncoveredDays: [] } });
+  SB.store.closeMonthExport = () => ({ ok: true, report: 'ok', files: [['smokebox-before-month-close-20260929.json', 'backup', 820000], ['smokebox-orders-2026-08-01-to-2026-08-28.csv', 'orders', 31000], ['smokebox-tickets-2026-08-01-to-2026-08-28.csv', 'tickets', 52000], ['smokebox-days-2026-08-01-to-2026-08-28.csv', 'days', 4000], ['smokebox-month-manifest-2026-08-01-to-2026-08-28.json', 'manifest', 1200]].map(([name, kind, chars]) => ({ name, kind, mime: 'text/plain', text: 'a', chars, sha256: 'a'.repeat(64) })) });
+  SB.store.closeMonthPrune = () => ({ ok: true, report: 'ok', info: { before: '2026-08-29', from: '2026-08-01', days: 28, tickets: 412, orders: 398, events: 3120, safetyEventsKept: 640, copyKept: true, copyKeepDays: 7 } });
+};
+const month = (upTo) => async (p) => {
+  await p.evaluate(monthStubs); await p.evaluate(() => SB.sheets.open('closemonth')); await p.waitForTimeout(500);
+  if (upTo < 1) return;
+  await p.click('[data-act=cm-next1]'); await p.click('[data-act=cm-save-files]'); await p.waitForTimeout(300);
+  if (upTo < 2) return;
+  await p.check('#cm-saw'); await p.click('[data-act=cm-next2]'); await p.fill('input[aria-label="Type CLOSE to confirm"]', 'CLOSE'); await p.waitForTimeout(600);
+  if (upTo < 3) return;
+  await p.click('[data-act=cm-go]'); await p.waitForTimeout(300);
+};
 // Every screen to check: [name, async prep(page)]. The page is on the board with the seeded kitchen when prep starts.
 function screens(kitchen) {
   const guide = fs.readdirSync(path.join(ROOT, 'docs/sop')).filter((f) => /^\d\d-.+\.md$/.test(f)).map((f) => f.replace(/^\d\d-/, '').replace(/\.md$/, ''));
@@ -78,6 +93,10 @@ function screens(kitchen) {
     ['Set up this tablet', sheet('setup')],
     ['Tablet checks', sheet('ready')],
     ['Pilot visit checklist', sheet('pilot')],
+    ['Close the month: step 1', month(0)],
+    ['Close the month: step 2', month(1)],
+    ['Close the month: step 3', month(2)],
+    ['Close the month: done', month(3)],
     ['Start over: step 1', sheet('startover')],
     ['Start over: step 2', async (p) => { await sheet('startover')(p); await p.click('[data-act=so-next1]'); await p.waitForTimeout(300); }],
     ['Start over: step 3', async (p) => { await sheet('startover')(p); await p.click('[data-act=so-next1]'); await p.click('[data-act=so-save-backup]').catch(() => {}); await p.check('#so-saw').catch(() => {}); await p.click('[data-act=so-next2]').catch(() => {}); await p.waitForTimeout(300); }],

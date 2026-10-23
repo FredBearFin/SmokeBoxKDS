@@ -2742,6 +2742,8 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .rd .stepper { display: flex; width: 100%; }
 .rd .stepper .stepper-field { flex: 1 1 auto; min-width: 0; }
 .rd .stepper .stepper-input { flex: 1 1 auto; min-width: 0; width: auto; text-align: center; }
+/* Close the month: the counts block and the list of files to save. */
+.cm-counts { display: grid; gap: var(--sp-2); } .cm-files { margin: 0; padding-left: var(--sp-5); display: grid; gap: var(--sp-1); overflow-wrap: anywhere; } .cm-files:empty { display: none; }
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -28412,6 +28414,152 @@ a.of-nav:active { background: var(--press); }
     return sheet;
   }
 
+  /* ---------- Close the month ---------- */
+
+  // The word the owner types to confirm closing the month.
+  const CLOSE_MONTH_WORD = 'CLOSE';
+  // Plain words for each way Close the month can be refused. Nothing is removed in any of these cases.
+  const MONTH_WORDS = {
+    backupRequired: 'The files must be saved first. Go back to step 2 and save them again. Nothing was removed.',
+    exportStale: 'Something changed since you saved the files (a new day started or a record changed). Save the files again in step 2, then close. Nothing was removed.',
+    notInDemo: 'You are in the demo, so there is no real history to close here. Tap Back to my kitchen first. Nothing was removed.',
+    hubKitchen: 'This tablet works through the main computer, so the month cannot be closed here. Do this on the main computer\'s own screen or the main tablet. Nothing was removed.',
+    nothingToDo: 'There is nothing to close yet. Only finished days older than 35 days can be moved out, and none are left before that date. Nothing was removed.',
+    storageBlocked: 'This browser would not save the change, so nothing was removed. Your kitchen is exactly as it was. Allow site data or use a normal window, then try again.',
+    badPatch: 'That date is not one Smokebox can use. Pick a date and try again. Nothing was removed.',
+  };
+  // Turns a store answer that was refused into one plain sentence.
+  function monthWords(r) { return MONTH_WORDS[r && r.report] || ((r && r.report) ? 'Smokebox could not do that (' + r.report + '). Nothing was removed.' : 'Smokebox could not do that. Nothing was removed.'); }
+  // Writes a YYYY-MM-DD day as a short date like Mar 3, 2026.
+  function monthDay(ymd) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || '')); if (!m) return String(ymd || ''); return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
+  // The first day of the current month as YYYY-MM-DD, the usual "close everything before" date.
+  function firstOfMonth() { const d = new Date(SB.store.now()); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01'; }
+  // Opens "Close the month": with a PIN set, the keypad comes first. opts.before picks the date (YYYY-MM-DD); the default is the first of this month.
+  function openCloseMonth(opts) {
+    if (SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.shell.requirePin) { SB.shell.requirePin().then((ok) => { if (ok) buildCloseMonth(opts || {}); }); return null; }
+    return buildCloseMonth(opts || {});
+  }
+  // Builds the Close the month sheet: what happens, save the files, type the word, then the done screen with Undo.
+  function buildCloseMonth(opts) {
+    const sheet = SB.ui.sheet({ title: 'Close the month', side: 'right', width: 'min(640px, 96vw)', name: 'closemonth' });
+    const root = h('div', { class: 'dp so cm' });
+    const store = SB.store;
+    let before = /^\d{4}-\d{2}-\d{2}$/.test(String(opts.before || '')) ? opts.before : firstOfMonth();
+    let exported = null; // the files of the last export: { files, backup: { filename, chars, sha256 } }
+
+    // Step 1: what happens, with the real counts.
+    const dateIn = h('input', { class: 'input', type: 'date', value: before, id: 'cm-before', dataset: { field: 'before' } });
+    const counts = h('div', { class: 'cm-counts', role: 'status', dataset: { role: 'cm-counts' } });
+    const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'cm-next1' }, disabled: true }, 'Next: save the files');
+    // Redraws the counts for the chosen date. The store says what would move out and what stays; nothing changes here.
+    function paintPreview() {
+      before = /^\d{4}-\d{2}-\d{2}$/.test(dateIn.value) ? dateIn.value : before; exported = null;
+      U.clear(counts); next1.disabled = true;
+      if (store.isHubClient && store.isHubClient()) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords({ report: 'hubKitchen' }))); return; }
+      if (store.isDemo && store.isDemo()) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords({ report: 'notInDemo' }))); return; }
+      const r = store.closeMonthPreview({ before });
+      if (!r.ok) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords(r))); return; }
+      const p = r.preview;
+      if (!p.tickets && !p.orders && !p.events) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords({ report: 'nothingToDo' }))); return; }
+      // Writes a count with the right singular or plural word.
+      const n = (x, one, many) => Number(x).toLocaleString() + ' ' + U.plural(x, one, many);
+      counts.append(...[
+        h('p', null, h('strong', null, 'This moves out of your kitchen: '), n(Array.isArray(p.days) ? p.days.length : p.days, 'day') + ' of history (' + monthDay(p.from) + ' up to, not including, ' + monthDay(p.before) + '), with ' + n(p.orders, 'order') + ', ' + n(p.tickets, 'ticket') + ' and ' + n(p.events, 'activity record', 'activity records') + '.'),
+        p.before !== before ? h('p', { class: 'fs-sub' }, 'You picked ' + monthDay(before) + ', but the last 35 days always stay, so it stops at ' + monthDay(p.before) + '.') : null,
+        h('p', null, h('strong', null, 'This stays: '), 'the last 35 days, today, every open order and open ticket' + (p.openOrdersKept || p.openTicketsKept ? ' (' + n(p.openOrdersKept || 0, 'open order') + ', ' + n(p.openTicketsKept || 0, 'open ticket') + ' right now)' : '') + ', your menu and settings, the end-of-day totals, and all food-safety records (' + n(p.safetyEventsKept || 0, 'record') + ').'),
+        p.uncoveredDays && p.uncoveredDays.length ? h('p', { class: 'fs-sub' }, n(p.uncoveredDays.length, 'older day') + ' with records but no end-of-day close stay where they are.') : null].filter(Boolean));
+      next1.disabled = false;
+    }
+    dateIn.addEventListener('change', paintPreview);
+    const step1 = h('section', { class: 'fs-section so-step' },
+      h('h3', { class: 'fs-h' }, '1. What this does'),
+      h('p', { class: 'fs-sub' }, 'Close the month moves old, finished history out of this tablet so it stays quick. First you save everything to files. Nothing is removed until step 3.'),
+      SB.ui.field({ label: 'Close everything before', control: dateIn }),
+      counts,
+      h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'After step 3 the history is gone from this tablet. Your files are the only copy of it. For 7 days Smokebox also keeps your kitchen as it was, and you can undo.'),
+      next1);
+
+    // Step 2: save the files.
+    const fileList = h('ul', { class: 'cm-files', dataset: { role: 'cm-files' } });
+    const saveSt = h('p', { class: 'fs-sub dp-msg', role: 'status', dataset: { role: 'cm-save-msg' } });
+    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'cm-next2' }, disabled: true }, 'Next: confirm');
+    const saw = h('input', { type: 'checkbox', id: 'cm-saw', disabled: true, dataset: { act: 'cm-saw' } });
+    saw.addEventListener('change', () => { next2.disabled = !(saw.checked && exported); });
+    // Hands one file to the browser as a download.
+    function download(f) {
+      const url = g.URL.createObjectURL(new g.Blob([f.text], { type: f.mime || 'text/plain' }));
+      const a = doc.createElement('a'); a.href = url; a.download = f.name; a.style.display = 'none'; doc.body.appendChild(a); a.click();
+      setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 4000);
+    }
+    // Makes the files and downloads them one after another (a browser may refuse several at once). The backup file comes first.
+    const saveNow = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'cm-save-files' },
+      // Makes the export, lists the files and starts the downloads, or says in words why it could not.
+      onClick: () => {
+      const r = store.closeMonthExport({ before });
+      if (!r.ok) { tell(saveSt, monthWords(r), 'bad'); return; }
+      exported = { files: r.files, backup: { filename: r.files[0].name, chars: r.files[0].chars, sha256: r.files[0].sha256 } };
+      U.clear(fileList);
+      const kindWord = { backup: 'Backup of the whole kitchen (to bring everything back)', orders: 'Orders being closed (opens in a spreadsheet)', tickets: 'Tickets being closed (opens in a spreadsheet)', days: 'Days being closed (opens in a spreadsheet)', manifest: 'List of what is in these files' };
+      r.files.forEach((f) => fileList.append(h('li', null, h('strong', null, f.name), ' ' + (kindWord[f.kind] || '') + ', ' + Math.max(1, Math.round(f.chars / 1024)) + ' KB')));
+      try { r.files.forEach((f, i) => setTimeout(() => { try { download(f); } catch (e) { /* the message below covers it */ } }, i * 400)); }
+      catch (e) { tell(saveSt, 'This browser would not save the files. Nothing was removed. Try again.', 'bad'); return; }
+      tell(saveSt, 'Asked your browser to save ' + r.files.length + ' files. Look in your downloads folder and check every file listed above is there. If the browser asks to allow several downloads, say yes.', 'ok');
+      saw.disabled = false; saw.checked = false; next2.disabled = true; saveNow.textContent = 'Save the files again';
+    } }, 'Save the month files now');
+    const step2 = h('section', { class: 'fs-section so-step', hidden: true },
+      h('h3', { class: 'fs-h' }, '2. Save the month files now'),
+      h('p', { class: 'fs-sub' }, 'These files hold your whole kitchen and the history being closed. Keep a copy off this device too (a memory stick or your email).'),
+      saveNow, fileList, saveSt,
+      h('label', { class: 'dp-check-row', for: 'cm-saw' }, saw, h('span', null, 'I saved the files and I can find them')),
+      h('p', { class: 'fs-sub' }, 'To bring everything back later: Back office, Data, Restore, and pick the backup file.'), next2);
+
+    // Step 3: the typed word and the red button.
+    const word = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': 'Type ' + CLOSE_MONTH_WORD + ' to confirm', placeholder: CLOSE_MONTH_WORD });
+    const goSt = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'cm-go-msg' } });
+    const go = h('button', { type: 'button', class: 'btn btn-danger btn-lg', dataset: { act: 'cm-go' }, disabled: true }, ico('trash', 22), h('span', null, 'Close the month'));
+    word.addEventListener('input', () => { go.disabled = word.value.trim().toUpperCase() !== CLOSE_MONTH_WORD; });
+    const step3 = h('section', { class: 'fs-section so-step', hidden: true },
+      h('h3', { class: 'fs-h' }, '3. Type ' + CLOSE_MONTH_WORD),
+      h('p', { class: 'fs-sub' }, 'To be sure this is what you want, type ' + CLOSE_MONTH_WORD + ' in the box. Then the red button works.'),
+      SB.ui.field({ label: 'Type ' + CLOSE_MONTH_WORD, control: word }), go, goSt);
+    const done = h('section', { class: 'fs-section so-step', hidden: true, dataset: { role: 'cm-done' } });
+
+    // Shows one step and hides the others.
+    const show = (which) => { [step1, step2, step3, done].forEach((s, i) => { s.hidden = i !== which; }); };
+    next1.addEventListener('click', () => show(1));
+    next2.addEventListener('click', () => show(2));
+    go.addEventListener('click', () => {
+      if (!exported) { tell(goSt, MONTH_WORDS.backupRequired, 'bad'); return; }
+      const res = store.closeMonthPrune({ before, confirmBackupSaved: exported.backup });
+      if (!res.ok) {
+        tell(goSt, monthWords(res), 'bad');
+        if (res.report === 'exportStale' || res.report === 'backupRequired') { exported = null; saw.checked = false; saw.disabled = true; next2.disabled = true; saveNow.textContent = 'Save the month files now'; U.clear(fileList); show(1); tell(saveSt, 'Save the files again, then continue.', 'bad'); }
+        return;
+      }
+      const i = res.info;
+      // Writes a count with the right singular or plural word.
+      const n = (x, one, many) => Number(x).toLocaleString() + ' ' + U.plural(x, one, many);
+      const undoMsg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'cm-undo-msg' } });
+      U.clear(done);
+      done.append(h('h3', { class: 'fs-h' }, 'Done. The month is closed.'),
+        h('p', { class: 'fs-sub' }, 'Moved out: ' + n(i.days, 'day') + ' (' + monthDay(i.from) + ' up to, not including, ' + monthDay(i.before) + '), ' + n(i.orders, 'order') + ', ' + n(i.tickets, 'ticket') + ' and ' + n(i.events, 'activity record', 'activity records') + '. Food-safety records all stayed (' + i.safetyEventsKept + ').'),
+        i.copyKept ? h('p', { class: 'fs-note', 'data-tone': 'ok' }, 'Your kitchen before this is kept for ' + i.copyKeepDays + ' days: ',
+          // Puts the kitchen back exactly as it was before the month was closed.
+          h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'cm-undo' }, onClick: () => {
+            const rep = store.undoRestore();
+            if (rep === 'ok' || (rep && rep.ok)) { tell(undoMsg, 'Undone. Your kitchen is back as it was, with all the history.', 'ok'); } else tell(undoMsg, 'The saved copy could not be put back (' + (rep && rep.report ? rep.report : rep) + '). Use the backup file you saved: Back office, Data, Restore.', 'bad');
+          } }, 'Undo')) : h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'No copy could be kept on this tablet, so the files you saved are the only way back: Back office, Data, Restore.'),
+        undoMsg,
+        // Closes the sheet when the person is finished reading the result.
+        h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'cm-finish' }, onClick: () => SB.sheets.closeAll() }, 'Done'));
+      show(3);
+    });
+    root.append(step1, step2, step3, done);
+    sheet.body.appendChild(root); keepInView(root);
+    paintPreview();
+    return sheet;
+  }
+
   /* ---------- How you serve ---------- */
 
   // The starting order buttons, as the engine knows them (the built-in list used when none is saved).
@@ -28799,11 +28947,12 @@ a.of-nav:active { background: var(--press); }
   SB.sheets.register('pilot', openPilot);
   SB.sheets.register('serve', openServe);
   SB.sheets.register('startover', openStartOver);
+  SB.sheets.register('closemonth', openCloseMonth);
   SB.sheets.register('menuimport', openImport);
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { showRecoveryCode, leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { openCloseMonth, showRecoveryCode, leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 77-floor-setup.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'77-floor-setup.js',message:String(e&&e.message||e)});}
