@@ -113,6 +113,9 @@
   function hourMs(key, h) { const p = key.split('-').map(Number); const w = Math.floor(h); return new Date(p[0], p[1] - 1, p[2], w, 0, 0, 0).getTime() + Math.round((h - w) * H); }
   // Local-time offset from UTC at that moment, in ms.
   const tzOff = (ts) => -new Date(ts).getTimezoneOffset() * MIN;
+  // Hours on the wall clock from midnight of a service date to a moment (12:45 am the next morning is 24.75). On a clock-change
+  // day this is the hour the kitchen's clock shows, not the hours that really passed.
+  function wallHourOn(t, date) { const m = dayMs(date); return (t + tzOff(t) - (m + tzOff(m))) / H; }
   // Service-date lookups dominate large datasets, so cache them per 15-minute slot (every real UTC offset is a multiple of 15 minutes and the
   // service-day boundary is a whole number of quarter hours, so a slot never straddles two service dates).
   const slotCache = new Map();
@@ -253,7 +256,7 @@
       // sh = hours since midnight of the service date (12:45 am = 24.75); hk numbers each date+hour slot.
       const sh = wallHours(t.createdAt, si);
       all.push({
-        t, items, id: t.id, num: t.num, channel: t.channel, createdAt: t.createdAt, date, sh, hour: Math.floor(sh), hk: Math.round(si.ms / H) + Math.floor(sh), wd: si.wd,
+        t, items, id: t.id, num: t.num, channel: t.channel, createdAt: t.createdAt, date, sh, hour: Math.floor(sh), hk: Math.round(si.ms / 86400e3) * 100 + Math.floor(sh), wd: si.wd,
         voided: t.status === 'voided', forced: t.forced === true, recalls: num(t.recalls) ? t.recalls : 0,
         pacing: typeof t.pacing === 'boolean' ? t.pacing : null, rush: !!t.rush, expeditedAt: null, totalMs: null, level: null,
       });
@@ -717,7 +720,7 @@
     return points.filter((p, i) => p.date in first && i >= first[p.date] && i <= last[p.date]);
   }
   // A moment as its service date plus its hour on that date (12:45 am is 24.75 of the previous date).
-  function stamp(ctx, t) { const date = ctx.dateOf(t); return { t, date, hour: (t - dayMs(date)) / H }; }
+  function stamp(ctx, t) { const date = ctx.dateOf(t); return { t, date, hour: wallHourOn(t, date) }; }
   /** Average absolute buckets over service days into time-of-day slots. */
   function foldPoints(ctx, points, bmin, fields) {
     const days = new Set(points.map((p) => p.date)).size; const slots = {};
@@ -748,18 +751,24 @@
     const stamps = []; for (const v of ctx.vol) stamps.push(v.createdAt); for (const v of ctx.spd) stamps.push(v.expeditedAt);
     if (!stamps.length) return res;
     let t0 = Infinity, t1 = -Infinity; for (const s of stamps) { if (s < t0) t0 = s; if (s > t1) t1 = s; }
-    // Buckets are cut on local clock time: the UTC offset is added so a bucket starts on :00, :15, :30 or
-    // :45 on the wall clock.
-    const off = tzOff(t0), cm = {}, dm = {};
-    for (const v of ctx.vol) { const k = Math.floor((v.createdAt + off) / bm); cm[k] = (cm[k] || 0) + 1; }
-    for (const v of ctx.spd) { const k = Math.floor((v.expeditedAt + off) / bm); dm[k] = (dm[k] || 0) + 1; }
-    const k0 = Math.floor((t0 + off) / bm), k1 = Math.floor((t1 + off) / bm); let pts = [];
+    // Buckets are cut on the wall clock: each moment gets its own UTC offset, so a bucket starts on :00, :15, :30 or :45 of the kitchen's clock
+    // also after a clock change inside the range. Bucket number k is "wall minutes since 1970 / width"; the repeated hour of a fall-back
+    // night is one bucket, and the hour that does not exist in spring has no bucket.
+    const cm = {}, dm = {};
+    for (const v of ctx.vol) { const k = Math.floor((v.createdAt + tzOff(v.createdAt)) / bm); cm[k] = (cm[k] || 0) + 1; }
+    for (const v of ctx.spd) { const k = Math.floor((v.expeditedAt + tzOff(v.expeditedAt)) / bm); dm[k] = (dm[k] || 0) + 1; }
+    const k0 = Math.floor((t0 + tzOff(t0)) / bm), k1 = Math.floor((t1 + tzOff(t1)) / bm); let pts = [];
     // A huge span (over 30 000 buckets) keeps only buckets that have tickets, to avoid a giant list of
     // zeros.
-    if (k1 - k0 > 30000) { const ks = Object.keys(cm).concat(Object.keys(dm)).map(Number).filter((k, i, a) => a.indexOf(k) === i).sort((a, b) => a - b); for (const k of ks) pts.push(mkT(k)); }
-    else for (let k = k0; k <= k1; k++) pts.push(mkT(k));
-    // Builds the point for bucket number k.
-    function mkT(k) { const st = stamp(ctx, k * bm - off); return Object.assign(st, { x: st.t, completed: dm[k] || 0, created: cm[k] || 0, v: { completed: dm[k] || 0, created: cm[k] || 0 } }); }
+    if (k1 - k0 > 30000) { const ks = Object.keys(cm).concat(Object.keys(dm)).map(Number).filter((k, i, a) => a.indexOf(k) === i).sort((a, b) => a - b); for (const k of ks) { const pt = mkT(k); if (pt) pts.push(pt); } }
+    else for (let k = k0; k <= k1; k++) { const pt = mkT(k); if (pt) pts.push(pt); }
+    // The real moment a wall-clock reading happened, or null when the kitchen's clock never showed it (spring forward).
+    function realOf(wall) {
+      const w = new Date(wall), t = new Date(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate(), w.getUTCHours(), w.getUTCMinutes(), w.getUTCSeconds(), 0).getTime();
+      return t + tzOff(t) === wall ? t : null;
+    }
+    // Builds the point for bucket number k (null for a wall-clock time that does not exist).
+    function mkT(k) { const t = realOf(k * bm); if (t === null) return null; const st = stamp(ctx, t); return Object.assign(st, { x: st.t, completed: dm[k] || 0, created: cm[k] || 0, v: { completed: dm[k] || 0, created: cm[k] || 0 } }); }
     pts = trimDays(pts, (p) => p.completed + p.created > 0);
     if (fold) {
       const f = foldPoints(ctx, pts, bmin, ['completed', 'created']); res.days = f.days;
@@ -1004,7 +1013,7 @@
     deltas.sort((a, b) => a.t - b.t || rank[a.kind] - rank[b.kind]);
     let lvl = res.openingG; res.endG = lvl;
     for (const d of deltas) {
-      lvl += d.d; res.points.push({ t: d.t, hour: (d.t - dayMs(day)) / H, g: lvl, d: d.d, kind: d.kind });
+      lvl += d.d; res.points.push({ t: d.t, hour: wallHourOn(d.t, day), g: lvl, d: d.d, kind: d.kind });
       if (d.kind === 'intake' || d.kind === 'restock') res.intakeG += d.d; else if (d.kind === 'use') res.usedG += -d.d; else res.wasteG += -d.d;
       if (res.minG === null || lvl < res.minG) { res.minG = lvl; res.minAt = d.t; }
     }
@@ -1035,7 +1044,7 @@
     const dates = new Set(ctx.dates()); for (const k in first) dates.add(first[k].date);
     const rows = Object.keys(first).map((k) => {
       const f = first[k], closeMs = hourMs(f.date, close);
-      return { date: f.date, ing: f.ing, name: im[f.ing] ? im[f.ing].name : f.ing, t: f.e.t, hour: (f.e.t - dayMs(f.date)) / H, hoursBeforeClose: (closeMs - f.e.t) / H, reason: f.e.reason, menuId: f.e.menuId, menuName: mm[f.e.menuId] ? mm[f.e.menuId].name : f.e.menuId };
+      return { date: f.date, ing: f.ing, name: im[f.ing] ? im[f.ing].name : f.ing, t: f.e.t, hour: wallHourOn(f.e.t, f.date), hoursBeforeClose: (closeMs - f.e.t) / H, reason: f.e.reason, menuId: f.e.menuId, menuName: mm[f.e.menuId] ? mm[f.e.menuId].name : f.e.menuId };
     }).sort((a, b) => a.t - b.t);
     const days = Array.from(dates).sort().map((d) => ({ date: d, label: U.fmtDateShort(d), weekday: U.weekday(d), closeMs: hourMs(d, close), items: rows.filter((r) => r.date === d).map((r) => ({ ing: r.ing, name: r.name, t: r.t, hour: r.hour, hoursBeforeClose: r.hoursBeforeClose, reason: r.reason, menuId: r.menuId, menuName: r.menuName })) }));
     const pc = {}; for (const r of rows) pc[r.ing] = (pc[r.ing] || 0) + 1;
