@@ -33,3 +33,15 @@ test('orders pane: an order paid on an earlier service day is not listed', () =>
   s = E.apply(s, 'payOrder', { orderId: s.orders[0].id, method: 'cash' }, T0 + 2 * MIN).state;
   assert.equal(D.wallOrders(s, T0 + 48 * 60 * MIN).paidCount, 0);
 });
+
+test('orders pane: an order opened yesterday and paid today counts as paid today (by the time it was paid)', () => {
+  let s = E.newState({ now: T0, stagger: true });
+  const mi = SB.config.menu.slice(0, 1).map((m) => ({ menuId: m.id, qty: 1 }));
+  s = E.apply(s, 'createTicket', { customer: 'Late tab', channel: 'dine_in', items: mi }, T0 + MIN).state;
+  const payAt = T0 + 26 * 60 * MIN; // the next service day
+  const r = E.apply(s, 'payOrder', { orderId: s.orders[0].id, method: 'cash' }, payAt);
+  assert.equal(r.report, 'ok'); s = r.state;
+  assert.notEqual(s.orders[0].serviceDate, SB.util.serviceDate(payAt, s.settings.service.dayStartHour));
+  const g = D.wallOrders(s, payAt + MIN);
+  assert.equal(g.paidCount, 1); assert.equal(g.paid[0].name, 'Late tab');
+});
