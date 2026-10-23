@@ -1595,6 +1595,12 @@
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
+    // The clock notice: the tablet's clock jumped far ahead, the board keeps the old time and asks. Calm, two plain choices, and the board keeps working.
+    const clockT = h('span', { class: 'fl-clock-t' });
+    const clockKeep = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-keep' }, onClick: () => { if (m) { m.clockDis = Date.now() + 10 * 60e3; updateStrip(store().now()); } } }, 'Keep the old time');
+    const clockUse = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-use' }, onClick: askClockUse }, 'Use the new time');
+    const clockWrap = h('div', { class: 'fl-strip-bar fl-bar-clock', role: 'alert', hidden: true }, ico('clock', 22), clockT, clockKeep, clockUse);
+    el.appendChild(clockWrap);
     const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear all notices', () => { if (m && m.noteKey) m.dis.add(m.noteKey); return 'snd'; }));
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
@@ -1617,7 +1623,7 @@
     // A visually hidden live region that changes only when a warning is announced (the leader tab), so a screen reader hears each warning once, never the ticking countdown.
     const announce = h('span', { class: 'visually-hidden', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
     el.appendChild(announce);
-    return { el, rows, soundBar: soundWrap, pauseBar: pauseWrap, pauseBtn: pauseBar, announce };
+    return { el, rows, clockBar: clockWrap, clockText: clockT, soundBar: soundWrap, pauseBar: pauseWrap, pauseBtn: pauseBar, announce };
   }
   // Shows the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { showCabinet(true, { batchId }); } catch (e) { console.error('[smokebox] cabinet failed', e); } }
@@ -1663,6 +1669,14 @@
     if (top.level === 4) { tell(PH('expired', { who, many }), 'expired'); return; }
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
     tell(PH('expire', { who, many, mins, goes86: first.goes86, approx: top.level === 2 }), top.level >= 3 ? 'start' : 'expire');
+  }
+  // Asks, in a small box, whether to use the tablet's new time. It needs a second deliberate tap, and "Keep the old time" is the way out.
+  function askClockUse() {
+    const cs = store().status().clockSuspect;
+    if (!cs || !SB.ui || !SB.ui.confirm) return;
+    const days = Math.round(cs.aheadMs / 86400000);
+    SB.ui.confirm({ title: 'Use the new time?', body: 'Timers and ages on every open ticket will jump forward by about ' + (days >= 2 ? days + ' days' : Math.round(cs.aheadMs / 3600000) + ' hours') + '. Only do this if the date and time on this tablet are right.', confirmLabel: 'Use the new time', cancelLabel: 'Keep the old time', tone: 'danger' })
+      .then((yes) => { if (yes) { store().acceptClockJump(); if (m) updateStrip(store().now()); } else if (m) m.clockDis = Date.now() + 10 * 60e3; });
   }
   // Says a cold item's low-time row once when it first shows (or gets worse), in plain words that name the owner's limit.
   // The first pass after the board opens only remembers what is already there, so a reload does not read old news aloud.
@@ -1738,9 +1752,18 @@
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
     // Only one notice shows at a time (the "tap for sound" bar first, then the note); the bar says how many more wait behind it, and
     // its X clears them all. Warning rows above are separate and always show.
-    const soundShown = needSound && !m.dis.has('snd');
+    // A device clock that jumped ahead comes first: it changes every timer on the board. It never hides the tickets.
+    const cs = store().status().clockSuspect;
+    const clockShown = !!cs && Date.now() >= (m.clockDis || 0);
+    if (clockShown) {
+      const dd = Math.round(cs.aheadMs / 86400000);
+      const t = 'This tablet\'s clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(cs.aheadMs / 3600000) + ' hours') + '. Smokebox is still using the old time, so tickets and timers keep running.';
+      if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
+    }
+    setHidden(m.strip.clockBar, !clockShown);
+    const soundShown = needSound && !m.dis.has('snd') && !clockShown;
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
-    const showNote = noteWanted && !soundShown;
+    const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
     const more = (noteWanted ? 1 : 0) + behindSilent;
@@ -1752,7 +1775,7 @@
       const want = updateNote() && note === updateNote() ? 'refresh' : 'volume-off';
       if (m.pauseIcon !== want) { m.pauseIcon = want; const old = m.strip.pauseBtn.firstChild; if (old) old.replaceWith(ico(want, 24)); }
     }
-    setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
+    setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote && !clockShown);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
       setHidden(r.wrap, !d);

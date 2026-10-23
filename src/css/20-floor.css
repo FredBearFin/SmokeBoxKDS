@@ -827,3 +827,9 @@ html[data-hub="on"] .fl-demo-chip, html[data-hub="on"] .fl-start-demo, html[data
   .fl-main[data-density="compact"] .slip-next { margin-top: 2px; padding-block: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 }
+/* The device-clock notice on the strip: calm, wraps, two plain buttons that are not the width of the screen. */
+.fl-bar-clock { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-4); background: var(--tint-warn, var(--paper)); border-bottom: var(--bw) solid var(--amber); }
+.fl-bar-clock[hidden] { display: none; }
+.fl-clock-t { flex: 1 1 260px; min-width: 0; font: var(--w-semi) var(--fs-3) / 1.3 var(--font-body); }
+.fl-bar-clock .btn { min-height: var(--tap, 44px); flex: 0 1 auto; }
+.fl-bar-clock > .icon { flex: none; margin-left: var(--sp-4); }

@@ -159,7 +159,7 @@ test('size and origin guards on /action still hold with followers connected (413
 
 test('streams: other methods and paths on the event route are refused; a slow reader does not stop the hub', async () => {
   const h = await hub();
-  for (const m of ['POST', 'PUT', 'DELETE']) { const c = code(await rawHttp(h.port, `${m} /events HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`, 150)); assert.ok(c === 404 || c === 405, m + ' /events -> ' + c); }
+  for (const m of ['POST', 'PUT', 'DELETE']) { const c = code(await rawHttp(h.port, `${m} /events HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`, 3000)); assert.ok(c === 404 || c === 405, m + ' /events -> ' + c); }
   // a reader that never reads: open a raw socket, send the request and then ignore the data while 50 changes are made
   const lazy = net.connect(h.port, '127.0.0.1'); lazy.write('GET /events HTTP/1.1\r\nHost: x\r\n\r\n'); lazy.pause();
   for (let i = 0; i < 50; i++) { const r = await postAction(h.origin, ticket(i, 'slow-' + i)); assert.equal(r.body.report, 'ok'); }

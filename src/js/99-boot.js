@@ -70,26 +70,38 @@
   // damaged text is offered as a file; nothing is written over it until the person says they have saved it.
   function showHeldData(text) {
     const wrap = doc.createElement('div');
-    wrap.id = 'held-data'; wrap.setAttribute('role', 'alertdialog');
-    wrap.style.cssText = 'position:fixed;inset:0;overflow:auto;padding:16px;background:#F5F2EB;color:#1E2224;font-family:system-ui,sans-serif;z-index:99999';
+    wrap.id = 'held-data'; wrap.setAttribute('role', 'alertdialog'); wrap.setAttribute('aria-labelledby', 'held-data-h');
+    // Follows the tablet's look: Night colors and Large text apply here too, so the screen reads the same as the board behind it.
+    let night = false, large = false;
+    try { night = !!(SB.theme && SB.theme.get && SB.theme.get() === 'night'); large = !!(SB.theme && SB.theme.textSize && SB.theme.textSize() === 'large'); } catch (e) { /* default look */ }
+    wrap.style.cssText = 'position:fixed;inset:0;overflow:auto;padding:16px;font-family:system-ui,sans-serif;z-index:99999;font-size:' + (large ? '120%' : '100%') + ';background:' + (night ? '#1E2224' : '#F5F2EB') + ';color:' + (night ? '#F5F2EB' : '#1E2224');
     const card = doc.createElement('div'); card.className = 'error-card';
-    const h2 = doc.createElement('h2'); h2.textContent = 'Your saved data could not be read, and could not be kept safe';
+    if (night) card.style.cssText = 'background:#2B3033;color:#F5F2EB;border-color:#6B7478';
+    const h2 = doc.createElement('h2'); h2.id = 'held-data-h'; h2.textContent = 'Your saved data could not be read, and could not be kept safe';
     const p = doc.createElement('p'); p.textContent = 'This browser is too full to set the old data aside, so Smokebox has not touched it. Nothing new will be saved on this device until you choose below. Download the old data now and keep the file. Then free some space, or continue and let Smokebox replace the old data.';
-    const row = doc.createElement('div'); row.className = 'row';
-    const dl = doc.createElement('button'); dl.type = 'button'; dl.className = 'btn btn-primary'; dl.textContent = 'Download the old data';
+    const row = doc.createElement('div'); row.className = 'row'; row.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-top:12px';
+    const bstyle = 'min-height:48px;flex:1 1 220px';
+    const dl = doc.createElement('button'); dl.type = 'button'; dl.className = 'btn btn-primary'; dl.style.cssText = bstyle; dl.textContent = 'Download the old data';
+    const show = doc.createElement('button'); show.type = 'button'; show.className = 'btn'; show.style.cssText = bstyle; show.textContent = 'Show the data so I can copy it';
+    const go = doc.createElement('button'); go.type = 'button'; go.className = 'btn'; go.style.cssText = bstyle; go.textContent = 'I have the file: continue and replace it';
+    const hint = doc.createElement('p'); hint.setAttribute('role', 'status'); hint.style.cssText = 'margin-top:8px;font-size:90%'; hint.textContent = 'The last button turns on after you download the data or show it to copy.';
+    const box = doc.createElement('textarea'); box.readOnly = true; box.hidden = true; box.value = text; box.rows = 8; box.style.cssText = 'width:100%;margin-top:12px';
+    box.setAttribute('aria-label', 'The old data, to copy by hand');
+    // The way forward is only offered once the person has the old data in hand (downloaded or shown), so it cannot be replaced by a stray tap.
+    go.disabled = true; go.setAttribute('aria-disabled', 'true');
+    const unlock = () => { go.disabled = false; go.setAttribute('aria-disabled', 'false'); hint.textContent = 'Keep the file somewhere safe, then continue.'; };
     dl.addEventListener('click', () => {
       try {
         const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' }));
         const a = doc.createElement('a'); a.href = url; a.download = 'smokebox-damaged-data.json'; doc.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => { try { g.URL.revokeObjectURL(url); } catch (e) { /* ignore */ } }, 5000);
-      } catch (e) { box.hidden = false; box.focus(); }
+        unlock();
+      } catch (e) { box.hidden = false; box.focus(); hint.textContent = 'The download did not work here. Copy the data from the box below, then continue.'; unlock(); }
     });
-    const go = doc.createElement('button'); go.type = 'button'; go.className = 'btn'; go.textContent = 'I have the file: continue and replace it';
-    go.addEventListener('click', () => { try { SB.store.releaseHold(); } catch (e) { /* ignore */ } wrap.remove(); });
-    const box = doc.createElement('textarea'); box.readOnly = true; box.hidden = true; box.value = text; box.rows = 8; box.style.cssText = 'width:100%;margin-top:12px';
-    box.setAttribute('aria-label', 'The old data, to copy by hand');
-    row.append(dl, go);
-    card.append(h2, p, row, box);
+    show.addEventListener('click', () => { box.hidden = false; box.focus(); box.select(); unlock(); });
+    go.addEventListener('click', () => { if (go.disabled) return; try { SB.store.releaseHold(); } catch (e) { /* ignore */ } wrap.remove(); });
+    row.append(dl, show, go);
+    card.append(h2, p, row, hint, box);
     wrap.appendChild(card);
     doc.body.appendChild(wrap);
     try { dl.focus(); } catch (e) { /* ignore */ }
@@ -102,6 +114,8 @@
       try {
         const s = SB.store.status();
         if (s.clockWrong && !toldWrong && SB.ui && SB.ui.toast) { toldWrong = true; SB.ui.toast("This device's clock looks wrong: some saved times are far ahead of it. Smokebox kept the device clock. Check the date and time in the device's settings.", { tone: 'warn', ms: 20000 }); }
+        // On the board the calm strip notice asks instead (a box over the screen would block tickets).
+        if (SB.floor && SB.floor.isMounted && SB.floor.isMounted()) return;
         if (!s.clockSuspect || asking || !SB.ui || !SB.ui.confirm) return;
         asking = true;
         const days = Math.round(s.clockSuspect.aheadMs / 86400000);

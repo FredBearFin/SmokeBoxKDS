@@ -2122,6 +2122,12 @@ html[data-hub="on"] .fl-demo-chip, html[data-hub="on"] .fl-start-demo, html[data
   .fl-main[data-density="compact"] .slip-next { margin-top: 2px; padding-block: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 }
+/* The device-clock notice on the strip: calm, wraps, two plain buttons that are not the width of the screen. */
+.fl-bar-clock { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-4); background: var(--tint-warn, var(--paper)); border-bottom: var(--bw) solid var(--amber); }
+.fl-bar-clock[hidden] { display: none; }
+.fl-clock-t { flex: 1 1 260px; min-width: 0; font: var(--w-semi) var(--fs-3) / 1.3 var(--font-body); }
+.fl-bar-clock .btn { min-height: var(--tap, 44px); flex: 0 1 auto; }
+.fl-bar-clock > .icon { flex: none; margin-left: var(--sp-4); }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -22463,6 +22469,12 @@ a.of-nav:active { background: var(--press); }
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
+    // The clock notice: the tablet's clock jumped far ahead, the board keeps the old time and asks. Calm, two plain choices, and the board keeps working.
+    const clockT = h('span', { class: 'fl-clock-t' });
+    const clockKeep = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-keep' }, onClick: () => { if (m) { m.clockDis = Date.now() + 10 * 60e3; updateStrip(store().now()); } } }, 'Keep the old time');
+    const clockUse = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-use' }, onClick: askClockUse }, 'Use the new time');
+    const clockWrap = h('div', { class: 'fl-strip-bar fl-bar-clock', role: 'alert', hidden: true }, ico('clock', 22), clockT, clockKeep, clockUse);
+    el.appendChild(clockWrap);
     const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear all notices', () => { if (m && m.noteKey) m.dis.add(m.noteKey); return 'snd'; }));
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
@@ -22485,7 +22497,7 @@ a.of-nav:active { background: var(--press); }
     // A visually hidden live region that changes only when a warning is announced (the leader tab), so a screen reader hears each warning once, never the ticking countdown.
     const announce = h('span', { class: 'visually-hidden', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
     el.appendChild(announce);
-    return { el, rows, soundBar: soundWrap, pauseBar: pauseWrap, pauseBtn: pauseBar, announce };
+    return { el, rows, clockBar: clockWrap, clockText: clockT, soundBar: soundWrap, pauseBar: pauseWrap, pauseBtn: pauseBar, announce };
   }
   // Shows the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { showCabinet(true, { batchId }); } catch (e) { console.error('[smokebox] cabinet failed', e); } }
@@ -22531,6 +22543,14 @@ a.of-nav:active { background: var(--press); }
     if (top.level === 4) { tell(PH('expired', { who, many }), 'expired'); return; }
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
     tell(PH('expire', { who, many, mins, goes86: first.goes86, approx: top.level === 2 }), top.level >= 3 ? 'start' : 'expire');
+  }
+  // Asks, in a small box, whether to use the tablet's new time. It needs a second deliberate tap, and "Keep the old time" is the way out.
+  function askClockUse() {
+    const cs = store().status().clockSuspect;
+    if (!cs || !SB.ui || !SB.ui.confirm) return;
+    const days = Math.round(cs.aheadMs / 86400000);
+    SB.ui.confirm({ title: 'Use the new time?', body: 'Timers and ages on every open ticket will jump forward by about ' + (days >= 2 ? days + ' days' : Math.round(cs.aheadMs / 3600000) + ' hours') + '. Only do this if the date and time on this tablet are right.', confirmLabel: 'Use the new time', cancelLabel: 'Keep the old time', tone: 'danger' })
+      .then((yes) => { if (yes) { store().acceptClockJump(); if (m) updateStrip(store().now()); } else if (m) m.clockDis = Date.now() + 10 * 60e3; });
   }
   // Says a cold item's low-time row once when it first shows (or gets worse), in plain words that name the owner's limit.
   // The first pass after the board opens only remembers what is already there, so a reload does not read old news aloud.
@@ -22606,9 +22626,18 @@ a.of-nav:active { background: var(--press); }
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
     // Only one notice shows at a time (the "tap for sound" bar first, then the note); the bar says how many more wait behind it, and
     // its X clears them all. Warning rows above are separate and always show.
-    const soundShown = needSound && !m.dis.has('snd');
+    // A device clock that jumped ahead comes first: it changes every timer on the board. It never hides the tickets.
+    const cs = store().status().clockSuspect;
+    const clockShown = !!cs && Date.now() >= (m.clockDis || 0);
+    if (clockShown) {
+      const dd = Math.round(cs.aheadMs / 86400000);
+      const t = 'This tablet\'s clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(cs.aheadMs / 3600000) + ' hours') + '. Smokebox is still using the old time, so tickets and timers keep running.';
+      if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
+    }
+    setHidden(m.strip.clockBar, !clockShown);
+    const soundShown = needSound && !m.dis.has('snd') && !clockShown;
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
-    const showNote = noteWanted && !soundShown;
+    const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
     const more = (noteWanted ? 1 : 0) + behindSilent;
@@ -22620,7 +22649,7 @@ a.of-nav:active { background: var(--press); }
       const want = updateNote() && note === updateNote() ? 'refresh' : 'volume-off';
       if (m.pauseIcon !== want) { m.pauseIcon = want; const old = m.strip.pauseBtn.firstChild; if (old) old.replaceWith(ico(want, 24)); }
     }
-    setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
+    setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote && !clockShown);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
       setHidden(r.wrap, !d);
@@ -30392,7 +30421,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Closing does not lock anything. You can still take orders, and closing again later includes them. The app's day turns over at 4 am."
+      "x": "Closing does not lock new orders, and closing again later includes them. A paid order from a day you already closed cannot be opened again. The app's day turns over at 4 am."
      },
      {
       "t": "h",
@@ -30435,7 +30464,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "ol",
       "x": [
-       "Open the thrown-out log from the board's menu.",
+       "Open the thrown-out log from the board's menu. It says which period it covers.",
        "Tap **Fix this entry** on the row.",
        "Say what was wrong, add your initials and tap **Save the fix**."
       ]
@@ -30491,14 +30520,34 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "h",
-      "x": "Start over with an empty menu"
+      "x": "Start over"
      },
+     {
+      "t": "p",
+      "x": "To empty your kitchen and begin again with a blank menu, see Start over with an empty menu."
+     },
+     {
+      "t": "h",
+      "x": "Erasing"
+     },
+     {
+      "t": "p",
+      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first."
+     }
+    ]
+   },
+   {
+    "id": "start-over",
+    "group": "guide",
+    "title": "Start over with an empty menu",
+    "summary": "Empty your kitchen and begin again with a blank menu. A backup file is saved first.",
+    "blocks": [
      {
       "t": "ol",
       "x": [
-       "Tap **Settings**. At the bottom, tap **Start over with an empty menu**.",
+       "Tap **Settings**. At the bottom, tap **Start over with an empty menu**. If a PIN is set, the PIN pad opens first.",
        "Read what goes and what stays. Clear **Keep my tax, hours, PIN and station names** to reset those too. Tap **Next: about your backup**.",
-       "This step only explains: the backup is saved at the moment of erasing, and if it fails, nothing is erased. Tap **Next: confirm**.",
+       "Tap **Save my backup file now**. The file downloads before anything is erased. Look in your downloads folder, select **I saved the backup file and I can find it**, then tap **Next: confirm**.",
        "Type ERASE, then tap **Erase everything and start over**.",
        "At \"Done. Your kitchen is empty.\" tap **Save the backup again** or **Go to the first screen**."
       ]
@@ -30508,12 +30557,8 @@ a.of-nav:active { background: var(--press); }
       "x": "There is no undo. To go back, restore the backup file. Left-over old demo tickets get **Clear them** or **Keep them**."
      },
      {
-      "t": "h",
-      "x": "Erasing"
-     },
-     {
       "t": "p",
-      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either."
+      "x": "With a PIN set, the PIN pad opens first. If the backup cannot be saved, nothing is erased."
      }
     ]
    },
@@ -30632,6 +30677,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "ul",
       "x": [
+       "A strip says the tablet's clock jumped ahead? Smokebox keeps the old time, so tickets and timers keep running. Tap **Keep the old time** to hide it for 10 minutes and fix the clock in the device settings. Tap **Use the new time** only if the new time is right. It asks once more before anything changes.",
        "Check the date range and the filters at the top of the Back office page.",
        "Choose **Live only** to leave out the sample history, which is made up.",
        "Unpaid orders are not counted as money collected.",
@@ -30652,7 +30698,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Smokebox saves every change on this device as you go. Open it again the same way, in the same browser, and the board comes back. The clocks kept running while it was closed, and no warning sounded."
+      "x": "Smokebox saves every change as you go. Open it again in the same browser and the board comes back. The clocks kept running, and no warning sounded while it was closed."
      },
      {
       "t": "h",
@@ -30660,7 +30706,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Your data lives only in the browser on one device. Clearing the browser data, using another browser, another file location or a private window shows an empty Smokebox. Restore your last backup (see Backup and restore)."
+      "x": "Your data lives only in the browser on one device. Clearing the browser data, or using another browser or a private window, shows an empty Smokebox. Restore your last backup (see Backup and restore)."
      },
      {
       "t": "h",
@@ -30668,15 +30714,15 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "When you set a PIN, Smokebox shows a recovery code once. Tap **Copy** or **Print**, keep it away from the tablet, select **I saved it**, then tap **Done**. On the PIN pad, open **Forgot the PIN?**, type the recovery code and a new PIN (or leave it empty to remove the PIN), and tap **Reset the PIN with my code**. A PIN from before codes existed can get one: **Settings**, **Tax, hours and PIN**, **Make a recovery code**."
+      "x": "When you set a PIN, a recovery code shows once. Tap **Copy** or **Print**, keep it away from the tablet, select **I saved it**, then tap **Done**. On the PIN pad, open **Forgot the PIN?**, type the recovery code and a new PIN (or leave it empty to remove the PIN), and tap **Reset the PIN with my code**. A PIN from before codes existed can get one: **Settings**, **Tax, hours and PIN**, **Make a recovery code**."
      },
      {
       "t": "p",
-      "x": "No code? The only way back is to clear this site's saved data in your browser settings. That erases everything on this device, including today's tickets and your menu. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before the PIN was set."
+      "x": "No code? The only way back is to clear this site's saved data in your browser settings. That erases everything on this device. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before it was set."
      },
      {
       "t": "p",
-      "x": "Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not real security."
+      "x": "With a PIN set, changing it or making a new recovery code asks for the current PIN. Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not security."
      },
      {
       "t": "h",
@@ -30684,7 +30730,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "That is by design for a new Smokebox. It starts with no dishes, tickets or food in the cabinet, and it never guesses. Add dishes under **Dishes and prices**. If it was full yesterday, see \"The tablet was replaced or cleared\" above."
+      "x": "That is by design for a new Smokebox. It starts with no dishes and never guesses. Add dishes under **Dishes and prices**. If it was full yesterday, see \"The tablet was replaced or cleared\" above."
      },
      {
       "t": "h",
@@ -30695,8 +30741,24 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "Tickets, dishes, settings and the PIN: in this browser on this device only.",
        "Sound, loudness, Day or Night and text size: on this device only.",
-       "Other devices do not see your board. A backup file is the only copy you can move."
+       "Only a backup file can be moved."
       ]
+     }
+    ]
+   },
+   {
+    "id": "saved-data-that-cannot-be-read",
+    "group": "guide",
+    "title": "Saved data that cannot be read",
+    "summary": "What to do when Smokebox says some of its saved data could not be read.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "A message at the top"
+     },
+     {
+      "t": "p",
+      "x": "If a message says some saved records could not be read and were left out, the data as it was is kept. Do not clear the browser data. Ask whoever set up Smokebox. If a full-screen message says the saved data could not be read, tap **Download the old data** or **Show the data so I can copy it**. Only then can you continue."
      }
     ]
    },
@@ -38130,26 +38192,38 @@ a.of-nav:active { background: var(--press); }
   // damaged text is offered as a file; nothing is written over it until the person says they have saved it.
   function showHeldData(text) {
     const wrap = doc.createElement('div');
-    wrap.id = 'held-data'; wrap.setAttribute('role', 'alertdialog');
-    wrap.style.cssText = 'position:fixed;inset:0;overflow:auto;padding:16px;background:#F5F2EB;color:#1E2224;font-family:system-ui,sans-serif;z-index:99999';
+    wrap.id = 'held-data'; wrap.setAttribute('role', 'alertdialog'); wrap.setAttribute('aria-labelledby', 'held-data-h');
+    // Follows the tablet's look: Night colors and Large text apply here too, so the screen reads the same as the board behind it.
+    let night = false, large = false;
+    try { night = !!(SB.theme && SB.theme.get && SB.theme.get() === 'night'); large = !!(SB.theme && SB.theme.textSize && SB.theme.textSize() === 'large'); } catch (e) { /* default look */ }
+    wrap.style.cssText = 'position:fixed;inset:0;overflow:auto;padding:16px;font-family:system-ui,sans-serif;z-index:99999;font-size:' + (large ? '120%' : '100%') + ';background:' + (night ? '#1E2224' : '#F5F2EB') + ';color:' + (night ? '#F5F2EB' : '#1E2224');
     const card = doc.createElement('div'); card.className = 'error-card';
-    const h2 = doc.createElement('h2'); h2.textContent = 'Your saved data could not be read, and could not be kept safe';
+    if (night) card.style.cssText = 'background:#2B3033;color:#F5F2EB;border-color:#6B7478';
+    const h2 = doc.createElement('h2'); h2.id = 'held-data-h'; h2.textContent = 'Your saved data could not be read, and could not be kept safe';
     const p = doc.createElement('p'); p.textContent = 'This browser is too full to set the old data aside, so Smokebox has not touched it. Nothing new will be saved on this device until you choose below. Download the old data now and keep the file. Then free some space, or continue and let Smokebox replace the old data.';
-    const row = doc.createElement('div'); row.className = 'row';
-    const dl = doc.createElement('button'); dl.type = 'button'; dl.className = 'btn btn-primary'; dl.textContent = 'Download the old data';
+    const row = doc.createElement('div'); row.className = 'row'; row.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-top:12px';
+    const bstyle = 'min-height:48px;flex:1 1 220px';
+    const dl = doc.createElement('button'); dl.type = 'button'; dl.className = 'btn btn-primary'; dl.style.cssText = bstyle; dl.textContent = 'Download the old data';
+    const show = doc.createElement('button'); show.type = 'button'; show.className = 'btn'; show.style.cssText = bstyle; show.textContent = 'Show the data so I can copy it';
+    const go = doc.createElement('button'); go.type = 'button'; go.className = 'btn'; go.style.cssText = bstyle; go.textContent = 'I have the file: continue and replace it';
+    const hint = doc.createElement('p'); hint.setAttribute('role', 'status'); hint.style.cssText = 'margin-top:8px;font-size:90%'; hint.textContent = 'The last button turns on after you download the data or show it to copy.';
+    const box = doc.createElement('textarea'); box.readOnly = true; box.hidden = true; box.value = text; box.rows = 8; box.style.cssText = 'width:100%;margin-top:12px';
+    box.setAttribute('aria-label', 'The old data, to copy by hand');
+    // The way forward is only offered once the person has the old data in hand (downloaded or shown), so it cannot be replaced by a stray tap.
+    go.disabled = true; go.setAttribute('aria-disabled', 'true');
+    const unlock = () => { go.disabled = false; go.setAttribute('aria-disabled', 'false'); hint.textContent = 'Keep the file somewhere safe, then continue.'; };
     dl.addEventListener('click', () => {
       try {
         const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' }));
         const a = doc.createElement('a'); a.href = url; a.download = 'smokebox-damaged-data.json'; doc.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => { try { g.URL.revokeObjectURL(url); } catch (e) { /* ignore */ } }, 5000);
-      } catch (e) { box.hidden = false; box.focus(); }
+        unlock();
+      } catch (e) { box.hidden = false; box.focus(); hint.textContent = 'The download did not work here. Copy the data from the box below, then continue.'; unlock(); }
     });
-    const go = doc.createElement('button'); go.type = 'button'; go.className = 'btn'; go.textContent = 'I have the file: continue and replace it';
-    go.addEventListener('click', () => { try { SB.store.releaseHold(); } catch (e) { /* ignore */ } wrap.remove(); });
-    const box = doc.createElement('textarea'); box.readOnly = true; box.hidden = true; box.value = text; box.rows = 8; box.style.cssText = 'width:100%;margin-top:12px';
-    box.setAttribute('aria-label', 'The old data, to copy by hand');
-    row.append(dl, go);
-    card.append(h2, p, row, box);
+    show.addEventListener('click', () => { box.hidden = false; box.focus(); box.select(); unlock(); });
+    go.addEventListener('click', () => { if (go.disabled) return; try { SB.store.releaseHold(); } catch (e) { /* ignore */ } wrap.remove(); });
+    row.append(dl, show, go);
+    card.append(h2, p, row, hint, box);
     wrap.appendChild(card);
     doc.body.appendChild(wrap);
     try { dl.focus(); } catch (e) { /* ignore */ }
@@ -38162,6 +38236,8 @@ a.of-nav:active { background: var(--press); }
       try {
         const s = SB.store.status();
         if (s.clockWrong && !toldWrong && SB.ui && SB.ui.toast) { toldWrong = true; SB.ui.toast("This device's clock looks wrong: some saved times are far ahead of it. Smokebox kept the device clock. Check the date and time in the device's settings.", { tone: 'warn', ms: 20000 }); }
+        // On the board the calm strip notice asks instead (a box over the screen would block tickets).
+        if (SB.floor && SB.floor.isMounted && SB.floor.isMounted()) return;
         if (!s.clockSuspect || asking || !SB.ui || !SB.ui.confirm) return;
         asking = true;
         const days = Math.round(s.clockSuspect.aheadMs / 86400000);
