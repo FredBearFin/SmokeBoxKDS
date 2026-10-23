@@ -15,3 +15,8 @@ Re-ran `tools/extract-strings.mjs` on `kds/connected` af5d394. Most new strings 
 
 ## Checked and fine
 Follower chip words (Connected, Reconnecting..., Out of date since), "This screen only shows the kitchen.", the Readings sheet, the equipment and thermometer entries, the fridge-limit and out-of-fridge messages. No UK spellings other than "tick". No safe, compliant or guarantee words.
+
+## Round 19 rows (connected 82d109f)
+- A2 `77-floor-setup.js:1465`: "stays safe on this tablet" is a claim. Say "stays untouched on this tablet".
+- One word for the other machine. The sheets say "hub" (77:1381-1394), the board says "the kitchen" (70:2080-2087), and the office says "main screen" (84-office-data.js:1409-1410, 87-office-closeday.js:158, 82-office-money.js:823), "main computer" (84-office-data.js:1409-1410) and "hub computer" (20-engine.js:88). An owner cannot tell these are the same thing. Suggest "the hub computer" for the machine, "the kitchen" for the shared kitchen (A2, A3, A5).
+- Checked and fine: Last known, Offline, Sending, Not confirmed yet, Not done:, Reload to update, Reset the offline copy, Opens without the internet, A new version is ready, the undo refusal.
