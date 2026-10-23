@@ -80,6 +80,13 @@ for (const [w, h] of SIZES) for (const [theme, text] of LOOKS) {
     await snap('startover-2', async () => { await page.evaluate(() => SB.sheets.open('startover')); await page.waitForTimeout(300); await page.click('[data-act=so-next1]'); });
     await snap('startover-3', async () => { await page.evaluate(() => SB.sheets.open('startover')); await page.waitForTimeout(300); await page.click('[data-act=so-next1]'); await page.click('[data-act=so-next2]'); });
     await snap('demo-intro', async () => { await page.evaluate(() => SB.sheets.open('demo')); });
+    // Round 18: screens added since the last sweep. The cold ingredient and cook-ahead are set up by the earlier snaps on this page.
+    await snap('settings-menu', async () => { await page.evaluate(() => SB.sheets.open('menu')); });
+    await snap('readings', async () => { await page.evaluate(() => { SB.store.dispatchEx('updateSettings', { patch: { modules: { cookAhead: true } } }, { source: 'ui' }); SB.sheets.open('readings'); }); });
+    await snap('discards', async () => { await page.evaluate(() => SB.sheets.open('discards')); });
+    await snap('cabinet-cold', async () => { await page.evaluate(() => { const s = SB.store.getState(); const ing = Object.values(s.inventory || s.ingredients || {}).find((x) => x && x.name === 'Coleslaw') || (s.ingredients || []).find((x) => x.name === 'Coleslaw'); if (ing) SB.store.dispatchEx('addBatch', { ing: ing.id, tempF: 38, cookedG: 3000, src: 'cook' }, { source: 'ui' }); }); const tab = page.locator('button', { hasText: 'Cabinet' }).first(); if (await tab.count()) await tab.click(); });
+    await snap('counter-board', async () => { await page.locator('button', { hasText: /^All/ }).first().click().catch(() => {}); await page.evaluate(() => { SB.store.dispatchEx('updateSettings', { patch: { service: { counter: true } } }, { source: 'ui' }); const id = SB.store.getState().menu.find((m) => !m.archived).id; SB.store.dispatchEx('createTicket', { customer: 'Front', items: [{ menuId: id, qty: 2 }] }, { source: 'ui' }); }); });
+    await snap('data-page', async () => { await page.evaluate(() => { location.hash = '#/office/data'; }); await page.waitForTimeout(500); const pad = page.locator('button', { hasText: /^1$/ }); if (await pad.count()) { for (const d of ['1', '2', '3', '4']) await page.locator('button', { hasText: new RegExp('^' + d + '$') }).first().click(); await page.waitForTimeout(600); } const rep = page.locator('summary, button', { hasText: /Pilot report/ }).first(); if (await rep.count()) await rep.click().catch(() => {}); });
   });
 }
 fs.writeFileSync(path.join(OUT, 'audit.json'), JSON.stringify(results, null, 1));

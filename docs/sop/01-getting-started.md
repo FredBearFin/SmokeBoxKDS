@@ -36,4 +36,4 @@ Smokebox only writes down how the order was paid. It never charges a card.
 
 ## 5. Save a backup
 
-Tap **Back office**, then **Menu and settings**. Find Data, backup and reset and tap **Download backup (JSON)**. Keep a copy off this device: email it to yourself or put it on a USB drive.
+Tap **Back office**, then **Menu and settings**. Find Data, backup and reset and tap **Download backup (JSON)**. This saves a file. Keep a copy off this device: email it to yourself or put it on a USB drive.

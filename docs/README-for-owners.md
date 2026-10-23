@@ -21,6 +21,8 @@ The in-app **Guide** (Settings, then Guide) has short pages and printable checkl
 
 Questions first-time owners ask (internet, a dead tablet, two tablets, cost, food-safety records) are answered in docs/owner-faq-support.md.
 
+One-page start for a new owner: docs/owner-quick-start.md.
+
 ## Who to ask
 
 Ask the person who set Smokebox up for you. A support contact for owners has not been settled yet (see docs/commercial-decisions.md, item 5). If something goes wrong first, the Guide's Troubleshooting page and its "When something goes wrong" card cover sound, sleep, missing dishes, lost data and the PIN.

@@ -1,6 +1,6 @@
 # Setup recipes
 
-Four ways to set up Smokebox. Pick the one closest to your place. Each uses only what the app has: a few stations, one cooking-ahead switch and counted dishes.
+Four ways to set up Smokebox. Pick the one closest to your place. Each uses only what the app can do today. A station is a place in your kitchen, like the grill or the cold counter.
 
 ## Counter cafe or bakery
 
@@ -19,7 +19,7 @@ Every order makes a ticket. With Counter service on, a paid order's ticket clear
 
 - Stations: rename the starting stations (Kitchen, Prep, Fryer, Cold and drinks) to match your line. Expo stays.
 - Settings: choose **Dine-in** and a table on each order. Set a PIN to keep cooks out of the back office.
-- The board: a station gets a tab once a dish is made there. Each cook opens their tab and sees only their dishes. Expo sees whole tickets, each dish tagged with its station, and taps **Bump** when the plate is complete.
+- The board: a station gets a tab once a dish is made there. Each cook opens their tab and sees only their dishes. Expo is the person who checks and packs whole orders. Expo sees whole tickets, each dish tagged with its station, and taps **Bump** when the plate is complete.
 
 ## Kitchen that cooks food ahead
 
