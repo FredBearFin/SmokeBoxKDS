@@ -521,3 +521,14 @@ test('thresholds: build uses the owner list from settings, and rungsFor still wo
   assert.deepEqual(f.rungsMin, [50, 25, 8]);
   assert.equal(f.rung, 2, '20 minutes left is past the 50 and 25 minute rungs');
 });
+
+test('batch waste time-steps: a younger batch sells only after the older one runs out or expires', () => {
+  // 1 unit an hour. A: 10 units, in at 0, gone at 3 h. B: 10 units, in at 1 h, ready at 2 h, gone at 8 h.
+  // A sells 3 in its 3 hours; B sells 5 from 3 h to 8 h, so B wastes 5, not 7.
+  const w = D.batchWaste([
+    { id: 'A', remainingG: 10, enteredAt: T0, readyAt: T0, expAt: T0 + 3 * HR },
+    { id: 'B', remainingG: 10, enteredAt: T0 + HR, readyAt: T0 + 2 * HR, expAt: T0 + 8 * HR },
+  ], 1 / HR, T0);
+  assert.ok(Math.abs(w.A - 7) < 1e-6, 'A wastes 7: ' + w.A);
+  assert.ok(Math.abs(w.B - 5) < 1e-6, 'B wastes 5: ' + w.B);
+});

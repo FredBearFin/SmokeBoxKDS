@@ -153,12 +153,14 @@
   // ingredient can have both: leftoverG (grams in batches still alive at close) and unmetG (demand nobody could
   // serve). Also runOutAt (the first moment demand went unserved), runOutCause ('rest-gap' when a batch is still
   // resting and ready later, gapEndAt; 'limit' when a batch passing its limit ended the supply, limitBatchId and
-  // limitQuality; else 'stock'), and wasteBefore (grams that passed their limit before close).
+  // limitQuality; else 'stock'), wasteBefore (grams that passed their limit before close) and wasteById (the same
+  // grams per batch id).
   function sweepToClose(batches, rate, now, closeAt) {
     const bs = batches.map((b) => ({ rem: b.remainingG, ent: b.enteredAt, ready: Math.max(now, b.readyAt || 0), exp: b.expAt, id: b.id, quality: !!b.quality })).sort((x, y) => x.ent - y.ent);
     const marks = new Set([now, closeAt]);
     for (const b of bs) for (const t of [b.ready, b.exp]) if (t > now && t < closeAt) marks.add(t);
     const times = Array.from(marks).sort((x, y) => x - y);
+    const wasteById = Object.create(null);
     let unmet = 0, gapUnmet = 0, runOutAt = null, wasteBefore = 0, cause = null, gapEndAt = null, limitBatchId = null, limitQuality = false, lastLimit = null;
     for (let i = 0; i + 1 < times.length; i++) {
       const a = times[i], z = times[i + 1], dem = rate * (z - a);
@@ -175,10 +177,17 @@
         unmet += need;
         if (cause === 'rest-gap' && z <= gapEndAt) gapUnmet += need;
       }
-      for (const b of bs) if (b.exp <= z && b.rem > 0) { wasteBefore += b.rem; b.rem = 0; if (!lastLimit || b.exp >= lastLimit.exp) lastLimit = { exp: b.exp, id: b.id, quality: b.quality }; }
+      for (const b of bs) if (b.exp <= z && b.rem > 0) { wasteBefore += b.rem; if (b.id != null) wasteById[b.id] = (wasteById[b.id] || 0) + b.rem; b.rem = 0; if (!lastLimit || b.exp >= lastLimit.exp) lastLimit = { exp: b.exp, id: b.id, quality: b.quality }; }
     }
     const alive = bs.reduce((acc, b) => acc + (b.exp > closeAt ? b.rem : 0), 0);
-    return { leftoverG: alive, unmetG: unmet, gapUnmetG: gapUnmet, runOutAt, runOutCause: cause, gapEndAt, limitBatchId, limitQuality, wasteBefore };
+    return { leftoverG: alive, unmetG: unmet, gapUnmetG: gapUnmet, runOutAt, runOutCause: cause, gapEndAt, limitBatchId, limitQuality, wasteBefore, wasteById };
+  }
+  // Grams of each batch the pace will not sell before that batch's own limit, keyed by batch id. Runs the same
+  // time-stepped sweep as the close check, but past close to the last limit, so a younger batch only sells once the
+  // older ones are gone or expired. Each batch is { id, remainingG, enteredAt, readyAt, expAt }.
+  function batchWaste(batches, rate, now) {
+    const end = batches.reduce((m, b) => Math.max(m, b.expAt), now) + 1;
+    return sweepToClose(batches, rate, now, end).wasteById;
   }
   // Whether a new batch started now would be ready before close: now + cook time + rest time against closing. Returns
   // null when the product has no cook time, else { readyAt, fits }.
@@ -254,32 +263,28 @@
       const name = ing ? ing.name : ingId;
       const list = byIng[ingId].slice().sort((a, b) => a.enteredAt - b.enteredAt);
       const rungs = rungsFor(ingId, state.settings), rate = sales.rate[ingId];
-      // Only batches that have finished resting can be sold, so the run-out total counts those alone.
-      const isReady = (b) => !(U.isNum(b.restUntil) && b.restUntil > now);
-      let soldBefore = 0, totalLeft = 0;
-      for (const b of list) if (isReady(b)) totalLeft += b.remainingG;
       // The close sweep first: a quality limit that ends the supply is told in that batch's own expiry row.
       const ci = rate !== undefined ? closeInfo(state, ing, list, rate, now, S) : null;
       const lim = ci && ci.r.runOutCause === 'limit' && ci.r.limitQuality && ci.r.unmetG >= NOTABLE_G ? ci.r : null;
       const limSb = lim ? startBy(ing, now, lim.runOutAt, lim.unmetG) : null;
-      list.forEach((b, i) => {
-        // A quality limit is a house rule: the batch passes it and waits for a taste test. A kept batch counts down
-        // to the end of its extension instead.
+      // A quality limit is a house rule: the batch passes it and waits for a taste test. A kept batch counts down
+      // to the end of its extension instead.
+      const expInfo = (b) => {
         const hardAt = b.enteredAt + (U.isNum(S.hardCapH) ? S.hardCapH : S.defaultMaxHoldH) * H, limAt = b.enteredAt + E()._internal.holdLimitMs(b, S);
         const q = b.holdBasis === 'quality' && limAt < hardAt;
-        const exp = q && U.isNum(b.keepUntil) && b.keepUntil > now ? Math.min(b.keepUntil, hardAt) : limAt;
+        return { q, exp: q && U.isNum(b.keepUntil) && b.keepUntil > now ? Math.min(b.keepUntil, hardAt) : limAt };
+      };
+      // WATCH OUT: per-batch waste must time-step like the close sweep. Subtracting older batches' sales over this
+      // batch's whole window overstates waste when an older batch expires first.
+      const wasteBy = rate !== undefined ? batchWaste(list.map((b, i) => ({ id: i, remainingG: b.remainingG, enteredAt: b.enteredAt, readyAt: b.restUntil, expAt: expInfo(b).exp })), rate, now) : null;
+      list.forEach((b, i) => {
+        const { q, exp } = expInfo(b);
         const msLeft = exp - now;
         const rung = rungOf(msLeft, rungs);
         const lastOne = list.length === 1;
-        // How much of this batch the sales pace will clear before it expires, after the older batches took theirs.
-        let sold = 0, waste = null;
-        if (rate !== undefined) {
-          // A batch that is still resting can only sell from the moment it is ready.
-          const sellMs = Math.max(0, exp - Math.max(now, isReady(b) ? now : b.restUntil));
-          sold = Math.max(0, Math.min(b.remainingG, rate * sellMs - soldBefore));
-          waste = b.remainingG - sold;
-          soldBefore += sold;
-        }
+        // How much of this batch the sales pace will not clear before it expires, oldest batch served first. A batch
+        // that is still resting only sells from the moment it is ready.
+        const waste = wasteBy ? (wasteBy[i] || 0) : null;
         // A few hundred grams left is not worth a warning: the row still shows but never sounds.
         const trivial = b.remainingG < TRIVIAL_G || (waste != null && waste < NOTABLE_G && waste < NOTABLE_SHARE * b.remainingG);
         const usd = waste != null && U.isNum(b.costPerCookedKg) ? waste / 1000 * b.costPerCookedKg : null;
@@ -818,5 +823,5 @@
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { spoken, clipWords, delivery, numWords, voiceInfo, build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
+  SB.deadlines = { spoken, clipWords, delivery, numWords, voiceInfo, build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, batchWaste, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
