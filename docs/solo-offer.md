@@ -1,7 +1,5 @@
 # Smokebox Solo: the first sellable offer (draft for Freddy to approve)
 
-> Refreshed for the current build. The owner-facing version is `docs/pilot/offer-one-pager.md`. Price, support and terms are still undecided. Nothing here has been tried on a real tablet.
-
 Scope is **Solo only**. Anything not listed under "What you get" is not part of the offer.
 
 ## What you get
@@ -9,8 +7,8 @@ Scope is **Solo only**. Anything not listed under "What you get" is not part of 
 - Kitchen board with batch warnings (strip, tones, spoken calls), hold cabinet, 86 board, order entry, payment **recording**, and the back office pages.
 - Far display mode (Settings, Far display) for a TV or a tablet read from across the kitchen.
 - A first run that starts **empty**: no batches, no tickets, no sample history. Nothing pretend is mixed in with the kitchen's real data.
-- A **demo** for showing the app to staff: tap Try the demo (on the empty board or in Settings). It opens a separate demo kitchen with sample dishes, sample tickets and sample history, labeled Demo, and **Back to my kitchen** returns to the real one untouched.
-- **Setup tools:** Add your first dish, an optional menu import (spreadsheet or Square, Toast, Clover and Lightspeed exports), Start over with an empty menu (it saves a backup first), counter service and your own order buttons (Settings, How you serve), a currency symbol, and a PIN that shows a recovery code once.
+- A **demo** for showing the app to staff: Try the demo (on the empty board or in Settings) opens a separate demo kitchen with sample dishes, tickets and history, labeled Demo. Back to my kitchen returns to the real one, untouched.
+- Setup tools: Add your first dish, an optional menu import (a spreadsheet, or Square, Toast, Clover or Lightspeed item exports), Start over with an empty menu (it saves a backup first), counter service and order buttons (Settings, How you serve), a currency symbol, and a PIN that shows a recovery code once.
 - A backup and restore of your data, a discard log, and a pilot report.
 
 ## What it is not (say this in every sales conversation)
@@ -29,10 +27,10 @@ Scope is **Solo only**. Anything not listed under "What you get" is not part of 
 
 The pilot fills in the real column: device model, OS and browser version, speaker, result of the tests in `docs/pilot-readiness.md`.
 
-## Setup (about 30 minutes on site; the visit plan aims for 15, which is an estimate and not measured)
+## Setup (about 30 minutes on site)
 1. Copy `smokebox.html` to the device and open it; install it as an app (Share, Add to Home Screen, or Install app).
 2. Settings, **Set up this tablet** (seven steps: sound, screen on, protected data, installed, placement, dishes, hold limits).
-3. Enter real products, costs and hold limits. The pit and hold cabinet are empty until the cook logs a real batch, so items that need cooked meat show as 86 until then; confirm quality versus safety limits with the owner.
+3. Enter real products, costs and hold limits. The cabinet is empty until the cook logs a real batch, so dishes that use a cooked-ahead item show as 86 until then. Confirm each quality limit and throw-out time with the owner.
 4. Set service hours. The app starts empty, so there is nothing to clear; if you showed the demo, tap Back to my kitchen. To clear a kitchen you tried out, use **Erase tickets and records** (settings are kept) or Start over with an empty menu. The report warns if demo orders or the demo clock were left on.
 5. Take a first backup.
 
@@ -52,9 +50,3 @@ Decision needed (see `docs/commercial-decisions.md`): proposed default is that F
 - Pilot: Freddy on call during the observed service, then email or text with a next-business-day reply.
 - Covered: installing, restoring a backup, explaining a setting or a warning.
 - Not covered: the tablet, speaker, Wi-Fi, power, the owner's food-safety procedures, POS or payment hardware, any integration.
-
-## Cold items and limits
-Cold food kept in a fridge has two limits the owner types: days in the fridge and hours out of the fridge. Smokebox has no pre-filled number for these and says so. Every hold limit is the owner's, from their local health department.
-
-## Server and tunnel
-The Solo offer is one file on one tablet. The hub in `server/` is a prototype for a later connected mode and is not sold. The install and tunnel scripts were security-reviewed (`docs/audit/server-security-review.md`) but not run on a live machine.

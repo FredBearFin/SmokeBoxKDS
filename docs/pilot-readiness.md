@@ -3,7 +3,7 @@
 Nothing in the automated QA proves real-world safety or that a warning can be heard. This list is the proof, done on the kitchen's own hardware. Record every result; a "no" is a finding, not something to talk around.
 
 Pilot target customer (fill in before choosing a kitchen): ______________ (for example: counter-service BBQ with a pit, one to three cooks, owner on site).
-Monthly price quoted: $______ (blank until Freddy decides) (must match `docs/pilot-protocol.md`).
+Monthly price quoted: $______ (must match `docs/pilot-protocol.md`).
 
 ## A. Device and warning tests (on the actual tablet, speaker, browser and kitchen network)
 Device ______ OS/browser version ______ speaker ______ Wi-Fi/none ______
@@ -28,15 +28,15 @@ If the sleep or hidden tests lose a warning in a way the kitchen cannot live wit
 
 ## B. Food-safety settings
 - Hold limits and temperature-check interval checked against the **local health department** (name and date of the person or document): ______________
-- Each product marked **quality limit** or **throw-out time** with the owner. The limits for cold items (days in the fridge, hours out) are typed by the owner from the health department; none is pre-filled.
+- Each product marked **quality limit** or **throw-out time** with the owner. Cold items use days in the fridge and hours out of the fridge that the owner types; the app pre-fills none.
 - The owner has read this sentence and agrees: "Smokebox is a helper and does not replace required food-safety procedures, logs or inspections."
 - A cook follows their own rules if the app is wrong; the observer says so aloud before service.
 
-## B2. New since the first checklist (also test on the tablet)
-- Start from an empty kitchen: Add your first dish, then import a menu file if the owner has one.
-- Set a PIN, write down the recovery code, then use Forgot the PIN to check the code works.
-- Take a backup, then restore it on a second browser profile.
-- Make a cold item with limits and a batch; tap Take out and Put back.
+## B2. Also test on the tablet (features added since)
+- Start from an empty kitchen, add a dish, import a menu file.
+- Set a PIN, write down the recovery code, then use Forgot the PIN with it.
+- Take a backup and restore it on a second browser profile.
+- Make a cold item with limits and a batch, then Take out and Put back.
 
 ## C. Go / no-go
 Go only if every row in A passes or has a written workaround the owner accepts, and B is complete. Then run `docs/pilot-protocol.md`.

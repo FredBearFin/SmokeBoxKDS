@@ -21,7 +21,7 @@ Say in every call: Smokebox is a helper, not a food-safety system. If the app an
 2. Install it as an app (browser menu, Install app or Add to Home Screen).
 3. First run is an empty kitchen: no batches, no tickets, no sample history. That is correct. The board shows New ticket, a walkthrough and a demo button.
 4. Settings, **Set up this tablet**: sound, screen on, protected data, installed, placement, dishes, hold limits.
-5. Enter real products, costs and hold limits. Confirm each hold limit as quality or safety with the owner.
+5. Enter real products, costs and hold limits. Confirm each hold limit as a quality limit or a throw-out time with the owner.
 6. Set service hours. Do not leave the demo running: the demo adds pretend tickets and a stocked pit; use Demo and clock, then **Erase tickets and records** to clear it.
 7. Back office, Data: **Download backup (JSON)** once, and save it somewhere that is not this device.
 
@@ -59,7 +59,7 @@ Proposal (not decided, see `docs/commercial-decisions.md` row 6): send a new `sm
 | Two screens show different things | Solo has no sync | Explain: one device is the kitchen board; the other is a separate copy |
 | Sound from two tabs | Two tabs of the app open | Close the extra tab; only one makes sound |
 | Everything is 86 or meat is "expired" | Batches never logged, or a demo batch was left in the pit | Check the Hold cabinet; discard demo batches; log real batches |
-| Text is too small to read | Screen size or distance | Settings, Far display (big type, quiet board); the size options in Menu |
+| Text is too small to read | Screen size or distance | Settings, Far display (big type, quiet board); the size options in Settings |
 | "Storage is full" message | Browser quota | Download a backup, then Erase tickets and records; the app trims the oldest history itself |
 | Back office asks for a PIN nobody remembers | PIN set earlier | No PIN recovery path has been verified. Ask the owner to look for a backup made before the PIN was set; a restore replaces everything including the PIN, so confirm first. Write down what you tried (this is a gap to fix) |
 
