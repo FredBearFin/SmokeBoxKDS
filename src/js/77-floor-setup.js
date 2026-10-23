@@ -1431,7 +1431,7 @@
     const hName = h('input', { type: 'text', class: 'input', id: 'hu-name', autocomplete: 'off', maxlength: 20, placeholder: 'Pass, Front counter...', 'aria-label': 'Name for this screen', dataset: { field: 'hub-name' } });
     const hMsg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'hub-msg' } });
     const choiceBox = h('div', { class: 'fw-choice', dataset: { role: 'choice' }, hidden: true });
-    const hStatus = h('p', { class: 'fs-sub fw-status', role: 'status', dataset: { role: 'hub-status' } });
+    const hStatus = h('p', { class: 'fs-sub fw-hubstatus', role: 'status', dataset: { role: 'hub-status' } });
     let probed = null, picked = '', lastFields = null;
     // Reads and checks the three fields; returns {url, code, name} or null after saying what is wrong.
     function hubFields() {
