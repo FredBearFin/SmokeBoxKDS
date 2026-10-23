@@ -34,6 +34,7 @@ check('tablet B says Connected', await until(async () => /Connected/.test((await
 const c0 = await chip(A);
 check('the chip is small and calm (under 36 px tall)', c0 && c0.h < 36, c0);
 check('a tablet in hub mode is not a read-only follower and can take orders', await A.p.evaluate(() => document.documentElement.dataset.follow !== 'on' && !!document.querySelector('.fl-new') && document.querySelector('.fl-new').offsetParent !== null));
+check('no "not saving" banner and no demo wording in hub mode', !/not saving|try the demo|Demo orders/i.test(await A.p.evaluate(() => document.body.innerText)));
 check('nothing demo-only shows in hub mode', await A.p.evaluate(() => ['.fl-demo-chip', '.fl-start-demo', '.fl-tool[data-tool="demo"]'].every((s) => [...document.querySelectorAll(s)].every((e) => e.offsetParent === null))));
 await A.p.evaluate(() => SB.floor.setWelcome(false)); await B.p.evaluate(() => SB.floor.setWelcome(false));
 

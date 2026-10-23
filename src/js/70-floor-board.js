@@ -1982,7 +1982,7 @@
     const title = firstRun ? 'Welcome. Let\'s build your menu.' : stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
     const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
-      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
+      : hubOn ? 'New orders land here the moment they are sent, from this tablet or any other screen in the kitchen.' : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
     if (following) { const sg = 'follow|' + zone + '|' + stationBusy; if (e.dataset.sig === sg) return; e.dataset.sig = sg; U.clear(e); e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.')); return; }
     const cardUp = !!(m.welcome && !m.welcome.hidden);
     const sig = title + '|' + text + '|' + cardUp;
