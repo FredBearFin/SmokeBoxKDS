@@ -2076,6 +2076,8 @@
     }
     // After a reload with the hub unreachable the board shows the last copy it had; it says so until the first live update.
     if (st.lastKnown && st.state !== 'connected' && st.state !== 'sending') return { tone: 'wait', text: 'Last known' + (st.lastKnownAt ? ', from ' + U.fmtTime(st.lastKnownAt) : '') + '. Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
+    // A screen the owner removed (or that was never paired) is told so in plain words, not just shown as offline.
+    if (st.error === 'revoked' || st.error === 'unpaired') return { tone: 'bad', text: st.reason || 'This screen was removed from the kitchen.', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
     if (st.state === 'offline' || st.state === 'error') return { tone: 'wait', text: 'Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
     if (st.state === 'connecting') return { tone: 'wait', text: 'Connecting...', sub: n ? n + ' waiting' : '', unsent: n };
     if (n > 0) return { tone: 'wait', text: 'Sending ' + n + '...', sub: '', unsent: n };

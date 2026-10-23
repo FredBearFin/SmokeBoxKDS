@@ -4151,12 +4151,36 @@
   }
 
   /* ======================================================================================================
+   * 18b. Trimmed copy for a screen that does not need the whole history
+   * ==================================================================================================== */
+  // Makes a smaller copy of a kitchen for a read-mostly screen: every open order and active ticket, everything newer than the last `days` days, the menu,
+  // ingredients, settings, batches, counters and the ledger as they are, and only the recent events and safety entries. The hub keeps everything; this
+  // never changes the state it is given. The second result says what was left out, so a page can say "Showing the last N days".
+  function trimState(state, now, days) {
+    if (!isState(state) || !isNum(now) || !isNum(days) || days < 1) return { state, trimmed: null };
+    const since = now - days * 86400000;
+    // True when a record was made inside the window.
+    const recent = (x) => isNum(x && x.createdAt) && x.createdAt >= since;
+    const keepOrder = new Set();
+    for (const o of state.orders) if (o.status === 'open' || recent(o)) keepOrder.add(o.id);
+    // True when a ticket is open work, recent, or belongs to an order that stays.
+    const keepTicket = (t) => t.status === 'active' || recent(t) || (t.orderId !== undefined && keepOrder.has(t.orderId));
+    for (const t of state.tickets) if (keepTicket(t) && t.orderId !== undefined) keepOrder.add(t.orderId);   // a kept ticket keeps its order
+    const tickets = state.tickets.filter(keepTicket), orders = state.orders.filter((o) => keepOrder.has(o.id));
+    const evs = Array.isArray(state.events) ? state.events.filter((e) => isNum(e.t) && e.t >= since) : [];
+    const keep = Array.isArray(state.safetyKeep) ? state.safetyKeep.filter((e) => isNum(e.t) && e.t >= since) : [];
+    const cut = { tickets: state.tickets.length - tickets.length, orders: state.orders.length - orders.length, events: (Array.isArray(state.events) ? state.events.length : 0) - evs.length + (Array.isArray(state.eventArchive) ? state.eventArchive.reduce((n, c) => n + (Array.isArray(c) ? c.length : 0), 0) : 0) };
+    const out = Object.assign({}, state, { tickets, orders, events: evs, eventArchive: [], safetyKeep: keep });
+    return { state: out, trimmed: { since, days, left: cut } };
+  }
+
+  /* ======================================================================================================
    * 19. Exports
    * ==================================================================================================== */
   // The public door: everything other files may use. _internal is for tests and tools.
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
-    pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
+    pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, trimState, serialize, deserialize, allEvents, prune,
     channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),

@@ -112,6 +112,10 @@
   function startOffline() {
     try { if (SB.offline && typeof SB.offline.register === 'function') SB.offline.register(); } catch (e) { /* offline loading is optional */ }
   }
+  // The ?trim=<days> in the address (opt-in smaller copy for a screen that does not need the whole history), or 0.
+  function trimDays() {
+    try { const m = /[?&]trim=(\d{1,3})(?=&|$|#)/.exec(g.location.search || ''); const n = m ? Number(m[1]) : 0; return n >= 1 && n <= 365 ? n : 0; } catch (e) { return 0; }
+  }
   // Starts a follower screen: connects to the hub, then shows the board. A hub that is only unreachable still opens the board
   // (it keeps trying); a wrong code, a wrong address or a hub of another version shows a plain message instead.
   function bootFollower(kind) {
@@ -133,7 +137,7 @@
       wrap.className = 'follow-fail';
       wrap.setAttribute('role', 'alert');
       const h2 = doc.createElement('h2'); h2.textContent = kind === 'hub' ? 'This tablet could not join the kitchen' : 'This screen could not follow the kitchen';
-      const p = doc.createElement('p'); p.textContent = words[res.error] || 'The kitchen could not be reached or answered with an error.';
+      const p = doc.createElement('p'); p.textContent = words[res.error] || res.reason || (res.status && res.status.reason) || 'The kitchen could not be reached or answered with an error.';
       const back = doc.createElement('button'); back.type = 'button'; back.className = 'btn btn-primary btn-lg'; back.textContent = 'Back to my own kitchen';
       back.addEventListener('click', () => { try { if (SB.setup && SB.setup.leaveFollow) SB.setup.leaveFollow(); else g.location.href = g.location.pathname; } catch (e) { g.location.href = g.location.pathname; } });
       wrap.append(h2, p, back);
@@ -144,7 +148,7 @@
     if (!SB.store || typeof SB.store[starter] !== 'function') { fail({ error: 'noFollower' }); return; }
     let p;
     // The browser's own fetch must be called on the page, so it is handed over wrapped.
-    try { p = SB.store[starter](Object.assign({ url: f.url, code: f.code, fetch: (u, o) => g.fetch(u, o), AbortController: g.AbortController, TextDecoder: g.TextDecoder }, kind === 'hub' ? { adopt: 'hub' } : {})); } catch (e) { fail({ error: 'unreachable' }); return; }
+    try { p = SB.store[starter](Object.assign({ url: f.url, code: f.code, trim: trimDays(), fetch: (u, o) => g.fetch(u, o), AbortController: g.AbortController, TextDecoder: g.TextDecoder }, kind === 'hub' ? { adopt: 'hub' } : {})); } catch (e) { fail({ error: 'unreachable' }); return; }
     Promise.resolve(p).then((res) => { if (res && res.ok === false && res.error && res.error !== 'unreachable') fail(res); else show(); }, () => show());
   }
 
