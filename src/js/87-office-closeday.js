@@ -125,7 +125,8 @@
       body.appendChild(countsBlock(m));
       // Leftover food, only when cooked-ahead food is tracked and some is left.
       if (cookAheadOn() && m.leftovers.count > 0) {
-        const sec = h('section', { class: 'cd-sec' }, h('h3', null, 'Food still in the cabinet'),
+        const headId = U.uid('cdleft');
+        const sec = h('section', { class: 'cd-sec', role: 'radiogroup', 'aria-labelledby': headId }, h('h3', { id: headId }, 'Food still in the cabinet'),
           h('p', { class: 'cd-note' }, m.leftovers.count + ' ' + U.plural(m.leftovers.count, 'batch', 'batches') + ', ' + U.weightText(m.leftovers.g) + ' in all. What should happen to it?'));
         // One radio choice for what to do with the leftover food.
         const mk = (id, label, note) => {
@@ -156,7 +157,9 @@
     function paintDone(m) {
       const s = stateNow() || {};
       const lc = s.lastClose || {};
-      body.appendChild(h('div', { class: 'cd-done' }, h('h3', null, 'The day is closed.'),
+      const doneHead = h('h3', { tabindex: -1 }, 'The day is closed.');
+      setTimeout(() => { try { doneHead.focus(); } catch (e) { /* the sheet may be gone */ } }, 0);
+      body.appendChild(h('div', { class: 'cd-done' }, doneHead,
         h('p', null, m.paid + ' ' + U.plural(m.paid, 'paid order') + ', ' + money(m.collected) + ' collected' + (m.tip > 0 ? ' (' + money(m.tip) + ' of it tips)' : '') + '. ' + (lc.leftovers === 'discard' ? 'The leftover food was thrown out.' : '') )));
       const status = h('p', { class: 'cd-status', role: 'status' });
       // Saves the backup file from the done screen.

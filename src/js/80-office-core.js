@@ -76,16 +76,18 @@
     const never = !f.anyLive && !f.batches && !f.records;
     const where = f.label ? ' on ' + f.label : ' in this range';
     if (pageId === 'pace' || pageId === 'tickets' || pageId === 'stations') {
-      if (f.tickets > 0) return null;
+      // With a finished-ticket count, the page needs finished tickets to say anything; tickets still on the line are not enough.
+      if (isNum(f.finished) ? f.finished > 0 : f.tickets > 0) return null;
+      if (isNum(f.finished) && f.tickets > 0) return { title: 'Nothing to show yet', body: 'The tickets on the line are not finished. Send one out and its times appear here.' };
       return never || !f.anyLive
-        ? { title: 'Take your first order', body: 'This page is built from your own tickets. Take an order on the line screen and bump it when it is done, and the times show up here.' }
+        ? { title: 'Nothing to show yet', body: 'Take an order and send it out when it is done, and the times appear here.' }
         : { title: 'No tickets' + where, body: 'Nothing was ordered in this range. Use the arrows or the range buttons to look at a day you were open.' };
     }
     if (pageId === 'money') {
       // the thrown-away ledger on this page needs no sales, so a discard also counts as data here
       if (f.tickets > 0 || f.discards > 0) return null;
       return !f.anyLive
-        ? { title: 'Take your first order', body: 'Sales come from your own orders. Take an order on the line screen and pay it from Orders, and the money shows up here.' }
+        ? { title: 'Take your first order', body: 'Sales come from your own orders. Take an order on the kitchen board and pay it from Orders, and the money shows up here.' }
         : { title: 'No sales' + where, body: 'Nothing was sold in this range. Use the arrows or the range buttons to look at a day you were open.' };
     }
     if (pageId === 'safety') {
@@ -774,12 +776,12 @@
     // Counts what falls inside the range (tickets, batches, safety records) for the empty-state coach.
     function coachFacts() {
       const ds = ctx.dataset(), r = ctx.filters.range, inR = (t) => isNum(t) && t >= r.from && t < r.to;
-      let tickets = 0, batches = 0, records = 0, discards = 0;
-      for (const t of ds.tickets || []) if (inR(t.createdAt)) tickets++;
+      let tickets = 0, batches = 0, records = 0, discards = 0, finished = 0;
+      for (const t of ds.tickets || []) if (inR(t.createdAt)) { tickets++; if (t.status !== 'active' && t.status !== 'voided') finished++; }
       for (const o of ds.orders || []) if (inR(o.createdAt)) tickets++;
       for (const b of ds.batches || []) if (b.src !== 'starter' && inR(b.enteredAt)) batches++;
       for (const e of ds.events || []) if (e && (e.type === 'temp_logged' || e.type === 'sanitize_done' || e.type === 'batch_discard') && inR(e.t)) { records++; if (e.type === 'batch_discard') discards++; }
-      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, batches, records, discards, label: r.label };
+      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, finished, batches, records, discards, label: r.label };
     }
     // Shows the "what to do next" message in place of blank tiles and charts when the range has no data.
     function paintCoach() {
@@ -1224,8 +1226,8 @@
   }
   // Pages that only make sense when the owner tracks cooked-ahead food (batches, hold cabinet, temperature checks).
   const GATED = {
-    safety: { title: 'Safety records are off', body: 'You are not tracking cooked-ahead food, so there are no batches, temperature checks or hold times to report on. Turn it on in Settings if you cook food ahead and hold it hot or cold.' },
-    stock: { title: 'Stock tracking is off', body: 'You are not tracking cooked-ahead food, so this page has no stock to show. Turn it on in Settings if you cook food ahead and want to know when it runs out.' },
+    safety: { title: 'Safety records are off', body: 'You are not tracking cooked-ahead food, so there are no batches, temperature checks or hold times to report on. Turn it on under Menu, Dishes and prices (Yes, I cook ahead) if you cook food ahead and hold it hot or cold.' },
+    stock: { title: 'Stock tracking is off', body: 'You are not tracking cooked-ahead food, so this page has no stock to show. Turn it on under Menu, Dishes and prices (Yes, I cook ahead) if you cook food ahead and want to know when it runs out.' },
   };
   // True when the cook-ahead module is on; a missing setting counts as on, so old saves and the demo are unchanged.
   function cookAheadOn() {
@@ -1237,7 +1239,7 @@
   function turnOnCookAhead(id) {
     let rep = 'error';
     try { rep = SB.store.dispatch('updateSettings', { patch: { modules: { cookAhead: true } } }); } catch (e) { /* shown below */ }
-    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. Open Menu and settings and try there.', { tone: 'bad' }); return; }
+    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. Open Menu, then Dishes and prices, and tap Yes, I cook ahead.', { tone: 'bad' }); return; }
     if (M) showPage(id, { focus: false });
   }
 

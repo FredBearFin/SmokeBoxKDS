@@ -364,4 +364,5 @@ a.of-nav:active { background: var(--press); }
   .of-tile:nth-child(4), .of-card:nth-of-type(4) { animation-delay: 120ms; }
 }
 
-@media (max-width: 720px) { .of-nav-off { display: none; } }
+@media (max-width: 1100px) { .of-nav-off { display: none; } }
+.of-page[data-coach="on"] > .of-headline { display: none; }
