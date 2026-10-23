@@ -582,7 +582,7 @@
     offs.push(SB.store.subscribe(() => paintCook()));
 
     // How do you serve? A skippable question under the dishes. Each answer only sets the settings found under Settings, How you serve.
-    const svBox = h('section', { class: 'fs-card dp-ca dp-serve', hidden: true });
+    const svBox = h('section', { class: 'fs-card dp-sv dp-serve', hidden: true });
     // The three answers: what each sets, in the order shown. Table service is the starting state, so it only records the answer.
     const SERVE_CHOICES = [
       { id: 'table', label: 'Table and kitchen tickets', sets: { counter: false, chips: null } },
@@ -607,9 +607,8 @@
     }
     // Saves one answer: counter service on or off, and the order buttons (the starting list when none are given).
     function answerServe(c) {
-      const patch = { service: { counter: c.sets.counter } };
-      if (c.sets.chips) patch.service.chips = c.sets.chips; else patch.service.chips = DEFAULT_CHIPS.slice();
-      const r = send('updateSettings', { patch });
+      const r1 = send('updateSettings', { patch: { service: { counter: c.sets.counter } } });
+      const r = r1.ok || r1.report === 'nothingToDo' ? send('setChips', { chips: c.sets.chips }) : r1;
       if (!r.ok && r.report !== 'nothingToDo') { svBox.appendChild(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'bad', role: 'alert' }, r.words)); return; }
       U.storage.set(KEY_SERVEANS, c.id); paintServe(c.id);
     }
@@ -775,6 +774,8 @@
       (sm.notes || []).forEach((n) => preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, n)));
       // Columns the importer did not use (like Notes), named once so nothing is dropped without a word.
       const ign = Array.isArray(sm.ignoredColumns) ? sm.ignoredColumns : [];
+      // Notes or descriptions are read but not stored with a dish, so say that too.
+      if (rows.some((r) => r.description)) preview.appendChild(h('p', { class: 'fs-sub dp-ignored', dataset: { act: 'notes-ignored' } }, 'Notes and descriptions in your file are not kept: Smokebox stores only the name, price, station and section.'));
       if (ign.length) preview.appendChild(h('p', { class: 'fs-sub dp-ignored', dataset: { act: 'ignored-columns' } }, (ign.length === 1 ? 'Ignored column: ' : 'Ignored columns: ') + ign.join(', ') + '. Smokebox does not keep ' + (ign.length === 1 ? 'it' : 'them') + '.'));
       // Words in the file that match none of the owner's categories or stations: say it once, and offer to add the categories.
       const um = sm.unmatched || { stations: [], categories: [] };
@@ -982,21 +983,16 @@
 
   /* ---------- How you serve ---------- */
 
-  // The order buttons a new install starts with (customer shortcuts on the order screen). An empty or missing saved list means these.
-  const DEFAULT_CHIPS = ['Walk-up', 'Pickup', 'Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'];
-  const CHIP_MAX = 12; // the most order buttons the order screen holds
-  const CHIP_LEN = 16; // letters in one order button name
+  // The starting order buttons, as the engine knows them (the built-in list used when none is saved).
+  const chipDefaults = () => (SB.engine && SB.engine.chipsOf ? SB.engine.chipsOf({}) : ['Walk-up', 'Pickup', 'Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6']);
+  const CHIP_MAX = (SB.engine && SB.engine.CHIP_MAX) || 12; // the most order buttons the order screen holds
+  const CHIP_LEN = (SB.engine && SB.engine.CHIP_LEN) || 24; // letters in one order button name
   // The order buttons now in use, as plain names: the owner's list, or the starting list when none is saved.
-  function currentChips() {
-    const sv = (SB.store.getState().settings || {}).service || {};
-    const list = Array.isArray(sv.chips) ? sv.chips.map((c) => String(c && typeof c === 'object' ? (c.label || c.name || '') : c)).filter(Boolean) : [];
-    return list.length ? list : DEFAULT_CHIPS.slice();
-  }
+  function currentChips() { return SB.engine && SB.engine.chipsOf ? SB.engine.chipsOf(SB.store.getState().settings) : chipDefaults(); }
   // The currency symbol now shown with prices, as plain text ($ when none is saved).
   function currentSymbol() {
     const ui = (SB.store.getState().settings || {}).ui || {};
-    const c = ui.currency;
-    return typeof c === 'string' && c ? c : (c && typeof c === 'object' && c.symbol) || '$';
+    return typeof ui.currency === 'string' && ui.currency ? ui.currency : '$';
   }
   // Opens "How you serve": counter service on or off, the order buttons, and the currency symbol. Every change saves at once and
   // offers Undo; nothing here is required.
@@ -1036,10 +1032,10 @@
     function saveChips(next, message) {
       const before = currentChips();
       if (next.length > CHIP_MAX) { tell(bSt, 'You can have up to ' + CHIP_MAX + ' order buttons. Remove one first.', 'bad'); return false; }
-      const r = send('updateSettings', { patch: { service: { chips: next } } });
+      const r = send('setChips', { chips: next });
       if (!r.ok && r.report !== 'nothingToDo') { tell(bSt, r.words, 'bad'); return false; }
       tell(bSt, message, 'ok');
-      offerUndo(message, () => { send('updateSettings', { patch: { service: { chips: before } } }); paintChips(); });
+      offerUndo(message, () => { send('setChips', { chips: before }); paintChips(); });
       paintChips();
       return true;
     }
@@ -1078,7 +1074,7 @@
     paintChips();
     const reset = h('button', { type: 'button', class: 'btn', dataset: { act: 'chips-reset' },
       // Goes back to the starting list of order buttons (with Undo).
-      onClick: () => saveChips(DEFAULT_CHIPS.slice(), 'Order buttons are back to the starting list.') }, 'Reset to the starting list');
+      onClick: () => saveChips(chipDefaults(), 'Order buttons are back to the starting list.') }, 'Reset to the starting list');
     const sec2 = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Order buttons'),
       h('p', { class: 'fs-sub' }, 'The quick buttons on the order screen for who the order is for: Walk-up, Pickup, tables, Phone, Delivery. Up to ' + CHIP_MAX + '.'), list, reset, bSt);
 
@@ -1103,7 +1099,7 @@
       offerUndo('Currency symbol is ' + sym + '.', () => { send('updateSettings', { patch: { ui: { currency: before } } }); });
     }
     // Saves your own symbol when the box is left; one to three characters.
-    custom.addEventListener('change', () => { const v = custom.value.trim(); if (!v || v.length > 3 || /\d/.test(v)) { tell(curSt, 'Type one to three characters, like kr or Rs, with no digits.', 'bad'); return; } saveSymbol(v); });
+    custom.addEventListener('change', () => { const v = custom.value.trim(); if (!v || !(SB.util.validCurrency ? SB.util.validCurrency(v) : v.length <= 3)) { tell(curSt, 'Type one to three letters or signs, like kr or Rs. No digits.', 'bad'); return; } saveSymbol(v); });
     const sec3 = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Currency symbol'),
       h('p', { class: 'fs-sub' }, 'Shown with every price. It does not convert anything.'), seg, custom, curSt);
 
@@ -1111,6 +1107,40 @@
     root.append(undoBar, sec1, sec2, sec3);
     sheet.body.appendChild(root); keepInView(root);
     return sheet;
+  }
+
+  /* ---------- PIN recovery code ---------- */
+
+  // Makes a new recovery code and shows it once on a "write this down" screen with Copy and Print. The Done button stays off until the
+  // owner selects "I saved it". Needs a PIN; says plainly why when it cannot make one. Used after a PIN is set, and from the PIN section.
+  async function showRecoveryCode() {
+    const st = SB.store;
+    if (!st || typeof st.createRecoveryCode !== 'function') return false;
+    const r = await st.createRecoveryCode();
+    if (!r.ok) { let w = r.report; try { w = SB.engine.describe(r.report, r.info, st.getState().settings) || w; } catch (e) { /* keep the code */ } if (SB.ui.toast) SB.ui.toast('The recovery code could not be made. ' + w, { tone: 'warn' }); return false; }
+    const sheet = SB.ui.sheet({ title: 'Write down your recovery code', side: 'center', width: 'min(560px, 96vw)', name: 'recoverycode' });
+    const codeEl = h('div', { class: 'rc-code', 'aria-label': 'Your recovery code', role: 'textbox' }, r.code);
+    const msg = h('p', { class: 'fs-sub', role: 'status' });
+    // Copies the code to the clipboard and says whether that worked.
+    const copy = h('button', { type: 'button', class: 'btn', dataset: { act: 'rc-copy' }, onClick: () => { Promise.resolve(SB.ui.copyText ? SB.ui.copyText(r.code) : false).then((ok) => tell(msg, ok ? 'Copied. Paste it somewhere safe, away from this tablet.' : 'Could not copy. Write the code down by hand.', ok ? 'ok' : 'bad')); } }, ico('copy', 20), h('span', null, 'Copy'));
+    // Prints a page with only the code and a short note, through a hidden frame.
+    const print = h('button', { type: 'button', class: 'btn', dataset: { act: 'rc-print' }, onClick: () => {
+      try {
+        const f = doc.createElement('iframe'); f.style.cssText = 'position:fixed;width:0;height:0;border:0'; doc.body.appendChild(f);
+        f.contentDocument.open(); f.contentDocument.write('<!doctype html><title>Smokebox recovery code</title><body style="font-family:sans-serif;padding:24px"><h1>Smokebox recovery code</h1><p style="font:700 32px monospace;letter-spacing:4px">' + r.code + '</p><p>Keep this page somewhere safe, away from the tablet. It is the only way back in if the manager PIN is forgotten.</p></body>'); f.contentDocument.close();
+        f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 2000);
+      } catch (e) { tell(msg, 'This browser could not print. Write the code down by hand.', 'bad'); }
+    } }, ico('receipt', 20), h('span', null, 'Print'));
+    const saved = h('input', { type: 'checkbox', id: 'rc-saved' });
+    // Copies the recovery code to the clipboard and says whether it worked.
+    const done = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'rc-done' }, disabled: true, onClick: () => sheet.close('done') }, 'Done');
+    // The Done button wakes up only when the owner says the code is saved.
+    saved.addEventListener('change', () => { done.disabled = !saved.checked; });
+    sheet.body.append(h('div', { class: 'dp' },
+      h('p', null, h('strong', null, 'Write this down now. '), 'If you forget the manager PIN, this code is the only way to set a new one. It will not be shown again, and Smokebox does not keep a readable copy.'),
+      codeEl, h('div', { class: 'fs-row' }, copy, print), msg,
+      h('label', { class: 'dp-check-row', for: 'rc-saved' }, saved, h('span', null, 'I saved it')), done));
+    return true;
   }
 
   /* ---------- the Tax, hours and PIN sheet ---------- */
@@ -1155,8 +1185,10 @@
         if (!/^\d{4}$/.test(v)) { tell(pinSt, 'Use exactly 4 digits.'); return; }
         const r = SB.shell && SB.shell.setPin ? await SB.shell.setPin(v) : { ok: false };
         tell(pinSt, r.ok ? 'PIN set. The back office will ask for it.' : 'The PIN could not be saved.');
-        if (r.ok) pin.value = '';
-      } }, 'Set PIN'));
+        if (r.ok) { pin.value = ''; await showRecoveryCode(); }
+      } }, 'Set PIN'),
+      // For a PIN set before recovery codes existed: makes the code now.
+      SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.store.hasRecoveryCode && !SB.store.hasRecoveryCode() ? h('button', { type: 'button', class: 'btn', dataset: { act: 'make-recovery' }, onClick: () => showRecoveryCode() }, 'Make a recovery code') : null);
     // Cook-ahead: one yes or no, kept in the real setting (settings.modules.cookAhead). A saved kitchen from before this
     // setting existed counts as Yes, so nothing disappears from it.
     const on0 = SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : false;
@@ -1192,5 +1224,5 @@
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { showRecoveryCode, leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

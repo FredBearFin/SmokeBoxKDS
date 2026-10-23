@@ -17,7 +17,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.click('[data-act=serve-counter]'); await page.waitForTimeout(300);
   let s = await svc(page);
   check('Counter service sets counter service on and a counter list of order buttons', s.counter === true && JSON.stringify(s.chips).includes('Phone'), s);
-  check('the answer is remembered and the card says where to change it', /Menu, How you serve/.test(await page.locator('.dp-serve').innerText()));
+  check('the answer is remembered and the card says where to change it', /Settings, How you serve/.test(await page.locator('.dp-serve').innerText()));
   await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(300);
   // The sheet.
   await page.click('.fl-menu'); await page.waitForTimeout(300);

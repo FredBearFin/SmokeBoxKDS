@@ -55,6 +55,7 @@ for (const [w, h] of SIZES) for (const [theme, text] of LOOKS) {
     await snap('import', async () => { await page.evaluate(() => SB.sheets.open('menuimport')); await page.waitForTimeout(300); await page.fill('textarea', 'Lemonade 3\nBad one\nChili 6.50'); await page.click('[data-act=import-check]'); });
     await snap('tablet-checklist', async () => { await page.evaluate(() => SB.sheets.open('setup')); });
     await snap('leftovers-card', async () => { await page.evaluate(() => { const id = SB.store.getState().menu[0].id; SB.store.dispatchEx('createTicket', { customer: 'Demo', src: 'demo', items: [{ menuId: id, qty: 1 }] }, { source: 'ui' }); SB.sheets.open('menu'); }); });
+    await snap('serve', async () => { await page.evaluate(() => SB.sheets.open('serve')); });
     await snap('startover-1', async () => { await page.evaluate(() => SB.sheets.open('startover')); });
     await snap('startover-2', async () => { await page.evaluate(() => SB.sheets.open('startover')); await page.waitForTimeout(300); await page.click('[data-act=so-next1]'); });
     await snap('startover-3', async () => { await page.evaluate(() => SB.sheets.open('startover')); await page.waitForTimeout(300); await page.click('[data-act=so-next1]'); await page.click('[data-act=so-next2]'); });
