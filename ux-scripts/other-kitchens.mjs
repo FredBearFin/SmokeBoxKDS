@@ -66,7 +66,7 @@ async function reloadAndReopen(page) {
 // Renames the first menu section (the one every dish lands in) in the Change menu sections fold, then picks it for the next dish.
 async function renameSection(page, to) {
   await page.locator('.dp-catfold summary').click();
-  await page.fill('[aria-label="Name of section Meats"]', to); await page.locator('[aria-label="Name of section Meats"]').blur(); await page.waitForTimeout(300);
+  await page.fill('[aria-label="Name of section Mains"]', to); await page.locator('[aria-label="Name of section Mains"]').blur(); await page.waitForTimeout(300);
   await page.locator('.dp-catfold summary').click();
   await page.selectOption('.dp-menusec', 'meat');
 }
@@ -85,7 +85,7 @@ await run('pizza', {}, async (page) => {
   await scan(page, 'first screen', []); await shot(page, 'first-run');
   await page.click('.fl-first-dish'); await page.waitForSelector('.dp-form');
   await scan(page, 'dishes sheet', []); await shot(page, 'dishes-first');
-  await stations(page, 'Pit', 'Oven', ['Hot sides', 'Fry', 'Cold and drinks']);
+  await stations(page, 'Kitchen', 'Oven', ['Prep', 'Fryer', 'Cold and drinks']);
   await scan(page, 'stations fold', ['Oven']); await shot(page, 'stations');
   await reloadAndReopen(page);
   await renameSection(page, 'Pizzas'); await shot(page, 'sections');
@@ -125,7 +125,7 @@ await run('bakery', {}, async (page) => {
 // 3. Taco truck: 8 dishes, one person, speed matters, prices "3.5" and "$4".
 await run('taco', {}, async (page) => {
   await page.click('.fl-first-dish'); await page.waitForSelector('.dp-form');
-  await stations(page, 'Pit', 'Grill', ['Hot sides', 'Fry', 'Cold and drinks']); await reloadAndReopen(page);
+  await stations(page, 'Kitchen', 'Grill', ['Prep', 'Fryer', 'Cold and drinks']); await reloadAndReopen(page);
   await renameSection(page, 'Tacos');
   const t0 = Date.now();
   let taps = 0; // tiles are skipped when one station is left
@@ -146,18 +146,18 @@ await run('taco', {}, async (page) => {
 // 4. Bar with food: 10 food dishes; the owner does NOT want drinks in the app.
 await run('bar', {}, async (page) => {
   await page.click('.fl-first-dish'); await page.waitForSelector('.dp-form');
-  await stations(page, 'Pit', 'Kitchen', ['Hot sides', 'Fry']); await reloadAndReopen(page);
+  await stations(page, 'Kitchen', 'Bar kitchen', ['Prep', 'Fryer']); await reloadAndReopen(page);
   await renameSection(page, 'Bar food');
   for (const [n, p] of [['Wings (8)', '11'], ['Nachos', '$12'], ['Burger', '13.5'], ['Chicken sandwich', '12'], ['Fish and chips', '$14'], ['Soft pretzel', '7'], ['Mozzarella sticks', '8'], ['Loaded fries', '9'], ['Side salad', '6'], ['Chili bowl', '8.5']]) await add(page, n, p, 'pit');
   note('tiles shown for station question: ' + (await page.locator('.dp-tiles').isVisible()) + ' (Cold and drinks still in use, so the owner is asked)');
-  await scan(page, 'dishes list', ['Kitchen']); await shot(page, 'dishes-list');
+  await scan(page, 'dishes list', ['Bar kitchen']); await shot(page, 'dishes-list');
   await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(300);
   note('board station tabs: ' + JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('.fl-tabs .seg-opt, .seg-opt')].map((b) => b.textContent.replace('needs attention', '').trim()).slice(0, 10))));
-  await scan(page, 'board', ['Kitchen']); await shot(page, 'board-empty');
-  await page.evaluate(() => SB.sheets.open('help')); await page.waitForTimeout(500); await scan(page, 'help sheet', ['Kitchen']); await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(600);
-  await page.evaluate(() => SB.sheets.open('board86')); await page.waitForTimeout(500); await scan(page, '86 board', ['Kitchen']); await shot(page, '86-board'); await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(600);
+  await scan(page, 'board', ['Bar kitchen']); await shot(page, 'board-empty');
+  await page.evaluate(() => SB.sheets.open('help')); await page.waitForTimeout(500); await scan(page, 'help sheet', ['Bar kitchen']); await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(600);
+  await page.evaluate(() => SB.sheets.open('board86')); await page.waitForTimeout(500); await scan(page, '86 board', ['Bar kitchen']); await shot(page, '86-board'); await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(600);
   await order(page, 2);
-  await scan(page, 'board with ticket', ['Kitchen']); await shot(page, 'board');
+  await scan(page, 'board with ticket', ['Bar kitchen']); await shot(page, 'board');
 });
 
 fs.writeFileSync(path.join(OUT, 'log.txt'), lines.join('\n'));

@@ -189,3 +189,34 @@ Prices show "$" everywhere (`U.fmtMoney`). A currency setting would need one set
 ## Round 8 (final): merged-build re-check (branch night/a2-r8)
 
 On the merged build (e7e9c93): the three browser tests, the second-run script (12 checks), the first-time-owners script and the touch audit (90 screens) all pass or run clean. One new check was added: a spreadsheet row with a price split at its comma ("Cappuccino,4,50,Coffee") arrives **unticked** in the real preview with the importer's "more columns than the header ... price may be 4.50, not 4" line, and a normal row beside it stays ticked. The diner script needed one change (a second Save after the "no dish selected" warning), which is the intended behavior since round 7. Final scripted numbers are in `docs/setup-timing.md`; the checklist for timing it with a stopwatch is there too, and the ten-step first look is `docs/try-this-first.md`.
+
+## Round 11: not just barbecue (branch night/a2-r11)
+
+Four first-time owners of other kitchens drove the real UI from a blank install to a first paid ticket with messy input (`ux-scripts/other-kitchens.mjs`; logs, results and screenshots in `docs/ux-shots/night/a2/other/`). After every screen the script scans what is on screen for barbecue words the owner never typed (Meats, Pit, smoker, brisket, ribs, slaw, Hot sides, ...). **PASS** = reached a paid ticket, no page errors, no barbecue words on any scanned screen. Scripted, headless Chromium, 1024x768; not real people.
+
+| Kitchen | What the script did | Result |
+|---|---|---|
+| Pizza shop | one station renamed Oven, three others marked Not used, section renamed Pizzas, 12 dishes with sizes as separate dishes and prices "$11", "14.5", "15,50", "5." | PASS |
+| Bakery-cafe | 30 items imported from a CSV with a header row and a Notes column (commas inside quotes), one section and one station for all | PASS |
+| Taco truck | one station renamed Grill, section Tacos, 8 dishes with "3.5" and "$4"; a 3-taco cash order from the board took 6 taps | PASS |
+| Bar with food | 10 food dishes, no drinks added, station renamed, section Bar food | PASS |
+
+### Hesitation log (found by reading what each run showed)
+1. **Every dish landed under "Meats".** The pizzas, pastries and tacos all sat under the heading "Meats" on the order screen, because the section came from the station's barbecue guess. **Fixed:** the add form now shows a "Menu section" pick list (starts from the station's guess, remembers the owner's last hand pick, so a pizza shop picks "Pizzas" once) and a "Change menu sections" fold (rename, Not used, add; same style as "Change stations"; names are saved through the shared owner-names mechanism, so the order screen follows at once). The import preview has a matching "Put all these dishes in" list for files with no category column (the bakery).
+2. **Starter names were barbecue** (stations Pit, Hot sides, Fry; sections Meats, Sandwiches, Fried). **Fixed by A5** (`applyStarterNames`, a new empty kitchen starts with Kitchen, Prep, Fryer, Cold and drinks, Expo and Mains, Sides, Snacks, Desserts, Drinks). I changed my own station hints ("Grill, oven or main line", "Prep and sides") and made the section guess work from the section's name as well as its id, so a Fryer dish still lands in Snacks.
+3. **A bakery that never renames stations saw tabs for stations nothing is made at.** **Fixed:** once a menu has dishes, a station tab no dish is made at waits (and returns when a dish is added there or a ticket arrives).
+4. **After renaming a station the board still showed the old name** until a reload. Left as it is (the screen says "Reload to show on the board" with a button); the scripts tap it. Proposal: apply station renames to the board live (a board change, A1).
+5. **Cooked-ahead question card used "chili ... potato salad"** as examples. **Fixed:** neutral "Soup in a warmer, salads in a cooler."
+6. **Left, for others:**
+   - A1, order screen customer chips: Walk-up, Pickup, Table 1 to Table 6 are a sit-down default. A pizza shop wants "Phone", "Delivery", a taco truck wants none of the tables. The channel names (Dine-in, Takeout, Drive-thru, Delivery app) are renamable in the Data page but there is no "Phone". Proposal: chips follow the channels, tables hidden unless the owner turns them on.
+   - A1, a bakery or taco truck with a counter hand-off still gets kitchen tickets (START/DONE, "Bump", an EXP tab). A "counter mode" with no kitchen ticket is a product decision (not built).
+   - A5, import: the Notes column of the bakery file is ignored (not stored on the dish); fine, but the preview does not say so. One line "Notes column ignored" would help.
+   - A5, 00-util.js and 30-store.js: the two new keys `setup.hiddenCategories` and `setup.lastCategory` need to be classified as kitchen data and added to the Start over list (asked; until done one unit test, "every smokebox.v1 key ... is classified", fails on this branch).
+
+### Defaults chosen (all easy to change)
+- The Menu section list is always in the add form (not under More options) so a non-barbecue owner sees it at the moment it matters; its starting value is the station's guess, then the owner's last hand pick.
+- "Not used" sections only leave the pick list; dishes already in them keep them.
+- A station no dish is made at keeps its tab hidden only while the menu has dishes and no ticket needs it.
+
+### Not checked in round 11
+Real people; a food truck's real one-handed speed; the Data page rename of channels (A3); Toast, Square or Clover exports for these kinds of menus; a menu with sizes entered as modifiers instead of separate dishes (not supported by the form).

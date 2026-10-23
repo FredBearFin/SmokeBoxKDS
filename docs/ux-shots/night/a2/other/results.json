@@ -3,60 +3,28 @@
   "paid": true,
   "errors": 0,
   "bbq": [],
-  "setupBbq": [
-   "first screen: Pit ... ll stations, All tickets Pit and slicing, PIT tickets",
-   "first screen: PIT ... tickets Pit and slicing, PIT tickets with work here H",
-   "first screen: Hot sides ... T tickets with work here Hot sides and prep, HOT tickets wi",
-   "dishes sheet: Pit ... ll stations, All tickets Pit and slicing, PIT tickets",
-   "dishes sheet: PIT ... tickets Pit and slicing, PIT tickets with work here H",
-   "dishes sheet: Hot sides ... T tickets with work here Hot sides and prep, HOT tickets wi",
-   "dishes sheet: Pit ... ollars Where is it made? Pit Smoker, grill or oven Ho",
-   "stations fold: Pit ... ll stations, All tickets Pit and slicing, PIT tickets",
-   "stations fold: PIT ... tickets Pit and slicing, PIT tickets with work here E",
-   "stations fold: Meats ... n the board Menu section Meats Sandwiches Hot sides Fri",
-   "stations fold: Hot sides ... section Meats Sandwiches Hot sides Fried Cold and drinks Wh",
-   "dishes list: Hot sides ... ection Pizzas Sandwiches Hot sides Fried Cold and drinks Wh",
-   "dishes list: Hot sides ... dishes Pizzas Sandwiches Hot sides Fried Cold and drinks Ov",
-   "dishes list: Hot sides ... I made Pizzas Sandwiches Hot sides Fried Cold and drinks Ov"
-  ],
+  "setupBbq": [],
   "pass": true
  },
  "bakery": {
   "paid": true,
   "errors": 0,
   "bbq": [],
-  "setupBbq": [
-   "more ways fold: Pit ... ll stations, All tickets Pit and slicing, PIT tickets",
-   "more ways fold: PIT ... tickets Pit and slicing, PIT tickets with work here H",
-   "more ways fold: Hot sides ... T tickets with work here Hot sides and prep, HOT tickets wi",
-   "more ways fold: Pit ... ollars Where is it made? Pit Smoker, grill or oven Ho",
-   "import preview: Pit ... ll stations, All tickets Pit and slicing, PIT tickets",
-   "import preview: PIT ... tickets Pit and slicing, PIT tickets with work here H",
-   "import preview: Hot sides ... T tickets with work here Hot sides and prep, HOT tickets wi",
-   "import preview: Pit ... ollars Where is it made? Pit Smoker, grill or oven Ho"
-  ],
+  "setupBbq": [],
   "pass": true
  },
  "taco": {
   "paid": true,
   "errors": 0,
   "bbq": [],
-  "setupBbq": [
-   "dishes list: Hot sides ... section Tacos Sandwiches Hot sides Fried Cold and drinks Wh",
-   "dishes list: Hot sides ...  dishes Tacos Sandwiches Hot sides Fried Cold and drinks Gr",
-   "dishes list: Hot sides ...  I made Tacos Sandwiches Hot sides Fried Cold and drinks Gr"
-  ],
+  "setupBbq": [],
   "pass": true
  },
  "bar": {
   "paid": true,
   "errors": 0,
   "bbq": [],
-  "setupBbq": [
-   "dishes list: Hot sides ... tion Bar food Sandwiches Hot sides Fried Cold and drinks Wh",
-   "dishes list: Hot sides ... shes Bar food Sandwiches Hot sides Fried Cold and drinks Ki",
-   "dishes list: Hot sides ... made Bar food Sandwiches Hot sides Fried Cold and drinks Ki"
-  ],
+  "setupBbq": [],
   "pass": true
  }
 }

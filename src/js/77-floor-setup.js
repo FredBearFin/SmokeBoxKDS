@@ -90,8 +90,10 @@
     pit: { cat: 'meat', sec: 300, track: 'two' }, sides: { cat: 'side', sec: 180, track: 'two' },
     fry: { cat: 'fried', sec: 240, track: 'two' }, cold: { cat: 'cold', sec: 60, track: 'one' },
   };
+  // Section names that fit each station best, in the old and the new starter names (lower case).
+  const SECTION_WORDS = { pit: ['meats', 'mains'], sides: ['hot sides', 'sides'], fry: ['fried', 'snacks'], cold: ['cold and drinks', 'drinks'] };
   // A short plain line under each station name on its tile.
-  const ZONE_HINT = { pit: 'Smoker, grill or oven', sides: 'Stove and sides', fry: 'Fryer', cold: 'No cooking: drinks, cold sides' };
+  const ZONE_HINT = { pit: 'Grill, oven or main line', sides: 'Prep and sides', fry: 'Fryer', cold: 'No cooking: drinks, cold items' };
   // The example menu. Columns: name, price in dollars, station id, category id. Made-up prices, owner to replace.
   // audit:data-start
   const EXAMPLES = [
@@ -150,8 +152,10 @@
   // The guessed category, prep seconds and tap style for a station, with safe values for a custom station.
   function defaultsFor(zoneId) {
     const d = ZONE_DEFAULT[zoneId];
-    if (d && SB.config.categoryById[d.cat]) return d;
-    return { cat: (SB.config.categories[0] || {}).id, sec: 180, track: 'two' };
+    if (!d || !SB.config.categoryById[d.cat]) return { cat: (SB.config.categories[0] || {}).id, sec: 180, track: 'two' };
+    // The section is found by its NAME first (the starter names changed from Meats, Hot sides, Fried to Mains, Sides, Snacks), then by id.
+    const byName = SECTION_WORDS[zoneId] ? SB.config.categories.find((c) => SECTION_WORDS[zoneId].indexOf(c.name.toLowerCase()) >= 0) : null;
+    return byName ? Object.assign({}, d, { cat: byName.id }) : d;
   }
   // Reads a typed price the way a person writes it: "12.50", "12,50", "$14", "14.", "USD 12", "1 200". Gives {value, rounded}
   // in dollars, or null when it is not one price. Uses the menu importer's reader when it is in this build.

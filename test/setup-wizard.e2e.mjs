@@ -33,7 +33,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.screenshot({ path: SHOT + '/dishes-form.png' });
   await page.click('[data-act=save-done]'); await page.waitForTimeout(400);
   const d3 = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).map((m) => [m.name, m.zone, m.cat, m.track]));
-  check('three dishes saved with the right category and tap style', d3.length === 3 && d3[2][2] === 'cold' && d3[2][3] === 'one' && d3[1][2] === 'side', d3);
+  check('three dishes saved with the right category and tap style', d3.length === 3 && d3[2][2] === 'cold' && d3[2][3] === 'one' && d3[1][2] === 'sandwich', d3);
   check('a duplicate name is refused', await (async () => { await page.waitForTimeout(600); await page.evaluate(() => SB.sheets.open('dishes')); await page.waitForTimeout(500); await page.fill('.dp-name', 'sweet tea'); await page.fill('.dp-price', '3'); await page.click('.dp-tile[data-zone=cold]'); await page.click('[data-act=save-again]'); const c = await page.locator('.dp-form .field-error:visible').count(); if (!c) console.log(await page.evaluate(() => JSON.stringify({ sheets: document.querySelectorAll('.sheet').length, forms: document.querySelectorAll('.dp-form').length, name: document.querySelector('.dp-name').value, status: document.querySelector('.dp-status').textContent, errs: [...document.querySelectorAll('.field-error')].map((e) => e.hidden + e.textContent) }))); return c > 0; })());
   // Edit a price in the list; remove a dish.
   await page.fill('.dp-name', ''); await page.fill('.dp-price', '');
@@ -49,12 +49,12 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   // Menu sections: the add form shows a Menu section list; Change menu sections renames one, marks one Not used (undoable) and adds one.
   check('the add form has a Menu section list', await page.locator('.dp-menusec').isVisible());
   await page.locator('.dp-catfold summary').click();
-  await page.fill('[aria-label="Name of section Meats"]', 'Plates'); await page.locator('[aria-label="Name of section Meats"]').blur(); await page.waitForTimeout(300);
+  await page.fill('[aria-label="Name of section Mains"]', 'Plates'); await page.locator('[aria-label="Name of section Mains"]').blur(); await page.waitForTimeout(300);
   check('a renamed section shows in the list and is saved in the shared names', (await page.locator('.dp-menusec option', { hasText: 'Plates' }).count()) === 1 && JSON.stringify(await page.evaluate(() => SB.config.customSpec())).includes('Plates'));
-  await page.locator('.dp-catrow-x, .dp-strow:has([aria-label="Name of section Fried"]) button').first().click(); await page.waitForTimeout(200);
-  check('Not used takes a section out of the list', (await page.locator('.dp-menusec option', { hasText: 'Fried' }).count()) === 0);
-  await page.locator('.dp-strow:has([aria-label="Name of section Fried"]) button').first().click(); await page.waitForTimeout(200);
-  check('Use again puts it back', (await page.locator('.dp-menusec option', { hasText: 'Fried' }).count()) === 1);
+  await page.locator('.dp-catrow-x, .dp-strow:has([aria-label="Name of section Desserts"]) button').first().click(); await page.waitForTimeout(200);
+  check('Not used takes a section out of the list', (await page.locator('.dp-menusec option', { hasText: 'Desserts' }).count()) === 0);
+  await page.locator('.dp-strow:has([aria-label="Name of section Desserts"]) button').first().click(); await page.waitForTimeout(200);
+  check('Use again puts it back', (await page.locator('.dp-menusec option', { hasText: 'Desserts' }).count()) === 1);
   await page.locator('.dp-catfold summary').click();
   // A section picked by hand is remembered for the next dish.
   await page.selectOption('.dp-menusec', 'cold'); await page.fill('.dp-name', 'Section test'); await page.fill('.dp-price', '2'); await page.click('.dp-tile >> nth=0'); await page.click('[data-act=save-again]'); await page.waitForTimeout(250);
@@ -89,10 +89,10 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   check('Bring it back un-archives the dish at the typed price', await page.evaluate((n) => { const m = SB.store.getState().menu.find((x) => x.name === n); return !!m && !m.archived && m.price === 9; }, goneName));
   // Stations: rename live, hide down to one (the question disappears), show again.
   await page.locator('.dp-stfold summary').click();
-  await page.fill('[aria-label="Name of station Pit"]', 'Smoker'); await page.locator('[aria-label="Name of station Smoker"], [aria-label="Name of station Pit"]').first().blur(); await page.waitForTimeout(300);
+  await page.fill('[aria-label="Name of station Kitchen"]', 'Smoker'); await page.locator('[aria-label="Name of station Smoker"], [aria-label="Name of station Kitchen"]').first().blur(); await page.waitForTimeout(300);
   check('a renamed station is saved in the shared names and shown on its tile', (await page.evaluate(() => JSON.stringify(SB.config.customSpec()))).includes('Smoker') && await page.locator('.dp-tile:has-text("Smoker")').count() === 1);
   await page.screenshot({ path: SHOT + '/stations-three.png' });
-  for (const nm of ['Hot sides', 'Fry']) { await page.locator('.dp-strow:has([aria-label="Name of station ' + nm + '"]) button').click(); await page.waitForTimeout(150); }
+  for (const nm of ['Prep', 'Fryer']) { await page.locator('.dp-strow:has([aria-label="Name of station ' + nm + '"]) button').click(); await page.waitForTimeout(150); }
   check('a station marked Not used loses its board tab while it has no tickets', await page.evaluate(() => { const b = document.querySelector('.fl-tabs [data-id=sides], [data-id=sides]'); return !b || b.style.display === 'none'; }));
   check('hiding stations leaves tiles for the rest', await page.locator('.dp-tile').count() === 2);
   await page.locator('.dp-strow:has([aria-label="Name of station Cold and drinks"]) button').click(); await page.waitForTimeout(150);
@@ -101,8 +101,8 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   check('a dish saves with no station tap when only one station shows', await page.evaluate(() => SB.store.getState().menu.some((m) => m.name === 'Test' && !m.archived)));
   await page.screenshot({ path: SHOT + '/station-one.png' });
   await page.locator('.dp-strow:has([aria-label="Name of station Cold and drinks"]) button').click();
-  await page.locator('.dp-strow:has([aria-label="Name of station Hot sides"]) button').click();
-  await page.locator('.dp-strow:has([aria-label="Name of station Fry"]) button').click(); await page.waitForTimeout(150);
+  await page.locator('.dp-strow:has([aria-label="Name of station Prep"]) button').click();
+  await page.locator('.dp-strow:has([aria-label="Name of station Fryer"]) button').click(); await page.waitForTimeout(150);
   await page.fill('[aria-label="New station name"]', 'Bar'); await page.getByRole('button', { name: 'Add station' }).click(); await page.waitForTimeout(250);
   check('a new station can be added', await page.evaluate(() => SB.config.workZones.length === 5));
   await page.evaluate(() => { SB.store.getState().menu.filter((m) => m.name === 'Test').forEach((m) => SB.store.dispatchEx('updateMenuItem', { id: m.id, patch: { archived: true } }, { source: 'ui' })); });
