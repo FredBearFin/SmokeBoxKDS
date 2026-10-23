@@ -60,6 +60,22 @@
     return 'Changed ' + (SETTING_NAME[last] || (key || 'a setting')) + ' from ' + settingValue(last, from) + ' to ' + settingValue(last, to);
   }
 
+  // Temperature readings grouped by batch, in log order, worked out once per state (the engine never changes a state in place), so a long
+  // record does not replay the whole log for every cold reading row.
+  const tempCache = new WeakMap();
+  function tempsByBatch(state) {
+    let m = tempCache.get(state);
+    if (m) return m;
+    m = new Map();
+    for (const x of SB.engine.allEvents(state)) {
+      if (!x || x.type !== 'temp_logged') continue;
+      if (!m.has(x.batchId)) m.set(x.batchId, []);
+      m.get(x.batchId).push(x);
+    }
+    tempCache.set(state, m);
+    return m;
+  }
+
   // For a cold-food reading: whether it was above the cold limit and how much time above the limit the batch has used up so far.
   // The engine adds up the time across separate stretches (an in-range reading does not wipe it), so this replays the batch's
   // readings in order the same way. Returns '' when the batch is not cold food or the limit is unknown.
@@ -68,8 +84,8 @@
     const lim = state.settings && state.settings.safety ? state.settings.safety.coldHoldF : null;
     if (!b || b.kind !== 'cold' || !isNum(lim) || !isNum(e.f) || !SB.engine || !SB.engine.allEvents) return '';
     let since = null, used = 0;
-    for (const x of SB.engine.allEvents(state)) {
-      if (x.type !== 'temp_logged' || x.batchId !== e.batchId || x.reverted || !isNum(x.f) || !isNum(x.t) || x.t > e.t) continue;
+    for (const x of tempsByBatch(state).get(e.batchId) || []) {
+      if (x.reverted || !isNum(x.f) || !isNum(x.t) || x.t > e.t) continue;
       if (x.f > lim) { if (since == null) since = x.t; } else if (since != null) { used += x.t - since; since = null; }
       if (x === e || x.id === e.id) break;
     }
