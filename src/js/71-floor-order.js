@@ -102,9 +102,6 @@
   // orderId is the open order this round is added to (null starts a new one); pay is how it is paid when sent
   // ('' leaves it open); tip is the tip text as typed.
   const D = { lines: [], customer: '', channel: 'dine_in', note: '', rush: false, orderId: null, pay: '', tip: '', allergy: '' };
-  // How the last order was paid when it was sent ('' = left open). A counter that takes cash all day starts the next
-  // order on cash, one tap fewer; Pay later is still one tap away.
-  let payDefault = '';
   let seq = 0;
   let lastSent = null; // { num, channel, items } of the last order sent from this sheet
   let live = null;     // the open view, or null
@@ -117,7 +114,9 @@
   // A separate copy of the order, kept so Undo can put it back.
   const copyDraft = () => JSON.parse(JSON.stringify(D));
   function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; D.allergy = snap.allergy || ''; saveDraftNow(); }
-  function resetDraft() { clearStoredDraft(); D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = payDefault; D.tip = ''; D.allergy = ''; }
+  // WATCH OUT: every new order starts on Pay later. Carrying the last order's payment over would let the next order be
+  // recorded as paid (cash, say) by a cook who never looked at the payment box.
+  function resetDraft() { clearStoredDraft(); D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = ''; D.tip = ''; D.allergy = ''; }
   // The half-built order is also kept in the browser, so a reload or a closed tab brings it back. Uses the store's own draft
   // calls (saveDraft, loadDraft, clearDraft) when this copy has them, and a plain browser-storage key until then.
   const KEY_DRAFT = 'smokebox.v1.orderdraft';
@@ -990,7 +989,6 @@
         const info = res.info || {};
         const zones = Array.isArray(info.zones) ? info.zones.length : 0;
         lastSent = { num: info.num, channel: D.channel, items: items.map((it) => ({ menuId: it.menuId, qty: it.qty, mods: (it.mods || []).slice() })) };
-        payDefault = D.pay;
         resetDraft();
         host.close('sent');
         const where = addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent to ' : ' sent to ';
@@ -999,10 +997,13 @@
         SB.ui.toast('Ticket #' + info.num + (oneStation ? (addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent' : ' sent') : where + zones + ' ' + U.plural(zones, 'station')) + '.' + (info.paid ? ' Paid ' + U.fmtMoney(info.total) + ' by ' + payWord + '.' : ''), { tone: 'ok' });
         return;
       }
-      const words = SB.engine.describe(res.report, res.info, st().settings);
+      let words = SB.engine.describe(res.report, res.info, st().settings);
+      // A dish taken off the menu (on another tablet, say) while this order was open: name it, so the cook knows which line to remove.
+      const gone = res.report === 'unknownMenu' && res.info ? menuById(res.info.menuId) : null;
+      if (gone) words = (gone.short || gone.name) + ' was taken off the menu. Remove it from this order, then send.';
       showError(words);
       setPane('order');
-      if (res.report === 'itemUnavailable') {
+      if (res.report === 'itemUnavailable' || res.report === 'unknownMenu') {
         paintTiles(); syncLines();
         const bad = D.lines.find((l) => l.menuId === (res.info && res.info.menuId));
         const v = bad && view.lineViews.get(bad.key);
