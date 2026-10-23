@@ -4,11 +4,11 @@ What to do when Smokebox opens empty, your data is gone, or you cannot get past 
 
 ## I closed the tab
 
-Smokebox saves every change on this device as you go. Open it again the same way, in the same browser, and the board comes back. The clocks kept running while it was closed, and no warning sounded.
+Smokebox saves every change as you go. Open it again in the same browser and the board comes back. The clocks kept running, and no warning sounded while it was closed.
 
 ## The tablet was replaced or cleared
 
-Your data lives only in the browser on one device. Clearing the browser data, using another browser, another file location or a private window shows an empty Smokebox. Restore your last backup (see Backup and restore).
+Your data lives only in the browser on one device. Clearing the browser data, or using another browser or a private window, shows an empty Smokebox. Restore your last backup (see Backup and restore).
 
 ## I forgot the PIN
 
@@ -16,7 +16,11 @@ When you set a PIN, Smokebox shows a recovery code once. Tap **Copy** or **Print
 
 No code? The only way back is to clear this site's saved data in your browser settings. That erases everything on this device, including today's tickets and your menu. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before the PIN was set.
 
-Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not real security.
+With a PIN set, changing it or making a new recovery code asks for the current PIN. Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not real security.
+
+## Smokebox could not read some records
+
+If a message says some saved records could not be read and were left out, the data as it was is kept. Do not clear the browser data. Ask whoever set up Smokebox.
 
 ## Smokebox opens empty
 

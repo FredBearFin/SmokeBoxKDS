@@ -242,13 +242,24 @@ async function startOver(browser) {
   const sh = '.sheet-root:last-of-type';
   for (const t of ['What happens', 'Keep my tax, hours, PIN and station names', 'Next: about your backup']) check('start over step 1: ' + t, await has(p, t, sh));
   await tap(p, 'Next: about your backup'); await p.waitForTimeout(500);
-  check('start over step 2: the backup is made at the moment of erasing', await seen(p, 'The moment you confirm', sh));
+  for (const t of ['Save my backup file now', 'I saved the backup file and I can find it', 'Next: confirm']) check('start over step 2: ' + t, await has(p, t, sh));
+  check('start over step 2: Next: confirm waits for the saved box', await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-root:last-of-type button')].find((e) => e.textContent.trim() === 'Next: confirm'); return !!b && b.disabled; }));
+  await tap(p, 'Save my backup file now'); await p.waitForTimeout(800);
+  await p.evaluate(() => document.querySelector('#so-saw').click()); await p.waitForTimeout(300);
   await tap(p, 'Next: confirm'); await p.waitForTimeout(500);
   check('start over step 3: Erase everything and start over', await has(p, 'Erase everything and start over', sh));
   await p.fill(sh + ' input[type=text]', 'erase'); await tap(p, 'Erase everything and start over'); await p.waitForTimeout(1500);
   for (const t of ['Done. Your kitchen is empty.', 'Go to the first screen', 'Save the backup again']) check('start over done: ' + t, await has(p, t, sh));
   check('start over: the kitchen is empty afterwards', (await p.evaluate(() => SB.store.getState().menu.length)) === 0);
   await p.close();
+  // With a PIN set the PIN pad comes first.
+  const q = await fresh(browser);
+  await addDish(q, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  await q.evaluate(() => SB.shell.setPin('1234')); await q.waitForTimeout(300);
+  await q.click('button.fl-menu'); await q.waitForTimeout(500);
+  await tap(q, 'Start over with an empty menu'); await q.waitForTimeout(800);
+  check('start over with a PIN: the PIN pad opens first', await q.evaluate(() => /Manager PIN/.test(document.body.innerText)));
+  await q.close();
 }
 
 // The Setup recipes walk: the four recipes on the Setup recipes page, each checked against the real screens.
@@ -430,6 +441,74 @@ async function readingsAndChecks(browser) {
   await p.close();
 }
 
+// The notices walk: PIN prompts on the sensitive actions, the clock-jump question, the closed-day refusal and the unreadable-records message.
+async function notices(browser) {
+  console.log('PIN prompts and notices');
+  const padUp = (p) => p.evaluate(() => !!document.querySelector('button[aria-label="Digit 1"]'));
+  const enter = async (p, pin) => { for (const d of pin) await p.evaluate((d) => document.querySelector('button[aria-label="Digit ' + d + '"]').click(), d); await p.waitForTimeout(900); };
+  let p = await fresh(browser);
+  await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  await p.evaluate(() => SB.shell.setPin('1234')); await p.waitForTimeout(400);
+  await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
+  await tap(p, 'Tax, hours and PIN'); await p.waitForTimeout(600);
+  await p.fill('.sheet-root:last-of-type input[aria-label="Manager PIN, 4 digits"]', '5678'); await tap(p, 'Set PIN'); await p.waitForTimeout(800);
+  check('PIN set: changing it asks for the current PIN', await padUp(p));
+  await p.keyboard.press('Escape'); await p.waitForTimeout(400);
+  await tap(p, 'Make a recovery code'); await p.waitForTimeout(800);
+  check('PIN set: a new recovery code asks for the PIN', await padUp(p));
+  await p.keyboard.press('Escape'); await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(300);
+  await tap(p, 'Back office'); await p.waitForTimeout(800);
+  check('PIN set: the back office asks for the PIN', await padUp(p)); await enter(p, '1234'); await p.waitForTimeout(1200);
+  await p.click('#sb-office nav >> text=Menu and settings'); await p.waitForTimeout(1500);
+  await tap(p, 'Erase tickets and records'); await p.waitForTimeout(800);
+  await p.fill('input[aria-label="Type ERASE to confirm"]', 'ERASE'); await p.waitForTimeout(300);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].reverse().find((e) => e.getClientRects().length && e.textContent.trim() === 'Erase tickets and records'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } });
+  await p.waitForTimeout(900);
+  check('PIN set: Erase tickets and records asks for the PIN', await padUp(p));
+  await p.keyboard.press('Escape'); await p.waitForTimeout(400);
+  check('PIN refused: Nothing was erased.', await p.evaluate(() => /Nothing was erased\./.test(document.body.innerText) || SB.store.getState().menu.length > 0));
+  const backup = await p.evaluate(() => SB.store.exportAll());
+  await p.evaluate((t) => { const b = [...document.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Check pasted backup'); let n = b; let a = null; while (n && !a) { n = n.parentElement; a = n && n.querySelector('textarea'); } if (a) { const d = a.closest('details'); if (d) d.open = true; a.value = t; a.dispatchEvent(new Event('input', { bubbles: true })); } }, backup);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Check pasted backup'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } }); await p.waitForTimeout(1200);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.getClientRects().length && e.textContent.trim() === 'Replace everything with this backup'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } }); await p.waitForTimeout(900);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].reverse().find((e) => e.getClientRects().length && e.textContent.trim() === 'Replace everything'); if (b) b.click(); }); await p.waitForTimeout(900);
+  check('PIN set: restoring a backup asks for the PIN', await padUp(p));
+  await p.close();
+  // The clock jumps 40 hours ahead: Smokebox asks, and offers the two answers.
+  p = await fresh(browser);
+  await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  await p.evaluate(() => { const d = Date.now.bind(Date); Date.now = () => d() + 40 * 3600e3; });
+  await p.waitForTimeout(7500);
+  check("clock jump: This device's clock jumped ahead", await p.evaluate(() => /This device's clock jumped ahead/.test(document.body.innerText)));
+  for (const t of ['Use the new time', 'Keep the old time']) check('clock jump: ' + t, await seen(p, t));
+  await p.close();
+  // A paid order from a day that was already closed cannot be opened again.
+  p = await fresh(browser);
+  await addDish(p, { name: 'Sweet tea', short: 'Sweet tea', zone: 'cold', price: 3, prepSec: 60, track: 'one' });
+  const closedWords = await p.evaluate(() => {
+    const S = SB.store, d = (t, pl) => S.dispatchEx(t, pl, { source: 'ui' });
+    const tk = d('createTicket', { customer: 'Maria', channel: 'dine_in', items: [{ menuId: 'sweet_tea', qty: 1 }], note: '', rush: false, src: 'live' });
+    const oid = tk.info && tk.info.orderId;
+    d('payOrder', { orderId: oid, method: 'cash' });
+    const c = d('closeDay', {});
+    const r = d('reopenOrder', { orderId: oid });
+    return { close: c.report, reopen: r.report, words: SB.engine.describe(r.report, r.info, S.getState().settings) };
+  });
+  check('closed day: the reopen is refused', closedWords.reopen === 'dayClosed', closedWords);
+  check('closed day: plain words', /already closed, so it cannot be opened again/.test(closedWords.words || ''), closedWords);
+  await p.close();
+  // A saved ticket that cannot be read is left out and the message says so.
+  p = await fresh(browser);
+  await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  await p.evaluate(() => SB.store.dispatchEx('createTicket', { customer: 'A', channel: 'dine_in', items: [{ menuId: 'fries', qty: 1 }], note: '', rush: false, src: 'live' }, { source: 'ui' }));
+  await p.waitForTimeout(1500);
+  await p.evaluate(() => { const k = 'smokebox.v1.state', s = JSON.parse(localStorage.getItem(k)); const st = s.state || s; st.tickets[0].items = 'garbage'; localStorage.setItem(k, JSON.stringify(s)); });
+  await p.reload(); await p.waitForTimeout(1500);
+  check('unreadable records: Smokebox could not read some saved records and left out 1 ticket', await p.evaluate(() => /Smokebox could not read some saved records and left out 1 ticket/.test(document.body.innerText)));
+  check('unreadable records: the data as it was has been kept', await p.evaluate(() => /The data as it was has been kept on this device/.test(document.body.innerText)));
+  await p.close();
+}
+
 // The demo walk: a fresh browser context opened with ?demo has sample dishes and tickets, and a normal tab in the same context stays empty.
 async function demoMode(browser) {
   console.log('Demo mode (?demo)');
@@ -445,7 +524,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'readings') await readingsAndChecks(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await readingsAndChecks(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'startover') await startOver(browser); else if (process.env.WALK_ONLY === 'notices') await notices(browser); else if (process.env.WALK_ONLY === 'readings') await readingsAndChecks(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await readingsAndChecks(browser); await startOver(browser); await notices(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);

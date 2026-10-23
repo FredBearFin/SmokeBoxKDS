@@ -602,7 +602,7 @@
      },
      {
       "t": "p",
-      "x": "Closing does not lock anything. You can still take orders, and closing again later includes them. The app's day turns over at 4 am."
+      "x": "Closing does not lock new orders, and closing again later includes them. A paid order from a day you already closed cannot be opened again. The app's day turns over at 4 am."
      },
      {
       "t": "h",
@@ -645,7 +645,7 @@
      {
       "t": "ol",
       "x": [
-       "Open the thrown-out log from the board's menu.",
+       "Open the thrown-out log from the board's menu. It says which period it covers.",
        "Tap **Fix this entry** on the row.",
        "Say what was wrong, add your initials and tap **Save the fix**."
       ]
@@ -701,14 +701,34 @@
      },
      {
       "t": "h",
-      "x": "Start over with an empty menu"
+      "x": "Start over"
      },
+     {
+      "t": "p",
+      "x": "To empty your kitchen and begin again with a blank menu, see Start over with an empty menu."
+     },
+     {
+      "t": "h",
+      "x": "Erasing"
+     },
+     {
+      "t": "p",
+      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first."
+     }
+    ]
+   },
+   {
+    "id": "start-over",
+    "group": "guide",
+    "title": "Start over with an empty menu",
+    "summary": "Empty your kitchen and begin again with a blank menu. A backup file is saved first.",
+    "blocks": [
      {
       "t": "ol",
       "x": [
-       "Tap **Settings**. At the bottom, tap **Start over with an empty menu**.",
+       "Tap **Settings**. At the bottom, tap **Start over with an empty menu**. If a PIN is set, the PIN pad opens first.",
        "Read what goes and what stays. Clear **Keep my tax, hours, PIN and station names** to reset those too. Tap **Next: about your backup**.",
-       "This step only explains: the backup is saved at the moment of erasing, and if it fails, nothing is erased. Tap **Next: confirm**.",
+       "Tap **Save my backup file now**. The file downloads before anything is erased. Look in your downloads folder, select **I saved the backup file and I can find it**, then tap **Next: confirm**.",
        "Type ERASE, then tap **Erase everything and start over**.",
        "At \"Done. Your kitchen is empty.\" tap **Save the backup again** or **Go to the first screen**."
       ]
@@ -718,12 +738,8 @@
       "x": "There is no undo. To go back, restore the backup file. Left-over old demo tickets get **Clear them** or **Keep them**."
      },
      {
-      "t": "h",
-      "x": "Erasing"
-     },
-     {
       "t": "p",
-      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either."
+      "x": "With a PIN set, the PIN pad opens first. If the backup cannot be saved, nothing is erased."
      }
     ]
    },
@@ -842,6 +858,7 @@
      {
       "t": "ul",
       "x": [
+       "A message says the device's clock jumped ahead? Choose **Use the new time** only if the new time is right. If the clock is wrong, fix it in the device settings and choose **Keep the old time**.",
        "Check the date range and the filters at the top of the Back office page.",
        "Choose **Live only** to leave out the sample history, which is made up.",
        "Unpaid orders are not counted as money collected.",
@@ -862,7 +879,7 @@
      },
      {
       "t": "p",
-      "x": "Smokebox saves every change on this device as you go. Open it again the same way, in the same browser, and the board comes back. The clocks kept running while it was closed, and no warning sounded."
+      "x": "Smokebox saves every change as you go. Open it again in the same browser and the board comes back. The clocks kept running, and no warning sounded while it was closed."
      },
      {
       "t": "h",
@@ -870,7 +887,7 @@
      },
      {
       "t": "p",
-      "x": "Your data lives only in the browser on one device. Clearing the browser data, using another browser, another file location or a private window shows an empty Smokebox. Restore your last backup (see Backup and restore)."
+      "x": "Your data lives only in the browser on one device. Clearing the browser data, or using another browser or a private window, shows an empty Smokebox. Restore your last backup (see Backup and restore)."
      },
      {
       "t": "h",
@@ -886,7 +903,15 @@
      },
      {
       "t": "p",
-      "x": "Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not real security."
+      "x": "With a PIN set, changing it or making a new recovery code asks for the current PIN. Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not real security."
+     },
+     {
+      "t": "h",
+      "x": "Smokebox could not read some records"
+     },
+     {
+      "t": "p",
+      "x": "If a message says some saved records could not be read and were left out, the data as it was is kept. Do not clear the browser data. Ask whoever set up Smokebox."
      },
      {
       "t": "h",
