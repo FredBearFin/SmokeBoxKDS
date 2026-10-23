@@ -23,7 +23,7 @@ A single HTML file (`dist/smokebox.html`) that runs in a browser. It is a kitche
 ## Records
 
 - The safety record (thrown-out batches, readings, entries) keeps entries for about 400 days. That is the app's own setting, not a legal rule. Ask your health department how long you must keep records.
-- Restoring a backup keeps what it replaced for 7 days inside the app, so a wrong restore can be undone in the code. There is no button for it on screen yet.
+- Restoring a backup keeps what it replaced for 7 days inside the app, and the Data page shows **Undo this restore** for that time (the PIN is asked if one is set).
 
 ## Warnings
 
