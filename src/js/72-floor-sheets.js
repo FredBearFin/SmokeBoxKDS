@@ -106,7 +106,6 @@
   function safetyNote(extra) {
     return h('div', { class: 'fs-note fs-safety' }, ico('shield-check', 20), h('div', null, extra ? h('p', null, extra) : null, h('p', null, C.safetyLine)));
   }
-  function simPill() { return h('span', { class: 'fs-sim' }, ico('info', 16), h('span', null, 'Demo only: no live POS connected')); }
 
   // Keep `parent`'s children in the order of `items`. New keys are created
   // with make(item); existing nodes are never replaced and only
@@ -1183,54 +1182,6 @@
     // Wide, so the menu and the stock sit side by side on a big screen.
     const sheet = SB.ui.sheet({ title: '86 board and stock', side: 'right', width: 'min(1060px, 96vw)', name: 'board86', onClose: () => offs.splice(0).forEach((f) => f()) });
 
-    // The sync strip: one chip per simulated channel. Nothing is really sent to any outside system.
-    const syncMap = new Map();
-    const syncGrid = h('div', { class: 'bd-sync-grid' });
-    C.syncTargets.forEach((t) => {
-      const st1 = h('div', { class: 'bd-chip-state' }), st2 = h('div', { class: 'bd-chip-sub' });
-      const icon = h('span', { class: 'bd-chip-i' });
-      const el = h('div', { class: 'bd-chip', dataset: { target: t.id, tone: 'muted' } }, icon, h('div', { class: 'bd-chip-t' }, h('div', { class: 'bd-chip-n' }, t.name), st1, st2));
-      syncMap.set(t.id, { el, st1, st2, icon, key: '' });
-      syncGrid.appendChild(el);
-    });
-    // Seconds a simulated channel takes to catch up (starter value from config).
-    const syncSec = () => (st().settings && st().settings.syncTargetSec) || C.syncTargetSec;
-    // Folded away by default and kept below the menu and stock, so the real controls come first.
-    const syncBox = h('details', { class: 'fs-section bd-sync', 'aria-label': 'Channel sync' },
-      h('summary', { class: 'fs-row', style: 'cursor:pointer' }, h('h3', { class: 'fs-h grow' }, 'Channel sync (demo only)'), simPill()),
-      syncGrid,
-      h('p', { class: 'fs-sub bd-sync-note' }, 'There is no live POS or delivery app connected. These four chips show how a real 86 would reach each channel. Changes catch up within ' + syncSec() + ' seconds.'));
-
-    // Updates the channel chips: syncing, synced after N seconds, or no changes yet.
-    function paintSync() {
-      const syncs = st().syncs || [];
-      const target = syncSec();
-      C.syncTargets.forEach((t) => {
-        const rec = syncMap.get(t.id);
-        let pending = 0, latest = null;
-        for (let i = syncs.length - 1; i >= 0; i--) {
-          const x = syncs[i].targets && syncs[i].targets[t.id];
-          if (!x) continue;
-          if (x.doneAt == null) pending++; else if (!latest) latest = { sy: syncs[i], x };
-        }
-        let tone, icon, line1, line2 = '';
-        if (pending) { tone = 'warn'; icon = 'clock'; line1 = 'Syncing...'; line2 = pending > 1 ? pending + ' changes on the way' : '1 change on the way'; }
-        else if (latest) {
-          const secs = Math.max(0, Math.round((latest.x.doneAt - latest.sy.t) / 1000));
-          const late = secs > target;
-          tone = late ? 'warn' : 'ok'; icon = late ? 'alert' : 'check-circle';
-          line1 = 'Synced ' + secs + ' s after ' + (latest.sy.kind === 'back' ? 'back on' : '86');
-          const mi = menuOf(latest.sy.menuId);
-          line2 = (mi ? mi.short || mi.name : '') + (late ? ', over the ' + target + ' s target' : '');
-        } else { tone = 'muted'; icon = 'info'; line1 = 'No changes yet'; line2 = 'Nothing has been 86\'d'; }
-        const key = tone + '|' + icon + '|' + line1 + '|' + line2;
-        if (rec.key === key) return;
-        rec.key = key; attr(rec.el, 'data-tone', tone);
-        U.clear(rec.icon); rec.icon.appendChild(ico(icon, 22));
-        text(rec.st1, line1); text(rec.st2, line2); setHidden(rec.st2, !line2);
-      });
-    }
-
     // Filter: all items, or only the ones that are off the menu.
     const filterSeg = SB.ui.segmented({ label: 'Show', class: 'bd-filter', value: filter, options: [{ id: 'all', label: 'All items', count: 0 }, { id: 'off', label: 'Off the menu', count: 0 }], onChange: (id) => { filter = id; applyFilter(); } });
     const menuBox = h('section', { class: 'fs-section bd-menu', 'aria-label': 'Menu availability' }, h('div', { class: 'fs-row' }, h('h3', { class: 'fs-h grow' }, 'Menu'), filterSeg));
@@ -1437,13 +1388,13 @@
     const noDishBtn = h('button', { type: 'button', class: 'btn btn-primary', onClick: () => closeThen(sheet, () => SB.sheets.open('dishes')) }, ico('plus', 20), h('span', null, 'Add your first dish'));
     const noDishBox = h('div', { class: 'empty bd-nodishes', hidden: true }, ico('ban', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your first dish. Then you can mark it sold out here, and Smokebox marks it for you when stock runs low.'), noDishBtn);
     const bdCols = h('div', { class: 'bd-cols' }, menuBox, stockBox);
-    sheet.body.append(h('div', { class: 'bd' }, noDishBox, bdCols, syncBox));
+    sheet.body.append(h('div', { class: 'bd' }, noDishBox, bdCols));
 
     // Repaints the dish rows and stock rows, and swaps in the no-dishes message when the menu is empty.
     function update(now) {
       const s = st();
       const menu = s.menu.filter((m) => !m.archived);
-      setHidden(noDishBox, menu.length > 0); setHidden(bdCols, menu.length === 0); setHidden(syncBox, menu.length === 0);
+      setHidden(noDishBox, menu.length > 0); setHidden(bdCols, menu.length === 0);
       // categories keep a stable order; a category appears the first time one of its items does
       const order = C.categories.map((c) => c.id);
       menu.forEach((m) => { if (order.indexOf(m.cat) < 0) order.push(m.cat); });
@@ -1465,7 +1416,6 @@
       let off = 0; rows.forEach((r) => { if (r.off) off++; });
       filterSeg.setCount('all', rows.size); filterSeg.setCount('off', off, { alert: off > 0 });
       applyFilter();
-      paintSync();
     }
     update(nowMs());
     watch(offs, () => update(nowMs()), (now) => update(now));
@@ -1679,7 +1629,7 @@
       } }, ico('zap', 22), h('span', null, 'Add 12-ticket rush'));
       simBox.append(
         h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Automatic orders'), h('p', { class: 'fs-sub' }, 'Demo tickets arrive on the kitchen clock, so a faster clock means faster orders. They are labeled Demo.'), ordersSeg),
-        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A demo cook who works while automatic orders run. Turn it off to work by hand.'), crewTog),
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A demo cook who works while automatic orders run. Turn it off to work the demo by hand.'), crewTog),
         h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Rush'), h('p', { class: 'fs-sub' }, 'Twelve tickets at once, like a lunch rush.'), burstBtn));
     } else {
       simBox.append(h('div', { class: 'fs-note', 'data-tone': 'warn', role: 'status' }, ico('alert', 20),
@@ -1917,7 +1867,7 @@
         rule('snow', 'Keep cold food cold', 'Cold food stays at ' + U.tempText(S.coldHoldF) + ' or below.'),
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + U.tempText(S.hotHoldF) + ', reheat to ' + U.tempText(S.reheatF) + ' within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
-        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
+        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat.'),
         rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit means the batch must be thrown out when time is up. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
         rule('snow', 'Cooling', 'From ' + U.tempText(S.hotHoldF) + ' to ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' hours, then to ' + U.tempText(c.finalF) + ' within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
@@ -1932,7 +1882,6 @@
         helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants that cook food ahead: tickets, paced start times, a hold cabinet and a sold-out list.'),
         helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
         helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
-        helpItem('info', 'Channel sync is for the demo only', 'There is no live POS or delivery app connected. The 86 board shows how a real sync would look and says so.'),
         helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
         helpItem('sparkle', 'Demo and sample data', 'Demo tickets and the sample history are made by the app. They are labeled wherever they appear.'),
       ]),
@@ -2170,7 +2119,7 @@
       // Start over sits alone at the very bottom, away from the everyday buttons. In the demo it is replaced by the way back.
       SB.store.isDemo && SB.store.isDemo()
         ? settingBlock('The demo', 'You are in the demo, not your kitchen.', h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => SB.store.leaveDemo() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Back to my kitchen')))
-        : settingBlock('Start over', 'Empty the menu and begin again. You will be asked to save a backup first.', link('trash', 'Start over with an empty menu', 'startover'))));
+        : settingBlock('Start over', 'Empty the menu and begin again. A backup is saved for you first.', link('trash', 'Start over with an empty menu', 'startover'))));
 
     // Keep every control in step when something else changes the look, the station or the clock.
     offs.push(SB.theme.onChange(() => { themeSeg.setValue(SB.theme.get()); textSeg.setValue(SB.theme.textSize()); sizeSeg.setValue(SB.theme.density()); hintsTog.setValue(SB.theme.hints()); }));

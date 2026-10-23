@@ -61,6 +61,13 @@
   const C = SB.config;
   // The rules engine (SB.engine), looked up on each call and never kept.
   const E = () => SB.engine;
+  // True when the kitchen runs as counter service (settings.service.counter): orders are taken and paid at the counter, with no
+  // cooking steps to track. Absent or false means the normal kitchen board.
+  function counterOn() {
+    const sv = store().getState().settings && store().getState().settings.service;
+    if (SB.engine && typeof SB.engine.counterOn === 'function') return !!SB.engine.counterOn(store().getState().settings);
+    return !!(sv && sv.counter === true);
+  }
   // True when the cook-ahead parts (batches, Cabinet tab, Hold button, temperature checks, sanitize timer) should show:
   // the module is on (absent means on), or some batch still holds food, which is never hidden.
   function cookOn() {
@@ -496,6 +503,14 @@
   };
 
   // Stops every listener, timer and observer and empties the element. Safe to call twice.
+  // Applies the saved station, category and channel names to the live app without a reload: reloads the name lists and draws
+  // the board again on the same element, on the same station tab. Safe to call when the board is not mounted.
+  F.refreshNames = function () {
+    try { C.applyCustom(C.customSpec()); } catch (e) { console.error('[smokebox] names failed', e); return false; }
+    if (m && m.el) { const el = m.el, zone = m.zone; F.unmount(); pendingZone = TABS.indexOf(zone) >= 0 ? zone : null; F.mount(el); }
+    return true;
+  };
+  // Stops the board's timers and listeners and takes it off the screen.
   F.unmount = function () {
     if (!m) return;
     const i = m;
@@ -583,7 +598,7 @@
 
     // New ticket opens the order sheet. Menu opens the full menu, or a short list on a narrow screen.
     const newBtn = h('button', { type: 'button', class: 'btn btn-primary fl-new', 'aria-keyshortcuts': 'N', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket'));
-    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Menu', onClick: (e) => { if (mq('(max-width: 999px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Menu'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
+    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Settings', onClick: (e) => { if (mq('(max-width: 999px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Settings'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
     // Back office is a plain labeled button for managers: sales, speed, stock and the menu. It asks for the PIN when one is set.
     const officeBtn = h('button', { type: 'button', class: 'btn fl-tool fl-office', 'aria-label': 'Back office', 'aria-keyshortcuts': 'Control+Shift+O', onClick: (e) => openOffice(e.currentTarget) }, ico('gauge', 24), h('span', { class: 'fl-tool-label fl-office-label' }, 'Back office'));
     try { SB.ui.tooltip(officeBtn, 'Back office: sales, speed, stock and your menu'); } catch (e) { /* ignore */ }
@@ -1547,8 +1562,12 @@
     if (!m.dis) m.dis = new Set();
     // With the cook-ahead part off (and no food in a batch) rows about batches, temperatures and sanitizing stay out of the strip.
     const ck = cookOn();
+    // Counter service has no cooking steps and no late tickets, so the strip leaves those rows out.
+    const co = counterOn();
+    const ticketRow = (d) => co && (d.kind === 'late' || d.kind === 'start' || d.kind === 'ready' || d.kind === 'new');
+    // Rows about batches, temperatures and sanitizing count as cook-ahead rows.
     const batchy = (d) => !ck && (d.batchId || d.kind === 'sanitize' || d.kind === 'check' || d.kind === 'shortfall' || d.kind === 'leftover' || d.kind === 'keepcheck' || d.kind === 'expiry' || d.kind === 'expired' || d.kind === 'past');
-    const feed = all.filter((d) => !d.trivial && !batchy(d) && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
+    const feed = all.filter((d) => !d.trivial && !batchy(d) && !ticketRow(d) && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
     // A tablet screen is short: one warning row there (the next shows when this one is cleared or done), two on a tall or far screen.
     // A far display below 1300 px tall keeps one big row, so the tickets keep most of the screen; a taller one has room for two.
     const maxRows = !F.wallActive() && (far ? (g.innerHeight || 0) >= 1300 : (g.innerHeight || 0) >= 900) ? 2 : 1;
@@ -1605,6 +1624,9 @@
     const c = S.select.counts();
     m.counts = c;
     applyCook(cookOn());
+    { const co = counterOn() ? 'on' : 'off'; if (m.root.dataset.counter !== co) { m.root.dataset.counter = co; m.fitKey = null; }
+      // At the counter there is one list of orders, so a station tab left open is switched back to All.
+      if (co === 'on' && m.zone !== 'all') F.setZone('all'); }
     if (!m.belowAt || now - m.belowAt > 1000 || now < m.belowAt) { m.belowAt = now; updateBelow(); }
     paintRole();
     updateStrip(now);
@@ -1670,7 +1692,7 @@
     // the menu button carries a dot when something on the quick list needs a look
     const needs = c.hold > 0 || c.sanitizeOverdue || demoOn;
     setHidden(m.menuBtn.querySelector('.fl-menu-dot'), !needs);
-    const menuName = needs ? 'Menu, something needs a look' : 'Menu';
+    const menuName = needs ? 'Settings, something needs a look' : 'Settings';
     if (m.menuBtn.getAttribute('aria-label') !== menuName) m.menuBtn.setAttribute('aria-label', menuName);
     toolCount(m.tool.demo, demoOn ? 1 : 0, 'warn', demoOn ? (speed > 1 ? 'clock running at x' + (Math.round(speed * 10) / 10) : 'demo orders running') : '', demoOn ? (speed > 1 ? 'x' + (Math.round(speed * 10) / 10) : 'on') : '');
     refit();
@@ -1742,7 +1764,7 @@
     ].filter((it) => !it.hide);
     // Hiding rows can leave a separator at the top, the bottom or twice in a row; those go.
     const clean = items.filter((it, i) => !(it.separator && (i === 0 || i === items.length - 1 || items[i - 1].separator)));
-    SB.ui.menu(anchor, clean, { label: 'Menu' });
+    SB.ui.menu(anchor, clean, { label: 'Settings' });
   }
 
   // Opens the back office from a visible button; the shell asks for the manager PIN first when one is set.
@@ -1990,7 +2012,10 @@
     const t = E().findTicket(store().getState(), rec.id);
     if (!t) { toast(E().REPORTS.unknownTicket, { tone: 'warn' }); return; }
     const left = notDoneItems(t);
-    if (!left.length) { run('bumpTicket', { ticketId: rec.id }); return; }
+    // At the counter nobody ticks off dishes one by one, so Bump never asks about unfinished items.
+    // The dishes are marked done first so the office numbers do not count a forced bump.
+    if (counterOn() && left.length) left.forEach((it) => { try { store().dispatchEx('completeItem', { ticketId: rec.id, itemId: it.id }, { source: 'ui' }); } catch (e) { /* the bump below then reports it */ } });
+    if (!left.length || counterOn()) { run('bumpTicket', { ticketId: rec.id }); return; }
     const names = left.slice(0, 3).map((it) => it.short || it.name).join(', ') + (left.length > 3 ? ' and ' + (left.length - 3) + ' more' : '');
     SB.ui.confirm({
       title: left.length + ' ' + U.plural(left.length, 'item') + ' not done. Bump anyway?',

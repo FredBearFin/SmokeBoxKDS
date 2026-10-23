@@ -26,7 +26,7 @@
     const out = [{ label: 'Exact', amount: cents(due) }], seen = new Set([cents(due)]);
     [5, 10, 20, 50, 100].forEach((step) => {
       const amt = Math.ceil(cents(due) / step - 1e-9) * step;
-      if (amt > 0 && !seen.has(amt) && out.length < 5) { seen.add(amt); out.push({ label: '$' + amt, amount: amt }); }
+      if (amt > 0 && !seen.has(amt) && out.length < 5) { seen.add(amt); out.push({ label: (U.currencySymbol ? U.currencySymbol() : '$') + amt, amount: amt }); }
     });
     return out;
   }
@@ -350,11 +350,11 @@
     const itemsP = h('p', { class: 'ox-pay-items' });
     // The order's money lines, rewritten whenever the discount changes.
     const calc = h('dl', { class: 'ox-calc' });
-    const discInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Discount in dollars' });
-    const discField = SB.ui.field({ label: 'Discount in dollars (optional)', control: discInput });
-    const tipInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Tip in dollars' });
-    const tipField = SB.ui.field({ label: 'Tip in dollars (optional)', control: tipInput });
-    const cashInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Cash the guest handed over, in dollars' });
+    const discInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Discount amount' });
+    const discField = SB.ui.field({ label: 'Discount (optional)', control: discInput });
+    const tipInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Tip amount' });
+    const tipField = SB.ui.field({ label: 'Tip (optional)', control: tipInput });
+    const cashInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Cash the guest handed over' });
     const cashField = SB.ui.field({ label: 'Cash handed over (to work out the change)', control: cashInput });
     const change = h('p', { class: 'ox-change', role: 'status' });
     const err = h('p', { class: 'ox-pay-err', role: 'alert', hidden: true });
@@ -425,10 +425,10 @@
     // Reads the boxes: the discount, tip and cash as numbers, or the first problem in plain words.
     function read() {
       const d = U.parseDollars(P.disc), t = U.parseDollars(P.tip), c = U.parseDollars(P.cash);
-      if (Number.isNaN(d)) return { err: 'Type the discount as dollars and cents, like 2.50.', box: discInput };
+      if (Number.isNaN(d)) return { err: 'Type the discount as an amount, like 2.50.', box: discInput };
       if (d > food() + 1e-9) return { err: 'The discount cannot be more than the food, ' + money(food()) + '.', box: discInput };
-      if (Number.isNaN(t)) return { err: 'Type the tip as dollars and cents, like 2.50.', box: tipInput };
-      if (Number.isNaN(c)) return { err: 'Type the cash as dollars and cents, like 40.00.', box: cashInput };
+      if (Number.isNaN(t)) return { err: 'Type the tip as an amount, like 2.50.', box: tipInput };
+      if (Number.isNaN(c)) return { err: 'Type the cash as an amount, like 40.00.', box: cashInput };
       return { d, t, c };
     }
     // Redraws the lines, the money rows, chip states, the change line and the Mark paid button.
