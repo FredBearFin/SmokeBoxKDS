@@ -1,29 +1,33 @@
 # Several screens (test feature)
 
-A second screen that shows your kitchen. This is a test feature. It is not part of the normal install.
-
-## What it is
-
-A second screen, like a TV above the pass or a phone, can show what the kitchen board shows. It only shows. Buttons on it do nothing to the kitchen, and it has no New ticket button.
-
-## What it cannot do
-
-- Take orders, start dishes, bump tickets or change anything.
-- Work by itself. Smokebox does not start the program that feeds it. That program is called the hub, and someone has to run it on a laptop or a server.
-- Share your own tablet's kitchen. The screen shows the hub's kitchen. Your tablet's saved kitchen is not sent anywhere and is not changed.
+Show your kitchen on a second screen, or let more than one tablet take orders into one kitchen. Both are test features. They are not part of the normal install, and nothing has been tried on real tablets.
 
 ## What you need
 
-A hub that someone is running, its address, and its access code if it has one. Nothing here has been tried on real tablets.
+A hub: a small program that keeps the kitchen in one place. Someone has to run it by hand on a laptop or a server. Smokebox never starts one. You also need its address, and its access code if it has one. Then tap **Settings**, then **Use one kitchen on several tablets**.
 
-## Connect
+## Show only
 
-On the second screen, tap **Settings**, then **Show this kitchen on another screen**. Type the **Address of the kitchen**, type the access code if asked, and tap **Connect**. The screen then says "Connected" and "This screen only shows the kitchen."
+For a TV or a phone. Tap **Show only**, type the **Address of the kitchen** and the code, and tap **Connect**. The screen says "Connected" and "This screen only shows the kitchen." It cannot take or change orders, and it does not touch the tablet's own saved kitchen.
 
-## Out of date
+## Use this hub for orders
 
-If the screen cannot reach the hub, it says "Reconnecting...". After a short while a red banner says "Out of date since" a time, and that what you see may not be what is happening in the kitchen. Do not rely on the screen until it says "Connected" again.
+For a tablet that takes orders too. Tap **Use this hub for orders on this tablet**. Type the address, the code and a name for this screen, like Pass. Tap **Check the hub**, then choose one:
 
-## Go back to your own kitchen
+- Show the hub's kitchen on this tablet. Your own saved kitchen stays untouched and comes back when you leave.
+- Send this tablet's kitchen to the hub. This works only if the hub is empty. Smokebox never mixes two kitchens.
 
-Tap the menu button at the top right, then **Back to my own kitchen**. Your own saved kitchen was never touched.
+Then tap **Join the hub**. If you reload the page, the tablet goes back to its own kitchen and you join again.
+
+## What the board tells you
+
+- "Connected": your taps are reaching the hub.
+- "Offline: your taps are saved and will be sent": the link is down. Taps wait on this tablet.
+- "Not confirmed yet" on a ticket: the hub has not answered that change.
+- "Not done:" and a reason: the hub refused a tap, for example because another tablet got there first.
+
+A Show only screen says "Reconnecting..." when the link drops. After a short while a red banner says "Out of date since" a time. Do not rely on it until it says "Connected".
+
+## Leave
+
+On a Show only screen, tap the menu button at the top right, then **Back to my own kitchen**. On a tablet using the hub, tap **Leave the hub**. If some taps have not reached the hub, Smokebox warns you first; **Leave anyway, lose those taps** loses them.
