@@ -41,7 +41,7 @@
   const patchFor = (path, v) => { const ks = path.split('.'); const root = {}; let c = root; ks.forEach((k, i) => { if (i === ks.length - 1) c[k] = v; else c = c[k] = {}; }); return root; };
   // The unit word for an ingredient, and an amount written with that unit.
   const unitWord = (ing) => (ing && ing.unit === 'ea' ? 'pieces' : 'g');
-  const amountText = (ing, v) => (ing && ing.unit === 'ea' ? num(v, 1) + ' ' + U.plural(v, 'piece') : U.fmtG(v));
+  const amountText = (ing, v) => (ing && ing.unit === 'ea' ? num(v, 1) + ' ' + U.plural(v, 'piece') : U.weightText(v));
   // Dollars with cents, as shown in field messages.
   const money = (v) => U.fmtMoney(v, 2);
   // An ingredient note from the config may quote a price per pound; show kilograms instead (this app never
@@ -235,6 +235,10 @@
   }
   // Small builders for a sub-heading and a paragraph.
   const sub = (text, id) => h('h3', { class: 'od-sub', id }, text);
+  // The small round "?" that opens one Guide page, or nothing when the Guide did not load.
+  const helpLink = (page, label) => { try { return SB.guide && SB.guide.link ? SB.guide.link(page, label) : null; } catch (e) { return null; } };
+  // A sub-heading with a Guide help link beside it.
+  const subHelp = (text, page, label) => { const hd = sub(text); const hl = helpLink(page, label); if (hl) { hd.appendChild(doc.createTextNode(' ')); hd.appendChild(hl); } return hd; };
   const para = (text, cls) => h('p', { class: cls || 'od-p' }, text);
   // Builders for a quiet hint line and for a button with an optional icon.
   const hintLine = (text) => h('p', { class: 'od-hint' }, text);
@@ -282,7 +286,7 @@
         const li = h('li', { class: 'od-bom-line' });
         const sel = h('select', { class: 'select od-bom-sel', 'aria-label': 'Ingredient for ' + itemName });
         sel.appendChild(h('option', { value: l.ing }, name));
-        s.ingredients.forEach((o) => { if (!used.has(o.id)) sel.appendChild(h('option', { value: o.id }, o.name)); });
+        s.ingredients.forEach((o) => { if (!o.hidden && !used.has(o.id)) sel.appendChild(h('option', { value: o.id }, o.name)); });
         sel.value = l.ing;
         const field = numField({
           label: unitWord(ing) === 'g' ? 'Grams' : 'Pieces', aria: name + ' in ' + itemName, hideLabel: true, value: l.qty, min: 1, max: 100000, step: 1, big: 10, unit: unitWord(ing), meta: BOM_META,
@@ -328,7 +332,7 @@
     addBtn.addEventListener('click', () => {
       const s = cur(); if (!s) return;
       const used = new Set(bomNow().map((l) => l.ing));
-      const cand = s.ingredients.find((i) => !used.has(i.id));
+      const cand = s.ingredients.find((i) => !i.hidden && !used.has(i.id));
       if (!cand) return;
       const q = cand.unit === 'ea' ? 1 : 100;
       const r = send('updateMenuItem', { id, patch: { bom: bomNow().concat([{ ing: cand.id, qty: q }]) } });
@@ -639,7 +643,11 @@
     starterChip.classList.add('od-fchip');
     const filters = h('div', { class: 'od-filters' }, segStatus, zoneSel, starterChip);
     const list = h('div', { class: 'od-list' });
-    const emptyEl = h('div', { class: 'od-empty', hidden: true }, h('strong', null, 'No items match.'), h('span', null, ' Change the filter above to see more.'));
+    const emptyT = h('strong', null, 'No items match.'), emptyB = h('span', null, ' Change the filter above to see more.');
+    // The add-your-first-dish button only shows when the menu has no dishes at all; it opens the dishes sheet.
+    const emptyAdd = h('button', { type: 'button', class: 'btn btn-primary', hidden: true, dataset: { act: 'first-dish' } }, ico('plus', 20), h('span', null, 'Add your first dish'));
+    emptyAdd.addEventListener('click', () => { if (SB.sheets && SB.sheets.open) SB.sheets.open('dishes'); });
+    const emptyEl = h('div', { class: 'od-empty', hidden: true }, emptyT, emptyB, emptyAdd);
     list.appendChild(emptyEl);
     pn.body.append(filters, list);
 
@@ -658,6 +666,10 @@
         row.root.hidden = !ok; if (ok) shown++;
       }
       emptyEl.hidden = shown > 0;
+      const none = s.menu.length === 0;
+      emptyT.textContent = none ? 'No dishes yet.' : 'No items match.';
+      emptyB.textContent = none ? ' Add your first dish to start taking orders.' : ' Change the filter above to see more.';
+      emptyAdd.hidden = !none;
     }
     P.syncs.push((s) => {
       const seen = new Set();
@@ -696,13 +708,13 @@
     const thrMeta = { name: 'The sold-out amount', unit: pieces ? 'pieces' : 'g' };
     const par = numField({
       label: 'Opening amount (par)', aria: 'Opening amount of ' + nm, value: ing0.parG, min: 0, max: 1e7, step: pieces ? 1 : 100, big: pieces ? 10 : 1000, unit: pieces ? 'pieces' : 'g', meta: parMeta,
-      read: pieces ? null : (u) => U.fmtG(u),
+      read: pieces ? null : (u) => U.weightText(u),
       // Par saves through the engine; the line under the row confirms it.
       save: (v) => mkPatch({ parG: v }, 'Saved. Par is ' + amountText(ing0, v) + '. After you reset live data and keep settings, opening stock starts at this amount.', parMeta), onSaved: (t) => status.ok(t),
     });
     const thr = numField({
       label: 'Sold out at', aria: 'Sold out at, ' + nm, value: ing0.thresholdG, min: 0, max: 1e7, step: pieces ? 1 : 50, big: pieces ? 10 : 500, unit: pieces ? 'pieces' : 'g', meta: thrMeta,
-      read: pieces ? null : (u) => U.fmtG(u), hint: 'Dishes that use this are marked sold out at or below this amount.',
+      read: pieces ? null : (u) => U.weightText(u), hint: 'Dishes that use this are marked sold out at or below this amount.',
       // The 86 point saves the same way.
       save: (v) => mkPatch({ thresholdG: v }, 'Saved. Items using ' + lower1(nm) + ' go 86 at ' + amountText(ing0, v) + ' or less.', thrMeta), onSaved: (t) => status.ok(t),
     });
@@ -722,7 +734,7 @@
       pull = numField({
         label: 'Amount per take-out', aria: 'Amount per take-out of ' + nm, value: ing0.pullG || 1000, min: 50, max: 50000, step: 100, big: 500, unit: 'g', meta: pullMeta,
         // Shows the pull size in kilograms next to the field once it reaches a kilogram.
-        read: (u) => U.fmtG(u),
+        read: (u) => U.weightText(u),
         hint: 'What one tap on Pull takes out of the cabinet: one whole brisket, one rack, one pan.',
         // The pull size saves through the engine like the other fields.
         save: (v) => mkPatch({ pullG: v }, 'Saved. One tap on Pull takes ' + amountText(ing0, v) + ' out of the cabinet.', pullMeta), onSaved: (t) => status.ok(t),
@@ -830,6 +842,8 @@
     P.syncs.push((s) => {
       const seen = new Set();
       for (const ing of s.ingredients) {
+        // Hidden counted-stock ingredients ("Portions of ...") are kept out of the settings list.
+        if (ing.hidden) continue;
         seen.add(ing.id);
         let row = rows.get(ing.id);
         if (!row) { row = ingRow(P, ing); rows.set(ing.id, row); list.appendChild(row.root); }
@@ -1168,10 +1182,14 @@
       seg.setAttribute('aria-labelledby', lid);
       return { wrap, seg, get };
     };
+    // Saves a unit choice (temperature or weight) in the settings and redraws the back office numbers.
+    const saveUnit = (key, v) => { const r = send('updateSettings', { patch: { ui: { [key]: v } } }); if (good(r)) { try { if (SB.office && SB.office.refresh) SB.office.refresh(); } catch (e) { /* the next refresh catches up */ } } };
     const segs = [
       mkSeg('Back office theme', 'Ember is dark and warm, Paper is light. This page and every chart follow it.', themeOpts(['ember', 'Ember'], ['paper', 'Paper']), () => SB.theme.office(), (v) => SB.theme.setOffice(v)),
       mkSeg('Line theme', 'Day is the anti-glare parchment for bright kitchens, Night is for a dim prep corner.', themeOpts(['day', 'Day'], ['night', 'Night']), () => SB.theme.get(), (v) => SB.theme.set(v)),
       mkSeg('Text size', 'Large makes all text about 20% bigger on the line and in the back office.', themeOpts(['normal', 'Normal'], ['large', 'Large']), () => SB.theme.textSize(), (v) => SB.theme.setTextSize(v)),
+      mkSeg('Temperatures', 'Shows temperatures in Fahrenheit or Celsius. Food-safety limits are still stored in Fahrenheit, so the limits on the Food safety page are entered in F.', themeOpts(['F', '°F'], ['C', '°C']), () => ((cur() || {}).settings.ui || {}).tempUnit || 'F', (v) => saveUnit('tempUnit', v)),
+      mkSeg('Weights', 'Shows food weights in kilograms and grams, or in pounds and ounces. Amounts you type on the Ingredients page are still in grams.', themeOpts(['kg', 'kg and g'], ['lb', 'lb and oz']), () => ((cur() || {}).settings.ui || {}).weightUnit || 'kg', (v) => saveUnit('weightUnit', v)),
     ];
     const status = statusLine();
     const hasSound = !!(SB.floor && typeof SB.floor.setSound === 'function');
@@ -1427,7 +1445,7 @@
     else sampleBox.append(h('p', { class: 'od-p od-warnline' }, ico('alert', 18), h('span', null, 'Simulator not loaded. This build has no sample history, so the back office shows only live tickets.')), para(SAMPLE_NOTE, 'od-hint'));
 
     // Export: JSON backup and CSV tables go through saveFile, with copy as the fallback.
-    pn.body.appendChild(sub('Export'));
+    pn.body.appendChild(subHelp('Export', 'backup-and-restore', 'backing up'));
     const exStatus = statusLine();
     const fbLabelId = U.uid('odfb');
     const fbText = h('textarea', { class: 'textarea od-fbtext', readonly: true, rows: 6, 'aria-labelledby': fbLabelId, spellcheck: 'false' });
@@ -1528,7 +1546,7 @@
       exStatus.el, fb);
 
     // Import: a chosen file or pasted text is checked and summarized before anything changes.
-    pn.body.appendChild(sub('Import'));
+    pn.body.appendChild(subHelp('Import', 'replacing-a-device', 'replacing a device'));
     const impHost = h('div', { class: 'od-import' });
     const impResult = h('div', { class: 'od-impresult', 'aria-live': 'polite' });
     const fileIn = h('input', { type: 'file', accept: '.json,application/json,text/plain', class: 'visually-hidden', tabindex: -1, 'aria-hidden': 'true', id: U.uid('odfile') });

@@ -230,7 +230,7 @@
         const n = b.so.rows.filter((r) => r.date === d.date).length;
         return { value: d.date, label: d.label + (n ? ', ' + n + ' ' + B.plural(n, 'food') + ' sold out' : '') };
       }));
-      const ings = (b.ds.ingredients || []).filter((i) => i && i.id).map((i) => i.id);
+      const ings = (b.ds.ingredients || []).filter((i) => i && i.id && !i.hidden).map((i) => i.id);
       const order = b.protein.concat(ings.filter((id) => b.protein.indexOf(id) < 0));
       ingSel.setOptions(order.map((id) => ({ value: id, label: B.ingName(b.ds, id) })));
       if (!days.length) { st.day = null; st.ing = null; return; }
@@ -386,7 +386,7 @@
           series: [{ id: 'level', name: name + ' in the cabinet', points: pts, slot: ingSlot(b, st.ing) }],
           x: { type: 'time', min: x0, max: endT }, y: { format: 'g', min: 0 },
           refLines: refs, bands, annotations: notes, markers: 'none', height: 320,
-          ariaLabel: 'Line chart of the ' + name + ' stock level on ' + lbl + ', in grams, from ' + fmt.g(pts[0][1]) + ' to ' + fmt.g(pts[pts.length - 1][1]) + ', with a line where the menu items go 86 at ' + fmt.g(sb.thresholdG) + '.',
+          ariaLabel: 'Line chart of the ' + name + ' stock level on ' + lbl + ', from ' + fmt.g(pts[0][1]) + ' to ' + fmt.g(pts[pts.length - 1][1]) + ', with a line where the menu items go 86 at ' + fmt.g(sb.thresholdG) + '.',
         };
       },
     });

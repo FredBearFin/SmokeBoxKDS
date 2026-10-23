@@ -217,7 +217,7 @@
     pct: (x, d) => U.fmtPct(x, d == null ? (isNum(x) && Math.abs(x) > 0 && Math.abs(x) < 0.1 ? 1 : 0) : d),
     money: (n, d) => U.fmtMoney(n, d == null ? 2 : d),
     // g gives grams or kilograms in words. num gives a plain number with the decimals asked for.
-    g: (n) => U.fmtG(n),
+    g: (n) => (U.weightText ? U.weightText(n) : U.fmtG(n)),
     num: (n, d) => U.fmtNum(n, d || 0),
     // hour gives a service hour such as 7 pm. clock gives the time of day for a time stamp.
     hour: (hr) => (isNum(hr) ? U.fmtHour(hr) : '-'),

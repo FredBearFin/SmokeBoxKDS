@@ -391,7 +391,7 @@
         const line = h('p', { class: 'ob-safetyline', dataset: { k: 'safetyline' } }, (SB.config && SB.config.safetyLine) || '');
         body.append(ul, note, h('div', { class: 'ob-actions' }, go), line);
         // Formats a temperature limit for display.
-        const T = (f) => U.fmtTemp(f);
+        const T = (f) => (U.tempText || U.fmtTemp)(f);
         // Rewrites every rule from the live settings, so a changed limit shows at the next refresh.
         const paint = () => {
           const S = B.settings(ctx.dataset()).safety;
