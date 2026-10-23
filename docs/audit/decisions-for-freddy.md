@@ -1,46 +1,33 @@
-# Decisions for Freddy (gathered by A4, round 4)
+# Decisions for Freddy (A4, round 7)
 
-Every naming and product question the agents raised so far, in plain words. For each: the options, what I recommend, and why. I have not applied any of these. Nobody who runs a restaurant has been asked yet; where a recommendation is a guess about owners, it says so. Sources: docs/audit/wording.md, glossary.md, office.md, board-ordering.md, e2e-triage.md, docs/clean-start-design.md, docs/commercial-decisions.md.
+The questions the agents raised, in plain words, with what I recommend and why. The twelve that matter most come first; the rest are in the "Also" list. Nothing here has been applied. Nobody who runs a restaurant has been asked yet, so a recommendation about owners is my guess. Longer detail: docs/audit/safety-defaults.md, pin-recovery-options.md, wording.md, glossary.md, docs/clean-start-design.md, docs/commercial-decisions.md.
 
-## Names
+## The twelve that matter most
 
-1. **"New ticket" or "New order"** (the big button). Today it says New ticket. It really starts a customer's order, and the slip in the kitchen is the ticket. Recommend **New order**: customers and counter staff say order. Cost: many tests and the Guide change.
-2. **"Menu" button.** It opens the Settings sheet, but "menu" also means your dishes. Options: keep Menu, call it More, or call it Settings. Recommend **Settings**: the sheet is already titled Settings. "Menu" then only ever means your dishes.
-3. **"Bump" or "Send out".** Cooks who used another kitchen screen know Bump. Owners may not. Recommend **keep Bump** for now and explain it once in Help and the Guide. Ask two real cooks before changing it.
-4. **"Pace" page and "Meal pacing" setting.** Two meanings: the page shows kitchen speed, the setting staggers dish starts. Recommend page **Speed**, setting **Finish together**.
-5. **"Ember / Paper" (back office) and "Day / Night" (board).** Two pairs for the same idea. Recommend **Day / Night** everywhere.
-6. **"Demo" or "Practice".** The first screen says practice, the header says Demo, older text says pretend or made-up. Now that the demo becomes its own mode with its own bar, recommend **Demo** for the mode and **Sample history** for the made-up past days, and stop using practice, pretend and simulated. (This reverses my round 1 advice; the separate mode makes Demo clearer.)
-7. **Two time limits on a batch.** Today: quality limit and safety limit. Plain options: **Best-by** (taste it first) and **Throw-out time** (must go). Recommend the plain words, after a quick check with one owner that Best-by does not sound like "still fine to sell".
-8. **Station names.** Barbecue names (Pit, Hot sides) or neutral ones (Main line, Sides). Recommend **neutral for a new kitchen**, barbecue names in the demo. Owners can rename either way.
+1. **Default limit for cold dishes and any dish an owner adds as cooked-ahead.** Cold dishes with mayonnaise, egg or dairy usually need a time limit that is a hard stop, not "taste it and keep serving". Recommend **hard stop (Throw-out time) by default**, 4 hours, and a prompt to ask the health department. Built so far: owner-added cooked-ahead items already default to a hard stop with 4 hours. Still open: the three cold sample dishes (slaw, potato salad, banana pudding) keep a quality limit. Recommend changing them in the sample, and dropping any sentence that states a rule. Related, from A5: a longest-any-batch default of **8 hours** instead of 12, and the temperature-check interval (120 minutes today, a house choice; the FDA figure is 4 hours): keep 2 hours, label it a starter value.
+2. **Do not let "cooking ahead" end up off by accident.** A5 asks two things: should setup ask a yes or no question that cannot be skipped, and should adding a perishable ingredient push the owner to the cooked-ahead kind? Recommend **yes to both**: one tap each, and "Not sure" counts as No with a line saying what turning it on adds. An owner who holds food hot or cold but leaves it off gets no reminders.
+3. **Forgot the PIN.** There is no recovery; the keypad explains the only way back (clear the browser's saved data, then restore a backup). Options: **A** a recovery code shown once when the PIN is set, **B** a backup file made on this device lets you reset it, **C** a 24-hour wait. Recommend **A, with C as the fallback**: no server or email, and nobody loses a day's data. The PIN stays a door latch, not security.
+4. **Demo or Practice, and what the demo says.** The app still says demo, practice, pretend and made-up in places, and the backup page says "Practice kitchen (the demo)". Recommend **Demo** for the mode and the bar, **Sample history** for made-up past days, and drop the rest. Keep the one-question confirm before the demo opens. Do **not** let the demo bar say anything like "your own kitchen is safe": say it is not touched.
+5. **"New ticket" or "New order".** The big button starts a customer's order; the slip in the kitchen is the ticket. Recommend **New order**. Cost: many tests and the Guide change.
+6. **The "Menu" button.** It opens a sheet already titled Settings, and "menu" also means your dishes. Recommend **Settings**.
+7. **"Bump" or "Send out".** Cooks from other kitchen screens know Bump. Recommend **keep Bump**, explained once in Help and the Guide, and ask two real cooks before changing it.
+8. **Two time limits on a batch.** Cabinet: "quality limit" and "safety limit". Back-office record: "best-by". Recommend **Best-by** (taste it first) and **Throw-out time** (must go) everywhere, after one owner confirms Best-by does not sound like "still fine to sell".
+9. **Station names.** Barbecue (Pit, Hot sides) or neutral (Main line, Sides). Recommend **neutral for a new kitchen**, barbecue names in the demo.
+10. **Pacing.** The "Pace" page and the "Meal pacing" setting mean different things. Recommend page **Speed**, setting **Finish together**, and **off by default** for a new kitchen.
+11. **The fake "Channel sync" strip** (shown with demo or sample data, labeled demo only). A3 left it in. Recommend **remove it from every screen** until a real connection exists: it is a feature that does nothing.
+12. **Starting over, and old demo data.** Recommend a **"Start over with an empty menu" button, with a backup taken first**, plus a **one-time offer to clear old demo or sample tickets** from an existing owner's real reports, showing a plain count.
 
-## Safe defaults
+## Also
 
-9. **Slaw, potato salad, banana pudding.** They start with a "quality" limit (taste it and keep serving), but cold dishes made with mayonnaise, egg or dairy usually need a time limit that is a hard stop. Recommend **default to the hard stop (Throw-out time)**; the owner can relax it after asking the health department. A wrong default is a food-illness and liability risk (see commercial decisions 8 and 9).
-10. **Custom cook-ahead items** (an owner adds their own): recommend the same careful default, a 4-hour hold, a hard stop, and a prompt to confirm it. Easier to loosen than to find out later it was too loose.
-11. **Pacing on or off for a new kitchen.** Recommend **off**. One cook does not need staggered starts, and gray waiting dishes confuse a new user. Turn it on when they ask.
-
-## What a new owner sees
-
-12. **"Start over with an empty menu" button** for existing owners. Recommend **yes, with a backup taken first**, next to the sample-dish option.
-13. **Busy-night demo on the first screen of a real kitchen.** Recommend **move it to the Menu list** under "Try the demo", so a new owner sees two buttons: Add your first dish, Show me how it works.
-14. **Simulated channel feeds** (Counter POS, Online ordering and so on). A fake feature on real screens. Recommend **hide now, remove later**.
-15. **Where the cooking-ahead question lives.** Today it is at the bottom of "Tax, hours and PIN", default No. And choosing Yes leaves the Cabinet's Product list empty, because there is no way to create an ingredient. Recommend **ask once in the first setup**, and when the answer is Yes, offer "Add a cooked-ahead item" (name and weight) right there, so the Cabinet works on day one. Until that exists, the Guide says the Cabinet may be empty.
-
-## Counting food (A2 and the engine)
-
-16. **"Portions on hand" on the add-dish form from day one.** Most small owners think "I have 12 left". Recommend **yes, as an optional line under More options** ("Made ahead? How many right now?"), and promote it if testers use it.
-17. **Recount.** Owners physically count. Recommend a simple **"I counted: __"** button on a counted dish that writes a visible correction, not a silent overwrite, so waste numbers stay honest.
-
-## Locked out
-
-18. **Forgot the PIN.** Today there is no recovery; the only way back in is clearing the browser's saved data, which erases everything. Options: leave it (and say so, as the Guide does), show a **one-time recovery code** when the PIN is set (print it, keep it), or let a backup file remove the PIN. Recommend the **recovery code**: no server or email is needed, and nobody loses a day's data. The PIN stays a door latch, not security.
-
-## Smaller ones
-
-19. **Units.** Settings hold °F or °C and kg or lb, with no screen yet. Recommend default **°F and kg** (your rule) with lb as a choice in settings, not in the first setup.
-20. **Thrown away, discard or thrown out.** Recommend **thrown out** everywhere (log, buttons, reports). Waste stays only as a total.
-21. **Customer or guest.** Recommend **customer**.
-
-## Business decisions already listed elsewhere
-
-docs/commercial-decisions.md has eleven open items (customer, price, billing, onboarding, support, updates, privacy, terms, liability and insurance, entity and tax, pilot terms). None is decided. Two of them (software terms, liability) need a lawyer or broker before money is taken, and item 9 above feeds into both.
+- **Reading the board from 10 feet (A1).** The Overdue badge is small at that distance; the red outline and "Do this first" tag carry the message. Recommend **a larger Overdue badge in Far display**, and a real look from across a real kitchen on the real TV before anyone relies on it. A 32-inch 2560 by 1440 monitor needs browser zoom.
+- **Sound strip on the board.** Now 44 px high. Keep it on the first run; the Guide explains why sound matters.
+- **Reordering dishes.** Up and down arrows exist. Recommend **arrows are enough**; no dragging. The order screen should follow the owner's order, not alphabetical.
+- **Imported dishes.** Recommend **ticked for clean rows, unticked for rows with a problem**, so a clean file is one tap and nothing broken sneaks in.
+- **Counting food.** Built: "I count what I made". Recommend a **"I counted: __" button** that writes a visible correction, an optional "How many right now?" under More options on the add form, and **Small 100 g, Normal 150 g, Big 250 g** instead of asking owners for grams.
+- **Day / Night vs Ember / Paper:** **Day / Night** everywhere. **Thrown out** not discard. **Customer** not guest.
+- **Units:** default **°F and kg**; lb as a choice in settings.
+- **Cooking-ahead question location:** the dishes sheet only. Yes turns everything on at once.
+- **"Not used" stations:** keep "Not used" and "Use again".
+- **Auto-start the busy-night crew in the demo:** no; a "Busy-night crew" button. **Resume the demo:** no resume button.
+- **Starting cash on Close the day:** an optional "cash in the drawer at open", remembered from yesterday. **Closing twice in a day:** keep allowing it.
+- **Business decisions** (price, billing, terms, liability, insurance, pilot terms): eleven open items in docs/commercial-decisions.md, none decided. Terms and liability need a lawyer or broker before money is taken, and decision 1 above feeds into both.

@@ -1,0 +1,24 @@
+/*
+ * WHAT THIS FILE IS: Styles for the printable food safety record: the bar on the Safety page, the preview sheet, and the print page.
+ */
+.si-bar { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin: 0 0 var(--sp-4); padding: var(--sp-2) 0; }
+.si-bar-t { font-weight: var(--w-semi); color: var(--ink2); }
+.si-lead { margin: 0 0 var(--sp-3); color: var(--ink2); line-height: 1.5; }
+.si-actions { display: flex; gap: var(--sp-3); align-items: end; flex-wrap: wrap; margin-bottom: var(--sp-3); }
+.si-count { margin: 0 0 var(--sp-2); color: var(--ink3); font-size: var(--fs-2); }
+.si-table { width: 100%; border-collapse: collapse; font-size: var(--fs-2); }
+.si-table th, .si-table td { padding: 6px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft, var(--line)); }
+.si-corr { font-style: italic; }
+.si-preview { overflow-x: auto; }
+@media print {
+  body:has(.sb-printroot) > *:not(.sb-printroot) { display: none !important; }
+  .si-printroot { display: block !important; position: static; color: #000; background: #fff; font: 12px/1.4 system-ui, sans-serif; }
+  .si-printroot h1 { font-size: 20px; margin: 0 0 8px; }
+  .si-note { margin: 6px 0; font-size: 11px; }
+  .si-table th, .si-table td { border-bottom: 1px solid #999; color: #000; }
+  .si-table thead { display: table-header-group; }
+  .si-table tr { break-inside: avoid; }
+}
+/* Page margins and page numbers; kept last so an older browser that skips the margin box loses nothing above. */
+@page { margin: 16mm; }
+@page { @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 11px sans-serif; } }

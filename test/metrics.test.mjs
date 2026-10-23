@@ -669,7 +669,7 @@ describe('safety: compliance, waste, batch timeline', () => {
     const r1 = tl.rows[0], r2 = tl.rows[1], r3 = tl.rows[2];
     assert.deepEqual(r1.segments.map((s) => [s.tone, s.start, s.end]), [['ok', at(0), at(3600)], ['check', at(3600), at(4000)], ['reheat', at(4000), at(6000)], ['discard', at(6000), at(7200)]]);
     assert.deepEqual([r1.open, r1.endMs, r1.discardReason], [false, at(7200), 'temp']);
-    assert.deepEqual(r1.marks.map((m) => m.label), ['150F', '148F', 'Discarded (temp)']);
+    assert.deepEqual(r1.marks.map((m) => m.label), ['150F', '148F', 'Thrown out (temp)']);
     assert.deepEqual([r2.endMs, r2.open, r2.segments.length], [at(3000), false, 1]);       // ended when its last grams were used
     assert.deepEqual([r3.open, r3.endMs], [true, at(2400)]);
     assert.equal(tl.rows.length, 3);

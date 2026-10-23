@@ -22,9 +22,9 @@
 .cd-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .cd-status { margin: 0; min-height: 1.2em; font-size: var(--fs-2); color: var(--ink2); }
 .cd-done h3 { margin: 0 0 var(--sp-2); font: var(--w-semi) var(--fs-5, 22px)/1.2 var(--font-display); }
-.cd-printroot { display: none; }
+.cd-printroot, .si-printroot { display: none; }
 @media print {
-  body > *:not(.cd-printroot) { display: none !important; }
+  body:has(.sb-printroot) > *:not(.sb-printroot) { display: none !important; }
   .cd-printroot { display: block !important; position: static; padding: 24px; color: #000; background: #fff; font: 14px/1.4 system-ui, sans-serif; }
   .cd-printroot h1 { font-size: 22px; margin: 0 0 12px; }
   .cd-ptable { width: 100%; border-collapse: collapse; }

@@ -70,7 +70,7 @@ function genAction(rng, s) {
   const tcs = s.ingredients.filter((i) => i.tcs);
   const W = [['createTicket', 16], ['advanceItem', 18], ['completeItem', 5], ['fireNow', 5], ['completeZone', 4], ['bumpTicket', 8], ['recallTicket', 3],
     ['voidTicket', 3], ['setRush', 3], ['toggle86', 4], ['restock', 3], ['addBatch', 5], ['logTemp', 5], ['correctSafety', 1], ['reheatBatch', 2], ['startCooling', 1],
-    ['discardBatch', 2], ['pullBatch', 3], ['keepServing', 2], ['endKeepServing', 1], ['planBatch', 1.5], ['cancelPlan', 2], ['snoozeAlert', 2], ['clearSnooze', 1.5], ['sanitizeDone', 2], ['updateSettings', 2], ['updateMenuItem', 1], ['addMenuItem', 0.6], ['payOrder', 4], ['reopenOrder', 1], ['voidOrder', 1], ['closeDay', 0.6], ['updateIngredient', 1], ['addIngredient', 0.6], ['setPortions', 0.8], ['undo', 7], ['resetLive', 0.2], ['junkType', 2]];
+    ['discardBatch', 2], ['pullBatch', 3], ['keepServing', 2], ['endKeepServing', 1], ['planBatch', 1.5], ['cancelPlan', 2], ['snoozeAlert', 2], ['clearSnooze', 1.5], ['sanitizeDone', 2], ['updateSettings', 2], ['updateMenuItem', 1], ['addMenuItem', 0.6], ['payOrder', 4], ['reopenOrder', 1], ['voidOrder', 1], ['closeDay', 0.6], ['updateIngredient', 1], ['addIngredient', 0.6], ['setPortions', 0.8], ['moveMenuItem', 0.8], ['undo', 7], ['resetLive', 0.2], ['junkType', 2]];
   let r = rng.next() * W.reduce((a, x) => a + x[1], 0);
   let type = W[0][0];
   for (const [k, w] of W) { r -= w; if (r <= 0) { type = k; break; } }
@@ -125,6 +125,7 @@ function genAction(rng, s) {
     case 'addMenuItem': p = { name: 'Dish ' + Math.floor(rng.next() * 40), zone: pick(['pit', 'sides', 'fry', 'cold', 'expo']), cat: pick(['meat', 'side', 'cold', 'other']), price: pick([8, 12.5, 0, -1]), prepSec: pick([60, 240, 900, 4]), track: pick(['one', 'two', 'three']) }; break;
     case 'updateIngredient': p = { id: ing.id, patch: pick([{ thresholdG: pick([0, 100, 900, 5000]) }, { yield: pick([0.5, 0.6]) }, { costPerKg: 12 }]) }; break;
     case 'addIngredient': p = { name: 'Item ' + Math.floor(rng.next() * 30), unit: pick(['g', 'ea', 'kg']), costPerKg: pick([2.5, undefined]), parG: pick([1000, undefined]) }; break;
+    case 'moveMenuItem': p = { id: menuId, toIndex: Math.floor(rng.next() * (s.menu.length + 1)) }; break;
     case 'setPortions': p = { menuId: (pick(s.menu.filter((m) => !m.bom.length || m.bom.some((l) => /^p_/.test(l.ing)))) || { id: menuId }).id, on: rng.next() < 0.8, count: pick([0, 10, undefined, -1]) }; break;
     case 'undo': p = {}; break;
     case 'resetLive': p = { keepSettings: rng.next() < 0.7 }; break;

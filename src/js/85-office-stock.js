@@ -107,7 +107,9 @@
         if (rows.length) return { ing: top.ing, day: rows[0].date };
       }
       const last = so.days[so.days.length - 1];
-      return last ? { ing: (so.proteins[0] && so.proteins[0].ing) || 'brisket', day: last.date } : null;
+      // No hard-coded fallback food: a kitchen with no tracked protein simply has no default pick.
+      const first = so.proteins[0] && so.proteins[0].ing;
+      return last && first ? { ing: first, day: last.date } : null;
     });
 
     // What a normal day looks like for one food: median cooked and median served over the days with any intake.
@@ -446,7 +448,7 @@
     spellTable.el.querySelector('.of-card-body').appendChild(spellNote);
 
     // ---------- simulated channel sync ----------
-    page.section('Channel sync (practice only)', 'Practice only: Smokebox pretends to tell each ordering channel when an item is sold out and times how long that would take. It is not connected to any real ordering system.');
+    page.section('Channel sync (practice only)', 'Practice only: this shows how a sold-out dish would reach other ordering systems. Nothing is sent.');
     const syncParts = [page.lastSection];
     syncParts.push(page.panel({
       span: 5, title: 'How fast 86 reaches the channels', sub: 'Simulated: no live POS connected',

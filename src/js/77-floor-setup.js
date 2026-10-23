@@ -21,6 +21,9 @@
   function openSetup() {
     const sheet = SB.ui.sheet({ title: 'Set up this tablet', side: 'right', width: 'min(720px, 96vw)', name: 'setup' });
     const list = h('div', { class: 'setup-list' });
+    // A small "?" help line at the top: the guide pages about setting up and about sound trouble, when the guide is in this build.
+    const gl = SB.guide && typeof SB.guide.link === 'function' ? [SB.guide.link('getting-started', 'setting up'), SB.guide.link('troubleshooting', 'no sound')].filter(Boolean) : [];
+    if (gl.length) list.appendChild(h('p', { class: 'fs-sub' }, 'Help: ', ...gl.flatMap((a, i) => (i ? [' · ', a] : [a]))));
     // Adds one checklist step: a title, plain words, an optional button and a status line.
     function step(title, words, action) {
       const status = h('p', { class: 'fs-sub', role: 'status' });
@@ -29,7 +32,7 @@
       return status;
     }
     // Runs a step's test and shows what it answers in the step's status line.
-    const runStep = (status, fn) => { status.textContent = fn() || ''; };
+    const runStep = (status, fn) => { tell(status, fn() || ''); };
     // Builds a button that runs fn and shows its answer in the step's status line.
     const btn = (label, icon, fn) => (status) => h('button', { type: 'button', class: 'btn', onClick: () => runStep(status, fn) }, ico(icon, 20), h('span', null, label));
 
@@ -37,20 +40,41 @@
       btn('Play a test warning', 'volume', () => { if (SB.floor && SB.floor.setSound) { SB.floor.setSound(true); if (SB.floor.setSpeech) SB.floor.setSpeech(true); return 'You should have heard a chime and a voice. If not, turn the tablet volume up and tap again.'; } return 'The kitchen board is not loaded.'; }));
     const wake = SB.floor && SB.floor.wakeLock ? SB.floor.wakeLock() : 'unknown';
     step('2. Keep the screen on', 'The board asks the browser to keep the screen awake' + (wake === 'on' ? ' (it is on now).' : wake === 'unsupported' ? ', but this browser does not support that.' : ', but this browser has not allowed it.') + ' Also set the tablet itself: Settings, Display, Auto-Lock (iPad) or Screen timeout (Android), to Never. Plug the tablet into power.');
-    const prot = step('3. Protect your data', 'Everything is saved in this browser only. Ask the browser to keep it safe, and save a copy of the discard log every day.',
-      btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Your browser agreed to keep this data. Still save a backup every day.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save the discard log every day.'; }));
+    const prot = step('3. Protect your data', 'Everything is saved in this browser only. Ask the browser to keep it safe, and save a backup every day (Menu and settings, then Data). If you cook ahead, save the thrown-out log too.',
+      btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Your browser agreed to keep this data. Still save a backup every day.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save a backup every day.'; }));
     step('4. Install as an app', 'On an iPad: Share, then Add to Home Screen. In Chrome on Android or a computer: the menu, then Install app or Add to Home screen. An installed app opens full screen and the browser is less likely to clear its data.');
     step('5. Where the tablet sits', 'Put the tablet where the person at the cutting board can tap it without walking. If it is out of reach, batch times will not get logged and the waste numbers will be wrong.');
     // Closes this sheet and opens the Menu and settings page of the back office.
     const openData = () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); };
-    step('6. Your dishes', 'Add your dishes under Dishes and prices, in the Menu. Then open Menu and settings to enter your real cost per kg, the 86 point, the pull size (one whole brisket, one rack, one pan), the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
+    step('6. Your dishes', 'Add your dishes under Dishes and prices, in the Menu. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
       () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu and settings')));
-    step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a safety limit. Slaw, potato salad and banana pudding start as quality limits. Ask your health department which limit applies to each food you hold, then set it on the Menu and settings page.');
-    sheet.body.appendChild(list);
+    step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a safety limit. Ask your health department which limit applies to each food you hold, then set it on the Menu and settings page.');
+    sheet.body.appendChild(list); keepInView(sheet.body);
     return sheet;
   }
 
+  // When a box in this sheet gets the cursor, scroll it to the middle so a tablet keyboard never covers what is being typed.
+  function keepInView(el) {
+    el.addEventListener('focusin', (ev) => {
+      const f = ev.target;
+      if (!f || !/^(INPUT|TEXTAREA|SELECT)$/.test(f.tagName)) return;
+      setTimeout(() => { try { f.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { /* older browsers */ } }, 250);
+    });
+  }
+
   /* ---------- helpers for the dish form ---------- */
+
+  // The one way every message in these screens is shown: the words, then a tone (ok or bad) that sets its colour. With no
+  // tone given, a message that says something went wrong is shown as bad. An empty message clears it.
+  const BAD_WORDS = /^(type |use |enter |closing |keep |that |the pin could not|batch size|minutes|there is|nothing|could not)|could not|cannot|too big|blocked|not saved|is full|would not/i;
+  function tell(el, text, tone) {
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.add('dp-msg');
+    const t = !text ? '' : (tone || (BAD_WORDS.test(text) ? 'bad' : 'ok'));
+    if (t) el.dataset.tone = t; else delete el.dataset.tone;
+    if (t === 'bad') el.setAttribute('role', 'alert'); else el.setAttribute('role', 'status');
+  }
 
   const KEY_DRAFT = 'smokebox.v1.setup.draft'; // the half-typed dish {name, price, zone}, kept so a closed tab loses nothing
   const KEY_LAST = 'smokebox.v1.setup.lastZone'; // the station chosen for the last saved dish
@@ -65,7 +89,7 @@
     fry: { cat: 'fried', sec: 240, track: 'two' }, cold: { cat: 'cold', sec: 60, track: 'one' },
   };
   // A short plain line under each station name on its tile.
-  const ZONE_HINT = { pit: 'Smoker and slicing', sides: 'Stove and sides', fry: 'Fryer', cold: 'No cooking: drinks, cold sides' };
+  const ZONE_HINT = { pit: 'Smoker, grill or oven', sides: 'Stove and sides', fry: 'Fryer', cold: 'No cooking: drinks, cold sides' };
   // The example menu. Columns: name, price in dollars, station id, category id. Made-up prices, owner to replace.
   // audit:data-start
   const EXAMPLES = [
@@ -82,7 +106,15 @@
     if (res.report === 'ok') return { ok: true, info: res.info || {}, words: '' };
     let words = res.report;
     try { words = SB.engine.describe(res.report, res.info, SB.store.getState().settings) || words; } catch (e) { /* keep the code */ }
-    return { ok: false, info: res.info || {}, words };
+    // The few refusals an owner meets while setting up get one plain sentence each: what happened, then what to do.
+    const key = String((res.info && res.info.key) || '');
+    if (/price$/.test(key)) words = 'The price has to be between $0 and $1,000. Type it like 12.50.';
+    else if (/name$/.test(key) && (res.report === 'nameTaken' || res.report === 'badPatch')) words = 'That name is already taken. Pick another name.';
+    else if (/name$/.test(key)) words = 'The name has to be 1 to 60 letters. Shorten it and try again.';
+    else if (key === 'menu' || res.report === 'tooManyItems') words = 'Your menu is full (150 dishes). Remove one you no longer sell, then add this one.';
+    else if (res.report === 'tooManyIngredients') words = 'You have as many cooked-ahead items as Smokebox can hold. Remove one first.';
+    else if (res.report === 'moduleOff') words = 'Cooking ahead is switched off. Turn it on in Tax, hours and PIN, then try again.';
+    return { ok: false, info: res.info || {}, words, report: res.report };
   }
   // Reads a number from a text box; blank or junk gives null so nothing is ever invented.
   function readNum(input) {
@@ -113,12 +145,16 @@
     if (d && SB.config.categoryById[d.cat]) return d;
     return { cat: (SB.config.categories[0] || {}).id, sec: 180, track: 'two' };
   }
-  // Turns a typed price like "12.5" or "$12.50" into dollars, or null when it is not a price.
-  function parsePrice(text) {
+  // Reads a typed price the way a person writes it: "12.50", "12,50", "$14", "14.", "USD 12", "1 200". Gives {value, rounded}
+  // in dollars, or null when it is not one price. Uses the menu importer's reader when it is in this build.
+  function priceInfo(text) {
+    const M = SB.menuImport;
+    if (M && typeof M.readPrice === 'function') { const r = M.readPrice(text); return r && typeof r.value === 'number' ? { value: r.value, rounded: !!r.rounded } : null; }
     const raw = String(text || '').replace(/[$\s]/g, '').replace(',', '.');
-    if (!/^(\d+\.?\d{0,2}|\.\d{1,2})$/.test(raw)) return null;
-    return parseFloat(raw);
+    return /^(\d+\.?\d{0,2}|\.\d{1,2})$/.test(raw) ? { value: parseFloat(raw), rounded: false } : null;
   }
+  // The price in dollars, or null when the text is not a price.
+  function parsePrice(text) { const i = priceInfo(text); return i ? i.value : null; }
   // Adds one dish with every hidden default filled in. opts may carry prepSec, cat and short from "More options".
   // The prep time is marked as a guess unless the owner typed one. Returns the send() result.
   function addDish(name, price, zone, opts) {
@@ -140,18 +176,20 @@
     const v = SB.store.getState().stock[ing.id];
     return typeof v === 'number' ? v : 0;
   }
+  // Set by the open Dishes sheet so a row's Stop counting can offer Undo in the sheet's undo bar.
+  let undoHook = null;
   // The small "I count what I made" part of a dish row: a start link, or "N left" with +10, a custom add and Stop.
   function portionsRow(m) {
     const left = portionLeft(m), msg = h('span', { class: 'fs-sub', role: 'status' });
     const box = h('div', { class: 'dp-por' });
     // Says what went wrong in plain words, such as a dish that already lists ingredients.
-    const say = (r) => { msg.textContent = r.ok ? '' : (r.report === 'portionsConflict' ? 'This dish already uses ingredients, so it cannot be counted by portions too.' : r.words); };
+    const say = (r) => { tell(msg, r.ok ? '' : (r.report === 'portionsConflict' ? 'This dish already uses ingredients, so it cannot be counted by portions too.' : r.words)); };
     if (left < 0) {
-      const cnt = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', placeholder: 'How many', 'aria-label': 'How many ' + m.name + ' you made' });
+      const cnt = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', placeholder: 'How many?', 'aria-label': 'How many ' + m.name + ' you made' });
       // Starts counting portions for this dish at the typed number.
       const go = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => {
         const n = cnt.value.trim() === '' ? 0 : Number(cnt.value);
-        if (!Number.isInteger(n) || n < 0) { msg.textContent = 'Type a whole number, like 20.'; return; }
+        if (!Number.isInteger(n) || n < 0) { tell(msg, 'Type a whole number, like 20.'); return; }
         say(send('setPortions', { menuId: m.id, on: true, count: n }));
       } }, 'Start counting');
       const fold = h('details', { class: 'dp-fold' }, h('summary', null, h('span', null, 'I count what I made')), h('div', { class: 'fs-row' }, cnt, go, h('span', { class: 'fs-sub' }, 'Sells out when the count reaches zero.')));
@@ -163,15 +201,37 @@
       // Adds ten portions to the count in one tap.
       h('button', { type: 'button', class: 'btn btn-sm', onClick: () => say(send('restock', { ing: portionIng(m).id, g: 10 })) }, '+10'),
       // Adds the typed number of portions to the count.
-      more, h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { const n = Number(more.value); if (!Number.isInteger(n) || n <= 0) { msg.textContent = 'Type how many you made, like 12.'; return; } say(send('restock', { ing: portionIng(m).id, g: n })); more.value = ''; } }, 'Add'),
+      more, h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { const n = Number(more.value); if (!Number.isInteger(n) || n <= 0) { tell(msg, 'Type how many you made, like 12.'); return; } say(send('restock', { ing: portionIng(m).id, g: n })); more.value = ''; } }, 'Add'),
       // Stops counting portions for this dish; the books stay whole.
-      h('button', { type: 'button', class: 'btn btn-sm', onClick: () => say(send('setPortions', { menuId: m.id, on: false })) }, 'Stop counting'), msg);
+      h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { const r = send('setPortions', { menuId: m.id, on: false }); say(r); if (r.ok && undoHook) undoHook('Stopped counting ' + m.name + '.', () => { send('setPortions', { menuId: m.id, on: true, count: 0 }); }); } }, 'Stop counting'), msg);
     return box;
   }
   // True when the cook-ahead module is on (an old saved kitchen with no setting counts as on).
   function cookOn() { return SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : true; }
   // The cooked-ahead items the owner has made: cook-ahead food that is not archived.
   function cookItems() { return SB.store.getState().ingredients.filter((i) => i.tcs && !i.archived); }
+
+  /* ---------- Try the demo ---------- */
+
+  // Asks once, in plain words, then opens the demo: a practice kitchen in this tab. The owner's own kitchen is saved first
+  // and comes back with the Back to my kitchen button.
+  async function tryDemo(skipAsk) {
+    const store = SB.store;
+    if (!store.enterDemo || store.isDemo()) return false;
+    const ok = skipAsk || !SB.ui.confirm ? true : await SB.ui.confirm({ title: 'Try the demo?', confirmLabel: 'Try the demo', cancelLabel: 'Not now',
+      body: ['The demo is a demo kitchen with a sample menu and sample tickets. Nothing in it is your kitchen.', 'Your own dishes and orders are not touched. A bar at the top of every screen has a Back to my kitchen button.'] });
+    if (!ok) return false;
+    if (!store.enterDemo() && SB.ui.toast) SB.ui.toast('This browser would not open the demo. Try again, or add ?demo to the address.', { tone: 'warn' });
+    return true;
+  }
+  // The body of the Demo sheet in a real kitchen: what the demo is, and one button that opens it.
+  function demoIntro() {
+    return h('div', { class: 'dm' }, h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Try the demo'),
+      h('p', { class: 'fs-sub' }, 'A demo kitchen with a sample menu, sample tickets and a crew that sends orders, so you can see Smokebox busy. Nothing in it is your kitchen, and nothing you do there reaches your real dishes, orders or numbers.'),
+      h('p', { class: 'fs-sub' }, 'A bar at the top of every demo screen says so and has a Back to my kitchen button. Leaving erases the demo.'),
+      // Opens the demo after the plain-words question.
+      h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'try-demo' }, onClick: () => tryDemo(true) }, ico('play', 22), h('span', null, 'Try the demo'))));
+  }
 
   /* ---------- the Dishes and prices sheet ---------- */
 
@@ -183,10 +243,14 @@
     const lead = h('p', { class: 'fs-sub dp-lead' });
 
     // The form: name, price, where it is made. Station tiles are big buttons that behave like radio buttons.
-    const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Brisket plate' });
+    const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Brisket plate', autocapitalize: 'words', spellcheck: 'false', enterkeyhint: 'next' });
     const nameField = SB.ui.field({ label: 'What is it called?', control: nameIn });
     const priceIn = h('input', { class: 'input dp-price', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '12.50' });
     const priceField = SB.ui.field({ label: 'Price in dollars', control: priceIn });
+    const priceEcho = h('p', { class: 'fs-sub dp-echo', 'aria-live': 'polite' });
+    priceField.appendChild(priceEcho);
+    // Shows what Smokebox understood from the typed price before anything is saved, so "12,50" is never a surprise.
+    priceIn.addEventListener('input', () => { const i = priceInfo(priceIn.value); tell(priceEcho, i ? 'Reads as ' + U.fmtMoney(i.value) + (i.rounded ? ' (rounded to the cent)' : '') : '', 'ok'); });
     let zone = '';
     const tiles = h('div', { class: 'dp-tiles', role: 'radiogroup', 'aria-label': 'Where it is made' });
     const zoneErr = h('div', { class: 'field-error', role: 'alert', hidden: true });
@@ -226,9 +290,9 @@
       spec.rename = spec.rename || {}; spec.add = spec.add || {};
       mutate(spec);
       const before = C.customSpec(), res = C.applyCustom(spec);
-      if (res.rejected.length) { C.applyCustom(before); stSt.textContent = 'That name cannot be used: it is empty, longer than ' + C.customLimits.name + ' letters, or already taken.'; return false; }
-      if (!C.saveCustom(spec)) { stSt.textContent = 'This browser would not save the change.'; return false; }
-      stSt.textContent = 'Saved. Tickets and the board show the new name after you reload.'; stReload.hidden = false;
+      if (res.rejected.length) { C.applyCustom(before); tell(stSt, 'That name cannot be used: it is empty, longer than ' + C.customLimits.name + ' letters, or already taken.'); return false; }
+      if (!C.saveCustom(spec)) { tell(stSt, 'This browser would not save the change.'); return false; }
+      tell(stSt, 'Saved. Tickets and the board show the new name after you reload.'); stReload.hidden = false;
       paintStations(); paintTiles();
       return true;
     }
@@ -244,8 +308,8 @@
         const hideBtn = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => {
           const now = U.storage.get(KEY_HIDDEN, []).filter((x) => x !== z.id);
           if (!isHid) now.push(z.id);
-          if (stations().every((s) => now.indexOf(s.id) >= 0)) { stSt.textContent = 'Keep at least one station in use.'; return; }
-          U.storage.set(KEY_HIDDEN, now); stSt.textContent = isHid ? z.name + ' is in use again.' : z.name + ' is marked not used: it leaves the tiles here and its tab on the board while it has no tickets. Dishes already made there keep it.';
+          if (stations().every((s) => now.indexOf(s.id) >= 0)) { tell(stSt, 'Keep at least one station in use.'); return; }
+          U.storage.set(KEY_HIDDEN, now); tell(stSt, isHid ? z.name + ' is in use again.' : z.name + ' is marked not used: it leaves the tiles here and its tab on the board while it has no tickets. Dishes already made there keep it.');
           paintStations(); paintTiles();
           if (SB.floor && SB.floor.applyHiddenTabs) SB.floor.applyHiddenTabs();
         } }, isHid ? 'Use again' : 'Not used');
@@ -292,13 +356,13 @@
       backRow.append(h('span', null, m.name + ' was removed earlier. '), h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'bring-back' }, onClick: () => {
         const r = send('updateMenuItem', { id: m.id, patch: price != null && price !== m.price ? { archived: false, price } : { archived: false } });
         backRow.hidden = true;
-        if (r.ok) { nameIn.value = ''; priceIn.value = ''; saveDraft(); status.textContent = m.name + ' is back on your menu.'; } else status.textContent = r.words;
+        if (r.ok) { nameIn.value = ''; priceIn.value = ''; saveDraft(); tell(status, m.name + ' is back on your menu.'); } else tell(status, r.words);
       } }, 'Bring it back'));
       backRow.hidden = false;
     }
     // Checks the form and saves one dish. Returns true when it saved. Each problem shows beside its own box.
     function saveOne() {
-      status.textContent = ''; nameField.setError(null); priceField.setError(null); backRow.hidden = true;
+      tell(status, ''); nameField.setError(null); priceField.setError(null); backRow.hidden = true;
       const name = nameIn.value.replace(/\s+/g, ' ').trim();
       const price = parsePrice(priceIn.value);
       if (!name) { nameField.setError('Type the dish name.'); nameIn.focus(); return false; }
@@ -307,7 +371,7 @@
       let prepSec = 0;
       if (minIn.value.trim()) {
         const mins = readNum(minIn);
-        if (mins == null || mins < 0.1 || mins > 60) { status.textContent = 'Minutes to make one: type a number from 1 to 60, or leave it empty.'; more.open = true; minIn.focus(); return false; }
+        if (mins == null || mins < 0.1 || mins > 60) { tell(status, 'Minutes to make one: type a number from 1 to 60, or leave it empty.'); more.open = true; minIn.focus(); return false; }
         prepSec = Math.round(mins * 60);
       }
       const r = addDish(name, price, zone, { prepSec, cat: catSel.value, short: shortIn.value.trim() });
@@ -315,11 +379,11 @@
         const gone = removedDishes().find((m) => m.name.toLowerCase() === name.toLowerCase());
         if (gone) showBringBack(gone, price);
         else if (/name/.test((r.info && r.info.key) || '')) nameField.setError('There is already a dish called ' + name + '. Pick another name.');
-        else status.textContent = r.words;
+        else tell(status, r.words);
         return false;
       }
-      status.textContent = 'Saved ' + name + ' at ' + U.fmtMoney(price) + '.';
-      nameIn.value = ''; priceIn.value = ''; minIn.value = ''; catSel.value = ''; shortIn.value = '';
+      tell(status, 'Saved ' + name + ' at ' + U.fmtMoney(price) + '.');
+      nameIn.value = ''; priceIn.value = ''; tell(priceEcho, ''); minIn.value = ''; catSel.value = ''; shortIn.value = '';
       saveDraft();
       return true;
     }
@@ -332,13 +396,22 @@
 
     // The Undo line after a Remove, and a fold that lists removed dishes so any can be brought back later.
     const undoBar = h('div', { class: 'fs-note dp-undo', hidden: true, role: 'status' });
-    // Shows "Removed X" with an Undo button that puts the dish back.
-    function showUndo(m) {
+    // Shows a plain message with an Undo button that runs the given undo step. Used after Remove, a move and Stop counting.
+    function showUndo(message, undo) {
       U.clear(undoBar);
-      // Puts the removed dish back on the menu at once.
-      undoBar.append(h('span', null, 'Removed ' + m.name + '. '), h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'undo-remove' }, onClick: () => { send('updateMenuItem', { id: m.id, patch: { archived: false } }); undoBar.hidden = true; } }, 'Undo'));
+      // Runs the undo step and puts the bar away.
+      undoBar.append(h('span', null, message + ' '), h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'undo-remove' }, onClick: () => { undo(); undoBar.hidden = true; } }, 'Undo'));
       undoBar.hidden = false;
     }
+    // Moves a dish one place up or down among the dishes on the menu (the order screen follows this order within a category).
+    function moveDish(m, dir) {
+      const menu = SB.store.getState().menu, act = menu.filter((x) => !x.archived);
+      const other = act[act.findIndex((x) => x.id === m.id) + dir];
+      if (!other) return;
+      const from = menu.findIndex((x) => x.id === m.id), to = menu.findIndex((x) => x.id === other.id);
+      if (send('moveMenuItem', { id: m.id, toIndex: to }).ok) showUndo('Moved ' + m.name + (dir < 0 ? ' up.' : ' down.'), () => { send('moveMenuItem', { id: m.id, toIndex: from }); });
+    }
+    undoHook = showUndo; offs.push(() => { undoHook = null; });
     const dishesHead = h('h3', { class: 'fs-h dp-h' }, 'Your dishes');
     const goneList = h('div', { class: 'dp-list' });
     const goneFold = h('details', { class: 'dp-fold dp-gone' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Removed dishes')), h('div', { class: 'dp-more' }, goneList));
@@ -355,7 +428,7 @@
     // Rebuilds the list of dishes when it has changed and no box in it is being typed in.
     function paintList() {
       const mine = activeDishes();
-      const sig = mine.map((m) => m.id + '|' + m.name + '|' + m.price + '|' + m.zone + '|' + portionLeft(m)).join(';');
+      const sig = mine.map((m) => m.id + '|' + m.name + '|' + m.price + '|' + m.zone + '|' + m.cat + '|' + portionLeft(m)).join(';');
       const typing = listBox.contains(doc.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(doc.activeElement.tagName);
       if (sig === listSig || typing) return;
       listSig = sig;
@@ -372,19 +445,29 @@
           const patch = {}, nv = n.value.replace(/\s+/g, ' ').trim(), pv = parsePrice(pr.value);
           if (nv && nv !== m.name) patch.name = nv;
           if (pv != null && pv !== m.price) patch.price = pv;
-          if (pv == null) { msg.textContent = 'Type the price like 12.50.'; pr.value = m.price.toFixed(2); return; }
+          if (pv == null) { tell(msg, 'Type the price like 12.50.'); pr.value = m.price.toFixed(2); return; }
           if (!Object.keys(patch).length) return;
           const r = send('updateMenuItem', { id: m.id, patch });
-          msg.textContent = r.ok ? 'Saved.' : r.words;
+          tell(msg, r.ok ? 'Saved.' : r.words);
           if (!r.ok) { n.value = m.name; pr.value = m.price.toFixed(2); }
         };
         n.addEventListener('change', save); pr.addEventListener('change', save);
         const rm = h('button', { type: 'button', class: 'btn btn-sm', 'aria-label': 'Remove ' + m.name, onClick: () => {
           // Removing archives the dish: it can no longer be ordered, and old tickets keep it. Undo is offered at once.
-          if (send('updateMenuItem', { id: m.id, patch: { archived: true } }).ok) showUndo(m);
+          if (send('updateMenuItem', { id: m.id, patch: { archived: true } }).ok) showUndo('Removed ' + m.name + '.', () => { send('updateMenuItem', { id: m.id, patch: { archived: false } }); });
         } }, ico('x', 18), h('span', null, 'Remove'));
+        const idx = mine.indexOf(m);
+        // Up and down buttons: plain moves, each one place; the ends are switched off.
+        const moveBox = h('span', { class: 'dp-move' },
+          h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + m.name + ' up', disabled: idx === 0, onClick: () => moveDish(m, -1) }, ico('arrow-up', 20)),
+          // Moves this dish one place up in the menu order.
+          h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + m.name + ' down', disabled: idx === mine.length - 1, onClick: () => moveDish(m, 1) }, ico('arrow-down', 20)));
+        // Move to: the category this dish sits in on the order screen, changed with one pick.
+        const catSelRow = h('select', { class: 'select dp-cat', 'aria-label': 'Category of ' + m.name }, SB.config.categories.map((c) => h('option', { value: c.id, selected: c.id === m.cat }, c.name)));
+        // Saves the new category for this dish and says so.
+        catSelRow.addEventListener('change', () => { const r = send('updateMenuItem', { id: m.id, patch: { cat: catSelRow.value } }); tell(msg, r.ok ? 'Moved to ' + (SB.config.categoryById[catSelRow.value] || {}).name + '.' : r.words); });
         const z = SB.config.zoneById[m.zone];
-        listBox.appendChild(h('div', { class: 'dp-row' }, n, pr, h('span', { class: 'chip dp-zone' }, z ? z.name : m.zone), ex.indexOf(m.id) >= 0 ? h('span', { class: 'chip dp-ex', 'data-tone': 'warn' }, 'Example') : null, rm, msg, portionsRow(m)));
+        listBox.appendChild(h('div', { class: 'dp-row' }, moveBox, n, pr, catSelRow, h('span', { class: 'chip dp-zone' }, z ? z.name : m.zone), ex.indexOf(m.id) >= 0 ? h('span', { class: 'chip dp-ex', 'data-tone': 'warn' }, 'Example') : null, rm, msg, portionsRow(m)));
       });
     }
     paintList(); paintGone();
@@ -408,7 +491,7 @@
       } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Add a cooked-ahead item' : 'Yes, I cook ahead'));
       if (!items.length) {
         caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook any of this ahead and hold it?'),
-          h('p', { class: 'fs-sub' }, 'Brisket in the morning, slaw in the cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. You can skip this and still take orders.'),
+          h('p', { class: 'fs-sub' }, 'Chili in a warmer, potato salad in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. You can skip this and still take orders.'),
           // Remembers the owner said no, so the question goes away.
           h('div', { class: 'fs-row' }, add, h('button', { type: 'button', class: 'btn', dataset: { act: 'skip-cooked' }, onClick: () => { U.storage.set(KEY_CASKIP, true); paintCook(); } }, 'No, skip this')));
       } else {
@@ -432,7 +515,7 @@
         if (r.ok) { n++; ids.push(r.info.id); }
       });
       U.storage.set(KEY_EXAMPLES, ids);
-      exStatus.textContent = n ? 'Added ' + n + ' example dishes with made-up prices. Each one is marked Example: change its name and price, or tap Remove.' : 'Those example dishes are already on your menu.';
+      tell(exStatus, n ? 'Added ' + n + ' example dishes with made-up prices. Each one is marked Example: change its name and price, or tap Remove.' : 'Those example dishes are already on your menu.');
     });
     const exRemove = h('button', { type: 'button', class: 'btn', dataset: { act: 'example-remove' } }, ico('x', 20), h('span', null, 'Remove all example dishes'));
     // Archives every dish that came from the example menu, in one tap.
@@ -440,20 +523,22 @@
       const ids = U.storage.get(KEY_EXAMPLES, []);
       ids.forEach((id) => send('updateMenuItem', { id, patch: { archived: true } }));
       U.storage.set(KEY_EXAMPLES, []);
-      exStatus.textContent = 'Example dishes removed.';
+      tell(exStatus, 'Example dishes removed.');
     });
     const ways = h('details', { class: 'dp-fold dp-ways' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'More ways to add dishes')),
-      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'An example barbecue menu with made-up prices, so you can see how Smokebox looks with food on it. You can edit or remove every dish.'), h('div', { class: 'fs-row' }, exBtn, exRemove), exStatus));
+      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'An example menu with sample prices, so you can see how Smokebox looks with food on it. You can edit or remove every dish.'), h('div', { class: 'fs-row' }, exBtn, exRemove), exStatus,
+        // A quiet link to the optional menu import screen.
+        h('p', { class: 'fs-sub' }, h('button', { type: 'button', class: 'btn btn-link', dataset: { act: 'open-import' }, onClick: () => SB.sheets.open('menuimport') }, 'Have a menu file? Import it'))));
 
     // Links to the other small settings and to the full menu editor in the back office.
     const shopBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('shop'), 60); } }, ico('sliders', 20), h('span', null, 'Tax, hours and PIN'));
     const fullBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); } }, ico('gauge', 20), h('span', null, 'Full menu editor (ingredients, prep times)'));
     root.append(lead, form, dishesHead, undoBar, listBox, goneFold, caBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
-    sheet.body.appendChild(root);
+    sheet.body.appendChild(root); keepInView(root);
 
     // Restore a draft left by a closed tab, then the last station used.
     const d = U.storage.get(KEY_DRAFT, null);
-    if (d && typeof d === 'object') { nameIn.value = String(d.name || ''); priceIn.value = String(d.price || ''); }
+    if (d && typeof d === 'object') { nameIn.value = String(d.name || ''); priceIn.value = String(d.price || ''); priceIn.dispatchEvent(new g.Event('input')); }
     const last = (d && d.zone) || U.storage.get(KEY_LAST, '');
     if (last && visibleStations().some((z) => z.id === last) && visibleStations().length > 1) pickZone(last);
     setTimeout(() => nameIn.focus(), 50);
@@ -479,20 +564,29 @@
       const gIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', value: '150', 'aria-label': 'Grams of it in one ' + m.name });
       return { m, cb, gIn, el: h('div', { class: 'dp-row' }, h('label', { class: 'grow' }, cb, ' ' + m.name + (portionLeft(m) >= 0 ? ' (counted by portions)' : '')), h('span', { class: 'fs-sub' }, 'grams in one:'), gIn) };
     });
-    const dishBox = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Which dishes use it?'), h('p', { class: 'fs-sub' }, 'Tick each dish and the grams of it in one serving (150 is a starting guess). Smokebox takes that much off the batch when the dish is made.'), h('div', { class: 'dp-list' }, dishRows.map((r) => r.el)));
+    const dishBox = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Which dishes use it?'), h('p', { class: 'fs-sub' }, 'Select each dish and enter the grams of it in one serving (150 is a starting guess). Smokebox takes that much off the batch when the dish is made.'), h('div', { class: 'dp-list' }, dishRows.map((r) => r.el)));
     const status = h('p', { class: 'fs-sub', role: 'status' });
     const after = h('div', { class: 'fs-row', hidden: true });
+    let warnedNoDish = false;
+    // Selecting a dish clears the one-time warning, so a later empty save warns again.
+    dishRows.forEach((x) => x.cb.addEventListener('change', () => { warnedNoDish = false; }));
     // Saves the item and links the ticked dishes; says plainly what happened and what to do next.
     const save = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'save-cooked' }, onClick: () => {
-      nameField.setError(null); hoursField.setError(null); status.textContent = '';
+      nameField.setError(null); hoursField.setError(null); tell(status, '');
       const name = nameIn.value.replace(/\s+/g, ' ').trim(), hrs = readNum(hoursIn), kg = kgIn.value.trim() ? readNum(kgIn) : null;
       if (!name) { nameField.setError('Type what you cook ahead.'); return; }
       if (hrs == null || hrs < 0.5 || hrs > 12) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
-      if (kgIn.value.trim() && (kg == null || kg <= 0 || kg > 1000)) { status.textContent = 'Batch size: type kilograms like 4, or leave it empty.'; return; }
+      if (kgIn.value.trim() && (kg == null || kg <= 0 || kg > 1000)) { tell(status, 'Batch size: type kilograms like 4, or leave it empty.'); return; }
+      // With dishes on the menu but none selected, nothing would use this item: say so once, and save only on a second tap.
+      if (dishRows.length && !dishRows.some((x) => x.cb.checked) && !warnedNoDish) {
+        warnedNoDish = true;
+        tell(status, 'No dish is selected, so nothing will use this item and it will not count down. Select a dish above, or tap Save again to keep it without one.', 'bad');
+        return;
+      }
       const payload = { name, unit: 'g', tcs: true, hold: kind.getValue(), maxHoldH: hrs, holdBasis: 'safety' };
       if (kg) payload.parG = Math.round(kg * 1000);
       const r = send('addIngredient', payload);
-      if (!r.ok) { if (r.report === 'nameTaken') nameField.setError('You already have an item called ' + name + '.'); else status.textContent = r.words; return; }
+      if (!r.ok) { if (r.report === 'nameTaken') nameField.setError('You already have an item called ' + name + '.'); else tell(status, r.words); return; }
       let linked = 0;
       dishRows.filter((x) => x.cb.checked).forEach((x) => {
         const grams = Number(x.gIn.value);
@@ -501,7 +595,7 @@
         const bom = (cur.bom || []).concat([{ ing: r.info.id, qty: grams }]);
         if (send('updateMenuItem', { id: x.m.id, patch: { bom } }).ok) linked++;
       });
-      status.textContent = 'Added ' + name + (linked ? ' and linked it to ' + linked + ' ' + U.plural(linked, 'dish', 'dishes') : '') + '. Log your first batch in the cabinet when you cook one.';
+      tell(status, 'Added ' + name + (linked ? ' and linked it to ' + linked + ' ' + U.plural(linked, 'dish', 'dishes') : '') + '. Log your first batch in the cabinet when you cook one.');
       save.hidden = true; after.hidden = false;
       U.clear(after);
       // Opens the cabinet on a new batch of the item just added.
@@ -511,7 +605,155 @@
     } }, ico('check', 22), h('span', null, 'Save cooked-ahead item'));
     sheet.body.appendChild(h('div', { class: 'dp' }, h('p', { class: 'fs-sub' }, 'Optional. Skip this and you can still take every order. Later you can add more from the Cabinet.'),
       h('div', { class: 'dp-form' }, nameField, h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Hot or cold'), kind), hoursField, kgField, dishBox, h('div', { class: 'fs-row' }, save), status, after)));
+    keepInView(sheet.body);
     setTimeout(() => nameIn.focus(), 50);
+    return sheet;
+  }
+
+  /* ---------- the Import a menu sheet ---------- */
+
+  // Opens "Import a menu": choose a file or paste text, check it, fix the rows in a preview, then import the ticked ones.
+  // Also has "Export my menu". Optional; the form is still the easy way to add dishes.
+  function openImport() {
+    const M = SB.menuImport;
+    const sheet = SB.ui.sheet({ title: 'Import a menu', side: 'right', width: 'min(900px, 96vw)', name: 'menuimport' });
+    const root = h('div', { class: 'dp' });
+    if (!M) { sheet.body.appendChild(h('p', { class: 'fs-sub' }, 'Menu import is not part of this copy of Smokebox.')); return sheet; }
+    const area = h('textarea', { class: 'textarea', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Paste your menu here', placeholder: 'Paste your menu here, one dish per line like "Pulled pork plate 12.50", or the text of a spreadsheet.' });
+    const fileIn = h('input', { type: 'file', accept: '.csv,.tsv,.txt,text/csv,text/plain', 'aria-label': 'Choose a menu file' });
+    const status = h('p', { class: 'fs-sub', role: 'status' });
+    const preview = h('div', { class: 'dp-preview' });
+    let parsed = null, rows = [];
+    // The station used for a row that names none: the first station still in use.
+    const defaultZone = () => visibleStations()[0].id;
+    // Runs the importer on the text and draws the preview, or says plainly what is wrong with the text.
+    function check(text, from) {
+      U.clear(preview); tell(status, '');
+      const res = M.parse(text, { existing: SB.store.getState().menu });
+      if (res.error) { tell(status, res.error); parsed = null; return; }
+      parsed = res; rows = res.rows.map((r) => Object.assign({ keep: r.ok && !r.hidden }, r));
+      // A category that is only digits usually means a price like 4,50 was split at its comma: warn, and leave the row unticked.
+      rows.forEach((r) => {
+        // The importer's own warnings about extra columns or a digits-only category also leave the row unticked.
+        if ((r.problems || []).some((p) => p.code === 'extraColumns' || p.code === 'numericCategory')) { r.keep = false; return; }
+        if (/^\d+$/.test(String(r.categoryText || '').trim())) { r.problems = (r.problems || []).concat([{ code: 'priceSplit', level: 'warn', message: 'The category here is "' + r.categoryText + '", which looks like the end of a price split at a comma (4,50).', fix: 'Check the price, tick the row when it is right. In your file, put prices with commas inside quotes.' }]); r.keep = false; }
+      });
+      if (res.summary && res.summary.unmatched) res.summary.unmatched.categories = res.summary.unmatched.categories.filter((c) => !/^\d+$/.test(String(c).trim()));
+      paintPreview(from);
+    }
+    // Says why a typed name cannot be used: 'removed' (a removed dish has it), 'menu' (a dish on the menu), 'list' (another row here), or ''.
+    function takenBy(r) {
+      const nm = String(r.name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      const hit = SB.store.getState().menu.find((m) => m.name.toLowerCase() === nm);
+      if (hit) return hit.archived ? 'removed' : 'menu';
+      return rows.some((o) => o !== r && o.keep && String(o.name || '').trim().toLowerCase() === nm) ? 'list' : '';
+    }
+    // True when an edited row can be imported: a name, a price from 0 to 1000 and a name that is not taken.
+    function rowOk(r) {
+      const nm = String(r.name || '').replace(/\s+/g, ' ').trim();
+      return !!nm && nm.length <= 60 && typeof r.price === 'number' && r.price >= 0 && r.price <= 1000 && !takenBy(r);
+    }
+    // Draws the format line, any file notes, the table of rows (tick, name, price, station, problems) and the Import button.
+    function paintPreview(from) {
+      U.clear(preview);
+      const sm = parsed.summary;
+      preview.append(h('p', { class: 'fs-sub dp-fmt' }, 'Read ' + (from || 'the text') + ' as: ' + parsed.label + '. ' + sm.message));
+      (sm.notes || []).forEach((n) => preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, n)));
+      // Words in the file that match none of the owner's categories or stations: say it once, and offer to add the categories.
+      const um = sm.unmatched || { stations: [], categories: [] };
+      if (um.categories.length) {
+        // Adds the file's category words as the owner's own categories, then reads the file again so each dish lands in its own.
+        const addCats = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'import-add-cats' }, onClick: () => {
+          const C = SB.config, spec = JSON.parse(JSON.stringify(C.customSpec()));
+          spec.add = spec.add || {}; spec.add.categories = (spec.add.categories || []).concat(um.categories.map((nm) => ({ name: nm })));
+          const before = C.customSpec(), res = C.applyCustom(spec);
+          if (res.rejected.length) { C.applyCustom(before); tell(status, 'Some of those category names could not be added (too long, a repeat, or the list is full). Change the category words in the file, or add them one by one in the Back office.', 'bad'); return; }
+          C.saveCustom(spec); check(area.value, 'the file');
+          tell(status, 'Added ' + um.categories.length + ' ' + U.plural(um.categories.length, 'category', 'categories') + '. Each dish now sits in its own.', 'ok');
+        } }, 'Add these categories');
+        preview.appendChild(h('div', { class: 'fs-note', 'data-tone': 'warn' }, h('div', null, h('p', null, 'Your file has categories that are not set up here: ' + um.categories.join(', ') + '. Until you add them, those dishes go in "' + ((SB.config.categories[0] || {}).name || 'the first category') + '".'), addCats)));
+      }
+      if (um.stations.length) preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'Your file names stations that are not set up here: ' + um.stations.join(', ') + '. Pick each dish\'s station below.'));
+      // One station for every dish that came with none, so a cafe does not pick it 22 times.
+      const bulk = h('select', { class: 'select', 'aria-label': 'Put every dish at this station' }, h('option', { value: '' }, 'Choose a station'), stations().map((z) => h('option', { value: z.id }, z.name)));
+      preview.appendChild(h('div', { class: 'fs-row dp-bulk' }, h('label', null, 'Put all these dishes at: '), bulk));
+      const body = h('div', { class: 'dp-ptable', role: 'table', 'aria-label': 'Dishes found' });
+      const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'import-go' } }, 'Import');
+      // Updates the Import button's count and enabled state from the ticked, valid rows.
+      const paintGo = () => { const n = rows.filter((r) => r.keep && r.ok).length; go.disabled = n === 0; go.textContent = n ? 'Import ' + n + ' ' + U.plural(n, 'dish', 'dishes') : 'Nothing to import'; };
+      rows.forEach((r) => {
+        const keepBox = h('input', { type: 'checkbox', checked: r.keep, 'aria-label': 'Import ' + r.name });
+        const keep = keepBox;
+        const keepWrap = h('label', { class: 'dp-check' }, keepBox);
+        const nm = h('input', { class: 'input', type: 'text', maxlength: 60, value: r.name || '', 'aria-label': 'Name, line ' + r.line });
+        const pr = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: typeof r.price === 'number' ? r.price.toFixed(2) : '', 'aria-label': 'Price, line ' + r.line });
+        const zs = h('select', { class: 'select', 'aria-label': 'Station, line ' + r.line }, stations().map((z) => h('option', { value: z.id, selected: (r.station || defaultZone()) === z.id }, z.name)));
+        const prob = h('div', { class: 'fs-sub dp-prob' });
+        const rowEl = h('div', { class: 'dp-prow', role: 'row', dataset: { ok: r.ok ? 'true' : 'false' } }, keepWrap, nm, pr, zs, prob);
+        // Redraws this row's plain problems and its tick after any edit.
+        const redo = () => {
+          r.ok = rowOk(r); if (!r.ok) r.keep = false;
+          keep.checked = r.keep; rowEl.dataset.ok = r.ok ? 'true' : 'false';
+          if (r.ok) prob.textContent = '';
+          else prob.textContent = (!String(r.name || '').trim() ? 'Type a name. ' : '') + (typeof r.price !== 'number' ? 'Type a price like 12.50. ' : '') + ({ removed: 'A removed dish has this name. Bring it back in Dishes and prices, or use another name.', menu: 'That name is already on the menu.', list: 'That name is in this list twice.' }[takenBy(r)] || '');
+          paintGo();
+        };
+        // Selecting a row in or out changes only whether it is imported.
+        keep.addEventListener('change', () => { r.keep = keep.checked && (r.ok = rowOk(r)); keep.checked = r.keep; paintGo(); });
+        // Typing a new name or price re-checks the row and ticks it in when it has become valid.
+        const edit = () => { r.name = nm.value.replace(/\s+/g, ' ').trim(); const p = SB.menuImport.readPrice(pr.value); r.price = p && typeof p.value === 'number' ? p.value : null; r.station = zs.value; r.ok = rowOk(r); r.keep = r.ok; redo(); };
+        nm.addEventListener('change', edit); pr.addEventListener('change', edit); zs.addEventListener('change', () => { r.station = zs.value; });
+        prob.textContent = (r.problems || []).filter((p) => p.code !== 'unknownCategory' && p.code !== 'unknownStation').map((p) => p.message + (p.fix ? ' ' + p.fix : '')).join(' ');
+        body.appendChild(rowEl);
+      });
+      // Choosing a station in the bulk list sets it on every row.
+      bulk.addEventListener('change', () => { if (!bulk.value) return; rows.forEach((r) => { r.station = bulk.value; }); body.querySelectorAll('select').forEach((s) => { s.value = bulk.value; }); });
+      // Imports the ticked rows through the importer's actions, then offers one-tap undo of that batch.
+      go.addEventListener('click', () => {
+        const picked = rows.filter((r) => r.keep && r.ok).map((r) => Object.assign({}, r, { station: r.station || defaultZone() }));
+        const out = M.toActions(picked, SB.store.getState().menu, { zone: defaultZone() });
+        const ids = [];
+        out.actions.forEach((a) => { const res = send(a.type, a.payload); if (res.ok && res.info && res.info.id) ids.push(res.info.id); });
+        const bad = out.actions.length - ids.length + out.skipped.length;
+        tell(status, 'Imported ' + ids.length + ' ' + U.plural(ids.length, 'dish', 'dishes') + (bad ? '. ' + bad + ' could not be imported' + (out.skipped.length ? ': ' + out.skipped.map((s) => s.name + ' (' + s.reason + ')').join('; ') : '.') : '.'));
+        U.clear(preview);
+        if (ids.length) {
+          // Takes the imported dishes off the menu again in one step (they are removed, not deleted).
+          preview.appendChild(h('button', { type: 'button', class: 'btn', dataset: { act: 'import-undo' }, onClick: () => { ids.forEach((id) => send('updateMenuItem', { id, patch: { archived: true } })); tell(status, 'Removed the ' + ids.length + ' imported ' + U.plural(ids.length, 'dish', 'dishes') + '.'); U.clear(preview); } }, 'Remove these ' + ids.length));
+        }
+      });
+      preview.append(body, h('div', { class: 'fs-row' }, go));
+      paintGo();
+    }
+    // Reads the chosen file as text and checks it like pasted text.
+    fileIn.addEventListener('change', () => {
+      const f = fileIn.files && fileIn.files[0];
+      if (!f) return;
+      if (f.size > M.limits.textMax) { tell(status, 'That file is too big to read. Use a file under 1 MB.'); return; }
+      const rd = new g.FileReader();
+      // When the file is read, check its text; a failed read says so.
+      rd.onload = () => { area.value = String(rd.result || ''); check(area.value, 'the file'); };
+      rd.onerror = () => { tell(status, 'That file could not be read.'); };
+      rd.readAsText(f);
+    });
+    const checkBtn = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'import-check' } }, ico('check', 20), h('span', null, 'Check it'));
+    // Checks the pasted text.
+    checkBtn.addEventListener('click', () => check(area.value, 'the pasted text'));
+    // Export: the menu as a spreadsheet file, so it can be edited elsewhere or kept as a copy.
+    const exp = h('button', { type: 'button', class: 'btn', dataset: { act: 'export-menu' } }, ico('download', 20), h('span', null, 'Export my menu'));
+    // Builds the menu CSV and starts a download; says so if the browser blocks it.
+    exp.addEventListener('click', () => {
+      const text = M.exportMenu(SB.store.getState().menu);
+      try {
+        const url = g.URL.createObjectURL(new g.Blob([text], { type: 'text/csv' }));
+        const a = doc.createElement('a'); a.href = url; a.download = 'smokebox-menu.csv'; a.style.display = 'none'; doc.body.appendChild(a); a.click();
+        setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 1000);
+        tell(status, 'Saved smokebox-menu.csv. Open it in a spreadsheet, or import it again later.');
+      } catch (e) { area.value = text; tell(status, 'Your browser blocked the download. The menu is in the box above: copy it into a file named smokebox-menu.csv.'); }
+    });
+    root.append(h('p', { class: 'fs-sub' }, 'Optional. Choose a spreadsheet (CSV) or an item export from Square, Toast or Clover, or paste a list. You will see every dish and can fix or clear any before anything is added. Adding dishes by hand in Dishes and prices is just as good.'),
+      h('div', { class: 'fs-row' }, fileIn), area, h('div', { class: 'fs-row' }, checkBtn, exp), status, preview);
+    sheet.body.appendChild(root); keepInView(sheet.body);
     return sheet;
   }
 
@@ -529,13 +771,13 @@
       return status;
     }
     const tax = h('input', { class: 'input', type: 'text', inputmode: 'decimal', value: String(set.service.taxRatePct || 0), 'aria-label': 'Sales tax percent' });
-    const taxSt = section('Sales tax', 'Orders add this percent when they are paid. Type 0 if you do not charge tax.', h('label', { class: 'fs-row' }, h('span', null, 'Percent'), tax),
+    const taxSt = section('Sales tax', 'The prices you type for dishes are before tax. Smokebox adds this percent to the bill when it is paid. Type 0 if you do not charge tax.', h('label', { class: 'fs-row' }, h('span', null, 'Percent'), tax),
       // Checks the tax box and saves the rate, or says what is wrong with it.
       h('button', { type: 'button', class: 'btn', onClick: () => {
         const v = readNum(tax);
-        if (v == null || v < 0 || v > 20) { taxSt.textContent = 'Type a number from 0 to 20.'; return; }
+        if (v == null || v < 0 || v > 20) { tell(taxSt, 'Type a number from 0 to 20.'); return; }
         const r = send('updateSettings', { patch: { service: { taxRatePct: v } } });
-        taxSt.textContent = r.ok ? 'Saved. Orders add ' + v + '% sales tax.' : r.report === 'nothingToDo' ? 'Already set.' : r.words;
+        tell(taxSt, r.ok ? 'Saved. Orders add ' + v + '% sales tax.' : r.report === 'nothingToDo' ? 'Already set.' : r.words);
       } }, 'Save tax'));
     // A list of whole hours with plain labels such as "11 am" and "1 am (next day)".
     const hourOpts = (from, to, sel) => { const out = []; for (let x = from; x <= to; x++) out.push(h('option', { value: String(x), selected: x === sel }, U.fmtHour(x) + (x >= 24 ? ' (next day)' : ''))); return out; };
@@ -545,18 +787,18 @@
       // Saves both hours, or says closing has to come after opening.
       h('button', { type: 'button', class: 'btn', onClick: () => {
         const o = Number(openSel.value), c = Number(closeSel.value);
-        if (o >= c) { hoursSt.textContent = 'Closing has to be after opening.'; return; }
+        if (o >= c) { tell(hoursSt, 'Closing has to be after opening.'); return; }
         const r = send('updateSettings', { patch: { service: { openHour: o, closeHour: c } } });
-        hoursSt.textContent = r.ok ? 'Saved. Open ' + U.fmtHour(o) + ' to ' + U.fmtHour(c) + '.' : r.report === 'nothingToDo' ? 'Already set.' : r.words;
+        tell(hoursSt, r.ok ? 'Saved. Open ' + U.fmtHour(o) + ' to ' + U.fmtHour(c) + '.' : r.report === 'nothingToDo' ? 'Already set.' : r.words);
       } }, 'Save hours'));
     const pin = h('input', { class: 'input', type: 'password', inputmode: 'numeric', maxlength: 4, autocomplete: 'off', 'aria-label': 'Manager PIN, 4 digits' });
     const pinSt = section('Manager PIN (optional)', 'A PIN keeps cooks out of the back office. It only keeps honest people out. Skip it if you do not want one.', h('label', { class: 'fs-row' }, h('span', null, '4 digits'), pin),
       // Saves the four-digit PIN, or asks for exactly four digits.
       h('button', { type: 'button', class: 'btn', onClick: async () => {
         const v = pin.value.trim();
-        if (!/^\d{4}$/.test(v)) { pinSt.textContent = 'Use exactly 4 digits.'; return; }
+        if (!/^\d{4}$/.test(v)) { tell(pinSt, 'Use exactly 4 digits.'); return; }
         const r = SB.shell && SB.shell.setPin ? await SB.shell.setPin(v) : { ok: false };
-        pinSt.textContent = r.ok ? 'PIN set. The back office will ask for it.' : 'The PIN could not be saved.';
+        tell(pinSt, r.ok ? 'PIN set. The back office will ask for it.' : 'The PIN could not be saved.');
         if (r.ok) pin.value = '';
       } }, 'Set PIN'));
     // Cook-ahead: one yes or no, kept in the real setting (settings.modules.cookAhead). A saved kitchen from before this
@@ -566,11 +808,11 @@
       // Saves the answer and says what appears or goes away; puts the old answer back if the save fails.
       onChange: (v) => {
         const r = send('updateSettings', { patch: { modules: { cookAhead: v === 'yes' } } });
-        if (!r.ok && r.report !== 'nothingToDo') { cook.setValue(v === 'yes' ? 'no' : 'yes'); cookSt.textContent = r.words; return; }
-        cookSt.textContent = v === 'yes' ? 'On. The Cabinet, cooked-batch times and their warnings are available. Change this any time here.' : 'Off. Batch tracking stays out of the way. Change this any time here.';
+        if (!r.ok && r.report !== 'nothingToDo') { cook.setValue(v === 'yes' ? 'no' : 'yes'); tell(cookSt, r.words); return; }
+        tell(cookSt, v === 'yes' ? 'On. The Cabinet, cooked-batch times and their warnings are available. Change this any time here.' : 'Off. Batch tracking stays out of the way. Change this any time here.');
       } });
-    const cookSt = section('Cooking ahead', 'Some places cook brisket or pork in the morning and slice it to order, or keep cold sides in a cooler. If you do, Smokebox can track those batches and warn you before they run out of time. Most new places start with No.', cook);
-    sheet.body.appendChild(list);
+    const cookSt = section('Cooking ahead', 'Some places cook a big batch in the morning and serve from it all day, or keep cold sides in a cooler. If you do, Smokebox can track those batches and warn you before they run out of time. Most new places start with No.', cook);
+    sheet.body.appendChild(list); keepInView(list);
     return sheet;
   }
 
@@ -588,8 +830,9 @@
   SB.sheets.register('setup', openSetup);
   SB.sheets.register('dishes', openDishes);
   SB.sheets.register('shop', openShop);
+  SB.sheets.register('menuimport', openImport);
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -39,6 +39,23 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.fill('.dp-name', ''); await page.fill('.dp-price', '');
   await page.locator('.dp-rp').first().fill('13'); await page.locator('.dp-rp').first().blur(); await page.waitForTimeout(300);
   check('a price edited in the list is saved', (await page.evaluate(() => SB.store.getState().menu.find((m) => m.name === 'Pulled pork plate').price)) === 13);
+  // Generous prices: "12,50" is read back as $12.50 before saving; a category can be changed from the dish row.
+  await page.fill('.dp-price', '12,50');
+  check('a typed price is read back before saving', /Reads as \$12\.50/.test(await page.locator('.dp-echo').textContent()));
+  await page.fill('.dp-price', '');
+  const nameFirst = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived)[0].name);
+  await page.selectOption('[aria-label="Category of ' + nameFirst + '"]', 'cold'); await page.waitForTimeout(300);
+  check('Move to: the category of a dish changes from its row', await page.evaluate((n) => SB.store.getState().menu.find((m) => m.name === n).cat === 'cold', nameFirst));
+  // Reorder: move the first dish down, check the menu order and the order screen follow, then Undo.
+  const names0 = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).map((m) => m.name));
+  await page.getByRole('button', { name: 'Move ' + names0[0] + ' down' }).click(); await page.waitForTimeout(300);
+  const names1 = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).map((m) => m.name));
+  check('a dish moves down one place', names1[0] === names0[1] && names1[1] === names0[0], [names0, names1]);
+  check('the first dish cannot move up and the last cannot move down', await page.getByRole('button', { name: 'Move ' + names1[0] + ' up' }).isDisabled());
+  await page.click('[data-act=undo-remove]'); await page.waitForTimeout(300);
+  check('Undo puts the order back', JSON.stringify(await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).map((m) => m.name))) === JSON.stringify(names0));
+  check('a refusal is shown in one consistent bad-tone line', await (async () => { await page.fill('.dp-name', names0[0]); await page.fill('.dp-price', '5'); await page.click('.dp-tile >> nth=0'); await page.click('[data-act=save-again]'); await page.waitForTimeout(250); return page.locator('.dp-form .field-error:visible, .dp-form .dp-msg[data-tone=bad]:visible, .dp-back:visible').count().then((c) => c > 0); })());
+  await page.fill('.dp-name', ''); await page.fill('.dp-price', '');
   await page.locator('.dp-row').nth(2).getByRole('button', { name: /Remove/ }).click(); await page.waitForTimeout(300);
   check('Remove archives the dish', (await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).length)) === 2);
   // Example menu fold.
@@ -113,6 +130,10 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   check('portions on hand: the dish row shows 20 left', await page.locator('.dp-row:has(input[aria-label="Name of Coleslaw"])').first().locator('.dp-left').textContent().then((x) => /20 left/.test(x)));
   await page.locator('.dp-row:has(input[aria-label="Name of Coleslaw"])').first().getByRole('button', { name: '+10' }).click(); await page.waitForTimeout(400);
   check('+10 restocks to 30 left', await page.locator('.dp-row:has(input[aria-label="Name of Coleslaw"])').first().locator('.dp-left').textContent().then((x) => /30 left/.test(x)));
+  await page.locator('.dp-row:has(input[aria-label="Name of Coleslaw"])').first().getByRole('button', { name: 'Stop counting' }).click(); await page.waitForTimeout(300);
+  check('Stop counting offers Undo', await page.locator('[data-act=undo-remove]').isVisible());
+  await page.click('[data-act=undo-remove]'); await page.waitForTimeout(400);
+  check('Undo brings the count back with the 30 that were left', await page.locator('.dp-row:has(input[aria-label="Name of Coleslaw"])').first().locator('.dp-left').textContent().then((x) => /30 left/.test(x)));
   check('the hidden "Portions of" ingredient is not shown anywhere in the sheet', !(await page.locator('.sheet').first().innerText()).includes('Portions of Coleslaw'));
   await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(300);
   await page.evaluate(() => SB.sheets.open('shop')); await page.waitForTimeout(400);

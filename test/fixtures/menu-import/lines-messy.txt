@@ -1,0 +1,8 @@
+Brisket plate, 14.00, pit
+Burger 9.50
+Burger 9.75
+Soup
+Salad, -3
+Big dinner, 5000
+Bad price, abc
+Pie 4.999

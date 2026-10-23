@@ -338,6 +338,14 @@
   const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   // Short date label such as "Fri 10/16".
   const dateShort = (ts) => { const d = new Date(ts); return WD[d.getDay()] + ' ' + (d.getMonth() + 1) + '/' + d.getDate(); };
+  // With two or more plain lines the colors alone are not enough for a colour-blind reader or a black-and-white print, so
+  // the second, third and fourth line get a dashed, dotted and dash-dot pattern. Bands, areas, stacked charts and charts with fewer lines stay solid.
+  function autoDash(spec, s, i) {
+    const list = Array.isArray(spec.series) ? spec.series : [];
+    const plain = list.filter((x) => x && x.kind !== 'band' && !x.area).length;
+    if (spec.stacked || s.area || s.kind === 'band' || plain < 2) return null;
+    return [null, '9 4', '2 4', '9 4 2 4'][i % 4];
+  }
   // Gram axis label: "850 g" below a thousand, "1.5 kg" from there.
   const fmtGAxis = (v) => (!isNum(v) ? '-' : U.units && U.units.weight === 'lb' && U.weightText ? U.weightText(v) : Math.abs(v) >= 1000 ? trim0((v / 1000).toFixed(1)) + ' kg' : Math.round(v) + ' g');
 
@@ -493,8 +501,6 @@
   const r1 = (n) => Math.round(n * 10) / 10;
   // Nearest pixel centre (whole number plus 0.5) so thin lines draw crisp.
   const px = (n) => Math.round(n) + 0.5;                       // 1px lines land on a pixel centre
-  // Number to text rounded to one decimal; "0" when not a number. Nothing calls it at the moment.
-  const num1 = (n) => (isNum(n) ? String(r1(n)) : '0');
 
   /** Rounded data-end bar path. dir = side the data end points to; the baseline end stays square. 'all' rounds every corner. */
   function barPath(x, y, w, h, r, dir) {
@@ -1011,7 +1017,7 @@
     const s = S('svg', { class: 'ch-sw', width: it.kind === 'line' ? 18 : 12, height: 12, viewBox: it.kind === 'line' ? '0 0 18 12' : '0 0 12 12', 'aria-hidden': 'true', focusable: 'false' });
     const fill = 'fill:' + it.css;
     if (it.kind === 'line') {
-      s.appendChild(S('line', { x1: 1, y1: 6, x2: 17, y2: 6, style: 'stroke:' + it.css + ';stroke-width:2;stroke-linecap:round', 'stroke-dasharray': it.dash ? '4 3' : null }));
+      s.appendChild(S('line', { x1: 1, y1: 6, x2: 17, y2: 6, style: 'stroke:' + it.css + ';stroke-width:2;stroke-linecap:round', 'stroke-dasharray': it.dash || null }));
       if (it.dot) s.appendChild(S('circle', { cx: 9, cy: 6, r: 3, style: fill + ';stroke:var(--ch-surface);stroke-width:1.5' }));
     } else if (it.kind === 'ring') {
       s.appendChild(S('circle', { cx: 6, cy: 6, r: 4, style: 'fill:var(--ch-surface);stroke:' + it.css + ';stroke-width:2' }));
@@ -1054,8 +1060,6 @@
   // Colour key for a reference line: its status tone if it has one, else 'muted' (grey and dashed).
   function refTone(r) { const t = keyOfTone(r && r.tone); return t === 'muted' || !t ? 'muted' : t; }
 
-  // Joins the non-empty pieces of text with semicolons. Nothing calls it at the moment.
-  const joinList = (arr) => arr.filter(Boolean).join('; ');
 
   /* =====================================================================================================
    * 6. CARTESIAN HELPERS (axes, grids, reference lines) shared by line, scatter, hist, bar, dumbbell, gantt
@@ -1238,7 +1242,7 @@
       let sorted = true; for (let k = 1; k < pts.length; k++) if (pts[k].x < pts[k - 1].x) { sorted = false; break; }
       if (!sorted) pts.sort((a, b) => a.x - b.x);
       const id = s.id != null ? String(s.id) : 'series' + i;
-      return { id, name: s.name != null ? String(s.name) : id, key: st.key, css: st.css, area: !!s.area || !!spec.stacked, dash: !!s.dash, band, pts, hidden: chart.hidden.has(id), raw: s };
+      return { id, name: s.name != null ? String(s.name) : id, key: st.key, css: st.css, area: !!s.area || !!spec.stacked, dash: s.dash ? '6 4' : autoDash(spec, s, i), band, pts, hidden: chart.hidden.has(id), raw: s };
     });
     const vis = series.filter((s) => !s.hidden);
     const has = vis.some((s) => s.pts.some((p) => p.y != null));
@@ -1400,7 +1404,7 @@
           for (let i = 0; i < dx.length; i++) { if (dy[i] == null) flush(); else run.push([dx[i], dy[i]]); }
           flush();
         }
-        marks.appendChild(S('path', { d, class: 'ch-ln', style: 'stroke:' + s.css, 'stroke-dasharray': s.dash ? '6 4' : null }));
+        marks.appendChild(S('path', { d, class: 'ch-ln', style: 'stroke:' + s.css, 'stroke-dasharray': s.dash || null }));
         drawn.push({ s, xs, ys });
       });
     }
@@ -1649,7 +1653,6 @@
     (spec.refLines || []).forEach((r) => { const v = r && (r.value != null ? r.value : orient === 'v' ? r.y : r.x); if (isNum(v)) { if (v > hi) hi = v; if (v < lo) lo = v; } });
     if (hi === 0 && lo === 0) hi = percent ? 100 : 1;
     // --- label strings (needed to size margins)
-    const lab = (v) => fmt.full(v);
     const pxText = (t, w) => chart.tw(t, 12, w || 600);
     const allVals = [];
     vis.forEach((s) => m.order.forEach((c) => { if (isNum(val(s, c))) allVals.push(val(s, c)); }));
@@ -2006,7 +2009,7 @@
     }
     // overlay step outlines
     const go = S('g', { class: 'ch-g-ov ch-rv-right' });
-    visOv.forEach((o) => {
+    visOv.forEach((o, oi) => {
       let d = '';
       for (let i = 0; i < b.n; i++) {
         const x0 = r1(X(b.lo + i * b.binSize)), x1 = r1(X(b.lo + (i + 1) * b.binSize)), y = r1(Y(o.c[i]));
@@ -2014,7 +2017,7 @@
       }
       d += 'V' + r1(bot);
       go.appendChild(S('path', { d: d + 'Z', style: 'fill:' + o.s.css + ';fill-opacity:.1;stroke:none' }));
-      go.appendChild(S('path', { d: d.replace(/Z$/, ''), class: 'ch-ln', style: 'stroke:' + o.s.css + ';stroke-linejoin:miter' }));
+      go.appendChild(S('path', { d: d.replace(/Z$/, ''), class: 'ch-ln', style: 'stroke:' + o.s.css + ';stroke-linejoin:miter', 'stroke-dasharray': visOv.length >= 2 ? [null, '9 4', '2 4', '9 4 2 4'][oi % 4] : null }));
     });
     svg.appendChild(go);
     drawRefLines(svg, chart, (spec.refLines || []).map((q) => (q.value == null && q.x != null ? Object.assign({}, q, { value: q.x }) : q)), { orient: 'v', scale: X, l, r, t: top, b: bot });

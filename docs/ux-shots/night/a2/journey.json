@@ -249,7 +249,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 2547,
+  "addThreeDishesWallMs": 2646,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -619,7 +619,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 1921,
+  "addThreeDishesWallMs": 2083,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -690,7 +690,7 @@
     "notes": [
      {
       "kind": "info",
-      "text": "Question card: Do you cook any of this ahead and hold it? Brisket in the morning, slaw in the cooler. If you do, Smokebox can track eac"
+      "text": "Question card: Do you cook any of this ahead and hold it? Chili in a warmer, potato salad in a cooler. If you do, Smokebox can track ea"
      },
      {
       "kind": "tap",
@@ -749,7 +749,7 @@
     ],
     "screen": "Sheet: Hold cabinet",
     "toasts": [
-     "Brisket batch 1 is in the cabinet: 2.00 kg cooked, first reading 150 °F."
+     "Brisket batch 1 is in the cabinet: 4.00 kg cooked, first reading 150 °F."
     ],
     "shot": "04-E-batch-logged.png"
    },
@@ -789,7 +789,7 @@
     ],
     "screen": "Kitchen board",
     "toasts": [
-     "Brisket batch 1 is in the cabinet: 2.00 kg cooked, first reading 150 °F.",
+     "Brisket batch 1 is in the cabinet: 4.00 kg cooked, first reading 150 °F.",
      "Ticket #101 sent to 1 station. Paid $14.00 by cash."
     ],
     "shot": "05-E-cook-ahead-paid.png"

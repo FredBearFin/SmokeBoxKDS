@@ -698,7 +698,7 @@
     for (const w of want) {
       keep.add(w.key);
       let r = P.rows.get(w.key);
-      if (!r) { r = { li: h('li', { class: 'fl-wall-row' }, h('span', { class: 'fl-wall-name' }), h('span', { class: 'fl-wall-meta num' })), a: null, b: null }; r.a = r.li.firstChild; r.b = r.li.lastChild; P.rows.set(w.key, r); w.list.appendChild(r.li); }
+      if (!r) { r = { li: h('li', { class: 'fl-wall-row' }, h('span', { class: 'fl-wall-name', dir: 'auto' }), h('span', { class: 'fl-wall-meta num' })), a: null, b: null }; r.a = r.li.firstChild; r.b = r.li.lastChild; P.rows.set(w.key, r); w.list.appendChild(r.li); }
       setTxt(r.a, w.text); setTxt(r.b, w.meta);
     }
     for (const [k, r] of Array.from(P.rows)) if (!keep.has(k)) { r.li.remove(); P.rows.delete(k); }
@@ -1025,6 +1025,14 @@
     setTimeout(done, 900 + Math.min(i, 9) * 55);
   }
 
+  // Gives an element one soft highlight so a changed ticket or dish catches the eye, then removes the hook.
+  // WATCH OUT: no forced layout here, because 200 tickets can change state in the same second.
+  function flash(el) {
+    if (!el || reduced() || el.classList.contains('fl-flash')) return;
+    el.classList.add('fl-flash');
+    setTimeout(() => el.classList.remove('fl-flash'), 900);
+  }
+
   // Takes a finished slip off the board: it slides out (inert, so no tap lands on it), or goes at once
   // with reduced motion.
   function removeSlip(rec) {
@@ -1058,11 +1066,12 @@
     const zone = mode === 'station' ? m.zone : null;
     const num = h('span', { class: 'slip-num num', id: uid + '-n' }, h('span', { class: 'visually-hidden' }, 'Ticket '), '#' + t.num);
     const stampSlot = h('span', { class: 'fl-stamp-slot' });
-    const who = h('span', { class: 'slip-who', id: uid + '-w' }, t.customer);
+    const who = h('span', { class: 'slip-who', dir: 'auto', id: uid + '-w' }, t.customer);
     const ch = C.channelById[t.channel] || { name: String(t.channel), icon: 'plate' };
     const count = h('span', { class: 'fl-count' });
     const meta = h('div', { class: 'slip-meta' }, h('span', { class: 'fl-chan' }, ico(ch.icon, 18), h('span', null, ch.name)), count,
-      t.src === 'demo' ? h('span', { class: 'fl-demo-tag', title: 'Demo ticket: made by the demo, not a real order' }, 'Demo', h('span', { class: 'dt-more' }, ' ticket')) : null);
+      // Inside the demo every ticket is a demo ticket and the demo bar already says so, so the tag only shows beside real tickets.
+      t.src === 'demo' && !(store().isDemo && store().isDemo()) ? h('span', { class: 'fl-demo-tag', title: 'Demo ticket: made by the demo, not a real order' }, 'Demo', h('span', { class: 'dt-more' }, ' ticket')) : null);
     const timer = h('span', { class: 'slip-timer num', dataset: { level: 'ok' } }, '00:00');
     const badge = buildBadge();
     const progI = h('i');
@@ -1227,7 +1236,7 @@
     const sr = h('span', { class: 'visually-hidden' });
     // Compact tickets show the short menu name; the full name stays in the reading order for screen readers.
     const short = it.short && it.short !== it.name ? it.short : null;
-    const name = h('span', { class: 'slip-name' }, short ? h('span', { class: 'nm-full' }, it.name) : it.name, short ? h('span', { class: 'nm-short', 'aria-hidden': 'true' }, short) : null, sr);
+    const name = h('span', { class: 'slip-name', dir: 'auto' }, short ? h('span', { class: 'nm-full' }, it.name) : it.name, short ? h('span', { class: 'nm-short', 'aria-hidden': 'true' }, short) : null, sr);
     const sub = h('span', { class: 'fl-sub' });
     row.sr = sr;
     if (kind === 'deck') {
@@ -1297,6 +1306,7 @@
     // Waiting and read-only rows change only with the status; tappable rows also refresh the timer.
     if (row.status === st && row.kind !== 'btn') { return; }
     const changed = row.status !== st;
+    if (changed && row.status != null) flash(row.li); // a dish that changes state gets one soft highlight
     row.status = st;
     row.li.dataset.state = st;
     if (row.kind === 'btn') {
@@ -1356,6 +1366,7 @@
       rec.refs.timer.dataset.level = lvl;
       rec.refs.badge.dataset.level = lvl;
       if (lvl !== 'breach') put(rec.refs.bw, WORDS[lvl]);
+      if (prev) flash(rec.el.querySelector('.slip-head')); // the head glows once when the ticket moves to a new time state
       if (announceBreach && lvl === 'breach' && prev && prev !== 'breach') say('Ticket #' + rec.num + ' is overdue.');
     }
   }
@@ -1518,7 +1529,8 @@
     const batchy = (d) => !ck && (d.batchId || d.kind === 'sanitize' || d.kind === 'check' || d.kind === 'shortfall' || d.kind === 'leftover' || d.kind === 'keepcheck' || d.kind === 'expiry' || d.kind === 'expired' || d.kind === 'past');
     const feed = all.filter((d) => !d.trivial && !batchy(d) && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
     // A tablet screen is short: one warning row there (the next shows when this one is cleared or done), two on a tall or far screen.
-    const maxRows = !F.wallActive() && (far || (g.innerHeight || 0) >= 900) ? 2 : 1;
+    // A far display below 1300 px tall keeps one big row, so the tickets keep most of the screen; a taller one has room for two.
+    const maxRows = !F.wallActive() && (far ? (g.innerHeight || 0) >= 1300 : (g.innerHeight || 0) >= 900) ? 2 : 1;
     const top = feed.slice(0, maxRows);
     const moreRows = feed.length - top.length;
     const needSound = sound && !audioReady();
@@ -1545,8 +1557,9 @@
       if (r.el.dataset.step !== stp) r.el.dataset.step = stp;
       if (r.el.dataset.snoozed !== sn) r.el.dataset.snoozed = sn;
       setTxt(r.when, d.kind === 'expired' ? 'OUT' : d.kind === 'past' ? 'PAST' : countdownText(d.msLeft));
-      setTxt(r.what, d.label);
-      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action + (i === top.length - 1 && moreRows > 0 ? ' (' + moreRows + ' more warning' + (moreRows > 1 ? 's' : '') + ' after this one.)' : ''));
+      // How many more warnings wait behind this one goes on the short name line, where a long explanation cannot cut it off.
+      setTxt(r.what, d.label + (i === top.length - 1 && moreRows > 0 ? '   +' + moreRows + ' more' : ''));
+      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action);
     });
   }
 
@@ -1777,21 +1790,6 @@
     else openSheet('help');
   }
   F.startTour = startTour;
-  // Clears the pretend tickets after a confirm, so a new user can begin with a clean board. Settings stay.
-  async function startEmpty() {
-    const ok = await SB.ui.confirm({
-      title: 'Start with an empty board?', confirmLabel: 'Clear the board', cancelLabel: 'Keep the tickets',
-      body: ['This removes the practice tickets and anything else logged on this device. Settings stay.'],
-    });
-    if (!ok || !m) return;
-    try { if (SB.sim && SB.sim.live) SB.sim.live.stop(); } catch (e) { /* the simulator may not be running */ }
-    store().setSpeed(1);
-    const r = store().resetLive({ keepSettings: true, starter: false });
-    if (r !== 'ok') { toast(E().describe(r, {}, store().getState().settings), { tone: 'warn' }); return; }
-    F.setWelcome(false);
-    toast('The board is empty. Tap New ticket to send an order.', { tone: 'info' });
-  }
-
   // Empty state: shown when no slips match the current tab.
 
   // Fills the empty panel: New ticket and Start demo, or on a quiet station a way back to All.
@@ -1803,7 +1801,7 @@
     const title = firstRun ? 'Welcome. Let\'s build your menu.' : stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
     const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
-      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or run the busy-night demo. Demo orders are for practice.';
+      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
     const sig = title + '|' + text;
     if (e.dataset.sig === sig) return;
     e.dataset.sig = sig;
@@ -1813,7 +1811,7 @@
     if (firstRun) {
       actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'Add your first dish')),
         h('button', { type: 'button', class: 'btn fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
-        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Try the busy-night demo (practice)')));
+        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Try the demo')));
       e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
       return;
     }
@@ -1822,12 +1820,14 @@
     actions.appendChild(h('button', { type: 'button', class: 'btn btn-primary', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket')));
     if (!stationBusy) actions.append(
       h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
-      h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Busy-night demo')));
+      h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, store().isDemo && store().isDemo() ? 'Busy-night crew' : 'Try the demo')));
     e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
   }
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.
   function startDemo() {
+    // In a real kitchen the button opens the demo kitchen in its own space; only inside the demo does it start the crew.
+    if (SB.setup && SB.setup.tryDemo && store().isDemo && !store().isDemo()) { SB.setup.tryDemo(); return; }
     // A real kitchen never turns into the demo: the demo is a separate mode (own saved data), entered with a reload.
     if (store().isolated && store().isolated() && !store().isDemo()) { store().enterDemo(); return; }
     // The pit starts empty now, so the demo first loads its own stocked kitchen (settings stay).
@@ -1837,7 +1837,7 @@
       try {
         live.start({ rate: 'normal' });
         if (typeof live.crew === 'function') live.crew(true);
-        toast('Busy-night demo started. Orders and the crew are for practice. Open Demo to stop it.', { tone: 'info' });
+        toast('Demo started. The orders and the crew are not real. Open Demo to stop it.', { tone: 'info' });
         return;
       } catch (e) { console.error('[smokebox] demo failed to start', e); }
     }

@@ -1,0 +1,5 @@
+Menu,Menu Group,Item Name,Price,Description,Visibility
+Dinner,Mains,Brisket plate,14.00,"Two sides, cornbread",Visible
+Dinner,Mains,Rib rack,29.00,Full rack,Visible
+Dinner,Sides,Mac and cheese,5.50,,Visible
+Dinner,Drinks,Sweet tea,3.50,,Hidden

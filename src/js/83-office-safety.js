@@ -99,7 +99,7 @@
     function judge(f) {
       const k = f.k;
       const none = !(k.tempChecks.count || k.sanitize.count || k.discards.count || k.batchesIn || k.lockouts.spellCount);
-      if (none) return { tone: 'info', word: 'Nothing yet', title: 'No food-safety records in this range yet.', body: 'Temperature readings, sanitize rounds and discards fill this page once the hold cabinet has been used. Log a batch and its temperature on the kitchen board, or pick a longer range.', problem: null };
+      if (none) return { tone: 'info', word: 'Nothing yet', title: 'No food-safety records in this range yet.', body: 'Temperature readings, sanitize rounds and thrown-out batches fill this page once the hold cabinet has been used. Log a batch and its temperature on the kitchen board, or pick a longer range.', problem: null };
       // Food went into the cabinet but nothing was logged: that is not the same as safe, so say so.
       if (!k.tempChecks.count && !k.sanitize.count && !k.discards.count && !k.lockouts.spellCount) return { tone: 'info', word: 'Nothing to judge', title: 'No temperature checks or sanitize rounds were logged in this range.', body: 'Food went into the hold cabinet, but without readings there is nothing to show whether it stayed in range. Log temperature checks from the kitchen board.', problem: null };
       const safetyDis = f.dis.filter((d) => SAFETY_REASONS[d.reason]);
@@ -289,7 +289,7 @@
     const timeline = page.card({
       type: 'gantt', span: 12, title: 'Batch timeline', sub: scope(),
       caption: 'Green bars are batches whose readings were in range. Amber means a temperature check was due, orange a reheat or chill, red a batch that was thrown out. Diamonds are readings.',
-      empty: { title: 'No batches in this range', body: 'Batches appear here once you log food cooked into the hold cabinet. Log your first batch on the line screen, or pick a longer range.', icon: 'thermometer' },
+      empty: { title: 'No batches in this range', body: 'Batches appear here once you log food cooked into the hold cabinet. Log your first batch on the kitchen board, or pick a longer range.', icon: 'thermometer' },
       spec: timelineSpec,
     });
     B.addAction(timeline, showSeg);

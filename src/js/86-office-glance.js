@@ -49,7 +49,7 @@
         { id: 'late', label: 'Late tickets', value: String(late), tone: late > 0 ? 'bad' : 'good',
           sub: late > 0 ? 'Past their overdue time' : near > 0 ? 'None late, ' + near + ' close to late' : 'Nothing late' },
         { id: 'out86', label: '86 list', value: String(names.length), tone: names.length ? 'warn' : 'good',
-          sub: inp.fresh ? 'Nothing cooked yet, so nothing is 86' : names.length ? names.slice(0, 4).join(', ') + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '') : 'Everything is on the menu' },
+          sub: inp.fresh ? 'Nothing cooked yet, so nothing is sold out' : names.length ? names.slice(0, 4).join(', ') + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '') : 'Everything is on the menu' },
         run ? { id: 'runout', label: inp.runout.name || 'Cooked food', value: run.tone === 'bad' ? 'None' : run.tone === 'warn' ? U.fmtTime(inp.runout.shortfallAt) : run.tone === 'good' ? 'Lasts' : '-', tone: run.tone, sub: run.text, wide: true } : null,
       ].filter(Boolean),
     };

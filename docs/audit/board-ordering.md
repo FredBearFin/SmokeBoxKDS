@@ -82,3 +82,67 @@ Fixed:
 - **PIN lock-out:** a "Forgot the PIN?" fold under the keypad (what the PIN protects, that it cannot be recovered, ask whoever set it, clear site data, restore a backup that brings its old PIN back). The lock message points to it. Options for Freddy: `docs/audit/pin-recovery-options.md`. No PIN logic changed.
 
 Left: the tour toast on an empty menu (message sent to A4 with the new text); the "?" on Set up this tablet (A2); "Fix this entry" only covers thrown-out entries (not temperature or sanitize rows, which need a safety page owner); initials are not asked for start cooling or keep serving beyond the existing keep-serving box; P2 items 3 and 6 to 11 of the first list.
+
+## Round 5 status
+
+Screenshots: `docs/ux-shots/night/a1/r5-before-slips-*` and `r5-after-slips-*` (4, 8, 12 and 30 tickets at 1024, 1280 and 1920; Day, Night, Large text) and `r5-after-cabinet-*`. Test: `test/board-round5.e2e.mjs`. Simulated in headless Chromium (software rendering), not on a tablet or TV.
+
+Fixed:
+- **Ticket slips:** tickets in one grid row now share one height (Bump stays right under the dishes, so it is never pushed out of reach). Item rows are about 15 px shorter (start time and station tag share a line), helper lines (start times, next-step line) are quieter and smaller, dish names a little larger, and waiting dishes are dimmed by colour, not by thin text. Far display keeps the bigger helper lines.
+- **Hold cabinet:** one compact card for every batch: name and status on one line, ring and the amount left, last reading, next reading and serve-by, one main button (Taste and keep, Reheat or Log temp) and a "..." for the rest (pull, remind me, cooling, discard, corrections). The card went from about 330 px to 227 px and three cards fit across at 1280, so six batches show on one screen instead of two. "Starter stock" is named once in the summary line, not on each card; yield and cost notes moved out of the cards.
+- **Units on the floor:** cabinet cards, sheets, toasts, help text, the thrown-out log, the notice strip text and the temperature boxes follow Fahrenheit/Celsius and kg/lb. The temperature boxes show the chosen unit and still store Fahrenheit (70 C is saved as 158 F). Cost per kg lines read per lb when pounds are chosen. Weight inputs in the New batch and restock forms still take kilograms (same as A3's office pages).
+- **Motion system:** one custom property, `--sb-motion` (in `00-tokens.css`; reduced motion sets it to 0), scales every duration. Print-in 240 ms, bump-out slides sideways and fades in 260 ms, time colours ease, and a changed ticket or dish gets one 800 ms highlight. The overdue pulse now runs 3 times and the "check it" row flash 6 times, then they hold still; nothing loops for ever.
+- **P2:** the "Amount" header in the thrown-out log no longer breaks.
+
+Performance (headless Chromium, software rendering, 4 s of a 120x clock with tickets changing state; frames per second are not a tablet figure):
+
+| Tickets | Motion on: avg / p95 / worst frame | Motion off: avg / p95 / worst frame |
+|---|---|---|
+| 60 | 16.7 / 16.8 / 33.3 ms | 17.4 / 16.8 / 66.7 ms |
+| 200 | 19.2 / 33.4 / 66.7 ms | 17.3 / 16.8 / 66.6 ms |
+
+Left: weight inputs in kg; "check this reading" and sanitize rows are not fixable from the log yet; P2 items 3 and 6 to 11 of the first list; no before/after of far display at 1024.
+
+## Round 6 status
+
+Screenshots: `docs/ux-shots/night/a1/r6-*.png` (Far display and Wall mode at 1920, 2560 and 3840; blank, late and 60 tickets). Tests: `test/board-contrast.e2e.mjs` and the updated `test/board-round2.e2e.mjs`. Simulated in headless Chromium only.
+
+Fixed:
+- **A real Night bug (mine, from round 3):** late tickets after the first three had a transparent head, so at Night the ticket number, customer and timer were dark text on the dark board (contrast 1.1 to 2:1, unreadable) and the "Next" tag was dark on dark. Heads now use the paper colour and the tag uses the slip colours. The new contrast test would have caught it.
+- **Contrast:** a pair checker over computed styles (4.5:1 small text, 3:1 large) found no other failure on the board, New ticket, Orders and the cabinet in Day, Night and Night with Large text. Focus rings are visible (outline at least 2 px). Keyboard: Tab reaches the controls, Enter opens New ticket and Orders, Escape closes them and focus returns to the board.
+- **Far display and Wall mode:** a 4K screen (3000 px and wider) now draws the board at twice size; Far display also enlarges dish names (1.3 times), the strip batch name and explanation (1.25 times) and the sound note, and keeps one strip row below 1300 px of height; the demo and backup bar grow on 4K. No horizontal scroll at any size; wall panes (orders, glance) work with a blank kitchen, the demo and 60 tickets; the strip never covers tickets (it pushes them down). New numbers against the 10-foot test are in `docs/ux-test-report.md`: which batch passes on a 43 in TV or larger; the explanation line is barely legible; the next-action line fails on a 43 in TV and passes only barely on 55 in and 65 in 4K TVs; a 32 in 1440p monitor fails most lines.
+- **Touch size:** the sound bar, the pause note and their clear buttons are at least 44 px high.
+- **Wording (A4's round 5 rows):** "held back" instead of "locked for safety", "Select" instead of "Tick", "Start and Done", "your dishes", "pulled pork or chili", "Demo batch", "restaurants that cook food ahead", "Sample history", demo wording instead of practice.
+
+Left: the Overdue badge is small at 10 feet (the red outline and the "Do this first" tag carry the message); the physical size of a 2560x1440 32 in monitor needs browser zoom; P2 items 3 and 6 to 11 of the first list.
+
+## Round 7 status
+
+Screenshots: `docs/ux-shots/night/a1/r7-*.png`. Tests: `test/board-contrast.e2e.mjs` (now also the 86, Recall, Menu, Help and discards sheets in Day, Night and Night with Large text, and focus rings by control type). `board-round3` and `board-round4` re-run and pass. Simulated in headless Chromium only.
+
+Fixed:
+- **Focus rings:** the dish row button had no ring at all, and controls on the dark sound bar (clear X, help "?") had a ring the same colour as the bar. Both now show a ring of at least 2 px with 3:1 contrast in Day and Night. The new sheets showed no contrast failures.
+- **Overdue badge in Far display:** bigger and on its own line (see `docs/ux-test-report.md`).
+- **Friday rush** (a blank kitchen, six dishes added, 40 tickets one every 250 ms, then Start, Bump with its "Bump anyway" confirm, tab switches, Orders with 40 orders, Pay, the 86 board, New ticket, and the cabinet tab after turning cooking ahead on): no overlap, no clipped text, no page errors. Time from tap to the next painted frame: new ticket 30 ms on average (worst 52), tap Start 16 ms, Bump 12 ms, tab switch 30 to 38 ms, Pay 36 ms, open the 86 board 46 ms, open New ticket 93 ms, open Orders with 40 orders 112 ms. The one thing found: in the cabinet view the 10-second "Paid ... Undo" toast sat on top of the In the cabinet and New batch tabs; it now sits below them.
+- **Order sheet with 36 dishes and 12 categories at 768x1024:** no clipped tile names (a 40-character name wraps to five lines), the 12 category tabs wrap to two rows, search plus Enter adds the first match. Emoji, Arabic and Hebrew names draw correctly; right-to-left customer names now align right (`dir="auto"` on slip, tile, wall, Orders and Recall names).
+- **From A2's first-time owner run:** tabs for categories with no dish are hidden (and all tabs when fewer than two categories have a dish); the payment note says "No sales tax is added. Set it under Menu, Tax, hours and PIN." when the tax rate is 0; the New batch weight starts at the usual batch size the owner typed.
+- **Wording (A4):** research-report sentence removed from Help, "step 1 of 2" and "step 2 of 2" for cooling, "throw it out".
+
+Left: a hint of how many tickets are below the fold (P2 6); countdown format switching between minutes and mm:ss (P2 7); bright slips at Night (P2 8); the Demo tag on every ticket (P2 11); wall names that are too long end in an ellipsis (no way to read the rest on a TV).
+
+## Round 8 status (final)
+
+Final screenshots with a "what to look for" list: `docs/ux-shots/final/README.md`. All board checks re-run on the merged build (e7e9c93 plus this branch): `board-round2` to `board-round5`, `board-contrast` (42 checks) and `strip-notices` pass.
+
+Done this round:
+- The "Demo" tag on tickets, Orders rows and Recall rows is hidden inside the demo (the demo bar already says it) and still shows beside real tickets.
+- On the notice strip the count of more warnings now reads "+N more" beside the batch name, where a long explanation can no longer cut it off.
+
+Known, not done:
+- **A hint of how many tickets are below the fold.** The tab count is the only hint. Needs a small "N more below" pill tied to the scroll position; not small enough to do safely this late.
+- **Countdown format.** The strip shows minutes ("25 min") until under 10 minutes, then mm:ss ("9:58"). It is consistent with itself, but the two forms look different at a glance. Left as the design.
+- **Bright slips at Night.** Paper slips stay light on the dark board. Readable (contrast checked) but bright in a dark kitchen. A dim-paper Night mode would be a design change.
+- "Show me how it works" shows twice when the setup card and the empty board are up together.
+- Wall list names that are too long end in an ellipsis.
+- A 32 in 2560x1440 monitor is too small for Far display from 10 feet (see `docs/ux-test-report.md`); the next-action line fails on a 43 in TV.
+- Nothing here was tested on a real tablet, TV or in a real kitchen.

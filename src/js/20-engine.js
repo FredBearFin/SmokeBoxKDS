@@ -114,10 +114,10 @@
     badWho: 'Initials must be 1 to 12 characters. Shorten them, or leave them blank if the screen allows.',
     unknownSafetyEntry: 'That safety log entry is not here, or it is not a temperature, discard, cooling, reheat, sanitize or keep-serving entry. Pick one from the safety log.',
     wrongBackupMode: 'That backup does not belong to this kitchen (one is from the demo, the other from a real kitchen). Nothing was changed. Choose a backup made from this kitchen.',
-    moduleOff: 'Cook-ahead tracking (batches, the hold cabinet, temperature checks and sanitizing) is switched off. Turn it on in Menu and settings first.',
+    moduleOff: 'Cook-ahead tracking (batches, the hold cabinet, temperature checks and sanitizing) is switched off. Turn it on under Dishes and prices: Yes, I cook ahead.',
     nameTaken: 'Another ingredient already has that name. Pick a different name, or use the one that exists.',
     tooManyIngredients: 'The ingredient list is full (' + 80 + ' ingredients). Archive one you no longer use, then add this one.',
-    portionsConflict: 'This dish already lists ingredients, so it cannot also count portions. Remove its ingredients first, or keep tracking it by ingredients.',
+    portionsConflict: 'This dish already uses ingredients, so it cannot also be counted by portions. Remove its ingredients first, or keep it as it is.',
     badSnooze: 'A reminder can be put off for 1 to 30 minutes, only for a batch still on the menu, and never past 5 minutes before its last warning. The last warning, a past-quality batch and a thrown-out batch cannot be put off.',
   };
 
@@ -157,8 +157,9 @@
     sanitizeDone: '{ who? }',
     updateSettings: '{ patch }',
     updateMenuItem: '{ id, patch }',
-    addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two" }',
+    addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two", prepGuess?:boolean }',
     updateIngredient: '{ id, patch }',
+    moveMenuItem: '{ id, toIndex }',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety" }',
     setPortions: '{ menuId, on:boolean, count? }',
     resetLive: '{ keepSettings?=true, starter?, stagger?, catalog?: "sample"|"blank", replaceOwn? }',
@@ -167,7 +168,7 @@
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient', 'moveMenuItem'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -563,7 +564,7 @@
     // after twice the interval.
     const iv = S.tempCheckEveryMin * MIN;
     // In range but past its quality limit: off the menu, still on the board, waiting for a taste test or a discard.
-    if (pastQ) return gateOut('PAST_QUALITY', false, 'pastQuality', 'bad', 'Past its quality limit. Taste it, then keep serving or discard it.', exp);
+    if (pastQ) return gateOut('PAST_QUALITY', false, 'pastQuality', 'bad', 'Past its quality limit. Taste it, then keep serving or throw it out.', exp);
     if (batch.lastTempAt == null) return gateOut('CHECK_TEMP', true, 'noReading', now - batch.enteredAt > iv ? 'bad' : 'warn', 'No temperature logged yet. Check it now.' + SAFETY, exp);
     const due = batch.lastTempAt + iv;
     if (now > due) return gateOut('CHECK_TEMP', true, 'checkDue', now > batch.lastTempAt + 2 * iv ? 'bad' : 'warn', 'Temperature check is due. Log a reading.' + SAFETY, exp);
@@ -1250,7 +1251,7 @@
         }
       }
       /*@I7*/ const a = hasOwn(avail, mi.id) ? avail[mi.id] : availability(tx.state(), mi.id);
-      if (!a || a.ok !== true) { tx.info.menuId = mi.id; tx.info.reason = a ? a.reason : null; tx.info.ing = a ? a.ing : null; return 'itemUnavailable'; }
+      if (!a || a.ok !== true) { tx.info.menuId = mi.id; tx.info.name = mi.name; tx.info.reason = a ? a.reason : null; tx.info.ing = a ? a.ing : null; return 'itemUnavailable'; }
       parsed.push({ mi, qty, mods });
     }
     delete tx.info.line;
@@ -2400,7 +2401,8 @@
   A.updateIngredient = (tx, p) => patchEntity(tx, p, 'ingredients', ING_PATCH, 'ingredients');
   // Adds a new dish. It needs a name, station, category, price, prep time and whether one tap or
   // start-then-finish makes it. The id is made from the name and never reuses an old one. The new dish has no
-  // recipe yet, so stock is not tracked for it, and its prep time counts as confirmed because the owner typed it.
+  // recipe yet, so stock is not tracked for it, and its prep time counts as confirmed because the owner typed it
+  // (unless prepGuess is true, as for an imported menu: then the app keeps learning the real time).
   A.addMenuItem = function (tx, p) {
     const list = tx.get('menu');
     if (list.length >= MENU_MAX) { tx.info = { key: 'menu', min: 0, max: MENU_MAX }; return 'outOfBounds'; }
@@ -2423,12 +2425,38 @@
     let id = base, n = 2;
     while (taken.has(id) || hasOwn(C.menuById, id) || !safeKey(id)) id = base + '_' + n++;
     const w = tx.mut('menu');
-    w.push({ id, name, short, zone: p.zone, cat: p.cat, price: p.price, prepSec: Math.round(p.prepSec), track: p.track, bom: [], prepConfirmed: true, archived: false });
+    w.push({ id, name, short, zone: p.zone, cat: p.cat, price: p.price, prepSec: Math.round(p.prepSec), track: p.track, bom: [], prepConfirmed: p.prepGuess !== true, archived: false });
     tx.event('settings_changed', { keys: ['menu.' + id + '.added'] });
     tx.info = { id, keys: ['menu.' + id + '.added'] };
     return 'ok';
   };
 
+  // Moves one dish to a new place in the menu list (0 is first). The order is what the order screen and the lists show
+  // inside each category. toIndex must be a whole number from 0 to the last place (outOfBounds otherwise); the same place
+  // gives nothingToDo. Undo puts it back while the dish is still where this move left it.
+  A.moveMenuItem = function (tx, p) {
+    const list = tx.get('menu');
+    const from = typeof p.id === 'string' ? list.findIndex((m) => m.id === p.id) : -1;
+    if (from < 0) return 'unknownMenu';
+    if (!isInt(p.toIndex) || p.toIndex < 0 || p.toIndex >= list.length) { tx.info = { key: 'toIndex', min: 0, max: list.length - 1 }; return 'outOfBounds'; }
+    if (p.toIndex === from) return 'nothingToDo';
+    const w = tx.mut('menu');
+    const [mi] = w.splice(from, 1);
+    w.splice(p.toIndex, 0, mi);
+    tx.event('settings_changed', { keys: ['menu.' + mi.id + '.moved'] });
+    pushUndo(tx, 'moveMenu', (mi.short || mi.name) + ' moved', { id: mi.id, from, to: p.toIndex });
+    tx.info = { id: mi.id, from, to: p.toIndex, keys: ['menu.' + mi.id + '.moved'] };
+    return 'ok';
+  };
+  // Undo of a move: the dish goes back to its old place, but only if it is still where the move put it.
+  UNDO.moveMenu = function (tx, d) {
+    const list = tx.get('menu');
+    if (!list[d.to] || list[d.to].id !== d.id || d.from >= list.length) return 'undoConflict';
+    const w = tx.mut('menu');
+    const [mi] = w.splice(d.to, 1);
+    w.splice(d.from, 0, mi);
+    return 'ok';
+  };
   // The most ingredients a kitchen may hold, so a typing slip cannot fill the saved data.
   const ING_MAX = 80;
   // Makes an id from a name that no ingredient and no config ingredient already uses ("Hamburger Buns" becomes
@@ -2580,7 +2608,9 @@
     }
     const ns = newState({
       now: tx.now, seq: s.seq, starter: p.starter !== false, stagger: p.stagger === true, blank, settings,
-      menu: keep && !fresh ? s.menu : undefined, ingredients: keep && !fresh ? s.ingredients : undefined, learned: keep ? s.learned : undefined,
+      menu: keep && !fresh ? s.menu : undefined, ingredients: keep && !fresh ? s.ingredients : undefined,
+      // Learned prep times belong to the dishes; when the dishes are replaced they go too (invariant I14).
+      learned: keep && !fresh ? s.learned : undefined,
     });
     for (const k of Object.keys(ns)) tx.set(k, ns[k]);
     if (!ns.catalog && hasOwn(s, 'catalog')) tx.set('catalog', undefined);
@@ -3321,6 +3351,8 @@
     {
       const ids = new Set(state.ingredients.map((i) => i.id));
       for (const mi of state.menu) for (const ln of Array.isArray(mi.bom) ? mi.bom : []) if (!ids.has(ln.ing)) add('B1 ' + mi.id + ' recipe names missing ingredient ' + ln.ing);
+      const seenIds = new Set();
+      for (const mi of state.menu) { if (seenIds.has(mi.id)) add('B2 menu id ' + mi.id + ' appears twice'); seenIds.add(mi.id); }
       for (const i of state.ingredients) if (i.forMenu !== undefined && !state.menu.some((m) => m.id === i.forMenu)) add('B1 ingredient ' + i.id + ' counts portions of missing dish ' + i.forMenu);
     }
     // I14
@@ -3705,7 +3737,8 @@
       case 'notAllDone': return isInt(i.remaining) ? i.remaining + ' ' + U.plural(i.remaining, 'item') + ' not done yet. Finish them, or use Bump anyway to send the ticket out.' : REPORTS.notAllDone;
       case 'itemUnavailable': {
         const why = i.reason === 'manual' ? 'marked 86 by hand' : i.reason === 'safety' ? 'on a safety hold' : i.reason === 'quality' ? 'past its quality limit' : i.reason === 'stock' ? 'sold out' : '86';
-        const mi = typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
+        // The dish's own name (the live menu put it in info); the sample menu is only a fallback for older callers.
+        const mi = typeof i.name === 'string' && i.name ? i.name : typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
         return mi + ' is ' + why + '. Take it off the order or pick something else.';
       }
       case 'wrongBackupMode': return i.backup === 'demo' ? 'That backup comes from the demo, not from your kitchen. Nothing was changed. Choose a backup made from your own kitchen.' : 'That backup comes from a real kitchen, so it cannot be loaded into the demo. Nothing was changed. Leave the demo first, then load it into your own kitchen.';

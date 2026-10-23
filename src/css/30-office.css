@@ -349,3 +349,22 @@ a.of-nav:active { background: var(--press); }
 .of-nav.is-off { opacity: 0.8; }
 .of[data-gated="true"] .of-filters { display: none; }
 .of-section[hidden], .of-card[hidden] { display: none; }
+
+/* Folded extras: pages show their lead chart, then a quiet button reveals the rest. */
+.of-grid[data-more-open="false"] > [data-more] { display: none; }
+.of-more { grid-column: 1 / -1; display: flex; justify-content: center; padding: var(--sp-2) 0; }
+.of-more-btn { min-width: 14em; }
+/* Charts and tiles ease in once when a page opens. No loop, no number animation; off for reduced motion or --motion-on: 0. */
+:root { --motion-on: 1; }
+@keyframes of-ease-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  .of-tile, .of-card, .of-section { animation: of-ease-in calc(var(--motion-on, 1) * 320ms) ease-out both; }
+  .of-tile:nth-child(2), .of-card:nth-of-type(2) { animation-delay: 40ms; }
+  .of-tile:nth-child(3), .of-card:nth-of-type(3) { animation-delay: 80ms; }
+  .of-tile:nth-child(4), .of-card:nth-of-type(4) { animation-delay: 120ms; }
+}
+
+@media (max-width: 1100px) { .of-nav-off { display: none; } }
+.of-page[data-coach="on"] > .of-headline { display: none; }
+.of-wdrow { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.of .of-wd { min-height: 34px; padding: 0 10px; }

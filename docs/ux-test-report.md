@@ -212,3 +212,40 @@ Taps (counted by driving the buttons on a 1280x800 touch screen, 2026-10-18): pu
 ## Cabinet view (built after the replay)
 
 The hold cabinet is now a page view as well as a sheet: the **Cabinet** tab sits after the station tabs (with the count of batches needing attention) and replaces the tickets on the same screen; the strip and header stay above it. The Hold button left the header (the tab is that button), which is also what keeps Recall and 86 visible on a 1024 px tablet: header fit at 1024x768 measured with the Cabinet tab in place: tab, 86 and Recall visible, Orders and Back office words dropped. `H` toggles it; tapping a strip row opens it on that batch; a station tab brings the tickets back. At 1920 wide its text scales with the board's large-screen factor (1.2). Screenshots: `docs/ux-shots/cabinet-1024x768.png`, `cabinet-1920x1080.png`. It is the same builder as the sheet, so both stay in step. Checked in a real browser at 1024x768 and 1920x1080: opens in one tap, Pull works in one tap from it, the tickets come back, `H` toggles, no console errors. Not yet checked: a real tablet, and the type is still not large enough for a TV across a room (see the readability section).
+
+## Far display re-measured (round 6, 2026-10-23)
+
+Method: the built app in headless Chromium with Far display on and the demo loaded (12 tickets, all overdue, so the strip and the ranking are showing), at 1920x1080, 2560x1440 and 3840x2160. Font sizes are the computed CSS pixels. Distances use the same assumptions as above (cap height 0.72 x font size; 0.4 degrees comfortable, 0.2 degrees barely legible) and the pixel density of the screen sizes named. Nothing here was read from 10 feet by a person, so "pass" means "the arithmetic passes". Script: `ux-scripts/reading-distance.py` assumptions, measurements in this table. Each cell is "size: comfortable / barely legible".
+
+| Item | 43 in TV, 1920x1080 | 32 in monitor, 2560x1440 | 55 in TV, 3840x2160 | 65 in TV, 3840x2160 |
+|---|---|---|---|---|
+| strip countdown | 56 px: 9.4 / 18.9 ft | 70 px: 6.6 / 13.2 ft | 94 px: 10.0 / 20.1 ft | 94 px: 11.8 / 23.8 ft |
+| strip batch name | 51 px: 8.6 / 17.2 ft | 64 px: 6.0 / 12.0 ft | 86 px: 9.1 / 18.4 ft | 86 px: 10.8 / 21.7 ft |
+| strip explanation | 38 px: 6.3 / 12.7 ft | 47 px: 4.4 / 8.9 ft | 63 px: 6.7 / 13.5 ft | 63 px: 8.0 / 16.0 ft |
+| ticket number | 56 px: 9.3 / 18.8 ft | 61 px: 5.7 / 11.4 ft | 93 px: 10.0 / 20.0 ft | 93 px: 11.8 / 23.7 ft |
+| timer | 48 px: 8.1 / 16.3 ft | 53 px: 4.9 / 9.9 ft | 81 px: 8.6 / 17.3 ft | 81 px: 10.2 / 20.5 ft |
+| dish name | 39 px: 6.5 / 13.0 ft | 48 px: 4.5 / 9.1 ft | 65 px: 6.9 / 13.9 ft | 65 px: 8.2 / 16.4 ft |
+| next-action line | 27 px: 4.5 / 9.1 ft | 34 px: 3.2 / 6.4 ft | 45 px: 4.9 / 9.8 ft | 45 px: 5.7 / 11.5 ft |
+| Overdue badge | 20 px: 3.4 / 6.8 ft | 25 px: 2.4 / 4.7 ft | 34 px: 3.6 / 7.3 ft | 34 px: 4.3 / 8.6 ft |
+
+What changed in this round to get there: Far display now also grows dish names (1.3 times), the strip's batch name and explanation (1.25 times) and the sound note; a 4K screen (3000 px wide and up) draws the board at twice the normal size; Far display keeps one strip row below 1300 px of height, so tickets keep most of the screen. Before this round, on the same 43 in TV, dish names were comfortable to 4.3 ft and barely legible to 8.7 ft, the strip batch name comfortable to 6.9 ft.
+
+Against the test "from 10 feet, in 10 seconds, with no taps, know which batch is about to go, what happens if nothing is done, and what to do":
+- **Which batch is about to go: passes on a 43 in TV or larger** (countdown and batch name are at least barely legible past 17 ft, comfortable at 9 to 12 ft).
+- **What happens if nothing is done (the explanation line): barely legible, not comfortable.** It is readable at 10 ft only as "barely" on the 43 in TV (12.7 ft) and 55 in (13.5 ft); comfortable reading ends at 6 to 8 ft.
+- **What to do (the next-action line on a ticket): fails at 10 ft** on a 43 in TV (barely legible to 9.1 ft) and on a 32 in 1440p monitor (6.4 ft). It passes on a 55 or 65 in 4K TV (9.8 and 11.5 ft, barely).
+- **A 32 in 2560x1440 monitor fails every line except the countdown and the batch name at "barely".** It packs many pixels into a small screen (92 pixels per inch), so the app's size steps (they follow pixel width, not physical size) cannot make it big enough. Use a larger TV, or raise the browser zoom to 150 percent on that screen.
+- The Overdue badge is the weakest item (barely legible to 6.8 ft on a 43 in TV). It also has the time and a red outline, so the ranking tag ("Do this first") and the red border carry the message at distance; this is a judgment, not a measurement.
+
+### Overdue badge re-measured (round 7)
+
+In Far display the Overdue badge now has its own line under the customer and is 1.55 times the size of the other chips (35 px at 1920 wide, 53 px at 2560, 71 px at 3840). Same assumptions as above, size: comfortable / barely legible:
+
+| Screen | Badge size | Comfortable / barely legible |
+|---|---|---|
+| 43 in TV, 1920x1080 | 35 px | 5.9 / 11.8 ft |
+| 32 in monitor, 2560x1440 | 53 px | 4.9 / 9.9 ft |
+| 55 in TV, 3840x2160 | 71 px | 7.6 / 15.3 ft |
+| 65 in TV, 3840x2160 | 71 px | 9.0 / 18.0 ft |
+
+So "Overdue +23 min" is now at least barely legible at 10 feet on every screen listed except the 32 in monitor, where it is right on the line (9.9 ft). The next-action line is unchanged and still fails on a 43 in TV. Arithmetic only; nobody read it from 10 feet.

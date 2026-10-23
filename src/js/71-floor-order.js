@@ -276,9 +276,12 @@
     const clearSearch = h('button', { type: 'button', class: 'btn btn-ghost btn-icon btn-sm ord-search-clear', 'aria-label': 'Clear search', hidden: true }, ico('x', 18));
     const searchBox = h('div', { class: 'ord-search' }, ico('search', 20), searchInput, clearSearch);
     const searchHint = h('div', { class: 'ord-hint', role: 'status', 'aria-live': 'polite', hidden: true });
-    const catOptions = [{ id: 'all', label: 'All' }].concat(C.categories.map((c) => ({ id: c.id, label: c.name })));
+    // Only categories that have a dish get a tab; with one category or none there is nothing to pick, so the tabs hide.
+    const catsWithDishes = C.categories.filter((c) => st().menu.some((x) => !x.archived && x.cat === c.id));
+    const catOptions = [{ id: 'all', label: 'All' }].concat(catsWithDishes.map((c) => ({ id: c.id, label: c.name })));
     // Category tabs; typing in the search box ignores the tab so a search always looks at the whole menu.
     const catSeg = SB.ui.segmented({ kind: 'tabs', label: 'Menu category', class: 'ord-cats', options: catOptions, value: 'all', onChange: (id) => { view.cat = id; applyFilter(); } });
+    if (catsWithDishes.length < 2) catSeg.hidden = true;
     const sticky = h('div', { class: 'ord-sticky' }, searchBox, searchHint, catSeg);
     const combosEl = h('div', { class: 'ord-combos', role: 'group', 'aria-label': 'Quick combos' });
     const tilesEl = h('div', { class: 'ord-tiles', role: 'group', 'aria-label': 'Menu items' });
@@ -321,7 +324,7 @@
       const hd = h('h3', { class: 'ord-cat-head' }, c.name);
       tilesEl.appendChild(hd); view.heads.push(hd);
       items.forEach((mi) => {
-        const nameEl = h('span', { class: 'ord-tile-name' }, mi.name);
+        const nameEl = h('span', { class: 'ord-tile-name', dir: 'auto' }, mi.name);
         const priceEl = h('span', { class: 'ord-tile-price num' }, U.fmtMoney(mi.price));
         const countEl = h('span', { class: 'ord-tile-count', hidden: true }, h('span', { class: 'num' }, '0'), h('span', { class: 'visually-hidden' }, ' in order'));
         const wordEl = h('span', { class: 'ord-tile-86' }, ico('ban', 18), h('span', { class: 'ord-tile-86-word' }, ''));
@@ -822,7 +825,7 @@
       tipField.setError(D.pay && Number.isNaN(tip) ? 'Type dollars and cents, like 2.50.' : null);
       if (!D.pay) { text(payNote, 'The order stays open. Take payment later from Orders.'); return; }
       const pt = pendingTotal(), pm = C.payMethodById[D.pay];
-      text(payNote, 'Marked paid by ' + (pm ? pm.name.toLowerCase() : D.pay) + ' when sent: ' + U.fmtMoney(pt.total) + (pt.tax > 0 ? ' with ' + U.fmtMoney(pt.tax) + ' tax' : '') + (tip > 0 ? ', plus a ' + U.fmtMoney(tip) + ' tip' : '') + '. Smokebox only records this; it does not charge cards.');
+      text(payNote, 'Marked paid by ' + (pm ? pm.name.toLowerCase() : D.pay) + ' when sent: ' + U.fmtMoney(pt.total) + (pt.tax > 0 ? ' with ' + U.fmtMoney(pt.tax) + ' tax' : '') + (tip > 0 ? ', plus a ' + U.fmtMoney(tip) + ' tip' : '') + '. Smokebox only records this; it does not charge cards.' + ((st().settings.service.taxRatePct || 0) === 0 ? ' No sales tax is added. Set it under Menu, Tax, hours and PIN.' : ''));
     }
 
     function paintAll() {

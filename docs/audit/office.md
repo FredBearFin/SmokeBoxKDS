@@ -97,3 +97,76 @@ What closing does in the engine (checked in `A.closeDay`): it refuses while any 
 Floor-side call sites for A1 that still show weights or temperatures without the units helpers (not touched, not mine): hold cabinet cards and sheets (72-floor-sheets.js), the ticket and board cards (70-floor-board.js), 76-floor-discards.js; use `U.weightText(g)` and `U.tempText(f)`.
 
 Left: starting-cash setting, Safety "?" link, tax percentage in the print summary, a printed layout check on a real printer.
+
+---
+
+## Round 5 update (branch night/a3-r5)
+
+Screenshots: `docs/ux-shots/night/a3/r5-*` (Data in the real and demo kitchens at 1280 and 390, restore previews, the typed-word reset box, the safety bar, the print sheet and printed record, Pace, Tickets and Stations at 390, 1024, 1280 and 1920 in Ember and Paper). Browser checks used `?demo` for the demo kitchen and a plain load for the real one.
+
+- **Data page is a three-card flow** (`84-office-data.js`, `88-office-backup.js`, `32-office-data.css`): 1 Back up now (a red line when never backed up, amber after about a day, red after three days; the Download backup (JSON) and Copy backup buttons keep their names because the Guide quotes them), 2 Restore from a backup (choose a file or paste; the preview shows saved date, kind (your own kitchen or practice), dishes, orders, tickets and whether a PIN is set; a backup from the other kind of kitchen is refused in plain words before anything is touched; checked both directions), 3 Replacing this device (numbered steps and a Guide link). Spreadsheet files and the pilot report moved into a closed group. Below it: stored counts and sample history as before, then a Danger zone. Reset live data and Reset everything now open a box that says what will be erased and needs the word RESET or ERASE typed before the red button turns on (checked: disabled until typed, Enter and Escape work). The old confirm dialogs are gone.
+- **Printable food safety record** (`89-office-inspector.js`, `34-office-inspector.css`): a bar at the top of the Safety page (only when cooked-ahead food is tracked) with Print the safety record and a Guide "?"; a sheet with a date range (Today, 7, 30, 90 days) and a preview; print page with a header that says it is the owner's record and not an inspection result, "Entries are never edited; corrections are added under the entry they correct", a repeating table header, a Reviewed by line and page numbers (margin box, which an older print engine may ignore). Rows come from the engine's `safetyLog` (read only): readings, reheats, cooling, sanitize rounds, thrown-out food with cost where known, who logged it, corrections under their entry. No safety page file was edited (83 is untouched).
+- **Pace, Tickets, Stations:** four tiles each (Pace: median, slowest 1 in 10, on time, per hour; Tickets: finished, median, overdue, voided; Stations: overdue, first to last item, finished food waiting, items per hour), the lead chart or two visible, and the rest behind one "Show more charts and findings" button. Pace's lead chart is now full width.
+- **Motion:** tiles, cards and section heads ease in once (a 320 ms fade and 6 px rise, small stagger); no looping, numbers do not animate. Off for prefers-reduced-motion and when `--motion-on` is 0 (defined as 1 in `30-office.css`; there is no `--sb-motion` on this merge).
+- Printing fix: the Close the day and safety print blocks now share the `sb-printroot` class, because one hiding rule had been hiding the other's block.
+
+Left: a calmer first screen when the day has no data yet (four "Not enough data" tiles still show above an empty chart); the glance panel duplicates a few numbers the tiles also show; real-printer checks.
+
+---
+
+## Round 6 update (branch night/a3-r6)
+
+Screenshots: `docs/ux-shots/night/a3/r6-*` (Close the day open, ready and done at 1024 Paper, 1280 Paper and 1920 Ember; Data real and demo at 1024 Paper and 1920 Ember; Pace, Tickets, Stations at 1280 Paper).
+
+- **Wording from A4's round 5 list applied** (line numbers checked on the merged build): the "Settings" pointers now say Menu, Dishes and prices, "Yes, I cook ahead" (80-office-core.js); "line screen" is now "kitchen board" (80, 82, 83); the Sales yield section no longer says smoked meat or smoker ("cooked meat", "while it cooks", "your main cooked-ahead meat", "raw weight put in to cook"); "discards" is now "thrown-out batches" (83-office-safety.js:102, the one line allowed); the Fahrenheit sentence reads "The limits on the Food safety page are always entered in °F."; "nothing is 86" is now "nothing is sold out"; the channel sync strip (practice-only, hidden for real kitchens) now says "Practice only: this shows how a sold-out dish would reach other ordering systems. Nothing is sent."
+- **Calmer first screen.** Pace, Tickets and Stations treat "no finished tickets" as empty: one card, "Nothing to show yet. Take an order and send it out when it is done, and the times appear here" (or "The tickets on the line are not finished. Send one out and its times appear here"), no row of "Not enough data" tiles over an empty chart, and no duplicate headline. The glance panel and tiles no longer repeat each other (tiles are the four speed numbers; the glance holds money, open orders, late tickets, 86 list and the run-out item).
+- **Themes and contrast.** A script walked every text element on all seven pages in Ember and Paper (demo data, extra charts open) and found no text under 4.5:1 (3:1 for large text). Keyboard focus rings are 3 px and solid in both themes (light on Ember, near-black on Paper). Status colors always come with an icon and a word; charts use an orange and blue pair with dashes and labels. Print pages are black on white. Not measured: UI-component 3:1 for every chart mark, and color-blind simulation of every chart.
+- **Keyboard and screen reader.** Tab order on the Data page runs top to bottom; the typed-word box describes what will be erased (aria-describedby), takes focus when it opens, closes on Escape and returns focus to the button that opened it; the Close the day leftover choice is a labeled radio group; the done state moves focus to "The day is closed."; backup and restore results are polite status messages and refusals are alerts; the show-more button has aria-expanded. The Orders footer's Close the day button opens the sheet (browser check `test/office-closeday.e2e.mjs`). No screen reader was run.
+- Rail words "Not tracking" are hidden below 1100 px wide.
+
+---
+
+## Round 7 update (branch night/a3-r7): the owner's week
+
+Method: a three-week history for a blank own kitchen (12 own dishes, no ingredients, cook-ahead off: 403 orders over 21 days, with Friday and Saturday busiest and a peak slowdown at lunch and dinner) was generated with the real engine (scratch script, not committed) and loaded into the real kitchen; the barbecue demo (`?demo`, 14 sample days, cook-ahead on) stood in for the cook-ahead kitchen, since the simulator only makes that one. Pages were walked with owner questions. Screenshots: `docs/ux-shots/night/a3/r7-*`.
+
+Found and fixed:
+- **First screen was empty on a normal morning.** With nothing ordered yet today the office opened on "Today" and every page said there was nothing, although three weeks of data existed. It now starts on the last 7 days when today has no tickets but the week does (`defaultFilters`). "What did I take this week" is now one tap (Sales and money) and reads "$2,558 was collected, $122 of it tips".
+- **"What sold best Friday"** took the Range buttons, the date box and typing. One day now shows seven weekday buttons (Mon to Sun) that jump to the latest such day (today only counts if something was ordered today). Sales, then One day, then Fri: three taps, and the page shows that day's sales, payment mix and top items.
+- **The End of day card sat above the charts** and pushed Top items off the first screen; it is now at the bottom of Sales and money (the Close the day button on the Orders sheet is unchanged).
+- "When was I slowest", "was a station behind": answered by the headline on Tickets ("1 to 2 pm is the slowest hour at a median of 16m 07s") and Stations ("Pit finished last on 63% of tickets") in one tap, on the new default range.
+- "How much did I throw away": Safety and Stock correctly say "Not tracking" for the blank kitchen; in the demo the Safety headline now says "thrown out" instead of "discarded" (`40-metrics.js`), and the timeline mark reads "Thrown out".
+- **Sales CSV for an accountant** (Data page, Spreadsheet files group, first button "Sales by day (for your accountant)"). One row per service day with plain column names: Date, Orders paid, Sales (after discounts), Discounts given, Tax, Tips, Total collected, Collected in cash, Collected by card, Collected other; then a Total row; plain digits with two decimals and no dollar signs so a spreadsheet adds them up; demo files carry `-demo` in the name. Tested in `test/office-inspector.test.mjs`.
+- **Colour-blind check.** A simulation of the 8 series colors and the 4 status colors (protan, deutan, tritan, Ember and Paper) shows several close pairs (orange and brass under protan, slate and violet, ok and bad under deutan). Status colors always carry a glyph and a word. Charts with three or more plain lines now give the third and fourth a dotted and a dashed pattern, as do the histogram outlines, so no mark relies on color alone; two-series charts, stacked areas and bars still rely on legends and direct labels. Legend samples for the histogram outlines are still solid lines.
+- **Re-checked:** inspector sheet in Paper at 1920, the erase box in Paper at 1920 (its label touched the field; spaced), all seven office pages at 390 in Ember and Paper with the week data (no sideways scroll).
+- **Wording:** one verb for each Data page erase action (Erase live data, Erase everything, in the buttons, boxes, toggle and Guide); the confirm sentence no longer names themes; "Practice kitchen (the demo)" is now "Demo kitchen"; dish-row examples are neutral; "quality limit" kept where the cabinet says it (inspector labels "Kept serving past its quality limit").
+
+Left: charts in black and white print (only the two print pages are print-styled); Legend dash samples for histograms; a weekday sales chart; Friday's busiest dish still needs the page scroll to Top items.
+
+---
+
+## Final summary (round 8, branch night/a3-r8)
+
+**What each page answers** (for a small owner; numbers come from the app's own records)
+- **Pace:** "How is the kitchen doing right now?" The glance cards (paid so far today, open orders, late tickets, 86 list, the cooked-ahead item that runs out soonest) plus four speed tiles and the ticket-time-by-hour chart. More charts sit behind one button.
+- **Tickets:** "When was I slowest, and where does a ticket's time go?" One headline sentence, finished and overdue tickets, how long tickets take, on time by order type.
+- **Stations:** "Was a station behind?" Which station finished last, items waiting by station, overdue tickets by station, prep times against the starter estimates.
+- **Sales and money:** "What did I take in, and what sold best on a day?" One headline (sales, paid orders, collected with tax and tips), the sales tile and average order, money by day and by payment method, top items, sales by hour; the weekday buttons under One day; the End of day card at the bottom; the sales CSV on the Data page.
+- **Safety** (only when cooked-ahead food is tracked): "Were my checks kept, and what did I throw out?" Checks kept on time, the batch timeline, thrown-out food by reason, and the printable record.
+- **Stock and 86** (only when cooked-ahead food is tracked): "Why did something run out, and what should I cook tomorrow?" Plus the sell-out clock; the channel sync strip is practice-only.
+- **Menu and settings, Data:** dishes, times, limits, units, backup, restore, replace a device, erase data.
+
+**Verified in round 8**
+- The sales-by-day download in a real browser (Playwright download event, `test/office-sales-csv.e2e.mjs`): a blank kitchen starts no download and says "No order has been paid yet..."; a three-week history gives `smokebox-sales-by-day-<date>.csv` with the plain header, 20 day rows and a Total row (60 paid orders, methods add up, ten cells per row, no dollar signs); the demo kitchen's file is named `smokebox-sales-by-day-demo-...`.
+- Contrast walk on the merged build: all seven pages, Ember and Paper, no text under 4.5:1 (3:1 large).
+- Close the day from the Orders footer (`test/office-closeday.e2e.mjs`).
+- Two-line charts and histogram outlines with two or more channels now carry a dash pattern (second line dashed, third dotted, fourth dash-dot); area plus line charts rely on the fill versus the line.
+
+**Known limits (be honest with owners)**
+- All history in screenshots and tests is simulated (the 14-day barbecue sample and a generated three-week own-kitchen history). The numbers have never come from a real kitchen, and no page has been compared with a real owner's books.
+- Black-and-white print: only the Close the day and safety record pages are print-styled and are black on white. Printing an office page directly prints the screen layout in color; stacked and bar charts rely on labels and legends, not patterns.
+- Charts still use color for series in two-series stacked and bar charts; ok and bad status colors carry a glyph and a word.
+- No screen reader, real printer, real tablet or real kitchen has been used.
+- `test/office-b.e2e.mjs` is stale against the blank-start and demo-isolation merges (it expects sample data and every page populated): 20 ok, 4 FAIL, then crashes at an empty headline. `test/office-data.e2e.mjs` was not re-run this round. `test/office.e2e.mjs` was not re-run either. These suites need updating by whoever owns the e2e refresh.
+
+**Not done:** starting-cash setting; weekday sales chart; legend samples for dashed lines on histograms; a printed-chart view.

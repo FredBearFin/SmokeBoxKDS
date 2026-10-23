@@ -55,6 +55,8 @@
 .fl[data-far="on"] .fl-slip[data-level="breach"] { outline: calc(6px * var(--fl-k)) solid var(--crimson); outline-offset: -3px; }
 @media (min-width: 1700px) { .fl { --fl-k: 1.2; } }
 @media (min-width: 2200px) { .fl { --fl-k: 1.5; } }
+/* A 4K screen (3840 px wide, a 55 inch TV or bigger) draws the board at twice the size, so it reads from across the room. */
+@media (min-width: 3000px) { .fl { --fl-k: 2; } }
 
 /* Quiet board: a ticket that is on time carries no badge, so only late and warning tickets speak. */
 .fl-badge[data-level="ok"] { display: none; }
@@ -611,7 +613,7 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl-slip[data-sel="true"] { outline: calc(5px * var(--fl-k)) solid var(--ink); outline-offset: calc(2px * var(--fl-k)); }
 
 /* In the cabinet view the cards have buttons along the bottom-left, where toasts normally sit: toasts go to the top right, under the strip. */
-html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto; top: var(--fl-toast-top, 130px); left: auto; right: var(--gutter); transform: none; width: min(400px, 34vw); }
+html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto; top: calc(var(--fl-toast-top, 130px) + 118px); left: auto; right: var(--gutter); transform: none; width: min(400px, 34vw); }
 
 /* The void sheet's reason chips. */
 .fl-reasons { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); margin: var(--sp-3, 12px) 0; }
@@ -629,7 +631,7 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-cabinet { flex: 1 1 auto; min-width: 0; }
 .fl-cabinet[hidden] { display: none; }
 .fl-cabinet .hc { max-width: none; }
-.fl-cabinet .hc-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(420px * var(--fl-k))), 1fr)); }
+.fl-cabinet .hc-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(330px * var(--fl-k))), 1fr)); }
 .fl-cabinet .hc-name { font-size: calc(var(--fs-4) * var(--fl-k)); }
 .fl-cabinet .hc-status { font-size: calc(var(--fs-4) * var(--fl-k)); }
 .fl-cabinet .hc-stock-t, .fl-cabinet .hc-dl, .fl-cabinet .hc-msg { font-size: calc(var(--fs-3) * var(--fl-k)); }
@@ -674,10 +676,10 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 }
 .fl-slip[data-tier="1"], .fl-slip[data-tier="2"] { padding-top: calc(24px * var(--fl-k)); }
 .fl-slip[data-tier="1"]::before { content: "Do this first"; }
-.fl-slip[data-tier="2"]::before { content: "Next"; background: var(--ink); color: var(--bg); }
+.fl-slip[data-tier="2"]::before { content: "Next"; background: var(--slip-ink); color: var(--slip); }
 .fl-slip[data-tier="2"][data-level="breach"] .slip-head, .fl-slip[data-tier="2"][data-level="breach"] .slip-body, .fl-slip[data-tier="2"][data-level="breach"] .slip-tear,
 .fl-slip[data-tier="3"][data-level="breach"] .slip-head, .fl-slip[data-tier="3"][data-level="breach"] .slip-body, .fl-slip[data-tier="3"][data-level="breach"] .slip-tear { animation: none; }
-.fl-slip[data-tier="3"][data-level="breach"] .slip-head { background: transparent; }
+.fl-slip[data-tier="3"][data-level="breach"] .slip-head { background: var(--slip); }
 .fl-slip[data-tier="3"][data-level="breach"] .slip-head, .fl-slip[data-tier="3"][data-level="breach"] .slip-body, .fl-slip[data-tier="3"][data-level="breach"] .slip-tear { box-shadow: none; }
 /* Parts that belong to the cook-ahead module (Cabinet tab, Hold button, sanitize chip) disappear fully when it is off. */
 .fl-seg .seg-opt[hidden], .fl-tool[hidden], .fl-chip[hidden] { display: none !important; }
@@ -688,3 +690,61 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-dock-list { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
 /* Wall mode keeps one notice row and no sound-pause note: the TV is for glancing, and the three panes need the height. */
 .fl[data-wall="on"] .fl-bar-pause { display: none; }
+
+/* ===== Round 5: slip density and hierarchy, motion system ===== */
+/* Motion: --sb-motion (set in 00-tokens.css) is the one switch. Reduced motion turns it to 0; set it to 0 anywhere to stop all movement. */
+@media (prefers-reduced-motion: reduce) { :root { --sb-motion: 0; } }
+/* Print-in, a little quicker; bump-out slides sideways and fades; time colours ease instead of jumping. */
+.fl-slip.is-printing { animation-duration: calc(240ms * var(--sb-motion)); }
+.fl-slip.fl-leaving { animation: fl-leave calc(260ms * var(--sb-motion)) var(--ease-in-out) both; }
+@keyframes fl-leave { 0% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(calc(36px * var(--fl-k))) scale(0.97); } }
+.fl-slip .slip-head, .fl-slip .slip-timer, .fl-badge, .fl-row > .slip-item, .slip-next { transition: background-color var(--dur-slow) var(--ease-out), color var(--dur-slow) var(--ease-out), border-color var(--dur-slow) var(--ease-out), box-shadow var(--dur-slow) var(--ease-out); }
+/* One soft highlight when a ticket changes time state or a dish changes state. It plays once and leaves nothing behind. */
+.fl-flash { animation: fl-flash calc(800ms * var(--sb-motion)) var(--ease-out) 1; }
+@keyframes fl-flash { 0% { box-shadow: inset 0 0 0 999px rgba(255, 190, 40, 0.38); } 100% { box-shadow: inset 0 0 0 999px rgba(255, 190, 40, 0); } }
+/* Warnings get the eye for a few seconds, then hold still: no loop runs for ever on a busy board. */
+.slip[data-level="breach"] .slip-head, .slip[data-level="breach"] .slip-body, .slip[data-level="breach"] .slip-tear { animation-iteration-count: 3; }
+.fl-row[data-cook="check"] > .slip-item, .fl-row[data-cook="check"] .fl-act[data-act="cook"] { animation-iteration-count: 6; }
+
+/* Density: tickets in one grid row stretch to the same height so a row looks even; Bump stays right under the dishes so it is never pushed out of reach. */
+.fl-grid { align-items: stretch; gap: var(--sp-5) var(--sp-4); }
+.fl-slip { display: flex; flex-direction: column; }
+.fl-slip .slip-body { flex: 1 1 auto; display: flex; flex-direction: column; }
+/* Hierarchy: number and timer first, dish names large, helper lines (start times, the next-step line) quiet. */
+.fl-row .slip-item { min-height: calc(52px * var(--fl-k)); padding: calc(5px * var(--fl-k)) var(--sp-3); gap: 0 var(--sp-3); }
+.fl-row .slip-name { font-size: calc(var(--fs-item) * 1.15); }
+.fl-row[data-state="queued"] .slip-name { font-weight: var(--w-bold); color: var(--ink2); }
+.fl-sub { padding-left: calc(var(--qty-w) + var(--sp-3)); gap: 0 var(--sp-2); }
+.fl-sub .chip { min-height: calc(22px * var(--fl-k)); padding-block: 0; font-size: var(--fs-1); }
+.fl-deck, .fl-cook { font-size: var(--fs-1); }
+.fl-deck { color: var(--ink3); }
+.slip-next { margin: var(--sp-1) var(--sp-3) 0; padding: calc(4px * var(--fl-k)) var(--sp-2); font-size: var(--fs-2); font-weight: var(--w-semi); }
+.fl-slip .slip-head { padding-bottom: var(--sp-3); }
+.fl-slip .slip-meta { margin-top: var(--sp-1); }
+.fl-slip .slip-progress { margin-top: var(--sp-1); }
+/* Far display keeps the roomier, bigger helper lines so they read from across the kitchen. */
+.fl[data-far="on"] .fl-deck, .fl[data-far="on"] .fl-cook { font-size: var(--fs-3); }
+.fl[data-far="on"] .fl-sub .chip { min-height: calc(28px * var(--fl-k)); font-size: var(--fs-2); }
+.fl[data-far="on"] .slip-next { font-size: var(--fs-3); }
+.fl-fire { min-height: calc(44px * var(--fl-k)); }
+/* Far display: the sound and pause notes grow too, so they read from across the room. */
+.fl[data-far="on"] .fl-strip-sound { font-size: calc(15px * var(--fl-k) * 1.4); min-height: calc(34px * var(--fl-k) * 1.4); }
+.fl[data-far="on"] .fl-strip-pause { font-size: calc(13px * var(--fl-k) * 1.4); }
+/* Far display, 10 feet test: dish names and the strip's name and explanation are bigger still, so the answer to "which batch,
+   what happens, what do I do" can be read from the doorway. Fewer tickets fit, which is the point of this mode. */
+.fl[data-far="on"] .fl-row .slip-name { font-size: calc(var(--fs-item) * 1.15 * 1.3); }
+.fl[data-far="on"] .slip-next { font-size: calc(var(--fs-3) * 1.2); }
+.fl[data-far="on"] .fl-strip-what { font-size: calc(19px * var(--fl-k) * var(--fl-far) * 1.25); }
+.fl[data-far="on"] .fl-strip-why { font-size: calc(14px * var(--fl-k) * var(--fl-far) * 1.25); }
+/* Touch size: the sound and pause bars and their clear (x) buttons are at least 44 px high. */
+.fl-strip-sound, .fl-strip-pause { min-height: max(44px, var(--tap)); }
+.fl-strip-x { min-height: max(44px, var(--tap)); min-width: max(44px, var(--tap)); }
+/* Keyboard focus is visible on every control: dish rows get a ring inside the row, and controls on the dark sound bar get a light ring. */
+.fl-item:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -4px; }
+.fl-bar-sound :focus-visible, .fl-bar-sound .gd-help:focus-visible { outline: var(--bw-focus) solid var(--bg); outline-offset: -3px; }
+.fl-bar-sound .gd-help:focus-visible { outline-offset: 2px; }
+/* Far display, the Overdue badge: much larger, on its own line under the customer, so "Overdue +23 min" reads from the doorway. */
+.fl[data-far="on"] .fl-slip .fl-badge { grid-column: 1 / -1; grid-row: 3; justify-self: start; font-size: calc(var(--fs-3) * 1.55); min-height: calc(32px * var(--fl-k) * 1.5); padding: 2px calc(14px * var(--fl-k)); }
+.fl[data-far="on"] .fl-slip .fl-badge .icon { width: 1.2em; height: 1.2em; }
+.fl[data-far="on"] .fl-slip .slip-meta { grid-row: 4; }
+.fl[data-far="on"] .fl-slip .slip-progress { grid-row: 5; }

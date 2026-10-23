@@ -9,7 +9,8 @@
     "build": "node tools/build.mjs --quiet",
     "test": "node tools/test.mjs",
     "audit": "node tools/comment-audit.mjs",
-    "smoke": "node tools/smoke.mjs"
+    "smoke": "node tools/smoke.mjs",
+    "bootcheck": "node tools/boot-old-saves.mjs"
   },
   "devDependencies": {
     "acorn": "8.14.1",

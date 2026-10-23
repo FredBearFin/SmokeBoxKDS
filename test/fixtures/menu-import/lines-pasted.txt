@@ -1,0 +1,13 @@
+Brisket plate, 14.00, pit
+Burger 9.50
+Fries	4
+Sweet tea; 3.5; cold
+Mac - $9
+"Smoked, sliced brisket", 16.5
+Smoked, sliced turkey, 12
+Pickles 3,50
+
+# a comment line
+Cornbread $4 sides
+Free sample, 0
+Mystery plate, MP

@@ -76,16 +76,18 @@
     const never = !f.anyLive && !f.batches && !f.records;
     const where = f.label ? ' on ' + f.label : ' in this range';
     if (pageId === 'pace' || pageId === 'tickets' || pageId === 'stations') {
-      if (f.tickets > 0) return null;
+      // With a finished-ticket count, the page needs finished tickets to say anything; tickets still on the line are not enough.
+      if (isNum(f.finished) ? f.finished > 0 : f.tickets > 0) return null;
+      if (isNum(f.finished) && f.tickets > 0) return { title: 'Nothing to show yet', body: 'The tickets on the line are not finished. Send one out and its times appear here.' };
       return never || !f.anyLive
-        ? { title: 'Take your first order', body: 'This page is built from your own tickets. Take an order on the line screen and bump it when it is done, and the times show up here.' }
+        ? { title: 'Nothing to show yet', body: 'Take an order and send it out when it is done, and the times appear here.' }
         : { title: 'No tickets' + where, body: 'Nothing was ordered in this range. Use the arrows or the range buttons to look at a day you were open.' };
     }
     if (pageId === 'money') {
       // the thrown-away ledger on this page needs no sales, so a discard also counts as data here
       if (f.tickets > 0 || f.discards > 0) return null;
       return !f.anyLive
-        ? { title: 'Take your first order', body: 'Sales come from your own orders. Take an order on the line screen and pay it from Orders, and the money shows up here.' }
+        ? { title: 'Take your first order', body: 'Sales come from your own orders. Take an order on the kitchen board and pay it from Orders, and the money shows up here.' }
         : { title: 'No sales' + where, body: 'Nothing was sold in this range. Use the arrows or the range buttons to look at a day you were open.' };
     }
     if (pageId === 'safety') {
@@ -203,8 +205,6 @@
   const h = U.h;
   // Draws an icon by name. A missing icon gives an empty span, so the page still builds.
   const ico = (name, size, o) => { try { return SB.icons.svg(name, Object.assign({ size: size || 20 }, o || {})); } catch (e) { return doc.createElement('span'); } };
-  // True when the person asked their device for less animation.
-  const reduced = () => (U.prefersReducedMotion ? U.prefersReducedMotion() : false);
   const warnOnce = (() => { const seen = new Set(); return (key, err) => { if (seen.has(key)) return; seen.add(key); if (seen.size > 200) seen.clear(); try { console.error('[smokebox] office: ' + key, err); } catch (e) { /* ignore */ } }; })();
 
   // Number formats: thin wrappers over SB.util that give a dash for an unknown value instead of NaN.
@@ -271,10 +271,18 @@
     return p ? { id: p.id, from: p.from, to: p.to, label: p.label, fromKey: p.fromKey, toKey: p.toKey } : { id: 'today', from: nowMs() - DAY, to: nowMs() + 1, label: 'Today' };
   }
   // Where the filters start: Last 14 days with sample data when it is loaded, otherwise Today with live
-  // data only.
+  // data only (or the last 7 days when today has no tickets yet but the week does).
   function defaultFilters() {
     const sampleOk = sampleFlag() && sampleLoaded();
-    return sampleOk ? { range: presetRange('last14'), channel: 'all', source: 'all' } : { range: presetRange('today'), channel: 'all', source: 'live' };
+    if (sampleOk) return { range: presetRange('last14'), channel: 'all', source: 'all' };
+    // With nothing sold yet today but tickets in the past week, start on the last 7 days so the first screen is not empty.
+    try {
+      const tickets = (storeDataset(false).tickets || []), today = presetRange('today'), week = presetRange('last7');
+      // True when any ticket was created inside the range.
+      const inR = (r) => tickets.some((t) => t && isNum(t.createdAt) && t.createdAt >= r.from && t.createdAt < r.to);
+      if (!inR(today) && inR(week)) return { range: week, channel: 'all', source: 'live' };
+    } catch (e) { /* fall back to today */ }
+    return { range: presetRange('today'), channel: 'all', source: 'live' };
   }
 
   // Builds the ctx a page receives: filters, the data, the one shared metrics handle and a few helpers.
@@ -707,6 +715,23 @@
       section(title, sub) {
         const sec = h('div', { class: 'of-section' }, h('h2', { class: 'of-section-t' }, title), sub ? h('p', { class: 'of-section-s' }, sub) : null);
         grid.appendChild(sec); page.lastSection = sec;
+        if (state.moreOn) sec.dataset.more = '1';
+        return page;
+      },
+      // more adds a quiet button row; everything added after it stays folded away until the button is pressed.
+      more(label) {
+        state.moreOn = true;
+        const btn = h('button', { type: 'button', class: 'btn of-more-btn', 'aria-expanded': 'false' }, label || 'Show more');
+        // Opens or folds the extra cards, then nudges charts to measure themselves again.
+        const toggle = () => {
+          const open = grid.dataset.moreOpen !== 'true';
+          grid.dataset.moreOpen = open ? 'true' : 'false'; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          btn.textContent = open ? 'Show less' : (label || 'Show more');
+          if (open) { try { g.dispatchEvent(new Event('resize')); } catch (e) { /* charts catch up on the next refresh */ } }
+        };
+        btn.addEventListener('click', toggle);
+        grid.dataset.moreOpen = 'false';
+        grid.appendChild(h('div', { class: 'of-more' }, btn));
         return page;
       },
       // card adds a chart card and panel adds a free-form box. Both go in the grid in the order they are
@@ -740,6 +765,7 @@
     // Adds a built card to the grid, remembers it for refresh and clean-up, and draws it once.
     function addSlot(slot) {
       state.slots.push(slot); grid.appendChild(slot.el);
+      if (state.moreOn) slot.el.dataset.more = '1';
       cardsLive.add(slot);
       // Wraps the card's destroy so it also leaves the live-card list that the leak counters read.
       const orig = slot.destroy; slot.destroy = () => { cardsLive.delete(slot); orig(); };
@@ -756,12 +782,12 @@
     // Counts what falls inside the range (tickets, batches, safety records) for the empty-state coach.
     function coachFacts() {
       const ds = ctx.dataset(), r = ctx.filters.range, inR = (t) => isNum(t) && t >= r.from && t < r.to;
-      let tickets = 0, batches = 0, records = 0, discards = 0;
-      for (const t of ds.tickets || []) if (inR(t.createdAt)) tickets++;
+      let tickets = 0, batches = 0, records = 0, discards = 0, finished = 0;
+      for (const t of ds.tickets || []) if (inR(t.createdAt)) { tickets++; if (t.status !== 'active' && t.status !== 'voided') finished++; }
       for (const o of ds.orders || []) if (inR(o.createdAt)) tickets++;
       for (const b of ds.batches || []) if (b.src !== 'starter' && inR(b.enteredAt)) batches++;
       for (const e of ds.events || []) if (e && (e.type === 'temp_logged' || e.type === 'sanitize_done' || e.type === 'batch_discard') && inR(e.t)) { records++; if (e.type === 'batch_discard') discards++; }
-      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, batches, records, discards, label: r.label };
+      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, finished, batches, records, discards, label: r.label };
     }
     // Shows the "what to do next" message in place of blank tiles and charts when the range has no data.
     function paintCoach() {
@@ -1005,7 +1031,22 @@
     const srcNote = h('span', { class: 'of-fnote', hidden: true });
 
     // The Day group only shows for Yesterday or One day, so the other filters fit on one row.
-    const dayGroup = h('div', { class: 'of-fg', hidden: true }, h('span', { class: 'of-fl' }, 'Day'), dayBox, dayErr);
+    // Seven weekday buttons: each jumps to the most recent such day (today counts once something was ordered), so "Friday" is one tap.
+    const wdRow = h('div', { class: 'of-wdrow', role: 'group', 'aria-label': 'Jump to a weekday' });
+    // Shows the most recent day with this weekday number (0 is Sunday), looking back up to a week.
+    const jumpWeekday = (wd) => {
+      const today = U.serviceDate(nowMs(), svcHour());
+      let todayHas = false;
+      try { todayHas = (storeDataset(false).tickets || []).some((t) => t && t.serviceDate === today); } catch (e) { todayHas = false; }
+      // Today only counts when something was ordered today; otherwise the same weekday last week is meant.
+      for (let i = todayHas ? 0 : 1; i < 8; i++) { const k = U.addDays(today, -i); if (U.weekday(k) === wd) { showDay(k, true); return; } }
+    };
+    [1, 2, 3, 4, 5, 6, 0].forEach((wd) => {
+      // Handles a tap on one weekday button.
+      const onTap = () => jumpWeekday(wd);
+      wdRow.appendChild(h('button', { type: 'button', class: 'btn btn-sm of-wd', onClick: onTap }, U.WEEKDAYS[wd]));
+    });
+    const dayGroup = h('div', { class: 'of-fg', hidden: true }, h('span', { class: 'of-fl' }, 'Day'), dayBox, wdRow, dayErr);
     body.append(
       h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Range'), rangeSeg),
       dayGroup,
@@ -1199,13 +1240,15 @@
         rec.inst = null;
       }
     }
+    // The Safety page gets a small bar to print the food safety record (only when cooked-ahead food is tracked).
+    if (id === 'safety' && !pageIsOff(id) && typeof O.safetyLogBar === 'function' && rec.container.firstChild) { try { rec.container.insertBefore(O.safetyLogBar(), rec.container.firstChild); } catch (e) { warnOnce('safety log bar', e); } }
     paintBanner(ctx);
     if (o.focus) { try { f.title.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   }
   // Pages that only make sense when the owner tracks cooked-ahead food (batches, hold cabinet, temperature checks).
   const GATED = {
-    safety: { title: 'Safety records are off', body: 'You are not tracking cooked-ahead food, so there are no batches, temperature checks or hold times to report on. Turn it on in Settings if you cook food ahead and hold it hot or cold.' },
-    stock: { title: 'Stock tracking is off', body: 'You are not tracking cooked-ahead food, so this page has no stock to show. Turn it on in Settings if you cook food ahead and want to know when it runs out.' },
+    safety: { title: 'Safety records are off', body: 'You are not tracking cooked-ahead food, so there are no batches, temperature checks or hold times to report on. Turn it on under Menu, Dishes and prices (Yes, I cook ahead) if you cook food ahead and hold it hot or cold.' },
+    stock: { title: 'Stock tracking is off', body: 'You are not tracking cooked-ahead food, so this page has no stock to show. Turn it on under Menu, Dishes and prices (Yes, I cook ahead) if you cook food ahead and want to know when it runs out.' },
   };
   // True when the cook-ahead module is on; a missing setting counts as on, so old saves and the demo are unchanged.
   function cookAheadOn() {
@@ -1217,7 +1260,7 @@
   function turnOnCookAhead(id) {
     let rep = 'error';
     try { rep = SB.store.dispatch('updateSettings', { patch: { modules: { cookAhead: true } } }); } catch (e) { /* shown below */ }
-    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. Open Menu and settings and try there.', { tone: 'bad' }); return; }
+    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. Open Menu, then Dishes and prices, and tap Yes, I cook ahead.', { tone: 'bad' }); return; }
     if (M) showPage(id, { focus: false });
   }
 
