@@ -21,6 +21,15 @@ A file that is not a valid backup is refused, and nothing is changed. A backup f
 
 Spreadsheet files, like the sales file, are for reading. You cannot restore from them.
 
+## Start over with an empty menu
+
+1. Tap **Menu**. At the bottom, tap **Start over with an empty menu**.
+2. It lists what goes (every dish, ticket, order and record on this device) and what stays (tax, hours, PIN and station names; clear the box to reset those too). Tap **Next: save a backup**.
+3. Tap **Save a backup now** and keep the file.
+4. Type START OVER, then tap **Erase everything and start over**.
+
+There is no undo. To go back, restore the backup you just saved.
+
 ## Erasing
 
 The Danger zone has **Erase live data** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either.

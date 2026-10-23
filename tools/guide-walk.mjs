@@ -223,6 +223,25 @@ async function tryDemo(browser) {
   await p.close();
 }
 
+// The start-over walk: Menu has a Start over block, the sheet has three steps, and the erase needs a saved backup and the typed words.
+async function startOver(browser) {
+  console.log('Start over with an empty menu');
+  const p = await fresh(browser);
+  await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  await p.click('button:has-text("Menu")'); await p.waitForTimeout(500);
+  check('menu: Start over with an empty menu', await tap(p, 'Start over with an empty menu')); await p.waitForTimeout(600);
+  const sh = '.sheet-root:last-of-type';
+  for (const t of ['What happens', 'Keep my tax, hours, PIN and station names', 'Next: save a backup']) check('start over step 1: ' + t, await has(p, t, sh));
+  await tap(p, 'Next: save a backup'); await p.waitForTimeout(500);
+  check('start over step 2: Save a backup now', await seen(p, 'Save a backup now', sh));
+  await tap(p, 'Save a backup now'); await p.waitForTimeout(900);
+  await tap(p, 'Next: confirm'); await p.waitForTimeout(500);
+  check('start over step 3: Erase everything and start over', await has(p, 'Erase everything and start over', sh));
+  await p.fill(sh + ' input[type=text]', 'START OVER'); await tap(p, 'Erase everything and start over'); await p.waitForTimeout(1500);
+  check('start over: the kitchen is empty afterwards', (await p.evaluate(() => SB.store.getState().menu.length)) === 0);
+  await p.close();
+}
+
 // The demo walk: a fresh browser context opened with ?demo has sample dishes and tickets, and a normal tab in the same context stays empty.
 async function demoMode(browser) {
   console.log('Demo mode (?demo)');
@@ -238,7 +257,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await tryDemo(browser); await demoMode(browser); } finally { await browser.close(); }
+try { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await startOver(browser); await tryDemo(browser); await demoMode(browser); } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);

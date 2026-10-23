@@ -64,3 +64,5 @@ Freddy decided yes. Draft for Backup and restore (about 80 words); replace the b
 > To undo it, restore the backup (see Restore from a backup).
 
 Before writing it, confirm with A2 and A5: the exact button label and where it lives, what is cleared and kept, where the automatic backup goes, and the wording of the confirm box.
+
+**Update:** written into the Guide (Backup and restore) from A2's branch night/a2-r10; the walk now covers it. A5's old-demo-ticket card is still to come.
