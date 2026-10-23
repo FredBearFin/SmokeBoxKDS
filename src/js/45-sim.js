@@ -1165,7 +1165,7 @@
     const st = SB.store;
     try { live.stop(); } catch (e) { /* the simulator may not be running */ }
     st.setSpeed(1);
-    if (st.resetLive({ keepSettings: true, starter: true, stagger: true }) !== 'ok') return -1;
+    if (st.resetLive({ keepSettings: true, starter: true, stagger: true, catalog: 'sample' }) !== 'ok') return -1;
     return Sim.seedFirstRun({ force: true });
   };
   /** True when the dish can be sold in this store right now (unknown counts as yes). */
