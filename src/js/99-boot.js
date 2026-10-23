@@ -66,13 +66,51 @@
     try { reload.focus(); } catch (e) { /* ignore */ }
   }
 
+  // Blocks the screen with a plain message when saved data could not be read AND could not be copied aside (the browser store is full). The
+  // damaged text is offered as a file; nothing is written over it until the person says they have saved it.
+  function showHeldData(text) {
+    const wrap = doc.createElement('div');
+    wrap.id = 'held-data'; wrap.setAttribute('role', 'alertdialog');
+    wrap.style.cssText = 'position:fixed;inset:0;overflow:auto;padding:16px;background:#F5F2EB;color:#1E2224;font-family:system-ui,sans-serif;z-index:99999';
+    const card = doc.createElement('div'); card.className = 'error-card';
+    const h2 = doc.createElement('h2'); h2.textContent = 'Your saved data could not be read, and could not be kept safe';
+    const p = doc.createElement('p'); p.textContent = 'This browser is too full to set the old data aside, so Smokebox has not touched it. Nothing new will be saved on this device until you choose below. Download the old data now and keep the file. Then free some space, or continue and let Smokebox replace the old data.';
+    const row = doc.createElement('div'); row.className = 'row';
+    const dl = doc.createElement('button'); dl.type = 'button'; dl.className = 'btn btn-primary'; dl.textContent = 'Download the old data';
+    dl.addEventListener('click', () => {
+      try {
+        const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' }));
+        const a = doc.createElement('a'); a.href = url; a.download = 'smokebox-damaged-data.json'; doc.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => { try { g.URL.revokeObjectURL(url); } catch (e) { /* ignore */ } }, 5000);
+      } catch (e) { box.hidden = false; box.focus(); }
+    });
+    const go = doc.createElement('button'); go.type = 'button'; go.className = 'btn'; go.textContent = 'I have the file: continue and replace it';
+    go.addEventListener('click', () => { try { SB.store.releaseHold(); } catch (e) { /* ignore */ } wrap.remove(); });
+    const box = doc.createElement('textarea'); box.readOnly = true; box.hidden = true; box.value = text; box.rows = 8; box.style.cssText = 'width:100%;margin-top:12px';
+    box.setAttribute('aria-label', 'The old data, to copy by hand');
+    row.append(dl, go);
+    card.append(h2, p, row, box);
+    wrap.appendChild(card);
+    doc.body.appendChild(wrap);
+    try { dl.focus(); } catch (e) { /* ignore */ }
+  }
+
   // Tells the person, once at start-up, when the saved board was unreadable, was repaired, or cannot be saved in this
   // browser (private windows block storage). Silent when everything is fine.
   function storageNotices() {
     const s = SB.store && typeof SB.store.status === 'function' ? SB.store.status() : null;
     if (!s || !SB.ui || typeof SB.ui.toast !== 'function') return;
+    if (s.heldInMemory && SB.store.damagedText && SB.store.damagedText()) { showHeldData(SB.store.damagedText()); return; }
     if (s.corrupt && s.restoredFromCopy) SB.ui.toast('Your saved board could not be read, so Smokebox restored the last good copy from ' + new Date(s.restoredFromCopy).toLocaleString() + '. Orders and history after that time are missing. A copy of the damaged data was kept in this browser.', { tone: 'warn', ms: 20000 });
     else if (s.corrupt) SB.ui.toast('Your saved board could not be read, so Smokebox started with an empty board. A copy of the old data was kept on this device.', { tone: 'warn', ms: 15000 });
+    else if (s.droppedCount) {
+      const d = s.droppedCount, bits = [];
+      if (d.orders) bits.push(d.orders + (d.orders === 1 ? ' order' : ' orders'));
+      if (d.tickets) bits.push(d.tickets + (d.tickets === 1 ? ' ticket' : ' tickets'));
+      if (d.batches) bits.push(d.batches + (d.batches === 1 ? ' batch' : ' batches'));
+      if (d.other) bits.push(d.other + (d.other === 1 ? ' other saved item' : ' other saved items'));
+      SB.ui.toast('Smokebox could not read some saved records and left out ' + bits.join(', ') + ' while opening. The data as it was has been kept on this device. Ask whoever set up Smokebox to look at it before you close the page for good.', { tone: 'warn', ms: 20000 });
+    }
     else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox updated a few saved settings while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
     if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }

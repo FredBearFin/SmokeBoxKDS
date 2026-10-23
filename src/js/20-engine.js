@@ -1426,6 +1426,16 @@
     const taxC = Math.floor((taxableC * Math.round(rate * 1e4) + 500000) / 1e6);
     return { subtotal: subCents / 100, discount: discC / 100, taxRate: rate, tax: taxC / 100, total: (taxableC + taxC) / 100, qty, rounds };
   }
+  // Totals for lines that are not on an order yet (the draft on the order screen), with the same whole-cent rule the charge uses, so what the
+  // screen shows is what the register charges. items are { price, qty }; opts: extraSubtotalCents (food already on the order), discount, taxRatePct.
+  function totalsOf(items, opts) {
+    let sub = isNum(opts && opts.extraSubtotalCents) ? Math.max(0, Math.round(opts.extraSubtotalCents)) : 0, qty = 0;
+    for (const it of Array.isArray(items) ? items : []) {
+      const q = isNum(it && it.qty) && it.qty > 0 ? Math.round(it.qty) : 0;
+      sub += toCents(isNum(it && it.price) ? it.price : 0) * q; qty += q;
+    }
+    return totalsFrom(sub, qty, 0, opts && opts.discount, opts && opts.taxRatePct);
+  }
   // The sales tax rate in force now, in percent (0 when none is set).
   const taxRateOf = (settings) => (settings && settings.service && isNum(settings.service.taxRatePct) ? settings.service.taxRatePct : 0);
   // What an order adds up to: the food on its tickets that are not voided, less the discount, plus tax. A paid
@@ -4149,7 +4159,7 @@
   // The public door: everything other files may use. _internal is for tests and tools.
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
-    pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
+    pacingPlan, planFor, ticketTiming, ticketProgress, totalsOf, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
     channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
