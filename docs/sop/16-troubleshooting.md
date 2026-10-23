@@ -24,7 +24,7 @@ Warnings cannot sound while the screen is off. Smokebox asks the browser to keep
 
 ## A number looks wrong
 
-- A message says the device's clock jumped ahead? Choose **Use the new time** only if the new time is right. If the clock is wrong, fix it in the device settings and choose **Keep the old time**.
+- A strip says the tablet's clock jumped ahead? Smokebox keeps the old time, so tickets and timers keep running. Tap **Keep the old time** to hide it for 10 minutes and fix the clock in the device settings. Tap **Use the new time** only if the new time is right. It asks once more before anything changes.
 - Check the date range and the filters at the top of the Back office page.
 - Choose **Live only** to leave out the sample history, which is made up.
 - Unpaid orders are not counted as money collected.

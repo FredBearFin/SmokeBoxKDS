@@ -858,7 +858,7 @@
      {
       "t": "ul",
       "x": [
-       "A message says the device's clock jumped ahead? Choose **Use the new time** only if the new time is right. If the clock is wrong, fix it in the device settings and choose **Keep the old time**.",
+       "A strip says the tablet's clock jumped ahead? Smokebox keeps the old time, so tickets and timers keep running. Tap **Keep the old time** to hide it for 10 minutes and fix the clock in the device settings. Tap **Use the new time** only if the new time is right. It asks once more before anything changes.",
        "Check the date range and the filters at the top of the Back office page.",
        "Choose **Live only** to leave out the sample history, which is made up.",
        "Unpaid orders are not counted as money collected.",
@@ -895,23 +895,15 @@
      },
      {
       "t": "p",
-      "x": "When you set a PIN, Smokebox shows a recovery code once. Tap **Copy** or **Print**, keep it away from the tablet, select **I saved it**, then tap **Done**. On the PIN pad, open **Forgot the PIN?**, type the recovery code and a new PIN (or leave it empty to remove the PIN), and tap **Reset the PIN with my code**. A PIN from before codes existed can get one: **Settings**, **Tax, hours and PIN**, **Make a recovery code**."
+      "x": "When you set a PIN, a recovery code shows once. Tap **Copy** or **Print**, keep it away from the tablet, select **I saved it**, then tap **Done**. On the PIN pad, open **Forgot the PIN?**, type the recovery code and a new PIN (or leave it empty to remove the PIN), and tap **Reset the PIN with my code**. A PIN from before codes existed can get one: **Settings**, **Tax, hours and PIN**, **Make a recovery code**."
      },
      {
       "t": "p",
-      "x": "No code? The only way back is to clear this site's saved data in your browser settings. That erases everything on this device, including today's tickets and your menu. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before the PIN was set."
+      "x": "No code? The only way back is to clear this site's saved data in your browser settings. That erases everything on this device. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before it was set."
      },
      {
       "t": "p",
-      "x": "With a PIN set, changing it or making a new recovery code asks for the current PIN. Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not real security."
-     },
-     {
-      "t": "h",
-      "x": "Smokebox could not read some records"
-     },
-     {
-      "t": "p",
-      "x": "If a message says some saved records could not be read and were left out, the data as it was is kept. Do not clear the browser data. Ask whoever set up Smokebox."
+      "x": "With a PIN set, changing it or making a new recovery code asks for the current PIN. Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not security."
      },
      {
       "t": "h",
@@ -919,7 +911,7 @@
      },
      {
       "t": "p",
-      "x": "That is by design for a new Smokebox. It starts with no dishes, tickets or food in the cabinet, and it never guesses. Add dishes under **Dishes and prices**. If it was full yesterday, see \"The tablet was replaced or cleared\" above."
+      "x": "That is by design for a new Smokebox. It starts with no dishes and never guesses. Add dishes under **Dishes and prices**. If it was full yesterday, see \"The tablet was replaced or cleared\" above."
      },
      {
       "t": "h",
@@ -930,8 +922,24 @@
       "x": [
        "Tickets, dishes, settings and the PIN: in this browser on this device only.",
        "Sound, loudness, Day or Night and text size: on this device only.",
-       "Other devices do not see your board. A backup file is the only copy you can move."
+       "Only a backup file can be moved."
       ]
+     }
+    ]
+   },
+   {
+    "id": "saved-data-that-cannot-be-read",
+    "group": "guide",
+    "title": "Saved data that cannot be read",
+    "summary": "What to do when Smokebox says some of its saved data could not be read.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "A message at the top"
+     },
+     {
+      "t": "p",
+      "x": "If a message says some saved records could not be read and were left out, the data as it was is kept. Do not clear the browser data. Ask whoever set up Smokebox. If a full-screen message says the saved data could not be read, tap **Download the old data** or **Show the data so I can copy it**. Only then can you continue."
      }
     ]
    },

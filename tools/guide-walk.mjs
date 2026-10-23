@@ -479,8 +479,11 @@ async function notices(browser) {
   await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
   await p.evaluate(() => { const d = Date.now.bind(Date); Date.now = () => d() + 40 * 3600e3; });
   await p.waitForTimeout(7500);
-  check("clock jump: This device's clock jumped ahead", await p.evaluate(() => /This device's clock jumped ahead/.test(document.body.innerText)));
+  check("clock jump: the strip says This tablet's clock jumped ahead by about 1 day", await p.evaluate(() => /This tablet's clock jumped ahead by about \d+ (days|hours)\. Smokebox is still using the old time, so tickets and timers keep running\./.test(document.body.innerText)), await p.evaluate(() => document.body.innerText.slice(0, 300)));
   for (const t of ['Use the new time', 'Keep the old time']) check('clock jump: ' + t, await seen(p, t));
+  await tap(p, 'Use the new time'); await p.waitForTimeout(700);
+  check('clock jump: Use the new time asks a second question', await p.evaluate(() => /Use the new time\?/.test(document.body.innerText) && /Only do this if the date and time on this tablet are right/.test(document.body.innerText)));
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.getClientRects().length && e.textContent.trim() === 'Keep the old time' && e.closest('.sheet-root, [role=dialog]')); if (b) b.click(); }); await p.waitForTimeout(400);
   await p.close();
   // A paid order from a day that was already closed cannot be opened again.
   p = await fresh(browser);
