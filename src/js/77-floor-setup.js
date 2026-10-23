@@ -79,6 +79,8 @@
   const KEY_DRAFT = 'smokebox.v1.setup.draft'; // the half-typed dish {name, price, zone}, kept so a closed tab loses nothing
   const KEY_LAST = 'smokebox.v1.setup.lastZone'; // the station chosen for the last saved dish
   const KEY_CASKIP = 'smokebox.v1.setup.cookAheadSkipped'; // true once the owner said no to the cooked-ahead question
+  const KEY_SERVESKIP = 'smokebox.v1.setup.serveSkipped'; // true once the owner skipped the How do you serve? question
+  const KEY_SERVEANS = 'smokebox.v1.setup.serveAnswer'; // 'table', 'counter' or 'truck' once the How do you serve? question is answered
   const KEY_HIDDENCAT = 'smokebox.v1.setup.hiddenCategories'; // category ids the owner marked Not used
   const KEY_LASTCAT = 'smokebox.v1.setup.lastCategory'; // the category the owner last chose by hand (not a guess)
   const KEY_HIDDEN = 'smokebox.v1.setup.hiddenStations'; // station ids the owner hid from the Where is it made? tiles
@@ -231,7 +233,7 @@
     const store = SB.store;
     if (!store.enterDemo || store.isDemo()) return false;
     const ok = skipAsk || !SB.ui.confirm ? true : await SB.ui.confirm({ title: 'Try the demo?', confirmLabel: 'Try the demo', cancelLabel: 'Not now',
-      body: ['The demo is a demo kitchen with a sample menu and sample tickets. Nothing in it is your kitchen.', 'Your own dishes and orders are not touched. A bar at the top of every screen has a Back to my kitchen button.'] });
+      body: ['The demo has a sample menu and sample tickets. Nothing in it is your kitchen.', 'Your own dishes and orders are not touched. A bar at the top of every screen has a Back to my kitchen button.'] });
     if (!ok) return false;
     if (!store.enterDemo() && SB.ui.toast) SB.ui.toast('This browser would not open the demo. Try again, or add ?demo to the address.', { tone: 'warn' });
     return true;
@@ -532,7 +534,7 @@
           // Moves this dish one place up in the menu order.
           h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + m.name + ' down', disabled: idx === mine.length - 1, onClick: () => moveDish(m, 1) }, ico('arrow-down', 20)));
         // Move to: the category this dish sits in on the order screen, changed with one pick.
-        const catSelRow = h('select', { class: 'select dp-cat', 'aria-label': 'Category of ' + m.name }, SB.config.categories.map((c) => h('option', { value: c.id, selected: c.id === m.cat }, c.name)));
+        const catSelRow = h('select', { class: 'select dp-cat', 'aria-label': 'Section of ' + m.name }, SB.config.categories.map((c) => h('option', { value: c.id, selected: c.id === m.cat }, c.name)));
         // Saves the new category for this dish and says so.
         catSelRow.addEventListener('change', () => { const r = send('updateMenuItem', { id: m.id, patch: { cat: catSelRow.value } }); tell(msg, r.ok ? 'Moved to ' + (SB.config.categoryById[catSelRow.value] || {}).name + '.' : r.words); });
         const z = SB.config.zoneById[m.zone];
@@ -571,6 +573,41 @@
     paintCook();
     offs.push(SB.store.subscribe(() => paintCook()));
 
+    // How do you serve? A skippable question under the dishes. Each answer only sets the settings found under Menu, How you serve.
+    const svBox = h('section', { class: 'fs-card dp-ca dp-serve', hidden: true });
+    // The three answers: what each sets, in the order shown. Table service is the starting state, so it only records the answer.
+    const SERVE_CHOICES = [
+      { id: 'table', label: 'Table and kitchen tickets', sets: { counter: false, chips: null } },
+      { id: 'counter', label: 'Counter service', sets: { counter: true, chips: ['Walk-up', 'Pickup', 'Phone', 'Delivery'] } },
+      { id: 'truck', label: 'Food truck / one person', sets: { counter: false, chips: ['Walk-up', 'Pickup'] } },
+    ];
+    // Paints the question until it is answered or skipped; after an answer it says what was set and where to change it.
+    function paintServe(answer) {
+      const answered = answer || U.storage.get(KEY_SERVEANS, '');
+      const show = activeDishes().length > 0 && !U.storage.get(KEY_SERVESKIP, false);
+      svBox.hidden = !show;
+      if (!show) return;
+      U.clear(svBox);
+      if (answered) { svBox.append(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'ok', role: 'status' }, 'Saved: ' + (SERVE_CHOICES.find((c) => c.id === answered) || {}).label + '. You can change this any time under Menu, How you serve.')); return; }
+      svBox.append(h('h3', { class: 'fs-h' }, 'How do you serve?'),
+        h('p', { class: 'fs-sub' }, 'Optional. It only sets the order buttons and counter service for you, and you can change both later.'),
+        h('div', { class: 'fs-row' }, SERVE_CHOICES.map((c) =>
+          // Saves this answer's settings in one step.
+          h('button', { type: 'button', class: c.id === 'table' ? 'btn btn-primary' : 'btn', dataset: { act: 'serve-' + c.id }, onClick: () => answerServe(c) }, c.label)),
+          // Remembers the owner skipped, so the question goes away.
+          h('button', { type: 'button', class: 'btn btn-link', dataset: { act: 'serve-skip' }, onClick: () => { U.storage.set(KEY_SERVESKIP, true); paintServe(); } }, 'Skip')));
+    }
+    // Saves one answer: counter service on or off, and the order buttons (the starting list when none are given).
+    function answerServe(c) {
+      const patch = { service: { counter: c.sets.counter } };
+      if (c.sets.chips) patch.service.chips = c.sets.chips; else patch.service.chips = DEFAULT_CHIPS.slice();
+      const r = send('updateSettings', { patch });
+      if (!r.ok && r.report !== 'nothingToDo') { svBox.appendChild(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'bad', role: 'alert' }, r.words)); return; }
+      U.storage.set(KEY_SERVEANS, c.id); paintServe(c.id);
+    }
+    paintServe();
+    offs.push(SB.store.subscribe(() => { if (!svBox.contains(doc.activeElement)) paintServe(); }));
+
     // More ways to add dishes: for now only an example menu, clearly marked as an example.
     const exStatus = h('p', { class: 'fs-sub', role: 'status' });
     const exBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'example-menu' } }, ico('book', 20), h('span', null, 'Start from an example menu'));
@@ -602,7 +639,7 @@
     // Links to the other small settings and to the full menu editor in the back office.
     const shopBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('shop'), 60); } }, ico('sliders', 20), h('span', null, 'Tax, hours and PIN'));
     const fullBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); } }, ico('gauge', 20), h('span', null, 'Full menu editor (ingredients, prep times)'));
-    root.append(lead, form, dishesHead, undoBar, listBox, goneFold, caBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
+    root.append(lead, form, dishesHead, undoBar, listBox, goneFold, caBox, svBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
     sheet.body.appendChild(root); keepInView(root);
 
     // Restore a draft left by a closed tab, then the last station used.
@@ -705,7 +742,7 @@
       rows.forEach((r) => {
         // The importer's own warnings about extra columns or a digits-only category also leave the row unticked.
         if ((r.problems || []).some((p) => p.code === 'extraColumns' || p.code === 'numericCategory')) { r.keep = false; return; }
-        if (/^\d+$/.test(String(r.categoryText || '').trim())) { r.problems = (r.problems || []).concat([{ code: 'priceSplit', level: 'warn', message: 'The category here is "' + r.categoryText + '", which looks like the end of a price split at a comma (4,50).', fix: 'Check the price, tick the row when it is right. In your file, put prices with commas inside quotes.' }]); r.keep = false; }
+        if (/^\d+$/.test(String(r.categoryText || '').trim())) { r.problems = (r.problems || []).concat([{ code: 'priceSplit', level: 'warn', message: 'The section here is "' + r.categoryText + '", which looks like the end of a price split at a comma (4,50).', fix: 'Check the price, select the row when it is right. In your file, put prices with commas inside quotes.' }]); r.keep = false; }
       });
       if (res.summary && res.summary.unmatched) res.summary.unmatched.categories = res.summary.unmatched.categories.filter((c) => !/^\d+$/.test(String(c).trim()));
       paintPreview(from);
@@ -728,6 +765,9 @@
       const sm = parsed.summary;
       preview.append(h('p', { class: 'fs-sub dp-fmt' }, 'Read ' + (from || 'the text') + ' as: ' + parsed.label + '. ' + sm.message));
       (sm.notes || []).forEach((n) => preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, n)));
+      // Columns the importer did not use (like Notes), named once so nothing is dropped without a word.
+      const ign = Array.isArray(sm.ignoredColumns) ? sm.ignoredColumns : [];
+      if (ign.length) preview.appendChild(h('p', { class: 'fs-sub dp-ignored', dataset: { act: 'ignored-columns' } }, (ign.length === 1 ? 'Ignored column: ' : 'Ignored columns: ') + ign.join(', ') + '. Smokebox does not keep ' + (ign.length === 1 ? 'it' : 'them') + '.'));
       // Words in the file that match none of the owner's categories or stations: say it once, and offer to add the categories.
       const um = sm.unmatched || { stations: [], categories: [] };
       if (um.categories.length) {
@@ -736,11 +776,11 @@
           const C = SB.config, spec = JSON.parse(JSON.stringify(C.customSpec()));
           spec.add = spec.add || {}; spec.add.categories = (spec.add.categories || []).concat(um.categories.map((nm) => ({ name: nm })));
           const before = C.customSpec(), res = C.applyCustom(spec);
-          if (res.rejected.length) { C.applyCustom(before); tell(status, 'Some of those category names could not be added (too long, a repeat, or the list is full). Change the category words in the file, or add them one by one in the Back office.', 'bad'); return; }
+          if (res.rejected.length) { C.applyCustom(before); tell(status, 'Some of those section names could not be added (too long, a repeat, or the list is full). Change the category words in the file, or add them one by one in the Back office.', 'bad'); return; }
           C.saveCustom(spec); check(area.value, 'the file');
-          tell(status, 'Added ' + um.categories.length + ' ' + U.plural(um.categories.length, 'category', 'categories') + '. Each dish now sits in its own.', 'ok');
-        } }, 'Add these categories');
-        preview.appendChild(h('div', { class: 'fs-note', 'data-tone': 'warn' }, h('div', null, h('p', null, 'Your file has categories that are not set up here: ' + um.categories.join(', ') + '. Until you add them, those dishes go in "' + ((SB.config.categories[0] || {}).name || 'the first category') + '".'), addCats)));
+          tell(status, 'Added ' + um.categories.length + ' ' + U.plural(um.categories.length, 'section', 'sections') + '. Each dish now sits in its own.', 'ok');
+        } }, 'Add these sections');
+        preview.appendChild(h('div', { class: 'fs-note', 'data-tone': 'warn' }, h('div', null, h('p', null, 'Your file has sections that are not set up here: ' + um.categories.join(', ') + '. Until you add them, those dishes go in "' + ((SB.config.categories[0] || {}).name || 'the first category') + '".'), addCats)));
       }
       if (um.stations.length) preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'Your file names stations that are not set up here: ' + um.stations.join(', ') + '. Pick each dish\'s station below.'));
       // One station for every dish that came with none, so a cafe does not pick it 22 times.
@@ -871,10 +911,10 @@
       h('h3', { class: 'fs-h' }, '1. What happens'),
       h('p', { class: 'fs-sub' }, 'This empties your kitchen so you can begin again with a blank menu.'),
       h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device.'),
-      h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and categories. Clear the box and those go back to how Smokebox starts.'),
+      h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and sections. Clear the box and those go back to how Smokebox starts.'),
       keepLabel,
       h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'There is no undo. We are sorry to be blunt: once you confirm, the old menu and history cannot be brought back, except from a backup file you saved first.'));
-    const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: save a backup');
+    const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: about your backup');
     step1.appendChild(next1);
 
     const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' } }, 'Next: confirm');
@@ -928,6 +968,139 @@
       show(3);
     });
     root.append(step1, step2, step3, done);
+    sheet.body.appendChild(root); keepInView(root);
+    return sheet;
+  }
+
+  /* ---------- How you serve ---------- */
+
+  // The order buttons a new install starts with (customer shortcuts on the order screen). An empty or missing saved list means these.
+  const DEFAULT_CHIPS = ['Walk-up', 'Pickup', 'Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'];
+  const CHIP_MAX = 12; // the most order buttons the order screen holds
+  const CHIP_LEN = 16; // letters in one order button name
+  // The order buttons now in use, as plain names: the owner's list, or the starting list when none is saved.
+  function currentChips() {
+    const sv = (SB.store.getState().settings || {}).service || {};
+    const list = Array.isArray(sv.chips) ? sv.chips.map((c) => String(c && typeof c === 'object' ? (c.label || c.name || '') : c)).filter(Boolean) : [];
+    return list.length ? list : DEFAULT_CHIPS.slice();
+  }
+  // The currency symbol now shown with prices, as plain text ($ when none is saved).
+  function currentSymbol() {
+    const ui = (SB.store.getState().settings || {}).ui || {};
+    const c = ui.currency;
+    return typeof c === 'string' && c ? c : (c && typeof c === 'object' && c.symbol) || '$';
+  }
+  // Opens "How you serve": counter service on or off, the order buttons, and the currency symbol. Every change saves at once and
+  // offers Undo; nothing here is required.
+  function openServe() {
+    const sheet = SB.ui.sheet({ title: 'How you serve', side: 'right', width: 'min(640px, 96vw)', name: 'serve', onClose: () => offs.splice(0).forEach((f) => f()) });
+    const offs = [];
+    const root = h('div', { class: 'dp so-serve' });
+    const undoBar = h('div', { class: 'fs-note dp-undo', hidden: true, role: 'status' });
+    // Shows a message with an Undo button that runs the given undo step.
+    function offerUndo(message, undo) {
+      U.clear(undoBar);
+      // Runs the undo step and puts the bar away.
+      undoBar.append(h('span', null, message + ' '), h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'serve-undo' }, onClick: () => { undo(); undoBar.hidden = true; } }, 'Undo'));
+      undoBar.hidden = false;
+    }
+
+    // 1. Counter service.
+    const cSt = h('p', { class: 'fs-sub', role: 'status' });
+    // Says whether counter service is on now.
+    const counterOn = () => !!(((SB.store.getState().settings || {}).service || {}).counter);
+    const counterTog = SB.ui.toggle({ label: 'Counter service', checked: counterOn(),
+      // Saves the choice, says what it means, and offers Undo.
+      onChange: (on) => {
+        const before = !on;
+        const r = send('updateSettings', { patch: { service: { counter: on } } });
+        if (!r.ok && r.report !== 'nothingToDo') { counterTog.setValue(before); tell(cSt, r.words, 'bad'); return; }
+        tell(cSt, on ? 'On. You hand food over at the counter, so orders do not wait on kitchen tickets.' : 'Off. Orders go to the kitchen as tickets.', 'ok');
+        offerUndo('Counter service is ' + (on ? 'on' : 'off') + '.', () => { send('updateSettings', { patch: { service: { counter: before } } }); counterTog.setValue(before); });
+      } });
+    const sec1 = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Counter service'),
+      h('p', { class: 'fs-sub' }, 'You hand food over at the counter and do not need kitchen tickets. Leave it off if cooks work from tickets.'), counterTog, cSt);
+
+    // 2. Order buttons.
+    const bSt = h('p', { class: 'fs-sub', role: 'status' });
+    const list = h('div', { class: 'dp-stlist' });
+    // Saves a whole new list of order buttons, with Undo back to the old list.
+    function saveChips(next, message) {
+      const before = currentChips();
+      if (next.length > CHIP_MAX) { tell(bSt, 'You can have up to ' + CHIP_MAX + ' order buttons. Remove one first.', 'bad'); return false; }
+      const r = send('updateSettings', { patch: { service: { chips: next } } });
+      if (!r.ok && r.report !== 'nothingToDo') { tell(bSt, r.words, 'bad'); return false; }
+      tell(bSt, message, 'ok');
+      offerUndo(message, () => { send('updateSettings', { patch: { service: { chips: before } } }); paintChips(); });
+      paintChips();
+      return true;
+    }
+    // Rebuilds the rows: a name box, up, down and Remove for each button, then an add box.
+    function paintChips() {
+      U.clear(list);
+      const cur = currentChips();
+      cur.forEach((label, i) => {
+        const inp = h('input', { class: 'input', type: 'text', maxlength: CHIP_LEN, value: label, 'aria-label': 'Order button ' + (i + 1) });
+        // Saves a renamed button when the box is left; an empty name is refused.
+        inp.addEventListener('change', () => {
+          const v = inp.value.replace(/\s+/g, ' ').trim();
+          if (!v) { inp.value = label; tell(bSt, 'A button needs a name. Type one, or tap Remove.', 'bad'); return; }
+          if (cur.some((x, j) => j !== i && x.toLowerCase() === v.toLowerCase())) { inp.value = label; tell(bSt, 'There is already a button called ' + v + '. Pick another name.', 'bad'); return; }
+          if (v !== label) saveChips(cur.map((x, j) => (j === i ? v : x)), 'Renamed ' + label + ' to ' + v + '.');
+        });
+        // Moves this button one place up or down.
+        const move = (d) => () => { const n = cur.slice(); const k = i + d; if (k < 0 || k >= n.length) return; [n[i], n[k]] = [n[k], n[i]]; saveChips(n, 'Moved ' + label + (d < 0 ? ' up.' : ' down.')); };
+        list.appendChild(h('div', { class: 'dp-strow' }, inp,
+          h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + label + ' up', disabled: i === 0, onClick: move(-1) }, ico('arrow-up', 20)),
+          h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + label + ' down', disabled: i === cur.length - 1, onClick: move(1) }, ico('arrow-down', 20)),
+          // Removes this button (it can be added again, or brought back with Undo).
+          h('button', { type: 'button', class: 'btn btn-sm', 'aria-label': 'Remove ' + label, onClick: () => { if (cur.length <= 1) { tell(bSt, 'Keep at least one order button, or reset to the starting list.', 'bad'); return; } saveChips(cur.filter((x, j) => j !== i), 'Removed ' + label + '.'); } }, ico('x', 18), h('span', null, 'Remove'))));
+      });
+      const addIn = h('input', { class: 'input', type: 'text', maxlength: CHIP_LEN, placeholder: 'New button, like Phone', 'aria-label': 'New order button name' });
+      // Adds a button with the typed name at the end of the list.
+      const add = () => {
+        const v = addIn.value.replace(/\s+/g, ' ').trim();
+        if (!v) return;
+        if (cur.some((x) => x.toLowerCase() === v.toLowerCase())) { tell(bSt, 'There is already a button called ' + v + '. Pick another name.', 'bad'); return; }
+        if (saveChips(cur.concat([v]), 'Added ' + v + '.')) addIn.value = '';
+      };
+      addIn.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); add(); } });
+      list.appendChild(h('div', { class: 'dp-strow' }, addIn, h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'chip-add' }, onClick: add }, ico('plus', 18), h('span', null, 'Add button'))));
+    }
+    paintChips();
+    const reset = h('button', { type: 'button', class: 'btn', dataset: { act: 'chips-reset' },
+      // Goes back to the starting list of order buttons (with Undo).
+      onClick: () => saveChips(DEFAULT_CHIPS.slice(), 'Order buttons are back to the starting list.') }, 'Reset to the starting list');
+    const sec2 = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Order buttons'),
+      h('p', { class: 'fs-sub' }, 'The quick buttons on the order screen for who the order is for: Walk-up, Pickup, tables, Phone, Delivery. Up to ' + CHIP_MAX + '.'), list, reset, bSt);
+
+    // 3. Currency symbol.
+    const curSt = h('p', { class: 'fs-sub', role: 'status' });
+    const custom = h('input', { class: 'input dp-num', type: 'text', maxlength: 3, autocomplete: 'off', 'aria-label': 'Your own currency symbol', placeholder: 'kr' });
+    const symbols = ['$', '\u20ac', '\u00a3'];
+    const now = currentSymbol();
+    const seg = SB.ui.segmented({ label: 'Currency symbol', value: symbols.indexOf(now) >= 0 ? now : 'other',
+      options: symbols.map((s) => ({ id: s, label: s })).concat([{ id: 'other', label: 'Your own' }]),
+      // Picks a standard symbol (saved at once) or shows the box for your own.
+      onChange: (id) => { custom.hidden = id !== 'other'; if (id !== 'other') saveSymbol(id); } });
+    custom.hidden = symbols.indexOf(now) >= 0;
+    if (symbols.indexOf(now) < 0) custom.value = now;
+    // Saves a symbol and offers Undo back to the old one.
+    function saveSymbol(sym) {
+      const before = currentSymbol();
+      if (sym === before) return;
+      const r = send('updateSettings', { patch: { ui: { currency: sym } } });
+      if (!r.ok && r.report !== 'nothingToDo') { tell(curSt, r.words, 'bad'); return; }
+      tell(curSt, 'Prices now show ' + sym + '. Screens already open update when you close this sheet.', 'ok');
+      offerUndo('Currency symbol is ' + sym + '.', () => { send('updateSettings', { patch: { ui: { currency: before } } }); });
+    }
+    // Saves your own symbol when the box is left; one to three characters.
+    custom.addEventListener('change', () => { const v = custom.value.trim(); if (!v || v.length > 3 || /\d/.test(v)) { tell(curSt, 'Type one to three characters, like kr or Rs, with no digits.', 'bad'); return; } saveSymbol(v); });
+    const sec3 = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Currency symbol'),
+      h('p', { class: 'fs-sub' }, 'Shown with every price. It does not convert anything.'), seg, custom, curSt);
+
+    offs.push(SB.store.subscribe(() => { if (!list.contains(doc.activeElement)) paintChips(); }));
+    root.append(undoBar, sec1, sec2, sec3);
     sheet.body.appendChild(root); keepInView(root);
     return sheet;
   }
@@ -1005,6 +1178,7 @@
   SB.sheets.register('setup', openSetup);
   SB.sheets.register('dishes', openDishes);
   SB.sheets.register('shop', openShop);
+  SB.sheets.register('serve', openServe);
   SB.sheets.register('startover', openStartOver);
   SB.sheets.register('menuimport', openImport);
   SB.sheets.register('cookahead', openCookAhead);
