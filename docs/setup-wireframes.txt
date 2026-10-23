@@ -1,0 +1,66 @@
+SMOKEBOX FIRST-RUN WIREFRAMES (low fidelity, 1280x800 tablet). Text only. Boxes are taps, [ ] are typed fields.
+
+SCREEN 1: FIRST OPEN (empty board, no menu)
++----------------------------------------------------------------------------+
+| [flame]  All  PIT  HOT  FRY  CLD  EXP  Cabinet         Orders  Back office |
++----------------------------------------------------------------------------+
+|                                                                            |
+|                 Welcome. Let's build your menu.                            |
+|         It takes about two minutes. Nothing is pre-filled.                 |
+|                                                                            |
+|            [ + ADD YOUR FIRST DISH ]    (big, the only loud button)        |
+|                                                                            |
+|      Show me how it works          Try the busy-night demo (pretend)       |
++----------------------------------------------------------------------------+
+
+SCREEN 2: ADD A DISH (one friendly form; same screen repeats)
++----------------------------------------------------------------------------+
+| Add a dish                                                    3 added      |
+|                                                                            |
+|  What is it called?   [ Pulled pork plate                              ]   |
+|  Price                [ $ 12.50 ]                                          |
+|                                                                            |
+|  Where is it made?    (the app remembers your last pick)                   |
+|  +---------+ +-----------+ +---------+ +-------------+                     |
+|  |  PIT    | | HOT SIDES | |  FRY    | | COLD/DRINKS |   <- big tap tiles  |
+|  | smoker  | |  stove    | | fryer   | |  no cooking |                     |
+|  +---------+ +-----------+ +---------+ +-------------+                     |
+|                                                                            |
+|  [ Save and add another ]      [ Save, I'm done ]                          |
+|                                                                            |
+|  > More options (short name, prep time, ingredients)   <- folded shut      |
+|                                                                            |
+|  Just added: Mac and cheese $4.50 (Hot sides)   Pulled pork plate $12.50   |
++----------------------------------------------------------------------------+
+  Hidden by default: category (taken from the tile), prep time (starts at a
+  guess by tile), short name (first 24 letters), ingredients and stock.
+
+SCREEN 3: THREE DISHES IN, NEXT STEP (one quiet card, skippable)
++----------------------------------------------------------------------------+
+|  Your menu: 3 dishes.            [ Add more ]   [ Edit menu ]              |
+|  Take your first order?          [ + New ticket ]  (big)                   |
+|  Later: sales tax, opening hours, manager PIN  ->  Settings                |
++----------------------------------------------------------------------------+
+
+SCREEN 4: NEW TICKET (own dishes only)
++----------------------------------------------------------------------------+
+| New ticket                        | Order                                  |
+| [ Search ]                        |  1 Pulled pork plate      $12.50       |
+| [Pulled pork plate $12.50]        |  1 Mac and cheese          $4.50       |
+| [Mac and cheese     $4.50]        |  1 Sweet tea               $3.00       |
+| [Sweet tea          $3.00]        | Customer: Walk-up  Table 1 ...         |
+|                                   | Pay now: Pay later | Cash | Card       |
+|  (a dish never says "sold out"    | [      Send to kitchen      ]          |
+|   unless the owner turned on      |                                        |
+|   stock tracking for it)          |                                        |
++----------------------------------------------------------------------------+
+
+SCREEN 5: AFTER THE FIRST PAID TICKET (toast, clears itself in 5 s)
+  "Ticket #1 sent. Paid $20.00 cash. Taxes, hours and PIN are in Settings."
+
+OPTIONAL, UNDER "More ways to add dishes" ON SCREEN 2 (never on screen 1)
++----------------------------------------------------------------------------+
+|  Have a list already?                                                      |
+|   [ Paste a list ]   [ Open a spreadsheet (CSV) ]   [ POS export ]         |
+|   [ Load a sample barbecue menu ]  (labeled SAMPLE, one tap to remove)     |
++----------------------------------------------------------------------------+
