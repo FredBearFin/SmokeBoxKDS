@@ -4,7 +4,7 @@
  * PARTS: 1 pure helpers, 2 numbers per refresh, 3 the story and the suggestions, 4 the page and its cards.
  * USES: 82-office-money.js (helpers), 80-office-core.js (the kit), 40-metrics.js.   USED BY: the office frame.
  * HONEST: suggestions come from the days in range (sample days are labeled), sync is simulated and labeled so, and refused order lines are
- * counted only where the app recorded them. The Pitcall note is a seam, not an integration.
+ * counted only where the app recorded them.
  */
 (function (g) {
   'use strict';
@@ -194,24 +194,21 @@
         const med = B.median(pool.map((d) => d.g));
         // Rounded up to the next 100 g so the number reads like one a cook would use.
         const suggest = Math.ceil((med * PADDING) / 100) * 100;
-        const basis = useWd ? 'the ' + sameWd.length + ' ' + WEEKDAY[tomorrowWd] + 's in this range' : 'all ' + demand.length + ' cooking days in this range';
         Object.assign(out, { suggestG: suggest, sold: soRows.length > 0 });
         // Where the days come from: simulated sample days must never read as the owner's own kitchen.
         const srcWord = b.ds.counts && b.ds.counts.sample > 0 ? 'Suggestion from days that include simulated sample data (not your kitchen)' : 'Suggestion from your own days in this range';
         const parts = [];
         if (soRows.length) {
           const earliest = soRows.slice().sort((x, y) => y.hoursBeforeClose - x.hoursBeforeClose)[0];
-          parts.push('Ran out on ' + soRows.length + ' of ' + so.dayCount + ' days, the earliest at ' + fmt.clock(earliest.t) + ', ' + B.hoursWords(earliest.hoursBeforeClose) + ' before close.');
-          const wanted = B.median(demand.filter((d) => d.est).map((d) => d.g));
-          parts.push('A normal day cooks ' + fmt.g(tp.medianIntake) + ' and serves ' + fmt.g(tp.medianUsed) + '; the days it ran out probably wanted about ' + fmt.g(wanted) + '.');
+          parts.push('Sold out on ' + soRows.length + ' of ' + so.dayCount + ' days, as early as ' + fmt.clock(earliest.t) + '. A normal day: cooks ' + fmt.g(tp.medianIntake) + ', serves ' + fmt.g(tp.medianUsed) + '.');
           const t = B.median(soRows.map((r) => r.hour)) - TOP_UP;
-          const topUp = 'have a top-up batch ready by about ' + U.fmtTime(B.dayMs(b.today) + t * HOUR) + ', an hour before the usual sell-out';
-          if (suggest > tp.medianIntake * 1.03) parts.push(srcWord + ': cook about ' + fmt.g(suggest) + ' (typical demand ' + fmt.g(med) + ' plus 10%, from ' + basis + '), ' + fmt.g(suggest - tp.medianIntake) + ' more than usual, and ' + topUp + '.');
-          else parts.push(srcWord + ': the total is about right (typical demand ' + fmt.g(med) + ' plus 10% is ' + fmt.g(suggest) + ', from ' + basis + '), so keep the amount and ' + topUp + '. The problem looks like timing, not quantity.');
+          const topUp = 'have a top-up batch ready by about ' + U.fmtTime(B.dayMs(b.today) + t * HOUR);
+          if (suggest > tp.medianIntake * 1.03) parts.push(srcWord + ': ' + fmt.g(suggest - tp.medianIntake) + ' more than usual, and ' + topUp + '.');
+          else parts.push(srcWord + ': keep the amount and ' + topUp + '. It looks like timing, not quantity.');
         } else {
-          parts.push('Never ran out. A normal day cooks ' + fmt.g(tp.medianIntake) + ' and serves ' + fmt.g(tp.medianUsed) + '.');
-          if (suggest < tp.medianIntake * 0.85) parts.push(srcWord + ': about ' + fmt.g(suggest) + ' covers typical demand plus 10% (' + basis + '), ' + fmt.g(tp.medianIntake - suggest) + ' less than usual.');
-          else parts.push(srcWord + ': the cook count looks about right. Typical demand plus 10% is ' + fmt.g(suggest) + '.');
+          parts.push('Never sold out. A normal day: cooks ' + fmt.g(tp.medianIntake) + ', serves ' + fmt.g(tp.medianUsed) + '.');
+          if (suggest < tp.medianIntake * 0.85) parts.push(srcWord + ': ' + fmt.g(tp.medianIntake - suggest) + ' less than usual would still cover it.');
+          else parts.push(srcWord + ': the cook count looks about right.');
         }
         out.parts = parts; out.text = parts.join(' ');
         return out;
@@ -271,14 +268,12 @@
 
     page.panel({
       span: 12, title: 'What to cook tomorrow', sub: 'A suggestion from the days in the range above, not a forecast. Simulated sample days are labeled when they are included.',
-      caption: 'A starting number per protein, worked out from how much was really used on the days in this range. Your own judgment about tomorrow comes first.',
-      // Builds the intro, the list and the Pitcall note once; update redraws the list only when it changed.
+      caption: 'A starting number per protein: the typical amount used on the days in this range, plus 10%. Your own judgment about tomorrow comes first.',
+      // Builds the intro and the list once; update redraws the list only when it changed.
       render: (body, p0) => {
         const intro = h('p', { class: 'ob-text', 'data-k': 'tomorrow-intro' });
         const list = h('ul', { class: 'ob-sugg', 'aria-label': 'Cook-count suggestions' });
-        // The Pitcall note is a hand-off point only: nothing is sent anywhere.
-        const seam = h('p', { class: 'ob-note ob-note--accent', 'data-k': 'seam' }, 'Pitcall can use the sell-out time to decide tomorrow\'s cook count. This page only shows the sell-out times; nothing is sent to Pitcall.');
-        body.append(intro, list, seam);
+        body.append(intro, list);
         let last = '';
         // Draws one card per protein with its suggestion; skipped when nothing changed, so there is no flicker.
         const paint = (p) => {
@@ -471,7 +466,7 @@
           // Tone of the within-target figure: good from 95%, warning from 80%, else bad (starter thresholds).
           stats.set([
             { k: 'median', label: 'Median', value: fmt.ms(s.medianMs), note: 'typical channel' },
-            { k: 'p90', label: 'Slowest 1 in 10', value: fmt.ms(s.p90Ms), note: '90th percentile' },
+            { k: 'p90', label: 'Slowest 1 in 10', value: fmt.ms(s.p90Ms), note: 'the slowest tenth' },
             { k: 'max', label: 'Slowest of all', value: fmt.ms(s.maxMs), note: 'worst single update' },
             { k: 'within', label: 'Within ' + s.targetSec + ' s', value: fmt.pct(s.withinPct, 0), note: s.withinCount + ' of ' + s.count + ' updates', tone: s.withinPct >= 0.95 ? 'good' : s.withinPct >= 0.8 ? 'warn' : 'bad' },
           ]);

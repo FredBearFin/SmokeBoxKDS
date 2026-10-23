@@ -39,3 +39,23 @@ Findings 2 and 4 to 11 and all P2: wording and layout changes that touch tests I
 
 ## Not checked
 Every state at every size and both themes by eye (about 15 of roughly 100 screenshots were opened); 1920x1080; keyboard and screen reader paths; the PIN gate (no PIN is set in these runs); after-closing-tickets state looked at only through pass/fail of page render; real device behavior. The two unit-suite failures seen (engine soak throughput, metrics 250 ms budget) are timing budgets that failed while six agents shared the CPU, not caused by these edits.
+
+---
+
+## Round 2 update (branch night/a3-r2)
+
+Screenshots: `docs/ux-shots/night/a3/r2-*` (empty 1280x800; sample 1280x2400 for all seven pages; header strip at 1024, 900, 760, 700, 390 as `r2-hdr-*`).
+
+Fixed since round 1, with the finding numbers above:
+- **5 (three money numbers).** One primary figure: Sales (food sold after discounts, from paid orders). Headline now reads "You sold $66,599 of food in 2,269 paid orders ($29.35 average). With tax and tips, $69,835 was collected, $3,236 of it tips." The tiles are Sales, Average order (the same $29.35), Food cost, Items sold; the table rows are Sales, Tax, Tips, Total collected. "Takings" became "Money collected". The old "Food sold" tile (menu value of finished food) is gone because it cannot be explained in one line. Food cost now shows "Cost not recorded" when no item has a recorded cost (the metric already skips lines with unknown cost; if A5's data change is not merged yet a dish with cost 0 would still count, which is the data side).
+- **2 (Pitcall).** Removed from the Stock page and the sell-out finding. Left in two places that are not in my files: the About list in Menu and settings (`84-office-data.js:1676`, asserted by `test/office-data.e2e.mjs:874`) and a help line in `72-floor-sheets.js:1834`.
+- **4 (empty states).** Empty pages now have a "Show sample numbers" button and a line saying the numbers are made up, labeled and never mixed with your own. It turns sample history on and shows the last 14 days with the Sample data chip.
+- **6 jargon.** "Waiting under the lamp" to "Finished food waiting"; "Plate spread" to "First to last dish"; "Pacing hold" to "Held back"; "Waiting at expo" to "Waiting to go out"; "Drifted" to "Off estimate"; "Items 86'd" to "Items sold out"; "Pace index" to "Busyness"; "Line friction" to "Slip-ups on the board" with plain bar names; "90th percentile" to "the slowest tenth".
+- **7 (simulated sync).** The Stock headline no longer reports simulated sync times. The "Channel sync (simulated)" section lower on the Stock page is still there, labeled simulated (left: remove or hide it; it needs a decision).
+- **8 (No comparison).** Tiles with no earlier period now leave the line empty; the single footnote under the tiles explains it.
+- **9 (headline wrap).** Bold numbers no longer break across lines.
+- **10 (cook tomorrow).** Cards cut to two short paragraphs each; the basis ("typical demand plus 10%") moved to the section caption.
+- **11 (menu list).** Each dish is one row (name, station and category, price, prep time, "Starter prep time" tag) and opens to the full form on tap. The new-dish form opens its row. Duplicate "Hot sides, Hot sides" avoided.
+- **Theme switch.** Between 521 and 720 px the Ember/Paper button showed its word squeezed into vertical letters (48 x 101 px); it is now an icon button below 720 px and never shrinks.
+
+Still open: 12 to 20 (P2), the Safety compliance ring (19), the "New tablet?" toast (A2 is removing it; it still showed on the round-1 deploy build I started from, so verify in the merged build), "channel" and "protein" words on Stock, remaining jargon in 84-office-data (not renamed here: wording decisions for A2/Freddy).

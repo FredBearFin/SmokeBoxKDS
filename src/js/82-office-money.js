@@ -321,15 +321,24 @@
     // The main (brisket) yield comparison, or null when it cannot be worked out.
     const yieldPrimary = B.memoP((p) => { const yc = M.yieldComparison(p); return yc && yc.primary ? yc.primary : null; });
 
+    const salesOf = B.memoP((p) => M.sales(p));
     page.headline();
 
     page.tiles([
-      // Menu value of the finished food, in whole dollars (the real takings are in the Takings section below).
-      { id: 'revenue', kpi: 'revenue', label: 'Food sold', format: (v) => fmt.money(v, 0) },
-      // Average ticket value, shown with cents.
-      { id: 'avgTicket', kpi: 'avgTicketValue', label: 'Average ticket value', format: (v) => fmt.money(v, 2) },
-      // Food cost as a share of menu price, one decimal.
-      { id: 'foodCost', kpi: 'foodCostPct', label: 'Food cost', format: (v) => fmt.pct(v, 1) },
+      // The one main money figure: sales after discounts from paid orders (blank until an order is paid).
+      { id: 'revenue', kpi: 'revenue', label: 'Sales', kind: 'money', good: 'higher', format: (v) => fmt.money(v, 0),
+        // Sales after discounts for the range; blank when no order was paid.
+        value: (p) => { const s = salesOf(p); return s.checks ? { value: s.net, spark: s.byDay.map((d) => d.net) } : null; },
+        // The same figure for the previous period, or null when it had no paid orders.
+        previous: (p) => { const q = prevHandle(p); const s = q ? salesOf(q) : null; return s && s.checks ? s.net : null; } },
+      // Average paid order, before tax and tips, so it agrees with the Sales tile.
+      { id: 'avgTicket', kpi: 'avgTicketValue', label: 'Average order', format: (v) => fmt.money(v, 2),
+        // Sales divided by paid orders; blank when nothing is paid.
+        value: (p) => { const s = salesOf(p); return s.checks ? s.avgCheck : null; } },
+      // Food cost as a share of menu price; blank with a plain note when no item has a recorded cost.
+      { id: 'foodCost', kpi: 'foodCostPct', label: 'Food cost', format: (v) => fmt.pct(v, 1), noValue: 'Cost not recorded',
+        // Cost share of the items that have a recorded cost; null when none do, never a fake zero.
+        value: (p) => { const f = M.foodCostPct(p); return f && f.lines > 0 && isNum(f.costPct) ? f.costPct : null; } },
       // Items sold has no ready-made kpi, so it is summed here and compared with the previous period's handle.
       { id: 'items', label: 'Items sold', kind: 'count', good: 'neutral', format: (v) => fmt.num(v, 0),
         // Sum of all items sold in the range.
@@ -339,15 +348,14 @@
     ]);
 
     /* ---------------------------------------------------------------- takings */
-    const salesOf = B.memoP((p) => M.sales(p));
-    page.section('Takings', 'What the till took from orders that were paid in this range. Smokebox only records how an order was paid; it never charges a card.');
+    page.section('Money collected', 'Sales are the food you sold after discounts. Add tax and tips and you get everything collected. Smokebox only records how an order was paid; it never charges a card.');
 
     page.panel({
-      span: 5, title: 'What the till took', sub: scope(),
-      caption: 'Net sales is the food sold less discounts. Tax and tips are on top of it, and all three together are what was collected.',
+      span: 5, title: 'Sales, tax and tips', sub: scope(),
+      caption: 'Sales is the food sold less discounts, and it is the number at the top of this page. Tax and tips are on top of it, and all three together are what was collected.',
       // Builds the figure rows and the notes under them; update repaints them in place.
       render: (body, p0) => {
-        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the line screen and its takings show up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
+        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the line screen and the money shows up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
         const stats = B.stats(body, { cls: 'ob-stats--3' });
         const open = h('p', { class: 'ob-note' });
         body.append(empty, open);
@@ -358,10 +366,10 @@
           if (!s.checks) stats.set([]);
           else stats.set([
             { k: 'checks', label: 'Orders paid', value: fmt.num(s.checks, 0), note: isNum(s.avgCheck) ? fmt.money(s.avgCheck, 2) + ' average order' : '' },
-            { k: 'net', label: 'Net sales', value: fmt.money(s.net, 2), note: s.discounts > 0 ? fmt.money(s.discounts, 2) + ' given as discounts' : 'before tax and tips' },
+            { k: 'net', label: 'Sales', value: fmt.money(s.net, 2), note: s.discounts > 0 ? fmt.money(s.discounts, 2) + ' given as discounts' : 'before tax and tips' },
             { k: 'tax', label: 'Tax collected', value: fmt.money(s.tax, 2), note: s.tax > 0 ? '' : 'No tax rate is set' },
-            { k: 'tips', label: 'Tips', value: fmt.money(s.tips, 2), note: isNum(s.tipPct) ? fmt.pct(s.tipPct, 0) + ' of net sales' : '' },
-            { k: 'all', label: 'Collected in all', value: fmt.money(s.collected, 2), note: 'net sales, tax and tips' },
+            { k: 'tips', label: 'Tips', value: fmt.money(s.tips, 2), note: isNum(s.tipPct) ? fmt.pct(s.tipPct, 0) + ' of sales' : '' },
+            { k: 'all', label: 'Total collected', value: fmt.money(s.collected, 2), note: 'sales, tax and tips' },
           ]);
           const bits = [];
           if (s.open.orders) bits.push(s.open.orders + ' ' + U.plural(s.open.orders, 'order is', 'orders are') + ' still open, ' + fmt.money(s.open.value, 2) + ' of food not yet paid');
@@ -375,8 +383,8 @@
     });
 
     page.card({
-      type: 'bar', span: 7, title: 'Takings by day', sub: scope(),
-      caption: 'Net sales for each day, from the orders paid that day. A short bar is a slow day or a day with orders still open.',
+      type: 'bar', span: 7, title: 'Money collected by day', sub: scope(),
+      caption: 'Sales for each day, from the orders paid that day. A short bar is a slow day or a day with orders still open.',
       empty: { title: 'No paid orders to chart yet', body: 'Each day with a paid order gets one bar.', icon: 'chart-bar' },
       // One bar per day with paid orders.
       spec: (p) => {
@@ -385,9 +393,9 @@
         const best = days.reduce((a, d) => (d.net > a.net ? d : a), days[0]);
         return {
           orient: 'v', categories: days.map((d) => d.label), sort: 'none', format: 'money',
-          series: [{ id: 'net', name: 'Net sales', values: days.map((d) => d.net) }],
+          series: [{ id: 'net', name: 'Sales', values: days.map((d) => d.net) }],
           height: 270,
-          ariaLabel: 'Bar chart of net sales for each day. The best day is ' + best.label + ' with ' + fmt.money(best.net, 0) + '.',
+          ariaLabel: 'Bar chart of sales for each day. The best day is ' + best.label + ' with ' + fmt.money(best.net, 0) + '.',
         };
       },
     });

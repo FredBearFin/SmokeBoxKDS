@@ -53,9 +53,9 @@
   // Plain words for a ticket's status.
   const levelWord = { ok: 'On time', warn: 'Running late', breach: 'Overdue' };
   // The four waits a ticket splits into: key, label shown, and the field name in the metrics row.
-  const PARTS = [['hold', 'Pacing hold', 'holdMs'], ['response', 'Waiting for a cook', 'responseMs'], ['work', 'Hands-on work', 'workMs'], ['dwell', 'Waiting at expo', 'dwellMs']];
+  const PARTS = [['hold', 'Held back', 'holdMs'], ['response', 'Waiting for a cook', 'responseMs'], ['work', 'Hands-on work', 'workMs'], ['dwell', 'Waiting to go out', 'dwellMs']];
   // Names the Gantt chart uses for the same waits.
-  const PART_TONES = { hold: 'Pacing hold', wait: 'Waiting for a cook', response: 'Waiting for a cook', work: 'Hands-on work', dwell: 'Waiting at expo' };
+  const PART_TONES = { hold: 'Held back', wait: 'Waiting for a cook', response: 'Waiting for a cook', work: 'Hands-on work', dwell: 'Waiting to go out' };
 
   // Works out what the hero chart shows: hours with enough tickets and, for short ranges, the usual
   // pattern from the 14 days before. Cached per handle because the spec, sub and caption all read it.
@@ -86,7 +86,7 @@
       { id: 'spread', kpi: 'avgSpreadMs', label: 'First to last item' },
       // The 86 tile counts items taken off the menu, compares with the earlier period and draws one dot
       // per day.
-      { id: 'e86', label: 'Items 86’d', kind: 'count', good: 'lower', format: 'num', value: (p) => M.eightySixes(p).length, previous: (p, c) => M.eightySixes(c.previous()).length,
+      { id: 'e86', label: 'Items sold out', kind: 'count', good: 'lower', format: 'num', value: (p) => M.eightySixes(p).length, previous: (p, c) => M.eightySixes(c.previous()).length,
         spark: (p) => { const by = {}; M.eightySixes(p).forEach((e) => { by[e.date] = (by[e.date] || 0) + 1; }); return M.byDay(p).map((d) => by[d.date] || 0); } },
     ];
   }
@@ -146,10 +146,10 @@
           if (!pi || pi.index === null || !isNum(pi.index) || !pi.n) return null;
           return {
             // The ring reads as percent of target, with words for comfortable, busy and behind.
-            value: pi.index, max: 1.5, target: 1, warn: 0.8, breach: 1.0001, label: 'Pace index', format: (v) => Math.round(v * 100) + '%',
+            value: pi.index, max: 1.5, target: 1, warn: 0.8, breach: 1.0001, label: 'Busyness', format: (v) => Math.round(v * 100) + '%',
             words: { ok: 'Comfortable', warn: 'Busy', bad: 'Behind' },
             sub: 'Median ' + fmt.ms(pi.medianMs) + ' against a target of ' + fmt.ms(pi.targetMs) + (pi.thin ? '. Only ' + pi.n + ' ' + plural(pi.n, 'ticket') + ' so far, so treat it as a rough guide' : ''),
-            ariaLabel: 'Pace index ' + Math.round(pi.index * 100) + ' percent of target, ' + lc(pi.label),
+            ariaLabel: 'Busyness ' + Math.round(pi.index * 100) + ' percent of target, ' + lc(pi.label),
           };
         },
         height: 270, table: false,
@@ -182,7 +182,7 @@
         // The subtitle says how much pacing cut the wait for the last item, once pacing on and off can be
         // compared.
         sub: (p) => { const c = M.pacingCompare(p); return c.comparable && isNum(c.lampCutPct) ? 'With pacing on, finished food waited ' + Math.round(Math.abs(c.lampCutPct) * 100) + '% ' + (c.lampCutPct >= 0 ? 'less' : 'more') + ' (different tickets, not a controlled test)' : 'Average wait for the last item, pacing off against on'; },
-        caption: 'Shorter is better. This is how long finished food sits under the lamp waiting for the rest of the plate. Pacing holds early items so the plate finishes together; it is not meant to make tickets faster, and the median ticket time can go up.',
+        caption: 'Shorter is better. This is how long finished food sits waiting for the rest of the plate. Pacing holds early items so the plate finishes together; it is not meant to make tickets faster, and the median ticket time can go up.',
         empty: { title: 'Pacing cannot be compared yet', body: 'This needs finished multi-item tickets with pacing on and with pacing off in the same range. Run a day with pacing off to see its effect.', icon: 'timer' },
         // Two bars: the average wait for the last item with pacing off and with pacing on.
         spec(p) {
@@ -278,7 +278,7 @@
         { id: 'count', kpi: 'count', label: 'Finished tickets' },
         { id: 'median', kpi: 'medianMs', label: 'Median ticket time' },
         { id: 'overdue', kpi: 'overdue', label: 'Overdue tickets' },
-        { id: 'lamp', kpi: 'avgLampMs', label: 'Waiting under the lamp' },
+        { id: 'lamp', kpi: 'avgLampMs', label: 'Finished food waiting' },
         { id: 'voids', kpi: 'voids', label: 'Voided tickets' },
       ]);
 
@@ -312,7 +312,7 @@
       page.section('Where the time goes', 'Every ticket splits into four waits that add up to its total.');
       page.card({
         type: 'stack', span: 6, title: 'By channel', sub: 'Average per ticket',
-        caption: 'Look for the widest part of each bar. A wide “Waiting at expo” part means finished food is sitting, not cooking. Items cooked in one step have no start tap, so their “Waiting for a cook” counts as zero and their work time runs from firing (estimated).',
+        caption: 'Look for the widest part of each bar. A wide “Waiting to go out” part means finished food is sitting, not cooking. Items cooked in one step have no start tap, so their “Waiting for a cook” counts as zero and their work time runs from firing (estimated).',
         empty: { title: 'No finished tickets yet', body: 'Each channel gets a bar once it has finished tickets in this range.' },
         // Average ticket time per channel, split into its four waits.
         spec(p) {
@@ -415,7 +415,7 @@
       page.tiles([
         { id: 'overdue', kpi: 'overdue', label: 'Overdue tickets' },
         { id: 'spread', kpi: 'avgSpreadMs', label: 'First to last item' },
-        { id: 'lamp', kpi: 'avgLampMs', label: 'Waiting under the lamp' },
+        { id: 'lamp', kpi: 'avgLampMs', label: 'Finished food waiting' },
         // Items finished per hour has no ready-made KPI, so it reads the summary for this and the earlier
         // period.
         { id: 'items', label: 'Items finished per hour', kind: 'count', good: 'neutral', format: 'num', value: (p) => { const s = M.summary(p); return s.count ? s.itemsPerHour : null; }, previous: (p, c) => { const s = M.summary(c.previous()); return s.count ? s.itemsPerHour : null; } },
@@ -496,7 +496,7 @@
       });
 
       page.card({
-        type: 'bar', span: 7, title: 'Line friction', sub: 'Events per 100 tickets',
+        type: 'bar', span: 7, title: 'Slip-ups on the board', sub: 'Events per 100 tickets',
         caption: 'We judge the screen by how often cooks hit a snag. If refused taps or undos climb, the screen is getting in their way, and that is a design problem, not a cook problem.',
         empty: { title: 'No tickets in this range', body: 'Friction is counted per 100 tickets, so it needs some tickets to measure against.' },
         // Events per 100 tickets for each kind of snag: undone taps, refused taps, forced bumps, early
@@ -508,9 +508,9 @@
           const per = (x) => (isNum(x) ? Math.round(x * 10) / 10 : 0);
           return {
             orient: 'h', format: 'num', labels: 'all',
-            categories: ['Undone actions', 'Refused taps', 'Bumped with items undone', 'Fired early by hand', 'Recalled tickets', 'Voided tickets'],
+            categories: ['Undone actions', 'Taps the app could not accept', 'Sent out before all dishes were done', 'Fired early by hand', 'Recalled tickets', 'Voided tickets'],
             series: [{ id: 'per100', name: 'Per 100 tickets', values: [per(f.undo.per100Tickets), per(f.reports.per100Tickets), per(f.forced.pct * 100), per(f.overrides.pct * 100), per(f.recalls.pct * 100), per(f.voids.pct * 100)] }],
-            ariaLabel: 'Line friction per 100 tickets: undone actions, refused taps, forced bumps, early fires, recalls and voids',
+            ariaLabel: 'Slip-ups per 100 tickets: undone actions, refused taps, forced bumps, early fires, recalls and voids',
           };
         },
       });

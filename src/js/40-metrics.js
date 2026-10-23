@@ -1458,7 +1458,7 @@
   const KPIS = [
     { id: 'medianMs', label: 'Median ticket time', kind: 'time', good: 'lower' }, { id: 'p90Ms', label: 'Slowest 1 in 10', kind: 'time', good: 'lower' },
     { id: 'onTimePct', label: 'On time', kind: 'share', good: 'higher' }, { id: 'perHour', label: 'Tickets per hour', kind: 'count', good: 'neutral' },
-    { id: 'avgSpreadMs', label: 'Plate spread', kind: 'time', good: 'lower' }, { id: 'avgLampMs', label: 'Waiting under the lamp', kind: 'time', good: 'lower' },
+    { id: 'avgSpreadMs', label: 'First to last dish', kind: 'time', good: 'lower' }, { id: 'avgLampMs', label: 'Finished food waiting', kind: 'time', good: 'lower' },
     { id: 'count', label: 'Finished tickets', kind: 'count', good: 'neutral' }, { id: 'overdue', label: 'Overdue tickets', kind: 'count', good: 'lower' },
     { id: 'voids', label: 'Voids', kind: 'count', good: 'lower' }, { id: 'revenue', label: 'Sales', kind: 'money', good: 'higher' },
     { id: 'avgTicketValue', label: 'Average ticket', kind: 'money', good: 'higher' }, { id: 'foodCostPct', label: 'Food cost', kind: 'share', good: 'lower' },
@@ -1602,7 +1602,7 @@
         for (const d of it.depleted) if (d && d.ing === w.ing && num(d.g) && d.g > 0) { n++; grams += d.g; if (it.doneAt < firstT) firstT = it.doneAt; }
       }
       let est = '';
-      if (n >= 3) { const span = Math.max(1, (w.t - firstT) / H), rate = grams / span; est = ' At the pace before the 86 (' + kgTxt(rate) + ' an hour) roughly ' + kgTxt(rate * w.hoursBeforeClose) + ' more cooked ' + w.name.toLowerCase() + ' would have lasted to close. Pitcall can use the sell-out time to set tomorrow\'s cook count.'; }
+      if (n >= 3) { const span = Math.max(1, (w.t - firstT) / H), rate = grams / span; est = ' At the pace before the 86 (' + kgTxt(rate) + ' an hour) roughly ' + kgTxt(rate * w.hoursBeforeClose) + ' more cooked ' + w.name.toLowerCase() + ' would have lasted to close.'; }
       return F(this.id, w.hoursBeforeClose >= 3 ? 'bad' : 'warn', Math.min(90, 70 + w.hoursBeforeClose * 3), w.name + ' went 86 at ' + clock(w.t),
         w.name + ' went 86 at ' + clock(w.t) + ' on ' + U.fmtDateShort(w.date) + ', ' + w.hoursBeforeClose.toFixed(1) + ' hours before close.' + est, { label: 'Hours before close', value: w.hoursBeforeClose, unit: 'hours' });
     } },
@@ -1757,8 +1757,8 @@
       }
       case 'money': {
         const t = moneyTotals(c), v = M.avgTicketValue(c), sl = M.sales(c);
-        // Real takings from paid checks lead the sentence once any exist.
-        if (sl.checks) return 'The till took ' + money0(sl.collected) + ' from ' + U.fmtNum(sl.checks) + ' paid ' + U.plural(sl.checks, 'order') + ' (' + money(sl.avgCheck) + ' average before tax and tips)' + (sl.tips > 0 ? ', ' + money0(sl.tips) + ' of it tips.' : '.');
+        // Sales from paid orders lead the sentence once any exist.
+        if (sl.checks) return 'You sold ' + money0(sl.net) + ' of food in ' + U.fmtNum(sl.checks) + ' paid ' + U.plural(sl.checks, 'order') + ' (' + money(sl.avgCheck) + ' average). With tax and tips, ' + money0(sl.collected) + ' was collected' + (sl.tips > 0 ? ', ' + money0(sl.tips) + ' of it tips.' : '.');
         if (t.revenue === null) return 'No sales in this range yet.';
         return 'Sales of ' + money0(t.revenue) + (v.count ? ' over ' + U.fmtNum(v.count) + ' finished tickets, ' + money(v.avg) + ' per ticket' : '') + (t.costPct !== null ? '; ingredients cost ' + pctTxt(t.costPct) + ' of menu price.' : '.');
       }
@@ -1767,9 +1767,9 @@
         return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' discarded (' + kgTxt(k.discards.g) + ', ' + money(k.discards.cost) + ').' : 'nothing was discarded.');
       }
       case 'stock': {
-        const so = M.sellOutClock(c), sy = M.syncLatency(c), n = so.rows.length; if (!so.dayCount && !sy.count) return 'No stock or 86 events in this range yet.';
+        const so = M.sellOutClock(c), n = so.rows.length; if (!so.dayCount) return 'No sell-outs in this range yet.';
         const w = so.rows.slice().sort((a, b) => b.hoursBeforeClose - a.hoursBeforeClose)[0];
-        return (n ? n + ' protein ' + U.plural(n, 'sell-out') + ' in ' + so.dayCount + ' ' + U.plural(so.dayCount, 'day') + (w ? ', the earliest ' + w.name.toLowerCase() + ' at ' + clock(w.t) + ' (' + Math.max(0, w.hoursBeforeClose).toFixed(1) + ' hours before close)' : '') + '.' : 'No protein sold out before close.') + (sy.count ? ' Simulated 86 updates reached every channel in a median of ' + mmss(sy.medianMs) + '.' : '');
+        return (n ? n + ' protein ' + U.plural(n, 'sell-out') + ' in ' + so.dayCount + ' ' + U.plural(so.dayCount, 'day') + (w ? ', the earliest ' + w.name.toLowerCase() + ' at ' + clock(w.t) + ' (' + Math.max(0, w.hoursBeforeClose).toFixed(1) + ' hours before close)' : '') + '.' : 'No protein sold out before close.');
       }
       case 'data': {
         let sample = 0, live = 0; for (const v of c.all) { if (v.t.src === 'sample') sample++; else live++; }

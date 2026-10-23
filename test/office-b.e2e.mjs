@@ -197,7 +197,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
     return { revenue: cmp.kpis.revenue.current, avg: SB.metrics.avgTicketValue(p).avg, cost: SB.metrics.foodCostPct(p).costPct, sold: items.reduce((a, r) => a + (r.sold || 0), 0), err: yc ? yc.staticCostErr : null, staticY: yc ? yc.staticYield : null, trueCost: yc ? yc.trueCostPerCookedKg : null, raw: yc ? yc.costPerKgRaw : null };
   });
   const tiles = await page.evaluate(() => [...document.querySelectorAll('.of-tile')].map((t) => ({ label: t.querySelector('.of-tile-label').textContent.trim(), val: t.querySelector('.of-tile-val').textContent.trim() })));
-  check('tiles: Food sold, Average ticket value, Food cost, Items sold, in that order', tiles.map((t) => t.label).join('|') === 'Food sold|Average ticket value|Food cost|Items sold', tiles.map((t) => t.label));
+  check('tiles: Sales, Average order, Food cost, Items sold, in that order', tiles.map((t) => t.label).join('|') === 'Sales|Average order|Food cost|Items sold', tiles.map((t) => t.label));
   // Pulls the number out of a text such as 12.5 kg.
   const num = (s) => parseFloat(String(s).replace(/[^0-9.]/g, ''));
   check('tiles: revenue matches SB.metrics', num(tiles[0].val) === Math.round(ref.revenue), [tiles[0].val, ref.revenue]);
@@ -417,7 +417,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   const sg = await page.locator('.ob-sg').evaluateAll((els) => els.map((e) => e.textContent));
   check('cook tomorrow: one card per protein with the numbers it used', sg.length === ref.so.proteins.length && sg.every((s) => /Cook about [\d.]+ kg|Not enough/.test(s) && /Suggestion from (days that include simulated sample data|your own days)|Not enough/.test(s)), sg);
   check('cook tomorrow: clearly labelled as a suggestion from the days in range, not a forecast', /suggestion from the days in the range above, not a forecast/i.test(await card(page, 'What to cook tomorrow').locator('.of-card-sub').textContent()));
-  check('cook tomorrow: the Pitcall seam sentence is there, and says nothing is sent', /Pitcall can use the sell-out time to decide tomorrow's cook count\./.test(await mainText(page)) && /nothing is sent to Pitcall/.test(await mainText(page)));
+  check('cook tomorrow: no Pitcall note is shown to the owner', !/Pitcall/.test(await mainText(page)));
   // pickers
   const ingSel = card(page, 'Stock level').locator('select').nth(1), daySel = card(page, 'Stock level').locator('select').nth(0);
   const iOpts = await ingSel.locator('option').evaluateAll((os) => os.map((o) => [o.value, o.textContent]));
