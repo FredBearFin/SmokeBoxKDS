@@ -627,7 +627,15 @@
   };
 
   // How many slips a station switch builds before painting; the rest follow right after.
-  const FIRST_SCREEN = 36;
+  const FIRST_SCREEN = 18, REST_CHUNK = 30;
+  // Builds the slips a station switch left for later, a few frames' worth at a time (not all at once), until every ticket of that station is there.
+  function buildRest(z) {
+    setTimeout(() => {
+      if (!m || m.zone !== z) return;
+      m.first = true; m.buildLimit = REST_CHUNK; render(); m.buildLimit = 0; m.first = false;
+      if (m.deferred) { m.deferred = false; buildRest(z); }
+    }, 25);
+  }
   // Switches to another station tab and announces the result. Called by the shell when the address changes.
   F.setZone = function (zone) {
     const z = TABS.indexOf(zone) >= 0 ? zone : 'all';
@@ -645,10 +653,7 @@
     render();
     m.buildLimit = 0;
     m.first = false;
-    if (m.deferred) {
-      m.deferred = false;
-      setTimeout(() => { if (!m || m.zone !== z) return; m.first = true; render(); m.first = false; }, 25);
-    }
+    if (m.deferred) { m.deferred = false; buildRest(z); }
     const n = store().select.ticketsForZone(z).length, zn = z === 'all' ? 'All stations' : zoneById(z).name;
     say(zn + ': ' + (n ? n + ' ' + U.plural(n, 'ticket') : 'no tickets') + '.');
     return z;
@@ -887,10 +892,17 @@
   // Runs every second: refits the header only when its width or chip text changed, so most ticks cost nothing.
   function refit() {
     if (m && m.head && headKey() !== m.fitKey) fitHead();
-    measureToastTop();
+    queueToastTop();
   }
   // True when the header has moved the status chips or tool buttons into the Menu list.
   const headSqueezed = () => !!m.head && (m.head.dataset.fit === 'status' || m.head.dataset.fit === 'labels' || m.head.dataset.fit === 'toollabels' || m.head.dataset.fit === 'tools');
+  // Asks for the toast position to be measured once at the start of the next frame, so the reading happens after this tick's writes
+  // and shares one layout with the frame instead of forcing its own every second.
+  function queueToastTop() {
+    if (!m || m.ttQ) return;
+    if (typeof g.requestAnimationFrame !== 'function') { measureToastTop(); return; }
+    m.ttQ = g.requestAnimationFrame(() => { if (m) { m.ttQ = 0; measureToastTop(); } });
+  }
   // In the cabinet view toasts move to the top right, under the header and the attention strip, so they never cover a card's buttons.
   // This tells the stylesheet where the page below the strip starts (--fl-toast-top).
   function measureToastTop() {
@@ -949,7 +961,7 @@
     m.cabOn = !!on;
     m.root.dataset.cabinet = on ? 'on' : 'off';
     doc.documentElement.dataset.cabinet = on ? 'on' : 'off';
-    measureToastTop();
+    queueToastTop();
     for (const el of [m.grid, m.empty, m.welcome, m.dock]) if (el) el.style.display = on ? 'none' : '';
     setHidden(m.cabEl, !on);
     m.seg.setValue(on ? 'cabinet' : m.zone);
@@ -1177,7 +1189,11 @@
     let n = 0;
     if (!m.cabOn && main.clientHeight > 0 && main.scrollHeight > main.clientHeight + 4) {
       const bottom = main.getBoundingClientRect().bottom;
-      for (const c of m.grid.children) { if (!c.classList.contains('fl-leaving') && c.getBoundingClientRect().top >= bottom - 8) n++; }
+      // The slips run row by row down the page, so the first one below the screen is found by halving (a few reads, not one per ticket).
+      const kids = m.grid.children;
+      let lo = 0, hi = kids.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (kids[mid].getBoundingClientRect().top >= bottom - 8) hi = mid; else lo = mid + 1; }
+      for (let i = lo; i < kids.length; i++) if (!kids[i].classList.contains('fl-leaving')) n++;
     }
     setHidden(m.below, n === 0);
     if (n) put(m.belowT, n + (n === 1 ? ' more ticket below' : ' more tickets below'));
@@ -1764,7 +1780,7 @@
       if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
     }
     setHidden(m.strip.clockBar, !clockShown);
-    measureToastTop();
+    queueToastTop();
     const soundShown = needSound && !m.dis.has('snd') && !clockShown;
     setHidden(m.strip.soundBar, !soundShown); // the clock notice goes first, so the sound bar waits behind it
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);

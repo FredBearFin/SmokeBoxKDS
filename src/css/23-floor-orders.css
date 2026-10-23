@@ -67,3 +67,6 @@
 
 /* A closed-day sale keeps a quiet, dashed Reopen button that explains itself; a tap still gives the full reason. */
 .ox-acts .ox-reopen.is-shut { border-style: dashed; color: var(--muted, inherit); white-space: normal; text-align: center; }
+
+/* Rows below the visible part of a long list are not drawn until they scroll near, which keeps a sheet with 200 orders quick to open on a slow tablet. */
+.ox-list > .ox-row { content-visibility: auto; contain-intrinsic-size: auto 150px; }
