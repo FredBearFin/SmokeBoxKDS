@@ -694,14 +694,18 @@
       "t": "ol",
       "x": [
        "In the second card, **Restore from a backup**, tap **Choose a backup file**. Pick the newest one, named smokebox-backup-(date).json. Or paste the text and tap **Check pasted backup**.",
-       "Read the summary: the saved date, the tickets and the batches should match what you expect. Nothing has changed yet.",
-       "If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN. There is no undo, so back up what is here first if you might want it.",
+       "Read the summary: the date, tickets and batches should match what you expect. Nothing has changed yet.",
+       "If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN and your station names. Back up what is here first if you might want it.",
        "Open the board and check your menu and your food. Sound and loudness are set per device, so test them again."
       ]
      },
      {
       "t": "p",
-      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. What was here is kept too, so you can undo once more."
+      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. What was here is kept too, so you can undo once more. If the browser was short on room, the copy keeps only recent tickets, or none can be kept and the restore says so."
+     },
+     {
+      "t": "p",
+      "x": "The look, text size, sound and starting cash stay on each device and are not in a backup."
      },
      {
       "t": "p",

@@ -16,6 +16,8 @@
 
   const SAVE_DELAY = 600;           // ms after the last change before a field is written (longer than the stepper's 500 ms hold-repeat gap)
   const MAX_IMPORT_CHARS = 20e6;    // same ceiling as SB.store.importAll
+  // Said with the undo copy when the browser was short on space and it keeps only recent tickets.
+  const TRIMMED_WORDS = 'This browser was short on space, so the copy keeps only your most recent tickets. Your menu, settings, PIN and food safety records are all in it.';
 
   // Builds the always-visible "Saved history" card of the Data page: a plain meter of how full the saved history is, a calm amber note with a
   // button into Close the month from 70 percent, the sentence about history already dropped, and the browser-may-delete line. Reads the store's
@@ -1363,7 +1365,7 @@
   function buildNames() {
     const wrap = h('div', { class: 'od-names' });
     wrap.appendChild(sub('Station, category and channel names'));
-    wrap.appendChild(para('Rename a station, a menu category or an order channel, or add a new one. Ids and history never change, only what people read. Changes show on every screen after you reload. Backups do not carry these names, so repeat them on a replacement device before restoring.', 'od-hint'));
+    wrap.appendChild(para('Rename a station, a menu category or an order channel, or add a new one. Ids and history never change, only what people read. Changes show on every screen after you reload. Backups carry these names, and restoring a backup puts them back.', 'od-hint'));
     const status = statusLine();
     // Reloads the page so every screen picks up the saved names.
     const reload = btn('Reload to apply', { icon: 'refresh', cls: 'btn-sm', onClick: () => g.location.reload() });
@@ -1462,6 +1464,11 @@
     if (text.length > MAX_IMPORT_CHARS) return { ok: false, reason: backupReason('too large') };
     let env;
     try { env = JSON.parse(text); } catch (e) { return { ok: false, reason: backupReason('not JSON') }; }
+    // A compact save (fmt 2) is unpacked first, the same way the restore itself reads it, so the check and the restore agree.
+    if (env && typeof env === 'object' && env.fmt !== undefined && SB.store.decodeSaved) {
+      env = SB.store.decodeSaved(env);
+      if (!env.state) return { ok: false, reason: 'It is a compact Smokebox save that cannot be read, so it cannot be restored.' };
+    }
     const v = SB.engine.validateBackup(env);
     if (!v.ok) return { ok: false, reason: backupReason(v.error) };
     const bySrc = { live: 0, demo: 0, sample: 0 };
@@ -1548,7 +1555,7 @@
 
   // Builds the restore card's working parts on the Data page (choose a file or paste text, check it, show what is inside, replace everything after a confirm and the PIN, and the way back from a restore) and returns what the page needs afterwards.
   function buildImportCard(env) {
-    const { stateNow, card2, card3, downloadBackup } = env;
+    const { stateNow, card2, card3, downloadBackup, P } = env;
     // Import: a chosen file or pasted text is checked and summarized before anything changes.
     const impResult = h('div', { class: 'od-impresult', 'aria-live': 'polite' });
     const fileIn = h('input', { type: 'file', accept: '.json,application/json,text/plain', class: 'visually-hidden', tabindex: -1, 'aria-hidden': 'true', id: U.uid('odfile') });
@@ -1567,6 +1574,7 @@
       b.dataset.action = 'undo-restore';
       undoBox.replaceChildren(
         h('p', { class: 'od-p od-undo-line' }, 'Your kitchen before this restore is kept for ' + days + ' ' + U.plural(days, 'day') + ' (until ' + U.fmtDateShort(U.dateKey(info.expiresAt)) + ' ' + U.fmtTime(info.expiresAt) + '). It was saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + '.'),
+        info.trimmed ? h('p', { class: 'od-hint' }, TRIMMED_WORDS) : null,
         h('div', { class: 'od-actions' }, b));
     }
     // After a confirm dialog and the PIN, puts the kitchen from before the restore back. Nothing changes if the PIN is not entered.
@@ -1574,7 +1582,7 @@
       const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
       if (!info) { paintUndo(); return; }
       const ok = await SB.ui.confirm({ title: 'Undo this restore?', tone: 'danger', confirmLabel: 'Put my old kitchen back', cancelLabel: 'Keep what I have',
-        body: ['This puts back the kitchen you had before the restore (saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + ') and replaces what is here now. What is here now is kept for the same time, so this can be undone once too.'] });
+        body: ['This puts back the kitchen you had before the restore (saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + ') and replaces what is here now. What is here now is kept for the same time, so this can be undone once too.'].concat(info.trimmed ? [TRIMMED_WORDS] : []) });
       if (!ok) return;
       if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
       const rep = SB.store.undoRestore();
@@ -1591,6 +1599,8 @@
     card2.body.append(
       para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
       h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
+    // A month close, or the copy's 7 days running out, while this page is open shows here on the next refresh.
+    P.syncs.push(() => paintUndo());
     card3.body.append(
       h('ol', { class: 'od-steps' },
         h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
@@ -1628,7 +1638,7 @@
         h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'This ' + source + ' is a valid Smokebox backup.')),
         h('dl', { class: 'od-stats od-stats-tight' }, rows.map(([k, v]) => h('div', { class: 'od-stat' }, h('dt', null, k), h('dd', { class: 'od-stat-v' }, v)))),
         repairs ? h('p', { class: 'od-hint' }, 'Smokebox repaired ' + repairs + ' small ' + U.plural(repairs, 'problem') + ' while reading it: ' + res.repaired.slice(0, 3).join('; ') + (repairs > 3 ? '; and ' + (repairs - 3) + ' more.' : '.')) : null,
-        h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This replaces everything on this device: ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', your menu edits and your settings. Back up first if you might want what is here.')),
+        h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This replaces everything on this device: ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', your menu edits, your settings, and your station, category and channel names and hidden stations. Back up first if you might want what is here.')),
         h('div', { class: 'od-actions' },
           btn('Back up what is here first', { icon: 'download', cls: 'btn-sm', onClick: downloadBackup }),
           // The replace button asks again in a dialog before anything is written.
@@ -1642,8 +1652,8 @@
       const p = pending, live = stateNow();
       const ok = await SB.ui.confirm({
         title: 'Replace everything on this device?', tone: 'danger', confirmLabel: 'Replace everything', cancelLabel: 'Keep what I have',
-        body: ['This replaces ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', every setting, your menu edits and the PIN with the backup\'s ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.',
-          'There is no undo. If you might want what is here now, cancel and download a backup first.'],
+        body: ['This replaces ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', every setting, your menu edits, the PIN, and your station, category and channel names and hidden stations with the backup\'s ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.',
+          'Smokebox keeps a copy of what is here now for 7 days so this can be undone, but only if this browser has room for it. To be safe, cancel and download a backup first.'],
       });
       if (!ok) return;
       // With a PIN set, restoring a backup asks for it again, even inside the back office grace period.
@@ -1651,7 +1661,11 @@
       const rep = SB.store.importAll(p.text);
       if (rep === 'ok') {
         clearImport(); pasteArea.value = ''; fileIn.value = '';
-        impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.'))));
+        const kept = ((SB.store.lastResult() || {}).info || {}).beforeRestore === true;
+        const hadData = live.tickets.length + live.batches.length > 0;
+        impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.')),
+          // WATCH OUT: when the browser had no room for the copy there is no undo, and the owner must hear that now.
+          !kept && hadData ? h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This browser had no room to keep a copy of the kitchen that was here, so this restore cannot be undone. A backup file you downloaded earlier is the only way back.')) : null));
         SB.ui.toast('Backup restored.', { tone: 'ok' });
         paintUndo();
       } else {
@@ -1747,7 +1761,7 @@
     card1.body.append(
       lastLine,
       para('A backup is one file with your dishes, orders, settings and records. Back up at the end of every day, and keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
-      para('The starting cash you type on Close the day is remembered on this device only. It is not in a backup.', 'od-hint'),
+      para('Some choices are kept on this device only and are not in a backup: the starting cash you type on Close the day, the look (day or night), text size, and sound and screen-on. Set them again on a new device.', 'od-hint'),
       h('div', { class: 'od-actions' }, dlBtn, cpBtn), exStatus.el, fb);
     // The spreadsheet files and the pilot report are less common, so they sit in a closed group below the flow.
     pn.body.appendChild(h('details', { class: 'od-paste-det od-more' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Spreadsheet files and the pilot report')),
@@ -1891,7 +1905,7 @@
     }
     buildExportCard({ stateNow, exStatus, reportSave, downloadCsv, downloadBackup, copyBackup, card1, fb, pn, P });
 
-    const { check } = buildImportCard({ stateNow, card2, card3, downloadBackup });
+    const { check } = buildImportCard({ stateNow, card2, card3, downloadBackup, P });
 
     const { resetStatus } = buildDangerZone({ pn, stateNow });
 
