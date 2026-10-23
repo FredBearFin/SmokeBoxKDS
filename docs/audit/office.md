@@ -280,3 +280,27 @@ Checked in the real app (headless browser, own blank kitchen and `?demo`) and in
 
 **Not checked:** a real pilot on a real tablet; the Print button on paper; the 390-wide look of the longer text.
 **Request to A5 (optional):** a setup-started timestamp in settings (or an event `setup_started`) would make time to first ticket honest.
+
+## Round 18: office regression and accounting check (night/a3-c5, based on main abf003e)
+
+- **Reconciliation against the current engine:** `test/reconcile.test.mjs` passes (11 tests) under `TZ=America/New_York`, `TZ=America/Chicago` and `TZ=UTC`, covering cents rounding, the clock-change weeks, Close the day against the ledger, and the sample history.
+- **New `test/accounting.test.mjs` (the CSV for an accountant):** a blank counter-service kitchen with the euro sign set, a dish name with a comma and quotes, three paid orders, one voided order and one re-opened and paid again. Opened with a real CSV reader: every row has ten cells, every amount is plain digits (no currency sign anywhere in the file), the Total row equals the sum of the day rows in every column, only three orders are counted (the voided one is out, the re-opened one counts once), collected = sales + tax + tips and cash + card + other = collected. Counter-service tickets (finished by payment) give no kitchen time (median null) but still count as created. The CSV header carries no currency name; the amounts are in the owner's currency.
+- **Cash in the drawer (bugs found and fixed in `87-office-closeday.js`):**
+  - It was **not forgotten by Start over**: the device-local key survived, so a new kitchen's first Close the day offered the old kitchen's starting cash. The value is now saved with the time it was saved and ignored unless this kitchen has an order from before that time; Start over empties the orders, so the old value is dropped (checked in the browser: first close 150, reopened 150, after Start over empty).
+  - Closing with the box emptied now clears the remembered value (before, the old one stayed).
+  - **Demo isolation:** the key is kept apart in the demo (`smokebox.demo.office.startCash`), checked in the browser.
+  - **Backups:** the value is device-only and not in a backup; the Data page now says so in one line under the backup text. Restoring a backup leaves the device value as it was.
+  - The box does not appear when no order has been paid today (nothing to count); this is by design.
+  - **Request to A5:** also remove `smokebox.v1.office.startCash` in Start over (`START_OVER_KEYS` in `30-store.js`), so the cleanup does not depend on my age check.
+- **Accessibility pass:**
+  - Safety record table: added a hidden caption and `scope="col"` on the column heads (both missing). The "at Pass" and made-date lines are plain text lines.
+  - Pilot report: the report text is now a focusable region with a name and `aria-live="polite"`; the three inputs have names ("Report window", "Cuts the observer counted", "Batches the observer counted"); Show, Download and Print are real buttons.
+  - Cash line: the box sits inside its label, and the sentence is `aria-live="polite"` and linked with `aria-describedby`.
+  - Best day chart: it is the same bar chart as "How guests paid" (name sentence on the figure, "View as table" button with `aria-pressed`, table), so it inherits the checks on the other bar cards. I did not re-open its table view in a browser this round.
+- **Follower and screen names:** see the follower run below.
+
+**Settings page layout (from A2's sweep, fixed here):** the 24-odd number and time steppers were 34 px wide (a three-digit value was clipped); they now have a minimum width of 4.8 characters (43 px). The section chips are 44 px tall in the list too (they were 40 in the wide layout). On narrow screens the contents strip scrolls sideways by design; it now has a soft right edge so a cut-off chip is no longer the only hint. The page itself does not scroll sideways (document width equals the window at 390, 768 and 1024); `of-slot`, `od` and `od-layout` are 16 px wider inside because of the strip's side margins, which is its own scroller. The page header's "There is no Undo for settings" is true of the settings fields; the setup sheets have their own Undo.
+
+**Follower run:** `office-follower.e2e` passes on a scratch merge of `kds/connected` into this branch (not committed; deleted afterwards). The connected wording now says "the hub computer" everywhere (on night/a3-c3, 4eb036d).
+**Bugs found this round:** drawer cash survived Start over (fixed); CSV and reconciliation had none; the safety record table lacked a caption and column scopes (fixed); the pilot report text was not a named, announced region (fixed); settings steppers too narrow (fixed).
+**Not checked:** the Best day table view in a browser this round, a real CSV opened in Excel or Sheets, real devices.

@@ -1516,7 +1516,7 @@
     const cutsIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Cuts the observer counted', style: 'width:7em' });
     const batchesIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Batches the observer counted', style: 'width:7em' });
     const whenSel = h('select', { class: 'input', 'aria-label': 'Report window' }, h('option', { value: 'open' }, 'Since opening'), h('option', { value: '4' }, 'Last 4 hours'), h('option', { value: '24' }, 'Last 24 hours'));
-    const repBox = h('pre', { class: 'od-report', hidden: true, style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
+    const repBox = h('pre', { class: 'od-report', hidden: true, role: 'region', 'aria-label': 'Pilot report', tabindex: '0', 'aria-live': 'polite', style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
     // Builds the report for the chosen window and shows it; with download true it also saves the CSV.
     async function makeReport(download) {
       const s = stateNow(), now = SB.store.now();
@@ -1585,6 +1585,7 @@
     card1.body.append(
       lastLine,
       para('A backup is one file with your dishes, orders, settings and records. Back up at the end of every day, and keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
+      para('The starting cash you type on Close the day is remembered on this device only. It is not in a backup.', 'od-hint'),
       h('div', { class: 'od-actions' }, dlBtn, cpBtn), exStatus.el, fb);
     // The spreadsheet files and the pilot report are less common, so they sit in a closed group below the flow.
     pn.body.appendChild(h('details', { class: 'od-paste-det od-more' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Spreadsheet files and the pilot report')),

@@ -197,9 +197,20 @@
   // classified as kitchen data in 00-util.js (an unclassified key is kept apart in the demo, which is the safe side).
   const START_KEY = 'smokebox.v1.' + 'office.startCash';
   // The starting cash remembered from the last close, as text ('' when none).
-  function rememberedStart() { try { const v = U.storage.get(START_KEY, ''); return typeof v === 'string' ? v : ''; } catch (e) { return ''; } }
+  // The starting cash remembered from the last close, as text, or '' when none or when it belongs to an older kitchen: it is
+  // saved with the time it was saved, and ignored unless this kitchen has an order from before that time (Start over
+  // empties the orders, so every later order is newer and the old value is dropped).
+  function rememberedStart() {
+    try {
+      const v = U.storage.get(START_KEY, null);
+      if (!v || typeof v !== 'object' || typeof v.t !== 'string' || !isNum(v.at)) return '';
+      const s = stateNow();
+      const orders = s && Array.isArray(s.orders) ? s.orders : [];
+      return orders.some((o) => o && isNum(o.createdAt) && o.createdAt <= v.at) ? v.t : '';
+    } catch (e) { return ''; }
+  }
   // Remembers the starting cash text for tomorrow when it is a valid amount.
-  function rememberStart(text) { try { if (isNum(U.parseDollars(text))) U.storage.set(START_KEY, String(text).trim()); } catch (e) { /* the helper still works without it */ } }
+  function rememberStart(text) { try { if (!String(text == null ? '' : text).trim()) U.storage.remove(START_KEY); else if (isNum(U.parseDollars(text))) U.storage.set(START_KEY, { t: String(text).trim(), at: SB.store.now() }); } catch (e) { /* the helper still works without it */ } }
 
   // The cash-in-the-drawer block: an optional starting cash box and the line that adds it to today's cash payments.
   function drawerBlock(m, drawer) {
