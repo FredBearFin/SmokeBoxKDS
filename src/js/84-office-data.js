@@ -16,6 +16,50 @@
 
   const SAVE_DELAY = 600;           // ms after the last change before a field is written (longer than the stepper's 500 ms hold-repeat gap)
   const MAX_IMPORT_CHARS = 20e6;    // same ceiling as SB.store.importAll
+
+  // Builds the "Close the month" card for the Data page: one plain paragraph on what it does, the numbers from the store's own preview,
+  // and a Start button that opens the guarded confirm flow (SB.setup.openCloseMonth). Nothing here changes any data.
+  function closeMonthCard(flowCard) {
+    const card = flowCard('4', 'Close the month', null, null);
+    const keep = (SB.engine && SB.engine.MONTH_KEEP_DAYS) || 35;
+    const sum = U.h('p', { class: 'od-p od-cm-sum', role: 'status' }), notes = U.h('p', { class: 'od-hint od-cm-keep' });
+    const start = U.h('button', { type: 'button', class: 'btn btn-sm', 'data-action': 'close-month' }, 'Close the month...');
+    const hint = U.h('p', { class: 'od-hint od-cm-hint', hidden: true });
+    // The day the preview counts back from: the first of this month (the same default as the guarded flow); the store still keeps the last days.
+    const opts = () => ({ before: U.serviceDate(SB.store.now(), (SB.store.getState().settings.service || {}).dayStartHour).slice(0, 8) + '01' });
+    // Asks the store what Close the month would clear now and writes it in plain words (nothing changes).
+    function paint() {
+      try { paintNow(); } catch (e) { start.disabled = true; sum.textContent = 'The preview is not available right now. Nothing was changed.'; notes.textContent = ''; }
+    }
+    // Does the work of paint; paint wraps it so this card can never stop the rest of the Data page from drawing.
+    function paintNow() {
+      const r = SB.store.closeMonthPreview(opts());
+      start.disabled = false; hint.hidden = true;
+      if (!r.ok || !r.preview || !r.preview.days || !r.preview.days.length || !r.preview.from) {
+        start.disabled = true;
+        sum.textContent = r.report === 'nothingToDo' || r.ok ? 'Nothing is old enough to clear yet: the last ' + keep + ' days, today and any open order always stay on this tablet.' : 'The preview is not available right now. Nothing was changed.';
+        notes.textContent = ''; return;
+      }
+      const p = r.preview;
+      // A count with its unit word, such as "3 days" or "1 order".
+      const n = (k, one, many) => U.fmtNum(k) + ' ' + U.plural(k, one, many || one + 's');
+      sum.textContent = 'Ready to save and clear ' + n(p.days.length, 'day') + ' (' + U.fmtDateShort(p.from) + ' to ' + U.fmtDateShort(U.addDays(p.before, -1)) + '): ' + n(p.tickets, 'ticket') + ', ' + n(p.orders, 'order') + ' and ' + n(p.events, 'activity record') + '. Those orders took in ' + U.fmtMoney(p.paidTotal) + '.';
+      notes.textContent = 'Stays on this tablet: ' + n(p.safetyEventsKept, 'safety record') + ', ' + n(p.dayRecordsKept, 'end-of-day total') + (p.openOrdersKept ? ', ' + n(p.openOrdersKept, 'open order') : '') + (p.uncoveredDays && p.uncoveredDays.length ? '. ' + n(p.uncoveredDays.length, 'older day') + ' never closed, so ' + (p.uncoveredDays.length === 1 ? 'it stays' : 'they stay') + '.' : '.');
+    }
+    start.addEventListener('click', async () => {
+      if (!SB.setup || typeof SB.setup.openCloseMonth !== 'function') { hint.textContent = 'The step-by-step Close the month is not available in this build. Nothing was changed.'; hint.hidden = false; return; }
+      try { await SB.setup.openCloseMonth(opts()); } catch (e) { hint.textContent = 'Close the month could not be started. Nothing was changed.'; hint.hidden = false; }
+      paint();
+    });
+    card.body.append(
+      U.h('p', { class: 'od-p' }, 'Close the month saves a complete backup and spreadsheet files of your old, closed days, then clears those days\' tickets, orders and plain activity from this tablet so it stays quick. End-of-day totals, the safety record and open orders stay. Nothing is cleared until you confirm the files are saved, and the whole kitchen can be put back from the backup.'),
+      sum, notes, U.h('div', { class: 'od-actions' }, start), hint);
+    paint();
+    // Keeps the preview in step with the store, redrawing only when the orders, the cleared-days mark or the day changed (the plan is not cheap).
+    let seen = '';
+    function sync(st) { const k = st.orders.length + '|' + (st.archivedBefore || '') + '|' + U.serviceDate(SB.store.now(), (st.settings.service || {}).dayStartHour); if (k !== seen) { seen = k; paint(); } }
+    return { el: card.el, sync };
+  }
   const VERSION = 'Smokebox KDS ' + (C && C.version ? 'v' + C.version : '');
 
   // Small helpers
@@ -1456,6 +1500,9 @@
     const card2 = flowCard('2', 'Restore from a backup', 'backup-and-restore', 'restoring a backup');
     const card3 = flowCard('3', 'Replacing this device', 'replacing-a-device', 'replacing a device');
     flow.append(card1.el, card2.el, card3.el);
+    // Close the month: not in the demo and not on a tablet that works through a hub (the store refuses it there too).
+    const hubTablet = (() => { try { return !!(SB.store.hubKitchen && SB.store.hubKitchen()); } catch (e) { return false; } })();
+    if (!(SB.store.isDemo && SB.store.isDemo()) && !hubTablet && SB.store.closeMonthPreview) { const cm = closeMonthCard(flowCard); flow.append(cm.el); P.syncs.push(cm.sync); }
     pn.body.prepend(flow);
     const exStatus = statusLine();
     const fbLabelId = U.uid('odfb');
@@ -1522,7 +1569,7 @@
       const s = stateNow(), now = SB.store.now();
       const from = whenSel.value === 'open' ? SB.pilot.defaultFrom(s, now) : now - Number(whenSel.value) * 3600e3;
       const rep = SB.pilot.build(s, { from, to: now, now, alerts: SB.floor && SB.floor.alertLog ? SB.floor.alertLog() : [], cutsCounted: cutsIn.value === '' ? null : Number(cutsIn.value), demoClock: SB.store.speed() > 1, demo: SB.store.isDemo && SB.store.isDemo(), batchesCounted: batchesIn.value === '' ? null : Number(batchesIn.value) });
-      repBox.textContent = SB.pilot.toText(rep); repBox.hidden = false;
+      repBox.textContent = SB.pilot.toText(rep) + (SB.office && SB.office.archivedWords ? (function (w) { return w ? '\n\n' + w : ''; })(SB.office.archivedWords(s.archivedBefore, from, ((s.settings || {}).service || {}).dayStartHour)) : ''); repBox.hidden = false;
       if (!download) { exStatus.ok('Report made for ' + rep.window.hours + ' hours.'); return; }
       const fname = (rep.demo ? 'smokebox-demo-pilot-report-' : 'smokebox-pilot-report-') + todayKey() + '.csv';
       const csv = SB.pilot.toCsv(rep);
