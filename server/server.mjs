@@ -106,7 +106,9 @@ export async function createHub(opts = {}) {
   const requireTokens = opts.requireTokens !== undefined ? !!opts.requireTokens : (process.env.SMOKEBOX_REQUIRE_TOKENS === '1' || process.env.SMOKEBOX_REQUIRE_TOKEN === '1');
   const minClient = opts.minClient !== undefined ? opts.minClient : (Number(process.env.SMOKEBOX_MIN_CLIENT) || DEFAULT_MIN_CLIENT);
   const screensFile = opts.screensFile !== undefined ? opts.screensFile : (dataFile ? dataFile + '.screens' : null);
-  const screens = createScreens({ file: screensFile, now, pairMs: opts.pairMs });
+  // Removing a screen cuts its open streams at once (cutScreen is defined below).
+  const cutOnRevoke = (id) => cutScreen(id);
+  const screens = createScreens({ file: screensFile, now, pairMs: opts.pairMs, onRevoke: cutOnRevoke });
   // The owner's key for the hub's admin calls (pair, list, remove). Kept in a file next to the data (owner-only) or given; never sent to a screen.
   const adminFile = dataFile ? dataFile + '.admin' : null;
   const adminKey = opts.adminKey || process.env.SMOKEBOX_ADMIN_KEY || (() => {
@@ -540,7 +542,6 @@ export async function createHub(opts = {}) {
       }
       const s = body && typeof body.id === 'string' ? screens.revoke(body.id) : null;
       if (!s) return refuse(res, 404, 'unpaired', { info: { error: 'no such screen' } });
-      cutScreen(s.id);
       sendJson(res, 200, { ok: true, screen: screens.pub(s) });
     }, 4096);
   }

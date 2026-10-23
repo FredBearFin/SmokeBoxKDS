@@ -103,7 +103,7 @@ export function createScreens(opts = {}) {
   // Every screen, for the owner: no hashes.
   S.list = () => screens.map(S.pub);
   // Removes a screen: its token stops working at once. Returns the screen or null.
-  S.revoke = (id) => { const s = screens.find((x) => x.id === id); if (!s) return null; if (!s.revokedAt) { s.revokedAt = now(); save(); } return s; };
+  S.revoke = (id) => { const s = screens.find((x) => x.id === id); if (!s) return null; if (!s.revokedAt) { s.revokedAt = now(); save(); } if (typeof opts.onRevoke === 'function') { try { opts.onRevoke(id); } catch (e) { /* the screen is removed all the same */ } } return s; };
   // How many screens are paired and not removed.
   S.activeCount = () => screens.filter((s) => !s.revokedAt).length;
   return S;
