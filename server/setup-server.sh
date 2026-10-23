@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Sets up the Smokebox prototype hub on a fresh Ubuntu 22.04 or 24.04 server, with automatic HTTPS and a password.
+# Usage (as root): bash setup-server.sh <time zone> <login name> <password> [domain]
+# If smokebox-server.tar.gz is not in the current folder, it is downloaded from the public GitHub repo (branch deploy).
+# Example: bash setup-server.sh America/New_York freddy 'a-long-password' smokebox.example.com
+# With no domain it uses <your-server-ip>.sslip.io, a free name that points at your IP, so HTTPS works at once.
+set -euo pipefail
+TZNAME="${1:?time zone, for example America/New_York}"
+LOGIN="${2:?login name}"
+PASS="${3:?password}"
+DOMAIN="${4:-}"
+[ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo bash ...)"; exit 1; }
+if [ ! -f smokebox-server.tar.gz ]; then
+  curl -fsSL https://github.com/FredBearFin/SmokeBoxKDS/archive/refs/heads/deploy.tar.gz -o smokebox-server.tar.gz
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y curl ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https ufw
+
+# Node 22
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt-get install -y nodejs
+
+# Caddy (web server that gets and renews HTTPS certificates by itself)
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
+apt-get update -y
+apt-get install -y caddy
+
+# The app
+id smokebox >/dev/null 2>&1 || useradd --system --home /opt/smokebox --shell /usr/sbin/nologin smokebox
+rm -rf /opt/smokebox.new && mkdir -p /opt/smokebox.new
+tar -xzf smokebox-server.tar.gz -C /opt/smokebox.new --strip-components=1
+rm -rf /opt/smokebox && mv /opt/smokebox.new /opt/smokebox
+mkdir -p /var/lib/smokebox
+chown -R smokebox:smokebox /var/lib/smokebox
+chown -R root:root /opt/smokebox
+
+cat > /etc/systemd/system/smokebox.service <<UNIT
+[Unit]
+Description=Smokebox prototype hub
+After=network.target
+
+[Service]
+User=smokebox
+Environment=PORT=8787
+Environment=HOST=127.0.0.1
+Environment=SMOKEBOX_TZ=${TZNAME}
+Environment=SMOKEBOX_DATA=/var/lib/smokebox/state.json
+WorkingDirectory=/opt/smokebox
+ExecStart=/usr/bin/node /opt/smokebox/server/server.mjs
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/smokebox
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now smokebox
+systemctl restart smokebox
+
+# Name for HTTPS: your own domain, or <ip>.sslip.io
+if [ -z "$DOMAIN" ]; then
+  IP="$(curl -4 -fsS https://api.ipify.org)"
+  DOMAIN="${IP//./-}.sslip.io"
+fi
+HASH="$(caddy hash-password --plaintext "$PASS")"
+cat > /etc/caddy/Caddyfile <<CADDY
+${DOMAIN} {
+	encode gzip
+	basic_auth {
+		${LOGIN} ${HASH}
+	}
+	reverse_proxy 127.0.0.1:8787 {
+		flush_interval -1
+	}
+}
+CADDY
+systemctl restart caddy
+
+ufw allow OpenSSH >/dev/null
+ufw allow 80/tcp >/dev/null
+ufw allow 443/tcp >/dev/null
+ufw --force enable >/dev/null
+
+sleep 3
+echo
+echo "Done. Open https://${DOMAIN}/ and sign in as ${LOGIN}."
+echo "If your own domain was given, point its A record at this server's IP first."
+echo "Check:   systemctl status smokebox caddy"
+echo "Logs:    journalctl -u smokebox -f"
+echo "Data:    /var/lib/smokebox/state.json (back this file up)"
