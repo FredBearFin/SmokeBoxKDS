@@ -14483,13 +14483,13 @@ a.of-nav:active { background: var(--press); }
   const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   // Short date label such as "Fri 10/16".
   const dateShort = (ts) => { const d = new Date(ts); return WD[d.getDay()] + ' ' + (d.getMonth() + 1) + '/' + d.getDate(); };
-  // With three or more plain lines the colors alone are not enough for a colour-blind reader, so the third and fourth
-  // line get a dotted and a dashed pattern. Bands, areas, stacked charts and charts with fewer lines stay solid.
+  // With two or more plain lines the colors alone are not enough for a colour-blind reader or a black-and-white print, so
+  // the second, third and fourth line get a dashed, dotted and dash-dot pattern. Bands, areas, stacked charts and charts with fewer lines stay solid.
   function autoDash(spec, s, i) {
     const list = Array.isArray(spec.series) ? spec.series : [];
     const plain = list.filter((x) => x && x.kind !== 'band' && !x.area).length;
-    if (spec.stacked || s.area || s.kind === 'band' || plain < 3) return null;
-    return [null, null, '2 4', '9 4'][i % 4];
+    if (spec.stacked || s.area || s.kind === 'band' || plain < 2) return null;
+    return [null, '9 4', '2 4', '9 4 2 4'][i % 4];
   }
   // Gram axis label: "850 g" below a thousand, "1.5 kg" from there.
   const fmtGAxis = (v) => (!isNum(v) ? '-' : U.units && U.units.weight === 'lb' && U.weightText ? U.weightText(v) : Math.abs(v) >= 1000 ? trim0((v / 1000).toFixed(1)) + ' kg' : Math.round(v) + ' g');
@@ -16162,7 +16162,7 @@ a.of-nav:active { background: var(--press); }
       }
       d += 'V' + r1(bot);
       go.appendChild(S('path', { d: d + 'Z', style: 'fill:' + o.s.css + ';fill-opacity:.1;stroke:none' }));
-      go.appendChild(S('path', { d: d.replace(/Z$/, ''), class: 'ch-ln', style: 'stroke:' + o.s.css + ';stroke-linejoin:miter', 'stroke-dasharray': visOv.length >= 3 ? [null, null, '2 4', '9 4'][oi % 4] : null }));
+      go.appendChild(S('path', { d: d.replace(/Z$/, ''), class: 'ch-ln', style: 'stroke:' + o.s.css + ';stroke-linejoin:miter', 'stroke-dasharray': visOv.length >= 2 ? [null, '9 4', '2 4', '9 4 2 4'][oi % 4] : null }));
     });
     svg.appendChild(go);
     drawRefLines(svg, chart, (spec.refLines || []).map((q) => (q.value == null && q.x != null ? Object.assign({}, q, { value: q.x }) : q)), { orient: 'v', scale: X, l, r, t: top, b: bot });
@@ -19770,7 +19770,8 @@ a.of-nav:active { background: var(--press); }
     const ch = C.channelById[t.channel] || { name: String(t.channel), icon: 'plate' };
     const count = h('span', { class: 'fl-count' });
     const meta = h('div', { class: 'slip-meta' }, h('span', { class: 'fl-chan' }, ico(ch.icon, 18), h('span', null, ch.name)), count,
-      t.src === 'demo' ? h('span', { class: 'fl-demo-tag', title: 'Demo ticket: made by the demo, not a real order' }, 'Demo', h('span', { class: 'dt-more' }, ' ticket')) : null);
+      // Inside the demo every ticket is a demo ticket and the demo bar already says so, so the tag only shows beside real tickets.
+      t.src === 'demo' && !(store().isDemo && store().isDemo()) ? h('span', { class: 'fl-demo-tag', title: 'Demo ticket: made by the demo, not a real order' }, 'Demo', h('span', { class: 'dt-more' }, ' ticket')) : null);
     const timer = h('span', { class: 'slip-timer num', dataset: { level: 'ok' } }, '00:00');
     const badge = buildBadge();
     const progI = h('i');
@@ -20256,8 +20257,9 @@ a.of-nav:active { background: var(--press); }
       if (r.el.dataset.step !== stp) r.el.dataset.step = stp;
       if (r.el.dataset.snoozed !== sn) r.el.dataset.snoozed = sn;
       setTxt(r.when, d.kind === 'expired' ? 'OUT' : d.kind === 'past' ? 'PAST' : countdownText(d.msLeft));
-      setTxt(r.what, d.label);
-      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action + (i === top.length - 1 && moreRows > 0 ? ' (' + moreRows + ' more warning' + (moreRows > 1 ? 's' : '') + ' after this one.)' : ''));
+      // How many more warnings wait behind this one goes on the short name line, where a long explanation cannot cut it off.
+      setTxt(r.what, d.label + (i === top.length - 1 && moreRows > 0 ? '   +' + moreRows + ' more' : ''));
+      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action);
     });
   }
 
@@ -23459,7 +23461,7 @@ a.of-nav:active { background: var(--press); }
       text(rec.num, '#' + t.num); text(rec.who, t.customer || 'No name');
       const ch = channelOf(t.channel);
       if (rec.chKey !== t.channel) { rec.chKey = t.channel; U.clear(rec.ch); rec.ch.append(ico(ch.icon, 16), h('span', null, ch.name)); }
-      setHidden(rec.demo, t.src !== 'demo');
+      setHidden(rec.demo, t.src !== 'demo' || !!(SB.store.isDemo && SB.store.isDemo()));
       text(rec.items, itemsSummary(t));
       const tm = levelOf(t, now);
       if (voided) {
@@ -24361,7 +24363,7 @@ a.of-nav:active { background: var(--press); }
       const ch = channelOf(o.channel);
       if (rec.chKey !== o.channel) { rec.chKey = o.channel; U.clear(rec.ch); rec.ch.append(ico(ch.icon, 16), h('span', null, ch.name)); }
       setHidden(rec.round, tot.rounds < 2); text(rec.round, tot.rounds + ' rounds');
-      setHidden(rec.demo, o.src !== 'demo');
+      setHidden(rec.demo, o.src !== 'demo' || !!(SB.store.isDemo && SB.store.isDemo()));
       text(rec.items, lines.length ? itemsLine(lines) : 'Nothing on this order any more.');
       const live = state.tickets.filter((t) => t.orderId === o.id && t.status !== 'voided');
       const out = live.filter((t) => t.status === 'expedited').length;
@@ -26088,7 +26090,7 @@ a.of-nav:active { background: var(--press); }
       "t": "ol",
       "x": [
        "A new Smokebox starts empty on purpose. Tap **Add your first dish** on the welcome screen.",
-       "Type what the dish is called and its price. Tap where it is made: Pit, Hot sides, Fry or Cold and drinks.",
+       "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made: Pit, Hot sides, Fry or Cold and drinks.",
        "Tap **Save and add another** until your menu is in. Then tap **Save and finish**."
       ]
      },
@@ -26098,15 +26100,11 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "The arrow buttons beside each dish change the order they appear in."
+      "x": "The arrow buttons beside each dish change the order they appear in. The category list on a dish's row moves it to another category."
      },
      {
       "t": "p",
-      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**."
-     },
-     {
-      "t": "p",
-      "x": "For a one-minute walkthrough, tap **Show me how it works**."
+      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything. New categories in the file? Tap **Add these categories**."
      },
      {
       "t": "h",
@@ -26114,15 +26112,11 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN** at the bottom. Enter your sales tax (0 if you charge none) and your opening hours. A PIN is optional. It keeps your cooks out of the back office."
+      "x": "Tap **Menu**, then **Tax, hours and PIN**. Enter your sales tax (0 if you charge none) and your opening hours. A PIN is optional. It keeps your cooks out of the back office."
      },
      {
       "t": "p",
       "x": "Cook food ahead and keep it hot or cold? Say so in **Dishes and prices** (see Cooked-ahead food and portions)."
-     },
-     {
-      "t": "p",
-      "x": "Temperatures show in °F and weights in kilograms. Change them in the **Back office**, under **Menu and settings**."
      },
      {
       "t": "h",
@@ -26434,7 +26428,8 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.",
        "If your health department asks, save or print the thrown-out log. Open it from the **Menu** button on the board.",
-       "Keep a copy of the backup off this device (see Backup and restore)."
+       "Keep a copy of the backup off this device (see Backup and restore).",
+       "For your accountant: in **Menu and settings**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other."
       ]
      }
     ]
@@ -26513,6 +26508,10 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "p",
       "x": "A file that is not a valid backup is refused, and nothing is changed. A backup from the demo is refused too."
+     },
+     {
+      "t": "p",
+      "x": "Spreadsheet files, like the sales file, are for reading. You cannot restore from them."
      },
      {
       "t": "h",
@@ -32112,6 +32111,8 @@ a.of-nav:active { background: var(--press); }
       const text = BPs.salesCsv(s, s.settings.service && s.settings.service.dayStartHour);
       const fname = 'smokebox-sales-by-day' + (SB.store.mode && SB.store.mode() === 'demo' ? '-demo' : '') + '-' + todayKey() + '.csv';
       const days = Math.max(0, text.split('\r\n').length - 3);
+      // With no paid orders there is nothing to hand over: say so instead of saving a file that only has column names.
+      if (!days) { exStatus.bad('No order has been paid yet, so there is no sales file to save. Pay an order first.'); return; }
       const res = await saveFile(fname, text, 'text/csv');
       if (res.how === 'host' || res.how === 'browser') exStatus.ok((res.how === 'host' ? 'Saved ' : 'Download started: ') + fname + (days ? ' (' + days + ' ' + U.plural(days, 'day') + ' of sales).' : ': it has only the column names because no order has been paid yet.'));
       else reportSave(res, fname, text, 'sales file');
