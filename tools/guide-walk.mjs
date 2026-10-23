@@ -508,6 +508,15 @@ async function pairing(browser) {
     check('pairing: the owner command makes a code that works once for 10 minutes', !!code && /works once/.test(out) && /10 minutes/.test(out), out);
     await p.fill('#hu-pair', code); await tap(p, 'Pair this tablet'); await p.waitForTimeout(2000);
     check('pairing: after pairing the choice appears', await has(p, 'Join this kitchen', js));
+    await p.evaluate(() => document.querySelector('input[name="hu-choice"][value="adopt"]').click()); await p.waitForTimeout(300);
+    await tap(p, 'Join this kitchen'); await p.waitForTimeout(2000);
+    const lst = execFileSync('node', [path.join(ROOT, 'server', 'server.mjs'), 'admin', 'list', '--port', PORT, '--data', data], { encoding: 'utf8' });
+    const sid = (/^([a-z0-9]+)\s+Pass/m.exec(lst) || [])[1] || '';
+    check('pairing: the owner list shows the paired screen', !!sid, lst);
+    execFileSync('node', [path.join(ROOT, 'server', 'server.mjs'), 'admin', 'revoke', sid, '--port', PORT, '--data', data], { encoding: 'utf8' });
+    await p.waitForTimeout(4000);
+    check('pairing: a removed tablet says so', await p.evaluate(() => /This tablet has been removed from the kitchen/.test(document.body.innerText)));
+    check('pairing: Leave and pair again', await has(p, 'Leave and pair again', js));
     await p.close();
   } finally { try { hub.kill(); } catch (e) { /* already stopped */ } }
 }
