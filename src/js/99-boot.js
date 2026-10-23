@@ -100,12 +100,18 @@
       // A small hook so tests and developers can read the state from the console.
       if (SB.store && typeof SB.store.getState === 'function') SB.dev = { state: () => SB.store.getState() };
       SB.booted = true;
+      startOffline();
       storageNotices();
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });
     } catch (e) { showBootError(e, stage); }
   }
 
+  // Asks the offline module to register its service worker (over https or localhost only; it does nothing on file:// or without
+  // support), so the app can open when the server or the internet is down. A failure here never stops the board.
+  function startOffline() {
+    try { if (SB.offline && typeof SB.offline.register === 'function') SB.offline.register(); } catch (e) { /* offline loading is optional */ }
+  }
   // Starts a follower screen: connects to the hub, then shows the board. A hub that is only unreachable still opens the board
   // (it keeps trying); a wrong code, a wrong address or a hub of another version shows a plain message instead.
   function bootFollower(kind) {
@@ -116,6 +122,7 @@
       try {
         SB.shell.mount(doc.getElementById('app') || doc.body);
         SB.booted = true;
+        startOffline();
       } catch (e) { showBootError(e, 'shell'); }
     };
     // Shows a plain message when the hub refuses this screen, with a way back to the device's own kitchen.

@@ -1,5 +1,5 @@
 /*
- * WHAT THIS FILE IS: Browser check for "Get this tablet ready": opens from the Settings sheet, shows five checks,
+ * WHAT THIS FILE IS: Browser check for "Get this tablet ready": opens from the Settings sheet, shows six checks,
  * the sound test asks "Did you hear it?", and answering Yes ticks sound and volume.
  * USES: tools/pw.mjs, dist/smokebox.html. RUN: node test/tablet-ready.e2e.mjs
  */
@@ -10,7 +10,7 @@ function ok(c, m) { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; }
 await withPage({ w: 1024, h: 768 }, async (page, logs) => {
   await page.evaluate(() => window.SB.sheets.open('ready'));
   await page.waitForSelector('[data-check="awake"]');
-  ok((await page.locator('.rd-card').count()) === 5, 'five check cards');
+  ok((await page.locator('.rd-card').count()) === 6, 'six check cards');
   ok(await page.locator('[data-check="sound"][data-ok="unknown"]').count() === 1, 'sound starts unchecked');
   await page.click('[data-act="sound-test"]');
   ok(await page.locator('[data-act="sound-yes"]').count() === 1, 'asks if the beep was heard');
@@ -18,7 +18,7 @@ await withPage({ w: 1024, h: 768 }, async (page, logs) => {
   ok(await page.locator('[data-check="sound"][data-ok="true"]').count() === 1, 'yes ticks sound');
   ok(await page.locator('[data-check="volume"][data-ok="true"]').count() === 1, 'yes ticks volume');
   ok(await page.locator('[data-check="installed"][data-ok="false"]').count() === 1, 'browser tab is not "installed"');
-  ok(/of 5 ready/.test(await page.locator('.rd-summary').innerText()), 'summary counts ticks');
+  ok(/of 6 ready/.test(await page.locator('.rd-summary').innerText()), 'summary counts ticks');
   await page.evaluate(() => { document.querySelector('.sheet-close, [data-close], .sheet button[aria-label*="lose"]')?.click(); });
   await page.evaluate(() => window.SB.sheets.open('pilot'));
   await page.waitForSelector('.pv-step');

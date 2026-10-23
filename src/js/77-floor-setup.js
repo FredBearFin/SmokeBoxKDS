@@ -1254,10 +1254,10 @@
     function releaseWake() { try { if (sentinel && sentinel.release) sentinel.release(); } catch (e) { /* already released */ } sentinel = null; }
     // One check card: an icon (tick or do this), a title, a plain line, and room for buttons.
     const card = (id, title) => { const el = h('section', { class: 'fs-card rd-card', dataset: { check: id } }); return { el, title, set(ok, line, ...extra) { U.clear(el); el.dataset.ok = ok === true ? 'true' : ok === false ? 'false' : 'unknown'; el.append(h('div', { class: 'rd-head' }, ico(ok === true ? 'check-circle' : 'alert-circle', 26), h('h3', { class: 'fs-h' }, title), h('span', { class: 'rd-state' }, ok === true ? 'Ready' : ok === false ? 'Do this' : 'Not checked yet')), h('p', { class: 'fs-sub' }, line), ...extra.filter(Boolean)); } }; };
-    const cAwake = card('awake', 'Screen stays awake'), cSound = card('sound', 'Sound is on'), cVol = card('volume', 'Volume is loud enough'), cInst = card('installed', 'Added to the home screen'), cFull = card('full', 'Full screen');
+    const cAwake = card('awake', 'Screen stays awake'), cSound = card('sound', 'Sound is on'), cVol = card('volume', 'Volume is loud enough'), cOff = card('offline', 'Opens without the internet'), cInst = card('installed', 'Added to the home screen'), cFull = card('full', 'Full screen');
     const summary = h('p', { class: 'fs-sub rd-summary', role: 'status' });
     // Counts the ticks and says how many checks are done.
-    function paintSummary() { const n = [cAwake, cSound, cVol, cInst, cFull].filter((c) => c.el.dataset.ok === 'true').length; tell(summary, n + ' of 5 ready. A check mark means the tablet or you confirmed it; it is not a promise it stays that way all day.', n === 5 ? 'ok' : undefined); }
+    function paintSummary() { const n = [cAwake, cSound, cVol, cInst, cFull, cOff].filter((c) => c.el.dataset.ok === 'true').length; tell(summary, n + ' of 6 ready. A check mark means the tablet or you confirmed it; it is not a promise it stays that way all day.', n === 5 ? 'ok' : undefined); }
 
     // 1. Screen awake: ask the browser to hold the screen on now (a tap lets it), or say how to set the tablet itself.
     // Asks for the screen hold and shows the result; the tablet's own timeout is still the first thing to set.
@@ -1305,6 +1305,19 @@
       else cInst.set(false, 'You are in the browser. iPad (Safari): tap Share, then Add to Home Screen. Android (Chrome): open the menu, then Install app or Add to Home screen. Then open Smokebox from that icon. An installed app opens without the browser bars; Smokebox cannot promise it keeps your data safe, so keep taking backups.');
       paintSummary();
     }
+    // 6. Opens without the internet: asks the offline module to read the stored page back (a real test), and says the answer in words.
+    function checkOffline() {
+      const o = SB.offline && typeof SB.offline.status === 'function' ? SB.offline.status() : null;
+      // Tapping runs the check again and redraws this card.
+      const again = h('button', { type: 'button', class: 'btn', dataset: { act: 'offline-check' }, onClick: () => checkOffline() }, 'Check again');
+      if (!o || !o.supported) { cOff.set(false, o && o.reason === 'insecure' ? 'This address is not secure (https), so the browser will not keep a copy for opening without the internet. Ask whoever runs the kitchen for the secure address.' : 'This page was opened from a saved file or a browser that cannot keep a copy. Open Smokebox from the kitchen\'s own address.', again); paintSummary(); return; }
+      cOff.set(null, 'Checking...', again); paintSummary();
+      Promise.resolve(SB.offline.check()).then((r) => {
+        if (r && r.ok) cOff.set(true, 'Yes: this tablet can open Smokebox without the internet. A stored copy was read back whole.', again);
+        else cOff.set(false, 'Not yet. Open Smokebox once with the kitchen connected and wait a moment, then check again.' + (r && r.reason ? ' (' + r.reason + ')' : ''), again);
+        paintSummary();
+      }, () => { cOff.set(false, 'The check did not finish. Try again.', again); paintSummary(); });
+    }
     // 5. Full screen: ticked when installed or already full screen; otherwise a button where the browser allows it.
     // Shows whether the page fills the screen, with a button to ask for it where the browser allows.
     function checkFull() {
@@ -1316,9 +1329,9 @@
       else cFull.set(false, can ? 'The browser bars are showing. Tap Go full screen, or install the app (above) so it opens without them.' : 'This browser cannot go full screen from here. On iPad add Smokebox to the Home Screen (above); it then opens full screen.', go);
       paintSummary();
     }
-    root.append(h('p', { class: 'fs-sub' }, 'Five quick checks so the board keeps working on this tablet during service. Nothing here has been tried on your tablet until you do it.'),
-      cAwake.el, cSound.el, cVol.el, cInst.el, cFull.el, summary);
-    checkAwake(); checkSound(); checkVol(); checkInstalled(); checkFull();
+    root.append(h('p', { class: 'fs-sub' }, 'Six quick checks so the board keeps working on this tablet during service. Nothing here has been tried on your tablet until you do it.'),
+      cAwake.el, cSound.el, cVol.el, cInst.el, cFull.el, cOff.el, summary);
+    checkAwake(); checkSound(); checkVol(); checkInstalled(); checkFull(); checkOffline();
     tryWake(false);
     sheet.body.appendChild(root); keepInView(root);
     return sheet;
