@@ -40,7 +40,8 @@ for (const f of jsFiles) {
   // A syntax error in one file would stop the whole inline script before any try/catch runs, so the build refuses it here, by name.
   // vm.Script only compiles the code; nothing runs.
   try { new vm.Script(body, { filename: 'src/js/' + f }); } catch (e) { console.error(`ERROR: src/js/${f} does not parse: ${e.message}`); process.exit(1); }
-  // each file is wrapped in its own try/catch boundary so one broken module is reported by name instead of killing the rest silently
+  // each file is wrapped in its own try/catch boundary so one broken module is reported by name instead of killing the rest silently.
+  // WATCH OUT: that block also hides a file's top-level const, let and class from every other file; test/cross-file-names.test.mjs catches a use.
   js += `\n/* ===== ${f} ===== */\n;try{\n${body}\n}catch(e){console.error('[smokebox] module ${f} failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'${f}',message:String(e&&e.message||e)});}\n`;
 }
 
