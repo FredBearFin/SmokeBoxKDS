@@ -68,13 +68,14 @@ test('Square, Toast and Clover exports are recognised by their headers and say s
   assert.equal(ts.rows[3].problems.some((p) => p.code === 'hiddenItem'), true);
   const cl = M.parse(fx('clover-items.csv'));
   assert.equal(cl.format, 'clover'); assert.match(cl.label, /Clover/);
-  assert.deepEqual(cl.rows.map((r) => r.price), [14, 9.5, null, 12.5]);          // cents converted
-  assert.ok(codes(cl.rows[0]).includes('centsConverted'));
+  assert.deepEqual(cl.rows.map((r) => r.price), [14, 9.5, null, 12.5]);          // dollars as written
+  assert.ok(!codes(cl.rows[0]).includes('centsConverted'));
   assert.ok(codes(cl.rows[2]).includes('variablePrice'));
-  assert.ok(cl.summary.notes.some((n) => /cents/.test(n)));
+  assert.equal(cl.summary.priceUnit, 'dollars');
+  assert.deepEqual(cl.rows.map((r) => r.readAs), ['$14.00', '$9.50', '', '$12.50']);
   const dollars = M.parse('Clover ID,Name,Price,Price Type\nA,Tea,3.5,FIXED\n', { priceUnit: 'dollars' });
   assert.equal(dollars.rows[0].price, 3.5);
-  assert.equal(M.parse('Clover ID,Name,Price,Price Type\nA,Tea,350,FIXED\n').rows[0].price, 3.5);
+  assert.equal(M.parse('Clover ID,Name,Price,Price Type\nA,Tea,350,FIXED\n', { priceUnit: 'cents' }).rows[0].price, 3.5);
   assert.equal(M.parse(fx('clover-items.csv'), { format: 'lines' }).format, 'lines'); // the caller can force lines
 });
 
@@ -179,4 +180,91 @@ test('a row with more columns than the header is flagged (an unquoted decimal co
   assert.deepEqual(kc(r.rows[2]), []);
   assert.deepEqual(kc(M.parse('Name,Price,Category\nTea,3.5,12\n').rows[0]), ['numericCategory']);
   assert.deepEqual(kc(M.parse('Name,Price,Category\nTea,3.5,Hot,,\n').rows[0]), []); // trailing empty cells are fine
+});
+
+
+// Round 13: findings from docs/research/pos-export-formats.md, with the header strings the research lists.
+test('whole-number prices are dollars: 12 is $12.00, never $0.12, and cents only when the header or the owner says so', () => {
+  const w = M.parse(fx('clover-whole-dollars.csv'));
+  assert.equal(w.format, 'clover');
+  assert.deepEqual(w.rows.map((r) => r.price), [12, 4, 15, 5.99]);
+  assert.deepEqual(w.rows.map((r) => r.readAs), ['$12.00', '$4.00', '$15.00', '$5.99']);
+  assert.ok(w.rows.every((r) => !codes(r).includes('centsConverted')));
+  assert.equal(w.summary.priceUnit, 'dollars'); assert.equal(w.summary.maybeCents, false);
+  // the header names the unit
+  const c = M.parse(fx('clover-cents.csv'));
+  assert.deepEqual(c.rows.map((r) => r.price), [12, 4, 15]);
+  assert.equal(c.summary.priceUnit, 'cents');
+  assert.ok(codes(c.rows[0]).includes('centsConverted'));
+  assert.ok(c.summary.notes.some((n) => /cents/.test(n)));
+  // the owner can still say dollars for a header that says cents
+  assert.ok(codes(M.parse(fx('clover-cents.csv'), { priceUnit: 'dollars' }).rows[0]).includes('hugePrice'));
+  // a whole-number file with prices far above any dish asks about cents instead of guessing
+  const big = M.parse('Name,Price\nBrisket,1400\nTea,350\n');
+  assert.equal(big.summary.maybeCents, true);
+  assert.ok(codes(big.rows[0]).includes('hugePrice'));
+  assert.ok(big.summary.notes.some((n) => /cents/.test(n)));
+  assert.equal(M.parse('Name,Price\nBrisket,1400\nTea,350\n', { priceUnit: 'cents' }).rows[0].price, 14);
+});
+
+test('plain sheet headers from the research are read as tables and the header row never becomes a dish', () => {
+  const cases = [['sheet-menu-price.csv', 'Brisket plate'], ['sheet-item-price.csv', 'Brisket plate'], ['sheet-dish-usd.csv', 'Brisket plate'], ['sheet-food-price.csv', 'Brisket plate']];
+  for (const [f, first] of cases) {
+    const r = M.parse(fx(f));
+    assert.equal(r.format, 'csv', f);
+    assert.equal(r.rows[0].name, first, f);
+    assert.equal(r.rows.length, 2, f);
+    assert.ok(r.rows.every((x) => x.ok), f);
+  }
+  assert.equal(M.parse(fx('sheet-food-price.csv')).rows[0].price, 14);        // a whole number is dollars
+  for (const head of ['Item,Item Price', 'Dish,Price (USD)', 'Food,Price', 'Menu,Price', 'Item Name,Prices', 'Nombre,Precio']) {
+    const r = M.parse(head + '\nTea,3.50\n');
+    assert.deepEqual(r.rows.map((x) => [x.name, x.price]), [['Tea', 3.5]], head);
+    assert.equal(r.format, 'csv', head);
+  }
+  // Toast is recognised only by its own columns; a bare Menu column is a name
+  assert.equal(M.parse('Menu,Menu Group,Item Name,Price\nDinner,Mains,Pie,5\n').format, 'toast');
+  assert.equal(M.parse('Menu Item,Price,Section\nPie,5,Dessert\n').rows[0].categoryText, 'Dessert');
+});
+
+test('column titles in typed lines are skipped with a note, not made into a dish', () => {
+  const r = M.parse(fx('lines-with-titles.txt'));
+  assert.equal(r.format, 'lines');
+  assert.deepEqual(r.rows.map((x) => [x.name, x.price]), [['Brisket plate', 14], ['Mac and cheese', 5.5]]);
+  assert.ok(r.summary.notes.some((n) => /column titles/.test(n)));
+  // a real dish line without a price is not mistaken for titles when its second cell is a station
+  const d = M.parse('Sweet tea, cold\nBrisket, 14\n');
+  assert.equal(d.rows.length, 2);
+});
+
+test('Lightspeed Type column is a row kind, not the menu section; sub-items and groups are left out', () => {
+  const r = M.parse(fx('lightspeed-items.csv'));
+  assert.equal(r.format, 'lightspeed'); assert.match(r.label, /Lightspeed/);
+  assert.deepEqual(r.rows.map((x) => x.name), ['Burger', 'Lunch combo', 'Fries']);
+  assert.ok(r.rows.every((x) => x.categoryText === 'Food' || x.categoryText === 'Mains' || x.categoryText === 'Sides'));
+  assert.ok(r.rows.every((x) => !['Item', 'Combo', 'Sub-item', 'Group'].includes(x.categoryText)));
+  assert.ok(r.summary.notes.some((n) => /2 rows marked Sub-item/.test(n)));
+  // a Type column that does hold sections is still used as the category
+  const t = M.parse('Name,Price,Type\nPie,5,Dessert\nTea,2,Drinks\n');
+  assert.deepEqual(t.rows.map((x) => x.categoryText), ['Dessert', 'Drinks']);
+});
+
+test('Square Categories and visibility columns, Clover Printer Labels as the station', () => {
+  const r = M.parse(fx('square-categories.csv'));
+  assert.equal(r.format, 'square');
+  assert.deepEqual(r.rows.map((x) => x.categoryText), ['Bread', 'Pastry']);
+  assert.equal(r.rows[1].problems.some((p) => p.code === 'hiddenItem'), true);
+  assert.equal(r.rows[0].problems.some((p) => p.code === 'hiddenItem'), false);
+  const c = M.parse(fx('clover-whole-dollars.csv'), { zones: [{ id: 'pit', name: 'Pit' }, { id: 'cold', name: 'Cold' }] });
+  assert.deepEqual(c.rows.map((x) => x.station), ['pit', 'cold', 'pit', 'cold']);
+  assert.equal(M.parse('Clover ID,Name,Price,Price Type\nA,Fish,9,Per unit\n').rows[0].priceError, 'variable');
+});
+
+test('ignored columns are named for the preview', () => {
+  const r = M.parse(fx('sheet-item-price.csv'));
+  assert.deepEqual(r.summary.ignoredColumns, []);                    // Notes is read as the description
+  const q = M.parse('Name,Price,Cost basis,Allergens\nPie,5,2,nuts\n');
+  assert.deepEqual(q.summary.ignoredColumns, ['Cost basis', 'Allergens']);
+  assert.equal(q.summary.ignoredText, 'Ignored: Cost basis, Allergens');
+  assert.equal(M.parse('Pie, 5\n').summary.ignoredText, '');
 });

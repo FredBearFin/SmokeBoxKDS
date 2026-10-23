@@ -1,0 +1,3 @@
+Dish, Cost to guest
+Brisket plate, 14.00
+Mac and cheese, 5.50

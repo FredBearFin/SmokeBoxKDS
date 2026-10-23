@@ -96,12 +96,18 @@
 
   // Header words for each field, compared after lower-casing and removing spaces and punctuation.
   const WORDS = {
-    name: ['name', 'item', 'itemname', 'dish', 'product', 'title', 'menuitem', 'itemtitle', 'dishname', 'productname'],
-    price: ['price', 'amount', 'baseprice', 'sellprice', 'unitprice', 'saleprice', 'menuprice', 'cost'],
-    station: ['station', 'zone', 'prepstation', 'kitchen', 'kitchenstation', 'madein', 'wheremade'],
-    category: ['category', 'group', 'menugroup', 'section', 'type', 'menucategory', 'reportingcategory'],
+    name: ['name', 'item', 'itemname', 'dish', 'product', 'title', 'menuitem', 'itemtitle', 'dishname', 'productname', 'menuitemname', 'food', 'foodname', 'dishes', 'items', 'nombre', 'menu'],
+    price: ['price', 'amount', 'baseprice', 'sellprice', 'unitprice', 'saleprice', 'menuprice', 'itemprice', 'priceusd', 'pricedollars', 'regularprice', 'prices', 'precio', 'pricecents', 'pricecent', 'amountcents', 'unitpricecents', 'cost'],
+    station: ['station', 'zone', 'prepstation', 'kitchen', 'kitchenstation', 'madein', 'wheremade', 'printerlabels', 'printerlabel', 'preparea', 'preplocation'],
+    category: ['category', 'categories', 'group', 'menugroup', 'section', 'menucategory', 'accountinggroup', 'reportingcategory', 'screen', 'screens', 'type'],
     description: ['description', 'desc', 'details', 'notes'],
   };
+  // Header names that say outright the prices are in cents ("Price (cents)", "Amount Cents").
+  const CENTS_HEADER = /cents?$/;
+  // The words a Lightspeed style "Type" column holds; such a column says what the row is, not which menu section it is in.
+  const ITEM_KINDS = new Set(['item', 'items', 'subitem', 'subitems', 'group', 'groups', 'combo', 'combos', 'modifier', 'modifiers', 'modifiergroup', 'menuitem', 'product', 'products']);
+  // The row kinds that are parts of another dish or only containers, skipped when a Type column names them.
+  const PART_KINDS = new Set(['subitem', 'subitems', 'group', 'groups', 'modifier', 'modifiers', 'modifiergroup']);
   // A header made comparable: lower case, letters and digits only.
   const norm = (h) => String(h == null ? '' : h).toLowerCase().replace(/[^a-z0-9]/g, '');
   // The column number whose header is one of the words, or -1. "cost" only counts as a price when no better word exists.
@@ -117,13 +123,14 @@
     const has = (x) => h.indexOf(x) >= 0;
     if (has('itemname') && (has('variationname') || has('token') || has('sku')) && has('price')) return 'square';
     if (has('cloverid') || (has('name') && has('pricetype') && (has('alternatename') || has('producecode') || has('productcode')))) return 'clover';
-    if ((has('menugroup') || has('menu') || has('menuitem') || has('menuitemname')) && (has('price') || has('baseprice') || has('basepricedollars') || has('itemprice'))) return 'toast';
+    if ((has('menugroup') || has('menuitem') || has('menuitemname')) && (has('price') || has('baseprice') || has('basepricedollars') || has('itemprice'))) return 'toast';
+    if (has('accountinggroup') && has('name') && has('price')) return 'lightspeed';
     const nameOk = WORDS.name.some((w) => has(w)), priceOk = WORDS.price.some((w) => has(w));
     return nameOk && priceOk ? 'csv' : null;
   }
   const FORMAT_LABEL = {
     square: 'Square item library export', toast: 'Toast menu export', clover: 'Clover items export',
-    csv: 'spreadsheet table (CSV, TSV or pasted from Excel or Google Sheets)', lines: 'typed or pasted lines',
+    lightspeed: 'Lightspeed items export', csv: 'spreadsheet table (CSV, TSV or pasted from Excel or Google Sheets)', lines: 'typed or pasted lines',
   };
 
   /* ---------- station and category words from the live config ---------- */
@@ -209,7 +216,7 @@
     else if (pr === 'bad') P.push(prob('badPrice', 'error', 'The price "' + row.priceText + '" is not a number.', 'Use digits only, for example 9.50.'));
     else if (typeof row.price === 'number') {
       if (row.price < 0) P.push(prob('negativePrice', 'error', 'The price ' + row.price + ' is below zero.', 'Enter the price as a positive amount.'));
-      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above ' + cs() + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "Prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950.'));
+      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above ' + cs() + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "Prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950. If the file is in cents, choose "Prices are in cents".'));
       else if (row.price === 0) P.push(prob('freeItem', 'warn', 'The price is ' + cs() + '0.00.', 'Keep it if the dish is free, or enter a price.'));
       if (row.rounded) P.push(prob('priceRounded', 'warn', 'The price had more than two decimals and was rounded to the cent.', 'Check the price shown.'));
     }
@@ -242,14 +249,28 @@
     row.station = zoneFrom(row.stationText, opts); row.category = catFrom(row.categoryText, opts);
   }
 
-  // Rows from the typed-lines format.
-  function parseLines(text, opts) {
+  // True when a first line is column titles: two or more cells, no digits, none is a known station, and a later line has a price.
+  function looksLikeTitles(raw, rest, opts) {
+    if (/\d/.test(raw)) return false;
+    const f = readLine(raw.trim());
+    const cells = [f.name].concat(f.priceText ? [f.priceText] : [], f.extras).filter(Boolean);
+    if (cells.length < 2 || cells.some((c) => zoneFrom(c, opts) || catFrom(c, opts))) return false;
+    return rest.some((l) => { if (!clean(l)) return false; const g = readLine(l.trim()); return PRICE_TOKEN.test(g.priceText || ''); });
+  }
+  // Rows from the typed-lines format. summary, when given, receives a note for anything skipped.
+  function parseLines(text, opts, summary) {
     const out = [];
     const lines = text.split(/\r\n|\r|\n/);
+    let first = true;
     for (let i = 0; i < lines.length && out.length < LIMITS.rowsRead; i++) {
       const raw = lines[i];
       if (!clean(raw)) continue;
       if (/^\s*(#|\/\/)/.test(raw)) continue;
+      // A first line of column titles ("Dish, Cost") is not a dish: no digits, two or more words, and a priced line follows.
+      if (first) {
+        first = false;
+        if (looksLikeTitles(raw, lines.slice(i + 1), opts)) { if (summary) summary.notes.push('The first line looked like column titles ("' + clean(raw) + '"), so it was skipped.'); continue; }
+      }
       const f = readLine(raw.trim());
       const row = newRow(i + 1);
       row.name = clean(unguard(f.name));
@@ -267,26 +288,38 @@
   function parseTable(table, format, opts, summary) {
     const headers = table[0].map(norm);
     const col = {
-      name: findCol(headers, format === 'toast' ? ['itemname', 'menuitem', 'menuitemname', 'name'] : WORDS.name),
+      name: findCol(headers, format === 'toast' ? ['itemname', 'menuitem', 'menuitemname', 'name'].concat(WORDS.name) : WORDS.name),
       price: findCol(headers, format === 'toast' ? ['price', 'baseprice', 'basepricedollars', 'itemprice'] : WORDS.price.filter((w) => w !== 'cost')),
       station: findCol(headers, WORDS.station),
-      category: findCol(headers, format === 'toast' ? ['menugroup', 'category', 'menucategory'] : WORDS.category),
+      category: findCol(headers, format === 'toast' ? ['menugroup', 'category', 'menucategory'].concat(WORDS.category) : WORDS.category),
       description: findCol(headers, WORDS.description),
       variation: format === 'square' ? headers.indexOf('variationname') : -1,
       priceType: format === 'clover' ? headers.indexOf('pricetype') : -1,
-      hidden: Math.max(headers.indexOf('hidden'), headers.indexOf('archived'), headers.indexOf('visibility')),
+      hidden: headers.reduce((a, h, i) => (['hidden', 'archived', 'visibility', 'squareonlineitemvisibility'].indexOf(h) >= 0 ? a.concat(i) : a), []),
+      kind: -1,
     };
     if (col.price < 0) col.price = findCol(headers, ['cost']);
+    // A "Type" column that only says Item, Sub-item, Group or Combo is a row kind, not a menu section.
+    const typeAt = headers.indexOf('type');
+    if (typeAt >= 0) {
+      const vals = table.slice(1).map((r) => norm(r[typeAt])).filter(Boolean);
+      if (vals.length && vals.every((v) => ITEM_KINDS.has(v))) { col.kind = typeAt; if (col.category === typeAt) col.category = -1; }
+    }
     // Columns the importer does not use are named, so a screen can say what was left out ("Ignored column: Notes").
-    const usedCols = new Set([col.name, col.price, col.station, col.category, col.description, col.variation, col.priceType, col.hidden].filter((x) => x >= 0));
+    const usedCols = new Set([col.name, col.price, col.station, col.category, col.description, col.variation, col.priceType, col.kind].concat(col.hidden).filter((x) => x >= 0));
     if (summary) summary.ignoredColumns = table[0].map((h, i) => [clean(h), i]).filter(([h, i]) => h && !usedCols.has(i)).map(([h]) => h);
-    const cents = opts.priceUnit === 'cents' || (opts.priceUnit !== 'dollars' && format === 'clover');
+    // Prices are dollars unless the owner chose cents or the price column is itself named in cents. Never guessed from the brand.
+    const cents = opts.priceUnit === 'cents' || (opts.priceUnit !== 'dollars' && col.price >= 0 && CENTS_HEADER.test(headers[col.price]));
+    if (summary) summary.priceUnit = cents ? 'cents' : 'dollars';
     const data = [];
+    let skippedParts = 0;
     for (let i = 1; i < table.length && data.length < LIMITS.rowsRead; i++) {
       const r = table[i];
       if (r.every((c) => !clean(c))) continue;
+      if (col.kind >= 0 && PART_KINDS.has(norm(r[col.kind]))) { skippedParts++; continue; }
       data.push({ cells: r, line: i + 1 });
     }
+    if (summary && skippedParts) summary.notes.push(skippedParts + ' ' + (skippedParts === 1 ? 'row' : 'rows') + ' marked Sub-item, Group or Modifier ' + (skippedParts === 1 ? 'was' : 'were') + ' left out; they are parts of other dishes.');
     // Square lists one row per variation; the variation name is added to the dish name when an item has more than one.
     const count = {};
     if (col.variation >= 0) for (const d of data) { const k = key(d.cells[col.name]); count[k] = (count[k] || 0) + 1; }
@@ -302,7 +335,7 @@
       }
       row.name = name;
       const typ = col.priceType >= 0 ? clean(c(col.priceType)).toUpperCase() : '';
-      if (typ === 'VARIABLE' || typ === 'PER_UNIT') { row.priceText = clean(c(col.price)) || typ.toLowerCase(); row.priceError = 'variable'; } else setPrice(row, c(col.price), cents);
+      if (/^(VARIABLE|PER[ _]?UNIT)$/.test(typ)) { row.priceText = clean(c(col.price)) || typ.toLowerCase(); row.priceError = 'variable'; } else setPrice(row, c(col.price), cents);
       setWhere(row, c(col.station), c(col.category), opts);
       // More filled cells than the header has columns: a comma inside an unquoted value pushed the rest along.
       let used = d.cells.length;
@@ -314,7 +347,7 @@
       }
       const desc = clean(c(col.description));
       if (desc) row.description = desc;
-      if (col.hidden >= 0 && /^(true|yes|y|1|hidden|archived)$/i.test(clean(c(col.hidden)))) row.hidden = true;
+      if (col.hidden.some((ix) => /^(true|yes|y|1|hidden|archived|unavailable)$/i.test(clean(c(ix))))) row.hidden = true;
       out.push(row);
     }
     return out;
@@ -342,10 +375,10 @@
         else if (format === 'csv' && found === null) format = 'lines';
       }
       res.format = format; res.label = FORMAT_LABEL[format] || format;
-      if (format === 'lines') res.rows = parseLines(text, opts);
+      if (format === 'lines') res.rows = parseLines(text, opts, res.summary);
       else {
         if (table.length < 2) { res.summary.notes.push('The file has a header row but no dishes under it.'); res.rows = []; } else res.rows = parseTable(table, format, opts, res.summary);
-        if (format === 'clover' && opts.priceUnit !== 'dollars') res.summary.notes.push('Clover prices are read as cents (1400 is ' + cs() + '14.00). If the first rows look wrong, read the file again with prices in dollars.');
+        if (res.summary.priceUnit === 'cents') res.summary.notes.push('Prices are read as cents (1400 is ' + cs() + '14.00). If the first rows look wrong, read the file again with prices in dollars.');
       }
       if (res.rows.length >= LIMITS.rowsRead) res.summary.notes.push('Only the first ' + LIMITS.rowsRead + ' rows were read.');
       const existing = new Set(((opts.existing) || []).map((m) => key(m && m.name)));
@@ -362,6 +395,14 @@
       }
       const S = res.summary;
       S.total = res.rows.length;
+      if (!S.priceUnit) S.priceUnit = opts.priceUnit === 'cents' ? 'cents' : 'dollars';
+      // What each price was read as, in the owner's words, so the preview can show "Read as $12.00".
+      for (const r of res.rows) r.readAs = typeof r.price === 'number' ? cs() + r.price.toFixed(2) : '';
+      // Whole numbers that are too big to be dollars: the file is probably in cents, so say so once.
+      const whole = res.rows.filter((r) => r.priceText && /^[+-]?\d+$/.test(r.priceText.replace(/[$€£\s]/g, '')));
+      S.maybeCents = S.priceUnit === 'dollars' && whole.length > 0 && whole.length === res.rows.filter((r) => r.priceText).length && whole.some((r) => r.price > LIMITS.priceMax);
+      if (S.maybeCents) S.notes.push('Every price is a whole number and some are above ' + cs() + LIMITS.priceMax + '. If the file is in cents (1400 is ' + cs() + '14.00), read it again with prices in cents.');
+      S.ignoredText = S.ignoredColumns.length ? 'Ignored: ' + S.ignoredColumns.join(', ') : '';
       for (const r of res.rows) { if (r.ok) S.ok++; if (r.problems.some((p) => p.level === 'error')) S.errors++; if (r.problems.some((p) => p.level === 'warn')) S.warnings++; }
       // Station and category words the file used that match none of the kitchen's, so a screen can offer to add them.
       S.unmatched = { stations: [], categories: [] };
