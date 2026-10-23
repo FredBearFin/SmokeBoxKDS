@@ -46,3 +46,24 @@ instead of the root; that is a change for the hub's owner, not needed here.
 - The codes sit in the address of the tablets (needed to open the page). Do not share screenshots of the address bar.
 - A second Node process uses memory on the same small server; the beta's data is separate and is not backed up by anything.
 - The connected build is experimental: do not run the real kitchen on it. The nightly beta update follows the branch `connected` as it is that night.
+
+## Server update safety (time, signing, pinning) and first-boot checks
+**Not run on a real server.** These steps were tested with fake services (`test/updater.test.mjs`), not with a real systemd, Caddy or GitHub.
+
+**Update time.** The nightly update runs at 4:30 in the zone you gave `go.sh` (the timer line now ends with the zone name). A server installed earlier runs it at 4:30 in the SERVER's zone, which is UTC on a fresh server (that is 11:30 PM or 12:30 AM in New York, during service). To fix an existing server, as root: `sed -i 's/^OnCalendar=.*/OnCalendar=*-*-* 04:30:00 America\/New_York/' /etc/systemd/system/smokebox-update.timer && systemctl daemon-reload && systemctl restart smokebox-update.timer`, then check with `systemctl list-timers smokebox-update.timer` (the NEXT column) and `systemd-analyze calendar '*-*-* 04:30:00 America/New_York'`. The beta timer (04:50) has the same fix in `beta.sh`.
+
+**Signed updates (optional, off by default).** Today the updater trusts whatever the `deploy` branch holds, so whoever can write that branch controls the server as root. The updater logs a WARNING line each night about this. To turn on checking:
+1. On YOUR computer (never on the server, never on GitHub): `openssl genpkey -algorithm ed25519 -out update-key.pem && openssl pkey -in update-key.pem -pubout -out update-pubkey.pem` (OpenSSL 3, as on Ubuntu 22.04 or later).
+2. Before each push to `deploy`, in the folder to be committed: `bash tools/sign-deploy.sh /path/to/update-key.pem`. It writes `deploy.manifest` (a sha256 line per file) and `deploy.manifest.sig` into the tree. They are inside the build, not a separate file next to a tarball, because GitHub's tarball bytes are not stable but the files are.
+3. On the server, as root: `mkdir -p /etc/smokebox && cp update-pubkey.pem /etc/smokebox/update-pubkey`. From then on the updater refuses a build that is unsigned, signed with another key, has a changed file, or has a file that is not on the list, and keeps the running version. To stop checking, delete that file.
+Lose the private key and you must remove the public key on the server by hand before the next update can pass.
+
+**Pinning.** `SMOKEBOX_UPDATE_REF=v1.4.0` (a tag) or a full 40-character commit id makes the updater download that exact version instead of the moving branch. Put it in the update service: `systemctl edit smokebox-update` and add `[Service]` and `Environment=SMOKEBOX_UPDATE_REF=v1.4.0`. Combine with signing for the strongest setting. The updater also refuses archives containing devices, pipes or links (as root they would be extracted).
+
+**Check the service hardening after installing (the settings in `setup-server.sh` were never run on a real systemd).** As root, after `go.sh`:
+- `systemctl status smokebox caddy smokebox-update.timer` (all active)
+- `systemd-analyze security smokebox` (shows an exposure score and each setting; a score of about 2 to 4 "OK" or "MEDIUM" is expected for this unit; look at lines marked with a red or yellow dot that are NOT among: network access, address families)
+- `journalctl -u smokebox -n 50 --no-pager` (no "Failed to set up", "Permission denied" or "namespace" lines)
+- `ls -ld /var/lib/smokebox && ls -l /var/lib/smokebox` (owned by `smokebox`, mode 700 / 600) and `ps -o user,cmd -C node` (runs as `smokebox`)
+- `curl -s http://127.0.0.1:8787/health` (should say `"ok":true`) and open the site from a tablet.
+If the service will not start after install, the most likely cause is a hardening line the server's systemd does not accept: run `journalctl -u smokebox -b --no-pager | tail -30`, comment out the named line in `/etc/systemd/system/smokebox.service`, `systemctl daemon-reload && systemctl restart smokebox`, and tell the developers which line it was.
