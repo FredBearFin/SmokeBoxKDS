@@ -555,9 +555,8 @@ for (const [w, h] of [[1280, 800], [390, 844]]) {
     for (let i = 0; i < 24; i++) { await page.keyboard.press('Tab'); const r = await page.evaluate(() => { const a = document.activeElement; const s = a && a.closest && a.closest('.fl-slip'); if (!s) return null; const b = s.getBoundingClientRect(); return { y: Math.round(b.top + document.querySelector('.fl-main').scrollTop), x: Math.round(b.left), t: s.dataset.ticket }; }); if (r) pos.push(r); }
     let ok2 = true;
     for (let i = 1; i < pos.length; i++) { const p = pos[i - 1], c = pos[i]; if (p.t === c.t) continue; if (Math.abs(c.y - p.y) < 30 ? c.x < p.x : c.y < p.y) ok2 = false; }
-    // KNOWN BUG (A1): the worst overdue slips are moved to the front with CSS order only (rankOverdue in 70-floor-board.js), so keyboard and
-    // screen reader order no longer match what is drawn. Reported in docs/audit/e2e-triage.md; remove knownBug when the DOM order is fixed.
-    knownBug(w + ': keyboard order through the slips follows the grid (left to right, top to bottom)', ok2 && pos.length > 4, pos.slice(0, 8), 'A1');
+    // The overdue ranking now reorders the page itself, so keyboard order matches what is drawn (it was a CSS-only reorder before round 14).
+    check(w + ': keyboard order through the slips follows the grid (left to right, top to bottom)', ok2 && pos.length > 4, pos.slice(0, 8));
     noErrors('tab order ' + w, logs);
   });
 }

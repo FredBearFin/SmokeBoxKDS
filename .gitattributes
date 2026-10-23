@@ -1,0 +1,15 @@
+# GitHub's branch download (deploy.tar.gz) leaves out every path marked export-ignore. The server needs only: server/, src/js/ (the engine files
+# the hub loads), dist/smokebox.html (the page it serves), the two install scripts and package.json. Everything else stays in the repository
+# but is not downloaded by go.sh or the nightly updater. After adding a file the server needs, make sure it is NOT matched here.
+/test export-ignore
+/docs export-ignore
+/tools export-ignore
+/ux-scripts export-ignore
+/reference export-ignore
+/.github export-ignore
+/HANDOFF.md export-ignore
+/SPEC.md export-ignore
+/START-PROMPT.md export-ignore
+/package-lock.json export-ignore
+/dist/* export-ignore
+/dist/smokebox.html -export-ignore

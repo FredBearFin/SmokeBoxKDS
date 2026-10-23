@@ -62,7 +62,7 @@ const providerFile = (p) => { const s = p.split('.'); return SUB_FILE[s.slice(1,
  * The contract (what the specs promise exists)
  * ========================================================================================================================== */
 const PAGE_TABLE = [
-  { id: 'pace', title: 'Pace', icon: 'gauge', order: 1 }, { id: 'tickets', title: 'Tickets', icon: 'receipt', order: 2 },
+  { id: 'pace', title: 'Speed', icon: 'gauge', order: 1 }, { id: 'tickets', title: 'Tickets', icon: 'receipt', order: 2 },
   { id: 'stations', title: 'Stations', icon: 'layers', order: 3 }, { id: 'money', title: 'Sales and money', icon: 'dollar', order: 4 },
   { id: 'safety', title: 'Safety', icon: 'shield-check', order: 5 }, { id: 'stock', title: 'Stock and 86', icon: 'package', order: 6 },
   { id: 'data', title: 'Menu and settings', icon: 'sliders', order: 7 },

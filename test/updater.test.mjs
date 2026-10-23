@@ -133,3 +133,52 @@ test('the install scripts parse and refuse short passwords', { skip: !have('bash
   assert.notEqual(r.status, 0);
   assert.match(r.stdout + r.stderr, /at least 8 characters/);
 });
+
+/* ---- the real deploy download: what GitHub's branch archive contains (git archive honors the same .gitattributes export-ignore rules) ---- */
+
+const haveGit = have('git') && fs.existsSync(path.join(ROOT, '.git'));
+function realExport(tmp) {
+  const tgz = path.join(tmp, 'real.tgz');
+  const out = execFileSync('git', ['-C', ROOT, 'archive', '--worktree-attributes', '--format=tar.gz', '--prefix=SmokeBoxKDS-deploy/', 'HEAD'], { maxBuffer: 1 << 30 });
+  fs.writeFileSync(tgz, out);
+  return tgz;
+}
+
+test('the real deploy archive is small and holds exactly what the server needs (no tests, docs, tools or screenshots)', { skip: !haveGit }, () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sbexp-'));
+  const tgz = realExport(tmp);
+  const size = fs.statSync(tgz).size;
+  assert.ok(size < 10 * 1024 * 1024, 'the archive is ' + Math.round(size / 1e6) + ' MB; it should be a few MB at most');
+  const names = execFileSync('tar', ['-tzf', tgz], { encoding: 'utf8', maxBuffer: 1 << 28 }).split('\n').filter(Boolean);
+  for (const need of ['server/server.mjs', 'server/setup-server.sh', 'server/smokebox-update.sh', 'dist/smokebox.html', 'src/js/00-util.js', 'src/js/10-config.js', 'src/js/20-engine.js', 'go.sh', 'tunnel.sh']) assert.ok(names.includes('SmokeBoxKDS-deploy/' + need), 'missing ' + need);
+  for (const bad of ['test/', 'docs/', 'tools/', 'ux-scripts/', 'reference/', '.github/', 'dist/integ.html', 'dist/qa.html']) assert.ok(!names.some((n) => n.startsWith('SmokeBoxKDS-deploy/' + bad)), 'should be left out: ' + bad);
+});
+
+test('the server starts from the extracted deploy archive and serves the page', { skip: !haveGit }, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sbexp-'));
+  const tgz = realExport(tmp);
+  execFileSync('tar', ['-xzf', tgz, '-C', tmp]);
+  const dir = path.join(tmp, 'SmokeBoxKDS-deploy');
+  const child = spawn(process.execPath, [path.join(dir, 'server/server.mjs')], { env: Object.assign({}, process.env, { PORT: '0', HOST: '127.0.0.1' }) });
+  let log = '';
+  child.stdout.on('data', (d) => (log += d)); child.stderr.on('data', (d) => (log += d));
+  try {
+    let port = 0;
+    for (let i = 0; i < 100 && !port; i++) { const m = /127\.0\.0\.1:(\d+)/.exec(log); if (m && Number(m[1]) > 0) port = Number(m[1]); else await new Promise((r) => setTimeout(r, 100)); }
+    assert.ok(port, 'the hub printed its address: ' + log);
+    const body = await new Promise((resolve, reject) => http.get({ port, host: '127.0.0.1', path: '/' }, (res) => { const c = []; res.on('data', (d) => c.push(d)); res.on('end', () => resolve({ status: res.statusCode, buf: Buffer.concat(c) })); }).on('error', reject));
+    assert.equal(body.status, 200);
+    assert.ok(body.buf.equals(fs.readFileSync(path.join(dir, 'dist/smokebox.html'))), 'the page served is dist/smokebox.html');
+  } finally { child.kill(); }
+});
+
+test('the updater accepts the real (small) deploy archive with its default size limits', { skip: skip || !haveGit }, async () => {
+  const t = setup('real');
+  const tgz = realExport(t.tmp);
+  await withHealth(true, async (port) => {
+    const r = await run({ SMOKEBOX_PREFIX: t.prefix, SMOKEBOX_UPDATE_URL: 'file://' + tgz, SMOKEBOX_SYSTEMCTL: t.fakeSystemctl, SMOKEBOX_HEALTH_URL: 'http://127.0.0.1:' + port + '/', SMOKEBOX_SELF_DEST: path.join(t.tmp, 'self'), SMOKEBOX_LOCK: path.join(t.tmp, 'lock') }, { SMOKEBOX_MIN_BYTES: '100000' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+  });
+  assert.ok(fs.existsSync(path.join(t.prefix, 'server/server.mjs')) && marker(t.prefix) === null, 'the new build replaced the old one');
+  assert.equal(marker(t.prefix + '.old'), 'OLD');
+});
