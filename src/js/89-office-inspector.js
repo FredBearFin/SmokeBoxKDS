@@ -169,7 +169,7 @@
   }
 
   // One row for one safety entry (the same shape inspectorRows gives), for tests and for entries read without the engine's log.
-  function rowFor(e, state) { return { id: e.id, at: e.t, kind: KIND[e.type] || 'Safety entry', food: foodOf(state, e), detail: [detailOf(e), e.type === 'temp_logged' ? coldNote(state, e) : ''].filter(Boolean).join(', '), facts: factsOf(state, e), screen: screenOf(e), who: e.who || '', corrections: [] }; }
+  function rowFor(e, state) { return { id: e.id, at: e.t, kind: KIND[e.type] || 'Safety entry', food: foodOf(state, e), detail: [detailOf(e), e.type === 'temp_logged' ? coldNote(state, e) : ''].filter(Boolean).join(', '), facts: factsOf(state, e), who: e.who || '', corrections: [] }; }
 
   O.inspectorPure = { inspectorRows, rowFor, factsOf, rangeFor, RANGES };
   if (!g.document) return; // Node: the pure rows are all the tests need
