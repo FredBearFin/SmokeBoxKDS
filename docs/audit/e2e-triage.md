@@ -284,3 +284,24 @@ Real bug: review finding 14 (second half). After a hub restart an action sent ag
 Known and not re-run: `tools/guide-walk.mjs` fails the Start over step until A4's night/a4-fix1 lands.
 
 Reviewer findings and the test that fails if the bug returns: 1, 2, 5 `review-fix-store.test.mjs`; 3, 7 `review-fix-hub.test.mjs`; 4 `pin-guard.e2e.mjs` (and the shell test); 6, 11 `csv-and-discards.test.mjs`; 8, 10 `review-fix-money.test.mjs`; 9 `order-money.test.mjs`; 12 `review-fix-import.test.mjs`; 13 `review-fix-pin.test.mjs`; 14 `updater.test.mjs` (the time zone in the timer) and `review-fix-restart.test.mjs`; 15 `updater.test.mjs` (signature, pinning, special files); 16 `start-over.test.mjs`, `start-over.e2e.mjs` and `pin-guard.e2e.mjs`. The only finding that had no test was the second half of 14, which this round adds.
+
+## Round 21: full regression on main (integration-main 4b40160, after tabs, durable log, month close, DST metrics, print, sleep and wake)
+
+Every slow suite singly (two at a time; the machine was shared), the 45 qa journeys, node:test files twice, smoke, the Guide checks and the Guide walk.
+
+| What | Result | Note |
+|---|---|---|
+| node:test files, run 1 and 2 | 861 and 872 pass, 0 fail, 4 todo each | the todo cases are known open: the two single-device multi-tab store cases (A5) and the two restart-duplicate cases (#14, the hub write-ahead log backport, A5) |
+| qa journeys | 45 of 45 pass (817 s) | **07a and 12c pass on main**: both bugs seen on the connected track are connected-only (A3 and A1 are fixing them there) |
+| smoke, Guide checks, Guide walk | pass (4 s, 12 s, 198 s) | the Start over step of the walk passes now |
+| multitab (new): three real Chromium tabs make tickets at the same moment, 20 fresh runs | pass (125 s) | also added to the slow runner list; before the store fix this lost a ticket about 1 run in 10 |
+| floor | one timing failure under load (1 Hz tick with 60 tickets, mean 11.8 ms against 8 ms); passes alone (134 s) | timing only |
+| board-round15 | FAIL alone, repeats | "the voice says it in plain words, once": the cold-item "out-of-fridge limit" line is never spoken (only "Call-outs are on." is) |
+| board-round16 | FAIL alone, repeats (3 checks) | the sleep line "background for 3 minutes" never shows; the strip shows the clock prompt ("Keep the old time / Use the new time") and the sound bar instead |
+| all other slow suites | pass | |
+
+Real bugs on main (both passed at b1672da, so they came in with the later merges, most likely A1's sleep and wake or the clock-prompt work):
+1. **A1/A4:** `node test/board-round15.e2e.mjs` fails "the voice says it in plain words, once" (the cold row is shown but not spoken).
+2. **A1/A5:** `node test/board-round16.e2e.mjs` fails three checks about the sleep line: after 3 minutes in the background the board shows the clock "Keep the old time / Use the new time" prompt instead of the calm "background for 3 minutes" line.
+
+New tools: `node tools/run-all.mjs` runs everything in order with one log per step and a final table (`--fast`, `--only=`, `--skip=`); documented in `docs/STATE-OF-THE-APP.md` section 7.
