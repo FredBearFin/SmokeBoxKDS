@@ -49,3 +49,30 @@ test('safety #1: the accumulated time survives a save and reload', () => {
   assert.equal(v.ok, true);
   assert.equal(v.state.batches.find((b) => b.id === id).coldOutMs, 60 * MIN);
 });
+
+test('safety #3: safety entries are kept 400 days, not 190', () => {
+  assert.equal(E.SAFETY_KEEP_DAYS, 400);
+  assert.equal(E.SAFETY_KEEP_MS, 400 * 24 * H);
+});
+
+test('safety #4: changing a food-safety number records its old and new value; other settings stay name-only', () => {
+  const s0 = E.newState({ now: T0, starter: true });
+  const oldHot = s0.settings.safety.hotHoldF, oldCool = s0.settings.safety.cooling.stage1H;
+  const r = E.apply(s0, 'updateSettings', { patch: { safety: { hotHoldF: 140, cooling: { stage1H: 1.5 } }, service: { openHour: 9 } } }, T0 + MIN, {});
+  assert.equal(r.report, 'ok', JSON.stringify(r.info));
+  const evs = E.allEvents(r.state).filter((e) => e.type === 'safety_setting_changed');
+  const hot = evs.find((e) => e.key === 'safety.hotHoldF');
+  assert.deepEqual([hot.from, hot.to], [oldHot, 140]);
+  const cool = evs.find((e) => e.key === 'safety.cooling.stage1H');
+  assert.deepEqual([cool.from, cool.to], [oldCool, 1.5]);
+  const plain = E.allEvents(r.state).filter((e) => e.type === 'settings_changed');
+  assert.ok(plain.length === 1 && plain[0].keys.every((k) => k.indexOf('safety.') !== 0));
+  // the entries are part of the safety log, so they survive trimming and show in the log
+  assert.ok(E.safetyLog(r.state).some((row) => row.event.type === 'safety_setting_changed'));
+  const p = E.prune(r.state, { maxEvents: 0 });
+  assert.ok(E.safetyLog(p).some((row) => row.event.type === 'safety_setting_changed' && row.event.key === 'safety.hotHoldF'));
+  // a change with only safety numbers writes no empty settings_changed
+  const r2 = E.apply(r.state, 'updateSettings', { patch: { safety: { hotHoldF: 145 } } }, T0 + 2 * MIN, {});
+  assert.equal(r2.report, 'ok');
+  assert.equal(E.allEvents(r2.state).filter((e) => e.type === 'settings_changed').length, 1);
+});
