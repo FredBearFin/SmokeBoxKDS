@@ -158,3 +158,8 @@
 @media (forced-colors: active) {
   .ob-callout, .ob-tag, .ob-sg { border-color: CanvasText; }
 }
+
+/* The thrown-away ledger: two lists (by product, by reason) side by side, one above the other on a phone. */
+.ob-twocol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); margin-top: var(--sp-4); }
+.ob-h3 { margin: 0 0 var(--sp-1); font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink2); }
+@media (max-width: 700px) { .ob-twocol { grid-template-columns: minmax(0, 1fr); } }
