@@ -61,6 +61,13 @@
   const C = SB.config;
   // The rules engine (SB.engine), looked up on each call and never kept.
   const E = () => SB.engine;
+  // True when the cook-ahead parts (batches, Cabinet tab, Hold button, temperature checks, sanitize timer) should show:
+  // the module is on (absent means on), or some batch still holds food, which is never hidden.
+  function cookOn() {
+    const s = store().getState();
+    if (!E() || typeof E().moduleOn !== 'function' || E().moduleOn(s, 'cookAhead')) return true;
+    return (s.batches || []).some((b) => b && b.status !== 'discard' && b.remainingG > 0);
+  }
   // Browser-storage keys: the sound switch, and whether the all-day strip is folded.
   const KEY_SOUND = 'smokebox.v1.sound';
   // Whether warnings are also spoken aloud (the tablet's own voice), on by default.
@@ -791,6 +798,7 @@
   // header stay. opts.batchId scrolls to one batch. Opened from the Cabinet tab, the Hold button, H and the strip rows.
   function showCabinet(on, opts) {
     if (on && roleNow() === 'front') return; // a front-of-house device has no cabinet
+    if (on && !cookOn()) return; // the cook-ahead module is off and no batch holds food
     if (!m || !SB.hold) { if (on) openSheet('hold'); return; }
     if (on) {
       if (!m.cab) m.cab = SB.hold.mount(m.cabEl, opts && opts.tab ? { tab: opts.tab } : {});
@@ -1503,9 +1511,12 @@
     // The strip is for what needs a cook soon: a row waits until the deadline is within the hour (or is already bad, past or out), so a quiet kitchen has no strip.
     const soon = (d) => d.sev === 'bad' || d.kind === 'past' || d.kind === 'expired' || !(d.msLeft > 60 * 60e3);
     if (!m.dis) m.dis = new Set();
-    const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
+    // With the cook-ahead part off (and no food in a batch) rows about batches, temperatures and sanitizing stay out of the strip.
+    const ck = cookOn();
+    const batchy = (d) => !ck && (d.batchId || d.kind === 'sanitize' || d.kind === 'check' || d.kind === 'shortfall' || d.kind === 'leftover' || d.kind === 'keepcheck' || d.kind === 'expiry' || d.kind === 'expired' || d.kind === 'past');
+    const feed = all.filter((d) => !d.trivial && !batchy(d) && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
     // A tablet screen is short: one warning row there (the next shows when this one is cleared or done), two on a tall or far screen.
-    const maxRows = far || (g.innerHeight || 0) >= 900 ? 2 : 1;
+    const maxRows = !F.wallActive() && (far || (g.innerHeight || 0) >= 900) ? 2 : 1;
     const top = feed.slice(0, maxRows);
     const moreRows = feed.length - top.length;
     const needSound = sound && !audioReady();
@@ -1537,6 +1548,19 @@
     });
   }
 
+  // Shows or hides everything that belongs to the cook-ahead part: the Cabinet tab, the Hold button and the sanitize chip.
+  // A cabinet that is open when the part switches off goes back to the tickets.
+  function applyCook(on) {
+    if (m.ck === on) return;
+    m.ck = on;
+    const tab = m.seg.querySelector('[data-id="cabinet"]');
+    if (tab) tab.hidden = !on;
+    if (m.tool.hold && m.tool.hold.b) m.tool.hold.b.hidden = !on;
+    if (m.sanChip) m.sanChip.hidden = !on;
+    m.fitKey = null; // the header has different contents now, so fit it again
+    if (!on && m.cabOn) showCabinet(false);
+  }
+
   // Refreshes what depends on data or time: tab counts and overdue dots, button counts, sanitize and
   // demo chips. Runs after every draw and tick. WATCH OUT: edits text and attributes only, no new nodes.
   function updateHeader(now) {
@@ -1544,6 +1568,7 @@
     const S = store();
     const c = S.select.counts();
     m.counts = c;
+    applyCook(cookOn());
     paintRole();
     updateStrip(now);
     driveCallouts(now);
@@ -1565,6 +1590,7 @@
     toolCount(m.tool.recall, recentN, '', recentN ? recentN + ' recently bumped' : '');
     toolCount(m.tool.hold, c.hold, 'warn', holdReason(c));
     m.seg.setCount('cabinet', c.hold, { alert: c.hold > 0 });
+    { const cc = m.seg.querySelector('[data-id="cabinet"] .seg-count'); if (cc) cc.dataset.zero = c.hold === 0 ? 'true' : 'false'; }
     toolCount(m.tool.board86, c.out86, 'bad', c.out86 ? c.out86 + ' ' + U.plural(c.out86, 'item') + ' off the menu' : '');
     // Orders still open, counted again only when the orders list itself changed.
     const ords = S.getState().orders || [];
@@ -1665,14 +1691,15 @@
       { hide: kit, label: 'Orders' + (m.openOrders ? ' (' + m.openOrders + ' open)' : ''), icon: 'receipt', onClick: () => openSheet('orders') },
       // Recall and Hold open the same sheets as their header buttons, with the same counts.
       { label: 'Recall' + (recentCount(store(), store().now()) ? ' (' + recentCount(store(), store().now()) + ')' : ''), icon: 'history', onClick: () => openSheet('recall') },
-      { hide: front, label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
+      { hide: front || !cookOn(), label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
       // 86 and Demo open their sheets too.
       { label: '86 board' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
       { hide: kit, label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
       // The sanitize entry opens its own small menu on the same anchor.
-      { label: 'Sanitize timer' + (m.sanText.textContent ? ': ' + m.sanText.textContent : ''), icon: 'shield-check', onClick: () => sanitiseMenu(anchor) },
+      { hide: !cookOn(), label: 'Sanitize timer' + (m.sanText.textContent ? ': ' + m.sanText.textContent : ''), icon: 'shield-check', onClick: () => sanitiseMenu(anchor) },
       { separator: true },
       // Settings, help and the office sit behind the Menu sheet.
+      { hide: !(typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'), label: 'Guide', icon: 'info', onClick: () => SB.guide.open() },
       { label: 'Settings and help', icon: 'settings', onClick: () => openSheet('menu') },
     ].filter((it) => !it.hide);
     // Hiding rows can leave a separator at the top, the bottom or twice in a row; those go.
@@ -1769,7 +1796,7 @@
     if (firstRun) {
       actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'Add your first dish')),
         h('button', { type: 'button', class: 'btn fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
-        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Try the busy-night demo (pretend)')));
+        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Try the busy-night demo (practice)')));
       e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
       return;
     }
@@ -2088,7 +2115,7 @@
     if (k === 'n') openSheet('order');
     else if (k === 'o') openSheet('orders');
     else if (k === 'r') openSheet('recall');
-    else if (k === 'h') toggleCabinet();
+    else if (k === 'h') { if (cookOn()) toggleCabinet(); }
     else if (k === '8') openSheet('board86');
     else if (k === 'd') openSheet('demo');
     else if (k === '?') openSheet('help');

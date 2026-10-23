@@ -1161,11 +1161,12 @@
   };
   // Starts the demo over: stops the simulator, puts the clock back to real time, clears live data (settings stay)
   // and puts the fresh tickets back. Returns how many tickets it made, or -1 when the clear was refused.
-  Sim.restartDemo = function () {
+  // WATCH OUT: when the kitchen has the owner's own dishes, o.replaceOwn must be true or the clear is refused.
+  Sim.restartDemo = function (o) {
     const st = SB.store;
     try { live.stop(); } catch (e) { /* the simulator may not be running */ }
     st.setSpeed(1);
-    if (st.resetLive({ keepSettings: true, starter: true, stagger: true, catalog: 'sample' }) !== 'ok') return -1;
+    if (st.resetLive({ keepSettings: true, starter: true, stagger: true, catalog: 'sample', replaceOwn: !!(o && o.replaceOwn) }) !== 'ok') return -1;
     return Sim.seedFirstRun({ force: true });
   };
   /** True when the dish can be sold in this store right now (unknown counts as yes). */

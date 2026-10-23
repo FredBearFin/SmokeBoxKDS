@@ -9,12 +9,12 @@ let fail = 0;
 // Records one check and prints it.
 function check(name, ok, detail) { if (!ok) fail++; console.log((ok ? '  ok    ' : '  FAIL  ') + name + (ok ? '' : ' -> ' + JSON.stringify(detail))); }
 const ready = (page) => page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 8000 });
-const prep = (page, demo = true) => page.evaluate((d) => { SB.floor.setWelcome(false); if (d) SB.sim.restartDemo(); SB.sim.live.crew(false); }, demo).then(() => page.addStyleTag({ content: '.sb-banner { display: none !important; }' }));
+const prep = (page, demo = true) => page.evaluate((d) => { SB.floor.setWelcome(false); SB.store.resetLive({ keepSettings: true, starter: !!d, stagger: !!d, catalog: 'sample', replaceOwn: true }); if (d) SB.sim.seedFirstRun({ force: true }); SB.sim.live.crew(false); }, demo).then(() => page.addStyleTag({ content: '.sb-banner { display: none !important; }' }));
 
 await withPage({ w: 390, h: 844 }, async (page) => {
   await ready(page);
   check('SB.floor._alerts exists from the start', await page.evaluate(() => Array.isArray(SB.floor._alerts)));
-  const tabs = await page.evaluate(() => [...document.querySelectorAll('.fl-seg .seg-opt')].map((e) => ({ t: e.textContent.trim().slice(0, 12), h: Math.round(e.getBoundingClientRect().height), ws: getComputedStyle(e).whiteSpace })));
+  const tabs = await page.evaluate(() => [...document.querySelectorAll('.fl-seg .seg-opt')].filter((e) => e.offsetParent !== null).map((e) => ({ t: e.textContent.trim().slice(0, 12), h: Math.round(e.getBoundingClientRect().height), ws: getComputedStyle(e).whiteSpace })));
   check('station tab names never wrap (nowrap)', tabs.length > 0 && tabs.every((t) => t.ws === 'nowrap'), tabs);
   check('all tabs the same height, so no label broke into two lines', new Set(tabs.map((t) => t.h)).size === 1, tabs);
 });
@@ -67,11 +67,11 @@ await withPage({ w: 1280, h: 800 }, async (page, logs) => {
 await withPage({ w: 1280, h: 800 }, async (page) => {
   await ready(page); await prep(page, false);
   // Sold-out explanation and name field order (a first-run kitchen has no food cooked, so dishes are sold out)
-  await page.evaluate(() => SB.sheets.open('order')); await page.waitForSelector('.ord-tile');
+  await page.evaluate(() => SB.sheets.open('order')); await page.waitForSelector('.ord-tile'); await page.waitForTimeout(700);
   const tile = await page.evaluate(() => { const t = [...document.querySelectorAll('.ord-tile.is-86')][0]; return t ? t.dataset.id : null; });
   check('an empty kitchen has a sold-out dish to try', !!tile, tile);
   if (tile) {
-    await page.click('.ord-tile[data-id="' + tile + '"]', { force: true }); await page.waitForTimeout(300);
+    await page.click('.ord-tile[data-id="' + tile + '"]', { force: true }); await page.waitForSelector('.toast', { timeout: 3000 }).catch(() => {});
     const msg = await page.evaluate(() => [...document.querySelectorAll('.toast')].map((e) => e.textContent).join(' | '));
     check('tapping a sold-out dish explains it and says how to sell it again', /Out of .+\. Log a batch to sell .+ again\./.test(msg), msg);
   }
@@ -85,8 +85,8 @@ await withPage({ w: 1280, h: 800 }, async (page) => {
   await page.evaluate(() => { const s = document.querySelector('.sheet-root'); if (s) SB.sheets.closeAll && SB.sheets.closeAll(); });
   await page.waitForTimeout(300);
   await page.evaluate(() => SB.sheets.open('order')); await page.waitForTimeout(600);
-  const first = await page.locator('.ord-first-dish').count();
-  check('an empty menu shows No dishes yet and an Add your first dish button', first === 1);
-  if (first) { await page.click('.ord-first-dish'); await page.waitForTimeout(700); check('that button opens the setup wizard', (await page.locator('.sheet').count()) >= 1 && /Set up your kitchen/.test(await page.evaluate(() => document.body.innerText))); }
+  // With no dishes the New ticket button now leads to the Dishes screen (the setup flow), never to a blank menu.
+  const ordScreen = await page.locator('.sheet .ord').count();
+  check('with no dishes, New ticket opens the dishes flow instead of an empty menu', ordScreen === 0 && (await page.locator('.sheet').count()) >= 1, ordScreen);
 });
 process.exit(fail ? 1 : 0);

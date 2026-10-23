@@ -54,3 +54,17 @@ Fixed:
 - Wording: no "safe"/"unsafe" claims in my files; Specs removed from the Menu sheet (still opens with `SB.sheets.open('specs')` and from Help while the demo is loaded); Pitcall mention removed; pretend, made-up, simulated and sample now say "practice" (the word "Demo" itself is kept for the button and tags, per the glossary option).
 
 Still open: P1-6 one-tap pay default method; P2 items 1-3, 5-11 above; the "New tablet?" toast stays 15 s (`77-floor-setup.js:171`, A2); the Demo and tag names; welcome buttons at 38 px (A2).
+
+## Round 3 status
+
+Screenshots: `docs/ux-shots/night/a1/r3-*.png` (blank board with the module off, demo board, 1024 and 1280, Day and Night, Paid by menu, slim banner). Tests: `test/board-round3.e2e.mjs` (18 checks) and the updated `test/board-round2.e2e.mjs`. Simulated in headless Chromium only.
+
+Fixed:
+- **Cook-ahead parts hide when the module is off** (`70-floor-board.js` `cookOn`): Cabinet tab, Hold button, key H, Sanitize chip, batch and temperature rows in the notice strip, the Hold and Sanitize entries in the quick menu, the 86 board "Nothing is cooked yet" note, the stock food-safety note and the Thrown-out log entry. If any batch still holds food, everything stays. An open cabinet closes when the module switches off. Absent setting means on, so the barbecue demo is unchanged.
+- **Guide** entry in the quick menu and the Menu sheet, only when `SB.guide.open` exists.
+- **Wording:** Thrown-out log, "In range" for "Holding fine", smoker and pit wording made neutral ("Ready at", "Batch on its way", "second batch"), "(practice)" on the first-run demo link. The Demo restart confirm now says it erases the owner's dishes and the button reads "Erase my dishes and restart" when they have any; `Sim.restartDemo({ replaceOwn })` passes the confirmed choice through (3-line change in `45-sim.js`).
+- **Backup banner** is a 40 px bar: one line, a small action, and an X (the old "Later" is now the X, with "Later" kept for screen readers). The save-failure banner has no X on purpose.
+- **Polish:** zero badges are hidden; welcome buttons 44 px and the welcome text is no longer cut; the All-day strip fades at its right edge; wall mode shows one notice row and no sound-pause note.
+- **One-tap pay:** a "Paid by Cash" switch beside Pay (menu: Cash, Card, Other). The Pay button names the method, the choice is remembered on the device (`smokebox.v1.paymethod`), the Tip or discount sheet also remembers it, and the 10 s undo is unchanged.
+
+Left: P2 items 3, 6-11 of the first list; the "New tablet?" 15 s toast (A2); Help sheet text about the cabinet still shows when the module is off.
