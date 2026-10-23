@@ -2770,6 +2770,10 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 @media (max-width: 560px) { .fw-modes { grid-template-columns: 1fr; } }
 .fw [hidden] { display: none !important; }
 .fw .fs-row { margin-block: var(--sp-2); }
+/* Readings: the number box fills the row, so there is no empty gap beside the +5 button. */
+.rd .stepper { display: flex; width: 100%; }
+.rd .stepper .stepper-field { flex: 1 1 auto; min-width: 0; }
+.rd .stepper .stepper-input { flex: 1 1 auto; min-width: 0; width: auto; text-align: center; }
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -22023,6 +22027,11 @@ a.of-nav:active { background: var(--press); }
     const showNote = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note) && (note === health || (needSound ? m.dis.has('snd') : true));
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
+    // The note's icon says what it is about: a new version waiting shows a refresh arrow, everything else the muted speaker.
+    if (showNote) {
+      const want = updateNote() && note === updateNote() ? 'refresh' : 'volume-off';
+      if (m.pauseIcon !== want) { m.pauseIcon = want; const old = m.strip.pauseBtn.firstChild; if (old) old.replaceWith(ico(want, 24)); }
+    }
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
@@ -24466,13 +24475,14 @@ a.of-nav:active { background: var(--press); }
       // Serve-by time with the kind of limit it is: quality (house limit, held at temperature) or safety (time as a health control).
       const coolingNow = b.kind === 'cooling';
       setHidden(rec.dtServe, coolingNow); setHidden(rec.ddServe, coolingNow);
-      if (!coolingNow) text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b)) + ', ' + (b.holdBasis === 'safety' ? 'throw-out time' : 'quality limit'));
+      // One answer per row: the label says which kind of limit it is and the value is just the time.
+      if (!coolingNow) { text(rec.dtServe, b.holdBasis === 'safety' ? 'Throw out at' : 'Quality limit'); text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b))); }
       // A cold item shows its fridge date instead: the last day in the fridge, or that no days were set.
       if (ci) {
         text(rec.dtServe, 'Fridge date');
         text(rec.ddServe, ci.useBy ? 'Use by ' + U.fmtDateShort(ci.useBy) + ' (your ' + trimNum(ci.fridgeDays) + ' ' + plural(ci.fridgeDays, 'day') + ')' : 'No limit set');
         setHidden(rec.dtServe, false); setHidden(rec.ddServe, false);
-      } else if (rec.dtServe.textContent !== 'Serve by') text(rec.dtServe, 'Serve by');
+      }
       const resting = U.isNum(b.restUntil) && b.restUntil > now && !coolingNow;
       setHidden(rec.dtRest, !resting); setHidden(rec.ddRest, !resting);
       if (resting) text(rec.ddRest, U.fmtTime(b.restUntil));
@@ -29957,7 +29967,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Not yet. Each device has its own board. A second screen can show a board, as a test feature, but cannot take orders (see Several screens). Two tabs in the same browser on the same device stay in step."
+      "x": "Not yet. Each device has its own board. Several tablets can share one kitchen through a hub, as a test feature that has not been tried on real tablets (see Several screens and Opening without the internet). Without a hub, each device has its own board. Two tabs in the same browser on the same device stay in step."
      },
      {
       "t": "h",
@@ -30057,7 +30067,7 @@ a.of-nav:active { background: var(--press); }
     "id": "several-screens",
     "group": "guide",
     "title": "Several screens (test feature)",
-    "summary": "Show your kitchen on a second screen, or let more than one tablet take orders into one kitchen. Both are test features. They are not part of the normal install, and nothing has been tried on real tablets.",
+    "summary": "More than one screen on one kitchen. This is a test feature, not part of the normal install, and nothing has been tried on real tablets.",
     "blocks": [
      {
       "t": "h",
@@ -30065,7 +30075,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "A hub: a small program that keeps the kitchen in one place. Someone has to run it by hand on a laptop or a server. Smokebox never starts one. You also need its address, and its access code if it has one. Then tap **Settings**, then **Use one kitchen on several tablets**."
+      "x": "A hub: a small program that keeps the kitchen in one place. Someone runs it by hand on a laptop or server. Smokebox never starts one. You need its address and its access code, if it has one. Then tap **Settings**, then **Use one kitchen on several tablets**."
      },
      {
       "t": "h",
@@ -30073,7 +30083,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "For a TV or a phone. Tap **Show only**, type the **Address of the kitchen** and the code, and tap **Connect**. The screen says \"Connected\" and \"This screen only shows the kitchen.\" It cannot take or change orders, and it does not touch the tablet's own saved kitchen."
+      "x": "For a TV or a phone. Tap **Show only**, type the **Address of the kitchen** and the code, and tap **Connect**. The screen says \"Connected\" and \"This screen only shows the kitchen.\" It cannot take or change orders. To leave, tap the menu button at the top right, then **Back to my own kitchen**."
      },
      {
       "t": "h",
@@ -30086,13 +30096,13 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "ul",
       "x": [
-       "Show the hub's kitchen on this tablet. Your own saved kitchen stays untouched and comes back when you leave.",
+       "Show the hub's kitchen on this tablet. Your own saved kitchen stays untouched.",
        "Send this tablet's kitchen to the hub. This works only if the hub is empty. Smokebox never mixes two kitchens."
       ]
      },
      {
       "t": "p",
-      "x": "Then tap **Join the hub**. If you reload the page, the tablet goes back to its own kitchen and you join again."
+      "x": "Then tap **Join the hub**. Tap **Leave the hub** to go back."
      },
      {
       "t": "h",
@@ -30103,21 +30113,18 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "\"Connected\": your taps are reaching the hub.",
        "\"Offline: your taps are saved and will be sent\": the link is down. Taps wait on this tablet.",
+       "\"Last known, from\" a time: the page reloaded while the hub was down, so it shows the last kitchen it had.",
        "\"Not confirmed yet\" on a ticket: the hub has not answered that change.",
        "\"Not done:\" and a reason: the hub refused a tap, for example because another tablet got there first."
       ]
      },
      {
-      "t": "p",
-      "x": "A Show only screen says \"Reconnecting...\" when the link drops. After a short while a red banner says \"Out of date since\" a time. Do not rely on it until it says \"Connected\"."
-     },
-     {
       "t": "h",
-      "x": "Leave"
+      "x": "Undo"
      },
      {
       "t": "p",
-      "x": "On a Show only screen, tap the menu button at the top right, then **Back to my own kitchen**. On a tablet using the hub, tap **Leave the hub**. If some taps have not reached the hub, Smokebox warns you first; **Leave anyway, lose those taps** loses them."
+      "x": "**Undo** works only on your own last action, and only while nobody else has acted since. Otherwise you see \"Someone else changed the kitchen since, so this cannot be undone from here. Fix it by hand.\""
      }
     ]
    },
@@ -30141,6 +30148,26 @@ a.of-nav:active { background: var(--press); }
        "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
        "Yesterday's backup saved and a copy kept off the device"
       ]
+     }
+    ]
+   },
+   {
+    "id": "opening-without-the-internet",
+    "group": "guide",
+    "title": "Opening without the internet (test feature)",
+    "summary": "A tablet can keep a copy of Smokebox so the page opens even when the network is down. This is a test feature, and nothing has been tried on real tablets.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Does this tablet have a copy?"
+     },
+     {
+      "t": "p",
+      "x": "The card **Opens without the internet** in **Tablet checks: screen, sound, home screen** says whether this tablet keeps a copy of Smokebox. It works after you have opened Smokebox once with the kitchen connected. It needs a secure (https) address, or the hub computer itself. A plain http address on your network cannot do it. iPad Safari may clear stored data after about a week unless Smokebox is added to the home screen."
+     },
+     {
+      "t": "p",
+      "x": "When a newer version is stored, Settings shows **A new version is ready**. Tap **Reload to update** when it is quiet; it never reloads by itself. If the copy misbehaves, tap **Reset the offline copy** in **Help and about**. Your board and orders are not touched."
      }
     ]
    },
