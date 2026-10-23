@@ -2637,6 +2637,9 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .hc-title { flex: 1 1 auto; }
 .hc-name { font-size: var(--fs-3); font-weight: var(--w-bold); }
 .hc-status { font-size: var(--fs-2); white-space: nowrap; }
+/* On a very narrow screen with Large text the name and the status may sit on two lines instead of pushing past the edge. */
+.hc-title { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 360px) { .hc-head { flex-wrap: wrap; } .hc-status { white-space: normal; } }
 .hc-body { gap: var(--sp-3); }
 .hc-ring { width: 76px; height: 76px; flex: none; }
 .hc-ring::before { inset: 7px; }
@@ -5371,7 +5374,7 @@ a.of-nav:active { background: var(--press); }
     else if (pr === 'bad') P.push(prob('badPrice', 'error', 'The price "' + row.priceText + '" is not a number.', 'Use digits only, for example 9.50.'));
     else if (typeof row.price === 'number') {
       if (row.price < 0) P.push(prob('negativePrice', 'error', 'The price ' + row.price + ' is below zero.', 'Enter the price as a positive amount.'));
-      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above ' + cs() + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "Prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950. If the file is in cents, choose "Prices are in cents".'));
+      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above ' + cs() + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "These prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950. If the file is in cents, choose "These prices are in cents".'));
       else if (row.price === 0) P.push(prob('freeItem', 'warn', 'The price is ' + cs() + '0.00.', 'Keep it if the dish is free, or enter a price.'));
       if (row.rounded) P.push(prob('priceRounded', 'warn', 'The price had more than two decimals and was rounded to the cent.', 'Check the price shown.'));
     }
@@ -5379,7 +5382,7 @@ a.of-nav:active { background: var(--press); }
     else if (/^\d+([.,]\d+)?$/.test(row.categoryText || '')) P.push(prob('numericCategory', 'warn', 'The menu section (category) "' + row.categoryText + '" is a number, which usually means a price was split in two.', 'Check the price and the menu section (category) in the file.'));
     if (row.stationText && !row.station) P.push(prob('unknownStation', 'warn', 'The station "' + row.stationText + '" is not one of yours, so the default station is used.', 'Pick the station after adding the dish.'));
     if (row.categoryText && !row.category) P.push(prob('unknownCategory', 'warn', 'The menu section (category) "' + row.categoryText + '" is not one of yours, so the default section is used.', 'Change the menu section after adding the dish.'));
-    if (row.fromCents) P.push(prob('centsConverted', 'warn', 'The price was read in cents (' + row.priceText + ' becomes ' + cs() + (row.price != null ? row.price.toFixed(2) : '?') + ').', 'If this is wrong, choose "Prices are in dollars".'));
+    if (row.fromCents) P.push(prob('centsConverted', 'warn', 'The price was read in cents (' + row.priceText + ' becomes ' + cs() + (row.price != null ? row.price.toFixed(2) : '?') + ').', 'If this is wrong, choose "These prices are in dollars".'));
     row.ok = !P.some((p) => p.level === 'error');
   }
 
@@ -5683,7 +5686,7 @@ a.of-nav:active { background: var(--press); }
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -5714,6 +5717,7 @@ a.of-nav:active { background: var(--press); }
     reasonRequired: 'Pick a reason first (for example: wrong order, customer left, dropped).',
     badTemp: 'Enter a temperature between 32 and 300 °F.',
     tempTooLow: 'A reheat needs a reading of at least ' + C.safety.reheatF + ' °F. Keep heating and log it again.' + SAFETY,
+    notFridgeBatch: 'This batch is not tracked by place. Only cold items kept in a fridge can be taken out and put back.',
     notReheatable: 'This batch cannot be reheated: Smokebox allows one reheat per batch, and only within ' + C.safety.belowHotGraceH + ' hours of going below ' + C.safety.hotHoldF + ' °F. Discard it.' + SAFETY,
     notEnoughData: 'Not enough data yet. Run a few more tickets first.',
     batchNotServable: 'That batch is locked or already discarded, so it cannot be used.' + SAFETY,
@@ -5798,7 +5802,9 @@ a.of-nav:active { background: var(--press); }
     moveMenuItem: '{ id, toIndex }',
     setChips: '{ chips: string[] | null }',
     clearDemoTickets: '{}',
-    addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety" }',
+    addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety", fridge?:boolean, fridgeDays?, outHours? }',
+    coldTakeOut: '{ batchId, who? }',
+    coldReturn: '{ batchId, who? }',
     setPortions: '{ menuId, on:boolean, count? }',
     resetLive: '{ keepSettings?=true, starter?, stagger?, catalog?: "sample"|"blank", replaceOwn? }',
     undo: '{}',
@@ -5806,7 +5812,7 @@ a.of-nav:active { background: var(--press); }
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient', 'moveMenuItem', 'setChips'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient', 'moveMenuItem', 'setChips', 'coldTakeOut', 'coldReturn'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -5820,7 +5826,7 @@ a.of-nav:active { background: var(--press); }
   const PAST_LIMIT_MS = 48 * H;
   // The reasons a batch can be thrown out. SAFETY_DISCARDS are the three that mean a food-safety problem;
   // those put dishes on "safety hold". Manual, quality and other do not.
-  const DISCARD_REASONS = ['expired', 'temp', 'cooling', 'manual', 'quality', 'other'];
+  const DISCARD_REASONS = ['expired', 'temp', 'cooling', 'manual', 'quality', 'other', 'fridgeDate', 'outTime'];
   const SAFETY_DISCARDS = { expired: 1, temp: 1, cooling: 1 };
   // Lists of allowed words. The 1 only means "is allowed" (tested with hasOwn). STATUS_OF turns a gate
   // action word into the status word stored on a batch.
@@ -5834,7 +5840,7 @@ a.of-nav:active { background: var(--press); }
   // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
   // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
   // safetyKeep bucket instead of being dropped.
-  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, cooling_started: 1, sanitize_done: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
   // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months). This is our own choice; no source gives a minimum, so ask your health department how long to keep records.
   const SAFETY_KEEP_MS = 190 * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
@@ -6129,9 +6135,74 @@ a.of-nav:active { background: var(--press); }
   // True for a batch whose own limit is a quality limit with room before the hard cap: past that limit it is
   // held off the menu until someone tastes it, instead of being thrown out. Batches saved before limit kinds
   // existed have no kind and act as safety limits.
-  const hasQualityStage = (b, S) => b.holdBasis === 'quality' && (isNum(b.maxHoldH) ? b.maxHoldH : S.defaultMaxHoldH) < hardCapH(S);
+  const hasQualityStage = (b, S) => b.fridge !== true && b.holdBasis === 'quality' && (isNum(b.maxHoldH) ? b.maxHoldH : S.defaultMaxHoldH) < hardCapH(S);
   // Formats a temperature as whole degrees for messages.
   const f0 = (x) => Math.round(x) + ' °F';
+  /* ---------- cold items kept in a fridge (two limits the owner types: days in the fridge, hours out of it) ---------- */
+  // True for a batch tracked by place: a cold item whose product the owner marked as kept in a fridge.
+  const isFridgeBatch = (b) => b.fridge === true && b.kind === 'cold';
+  // Time spent out of the fridge so far, in ms: the stays already finished plus the stay in progress (never negative).
+  const lineElapsedMs = (b, now) => (isNum(b.lineMs) && b.lineMs > 0 ? b.lineMs : 0) + (b.place === 'line' && isNum(b.lineSince) ? Math.max(0, now - b.lineSince) : 0);
+  // The last day in the fridge as a date: the made-on date plus the owner's days, with the day made counted as day 1.
+  const fridgeLastDay = (b) => (isNum(b.fridgeDays) && typeof b.madeOn === 'string' ? U.addDays(b.madeOn, b.fridgeDays - 1) : null);
+  // The moment the fridge date runs out: midnight at the end of the last day. Infinity when the owner set no days.
+  const fridgeEndAt = (b) => (isNum(b.fridgeDays) && typeof b.madeOn === 'string' ? U.dateKeyToMs(U.addDays(b.madeOn, b.fridgeDays)) : Infinity);
+  // The moment the out-of-fridge hours run out. While out it counts from the stay's start; in the fridge the clock is
+  // paused, so it is Infinity, or -Infinity when the hours are already used up and the batch is due to be re-checked.
+  function lineEndAt(b) {
+    if (!isNum(b.outHours)) return Infinity;
+    const left = b.outHours * H - (isNum(b.lineMs) && b.lineMs > 0 ? b.lineMs : 0);
+    if (b.place === 'line' && isNum(b.lineSince)) return b.lineSince + Math.max(0, left);
+    return left < 0 ? -Infinity : Infinity;
+  }
+  // Plain facts about a cold batch for screens and call-outs: where it is, the date mark, time used and left, and a color
+  // word. Returns null for any other batch. Says "noLimit" when the owner set neither limit; it never states a rule.
+  function coldInfo(b, now) {
+    if (!isObj(b) || !isFridgeBatch(b)) return null;
+    const outMs = lineElapsedMs(b, now), fEnd = fridgeEndAt(b), lEnd = lineEndAt(b);
+    const outLeftMs = isNum(b.outHours) ? b.outHours * H - outMs : null;
+    const fridgeLeftMs = isFinite(fEnd) ? fEnd - now : null;
+    let state = 'ok';
+    if (b.status === 'discard') state = 'bad';
+    else {
+      const left = Math.min(outLeftMs == null ? Infinity : outLeftMs, fridgeLeftMs == null ? Infinity : fridgeLeftMs);
+      if (left <= 0) state = 'bad'; else if (left <= 2 * H || b.status === 'check' || b.status === 'chill') state = left <= 30 * MIN ? 'bad' : 'warn';
+    }
+    return { place: b.place === 'line' ? 'line' : 'fridge', madeOn: b.madeOn || null, fridgeDays: isNum(b.fridgeDays) ? b.fridgeDays : null, useBy: fridgeLastDay(b),
+      outHours: isNum(b.outHours) ? b.outHours : null, outMs, outLeftMs, fridgeLeftMs, outSince: b.place === 'line' && isNum(b.lineSince) ? b.lineSince : null,
+      noLimit: !isNum(b.fridgeDays) && !isNum(b.outHours), state, nextAt: Math.min(fEnd, lEnd) };
+  }
+  // Gate for a fridge-kept cold batch. The owner's two limits end it (past the fridge date, or more out-of-fridge hours
+  // than typed); while out, no temperature check is due; in the fridge the usual cold checks apply. Never states a rule.
+  function coldGate(b, now, S) {
+    const fEnd = fridgeEndAt(b), lEnd = lineEndAt(b);
+    if (now > fEnd) return gateOut('DISCARD_LOCKOUT', false, 'fridgeDate', 'bad', 'Past your fridge date (last day ' + fridgeLastDay(b) + '). Discard.' + SAFETY);
+    if (isNum(b.outHours) && lineElapsedMs(b, now) > b.outHours * H) return gateOut('DISCARD_LOCKOUT', false, 'outTime', 'bad', 'Out of the fridge for more than your ' + U.round(b.outHours, 2) + '-hour limit. Discard.' + SAFETY);
+    const end = Math.min(fEnd, lEnd);
+    if (b.place === 'line') {
+      const used = Math.round(lineElapsedMs(b, now) / MIN);
+      return gateOut('NONE', true, 'onLine', 'ok', 'Out of the fridge, ' + used + ' min so far' + (isNum(b.outHours) ? ' of your ' + U.round(b.outHours, 2) + '-hour limit.' : '. No out-of-fridge limit set.'), end);
+    }
+    if (b.outSince != null) {
+      const lim = b.outSince + S.aboveColdGraceH * H;
+      if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
+      return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, end));
+    }
+    const iv = S.tempCheckEveryMin * MIN;
+    if (b.lastTempAt == null) return gateOut('CHECK_TEMP', true, 'noReading', now - b.enteredAt > iv ? 'bad' : 'warn', 'No temperature logged yet. Check it now.' + SAFETY, end);
+    const due = b.lastTempAt + iv;
+    if (now > due) return gateOut('CHECK_TEMP', true, 'checkDue', now > b.lastTempAt + 2 * iv ? 'bad' : 'warn', 'Temperature check is due. Log a reading.' + SAFETY, end);
+    return gateOut('NONE', true, 'ok', 'ok', 'Holding fine.', Math.min(due, end));
+  }
+  // The next moment a fridge-kept batch's stored status can change on its own (-Infinity when it already disagrees).
+  function coldDeadline(b, S) {
+    const end = Math.min(fridgeEndAt(b), lineEndAt(b));
+    if (b.place === 'line') return b.status === 'ok' ? end : -Infinity;
+    if (b.outSince != null) return b.status !== 'chill' ? -Infinity : Math.min(end, b.outSince + S.aboveColdGraceH * H);
+    if (b.status === 'check') return end;
+    if (b.status !== 'ok' || b.lastTempAt == null) return -Infinity;
+    return Math.min(end, b.lastTempAt + S.tempCheckEveryMin * MIN);
+  }
   // Builds the answer card that gate() returns. The status word comes from the action word; nextDeadlineAt
   // is included only when it is a real time.
   function gateOut(action, canServe, reason, severity, text, nextDeadlineAt) {
@@ -6162,7 +6233,7 @@ a.of-nav:active { background: var(--press); }
   // above it, so they are thrown out at the cap. Takes the state.
   function noQualityStage(state) {
     const S = safetyOf(state.settings), out = [];
-    for (const ing of state.ingredients) if (ing.tcs && (isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH) >= hardCapH(S)) out.push(ing.name);
+    for (const ing of state.ingredients) if (ing.tcs && ing.fridge !== true && (isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH) >= hardCapH(S)) out.push(ing.name);
     return out;
   }
   /** gate(batch, now, safety) -> { canServe, action, reason, severity, status, nextDeadlineAt?, text } */
@@ -6175,6 +6246,7 @@ a.of-nav:active { background: var(--press); }
     // A missing time falls back to the entry time, so a bad call cannot crash or discard by mistake.
     if (!isNum(now)) now = batch.enteredAt;
     if (batch.kind === 'cooling') return coolingGate(batch, now, S);
+    if (isFridgeBatch(batch)) return coldGate(batch, now, S);
     const lim = holdLimitMs(batch, S), qStage = hasQualityStage(batch, S);
     const hard = batch.enteredAt + hardLimitMs(S);
     let exp = batch.enteredAt + lim;
@@ -6219,6 +6291,7 @@ a.of-nav:active { background: var(--press); }
       if (b.stage1At == null && b.status === 'chill') return st + c.stage1H * H;
       return st + c.totalH * H;
     }
+    if (isFridgeBatch(b)) return coldDeadline(b, S);
     const q = hasQualityStage(b, S);
     const hard = b.enteredAt + hardLimitMs(S);
     const lim = b.enteredAt + holdLimitMs(b, S);
@@ -7399,6 +7472,13 @@ a.of-nav:active { background: var(--press); }
       maxHoldH: isNum(ing.maxHoldH) ? ing.maxHoldH : S.defaultMaxHoldH, status: 'ok', action: 'NONE', canServe: true,
     };
     b.holdBasis = ing.holdBasis === 'safety' ? 'safety' : 'quality';
+    // A cold product kept in a fridge starts in the fridge with its made-on date; the owner's two limits are copied so
+    // the label stays what it was when the batch was made, even if the product is edited later.
+    if (b.kind === 'cold' && ing.fridge === true) {
+      b.fridge = true; b.place = 'fridge'; b.lineMs = 0; b.madeOn = U.dateKey(tx.now);
+      if (isNum(ing.fridgeDays)) b.fridgeDays = ing.fridgeDays;
+      if (isNum(ing.outHours)) b.outHours = ing.outHours;
+    }
     if (isNum(ing.restH) && ing.restH > 0) b.restUntil = tx.now + ing.restH * H;
     if (isNum(o.rawG)) b.rawG = o.rawG;
     if (isNum(o.yieldPct)) b.yieldPct = o.yieldPct;
@@ -7544,10 +7624,10 @@ a.of-nav:active { background: var(--press); }
     let reheated = false;
     if (b.kind === 'cooling') {
       const c = S.cooling || C.safety.cooling;
-      if (b.stage1At == null && f <= c.stage1ToF) w.stage1At = t;
-      if (w.stage1At != null && b.finalAt == null && f <= c.finalF) w.finalAt = t;
+      if (b.stage1At == null && f <= c.stage1ToF) { w.stage1At = t; w.stage1F = f; }
+      if (w.stage1At != null && b.finalAt == null && f <= c.finalF) { w.finalAt = t; w.finalF = f; }
     } else if (b.kind === 'cold') {
-      if (f > S.coldHoldF) { if (b.outSince == null) w.outSince = t; } else if (b.outSince != null) delete w.outSince;
+      if (f > S.coldHoldF) { if (b.outSince == null && b.place !== 'line') w.outSince = t; } else if (b.outSince != null) delete w.outSince;
     } else if (f < S.hotHoldF) {
       if (b.outSince == null) w.outSince = t;
     } else if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1) && t - b.outSince <= S.belowHotGraceH * H) {
@@ -7596,6 +7676,47 @@ a.of-nav:active { background: var(--press); }
     refreshBatch(tx, bi);
     const nb = tx.get('batches')[bi];
     tx.info = { batchId: b.id, status: nb.status, canServe: nb.canServe };
+    return 'ok';
+  };
+
+  // Takes a fridge-kept cold batch out to the line, or puts it back. The out-of-fridge clock starts when it comes out, pauses
+  // when it goes back and adds up over every stay. Needs a batch the owner marked as kept in a fridge. Logged with who and when.
+  function coldMove(tx, p, to) {
+    const bs = tx.get('batches');
+    const bi = findBatchIdx(bs, p.batchId);
+    if (bi < 0) return 'unknownBatch';
+    const who = readWho(p);
+    if (who === null) return 'badWho';
+    const b = bs[bi];
+    if (b.status === 'discard') return 'batchNotServable';
+    if (!isFridgeBatch(b)) return 'notFridgeBatch';
+    if (b.place === to) { tx.info.why = to === 'line' ? 'alreadyOut' : 'alreadyIn'; return 'nothingToDo'; }
+    // The move time never goes backwards, even if the clock was set back, so out time only ever grows.
+    const t = stampAfter(b.movedAt, stampAfter(b.enteredAt, tx.now));
+    const w = tx.batch(bi);
+    w.place = to; w.movedAt = t;
+    if (to === 'line') w.lineSince = t;
+    else { w.lineMs = (isNum(b.lineMs) && b.lineMs > 0 ? b.lineMs : 0) + (isNum(b.lineSince) ? Math.max(0, t - b.lineSince) : 0); delete w.lineSince; }
+    tx.event(to === 'line' ? 'batch_out' : 'batch_back', whoField({ batchId: b.id, ing: b.ing, outMs: to === 'line' ? lineElapsedMs(b, t) : w.lineMs }, who));
+    refreshBatch(tx, bi);
+    const nb = tx.get('batches')[bi];
+    pushUndo(tx, 'coldMove', (b.label || 'Batch') + (to === 'line' ? ' taken out' : ' put back'), { batchId: b.id, before: b, at: t, discardedAt: nb.discardedAt });
+    tx.info = { batchId: b.id, place: nb.place, status: nb.status, canServe: nb.canServe, outMs: lineElapsedMs(nb, t) };
+    return 'ok';
+  }
+  // Takes a fridge-kept cold batch out of the fridge (see coldMove).
+  A.coldTakeOut = (tx, p) => coldMove(tx, p, 'line');
+  // Puts a fridge-kept cold batch back in the fridge (see coldMove).
+  A.coldReturn = (tx, p) => coldMove(tx, p, 'fridge');
+  // Undo of a take-out or put-back: the old place and clock go back, only while the batch is still as the move left it.
+  UNDO.coldMove = function (tx, d) {
+    const bs = tx.get('batches');
+    const bi = findBatchIdx(bs, d.batchId);
+    if (bi < 0 || bs[bi].movedAt !== d.at || bs[bi].discardedAt !== d.discardedAt || !isObj(d.before)) return 'undoConflict';
+    tx.mut('batches')[bi] = Object.assign({}, d.before);
+    tx.own.add(tx.get('batches')[bi]);
+    tx.batchTouched = true;
+    refreshBatch(tx, bi);
     return 'ok';
   };
 
@@ -8038,6 +8159,8 @@ a.of-nav:active { background: var(--press); }
     name: { t: 'text', max: 60 }, thresholdG: R(0, 1e6), parG: R(0, 1e7), yield: R(0.05, 3), yieldConfirmed: { t: 'bool' },
     costPerKg: R(0, 10000), costEach: R(0, 10000), pullG: R(50, 50000),
     maxHoldH: R(0.5, 12), restH: R(0, 12), cookH: R(0, 48), holdBasis: { t: 'enum', v: ['quality', 'safety'] }, archived: { t: 'bool' },
+    // Cold items kept in a fridge: the flag, and the owner's own two limits (days in the fridge, hours out of it). No default numbers; null clears one.
+    fridge: { t: 'bool' }, fridgeDays: Object.assign(R(1, 30, true), { clearable: true }), outHours: Object.assign(R(0.25, 24), { clearable: true }),
   };
   // Shared editor for menu items and ingredients. Checks each field, ignores unchanged ones (nothingToDo if
   // nothing changed), writes one new copy and logs settings_changed. Changing a starter prep time re-fits
@@ -8061,6 +8184,7 @@ a.of-nav:active { background: var(--press); }
       // use known ingredients with no repeats, and other fields use the range rules.
       const spec = schema[k];
       let nv = v;
+      if (v === null && spec.clearable) { if (cur[k] !== undefined) { delete out[k]; keys.push(key); } continue; }
       if (spec.t === 'text') {
         if (typeof v !== 'string' || v.length > 400) { tx.info.key = key; return 'badPatch'; }
         nv = cleanText(v);
@@ -8082,6 +8206,12 @@ a.of-nav:active { background: var(--press); }
         if (k === 'price') nv = cents(v); // a price is whole cents, so what is shown is what is charged
       }
       if (JSON.stringify(cur[k]) !== JSON.stringify(nv)) { out[k] = nv; keys.push(key); }
+    }
+    // Place and limits belong only to a cold cooked-ahead product marked as kept in a fridge; a hot or plain one cannot carry them.
+    if (listKey === 'ingredients') {
+      if (out.fridge !== true && (out.fridgeDays !== undefined || out.outHours !== undefined)) { delete out.fridgeDays; delete out.outHours; if (!keys.length) keys.push(prefix + '.' + cur.id + '.fridgeDays'); }
+      if (out.fridge === true && !(out.tcs === true && out.hold === 'cold')) { tx.info.key = prefix + '.' + cur.id + '.fridge'; return 'badPatch'; }
+      if (out.fridge === false && cur.fridge === undefined) delete out.fridge;
     }
     if (!keys.length) return 'nothingToDo';
     const w = tx.mut(listKey);
@@ -8281,6 +8411,7 @@ a.of-nav:active { background: var(--press); }
       out[k] = p[k];
     }
     if (out.thresholdG === undefined) out.thresholdG = 0;
+    // A cooked-ahead product also gets its hold type, limit kind and time; a cold one may be marked as kept in a fridge.
     if (tcs) {
       const hold = p.hold == null ? 'hot' : p.hold;
       if (hold !== 'hot' && hold !== 'cold') { tx.info.key = 'ingredients.new.hold'; return 'badPatch'; }
@@ -8291,7 +8422,19 @@ a.of-nav:active { background: var(--press); }
       const me = checkLeaf(ING_PATCH.maxHoldH, mh, 'ingredients.new.maxHoldH');
       if (me) { tx.info = { key: me.key, min: me.min, max: me.max }; return me.report; }
       Object.assign(out, { hold, holdBasis: basis, maxHoldH: mh, cookH: 2, restH: 0, pullG: 1000 });
-    }
+      if (p.fridge != null) {
+        const fe = checkLeaf(ING_PATCH.fridge, p.fridge, 'ingredients.new.fridge');
+        if (fe || (p.fridge && hold !== 'cold')) { tx.info.key = 'ingredients.new.fridge'; return 'badPatch'; }
+        if (p.fridge) out.fridge = true;
+      }
+      for (const k of ['fridgeDays', 'outHours']) {
+        if (p[k] == null) continue;
+        if (out.fridge !== true) { tx.info.key = 'ingredients.new.' + k; return 'badPatch'; }
+        const e = checkLeaf(ING_PATCH[k], p[k], 'ingredients.new.' + k);
+        if (e) { tx.info = { key: e.key, min: e.min, max: e.max }; return e.report; }
+        out[k] = p[k];
+      }
+    } else if (p.fridge != null || p.fridgeDays != null || p.outHours != null) { tx.info.key = 'ingredients.new.fridge'; return 'badPatch'; }
     tx.mut('ingredients').push(out);
     if (!tcs) tx.mut('stock')[out.id] = 0;
     tx.mut('ledger')[out.id] = { open: 0, in: 0, pulled: 0, prunedUsed: 0, prunedWaste: 0, prunedRemain: 0, dropped: 0 };
@@ -9102,6 +9245,12 @@ a.of-nav:active { background: var(--press); }
       if (b.status === 'discard' && (b.canServe !== false || b.remainingG !== 0)) add('I8 ' + b.id + ' discarded but servable or not empty');
       if (!hasOwn(BATCH_STATUS, b.status) || !hasOwn(BATCH_KIND, b.kind)) add('batch ' + b.id + ' bad status/kind');
       if (b.kind === 'cooling' && b.canServe) add('I8 ' + b.id + ' cooling batch servable');
+      // I20: a fridge-kept cold batch has a place, a made-on date, out time that is never negative, and a start time exactly while it is out.
+      if (b.fridge !== undefined || b.place !== undefined) {
+        if (b.fridge !== true || b.kind !== 'cold') add('I20 ' + b.id + ' has place fields but is not a fridge-kept cold batch');
+        else if ((b.place !== 'fridge' && b.place !== 'line') || !isNum(b.lineMs) || b.lineMs < 0 || typeof b.madeOn !== 'string' || (b.place === 'line') !== isNum(b.lineSince)) add('I20 ' + b.id + ' place ' + b.place + ' out ' + b.lineMs + ' made ' + b.madeOn);
+        else if ((b.fridgeDays !== undefined && !(isInt(b.fridgeDays) && b.fridgeDays >= 1)) || (b.outHours !== undefined && !(isNum(b.outHours) && b.outHours > 0))) add('I20 ' + b.id + ' limits fridgeDays ' + b.fridgeDays + ' outHours ' + b.outHours);
+      }
       if (isNum(now) && b.status !== 'discard' && (b.remainingG > 0 || b.kind === 'cooling')) {
         const gt = gate(b, now, S);
         if (gt.status !== b.status || gt.canServe !== b.canServe) add('I8 ' + b.id + ' stored ' + b.status + '/' + b.canServe + ' but gate says ' + gt.status + '/' + gt.canServe);
@@ -9221,6 +9370,9 @@ a.of-nav:active { background: var(--press); }
         if (typeof out.tcs !== 'boolean' || (out.unit !== 'g' && out.unit !== 'ea') || typeof out.name !== 'string') { repaired.push('dropped ingredient ' + x.id); continue; }
         for (const k of Object.keys(ING_PATCH)) if (ING_PATCH[k].t === 'num' && out[k] !== undefined && checkLeaf(ING_PATCH[k], out[k], k)) { out[k] = base && base[k] !== undefined ? base[k] : undefined; if (out[k] === undefined) delete out[k]; repaired.push('ingredient ' + x.id + '.' + k + ' reset'); }
         if (out.tcs && out.hold !== 'hot' && out.hold !== 'cold') out.hold = 'hot';
+        // Fridge flag and the owner's two limits only on a cold cooked-ahead product.
+        if (out.fridge !== undefined && (out.fridge !== true || !out.tcs || out.hold !== 'cold')) { delete out.fridge; repaired.push('ingredient ' + x.id + '.fridge cleared'); }
+        if (out.fridge !== true) { delete out.fridgeDays; delete out.outHours; }
         seenIng.add(x.id);
         ingredients.push(out);
       }
@@ -9305,6 +9457,18 @@ a.of-nav:active { background: var(--press); }
         out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS)
           .map((x) => (typeof x.who === 'string' && x.who.length >= 1 && x.who.length <= 12 ? { t: x.t, f: x.f, who: x.who } : { t: x.t, f: x.f }));
         for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
+        for (const k of ['stage1F', 'finalF', 'lineMs', 'lineSince', 'movedAt', 'fridgeDays', 'outHours']) if (out[k] !== undefined && !isNum(out[k])) delete out[k];
+        // Place and the owner's limits exist only on a cold batch made from a fridge-kept product; anything else is cleared.
+        if (out.fridge !== true || out.kind !== 'cold') { for (const k of ['fridge', 'place', 'lineMs', 'lineSince', 'movedAt', 'madeOn', 'fridgeDays', 'outHours']) delete out[k]; }
+        else {
+          if (out.place !== 'line') out.place = 'fridge';
+          if (!isNum(out.lineMs) || out.lineMs < 0) out.lineMs = 0;
+          if (out.place === 'line' && !isNum(out.lineSince)) out.place = 'fridge';
+          if (out.place === 'fridge') delete out.lineSince;
+          if (typeof out.madeOn !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(out.madeOn)) out.madeOn = U.dateKey(out.enteredAt);
+          if (isNum(out.fridgeDays) && !(out.fridgeDays >= 1 && out.fridgeDays <= 30 && Number.isInteger(out.fridgeDays))) delete out.fridgeDays;
+          if (isNum(out.outHours) && !(out.outHours > 0 && out.outHours <= 24)) delete out.outHours;
+        }
         if (!hasOwn(SRC_BATCH, out.src)) out.src = 'cook';
         bIds.add(b.id);
         batches.push(out);
@@ -9544,7 +9708,7 @@ a.of-nav:active { background: var(--press); }
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, coldInfo, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.
@@ -9805,7 +9969,7 @@ a.of-nav:active { background: var(--press); }
   function batchRows(state, now, S, sales, out) {
     const byIng = Object.create(null);
     for (const b of state.batches) {
-      if (b.status === 'discard' || !(b.remainingG > 0) || b.kind === 'cooling') continue;
+      if (b.status === 'discard' || !(b.remainingG > 0) || b.kind === 'cooling' || b.fridge === true) continue;
       // A batch past its quality limit is off the menu: it cannot sell, so it gets its own row and no projection.
       if (b.status === 'past') { pastRow(state, b, now, out); continue; }
       (byIng[b.ing] = byIng[b.ing] || []).push(b);
@@ -9875,7 +10039,7 @@ a.of-nav:active { background: var(--press); }
       const gt = E().gate(b, now, S);
       if (gt.action === 'NONE' && !(b.kind === 'cooling')) {
         const due = gt.nextDeadlineAt;
-        if (U.isNum(due) && due !== Infinity && due - now <= 15 * MIN && b.enteredAt + E()._internal.holdLimitMs(b, S) > due) {
+        if (U.isNum(due) && due !== Infinity && due - now <= 15 * MIN && (b.fridge === true || b.enteredAt + E()._internal.holdLimitMs(b, S) > due)) {
           out.push({ id: 'check:' + b.id, kind: 'check', ing: b.ing, batchId: b.id, label: b.label || b.ing, at: due, msLeft: due - now, rung: 0, rungs: 0, sev: 'info',
             consequence: 'A temperature reading is due at ' + U.fmtTime(due) + '.', action: 'Log a temperature.', unknown: false });
         }
@@ -9889,16 +10053,47 @@ a.of-nav:active { background: var(--press); }
         consequence: text, action: kind === 'check' ? 'Log a temperature.' : kind === 'reheat' ? 'Reheat it and log the reading.' : kind === 'chill' ? 'Chill it now.' : 'Log a reading as it cools.', unknown: false });
     }
   }
+  // Plain words about a cold batch kept in a fridge, for a card line or a call-out: where it is, the date mark and the time left
+  // against the owner's own limits. Never states a rule: it says "your limit". Returns '' for any other batch.
+  function coldLine(b, now) {
+    const c = E().coldInfo(b, now);
+    if (!c) return '';
+    const parts = [c.place === 'line' ? 'Out of the fridge' + (c.outSince != null ? ' since ' + U.fmtTime(c.outSince) : '') : 'In the fridge'];
+    if (c.madeOn) parts.push('made ' + U.fmtDateShort(c.madeOn));
+    if (c.fridgeDays != null) parts.push('your fridge limit ' + c.fridgeDays + (c.fridgeDays === 1 ? ' day' : ' days') + ', last day ' + U.fmtDateShort(c.useBy));
+    if (c.outHours != null) parts.push(c.outMs > 0 || c.place === 'line' ? U.fmtDur(c.outMs) + ' out so far, ' + (c.outLeftMs > 0 ? U.fmtDur(c.outLeftMs) + ' left of' : 'over') + ' your ' + c.outHours + '-hour limit' : 'your out-of-fridge limit ' + c.outHours + ' hours');
+    if (c.noLimit) parts.push('no limit set');
+    else if (c.outHours == null && c.fridgeDays != null) parts.push('no out-of-fridge limit set');
+    else if (c.fridgeDays == null && c.outHours != null) parts.push('no fridge limit set');
+    return parts.join(' - ');
+  }
+  // Rows for cold batches kept in a fridge: the out-of-fridge hours running low, and the last day of the fridge limit. The words
+  // say "your limit"; the app does not know the local rule.
+  function coldRows(state, now, out) {
+    for (const b of state.batches) {
+      if (b.fridge !== true || b.status === 'discard' || !(b.remainingG > 0)) continue;
+      const c = E().coldInfo(b, now);
+      const label = b.label || b.ing;
+      if (c.place === 'line' && c.outLeftMs != null && c.outLeftMs <= 30 * MIN) {
+        out.push({ id: 'coldout:' + b.id, epoch: 0, kind: 'coldOut', ing: b.ing, batchId: b.id, label, at: now + c.outLeftMs, msLeft: c.outLeftMs, rung: 0, rungs: 0, sev: c.outLeftMs <= 10 * MIN ? 'bad' : 'warn',
+          consequence: c.outLeftMs > 0 ? U.fmtDur(c.outLeftMs) + ' left of your ' + c.outHours + '-hour limit out of the fridge.' : 'Past your ' + c.outHours + '-hour limit out of the fridge.', action: 'Put it back in the fridge, or use it. Your food-safety plan comes first.', unknown: false });
+      }
+      if (c.fridgeLeftMs != null && c.fridgeLeftMs <= 6 * H) {
+        out.push({ id: 'colddate:' + b.id, epoch: 0, kind: 'coldDate', ing: b.ing, batchId: b.id, label, at: now + c.fridgeLeftMs, msLeft: c.fridgeLeftMs, rung: 0, rungs: 0, sev: c.fridgeLeftMs <= 2 * H ? 'bad' : 'warn',
+          consequence: 'The last day of your fridge limit (' + U.fmtDateShort(c.useBy) + ') ends at midnight.', action: 'Use it today, or check it against your food-safety plan.', unknown: false });
+      }
+    }
+  }
   // Rows for batches that expired and were thrown out in the last 30 minutes, so the loss is not silent.
   function expiredRows(state, now, out) {
     for (const b of state.batches) {
-      if (b.status !== 'discard' || b.discardReason !== 'expired' || !U.isNum(b.discardedAt) || now - b.discardedAt > 30 * MIN || !(b.wasteG >= TRIVIAL_G)) continue;
+      if (b.status !== 'discard' || !(b.discardReason === 'expired' || b.discardReason === 'fridgeDate' || b.discardReason === 'outTime') || !U.isNum(b.discardedAt) || now - b.discardedAt > 30 * MIN || !(b.wasteG >= TRIVIAL_G)) continue;
       const ing = state.ingredients.find((x) => x.id === b.ing);
       const name = ing ? ing.name : b.ing;
       const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');
       const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' (' + U.currencySymbol() + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
       out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
-        consequence: 'Expired and thrown out: ' + U.weightText(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
+        consequence: (b.discardReason === 'expired' ? 'Expired and thrown out: ' : 'Past your limit and thrown out: ') + U.weightText(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
     }
   }
   // Rows for batches that are being kept serving: shown from 15 minutes before the extension ends, or when the last
@@ -10231,6 +10426,7 @@ a.of-nav:active { background: var(--press); }
       const sales = salesRate(state, now);
       batchRows(state, now, S, sales, out);
       safetyRows(state, now, S, out);
+      coldRows(state, now, out);
       expiredRows(state, now, out);
       keepRows(state, now, S, out);
     }
@@ -10240,7 +10436,7 @@ a.of-nav:active { background: var(--press); }
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
+  SB.deadlines = { build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 25-deadlines.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'25-deadlines.js',message:String(e&&e.message||e)});}
@@ -11301,7 +11497,7 @@ a.of-nav:active { background: var(--press); }
   // ingredients, stock, batches, tickets, orders and history (resetLive, catalog 'blank') and the setup-progress choices, so the
   // kitchen is exactly like a brand-new install. opts.keepSettings (default true) keeps tax, hours, PIN, units and station names;
   // false resets those too. Returns { ok, report, info, backup? } with backup { text, filename, mime, savedAt, chars } for the
-  // screen to download; the last good copy is also refreshed first, so a damaged save can still come back.
+  // screen to download; the old last good copy and any set-aside damaged copy are dropped after the erase and the last good copy is retaken from the empty kitchen, so a damaged save can never bring the erased kitchen back.
   // WATCH OUT: the demo's keys are never read or written here.
   function startOver(opts) {
     opts = opts || {};
@@ -11315,10 +11511,14 @@ a.of-nav:active { background: var(--press); }
     const text = exportAll();
     if (text == null) { const lr = last || {}; return fail(lr.report || 'invalidBackup', lr.info); }
     const savedAt = realNow();
-    snapWanted = 'startOver'; maybeSnapshot(savedAt);
     const rep = resetLive({ keepSettings: keep, catalog: 'blank', replaceOwn: true, starter: false });
     if (rep !== 'ok') return fail(rep);
     for (const k of START_OVER_KEYS) { try { storage.remove(k); } catch (e) { /* ignore */ } }
+    // Only now that the erase went in: the rolling last-good copy and any set-aside damaged copy still hold the old kitchen's
+    // customers and orders, so both are dropped and the last-good copy is retaken from the new empty kitchen.
+    try { storage.remove(LASTGOOD_KEY); storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); } catch (e) { /* ignore */ }
+    st.corrupt = null;
+    snapWanted = 'startOver'; persistNow(); maybeSnapshot(savedAt);
     if (!keep && SB.config && typeof SB.config.applyCustom === 'function') {
       try { SB.config.applyCustom({}); SB.config.saveCustom({ rename: {}, add: {} }); } catch (e) { /* the names stay as they were */ }
     }
@@ -20129,7 +20329,8 @@ a.of-nav:active { background: var(--press); }
       want.push(rec);
     }
     for (const rec of Array.from(m.slips.values())) if (!seen.has(rec.id)) removeSlip(rec);
-    reorder(m.grid, want.map((r) => r.el));
+    m.want = want;
+    reorder(m.grid, lateFirst(want).map((r) => r.el));
     // Slips present at the first draw just appear; later arrivals print in.
     if (!m.first && added.length) added.forEach((rec, i) => printIn(rec, i));
     else added.forEach((rec) => { if (m.io) m.io.observe(rec.el); });
@@ -20563,9 +20764,16 @@ a.of-nav:active { background: var(--press); }
     }
   }
 
+  // The slips with the overdue ones first (most overdue first) and the rest in the store's order. The page order is
+  // this order, so keyboard and screen reader users meet the worst ticket first, just as the eye does.
+  function lateFirst(recs) {
+    const late = recs.filter((r) => r.overMs > 0).sort((a, b) => (b.overMs - a.overMs) || (a.num - b.num));
+    return late.concat(recs.filter((r) => !(r.overMs > 0)));
+  }
   // Ranks the overdue slips, most overdue first, and tells the stylesheet: data-tier 1 for the worst slip, 2 for the
-  // next two, 3 for the rest, and a CSS order so the worst sit first on the board without moving any node.
-  // WATCH OUT: it only edits attributes and styles, and only when a rank changed.
+  // next two, 3 for the rest. When the ranking changes the slips are also moved in the page, so the reading order
+  // matches what is drawn; a focused control keeps its focus.
+  // WATCH OUT: it only edits attributes and the slip order, and only when something changed.
   function rankOverdue() {
     const late = [];
     for (const rec of m.slips.values()) if (rec.overMs > 0) late.push(rec);
@@ -20575,12 +20783,17 @@ a.of-nav:active { background: var(--press); }
       ranked.add(rec);
       const tier = i === 0 ? '1' : i < 3 ? '2' : '3';
       if (rec.tier !== tier) { rec.tier = tier; rec.el.dataset.tier = tier; }
-      const ord = String(i - 1000);
-      if (rec.ord !== ord) { rec.ord = ord; rec.el.style.order = ord; }
     });
     for (const rec of m.slips.values()) {
       if (ranked.has(rec) || !rec.tier) continue;
-      rec.tier = ''; rec.ord = ''; delete rec.el.dataset.tier; rec.el.style.removeProperty('order');
+      rec.tier = ''; delete rec.el.dataset.tier;
+    }
+    const key = late.map((r) => r.id).join(',');
+    if (key !== m.lateKey && m.want) {
+      m.lateKey = key;
+      const keep = document.activeElement, had = keep && m.grid.contains(keep);
+      reorder(m.grid, lateFirst(m.want.filter((r) => m.slips.get(r.id) === r)).map((r) => r.el));
+      if (had && document.activeElement !== keep) { try { keep.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
     }
     // Late slips on screen right now, for the header and for tests.
     m.lateCount = late.length;
@@ -25960,6 +26173,14 @@ a.of-nav:active { background: var(--press); }
   }
   // True when the cook-ahead module is on (an old saved kitchen with no setting counts as on).
   function cookOn() { return SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : true; }
+  // A short plain line about one cooked-ahead item for the list: hot with its hours, or cold with the limits the owner entered.
+  function coldText(i) {
+    if (i.hold !== 'cold') return 'Hot, up to ' + i.maxHoldH + ' h';
+    const bits = [];
+    if (i.fridgeDays != null) bits.push(i.fridgeDays + ' ' + U.plural(i.fridgeDays, 'day', 'days') + ' in the fridge');
+    if (i.outHours != null) bits.push(i.outHours + ' h out');
+    return 'Cold, ' + (bits.length ? bits.join(', ') : 'no limit set');
+  }
   // The cooked-ahead items the owner has made: cook-ahead food that is not archived.
   function cookItems() { return SB.store.getState().ingredients.filter((i) => i.tcs && !i.archived); }
 
@@ -26313,7 +26534,9 @@ a.of-nav:active { background: var(--press); }
             } }, lbl))));
       } else {
         caBox.append(h('h3', { class: 'fs-h' }, 'Cooked-ahead food'),
-          h('div', { class: 'dp-list' }, items.map((i) => h('div', { class: 'dp-row' }, h('strong', null, i.name), h('span', { class: 'chip' }, (i.hold === 'cold' ? 'Cold' : 'Hot') + ', up to ' + i.maxHoldH + ' h')))), h('div', { class: 'fs-row' }, add));
+          h('div', { class: 'dp-list' }, items.map((i) => h('div', { class: 'dp-row' }, h('strong', null, i.name), h('span', { class: 'chip' }, coldText(i)),
+          // Opens the same form, filled in, to change the name or the limits.
+          h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'edit-cooked' }, 'aria-label': 'Edit ' + i.name, onClick: () => SB.sheets.open('cookahead', { id: i.id }) }, 'Edit')))), h('div', { class: 'fs-row' }, add));
       }
     }
     paintCook();
@@ -26400,13 +26623,25 @@ a.of-nav:active { background: var(--press); }
 
   // Opens "Cooked-ahead food": name, hot or cold, how long it may stay, a usual batch size and which dishes use it.
   // Saves the item with addIngredient, then gives each chosen dish a recipe line. Nothing here is needed to take orders.
-  function openCookAhead() {
-    const sheet = SB.ui.sheet({ title: 'Cooked-ahead food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
+  function openCookAhead(opts) {
+    const editing = opts && opts.id ? SB.store.getState().ingredients.find((i) => i.id === opts.id && i.tcs) : null;
+    const sheet = SB.ui.sheet({ title: editing ? 'Edit cooked-ahead food' : 'Cooked-ahead food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
     const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Brisket' });
     const nameField = SB.ui.field({ label: 'What do you cook ahead?', control: nameIn });
-    const kind = SB.ui.segmented({ label: 'Is it kept hot or cold?', value: 'hot', options: [{ id: 'hot', label: 'Hot' }, { id: 'cold', label: 'Cold' }] });
+    const kind = SB.ui.segmented({ label: 'Is it kept hot or cold?', value: 'hot', options: [{ id: 'hot', label: 'Hot' }, { id: 'cold', label: 'Cold' }],
+      // Shows the boxes that fit hot or cold food.
+      onChange: () => paintKind() });
     const hoursIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: '4', 'aria-label': 'Hours it may stay' });
     const hoursField = SB.ui.field({ label: 'How long may it stay, in hours?', control: hoursIn, hint: '4 hours is a careful starting point. Your local health code decides what is allowed: ask your health department and change this to match.' });
+    // Cold food: two optional limits the owner gets from their health department. Blank means no limit is set and Smokebox only shows the time.
+    const daysIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Days it may stay in the fridge' });
+    const daysField = SB.ui.field({ label: 'How many days may it stay in the fridge?', control: daysIn });
+    const outIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Hours it may be out of the fridge' });
+    const outField = SB.ui.field({ label: 'How many hours may it be out of the fridge?', control: outIn });
+    const coldBox = h('div', { class: 'dp-cold', hidden: true }, daysField, outField,
+      h('p', { class: 'fs-sub' }, 'Use the limits your local health department gives you. Leave a box empty for no limit set: Smokebox will then only show the time.'));
+    // Shows the hours box for hot food and the two fridge boxes for cold food.
+    function paintKind() { const cold = kind.getValue() === 'cold'; coldBox.hidden = !cold; hoursField.hidden = cold; }
     const kgIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Usual batch size in kilograms' });
     const kgField = SB.ui.field({ label: 'Usual batch size, in kg', control: kgIn, hint: 'A normal pan or batch, like 4. Leave it empty if you are not sure.' });
     // One checkbox row per dish: tick the dishes that use this food and say about how many grams each takes.
@@ -26426,7 +26661,12 @@ a.of-nav:active { background: var(--press); }
       nameField.setError(null); hoursField.setError(null); tell(status, '');
       const name = nameIn.value.replace(/\s+/g, ' ').trim(), hrs = readNum(hoursIn), kg = kgIn.value.trim() ? readNum(kgIn) : null;
       if (!name) { nameField.setError('Type what you cook ahead.'); return; }
-      if (hrs == null || hrs < 0.5 || hrs > 12) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
+      const isCold = kind.getValue() === 'cold';
+      daysField.setError(null); outField.setError(null);
+      if (!isCold && (hrs == null || hrs < 0.5 || hrs > 12)) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
+      let days = null, outH = null;
+      if (isCold && daysIn.value.trim()) { days = readNum(daysIn); if (days == null || days < 1 || days > 60 || !Number.isInteger(days)) { daysField.setError('Type a whole number of days from 1 to 60, or leave it empty.'); return; } }
+      if (isCold && outIn.value.trim()) { outH = readNum(outIn); if (outH == null || outH <= 0 || outH > 24) { outField.setError('Type hours above 0 and up to 24, or leave it empty.'); return; } }
       if (kgIn.value.trim() && (kg == null || kg <= 0 || kg > 1000)) { tell(status, 'Batch size: type kilograms like 4, or leave it empty.'); return; }
       // With dishes on the menu but none selected, nothing would use this item: say so once, and save only on a second tap.
       if (dishRows.length && !dishRows.some((x) => x.cb.checked) && !warnedNoDish) {
@@ -26434,7 +26674,9 @@ a.of-nav:active { background: var(--press); }
         tell(status, 'No dish is selected, so nothing will use this item and it will not count down. Select a dish above, or tap Save again to keep it without one.', 'bad');
         return;
       }
-      const payload = { name, unit: 'g', tcs: true, hold: kind.getValue(), maxHoldH: hrs, holdBasis: 'safety' };
+      const payload = { name, unit: 'g', tcs: true, hold: kind.getValue(), maxHoldH: hrs == null ? 4 : hrs, holdBasis: 'safety' };
+      if (days != null) payload.fridgeDays = days;
+      if (outH != null) payload.outHours = outH;
       if (kg) payload.parG = Math.round(kg * 1000);
       const r = send('addIngredient', payload);
       if (!r.ok) { if (r.report === 'nameTaken') nameField.setError('You already have an item called ' + name + '.'); else tell(status, r.words); return; }
@@ -26454,8 +26696,40 @@ a.of-nav:active { background: var(--press); }
         // Closes the sheet without logging a batch.
         h('button', { type: 'button', class: 'btn btn-lg', onClick: () => sheet.close('done') }, 'Done for now'));
     } }, ico('check', 22), h('span', null, 'Save cooked-ahead item'));
-    sheet.body.appendChild(h('div', { class: 'dp' }, h('p', { class: 'fs-sub' }, 'Optional. Skip this and you can still take every order. Later you can add more from the Cabinet.'),
-      h('div', { class: 'dp-form' }, nameField, h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Hot or cold'), kind), hoursField, kgField, dishBox, h('div', { class: 'fs-row' }, save), status, after)));
+    const kindField = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Hot or cold'), kind);
+    // Edit mode: the same boxes, filled in; hot or cold and the dish links stay as they were, and Save changes the limits and the name.
+    const saveEdit = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'save-cooked-edit' }, onClick: () => {
+      nameField.setError(null); daysField.setError(null); outField.setError(null); hoursField.setError(null); tell(status, '');
+      const name = nameIn.value.replace(/\s+/g, ' ').trim();
+      if (!name) { nameField.setError('Type what you cook ahead.'); return; }
+      const patch = { name };
+      if (editing.hold === 'cold') {
+        const dv = daysIn.value.trim() ? readNum(daysIn) : null, ov = outIn.value.trim() ? readNum(outIn) : null;
+        if (dv != null && (dv < 1 || dv > 60 || !Number.isInteger(dv))) { daysField.setError('Type a whole number of days from 1 to 60, or leave it empty.'); return; }
+        if (ov != null && (ov <= 0 || ov > 24)) { outField.setError('Type hours above 0 and up to 24, or leave it empty.'); return; }
+        patch.fridgeDays = dv; patch.outHours = ov;
+      } else {
+        const hv = readNum(hoursIn);
+        if (hv == null || hv < 0.5 || hv > 12) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
+        patch.maxHoldH = hv;
+      }
+      for (const k of Object.keys(patch)) if (patch[k] === editing[k]) delete patch[k];
+      if (!Object.keys(patch).length) { tell(status, 'Nothing changed.', 'ok'); return; }
+      const r = send('updateIngredient', { id: editing.id, patch });
+      if (!r.ok) { tell(status, r.words, 'bad'); return; }
+      tell(status, 'Saved.', 'ok');
+      setTimeout(() => sheet.close('done'), 600);
+    } }, ico('check', 22), h('span', null, 'Save changes'));
+    if (editing) {
+      nameIn.value = editing.name; kind.setValue(editing.hold === 'cold' ? 'cold' : 'hot');
+      hoursIn.value = String(editing.maxHoldH == null ? 4 : editing.maxHoldH);
+      if (editing.fridgeDays != null) daysIn.value = String(editing.fridgeDays);
+      if (editing.outHours != null) outIn.value = String(editing.outHours);
+      kindField.hidden = true; kgField.hidden = true; dishBox.hidden = true; save.hidden = true;
+    } else saveEdit.hidden = true;
+    paintKind();
+    sheet.body.appendChild(h('div', { class: 'dp' }, h('p', { class: 'fs-sub' }, editing ? 'Change the limits or the name. Hot or cold stays as it was.' : 'Optional. Skip this and you can still take every order. Later you can add more from the Cabinet.'),
+      h('div', { class: 'dp-form' }, nameField, kindField, hoursField, coldBox, kgField, dishBox, h('div', { class: 'fs-row' }, save, saveEdit), status, after)));
     keepInView(sheet.body);
     setTimeout(() => nameIn.focus(), 50);
     return sheet;
@@ -27026,7 +27300,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Problem rows are flagged before anything is added. New menu sections in the file? Tap **Add these sections**."
+      "x": "Have your menu in a file? See Import a menu."
      },
      {
       "t": "h",
@@ -27174,7 +27448,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Pick $, € or £, or **Your own**: one to three characters, like kr. It shows with every price. It does not convert anything."
+      "x": "Pick $, € or £, or **Your own**: one to three characters, like kr. It shows with every price, and open screens update when you close the sheet. It does not convert anything."
      },
      {
       "t": "h",
@@ -27183,6 +27457,51 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "p",
       "x": "If the page closes or reloads in the middle of an order, tap **New ticket**. Your dishes come back with the note \"Restored your unfinished order\". Tap **Clear order** to start fresh."
+     }
+    ]
+   },
+   {
+    "id": "import-a-menu",
+    "group": "guide",
+    "title": "Import a menu",
+    "summary": "Bring dishes in from a spreadsheet or a point-of-sale export, instead of typing each one.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Open it"
+     },
+     {
+      "t": "p",
+      "x": "Tap **Settings**, **Dishes and prices**, **More ways to add dishes**, then **Have a menu file? Import it**. Choose a file or paste a list, then tap **Check it**. Nothing is added yet."
+     },
+     {
+      "t": "h",
+      "x": "Read the preview"
+     },
+     {
+      "t": "p",
+      "x": "Smokebox says what kind of file it thinks this is, such as a spreadsheet or a Lightspeed items export. Square, Toast and Clover exports work the same way. Each row shows its dish, its price and \"Read as $14.00\", the price it understood. Fix a name or price in the row, or clear the box to leave a dish out. A row with a problem says what is wrong and starts cleared."
+     },
+     {
+      "t": "ul",
+      "x": [
+       "Prices may be in cents. If every price is a large whole number, Smokebox asks. Tap **These prices are in cents**, or **These prices are in dollars** to undo it.",
+       "Columns it does not use are listed, like \"Ignored column: Calories\". Notes and descriptions are not kept. Only the name, price, station and section are.",
+       "Pick one station for every dish in **Put all these dishes at**, and one section in **Put all these dishes in**.",
+       "New sections in the file? Tap **Add these sections**."
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Add them"
+     },
+     {
+      "t": "p",
+      "x": "Tap **Import** with the number shown, like Import 12 dishes. Changed your mind? Tap **Remove these** and the whole import comes off the menu."
+     },
+     {
+      "t": "p",
+      "x": "Adding dishes by hand in Dishes and prices works just as well."
      }
     ]
    },
@@ -27359,9 +27678,9 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "In **Dishes and prices**, find \"Do you cook food ahead?\" and tap **Yes, I cook ahead**. The cooked-ahead sheet opens.",
        "Type what you cook ahead and choose Hot or Cold.",
-       "Set how long it may stay. Set the limit your local health department gives you.",
+       "Set how long it may stay. For hot food it is one number of hours. For cold food two optional boxes ask how many days it may stay in the fridge and how many hours it may be out of the fridge. Use the limits your local health department gives you. Leave a box empty if no limit is set: Smokebox then only shows the time.",
        "Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.",
-       "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**."
+       "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**. To change an item later, open it from the list and tap **Save changes**."
       ]
      },
      {
@@ -27444,7 +27763,7 @@ a.of-nav:active { background: var(--press); }
        "Tap **Orders**, then **Close the day** at the bottom.",
        "If an order is still open, it is listed. Every order must be paid or cancelled first. Tap **Open Orders to pay or void**, then come back.",
        "If you cook ahead and food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).",
-       "Read Money today: cash, card and other. The cash line says how much should be in the drawer, on top of the cash you started with.",
+       "Read Money today: cash, card and other. If you like, type **Cash you started the day with**. Smokebox remembers it on this device and adds today's cash payments, and tips paid in cash, to say how much should be in the drawer. It is a helper for counting.",
        "Tap **Close the day**.",
        "Tap **Back up today's data now** and **Print today's summary**."
       ]
@@ -27463,6 +27782,7 @@ a.of-nav:active { background: var(--press); }
        "Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.",
        "If your health department asks, save or print the thrown-out log. Open it from the **Settings** button on the board.",
        "Keep a copy of the backup off this device (see Backup and restore).",
+       "Which weekday sells best? In **Back office**, open **Sales and money** and look at **Best day of the week**.",
        "For your accountant: in **Menu and settings**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other."
       ]
      }
@@ -27848,8 +28168,8 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "ul",
       "x": [
-       "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Your own food-safety plan, your training and your thermometer checks still apply.",
-       "Your local health code. The limits Smokebox starts with (such as 4 hours, the check interval and one reheat per batch) are its own starting values or house rules, not code. Set the limits your local health department gives you.",
+       "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Smokebox does not log cooler or freezer temperatures, sanitizer strength or thermometer checks: keep a paper log for those. Your own food-safety plan, your training and your thermometer checks still apply.",
+       "Your local health code. The limits Smokebox starts with (such as 4 hours, the check interval and one reheat per batch) are starting values, not your local rules. Set the limits your local health department gives you.",
        "Card processing. Smokebox only writes down how an order was paid. Keep your card reader and your processor.",
        "Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.",
        "Allergy care. A note on a ticket is a reminder. Tell your staff about every allergy, and follow your own allergen rules.",
@@ -27873,6 +28193,8 @@ a.of-nav:active { background: var(--press); }
        "Tap the warning bar once, or use Play a test warning under Set up this tablet",
        "Check the 86 board: what is out today?",
        "Counted dishes: how many did you make today?",
+       "Hand sink works and is stocked. Anyone unwell? Tell the manager",
+       "Thermometer checked in ice water. Cooler and freezer readings on your paper log",
        "If you cook ahead: log a first temperature on each batch in the cabinet",
        "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
        "Yesterday's backup saved and a copy kept off the device"
@@ -27892,6 +28214,8 @@ a.of-nav:active { background: var(--press); }
        "Orders: every open order paid or cancelled, then Close the day",
        "If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)",
        "If you cook ahead: surfaces wiped and Sanitize logged",
+       "Food kept over a day: labeled with a date, as your local rule says",
+       "Final cooler and freezer readings on your paper log",
        "Sales and money looks right in the Back office",
        "Log of thrown-out batches saved or printed",
        "Backup downloaded and a copy kept off the device",
