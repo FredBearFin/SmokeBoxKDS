@@ -222,6 +222,14 @@
   }
   // True when the cook-ahead module is on (an old saved kitchen with no setting counts as on).
   function cookOn() { return SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : true; }
+  // A short plain line about one cooked-ahead item for the list: hot with its hours, or cold with the limits the owner entered.
+  function coldText(i) {
+    if (i.hold !== 'cold') return 'Hot, up to ' + i.maxHoldH + ' h';
+    const bits = [];
+    if (i.fridgeDays != null) bits.push(i.fridgeDays + ' ' + U.plural(i.fridgeDays, 'day', 'days') + ' in the fridge');
+    if (i.outHours != null) bits.push(i.outHours + ' h out');
+    return 'Cold, ' + (bits.length ? bits.join(', ') : 'no limit set');
+  }
   // The cooked-ahead items the owner has made: cook-ahead food that is not archived.
   function cookItems() { return SB.store.getState().ingredients.filter((i) => i.tcs && !i.archived); }
 
@@ -575,7 +583,9 @@
             } }, lbl))));
       } else {
         caBox.append(h('h3', { class: 'fs-h' }, 'Cooked-ahead food'),
-          h('div', { class: 'dp-list' }, items.map((i) => h('div', { class: 'dp-row' }, h('strong', null, i.name), h('span', { class: 'chip' }, (i.hold === 'cold' ? 'Cold' : 'Hot') + ', up to ' + i.maxHoldH + ' h')))), h('div', { class: 'fs-row' }, add));
+          h('div', { class: 'dp-list' }, items.map((i) => h('div', { class: 'dp-row' }, h('strong', null, i.name), h('span', { class: 'chip' }, coldText(i)),
+          // Opens the same form, filled in, to change the name or the limits.
+          h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'edit-cooked' }, 'aria-label': 'Edit ' + i.name, onClick: () => SB.sheets.open('cookahead', { id: i.id }) }, 'Edit')))), h('div', { class: 'fs-row' }, add));
       }
     }
     paintCook();
@@ -662,13 +672,25 @@
 
   // Opens "Cooked-ahead food": name, hot or cold, how long it may stay, a usual batch size and which dishes use it.
   // Saves the item with addIngredient, then gives each chosen dish a recipe line. Nothing here is needed to take orders.
-  function openCookAhead() {
-    const sheet = SB.ui.sheet({ title: 'Cooked-ahead food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
+  function openCookAhead(opts) {
+    const editing = opts && opts.id ? SB.store.getState().ingredients.find((i) => i.id === opts.id && i.tcs) : null;
+    const sheet = SB.ui.sheet({ title: editing ? 'Edit cooked-ahead food' : 'Cooked-ahead food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
     const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Brisket' });
     const nameField = SB.ui.field({ label: 'What do you cook ahead?', control: nameIn });
-    const kind = SB.ui.segmented({ label: 'Is it kept hot or cold?', value: 'hot', options: [{ id: 'hot', label: 'Hot' }, { id: 'cold', label: 'Cold' }] });
+    const kind = SB.ui.segmented({ label: 'Is it kept hot or cold?', value: 'hot', options: [{ id: 'hot', label: 'Hot' }, { id: 'cold', label: 'Cold' }],
+      // Shows the boxes that fit hot or cold food.
+      onChange: () => paintKind() });
     const hoursIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: '4', 'aria-label': 'Hours it may stay' });
     const hoursField = SB.ui.field({ label: 'How long may it stay, in hours?', control: hoursIn, hint: '4 hours is a careful starting point. Your local health code decides what is allowed: ask your health department and change this to match.' });
+    // Cold food: two optional limits the owner gets from their health department. Blank means no limit is set and Smokebox only shows the time.
+    const daysIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Days it may stay in the fridge' });
+    const daysField = SB.ui.field({ label: 'How many days may it stay in the fridge?', control: daysIn });
+    const outIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Hours it may be out of the fridge' });
+    const outField = SB.ui.field({ label: 'How many hours may it be out of the fridge?', control: outIn });
+    const coldBox = h('div', { class: 'dp-cold', hidden: true }, daysField, outField,
+      h('p', { class: 'fs-sub' }, 'Use the limits your local health department gives you. Leave a box empty for no limit set: Smokebox will then only show the time.'));
+    // Shows the hours box for hot food and the two fridge boxes for cold food.
+    function paintKind() { const cold = kind.getValue() === 'cold'; coldBox.hidden = !cold; hoursField.hidden = cold; }
     const kgIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Usual batch size in kilograms' });
     const kgField = SB.ui.field({ label: 'Usual batch size, in kg', control: kgIn, hint: 'A normal pan or batch, like 4. Leave it empty if you are not sure.' });
     // One checkbox row per dish: tick the dishes that use this food and say about how many grams each takes.
@@ -688,7 +710,12 @@
       nameField.setError(null); hoursField.setError(null); tell(status, '');
       const name = nameIn.value.replace(/\s+/g, ' ').trim(), hrs = readNum(hoursIn), kg = kgIn.value.trim() ? readNum(kgIn) : null;
       if (!name) { nameField.setError('Type what you cook ahead.'); return; }
-      if (hrs == null || hrs < 0.5 || hrs > 12) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
+      const isCold = kind.getValue() === 'cold';
+      daysField.setError(null); outField.setError(null);
+      if (!isCold && (hrs == null || hrs < 0.5 || hrs > 12)) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
+      let days = null, outH = null;
+      if (isCold && daysIn.value.trim()) { days = readNum(daysIn); if (days == null || days < 1 || days > 60 || !Number.isInteger(days)) { daysField.setError('Type a whole number of days from 1 to 60, or leave it empty.'); return; } }
+      if (isCold && outIn.value.trim()) { outH = readNum(outIn); if (outH == null || outH <= 0 || outH > 24) { outField.setError('Type hours above 0 and up to 24, or leave it empty.'); return; } }
       if (kgIn.value.trim() && (kg == null || kg <= 0 || kg > 1000)) { tell(status, 'Batch size: type kilograms like 4, or leave it empty.'); return; }
       // With dishes on the menu but none selected, nothing would use this item: say so once, and save only on a second tap.
       if (dishRows.length && !dishRows.some((x) => x.cb.checked) && !warnedNoDish) {
@@ -696,7 +723,9 @@
         tell(status, 'No dish is selected, so nothing will use this item and it will not count down. Select a dish above, or tap Save again to keep it without one.', 'bad');
         return;
       }
-      const payload = { name, unit: 'g', tcs: true, hold: kind.getValue(), maxHoldH: hrs, holdBasis: 'safety' };
+      const payload = { name, unit: 'g', tcs: true, hold: kind.getValue(), maxHoldH: hrs == null ? 4 : hrs, holdBasis: 'safety' };
+      if (days != null) payload.fridgeDays = days;
+      if (outH != null) payload.outHours = outH;
       if (kg) payload.parG = Math.round(kg * 1000);
       const r = send('addIngredient', payload);
       if (!r.ok) { if (r.report === 'nameTaken') nameField.setError('You already have an item called ' + name + '.'); else tell(status, r.words); return; }
@@ -716,8 +745,40 @@
         // Closes the sheet without logging a batch.
         h('button', { type: 'button', class: 'btn btn-lg', onClick: () => sheet.close('done') }, 'Done for now'));
     } }, ico('check', 22), h('span', null, 'Save cooked-ahead item'));
-    sheet.body.appendChild(h('div', { class: 'dp' }, h('p', { class: 'fs-sub' }, 'Optional. Skip this and you can still take every order. Later you can add more from the Cabinet.'),
-      h('div', { class: 'dp-form' }, nameField, h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Hot or cold'), kind), hoursField, kgField, dishBox, h('div', { class: 'fs-row' }, save), status, after)));
+    const kindField = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Hot or cold'), kind);
+    // Edit mode: the same boxes, filled in; hot or cold and the dish links stay as they were, and Save changes the limits and the name.
+    const saveEdit = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'save-cooked-edit' }, onClick: () => {
+      nameField.setError(null); daysField.setError(null); outField.setError(null); hoursField.setError(null); tell(status, '');
+      const name = nameIn.value.replace(/\s+/g, ' ').trim();
+      if (!name) { nameField.setError('Type what you cook ahead.'); return; }
+      const patch = { name };
+      if (editing.hold === 'cold') {
+        const dv = daysIn.value.trim() ? readNum(daysIn) : null, ov = outIn.value.trim() ? readNum(outIn) : null;
+        if (dv != null && (dv < 1 || dv > 60 || !Number.isInteger(dv))) { daysField.setError('Type a whole number of days from 1 to 60, or leave it empty.'); return; }
+        if (ov != null && (ov <= 0 || ov > 24)) { outField.setError('Type hours above 0 and up to 24, or leave it empty.'); return; }
+        patch.fridgeDays = dv; patch.outHours = ov;
+      } else {
+        const hv = readNum(hoursIn);
+        if (hv == null || hv < 0.5 || hv > 12) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
+        patch.maxHoldH = hv;
+      }
+      for (const k of Object.keys(patch)) if (patch[k] === editing[k]) delete patch[k];
+      if (!Object.keys(patch).length) { tell(status, 'Nothing changed.', 'ok'); return; }
+      const r = send('updateIngredient', { id: editing.id, patch });
+      if (!r.ok) { tell(status, r.words, 'bad'); return; }
+      tell(status, 'Saved.', 'ok');
+      setTimeout(() => sheet.close('done'), 600);
+    } }, ico('check', 22), h('span', null, 'Save changes'));
+    if (editing) {
+      nameIn.value = editing.name; kind.setValue(editing.hold === 'cold' ? 'cold' : 'hot');
+      hoursIn.value = String(editing.maxHoldH == null ? 4 : editing.maxHoldH);
+      if (editing.fridgeDays != null) daysIn.value = String(editing.fridgeDays);
+      if (editing.outHours != null) outIn.value = String(editing.outHours);
+      kindField.hidden = true; kgField.hidden = true; dishBox.hidden = true; save.hidden = true;
+    } else saveEdit.hidden = true;
+    paintKind();
+    sheet.body.appendChild(h('div', { class: 'dp' }, h('p', { class: 'fs-sub' }, editing ? 'Change the limits or the name. Hot or cold stays as it was.' : 'Optional. Skip this and you can still take every order. Later you can add more from the Cabinet.'),
+      h('div', { class: 'dp-form' }, nameField, kindField, hoursField, coldBox, kgField, dishBox, h('div', { class: 'fs-row' }, save, saveEdit), status, after)));
     keepInView(sheet.body);
     setTimeout(() => nameIn.focus(), 50);
     return sheet;

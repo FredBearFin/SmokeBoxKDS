@@ -7,7 +7,7 @@ bakery: rows 30; unticked 0; stations in preview ["Kitchen"]
 bakery: categories after import: {"Drinks":30}
 bakery: ticket on the board: "Smokebox kitchen board Ticket #101 Walk-up Dine-in 0 of 2 done 00:00 Make Drip coffee and Latte, then tap DONE. 1 Drip coffee , ready. Press when done. DONE CLD 1 Latte , ready. Press when done. DONE CLD Bump"
 bakery: PASS (paid true, page errors 0, barbecue words in live screens 0, starter names on setup screens 0)
-taco: 8 dishes in 2178 ms of script time; saves tapped 8; tile question shown: false
+taco: 8 dishes in 1910 ms of script time; saves tapped 8; tile question shown: false
 taco: order screen category headings: ["Tacos"]
 taco: a 3-taco cash order from the board took 6 taps
 taco: PASS (paid true, page errors 0, barbecue words in live screens 0, starter names on setup screens 0)
