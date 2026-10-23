@@ -1,6 +1,6 @@
 # Getting started
 
-Add your dishes, send a test order, take payment and save your first backup. About ten minutes.
+Add dishes, send a test order, take payment and save a backup. About ten minutes.
 
 ## 1. Add your first dish
 
@@ -10,17 +10,19 @@ Add your dishes, send a test order, take payment and save your first backup. Abo
 
 Change dishes and prices later: tap **Menu**, then **Dishes and prices**. A dish you remove goes to **Removed dishes**. Tap **Bring it back** to put it back.
 
+The arrow buttons beside each dish change the order they appear in.
+
 Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**.
 
-Want to see how a ticket works first? Tap **Show me how it works** for a one-minute walkthrough.
+For a one-minute walkthrough, tap **Show me how it works**.
 
 ## 2. Set your tax and hours
 
 Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN** at the bottom. Enter your sales tax (0 if you charge none) and your opening hours. A PIN is optional. It keeps your cooks out of the back office.
 
-Do you cook food ahead and keep it hot or cold? Say so in **Dishes and prices** (see Cooked-ahead food and portions). If you cook everything to order, skip it.
+Cook food ahead and keep it hot or cold? Say so in **Dishes and prices** (see Cooked-ahead food and portions).
 
-Temperatures show in °F and weights in kilograms. You can change both in the **Back office**, under **Menu and settings**.
+Temperatures show in °F and weights in kilograms. Change them in the **Back office**, under **Menu and settings**.
 
 ## 3. Send a test order
 

@@ -5,12 +5,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadSB, ROOT } from './_load.mjs';
-import { readPages, dataBlock, inject } from '../tools/build-guide.mjs';
+import { readPages, dataBlock, inject, faqText } from '../tools/build-guide.mjs';
 
 const SB = await loadSB(['00-util', '10-config', '60-shell', '78-guide']);
 const G = SB.guide;
 const GUIDE = ['getting-started', 'taking-an-order', 'running-the-line', 'cooked-ahead-and-portions', 'hold-cabinet-and-warnings', 'closing-the-day', 'who-made-this-entry', 'backup-and-restore', 'replacing-a-device', 'troubleshooting', 'empty-lost-or-locked', 'trying-the-demo', 'questions-and-answers', 'what-this-app-does-not-replace'];
-const CARDS = ['card-opening-checklist', 'card-closing-checklist', 'card-when-something-goes-wrong'];
+const CARDS = ['card-opening-checklist', 'card-closing-checklist', 'card-when-something-goes-wrong', 'card-first-day-checklist', 'card-tablet-setup'];
 const FIGURES = ['ticket', 'ladder', 'cabinet'];
 // Every piece of text on a page (picture descriptions included), in one list, for the word checks.
 const textOf = (p) => G.textsOf(p);
@@ -21,7 +21,7 @@ test('the data in 78-guide.js is exactly what docs/sop produces (one source of t
   assert.equal(inject(src, dataBlock(readPages())), src, 'run: node tools/build-guide.mjs');
 });
 
-test('the Guide has its fourteen pages and three quick cards, in order, each with a title, a summary and real content', () => {
+test('the Guide has its fourteen pages and five quick cards, in order, each with a title, a summary and real content', () => {
   assert.deepEqual(G.pages.filter((p) => p.group === 'guide').map((p) => p.id), GUIDE);
   assert.deepEqual(G.pages.filter((p) => p.group === 'cards').map((p) => p.id), CARDS);
   G.pages.forEach((p) => {
@@ -44,7 +44,7 @@ test('every picture is one of the three drawn in 79-guide-art.js and has a real 
 });
 
 test('the quick cards are checklists, so they print with boxes to tick', () => {
-  CARDS.forEach((id) => { const p = G.byId(id); assert.ok(p.blocks.some((b) => b.t === 'check' && b.x.length >= 6), id); });
+  CARDS.forEach((id) => { const p = G.byId(id); assert.ok(p.blocks.filter((b) => b.t === 'check').reduce((n, b) => n + b.x.length, 0) >= 6, id); });
 });
 
 test('search finds pages by plain words, ranks a title match first, and says nothing for nonsense', () => {
@@ -110,4 +110,8 @@ test('every "?" link and open() call in the app points at a Guide page that exis
     for (const m of src.matchAll(/(?:helpLink|guideLink)\(\s*'([a-z0-9-]+)'/g)) if (!ids.has(m[1])) bad.push(f + ': ' + m[1]);
   });
   assert.deepEqual(bad, []);
+});
+
+test('docs/faq.md is a copy of the Questions and answers page (one source of truth)', () => {
+  assert.equal(fs.readFileSync(path.join(ROOT, 'docs/faq.md'), 'utf8'), faqText(), 'run: node tools/build-guide.mjs');
 });

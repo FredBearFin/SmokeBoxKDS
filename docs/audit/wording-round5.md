@@ -108,3 +108,24 @@ Re-ran `tools/extract-strings.mjs`: 4,564 strings (4,368 before). 223 are new or
 - Demo bar (60:1685): "You are trying the demo. Nothing here is your kitchen."
 
 **Bug carried over:** A3's print rules (`body > *:not(.sb-printroot) { display: none !important; }` in 33-office-closeday.css and 34-office-inspector.css) hide the whole app on every print. The Guide has its own override; A3 was told to scope theirs.
+
+## Status after the round 6 merge (kds/deploy 250813b, checked in round 7)
+
+Re-ran `tools/extract-strings.mjs`: 4,581 strings. Most open rows above now read correctly in the merged strings: "held back" instead of "locked for safety", the About text without "BBQ line", "your dishes", neutral cooked-ahead examples, "kitchen board" in the office pages, the yield section without smoked meat, "thrown-out batches" at 83:102, "sold out" at 86, and no "pretends to tell" or "Practice batch" left.
+
+**Still open, sent to the owners with exact lines (round 7)**
+| file:line | current | proposed | owner |
+|---|---|---|---|
+| 72-floor-sheets.js:1922 | `That is a deliberate difference from the research report this app started from.` | delete the sentence | A1 |
+| 72-floor-sheets.js:313, 314 | `reaches stage 1`, `finishes the cooling` | `step 1 of 2`, `step 2 of 2` | A1 |
+| 72-floor-sheets.js:659 | `... now, or discard it.` | `... now, or throw it out.` | A1 |
+| 77-floor-setup.js:218 | `a practice kitchen with a sample barbecue menu and pretend tickets`, `kept safe` | `a demo kitchen with a sample menu and sample tickets`, `not touched` | A2 |
+| 77-floor-setup.js:706 | `untick any` | `clear any` | A2 |
+| 84-office-data.js:474 | `like tea or slaw ... like brisket or fries` | neutral examples | A3 |
+| 84-office-data.js:1664 vs 1694, 1710 | buttons `Reset live data`, `Reset everything`; boxes `Clear live data`, `Erase everything` | one verb per action (recommend Erase), then update the Guide | A3 |
+| 84-office-data.js:1712 | `Ember or Paper` | `Day or Night` (decision 5) | A3 |
+| 88-office-backup.js:39 | `Practice kitchen (the demo)` | `Demo kitchen` (decision 4) | A3 |
+| 89-office-inspector.js:18 | `Kept past best-by`, `Best-by note corrected` | `Kept serving past its quality limit` until decision 8 | A3 |
+| 20-engine.js:567, 25-deadlines.js:134 | `... or discard it.` | `... or throw it out.` (low priority) | A5 |
+
+My own files (74-floor-tour.js, 76-floor-discards.js, 83-office-safety.js, the Guide) have no open rows.
