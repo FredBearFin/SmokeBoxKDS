@@ -1,5 +1,5 @@
 /*
- * WHAT THIS FILE IS: Browser check for "Show this kitchen on another screen": the plain explanation, address and code
+ * WHAT THIS FILE IS: Browser check for "Use one kitchen on several tablets": the plain explanation, address and code
  * validation with plain errors, Connect building a ?follow link without touching saved data, hidden in the demo.
  * USES: tools/pw.mjs, dist/smokebox.html. RUN: node test/follow-ui.e2e.mjs
  */
@@ -14,7 +14,7 @@ await withPage({ w: 1024, h: 768, init: () => { window.__followNoNav = true; } }
   await page.evaluate(() => window.SB.sheets.open('follow'));
   await page.waitForSelector('[data-part="main"]');
   const main = await page.locator('[data-part="main"]').innerText();
-  ok(/only shows/.test(main) && /hub is not set up/.test(main), 'explains it only shows and the hub is not set up');
+  ok(/Show only/.test(main) && /hub is not set up/.test(main), 'explains it only shows and the hub is not set up');
   ok(await page.locator('[data-role="file-note"]').count() === 1, 'file copy says another screen cannot reach it');
   await page.click('[data-act="follow-connect"]');
   ok(/Type the address/.test(await page.locator('[data-role="msg"]').innerText()), 'empty address: plain error');
@@ -47,13 +47,13 @@ await withPage({ w: 1024, h: 768, query: '?demo' }, async (page) => {
   ok(/not available in the demo/.test(await page.locator('.fw').innerText()), 'demo: sheet says not available');
   await page.evaluate(() => window.SB.sheets.open('menu'));
   await page.waitForTimeout(400);
-  ok(await page.locator('.mn-links').getByText('Show this kitchen on another screen').count() === 0, 'demo: Settings has no follow link');
+  ok(await page.locator('.mn-links').getByText('Use one kitchen on several tablets').count() === 0, 'demo: Settings has no follow link');
 });
 // A normal kitchen's Settings shows the link and opens the sheet from it.
 await withPage({ w: 1024, h: 768 }, async (page) => {
   await page.evaluate(() => window.SB.sheets.open('menu'));
   await page.waitForTimeout(400);
-  await page.locator('.mn-links').getByText('Show this kitchen on another screen').click();
+  await page.locator('.mn-links').getByText('Use one kitchen on several tablets').click();
   await page.waitForSelector('[data-part="other"]');
   ok(true, 'Settings link opens the follow sheet');
 });

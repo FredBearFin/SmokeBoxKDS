@@ -652,3 +652,14 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .fw { gap: var(--sp-3); }
 .fw-addr { font-family: var(--font-mono, monospace); word-break: break-all; }
 .fw .input { width: 100%; min-height: 48px; }
+
+/* Use one kitchen on several tablets (fw-): the two ways, and the explicit join choice. */
+.fw-modes { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.fw-mode { display: grid; gap: var(--sp-1); text-align: left; min-height: 64px; cursor: pointer; }
+.fw-mode[aria-pressed="true"] { border-color: var(--ember, var(--amber)); box-shadow: inset 0 0 0 2px var(--ember, var(--amber)); }
+.fw-choice { display: grid; gap: var(--sp-2); }
+.fw-opt { min-height: 56px; }
+.fw-stop { color: var(--amber-ink); font-weight: var(--w-bold); }
+@media (max-width: 560px) { .fw-modes { grid-template-columns: 1fr; } }
+.fw [hidden] { display: none !important; }
+.fw .fs-row { margin-block: var(--sp-2); }
