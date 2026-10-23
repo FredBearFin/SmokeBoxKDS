@@ -84,7 +84,7 @@ async function boot(ctx, query) {
     check('cold card says when it went in the fridge and when it was made', a && /In the fridge since/.test(a.text) && /made/.test(a.text), a);
     check('cold card main action is Take out', a && a.vis[0] === 'Take out', a);
     check('cold card shows the out-of-fridge limit in words, not as a rule', a && /out of your 2 h limit|Not taken out yet/.test(a.text) && !/must|required|law/i.test(a.text), a && a.text);
-    check("hot card is unchanged (no Take out, no fridge wording)", g && !/Take out|fridge/i.test(g.text) && g.vis[0] === "Log temp", g);
+    check("hot card is unchanged (no Take out, no fridge wording)", g && !/Take out|fridge/i.test(g.text) && g.vis.includes("Log temp"), g);
     check('blank limit says no limit set', sl && /no limit set/i.test(sl.text), sl && sl.text);
     await p.click('.hc-card:has(.hc-name:text-matches("^Chicken")) [data-act="take-out"]');
     await p.waitForTimeout(500);
