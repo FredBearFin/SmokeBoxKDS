@@ -1328,16 +1328,21 @@
    * Orders (the check): one per table, tab or customer. Food is sent in rounds, and each round is one ticket
    * on the kitchen screen. The order keeps the money; the tickets keep the timing.
    * ==================================================================================================== */
-  // Dollars rounded to whole cents.
-  const cents = (v) => Math.round(v * 100) / 100;
-  // Builds the money lines of an order from its food total (in whole cents), a discount and a tax rate.
+  // Dollars as a whole number of cents (half a cent rounds up). The tiny addition makes a typed 1.005 count as 101 cents
+  // although the number is stored as 1.00499999999999989...; all money below is worked in whole cents.
+  const toCents = (v) => Math.round(v * 100 + (v >= 0 ? 1e-7 : -1e-7));
+  // A dollar amount rounded to whole cents, with half a cent rounding up.
+  const cents = (v) => toCents(v) / 100;
+  // Builds the money lines of an order from its food total (in whole cents), a discount (dollars) and a tax rate (percent).
+  // Everything is whole cents: the discount cannot exceed the food, tax is the taxable cents times the rate (to four decimals
+  // of a percent) rounded half up to a cent, and total = food - discount + tax exactly.
+  // Example: 1480.75 dollars at 10 percent: 148075 x 100000 / 1e6 = 14807.5 cents, which rounds up to 14808 (a float sum gave 14807).
   function totalsFrom(subCents, qty, rounds, discount, taxRatePct) {
-    const subtotal = subCents / 100;
-    const disc = Math.min(cents(Math.max(0, isNum(discount) ? discount : 0)), subtotal);
-    const taxable = cents(subtotal - disc);
+    const discC = Math.min(toCents(Math.max(0, isNum(discount) ? discount : 0)), subCents);
+    const taxableC = subCents - discC;
     const rate = isNum(taxRatePct) && taxRatePct > 0 ? taxRatePct : 0;
-    const tax = cents(taxable * rate / 100);
-    return { subtotal, discount: disc, taxRate: rate, tax, total: cents(taxable + tax), qty, rounds };
+    const taxC = Math.floor((taxableC * Math.round(rate * 1e4) + 500000) / 1e6);
+    return { subtotal: subCents / 100, discount: discC / 100, taxRate: rate, tax: taxC / 100, total: (taxableC + taxC) / 100, qty, rounds };
   }
   // The sales tax rate in force now, in percent (0 when none is set).
   const taxRateOf = (settings) => (settings && settings.service && isNum(settings.service.taxRatePct) ? settings.service.taxRatePct : 0);
@@ -1350,7 +1355,7 @@
     for (const t of state.tickets) {
       if (t.orderId !== order.id || t.status === 'voided') continue;
       rounds++;
-      for (const it of t.items) { sub += Math.round((isNum(it.price) ? it.price : 0) * 100) * it.qty; qty += it.qty; }
+      for (const it of t.items) { sub += toCents(isNum(it.price) ? it.price : 0) * it.qty; qty += it.qty; }
     }
     return totalsFrom(sub, qty, rounds, opts && opts.discount, taxRateOf(state.settings));
   }
@@ -1365,7 +1370,7 @@
         const a = t.orderId !== undefined && t.status !== 'voided' ? acc.get(t.orderId) : undefined;
         if (!a) continue;
         a.rounds++;
-        for (const it of t.items) { a.sub += Math.round((isNum(it.price) ? it.price : 0) * 100) * it.qty; a.qty += it.qty; }
+        for (const it of t.items) { a.sub += toCents(isNum(it.price) ? it.price : 0) * it.qty; a.qty += it.qty; }
       }
     }
     const rate = taxRateOf(state.settings);
@@ -2387,6 +2392,7 @@
         const e = checkLeaf(spec, v, key);
         if (e) { tx.info = { key: e.key, min: e.min, max: e.max }; return e.report; }
         if (k === 'prepSec') nv = Math.round(v);
+        if (k === 'price') nv = cents(v); // a price is whole cents, so what is shown is what is charged
       }
       if (JSON.stringify(cur[k]) !== JSON.stringify(nv)) { out[k] = nv; keys.push(key); }
     }
@@ -2428,7 +2434,7 @@
     let id = base, n = 2;
     while (taken.has(id) || hasOwn(C.menuById, id) || !safeKey(id)) id = base + '_' + n++;
     const w = tx.mut('menu');
-    w.push({ id, name, short, zone: p.zone, cat: p.cat, price: p.price, prepSec: Math.round(p.prepSec), track: p.track, bom: [], prepConfirmed: p.prepGuess !== true, archived: false });
+    w.push({ id, name, short, zone: p.zone, cat: p.cat, price: cents(p.price), prepSec: Math.round(p.prepSec), track: p.track, bom: [], prepConfirmed: p.prepGuess !== true, archived: false });
     tx.event('settings_changed', { keys: ['menu.' + id + '.added'] });
     tx.info = { id, keys: ['menu.' + id + '.added'] };
     return 'ok';
@@ -3357,9 +3363,10 @@
         const T = o.totals;
         if (!hasOwn(C.payMethodById, o.method)) add('I16 ' + o.id + ' paid without a valid method');
         else if (!isObj(T) || !['subtotal', 'discount', 'tax', 'total'].every((k) => isNum(T[k]) && T[k] >= 0)) add('I16 ' + o.id + ' paid without totals');
-        else if (T.discount > T.subtotal + 1e-9 || Math.abs(T.total - cents(cents(T.subtotal - T.discount) + T.tax)) > 0.006) add('I16 ' + o.id + ' totals do not add up');
+        else if (T.discount > T.subtotal + 1e-9 || toCents(T.total) !== toCents(T.subtotal) - toCents(T.discount) + toCents(T.tax)) add('I16 ' + o.id + ' totals do not add up (in whole cents)');
+        else if (['subtotal', 'discount', 'tax', 'total'].some((k) => Math.abs(T[k] * 100 - Math.round(T[k] * 100)) > 1e-6)) add('I16 ' + o.id + ' totals are not whole cents');
         if (!isNum(o.paidAt) || o.paidAt < o.createdAt) add('I16 ' + o.id + ' paidAt before createdAt');
-        if (!isNum(o.tip) || o.tip < 0) add('I16 ' + o.id + ' tip ' + o.tip);
+        if (!isNum(o.tip) || o.tip < 0 || Math.abs(o.tip * 100 - Math.round(o.tip * 100)) > 1e-6) add('I16 ' + o.id + ' tip ' + o.tip);
       } else if (o.paidAt !== undefined || o.totals !== undefined || o.method !== undefined) add('I16 ' + o.id + ' ' + o.status + ' with payment fields');
       if (o.status === 'voided' && !(typeof o.voidReason === 'string' && o.voidReason.trim())) add('I16 ' + o.id + ' voided without reason');
     }
