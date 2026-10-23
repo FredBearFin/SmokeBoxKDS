@@ -12202,15 +12202,52 @@ a.of-nav:active { background: var(--press); }
     for (const k of Object.keys(r.taps.jobs)) { add('taps', k, r.taps.jobs[k].n); add('taps', k + ' per hour', r.taps.jobs[k].perHour, '/h'); }
     add('tickets', 'count', r.tickets.n); add('tickets', 'median seconds to bump', r.tickets.medianSec, 's');
     add('settings', 'hot hold', r.settings.hotHoldF, 'F'); add('settings', 'temperature check', r.settings.tempCheckEveryMin, 'min'); add('settings', 'hard cap', r.settings.hardCapH, 'h');
-    // Quote a cell when it holds a comma, quote or line break; text cells never start with a formula sign.
-    const cell = (v) => { let s = String(v); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-    return rows.map((x) => x.map(cell).join(',')).join('\n') + '\n';
+    // Every cell goes through the shared guard (36-csv.js): text that could run as a formula gets a leading apostrophe.
+    return rows.map((x) => SB.csv.line(x)).join('\n') + '\n';
   }
 
   SB.pilot = { build, toText, toCsv, defaultFrom, KEY_ALERTLOG: 'smokebox.v1.alertlog', LOG_MAX: 400 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 35-pilot.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'35-pilot.js',message:String(e&&e.message||e)});}
+
+/* ===== 36-csv.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The one place that turns values into spreadsheet (CSV) cells safely. A text cell that starts with
+ *    = + - @ or a tab or carriage return could be run as a formula by a spreadsheet (a note typed as =HYPERLINK(...) in a
+ *    file handed to an inspector or an accountant), so such text gets a leading apostrophe. Real numbers and plain
+ *    number text stay numbers.
+ * PARTS: the cell, the line, the whole file.
+ * USES: nothing. USED BY: 35-pilot.js (pilot report), 76-floor-discards.js (thrown-out log), 88-office-backup.js (sales by day),
+ *    tests. The store has its own copy of the same rule for its five data files (30-store.js).
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  // Text that is only a number (an optional minus, digits, an optional decimal part): safe to leave as it is.
+  const PLAIN_NUMBER = /^-?\d+(?:\.\d+)?$/;
+  // Text that a spreadsheet may read as a formula or a command.
+  const DANGEROUS = /^[=+\-@\t\r]/;
+
+  // One CSV cell: numbers as digits, text with a leading apostrophe when it could be a formula, and quotes when it holds a comma, quote or line break.
+  function cell(v) {
+    if (v === undefined || v === null) return '';
+    if (typeof v === 'number') return isFinite(v) ? String(v) : '';
+    if (typeof v === 'boolean') return v ? 'true' : 'false';
+    let s = typeof v === 'string' ? v : String(v);
+    if (DANGEROUS.test(s) && !PLAIN_NUMBER.test(s)) s = "'" + s;
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  // One CSV line from a list of values (no line break at the end).
+  const line = (a) => a.map(cell).join(',');
+  // A whole CSV text from a list of lists, with a carriage return and line feed after each line.
+  const text = (rows) => rows.map(line).join('\r\n') + '\r\n';
+
+  SB.csv = { cell, line, text };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 36-csv.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'36-csv.js',message:String(e&&e.message||e)});}
 
 /* ===== 40-metrics.js ===== */
 ;try{
@@ -26600,7 +26637,6 @@ a.of-nav:active { background: var(--press); }
   const SB = (g.SB = g.SB || {});
   const U = SB.util;
   const doc = g.document;
-  if (!doc || !SB.sheets) return;
   const h = U.h;
   // Builds an icon element, or an empty span when icons are missing.
   const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 20 }); } catch (e) { return doc.createElement('span'); } };
@@ -26631,8 +26667,10 @@ a.of-nav:active { background: var(--press); }
     // The engine's own discard entries by batch: who threw it out, the entry id for a fix, and fixes already made.
     const logged = new Map();
     for (const row of SB.engine.safetyLog(state)) if (row.event.type === 'batch_discard' && row.event.batchId) logged.set(row.event.batchId, row);
+    const seen = new Set();
     for (const b of state.batches) {
       if (b.status !== 'discard' || !Number.isFinite(b.discardedAt)) continue;
+      seen.add(b.id);
       out.push({
         id: b.id, t: b.discardedAt, date: U.fmtDateShort(U.dateKey(b.discardedAt)), food: b.label || b.ing,
         amount: U.weightText(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
@@ -26640,37 +26678,65 @@ a.of-nav:active { background: var(--press); }
         eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
     }
+    // Discards whose batch has since been dropped from the cabinet list are still in the safety record (kept about six months):
+    // show them from that entry, with what the entry holds (the amount, the reason, who) and nothing invented.
+    const ingName = (id) => { const i = (state.ingredients || []).find((x) => x && x.id === id); return i && i.name ? i.name : id || 'Food'; };
+    for (const [batchId, row] of logged) {
+      const e = row.event;
+      if (seen.has(batchId) || !Number.isFinite(e.t)) continue;
+      out.push({
+        id: batchId, t: e.t, date: U.fmtDateShort(U.dateKey(e.t)), food: ingName(e.ing), amount: Number.isFinite(e.g) ? U.weightText(e.g) : '',
+        since: '', out: U.fmtTime(e.t), reason: REASON[e.reason] || 'Other',
+        initials: rec.initials[batchId] || e.who || '', extra: rec.extra[batchId] || e.note || '', eventId: e.id || '', fixes: row.corrections || [],
+      });
+    }
     return out.sort((a, b) => b.t - a.t);
+  }
+  // How far back the log reaches, in plain words, so nobody reads it as more than it is. The app keeps safety records for
+  // about six months (190 days); a kitchen newer than that has everything from its first record.
+  function coverageText(state, list, now) {
+    if (!list.length) return '';
+    const oldest = list[list.length - 1].t;
+    let first = oldest;
+    for (const row of SB.engine.safetyLog(state)) if (Number.isFinite(row.event.t) && row.event.t < first) first = row.event.t;
+    for (const b of state.batches || []) if (b && Number.isFinite(b.enteredAt) && b.enteredAt < first) first = b.enteredAt;
+    const since = U.fmtDateShort(U.dateKey(oldest));
+    const n = list.length + ' ' + U.plural(list.length, 'batch', 'batches');
+    if (now - first < 175 * 86400e3) return 'Showing every batch thrown out since ' + U.fmtDateShort(U.dateKey(first)) + ' (' + n + '), the first record this app has.';
+    return 'Showing the ' + n + ' thrown out since ' + since + '. Records older than about six months are not kept, so older ones are not here.';
   }
   // Escapes text for safe use inside HTML.
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // Builds the log as plain HTML for printing: a heading and one table with the columns that are switched on.
-  function printHtml(list, rec) {
+  function printHtml(list, rec, note) {
     const cols = rec.cols.filter((c) => c.on);
     const head = '<tr>' + cols.map((c) => '<th>' + esc(c.label) + '</th>').join('') + '</tr>';
     const body = list.map((r) => '<tr>' + cols.map((c) => '<td>' + esc(r[c.key]) + '</td>').join('') + '</tr>').join('');
-    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p><table>' + head + body + '</table>';
+    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p>' + (note ? '<p>' + esc(note) + '</p>' : '') + '<table>' + head + body + '</table>';
   }
   // Builds the log as CSV text with the columns that are switched on.
-  function csv(list, rec) {
+  function csv(list, rec, note) {
     const cols = rec.cols.filter((c) => c.on);
-    // Wraps one value in quotes, doubling any quotes inside it, as CSV requires.
-    const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
-    return [cols.map((c) => q(c.label)).join(',')].concat(list.map((r) => cols.map((c) => q(r[c.key])).join(','))).join('\r\n') + '\r\n';
+    // Each cell goes through the shared guard (36-csv.js): quotes where needed and an apostrophe before anything a spreadsheet could run as a formula.
+    const rowsOut = [cols.map((c) => c.label)].concat(list.map((r) => cols.map((c) => r[c.key])));
+    if (note) rowsOut.push([note]);
+    return SB.csv.text(rowsOut);
   }
+  SB.discardsPure = { rows, coverageText, csv, printHtml };
+  if (!doc || !SB.sheets) return;
   // Prints the log through a hidden frame so the board behind the sheet is not printed with it.
-  function printLog(list, rec) {
+  function printLog(list, rec, note) {
     const f = doc.createElement('iframe');
     f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
     doc.body.appendChild(f);
-    f.srcdoc = printHtml(list, rec);
+    f.srcdoc = printHtml(list, rec, note);
     // Prints once the hidden frame has loaded its page, then removes it.
     f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { /* printing is optional */ } setTimeout(() => f.remove(), 2000); };
   }
   // Saves the log as a CSV file with the browser's normal download, and notes the save time.
-  function saveCsv(list, rec) {
+  function saveCsv(list, rec, note) {
     try {
-      const url = URL.createObjectURL(new Blob([csv(list, rec)], { type: 'text/csv' }));
+      const url = URL.createObjectURL(new Blob([csv(list, rec, note)], { type: 'text/csv' }));
       const a = doc.createElement('a');
       a.href = url; a.download = 'smokebox-thrown-out-log-' + new Date().toISOString().slice(0, 10) + '.csv'; a.style.display = 'none';
       doc.body.appendChild(a); a.click();
@@ -26687,8 +26753,11 @@ a.of-nav:active { background: var(--press); }
     // Stops listening to the store when the sheet closes.
     const onClose = () => offs.splice(0).forEach((f) => f());
     const sheet = SB.ui.sheet({ title: 'Thrown-out log', side: 'right', width: 'min(1040px, 96vw)', name: 'discards', onClose });
-    const note = h('p', { class: 'fs-sub' }, 'Every batch thrown out, newest first. Add initials on each row. Copy these to your health department\'s own form if it asks for a different layout. Save a copy every day: this log lives on this device only.');
+    const note = h('p', { class: 'fs-sub' }, 'Batches thrown out, newest first. Add initials on each row. Copy these to your health department\'s own form if it asks for a different layout. Save a copy every day: this log lives on this device only.');
     const status = h('p', { class: 'fs-sub', role: 'status' });
+    const cover = h('p', { class: 'fs-sub dlog-cover' });
+    // The plain words for how far back the log reaches, for the sheet, print and file.
+    const noteFor = (list) => coverageText(SB.store.getState(), list, SB.store.now());
     const wrap = h('div', { class: 'dlog-wrap', style: 'overflow:auto' });
     const colsBox = h('div', { class: 'dlog-cols', hidden: true });
 
@@ -26716,6 +26785,7 @@ a.of-nav:active { background: var(--press); }
     function draw() {
       U.clear(wrap);
       const list = rows(SB.store.getState(), rec);
+      cover.textContent = noteFor(list);
       const cols = rec.cols.filter((c) => c.on);
       if (!list.length) { wrap.appendChild(h('div', { class: 'empty' }, ico('trash', 40), h('h3', null, 'Nothing thrown out yet'), h('p', null, 'Batches you throw out show up here with their time and reason.'))); return; }
       const table = h('table', { class: 'dlog-table', style: 'border-collapse:collapse;width:100%' });
@@ -26754,15 +26824,15 @@ a.of-nav:active { background: var(--press); }
       });
     }
     // Prints the log as it stands.
-    const doPrint = () => printLog(rows(SB.store.getState(), rec), rec);
+    const doPrint = () => { const l = rows(SB.store.getState(), rec); printLog(l, rec, noteFor(l)); };
     // Saves a spreadsheet copy and says whether it worked.
-    const doCsv = () => { status.textContent = saveCsv(rows(SB.store.getState(), rec), rec) ? 'Saved a copy to your downloads.' : 'The browser blocked the download. Use Print instead.'; };
+    const doCsv = () => { const l = rows(SB.store.getState(), rec); status.textContent = saveCsv(l, rec, noteFor(l)) ? 'Saved a copy to your downloads.' : 'The browser blocked the download. Use Print instead.'; };
     // Shows or hides the column editor.
     const doCols = () => { colsBox.hidden = !colsBox.hidden; if (!colsBox.hidden) drawCols(); };
     const bPrint = h('button', { type: 'button', class: 'btn', onClick: doPrint }, ico('receipt', 20), h('span', null, 'Print or save as PDF'));
     const bCsv = h('button', { type: 'button', class: 'btn btn-primary', onClick: doCsv }, ico('package', 20), h('span', null, 'Save as spreadsheet'));
     const bCols = h('button', { type: 'button', class: 'btn', onClick: doCols }, ico('sliders', 20), h('span', null, 'Edit columns'));
-    sheet.body.append(note, h('div', { class: 'row', style: 'display:flex;gap:12px;flex-wrap:wrap;margin:12px 0' }, bCsv, bPrint, bCols), status, colsBox, wrap);
+    sheet.body.append(note, cover, h('div', { class: 'row', style: 'display:flex;gap:12px;flex-wrap:wrap;margin:12px 0' }, bCsv, bPrint, bCols), status, colsBox, wrap);
     draw();
     offs.push(SB.store.subscribe(() => draw()));
     return sheet;
@@ -26789,7 +26859,7 @@ a.of-nav:active { background: var(--press); }
   // Rows for the state, with the saved initials and notes filled in.
   const rowsFor = (state) => rows(state, load());
   // The whole log for the state as CSV text.
-  const csvFor = (state) => csv(rows(state, load()), load());
+  const csvFor = (state) => { const l = rows(state, load()); return csv(l, load(), coverageText(state, l, SB.store.now())); };
   SB.discards = { rows: rowsFor, csv: csvFor, remind, persist };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
@@ -36150,10 +36220,7 @@ a.of-nav:active { background: var(--press); }
 
 
   // Quotes one value for a CSV cell: wraps it in quotes when it holds a comma, quote or line break.
-  function csvCell(v) {
-    const t = v == null ? '' : String(v);
-    return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
-  }
+  function csvCell(v) { return SB.csv.cell(v); }
   // Whole cents as plain digits with two decimals (1240 gives "12.40"), with no dollar sign or thousands commas, so a spreadsheet adds them up.
   const plainMoney = (v) => (isNum(v) ? (Math.round(v) / 100).toFixed(2) : '0.00');
 
