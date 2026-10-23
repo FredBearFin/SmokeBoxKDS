@@ -71,6 +71,9 @@ export async function createHub(opts = {}) {
   const ops = []; // recent applied actions {seq, opId, actionType, payload, now, by}, so a returning screen can catch up
   const MAX_OPS = opts.maxOps ?? 5000;
   let lastAt = 0; // the time of the last applied action; action times never go backwards
+  // Undo with several screens: which action made each undo entry, and which action was applied last (ticks and screen reports do not count).
+  const undoOwner = new Map();
+  let lastActionKey = null;
   const WAL_KEEP = 1000, WAL_COMPACT_AT = 3000; // lines kept after a save, and how many lines trigger a rewrite
   let walFd = null, walLines = 0;
   const replies = new Map(); // opId -> reply already given, so a resend is answered but not applied twice
@@ -127,9 +130,19 @@ export async function createHub(opts = {}) {
       const r = e.type === 'tick' ? { report: 'ok', state: E.tick(state, e.now).state } : E.apply(state, e.type, e.payload, e.now, { screen: e.screen });
       if (r.report !== 'ok') { console.warn('[hub] record entry ' + e.seq + ' did not replay (' + r.report + '); replay stopped'); break; }
       state = r.state; seq = e.seq; lastAt = Math.max(lastAt, e.now); n++;
+      noteApplied(e.opId || 'seq:' + e.seq, e.type, state, e.by || null);
       remember(e);
     }
     return n;
+  }
+  // After an action was applied: remembers which action made the newest undo entry and which action is now the last one.
+  function noteApplied(key, type, newState, by) {
+    if (type === 'tick' || type === 'uiReport') return;
+    lastActionKey = key;
+    const u = Array.isArray(newState.undo) ? newState.undo : [];
+    const top = u.length ? u[u.length - 1] : null;
+    if (top && typeof top.id === 'string' && !undoOwner.has(top.id)) undoOwner.set(top.id, { key, by: by || null });
+    if (undoOwner.size > 400) { const live = new Set(u.map((x) => x.id)); for (const k of Array.from(undoOwner.keys())) if (!live.has(k)) undoOwner.delete(k); }
   }
   // Keeps a replayed or applied entry in the recent log and, when it has an action id, its answer.
   function remember(e) {
@@ -186,7 +199,15 @@ export async function createHub(opts = {}) {
     // A client may say when it did the action (a queued action replayed after being offline). The hub trusts that
     // time only between the last applied action and its own clock, so time never runs backwards or into the future.
     const t = typeof at === 'number' && isFinite(at) ? Math.min(now(), Math.max(lastAt, at)) : Math.max(lastAt, now());
-    const r = E.apply(state, type, payload, t, { screen });
+    let r = E.apply(state, type, payload, t, { screen });
+    // Undo with several screens: allowed only when the newest undo entry was made by the action the caller names and that action is still the last
+    // one applied. Anything else means someone else changed the kitchen since, and the undo is refused.
+    if (type === 'undo' && r.report === 'ok') {
+      const u = Array.isArray(state.undo) ? state.undo : [], top = u.length ? u[u.length - 1] : null;
+      const owner = top ? undoOwner.get(top.id) : null;
+      const named = payload && typeof payload.ofOpId === 'string' ? payload.ofOpId : null;
+      if (!owner || named !== owner.key || lastActionKey !== owner.key || owner.by !== (typeof clientId === 'string' ? clientId : null)) r = { state, report: 'undoElsewhere', events: [], info: {} };
+    }
     let reply;
     if (r.report === 'ok') {
       const by = typeof clientId === 'string' ? clientId : null;
@@ -195,6 +216,7 @@ export async function createHub(opts = {}) {
       try { walAppend(entry, true); } catch (e) { console.warn('[hub] could not record an action: ' + e.message); return { status: 500, body: { report: 'badPatch', info: { error: 'could not record the action' }, seq } }; }
       state = r.state;
       lastAt = t;
+      noteApplied(entry.opId || 'seq:' + entry.seq, type, state, entry.by);
       const op = remember(entry);
       changed({ by, opId: op.opId, type, op });
       reply = { ok: true, report: 'ok', info: r.info, seq };
@@ -243,6 +265,8 @@ export async function createHub(opts = {}) {
   const readOk = (given) => (!followCode && !writeCode) || (!!followCode && codeEq(given, followCode)) || (!!writeCode && codeEq(given, writeCode));
   // True when a writing screen's code is right (no write code set means open).
   const writeOk = (given) => !writeCode || codeEq(given, writeCode);
+  // The access code a read request carries: the x-smokebox-code header (kept out of addresses and logs), or the code in the address.
+  const codeFrom = (req, q) => String(req.headers['x-smokebox-code'] || q.get('code') || '');
   // Counts a wrong code against the caller's address and returns the status to answer (403, or 429 while locked); null when fine to try.
   function lockState(who) {
     const f = failures.get(who);
@@ -265,7 +289,7 @@ export async function createHub(opts = {}) {
     const who = req.socket.remoteAddress || '?';
     if (followCode || writeCode) {
       if (lockState(who)) return fail(429, 'tooManyTries', { 'retry-after': '60' });
-      if (!readOk(q.get('code'))) { noteFailure(who); return fail(403, 'badCode'); }
+      if (!readOk(codeFrom(req, q))) { noteFailure(who); return fail(403, 'badCode'); }
       failures.delete(who);
     }
     if (clients.size + followers.size >= MAX_CLIENTS) return fail(503, 'tooMany', { 'retry-after': '10' });
@@ -293,7 +317,7 @@ export async function createHub(opts = {}) {
     const answer = (code, body) => { res.writeHead(code, Object.assign({ 'content-type': 'application/json' }, cors)); res.end(JSON.stringify(body)); };
     if (followCode || writeCode) {
       if (lockState(who)) return answer(429, { error: 'tooManyTries' });
-      if (!readOk(q.get('code'))) { noteFailure(who); return answer(403, { error: 'badCode' }); }
+      if (!readOk(codeFrom(req, q))) { noteFailure(who); return answer(403, { error: 'badCode' }); }
       failures.delete(who);
     }
     answer(200, { proto: PROTO, hubId, seq, empty: seq === 0 && !seeded, serverNow: now() });
@@ -321,7 +345,7 @@ export async function createHub(opts = {}) {
       if (!v.ok) return reply(400, { ok: false, report: 'invalidBackup', info: { error: v.error } });
       state = v.state; seeded = true; seq = 0; lastAt = 0;
       hubId = crypto.randomBytes(6).toString('hex');
-      ops.length = 0; opsBytes = 0; replies.clear();
+      ops.length = 0; opsBytes = 0; replies.clear(); undoOwner.clear(); lastActionKey = null;
       if (walFd !== null) { try { fs.closeSync(walFd); } catch (e) { /* ignore */ } walFd = null; }
       if (walFile) { try { fs.rmSync(walFile, { force: true }); } catch (e) { /* ignore */ } walLines = 0; }
       dirty = true; flush();
@@ -346,6 +370,12 @@ export async function createHub(opts = {}) {
       const covered = Number.isInteger(since) && since >= 0 && since <= seq && (since === seq || (ops.length && ops[0].seq <= since + 1) || (!ops.length && since === seq));
       if (covered) send(res, 'catchup', { ops: ops.filter((o) => o.seq > since), serverNow: now(), seq });
       else send(res, 'snapshot', view());
+      return;
+    }
+    if (req.method === 'OPTIONS' && (url === '/follow' || url === '/probe')) {
+      const open = followCode || writeCode;
+      res.writeHead(204, open ? { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'x-smokebox-code, accept', 'access-control-allow-methods': 'GET', 'access-control-max-age': '600' } : {});
+      res.end();
       return;
     }
     if (req.method === 'GET' && url === '/follow') return handleFollow(req, res);
