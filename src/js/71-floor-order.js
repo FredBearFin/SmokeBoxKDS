@@ -144,27 +144,67 @@
     return parts.join(', ') + '. All ready together in about ' + mmss(plan.readySec) + '.';
   }
 
-  // Builds and opens the New ticket sheet and returns it. The draft
-  // lives outside, so closing never loses an order.
+  // Builds and opens the New ticket sheet and returns it. The draft lives outside, so closing never loses an order.
+  // The sheet only supplies the frame; buildOrder fills it, so the same screen can also be a full page.
   function openOrder(opts) {
+    let built = null;
+    // Esc is handled by the order screen, not by the shell, because an order with items must ask before it closes.
+    const sheet = SB.ui.sheet({
+      title: 'New ticket', side: 'right', width: 'min(1180px, 96vw)', name: 'order', closeOnEsc: false,
+      // Only focus the search box with a mouse or keyboard, so a touch tablet keeps its on-screen keyboard down.
+      initialFocus: () => (built ? built.startFocus() : null),
+      // Whatever closes the sheet, drop the listeners and timers this screen added.
+      onClose: () => { if (built) built.teardown(); },
+    });
+    built = buildOrder({ body: sheet.body, footer: sheet.footer, el: sheet.el, close: sheet.close, isPage: false }, opts);
+    return sheet;
+  }
+
+  // Shows New ticket as a full page inside `host` (any empty element) and returns { el, close, leave, destroy }.
+  // opts.onExit(reason) runs when the page closes (sent, discarded, back); the default goes back to the board.
+  // WATCH OUT: the draft D is shared with the sheet version, so an unsent order survives either way of opening.
+  function mount(host, opts) {
+    opts = opts || {};
+    let built = null, closed = false;
+    const page = h('div', { class: 'ord-page', dataset: { name: 'order' } });
+    // The page's own back button asks first when the order has items, like Esc does.
+    const backBtn = h('button', { type: 'button', class: 'btn btn-ghost ord-page-back', 'aria-label': 'Back to the board' }, ico('chevron-left', 22), h('span', null, 'Board'));
+    const bar = h('header', { class: 'ord-page-bar' }, backBtn, h('h1', { class: 'ord-page-title' }, 'New ticket'));
+    const body = h('div', { class: 'sheet-body ord-host' }), footer = h('footer', { class: 'sheet-foot' });
+    page.append(bar, body, footer);
+    host.appendChild(page);
+    // Closes the page once: stops listeners, takes the page off the screen, then tells the caller why.
+    // Closes the page once and reports why.
+    const close = (why) => {
+      if (closed) return;
+      closed = true;
+      if (built) built.teardown();
+      page.remove();
+      if (typeof opts.onExit === 'function') opts.onExit(why || 'api');
+      else if (SB.router && SB.router.go) SB.router.go({ kind: 'floor', zone: SB.router.lastZone() });
+    };
+    built = buildOrder({ body, footer, el: page, close, isPage: true }, opts);
+    // Asks before leaving when the order has items; closes straight away when it is empty.
+    const leave = () => built.leave();
+    // Closes the page without asking, for the router when it moves to another screen.
+    const destroy = () => close('destroy');
+    backBtn.addEventListener('click', leave);
+    const f = built.startFocus(); if (f) f.focus({ preventScroll: true });
+    return { el: page, close, leave, destroy };
+  }
+
+  // Fills a frame (a sheet or a page) with the whole New ticket screen. host = { body, footer, el, close(why),
+  // isPage }. Returns { teardown, startFocus, leave } so the frame can focus it, close it and ask before leaving.
+  function buildOrder(host, opts) {
     // Opened from the Orders screen to add another round: pick that order when it is still open.
     if (opts && opts.orderId) { const o0 = SB.engine.findOrder(st(), opts.orderId); if (o0 && o0.status === 'open') D.orderId = o0.id; }
     const fine = (() => { try { return g.matchMedia('(pointer: fine)').matches; } catch (e) { return false; } })();
     let searchInput = null;
-    // Esc is handled here, not by the shell, because an order with items must ask before it closes.
-    const sheet = SB.ui.sheet({
-      title: 'New ticket', side: 'right', width: 'min(1180px, 96vw)', name: 'order', closeOnEsc: false,
-      // Only focus the search box with a mouse or keyboard, so a
-      // touch tablet keeps its on-screen keyboard down.
-      initialFocus: () => (fine && searchInput ? searchInput : null),
-      // Whatever closes the sheet, drop the listeners and timers this screen added.
-      onClose: () => teardown(),
-    });
-    sheet.body.classList.add('ord-host');
+    host.body.classList.add('ord-host');
 
     const view = { cat: 'all', search: '', pane: 'menu', editing: null, tiles: [], heads: [], lineViews: new Map(), chipBtns: new Map(), offs: [] };
     const root = h('div', { class: 'ord', dataset: { pane: 'menu' } });
-    sheet.body.appendChild(root);
+    host.body.appendChild(root);
 
     // On a phone the menu and the order are two panes, with a
     // switch on top (hidden on wide screens by the CSS).
@@ -175,7 +215,7 @@
       onChange: (id) => setPane(id),
     });
     // Shows one pane (menu or order) and keeps the switch and the footer buttons in step.
-    function setPane(id) { view.pane = id; root.dataset.pane = id; sheet.footer.dataset.pane = id; paneSeg.setValue(id); }
+    function setPane(id) { view.pane = id; root.dataset.pane = id; host.footer.dataset.pane = id; paneSeg.setValue(id); }
 
     // LEFT: menu pane.
     const menuPane = h('section', { class: 'ord-menu', 'aria-label': 'Menu' });
@@ -350,8 +390,8 @@
     const total = h('div', { class: 'ord-total' }, totalN, totalSum);
     const reviewBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg ord-review' }, ico('receipt', 22), h('span', null, 'View order'));
     const sendBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg ord-send' }, ico('ticket', 22), h('span', null, 'Send to kitchen'));
-    sheet.footer.classList.add('ord-foot'); sheet.footer.dataset.pane = 'menu';
-    sheet.footer.append(errEl, total, reviewBtn, sendBtn);
+    host.footer.classList.add('ord-foot'); host.footer.dataset.pane = 'menu';
+    host.footer.append(errEl, total, reviewBtn, sendBtn);
 
     // painting: every function updates nodes in place
     // Updates every menu tile in place: price, 86 state, and how many are on the order.
@@ -736,7 +776,7 @@
         const zones = Array.isArray(info.zones) ? info.zones.length : 0;
         lastSent = { num: info.num, channel: D.channel, items: items.map((it) => ({ menuId: it.menuId, qty: it.qty, mods: (it.mods || []).slice() })) };
         resetDraft();
-        sheet.close('sent');
+        host.close('sent');
         const where = addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent to ' : ' sent to ';
         SB.ui.toast('Ticket #' + info.num + where + zones + ' ' + U.plural(zones, 'station') + '.' + (info.paid ? ' Paid ' + U.fmtMoney(info.total) + ' by ' + payWord + '.' : ''), { tone: 'ok' });
         return;
@@ -779,19 +819,20 @@
     function onEscape(e) {
       e.preventDefault();
       if (view.editing) { const k = view.editing; view.editing = null; syncLines(); const v = view.lineViews.get(k); if (v) v.el.querySelector('.ord-mods-btn').focus({ preventScroll: true }); return; }
-      if (draftEmpty()) sheet.close('esc'); else askLeave(sheet, () => { if (fine) searchInput.focus({ preventScroll: true }); });
+      if (draftEmpty()) host.close('esc'); else askLeave(host, () => { if (fine) searchInput.focus({ preventScroll: true }); });
     }
     // When the button that had focus disappears (Repeat last order, a removed
     // line), focus falls to the page and Esc would do nothing
     // because the sheet is built with closeOnEsc off. This catches that
     // case, but only while this sheet is the top one.
     function onDocKey(e) {
-      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || sheet.el.contains(document.activeElement)) return;
+      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || host.el.contains(document.activeElement)) return;
       const roots = document.querySelectorAll('.sheet-root:not(.is-closing)');
-      if (roots.length && roots[roots.length - 1].contains(sheet.el)) onEscape(e);
+      // A page has no sheet of its own: it acts only when no sheet is open on top of it.
+      if (host.isPage ? !roots.length : roots.length && roots[roots.length - 1].contains(host.el)) onEscape(e);
     }
     document.addEventListener('keydown', onDocKey);
-    sheet.el.addEventListener('keydown', (e) => {
+    host.el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); send(); return; }
       if (e.key === 'Escape' && !e.isComposing) { onEscape(e); return; }
       // typing in this sheet must never trigger the board's single-key shortcuts
@@ -819,11 +860,15 @@
     live = view;
     paintAll();
     if (!draftEmpty()) { showNotice('Your unsent order is back. Clear it to start fresh.'); setPane('order'); }
-    return sheet;
+    // The search box when a mouse or keyboard is in use, so a touch tablet keeps its on-screen keyboard down.
+    const startFocus = () => (fine && searchInput ? searchInput : null);
+    // Leaving the screen the way Esc does: close an empty order, ask first when there are items.
+    const leave = () => onEscape({ preventDefault() {} });
+    return { teardown, startFocus, leave };
   }
 
   /** Esc on an order that has items: close and keep the draft, keep editing, or discard it. */
-  function askLeave(sheet, back) {
+  function askLeave(host, back) {
     const n = qtyTotal();
     const dlg = SB.ui.sheet({ title: 'Leave this order?', side: 'center', width: 480, role: 'alertdialog', name: 'order-leave' });
     dlg.body.appendChild(h('div', { class: 'sheet-copy' },
@@ -832,13 +877,15 @@
     // Keep editing: closes this question and goes back to the order.
     const keep = h('button', { type: 'button', class: 'btn', onClick: () => { dlg.close('keep-editing'); if (back) back(); } }, 'Keep editing');
     // Discard order: forgets the draft and closes both sheets.
-    const discard = h('button', { type: 'button', class: 'btn btn-danger', onClick: () => { resetDraft(); dlg.close('discard'); sheet.close('discard'); SB.ui.toast('Order discarded.', { tone: 'info' }); } }, ico('trash', 20), h('span', null, 'Discard order'));
+    const discard = h('button', { type: 'button', class: 'btn btn-danger', onClick: () => { resetDraft(); dlg.close('discard'); host.close('discard'); SB.ui.toast('Order discarded.', { tone: 'info' }); } }, ico('trash', 20), h('span', null, 'Discard order'));
     // Close, keep draft: closes the order sheet but remembers the items for next time.
-    const close = h('button', { type: 'button', class: 'btn btn-primary', 'data-autofocus': '', onClick: () => { dlg.close('close'); sheet.close('esc'); } }, ico('check', 20), h('span', null, 'Close, keep draft'));
+    const close = h('button', { type: 'button', class: 'btn btn-primary', 'data-autofocus': '', onClick: () => { dlg.close('close'); host.close('esc'); } }, ico('check', 20), h('span', null, 'Close, keep draft'));
     dlg.footer.append(keep, discard, close);
     dlg.focus(close);
     return dlg;
   }
 
   SB.sheets.register('order', openOrder);
+  // The page version is for the router: SB.order.mount(hostElement, { onExit }) shows New ticket as a full page.
+  SB.order = { mount, open: openOrder };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

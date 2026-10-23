@@ -46,6 +46,12 @@
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px);
 }
 .ord-switch { display: none; }
+/* New ticket as a full page (SB.order.mount): a slim top bar, then the same menu/order body and footer as the sheet. */
+.ord-page { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg); }
+.ord-page-bar { flex: none; display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); min-height: 64px; background: var(--sub); border-bottom: var(--bw) solid var(--line); }
+.ord-page-title { font-size: var(--fs-5); font-weight: var(--w-bold); line-height: var(--lh-snug); }
+.ord-page > .sheet-body { flex: 1 1 auto; }
+.ord-page > .sheet-foot { border-radius: 0; }
 .ord-menu, .ord-order { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--sp-4); }
 .ord-menu { padding-top: 0; }
 .ord-order { display: flex; flex-direction: column; gap: var(--sp-4); background: var(--paper); border-left: var(--bw) solid var(--line); }
