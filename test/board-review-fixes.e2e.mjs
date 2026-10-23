@@ -209,6 +209,23 @@ for (const [label, w, h, theme, size] of [['1024 day', 1024, 768, 'day', 'normal
   }
   await ctx.close();
 }
+
+// 6. Tab names read "1 ticket", never "1 tickets"
+{
+  const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const p = await ctx.newPage();
+  p.on('pageerror', (e) => errs.push(String(e)));
+  await p.goto(URL0); await p.waitForFunction(() => window.SB && SB.booted === true);
+  await p.evaluate(`SB.floor.setWelcome(false); ${addDish} SB.store.dispatchEx('createTicket', { customer: 'T1', channel: 'dine_in', items: [{ menuId: SB.store.getState().menu[0].id, qty: 1 }], note: '', rush: false }, { source: 'ui' });`);
+  await p.waitForTimeout(1500);
+  const one = await p.evaluate(() => document.querySelector('.fl-tabs [data-id="all"]').textContent.replace(/\s+/g, ' '));
+  check('one ticket: the All tab reads "1 ticket" and never "1 tickets"', /1\D*ticket$/.test(one.trim()), one);
+  await p.evaluate(`SB.store.dispatchEx('createTicket', { customer: 'T2', channel: 'dine_in', items: [{ menuId: SB.store.getState().menu[0].id, qty: 1 }], note: '', rush: false }, { source: 'ui' });`);
+  await p.waitForTimeout(1500);
+  const two = await p.evaluate(() => document.querySelector('.fl-tabs [data-id="all"]').textContent.replace(/\s+/g, ' '));
+  check('two tickets: the All tab reads "2 tickets"', /2\D*tickets$/.test(two.trim()), two);
+  await ctx.close();
+}
 check('no uncaught page errors', errs.length === 0, errs.slice(0, 3));
 await browser.close();
 console.log(fail ? fail + ' check(s) failed' : 'all checks passed');

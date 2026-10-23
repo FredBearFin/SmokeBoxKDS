@@ -629,7 +629,7 @@
       if (!b) return;
       if (id !== 'all') b.dataset.zone = id;
       b.insertBefore(h('span', { class: 'visually-hidden' }, (id === 'all' ? 'All stations' : zoneById(id).long) + ', '), b.firstChild);
-      b.appendChild(h('span', { class: 'visually-hidden' }, id === 'all' || id === 'expo' ? ' tickets' : ' tickets with work here'));
+      b.appendChild(h('span', { class: 'visually-hidden fl-tab-what', dataset: { here: id === 'all' || id === 'expo' ? 'no' : 'yes' } }, tabWhat(0, id)));
     });
     const tabs = h('div', { class: 'fl-tabs' }, seg);
 
@@ -834,6 +834,8 @@
     }
     m.fitKey = headKey();
   }
+  // The hidden words after a tab's count: "ticket" for one, "tickets" for the rest, and "with work here" on a station tab.
+  function tabWhat(n, id) { return ' ' + U.plural(n, 'ticket') + (id === 'all' || id === 'expo' ? '' : ' with work here'); }
   // Runs every second: refits the header only when its width or chip text changed, so most ticks cost nothing.
   function refit() {
     if (m && m.head && headKey() !== m.fitKey) fitHead();
@@ -1777,6 +1779,8 @@
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
     const tabCount = (id, n, alert) => {
       m.seg.setCount(id, n, { alert });
+      const what = m.seg.querySelector('[data-id="' + id + '"] .fl-tab-what');
+      if (what) { const t = tabWhat(n, id); if (what.textContent !== t) what.textContent = t; }
       const p = m.tabParts[id];
       if (p && p.n !== n) { p.n = n; p.count.dataset.zero = n === 0 ? 'true' : 'false'; }
     };
