@@ -75,3 +75,25 @@ Fixed:
 - The compliance ring wording was already handled by A4 in Safety.
 
 Left: "Meal pacing" section title (Freddy's call on Finish together), the About "What is simulated" row, "protein" wording on Stock, Day/Night vs Ember/Paper, P2 items 12 to 17 and 20, a forgot-the-PIN path (60-shell, not mine). Not re-checked by eye: Paper at 1920 for every page, Safety and Stock pages with real cooked-ahead data other than the demo.
+
+---
+
+## Round 4 update (branch night/a3-r4)
+
+Screenshots: `docs/ux-shots/night/a3/r4-*` (Close the day open, ready, done at 1280x800 Ember and 390x844; printed summary at 1024x768; Appearance with units; blank-kitchen dish list at 1280 and 390; stock with pounds).
+
+**Close the day** (`src/js/87-office-closeday.js`, `src/css/33-office-closeday.css`). A sheet opened by `SB.office.openCloseDay()`, by the "End of day" card on Sales and money, or by the address `#/office/money?close=1`. It shows: a plain line on what closing does; open orders with a button that opens Orders (the button is the only way to close while any order is open); money by cash, card and other (orders, sales, tax if any, tips, collected) and a "Cash in the drawer should be $X, plus the cash you started with" line; counts of tickets and voids; leftover food keep or throw out only when cooked-ahead food is tracked and some is left; then Close the day. The done state says "Back up today's data now" (downloads the backup and tells the app a backup was made), plus Print today's summary and Done. The print summary is a one-page table (paid orders, sales, tax, tips, collected, by method, cash expected, voids, food thrown out with cost where known) with a practice-numbers note when demo tickets exist; it prints through a print-only block. A "?" opens the Guide page `closing-the-day`.
+
+What closing does in the engine (checked in `A.closeDay`): it refuses while any order is open; otherwise it logs one `day_closed` event with the day's totals and counts, optionally throws out every batch with food, and records `lastClose`. It does not lock the day and does not move the clock: the service day still turns over at the set hour (4 am), orders taken after closing are allowed, and closing again the same day covers the whole day. The sheet says this in plain words. There is no starting-cash setting, so the drawer line says "plus the cash you started with".
+
+**Units.** Appearance now has Temperatures (F or C) and Weights (kg and g, or lb and oz), saved in the settings. Office text follows them: tile and card weights (`kit.fmt.g`), the Pace glance, charts (g and temp formats in `50-charts.js`, axis labels too), thrown-out sentences, the safety page temperatures and the Settings read-outs. Left in the stored unit by design: the entry fields (Ingredients amounts in grams, Food safety limits in F), money per kg labels, and chart tick positions (they stay at round gram and F values; only the labels change).
+
+**Hidden counted-stock ingredients** ("Portions of X") are filtered out of the Settings ingredient list, the add-an-ingredient pick list, and the stock chart picker; a name shown anywhere reads as the dish.
+
+**Help links** added: Close day sheet and Sales and money card, Data Export (`backup-and-restore`) and Import (`replacing-a-device`). The Safety page "?" is in 83-office-safety.js (A4).
+
+**Blank dish list** says "No dishes yet. Add your first dish to start taking orders." with an "Add your first dish" button that opens the dishes sheet.
+
+Floor-side call sites for A1 that still show weights or temperatures without the units helpers (not touched, not mine): hold cabinet cards and sheets (72-floor-sheets.js), the ticket and board cards (70-floor-board.js), 76-floor-discards.js; use `U.weightText(g)` and `U.tempText(f)`.
+
+Left: starting-cash setting, Safety "?" link, tax percentage in the print summary, a printed layout check on a real printer.

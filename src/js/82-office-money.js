@@ -55,6 +55,8 @@
   // Display name of an ingredient from the data, then from the built-in config, else the plain id.
   B.ingName = (ds, id) => {
     const a = ((ds && ds.ingredients) || []).find((i) => i && i.id === id) || (SB.config && SB.config.ingredientById && SB.config.ingredientById[id]);
+    // A hidden counted-stock ingredient ("Portions of X") reads as the dish it counts, never as an ingredient.
+    if (a && a.hidden && a.name) return String(a.name).replace(/^Portions of /, '');
     return a ? a.name : id;
   };
   // The whole ingredient record (cost, yield, limits) for an id, or null when nothing knows it.
@@ -346,6 +348,20 @@
         // The same sum for the previous period, or null when there is none.
         previous: (p) => { const q = prevHandle(p); return q ? soldTotal(q) : null; } },
     ]);
+
+    /* ---------------------------------------------------------------- end of day */
+    page.panel({
+      span: 12, title: 'End of day', sub: 'When service is over',
+      // Builds the explanation and the button that opens the Close the day sheet.
+      render: (body) => {
+        const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
+        body.append(h('p', { class: 'ob-text' }, 'Close the day when the last order is paid. You get today\'s totals by cash, card and other, a cash-in-the-drawer line, a backup button and a page to print.', help ? h('span', null, ' ', help) : null),
+          h('button', { type: 'button', class: 'btn btn-primary', 'data-k': 'close-day', onClick: () => { if (O.openCloseDay) O.openCloseDay(); } }, 'Close the day'));
+        // The address #/office/money?close=1 opens the sheet straight away.
+        if (O.maybeOpenCloseDay) O.maybeOpenCloseDay();
+        return {};
+      },
+    });
 
     /* ---------------------------------------------------------------- takings */
     page.section('Money collected', 'Sales are the food you sold after discounts. Add tax and tips and you get everything collected. Smokebox only records how an order was paid; it never charges a card.');
@@ -749,7 +765,7 @@
           setText(oHot.v, t.hotPct.toFixed(1) + '%'); setText(oHot.n, 'of raw weight, straight from the smoker');
           setText(oChill.v, t.chilledPct.toFixed(1) + '%'); setText(oChill.n, 'after chilling overnight');
           const cg = isNum(t.cookedG) ? Math.round(t.cookedG) : null;
-          setText(oCooked.v, cg === null ? '-' : fmt.g(cg)); setText(oCooked.n, cg === null ? '' : fmt.num(cg, 0) + ' g from ' + fmt.g(rawG) + ' raw');
+          setText(oCooked.v, cg === null ? '-' : fmt.g(cg)); setText(oCooked.n, cg === null ? '' : fmt.g(cg) + ' from ' + fmt.g(rawG) + ' raw');
           setText(oCost.v, isNum(t.trueCostPerCookedKg) ? fmt.money(t.trueCostPerCookedKg, 2) : 'Not known'); setText(oCost.n, isNum(rc.cost) ? 'raw cost ' + fmt.money(rc.cost, 2) + ' per kg' : 'no raw cost recorded');
           if (isNum(rc.staticY) && cg !== null) {
             const sg = Math.round(rawG * rc.staticY);

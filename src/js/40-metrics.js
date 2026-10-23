@@ -79,7 +79,7 @@
   // Fraction to text: 0.87 gives "87%". Unknown gives "-".
   const pctTxt = (x) => (num(x) ? Math.round(x * 100) + '%' : '-');
   // Grams to text: 4800 gives "4.8 kg". Unknown gives "-".
-  const kgTxt = (g) => (num(g) ? (g / 1000).toFixed(1) + ' kg' : '-');
+  const kgTxt = (g) => (num(g) ? (U.units && U.units.weight === 'lb' ? U.weightText(g) : (g / 1000).toFixed(1) + ' kg') : '-');
   // Dollars with cents ("$14.00"). Unknown gives "-".
   const money = (n) => U.fmtMoney(n);
   // Dollars without cents ("$14"), for big totals.
@@ -1172,7 +1172,7 @@
     // Picks the singular or plural word for a count.
     const plural = (n, one, many) => (n === 1 ? one : many);
     if (!a.count && !b.count) return 'Nothing was thrown away this week or last week.';
-    if (!a.count) return 'Nothing was thrown away this week. Last week ' + U.fmtMoney(b.cost) + ' of food went in the trash (' + U.fmtG(b.g) + ').';
+    if (!a.count) return 'Nothing was thrown away this week. Last week ' + U.fmtMoney(b.cost) + ' of food went in the trash (' + (U.weightText || U.fmtG)(b.g) + ').';
     const parts = [];
     if (a.cost > 0) {
       let vs = '';
@@ -1180,8 +1180,8 @@
         const diff = Math.round((a.cost - b.cost) * 100) / 100;
         vs = diff === 0 ? ', the same as last week' : ', ' + (diff > 0 ? 'up ' : 'down ') + U.fmtMoney(Math.abs(diff)) + ' from last week\'s ' + U.fmtMoney(b.cost);
       } else if (!b.count) vs = ', and nothing was thrown away last week';
-      parts.push('You threw away ' + U.fmtMoney(a.cost) + ' of food this week (' + U.fmtG(a.g) + ')' + vs + '.');
-    } else parts.push(a.count + ' ' + plural(a.count, 'batch was', 'batches were') + ' thrown away this week (' + U.fmtG(a.g) + '), but no cost is recorded for ' + plural(a.count, 'it', 'them') + ', so the dollars are not known.');
+      parts.push('You threw away ' + U.fmtMoney(a.cost) + ' of food this week (' + (U.weightText || U.fmtG)(a.g) + ')' + vs + '.');
+    } else parts.push(a.count + ' ' + plural(a.count, 'batch was', 'batches were') + ' thrown away this week (' + (U.weightText || U.fmtG)(a.g) + '), but no cost is recorded for ' + plural(a.count, 'it', 'them') + ', so the dollars are not known.');
     const top = tw.byProduct.filter((r) => r.cost > 0)[0] || tw.byProduct[0], why = tw.byReason.slice().sort((x, y) => y.cost - x.cost || y.g - x.g)[0];
     if (top && why && a.cost > 0) parts.push('Most of it was ' + top.name.toLowerCase() + ' (' + U.fmtMoney(top.cost) + '), and the biggest reason was ' + why.label.toLowerCase() + '.');
     if (a.cost > 0 && a.noCostCount > 0) parts.push(a.noCostCount + ' ' + plural(a.noCostCount, 'discard has', 'discards have') + ' no recorded cost, so the real figure is higher.');

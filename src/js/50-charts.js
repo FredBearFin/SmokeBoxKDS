@@ -339,7 +339,7 @@
   // Short date label such as "Fri 10/16".
   const dateShort = (ts) => { const d = new Date(ts); return WD[d.getDay()] + ' ' + (d.getMonth() + 1) + '/' + d.getDate(); };
   // Gram axis label: "850 g" below a thousand, "1.5 kg" from there.
-  const fmtGAxis = (v) => (!isNum(v) ? '-' : Math.abs(v) >= 1000 ? trim0((v / 1000).toFixed(1)) + ' kg' : Math.round(v) + ' g');
+  const fmtGAxis = (v) => (!isNum(v) ? '-' : U.units && U.units.weight === 'lb' && U.weightText ? U.weightText(v) : Math.abs(v) >= 1000 ? trim0((v / 1000).toFixed(1)) + ' kg' : Math.round(v) + ' g');
 
   // Named formats for spec.format. full is the exact tooltip text, axis the short tick-label text, steps
   // the preferred tick spacings, scale converts the value before ticking (pct holds 0..1, ticks in whole
@@ -357,9 +357,9 @@
     // durS: durations in seconds. clock: elapsed clock text such as 05:14 from milliseconds.
     durS: { full: (s) => fmtDurMs(s * 1000), axis: (s) => durAxis(s * 1000), steps: M.SEC_STEPS },
     clock: { full: (ms) => (U.fmtClock ? U.fmtClock(ms) : durAxis(ms)), axis: durAxis, steps: M.MS_STEPS },
-    // g: grams (kg from 1000). temp: degrees F.
-    g: { full: (v) => (U.fmtG ? U.fmtG(v) : numFull(v) + ' g'), axis: fmtGAxis },
-    temp: { full: (v) => (U.fmtTemp ? U.fmtTemp(v) : Math.round(v) + '°F'), axis: (v) => Math.round(v) + '°' },
+    // g: weights in the chosen unit (stored as grams). temp: degrees in the chosen unit (stored as F).
+    g: { full: (v) => (U.weightText ? U.weightText(v) : U.fmtG ? U.fmtG(v) : numFull(v) + ' g'), axis: fmtGAxis },
+    temp: { full: (v) => (U.tempText ? U.tempText(v) : U.fmtTemp ? U.fmtTemp(v) : Math.round(v) + '°F'), axis: (v) => (U.tempShown ? U.tempShown(v) : Math.round(v)) + '°' },
     // hour: decimal service-day hours. time: timestamp as clock time. date: timestamp as a short date.
     hour: { full: hourFull, axis: hourAxis, steps: M.HOUR_STEPS },
     time: { full: timeOfDay, axis: timeAxis },
