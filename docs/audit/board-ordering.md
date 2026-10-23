@@ -208,3 +208,13 @@ Checked in headless Chromium with a simulated clock only. Nothing here was tried
 - **Hold sheet at 280 px with Large text** no longer sticks out 9 px: name and status may wrap and the name breaks long words.
 - **Not done:** call-outs for the cold feed rows use the engine's own phrases and I did not add any board wording for them; the strip shows them like other rows (checked only that nothing breaks).
 - **Tests:** `test/board-round14.e2e.mjs`. `test/floor.e2e.mjs` expectations for slip order now put the overdue ticket first.
+
+## Round 15: cold items on the strip and voice
+
+Headless Chromium with a simulated clock only; nothing was tried on a real device or in a real kitchen.
+
+- The strip shows the engine's `coldOut` row ("27m 59s left of your 1-hour limit out of the fridge. Put it back in the fridge, or use it. Your food-safety plan comes first.") and the `coldDate` row (last 6 hours of the last fridge day). Neither says "overdue" or "late"; the tab dots only talk about overdue tickets.
+- The voice says a cold row once when it first shows or gets worse, for example "Chicken salad batch 1: 28 minutes left of your out-of-fridge limit." The first pass after the board opens only remembers what is already there, so a reload reads nothing old. It follows the same sound and speech switches and the same leader tab as the other warnings.
+- When a Take out or Put back itself ends the batch, the cook sees the engine's words as a warning instead of the plain "taken out" message. This case could not be reproduced in a test.
+- Tests: `test/board-round15.e2e.mjs` (feed row, strip words, spoken once, no overdue wording). All board suites passed on the merged build, including `floor` and `floor-sheets` (floor: 201 passed, 0 failed, 2 known reported).
+- Not done: a cold row has no chime ladder of its own (the engine gives it zero rungs), so the sound is a single chime with the spoken line.
