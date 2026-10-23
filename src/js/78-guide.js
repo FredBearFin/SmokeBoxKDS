@@ -451,7 +451,7 @@
      },
      {
       "t": "p",
-      "x": "Spreadsheet files, like the sales file, are for reading. You cannot restore from them."
+      "x": "Spreadsheet files, like the sales file, cannot be restored."
      },
      {
       "t": "h",
@@ -461,14 +461,15 @@
       "t": "ol",
       "x": [
        "Tap **Menu**. At the bottom, tap **Start over with an empty menu**.",
-       "It lists what goes (every dish, ticket, order and record on this device) and what stays (tax, hours, PIN and station names; clear the box to reset those too). Tap **Next: save a backup**.",
-       "Tap **Save a backup now** and keep the file.",
-       "Type START OVER, then tap **Erase everything and start over**."
+       "Read what goes and what stays. Clear **Keep my tax, hours, PIN and station names** to reset those too. Tap **Next: save a backup**.",
+       "This step only explains: the backup is saved at the moment of erasing, and if it fails, nothing is erased. Tap **Next: confirm**.",
+       "Type ERASE, then tap **Erase everything and start over**.",
+       "At \"Done. Your kitchen is empty.\" tap **Save the backup again** or **Go to the first screen**."
       ]
      },
      {
       "t": "p",
-      "x": "There is no undo. To go back, restore the backup you just saved."
+      "x": "There is no undo. To go back, restore the backup file. Left-over practice tickets get **Clear them** or **Keep them**."
      },
      {
       "t": "h",
