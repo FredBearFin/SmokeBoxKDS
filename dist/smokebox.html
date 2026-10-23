@@ -10521,7 +10521,10 @@ a.of-nav:active { background: var(--press); }
     for (const day of [-1, 0]) {
       const d = new Date(now);
       d.setDate(d.getDate() + day); d.setHours(0, 0, 0, 0);
-      const at = d.getTime() + sv.closeHour * H;
+      // Whole hours go on the wall clock, so a clock-change day still closes at the clock time set; only the part
+      // of an hour is added as milliseconds.
+      const w = Math.floor(sv.closeHour);
+      const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), w, 0, 0, 0).getTime() + Math.round((sv.closeHour - w) * H);
       if (at > now && (best == null || at < best)) best = at;
     }
     return best;
@@ -10532,12 +10535,14 @@ a.of-nav:active { background: var(--press); }
   // ingredient can have both: leftoverG (grams in batches still alive at close) and unmetG (demand nobody could
   // serve). Also runOutAt (the first moment demand went unserved), runOutCause ('rest-gap' when a batch is still
   // resting and ready later, gapEndAt; 'limit' when a batch passing its limit ended the supply, limitBatchId and
-  // limitQuality; else 'stock'), and wasteBefore (grams that passed their limit before close).
+  // limitQuality; else 'stock'), wasteBefore (grams that passed their limit before close), wasteById (the same
+  // grams per batch id) and plannedLeftG (the part of leftoverG in planned batches, ids starting 'plan:').
   function sweepToClose(batches, rate, now, closeAt) {
     const bs = batches.map((b) => ({ rem: b.remainingG, ent: b.enteredAt, ready: Math.max(now, b.readyAt || 0), exp: b.expAt, id: b.id, quality: !!b.quality })).sort((x, y) => x.ent - y.ent);
     const marks = new Set([now, closeAt]);
     for (const b of bs) for (const t of [b.ready, b.exp]) if (t > now && t < closeAt) marks.add(t);
     const times = Array.from(marks).sort((x, y) => x - y);
+    const wasteById = Object.create(null);
     let unmet = 0, gapUnmet = 0, runOutAt = null, wasteBefore = 0, cause = null, gapEndAt = null, limitBatchId = null, limitQuality = false, lastLimit = null;
     for (let i = 0; i + 1 < times.length; i++) {
       const a = times[i], z = times[i + 1], dem = rate * (z - a);
@@ -10554,10 +10559,18 @@ a.of-nav:active { background: var(--press); }
         unmet += need;
         if (cause === 'rest-gap' && z <= gapEndAt) gapUnmet += need;
       }
-      for (const b of bs) if (b.exp <= z && b.rem > 0) { wasteBefore += b.rem; b.rem = 0; if (!lastLimit || b.exp >= lastLimit.exp) lastLimit = { exp: b.exp, id: b.id, quality: b.quality }; }
+      for (const b of bs) if (b.exp <= z && b.rem > 0) { wasteBefore += b.rem; if (b.id != null) wasteById[b.id] = (wasteById[b.id] || 0) + b.rem; b.rem = 0; if (!lastLimit || b.exp >= lastLimit.exp) lastLimit = { exp: b.exp, id: b.id, quality: b.quality }; }
     }
     const alive = bs.reduce((acc, b) => acc + (b.exp > closeAt ? b.rem : 0), 0);
-    return { leftoverG: alive, unmetG: unmet, gapUnmetG: gapUnmet, runOutAt, runOutCause: cause, gapEndAt, limitBatchId, limitQuality, wasteBefore };
+    const plannedLeft = bs.reduce((acc, b) => acc + (b.exp > closeAt && String(b.id).indexOf('plan:') === 0 ? b.rem : 0), 0);
+    return { leftoverG: alive, plannedLeftG: plannedLeft, unmetG: unmet, gapUnmetG: gapUnmet, runOutAt, runOutCause: cause, gapEndAt, limitBatchId, limitQuality, wasteBefore, wasteById };
+  }
+  // Grams of each batch the pace will not sell before that batch's own limit, keyed by batch id. Runs the same
+  // time-stepped sweep as the close check, but past close to the last limit, so a younger batch only sells once the
+  // older ones are gone or expired. Each batch is { id, remainingG, enteredAt, readyAt, expAt }.
+  function batchWaste(batches, rate, now) {
+    const end = batches.reduce((m, b) => Math.max(m, b.expAt), now) + 1;
+    return sweepToClose(batches, rate, now, end).wasteById;
   }
   // Whether a new batch started now would be ready before close: now + cook time + rest time against closing. Returns
   // null when the product has no cook time, else { readyAt, fits }.
@@ -10599,9 +10612,16 @@ a.of-nav:active { background: var(--press); }
   function closeRows(info, ing, name, now, out) {
     if (!info) return;
     const { closeAt, stock, r } = info;
-    if (r.leftoverG >= Math.max(NOTABLE_G, NOTABLE_SHARE * stock)) {
-      out.push({ id: 'leftover:' + ing.id, kind: 'leftover', ing: ing.id, label: name, at: closeAt, msLeft: closeAt - now, rung: 0, rungs: 0, sev: 'info', leftoverG: r.leftoverG,
-        consequence: 'At the current pace about ' + U.weightText(r.leftoverG) + ' of ' + name + ' will be left at close, not counting what is already on the block.', action: 'Sell it: run a special, tell the front.', unknown: false });
+    // WATCH OUT: grams in a planned batch were never cooked, so they are not food to sell off; they are told apart as
+    // a smaller plan.
+    const planLeft = r.plannedLeftG || 0, realLeft = Math.max(0, r.leftoverG - planLeft);
+    const realNote = realLeft >= Math.max(NOTABLE_G, NOTABLE_SHARE * stock), planNote = planLeft >= NOTABLE_G;
+    if (realNote || planNote) {
+      const consequence = (realNote ? 'At the current pace about ' + U.weightText(realLeft) + ' of ' + name + ' will be left at close, not counting what is already on the block.' : '')
+        + (planNote ? (realNote ? ' ' : '') + 'The planned batch would leave about ' + U.weightText(planLeft) + (realNote ? ' more' : ' of ' + name) + ' at close.' : '');
+      const action = realNote ? 'Sell it: run a special, tell the front.' + (planNote ? ' Plan a smaller batch.' : '') : 'Plan a smaller batch, or none.';
+      out.push({ id: 'leftover:' + ing.id, kind: 'leftover', ing: ing.id, label: name, at: closeAt, msLeft: closeAt - now, rung: 0, rungs: 0, sev: 'info', leftoverG: realLeft, plannedLeftG: planLeft,
+        consequence, action, unknown: false });
     }
     if ((r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG) < NOTABLE_G || r.runOutAt == null || (r.runOutCause === 'limit' && r.limitQuality)) return;
     let consequence, action, sb = null;
@@ -10633,32 +10653,28 @@ a.of-nav:active { background: var(--press); }
       const name = ing ? ing.name : ingId;
       const list = byIng[ingId].slice().sort((a, b) => a.enteredAt - b.enteredAt);
       const rungs = rungsFor(ingId, state.settings), rate = sales.rate[ingId];
-      // Only batches that have finished resting can be sold, so the run-out total counts those alone.
-      const isReady = (b) => !(U.isNum(b.restUntil) && b.restUntil > now);
-      let soldBefore = 0, totalLeft = 0;
-      for (const b of list) if (isReady(b)) totalLeft += b.remainingG;
       // The close sweep first: a quality limit that ends the supply is told in that batch's own expiry row.
       const ci = rate !== undefined ? closeInfo(state, ing, list, rate, now, S) : null;
       const lim = ci && ci.r.runOutCause === 'limit' && ci.r.limitQuality && ci.r.unmetG >= NOTABLE_G ? ci.r : null;
       const limSb = lim ? startBy(ing, now, lim.runOutAt, lim.unmetG) : null;
-      list.forEach((b, i) => {
-        // A quality limit is a house rule: the batch passes it and waits for a taste test. A kept batch counts down
-        // to the end of its extension instead.
+      // A quality limit is a house rule: the batch passes it and waits for a taste test. A kept batch counts down
+      // to the end of its extension instead.
+      const expInfo = (b) => {
         const hardAt = b.enteredAt + (U.isNum(S.hardCapH) ? S.hardCapH : S.defaultMaxHoldH) * H, limAt = b.enteredAt + E()._internal.holdLimitMs(b, S);
         const q = b.holdBasis === 'quality' && limAt < hardAt;
-        const exp = q && U.isNum(b.keepUntil) && b.keepUntil > now ? Math.min(b.keepUntil, hardAt) : limAt;
+        return { q, exp: q && U.isNum(b.keepUntil) && b.keepUntil > now ? Math.min(b.keepUntil, hardAt) : limAt };
+      };
+      // WATCH OUT: per-batch waste must time-step like the close sweep. Subtracting older batches' sales over this
+      // batch's whole window overstates waste when an older batch expires first.
+      const wasteBy = rate !== undefined ? batchWaste(list.map((b, i) => ({ id: i, remainingG: b.remainingG, enteredAt: b.enteredAt, readyAt: b.restUntil, expAt: expInfo(b).exp })), rate, now) : null;
+      list.forEach((b, i) => {
+        const { q, exp } = expInfo(b);
         const msLeft = exp - now;
         const rung = rungOf(msLeft, rungs);
         const lastOne = list.length === 1;
-        // How much of this batch the sales pace will clear before it expires, after the older batches took theirs.
-        let sold = 0, waste = null;
-        if (rate !== undefined) {
-          // A batch that is still resting can only sell from the moment it is ready.
-          const sellMs = Math.max(0, exp - Math.max(now, isReady(b) ? now : b.restUntil));
-          sold = Math.max(0, Math.min(b.remainingG, rate * sellMs - soldBefore));
-          waste = b.remainingG - sold;
-          soldBefore += sold;
-        }
+        // How much of this batch the sales pace will not clear before it expires, oldest batch served first. A batch
+        // that is still resting only sells from the moment it is ready.
+        const waste = wasteBy ? (wasteBy[i] || 0) : null;
         // A few hundred grams left is not worth a warning: the row still shows but never sounds.
         const trivial = b.remainingG < TRIVIAL_G || (waste != null && waste < NOTABLE_G && waste < NOTABLE_SHARE * b.remainingG);
         const usd = waste != null && U.isNum(b.costPerCookedKg) ? waste / 1000 * b.costPerCookedKg : null;
@@ -11166,11 +11182,11 @@ a.of-nav:active { background: var(--press); }
     if (!state || !U.isNum(now)) return out;
     const dsh = state.settings && state.settings.service ? state.settings.service.dayStartHour : undefined;
     const day = U.serviceDate(now, dsh);
+    // WATCH OUT: an order counts on the day it was paid, like close-the-day, not the day it was opened (o.serviceDate).
     const totals = E().openOrderTotals(state);
     for (const o of Array.isArray(state.orders) ? state.orders : []) {
       const t = totals.get(o.id);
       if (o.status === 'open') out.open.push({ id: o.id, name: o.customer, rounds: t ? t.rounds : 0, total: t ? t.total : 0, at: o.createdAt });
-      // Paid today goes by when it was paid (as the day close counts it), not the day the order was opened.
       else if (o.status === 'paid' && U.isNum(o.paidAt) && U.serviceDate(o.paidAt, dsh) === day && o.totals) { out.paidCount++; out.paid.push({ id: o.id, name: o.customer, total: o.totals.total, method: o.method, at: o.paidAt }); }
     }
     out.open.sort((a, b) => a.at - b.at);
@@ -11199,7 +11215,7 @@ a.of-nav:active { background: var(--press); }
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { spoken, clipWords, delivery, numWords, voiceInfo, build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
+  SB.deadlines = { spoken, clipWords, delivery, numWords, voiceInfo, build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, batchWaste, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 25-deadlines.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'25-deadlines.js',message:String(e&&e.message||e)});}
@@ -13056,8 +13072,10 @@ a.of-nav:active { background: var(--press); }
       if (first >= t0) { out.firstTicket.minutes = Math.round((first - t0) / MIN); out.firstTicket.from = t0; }
     }
     // The gate numbers in one place. Only the two the app can count are given a verdict; the rest are for the observer.
-    out.gate.pullTap = out.pulls.tapRate == null || !out.batches.cookAheadOn ? null : { rate: out.pulls.tapRate, pass: out.pulls.tapRate >= 50 };
-    out.gate.batches = out.batches.rate == null ? null : { rate: out.batches.rate };
+    // WATCH OUT: a rate over 100 percent means the app logged more than the observer counted, so the observer's count is
+    // off; it is flagged (over) and never passes the gate.
+    out.gate.pullTap = out.pulls.tapRate == null || !out.batches.cookAheadOn ? null : { rate: out.pulls.tapRate, pass: out.pulls.tapRate >= 50 && out.pulls.tapRate <= 100, over: out.pulls.tapRate > 100 };
+    out.gate.batches = out.batches.rate == null ? null : { rate: out.batches.rate, over: out.batches.rate > 100 };
     return out;
   }
 
@@ -13074,8 +13092,8 @@ a.of-nav:active { background: var(--press); }
     if (r.excluded.demoClock) L.push('WARNING: the demo clock or demo orders were on; demo pulls cannot be told apart, so do not trust these numbers.');
     L.push('');
     L.push('THE GATES, IN PLAIN WORDS');
-    L.push('1. Pull taps: ' + (!r.batches.cookAheadOn ? 'cook-ahead is turned off in this kitchen, so there are no pulls to count and this gate does not apply.' : r.gate.pullTap ? r.gate.pullTap.rate + ' percent of the observer\'s cuts got a tap. ' + (r.gate.pullTap.pass ? 'That is at or above the 50 percent gate.' : 'That is below the 50 percent gate.') : 'enter the number of cuts the observer counted to get the rate (the gate needs at least 50 percent).'));
-    L.push('2. Batches: ' + (r.batches.cookAheadOn ? r.batches.n + ' batches logged' + (r.batches.observerCount ? ' of ' + r.batches.observerCount + ' the observer counted (' + r.batches.rate + ' percent).' : '. Enter the observer\'s batch count to compare.') : 'cook-ahead is turned off in this kitchen, so there are no batches or pulls to count.'));
+    L.push('1. Pull taps: ' + (!r.batches.cookAheadOn ? 'cook-ahead is turned off in this kitchen, so there are no pulls to count and this gate does not apply.' : r.gate.pullTap ? r.gate.pullTap.rate + ' percent of the observer\'s cuts got a tap. ' + (r.gate.pullTap.over ? 'That is more taps than cuts, so the observer\'s count looks too low: recount before using this gate.' : r.gate.pullTap.pass ? 'That is at or above the 50 percent gate.' : 'That is below the 50 percent gate.') : 'enter the number of cuts the observer counted to get the rate (the gate needs at least 50 percent).'));
+    L.push('2. Batches: ' + (r.batches.cookAheadOn ? r.batches.n + ' batches logged' + (r.batches.observerCount ? ' of ' + r.batches.observerCount + ' the observer counted (' + r.batches.rate + ' percent' + (r.batches.rate > 100 ? ', more than the observer counted, so check that count' : '') + ').' : '. Enter the observer\'s batch count to compare.') : 'cook-ahead is turned off in this kitchen, so there are no batches or pulls to count.'));
     if (r.costs.ingredientsTotal && r.costs.ingredientsWithoutCost.length) L.push('3. Discard cost: ' + usd(r.discards.cost) + ', but ' + r.costs.ingredientsWithoutCost.length + ' of ' + r.costs.ingredientsTotal + ' cooked-ahead ingredients have no cost per kg (' + r.costs.ingredientsWithoutCost.slice(0, 6).join(', ') + '), so the cost is too low. To fix it, open Settings, Dishes and prices, and type the cost per kg for each one; it takes about a minute each.');
     else L.push('3. Discard cost: ' + usd(r.discards.cost) + ' from ' + r.discards.n + ' discards' + (r.discards.costUnknownN ? ' (' + r.discards.costUnknownN + ' had no cost on record)' : '') + '. Ask the owner to say their own weekly figure and compare it with the price.');
     L.push('4. Warnings: ' + r.sounds.firstSounds + ' shown (sounded), ' + r.sounds.acknowledged + ' tapped. The app cannot know a warning was heard; the observer writes that down.');
@@ -13107,7 +13125,7 @@ a.of-nav:active { background: var(--press); }
     add('window', 'demo kitchen', r.demo ? 'yes' : 'no');
     for (const k of Object.keys(r.excluded)) add('excluded', k, r.excluded[k]);
     add('batches', 'logged', r.batches.n); add('batches', 'observer count', r.batches.observerCount); add('batches', 'logged vs observer', r.batches.rate, '%');
-    add('gate', 'pull-tap at least 50%', r.gate.pullTap ? (r.gate.pullTap.pass ? 'yes' : 'no') : '');
+    add('gate', 'pull-tap at least 50%', r.gate.pullTap ? (r.gate.pullTap.over ? 'check the observer count (over 100%)' : r.gate.pullTap.pass ? 'yes' : 'no') : '');
     add('costs', 'discards with no cost', r.discards.costUnknownN); add('costs', 'ingredients with no cost per kg', r.costs.ingredientsWithoutCost.length); add('costs', 'cooked-ahead ingredients', r.costs.ingredientsTotal);
     add('warnings', 'shown', r.sounds.firstSounds); add('warnings', 'tapped', r.sounds.acknowledged); add('warnings', 'heard', '', 'observer writes this down');
     add('first ticket', 'minutes after first record', r.firstTicket.minutes, 'min');
@@ -13118,7 +13136,7 @@ a.of-nav:active { background: var(--press); }
     for (const l of [1, 2, 3, 4]) add('sounds', 'level ' + l, r.sounds.byLevel[l]);
     for (const k of Object.keys(r.keeps)) add('keeps', k, r.keeps[k]);
     add('discards', 'batches', r.discards.n); add('discards', 'grams', r.discards.g, 'g'); add('discards', 'cost', r.discards.cost, '$'); add('discards', 'batches with no cost recorded', r.discards.costUnknownN);
-    add('warnings', 'distinct', r.sounds.warnings); add('warnings', 'acknowledged', r.sounds.warningsAcked); add('warnings', 'acknowledged rate', r.sounds.ackRate, '%'); add('undo', 'undos', r.undos); add('undo', 'refused taps', r.refused); add('discards', 'cost per week at this rate', r.discards.perWeekCost, '$');
+    add('warnings', 'distinct', r.sounds.warnings); add('warnings', 'acknowledged', r.sounds.warningsAcked); add('warnings', 'acknowledged rate', r.sounds.ackRate, '%'); add('undo', 'undos', r.undos); add('undo', 'refused taps', r.refused); add('discards', 'cost per week at this rate' + (r.window.hours < 12 ? ' (rough guess from one service)' : ''), r.discards.perWeekCost, '$');
     for (const id of Object.keys(r.discards.byIng)) add('discards ' + id, 'cost', r.discards.byIng[id].cost, '$');
     for (const k of Object.keys(r.discards.byReason)) add('discards by reason', k, r.discards.byReason[k].cost, '$');
     for (const k of Object.keys(r.taps.jobs)) { add('taps', k, r.taps.jobs[k].n); add('taps', k + ' per hour', r.taps.jobs[k].perHour, '/h'); }
@@ -14037,7 +14055,7 @@ a.of-nav:active { background: var(--press); }
   M.queueLoad = (ds, opts) => {
     const ctx = makeCtx(ds, opts); const bmin = bucketMinOf(ctx), bm = bmin * MIN, fold = !!ctx.o.opts.fold, now = ctx.nowMs();
     const res = { bucketMin: bmin, fold, days: 0, zones: [], names: {}, peak: null, points: [], series: [] };
-    const iv = []; let t0 = Infinity;
+    const iv = [];
     // Step 1: turn each open item into an interval from when it fired to when it ended.
     for (const { it, v } of ctx.lines(true)) {
       if (!num(it.firedAt) || !it.zone) continue;
@@ -14050,13 +14068,15 @@ a.of-nav:active { background: var(--press); }
       else end = now;
       if (!num(end) || end <= it.firedAt) continue;
       // A line open over 12 hours is cut off at 12, so one forgotten ticket cannot paint days of load.
-      iv.push([it.firedAt, Math.min(end, it.firedAt + 12 * H), it.zone]); if (it.firedAt < t0) t0 = it.firedAt;
+      iv.push([it.firedAt, Math.min(end, it.firedAt + 12 * H), it.zone]);
     }
     if (!iv.length) return res;
-    // Step 2: per station and bucket, add up the milliseconds of open-line time inside the bucket.
-    const off = tzOff(t0), acc = {}; let kmin = Infinity, kmax = -Infinity;
+    // Step 2: per station and bucket, add up the milliseconds of open-line time inside the bucket. Buckets are
+    // counted on the wall clock like throughput: each line uses the clock offset at its own start, so a range
+    // that crosses a clock change keeps every day's buckets on the hour the kitchen's clock showed.
+    const acc = {}; let kmin = Infinity, kmax = -Infinity;
     for (const [s, e, z] of iv) {
-      const m = acc[z] || (acc[z] = {});
+      const off = tzOff(s), m = acc[z] || (acc[z] = {});
       const a = Math.floor((s + off) / bm), b = Math.floor((e + off - 1e-6) / bm);
       for (let k = a; k <= b; k++) { const bs = k * bm - off; const ov = Math.min(e, bs + bm) - Math.max(s, bs); if (ov > 0) m[k] = (m[k] || 0) + ov; }
       if (a < kmin) kmin = a; if (b > kmax) kmax = b;
@@ -14065,7 +14085,10 @@ a.of-nav:active { background: var(--press); }
     const zones = C.workZones.filter((z) => acc[z]).concat(Object.keys(acc).filter((z) => C.workZones.indexOf(z) < 0).sort());
     let pts = [];
     for (let k = kmin; k <= kmax; k++) {
-      const st = stamp(ctx, k * bm - off); const bs = st.t;
+      // The real moment the wall-clock bucket starts; a wall time the clock skipped (spring forward) has no bucket.
+      const wall = k * bm, t = wall - tzOff(wall - tzOff(wall));
+      if (t + tzOff(t) !== wall) continue;
+      const st = stamp(ctx, t); const bs = st.t;
       // The bucket holding an explicit opts.now is divided by the time elapsed so far, not its full width
       // (F-M8).
       const div = ctx.o.now !== null && now > bs && now < bs + bm ? now - bs : bm; const v = {}; let tot = 0;
@@ -14176,14 +14199,16 @@ a.of-nav:active { background: var(--press); }
    * day's batches are tracked on their own (opening 0, depletions matched by batchId; if no depletion carries a batchId all of the day's depletions are
    * used). Non-TCS: opening = opts.openingG or the ingredient's par (openingAssumed = true) plus restock events.
    * @param {object} opts {day:'YYYY-MM-DD' (default: newest day with data), ing:'brisket', openingG?}
-   * @returns {{day,ing,name,unit,tcs,thresholdG,parG,openingG,openingAssumed,openMs,closeMs,intakeG,usedG,wasteG,endG,minG,minAt,
+   * The level never shows below zero: grams used beyond what was counted in are added up in overdrawnG instead (with an
+   * assumed opening that means the real opening was above par).
+   * @returns {{day,ing,name,unit,tcs,thresholdG,parG,openingG,openingAssumed,openMs,closeMs,intakeG,usedG,wasteG,endG,minG,minAt,overdrawnG,
    *   points:Array<{t,hour,g,d,kind:'intake'|'use'|'waste'|'restock'}>,batches:Array<{id,label,enteredAt,cookedG}>}}
    */
   M.stockBurn = (ds, opts) => {
     ds = unwrap(ds); ds = ds && typeof ds === 'object' ? ds : {}; opts = opts && typeof opts === 'object' ? opts : {};
     const ctx = makeCtx(ds, { from: -Infinity, to: Infinity }); const im = ctx.ingMap(); const ing = opts.ing; const meta = im[ing];
     const empty = { day: null, ing: ing || null, name: meta ? meta.name : ing || null, unit: meta ? meta.unit : null, tcs: !!(meta && meta.tcs), thresholdG: meta && num(meta.thresholdG) ? meta.thresholdG : null, parG: meta && num(meta.parG) ? meta.parG : null,
-      openingG: null, openingAssumed: false, openMs: null, closeMs: null, intakeG: 0, usedG: 0, wasteG: 0, endG: null, minG: null, minAt: null, points: [], batches: [] };
+      openingG: null, openingAssumed: false, openMs: null, closeMs: null, intakeG: 0, usedG: 0, wasteG: 0, endG: null, minG: null, minAt: null, overdrawnG: 0, points: [], batches: [] };
     if (!ing) return empty;
     let day = typeof opts.day === 'string' ? opts.day : null;
     if (!day) { const ds2 = []; for (const v of ctx.all) ds2.push(v.date); for (const b of arr(ds.batches)) if (b && num(b.enteredAt)) ds2.push(ctx.dateOf(b.enteredAt)); ds2.sort(); day = ds2.length ? ds2[ds2.length - 1] : null; }
@@ -14219,7 +14244,10 @@ a.of-nav:active { background: var(--press); }
     deltas.sort((a, b) => a.t - b.t || rank[a.kind] - rank[b.kind]);
     let lvl = res.openingG; res.endG = lvl;
     for (const d of deltas) {
-      lvl += d.d; res.points.push({ t: d.t, hour: wallHourOn(d.t, day), g: lvl, d: d.d, kind: d.kind });
+      lvl += d.d;
+      // A level below zero is not stock: the count in was too low (often an assumed par), so it is noted, not shown.
+      if (lvl < 0) { res.overdrawnG += -lvl; lvl = 0; }
+      res.points.push({ t: d.t, hour: wallHourOn(d.t, day), g: lvl, d: d.d, kind: d.kind });
       if (d.kind === 'intake' || d.kind === 'restock') res.intakeG += d.d; else if (d.kind === 'use') res.usedG += -d.d; else res.wasteG += -d.d;
       if (res.minG === null || lvl < res.minG) { res.minG = lvl; res.minAt = d.t; }
     }
@@ -14273,6 +14301,14 @@ a.of-nav:active { background: var(--press); }
   };
 
   /* ================= safety ================= */
+  // Dollar words for a set of discards ({count, cost, noCostCount}): "cost not recorded" when none has a cost, and the
+  // known part named as such when only some do, so an unknown cost never reads as $0.
+  M.discardCostWords = (d, fmtMoney) => {
+    const f = typeof fmtMoney === 'function' ? fmtMoney : (v) => U.fmtMoney(v, 0), n = d && num(d.noCostCount) ? d.noCostCount : 0;
+    if (!d || !d.count) return f(0);
+    if (n >= d.count) return 'cost not recorded';
+    return f(d.cost) + (n ? ' for the ' + (d.count - n) + ' with a recorded cost' : '');
+  };
   // Every discard in the range: batch_discard events, plus discarded batches that have no event. Nothing
   // missed, nothing counted twice.
   function discardList(ctx) {
@@ -14306,7 +14342,7 @@ a.of-nav:active { background: var(--press); }
    * Food-safety compliance from events (and batches for discards). onTimePct are fractions of events that say whether they were on time.
    * score = average of the available temperature-check and sanitise on-time shares (null when neither is known).
    * @returns {{tempChecks:{count,onTime,late,onTimePct,avgLateMs,maxLateMs},sanitize:{count,onTime,late,onTimePct,avgLateMs,maxLateMs},
-   *   discards:{count,g,cost,byReason:Array<{reason,count,g,cost}>},lockouts:{batchCount:number,spellCount:number,totalMs:number,spells:Array},
+   *   discards:{count,g,cost,noCostCount,byReason:Array<{reason,count,g,cost}>},lockouts:{batchCount:number,spellCount:number,totalMs:number,spells:Array},
    *   reheats:number,batchesIn:number,intakeG:number,wastePct:number|null,score:number|null}}
    */
   M.compliance = (ds, opts) => {
@@ -14320,9 +14356,11 @@ a.of-nav:active { background: var(--press); }
     };
     const tc = chk(ctx.ev('temp_logged')), sn = chk(ctx.ev('sanitize_done')), dl = discardList(ctx), il = intakeList(ctx);
     const spells = eightySixList(ctx).filter((s) => s.reason === 'safety');
-    const bl = ctx.ev('batch_status').filter((e) => e.action === 'DISCARD_LOCKOUT' || e.to === 'discard').length;
+    // Batches, not events: a lockout and the discard that follows it are two events for one batch.
+    const bl = new Set(ctx.ev('batch_status').filter((e) => e.action === 'DISCARD_LOCKOUT' || e.to === 'discard').map((e, i) => (e.batchId != null ? e.batchId : '#' + i))).size;
     const dg = sumOf(dl.map((d) => d.g)), ig = sumOf(il.map((d) => d.g)); const parts = [tc.onTimePct, sn.onTimePct].filter(num);
-    return { tempChecks: tc, sanitize: sn, discards: { count: dl.length, g: dg, cost: sumOf(dl.map((d) => d.cost)), byReason: reasonAgg(dl) },
+    // WATCH OUT: cost adds only the discards with a known cost; noCostCount says how many had none, so 0 is not "free".
+    return { tempChecks: tc, sanitize: sn, discards: { count: dl.length, g: dg, cost: sumOf(dl.map((d) => d.cost)), noCostCount: dl.filter((d) => d.cost === null).length, byReason: reasonAgg(dl) },
       lockouts: { batchCount: bl, spellCount: spells.length, totalMs: sumOf(spells.map((s) => s.durationMs)), spells },
       reheats: ctx.ev('batch_reheat').length, batchesIn: il.length, intakeG: ig, wastePct: ig > 0 ? dg / ig : null, score: parts.length ? mean(parts) : null };
   };
@@ -14342,9 +14380,10 @@ a.of-nav:active { background: var(--press); }
   };
 
   // Plain names for the discard reasons, in the order the ledger lists them. "manual" and "other" are
-  // folded into one "Other" line.
-  const DISCARD_WORDS = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', other: 'Other' };
-  const DISCARD_ORDER = ['expired', 'quality', 'temp', 'cooling', 'other'];
+  // folded into one "Other" line. The cold-food limits (fridge date, time out of the fridge, date mark) keep their own
+  // lines, since they are safety limits and not "other".
+  const DISCARD_WORDS = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', fridgeDate: 'Past the fridge date', outTime: 'Out of the fridge too long', datemark: 'Past the date mark', other: 'Other' };
+  const DISCARD_ORDER = ['expired', 'quality', 'temp', 'cooling', 'fridgeDate', 'outTime', 'datemark', 'other'];
   // Adds up one window of discards: total, by product and by reason. Dollars are grams x the batch's
   // recorded cost per cooked kg, so a discard with no recorded cost counts in grams but never as $0.
   function discardWindow(raw, from, to, label) {
@@ -14979,11 +15018,12 @@ a.of-nav:active { background: var(--press); }
         // Sales from paid orders lead the sentence once any exist.
         if (sl.checks) return 'You sold ' + money0(sl.net) + ' of food in ' + U.fmtNum(sl.checks) + ' paid ' + U.plural(sl.checks, 'order') + ' (' + money(sl.avgCheck) + ' average). With tax and tips, ' + money0(sl.collected) + ' was collected' + (sl.tips > 0 ? ', ' + money0(sl.tips) + ' of it tips.' : '.');
         if (t.revenue === null) return 'No sales in this range yet.';
-        return 'Sales of ' + money0(t.revenue) + (v.count ? ' over ' + U.fmtNum(v.count) + ' finished tickets, ' + money(v.avg) + ' per ticket' : '') + (t.costPct !== null ? '; ingredients cost ' + pctTxt(t.costPct) + ' of menu price.' : '.');
+        // WATCH OUT: with no paid order this is finished food at menu price, a different base from Sales, so it says so.
+        return 'No paid orders yet. Finished food worth ' + money0(t.revenue) + ' at menu price' + (v.count ? ' over ' + U.fmtNum(v.count) + ' finished tickets, ' + money(v.avg) + ' per ticket' : '') + (t.costPct !== null ? '; ingredients cost ' + pctTxt(t.costPct) + ' of menu price.' : '.');
       }
       case 'safety': {
         const k = M.compliance(c); if (!k.tempChecks.count && !k.sanitize.count && !k.discards.count) return 'No food-safety records in this range yet.';
-        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + money(k.discards.cost) + ').' : 'nothing was discarded.');
+        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + M.discardCostWords(k.discards, money) + ').' : 'nothing was discarded.');
       }
       case 'stock': {
         const so = M.sellOutClock(c), n = so.rows.length; if (!so.dayCount) return 'No sell-outs in this range yet.';
@@ -16430,14 +16470,15 @@ a.of-nav:active { background: var(--press); }
   };
 
   /**
-   * Histogram binning. binValues(values, binSize, min, max) -> { lo, hi, binSize, counts, total, overflow, under, n }
+   * Histogram binning. binValues(values, binSize, min, max) -> { lo, hi, cap, binSize, counts, total, overflow, under, n }
    * Auto min/max snap to bin edges. When max is given, larger values pile into the last bin and count as `overflow`; values below
    * min are `under` and dropped. At most 200 bins (binSize grows by whole multiples).
+   * WATCH OUT: hi is max rounded up to a bin edge, so overflow is counted against max itself and cap keeps it for the note.
    */
   M.binValues = function binValues(values, binSize, min, max) {
     const v = [];
     if (values) for (let i = 0; i < values.length; i++) if (isNum(values[i])) v.push(values[i]);
-    if (!v.length) return { lo: isNum(min) ? min : 0, hi: isNum(max) ? max : 1, binSize: binSize > 0 ? binSize : 1, counts: [], total: 0, overflow: 0, under: 0, n: 0 };
+    if (!v.length) return { lo: isNum(min) ? min : 0, hi: isNum(max) ? max : 1, cap: isNum(max) ? max : 1, binSize: binSize > 0 ? binSize : 1, counts: [], total: 0, overflow: 0, under: 0, n: 0 };
     let dMin = Infinity, dMax = -Infinity;
     for (const x of v) { if (x < dMin) dMin = x; if (x > dMax) dMax = x; }
     const flat = dMax === dMin;                                // every value identical: show one bin with empty neighbours instead of one full-width bar
@@ -16453,10 +16494,11 @@ a.of-nav:active { background: var(--press); }
     for (const x of v) {
       if (x < lo) { under++; continue; }
       let i = Math.floor((x - lo) / binSize + 1e-9);
-      if (i >= n) { if (isNum(max) && x > hi + 1e-9) overflow++; i = n - 1; }
+      if (isNum(max) && x > max + 1e-9) overflow++;
+      if (i >= n) i = n - 1;
       counts[i]++;
     }
-    return { lo: fix(lo), hi, binSize: fix(binSize), counts, total: v.length - under, overflow, under, n };
+    return { lo: fix(lo), hi, cap: isNum(max) ? max : hi, binSize: fix(binSize), counts, total: v.length - under, overflow, under, n };
   };
 
   /** Stack values (per category) for visible series: returns { base[s][c], top[s][c] } with positives stacking up, negatives down. */
@@ -16523,8 +16565,9 @@ a.of-nav:active { background: var(--press); }
   function compact(v, dec) {
     if (!isNum(v)) return '-';
     const a = Math.abs(v);
-    if (a >= 1e9) return trim0((v / 1e9).toFixed(1)) + 'B';
-    if (a >= 1e6) return trim0((v / 1e6).toFixed(a >= 1e7 ? 0 : 1)) + 'M';
+    // WATCH OUT: the unit is picked after rounding, so 999,950 reads 1M and not 1000K.
+    if (a >= 1e9 || Number((a / 1e6).toFixed(0)) >= 1000) return trim0((v / 1e9).toFixed(1)) + 'B';
+    if (a >= 1e6 || Number((a / 1e3).toFixed(0)) >= 1000) return trim0((v / 1e6).toFixed(a >= 1e7 ? 0 : 1)) + 'M';
     if (a >= 1e4) return trim0((v / 1e3).toFixed(a >= 1e5 ? 0 : 1)) + 'K';
     if (a >= 1e3 && dec === 0) return grp(String(Math.round(v)));
     return trim0(v.toFixed(dec == null ? (a >= 100 ? 0 : a >= 10 ? 1 : 2) : dec));
@@ -17334,15 +17377,17 @@ a.of-nav:active { background: var(--press); }
     cfg = cfg || {}; o = o || {};
     const fmt = resolveFormat(o.format != null ? o.format : cfg.format, F.num);
     let lo = isNum(dMin) ? dMin : 0, hi = isNum(dMax) ? dMax : 1;
-    if (isNum(cfg.min)) lo = cfg.min;
+    // WATCH OUT: bars and areas (zero 'force') ignore a minimum above zero; a cut baseline makes a small bar look tiny.
+    const minSet = isNum(cfg.min) && !(o.zero === 'force' && cfg.min > 0);
+    if (minSet) lo = cfg.min;
     if (isNum(cfg.max)) hi = cfg.max;
     // Bars always start at zero. Lines start at zero only if the low end is under about half the high end,
     // so a line near 95 is not squashed flat.
-    if (o.zero && !isNum(cfg.min) && lo > 0 && (o.zero === 'force' || lo < 0.55 * hi)) lo = 0;
+    if (o.zero && !minSet && lo > 0 && (o.zero === 'force' || lo < 0.55 * hi)) lo = 0;
     if (o.zero && !isNum(cfg.max) && hi < 0) hi = 0;
     if (lo > hi) { const t = lo; lo = hi; hi = t; }
     const count = clamp(Math.floor(len / (o.spacing || 44)) + 1, 3, o.maxTicks || 7);
-    const nt = M.valueTicks(fmt, lo, hi, count, { fixMin: isNum(cfg.min) ? cfg.min : undefined, fixMax: isNum(cfg.max) ? cfg.max : undefined, nice: true });
+    const nt = M.valueTicks(fmt, lo, hi, count, { fixMin: minSet ? cfg.min : undefined, fixMax: isNum(cfg.max) ? cfg.max : undefined, nice: true });
     // d0 and d1 are the axis ends after rounding outward to tidy ticks; full(v) is tooltip text.
     return { d0: nt.min, d1: nt.max, step: nt.step, fmt, full: (v) => fmt.full(v), ticks: nt.ticks.map((v) => ({ v, label: fmt.axis(v, nt.step) })) };
   }
@@ -17517,15 +17562,19 @@ a.of-nav:active { background: var(--press); }
     if (stacked) {
       const xs = m.xsAll;
       // Stacking needs every series at the same x values, so missing ones are filled in by interpolation.
+      // WATCH OUT: a gap still stacks as 0 so the layers stay closed, but it is remembered so the tooltip says
+      // "no data" for it instead of a real-looking 0.
+      const miss = vis.map((s) => xs.map((x) => interpAt(s.pts, x) == null));
       const vals = vis.map((s) => xs.map((x) => { const v = interpAt(s.pts, x); return v == null ? 0 : Math.max(0, v); }));
-      stack = M.stackLayout(vals, xs.length); stack.xs = xs;
+      stack = M.stackLayout(vals, xs.length); stack.xs = xs; stack.miss = miss;
     }
     // y domain: the lowest and highest values any series, band, reference line or annotation needs.
     let yLo = Infinity, yHi = -Infinity;
     const see = (v) => { if (isNum(v)) { if (v < yLo) yLo = v; if (v > yHi) yHi = v; } };
     if (stacked) { stack.pos.forEach(see); see(0); }
     else vis.forEach((s) => s.pts.forEach((p) => { see(p.y); if (s.band) see(p.y2); }));
-    (spec.refLines || []).forEach((r) => { if (r && isNum(r.y)) see(r.y); });
+    // A level line may come as {y} or {value}; both are drawn across, so both must fit in the y range or it is clipped.
+    (spec.refLines || []).forEach((r) => { if (r) see(r.value != null ? r.value : r.y); });
     (spec.bandY || []).forEach((b) => { if (b) { see(b.y0); see(b.y1); } });
     (spec.annotations || []).forEach((a) => { if (a) see(a.y); });
     const anyArea = vis.some((s) => s.area);
@@ -17694,6 +17743,7 @@ a.of-nav:active { background: var(--press); }
         if (!near || d.ys[j] == null) return;
         any = true;
         if (s.band) rows.push({ key: { css: s.css, shape: 'box' }, v: fmtY.full(d.ys[j]) + ' to ' + fmtY.full(d.ys2[j]), k: s.name });
+        else if (stacked && stack.miss[d.stackIdx][j]) rows.push({ key: { css: s.css }, v: 'no data', k: s.name });
         else { rows.push({ key: { css: s.css }, v: fmtY.full(stacked ? (d.ys[j] - (stack.base[d.stackIdx][j] || 0)) : d.ys[j]), k: s.name }); total += stacked ? (d.ys[j] - stack.base[d.stackIdx][j]) : 0; }
       });
       if (stacked && rows.length > 1) rows.push({ key: null, v: fmtY.full(total), k: 'Total' });
@@ -17862,6 +17912,9 @@ a.of-nav:active { background: var(--press); }
     let lo = 0, hi = 0;
     // Value of series s in category c.
     const val = (s, c) => s.values[c];
+    // WATCH OUT: percent bars are drawn as shares of the positive total, so their labels and tooltips use it too
+    // (the signed total would disagree with the bar sizes once a segment is negative).
+    const posTot = (c) => vis.reduce((a, s) => { const v = val(s, c); return a + (isNum(v) && v > 0 ? v : 0); }, 0);
     let stackL = null;
     if (stacked) {
       const vals = vis.map((s) => m.order.map((c) => { const v = val(s, c); return v == null ? null : v; }));
@@ -17900,7 +17953,7 @@ a.of-nav:active { background: var(--press); }
     const tipFor = (c, hotSi) => {
       const rows = vis.map((s) => {
         const v = val(s, c);
-        const share = percent && m.total(c) > 0 && isNum(v) ? ' (' + F.pct100.full((v / m.total(c)) * 100) + ')' : '';
+        const share = percent && posTot(c) > 0 && isNum(v) ? ' (' + F.pct100.full((v / posTot(c)) * 100) + ')' : '';
         return { key: { css: css(barKey(s, c)), shape: 'box' }, v: v == null ? '-' : fmt0.full(v) + share, k: s.name };
       });
       if (stacked && vis.length > 1) rows.push({ key: null, v: fmt0.full(m.total(c)), k: 'Total' });
@@ -17980,7 +18033,7 @@ a.of-nav:active { background: var(--press); }
             const p = chart.fillShape(svg, g1, d, barKey(q.s, c));
             visEls.push(p);
             if (labelsMode !== 'none' && (labelsMode === 'all' || true)) {
-              const tvv = percent ? shareCell(((val(q.s, c)) / (m.total(c) || 1)) * 100) : fmt0.full(val(q.s, c));
+              const tvv = percent ? shareCell(((val(q.s, c)) / (posTot(c) || 1)) * 100) : fmt0.full(val(q.s, c));
               const tw_ = pxText(tvv);
               if (bot_ - top_ >= 16 && tw_ + 8 <= bw && (labelsMode !== 'none')) gl.appendChild(txt(tvv, cx, (top_ + bot_) / 2, 'ch-in', 'middle', { dy: '.35em', style: 'fill:' + chart.inkOn(barKey(q.s, c)) }));
             }
@@ -18090,7 +18143,7 @@ a.of-nav:active { background: var(--press); }
             if (r_ - l_ < 1) r_ = l_ + 1;
             const d = barPath(l_, cy - bwid / 2, r_ - l_, bwid, 4, outer ? (q.neg ? 'left' : 'right') : 'none');
             const p = chart.fillShape(svg, g1, d, barKey(q.s, c)); visEls.push(p);
-            const tvv = percent ? shareCell(((val(q.s, c)) / (m.total(c) || 1)) * 100) : fmt0.full(val(q.s, c));
+            const tvv = percent ? shareCell(((val(q.s, c)) / (posTot(c) || 1)) * 100) : fmt0.full(val(q.s, c));
             const tw_ = pxText(tvv);
             if (labelsMode !== 'none' && r_ - l_ >= tw_ + 12 && bwid >= 14) gl.appendChild(txt(tvv, (l_ + r_) / 2, cy, 'ch-in', 'middle', { dy: '.35em', style: 'fill:' + chart.inkOn(barKey(q.s, c)) }));
           });
@@ -18177,8 +18230,8 @@ a.of-nav:active { background: var(--press); }
     const empty = !pool.length;
     const counts = empty ? [] : (base.length ? M.binValues(base, b.binSize, b.lo, b.hi).counts : null);
     const ovCounts = ov.map((s) => M.binValues(s.values, b.binSize, b.lo, b.hi));
-    const overflow = isNum(spec.max) ? b.overflow : 0;
-    return { spec, b, base, counts, ov, ovCounts, empty, overflow, summary: pool.length + ' values in ' + b.n + ' bins' };
+    const overflow = isNum(spec.max) ? b.overflow : 0, under = isNum(spec.min) ? b.under : 0;
+    return { spec, b, base, counts, ov, ovCounts, empty, overflow, under, summary: pool.length + ' values in ' + b.n + ' bins' + (under ? ', ' + under + ' below ' + b.lo + ' left out' : '') };
   }
   // Draws a count bar per bin, optional step outlines for overlay series, axes and reference lines; a hover
   // area per bin. Returns the height.
@@ -18210,7 +18263,9 @@ a.of-nav:active { background: var(--press); }
       if (showBase) rows.push({ key: { css: css(baseKey), shape: 'box' }, v: String(m.counts[i]) + (total ? ' (' + F.pct100.full((m.counts[i] / total) * 100) + ')' : ''), k: visOv.length ? 'All' : (spec.unit || 'Count') });
       visOv.forEach((o) => rows.push({ key: { css: o.s.css }, v: String(o.c[i]), k: o.s.name }));
       const t = { head: xAx.full(a) + ' to ' + xAx.full(e), rows };
-      if (i === b.n - 1 && m.overflow) t.note = 'Includes ' + m.overflow + ' above ' + xAx.full(b.hi) + '.';
+      if (i === b.n - 1 && m.overflow) t.note = 'Includes ' + m.overflow + ' above ' + xAx.full(b.cap) + '.';
+      // Values below the chart's minimum are left out of the bars and the shares, so the first bin says so.
+      if (i === 0 && m.under) t.note = 'Leaves out ' + m.under + ' below ' + xAx.full(b.lo) + '; shares are of the rest.';
       return t;
     };
     for (let i = 0; i < b.n; i++) {
@@ -18516,8 +18571,9 @@ a.of-nav:active { background: var(--press); }
     const l = labW + 12, r = W - 10 - flagRoom - lblRoom * 0 - 6;
     const pitch = isNum(spec.height) ? (spec.height - 34) / Math.max(1, n) : 36;
     const top = 6, bot = top + n * pitch, H0 = bot + 30;
-    let mx = 0; m.rows.forEach((q) => { [q.a, q.b, q.c].forEach((v) => { if (v != null && v > mx) mx = v; }); });
-    const ax = valueAxis(spec.x || {}, 0, mx || 1, r - l - lblRoom, { format: spec.format, zero: 'force', spacing: 70, maxTicks: 6 });
+    // The scale runs from zero, or lower when a value is below zero, so no dot lands in the row labels.
+    let mx = 0, mn = 0; m.rows.forEach((q) => { [q.a, q.b, q.c].forEach((v) => { if (v != null && v > mx) mx = v; if (v != null && v < mn) mn = v; }); });
+    const ax = valueAxis(spec.x || {}, mn, mx || 1, r - l - lblRoom, { format: spec.format, zero: 'force', spacing: 70, maxTicks: 6 });
     // domain padded on the right so end labels fit
     const V = M.linear(ax.d0, ax.d1, l, r - lblRoom);
     ax.ticks.forEach((t) => { const x = V(t.v); svg.appendChild(vline(x, top, bot, Math.abs(t.v - ax.d0) < 1e-9 ? 'ch-ax' : 'ch-gl')); });
@@ -18547,8 +18603,11 @@ a.of-nav:active { background: var(--press); }
       let rightmost = Math.max(pa == null ? -1e9 : pa, pb == null ? -1e9 : pb, pc == null ? -1e9 : pc);
       if (pa != null && pb != null) {
         const lowP = Math.min(pa, pb), highP = Math.max(pa, pb), lowT = pa <= pb ? aT : bT, highT = pa <= pb ? bT : aT;
-        if (highP - lowP < chart.tw(lowT, 12) + 16) {
-          { const both = aT === bT ? bT : aT + ' to ' + bT; svg.appendChild(txt(highP + 14 + chart.tw(both, 12, 600) <= W - flagRoom - 4 ? both : bT, highP + 14, cy, 'ch-v', 'start', { dy: '.35em' })); }
+        const both = aT === bT ? bT : aT + ' to ' + bT;
+        // Ends that nearly touch share one label on the right; when it does not fit, each end keeps its own label
+        // outside the pair, so the starter value is never dropped.
+        if (highP - lowP < chart.tw(lowT, 12) + 16 && highP + 14 + chart.tw(both, 12, 600) <= W - flagRoom - 4) {
+          svg.appendChild(txt(both, highP + 14, cy, 'ch-v', 'start', { dy: '.35em' }));
         } else {
           svg.appendChild(txt(lowT, lowP - 11, cy, 'ch-lbl2', 'end', { dy: '.35em' }));
           svg.appendChild(txt(highT, highP + 11, cy, 'ch-v', 'start', { dy: '.35em' }));
@@ -18731,9 +18790,13 @@ a.of-nav:active { background: var(--press); }
   // 1) and the status.
   function meterModel(spec) {
     const v = isNum(spec.value) ? spec.value : null;
-    const max = isNum(spec.max) && spec.max > 0 ? spec.max : (v != null && v > 0 ? v : 1);
+    // WATCH OUT: with no max the value alone would fill the bar every time, so the scale reaches past the larger of
+    // the value and the warn and breach limits, and the table says no full scale was set.
+    const scaleSet = isNum(spec.max) && spec.max > 0;
+    const top = Math.max(v != null && v > 0 ? v : 0, isNum(spec.warn) ? spec.warn : 0, isNum(spec.breach) ? spec.breach : 0);
+    const max = scaleSet ? spec.max : top > 0 ? top * 1.25 : 1;
     const st = stateOf(spec, v);
-    return { spec, v, max, st, empty: false, summary: '' };
+    return { spec, v, max, scaleSet, st, empty: false, summary: '' };
   }
   // Draws label and value text, a track with a filled bar, ticks at the warn and breach limits and an
   // optional sub line; one hover area. Returns the height.
@@ -18778,7 +18841,7 @@ a.of-nav:active { background: var(--press); }
   }
   // Meter and ring show a table only if spec.table is true (tableOptIn), draw their own subtitle (ownSub),
   // and emptyHeight sizes the "no data" message.
-  TYPES.meter = { noun: 'Meter', tableOptIn: true, table: (m) => ({ head: ['Measure', 'Value'], rows: [[m.spec.label || 'Value', resolveFormat(m.spec.format, F.num).full(m.v)], ['Full scale', resolveFormat(m.spec.format, F.num).full(m.max)]] }), model: meterModel, draw: meterDraw, emptyHeight: 40, ownSub: true };
+  TYPES.meter = { noun: 'Meter', tableOptIn: true, table: (m) => ({ head: ['Measure', 'Value'], rows: [[m.spec.label || 'Value', resolveFormat(m.spec.format, F.num).full(m.v)], ['Full scale', m.scaleSet ? resolveFormat(m.spec.format, F.num).full(m.max) : 'not set']] }), model: meterModel, draw: meterDraw, emptyHeight: 40, ownSub: true };
 
   // Draws a progress ring: big value in the middle, optional label, status shape and word, target tick and
   // wrapped sub text. Returns the height.
@@ -18834,7 +18897,7 @@ a.of-nav:active { background: var(--press); }
     return y + 4;
   }
   // The ring reuses the meter's model with its own drawing function.
-  TYPES.ring = { noun: 'Ring', tableOptIn: true, table: (m) => ({ head: ['Measure', 'Value'], rows: [[m.spec.label || 'Value', resolveFormat(m.spec.format, F.num).full(m.v)], ['Full scale', resolveFormat(m.spec.format, F.num).full(m.max)]] }), model: meterModel, draw: ringDraw, emptyHeight: 120, ownSub: true };
+  TYPES.ring = { noun: 'Ring', tableOptIn: true, table: (m) => ({ head: ['Measure', 'Value'], rows: [[m.spec.label || 'Value', resolveFormat(m.spec.format, F.num).full(m.v)], ['Full scale', m.scaleSet ? resolveFormat(m.spec.format, F.num).full(m.max) : 'not set']] }), model: meterModel, draw: ringDraw, emptyHeight: 120, ownSub: true };
 
   /* =====================================================================================================
    * 15. SPARK (tiny inline trend). spec: { values:[], prev?:[], area?, ref?, width?, height?, format, labels?:[], tone?, label? }
@@ -18854,7 +18917,8 @@ a.of-nav:active { background: var(--press); }
     const key = keyOfTone(spec.tone) || 'cat1';
     const all = m.vals.concat(m.prev || []).filter((v) => v != null);
     if (isNum(spec.ref)) all.push(spec.ref);
-    if (!all.length) { svg.appendChild(S('line', { x1: pad, x2: W - pad, y1: H0 / 2, y2: H0 / 2, style: 'stroke:var(--ch-axis);stroke-width:1.5;stroke-linecap:round' })); svg.setAttribute('aria-label', (spec.label || 'Trend') + ': no data'); return H0; }
+    // WATCH OUT: with nothing to draw, say "no data" in words; a flat line would read as a steady trend.
+    if (!all.length) { svg.appendChild(txt('no data', W / 2, H0 / 2, 'ch-t', 'middle', { dy: '.35em' })); svg.setAttribute('aria-label', (spec.label || 'Trend') + ': no data'); return H0; }
     let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
     if (hi === lo) { lo -= 1; hi += 1; }
     const n = Math.max(m.vals.length, m.prev ? m.prev.length : 0);
@@ -33381,12 +33445,14 @@ a.of-nav:active { background: var(--press); }
         spec(p) {
           const f = M.frictionSummary(p);
           if (!f.tickets) return null;
-          // Rounds to one decimal. Unknown counts as zero events.
-          const per = (x) => (isNum(x) ? Math.round(x * 10) / 10 : 0);
+          // Rounds to one decimal. Unknown stays unknown (no bar, '-' in the tooltip), never a fake zero.
+          const per = (x) => (isNum(x) ? Math.round(x * 10) / 10 : null);
+          // A share (0 to 1) as events per 100, or null when it is unknown.
+          const pc = (x) => (isNum(x) ? x * 100 : null);
           return {
             orient: 'h', format: 'num', labels: 'all',
             categories: ['Undone actions', 'Taps the app could not accept', 'Sent out before all dishes were done', 'Fired early by hand', 'Recalled tickets', 'Voided tickets'],
-            series: [{ id: 'per100', name: 'Per 100 tickets', values: [per(f.undo.per100Tickets), per(f.reports.per100Tickets), per(f.forced.pct * 100), per(f.overrides.pct * 100), per(f.recalls.pct * 100), per(f.voids.pct * 100)] }],
+            series: [{ id: 'per100', name: 'Per 100 tickets', values: [per(f.undo.per100Tickets), per(f.reports.per100Tickets), per(pc(f.forced.pct)), per(pc(f.overrides.pct)), per(pc(f.recalls.pct)), per(pc(f.voids.pct))] }],
             ariaLabel: 'Slip-ups per 100 tickets: undone actions, refused taps, forced bumps, early fires, recalls and voids',
           };
         },
@@ -33595,7 +33661,7 @@ a.of-nav:active { background: var(--press); }
   };
 
   /** Reasons a batch was thrown away, in words an owner would say. */
-  B.REASON = { expired: 'Held too long', temp: 'Out of temperature', cooling: 'Cooled too slowly', manual: 'Thrown out by hand', quality: 'Quality', other: 'Other reason' };
+  B.REASON = { expired: 'Held too long', temp: 'Out of temperature', cooling: 'Cooled too slowly', manual: 'Thrown out by hand', quality: 'Quality', fridgeDate: 'Past the fridge date', outTime: 'Out of the fridge too long', datemark: 'Past the date mark', other: 'Other reason' };
   // Owner wording for a discard reason; an unknown reason is tidied up instead of shown raw.
   B.reasonWord = (r) => B.REASON[r] || (r ? String(r).replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : 'Other reason');
 
@@ -33962,15 +34028,20 @@ a.of-nav:active { background: var(--press); }
         // Opens the Menu and settings page, where a missing cost is entered.
         const go = kit.button({ label: 'Open Menu and settings', icon: 'sliders', onClick: () => ctx.navigate('data') });
         const goWrap = h('div', { class: 'ob-actions' }, go);
-        body.append(list, none, goWrap);
+        // How much of what sold the Food cost tile really covers, since it leaves out items with no cost.
+        const cov = h('p', { class: 'ob-note', hidden: true });
+        body.append(cov, list, none, goWrap);
         let last = '';
         // Lists items that sold with no cost, then items whose cost covers only part of their sales.
         const paint = (p) => {
           const rows = itemRows(p).filter((r) => r.sold > 0 && (r.cost === null || r.costCoverage === 0)).sort((a, b) => b.sold - a.sold);
           const partial = itemRows(p).filter((r) => r.sold > 0 && r.cost !== null && isNum(r.costCoverage) && r.costCoverage < 1);
           // A signature of what the list shows: if it is unchanged nothing is rebuilt, so there is no flicker.
-          const sig = JSON.stringify([rows.map((r) => [r.menuId, r.sold]), partial.map((r) => [r.menuId, r.costCoverage]), itemRows(p).length]);
+          const fc = M.foodCostPct(p), share = fc && isNum(fc.coverage) ? fc.coverage : null;
+          const sig = JSON.stringify([rows.map((r) => [r.menuId, r.sold]), partial.map((r) => [r.menuId, r.costCoverage]), itemRows(p).length, share]);
           if (sig === last) return; last = sig;
+          cov.hidden = !(share !== null && share < 0.995 && share > 0);
+          if (!cov.hidden) setText(cov, 'The Food cost figure at the top covers ' + fmt.pct(share, 0) + ' of the priced items sold. The rest have no cost on file, so the real food cost is not known for them.');
           U.clear(list);
           rows.forEach((r) => list.appendChild(h('li', { class: 'ob-li' },
             h('span', { class: 'ob-li-n' }, r.name),
@@ -33995,13 +34066,15 @@ a.of-nav:active { background: var(--press); }
 
   // Builds the What sells and what it earns section of the Sales and money page (top items, sales by hour, by order type and cost of goods) and returns the four cards the page result keeps.
   function buildSellsSection(env) {
-    const { page, scope, st, itemRows, fmt, M, ctx } = env;
+    const { page, scope, st, itemRows, salesOf, fmt, M, ctx } = env;
     /* ---------------------------------------------------------------- what sells */
-    page.section('What sells and what it earns', 'Every figure here comes from finished tickets with priced items in the range above.');
+    // WATCH OUT: two bases live on this page. Sales by hour and by channel come from paid orders, like the Sales
+    // tile. Top items and food cost can only come from finished food at menu price, so they say "menu value".
+    page.section('What sells and what it earns', 'Sales by hour and by channel come from paid orders, like the Sales figure at the top. Top items and food cost use the menu price of finished food, before discounts and whether paid yet or not, so their totals can differ from Sales.');
 
     const topCard = page.card({
       type: 'bar', span: 6, title: 'Top items', sub: scope(),
-      caption: 'Whether your best sellers are also your best earners. Switch between how many were sold and how much they brought in.',
+      caption: 'Whether your best sellers are also your best earners. Switch between how many were sold and their menu value (menu price times number sold, before discounts).',
       empty: { title: 'No sales in this range yet', body: 'Finished tickets with priced items fill this chart. Take and finish an order on the kitchen board, or pick a longer range.', icon: 'chart-bar' },
       // Top 10 items by the picked measure; items with no sales are left out.
       spec: (p) => {
@@ -34009,52 +34082,52 @@ a.of-nav:active { background: var(--press); }
         const rows = itemRows(p).filter((r) => isNum(by === 'sold' ? r.sold : r.revenue) && (by === 'sold' ? r.sold : r.revenue) > 0);
         if (!rows.length) return null;
         const top = rows.slice().sort((a, b) => (by === 'sold' ? b.sold - a.sold : b.revenue - a.revenue)).slice(0, 10);
-        const word = by === 'sold' ? 'number sold' : 'sales';
+        const word = by === 'sold' ? 'number sold' : 'menu value';
         return {
           orient: 'h', categories: top.map((r) => r.name), sort: 'none', labels: 'all', format: by === 'sold' ? 'int' : 'money',
-          series: [{ id: by, name: by === 'sold' ? 'Sold' : 'Sales', values: top.map((r) => (by === 'sold' ? r.sold : r.revenue)) }],
+          series: [{ id: by, name: by === 'sold' ? 'Sold' : 'Menu value', values: top.map((r) => (by === 'sold' ? r.sold : r.revenue)) }],
           height: Math.max(170, 32 * top.length + 40),
-          ariaLabel: 'Bar chart of the ' + top.length + ' top items by ' + word + '. ' + top[0].name + ' leads with ' + (by === 'sold' ? fmt.num(top[0].sold, 0) + ' sold' : fmt.money(top[0].revenue, 0) + ' in sales') + '.',
+          ariaLabel: 'Bar chart of the ' + top.length + ' top items by ' + word + '. ' + top[0].name + ' leads with ' + (by === 'sold' ? fmt.num(top[0].sold, 0) + ' sold' : fmt.money(top[0].revenue, 0) + ' in menu value') + '.',
         };
       },
     });
-    // Sold or Sales switch: only this card redraws.
-    B.addAction(topCard, B.seg({ label: 'Rank items by', value: st.itemsBy, options: [{ id: 'sold', label: 'Sold' }, { id: 'revenue', label: 'Sales' }], onChange: (id) => { st.itemsBy = id; topCard.update(ctx.prepared(), ctx); } }));
+    // Sold or Menu value switch: only this card redraws.
+    B.addAction(topCard, B.seg({ label: 'Rank items by', value: st.itemsBy, options: [{ id: 'sold', label: 'Sold' }, { id: 'revenue', label: 'Menu value' }], onChange: (id) => { st.itemsBy = id; topCard.update(ctx.prepared(), ctx); } }));
 
     const hourCard = page.card({
       type: 'bar', span: 6, title: 'Sales by hour of the day', sub: scope(),
       caption: 'The hours that pay the bills. Staff, prep and the second cook wave should line up with the tallest bars.',
-      empty: { title: 'No hourly sales yet', body: 'Finished tickets with priced items fill this chart, one bar per hour of the day.', icon: 'chart-bar' },
-      // One bar per hour of the day; the card stays empty until some hour has sales.
+      empty: { title: 'No hourly sales yet', body: 'Paid orders fill this chart, one bar per hour of the day they were paid.', icon: 'chart-bar' },
+      // One bar per hour of the day from paid orders, so the bars add up to the Sales tile; empty until some hour has sales.
       spec: (p) => {
-        const rows = M.revenueByHour(p);
-        if (!rows.length || !rows.some((r) => r.revenue > 0)) return null;
-        const peak = rows.reduce((a, r) => (r.revenue > a.revenue ? r : a), rows[0]);
+        const rows = salesOf(p).byHour;
+        if (!rows.length || !rows.some((r) => r.net > 0)) return null;
+        const peak = rows.reduce((a, r) => (r.net > a.net ? r : a), rows[0]);
         return {
           orient: 'v', categories: rows.map((r) => r.label), sort: 'none', format: 'money',
-          series: [{ id: 'sales', name: 'Sales', values: rows.map((r) => r.revenue) }],
+          series: [{ id: 'sales', name: 'Sales', values: rows.map((r) => r.net) }],
           height: 270,
-          ariaLabel: 'Bar chart of sales for each hour of the day. The busiest hour is ' + peak.span + ' with ' + fmt.money(peak.revenue, 0) + '.',
+          ariaLabel: 'Bar chart of sales for each hour of the day. The busiest hour is ' + peak.span + ' with ' + fmt.money(peak.net, 0) + '.',
         };
       },
     });
 
     const chanCard = page.card({
-      type: 'bar', span: 6, title: 'Average ticket value by channel', sub: scope(),
-      caption: 'Which way of ordering brings the biggest tickets. A low bar is a channel where guests add little to the order.',
-      empty: { title: 'No ticket values yet', body: 'Finished tickets with priced items fill this chart, one bar per order channel.', icon: 'chart-bar' },
-      // One bar per order channel, with a line at the all-channel average when there is more than one.
+      type: 'bar', span: 6, title: 'Average order by channel', sub: scope(),
+      caption: 'Which way of ordering brings the biggest orders: sales on paid orders divided by the number of them, like the Average order tile. A low bar is a channel where guests add little to the order.',
+      empty: { title: 'No paid orders yet', body: 'Paid orders fill this chart, one bar per order channel.', icon: 'chart-bar' },
+      // One bar per order channel from paid orders, with a line at the all-channel average when there is more than one.
       spec: (p) => {
-        const v = M.avgTicketValue(p);
-        const rows = (v.byChannel || []).filter((r) => isNum(r.avg));
+        const s = salesOf(p);
+        const rows = (s.byChannel || []).filter((r) => isNum(r.avg));
         if (!rows.length) return null;
         const lead = rows.slice().sort((a, b) => b.avg - a.avg)[0];
         return {
           orient: 'h', categories: rows.map((r) => r.name), sort: 'none', labels: 'all', format: 'money',
-          series: [{ id: 'avg', name: 'Average ticket', values: rows.map((r) => r.avg) }],
-          refLines: isNum(v.avg) && rows.length > 1 ? [{ value: v.avg, label: 'All channels ' + fmt.money(v.avg, 2), tone: 'muted' }] : [],
+          series: [{ id: 'avg', name: 'Average order', values: rows.map((r) => r.avg) }],
+          refLines: isNum(s.avgCheck) && rows.length > 1 ? [{ value: s.avgCheck, label: 'All channels ' + fmt.money(s.avgCheck, 2), tone: 'muted' }] : [],
           height: Math.max(150, 46 * rows.length + 40),
-          ariaLabel: 'Bar chart of the average ticket value for each order channel. ' + lead.name + ' is highest at ' + fmt.money(lead.avg, 2) + '.',
+          ariaLabel: 'Bar chart of the average paid order for each order channel. ' + lead.name + ' is highest at ' + fmt.money(lead.avg, 2) + '.',
         };
       },
     });
@@ -34106,7 +34179,7 @@ a.of-nav:active { background: var(--press); }
           else stats.set([
             { k: 'checks', label: 'Orders paid', value: fmt.num(s.checks, 0), note: isNum(s.avgCheck) ? fmt.money(s.avgCheck, 2) + ' average order' : '' },
             { k: 'net', label: 'Sales', value: fmt.money(s.net, 2), note: s.discounts > 0 ? fmt.money(s.discounts, 2) + ' given as discounts' : 'before tax and tips' },
-            { k: 'tax', label: 'Tax collected', value: fmt.money(s.tax, 2), note: s.tax > 0 ? '' : 'No tax rate is set' },
+            { k: 'tax', label: 'Tax collected', value: fmt.money(s.tax, 2), note: s.tax > 0 ? '' : (isNum(B.settings(ctx.dataset()).service.taxRatePct) && B.settings(ctx.dataset()).service.taxRatePct > 0 ? 'No tax on these orders' : 'No tax rate is set') },
             { k: 'tips', label: 'Tips', value: fmt.money(s.tips, 2), note: isNum(s.tipPct) ? fmt.pct(s.tipPct, 0) + ' of sales' : '' },
             { k: 'all', label: 'Total collected', value: fmt.money(s.collected, 2), note: 'sales, tax and tips' },
           ]);
@@ -34122,8 +34195,8 @@ a.of-nav:active { background: var(--press); }
     });
 
     page.card({
-      type: 'bar', span: 7, title: 'Money collected by day', sub: scope(),
-      caption: 'Sales for each day, from the orders paid that day. A short bar is a slow day or a day with orders still open.',
+      type: 'bar', span: 7, title: 'Sales by day', sub: scope(),
+      caption: 'Sales for each day, from the orders paid that day, before tax and tips (so less than the cash and card taken in). A short bar is a slow day or a day with orders still open.',
       empty: { title: 'No paid orders to chart yet', body: 'Each day with a paid order gets one bar.', icon: 'chart-bar' },
       // One bar per day with paid orders.
       spec: (p) => {
@@ -34214,7 +34287,7 @@ a.of-nav:active { background: var(--press); }
 
     const salesOf = B.memoP((p) => M.sales(p));
     page.headline();
-    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu and settings (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Every figure is added up in whole cents from the paid orders themselves.');
+    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu and settings (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Food cost is ingredient cost as a share of menu price, counted only over items with a cost on file. Every figure is added up in whole cents from the paid orders themselves.');
 
     page.tiles([
       // The one main money figure: sales after discounts from paid orders (blank until an order is paid).
@@ -34225,8 +34298,12 @@ a.of-nav:active { background: var(--press); }
         previous: (p) => { const q = prevHandle(p); const s = q ? salesOf(q) : null; return s && s.checks ? s.net : null; } },
       // Average paid order, before tax and tips, so it agrees with the Sales tile.
       { id: 'avgTicket', kpi: 'avgTicketValue', label: 'Average order', format: (v) => fmt.money(v, 2),
-        // Sales divided by paid orders; blank when nothing is paid.
-        value: (p) => { const s = salesOf(p); return s.checks ? s.avgCheck : null; } },
+        // Sales divided by paid orders; blank when nothing is paid. The daily line is on the same paid basis.
+        value: (p) => { const s = salesOf(p); return s.checks ? { value: s.avgCheck, spark: s.byDay.map((d) => (d.checks ? d.net / d.checks : null)) } : null; },
+        // WATCH OUT: the ready-made avgTicketValue kpi is finished food at menu price, so the change arrow must come
+        // from paid orders here too or it compares two different things.
+        kind: 'money', good: 'higher',
+        previous: (p) => { const q = prevHandle(p); const s = q ? salesOf(q) : null; return s && s.checks ? s.avgCheck : null; } },
       // Food cost as a share of menu price; blank with a plain note when no item has a recorded cost.
       { id: 'foodCost', kpi: 'foodCostPct', label: 'Food cost', format: (v) => fmt.pct(v, 1), noValue: 'Cost not recorded',
         // Cost share of the items that have a recorded cost; null when none do, never a fake zero.
@@ -34241,7 +34318,7 @@ a.of-nav:active { background: var(--press); }
 
     buildTakingsSection({ page, scope, kit, salesOf, fmt, ctx });
 
-    const { topCard, hourCard, chanCard, costCard } = buildSellsSection({ page, scope, st, itemRows, fmt, M, ctx });
+    const { topCard, hourCard, chanCard, costCard } = buildSellsSection({ page, scope, st, itemRows, salesOf, fmt, M, ctx });
 
     const { marginCard, noCost } = buildMarginSection({ page, scope, st, M, fmt, kit, itemRows, ctx });
 
@@ -34264,7 +34341,7 @@ a.of-nav:active { background: var(--press); }
         // One list row: the name, this week's dollars (or "cost not recorded") and last week's for comparison.
         const row = (name, a, b) => h('li', { class: 'ob-li' },
           h('span', { class: 'ob-li-n' }, name),
-          h('span', { class: 'ob-li-v' }, h('span', { class: 'num' }, a.cost > 0 ? fmt.money(a.cost, 2) : 'cost not recorded'), h('span', { class: 'num ob-li-s' }, fmt.g(a.g) + ' this week, ' + (b ? (b.cost > 0 ? fmt.money(b.cost, 2) : fmt.g(b.g)) : 'none') + ' last week')));
+          h('span', { class: 'ob-li-v' }, h('span', { class: 'num' }, a.cost > 0 ? fmt.money(a.cost, 2) : 'cost not recorded'), h('span', { class: 'num ob-li-s' }, fmt.g(a.g) + ' this week' + (a.cost > 0 && a.noCostCount > 0 ? ' (' + a.noCostCount + ' with no cost, not in the dollars)' : '') + ', ' + (b ? (b.cost > 0 ? fmt.money(b.cost, 2) : fmt.g(b.g)) : 'none') + ' last week')));
         // Fills one list from this week's rows, matching each to the same key last week.
         const fill = (ul, rows, lastRows, key, nameOf, none) => {
           U.clear(ul);
@@ -34347,9 +34424,10 @@ a.of-nav:active { background: var(--press); }
 
   // Legend words, chart color slots, stacking order, and which discard reasons count as safety breaches.
   const TONE_NAMES = { ok: 'In range', check: 'Temperature check due', reheat: 'Reheat or chill now', discard: 'Thrown out' };
-  const REASON_SLOT = { expired: 1, temp: 2, cooling: 3, manual: 4, quality: 5, other: 6 };
-  const REASON_ORDER = ['temp', 'expired', 'cooling', 'manual', 'quality', 'other'];
-  const SAFETY_REASONS = { temp: 1, expired: 1, cooling: 1 };
+  const REASON_SLOT = { expired: 1, temp: 2, cooling: 3, manual: 4, quality: 5, other: 6, fridgeDate: 7, datemark: 7, outTime: 8 };
+  const REASON_ORDER = ['temp', 'expired', 'cooling', 'fridgeDate', 'outTime', 'datemark', 'manual', 'quality', 'other'];
+  // The cold-food limits are time limits too, so they count as safety discards in the verdict.
+  const SAFETY_REASONS = { temp: 1, expired: 1, cooling: 1, fridgeDate: 1, outTime: 1, datemark: 1 };
 
   // Builds the Safety page into the container and returns {update, destroy} for the frame.
   function render(container, ctx) {
@@ -34477,7 +34555,7 @@ a.of-nav:active { background: var(--press); }
       if (k.tempChecks.count) parts.push('Temperature checks were on time ' + fmt.pct(k.tempChecks.onTimePct, 0) + ' of the time (' + k.tempChecks.onTime + ' of ' + k.tempChecks.count + ')');
       if (k.sanitize.count) parts.push('sanitize rounds ' + fmt.pct(k.sanitize.onTimePct, 0) + ' (' + k.sanitize.onTime + ' of ' + k.sanitize.count + ')');
       let body = parts.length ? parts[0] + (parts[1] ? ', ' + parts[1] : '') + '.' : 'No temperature checks or sanitize rounds were logged.';
-      if (k.discards.count) body += ' ' + k.discards.count + ' ' + B.plural(k.discards.count, 'batch was', 'batches were') + ' thrown out (' + kgWords(k.discards.g) + ', ' + fmt.money(k.discards.cost, 0) + '), ' + safetyDis.length + ' for time or temperature rules.';
+      if (k.discards.count) body += ' ' + k.discards.count + ' ' + B.plural(k.discards.count, 'batch was', 'batches were') + ' thrown out (' + kgWords(k.discards.g) + ', ' + SB.metrics.discardCostWords(k.discards, (v) => fmt.money(v, 0)) + '), ' + safetyDis.length + ' for time or temperature rules.';
       else body += ' Nothing was thrown out.';
       if (brief.length) body += brief.length === 1 ? ' A time or temperature limit also took an item off the menu once, for ' + fmt.ms(brief[0].openMs) + '.' : ' Time or temperature limits also took items off the menu ' + brief.length + ' times for a few minutes each, the longest ' + fmt.ms(Math.max.apply(null, brief.map((c) => c.openMs))) + '.';
       // A red verdict is worded by cause: lost selling time, or checks that fell behind.
@@ -34520,7 +34598,7 @@ a.of-nav:active { background: var(--press); }
     const WORDS = { ok: 'On track', warn: 'Slipping', bad: 'Needs attention' };
 
     const ringCard = page.card({
-      type: 'ring', span: 4, title: 'Checks kept on time', sub: 'Average of the two measures beside it',
+      type: 'ring', span: 4, title: 'Checks kept on time', sub: 'Average of the measures beside it that have readings',
       caption: 'One number for the whole night. Green is 90% or better; below 75% a check or two were being skipped.',
       empty: { title: 'No score yet', body: 'The score needs temperature checks or sanitize rounds to be logged in this range.', icon: 'shield-check' },
       // Compliance ring: the average of the two on-time rates, empty until a check is logged.
@@ -34529,7 +34607,7 @@ a.of-nav:active { background: var(--press); }
         if (!isNum(k.score)) return null;
         // Thresholds in percent: below 90 warns, below 75 breaches; inverted because a higher score is better.
         return { value: k.score * 100, max: 100, label: 'Checks kept', sub: 'Temperature checks and sanitize rounds on time', format: 'pct100', warn: 90, breach: 75, invert: true, words: WORDS, size: 188,
-          ariaLabel: 'Checks kept on time ' + fmt.pct(k.score, 0) + ', the average of temperature checks and sanitize rounds logged on time.' };
+          ariaLabel: 'Checks kept on time ' + fmt.pct(k.score, 0) + (k.tempChecks.count && k.sanitize.count ? ', the average of temperature checks and sanitize rounds logged on time.' : k.tempChecks.count ? ', from temperature checks alone; no sanitize rounds were logged.' : ', from sanitize rounds alone; no temperature checks were logged.') };
       },
     });
     const tempCard = page.card({
@@ -34724,8 +34802,8 @@ a.of-nav:active { background: var(--press); }
           const set = (k, t, d) => { B.setText(nodes[k].t, t); B.setText(nodes[k].d, d); };
           set('hot', 'Hot food stays at ' + T(S.hotHoldF) + ' or above', 'A pan reading below ' + T(S.hotHoldF) + ' must be reheated or thrown out. FDA Food Code 3-501.16; your local code applies.');
           set('cold', 'Cold food stays at ' + T(S.coldHoldF) + ' or below', 'A pan reading above ' + T(S.coldHoldF) + ' must be chilled again or thrown out.');
-          set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'The model Food Code (3-403.11) sets the 165 °F target. Reheating a batch only once is our own rule: if it drops below the limit again it is thrown out.');
-          set('hold', 'Each product has its own hold limit, never more than ' + (S.hardCapH) + ' hours', 'The throw-out time throws the batch out when it is reached. A quality limit is a house rule for food held at temperature: at the limit the batch is taken off the menu but stays on the board until someone tastes it, and it can be kept serving for 30 minutes or 1 hour at a time while a reading of ' + S.hotHoldF + ' F or higher (cold food ' + S.coldHoldF + ' F or lower) is logged within the check interval. Every extension is logged with who and when. The hard cap of ' + (S.hardCapH) + ' hours throws out any batch (products whose limit is at or above it have no quality stage). Slaw, potato salad and banana pudding start with a quality limit for the owner to confirm: if you hold them outside temperature control, make theirs a safety limit. Your local health department\'s rules apply to quality extensions. Brisket and pulled pork starter limits are placeholders for the owner to confirm.');
+          set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'The model Food Code (3-403.11) sets ' + T(165) + ' as the target' + (S.reheatF !== 165 ? '; yours is set to ' + T(S.reheatF) : '') + '. Reheating a batch only once is our own rule: if it drops below the limit again it is thrown out.');
+          set('hold', 'Each product has its own hold limit, never more than ' + (S.hardCapH) + ' hours', 'The throw-out time throws the batch out when it is reached. A quality limit is a house rule for food held at temperature: at the limit the batch is taken off the menu but stays on the board until someone tastes it, and it can be kept serving for 30 minutes or 1 hour at a time while a reading of ' + T(S.hotHoldF) + ' or higher (cold food ' + T(S.coldHoldF) + ' or lower) is logged within the check interval. Every extension is logged with who and when. The hard cap of ' + (S.hardCapH) + ' hours throws out any batch (products whose limit is at or above it have no quality stage). Slaw, potato salad and banana pudding start with a quality limit for the owner to confirm: if you hold them outside temperature control, make theirs a safety limit. Your local health department\'s rules apply to quality extensions. Brisket and pulled pork starter limits are placeholders for the owner to confirm.');
           set('grace', 'Grace of ' + S.belowHotGraceH + ' hours below ' + T(S.hotHoldF) + ' (cold food: ' + S.aboveColdGraceH + ' hours above ' + T(S.coldHoldF) + ')', 'The clock starts at the first reading outside the limit. After the grace time the batch is thrown out.');
           set('checks', 'A temperature reading every ' + U.minutesText(S.tempCheckEveryMin), 'A late reading is flagged and counted here. It does not stop service by itself.');
           set('sanitize', 'Sanitize food-contact surfaces every ' + S.sanitizeEveryH + ' hours', 'A late round is a warning on the line and counts against the checks-kept score. Four hours is our starting value; set the limit your health department gives you.');
@@ -36909,6 +36987,7 @@ a.of-nav:active { background: var(--press); }
       ev.forEach((t) => {
         const live = cl.filter((c) => c.startT <= t && (c.endT === null || t <= c.endT));
         const foods = new Set(live.map((c) => c.ing || c.items[0]));
+        // Spells come sorted by start (B.clusterSpells), so overlapping spells of one food credit the one that began first.
         if (foods.size === 1) live[0].refused++; else loose++;
       });
       return { cl, recorded, loose, total: ev.length };
@@ -37075,8 +37154,18 @@ a.of-nav:active { background: var(--press); }
     const base = B.memoP((p) => {
       const ds = ctx.dataset(), S = B.settings(ds);
       const so = M.sellOutClock(p);
-      return { ds, S, so, protein: so.proteins.map((x) => x.ing), today: U.serviceDate(ctx.now(), S.dayStartHour) };
+      const today = U.serviceDate(ctx.now(), S.dayStartHour);
+      return { ds, S, so, protein: so.proteins.map((x) => x.ing), today, pastSig: pastSig(ds, B.dayMs(today) + S.dayStartHour * HOUR) };
     });
+    // A cheap fingerprint of everything dated before today: counts and grams that change when a past day is edited
+    // (a backdated batch or reading, a voided ticket, a discard), but not when today's service moves on.
+    function pastSig(ds, todayMs) {
+      let nt = 0, nv = 0, nb = 0, gb = 0, ne = 0;
+      for (const t of ds.tickets || []) if (t && t.createdAt < todayMs) { nt++; if (t.status === 'voided') nv++; }
+      for (const x of ds.batches || []) if (x && x.enteredAt < todayMs) { nb++; gb += (isNum(x.remainingG) ? x.remainingG : 0) + (x.status === 'discard' ? 1e9 : 0); }
+      for (const e of ds.events || []) if (e && e.t < todayMs) ne += e.reverted ? 1e6 : 1;
+      return [nt, nv, nb, Math.round(gb), ne].join(':');
+    }
     // Chart color slot of a protein: its place in the protein list, or 6 for any other food.
     const ingSlot = (b, ing) => { const i = b.protein.indexOf(ing); return i >= 0 ? i + 1 : 6; };
 
@@ -37084,7 +37173,8 @@ a.of-nav:active { background: var(--press); }
     // are remembered.
     function burn(p, day, ing) {
       const b = base(p);
-      const stamp = (b.ds.counts ? b.ds.counts.sample : 0) + ':' + (b.ds.range ? b.ds.range.from : 0);
+      // WATCH OUT: the stamp must change when a past day is edited, or the story shows stale numbers.
+      const stamp = (b.ds.counts ? b.ds.counts.sample : 0) + ':' + (b.ds.range ? b.ds.range.from : 0) + ':' + b.pastSig;
       const key = day + '|' + ing;
       const past = day < b.today;
       if (past) { const c = usageCache.get(key); if (c && c.stamp === stamp) return c.v; }
@@ -37149,6 +37239,7 @@ a.of-nav:active { background: var(--press); }
       const open = st.day >= b.today && isNum(sb.closeMs) && ctx.now() < sb.closeMs;
       const was = open ? 'has been' : 'was';
       parts.push((open ? 'So far today ' : 'That day ') + fmt.g(sb.intakeG) + ' ' + was + ' ' + (sb.tcs ? 'cooked' : 'restocked') + (sb.tcs && nb ? ' in ' + nb + ' ' + B.plural(nb, 'batch', 'batches') + ', the last at ' + fmt.clock(sb.batches[nb - 1].enteredAt) : '') + '; ' + fmt.g(sb.usedG) + ' ' + was + ' served' + (sb.wasteG > 0 ? ' and ' + fmt.g(sb.wasteG) + ' ' + was + ' thrown away' : '') + '.');
+      if (sb.overdrawnG > 0) parts.push(fmt.g(sb.overdrawnG) + ' more was used than was counted in' + (sb.openingAssumed ? ', so the day started with more than the par level the chart assumes.' : '.'));
       const typ = typicalDay(p, st.ing);
       if (typ.n >= MIN_DAYS) parts.push('A typical day in this range cooks ' + fmt.g(typ.medianIntake) + ' and serves ' + fmt.g(typ.medianUsed) + '.');
       let busy = null;
@@ -37158,10 +37249,11 @@ a.of-nav:active { background: var(--press); }
         const left = isNum(sb.endG) ? ' ' + fmt.g(sb.endG) + (open ? ' is in the cabinet now.' : ' was left at close.') : '';
         return { tone: 'good', word: open ? 'Not out yet' : 'Lasted', title: open ? name + ' has not run out so far today.' : name + ' lasted all day on ' + dayLabel(st.day) + '.', body: parts.join(' ') + left, extra: '' };
       }
-      // The most likely reason, in order: less cooked than a normal day uses, a lot thrown away, or simply
-      // more orders than usual.
+      // The most likely reason, in order: less cooked than a normal day cooks, a lot thrown away, or simply
+      // more orders than usual. WATCH OUT: compare cooked with cooked; a normal day's served grams leave out its
+      // waste, so comparing with them would flag a normal cook as short.
       let why = '';
-      if (typ.n >= MIN_DAYS && sb.intakeG < typ.medianUsed * 0.95) why = 'You cooked ' + fmt.g(typ.medianUsed - sb.intakeG) + ' less than a normal day uses, so it ran out early.';
+      if (typ.n >= MIN_DAYS && sb.intakeG < typ.medianIntake * 0.95) why = 'You cooked ' + fmt.g(typ.medianIntake - sb.intakeG) + ' less than a normal day, so it ran out early.';
       else if (sb.wasteG > 0 && sb.wasteG >= 0.1 * sb.intakeG) why = fmt.g(sb.wasteG) + ' of what was cooked was thrown away before it could be served, which cut the day short.';
       else if (typ.n >= MIN_DAYS) why = 'You cooked about the usual amount, so guests simply ordered more than usual that day.';
       const early = row.hoursBeforeClose >= 3;
@@ -37587,6 +37679,8 @@ a.of-nav:active { background: var(--press); }
   // Opens the Close the day sheet and keeps it current while it is open. Returns the sheet.
   function openCloseDay() {
     if (!SB.ui || !SB.ui.sheet || !stateNow()) return null;
+    // WATCH OUT: declared before the first paint, so a sheet closed during that paint does not touch it too early.
+    let off = null;
     // Stops listening to the store when the sheet closes.
     const onClose = () => { if (off) off(); };
     const sheet = SB.ui.sheet({ title: 'Close the day', side: 'right', width: 'min(640px, 96vw)', name: 'closeday', onClose });
@@ -37606,7 +37700,7 @@ a.of-nav:active { background: var(--press); }
     // The review: open orders, money, leftovers and the confirm button.
     function paintReview(m) {
       const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
-      body.appendChild(h('p', { class: 'cd-lead' }, 'Today is ' + U.fmtDateShort(m.day) + '. ', whatClosingDoes((stateNow().settings.service || {}).dayStartHour), help ? h('span', null, ' ', help) : null));
+      body.appendChild(h('p', { class: 'cd-lead' }, 'Today is ' + U.fmtDateShort(m.day) + '. ', whatClosingDoes((((stateNow() || {}).settings || {}).service || {}).dayStartHour), help ? h('span', null, ' ', help) : null));
       // From 85 percent full the sheet repeats the saved-history warning, because closing the day is when the owner is already looking at the numbers.
       try {
         const BPh = SB.office && SB.office.backupPure, fill = SB.store.historyFill ? SB.store.historyFill() : null;
@@ -37629,6 +37723,8 @@ a.of-nav:active { background: var(--press); }
       body.appendChild(sec1);
       body.appendChild(moneyTable(m, drawer));
       body.appendChild(countsBlock(m));
+      // The closing button says when it will also throw food out, so that choice is never a surprise.
+      let setGoLabel = () => {};
       // Leftover food, only when cooked-ahead food is tracked and some is left.
       if (cookAheadOn() && m.leftovers.count > 0) {
         const headId = U.uid('cdleft');
@@ -37637,7 +37733,7 @@ a.of-nav:active { background: var(--press); }
         // One radio choice for what to do with the leftover food.
         const mk = (id, label, note) => {
           const input = h('input', { type: 'radio', name: 'cd-left', value: id, checked: leftovers === id });
-          input.addEventListener('change', () => { leftovers = id; });
+          input.addEventListener('change', () => { leftovers = id; setGoLabel(); });
           return h('label', { class: 'cd-radio' }, input, h('span', null, h('strong', null, label), h('small', null, note)));
         };
         sec.append(mk('keep', 'Keep it', 'The food stays in the cabinet and its timers keep running.'),
@@ -37647,10 +37743,20 @@ a.of-nav:active { background: var(--press); }
       const blocked = blockedLine(m);
       const status = h('p', { class: 'cd-status', role: 'status' }, blocked);
       const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', disabled: !!m.open.length }, 'Close the day');
+      // True when closing will also throw out the food still in the cabinet.
+      const throwing = () => cookAheadOn() && m.leftovers.count > 0 && leftovers === 'discard';
+      // Names the food on the button when it will be thrown out, else the plain label.
+      setGoLabel = () => { go.textContent = throwing() ? 'Close the day and throw out ' + U.weightText(m.leftovers.g) : 'Close the day'; };
+      setGoLabel();
       go.addEventListener('click', () => {
         go.disabled = true;
         let rep = 'error';
-        try { rep = SB.store.dispatch('closeDay', { leftovers: cookAheadOn() && m.leftovers.count > 0 ? leftovers : 'keep' }); } catch (e) { /* shown below */ }
+        const before = (stateNow() || {}).lastClose;
+        try { rep = SB.store.dispatch('closeDay', { leftovers: throwing() ? 'discard' : 'keep' }); } catch (e) {
+          // WATCH OUT: a throw can come after the close was saved (a listener failing), so look before saying nothing changed.
+          const after = (stateNow() || {}).lastClose;
+          if (after && after !== before && after.day === m.day) rep = 'ok';
+        }
         if (rep === 'ok') { rememberStart(drawer.text); closedSummary = m; paint(); return; }
         status.textContent = rep === 'ordersStillOpen' ? 'Another order is still open. Pay or void it, then try again.' : 'The day could not be closed. Nothing was changed.';
         go.disabled = false;
@@ -37681,7 +37787,7 @@ a.of-nav:active { background: var(--press); }
         h('p', { class: 'cd-note' }, 'Keep a copy of the backup off this device (email it to yourself or use a USB drive).'));
     }
     paint();
-    const off = SB.store.subscribe(() => { if (!closedSummary) paint(); });
+    off = SB.store.subscribe(() => { if (!closedSummary) paint(); });
     return sheet;
   }
 
