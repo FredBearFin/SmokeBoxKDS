@@ -5,7 +5,7 @@
 // proofs print a clear SKIP line and exit 0; the hub-level proofs run today and fail where the hub still has a known gap.
 // ADAPTER: how a page is told to lead or follow is not fixed yet. The two URL templates below can be changed with environment variables and
 // are the ONLY place to edit once the real names are known: SMOKEBOX_LEADER_URL and SMOKEBOX_FOLLOWER_URL, with {hub} for the hub address.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -32,11 +32,11 @@ export async function startHub(opts = {}) {
   let child = null, out = '', port = 0;
   async function launch() {
     out = ''; const prev = port; port = 0;
-    child = spawn(process.execPath, [path.join(ROOT, 'server/server.mjs')], { env: Object.assign({}, process.env, { PORT: String(opts.port || prev || 0), HOST: '127.0.0.1', SMOKEBOX_DATA: file, SMOKEBOX_STARTER: opts.starter === false ? '0' : '1', SMOKEBOX_TZ: 'America/New_York' }, opts.env || {}) });
+    child = spawn(process.execPath, [path.join(ROOT, 'server/server.mjs')], { env: Object.assign({}, process.env, { PORT: String(opts.port || prev || 0), HOST: '127.0.0.1', SMOKEBOX_DATA: file, SMOKEBOX_STARTER: opts.starter === false ? '0' : '1', SMOKEBOX_TZ: 'America/New_York' }, opts.tokens ? { SMOKEBOX_REQUIRE_TOKENS: '1' } : {}, opts.env || {}) });
     child.stdout.on('data', (d) => (out += d)); child.stderr.on('data', (d) => (out += d));
     for (let i = 0; i < 150; i++) { const m = /127\.0\.0\.1:(\d+)/.exec(out); if (m && Number(m[1]) > 0) { port = Number(m[1]); break; } await sleep(40); }
     if (!port) throw new Error('the hub did not start: ' + out);
-    hub.port = port; hub.origin = 'http://127.0.0.1:' + port;
+    hub.port = port; hub.origin = 'http://127.0.0.1:' + port; hub.pid = child.pid;
   }
   const hub = {
     dir, file, port: 0, origin: '',
@@ -113,4 +113,34 @@ export async function startRelay(targetPort) {
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   const port = srv.address().port;
   return { port, origin: 'http://127.0.0.1:' + port, cut: () => { cut = true; for (const s of socks) s.destroy(); }, heal: () => { cut = false; }, close: () => { cut = true; for (const s of socks) s.destroy(); srv.close(); } };
+}
+
+/** Runs the hub's own admin command on this computer (node server/server.mjs admin ...), as the owner of the hub would. Resolves { code, out, err }. */
+export function adminCli(hub, args) {
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'server/server.mjs'), 'admin', ...args, '--port', String(hub.port), '--data', hub.file], { encoding: 'utf8', timeout: 20000 });
+  return { code: r.status, out: r.stdout || '', err: r.stderr || '' };
+}
+/** A one-time 6-character pairing code from the hub (owner true: the screen that uses it can make codes and remove screens). Throws if refused. */
+export function pairingCode(hub, { owner = false } = {}) {
+  const r = adminCli(hub, ['pair', ...(owner ? ['--owner'] : [])]);
+  const m = /Pairing code: ([A-Z2-9]{6})/.exec(r.out);
+  if (!m) throw new Error('no pairing code: ' + (r.err || r.out));
+  return m[1];
+}
+/** Every screen the hub knows: [{ id, name, owner, lastSeen?, revokedAt? }] (through the admin list command). */
+export function listScreens(hub) {
+  const key = fs.readFileSync(hub.file + '.admin', 'utf8').trim();
+  return new Promise((resolve, reject) => { http.get({ host: '127.0.0.1', port: hub.port, path: '/admin/screens', headers: { authorization: 'Bearer ' + key } }, (res) => { let t = ''; res.on('data', (c) => (t += c)); res.on('end', () => { try { resolve(JSON.parse(t).screens); } catch (e) { reject(e); } }); }).on('error', reject); });
+}
+/** Removes one screen by id, as the owner would (node server/server.mjs admin revoke ID). */
+export function revokeScreen(hub, id) { return adminCli(hub, ['revoke', id]); }
+/** The hub's pairing answer for a code and a name, over HTTP as a screen would ask: { status, body }. */
+export function pairOver(origin, code, name, headers = {}) { return postJson(origin, '/pair', { code, name }, headers); }
+/** One JSON POST to any path: { status, body }. */
+export function postJson(origin, p, body, headers = {}) {
+  const u = new URL(origin), data = JSON.stringify(body);
+  return new Promise((resolve) => {
+    const r = http.request({ host: u.hostname, port: u.port, path: p, method: 'POST', headers: Object.assign({ 'content-type': 'application/json', 'content-length': Buffer.byteLength(data), 'x-smokebox-client': '1' }, headers) }, (res) => { let t = ''; res.on('data', (c) => (t += c)); res.on('end', () => { let j = null; try { j = JSON.parse(t); } catch (e) { /* not JSON */ } resolve({ status: res.statusCode, body: j, text: t }); }); });
+    r.on('error', () => resolve({ status: 0, body: null })); r.write(data); r.end();
+  });
 }

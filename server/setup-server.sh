@@ -53,6 +53,7 @@ User=smokebox
 Environment=PORT=8787
 Environment=HOST=127.0.0.1
 Environment=SMOKEBOX_TZ=${TZNAME}
+Environment=SMOKEBOX_TRUST_PROXY=1
 Environment=SMOKEBOX_DATA=/var/lib/smokebox/state.json
 WorkingDirectory=/opt/smokebox
 ExecStart=/usr/bin/node /opt/smokebox/server/server.mjs
