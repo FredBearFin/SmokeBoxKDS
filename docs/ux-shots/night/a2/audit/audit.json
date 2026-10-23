@@ -64,6 +64,13 @@
  },
  {
   "tag": "390x844-day-normal",
+  "name": "leftovers-card",
+  "small": [],
+  "clipped": [],
+  "hscroll": []
+ },
+ {
+  "tag": "390x844-day-normal",
   "name": "startover-1",
   "small": [],
   "clipped": [],
@@ -155,6 +162,13 @@
  },
  {
   "tag": "390x844-night-normal",
+  "name": "leftovers-card",
+  "small": [],
+  "clipped": [],
+  "hscroll": []
+ },
+ {
+  "tag": "390x844-night-normal",
   "name": "startover-1",
   "small": [],
   "clipped": [],
@@ -246,6 +260,13 @@
  },
  {
   "tag": "390x844-day-large",
+  "name": "leftovers-card",
+  "small": [],
+  "clipped": [],
+  "hscroll": []
+ },
+ {
+  "tag": "390x844-day-large",
   "name": "startover-1",
   "small": [],
   "clipped": [],
@@ -337,6 +358,13 @@
  },
  {
   "tag": "768x1024-day-normal",
+  "name": "leftovers-card",
+  "small": [],
+  "clipped": [],
+  "hscroll": []
+ },
+ {
+  "tag": "768x1024-day-normal",
   "name": "startover-1",
   "small": [],
   "clipped": [],
@@ -428,6 +456,13 @@
  },
  {
   "tag": "768x1024-night-normal",
+  "name": "leftovers-card",
+  "small": [],
+  "clipped": [],
+  "hscroll": []
+ },
+ {
+  "tag": "768x1024-night-normal",
   "name": "startover-1",
   "small": [],
   "clipped": [],
@@ -519,6 +554,13 @@
  },
  {
   "tag": "768x1024-day-large",
+  "name": "leftovers-card",
+  "small": [],
+  "clipped": [],
+  "hscroll": []
+ },
+ {
+  "tag": "768x1024-day-large",
   "name": "startover-1",
   "small": [],
   "clipped": [],
@@ -610,6 +652,13 @@
  },
  {
   "tag": "1024x768-day-normal",
+  "name": "leftovers-card",
+  "small": [],
+  "clipped": [],
+  "hscroll": []
+ },
+ {
+  "tag": "1024x768-day-normal",
   "name": "startover-1",
   "small": [],
   "clipped": [],
@@ -701,6 +750,13 @@
  },
  {
   "tag": "1024x768-night-normal",
+  "name": "leftovers-card",
+  "small": [],
+  "clipped": [],
+  "hscroll": []
+ },
+ {
+  "tag": "1024x768-night-normal",
   "name": "startover-1",
   "small": [],
   "clipped": [],
@@ -786,6 +842,13 @@
  {
   "tag": "1024x768-day-large",
   "name": "tablet-checklist",
+  "small": [],
+  "clipped": [],
+  "hscroll": []
+ },
+ {
+  "tag": "1024x768-day-large",
+  "name": "leftovers-card",
   "small": [],
   "clipped": [],
   "hscroll": []
