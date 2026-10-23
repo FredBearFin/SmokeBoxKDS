@@ -1223,6 +1223,9 @@
       M.bannerCache = { ds: key, from: F.range.from, to: F.range.to, channel: F.channel, n: key ? key.tickets.length : 0, info };
     }
     const b = bannerText(info);
+    // A screen that keeps only the last N days of a shared kitchen says so: ranges older than that are partial here.
+    let trim = null; try { trim = SB.store && SB.store.trimInfo ? SB.store.trimInfo() : null; } catch (e) { trim = null; }
+    if (trim && isNum(trim.days) && trim.days > 0) b.text += ' Showing the last ' + trim.days + ' days; the full history is on the hub computer.';
     const t = M.banner.querySelector('.of-banner-t');
     if (t.textContent !== b.text) t.textContent = b.text;
     M.banner.dataset.kind = b.kind;
