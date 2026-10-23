@@ -10,6 +10,27 @@
   'use strict';
   const SB = (g.SB = g.SB || {});
   const doc = g.document;
+
+  // The customer names to offer as one-tap "Recent" buttons: newest orders first, no blanks, no repeats (ignoring
+  // capital letters), and never a name that is already a quick name. state is the app state; quick is the quick names.
+  function recentNames(state, quick, limit) {
+    const skip = new Set((quick || []).map((n) => String(n).trim().toLowerCase()));
+    const orders = ((state && state.orders) || []).slice().sort((a, b) => b.createdAt - a.createdAt);
+    const out = [];
+    for (let i = 0; i < orders.length && out.length < (limit || 4); i++) {
+      const nm = String(orders[i].customer || '').trim(), key = nm.toLowerCase();
+      if (!nm || skip.has(key)) continue;
+      skip.add(key); out.push(nm);
+    }
+    return out;
+  }
+  // Short text for the last order: up to three dishes then "and N more", used under the Repeat button.
+  function summarize(items, nameOf) {
+    const parts = items.map((it) => nameOf(it.menuId) + (it.qty > 1 ? ' x' + it.qty : ''));
+    return parts.length <= 3 ? parts.join(', ') : parts.slice(0, 3).join(', ') + ' and ' + (parts.length - 3) + ' more';
+  }
+  SB.orderLogic = { recentNames, summarize };
+
   if (!doc) return; // Node: the sheet is DOM only
 
   const U = SB.util, C = SB.config, h = U.h;
@@ -53,6 +74,9 @@
   // orderId is the open order this round is added to (null starts a new one); pay is how it is paid when sent
   // ('' leaves it open); tip is the tip text as typed.
   const D = { lines: [], customer: '', channel: 'dine_in', note: '', rush: false, orderId: null, pay: '', tip: '' };
+  // How the last order was paid when it was sent ('' = left open). A counter that takes cash all day starts the next
+  // order on cash, one tap fewer; Pay later is still one tap away.
+  let payDefault = '';
   let seq = 0;
   let lastSent = null; // { num, channel, items } of the last order sent from this sheet
   let live = null;     // the open view, or null
@@ -65,7 +89,7 @@
   // A separate copy of the order, kept so Undo can put it back.
   const copyDraft = () => JSON.parse(JSON.stringify(D));
   function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; }
-  function resetDraft() { D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = ''; D.tip = ''; }
+  function resetDraft() { D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = payDefault; D.tip = ''; }
   // The orders still open, oldest first, for the Add to open order list.
   function openOrdersList() { return (st().orders || []).filter((o) => o.status === 'open').sort((a, b) => a.createdAt - b.createdAt); }
   // A short name for an order in a list: who it is for and where, like "Table 4 (Dine-in)".
@@ -202,7 +226,7 @@
     let searchInput = null;
     host.body.classList.add('ord-host');
 
-    const view = { cat: 'all', search: '', pane: 'menu', editing: null, tiles: [], heads: [], lineViews: new Map(), chipBtns: new Map(), offs: [] };
+    const view = { cat: 'all', search: '', pane: 'menu', editing: null, tiles: [], heads: [], lineViews: new Map(), chipBtns: new Map(), recentBtns: new Map(), offs: [] };
     const root = h('div', { class: 'ord', dataset: { pane: 'menu' } });
     host.body.appendChild(root);
 
@@ -299,7 +323,25 @@
       b.addEventListener('click', () => { D.customer = D.customer === nm ? '' : nm; custInput.value = D.customer; paintCustomer(); touched(); });
       chipsEl.appendChild(b); view.chipBtns.set(nm, b);
     });
+    // Names of recent orders that are not quick names, as one-tap buttons; rebuilt only when the list changes.
+    const recentEl = h('div', { class: 'ord-chips ord-recent', role: 'group', 'aria-label': 'Recent customers', hidden: true });
+    // Rebuilds the Recent buttons when the newest orders bring a different set of names.
+    function paintRecent() {
+      const names = recentNames(st(), C.quickNames, 4);
+      const sig = names.join('\u0001');
+      if (recentEl.dataset.sig !== sig) {
+        recentEl.dataset.sig = sig; U.clear(recentEl); view.recentBtns.clear();
+        names.forEach((nm) => {
+          const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, nm));
+          b.addEventListener('click', () => { D.customer = D.customer === nm ? '' : nm; custInput.value = D.customer; paintCustomer(); touched(); });
+          recentEl.appendChild(b); view.recentBtns.set(nm, b);
+        });
+        setHidden(recentEl, !names.length);
+      }
+      view.recentBtns.forEach((b, nm) => b.setAttribute('aria-pressed', D.customer === nm ? 'true' : 'false'));
+    }
     custField.querySelector('.field-label').after(chipsEl);
+    chipsEl.after(recentEl);
     custField.classList.add('ord-cust');
     custField.appendChild(custCount);
 
@@ -354,6 +396,7 @@
       ico('receipt', 30),
       h('p', { class: 'ord-empty-title' }, 'No items yet'),
       h('p', { class: 't-muted' }, 'Tap an item on the menu to add it.'),
+      h('p', { class: 't-muted ord-empty-last', hidden: true }),
       h('button', { type: 'button', class: 'btn btn-sm ord-empty-repeat' }, ico('history', 18), h('span', null, 'Repeat last order')));
     const toMenu = h('button', { type: 'button', class: 'btn btn-sm ord-to-menu' }, ico('plus', 18), h('span', null, 'Add items'));
     emptyEl.appendChild(toMenu);
@@ -450,6 +493,7 @@
     // Updates the quick-name buttons and the length counter, and shows an error when the name is too long.
     function paintCustomer() {
       view.chipBtns.forEach((b, nm) => b.setAttribute('aria-pressed', D.customer === nm ? 'true' : 'false'));
+      paintRecent();
       const len = D.customer.trim().length;
       const over = len > L.maxCustomerLen;
       setHidden(custCount, len < 28 && !over);
@@ -485,6 +529,8 @@
       text(repeatBtn.lastChild, lbl);
       const er = emptyEl.querySelector('.ord-empty-repeat');
       setHidden(er, !last); text(er.lastChild, lbl);
+      const lastEl = emptyEl.querySelector('.ord-empty-last');
+      setHidden(lastEl, !last); if (last) text(lastEl, 'Last order: ' + summarize(last.items, (id) => { const mi = menuById(id); return mi ? mi.short || mi.name : id; }) + '.');
       setHidden(emptyEl, !draftEmpty());
       setHidden(linesEl, draftEmpty());
       rushStamp.hidden = !D.rush;
@@ -775,6 +821,7 @@
         const info = res.info || {};
         const zones = Array.isArray(info.zones) ? info.zones.length : 0;
         lastSent = { num: info.num, channel: D.channel, items: items.map((it) => ({ menuId: it.menuId, qty: it.qty, mods: (it.mods || []).slice() })) };
+        payDefault = D.pay;
         resetDraft();
         host.close('sent');
         const where = addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent to ' : ' sent to ';
