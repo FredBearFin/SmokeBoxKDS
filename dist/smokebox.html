@@ -2683,6 +2683,21 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* A cold item keeps its "In the fridge since" row visible on the compact card. */
 .hc-card[data-cold="on"] .hc-dl dt:nth-of-type(3), .hc-card[data-cold="on"] .hc-dl dd:nth-of-type(3) { display: block; }
 
+/* Get this tablet ready (rd-): one card per check with a tick or a do-this line. */
+.rd { gap: var(--sp-3); }
+.rd-card { display: grid; gap: var(--sp-2); }
+.rd-head { display: flex; align-items: center; gap: var(--sp-3); }
+.rd-head .fs-h { flex: 1 1 auto; margin: 0; }
+.rd-state { font: var(--w-bold) var(--fs-2) / 1.2 var(--font-body); }
+.rd-card[data-ok="true"] { border-color: var(--sage); }
+.rd-card[data-ok="true"] .icon, .rd-card[data-ok="true"] .rd-state { color: var(--sage-ink); }
+.rd-card[data-ok="false"] { border-color: var(--amber); }
+.rd-card[data-ok="false"] .icon, .rd-card[data-ok="false"] .rd-state { color: var(--amber-ink); }
+
+/* Pilot visit checklist (pv-): numbered steps with a tick box each. */
+.pv-list { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.pv-step { display: grid; gap: var(--sp-1); }
+
 /* ===== 22-floor-tour.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the "Show me how it works" walkthrough: the pulsing ring and the caption card.
@@ -25000,7 +25015,7 @@ a.of-nav:active { background: var(--press); }
     // The Guide opens only when the guide page is part of this copy of Smokebox.
     const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Get this tablet ready', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
@@ -26161,6 +26176,8 @@ a.of-nav:active { background: var(--press); }
   function openSetup() {
     const sheet = SB.ui.sheet({ title: 'Set up this tablet', side: 'right', width: 'min(720px, 96vw)', name: 'setup' });
     const list = h('div', { class: 'setup-list' });
+    // The quick way in: the five checks with ticks, so the long list below is only for reading.
+    list.appendChild(h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'open-ready' }, onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('ready'), 60); } }, ico('check-circle', 22), h('span', null, 'Get this tablet ready')), h('button', { type: 'button', class: 'btn', dataset: { act: 'open-pilot' }, onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('pilot'), 60); } }, 'Pilot visit checklist')));
     // A small "?" help line at the top: the guide pages about setting up and about sound trouble, when the guide is in this build.
     const gl = SB.guide && typeof SB.guide.link === 'function' ? [SB.guide.link('getting-started', 'setting up'), SB.guide.link('troubleshooting', 'no sound')].filter(Boolean) : [];
     // Each help link gets words beside its round ? so it is clear what it opens.
@@ -27359,6 +27376,147 @@ a.of-nav:active { background: var(--press); }
     return true;
   }
 
+  /* ---------- Get this tablet ready ---------- */
+
+  // Plays one short, clear beep through the browser's own audio, at this tablet's saved loudness. Returns true when a beep was started.
+  // A tap is needed first on most tablets: it is only called from a button.
+  function playBeep() {
+    try {
+      const AC = g.AudioContext || g.webkitAudioContext;
+      if (!AC) return false;
+      const ctx = new AC();
+      if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      const vol = SB.floor && typeof SB.floor.volume === 'function' ? SB.floor.volume() : 0.8;
+      osc.type = 'sine'; osc.frequency.value = 880; gain.gain.value = Math.max(0.2, Math.min(1, vol));
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + 0.45);
+      setTimeout(() => { try { ctx.close(); } catch (e) { /* already closed */ } }, 800);
+      return true;
+    } catch (e) { return false; }
+  }
+  // True when this page runs as an installed app (opened from the home screen), on iPad or Android.
+  function isInstalled() {
+    try { return !!(g.navigator && g.navigator.standalone) || !!(g.matchMedia && (g.matchMedia('(display-mode: standalone)').matches || g.matchMedia('(display-mode: fullscreen)').matches)); } catch (e) { return false; }
+  }
+  // Opens "Get this tablet ready": five checks in plain words, each with a green tick or a plain "do this" line. It only reports what the
+  // browser can really tell (screen awake, installed, full screen); sound and volume are confirmed by the person who hears the beep.
+  function openReady() {
+    const sheet = SB.ui.sheet({ title: 'Get this tablet ready', side: 'right', width: 'min(720px, 96vw)', name: 'ready', onClose: () => { releaseWake(); } });
+    const root = h('div', { class: 'dp rd' });
+    let sentinel = null, wakeNow = 'unknown', heard = null, played = false;
+    // Lets go of the screen hold this sheet took, when it closes.
+    function releaseWake() { try { if (sentinel && sentinel.release) sentinel.release(); } catch (e) { /* already released */ } sentinel = null; }
+    // One check card: an icon (tick or do this), a title, a plain line, and room for buttons.
+    const card = (id, title) => { const el = h('section', { class: 'fs-card rd-card', dataset: { check: id } }); return { el, title, set(ok, line, ...extra) { U.clear(el); el.dataset.ok = ok === true ? 'true' : ok === false ? 'false' : 'unknown'; el.append(h('div', { class: 'rd-head' }, ico(ok === true ? 'check-circle' : 'alert-circle', 26), h('h3', { class: 'fs-h' }, title), h('span', { class: 'rd-state' }, ok === true ? 'Ready' : ok === false ? 'Do this' : 'Not checked yet')), h('p', { class: 'fs-sub' }, line), ...extra.filter(Boolean)); } }; };
+    const cAwake = card('awake', 'Screen stays awake'), cSound = card('sound', 'Sound is on'), cVol = card('volume', 'Volume is loud enough'), cInst = card('installed', 'Added to the home screen'), cFull = card('full', 'Full screen');
+    const summary = h('p', { class: 'fs-sub rd-summary', role: 'status' });
+    // Counts the ticks and says how many checks are done.
+    function paintSummary() { const n = [cAwake, cSound, cVol, cInst, cFull].filter((c) => c.el.dataset.ok === 'true').length; tell(summary, n + ' of 5 ready. A tick means the tablet or you confirmed it; it is not a promise it stays that way all day.', n === 5 ? 'ok' : undefined); }
+
+    // 1. Screen awake: ask the browser to hold the screen on now (a tap lets it), or say how to set the tablet itself.
+    // Asks for the screen hold and shows the result; the tablet's own timeout is still the first thing to set.
+    function checkAwake() {
+      const boardState = SB.floor && SB.floor.wakeLock ? SB.floor.wakeLock() : 'unknown';
+      // Tapping asks the browser again, then redraws this card.
+      const again = h('button', { type: 'button', class: 'btn', dataset: { act: 'awake-check' }, onClick: () => tryWake(true) }, 'Check again');
+      const how = h('p', { class: 'fs-sub' }, 'Also set the tablet itself so it never sleeps in service. iPad: Settings, Display & Brightness, Auto-Lock, Never. Android: Settings, Display, Screen timeout, the longest or Never. Plug it into power.');
+      if (wakeNow === 'on' || boardState === 'on') cAwake.set(true, 'The board is holding the screen awake while it is open. Still set Auto-Lock to Never and keep the tablet plugged in.', again);
+      else cAwake.set(false, wakeNow === 'unsupported' || boardState === 'unsupported' ? 'This browser cannot hold the screen awake by itself.' : 'The browser did not agree to hold the screen awake yet.', how, again);
+      paintSummary();
+    }
+    // Requests the screen hold, remembers the answer, and redraws the card.
+    function tryWake(redraw) {
+      try {
+        if (!g.navigator || !g.navigator.wakeLock) { wakeNow = 'unsupported'; checkAwake(); return; }
+        g.navigator.wakeLock.request('screen').then((s) => { sentinel = s; wakeNow = 'on'; if (redraw) checkAwake(); else checkAwake(); }, () => { wakeNow = 'refused'; checkAwake(); });
+      } catch (e) { wakeNow = 'refused'; checkAwake(); }
+    }
+
+    // 2. Sound: a real beep, then the person says whether they heard it.
+    // Plays the beep and asks if it was heard; the answer sets the tick.
+    function checkSound() {
+      const test = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'sound-test' }, onClick: () => { played = playBeep(); if (SB.floor && SB.floor.setSound && played) { /* the board's own sound stays as the owner set it */ } heard = null; checkSound(); } }, ico('volume', 20), h('span', null, played ? 'Play it again' : 'Test the sound'));
+      if (heard === true) { cSound.set(true, 'You heard the beep. Warnings on the board use the same speaker.', test); }
+      else if (heard === false) { cSound.set(false, 'You did not hear it. Turn the tablet volume up, check the silent or mute switch (iPad: the side switch or Control Center), and try a cheap Bluetooth speaker. Then tap Play it again.', test); }
+      else if (played) {
+        cSound.set(null, 'Did you hear a short beep?', test,
+          // Both answers: yes ticks the check, no says what to try.
+          h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn', dataset: { act: 'sound-yes' }, onClick: () => { heard = true; if (SB.floor && SB.floor.sound && !SB.floor.sound() && SB.floor.setSound) SB.floor.setSound(true); checkSound(); checkVol(); } }, 'Yes, I heard it'), h('button', { type: 'button', class: 'btn', dataset: { act: 'sound-no' }, onClick: () => { heard = false; checkSound(); checkVol(); } }, 'No')));
+      } else cSound.set(null, 'Browsers only allow sound after a tap, so test it here. Turn the volume up first.', test);
+      paintSummary();
+    }
+    // 3. Volume: it cannot be read, so it follows the beep answer and tells the owner how loud to aim for.
+    // Shows the volume line: ticked once the beep was heard, with the aim for a loud kitchen.
+    function checkVol() {
+      const line = 'Aim for a beep you can hear from the pit or the line over the fans. A tablet speaker is easy to miss in a loud kitchen: a cheap Bluetooth speaker near the cutting board helps.';
+      if (heard === true) cVol.set(true, line); else if (heard === false) cVol.set(false, line); else cVol.set(null, 'Test the sound above first. ' + line);
+      paintSummary();
+    }
+    // 4. Home screen: the page can tell whether it was opened as an installed app.
+    // Ticked when opened from the home screen; otherwise how to add it on iPad and Android. No promises about what it does for storage.
+    function checkInstalled() {
+      if (isInstalled()) cInst.set(true, 'Smokebox is running as an installed app.');
+      else cInst.set(false, 'You are in the browser. iPad (Safari): tap Share, then Add to Home Screen. Android (Chrome): open the menu, then Install app or Add to Home screen. Then open Smokebox from that icon. An installed app opens without the browser bars; Smokebox cannot promise it keeps your data safe, so keep taking backups.');
+      paintSummary();
+    }
+    // 5. Full screen: ticked when installed or already full screen; otherwise a button where the browser allows it.
+    // Shows whether the page fills the screen, with a button to ask for it where the browser allows.
+    function checkFull() {
+      const fs = !!(doc.fullscreenElement || doc.webkitFullscreenElement) || isInstalled();
+      const can = !!(doc.documentElement && (doc.documentElement.requestFullscreen || doc.documentElement.webkitRequestFullscreen));
+      // Tapping asks the browser to fill the screen, then redraws the card.
+      const go = can ? h('button', { type: 'button', class: 'btn', dataset: { act: 'go-fullscreen' }, onClick: () => { try { const r = (doc.documentElement.requestFullscreen || doc.documentElement.webkitRequestFullscreen).call(doc.documentElement); Promise.resolve(r).then(() => setTimeout(checkFull, 300), () => setTimeout(checkFull, 300)); } catch (e) { checkFull(); } } }, 'Go full screen') : null;
+      if (fs) cFull.set(true, 'The board fills the screen.');
+      else cFull.set(false, can ? 'The browser bars are showing. Tap Go full screen, or install the app (above) so it opens without them.' : 'This browser cannot go full screen from here. On iPad add Smokebox to the Home Screen (above); it then opens full screen.', go);
+      paintSummary();
+    }
+    root.append(h('p', { class: 'fs-sub' }, 'Five quick checks so the board keeps working on this tablet during service. Nothing here has been tried on your tablet until you do it.'),
+      cAwake.el, cSound.el, cVol.el, cInst.el, cFull.el, summary);
+    checkAwake(); checkSound(); checkVol(); checkInstalled(); checkFull();
+    tryWake(false);
+    sheet.body.appendChild(root); keepInView(root);
+    return sheet;
+  }
+
+  /* ---------- Pilot visit checklist ---------- */
+
+  // The visit steps, in order: what to do, where in the app, and minutes allowed. Kept as plain data so the printed card and the doc match.
+  const PILOT_STEPS = [
+    { min: 3, what: 'Get this tablet ready', how: 'Settings, Get this tablet ready. Screen never sleeps, plugged in, sound test heard, added to the home screen, full screen.' },
+    { min: 3, what: 'Put the menu in', how: 'Import their spreadsheet (Settings, Dishes and prices, More ways to add dishes) or add the first dishes by hand. Check the preview before saving.' },
+    { min: 2, what: 'Tax, hours and PIN', how: 'Settings, Tax, hours and PIN. Set the manager PIN and write down the recovery code with the owner.' },
+    { min: 2, what: 'Name stations and menu sections', how: 'Use their words. Hide stations they do not have (Change stations).' },
+    { min: 1, what: 'Cook-ahead question', how: 'Ask whether they cook some dishes ahead. Answer Yes, No or Not sure; it can be changed later.' },
+    { min: 2, what: 'One test ticket', how: 'New ticket, add two dishes, send it, then bump it. Watch that the right station sees it.' },
+    { min: 1, what: 'Backup and who to call', how: 'Show where to save a backup (Settings, Data). Leave a phone number.' }
+  ];
+  // Adds up the minutes of all the visit steps.
+  function pilotMinutes() { return PILOT_STEPS.reduce((n, s) => n + s.min, 0); }
+  // Builds the printable visit card as plain HTML text, used for both the on-screen sheet and the print frame.
+  function pilotHtml() {
+    const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    return '<h1>Smokebox pilot visit</h1><p>About ' + pilotMinutes() + ' minutes. Nothing here has been tried in your kitchen until you do it.</p><ol>' +
+      PILOT_STEPS.map((s) => '<li><strong>' + esc(s.what) + '</strong> (' + s.min + ' min)<br>' + esc(s.how) + '<br>Done: ____</li>').join('') + '</ol>';
+  }
+  // Opens the visit checklist as a card to read on screen, with a Print button.
+  function openPilot() {
+    const sheet = SB.ui.sheet({ title: 'Pilot visit checklist', side: 'right', width: 'min(720px, 96vw)', name: 'pilot' });
+    const msg = h('p', { class: 'fs-sub', role: 'status' });
+    const body = h('div', { class: 'dp pv' }, h('p', { class: 'fs-sub pv-total' }, 'About ' + pilotMinutes() + ' minutes in all. Tick each step as you go.'),
+      h('ol', { class: 'pv-list' }, ...PILOT_STEPS.map((s) => h('li', { class: 'fs-card pv-step' }, h('label', { class: 'dp-check-row' }, h('input', { type: 'checkbox' }), h('span', null, h('strong', null, s.what), ' (' + s.min + ' min)')), h('p', { class: 'fs-sub' }, s.how)))));
+    // Prints the card through a hidden frame so the board is not printed with it.
+    const print = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'pilot-print' }, onClick: () => {
+      try {
+        const f = doc.createElement('iframe'); f.style.cssText = 'position:fixed;width:0;height:0;border:0'; doc.body.appendChild(f);
+        f.contentDocument.open(); f.contentDocument.write('<!doctype html><title>Smokebox pilot visit</title><body style="font-family:sans-serif;padding:24px;line-height:1.4">' + pilotHtml() + '</body>'); f.contentDocument.close();
+        f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 2000);
+      } catch (e) { tell(msg, 'This browser could not print. Use the screen as the card.', 'bad'); }
+    } }, ico('receipt', 20), h('span', null, 'Print this card'));
+    sheet.body.append(body, h('div', { class: 'fs-row' }, print), msg);
+    return sheet;
+  }
+
   /* ---------- the Tax, hours and PIN sheet ---------- */
 
   // Opens "Tax, hours and PIN": the shop settings that used to be steps of a wizard. Each saves on its own button.
@@ -27434,6 +27592,8 @@ a.of-nav:active { background: var(--press); }
   SB.sheets.register('setup', openSetup);
   SB.sheets.register('dishes', openDishes);
   SB.sheets.register('shop', openShop);
+  SB.sheets.register('ready', openReady);
+  SB.sheets.register('pilot', openPilot);
   SB.sheets.register('serve', openServe);
   SB.sheets.register('startover', openStartOver);
   SB.sheets.register('menuimport', openImport);
