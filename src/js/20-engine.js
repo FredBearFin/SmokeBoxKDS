@@ -3258,6 +3258,7 @@
     let drop = arr.length - target;
     const open = new Set();
     for (const o of tx.get('orders') || []) if (o && o.status === 'open') open.add(o.id);
+    // True when the ticket belongs to a check that is still open.
     const onOpen = (t) => !!(t.orderId && open.has(t.orderId));
     // First pass: the oldest finished tickets not on an open check; second pass, only if still too many: the rest.
     const gone = new Set();
