@@ -7,12 +7,17 @@
 set -euo pipefail
 TZNAME="${1:?time zone, for example America/New_York}"
 LOGIN="${2:?login name}"
-PASS="${3:?password}"
+PASS="${3:-${SMOKEBOX_PASS:-}}"   # or set SMOKEBOX_PASS so it is not on the command line
 DOMAIN="${4:-}"
+[ -n "$PASS" ] || { echo "password needed (third argument or SMOKEBOX_PASS)"; exit 1; }
+[ "${#PASS}" -ge 8 ] || { echo "Use a password of at least 8 characters (a long phrase is best): this server is on the internet."; exit 1; }
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo bash ...)"; exit 1; }
 if [ ! -f smokebox-server.tar.gz ]; then
-  curl -fsSL https://github.com/FredBearFin/SmokeBoxKDS/archive/refs/heads/deploy.tar.gz -o smokebox-server.tar.gz
+  curl -fsSL --max-time 180 --retry 2 https://github.com/FredBearFin/SmokeBoxKDS/archive/refs/heads/deploy.tar.gz -o smokebox-server.tar.gz
 fi
+[ "$(wc -c < smokebox-server.tar.gz)" -ge 100000 ] || { echo "smokebox-server.tar.gz is too small to be the app; stopping."; exit 1; }
+gzip -t smokebox-server.tar.gz
+if tar -tzf smokebox-server.tar.gz | grep -Eq '(^/|(^|/)\.\.(/|$))'; then echo "The archive has unsafe paths; stopping."; exit 1; fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
@@ -31,7 +36,8 @@ apt-get install -y caddy
 # The app
 id smokebox >/dev/null 2>&1 || useradd --system --home /opt/smokebox --shell /usr/sbin/nologin smokebox
 rm -rf /opt/smokebox.new && mkdir -p /opt/smokebox.new
-tar -xzf smokebox-server.tar.gz -C /opt/smokebox.new --strip-components=1
+tar -xzf smokebox-server.tar.gz -C /opt/smokebox.new --strip-components=1 --no-same-owner --no-same-permissions
+[ -s /opt/smokebox.new/server/server.mjs ] && [ -s /opt/smokebox.new/dist/smokebox.html ] || { echo "The download is missing app files; stopping."; exit 1; }
 rm -rf /opt/smokebox && mv /opt/smokebox.new /opt/smokebox
 mkdir -p /var/lib/smokebox
 chown -R smokebox:smokebox /var/lib/smokebox
@@ -57,6 +63,15 @@ ProtectSystem=strict
 ReadWritePaths=/var/lib/smokebox
 ProtectHome=true
 PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+CapabilityBoundingSet=
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
@@ -74,6 +89,16 @@ HASH="$(caddy hash-password --plaintext "$PASS")"
 cat > /etc/caddy/Caddyfile <<CADDY
 ${DOMAIN} {
 	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		-Server
+	}
+	request_body {
+		max_size 2MB
+	}
 	basic_auth {
 		${LOGIN} ${HASH}
 	}

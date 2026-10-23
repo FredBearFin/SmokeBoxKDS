@@ -60,6 +60,10 @@ export async function createHub(opts = {}) {
   let lastAt = 0; // the time of the last applied action; action times never go backwards
   const replies = new Map(); // opId -> reply already given, so a resend is answered but not applied twice
   const MAX_REPLIES = 5000;
+  // Hard limits so one misbehaving screen cannot use up the hub's memory: the biggest action body, the most connected screens, and the
+  // most bytes the recent-actions log may hold (oldest dropped first).
+  const MAX_BODY = opts.maxBody ?? 256 * 1024, MAX_CLIENTS = opts.maxClients ?? 100, MAX_OPS_BYTES = opts.maxOpsBytes ?? 8 * 1024 * 1024;
+  let opsBytes = 0;
   let saveTimer = null, dirty = false;
 
   // Writes the file soon (one write per burst of changes) when a data file is set.
@@ -101,7 +105,9 @@ export async function createHub(opts = {}) {
       lastAt = t;
       const by = typeof clientId === 'string' ? clientId : null;
       const op = { seq: seq + 1, opId: typeof opId === 'string' ? opId : null, actionType: type, payload: payload ?? {}, now: t, by };
-      ops.push(op); if (ops.length > MAX_OPS) ops.shift();
+      op.bytes = JSON.stringify(op).length;
+      ops.push(op); opsBytes += op.bytes;
+      while (ops.length > MAX_OPS || (opsBytes > MAX_OPS_BYTES && ops.length > 1)) opsBytes -= ops.shift().bytes || 0;
       changed({ by, opId: op.opId, type, op });
       reply = { report: 'ok', info: r.info, seq };
     } else reply = { report: r.report, info: r.info, seq };
@@ -112,18 +118,32 @@ export async function createHub(opts = {}) {
     return { status: 200, body: reply };
   }
 
-  // Reads a request body up to 1 MB and calls back with the parsed JSON (or null if it is not JSON).
-  function readJson(req, cb) {
-    let n = 0; const chunks = [];
-    req.on('data', (c) => { n += c.length; if (n > 1e6) { req.destroy(); } else chunks.push(c); });
-    req.on('end', () => { try { cb(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch (e) { cb(null); } });
+  // Reads a request body up to MAX_BODY bytes and calls back with the parsed JSON (or null if it is not JSON). A bigger body is answered
+  // with 413 at once and the connection is closed, so nothing large is ever held. A Content-Length that is already too big is refused up front.
+  function readJson(req, res, cb) {
+    let n = 0, done = false; const chunks = [];
+    const tooBig = () => {
+      if (done) return; done = true;
+      res.writeHead(413, { 'content-type': 'application/json', connection: 'close' });
+      res.end(JSON.stringify({ report: 'badPatch', info: { error: 'body too large', max: MAX_BODY }, seq }), () => req.destroy());
+    };
+    if (Number(req.headers['content-length']) > MAX_BODY) return tooBig();
+    req.on('data', (c) => { n += c.length; if (n > MAX_BODY) tooBig(); else if (!done) chunks.push(c); });
+    req.on('end', () => {
+      if (done) return; done = true;
+      let body = null;
+      try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch (e) { body = null; }
+      cb(body);
+    });
+    req.on('error', () => { done = true; });
   }
 
   // Answers one HTTP request: the page, the event stream, or an action.
   function handle(req, res) {
     const url = (req.url || '/').split('?')[0];
     if (req.method === 'GET' && url === '/events') {
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+      if (clients.size >= MAX_CLIENTS) { res.writeHead(503, { 'content-type': 'text/plain', 'retry-after': '10' }); res.end('too many screens connected'); return; }
+      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', connection: 'keep-alive' });
       clients.add(res);
       req.on('close', () => clients.delete(res));
       // ?since=N: a screen that was away asks for the actions after N. If the log still reaches back that far it gets
@@ -136,8 +156,24 @@ export async function createHub(opts = {}) {
       return;
     }
     if (req.method === 'POST' && url === '/action') {
-      readJson(req, (body) => {
-        const out = body ? runAction(body) : { status: 400, body: { report: 'badPatch', info: { error: 'not JSON' }, seq } };
+      // Cross-site request forgery: a web page the signed-in person visits could send a "simple" POST here and the browser would attach the
+      // cached login. Two cheap guards: the body must say it is application/json (a cross-site page cannot send that without a permission
+      // check the hub never grants), and a request that names another origin is refused.
+      const ct = String(req.headers['content-type'] || '').toLowerCase();
+      const origin = req.headers.origin;
+      let sameOrigin = true;
+      if (origin) { try { sameOrigin = new URL(origin).host === req.headers.host; } catch (e) { sameOrigin = false; } }
+      if (!ct.startsWith('application/json') || !sameOrigin) {
+        res.writeHead(!sameOrigin ? 403 : 415, { 'content-type': 'application/json', connection: 'close' });
+        res.end(JSON.stringify({ report: 'badPatch', info: { error: !sameOrigin ? 'cross-site request refused' : 'content-type must be application/json' }, seq }));
+        req.resume();
+        return;
+      }
+      readJson(req, res, (body) => {
+        // An action that makes the engine throw is answered with 500 and changes nothing, instead of taking the hub down.
+        let out;
+        try { out = body && typeof body === 'object' && !Array.isArray(body) ? runAction(body) : { status: 400, body: { report: 'badPatch', info: { error: 'not a JSON object' }, seq } }; }
+        catch (e) { console.warn('[hub] action failed: ' + e.message); out = { status: 500, body: { report: 'badPatch', info: { error: 'action failed' }, seq } }; }
         res.writeHead(out.status, { 'content-type': 'application/json' });
         res.end(JSON.stringify(out.body));
       });
@@ -145,14 +181,16 @@ export async function createHub(opts = {}) {
     }
     if (req.method === 'GET' && (url === '/' || url === '/smokebox.html')) {
       if (!fs.existsSync(htmlFile)) { res.writeHead(404, { 'content-type': 'text/plain' }); res.end('dist/smokebox.html is not built; run node tools/build.mjs'); return; }
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      fs.createReadStream(htmlFile).pipe(res);
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'x-frame-options': 'DENY' });
+      fs.createReadStream(htmlFile).on('error', () => res.destroy()).pipe(res);
       return;
     }
     res.writeHead(404, { 'content-type': 'text/plain' }); res.end('not found');
   }
 
   const server = http.createServer(handle);
+  // A slow or stalled sender is cut off (these limits apply to receiving a request, not to the long event stream).
+  server.headersTimeout = 15000; server.requestTimeout = 30000;
   let tickTimer = null, hbTimer = null;
   // Starts listening, the 1 s tick and the heartbeat; resolves with the port actually used.
   function listen(port = 0, host = '127.0.0.1') {

@@ -182,18 +182,17 @@ export default function (h) {
     await t.clean(page, 'lockout');
   });
 
-  h.test('04c-board-86', '86 board: manual 86 hides the item from the order screen, Back on restores, sync strip is labelled Simulated', { owner: 'sheets', timeout: 60000 }, async (t) => {
+  h.test('04c-board-86', '86 board: manual 86 hides the item from the order screen, Back on restores, no pretend sync strip', { owner: 'sheets', timeout: 60000 }, async (t) => {
     const page = await t.open({ w: 1280, h: 800, kitchen: true });
     let d = await open86(page);
     const txt = await d.innerText();
-    t.check('the sync strip says "Simulated: no live POS connected"', /(Simulated|Demo only|Practice only): no live POS connected/.test(txt), txt.slice(0, 160));
-    t.check('four channel chips are listed (Counter POS, Online ordering, Drive-thru board, Delivery apps)', ['Counter POS', 'Online ordering', 'Drive-thru board', 'Delivery apps'].every((x) => txt.includes(x)), txt.slice(0, 400));
+    // The pretend channel sync strip and its four chips were taken off the 86 board (round 12): nothing may claim a sync that does not exist.
+    t.check('the 86 board has no pretend channel sync strip', !/Channel sync|no live POS|Counter POS|Delivery apps/.test(txt), txt.slice(0, 200));
     await d.getByRole('button', { name: '86 it: Brisket, 1/4 lb' }).click();
     await settle(page, 400);
     const afterTxt = await d.innerText();
     t.check('the row says "86 manual" and "Marked 86 by hand"', /86 manual/.test(afterTxt) && /Marked 86 by hand/.test(afterTxt), afterTxt.slice(180, 600));
     t.check('the Off the menu count becomes 1', /Off the menu\s*\n?\s*1/.test(afterTxt), afterTxt.slice(380, 520));
-    t.check('the channels show Syncing right after the 86', /Syncing/.test(afterTxt), afterTxt.slice(0, 300));
     t.check('a toast with Undo confirms the 86', await page.locator('.toast .toast-undo').count() === 1, await page.locator('.toast').allInnerTexts());
     // let the simulated channels catch up (bench shortcut: clock x1000 for 1.5 s is about 25 minutes of kitchen time)
     await page.evaluate(() => SB.store.setSpeed(1000));
@@ -201,8 +200,6 @@ export default function (h) {
     await page.evaluate(() => SB.store.setSpeed(1));
     await settle(page, 500);
     const synced = await d.innerText();
-    t.check('after the sync window the chips say "synced N s after 86"', /[Ss]ynced \d+\s*s? after/.test(synced) || /synced/i.test(synced), synced.slice(0, 500));
-    t.check('the strip still says Simulated after syncing', /Simulated|Demo only|Practice only|no live POS/.test(synced));
     await t.shot(page, 'board86-manual');
     const od = await openKey(page, 'n', 'New ticket');
     const tile = od.getByRole('button', { name: /^Brisket, 1\/4 lb/ });

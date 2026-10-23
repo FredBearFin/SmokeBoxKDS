@@ -1,5 +1,5 @@
 {
- "runStart": "2026-10-23T12:06:20.440Z",
+ "runStart": "2026-10-23T12:59:17.341Z",
  "results": [
   {
    "id": "01-first-run",
@@ -8,7 +8,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 7313,
+   "ms": 7156,
    "checks": 24,
    "failed": [],
    "skips": [],
@@ -16,7 +16,7 @@
    "shots": [
     "test/.out/qa/first-run-1280.png"
    ],
-   "at": "2026-10-23T12:04:59.911Z"
+   "at": "2026-10-23T12:46:20.740Z"
   },
   {
    "id": "02a-send-ticket",
@@ -25,7 +25,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 4058,
+   "ms": 3516,
    "checks": 16,
    "failed": [],
    "skips": [],
@@ -33,7 +33,7 @@
    "shots": [
     "test/.out/qa/cook-order-filled.png"
    ],
-   "at": "2026-10-23T11:49:41.242Z"
+   "at": "2026-10-23T12:46:24.257Z"
   },
   {
    "id": "02b-advance-bump-undo",
@@ -42,21 +42,21 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 20533,
+   "ms": 19717,
    "checks": 21,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "undo toast lifetime",
-     "value": 9.78,
+     "value": 9.775,
      "unit": "s"
     }
    ],
    "shots": [
     "test/.out/qa/cook-after-undo.png"
    ],
-   "at": "2026-10-23T11:50:01.775Z"
+   "at": "2026-10-23T12:46:43.974Z"
   },
   {
    "id": "02c-bump-anyway-void-recall",
@@ -65,7 +65,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 7581,
+   "ms": 7098,
    "checks": 16,
    "failed": [],
    "skips": [],
@@ -73,7 +73,7 @@
    "shots": [
     "test/.out/qa/cook-void-sheet.png"
    ],
-   "at": "2026-10-23T11:50:09.356Z"
+   "at": "2026-10-23T12:46:51.072Z"
   },
   {
    "id": "02d-fire-rush",
@@ -82,13 +82,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 4041,
+   "ms": 3934,
    "checks": 10,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:50:13.398Z"
+   "at": "2026-10-23T12:46:55.007Z"
   },
   {
    "id": "03a-station-views",
@@ -97,7 +97,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 5924,
+   "ms": 5139,
    "checks": 32,
    "failed": [],
    "skips": [],
@@ -105,7 +105,7 @@
    "shots": [
     "test/.out/qa/stations-fry.png"
    ],
-   "at": "2026-10-23T11:50:19.322Z"
+   "at": "2026-10-23T12:47:00.146Z"
   },
   {
    "id": "03b-keyboard",
@@ -114,13 +114,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 14673,
+   "ms": 14049,
    "checks": 30,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:50:33.996Z"
+   "at": "2026-10-23T12:47:14.195Z"
   },
   {
    "id": "04a-hold-cabinet",
@@ -129,7 +129,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 9274,
+   "ms": 9583,
    "checks": 33,
    "failed": [],
    "skips": [],
@@ -138,7 +138,7 @@
     "test/.out/qa/hold-new-batch.png",
     "test/.out/qa/hold-below-135.png"
    ],
-   "at": "2026-10-23T11:50:43.270Z"
+   "at": "2026-10-23T12:47:23.779Z"
   },
   {
    "id": "04b-lockout-86",
@@ -147,7 +147,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 13546,
+   "ms": 13881,
    "checks": 9,
    "failed": [],
    "skips": [],
@@ -157,24 +157,24 @@
     "test/.out/qa/hold-lockout.png",
     "test/.out/qa/order-86-after-lockout.png"
    ],
-   "at": "2026-10-23T11:50:56.816Z"
+   "at": "2026-10-23T12:47:37.660Z"
   },
   {
    "id": "04c-board-86",
-   "title": "86 board: manual 86 hides the item from the order screen, Back on restores, sync strip is labelled Simulated",
+   "title": "86 board: manual 86 hides the item from the order screen, Back on restores, no pretend sync strip",
    "owner": "sheets",
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 9783,
-   "checks": 17,
+   "ms": 9513,
+   "checks": 13,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
     "test/.out/qa/board86-manual.png"
    ],
-   "at": "2026-10-23T11:51:06.600Z"
+   "at": "2026-10-23T12:59:26.944Z"
   },
   {
    "id": "05-demo-flow",
@@ -183,19 +183,19 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 34250,
+   "ms": 26247,
    "checks": 36,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "demo x15: real seconds until 3 tickets sent and 1 finished",
-     "value": 20,
+     "value": 14,
      "unit": "s"
     },
     {
      "key": "demo x15: tickets sent while watching",
-     "value": 13,
+     "value": 12,
      "unit": "tickets"
     },
     {
@@ -214,7 +214,7 @@
     "test/.out/qa/demo-rush-sheet.png",
     "test/.out/qa/demo-restarted.png"
    ],
-   "at": "2026-10-23T11:51:40.850Z"
+   "at": "2026-10-23T12:48:13.126Z"
   },
   {
    "id": "06a-gesture-and-exits",
@@ -223,7 +223,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 28367,
+   "ms": 27403,
    "checks": 25,
    "failed": [],
    "skips": [],
@@ -231,7 +231,7 @@
    "shots": [
     "test/.out/qa/door-open.png"
    ],
-   "at": "2026-10-23T11:52:09.217Z"
+   "at": "2026-10-23T12:48:40.529Z"
   },
   {
    "id": "06b-reduced-motion",
@@ -240,26 +240,26 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 4812,
+   "ms": 4431,
    "checks": 6,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "reduced-motion open time",
-     "value": 31,
+     "value": 26,
      "unit": "ms"
     },
     {
      "key": "normal motion: the ember ring stays in the page for",
-     "value": 945,
+     "value": 917,
      "unit": "ms (the ignition is meant to run about 720 ms)"
     }
    ],
    "shots": [
     "test/.out/qa/door-reduced.png"
    ],
-   "at": "2026-10-23T11:52:14.029Z"
+   "at": "2026-10-23T12:48:44.960Z"
   },
   {
    "id": "06c-pin",
@@ -268,7 +268,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 26729,
+   "ms": 25865,
    "checks": 28,
    "failed": [],
    "skips": [],
@@ -282,7 +282,7 @@
    "shots": [
     "test/.out/qa/pin-keypad.png"
    ],
-   "at": "2026-10-23T11:52:40.758Z"
+   "at": "2026-10-23T12:49:10.825Z"
   },
   {
    "id": "06d-office-button",
@@ -291,13 +291,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 21319,
+   "ms": 19933,
    "checks": 23,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:53:02.078Z"
+   "at": "2026-10-23T12:49:30.758Z"
   },
   {
    "id": "07a-pages-sample",
@@ -306,13 +306,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 18361,
+   "ms": 13037,
    "checks": 101,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:53:20.439Z"
+   "at": "2026-10-23T12:49:43.795Z"
   },
   {
    "id": "07b-pages-live-only",
@@ -321,7 +321,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 11378,
+   "ms": 9210,
    "checks": 52,
    "failed": [],
    "skips": [],
@@ -329,7 +329,7 @@
    "shots": [
     "test/.out/qa/office-live-only-empty.png"
    ],
-   "at": "2026-10-23T11:53:31.818Z"
+   "at": "2026-10-23T12:49:53.006Z"
   },
   {
    "id": "07c-filters",
@@ -338,13 +338,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 16716,
+   "ms": 13439,
    "checks": 15,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:53:48.534Z"
+   "at": "2026-10-23T12:50:06.446Z"
   },
   {
    "id": "07d-gantt-themes-keys",
@@ -353,7 +353,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 32139,
+   "ms": 24568,
    "checks": 20,
    "failed": [],
    "skips": [],
@@ -362,7 +362,7 @@
     "test/.out/qa/office-gantt.png",
     "test/.out/qa/office-paper-tickets.png"
    ],
-   "at": "2026-10-23T11:54:20.673Z"
+   "at": "2026-10-23T12:50:31.014Z"
   },
   {
    "id": "07e-data-page",
@@ -371,7 +371,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 26489,
+   "ms": 22510,
    "checks": 50,
    "failed": [],
    "skips": [],
@@ -385,7 +385,7 @@
    "shots": [
     "test/.out/qa/data-import-refused.png"
    ],
-   "at": "2026-10-23T11:54:47.162Z"
+   "at": "2026-10-23T12:50:53.524Z"
   },
   {
    "id": "08a-reload-keeps",
@@ -394,13 +394,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 8978,
+   "ms": 6633,
    "checks": 11,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:54:56.140Z"
+   "at": "2026-10-23T12:51:00.157Z"
   },
   {
    "id": "08b-two-pages-sync",
@@ -409,13 +409,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 9982,
+   "ms": 9774,
    "checks": 15,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T12:04:51.887Z"
+   "at": "2026-10-23T12:51:09.931Z"
   },
   {
    "id": "08c-corrupt-storage",
@@ -424,15 +424,26 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 14100,
-   "checks": 45,
+   "ms": 16061,
+   "checks": 55,
    "failed": [],
    "skips": [],
-   "notes": [],
+   "notes": [
+    {
+     "key": "browser dropped all storage on reload, case repeated: wrong shape",
+     "value": 1,
+     "unit": "x"
+    },
+    {
+     "key": "browser dropped all storage on reload, case repeated: a bare number",
+     "value": 2,
+     "unit": "x"
+    }
+   ],
    "shots": [
     "test/.out/qa/corrupt-storage-board.png"
    ],
-   "at": "2026-10-23T11:55:29.805Z"
+   "at": "2026-10-23T12:51:25.992Z"
   },
   {
    "id": "08d-storage-blocked",
@@ -441,13 +452,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 1777,
+   "ms": 1064,
    "checks": 7,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:55:31.582Z"
+   "at": "2026-10-23T12:51:27.056Z"
   },
   {
    "id": "09a-floor-viewports",
@@ -456,7 +467,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 34960,
+   "ms": 19697,
    "checks": 45,
    "failed": [],
    "skips": [],
@@ -501,7 +512,7 @@
     "test/.out/qa/vp-floor-1280-day.png",
     "test/.out/qa/vp-floor-2560-day.png"
    ],
-   "at": "2026-10-23T11:56:06.546Z"
+   "at": "2026-10-23T12:51:46.753Z"
   },
   {
    "id": "09b-sheets-wide",
@@ -510,7 +521,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 68496,
+   "ms": 66407,
    "checks": 21,
    "failed": [],
    "skips": [],
@@ -520,7 +531,7 @@
     "test/.out/qa/vp-sheet-hold-1280.png",
     "test/.out/qa/vp-sheet-board86-1280.png"
    ],
-   "at": "2026-10-23T12:06:13.084Z"
+   "at": "2026-10-23T12:52:53.160Z"
   },
   {
    "id": "09c-sheets-narrow",
@@ -529,7 +540,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 49589,
+   "ms": 44825,
    "checks": 14,
    "failed": [],
    "skips": [],
@@ -548,7 +559,7 @@
     "test/.out/qa/vp-sheet-hold-280.png",
     "test/.out/qa/vp-sheet-board86-280.png"
    ],
-   "at": "2026-10-23T11:58:13.365Z"
+   "at": "2026-10-23T12:53:37.985Z"
   },
   {
    "id": "09d-office-wide",
@@ -557,7 +568,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 45464,
+   "ms": 42960,
    "checks": 40,
    "failed": [],
    "skips": [],
@@ -574,7 +585,7 @@
     "test/.out/qa/vp-office-1280-paper-pace.png",
     "test/.out/qa/vp-office-1024-ember-pace.png"
    ],
-   "at": "2026-10-23T11:58:58.830Z"
+   "at": "2026-10-23T12:54:20.945Z"
   },
   {
    "id": "09e-office-narrow",
@@ -583,7 +594,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 45968,
+   "ms": 42451,
    "checks": 40,
    "failed": [],
    "skips": [],
@@ -616,7 +627,7 @@
     "test/.out/qa/vp-office-280-ember-pace.png",
     "test/.out/qa/vp-office-280-ember-money.png"
    ],
-   "at": "2026-10-23T11:59:44.798Z"
+   "at": "2026-10-23T12:55:03.396Z"
   },
   {
    "id": "10a-no-network",
@@ -625,14 +636,14 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 31399,
+   "ms": 23543,
    "checks": 11,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "built file size",
-     "value": 2264,
+     "value": 2304,
      "unit": "KB"
     },
     {
@@ -644,7 +655,7 @@
    "shots": [
     "test/.out/qa/offline-board.png"
    ],
-   "at": "2026-10-23T12:00:16.197Z"
+   "at": "2026-10-23T12:55:26.939Z"
   },
   {
    "id": "10b-artifact-host",
@@ -653,7 +664,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 6996,
+   "ms": 4176,
    "checks": 1,
    "failed": [],
    "skips": [],
@@ -665,54 +676,48 @@
     }
    ],
    "shots": [],
-   "at": "2026-10-23T12:00:23.194Z"
+   "at": "2026-10-23T12:55:31.115Z"
   },
   {
    "id": "11a-startup-and-sample",
    "title": "Performance: time to first paint, boot, SB.sim.sample() cold and memoised",
    "owner": "lead",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 6243,
+   "ms": 5282,
    "checks": 8,
-   "failed": [
-    {
-     "name": "SB.sim.sample() cold finishes in under 2000 ms",
-     "detail": "{\"coldMs\":2043.3999999994412,\"generatedMs\":2042,\"tickets\":2475,\"events\":33227,\"days\":14,\"memoMs\":0,\"json\":3336543}",
-     "owner": "sim"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "machine load average (1 min, 2 cores shared) before the probes",
-     "value": 4.1,
+     "value": 1.2,
      "unit": ""
     },
     {
      "key": "first paint (median of 3 cold loads)",
-     "value": 212,
+     "value": 204,
      "unit": "ms"
     },
     {
      "key": "first contentful paint (median of 3)",
-     "value": 356,
+     "value": 412,
      "unit": "ms"
     },
     {
      "key": "DOMContentLoaded (parse + run all scripts, median of 3)",
-     "value": 326.9,
+     "value": 360.7,
      "unit": "ms"
     },
     {
      "key": "SB.booted true (median of 3)",
-     "value": 332.9,
+     "value": 392.7,
      "unit": "ms"
     },
     {
      "key": "board has slips or the empty state painted (median of 3)",
-     "value": 333,
+     "value": 392.8,
      "unit": "ms"
     },
     {
@@ -722,12 +727,12 @@
     },
     {
      "key": "SB.sim.sample() cold (14 days)",
-     "value": 2043.4,
+     "value": 1740.4,
      "unit": "ms"
     },
     {
      "key": "SB.sim.sample() generatedMs reported by the simulator",
-     "value": 2042,
+     "value": 1740,
      "unit": "ms"
     },
     {
@@ -741,11 +746,8 @@
      "unit": ""
     }
    ],
-   "shots": [
-    "test/.out/qa/fail-11a-startup-and-sample.png",
-    "test/.out/qa/fail-11a-startup-and-sample-1.png"
-   ],
-   "at": "2026-10-23T12:06:26.782Z"
+   "shots": [],
+   "at": "2026-10-23T12:55:36.398Z"
   },
   {
    "id": "11b-office-render",
@@ -754,69 +756,69 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 26456,
+   "ms": 25583,
    "checks": 6,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "deep link #/office/pace to first chart in the DOM (includes the 0.7 s ignition)",
-     "value": 15005,
+     "value": 15003,
      "unit": "ms"
     },
     {
      "key": "office page \"data\" navigate to painted",
-     "value": 83.1,
+     "value": 75.7,
      "unit": "ms"
     },
     {
      "key": "office page \"stock\" navigate to painted",
-     "value": 22,
+     "value": 10.5,
      "unit": "ms"
     },
     {
      "key": "office page \"safety\" navigate to painted",
-     "value": 16.6,
+     "value": 9.5,
      "unit": "ms"
     },
     {
      "key": "office page \"money\" navigate to painted",
-     "value": 22,
+     "value": 27.5,
      "unit": "ms"
     },
     {
      "key": "office page \"stations\" navigate to painted",
-     "value": 16.9,
+     "value": 12.1,
      "unit": "ms"
     },
     {
      "key": "office page \"tickets\" navigate to painted",
-     "value": 14,
+     "value": 13.3,
      "unit": "ms"
     },
     {
      "key": "office page \"pace\" navigate to painted",
-     "value": 16.1,
+     "value": 12.5,
      "unit": "ms"
     },
     {
      "key": "office page \"pace\" navigate to painted",
-     "value": 13.2,
+     "value": 4.9,
      "unit": "ms"
     },
     {
      "key": "long tasks (over 50 ms) while paging through the office",
-     "value": "70",
+     "value": "65",
      "unit": "ms"
     },
     {
      "key": "Pace: change the date range to 7 days, until painted",
-     "value": 5.9,
+     "value": 7.7,
      "unit": "ms"
     }
    ],
    "shots": [],
-   "at": "2026-10-23T12:00:58.071Z"
+   "at": "2026-10-23T12:56:01.981Z"
   },
   {
    "id": "11c-sixty-tickets",
@@ -825,7 +827,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 8790,
+   "ms": 8610,
    "checks": 10,
    "failed": [],
    "skips": [],
@@ -837,22 +839,22 @@
     },
     {
      "key": "board full render with that many slips (lastRenderMs)",
-     "value": 67.7,
+     "value": 75.2,
      "unit": "ms"
     },
     {
      "key": "1 Hz tick with 60 slips: median cost",
-     "value": 13.5,
+     "value": 12,
      "unit": "ms"
     },
     {
      "key": "1 Hz tick: worst cost seen (maxTickMs)",
-     "value": 116.6,
+     "value": 60.2,
      "unit": "ms"
     },
     {
      "key": "frames in 6 s / frames slower than 50 ms / worst frame",
-     "value": "356 / 0 / 37 ms",
+     "value": "360 / 0 / 34 ms",
      "unit": ""
     },
     {
@@ -862,14 +864,14 @@
     },
     {
      "key": "one \"All done here\" on a board of 60: dispatch to painted",
-     "value": 32,
+     "value": 27.1,
      "unit": "ms"
     }
    ],
    "shots": [
     "test/.out/qa/perf-60-tickets.png"
    ],
-   "at": "2026-10-23T12:01:06.862Z"
+   "at": "2026-10-23T12:56:10.592Z"
   },
   {
    "id": "12a-structure",
@@ -878,7 +880,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 25905,
+   "ms": 24408,
    "checks": 41,
    "failed": [],
    "skips": [],
@@ -895,7 +897,7 @@
     }
    ],
    "shots": [],
-   "at": "2026-10-23T12:01:32.769Z"
+   "at": "2026-10-23T12:56:35.000Z"
   },
   {
    "id": "12b-keyboard",
@@ -904,7 +906,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 8381,
+   "ms": 7107,
    "checks": 12,
    "failed": [],
    "skips": [],
@@ -916,7 +918,7 @@
     }
    ],
    "shots": [],
-   "at": "2026-10-23T12:01:41.151Z"
+   "at": "2026-10-23T12:56:42.107Z"
   },
   {
    "id": "12c-live-regions",
@@ -925,29 +927,29 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 32599,
+   "ms": 32433,
    "checks": 7,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "screen reader announcements during 30 s of the demo at x15 (distinct)",
-     "value": 4,
+     "value": 3,
      "unit": "announcements"
     },
     {
      "key": "announcements per real minute at x15",
-     "value": 8,
+     "value": 6,
      "unit": "/min"
     },
     {
      "key": "sample of what was announced",
-     "value": "\"Ticket #104 added for Table 3.\" | \"Check Burnt ends on ticket #101. Time is up. Check Pork 1/2 on ticket \" | \"Ticket #109 added for Ola.\" | \"Ticket #111 added for Uber Eats 7005.\"",
+     "value": "\"Ticket #103 added for Table 2.\" | \"Ticket #104 added for Table 3.\" | \"Ticket #107 added for Table 8. Check Pork 1/2 on ticket #104. Time is \"",
      "unit": ""
     }
    ],
    "shots": [],
-   "at": "2026-10-23T12:02:13.751Z"
+   "at": "2026-10-23T12:57:14.540Z"
   },
   {
    "id": "12d-contrast-floor",
@@ -956,7 +958,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 23779,
+   "ms": 23650,
    "checks": 10,
    "failed": [],
    "skips": [],
@@ -973,7 +975,7 @@
     }
    ],
    "shots": [],
-   "at": "2026-10-23T12:02:37.530Z"
+   "at": "2026-10-23T12:57:38.190Z"
   },
   {
    "id": "12e-contrast-office",
@@ -999,7 +1001,7 @@
     }
    ],
    "shots": [],
-   "at": "2026-10-23T12:02:56.527Z"
+   "at": "2026-10-23T12:57:57.185Z"
   },
   {
    "id": "13a-tour-full-loop",
@@ -1008,7 +1010,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 13008,
+   "ms": 12888,
    "checks": 48,
    "failed": [],
    "skips": [],
@@ -1021,7 +1023,7 @@
     "test/.out/qa/tour-8-1280.png",
     "test/.out/qa/tour-9-1280.png"
    ],
-   "at": "2026-10-23T12:03:09.535Z"
+   "at": "2026-10-23T12:58:10.074Z"
   },
   {
    "id": "13b-tour-skip-escape",
@@ -1030,13 +1032,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 4089,
+   "ms": 4070,
    "checks": 13,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T12:03:13.624Z"
+   "at": "2026-10-23T12:58:14.144Z"
   },
   {
    "id": "13c-tour-out-of-order",
@@ -1045,13 +1047,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 4335,
+   "ms": 3967,
    "checks": 12,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T12:03:17.960Z"
+   "at": "2026-10-23T12:58:18.111Z"
   },
   {
    "id": "13d-tour-pauses",
@@ -1060,13 +1062,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 8908,
+   "ms": 7909,
    "checks": 11,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T12:03:26.869Z"
+   "at": "2026-10-23T12:58:26.020Z"
   },
   {
    "id": "13e-tour-layouts",
@@ -1075,7 +1077,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 23806,
+   "ms": 22147,
    "checks": 57,
    "failed": [],
    "skips": [],
@@ -1086,7 +1088,7 @@
     "test/.out/qa/tour-8-large-text-1280.png",
     "test/.out/qa/tour-9-large-text-1280.png"
    ],
-   "at": "2026-10-23T12:03:50.677Z"
+   "at": "2026-10-23T12:58:48.168Z"
   },
   {
    "id": "13f-tour-busy-board",
@@ -1095,7 +1097,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 12717,
+   "ms": 11368,
    "checks": 34,
    "failed": [],
    "skips": [],
@@ -1104,7 +1106,7 @@
     "test/.out/qa/tour-8-busy-board-1280.png",
     "test/.out/qa/tour-9-busy-board-1280.png"
    ],
-   "at": "2026-10-23T12:04:03.397Z"
+   "at": "2026-10-23T12:58:59.536Z"
   }
  ]
 }

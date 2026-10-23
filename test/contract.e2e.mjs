@@ -170,7 +170,9 @@ describe('behaviour across files', () => {
         return t;
       };
       assert.ok((await sheetText('hold')).includes(line), 'the hold cabinet must show SB.config.safetyLine');
-      assert.match(await sheetText('board86'), /simulated|practice|demo/i, 'the 86 board must say the channel sync is practice only');
+      // The pretend channel sync strip was removed from the 86 board in round 12; if a sync claim ever comes back it must be labelled practice/demo.
+      const b86 = await sheetText('board86');
+      if (/channel sync|live POS/i.test(b86)) assert.match(b86, /simulated|practice|demo/i, 'a channel sync claim on the 86 board must say it is practice only');
       await page.evaluate(() => { location.hash = '#/office/pace'; });
       await page.waitForFunction(() => SB.office.isMounted(), null, { timeout: 8000 });
       await page.waitForTimeout(900);
@@ -180,7 +182,8 @@ describe('behaviour across files', () => {
       if (sampleOn) assert.match(banner, /sample|practice|demo/i, 'the data banner must say sample data is in the range: "' + banner + '"');
       assert.ok((await pageText('safety')).includes(line), 'the Safety page must show SB.config.safetyLine');
       assert.match(await pageText('money'), /starter estimate/i, 'the Sales and money page must label starter numbers as starter estimates');
-      assert.match(await pageText('stock'), /simulated|practice|demo/i, 'the Stock and 86 page must say channel sync is practice only');
+      const stockText = await pageText('stock');
+      if (/channel sync|live POS|syncs? to/i.test(stockText)) assert.match(stockText, /simulated|practice|demo/i, 'a channel sync claim on the Stock and 86 page must say it is practice only');
       assert.ok((await pageText('data')).includes(line), 'the Data page must show SB.config.safetyLine');
     });
   });

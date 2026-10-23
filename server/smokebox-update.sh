@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Nightly updater for the Smokebox server. Installed by go.sh as /usr/local/bin/smokebox-update and run by smokebox-update.timer.
+# It downloads the latest deploy build, checks it, swaps it in, restarts the service and, if the new build does not answer, puts the old one back.
+# Saved data (/var/lib/smokebox) is never touched. Every path and command can be replaced through SMOKEBOX_* variables so the steps can be tested.
+set -euo pipefail
+
+PREFIX="${SMOKEBOX_PREFIX:-/opt/smokebox}"
+URL="${SMOKEBOX_UPDATE_URL:-https://github.com/FredBearFin/SmokeBoxKDS/archive/refs/heads/deploy.tar.gz}"
+SYSTEMCTL="${SMOKEBOX_SYSTEMCTL:-systemctl}"
+HEALTH_URL="${SMOKEBOX_HEALTH_URL:-http://127.0.0.1:8787/}"
+SELF_DEST="${SMOKEBOX_SELF_DEST:-/usr/local/bin/smokebox-update}"
+LOCK="${SMOKEBOX_LOCK:-/run/lock/smokebox-update.lock}"
+MIN_BYTES="${SMOKEBOX_MIN_BYTES:-100000}"     # the built page alone is over a megabyte; anything tiny is an error page
+HEALTH_TRIES="${SMOKEBOX_HEALTH_TRIES:-20}"
+say() { echo "smokebox-update: $*"; }
+fail() { say "$*"; exit 1; }
+
+# One update at a time (the timer and a hand-started run could overlap).
+mkdir -p "$(dirname "$LOCK")"
+exec 9>"$LOCK"
+flock -n 9 || { say "another update is running; nothing to do"; exit 0; }
+
+WORK="$(mktemp -d "${TMPDIR:-/var/tmp}/smokebox-update.XXXXXX")"
+NEW="$PREFIX.new"; OLD="$PREFIX.old"
+trap 'rm -rf "$WORK" "$NEW"' EXIT
+
+# 1. Download, and make sure it is a real, reasonably large archive.
+curl -fsSL --max-time 180 --retry 2 "$URL" -o "$WORK/update.tar.gz" || fail "download failed; the running version is kept"
+[ -s "$WORK/update.tar.gz" ] || fail "the download is empty; the running version is kept"
+SIZE="$(wc -c < "$WORK/update.tar.gz")"
+[ "$SIZE" -ge "$MIN_BYTES" ] || fail "the download is only $SIZE bytes (expected at least $MIN_BYTES); the running version is kept"
+gzip -t "$WORK/update.tar.gz" || fail "the download is not a valid gzip file; the running version is kept"
+
+# 2. Refuse archives that could write outside the folder: absolute paths, '..' parts, links of any kind.
+if tar -tzf "$WORK/update.tar.gz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then fail "the archive has unsafe paths; the running version is kept"; fi
+if tar -tvzf "$WORK/update.tar.gz" | grep -Eq '^[lh]'; then fail "the archive contains links; the running version is kept"; fi
+
+# 3. Unpack beside the live folder and check the pieces the service needs.
+rm -rf "$NEW"; mkdir -p "$NEW"
+tar -xzf "$WORK/update.tar.gz" -C "$NEW" --strip-components=1 --no-same-owner --no-same-permissions
+for f in server/server.mjs dist/smokebox.html src/js/20-engine.js; do
+  [ -s "$NEW/$f" ] || fail "the new build has no $f; the running version is kept"
+done
+HTML_BYTES="$(wc -c < "$NEW/dist/smokebox.html")"
+[ "$HTML_BYTES" -ge "$MIN_BYTES" ] || fail "the new page is only $HTML_BYTES bytes; the running version is kept"
+node --check "$NEW/server/server.mjs" || fail "the new server file does not parse; the running version is kept"
+if [ "$(id -u)" -eq 0 ]; then chown -R root:root "$NEW"; fi
+
+# 4. Swap in, restart, and wait for the new build to answer.
+rm -rf "$OLD"
+mv "$PREFIX" "$OLD"
+mv "$NEW" "$PREFIX"
+rollback() {
+  say "$1; putting the previous version back"
+  rm -rf "$PREFIX"
+  mv "$OLD" "$PREFIX"
+  "$SYSTEMCTL" restart smokebox || true
+  exit 1
+}
+"$SYSTEMCTL" restart smokebox || rollback "the service would not restart"
+healthy=0
+for _ in $(seq 1 "$HEALTH_TRIES"); do
+  if curl -fsS --max-time 3 "$HEALTH_URL" -o /dev/null 2>/dev/null; then healthy=1; break; fi
+  sleep 1
+done
+[ "$healthy" -eq 1 ] || rollback "the new build did not answer at $HEALTH_URL"
+
+# 5. Refresh this script from the new build (atomic), so improvements to the updater arrive too.
+if [ -f "$PREFIX/server/smokebox-update.sh" ]; then
+  cp "$PREFIX/server/smokebox-update.sh" "$SELF_DEST.new" && chmod 755 "$SELF_DEST.new" && mv "$SELF_DEST.new" "$SELF_DEST" || true
+fi
+say "updated; the previous version is kept in $OLD"
