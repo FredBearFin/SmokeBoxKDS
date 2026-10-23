@@ -26,3 +26,5 @@ None of this has been tried on a real tablet yet; everything above was checked o
 
 
 17. Open Settings, then Get this tablet ready. Tap Test the sound and answer. Read the amber lines: they say what to set on the tablet. Then open Pilot visit checklist and print it or read it on screen.
+
+18. Open Settings, then Show this kitchen on another screen. Read the plain explanation: a second screen only shows the board, and it needs a hub that is not set up in this version. On the other screen, type an address and tap Connect. Try a wrong address and a wrong code to see the plain errors. Not tried against a real hub yet.

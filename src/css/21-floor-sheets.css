@@ -647,3 +647,8 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .rd-fix .input { flex: 1 1 180px; }
 .rd-fix[hidden] { display: none; }
 [data-tone="bad"].fs-sub { color: var(--crimson); }
+
+/* Show this kitchen on another screen (fw-): two cards and a status line. */
+.fw { gap: var(--sp-3); }
+.fw-addr { font-family: var(--font-mono, monospace); word-break: break-all; }
+.fw .input { width: 100%; min-height: 48px; }
