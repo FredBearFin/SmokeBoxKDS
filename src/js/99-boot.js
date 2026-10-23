@@ -127,7 +127,8 @@
     };
     // Shows a plain message when the hub refuses this screen, with a way back to the device's own kitchen.
     const fail = (res) => {
-      const words = { noFollower: 'This version of Smokebox cannot show another screen. Update it and try again.', badCode: 'The access code was not accepted. Check it and try again.', notFound: 'This address is not a Smokebox kitchen.', wrongVersion: 'The kitchen runs another version of Smokebox. Update this page and try again.', tooMany: 'The kitchen has too many screens connected right now. Try again in a minute.' };
+      const words = { noFollower: 'This version of Smokebox cannot show another screen. Update it and try again.', badCode: 'The access code was not accepted. Check it and try again.', notFound: 'This address is not a Smokebox kitchen.', wrongVersion: 'The kitchen runs another version of Smokebox. Update this page and try again.', tooMany: 'The kitchen has too many screens connected right now. Try again in a minute.',
+        unpaired: 'This tablet is not paired with the kitchen yet. Ask the person who runs it for a pairing code.', revoked: 'This tablet was removed from the kitchen. Ask for a new pairing code.', badPairCode: 'That pairing code was not accepted. Check it, or ask for a new one.', tooManyTries: 'Too many wrong pairing codes. Wait a few minutes and try again.', badName: 'That screen name is not allowed. Use letters, numbers and spaces, up to 20 characters.', notOwner: 'Only an owner screen can do that. Ask the owner.' };
       const wrap = doc.createElement('div');
       wrap.className = 'follow-fail';
       wrap.setAttribute('role', 'alert');

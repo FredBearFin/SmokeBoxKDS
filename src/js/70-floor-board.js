@@ -2023,6 +2023,11 @@
     const st = SB.store && typeof SB.store.hubStatus === 'function' ? SB.store.hubStatus() : null;
     if (!st || st.mode === 'off') return { tone: 'wait', text: 'Connecting...', sub: '', unsent: 0 };
     const n = Math.max(0, Number(st.unsent) || 0);
+    // A tablet the kitchen refused is not merely offline: it says so plainly, with how many taps are waiting (they are kept for when it is paired again).
+    if (st.error === 'revoked' || st.error === 'unpaired' || st.error === 'wrongVersion') {
+      const words = st.error === 'revoked' ? 'Removed from the kitchen. Ask for a new pairing code.' : st.error === 'unpaired' ? 'Not paired with the kitchen. Ask for a pairing code.' : 'This tablet and the kitchen run different versions. Reload the page.';
+      return { tone: 'bad', text: words, sub: n ? n + (n === 1 ? ' tap is waiting.' : ' taps are waiting.') : '', unsent: n };
+    }
     // After a reload with the hub unreachable the board shows the last copy it had; it says so until the first live update.
     if (st.lastKnown && st.state !== 'connected' && st.state !== 'sending') return { tone: 'wait', text: 'Last known' + (st.lastKnownAt ? ', from ' + U.fmtTime(st.lastKnownAt) : '') + '. Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
     if (st.state === 'offline' || st.state === 'error') return { tone: 'wait', text: 'Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
@@ -2076,6 +2081,9 @@
     if (typeof sub !== 'function') return;
     const off = sub.call(SB.store, onHubRefusal);
     if (typeof off === 'function') m.offs.push(off);
+    // The chip follows every change of the connection at once, not only at the next one-second tick.
+    const sh = SB.store && SB.store.subscribeHub;
+    if (typeof sh === 'function') { const off2 = sh.call(SB.store, () => { if (m) paintHub(); }); if (typeof off2 === 'function') m.offs.push(off2); }
   }
 
   /* ---------- follower screen: a read-only second screen that mirrors the hub ---------- */

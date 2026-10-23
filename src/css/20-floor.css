@@ -808,3 +808,5 @@ html[data-follow="on"] .hc-actions, html[data-follow="on"] .hc-editor-slot, html
 .slip-pending { padding: 2px var(--sp-3); font: var(--w-bold) var(--fs-1) / 1.2 var(--font-body); color: var(--amber-ink); background: var(--tint-warn, var(--paper)); border-bottom: 1px dashed var(--amber); }
 .fl-slip[data-pending="on"] { box-shadow: inset 4px 0 0 var(--amber); }
 html[data-hub="on"] .fl-demo-chip, html[data-hub="on"] .fl-start-demo, html[data-hub="on"] .fl-tool[data-tool="demo"] { display: none !important; }
+.fl-hchip[data-tone="bad"] { border-color: var(--crimson); background: var(--tint-bad); }
+.fl-hchip[data-tone="bad"] .fl-hdot { background: var(--crimson); }
