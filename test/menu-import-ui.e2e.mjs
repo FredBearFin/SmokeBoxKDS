@@ -26,6 +26,17 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   check('an imported prep time is a guess, not confirmed', await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).every((m) => m.prepConfirmed === false)));
   await page.click('[data-act=import-undo]'); await page.waitForTimeout(400);
   check('Remove these N takes the whole batch off the menu', (await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).length)) === 0);
+  // A file with categories that are not set up: one note, one button, and a bulk station.
+  await page.fill('textarea', 'Item,Price,Category\nEspresso,$3.00,Coffee\nLatte,$4.50,Coffee\nCroissant,3.25,Pastry');
+  await page.click('[data-act=import-check]'); await page.waitForTimeout(400);
+  check('unknown categories are named once, not on every row', await page.locator('[data-act=import-add-cats]').count() === 1 && !(await page.locator('.dp-prob').allTextContents()).some((x) => /not one of yours/.test(x)));
+  await page.click('[data-act=import-add-cats]'); await page.waitForTimeout(500);
+  check('adding the categories maps each dish to its own', await page.locator('[data-act=import-add-cats]').count() === 0);
+  await page.selectOption('[aria-label="Put every dish at this station"]', 'sides'); await page.waitForTimeout(200);
+  check('one choice sets the station on every row', (await page.locator('.dp-prow select').evaluateAll((s) => s.every((x) => x.value === 'sides'))));
+  await page.click('[data-act=import-go]'); await page.waitForTimeout(500);
+  check('the dishes land in the new categories', await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).map((m) => (SB.config.categoryById[m.cat] || {}).name).sort().join() === 'Coffee,Coffee,Pastry'));
+  await page.click('[data-act=import-undo]'); await page.waitForTimeout(400);
   // A messy pasted list with a row to fix.
   await page.fill('textarea', 'Pulled pork plate 12.50\nBad one\nLemonade 3');
   await page.click('[data-act=import-check]'); await page.waitForTimeout(400);

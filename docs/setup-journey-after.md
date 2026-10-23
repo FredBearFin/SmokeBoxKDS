@@ -139,3 +139,49 @@ Tests: setup-wizard.e2e.mjs (reorder, undo, Stop counting undo, refusal line add
 
 Not checked in round 6: a real tablet or phone (on-screen keyboard, thumb reach); drag reorder (not built); the board's own touch sizes (A1); the guide pages themselves; moving a dish between categories (the category follows the station tile unless set under More options; there is no move across groups); restore from a backup made on a different device with renamed stations (names are per browser).
 Questions for Freddy: (a) Is "up and down one place" enough, or do you want to drag dishes? (b) Should the order screen sort dishes in a category by this order (as it does now) or alphabetically? (c) The sound-warning strip on the board is shorter than a finger; do you want it taller or removed from first run?
+
+## Round 7: first-time owner simulation (branch night/a2-r7)
+
+Three made-up owners drove the real UI from a blank install to a first paid ticket (`ux-scripts/first-time-owners.mjs`; logs and shots in `docs/ux-shots/night/a2/sim/`). They are scripts playing people, so "hesitation" below means a moment where the screen said something unclear, said nothing, or did something the owner would not expect, found by reading what each slip produced. No real person did any of this.
+
+### Owner 1: food truck, 5 dishes (really 7 with slips), never sets up tax
+Slips tried: blank name, "12,50", "$7", "6.", "abc", "1500", a repeated name, a 70-letter name, closing the sheet half done, browser Back with the sheet open, reload in the middle.
+- Blank name, no station, "abc" and "1500" each gave one plain line that says what to do. Good.
+- "12,50", "$7" and "6." were all read correctly and saved as $12.50, $7.00 and $6.00. **Fixed:** the price box now says "Reads as $12.50" as you type, so the reading is seen before saving.
+- A 70-letter name is cut to 60 letters by the box without a word. Left: harmless, but silent (proposal: a "60 letters" hint under the name box).
+- Browser Back with a sheet open closes the sheet and the app stays; closing the sheet half done and reloading both bring back the half-typed name and price.
+- **Hesitation: tax.** The truck never sets tax. The bill said "Paid $21.50" with no hint that no tax was added. The first-steps card mentions tax only until the first ticket. **Fixed:** the main Menu now lists "Tax, hours and PIN" (Menu, then Tax, hours and PIN), and the tax text says dish prices are before tax. **For A1:** in the order screen's payment note (`71-floor-order.js`, the `paintNote` / `ord-pay-note` text, about line 840), when the tax rate is 0 add "No sales tax is added. Set it under Menu, Tax, hours and PIN." so a taxed truck notices on the first bill.
+- **For A1:** the order screen's category tabs list all five barbecue categories (Meats, Sandwiches, Hot sides, Fried, Cold and drinks) even when empty; tabs for categories with no dish could be hidden.
+
+### Owner 2: cafe, cooks nothing ahead, 25 dishes from a spreadsheet CSV
+File had a blank name, a repeated "Latte", a blank price, prices "$4.50", "4.75", "3", and one unquoted "4,50".
+- The preview named the format in plain words and counted "22 of 25 dishes are ready; 3 need a fix". Blank name, duplicate and no-price rows were flagged with a fix line. Good.
+- **Hesitation 1:** every one of the 22 rows carried the same line "category 'Coffee' is not one of yours", and all 22 dishes would have landed in "Meats" at station "Pit" (barbecue words for a cafe). **Fixed:** one note names the categories the file uses, with an "Add these categories" button that adds them and re-reads the file so each dish lands in its own; the per-row repeat is gone; and one list "Put all these dishes at:" sets the station for every row at once.
+- **Hesitation 2 (found by the simulation):** the unquoted "4,50" split into price 4 and category "50", so Cappuccino would have been imported at $4.00 in a category called "50" with no warning. **Fixed here:** a category that is only digits now shows a warning ("looks like the end of a price split at a comma"), the row is left unticked, and "50" is not offered as a category. **For A5:** the importer itself should flag a row with more fields than the header and a numeric last field (`13-menu-import.js`).
+- Left: the order screen still shows the five barbecue categories next to the cafe's new ones. A "Change categories" fold like "Change stations" would fix it; proposed, not built.
+
+### Owner 3: rural diner, cooks pots ahead
+Seven dishes, then Pot roast as a cooked-ahead item. Slips: hours "4 hrs", hours "13", batch "6 kg", saving with no dish selected, reload in the middle.
+- "4 hrs", "13" and "6 kg" each got a one-line fix message. Good.
+- **Hesitation:** saving with no dish selected said "Added Pot roast" and nothing was linked, so the dish never counted down (after a reload the dish had 0 recipe lines). **Fixed:** the first save with no dish selected now stops with "No dish is selected, so nothing will use this item and it will not count down. Select a dish above, or tap Save again to keep it without one."
+- The cabinet form opened with Pot roast chosen and a first-reading hint, but its starting weight was half the "usual batch size" typed in the sheet (3 kg for 6). **For A1:** `buildBatchForm` (`72-floor-sheets.js`, `defaultKg`) uses half the par; the cooked-ahead sheet stores the typed batch size as par. Either use the par as is, or tell me where to store a separate usual batch size.
+- Left: the half-typed Cooked-ahead sheet is not kept if the tab closes (the Dishes form is).
+
+### Other changes this round
+- Prices are read generously (`12.50`, `12,50`, `$14`, `14.`, `USD 12`, `1 200`) through the importer's reader, and shown back before saving.
+- Dish rows have a category picker ("Move to") next to the up and down buttons.
+- A4's wording rows landed (demo text; "clear" instead of "untick").
+
+### Currency symbol (proposal only)
+Prices show "$" everywhere (`U.fmtMoney`). A currency setting would need one setting (symbol and where it goes) read by that function, plus the CSV import/export; 00-util.js is not mine, so I did not build it. Proposal: `settings.ui.currency = { symbol, after }` default `$`, shown under "Tax, hours and PIN" as "Your currency symbol".
+
+### Steps list for the Guide (A4)
+1. Open Smokebox. The board says "Welcome. Let's build your menu." Tap "Add your first dish".
+2. Type the dish name, press Enter or Next, type the price (12.50, 12,50 and $12.50 all work; Smokebox shows how it read it), tap where it is made, tap "Save and add another". The last station stays chosen.
+3. More ways: "Have a menu file? Import it" (inside "More ways to add dishes"): choose a file or paste, check the preview, add the categories from the file if offered, pick one station for all, import. "Remove these N" undoes an import.
+4. Change names: "Change stations" renames or marks a station "Not used" (its tab leaves the board when it has no tickets). Rename or reorder dishes in "Your dishes": up and down, Category picker, Remove (with Undo).
+5. Tax: Menu, then "Tax, hours and PIN". Dish prices are before tax.
+6. Cook food ahead? Say "Yes, I cook ahead" under the dishes (or in Tax, hours and PIN), add the item, select the dishes that use it, then "Log a first batch".
+7. First ticket: New ticket, tap dishes, choose Cash or Card, Send to kitchen.
+8. Coming back: the board is the first screen. Menu, then "Dishes and prices" is two taps.
+9. Demo: "Try the demo" opens a separate demo kitchen; "Back to my kitchen" returns and erases the demo.

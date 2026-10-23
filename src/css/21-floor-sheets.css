@@ -615,3 +615,4 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dp, .dp-form, .dp .fs-row { min-width: 0; max-width: 100%; }
 .dp .fs-row { flex-wrap: wrap; }
 .dp input[type="file"]::file-selector-button { min-height: 44px; padding: 0 var(--sp-4); margin-right: var(--sp-3); border-radius: var(--r-btn); font: inherit; cursor: pointer; }
+.dp-cat { flex: 0 1 14ch; min-width: 0; }

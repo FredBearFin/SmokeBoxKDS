@@ -212,10 +212,7 @@
  {
   "tag": "768x1024-day-normal",
   "name": "first-run",
-  "small": [
-   "Tap here to turn on warning so 696x34",
-   "Clear this notice 44x34"
-  ],
+  "small": [],
   "clipped": [],
   "hscroll": []
  },
@@ -285,10 +282,7 @@
  {
   "tag": "768x1024-night-normal",
   "name": "first-run",
-  "small": [
-   "Tap here to turn on warning so 696x34",
-   "Clear this notice 44x34"
-  ],
+  "small": [],
   "clipped": [],
   "hscroll": []
  },
@@ -358,10 +352,7 @@
  {
   "tag": "768x1024-day-large",
   "name": "first-run",
-  "small": [
-   "Tap here to turn on warning so 696x34",
-   "Clear this notice 44x34"
-  ],
+  "small": [],
   "clipped": [],
   "hscroll": []
  },
@@ -431,10 +422,7 @@
  {
   "tag": "1024x768-day-normal",
   "name": "first-run",
-  "small": [
-   "Tap here to turn on warning so 952x34",
-   "Clear this notice 44x34"
-  ],
+  "small": [],
   "clipped": [],
   "hscroll": []
  },
@@ -504,10 +492,7 @@
  {
   "tag": "1024x768-night-normal",
   "name": "first-run",
-  "small": [
-   "Tap here to turn on warning so 952x34",
-   "Clear this notice 44x34"
-  ],
+  "small": [],
   "clipped": [],
   "hscroll": []
  },
@@ -577,10 +562,7 @@
  {
   "tag": "1024x768-day-large",
   "name": "first-run",
-  "small": [
-   "Tap here to turn on warning so 952x34",
-   "Clear this notice 44x34"
-  ],
+  "small": [],
   "clipped": [],
   "hscroll": []
  },
