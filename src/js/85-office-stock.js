@@ -71,6 +71,7 @@
       ev.forEach((t) => {
         const live = cl.filter((c) => c.startT <= t && (c.endT === null || t <= c.endT));
         const foods = new Set(live.map((c) => c.ing || c.items[0]));
+        // Spells come sorted by start (B.clusterSpells), so overlapping spells of one food credit the one that began first.
         if (foods.size === 1) live[0].refused++; else loose++;
       });
       return { cl, recorded, loose, total: ev.length };
