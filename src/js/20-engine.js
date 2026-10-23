@@ -31,7 +31,7 @@
  *   validateBackup(objOrText)             -> { ok, state?, error?, repaired: string[] }
  *   serialize(state) -> string             deserialize(text) -> validateBackup result
  *   allEvents(state)                      -> Event[] (archive chunks + recent window, oldest first; memoised)
- *   prune(state, { maxTickets?, maxEvents? }) -> state (drops oldest completed tickets / oldest events, keeps the ledger whole)
+ *   prune(state, { maxTickets?, maxEvents?, now? }) -> state (drops oldest completed tickets / oldest events, keeps the ledger whole)
  *   findTicket(state, id) -> ticket|undefined      channelThresholds(settings, channelId) -> { warnSec, breachSec }
  *   views.*: activeTickets, ticketsForZone, expoTickets, recent, voided, counts, unavailable, batches (pure, used by SB.store.select)
  *   REPORTS (id -> plain-English message with the fix), REPORT_IDS, describe(report, info, settings) -> message with live numbers
@@ -809,7 +809,10 @@
   function safetyOnly(list) { return list.filter((e) => hasOwn(SAFETY_EVENT, e.type)); }
   // Adds newly dropped safety events to the retention bucket and lets go of entries older than SAFETY_KEEP_DAYS
   // (measured from refT, the newest time known). The bucket is never trimmed by size, only by age.
-  function keepSafety(prev, dropped, refT) {
+  // WATCH OUT: pass now as well when there is one. A future-dated event (a device clock set ahead) must never move the
+  // 400-day cut forward, so the reference time is the newest event or now, whichever is earlier.
+  function keepSafety(prev, dropped, refT, now) {
+    if (isNum(now) && now > 0 && isNum(refT) && now < refT) refT = now;
     const all = (Array.isArray(prev) ? prev : []).concat(dropped);
     if (!isNum(refT)) return all;
     const cut = refT - SAFETY_KEEP_MS;
@@ -927,7 +930,7 @@
       const ev = this.get('events');
       const r = appendEvents(ev, this.get('eventArchive') || [], this.evs, this.own.has(ev));
       s.events = r.events; s.eventArchive = r.archive;
-      if (r.dropped.length) s.safetyKeep = keepSafety(this.get('safetyKeep'), r.dropped, this.evs[this.evs.length - 1].t);
+      if (r.dropped.length) s.safetyKeep = keepSafety(this.get('safetyKeep'), r.dropped, this.evs[this.evs.length - 1].t, this.now);
     }
     if (s.tickets !== this.s0.tickets && !this.pruned) {
       const old = ACTIVE.get(this.s0.tickets);
@@ -3265,7 +3268,8 @@
     }
     if (keep.length !== arr.length) { tx.own.add(keep); tx.ch.tickets = keep; tx.pruned = true; }
   }
-  /** prune(state, { maxTickets?, maxEvents? }) -> state. Used by the store to fit storage quotas. Keeps I2 (ledger) whole. */
+  /** prune(state, { maxTickets?, maxEvents?, now? }) -> state. Used by the store to fit storage quotas. Keeps I2 (ledger) whole.
+   *  now, when given, caps the time the 400-day safety cut is measured from. */
   function prune(state, lim) {
     if (!isState(state)) return state;
     lim = isObj(lim) ? lim : {};
@@ -3275,7 +3279,7 @@
       let flat = allEvents(state);
       if (flat.length > lim.maxEvents) {
         const gone = safetyOnly(flat.slice(0, flat.length - lim.maxEvents));
-        if (gone.length) tx.set('safetyKeep', keepSafety(state.safetyKeep, gone, flat[flat.length - 1].t));
+        if (gone.length) tx.set('safetyKeep', keepSafety(state.safetyKeep, gone, flat[flat.length - 1].t, lim.now));
         flat = flat.slice(flat.length - lim.maxEvents);
         const ar = [];
         while (flat.length >= 2 * EVENT_CHUNK) { ar.push(flat.slice(0, EVENT_CHUNK)); flat = flat.slice(EVENT_CHUNK); }

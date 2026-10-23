@@ -168,3 +168,15 @@ test('Bram 11: closing the month never removes the old events of a ticket that s
   const gone = E.allEvents(s).filter((e) => p.plan.eventIds.has(e.id) && e.ticketId === t.info.ticketId);
   assert.deepEqual(gone.map((e) => e.type), [], 'and so do its events');
 });
+
+test('Esme 2: a future-dated event never moves the 400-day safety cut forward when old events are trimmed', () => {
+  let s = E.newState({ now: T0, empty: true });
+  const go = (type, p, at) => { const r = E.apply(s, type, p, at, {}); assert.equal(r.report, 'ok', r.report); s = r.state; };
+  go('sanitizeDone', { who: 'AB' }, T0);
+  go('logEquipmentTemp', { unit: 'cooler', f: 38 }, T0 + MIN);
+  go('sanitizeDone', { who: 'AB' }, T0 + 500 * 24 * H);           // the device clock was set far ahead for this one
+  const kept = (st) => (st.safetyKeep || []).filter((e) => e.t < T0 + H).length;
+  assert.equal(kept(E.prune(s, { maxEvents: 1, now: T0 + 24 * H })), 2, 'the real time decides what is 400 days old');
+  // control: with no time given, the old reference (the newest event) still applies
+  assert.equal(kept(E.prune(s, { maxEvents: 1 })), 0);
+});

@@ -359,7 +359,7 @@
     // in memory (finding F-E5).
     let nt = Math.min(state.tickets.length, 1500), ne = Math.min(E().allEvents(state).length, 10000);
     for (let tries = 0; tries < 12; tries++) {
-      const s2 = lim ? E().prune(state, lim) : state;
+      const s2 = lim ? E().prune(state, Object.assign({ now: v }, lim)) : state;
       try {
         const env = { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, ops: journal, era };
         if (wantCompact(s2)) { env.fmt = 2; env.p = packer.pack(s2); } else env.state = s2;
