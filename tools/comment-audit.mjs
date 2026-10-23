@@ -11,11 +11,10 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
+import { toolRequire } from './_deps.mjs';
 import { fileURLToPath } from 'node:url';
-const require = createRequire('/opt/npm-tools/node_modules/');
-const acorn = require('acorn');
-const walk = require('acorn-walk');
+const acorn = toolRequire('acorn');
+const walk = toolRequire('acorn-walk');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const args = process.argv.slice(2);

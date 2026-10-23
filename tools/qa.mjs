@@ -28,13 +28,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { createRequire } from 'node:module';
+import { toolRequire } from './_deps.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const require = createRequire('/opt/npm-tools/node_modules/');
-const { chromium } = require('playwright');
+const { chromium } = toolRequire('playwright');
 
 export const OWNERS = {
   sim: { name: 'Sim', agent: 'ad717b3d4d0948743', files: '45-sim.js' },

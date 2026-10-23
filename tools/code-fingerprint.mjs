@@ -9,11 +9,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { createRequire } from 'node:module';
+import { toolRequire } from './_deps.mjs';
 import { fileURLToPath } from 'node:url';
 
-const require = createRequire('/opt/npm-tools/node_modules/');
-const acorn = require('acorn');
+const acorn = toolRequire('acorn');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = path.join(root, 'test/.baseline/fingerprints.json');
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');

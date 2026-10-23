@@ -5,13 +5,12 @@
 // the batch is on now and plays that one sound (the earlier rungs are not replayed).
 // WHAT IT DOES NOT PROVE: real tablet behavior. A hidden page gets throttled timers (about one a second, and about one a minute
 // after some minutes hidden), a locked screen runs no JavaScript at all, and real audio is not played (a stub counts notes).
-import { createRequire } from 'node:module';
+import { toolRequire } from '../tools/_deps.mjs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const require = createRequire('/opt/npm-tools/node_modules/');
-const { chromium } = require('playwright');
+const { chromium } = toolRequire('playwright');
 const DIST = path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), 'dist/smokebox.html');
 const MIN = 60e3, H = 3600e3;
 const T0 = new Date(2026, 9, 19, 11, 0, 0).getTime();

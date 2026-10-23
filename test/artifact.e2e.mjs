@@ -3,11 +3,10 @@
 //   node test/artifact.e2e.mjs
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
+import { toolRequire } from '../tools/_deps.mjs';
 import { spawnSync } from 'node:child_process';
 import { ROOT } from '../tools/pw.mjs';
-const require = createRequire('/opt/npm-tools/node_modules/');
-const { chromium } = require('playwright');
+const { chromium } = toolRequire('playwright');
 
 const b = spawnSync(process.execPath, [path.join(ROOT, 'tools/build-artifact.mjs'), '--out', 'dist/smokebox.artifact.html'], { cwd: ROOT, encoding: 'utf8' });
 process.stdout.write(b.stdout + b.stderr);

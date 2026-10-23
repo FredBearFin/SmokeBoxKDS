@@ -1,0 +1,17 @@
+{
+  "name": "smokebox",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Smokebox: offline single-file kitchen display. This file only lists dev tools; the app itself has no dependencies.",
+  "type": "commonjs",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "node tools/build.mjs --quiet",
+    "test": "node tools/test.mjs",
+    "audit": "node tools/comment-audit.mjs"
+  },
+  "devDependencies": {
+    "acorn": "8.14.1",
+    "acorn-walk": "8.3.4"
+  }
+}

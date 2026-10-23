@@ -18,14 +18,13 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
+import { toolRequire } from './_deps.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { seedStandard, settle, wait, closeSheets, waitOffice, gotoOffice, OFFICE_PAGES } from '../test/e2e/_lib.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const require = createRequire('/opt/npm-tools/node_modules/');
-const { chromium } = require('playwright');
+const { chromium } = toolRequire('playwright');
 const OUT = path.join(ROOT, 'test/.out/qa');
 const BUILD = path.join(ROOT, 'dist/qa.html');
 fs.mkdirSync(OUT, { recursive: true });
