@@ -44,6 +44,7 @@ const strip = (p) => p.evaluate(() => { const e = document.querySelector('.fl-st
   await p.evaluate(() => { const real = Date.now; Date.now = () => real() + 3 * 60e3; Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' }); document.dispatchEvent(new Event('visibilitychange')); });
   await p.waitForTimeout(1500);
   check('it is asked for again when the page comes back', (await p.evaluate(() => __wl.calls)) > before, await p.evaluate(() => __wl.calls));
+  if (await p.locator('.fl-strip-sound:visible').count()) { await p.locator('.fl-strip-sound:visible').first().click(); await p.waitForTimeout(1200); }
   const s1 = await strip(p);
   check('after minutes in the background a calm line says warnings were silent', /background for 3 minutes/.test(s1), s1);
   const b2 = await p.evaluate(() => __wl.calls);
@@ -63,7 +64,10 @@ const strip = (p) => p.evaluate(() => { const e = document.querySelector('.fl-st
   await p.evaluate(() => SB.floor.setWelcome(false));
   await p.waitForTimeout(1500);
   const s = await strip(p);
-  check('a screen that cannot stay awake gets a calm line', /may go to sleep/.test(s), s);
+  check('with the sound bar up, the sleep line waits behind it and the bar says so (one notice at a time)', /Tap here to turn on warning sounds/.test(s) && /\(1 more notice\)/.test(s) && !/may go to sleep/.test(s), s);
+  await p.click('.fl-strip-sound >> nth=0'); await p.waitForTimeout(1200);
+  const s2 = await strip(p);
+  check('once sound is allowed the sleep line shows: a screen that cannot stay awake gets a calm line', /may go to sleep/.test(s2), s2);
   await p.click('.fl-new'); await p.waitForTimeout(500);
   check('the line does not block the work (New ticket opens)', (await p.locator('.ord-tile').count()) > 0 || (await p.locator('[role="dialog"]').count()) > 0);
   await ctx.close();
@@ -108,10 +112,17 @@ const strip = (p) => p.evaluate(() => { const e = document.querySelector('.fl-st
   await p.waitForSelector('[data-act="log-equip"]');
   await p.click('.rd-unit [data-id="freezer"]');
   await p.fill('input[aria-label="Name (optional)"]', 'Walk-in');
+  const dis = await p.evaluate(() => ['log-equip', 'log-thermo', 'log-strip'].map((a) => document.querySelector('[data-act="' + a + '"]').disabled));
+  check('every Log button waits until a number is typed (no starting number can be logged)', dis.every(Boolean), dis);
+  check('the temperature boxes start empty', await p.evaluate(() => ['Temperature of the fridge, freezer or case', 'What the food thermometer says', 'Sanitizer strip reading in parts per million'].every((l) => document.querySelector('input[aria-label="' + l + '"]').value === '')));
+  await p.fill('input[aria-label="Temperature of the fridge, freezer or case"]', '0');
   await p.click('[data-act="log-equip"]'); await p.waitForTimeout(500);
+  check('after a log the box is empty again and Log waits', await p.evaluate(() => document.querySelector('[data-act="log-equip"]').disabled && document.querySelector('input[aria-label="Temperature of the fridge, freezer or case"]').value === ''));
+  await p.fill('input[aria-label="What the food thermometer says"]', '32');
   await p.click('[data-act="log-thermo"]'); await p.waitForTimeout(500);
   await p.fill('input[aria-label="Sanitizer (optional)"]', 'Quat');
   await p.fill('input[aria-label="Where (optional)"]', 'Prep sink');
+  await p.fill('input[aria-label="Sanitizer strip reading in parts per million"]', '200');
   await p.click('[data-act="log-strip"]'); await p.waitForTimeout(500);
   const ev = await p.evaluate(() => SB.engine.safetyLog(SB.store.getState()).map((r) => r.event).filter((e) => /equip_temp|thermometer_checked|sanitize_done/.test(e.type)).map((e) => [e.type, e.unit, e.label, e.f, e.method, e.ppm, e.product, e.where, e.who].join('|')));
   check('a fridge reading is saved with its name, kind and initials', ev.some((x) => /^equip_temp\|freezer\|Walk-in\|/.test(x) && /FW$/.test(x)), ev);
