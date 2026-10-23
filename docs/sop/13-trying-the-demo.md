@@ -9,4 +9,4 @@ See Smokebox with food on it, without touching your own kitchen.
 
 A backup made in the demo cannot be loaded into your own kitchen, and a real backup cannot be loaded into the demo. Smokebox refuses it and changes nothing.
 
-Sample numbers are made up. They are never your sales or your food.
+The demo kitchen is a barbecue restaurant. Yours can be anything. Sample numbers are made up. They are never your sales or your food.

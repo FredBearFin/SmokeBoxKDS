@@ -1,8 +1,12 @@
-<!-- Generated from docs/sop/13-questions-and-answers.md by tools/build-guide.mjs. Edit that file, then run the tool. -->
+<!-- Generated from docs/sop/14-questions-and-answers.md by tools/build-guide.mjs. Edit that file, then run the tool. -->
 
 # Questions and answers
 
 Short answers to the questions owners ask first.
+
+## Is it only for barbecue?
+
+No. A new Smokebox starts empty. You add your own dishes, rename the stations and choose whether you cook ahead. Only the demo is a barbecue kitchen.
 
 ## Does it need the internet?
 
