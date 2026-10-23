@@ -1679,7 +1679,7 @@
       } }, ico('zap', 22), h('span', null, 'Add 12-ticket rush'));
       simBox.append(
         h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Automatic orders'), h('p', { class: 'fs-sub' }, 'Demo tickets arrive on the kitchen clock, so a faster clock means faster orders. They are labeled Demo.'), ordersSeg),
-        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A demo cook who works while automatic orders run. Turn it off to practice by hand.'), crewTog),
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A demo cook who works while automatic orders run. Turn it off to work by hand.'), crewTog),
         h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Rush'), h('p', { class: 'fs-sub' }, 'Twelve tickets at once, like a lunch rush.'), burstBtn));
     } else {
       simBox.append(h('div', { class: 'fs-note', 'data-tone': 'warn', role: 'status' }, ico('alert', 20),
@@ -2151,7 +2151,7 @@
     // The Guide opens only when the guide page is part of this copy of Smokebox.
     const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.

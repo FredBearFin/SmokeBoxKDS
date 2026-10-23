@@ -1785,7 +1785,7 @@
     // The empty board leaves out its own walkthrough button while the card (which has one) is up, so there is only one.
     if (wasShown !== show && m.empty && m.empty.dataset.sig) paintEmpty(store().select.counts());
     if (!show) return;
-    put(m.wText, 'Your menu has ' + n + ' ' + U.plural(n, 'dish', 'dishes') + '. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices.');
+    put(m.wText, 'Your menu has ' + n + ' ' + U.plural(n, 'dish', 'dishes') + '. Tap New ticket to take a first order. Tax, hours and PIN are under Settings, Dishes and prices.');
   }
   // Hides the card for good, or shows it again (a restarted demo starts with it).
   F.setWelcome = function (on) {

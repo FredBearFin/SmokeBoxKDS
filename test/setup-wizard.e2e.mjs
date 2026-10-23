@@ -44,7 +44,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   check('a typed price is read back before saving', /Reads as \$12\.50/.test(await page.locator('.dp-echo').textContent()));
   await page.fill('.dp-price', '');
   const nameFirst = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived)[0].name);
-  await page.selectOption('[aria-label="Category of ' + nameFirst + '"]', 'cold'); await page.waitForTimeout(300);
+  await page.selectOption('[aria-label="Section of ' + nameFirst + '"]', 'cold'); await page.waitForTimeout(300);
   check('Move to: the category of a dish changes from its row', await page.evaluate((n) => SB.store.getState().menu.find((m) => m.name === n).cat === 'cold', nameFirst));
   // Menu sections: the add form shows a Menu section list; Change menu sections renames one, marks one Not used (undoable) and adds one.
   check('the add form has a Menu section list', await page.locator('.dp-menusec').isVisible());
