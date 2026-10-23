@@ -556,7 +556,7 @@
       return gateOut('NONE', true, 'onLine', 'ok', 'Out of the fridge, ' + used + ' min so far' + (isNum(b.outHours) ? ' of your ' + U.round(b.outHours, 2) + '-hour limit.' : '. No out-of-fridge limit set.'), end);
     }
     if (b.outSince != null) {
-      const lim = b.outSince + S.aboveColdGraceH * H;
+      const lim = coldOutLimit(b, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, end));
     }
@@ -638,7 +638,7 @@
         if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Below ' + f0(S.hotHoldF) + ' for more than ' + S.belowHotGraceH + ' hours. Discard.' + SAFETY);
         return gateOut('REHEAT_IMMEDIATE', false, 'belowHot', 'bad', 'Below ' + f0(S.hotHoldF) + '. Reheat to ' + f0(S.reheatF) + ' now (Smokebox allows one reheat per batch) or discard.' + SAFETY, Math.min(lim, exp));
       }
-      const lim = batch.outSince + S.aboveColdGraceH * H;
+      const lim = coldOutLimit(batch, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, exp));
     }
@@ -675,7 +675,7 @@
     if (b.outSince != null) {
       const want = b.kind === 'cold' ? 'chill' : 'reheat';
       if (b.status !== want || (b.kind !== 'cold' && b.reheats >= 1)) return -Infinity;
-      return Math.min(q ? hard : exp, b.outSince + (b.kind === 'cold' ? S.aboveColdGraceH : S.belowHotGraceH) * H);
+      return Math.min(q ? hard : exp, b.kind === 'cold' ? coldOutLimit(b, S) : b.outSince + S.belowHotGraceH * H);
     }
     // A past batch stays past (a late temperature check does not change it) until the hard cap.
     if (b.status === 'past') return q ? hard : -Infinity;
@@ -2006,6 +2006,9 @@
     const w = p.who.trim();
     return w.length > 12 ? null : w;
   }
+  // The moment cold food that is above its limit must be thrown out: the grace time (aboveColdGraceH) minus the time it already spent above the limit
+  // in earlier stretches (coldOutMs), counted from when it went out of range this time. One good reading does not wipe the earlier time away.
+  const coldOutLimit = (b, S) => b.outSince + Math.max(0, S.aboveColdGraceH * H - (isNum(b.coldOutMs) ? b.coldOutMs : 0));
   // Records a temperature reading, then re-runs the gate. A hot reading below the hot-hold limit, or a cold
   // one above its limit, starts the out-of-range clock (outSince); an in-range cold reading clears it. A
   // cooling batch records stage 1 and final. Also logs whether the check was on time.
@@ -2035,7 +2038,7 @@
       if (b.stage1At == null && f <= c.stage1ToF) { w.stage1At = t; w.stage1F = f; }
       if (w.stage1At != null && b.finalAt == null && f <= c.finalF) { w.finalAt = t; w.finalF = f; }
     } else if (b.kind === 'cold') {
-      if (f > S.coldHoldF) { if (b.outSince == null && b.place !== 'line') w.outSince = t; } else if (b.outSince != null) delete w.outSince;
+      if (f > S.coldHoldF) { if (b.outSince == null && b.place !== 'line') w.outSince = t; } else if (b.outSince != null) { w.coldOutMs = Math.round((isNum(b.coldOutMs) ? b.coldOutMs : 0) + Math.max(0, t - b.outSince)); delete w.outSince; }
     } else if (f < S.hotHoldF) {
       if (b.outSince == null) w.outSince = t;
     } else if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1) && t - b.outSince <= S.belowHotGraceH * H) {
@@ -3913,7 +3916,7 @@
         if (!Array.isArray(out.temps)) out.temps = [];
         out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS)
           .map((x) => (typeof x.who === 'string' && x.who.length >= 1 && x.who.length <= 12 ? { t: x.t, f: x.f, who: x.who } : { t: x.t, f: x.f }));
-        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
+        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coldOutMs', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
         for (const k of ['stage1F', 'finalF', 'lineMs', 'lineSince', 'movedAt', 'fridgeDays', 'outHours']) if (out[k] !== undefined && !isNum(out[k])) delete out[k];
         // Place and the owner's limits exist only on a cold batch made from a fridge-kept product; anything else is cleared.
         if (out.fridge !== true || out.kind !== 'cold') { for (const k of ['fridge', 'place', 'lineMs', 'lineSince', 'movedAt', 'madeOn', 'fridgeDays', 'outHours']) delete out[k]; }
