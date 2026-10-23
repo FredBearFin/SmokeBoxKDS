@@ -54,7 +54,7 @@
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'confirmWord', 'notInDemo'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -114,6 +114,11 @@
     badWho: 'Initials must be 1 to 12 characters. Shorten them, or leave them blank if the screen allows.',
     unknownSafetyEntry: 'That safety log entry is not here, or it is not a temperature, discard, cooling, reheat, sanitize or keep-serving entry. Pick one from the safety log.',
     wrongBackupMode: 'That backup does not belong to this kitchen (one is from the demo, the other from a real kitchen). Nothing was changed. Choose a backup made from this kitchen.',
+    pinRequired: 'Set a back office PIN first. A recovery code belongs to a PIN.',
+    noRecoveryCode: 'No recovery code was made for this PIN, so it cannot be reset this way. Use the backup, or make a recovery code while you still know the PIN.',
+    wrongRecoveryCode: 'That is not the recovery code. Check the letters and numbers on the card you wrote it down on. Nothing was changed.',
+    recoveryLocked: 'Too many wrong recovery codes. Wait a little, then try again. Nothing was changed.',
+    noCrypto: 'This browser cannot make the secure code Smokebox needs. Nothing was changed.',
     confirmWord: 'Type the confirmation word exactly as shown to go ahead. Nothing was changed.',
     notInDemo: 'This only works in your own kitchen, not in the demo. Nothing was changed.',
     moduleOff: 'Cook-ahead tracking (batches, the hold cabinet, temperature checks and sanitizing) is switched off. Turn it on under Dishes and prices: Yes, I cook ahead.',
@@ -2225,7 +2230,7 @@
     undoMs: R(3000, 60000, true),
     syncTargetSec: R(10, 600),
     ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, currency: { t: 'currency' }, sound: { t: 'bool' }, tempUnit: { t: 'enum', v: ['F', 'C'] }, weightUnit: { t: 'enum', v: ['kg', 'lb'] } },
-    office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' } },
+    office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' }, recoveryHash: { t: 'pin' } },
     alerts: { ladderThresholds: { t: 'ladder' } },
     modules: { cookAhead: { t: 'bool' } },
   };
@@ -3893,6 +3898,8 @@
         const mi = typeof i.name === 'string' && i.name ? i.name : typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
         return mi + ' is ' + why + '. Take it off the order or pick something else.';
       }
+      case 'recoveryLocked': { const m = isNum(i.waitMs) ? Math.max(1, Math.ceil(i.waitMs / 60000)) : 0; return m ? 'Too many wrong recovery codes. Try again in ' + m + ' ' + U.plural(m, 'minute') + '. Nothing was changed.' : REPORTS.recoveryLocked; }
+      case 'wrongRecoveryCode': return isNum(i.triesLeft) && i.triesLeft > 0 ? REPORTS.wrongRecoveryCode + ' ' + i.triesLeft + ' ' + U.plural(i.triesLeft, 'try', 'tries') + ' left.' : REPORTS.wrongRecoveryCode;
       case 'wrongBackupMode': return i.backup === 'demo' ? 'That backup comes from the demo, not from your kitchen. Nothing was changed. Choose a backup made from your own kitchen.' : 'That backup comes from a real kitchen, so it cannot be loaded into the demo. Nothing was changed. Leave the demo first, then load it into your own kitchen.';
       case 'ordersStillOpen': return isInt(i.count) && i.count > 0 ? i.count + ' ' + U.plural(i.count, 'order') + ' still open. Take payment on ' + (i.count === 1 ? 'it' : 'each one') + ', or void ' + (i.count === 1 ? 'it' : 'them') + ', then close the day again.' : REPORTS.ordersStillOpen;
       case 'outOfBounds': return isNum(i.min) && isNum(i.max) ? 'That value is outside the allowed range (' + i.min + ' to ' + i.max + '). Enter a value inside it.' : REPORTS.outOfBounds;
