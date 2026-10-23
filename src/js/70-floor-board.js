@@ -1410,23 +1410,31 @@
     // The sound check: shown while sound is on but the browser has not yet allowed it. One tap allows it and plays a test.
     const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', hidden: true, onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); playHere(() => { chime(); speak('Sound is on.'); }); } },
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
-    el.appendChild(soundBar);
+    // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
+    const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
+    const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, clearBtn('Clear this notice', 'snd'));
+    el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
     const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', hidden: true, onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
-    el.appendChild(pauseBar);
+    const pauseWrap = h('div', { class: 'fl-strip-bar fl-bar-pause', hidden: true }, pauseBar, clearBtn('Clear this notice', () => 'pause:' + (pauseBar.textContent || '')));
+    el.appendChild(pauseWrap);
     for (let i = 0; i < 3; i++) {
       const when = h('span', { class: 'fl-strip-when num' }), what = h('span', { class: 'fl-strip-what' }), why = h('span', { class: 'fl-strip-why' });
       // Acknowledges this row, then opens the hold cabinet on its batch, or just the cabinet when it is not about one batch.
       const openRow = () => { const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (r.batchId) openHoldFor(r.batchId); else showCabinet(true); };
       const row = h('button', { type: 'button', class: 'fl-strip-row', hidden: true, dataset: { i: String(i) }, onClick: openRow },
         when, h('span', { class: 'fl-strip-text' }, what, why));
-      rows.push({ el: row, when, what, why, key: '', batchId: null });
-      el.appendChild(row);
+      // Clearing a row counts as seeing it (the loud tone stops) and hides it until its next step on the ladder.
+      const rowKey = () => { const r = rows[i]; return r && r.key ? 'row:' + r.key + ':' + (r.el.dataset.step || '') : ''; };
+      const xr = h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': 'Clear this warning until the next one', title: 'Clear until the next warning', onClick: (e) => { e.stopPropagation(); const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (m) { m.dis.add(rowKey()); updateStrip(store().now()); } } }, ico('x', 18));
+      const wrap = h('div', { class: 'fl-strip-rowwrap', hidden: true, dataset: { i: String(i) } }, row, xr);
+      rows.push({ el: row, wrap, when, what, why, key: '', batchId: null, rowKey });
+      el.appendChild(wrap);
     }
     // A visually hidden live region that changes only when a warning is announced (the leader tab), so a screen reader hears each warning once, never the ticking countdown.
     const announce = h('span', { class: 'visually-hidden', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
     el.appendChild(announce);
-    return { el, rows, soundBar, pauseBar, announce };
+    return { el, rows, soundBar: soundWrap, pauseBar: pauseWrap, pauseBtn: pauseBar, announce };
   }
   // Shows the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { showCabinet(true, { batchId }); } catch (e) { console.error('[smokebox] cabinet failed', e); } }
@@ -1489,22 +1497,29 @@
       playCalls(late.concat(calls));
     }
     // Info rows only show for batches and run-outs; an expired notice goes away once someone taps it.
-    const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)));
-    const top = feed.slice(0, 3);
+    // The strip is for what needs a cook soon: a row waits until the deadline is within the hour (or is already bad, past or out), so a quiet kitchen has no strip.
+    const soon = (d) => d.sev === 'bad' || d.kind === 'past' || d.kind === 'expired' || !(d.msLeft > 60 * 60e3);
+    if (!m.dis) m.dis = new Set();
+    const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
+    const top = feed.slice(0, 2);
     const needSound = sound && !audioReady();
-    setHidden(m.strip.soundBar, !needSound);
+    setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
     const note = sound ? SB.deadlines.pauseNote(store().getState(), now) : 'Sound is off on this tablet: warnings will not be heard. Tap to turn it on.';
-    setHidden(m.strip.pauseBar, !note);
-    if (note) setTxt(m.strip.pauseBar.querySelector('.fl-strip-pause-t'), note);
-    setHidden(m.strip.el, top.length === 0 && !needSound && !note);
+    // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
+    const showNote = !!note && (!sound || top.length > 0) && !m.dis.has('pause:' + note);
+    setHidden(m.strip.pauseBar, !showNote);
+    if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
+    setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
+      setHidden(r.wrap, !d);
       setHidden(r.el, !d);
       if (!d) { r.key = ''; return; }
       r.key = d.id; r.batchId = d.batchId || null;
       setTone(r.el, d.snoozedUntil ? 'info' : d.sev);
+      setTone(r.wrap, d.snoozedUntil ? 'info' : d.sev);
       // Where the row is on its ladder (first, middle, last) and whether its reminder is put off; the stylesheet draws both.
       const stp = d.step || '', sn = d.snoozedUntil ? 'true' : 'false';
       if (r.el.dataset.step !== stp) r.el.dataset.step = stp;
