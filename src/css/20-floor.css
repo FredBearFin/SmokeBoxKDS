@@ -406,7 +406,7 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl-cook[hidden] { display: none; }
 .fl-row[data-cook="check"] .fl-cook { color: var(--stamp); }
 .fl-row[data-cook="check"] > .slip-item { box-shadow: inset calc(6px * var(--fl-k)) 0 0 var(--stamp); background: var(--tint-bad); animation: fl-check-row 1.1s ease-in-out infinite; }
-.fl-row[data-cook="check"] .fl-act[data-act="cook"] { color: var(--bg); background: var(--stamp); border-color: var(--stamp); box-shadow: 0 calc(3px * var(--fl-k)) 0 var(--stamp); animation: fl-check-tile 1.1s ease-in-out infinite; }
+.fl-row[data-cook="check"] .fl-act[data-act="cook"] { color: var(--paper); background: var(--stamp); border-color: var(--stamp); box-shadow: 0 calc(3px * var(--fl-k)) 0 var(--stamp); animation: fl-check-tile 1.1s ease-in-out infinite; }
 @keyframes fl-check-row { 0%, 100% { background-color: var(--tint-bad); } 50% { background-color: var(--tint-warn); } }
 @keyframes fl-check-tile { 0%, 100% { transform: none; } 50% { transform: scale(1.06); } }
 @media (prefers-reduced-motion: reduce) { .fl-row[data-cook="check"] > .slip-item, .fl-row[data-cook="check"] .fl-act[data-act="cook"] { animation: none; } }
@@ -467,8 +467,8 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl-main[data-density="compact"] .fl-slip .slip-clip { width: calc(34px * var(--fl-k)); height: calc(13px * var(--fl-k)); margin-left: calc(-17px * var(--fl-k)); }
 .fl-main[data-density="compact"] .fl-slip .slip-head { padding-bottom: var(--sp-2); row-gap: 0; }
 .fl-main[data-density="compact"] .fl-slip[data-rush="true"] .slip-head { box-shadow: inset 0 calc(4px * var(--fl-k)) 0 var(--stamp); padding-top: calc(var(--sp-2) + 3px * var(--fl-k)); }
-.fl-main[data-density="compact"] .fl-slip .slip-num { font-size: calc(clamp(calc(22px * var(--fl-k)), calc(10cqw * var(--fl-tl)), calc(30px * var(--fl-k) * var(--fl-tl))) * var(--fl-esc, 1)); }
-.fl-main[data-density="compact"] .fl-slip .slip-timer { font-size: calc(clamp(calc(20px * var(--fl-k)), calc(9cqw * var(--fl-tl)), calc(26px * var(--fl-k) * var(--fl-tl))) * var(--fl-esc, 1)); }
+.fl-main[data-density="compact"] .fl-slip .slip-num { font-size: calc(clamp(calc(28px * var(--fl-k)), calc(12cqw * var(--fl-tl)), calc(34px * var(--fl-k) * var(--fl-tl))) * var(--fl-esc, 1)); }
+.fl-main[data-density="compact"] .fl-slip .slip-timer { font-size: calc(clamp(calc(24px * var(--fl-k)), calc(10cqw * var(--fl-tl)), calc(28px * var(--fl-k) * var(--fl-tl))) * var(--fl-esc, 1)); }
 .fl-main[data-density="compact"] .fl-stamp-slot .stamp { font-size: var(--fs-1); padding: calc(2px * var(--fl-k)) calc(6px * var(--fl-k)) calc(1px * var(--fl-k)); }
 .fl-main[data-density="compact"] .fl-slip .slip-who { margin-top: 0; line-height: 1.1; }
 .fl-main[data-density="compact"] .fl-slip .slip-meta { margin-top: 2px; gap: 2px var(--sp-3); }
@@ -716,7 +716,7 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-row[data-state="queued"] .slip-name { font-weight: var(--w-bold); color: var(--ink2); }
 .fl-sub { padding-left: calc(var(--qty-w) + var(--sp-3)); gap: 0 var(--sp-2); }
 .fl-sub .chip { min-height: calc(22px * var(--fl-k)); padding-block: 0; font-size: var(--fs-1); }
-.fl-deck, .fl-cook { font-size: var(--fs-1); }
+.fl-deck { font-size: var(--fs-1); } /* the cooking countdown (.fl-cook) keeps its larger size: it is read from across the line */
 .fl-deck { color: var(--ink3); }
 .slip-next { margin: var(--sp-1) var(--sp-3) 0; padding: calc(4px * var(--fl-k)) var(--sp-2); font-size: var(--fs-2); font-weight: var(--w-semi); }
 .fl-slip .slip-head { padding-bottom: var(--sp-3); }
