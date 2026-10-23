@@ -249,7 +249,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 2569,
+  "addThreeDishesWallMs": 2646,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -619,7 +619,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 1988,
+  "addThreeDishesWallMs": 2083,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -749,7 +749,7 @@
     ],
     "screen": "Sheet: Hold cabinet",
     "toasts": [
-     "Brisket batch 1 is in the cabinet: 2.00 kg cooked, first reading 150 °F."
+     "Brisket batch 1 is in the cabinet: 4.00 kg cooked, first reading 150 °F."
     ],
     "shot": "04-E-batch-logged.png"
    },
@@ -789,7 +789,7 @@
     ],
     "screen": "Kitchen board",
     "toasts": [
-     "Brisket batch 1 is in the cabinet: 2.00 kg cooked, first reading 150 °F.",
+     "Brisket batch 1 is in the cabinet: 4.00 kg cooked, first reading 150 °F.",
      "Ticket #101 sent to 1 station. Paid $14.00 by cash."
     ],
     "shot": "05-E-cook-ahead-paid.png"

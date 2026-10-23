@@ -13,20 +13,20 @@ truck: New ticket opens: New ticket
 truck: browser Back with the Dishes sheet open (history length 3): app alive true, sheet still open 0, url /user/nt-a2/dist/smokebox.html
 truck: after reload the half-typed name is "Brisket taco" and price "9"
 truck: dishes now: 6
-truck: pay note: Marked paid by cash when sent: $21.50. Smokebox only records this; it does not charge cards.
+truck: pay note: Marked paid by cash when sent: $21.50. Smokebox only records this; it does not charge cards. No sales tax is added. Set it under Menu, Tax, hours and PIN.
 truck: toast after send: ["Ticket #101 sent to 1 station. Paid $21.50 by cash."]
 truck: page errors: 0, console errors: 0
 cafe: import link visible after opening "More ways to add dishes": true
 cafe: format line: Read the file as: spreadsheet table (CSV, TSV or pasted from Excel or Google Sheets). 22 of 25 dishes are ready to add; 3 need a fix or will be skipped.
 cafe: rows: 25, problem rows: 3
-cafe: problem lines: ["Cappuccino => The category here is \"50\", which looks like the end of a price split at a comma (4,50). Check the price, tick the row when it is right. In your file, put prices with commas inside quotes.","Latte => \"Latte\" appears again; line 4 already has it. Keep one of the two rows, or rename this one."," => This row has no dish name. Type a name in the first column, or delete the row.","Brownie => This row has no price. Enter the price in dollars, for example 9.50. A price is never guessed."]
+cafe: problem lines: ["Cappuccino => This row has 1 more column than the header, so a value may have been split at a comma. The price may be 4.50, not 4. Put quotes around a price with a comma (for example \"4,50\"), or use a dot (4.50), then read the file again.","Latte => \"Latte\" appears again; line 4 already has it. Keep one of the two rows, or rename this one."," => This row has no dish name. Type a name in the first column, or delete the row.","Brownie => This row has no price. Enter the price in dollars, for example 9.50. A price is never guessed."]
 cafe: stations chosen in the preview: ["Pit"]
 cafe: file-level notes: ["Your file has categories that are not set up here: Coffee, Tea, Other drinks, Pastry, Lunch. Until you add them, those dishes go in \"Meats\".Add these categories"]
 cafe: after "Add these categories": ["Added 5 categories. Each dish now sits in its own."]; rows 25
 cafe: import button reads: Import 21 dishes
 cafe: categories the imported dishes landed in: {"Coffee":4,"Tea":2,"Other drinks":2,"Pastry":6,"Lunch":7}
 cafe: message after import: ["Imported 21 dishes."]
-cafe: order screen tabs: ["Menuneeds attention","Order0needs attention","Allneeds attention","Meatsneeds attention","Sandwichesneeds attention","Hot sidesneeds attention","Friedneeds attention","Cold and drinksneeds attention","Coffeeneeds attention","Teaneeds attention"]
+cafe: order screen tabs: ["Menuneeds attention","Order0needs attention","Allneeds attention","Coffeeneeds attention","Teaneeds attention","Other drinksneeds attention","Pastryneeds attention","Lunchneeds attention","New orderneeds attention","Add to open order0needs attention"]
 cafe: toast: ["Ticket #101 sent to 1 station. Paid $11.50 by cash."]
 cafe: stock/86 badge on the board: ["86"]
 cafe: page errors: 0
@@ -35,10 +35,11 @@ diner: question card text: Do you cook any of this ahead and hold it?Chili in a 
 diner: hours "4 hrs" -> ["Saved Coffee at $1.75.","Type hours from 0.5 to 12."]
 diner: hours "13" -> ["Saved Coffee at $1.75.","Type hours from 0.5 to 12."]
 diner: batch "6 kg" -> ["Saved Coffee at $1.75.","Batch size: type kilograms like 4, or leave it empty."]
-diner: saved with no dish selected -> ["Saved Coffee at $1.75.","Added Pot roast. Log your first batch in the cabinet when you cook one."]
+diner: saved with no dish selected -> ["Saved Coffee at $1.75.","No dish is selected, so nothing will use this item and it will not count down. Select a dish above, or tap Save again to keep it without one."]
+diner: second Save -> ["Saved Coffee at $1.75.","Added Pot roast. Log your first batch in the cabinet when you cook one."]
 diner: cabinet new-batch form shows product: ["Pot roast"]
 diner: first temperature reading preset: In range (135 °F or above).
-diner: after Put in hold cabinet: ["Pot roast batch 1 is in the cabinet: 3.00 kg cooked, first reading 150 °F.","Saved Coffee at $1.75.","General food-safety guidance. Your local health-code rules override this."] batches 1
+diner: after Put in hold cabinet: ["Pot roast batch 1 is in the cabinet: 6.00 kg cooked, first reading 150 °F.","Saved Coffee at $1.75.","General food-safety guidance. Your local health-code rules override this."] batches 1
 diner: after reload: batches 1, Pot roast plate recipe lines 0
 diner: tiles sold out on the order screen: 0 of 7; reasons: []
 diner: toast: ["Ticket #101 sent to 1 station. Paid $11.95 by cash."]
