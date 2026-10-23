@@ -1149,7 +1149,9 @@
     const menuBox = h('section', { class: 'fs-section bd-menu', 'aria-label': 'Menu availability' }, h('div', { class: 'fs-row' }, h('h3', { class: 'fs-h grow' }, 'Menu'), filterSeg));
     const catHost = h('div', { class: 'bd-cats' });
     const noneOff = h('div', { class: 'empty bd-none', hidden: true }, ico('check-circle', 36), h('h3', null, 'Everything is on the menu'), h('p', null, 'Nothing is 86 right now. Tap 86 it on an item that has run out.'));
-    menuBox.append(catHost, noneOff);
+    // Shown while no cooked food is in the cabinet, so a board full of 86 items is not a mystery.
+    const nothingCooked = h('p', { class: 'fs-sub bd-nocook', hidden: true, role: 'status' }, 'Nothing is cooked yet. Meat and sides show as 86 until you put a batch in the hold cabinet.');
+    menuBox.append(nothingCooked, catHost, noneOff);
 
     // Builds one menu row (name, price, state, reason, buttons) once; updateRow keeps it current.
     function makeRow(mi) {
@@ -1250,6 +1252,7 @@
       rows.forEach((rec) => { const hide = filter === 'off' && !rec.off; setHidden(rec.el, hide); if (!hide) shown++; });
       cats.forEach((c) => { let any = false; c.map.forEach((r) => { if (!r.el.hidden) any = true; }); setHidden(c.el, !any); });
       setHidden(noneOff, !(filter === 'off' && shown === 0));
+      setHidden(nothingCooked, st().batches.some((b) => b.status !== 'discard' && b.remainingG > 0));
     }
 
     // Builds one ingredient stock row once.
