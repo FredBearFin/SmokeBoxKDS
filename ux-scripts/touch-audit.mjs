@@ -62,6 +62,9 @@ for (const [w, h] of SIZES) for (const [theme, text] of LOOKS) {
     await snap('tablet-ready', async () => { await page.evaluate(() => SB.sheets.open('ready')); await page.waitForTimeout(400); });
     await snap('tablet-ready-heard', async () => { await page.evaluate(() => SB.sheets.open('ready')); await page.waitForTimeout(300); await page.click('[data-act=sound-test]'); await page.click('[data-act=sound-yes]'); });
     await snap('pilot-checklist', async () => { await page.evaluate(() => SB.sheets.open('pilot')); });
+    await snap('follow-sheet', async () => { await page.evaluate(() => SB.sheets.open('follow')); await page.waitForTimeout(300); });
+    await snap('follow-errors', async () => { await page.evaluate(() => SB.sheets.open('follow')); await page.waitForTimeout(300); await page.fill('[data-field=url]', 'nope'); await page.click('[data-act=follow-connect]'); });
+    await snap('follow-following', async () => { await page.evaluate(() => { SB.store.isFollower = () => true; SB.store.followStatus = () => ({ state: 'reconnecting', lastUpdate: Date.now() }); SB.sheets.open('follow'); }); await page.waitForTimeout(300); });
     await snap('tablet-checklist', async () => { await page.evaluate(() => SB.sheets.open('setup')); });
     await snap('leftovers-card', async () => { await page.evaluate(() => { const id = SB.store.getState().menu[0].id; SB.store.dispatchEx('createTicket', { customer: 'Demo', src: 'demo', items: [{ menuId: id, qty: 1 }] }, { source: 'ui' }); SB.sheets.open('menu'); }); });
     await snap('cold-form', async () => { await page.evaluate(() => { SB.store.dispatchEx('updateSettings', { patch: { modules: { cookAhead: true } } }, { source: 'ui' }); SB.sheets.open('cookahead'); }); await page.waitForTimeout(400); await page.locator('.sheet .seg-opt', { hasText: 'Cold' }).click(); });
