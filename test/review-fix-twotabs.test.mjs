@@ -70,7 +70,7 @@ test('two tabs #2: with Web Locks, timed saves take the lock and both tabs\' tic
   assert.equal(A.dispatch('createTicket', { items: [{ menuId: 'tea' }] }), 'ok');
   assert.equal(B.dispatch('createTicket', { items: [{ menuId: 'mac' }] }), 'ok');
   await sleep(1500);
-  assert.ok(asked.length >= 2 && asked.every((n) => n === 'smokebox.v1.save'), 'timed saves asked for the lock');
+  assert.ok(asked.length >= 2 && asked.every((n) => n === 'smokebox-save-lock'), 'timed saves asked for the lock');
   assert.equal(storage.get(A.KEY).state.tickets.length, 2);
   assert.equal(nums(A), nums(B));
 });
