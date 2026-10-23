@@ -159,6 +159,7 @@
     updateMenuItem: '{ id, patch }',
     addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two", prepGuess?:boolean }',
     updateIngredient: '{ id, patch }',
+    moveMenuItem: '{ id, toIndex }',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety" }',
     setPortions: '{ menuId, on:boolean, count? }',
     resetLive: '{ keepSettings?=true, starter?, stagger?, catalog?: "sample"|"blank", replaceOwn? }',
@@ -167,7 +168,7 @@
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient', 'moveMenuItem'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -1250,7 +1251,7 @@
         }
       }
       /*@I7*/ const a = hasOwn(avail, mi.id) ? avail[mi.id] : availability(tx.state(), mi.id);
-      if (!a || a.ok !== true) { tx.info.menuId = mi.id; tx.info.reason = a ? a.reason : null; tx.info.ing = a ? a.ing : null; return 'itemUnavailable'; }
+      if (!a || a.ok !== true) { tx.info.menuId = mi.id; tx.info.name = mi.name; tx.info.reason = a ? a.reason : null; tx.info.ing = a ? a.ing : null; return 'itemUnavailable'; }
       parsed.push({ mi, qty, mods });
     }
     delete tx.info.line;
@@ -2430,6 +2431,32 @@
     return 'ok';
   };
 
+  // Moves one dish to a new place in the menu list (0 is first). The order is what the order screen and the lists show
+  // inside each category. toIndex must be a whole number from 0 to the last place (outOfBounds otherwise); the same place
+  // gives nothingToDo. Undo puts it back while the dish is still where this move left it.
+  A.moveMenuItem = function (tx, p) {
+    const list = tx.get('menu');
+    const from = typeof p.id === 'string' ? list.findIndex((m) => m.id === p.id) : -1;
+    if (from < 0) return 'unknownMenu';
+    if (!isInt(p.toIndex) || p.toIndex < 0 || p.toIndex >= list.length) { tx.info = { key: 'toIndex', min: 0, max: list.length - 1 }; return 'outOfBounds'; }
+    if (p.toIndex === from) return 'nothingToDo';
+    const w = tx.mut('menu');
+    const [mi] = w.splice(from, 1);
+    w.splice(p.toIndex, 0, mi);
+    tx.event('settings_changed', { keys: ['menu.' + mi.id + '.moved'] });
+    pushUndo(tx, 'moveMenu', (mi.short || mi.name) + ' moved', { id: mi.id, from, to: p.toIndex });
+    tx.info = { id: mi.id, from, to: p.toIndex, keys: ['menu.' + mi.id + '.moved'] };
+    return 'ok';
+  };
+  // Undo of a move: the dish goes back to its old place, but only if it is still where the move put it.
+  UNDO.moveMenu = function (tx, d) {
+    const list = tx.get('menu');
+    if (!list[d.to] || list[d.to].id !== d.id || d.from >= list.length) return 'undoConflict';
+    const w = tx.mut('menu');
+    const [mi] = w.splice(d.to, 1);
+    w.splice(d.from, 0, mi);
+    return 'ok';
+  };
   // The most ingredients a kitchen may hold, so a typing slip cannot fill the saved data.
   const ING_MAX = 80;
   // Makes an id from a name that no ingredient and no config ingredient already uses ("Hamburger Buns" becomes
@@ -3322,6 +3349,8 @@
     {
       const ids = new Set(state.ingredients.map((i) => i.id));
       for (const mi of state.menu) for (const ln of Array.isArray(mi.bom) ? mi.bom : []) if (!ids.has(ln.ing)) add('B1 ' + mi.id + ' recipe names missing ingredient ' + ln.ing);
+      const seenIds = new Set();
+      for (const mi of state.menu) { if (seenIds.has(mi.id)) add('B2 menu id ' + mi.id + ' appears twice'); seenIds.add(mi.id); }
       for (const i of state.ingredients) if (i.forMenu !== undefined && !state.menu.some((m) => m.id === i.forMenu)) add('B1 ingredient ' + i.id + ' counts portions of missing dish ' + i.forMenu);
     }
     // I14
@@ -3706,7 +3735,8 @@
       case 'notAllDone': return isInt(i.remaining) ? i.remaining + ' ' + U.plural(i.remaining, 'item') + ' not done yet. Finish them, or use Bump anyway to send the ticket out.' : REPORTS.notAllDone;
       case 'itemUnavailable': {
         const why = i.reason === 'manual' ? 'marked 86 by hand' : i.reason === 'safety' ? 'on a safety hold' : i.reason === 'quality' ? 'past its quality limit' : i.reason === 'stock' ? 'sold out' : '86';
-        const mi = typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
+        // The dish's own name (the live menu put it in info); the sample menu is only a fallback for older callers.
+        const mi = typeof i.name === 'string' && i.name ? i.name : typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
         return mi + ' is ' + why + '. Take it off the order or pick something else.';
       }
       case 'wrongBackupMode': return i.backup === 'demo' ? 'That backup comes from the demo, not from your kitchen. Nothing was changed. Choose a backup made from your own kitchen.' : 'That backup comes from a real kitchen, so it cannot be loaded into the demo. Nothing was changed. Leave the demo first, then load it into your own kitchen.';
