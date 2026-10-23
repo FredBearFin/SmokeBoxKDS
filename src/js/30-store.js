@@ -42,7 +42,7 @@
   // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
   const SNAP_KEEP = { maxTickets: 300, maxEvents: 2000 };
   // The 'before restore' copy stays in the last-good slot for 7 days, or until a close-day copy replaces it, so a wrong restore can be undone.
-  const BEFORE_RESTORE = 'before restore', BEFORE_RESTORE_KEEP_MS = 7 * 24 * 3600e3;
+  const BEFORE_RESTORE = 'before restore', BEFORE_MONTH_CLOSE = 'before month close', BEFORE_RESTORE_KEEP_MS = 7 * 24 * 3600e3;
   const SID_KEY = 'smokebox.v1.sid';
   // Two tabs of one browser must not overwrite each other's save. Where the browser has Web Locks, a timed save waits for the lock named
   // LOCK_NAME, so only one tab at a time reads the save id, builds the text and writes it. Where it does not, a tab writes its own tag to
@@ -305,19 +305,19 @@
   function beforeRestoreCopy(r) {
     try {
       const g = storage.get(LASTGOOD_KEY, null);
-      return g && typeof g === 'object' && g.reason === BEFORE_RESTORE && isNum(g.takenAt) && r - g.takenAt < BEFORE_RESTORE_KEEP_MS && r >= g.takenAt ? g : null;
+      return g && typeof g === 'object' && (g.reason === BEFORE_RESTORE || g.reason === BEFORE_MONTH_CLOSE) && isNum(g.takenAt) && r - g.takenAt < BEFORE_RESTORE_KEEP_MS && r >= g.takenAt ? g : null;
     } catch (e) { return null; }
   }
   // Before a restore replaces the kitchen: keeps a whole copy of the current one in the last-good slot (full history if the
   // browser has room, else the small rolling size). Returns the time it was taken, or null when there was nothing worth
   // keeping (an empty kitchen, the demo, no storage) or the browser had no room. Never throws.
-  function snapshotBeforeRestore() {
+  function snapshotBeforeRestore(why) {
     if (!strict || mode !== 'real' || !storage || !state || isBlank()) return null;
     const r = realNow();
     for (const keep of [null, SNAP_KEEP]) {
       try {
         const small = keep ? E().prune(state, keep) : state;
-        const env = { v: 1, takenAt: r, reason: BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
+        const env = { v: 1, takenAt: r, reason: why || BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
         if (!E().validateBackup(JSON.stringify(env)).ok) continue;
         if (storage.set(LASTGOOD_KEY, env) === false) continue;
         snapAt = r; snapWanted = null; st.lastGoodAt = r; st.beforeRestoreAt = r;
@@ -330,7 +330,7 @@
   function beforeRestoreInfo() {
     if (!storage) return null;
     const g = beforeRestoreCopy(realNow());
-    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS } : null;
+    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS, reason: g.reason } : null;
   }
   // Puts the 'before restore' copy back as the kitchen (the way back from a wrong restore). Returns 'ok', or 'noCopy'.
   // The copy it replaces is kept the same way, so this can be undone once too.
@@ -850,6 +850,116 @@
     last = { type: 'import', report: 'ok', info: { repaired: v.repaired, beforeRestore: beforeAt != null, beforeRestoreAt: beforeAt, beforeRestoreKeepDays: beforeAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, events: [] };
     return 'ok';
   }
+
+  /* ---------- close the month: preview, export, prune ---------- */
+  // What the last Close the month export held, so the prune can check the owner saved exactly that: { before, planKey, backup: { chars, sha256 } }.
+  let monthExport = null;
+  // A short key for a plan: the boundary plus the sha256 of its sorted ticket, order and event ids. Two plans with the same key remove the same records.
+  function planKey(pl) {
+    return pl.before + ':' + U.sha256Hex([Array.from(pl.ticketIds).sort().join(','), Array.from(pl.orderIds).sort().join(','), Array.from(pl.eventIds).sort().join(',')].join('|'));
+  }
+  // The public part of a plan (no id sets), for the screens.
+  function planView(pl) {
+    const v = {};
+    for (const k of Object.keys(pl)) if (!(pl[k] instanceof Set)) v[k] = pl[k];
+    return v;
+  }
+  // Records a Close-the-month answer and returns it.
+  function monthAnswer(type, ok, report, info, extra) { last = { type, report, info: info || {}, events: [] }; return Object.assign({ ok, report, info: info || {} }, extra || {}); }
+  // Says exactly what Close the month would remove for opts { before: 'YYYY-MM-DD', keepDays? } (days before 'before' that are closed and older
+  // than keepDays, default 35), and what stays. Changes nothing. { ok, report, preview } where preview has tickets, orders, events, days, from,
+  // before (the real boundary), safetyEventsKept, dayRecordsKept, openTicketsKept, openOrdersKept, uncoveredDays, paidTotal.
+  function closeMonthPreview(opts) {
+    if (!state) return monthAnswer('closeMonthPreview', false, 'invalidBackup');
+    const r = E().monthPlan(state, opts, now());
+    if (!r.ok) return monthAnswer('closeMonthPreview', false, r.report, r.info);
+    return monthAnswer('closeMonthPreview', true, 'ok', {}, { preview: planView(r.plan) });
+  }
+  // File name part for a date like 2026-09-01 without dashes.
+  const flatDay = (d) => String(d).replace(/-/g, '');
+  // Builds the files for Close the month, changing nothing: the full backup of the kitchen as it is now (first, so nothing is lost even if the
+  // prune goes wrong), CSV files for the records that would be removed (orders, tickets, day totals), and a manifest with counts and the sha256
+  // and size of each. { ok, report, files: [{ name, kind, mime, text, chars, sha256 }], manifest }. Remembers the backup so closeMonthPrune
+  // can check the owner saved that exact file.
+  function closeMonthExport(opts) {
+    if (!state) return monthAnswer('closeMonthExport', false, 'invalidBackup');
+    if (mode === 'demo') return monthAnswer('closeMonthExport', false, 'notInDemo');
+    const r = E().monthPlan(state, opts, now());
+    if (!r.ok) return monthAnswer('closeMonthExport', false, r.report, r.info);
+    const pl = r.plan;
+    if (!pl.tickets && !pl.orders && !pl.events) return monthAnswer('closeMonthExport', false, 'nothingToDo', { before: pl.before });
+    const backupText = exportAll();
+    if (backupText == null) { const lr = last || {}; return monthAnswer('closeMonthExport', false, lr.report || 'invalidBackup', lr.info); }
+    // Turns rows of values into CSV file text (A3's shared writer when loaded).
+    const toText = (rows) => (SB.csv && typeof SB.csv.text === 'function' ? SB.csv.text(rows) : rows.map(row).join('\r\n') + '\r\n');
+    const range = pl.from + '-to-' + pl.days[pl.days.length - 1];
+    const files = [];
+    // Adds one file to the list with its size and sha256.
+    const add = (name, kind, mime, text) => files.push({ name, kind, mime, text, chars: text.length, sha256: U.sha256Hex(text) });
+    add('smokebox-before-month-close-' + flatDay(U.dateKey(realNow())) + '.json', 'backup', 'application/json', backupText);
+    add('smokebox-orders-' + range + '.csv', 'orders', 'text/csv', toText(csvRows('orders', state, pl)));
+    add('smokebox-tickets-' + range + '.csv', 'tickets', 'text/csv', toText(csvRows('tickets', state, pl)));
+    // Day totals: the last day_closed record of each removed day.
+    const dayRows = [['day', 'orders', 'voidedOrders', 'tickets', 'voidedTickets', 'subtotal', 'discount', 'tax', 'total', 'tip', 'discarded', 'discardedG']];
+    const lastOf = new Map();
+    for (const e of E().allEvents(state)) if (e.type === 'day_closed' && pl.days.indexOf(e.day) >= 0) lastOf.set(e.day, e);
+    for (const d of Array.from(lastOf.keys()).sort()) { const e = lastOf.get(d); dayRows.push([e.day, e.orders, e.voidedOrders, e.tickets, e.voidedTickets, e.subtotal, e.discount, e.tax, e.total, e.tip, e.discarded, e.discardedG]); }
+    add('smokebox-days-' + range + '.csv', 'days', 'text/csv', toText(dayRows));
+    const manifest = {
+      app: 'Smokebox', kind: 'close-the-month', madeAt: realNow(), before: pl.before, requestedBefore: pl.requestedBefore, keepDays: pl.keepDays, from: pl.from, days: pl.days.length,
+      counts: { tickets: pl.tickets, orders: pl.orders, events: pl.events, safetyEventsKept: pl.safetyEventsKept, dayRecordsKept: pl.dayRecordsKept }, paidTotal: pl.paidTotal,
+      files: files.map((f) => ({ name: f.name, kind: f.kind, chars: f.chars, sha256: f.sha256 })),
+    };
+    add('smokebox-month-manifest-' + range + '.json', 'manifest', 'application/json', JSON.stringify(manifest, null, 2) + '\n');
+    monthExport = { before: pl.before, planKey: planKey(pl), backup: { chars: files[0].chars, sha256: files[0].sha256 } };
+    last = { type: 'closeMonthExport', report: 'ok', info: { files: files.length }, events: [] };
+    return { ok: true, report: 'ok', info: { files: files.length }, files, manifest };
+  }
+  // Removes the history closeMonthPreview described, after the owner confirmed the backup file was saved. opts: { before, keepDays?,
+  // confirmBackupSaved: { filename, chars, sha256 } } where chars and sha256 are those closeMonthExport gave for the backup file. Refuses
+  // with backupRequired (no or wrong proof), notInDemo, hubKitchen (a tablet that works through a hub), nothingToDo or exportStale (the records
+  // changed since the export: export again). First keeps a 'before month close' copy of the kitchen for 7 days (the same slot as before restore),
+  // then removes and saves; if the save does not go in, the kitchen is put back exactly as it was and the answer is storageBlocked.
+  // Not undoable; importAll of the backup file brings everything back.
+  function closeMonthPrune(opts) {
+    opts = opts || {};
+    // Records and returns a refusal; nothing has been changed when this is used.
+    const fail = (report, info) => monthAnswer('closeMonthPrune', false, report, info);
+    if (!state) return fail('invalidBackup');
+    if (mode === 'demo') return fail('notInDemo');
+    if (tr && typeof tr.push === 'function') return fail('hubKitchen');
+    const cb = opts.confirmBackupSaved;
+    if (!cb || typeof cb !== 'object' || typeof cb.filename !== 'string' || !cb.filename.trim() || !(Number.isFinite(cb.chars) && cb.chars > 0) || typeof cb.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(cb.sha256)) return fail('backupRequired');
+    const r = E().monthPlan(state, opts, now());
+    if (!r.ok) return fail(r.report, r.info);
+    const pl = r.plan;
+    if (!pl.tickets && !pl.orders && !pl.events) return fail('nothingToDo', { before: pl.before });
+    if (!monthExport || monthExport.backup.sha256 !== cb.sha256 || monthExport.backup.chars !== cb.chars) return fail('backupRequired', { why: 'notTheExport' });
+    if (monthExport.planKey !== planKey(pl)) return fail('exportStale');
+    // Make sure what is in storage is this very kitchen before anything is removed.
+    persistNow();
+    const before = state, savedAt = realNow();
+    const out = E().closeMonth(state, { before: opts.before, keepDays: opts.keepDays, backup: cb }, now());
+    if (out.report !== 'ok') return fail(out.report, out.info);
+    const copyAt = snapshotBeforeRestore(BEFORE_MONTH_CLOSE);
+    const ns = out.state;
+    ns.rev = Math.max(ns.rev, (before.rev || 0) + 1);
+    atLeast(lastStamp(ns));
+    state = ns; syncUnits();
+    pendingBroadcast = true; skipRebase = true; pending = [];
+    const ok = persistNow();
+    if (!ok) {
+      // The save did not go in: the kitchen in memory goes back to what it was, and what is stored is still the full copy.
+      state = before; skipRebase = true; pendingBroadcast = false; syncUnits(); scheduleNotify();
+      if (copyAt != null) { try { storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } }
+      persistNow();
+      return fail('storageBlocked');
+    }
+    monthExport = null;
+    scheduleNotify();
+    last = { type: 'closeMonthPrune', report: 'ok', info: Object.assign({ copyKept: copyAt != null, copyKeepDays: copyAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, out.info), events: [] };
+    return { ok: true, report: 'ok', info: last.info, savedAt };
+  }
   // Time in ms as readable date text for spreadsheets, or empty text when missing.
   const ISO = (t) => (isNum(t) ? new Date(t).toISOString() : '');
   // Prepares one value for a spreadsheet (CSV) cell: empty for missing, quotes where needed. WATCH OUT: text
@@ -867,47 +977,60 @@
   // Spreadsheet text for "tickets", "items", "orders", "events" or "batches", one header line then one line per
   // record. Returns empty text for an unknown kind.
   function exportCsv(kind) {
-    if (!state) return '';
+    const rows = state ? csvRows(kind, state, null) : null;
+    return rows ? rows.map(row).join('\n') + '\n' : '';
+  }
+  // The rows (lists of values, header first) of one CSV kind for state st, or null for an unknown kind. only, when given, limits it to the
+  // tickets, orders and events in its three id sets (what Close the month removes).
+  function csvRows(kind, st0, only) {
+    const state = st0;
+    if (!state) return null;
+    // True when the record is inside the chosen sets (or when no sets were given).
+    const inT = (t) => !only || only.ticketIds.has(t.id);
+    // True when the order is inside the chosen sets, or no sets were given.
+    const inO = (o) => !only || only.orderIds.has(o.id);
+    // True when the event is inside the chosen sets, or no sets were given.
+    const inE = (e) => !only || only.eventIds.has(e.id);
     const out = [];
     if (kind === 'tickets') {
-      out.push(row(['id', 'num', 'serviceDate', 'customer', 'channel', 'src', 'status', 'rush', 'pacing', 'dmaxSec', 'createdAt', 'expeditedAt', 'voidedAt', 'totalSec', 'lines', 'qty', 'value', 'forced', 'recalls', 'voidReason', 'note']));
-      for (const t of state.tickets) {
+      out.push((['id', 'num', 'serviceDate', 'customer', 'channel', 'src', 'status', 'rush', 'pacing', 'dmaxSec', 'createdAt', 'expeditedAt', 'voidedAt', 'totalSec', 'lines', 'qty', 'value', 'forced', 'recalls', 'voidReason', 'note']));
+      for (const t of state.tickets.filter(inT)) {
         // Totals for the ticket are worked out from its items, so the sheet needs no extra columns.
         let qty = 0, value = 0;
         for (const it of t.items) { qty += it.qty; value += it.qty * it.price; }
-        out.push(row([t.id, t.num, t.serviceDate, t.customer, t.channel, t.src, t.status, t.rush, t.pacing, t.dmaxSec, ISO(t.createdAt), ISO(t.expeditedAt), ISO(t.voidedAt),
+        out.push(([t.id, t.num, t.serviceDate, t.customer, t.channel, t.src, t.status, t.rush, t.pacing, t.dmaxSec, ISO(t.createdAt), ISO(t.expeditedAt), ISO(t.voidedAt),
           isNum(t.expeditedAt) ? Math.round((t.expeditedAt - t.createdAt) / 1000) : undefined, t.items.length, qty, U.round(value, 2), !!t.forced, t.recalls, t.voidReason, t.note]));
       }
     } else if (kind === 'items') {
-      out.push(row(['ticketId', 'itemId', 'menuId', 'name', 'zone', 'qty', 'mods', 'track', 'status', 'price', 'prepSec', 'offsetSec', 'fireAt', 'firedAt', 'startedAt', 'doneAt', 'override', 'rushed', 'cost', 'shortG']));
-      for (const t of state.tickets) for (const it of t.items) {
+      out.push((['ticketId', 'itemId', 'menuId', 'name', 'zone', 'qty', 'mods', 'track', 'status', 'price', 'prepSec', 'offsetSec', 'fireAt', 'firedAt', 'startedAt', 'doneAt', 'override', 'rushed', 'cost', 'shortG']));
+      for (const t of state.tickets.filter(inT)) for (const it of t.items) {
         // shortG is grams the kitchen cooked that stock could not cover.
         let short = 0;
         for (const r of it.depleted || []) if (r.short > 0) short += r.short;
-        out.push(row([t.id, it.id, it.menuId, it.name, it.zone, it.qty, (it.mods || []).join('; '), it.track, it.status, it.price, it.prepSec, it.offsetSec, ISO(it.fireAt),
+        out.push(([t.id, it.id, it.menuId, it.name, it.zone, it.qty, (it.mods || []).join('; '), it.track, it.status, it.price, it.prepSec, it.offsetSec, ISO(it.fireAt),
           ISO(it.firedAt), ISO(it.startedAt), ISO(it.doneAt), !!it.override, !!it.rushed, it.cost, short || undefined]));
       }
     } else if (kind === 'orders') {
-      out.push(row(['id', 'serviceDate', 'customer', 'channel', 'src', 'status', 'rounds', 'createdAt', 'paidAt', 'method', 'subtotal', 'discount', 'tax', 'tip', 'total', 'voidReason']));
-      for (const o of state.orders || []) {
+      out.push((['id', 'serviceDate', 'customer', 'channel', 'src', 'status', 'rounds', 'createdAt', 'paidAt', 'method', 'subtotal', 'discount', 'tax', 'tip', 'total', 'voidReason']));
+      for (const o of (state.orders || []).filter(inO)) {
         // Paid orders carry the totals frozen when they were paid; open ones are worked out now.
         const tot = o.status === 'voided' ? null : E().orderTotals(state, o) || {};
-        out.push(row([o.id, o.serviceDate, o.customer, o.channel, o.src, o.status, o.rounds, ISO(o.createdAt), ISO(o.paidAt), o.method,
+        out.push(([o.id, o.serviceDate, o.customer, o.channel, o.src, o.status, o.rounds, ISO(o.createdAt), ISO(o.paidAt), o.method,
           tot ? tot.subtotal : undefined, tot ? tot.discount : undefined, tot ? tot.tax : undefined, o.status === 'paid' ? o.tip : undefined, tot ? tot.total : undefined, o.voidReason]));
       }
     } else if (kind === 'events') {
-      out.push(row(['id', 't', 'time', 'type', 'reverted', 'fields']));
-      for (const e of E().allEvents(state)) {
+      out.push((['id', 't', 'time', 'type', 'reverted', 'fields']));
+      for (const e of E().allEvents(state).filter(inE)) {
         // Event details beyond the four basic columns are packed as JSON in the last column.
         const f = {};
         for (const k of Object.keys(e)) if (k !== 'id' && k !== 't' && k !== 'type' && k !== 'reverted') f[k] = e[k];
-        out.push(row([e.id, e.t, ISO(e.t), e.type, !!e.reverted, JSON.stringify(f)]));
+        out.push(([e.id, e.t, ISO(e.t), e.type, !!e.reverted, JSON.stringify(f)]));
       }
     } else if (kind === 'batches') {
-      out.push(row(['id', 'ing', 'label', 'kind', 'src', 'enteredAt', 'rawG', 'cookedG', 'remainingG', 'yieldPct', 'costPerCookedKg', 'status', 'action', 'canServe', 'lastTempF', 'lastTempAt', 'reheats', 'discardedAt', 'discardReason', 'wasteG']));
-      for (const b of state.batches) out.push(row([b.id, b.ing, b.label, b.kind, b.src, ISO(b.enteredAt), b.rawG, b.cookedG, b.remainingG, b.yieldPct, b.costPerCookedKg, b.status, b.action, b.canServe, b.lastTempF, ISO(b.lastTempAt), b.reheats, ISO(b.discardedAt), b.discardReason, b.wasteG]));
-    } else return '';
-    return out.join('\n') + '\n';
+      out.push((['id', 'ing', 'label', 'kind', 'src', 'enteredAt', 'rawG', 'cookedG', 'remainingG', 'yieldPct', 'costPerCookedKg', 'status', 'action', 'canServe', 'lastTempF', 'lastTempAt', 'reheats', 'discardedAt', 'discardReason', 'wasteG']));
+      for (const b of state.batches) out.push(([b.id, b.ing, b.label, b.kind, b.src, ISO(b.enteredAt), b.rawG, b.cookedG, b.remainingG, b.yieldPct, b.costPerCookedKg, b.status, b.action, b.canServe, b.lastTempF, ISO(b.lastTempAt), b.reheats, ISO(b.discardedAt), b.discardReason, b.wasteG]));
+    } else return null;
+    return out;
   }
 
   /* ---------- resets ---------- */
@@ -1030,6 +1153,8 @@
       tickets, orders, events, batches, learned: state.learned, menu: state.menu, ingredients: state.ingredients, settings: state.settings,
       range: { from: isNum(from) ? from : to, to }, counts: { live: state.tickets.length, sample: smp ? smp.tickets.length : 0 }, hasSample: !!smp,
     };
+    // Days before this date were archived by Close the month: their day totals stay (day_closed events), their tickets and orders are in the owner's files.
+    if (typeof state.archivedBefore === 'string') ds.archivedBefore = state.archivedBefore;
     m[key] = { smp, ds };
     return ds;
   }
@@ -1258,13 +1383,13 @@
   function isOwn() { return !!(state && state.catalog === 'own'); }
 
   // Public API: init, destroy, status, getState, now, tick, dispatch, dispatchEx, lastResult, subscribe,
-  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset,
+  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset,
   // resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY.
   SB.store = {
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
