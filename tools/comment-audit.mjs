@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* Counts how well the code is explained, so "every function explained" is measured, not hoped.
  *   node tools/comment-audit.mjs [files...] [--max-gap 40] [--min-words 6] [--report]
- * Default files: every src/js/*.js, src/css/*.css and src/index.template.html. Exit code 1 if any problem (unless --report).
+ * Default files: every src/js/*.js, src/css/*.css, server/*.mjs and src/index.template.html. Exit code 1 if any problem (unless --report).
  * LEAN rules (see docs/comment-style.md). This is a floor, not a goal:
  *  - the file starts with a header comment that has "WHAT THIS FILE IS" (the template has "READ ME FIRST")
  *  - every NAMED function has a comment directly above it (or at the top of its body) of at least --min-words words
@@ -25,7 +25,7 @@ const MAX_GAP = opt('max-gap', 40), MIN_WORDS = opt('min-words', 6);
 const skip = new Set(); args.forEach((a, i) => { if (a === '--max-gap' || a === '--min-words') skip.add(i).add(i + 1); });
 let files = args.filter((a, i) => !a.startsWith('--') && !skip.has(i));
 if (!files.length) {
-  for (const [dir, ext] of [['src/js', '.js'], ['src/css', '.css']]) for (const f of fs.readdirSync(path.join(root, dir)).sort()) if (f.endsWith(ext)) files.push(path.join(dir, f));
+  for (const [dir, ext] of [['src/js', '.js'], ['src/css', '.css'], ['server', '.mjs']]) for (const f of (fs.existsSync(path.join(root, dir)) ? fs.readdirSync(path.join(root, dir)) : []).sort()) if (f.endsWith(ext)) files.push(path.join(dir, f));
   files.push('src/index.template.html');
 }
 
