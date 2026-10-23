@@ -200,7 +200,7 @@
 
     // Builds one open-order row once; updateOpenRow fills it in place.
     function makeOpenRow(o) {
-      const who = h('span', { class: 'ox-who' }), ch = h('span', { class: 'chip ox-ch' });
+      const who = h('span', { class: 'ox-who', dir: 'auto' }), ch = h('span', { class: 'chip ox-ch' });
       const round = h('span', { class: 'chip ox-round', hidden: true }), demo = h('span', { class: 'chip', dataset: { tone: 'info' }, hidden: true }, 'Demo');
       const items = h('div', { class: 'ox-items' }), meta = h('div', { class: 'ox-meta' });
       const total = h('span', { class: 'ox-total num' }), sub = h('span', { class: 'ox-sub num' });
@@ -260,7 +260,7 @@
     }
     // Builds one paid-order row once; updatePaidRow fills it in place.
     function makePaidRow(o) {
-      const who = h('span', { class: 'ox-who' }), ch = h('span', { class: 'chip ox-ch' });
+      const who = h('span', { class: 'ox-who', dir: 'auto' }), ch = h('span', { class: 'chip ox-ch' });
       const items = h('div', { class: 'ox-items' }), meta = h('div', { class: 'ox-meta' });
       const total = h('span', { class: 'ox-total num' }), sub = h('span', { class: 'ox-sub num' });
       const reopen = h('button', { type: 'button', class: 'btn ox-reopen', dataset: { act: 'reopen' } }, ico('history', 20), h('span', null, 'Reopen'));

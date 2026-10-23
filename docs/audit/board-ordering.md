@@ -115,3 +115,17 @@ Fixed:
 - **Wording (A4's round 5 rows):** "held back" instead of "locked for safety", "Select" instead of "Tick", "Start and Done", "your dishes", "pulled pork or chili", "Demo batch", "restaurants that cook food ahead", "Sample history", demo wording instead of practice.
 
 Left: the Overdue badge is small at 10 feet (the red outline and the "Do this first" tag carry the message); the physical size of a 2560x1440 32 in monitor needs browser zoom; P2 items 3 and 6 to 11 of the first list.
+
+## Round 7 status
+
+Screenshots: `docs/ux-shots/night/a1/r7-*.png`. Tests: `test/board-contrast.e2e.mjs` (now also the 86, Recall, Menu, Help and discards sheets in Day, Night and Night with Large text, and focus rings by control type). `board-round3` and `board-round4` re-run and pass. Simulated in headless Chromium only.
+
+Fixed:
+- **Focus rings:** the dish row button had no ring at all, and controls on the dark sound bar (clear X, help "?") had a ring the same colour as the bar. Both now show a ring of at least 2 px with 3:1 contrast in Day and Night. The new sheets showed no contrast failures.
+- **Overdue badge in Far display:** bigger and on its own line (see `docs/ux-test-report.md`).
+- **Friday rush** (a blank kitchen, six dishes added, 40 tickets one every 250 ms, then Start, Bump with its "Bump anyway" confirm, tab switches, Orders with 40 orders, Pay, the 86 board, New ticket, and the cabinet tab after turning cooking ahead on): no overlap, no clipped text, no page errors. Time from tap to the next painted frame: new ticket 30 ms on average (worst 52), tap Start 16 ms, Bump 12 ms, tab switch 30 to 38 ms, Pay 36 ms, open the 86 board 46 ms, open New ticket 93 ms, open Orders with 40 orders 112 ms. The one thing found: in the cabinet view the 10-second "Paid ... Undo" toast sat on top of the In the cabinet and New batch tabs; it now sits below them.
+- **Order sheet with 36 dishes and 12 categories at 768x1024:** no clipped tile names (a 40-character name wraps to five lines), the 12 category tabs wrap to two rows, search plus Enter adds the first match. Emoji, Arabic and Hebrew names draw correctly; right-to-left customer names now align right (`dir="auto"` on slip, tile, wall, Orders and Recall names).
+- **From A2's first-time owner run:** tabs for categories with no dish are hidden (and all tabs when fewer than two categories have a dish); the payment note says "No sales tax is added. Set it under Menu, Tax, hours and PIN." when the tax rate is 0; the New batch weight starts at the usual batch size the owner typed.
+- **Wording (A4):** research-report sentence removed from Help, "step 1 of 2" and "step 2 of 2" for cooling, "throw it out".
+
+Left: a hint of how many tickets are below the fold (P2 6); countdown format switching between minutes and mm:ss (P2 7); bright slips at Night (P2 8); the Demo tag on every ticket (P2 11); wall names that are too long end in an ellipsis (no way to read the rest on a TV).

@@ -236,3 +236,16 @@ Against the test "from 10 feet, in 10 seconds, with no taps, know which batch is
 - **What to do (the next-action line on a ticket): fails at 10 ft** on a 43 in TV (barely legible to 9.1 ft) and on a 32 in 1440p monitor (6.4 ft). It passes on a 55 or 65 in 4K TV (9.8 and 11.5 ft, barely).
 - **A 32 in 2560x1440 monitor fails every line except the countdown and the batch name at "barely".** It packs many pixels into a small screen (92 pixels per inch), so the app's size steps (they follow pixel width, not physical size) cannot make it big enough. Use a larger TV, or raise the browser zoom to 150 percent on that screen.
 - The Overdue badge is the weakest item (barely legible to 6.8 ft on a 43 in TV). It also has the time and a red outline, so the ranking tag ("Do this first") and the red border carry the message at distance; this is a judgment, not a measurement.
+
+### Overdue badge re-measured (round 7)
+
+In Far display the Overdue badge now has its own line under the customer and is 1.55 times the size of the other chips (35 px at 1920 wide, 53 px at 2560, 71 px at 3840). Same assumptions as above, size: comfortable / barely legible:
+
+| Screen | Badge size | Comfortable / barely legible |
+|---|---|---|
+| 43 in TV, 1920x1080 | 35 px | 5.9 / 11.8 ft |
+| 32 in monitor, 2560x1440 | 53 px | 4.9 / 9.9 ft |
+| 55 in TV, 3840x2160 | 71 px | 7.6 / 15.3 ft |
+| 65 in TV, 3840x2160 | 71 px | 9.0 / 18.0 ft |
+
+So "Overdue +23 min" is now at least barely legible at 10 feet on every screen listed except the 32 in monitor, where it is right on the line (9.9 ft). The next-action line is unchanged and still fails on a 43 in TV. Arithmetic only; nobody read it from 10 feet.

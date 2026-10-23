@@ -36,6 +36,11 @@ const states = {
   order: async (p) => { await p.evaluate(() => SB.sheets.open('order')); await p.waitForTimeout(600); },
   orders: async (p) => { await p.evaluate(() => SB.sheets.open('orders')); await p.waitForTimeout(600); },
   cabinet: async (p) => { await p.click('.fl-seg button:has-text("Cabinet")'); await p.waitForTimeout(600); },
+  board86: async (p) => { await p.evaluate(() => SB.sheets.open('board86')); await p.waitForTimeout(600); },
+  recall: async (p) => { await p.evaluate(() => SB.sheets.open('recall')); await p.waitForTimeout(600); },
+  menu: async (p) => { await p.evaluate(() => SB.sheets.open('menu')); await p.waitForTimeout(600); },
+  help: async (p) => { await p.evaluate(() => SB.sheets.open('help')); await p.waitForTimeout(600); },
+  discards: async (p) => { await p.evaluate(() => SB.sheets.open('discards')); await p.waitForTimeout(600); },
 };
 for (const th of ['day', 'night', 'night-large']) {
   await withPage({ w: 1280, h: 800, hash: '' }, async (page) => {
@@ -51,6 +56,22 @@ for (const th of ['day', 'night', 'night-large']) {
       if (name === 'order' && (await page.locator('button:has-text("Close, keep draft")').count())) await page.click('button:has-text("Close, keep draft")');
       await page.waitForTimeout(300);
       if (name === 'cabinet') await page.click('.fl-seg button:has-text("All")');
+    }
+  });
+}
+
+// Focus rings on every kind of control, in Day and Night: each must show an outline of at least 2 px whose colour has 3:1 against what is behind it.
+for (const th of ['day', 'night']) {
+  await withPage({ w: 1280, h: 800, hash: '' }, async (page) => {
+    await ready(page);
+    await page.goto(page.url().split('#')[0].split('?')[0] + '?demo'); await ready(page);
+    await page.evaluate((t) => { SB.floor.setWelcome(false); SB.theme.set(t); SB.sim.live.crew(false); SB.store.resetLive({ keepSettings: true, starter: true, stagger: true, catalog: 'sample', replaceOwn: true }); SB.sim.seedFirstRun({ force: true }); }, th);
+    await page.waitForTimeout(800);
+    await page.keyboard.press('Tab');
+    const kinds = { 'tab button': '.fl-seg [role="tab"][aria-selected="true"]', 'header button': '.fl-new', 'ticket button': '.fl-bump', 'dish tile button': 'button.fl-item', 'strip clear button': '.fl-strip-x', 'help link': '.gd-help' };
+    for (const [name, sel] of Object.entries(kinds)) {
+      const r = await page.evaluate((sel) => { const e = [...document.querySelectorAll(sel)].find((x) => x.offsetParent !== null); if (!e) return null; e.focus({ focusVisible: true }); const cs = getComputedStyle(e); const parse = (c) => { const m = c.match(/rgba?\(([^)]+)\)/); const q = m[1].split(',').map(Number); return { r: q[0], g: q[1], b: q[2] }; }; const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); }; let bg = null, x = e.parentElement; while (x) { const b = getComputedStyle(x).backgroundColor; const m = b.match(/rgba?\(([^)]+)\)/); if (m) { const q = m[1].split(',').map(Number); if (q.length < 4 || q[3] > 0.9) { bg = { r: q[0], g: q[1], b: q[2] }; break; } } x = x.parentElement; } const oc = parse(cs.outlineColor); const L1 = lum(oc), L2 = bg ? lum(bg) : 1; return { w: parseFloat(cs.outlineWidth), style: cs.outlineStyle, ratio: +((Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05)).toFixed(2) }; }, sel);
+      if (r) check(th + ' focus ring on ' + name, r.style !== 'none' && r.w >= 2 && r.ratio >= 3, r);
     }
   });
 }

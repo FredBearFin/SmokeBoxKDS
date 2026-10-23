@@ -698,7 +698,7 @@
     for (const w of want) {
       keep.add(w.key);
       let r = P.rows.get(w.key);
-      if (!r) { r = { li: h('li', { class: 'fl-wall-row' }, h('span', { class: 'fl-wall-name' }), h('span', { class: 'fl-wall-meta num' })), a: null, b: null }; r.a = r.li.firstChild; r.b = r.li.lastChild; P.rows.set(w.key, r); w.list.appendChild(r.li); }
+      if (!r) { r = { li: h('li', { class: 'fl-wall-row' }, h('span', { class: 'fl-wall-name', dir: 'auto' }), h('span', { class: 'fl-wall-meta num' })), a: null, b: null }; r.a = r.li.firstChild; r.b = r.li.lastChild; P.rows.set(w.key, r); w.list.appendChild(r.li); }
       setTxt(r.a, w.text); setTxt(r.b, w.meta);
     }
     for (const [k, r] of Array.from(P.rows)) if (!keep.has(k)) { r.li.remove(); P.rows.delete(k); }
@@ -1066,7 +1066,7 @@
     const zone = mode === 'station' ? m.zone : null;
     const num = h('span', { class: 'slip-num num', id: uid + '-n' }, h('span', { class: 'visually-hidden' }, 'Ticket '), '#' + t.num);
     const stampSlot = h('span', { class: 'fl-stamp-slot' });
-    const who = h('span', { class: 'slip-who', id: uid + '-w' }, t.customer);
+    const who = h('span', { class: 'slip-who', dir: 'auto', id: uid + '-w' }, t.customer);
     const ch = C.channelById[t.channel] || { name: String(t.channel), icon: 'plate' };
     const count = h('span', { class: 'fl-count' });
     const meta = h('div', { class: 'slip-meta' }, h('span', { class: 'fl-chan' }, ico(ch.icon, 18), h('span', null, ch.name)), count,
@@ -1235,7 +1235,7 @@
     const sr = h('span', { class: 'visually-hidden' });
     // Compact tickets show the short menu name; the full name stays in the reading order for screen readers.
     const short = it.short && it.short !== it.name ? it.short : null;
-    const name = h('span', { class: 'slip-name' }, short ? h('span', { class: 'nm-full' }, it.name) : it.name, short ? h('span', { class: 'nm-short', 'aria-hidden': 'true' }, short) : null, sr);
+    const name = h('span', { class: 'slip-name', dir: 'auto' }, short ? h('span', { class: 'nm-full' }, it.name) : it.name, short ? h('span', { class: 'nm-short', 'aria-hidden': 'true' }, short) : null, sr);
     const sub = h('span', { class: 'fl-sub' });
     row.sr = sr;
     if (kind === 'deck') {

@@ -613,7 +613,7 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl-slip[data-sel="true"] { outline: calc(5px * var(--fl-k)) solid var(--ink); outline-offset: calc(2px * var(--fl-k)); }
 
 /* In the cabinet view the cards have buttons along the bottom-left, where toasts normally sit: toasts go to the top right, under the strip. */
-html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto; top: var(--fl-toast-top, 130px); left: auto; right: var(--gutter); transform: none; width: min(400px, 34vw); }
+html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto; top: calc(var(--fl-toast-top, 130px) + 118px); left: auto; right: var(--gutter); transform: none; width: min(400px, 34vw); }
 
 /* The void sheet's reason chips. */
 .fl-reasons { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); margin: var(--sp-3, 12px) 0; }
@@ -739,3 +739,12 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 /* Touch size: the sound and pause bars and their clear (x) buttons are at least 44 px high. */
 .fl-strip-sound, .fl-strip-pause { min-height: max(44px, var(--tap)); }
 .fl-strip-x { min-height: max(44px, var(--tap)); min-width: max(44px, var(--tap)); }
+/* Keyboard focus is visible on every control: dish rows get a ring inside the row, and controls on the dark sound bar get a light ring. */
+.fl-item:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -4px; }
+.fl-bar-sound :focus-visible, .fl-bar-sound .gd-help:focus-visible { outline: var(--bw-focus) solid var(--bg); outline-offset: -3px; }
+.fl-bar-sound .gd-help:focus-visible { outline-offset: 2px; }
+/* Far display, the Overdue badge: much larger, on its own line under the customer, so "Overdue +23 min" reads from the doorway. */
+.fl[data-far="on"] .fl-slip .fl-badge { grid-column: 1 / -1; grid-row: 3; justify-self: start; font-size: calc(var(--fs-3) * 1.55); min-height: calc(32px * var(--fl-k) * 1.5); padding: 2px calc(14px * var(--fl-k)); }
+.fl[data-far="on"] .fl-slip .fl-badge .icon { width: 1.2em; height: 1.2em; }
+.fl[data-far="on"] .fl-slip .slip-meta { grid-row: 4; }
+.fl[data-far="on"] .fl-slip .slip-progress { grid-row: 5; }
