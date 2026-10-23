@@ -1385,7 +1385,7 @@
     let lastRev = -1, lastSizeAt = 0;
     // Size of what is stored on this device, in characters; falls back to the live state.
     const storedChars = () => {
-      try { const raw = g.localStorage && g.localStorage.getItem(SB.store.KEY); if (raw) return raw.length; } catch (e) { /* fall through */ }
+      try { const raw = SB.util.storage.raw(SB.store.KEY); if (raw) return raw.length; } catch (e) { /* fall through */ }
       try { return JSON.stringify(cur()).length; } catch (e) { return null; }
     };
     // The simulator when it can switch sample history, otherwise null (the page then says it is not

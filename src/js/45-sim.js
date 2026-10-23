@@ -1164,6 +1164,8 @@
   // WATCH OUT: when the kitchen has the owner's own dishes, o.replaceOwn must be true or the clear is refused.
   Sim.restartDemo = function (o) {
     const st = SB.store;
+    // In an isolated build the demo is its own mode: a real kitchen is never turned into the demo from here.
+    if (typeof st.isolated === 'function' && st.isolated() && !st.isDemo()) return -1;
     try { live.stop(); } catch (e) { /* the simulator may not be running */ }
     st.setSpeed(1);
     if (st.resetLive({ keepSettings: true, starter: true, stagger: true, catalog: 'sample', replaceOwn: !!(o && o.replaceOwn) }) !== 'ok') return -1;

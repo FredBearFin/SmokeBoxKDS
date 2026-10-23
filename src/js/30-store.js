@@ -24,6 +24,8 @@
   const MAX_TEXT = 20e6; // characters; backups above this are refused (Pitcall PO4c)
   // 400 ms: wait this long after the last change before saving, so a burst of taps is one save.
   const SAVE_MS = 400;
+  // True for a plain object (not null, not a list).
+  const isObjLike = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
   // True only for a real, finite number.
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   // Looks up the engine each time it is needed, not once at load, so the engine can be swapped in tests.
@@ -55,6 +57,9 @@
   // simRef is the simulator (if attached). last is the result of the most recent action. st is the save
   // status. tabId names this tab in tab-sync messages.
   let simRef = null;
+  // Which kitchen this store holds: 'real' or 'demo'. strict is true when the start-up named the mode (the app does;
+  // plain tests do not): then the real kitchen refuses a fast clock and the sample history, and backups carry the mode.
+  let mode = 'real', strict = false, baseStorage = null, reloadFn = null;
   let last = null;
   let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0 };
   const tabId = 'tab_' + Math.floor(Math.random() * 1e9).toString(36);
@@ -76,6 +81,7 @@
   // jump. Returns false for a bad speed.
   function setSpeed(x) {
     if (!isNum(x) || x < 0.1 || x > 1000) return false;
+    if (strict && mode === 'real' && x !== 1) return false; // only the demo may run the clock fast: a real board must keep real time
     const v = now();
     clk = { base: v, realBase: realNow(), speed: x };
     schedulePersist(false);
@@ -299,7 +305,8 @@
   function openTransport(given) {
     let t = given;
     try { if (typeof t === 'function') t = t(); } catch (e) { t = null; }
-    if (!t) t = channelTransport();
+    if (strict && mode === 'demo') t = null; // a server or hub transport never carries the demo
+    if (!t) t = channelTransport(mode === 'demo' ? 'smokebox-demo' : undefined); // the demo talks on its own channel
     if (typeof t.open !== 'function' || typeof t.post !== 'function') return;
     let ok = false;
     try { ok = t.open((msg) => { if (tr === t && msg && typeof msg === 'object') onMessage(msg); }) !== false; } catch (e) { ok = false; }
@@ -424,7 +431,14 @@
     opts = opts || {};
     destroy();
     realNow = typeof opts.now === 'function' ? opts.now : () => Date.now();
-    storage = opts.storage && typeof opts.storage.get === 'function' && typeof opts.storage.set === 'function' ? opts.storage : U.storage;
+    // The mode: named by the caller, else the page's own. A named mode also puts the store in strict mode (see above).
+    strict = opts.mode === 'demo' || opts.mode === 'real';
+    mode = strict ? opts.mode : (U.mode && U.mode() === 'demo' ? 'demo' : 'real');
+    reloadFn = typeof opts.reload === 'function' ? opts.reload : null;
+    const given = opts.storage && typeof opts.storage.get === 'function' && typeof opts.storage.set === 'function' ? opts.storage : null;
+    // Kitchen data goes to the demo's own keys in the demo, so the demo never reads or writes the real kitchen's data.
+    baseStorage = given || U.rawStorage;
+    storage = given ? (strict && mode === 'demo' ? U.storageFor(given, 'demo') : given) : (strict ? U.storageFor(U.rawStorage, mode) : U.storage);
     st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0 };
     last = null;
     baseSid = null; pending = []; skipRebase = false;
@@ -464,7 +478,8 @@
     // A real kitchen starts with an empty pit; init({ starter: true }) gives the demo stock. init({ blank: true }) (what the
     // app's start-up passes) makes a brand-new install start with no dishes, ingredients or prices at all. A saved state
     // always wins: nobody who already has data is changed.
-    state = loaded || E().newState(opts.blank === true && opts.starter !== true ? { now: now(), blank: true } : { now: now(), starter: opts.starter === true, stagger: opts.starter === true });
+    const demoStart = strict && mode === 'demo';
+    state = loaded || E().newState(opts.blank === true && opts.starter !== true && !demoStart ? { now: now(), blank: true } : { now: now(), starter: opts.starter === true || demoStart, stagger: opts.starter === true || demoStart });
     // Catch up anything that became due while the page was closed.
     const t = E().tick(state, now());
     state = t.state;
@@ -538,10 +553,18 @@
   function envelope() {
     const r = realNow();
     const env = { v: 1, savedAt: r, rev: state.rev, clock: { virtual: now(), real: r, speed: clk.speed }, state };
+    if (strict) env.mode = mode;
+    // Owner choices from the setup screens that live outside the board state travel with the backup too.
+    const setup = {};
+    for (const k of SETUP_LISTS) { let v = null; try { v = storage ? storage.get(SETUP_KEYS[k], null) : null; } catch (e) { v = null; } if (Array.isArray(v)) setup[k] = v.filter((x) => typeof x === 'string').slice(0, 200); }
+    if (Object.keys(setup).length) env.setup = setup;
     const nm = ownerNames();
     if (nm) env.names = nm;
     return env;
   }
+  // The setup-screen lists a backup carries: stations the owner hid from the tiles, and dishes that came from the examples.
+  const SETUP_KEYS = { hiddenStations: 'smokebox.v1.setup.hiddenStations', examples: 'smokebox.v1.setup.examples' };
+  const SETUP_LISTS = Object.keys(SETUP_KEYS);
   // The owner's station, category and channel names (SB.config.customSpec), or null when there are none or the
   // config has no such feature. Backups carry them so tickets on an added station survive a restore.
   function ownerNames() {
@@ -572,6 +595,14 @@
   function importAll(text) {
     if (typeof text !== 'string') { last = { type: 'import', report: 'invalidBackup', info: { error: 'not text' }, events: [] }; return 'invalidBackup'; }
     if (text.length > MAX_TEXT) { last = { type: 'import', report: 'exportTooLarge', info: { chars: text.length, max: MAX_TEXT }, events: [] }; return 'exportTooLarge'; }
+    // A backup made in the demo cannot be loaded into the real kitchen, nor the reverse. A backup with no mode (made before
+    // the demo had its own storage) is a real kitchen's.
+    let parsed = null;
+    try { parsed = JSON.parse(text); } catch (e) { parsed = null; }
+    if (strict && parsed && typeof parsed === 'object') {
+      const from = parsed.mode === 'demo' ? 'demo' : 'real';
+      if (from !== mode) { last = { type: 'import', report: 'wrongBackupMode', info: { backup: from, mode }, events: [] }; return 'wrongBackupMode'; }
+    }
     // A backup that carries owner names puts them in place BEFORE the check, so tickets on an added station are
     // not dropped. A backup without names (an older one) leaves the current names alone. A refused import
     // puts the old names back.
@@ -590,6 +621,7 @@
       return 'invalidBackup';
     }
     if (namesGiven && typeof C.saveCustom === 'function') { try { C.saveCustom(namesGiven); } catch (e) { /* the names stay applied for this session */ } }
+    if (parsed && isObjLike(parsed.setup)) for (const k of SETUP_LISTS) if (Array.isArray(parsed.setup[k])) { try { storage.set(SETUP_KEYS[k], parsed.setup[k].filter((x) => typeof x === 'string').slice(0, 200)); } catch (e) { /* the list is a convenience */ } }
     const ns = v.state;
     // The revision must go up so other tabs treat the imported copy as newer; the clock must not be behind
     // its times.
@@ -763,7 +795,7 @@
   // front of the live data. Remembered per state object.
   function dataset(opts) {
     if (!state) return { tickets: [], orders: [], events: [], batches: [], learned: {}, menu: [], ingredients: [], settings: E().defaultSettings(), range: { from: 0, to: 0 }, counts: { live: 0, sample: 0 }, hasSample: false };
-    const wantSample = !!(opts && opts.sample);
+    const wantSample = !!(opts && opts.sample) && !(strict && mode === 'real'); // sample history belongs to the demo only
     const smp = wantSample ? sampleData() : null;
     let m = dsMemo.get(state);
     if (!m) { m = {}; dsMemo.set(state, m); }
@@ -787,6 +819,39 @@
     return ds;
   }
 
+  // The kitchen this page shows: 'real' or 'demo'.
+  function modeNow() { return mode; }
+  // True while this tab is in the demo kitchen, false in the real one.
+  function isDemo() { return mode === 'demo'; }
+  // True when the start-up named the mode, so the demo and the real kitchen are kept apart (plain tests start without it).
+  function isolated() { return strict; }
+  // Reloads the page (or calls the reload hook given to init). Returns true when a reload was asked for.
+  function reloadPage() {
+    try { if (reloadFn) { reloadFn(); return true; } if (g.location && typeof g.location.reload === 'function') { g.location.reload(); return true; } } catch (e) { /* ignore */ }
+    return false;
+  }
+  // Switches this tab to the demo: saves the real kitchen first, remembers the choice for this tab only, and reloads.
+  // The real data is not touched again while the tab is in the demo. Returns false when already in the demo or the
+  // browser cannot remember the choice.
+  function enterDemo() {
+    if (mode === 'demo' || !state) return false;
+    flush();
+    try { g.sessionStorage.setItem(U.MODE_KEY, 'demo'); } catch (e) { return false; }
+    reloadPage();
+    return true;
+  }
+  // Leaves the demo: throws away everything the demo saved, forgets the choice, stops this tab saving, and reloads into
+  // the real kitchen. Returns false when not in the demo.
+  function leaveDemo() {
+    if (mode !== 'demo') return false;
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    dirty = false; storage = null; // nothing more may be saved from this tab
+    try { for (const k of baseStorage.keys ? baseStorage.keys('smokebox.demo.') : []) baseStorage.remove(k); } catch (e) { /* ignore */ }
+    try { g.sessionStorage.removeItem(U.MODE_KEY); } catch (e) { /* ignore */ }
+    try { if (g.location && /[?&]demo(=|&|$)/.test(g.location.search || '') && g.history && g.history.replaceState) g.history.replaceState(null, '', g.location.pathname + g.location.hash); } catch (e) { /* ignore */ }
+    reloadPage();
+    return true;
+  }
   // True while this kitchen began empty and still has no dish on the menu (archived dishes do not count): the setup
   // screens use it to know a first-time owner is looking at an empty kitchen. False for old saves and the demo.
   function isBlank() {
@@ -802,7 +867,7 @@
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, KEY, CORRUPT_KEY,
+    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").

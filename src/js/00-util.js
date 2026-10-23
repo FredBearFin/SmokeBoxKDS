@@ -238,7 +238,7 @@
   const mem = new Map();
   let ls = null;
   try { ls = g.localStorage || null; if (ls) { ls.setItem('__sb_probe', '1'); ls.removeItem('__sb_probe'); } } catch (e) { ls = null; }
-  U.storage = {
+  const rawStorage = {
     persistent: !!ls,
     // Reads a saved value. Gives fallback if it is missing, unreadable, or storage is blocked. Never throws.
     get(key, fallback) {
@@ -257,7 +257,71 @@
     },
     // Deletes a saved value from the browser and from memory.
     remove(key) { try { if (ls) ls.removeItem(key); } catch (e) { /* ignore */ } mem.delete(key); },
+    // Every saved key that starts with the prefix (browser and memory). Never throws.
+    keys(prefix) {
+      const out = new Set();
+      try { if (ls) for (let i = 0; i < ls.length; i++) { const k = ls.key(i); if (k && k.indexOf(prefix) === 0) out.add(k); } } catch (e) { /* ignore */ }
+      mem.forEach((v, k) => { if (k.indexOf(prefix) === 0) out.add(k); });
+      return Array.from(out);
+    },
   };
+
+  /* ---------- demo and real kitchen keep separate saved data ---------- */
+  // The settings that belong to the device, not to a kitchen (look, sound, which station this tablet shows). They
+  // are the same in the demo and the real kitchen. Every other smokebox.v1 key is kitchen data and gets its own
+  // copy in the demo (smokebox.demo.<name>), so the demo can never read or write the real kitchen's data.
+  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'callouts', 'far', 'wall', 'dock'].map((k) => 'smokebox.v1.' + k);
+  // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
+  // is treated as kitchen data (the safe side).
+  const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone'].map((k) => 'smokebox.v1.' + k);
+  const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
+  // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
+  function detectMode() {
+    try {
+      const q = g.location && typeof g.location.search === 'string' ? g.location.search : '';
+      if (/[?&]demo(=|&|$)/.test(q)) { try { g.sessionStorage.setItem(MODE_KEY, 'demo'); } catch (e) { /* the address alone still works for this load */ } return 'demo'; }
+      return g.sessionStorage && g.sessionStorage.getItem(MODE_KEY) === 'demo' ? 'demo' : 'real';
+    } catch (e) { return 'real'; }
+  }
+  let curMode = detectMode();
+  // The kitchen this page shows: 'real' or 'demo'.
+  U.mode = () => curMode;
+  // Changes the mode inside this page (tests, and the store when it starts in a named mode). Does not reload.
+  U.setMode = (m) => { curMode = m === 'demo' ? 'demo' : 'real'; return curMode; };
+  U.MODE_KEY = MODE_KEY;
+  U.sharedKeys = SHARED_KEYS.slice();
+  U.dataKeys = DATA_KEYS.slice();
+  // The key a value is really saved under: in the demo, kitchen data moves to smokebox.demo.*; device settings and
+  // anything outside smokebox.v1 keep their name.
+  function keyFor(key, m) {
+    return m === 'demo' && typeof key === 'string' && key.indexOf('smokebox.v1.') === 0 && SHARED_KEYS.indexOf(key) < 0 ? 'smokebox.demo.' + key.slice('smokebox.v1.'.length) : key;
+  }
+  U.storageKey = keyFor;
+  // Wraps a storage object so every key is translated for the mode (a name, or a function giving it). The wrapper
+  // has the same get, raw, set and remove, so code written against storage does not change.
+  function storageFor(base, modeOf) {
+    const m = () => (typeof modeOf === 'function' ? modeOf() : modeOf);
+    // The wrapper below passes each call to the real storage with the key translated for the mode.
+    return {
+      // Whether the browser really keeps what is saved (false in a private window).
+      get persistent() { return base.persistent; },
+      // Reads a value through the translated key.
+      get: (key, fb) => base.get(keyFor(key, m()), fb),
+      // The saved text exactly as stored, through the translated key.
+      raw: (key) => (typeof base.raw === 'function' ? base.raw(keyFor(key, m())) : null),
+      // Saves a value through the translated key.
+      set: (key, val) => base.set(keyFor(key, m()), val),
+      // Deletes a value through the translated key.
+      remove: (key) => base.remove(keyFor(key, m())),
+      // Every saved key with this prefix, exactly as named in the browser (not translated).
+      keys: (prefix) => (typeof base.keys === 'function' ? base.keys(prefix) : []),
+    };
+  }
+  U.storageFor = storageFor;
+  U.rawStorage = rawStorage;
+  // The storage every screen uses: follows the page's mode.
+  U.storage = storageFor(rawStorage, () => curMode);
 
   /* ---------- DOM helpers (browser only; call after load) ---------- */
   // Makes text safe to place inside page markup by replacing & < > and quotes.

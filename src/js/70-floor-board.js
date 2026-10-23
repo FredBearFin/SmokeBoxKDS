@@ -1811,6 +1811,8 @@
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.
   function startDemo() {
+    // A real kitchen never turns into the demo: the demo is a separate mode (own saved data), entered with a reload.
+    if (store().isolated && store().isolated() && !store().isDemo()) { store().enterDemo(); return; }
     // The pit starts empty now, so the demo first loads its own stocked kitchen (settings stay).
     if (SB.sim && SB.sim.restartDemo && !store().getState().batches.length) SB.sim.restartDemo();
     const live = SB.sim && SB.sim.live;
