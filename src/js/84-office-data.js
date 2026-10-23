@@ -214,15 +214,15 @@
 
   // Panels. The sticky table of contents links to them; each panel is a section with a focusable heading.
   const SECTIONS = [
-    { id: 'menu', label: 'Menu', title: 'Dishes and what goes in them' },
-    { id: 'ingredients', label: 'Ingredients', title: 'Ingredients' },
-    { id: 'times', label: 'Time limits', title: 'Ticket time limits by channel' },
-    { id: 'pacing', label: 'Pacing', title: 'Meal pacing' },
-    { id: 'safety', label: 'Food safety', title: 'Food safety limits' },
-    { id: 'pin', label: 'PIN', title: 'Manager PIN' },
-    { id: 'look', label: 'Appearance', title: 'Appearance and service hours' },
-    { id: 'data', label: 'Data', title: 'Data, backup and reset' },
-    { id: 'about', label: 'About', title: 'About this build' },
+    { id: 'menu', label: 'Menu', title: 'Dishes and what goes in them', group: 'Shop' },
+    { id: 'ingredients', label: 'Ingredients', title: 'Ingredients', group: 'Kitchen' },
+    { id: 'times', label: 'Time limits', title: 'Ticket time limits by channel', group: 'Kitchen' },
+    { id: 'pacing', label: 'Pacing', title: 'Meal pacing', group: 'Advanced' },
+    { id: 'safety', label: 'Food safety', title: 'Food safety limits', group: 'Safety' },
+    { id: 'pin', label: 'PIN', title: 'Manager PIN', group: 'Shop' },
+    { id: 'look', label: 'Appearance', title: 'Appearance and service hours', group: 'Shop' },
+    { id: 'data', label: 'Data', title: 'Data, backup and reset', group: 'Devices' },
+    { id: 'about', label: 'About', title: 'About this build', group: 'Devices' },
   ];
   // One panel: a section with a focusable heading and an empty body. Returns {el, body, title, def}.
   function panel(def, intro) {
@@ -1734,10 +1734,17 @@
     function goTo(id) {
       const el = doc.getElementById('od-' + id);
       if (!el) return;
+      const adv = el.closest('details'); if (adv) adv.open = true; // an Advanced panel opens before it is scrolled to
       el.scrollIntoView({ block: 'start', behavior: U.prefersReducedMotion() ? 'auto' : 'smooth' });
       const t = el.querySelector('.od-title'); if (t) t.focus({ preventScroll: true });
     }
-    SECTIONS.forEach((sec) => {
+    // The Settings are grouped by task. Panels keep their old numbers; only the order on the page changes.
+    // Group order: Shop, Kitchen, Safety, Devices, then Advanced (collapsed by default).
+    const ORDER = ['menu', 'look', 'pin', 'ingredients', 'times', 'safety', 'data', 'about', 'pacing'].map((id) => SECTIONS.findIndex((s) => s.id === id)).filter((i) => i >= 0);
+    let lastGroup = '';
+    ORDER.forEach((i) => {
+      const sec = SECTIONS[i];
+      if (sec.group !== lastGroup) { lastGroup = sec.group; tocList.appendChild(h('li', { class: 'od-toc-group', role: 'presentation' }, sec.group)); }
       const a = h('a', { class: 'od-toc-link', href: '#od-' + sec.id, dataset: { target: sec.id } }, sec.label);
       a.addEventListener('click', (ev) => { ev.preventDefault(); goTo(sec.id); }); // a real hash would be read by the router as "leave the office"
       links.push(a);
@@ -1755,7 +1762,12 @@
         return pn;
       }
     });
-    const content = h('div', { class: 'od-content' }, ...panels.map((p) => p.el));
+    // Panels go in group order; the Advanced ones sit inside a fold that starts closed.
+    const content = h('div', { class: 'od-content' });
+    ORDER.forEach((i) => {
+      if (SECTIONS[i].group !== 'Advanced') { content.appendChild(panels[i].el); return; }
+      content.appendChild(h('details', { class: 'od-adv' }, h('summary', null, 'Advanced: ' + SECTIONS[i].label), panels[i].el));
+    });
     root.append(headBox, h('div', { class: 'od-layout' }, toc, content));
 
     // the frame keeps its own sticky bar (the data banner) at the top of the scroll area: sit the contents
@@ -1779,9 +1791,9 @@
       const bar = frameBar();
       const line = (bar ? bar.getBoundingClientRect().bottom : 0) + 90;
       let best = SECTIONS[0].id;
-      panels.forEach((p, i) => { if (p.el.getBoundingClientRect().top <= line) best = SECTIONS[i].id; });
+      ORDER.forEach((i) => { const r = panels[i].el.getBoundingClientRect(); if (r.height > 0 && r.top <= line) best = SECTIONS[i].id; });
       const atEnd = scroller === g ? false : scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4; // the last panels are short and never reach the line
-      if (atEnd) best = SECTIONS[SECTIONS.length - 1].id;
+      if (atEnd) best = SECTIONS[ORDER[ORDER.length - 1]].id;
       links.forEach((a) => { if (a.dataset.target === best) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current'); });
     }
     // Runs markCurrent at most once per frame.

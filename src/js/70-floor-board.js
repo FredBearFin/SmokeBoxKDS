@@ -1712,7 +1712,9 @@
     if (!m || !m.welcome) return;
     const s = store().getState();
     const n = SB.setup ? SB.setup.dishCount() : 0;
-    const show = !welcomeDone() && m.zone === 'all' && n > 0 && s.tickets.length === 0 && !(s.orders && s.orders.length);
+    // Once any ticket or order exists the first-steps card is finished for good, even if the board is cleared later.
+    if ((s.tickets.length || (s.orders && s.orders.length)) && !welcomeDone()) U.storage.set(KEY_WELCOME, 'done');
+    const show = !welcomeDone() && m.zone === 'all' && n > 0;
     setHidden(m.welcome, !show);
     if (!show) return;
     put(m.wText, 'Your menu has ' + n + ' ' + U.plural(n, 'dish', 'dishes') + '. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices.');

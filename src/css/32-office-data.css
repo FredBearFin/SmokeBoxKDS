@@ -266,3 +266,8 @@
 .od-item[data-open="true"] .od-sum-i { transform: rotate(180deg); }
 .od-item-body { padding: var(--sp-2) var(--sp-2) var(--sp-3); }
 @media (max-width: 720px) { .od-sum { grid-template-columns: minmax(0, 1fr) auto auto 24px; } .od-sum-m { display: none; } }
+
+/* Settings groups: a small heading in the contents list, and the closed Advanced fold. */
+.od-toc-group { list-style: none; padding: var(--sp-2) var(--sp-3) 0; font: var(--w-bold) var(--fs-1, 0.75rem) / 1.2 var(--font-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+.od-adv { border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-panel); padding: 0 var(--sp-3); }
+.od-adv > summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; font-weight: var(--w-bold); }

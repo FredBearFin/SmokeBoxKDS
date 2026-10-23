@@ -54,7 +54,7 @@
 
   const KEY_DRAFT = 'smokebox.v1.setup.draft'; // the half-typed dish {name, price, zone}, kept so a closed tab loses nothing
   const KEY_LAST = 'smokebox.v1.setup.lastZone'; // the station chosen for the last saved dish
-  const KEY_COOK = 'smokebox.v1.setup.cookAhead'; // 'yes' or 'no': the cook-ahead answer (not used by the engine yet)
+  const KEY_HIDDEN = 'smokebox.v1.setup.hiddenStations'; // station ids the owner hid from the Where is it made? tiles
   const KEY_EXAMPLES = 'smokebox.v1.setup.examples'; // ids of dishes that came from the example menu
 
   // What a new dish gets from the station tile alone: its order-screen category, a guessed prep time in seconds
@@ -94,10 +94,18 @@
     const s = SB.store.getState();
     return s.menu.filter((m) => !m.archived);
   }
+  // The dishes the owner removed (archived), newest last, so they can be brought back.
+  function removedDishes() { return SB.store.getState().menu.filter((m) => m.archived); }
   // True when nothing can be ordered yet: the first-run state that shows the Add your first dish button.
   function noDishes() { return activeDishes().length === 0; }
   // The stations a dish can be made at, in order: only the ones that receive items (not expo).
   function stations() { return SB.config.workZones.map((z) => SB.config.zoneById[z]).filter(Boolean); }
+  // The stations still shown as tiles: all of them except the ones the owner hid. At least one always stays.
+  function visibleStations() {
+    const hid = U.storage.get(KEY_HIDDEN, []);
+    const all = stations(), shown = all.filter((z) => hid.indexOf(z.id) < 0);
+    return shown.length ? shown : all.slice(0, 1);
+  }
   // The guessed category, prep seconds and tap style for a station, with safe values for a custom station.
   function defaultsFor(zoneId) {
     const d = ZONE_DEFAULT[zoneId];
@@ -136,19 +144,74 @@
     let zone = '';
     const tiles = h('div', { class: 'dp-tiles', role: 'radiogroup', 'aria-label': 'Where it is made' });
     const zoneErr = h('div', { class: 'field-error', role: 'alert', hidden: true });
-    stations().forEach((z) => {
-      const tile = h('button', { type: 'button', class: 'dp-tile', role: 'radio', 'aria-checked': 'false', dataset: { zone: z.id } },
-        ico(z.icon || 'pot', 28), h('strong', null, z.name), h('span', null, ZONE_HINT[z.id] || z.long || ''));
-      // Picks this station and remembers it for the next dish.
-      tile.addEventListener('click', () => { pickZone(z.id); U.storage.set(KEY_LAST, z.id); saveDraft(); });
-      tiles.appendChild(tile);
-    });
+    const whereLabel = h('div', { class: 'field-label' }, 'Where is it made?');
+    // Builds one tile per visible station. With only one station there is nothing to ask, so the tiles are hidden
+    // and that station is used for every dish.
+    function paintTiles() {
+      U.clear(tiles);
+      const shown = visibleStations();
+      shown.forEach((z) => {
+        const tile = h('button', { type: 'button', class: 'dp-tile', role: 'radio', 'aria-checked': 'false', dataset: { zone: z.id } },
+          ico(z.icon || 'pot', 28), h('strong', null, z.name), h('span', null, ZONE_HINT[z.id] || ''));
+        // Picks this station and remembers it for the next dish.
+        tile.addEventListener('click', () => { pickZone(z.id); U.storage.set(KEY_LAST, z.id); saveDraft(); });
+        tiles.appendChild(tile);
+      });
+      const one = shown.length === 1;
+      tiles.hidden = one; whereLabel.hidden = one;
+      if (one) zone = shown[0].id;
+      else if (!shown.some((z) => z.id === zone)) zone = '';
+      pickZone(zone);
+    }
     // Shows which station tile is chosen and clears the "tap where it is made" message.
     function pickZone(id) {
       zone = id; zoneErr.hidden = true;
       tiles.querySelectorAll('.dp-tile').forEach((b) => b.setAttribute('aria-checked', b.dataset.zone === id ? 'true' : 'false'));
     }
-    const whereBlock = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Where is it made?'), tiles, zoneErr);
+    // Change stations: rename, hide or add one, using the same saved names the board and tickets read.
+    const stSt = h('p', { class: 'fs-sub', role: 'status' });
+    const stList = h('div', { class: 'dp-stlist' });
+    // Reloads the page so the board and tickets pick up the new station names.
+    const stReload = h('button', { type: 'button', class: 'btn btn-sm', hidden: true, onClick: () => g.location.reload() }, ico('refresh', 18), h('span', null, 'Reload to show on the board'));
+    // Saves a change to the owner's station names through SB.config (checked first, so a bad name changes nothing).
+    function commitNames(mutate) {
+      const C = SB.config;
+      const spec = JSON.parse(JSON.stringify(C.customSpec()));
+      spec.rename = spec.rename || {}; spec.add = spec.add || {};
+      mutate(spec);
+      const before = C.customSpec(), res = C.applyCustom(spec);
+      if (res.rejected.length) { C.applyCustom(before); stSt.textContent = 'That name cannot be used: it is empty, longer than ' + C.customLimits.name + ' letters, or already taken.'; return false; }
+      if (!C.saveCustom(spec)) { stSt.textContent = 'This browser would not save the change.'; return false; }
+      stSt.textContent = 'Saved. Tickets and the board show the new name after you reload.'; stReload.hidden = false;
+      paintStations(); paintTiles();
+      return true;
+    }
+    // Rebuilds the station rows: a name box, Hide or Show, and an add box at the end.
+    function paintStations() {
+      U.clear(stList);
+      const hid = U.storage.get(KEY_HIDDEN, []);
+      stations().forEach((z) => {
+        const inp = h('input', { class: 'input', type: 'text', maxlength: SB.config.customLimits.name, value: z.name, 'aria-label': 'Name of station ' + z.name });
+        inp.addEventListener('change', () => { if (inp.value.trim() !== z.name) commitNames((sp) => { sp.rename.zones = Object.assign({}, sp.rename.zones, { [z.id]: inp.value }); }); });
+        const isHid = hid.indexOf(z.id) >= 0;
+        // Hides this station from the tiles, or shows it again, keeping at least one.
+        const hideBtn = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => {
+          const now = U.storage.get(KEY_HIDDEN, []).filter((x) => x !== z.id);
+          if (!isHid) now.push(z.id);
+          if (stations().every((s) => now.indexOf(s.id) >= 0)) { stSt.textContent = 'Keep at least one station showing.'; return; }
+          U.storage.set(KEY_HIDDEN, now); stSt.textContent = isHid ? z.name + ' is showing again.' : z.name + ' is hidden from the tiles. Dishes already made there keep it.';
+          paintStations(); paintTiles();
+        } }, isHid ? 'Show' : 'Hide');
+        stList.appendChild(h('div', { class: 'dp-strow' }, inp, hideBtn));
+      });
+      const addIn = h('input', { class: 'input', type: 'text', maxlength: SB.config.customLimits.name, placeholder: 'New station, like Bar', 'aria-label': 'New station name' });
+      // Adds a new station with the typed name, after the same checks as a rename.
+      stList.appendChild(h('div', { class: 'dp-strow' }, addIn, h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { if (addIn.value.trim()) commitNames((sp) => { sp.add.zones = (sp.add.zones || []).concat([{ name: addIn.value }]); }); } }, ico('plus', 18), h('span', null, 'Add station'))));
+    }
+    const stFold = h('details', { class: 'dp-fold dp-stfold' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Change stations')),
+      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'Name the places in your kitchen the way your cooks say them. Hide any you do not use. If you only have one, you will not be asked.'), stList, stSt, stReload));
+    paintStations(); paintTiles();
+    const whereBlock = h('div', { class: 'field' }, whereLabel, tiles, zoneErr, stFold);
 
     // More options, folded shut: prep time, category and a short ticket name. Nothing here is needed.
     const minIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', placeholder: 'auto', 'aria-label': 'Prep time in minutes' });
@@ -172,9 +235,23 @@
     nameIn.setAttribute('enterkeyhint', 'next'); priceIn.setAttribute('enterkeyhint', 'done');
     nameIn.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); priceIn.focus(); } });
 
+    // A line under the name box that appears when the typed name belongs to a removed dish: one tap brings it back.
+    const backRow = h('div', { class: 'fs-note dp-back', hidden: true, role: 'alert' });
+    nameField.appendChild(backRow);
+    // Shows "X was removed earlier" with a Bring it back button that un-archives it at the typed price.
+    function showBringBack(m, price) {
+      U.clear(backRow);
+      // Brings the removed dish back, at the price typed in the form.
+      backRow.append(h('span', null, m.name + ' was removed earlier. '), h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'bring-back' }, onClick: () => {
+        const r = send('updateMenuItem', { id: m.id, patch: price != null && price !== m.price ? { archived: false, price } : { archived: false } });
+        backRow.hidden = true;
+        if (r.ok) { nameIn.value = ''; priceIn.value = ''; saveDraft(); status.textContent = m.name + ' is back on your menu.'; } else status.textContent = r.words;
+      } }, 'Bring it back'));
+      backRow.hidden = false;
+    }
     // Checks the form and saves one dish. Returns true when it saved. Each problem shows beside its own box.
     function saveOne() {
-      status.textContent = ''; nameField.setError(null); priceField.setError(null);
+      status.textContent = ''; nameField.setError(null); priceField.setError(null); backRow.hidden = true;
       const name = nameIn.value.replace(/\s+/g, ' ').trim();
       const price = parsePrice(priceIn.value);
       if (!name) { nameField.setError('Type the dish name.'); nameIn.focus(); return false; }
@@ -188,7 +265,9 @@
       }
       const r = addDish(name, price, zone, { prepSec, cat: catSel.value, short: shortIn.value.trim() });
       if (!r.ok) {
-        if (/name/.test((r.info && r.info.key) || '')) nameField.setError('There is already a dish called ' + name + ' (a removed dish keeps its name). Pick another name.');
+        const gone = removedDishes().find((m) => m.name.toLowerCase() === name.toLowerCase());
+        if (gone) showBringBack(gone, price);
+        else if (/name/.test((r.info && r.info.key) || '')) nameField.setError('There is already a dish called ' + name + '. Pick another name.');
         else status.textContent = r.words;
         return false;
       }
@@ -204,6 +283,25 @@
       if (empty || saveOne()) sheet.close('done');
     });
 
+    // The Undo line after a Remove, and a fold that lists removed dishes so any can be brought back later.
+    const undoBar = h('div', { class: 'fs-note dp-undo', hidden: true, role: 'status' });
+    // Shows "Removed X" with an Undo button that puts the dish back.
+    function showUndo(m) {
+      U.clear(undoBar);
+      // Puts the removed dish back on the menu at once.
+      undoBar.append(h('span', null, 'Removed ' + m.name + '. '), h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'undo-remove' }, onClick: () => { send('updateMenuItem', { id: m.id, patch: { archived: false } }); undoBar.hidden = true; } }, 'Undo'));
+      undoBar.hidden = false;
+    }
+    const dishesHead = h('h3', { class: 'fs-h dp-h' }, 'Your dishes');
+    const goneList = h('div', { class: 'dp-list' });
+    const goneFold = h('details', { class: 'dp-fold dp-gone' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Removed dishes')), h('div', { class: 'dp-more' }, goneList));
+    // Lists removed dishes with a Bring it back button each; the fold hides when there are none.
+    function paintGone() {
+      const list = removedDishes().slice(-30);
+      goneFold.hidden = list.length === 0;
+      U.clear(goneList);
+      list.forEach((m) => goneList.appendChild(h('div', { class: 'dp-row' }, h('span', { class: 'grow' }, m.name + ' (' + U.fmtMoney(m.price) + ')'), h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { send('updateMenuItem', { id: m.id, patch: { archived: false } }); } }, 'Bring it back'))));
+    }
     // The dishes so far: each row is a name box, a price box and Remove. Changes save when the box is left.
     const listBox = h('div', { class: 'dp-list' });
     let listSig = '';
@@ -213,6 +311,7 @@
       const sig = mine.map((m) => m.id + '|' + m.name + '|' + m.price + '|' + m.zone).join(';');
       if (sig === listSig || listBox.contains(doc.activeElement)) return;
       listSig = sig;
+      dishesHead.hidden = mine.length === 0;
       const ex = U.storage.get(KEY_EXAMPLES, []);
       U.clear(listBox);
       lead.textContent = mine.length ? (mine.length + ' ' + U.plural(mine.length, 'dish', 'dishes') + ' on your menu. Change a name or price below and it saves when you tap away.') : 'Add the dishes you sell. Name, price and where it is made is all you need. Nothing here is pre-filled.';
@@ -233,15 +332,15 @@
         };
         n.addEventListener('change', save); pr.addEventListener('change', save);
         const rm = h('button', { type: 'button', class: 'btn btn-sm', 'aria-label': 'Remove ' + m.name, onClick: () => {
-          // Removing archives the dish: it can no longer be ordered, and old tickets keep it.
-          send('updateMenuItem', { id: m.id, patch: { archived: true } });
+          // Removing archives the dish: it can no longer be ordered, and old tickets keep it. Undo is offered at once.
+          if (send('updateMenuItem', { id: m.id, patch: { archived: true } }).ok) showUndo(m);
         } }, ico('x', 18), h('span', null, 'Remove'));
         const z = SB.config.zoneById[m.zone];
         listBox.appendChild(h('div', { class: 'dp-row' }, n, pr, h('span', { class: 'chip dp-zone' }, z ? z.name : m.zone), ex.indexOf(m.id) >= 0 ? h('span', { class: 'chip dp-ex', 'data-tone': 'warn' }, 'Example') : null, rm, msg));
       });
     }
-    paintList();
-    offs.push(SB.store.subscribe(() => { paintList(); }));
+    paintList(); paintGone();
+    offs.push(SB.store.subscribe(() => { paintList(); paintGone(); }));
 
     // More ways to add dishes: for now only an example menu, clearly marked as an example.
     const exStatus = h('p', { class: 'fs-sub', role: 'status' });
@@ -272,14 +371,14 @@
     // Links to the other small settings and to the full menu editor in the back office.
     const shopBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('shop'), 60); } }, ico('sliders', 20), h('span', null, 'Tax, hours and PIN'));
     const fullBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); } }, ico('gauge', 20), h('span', null, 'Full menu editor (ingredients, prep times)'));
-    root.append(lead, form, h('h3', { class: 'fs-h dp-h' }, 'Your dishes'), listBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
+    root.append(lead, form, dishesHead, undoBar, listBox, goneFold, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
     sheet.body.appendChild(root);
 
     // Restore a draft left by a closed tab, then the last station used.
     const d = U.storage.get(KEY_DRAFT, null);
     if (d && typeof d === 'object') { nameIn.value = String(d.name || ''); priceIn.value = String(d.price || ''); }
     const last = (d && d.zone) || U.storage.get(KEY_LAST, '');
-    if (last && SB.config.zoneById[last] && SB.config.workZones.indexOf(last) >= 0) pickZone(last);
+    if (last && visibleStations().some((z) => z.id === last) && visibleStations().length > 1) pickZone(last);
     setTimeout(() => nameIn.focus(), 50);
     return sheet;
   }
@@ -328,11 +427,17 @@
         pinSt.textContent = r.ok ? 'PIN set. The back office will ask for it.' : 'The PIN could not be saved.';
         if (r.ok) pin.value = '';
       } }, 'Set PIN'));
-    // Cook-ahead: one yes or no. The answer is only remembered for now; a later update will use it.
-    const cook = SB.ui.segmented({ label: 'Do you cook meat ahead and hold it hot?', value: U.storage.get(KEY_COOK, 'no'), options: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }],
-      // Remembers the yes or no answer and says that nothing changes yet.
-      onChange: (v) => { U.storage.set(KEY_COOK, v); cookSt.textContent = 'Noted. Nothing changes yet: batch tracking is a later update.'; } });
-    const cookSt = section('Cooking ahead', 'Some places cook brisket or pork in the morning and slice it to order. If you do, Smokebox can track the batches and warn you before they run out of time.', cook);
+    // Cook-ahead: one yes or no, kept in the real setting (settings.modules.cookAhead). A saved kitchen from before this
+    // setting existed counts as Yes, so nothing disappears from it.
+    const on0 = SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : false;
+    const cook = SB.ui.segmented({ label: 'Do you cook food ahead and hold it warm or cold?', value: on0 ? 'yes' : 'no', options: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }],
+      // Saves the answer and says what appears or goes away; puts the old answer back if the save fails.
+      onChange: (v) => {
+        const r = send('updateSettings', { patch: { modules: { cookAhead: v === 'yes' } } });
+        if (!r.ok && r.report !== 'nothingToDo') { cook.setValue(v === 'yes' ? 'no' : 'yes'); cookSt.textContent = r.words; return; }
+        cookSt.textContent = v === 'yes' ? 'On. The Cabinet, cooked-batch times and their warnings are available. Change this any time here.' : 'Off. Batch tracking stays out of the way. Change this any time here.';
+      } });
+    const cookSt = section('Cooking ahead', 'Some places cook brisket or pork in the morning and slice it to order, or keep cold sides in a cooler. If you do, Smokebox can track those batches and warn you before they run out of time. Most new places start with No.', cook);
     sheet.body.appendChild(list);
     return sheet;
   }

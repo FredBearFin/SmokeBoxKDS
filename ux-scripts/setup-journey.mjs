@@ -77,11 +77,13 @@ async function inventory(page) {
 }
 
 // Run A: the path the first-run screen leads to: Add your first dish, three dishes, New ticket, pay, send.
-async function runA() {
+async function runA(oneStation) {
   return withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
     await page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 8000 });
+    // Variant D: the owner of a one-station kitchen has already hidden the other three (set up before the clock starts).
+    if (oneStation) { await page.evaluate(() => localStorage.setItem('smokebox.v1.setup.hiddenStations', JSON.stringify(['sides', 'fry', 'cold']))); await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => window.SB && SB.booted === true); }
     await page.waitForTimeout(700);
-    const R = recorder(page, 'A');
+    const R = recorder(page, oneStation ? 'D' : 'A');
     R.begin('First open', 'The owner opens smokebox.html for the first time.');
     const inv0 = await inventory(page);
     R.rec.firstOpenInventory = inv0;
@@ -111,7 +113,9 @@ async function runA() {
       if (!/dp-price/.test(moved || '')) R.note('confusing', 'Enter in the name box did not move to the price box.');
       await page.keyboard.type(price); R.typed(price, 'Price');
       const chosen = await page.evaluate(() => (document.querySelector('.dp-tile[aria-checked="true"]') || {}).dataset && document.querySelector('.dp-tile[aria-checked="true"]').dataset.zone);
-      if (chosen !== zone) await R.tap('.dp-tile[data-zone="' + zone + '"]', 'Where it is made: ' + zone);
+      const tileThere = await page.locator('.dp-tiles').isVisible();
+      if (!tileThere) R.note('info', 'Only one station is showing, so there is no "Where is it made?" question.');
+      else if (chosen !== zone) await R.tap('.dp-tile[data-zone="' + zone + '"]', 'Where it is made: ' + zone);
       else R.note('info', 'Station tile "' + zone + '" was already chosen from the last dish: no tap needed.');
       await R.tap(i < 3 ? '[data-act="save-again"]' : '[data-act="save-done"]', i < 3 ? 'Save and add another' : 'Save and finish');
       await page.waitForTimeout(350);
@@ -201,14 +205,15 @@ async function runC() {
 // Turns a run into modeled seconds.
 function modeled(rec) { return Math.round(rec.taps * TAP_S + rec.typed * TYPE_S + rec.chars * CHAR_S + rec.picks * PICK_S + rec.reads * READ_S); }
 
-const A = await runA(); const B = await runB(); const C = await runC();
-for (const r of [A, B, C]) r.modeledSeconds = modeled(r);
-const out = { generated: 'modeled, headless Chromium 1280x800, empty storage; not a real person or tablet', model: { TAP_S, TYPE_S, CHAR_S, PICK_S, READ_S }, A, B, C };
+const A = await runA(); const B = await runB(); const C = await runC(); const D = await runA(true);
+for (const r of [A, B, C, D]) r.modeledSeconds = modeled(r);
+const out = { generated: 'modeled, headless Chromium 1280x800, empty storage; not a real person or tablet', model: { TAP_S, TYPE_S, CHAR_S, PICK_S, READ_S }, A, B, C, D };
 fs.writeFileSync(path.join(OUT, 'journey.json'), JSON.stringify(out, null, 1));
 const line = (r) => 'taps ' + r.taps + ', typed fields ' + r.typed + ' (' + r.chars + ' chars), list choices ' + r.picks + ', screens read ' + r.reads + ', dead ends ' + r.deadEnds + ', confusing ' + r.confusing + ', modeled ' + (r.modeledSeconds / 60).toFixed(1) + ' min';
 console.log('A guided path :', line(A), ' | paid:', A.firstPaidTicket, ' | errors:', A.errors);
 console.log('B naive path  :', line(B));
 console.log('C find menu   :', line(C));
+console.log('D one station :', line(D), ' | paid:', D.firstPaidTicket);
 console.log('first open    :', JSON.stringify(A.firstOpenInventory));
-for (const r of [A, B, C]) for (const s of r.steps) { console.log('\n[' + r.run + s.n + '] ' + s.name + ' -> ' + s.screen + ' (' + s.shot + ') taps ' + s.taps + ' typed ' + s.typed); for (const n of s.notes) if (n.kind !== 'tap' && n.kind !== 'type' && n.kind !== 'pick') console.log('   ' + n.kind + ': ' + n.text); }
+for (const r of [A, B, C, D]) for (const s of r.steps) { console.log('\n[' + r.run + s.n + '] ' + s.name + ' -> ' + s.screen + ' (' + s.shot + ') taps ' + s.taps + ' typed ' + s.typed); for (const n of s.notes) if (n.kind !== 'tap' && n.kind !== 'type' && n.kind !== 'pick') console.log('   ' + n.kind + ': ' + n.text); }
 void fileURLToPath;

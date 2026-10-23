@@ -47,6 +47,33 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   check('example dishes are marked Example (some names may collide with old sample dishes)', ex >= 4, ex);
   await page.click('[data-act=example-remove]'); await page.waitForTimeout(300);
   check('one tap removes every example dish', (await page.locator('.dp-ex').count()) === 0 && (await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).length)) === 2);
+  // Removed dishes: Undo, Bring it back, and a taken-by-removed name offers to bring the dish back.
+  await page.locator('.dp-row').nth(1).getByRole('button', { name: /Remove/ }).click(); await page.waitForTimeout(200);
+  check('Remove offers Undo and Undo puts the dish back', await page.locator('[data-act=undo-remove]').isVisible() && await (async () => { await page.click('[data-act=undo-remove]'); await page.waitForTimeout(250); return (await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).length)) === 2; })());
+  await page.locator('.dp-row').nth(1).getByRole('button', { name: /Remove/ }).click(); await page.waitForTimeout(200);
+  const goneName = await page.evaluate(() => SB.store.getState().menu.filter((m) => m.archived).slice(-1)[0].name);
+  await page.fill('.dp-name', goneName); await page.fill('.dp-price', '9'); await page.click('[data-act=save-again]'); await page.waitForTimeout(200);
+  check('a name taken by a removed dish offers Bring it back', await page.locator('[data-act=bring-back]').isVisible());
+  await page.click('[data-act=bring-back]'); await page.waitForTimeout(250);
+  check('Bring it back un-archives the dish at the typed price', await page.evaluate((n) => { const m = SB.store.getState().menu.find((x) => x.name === n); return !!m && !m.archived && m.price === 9; }, goneName));
+  // Stations: rename live, hide down to one (the question disappears), show again.
+  await page.locator('.dp-stfold summary').click();
+  await page.fill('[aria-label="Name of station Pit"]', 'Smoker'); await page.locator('[aria-label="Name of station Smoker"], [aria-label="Name of station Pit"]').first().blur(); await page.waitForTimeout(300);
+  check('a renamed station is saved in the shared names and shown on its tile', (await page.evaluate(() => JSON.stringify(SB.config.customSpec()))).includes('Smoker') && await page.locator('.dp-tile:has-text("Smoker")').count() === 1);
+  await page.screenshot({ path: SHOT + '/stations-three.png' });
+  for (const nm of ['Hot sides', 'Fry']) { await page.locator('.dp-strow:has([aria-label="Name of station ' + nm + '"]) button').click(); await page.waitForTimeout(150); }
+  check('hiding stations leaves tiles for the rest', await page.locator('.dp-tile').count() === 2);
+  await page.locator('.dp-strow:has([aria-label="Name of station Cold and drinks"]) button').click(); await page.waitForTimeout(150);
+  check('with one station showing the question is skipped', await page.locator('.dp-tile').count() === 1 && !(await page.locator('.dp-tiles').isVisible()));
+  await page.fill('.dp-name', 'Test'); await page.fill('.dp-price', '1'); await page.click('[data-act=save-again]'); await page.waitForTimeout(250);
+  check('a dish saves with no station tap when only one station shows', await page.evaluate(() => SB.store.getState().menu.some((m) => m.name === 'Test' && !m.archived)));
+  await page.screenshot({ path: SHOT + '/station-one.png' });
+  await page.locator('.dp-strow:has([aria-label="Name of station Cold and drinks"]) button').click();
+  await page.locator('.dp-strow:has([aria-label="Name of station Hot sides"]) button').click();
+  await page.locator('.dp-strow:has([aria-label="Name of station Fry"]) button').click(); await page.waitForTimeout(150);
+  await page.fill('[aria-label="New station name"]', 'Bar'); await page.getByRole('button', { name: 'Add station' }).click(); await page.waitForTimeout(250);
+  check('a new station can be added', await page.evaluate(() => SB.config.workZones.length === 5));
+  await page.evaluate(() => { SB.store.getState().menu.filter((m) => m.name === 'Test').forEach((m) => SB.store.dispatchEx('updateMenuItem', { id: m.id, patch: { archived: true } }, { source: 'ui' })); });
   // A half-typed dish survives a reload; dishes survive too.
   await page.fill('.dp-name', 'Brisket pl'); await page.waitForTimeout(100);
   await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => window.SB && SB.booted === true); await page.waitForTimeout(500);
@@ -61,9 +88,20 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   const sv = await page.evaluate(() => SB.store.getState().settings.service);
   check('tax and hours saved from the Tax, hours and PIN sheet', sv.taxRatePct === 6 && sv.openHour === 10 && sv.closeHour === 22, sv);
   await page.screenshot({ path: SHOT + '/shop.png' });
+  await page.locator('.sheet .seg-opt', { hasText: 'Yes' }).click(); await page.waitForTimeout(250);
+  check('the cook-ahead question writes the real setting', await page.evaluate(() => SB.store.getState().settings.modules.cookAhead === true));
+  await page.locator('.sheet .seg-opt', { hasText: 'No' }).click(); await page.waitForTimeout(250);
+  check('cook-ahead can be turned back off', await page.evaluate(() => SB.store.getState().settings.modules.cookAhead === false));
   await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(9500);
   check('no "New tablet?" toast arrives after about 8 seconds', !(await page.evaluate(() => document.body.innerText.includes('New tablet?'))));
   check('the main menu has a Dishes and prices entry', await (async () => { await page.evaluate(() => SB.sheets.open('menu')); await page.waitForTimeout(300); return page.getByRole('button', { name: /Dishes and prices/ }).isVisible(); })());
+  // The first-steps card goes for good once a ticket exists, even if the board is cleared again.
+  await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(200);
+  await page.evaluate(() => { const id = SB.store.getState().menu.find((m) => !m.archived).id; SB.store.dispatchEx('createTicket', { customer: 'T', items: [{ menuId: id, qty: 1 }] }, { source: 'ui' }); });
+  await page.waitForTimeout(300);
+  check('the first-steps card is gone once a ticket exists', !(await page.locator('.fl-welcome').isVisible()));
+  await page.evaluate(() => SB.store.resetLive({ keepSettings: true, starter: false })); await page.waitForTimeout(400);
+  check('and it does not come back when the board is cleared', !(await page.locator('.fl-welcome').isVisible()));
   check('no page errors', logs.pageErrors.length === 0, logs.pageErrors);
 });
 process.exit(bad ? 1 : 0);

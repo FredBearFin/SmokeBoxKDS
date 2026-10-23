@@ -249,7 +249,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 2487,
+  "addThreeDishesWallMs": 2595,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -376,5 +376,271 @@
   "confusing": 0,
   "extraTaps": 0,
   "modeledSeconds": 20
+ },
+ "D": {
+  "run": "D",
+  "steps": [
+   {
+    "n": 1,
+    "name": "First open",
+    "intent": "The owner opens smokebox.html for the first time.",
+    "taps": 0,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "info",
+      "text": "Empty board with one big \"Add your first dish\" button: true. Welcome card showing: false. 86 badge count: 0."
+     },
+     {
+      "kind": "info",
+      "text": "Dishes already on the menu that the owner did not enter: 0; ingredients 0; batches 0; tickets 0; orders 0."
+     }
+    ],
+    "screen": "Kitchen board",
+    "shot": "01-D-first-open.png"
+   },
+   {
+    "n": 2,
+    "name": "Tap Add your first dish",
+    "intent": "The one big button.",
+    "taps": 1,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "Add your first dish"
+     }
+    ],
+    "screen": "Sheet: Dishes and prices",
+    "shot": "02-D-dishes-open.png"
+   },
+   {
+    "n": 3,
+    "name": "Add dish 1: Pulled pork plate",
+    "intent": "Name, price, tap where it is made.",
+    "taps": 1,
+    "typed": 2,
+    "picks": 0,
+    "chars": 22,
+    "notes": [
+     {
+      "kind": "type",
+      "text": "Dish name = \"Pulled pork plate\""
+     },
+     {
+      "kind": "type",
+      "text": "Price = \"12.50\""
+     },
+     {
+      "kind": "info",
+      "text": "Only one station is showing, so there is no \"Where is it made?\" question."
+     },
+     {
+      "kind": "tap",
+      "text": "Save and add another"
+     }
+    ],
+    "screen": "Sheet: Dishes and prices",
+    "shot": "03-D-add-dish-1.png"
+   },
+   {
+    "n": 4,
+    "name": "Add dish 2: Mac and cheese",
+    "intent": "Name, price, tap where it is made.",
+    "taps": 1,
+    "typed": 2,
+    "picks": 0,
+    "chars": 18,
+    "notes": [
+     {
+      "kind": "type",
+      "text": "Dish name = \"Mac and cheese\""
+     },
+     {
+      "kind": "type",
+      "text": "Price = \"4.50\""
+     },
+     {
+      "kind": "info",
+      "text": "Only one station is showing, so there is no \"Where is it made?\" question."
+     },
+     {
+      "kind": "tap",
+      "text": "Save and add another"
+     }
+    ],
+    "screen": "Sheet: Dishes and prices",
+    "shot": "04-D-add-dish-2.png"
+   },
+   {
+    "n": 5,
+    "name": "Add dish 3: Sweet tea",
+    "intent": "Name, price, tap where it is made.",
+    "taps": 1,
+    "typed": 2,
+    "picks": 0,
+    "chars": 13,
+    "notes": [
+     {
+      "kind": "type",
+      "text": "Dish name = \"Sweet tea\""
+     },
+     {
+      "kind": "type",
+      "text": "Price = \"3.00\""
+     },
+     {
+      "kind": "info",
+      "text": "Only one station is showing, so there is no \"Where is it made?\" question."
+     },
+     {
+      "kind": "tap",
+      "text": "Save and finish"
+     }
+    ],
+    "screen": "Kitchen board",
+    "shot": "05-D-add-dish-3.png"
+   },
+   {
+    "n": 6,
+    "name": "Back on the board",
+    "intent": "The sheet closes; the next-step card shows.",
+    "taps": 0,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "info",
+      "text": "Next-step card: \"Your menu is ready Your menu has 3 dishes. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices. Add more dishes Show me h\""
+     }
+    ],
+    "screen": "Kitchen board",
+    "shot": "06-D-back-on-board.png"
+   },
+   {
+    "n": 7,
+    "name": "New ticket: three dishes",
+    "intent": "Tap New ticket and pick the three dishes.",
+    "taps": 1,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "New ticket"
+     },
+     {
+      "kind": "info",
+      "text": "3 dishes on the order screen, 0 sold out."
+     },
+     {
+      "kind": "tap",
+      "text": "tapped the three dishes (3 taps)"
+     }
+    ],
+    "screen": "Sheet: New ticket",
+    "shot": "07-D-order-dishes.png"
+   },
+   {
+    "n": 8,
+    "name": "Pay now and send",
+    "intent": "Choose Cash and send to the kitchen.",
+    "taps": 2,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "Payment: Cash"
+     },
+     {
+      "kind": "tap",
+      "text": "Send to kitchen"
+     },
+     {
+      "kind": "info",
+      "text": "Order recorded as paid in the store: true."
+     }
+    ],
+    "screen": "Kitchen board",
+    "toasts": [
+     "Ticket #101 sent to 1 station. Paid $20.00 by cash."
+    ],
+    "shot": "08-D-first-paid-ticket.png"
+   },
+   {
+    "n": 9,
+    "name": "Wait: any late setup toast?",
+    "intent": "The old build showed \"New tablet?\" about 8 s in.",
+    "taps": 0,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "info",
+      "text": "Toasts on screen about 20 s after first open: \"\"."
+     }
+    ],
+    "screen": "Kitchen board",
+    "shot": "09-D-late-toast.png"
+   }
+  ],
+  "taps": 10,
+  "typed": 6,
+  "picks": 0,
+  "chars": 53,
+  "reads": 9,
+  "deadEnds": 0,
+  "confusing": 0,
+  "extraTaps": 0,
+  "firstOpenInventory": {
+   "menuDishes": 0,
+   "ingredients": 0,
+   "batches": 0,
+   "tickets": 0,
+   "orders": 0,
+   "taxPct": 0,
+   "openHour": 11,
+   "closeHour": 21,
+   "sampleHistory": null,
+   "menuPriceRange": [
+    null,
+    null
+   ],
+   "eightySixed": 0,
+   "tilesShown": 0,
+   "tilesSoldOut": 0
+  },
+  "addThreeDishesWallMs": 1928,
+  "dishesAfter": 3,
+  "firstPaidTicket": true,
+  "inventoryAtEnd": {
+   "menuDishes": 3,
+   "ingredients": 0,
+   "batches": 0,
+   "tickets": 1,
+   "orders": 1,
+   "taxPct": 0,
+   "openHour": 11,
+   "closeHour": 21,
+   "sampleHistory": null,
+   "menuPriceRange": [
+    3,
+    12.5
+   ],
+   "eightySixed": 0,
+   "tilesShown": 0,
+   "tilesSoldOut": 0
+  },
+  "errors": 0,
+  "modeledSeconds": 79
  }
 }
