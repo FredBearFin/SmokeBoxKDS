@@ -1580,7 +1580,7 @@
     // Prints the report text as one page: builds a print-only block, prints it, and removes it again.
     async function printReport() {
       await makeReport(false);
-      const root = h('div', { class: 'sb-printroot' }, h('h1', null, 'Pilot report'), h('pre', { style: 'white-space:pre-wrap;font-size:13px' }, repBox.textContent));
+      const root = h('div', { class: 'sb-printroot pr-printroot' }, h('h1', null, 'Pilot report'), h('pre', { style: 'white-space:pre-wrap;font-size:13px' }, repBox.textContent));
       document.body.appendChild(root);
       // Removes the print-only block again.
       const done = () => { try { root.remove(); } catch (e) { /* already gone */ } };
