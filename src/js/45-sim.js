@@ -884,12 +884,12 @@
     };
   };
 
-  /* ---------- whether the back office shows the sample (persisted, default on) ---------- */
+  /* ---------- whether the back office shows the sample (persisted, default off: a real kitchen sees real numbers) ---------- */
   let enabled = null;       // null until first read from storage
   const enabledListeners = new Set();
-  // True when the back office should show the sample. Read from storage on first use; the default is on.
+  // True when the back office should show the sample. Read from storage on first use; the default is off.
   Sim.sampleEnabled = function () {
-    if (enabled === null) enabled = U.storage.get(ENABLED_KEY, true) !== false;
+    if (enabled === null) enabled = U.storage.get(ENABLED_KEY, false) === true;
     return enabled;
   };
   // Turns the sample on or off, saves the choice, and tells listeners. Returns the new setting.
@@ -1165,7 +1165,7 @@
     const st = SB.store;
     try { live.stop(); } catch (e) { /* the simulator may not be running */ }
     st.setSpeed(1);
-    if (st.resetLive({ keepSettings: true }) !== 'ok') return -1;
+    if (st.resetLive({ keepSettings: true, starter: true, stagger: true }) !== 'ok') return -1;
     return Sim.seedFirstRun({ force: true });
   };
   /** True when the dish can be sold in this store right now (unknown counts as yes). */

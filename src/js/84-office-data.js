@@ -1560,7 +1560,7 @@
           'Sample history is not touched. There is no undo: download a backup first if you might want this data.'],
       });
       if (!ok) return;
-      const rep = SB.store.resetLive({ keepSettings: k });
+      const rep = SB.store.resetLive({ keepSettings: k, starter: false });
       if (rep === 'ok') { resetStatus.ok('Live data cleared. The board is empty and starter stock is back' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data cleared.', { tone: 'ok' }); }
       else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
     });

@@ -15,7 +15,7 @@
  * Public API (other modules code against these names; see docs/smokebox.z.md for the formal statement):
  *   apply(state, type, payload, now)      -> { state, report, events, info }      (ACTIONS lists every type + payload)
  *   tick(state, now)                      -> { state, events }   same ref when nothing is due
- *   newState({ now, empty?, stagger?, settings?, menu?, ingredients?, learned?, seq? }) -> state
+ *   newState({ now, empty?, starter?, stagger?, settings?, menu?, ingredients?, learned?, seq? }) -> state
  *   availability(state, menuId)           -> { ok, reason: null|'manual'|'safety'|'stock', ing }
  *   computeAvail(state)                   -> { [menuId]: { ok, reason, ing } }
  *   servable(state, ingId)                -> grams (or 'ea') that can be served now
@@ -2254,9 +2254,11 @@
   A.resetLive = function (tx, p) {
     const keep = p.keepSettings == null ? true : p.keepSettings;
     if (typeof keep !== 'boolean') { tx.info.key = 'keepSettings'; return 'badPatch'; }
+    // starter false starts the pit empty; stagger true gives the demo batches different ages. Both default to the old behaviour.
+    for (const k of ['starter', 'stagger']) if (p[k] != null && typeof p[k] !== 'boolean') { tx.info.key = k; return 'badPatch'; }
     const s = tx.s0;
     const ns = newState({
-      now: tx.now, seq: s.seq,
+      now: tx.now, seq: s.seq, starter: p.starter !== false, stagger: p.stagger === true,
       settings: keep ? s.settings : undefined, menu: keep ? s.menu : undefined, ingredients: keep ? s.ingredients : undefined, learned: keep ? s.learned : undefined,
     });
     for (const k of Object.keys(ns)) tx.set(k, ns[k]);
@@ -2641,7 +2643,8 @@
    * 14. newState
    * ==================================================================================================== */
   // Builds a fresh state: starter stock and one starter batch per TCS ingredient (155 F hot, 38 F cold)
-  // unless empty is true. The ledger opens at that stock. Sanitising is due at once, because nobody knows
+  // unless empty is true. With starter false the plain stock stays at par but the pit and cabinet start empty
+  // (a real kitchen logs what it really cooked, so nothing is made up). The ledger opens at that stock. Sanitising is due at once, because nobody knows
   // when it was last done. The options let a reset keep settings, menu, ingredients, learned times and id
   // counters.
   function newState(opts) {
@@ -2659,7 +2662,7 @@
     for (const ing of ingredients) {
       ledger[ing.id] = { open: 0, in: 0, pulled: 0, prunedUsed: 0, prunedWaste: 0, prunedRemain: 0, dropped: 0 };
       if (!ing.tcs) { stock[ing.id] = opts.empty ? 0 : isNum(ing.parG) && ing.parG > 0 ? ing.parG : 0; ledger[ing.id].open = stock[ing.id]; continue; }
-      if (opts.empty || !(ing.parG > 0)) continue;
+      if (opts.empty || opts.starter === false || !(ing.parG > 0)) continue;
       // starter batches: labelled src 'starter' (demo opening stock) with a starter reading so the line can open
       const hot = ing.hold !== 'cold';
       const f = hot ? 155 : 38;

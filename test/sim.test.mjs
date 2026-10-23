@@ -280,19 +280,19 @@ test('sampleInfo agrees with the sample', () => {
   assert.ok(/not your restaurant/i.test(info.note) && /sample/i.test(info.note), 'the note says plainly that this is sample data');
 });
 
-test('the sample switch is persisted under smokebox.v1.sample and defaults to on', () => {
-  assert.equal(Sim.sampleEnabled(), true);
+test('the sample switch is persisted under smokebox.v1.sample and defaults to off', () => {
+  assert.equal(Sim.sampleEnabled(), false);
   const heard = [];
   const off = Sim.onSampleChange((v) => heard.push(v));
-  assert.equal(Sim.setSampleEnabled(false), false);
-  assert.equal(Sim.sampleEnabled(), false);
-  assert.equal(U.storage.get('smokebox.v1.sample', null), false);
   assert.equal(Sim.setSampleEnabled(true), true);
   assert.equal(U.storage.get('smokebox.v1.sample', null), true);
-  assert.deepEqual(heard, [false, true]);
+  assert.equal(Sim.setSampleEnabled(false), false);
+  assert.equal(U.storage.get('smokebox.v1.sample', null), false);
+  assert.deepEqual(heard, [true, false]);
   off();
-  Sim.setSampleEnabled(false); Sim.setSampleEnabled(true);
-  assert.deepEqual(heard, [false, true], 'removed listeners stay quiet');
+  Sim.setSampleEnabled(true); Sim.setSampleEnabled(false);
+  assert.deepEqual(heard, [true, false], 'removed listeners stay quiet');
+  Sim.setSampleEnabled(true);
   // a fresh copy reads the stored value
   assert.equal(Sim.sampleEnabled(), true);
 });
@@ -318,6 +318,7 @@ function boot() {
   Sim.live.stop();
   const clock = { real: T0 };
   S.init({ now: () => clock.real, storage: memStorage(), noTimers: true, noSync: true });
+  S.resetLive({ keepSettings: true, starter: true, stagger: true }); // the demo kitchen, which a real first run no longer starts with
   const tick = (secs, step = 1) => { for (let s = 0; s < secs; s += step) { clock.real += step * 1000; S.tick(); } };
   return { clock, tick };
 }
@@ -425,6 +426,8 @@ test('seedFirstRun: three fresh demo tickets, none late, once per session, never
     for (const f of ['00-util', '10-config', '20-engine', '30-store', '45-sim']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
     const clock = { real: T0 };
     ctx.SB.store.init({ now: () => clock.real, storage: memStorage(), noTimers: true, noSync: true });
+  ctx.SB.store.resetLive({ keepSettings: true, starter: true, stagger: true });
+    ctx.SB.store.resetLive({ keepSettings: true, starter: true, stagger: true });
     if (hasTickets) assert.equal(ctx.SB.store.dispatch('createTicket', { customer: 'Walk-in', items: [{ menuId: 'slaw' }] }), 'ok');
     return ctx.SB;
   };
@@ -453,6 +456,7 @@ test('restartDemo: clears the board and the fast clock, then puts the three fres
   const clock = { real: T0 };
   ctx.SB.store.init({ now: () => clock.real, storage: memStorage(), noTimers: true, noSync: true });
   const { sim, store, engine } = ctx.SB;
+  store.resetLive({ keepSettings: true, starter: true, stagger: true });
   assert.equal(sim.seedFirstRun(), 3);
   assert.equal(store.dispatch('createTicket', { customer: 'Walk-in', items: [{ menuId: 'slaw' }] }), 'ok');
   store.setSpeed(30);

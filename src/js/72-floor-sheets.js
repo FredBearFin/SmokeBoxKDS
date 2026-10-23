@@ -1640,7 +1640,7 @@
       });
       if (!ok) return;
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
-      const rep = SB.store.resetLive({ keepSettings: true });
+      const rep = SB.store.resetLive({ keepSettings: true, starter: false });
       if (rep === 'ok') toast('Live data cleared. Starter stock is back.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
       paint();
     }

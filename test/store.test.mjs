@@ -25,7 +25,7 @@ function memStorage(limitChars = Infinity) {
 function boot(opts = {}) {
   const clock = { real: opts.real ?? T0 };
   const storage = opts.storage || memStorage();
-  const st = S.init({ now: () => clock.real, storage, noTimers: true, noSync: true });
+  const st = S.init({ now: () => clock.real, storage, noTimers: true, noSync: true, starter: true });
   return { clock, storage, st };
 }
 
@@ -124,7 +124,7 @@ test('persistence: debounced 400 ms write, flush, reload restores state and cont
   S.destroy();
   // reload 10 s later: same state, speed back to 1, virtual time continues from where it was (ahead of real time)
   clock.real += 10000;
-  const st = S.init({ now: () => clock.real, storage, noTimers: true, noSync: true });
+  const st = S.init({ now: () => clock.real, storage, noTimers: true, noSync: true, starter: true });
   assert.equal(st.firstRun, false);
   assert.equal(S.speed(), 1);
   assert.equal(S.getState().rev, rev);
@@ -298,14 +298,14 @@ test('two tabs share one state through storage + BroadcastChannel (F17)', async 
   const storage = memStorage();
   let real = T0;
   // tab A: this realm's store, with tab sync on
-  S.init({ now: () => real, storage, noTimers: true });
+  S.init({ now: () => real, storage, noTimers: true, starter: true });
   // tab B: a second copy of the modules in its own VM context, same storage, same channel name
   const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, BroadcastChannel: globalThis.BroadcastChannel };
   ctx.globalThis = ctx;
   vm.createContext(ctx);
   for (const f of ['00-util.js', '10-config.js', '20-engine.js', '30-store.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js', f), 'utf8'), ctx, { filename: f });
   const B = ctx.SB.store;
-  B.init({ now: () => real, storage, noTimers: true });
+  B.init({ now: () => real, storage, noTimers: true, starter: true });
   assert.equal(S.dispatch('createTicket', { items: [{ menuId: 'tea' }] }), 'ok');
   S.flush(); // persist + announce
   await sleep(50);
@@ -319,13 +319,13 @@ test('two tabs creating tickets at the same moment keep all of them (F-L9)', asy
   if (typeof globalThis.BroadcastChannel !== 'function') return;
   const storage = memStorage();
   let real = T0;
-  S.init({ now: () => real, storage, noTimers: true });
+  S.init({ now: () => real, storage, noTimers: true, starter: true });
   const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, BroadcastChannel: globalThis.BroadcastChannel };
   ctx.globalThis = ctx;
   vm.createContext(ctx);
   for (const f of ['00-util.js', '10-config.js', '20-engine.js', '30-store.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js', f), 'utf8'), ctx, { filename: f });
   const B = ctx.SB.store;
-  B.init({ now: () => real, storage, noTimers: true });
+  B.init({ now: () => real, storage, noTimers: true, starter: true });
   // Both tabs act before either one's save reaches the other.
   for (let i = 0; i < 3; i++) { real += 1000; assert.equal(S.dispatch('createTicket', { items: [{ menuId: 'tea' }] }), 'ok'); }
   for (let i = 0; i < 3; i++) { real += 1000; assert.equal(B.dispatch('createTicket', { items: [{ menuId: 'mac' }] }), 'ok'); }
@@ -366,13 +366,13 @@ test('two tabs each planning a batch at the same moment keep both plans', async 
   if (typeof globalThis.BroadcastChannel !== 'function') return;
   const storage = memStorage();
   let real = T0;
-  S.init({ now: () => real, storage, noTimers: true });
+  S.init({ now: () => real, storage, noTimers: true, starter: true });
   const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, BroadcastChannel: globalThis.BroadcastChannel };
   ctx.globalThis = ctx;
   vm.createContext(ctx);
   for (const f of ['00-util.js', '10-config.js', '20-engine.js', '30-store.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js', f), 'utf8'), ctx, { filename: f });
   const B = ctx.SB.store;
-  B.init({ now: () => real, storage, noTimers: true });
+  B.init({ now: () => real, storage, noTimers: true, starter: true });
   real += 1000; assert.equal(S.dispatch('planBatch', { ing: 'pork', grams: 5000, offAt: real + 3600e3 }), 'ok');
   real += 1000; assert.equal(B.dispatch('planBatch', { ing: 'ribs', grams: 3000, offAt: real + 3600e3 }), 'ok');
   S.flush(); B.flush();

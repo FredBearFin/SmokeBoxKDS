@@ -4314,7 +4314,7 @@ a.of-nav:active { background: var(--press); }
  * Public API (other modules code against these names; see docs/smokebox.z.md for the formal statement):
  *   apply(state, type, payload, now)      -> { state, report, events, info }      (ACTIONS lists every type + payload)
  *   tick(state, now)                      -> { state, events }   same ref when nothing is due
- *   newState({ now, empty?, stagger?, settings?, menu?, ingredients?, learned?, seq? }) -> state
+ *   newState({ now, empty?, starter?, stagger?, settings?, menu?, ingredients?, learned?, seq? }) -> state
  *   availability(state, menuId)           -> { ok, reason: null|'manual'|'safety'|'stock', ing }
  *   computeAvail(state)                   -> { [menuId]: { ok, reason, ing } }
  *   servable(state, ingId)                -> grams (or 'ea') that can be served now
@@ -6553,9 +6553,11 @@ a.of-nav:active { background: var(--press); }
   A.resetLive = function (tx, p) {
     const keep = p.keepSettings == null ? true : p.keepSettings;
     if (typeof keep !== 'boolean') { tx.info.key = 'keepSettings'; return 'badPatch'; }
+    // starter false starts the pit empty; stagger true gives the demo batches different ages. Both default to the old behaviour.
+    for (const k of ['starter', 'stagger']) if (p[k] != null && typeof p[k] !== 'boolean') { tx.info.key = k; return 'badPatch'; }
     const s = tx.s0;
     const ns = newState({
-      now: tx.now, seq: s.seq,
+      now: tx.now, seq: s.seq, starter: p.starter !== false, stagger: p.stagger === true,
       settings: keep ? s.settings : undefined, menu: keep ? s.menu : undefined, ingredients: keep ? s.ingredients : undefined, learned: keep ? s.learned : undefined,
     });
     for (const k of Object.keys(ns)) tx.set(k, ns[k]);
@@ -6940,7 +6942,8 @@ a.of-nav:active { background: var(--press); }
    * 14. newState
    * ==================================================================================================== */
   // Builds a fresh state: starter stock and one starter batch per TCS ingredient (155 F hot, 38 F cold)
-  // unless empty is true. The ledger opens at that stock. Sanitising is due at once, because nobody knows
+  // unless empty is true. With starter false the plain stock stays at par but the pit and cabinet start empty
+  // (a real kitchen logs what it really cooked, so nothing is made up). The ledger opens at that stock. Sanitising is due at once, because nobody knows
   // when it was last done. The options let a reset keep settings, menu, ingredients, learned times and id
   // counters.
   function newState(opts) {
@@ -6958,7 +6961,7 @@ a.of-nav:active { background: var(--press); }
     for (const ing of ingredients) {
       ledger[ing.id] = { open: 0, in: 0, pulled: 0, prunedUsed: 0, prunedWaste: 0, prunedRemain: 0, dropped: 0 };
       if (!ing.tcs) { stock[ing.id] = opts.empty ? 0 : isNum(ing.parG) && ing.parG > 0 ? ing.parG : 0; ledger[ing.id].open = stock[ing.id]; continue; }
-      if (opts.empty || !(ing.parG > 0)) continue;
+      if (opts.empty || opts.starter === false || !(ing.parG > 0)) continue;
       // starter batches: labelled src 'starter' (demo opening stock) with a starter reading so the line can open
       const hot = ing.hold !== 'cold';
       const f = hot ? 155 : 38;
@@ -8492,7 +8495,7 @@ a.of-nav:active { background: var(--press); }
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
     if (loaded) atLeast(lastStamp(loaded));
-    state = loaded || E().newState({ now: now(), stagger: true });
+    state = loaded || E().newState({ now: now(), starter: opts.starter === true, stagger: opts.starter === true }); // a real kitchen starts with an empty pit; init({ starter: true }) gives the demo stock
     // Catch up anything that became due while the page was closed.
     const t = E().tick(state, now());
     state = t.state;
@@ -8659,7 +8662,7 @@ a.of-nav:active { background: var(--press); }
   function reset() {
     rebaseClock();
     const old = state;
-    const ns = E().newState({ now: now(), stagger: true, seq: old ? old.seq : undefined });
+    const ns = E().newState({ now: now(), starter: false, seq: old ? old.seq : undefined });
     ns.rev = (old ? old.rev : 0) + 1;
     commit(ns, true);
     skipRebase = true; pending = [];
@@ -11610,12 +11613,12 @@ a.of-nav:active { background: var(--press); }
     };
   };
 
-  /* ---------- whether the back office shows the sample (persisted, default on) ---------- */
+  /* ---------- whether the back office shows the sample (persisted, default off: a real kitchen sees real numbers) ---------- */
   let enabled = null;       // null until first read from storage
   const enabledListeners = new Set();
-  // True when the back office should show the sample. Read from storage on first use; the default is on.
+  // True when the back office should show the sample. Read from storage on first use; the default is off.
   Sim.sampleEnabled = function () {
-    if (enabled === null) enabled = U.storage.get(ENABLED_KEY, true) !== false;
+    if (enabled === null) enabled = U.storage.get(ENABLED_KEY, false) === true;
     return enabled;
   };
   // Turns the sample on or off, saves the choice, and tells listeners. Returns the new setting.
@@ -11891,7 +11894,7 @@ a.of-nav:active { background: var(--press); }
     const st = SB.store;
     try { live.stop(); } catch (e) { /* the simulator may not be running */ }
     st.setSpeed(1);
-    if (st.resetLive({ keepSettings: true }) !== 'ok') return -1;
+    if (st.resetLive({ keepSettings: true, starter: true, stagger: true }) !== 'ok') return -1;
     return Sim.seedFirstRun({ force: true });
   };
   /** True when the dish can be sold in this store right now (unknown counts as yes). */
@@ -14733,7 +14736,7 @@ a.of-nav:active { background: var(--press); }
   // Colour of the browser's top bar for each look; each matches that look's background colour.
   const THEME_COLOR = { day: '#F5F2EB', night: '#15181A', ember: '#181513', paper: '#F0ECE3' };
   // Current choices: floor look, office look (ember dark / paper light), text size. themeSubs = listeners.
-  const cur = { theme: 'day', otheme: 'ember', text: 'normal', density: 'auto', hints: true };
+  const cur = { theme: 'day', otheme: 'ember', text: 'normal', density: 'compact', hints: true }; // compact tickets by default: full-size ones were too big for a busy board
   const themeSubs = [];
   // Reads the saved look and text size from the notebook; only known values are accepted.
   function loadTheme() {
@@ -17619,8 +17622,8 @@ a.of-nav:active { background: var(--press); }
     // demo chip
     const speed = S.speed();
     const live = SB.sim && SB.sim.live && typeof SB.sim.live.status === 'function' ? safeStatus() : null;
-    // The simulator's status fields are not fixed, so several names are accepted.
-    const running = !!(live && (live.running || live.on || live.orders || (live.rate && live.rate !== 'off')));
+    // Only a running simulator counts: its rate field always holds a value (normal by default), so it says nothing.
+    const running = !!(live && (live.running || live.on || live.orders));
     const demoOn = speed > 1 || running;
     setHidden(m.demoChip, !demoOn);
     if (demoOn) {
@@ -17761,7 +17764,7 @@ a.of-nav:active { background: var(--press); }
     if (!ok || !m) return;
     try { if (SB.sim && SB.sim.live) SB.sim.live.stop(); } catch (e) { /* the simulator may not be running */ }
     store().setSpeed(1);
-    const r = store().resetLive({ keepSettings: true });
+    const r = store().resetLive({ keepSettings: true, starter: false });
     if (r !== 'ok') { toast(E().describe(r, {}, store().getState().settings), { tone: 'warn' }); return; }
     F.setWelcome(false);
     toast('The board is empty. Tap New ticket to send an order.', { tone: 'info' });
@@ -17794,6 +17797,8 @@ a.of-nav:active { background: var(--press); }
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.
   function startDemo() {
+    // The pit starts empty now, so the demo first loads its own stocked kitchen (settings stay).
+    if (SB.sim && SB.sim.restartDemo && !store().getState().batches.length) SB.sim.restartDemo();
     const live = SB.sim && SB.sim.live;
     if (live && typeof live.start === 'function') {
       try {
@@ -20553,7 +20558,7 @@ a.of-nav:active { background: var(--press); }
       });
       if (!ok) return;
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
-      const rep = SB.store.resetLive({ keepSettings: true });
+      const rep = SB.store.resetLive({ keepSettings: true, starter: false });
       if (rep === 'ok') toast('Live data cleared. Starter stock is back.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
       paint();
     }
@@ -26461,7 +26466,7 @@ a.of-nav:active { background: var(--press); }
           'Sample history is not touched. There is no undo: download a backup first if you might want this data.'],
       });
       if (!ok) return;
-      const rep = SB.store.resetLive({ keepSettings: k });
+      const rep = SB.store.resetLive({ keepSettings: k, starter: false });
       if (rep === 'ok') { resetStatus.ok('Live data cleared. The board is empty and starter stock is back' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data cleared.', { tone: 'ok' }); }
       else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
     });
@@ -27168,7 +27173,7 @@ a.of-nav:active { background: var(--press); }
 ;try{
 /*
  * WHAT THIS FILE IS: The start-up sequence, loaded last, in the order of SPEC section 19: page ready,
- *    store.init (load saved data), on a first run seed the demo tickets, then mount the shell (draw the
+ *    store.init (load saved data; a first run is an empty kitchen), then mount the shell (draw the
  *    screen). If any step fails it shows a plain "Smokebox could not start" card with Reload and Copy details
  *    buttons, never a white screen.
  * PARTS: loadErrors, detailsText, showBootError, storageNotices, boot.
@@ -27250,15 +27255,9 @@ a.of-nav:active { background: var(--press); }
   function boot() {
     let stage = 'start';
     try {
-      const U = SB.util;
       stage = 'store';
-      // Fallback for first-run detection if the store does not report it: was anything saved before?
-      const hadState = !!(U && U.storage && U.storage.get('smokebox.v1.state', null));
-      let res;
-      if (SB.store && typeof SB.store.init === 'function') res = SB.store.init();
-      const first = res && typeof res.firstRun === 'boolean' ? res.firstRun : !hadState;
-      stage = 'seed';
-      if (first && SB.sim && typeof SB.sim.seedFirstRun === 'function') SB.sim.seedFirstRun();
+      if (SB.store && typeof SB.store.init === 'function') SB.store.init();
+      // A first run is a real, empty kitchen: the demo tickets and batches only load when the user asks for the demo.
       stage = 'shell';
       if (!SB.shell || typeof SB.shell.mount !== 'function') throw new Error('The shell module (60-shell.js) is not available.');
       SB.shell.mount(doc.getElementById('app') || doc.body);

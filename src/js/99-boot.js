@@ -1,6 +1,6 @@
 /*
  * WHAT THIS FILE IS: The start-up sequence, loaded last, in the order of SPEC section 19: page ready,
- *    store.init (load saved data), on a first run seed the demo tickets, then mount the shell (draw the
+ *    store.init (load saved data; a first run is an empty kitchen), then mount the shell (draw the
  *    screen). If any step fails it shows a plain "Smokebox could not start" card with Reload and Copy details
  *    buttons, never a white screen.
  * PARTS: loadErrors, detailsText, showBootError, storageNotices, boot.
@@ -82,15 +82,9 @@
   function boot() {
     let stage = 'start';
     try {
-      const U = SB.util;
       stage = 'store';
-      // Fallback for first-run detection if the store does not report it: was anything saved before?
-      const hadState = !!(U && U.storage && U.storage.get('smokebox.v1.state', null));
-      let res;
-      if (SB.store && typeof SB.store.init === 'function') res = SB.store.init();
-      const first = res && typeof res.firstRun === 'boolean' ? res.firstRun : !hadState;
-      stage = 'seed';
-      if (first && SB.sim && typeof SB.sim.seedFirstRun === 'function') SB.sim.seedFirstRun();
+      if (SB.store && typeof SB.store.init === 'function') SB.store.init();
+      // A first run is a real, empty kitchen: the demo tickets and batches only load when the user asks for the demo.
       stage = 'shell';
       if (!SB.shell || typeof SB.shell.mount !== 'function') throw new Error('The shell module (60-shell.js) is not available.');
       SB.shell.mount(doc.getElementById('app') || doc.body);

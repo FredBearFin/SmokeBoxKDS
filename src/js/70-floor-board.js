@@ -1371,8 +1371,8 @@
     // demo chip
     const speed = S.speed();
     const live = SB.sim && SB.sim.live && typeof SB.sim.live.status === 'function' ? safeStatus() : null;
-    // The simulator's status fields are not fixed, so several names are accepted.
-    const running = !!(live && (live.running || live.on || live.orders || (live.rate && live.rate !== 'off')));
+    // Only a running simulator counts: its rate field always holds a value (normal by default), so it says nothing.
+    const running = !!(live && (live.running || live.on || live.orders));
     const demoOn = speed > 1 || running;
     setHidden(m.demoChip, !demoOn);
     if (demoOn) {
@@ -1513,7 +1513,7 @@
     if (!ok || !m) return;
     try { if (SB.sim && SB.sim.live) SB.sim.live.stop(); } catch (e) { /* the simulator may not be running */ }
     store().setSpeed(1);
-    const r = store().resetLive({ keepSettings: true });
+    const r = store().resetLive({ keepSettings: true, starter: false });
     if (r !== 'ok') { toast(E().describe(r, {}, store().getState().settings), { tone: 'warn' }); return; }
     F.setWelcome(false);
     toast('The board is empty. Tap New ticket to send an order.', { tone: 'info' });
@@ -1546,6 +1546,8 @@
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.
   function startDemo() {
+    // The pit starts empty now, so the demo first loads its own stocked kitchen (settings stay).
+    if (SB.sim && SB.sim.restartDemo && !store().getState().batches.length) SB.sim.restartDemo();
     const live = SB.sim && SB.sim.live;
     if (live && typeof live.start === 'function') {
       try {

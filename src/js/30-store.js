@@ -290,7 +290,7 @@
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
     if (loaded) atLeast(lastStamp(loaded));
-    state = loaded || E().newState({ now: now(), stagger: true });
+    state = loaded || E().newState({ now: now(), starter: opts.starter === true, stagger: opts.starter === true }); // a real kitchen starts with an empty pit; init({ starter: true }) gives the demo stock
     // Catch up anything that became due while the page was closed.
     const t = E().tick(state, now());
     state = t.state;
@@ -457,7 +457,7 @@
   function reset() {
     rebaseClock();
     const old = state;
-    const ns = E().newState({ now: now(), stagger: true, seq: old ? old.seq : undefined });
+    const ns = E().newState({ now: now(), starter: false, seq: old ? old.seq : undefined });
     ns.rev = (old ? old.rev : 0) + 1;
     commit(ns, true);
     skipRebase = true; pending = [];

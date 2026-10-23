@@ -117,7 +117,7 @@
   // Colour of the browser's top bar for each look; each matches that look's background colour.
   const THEME_COLOR = { day: '#F5F2EB', night: '#15181A', ember: '#181513', paper: '#F0ECE3' };
   // Current choices: floor look, office look (ember dark / paper light), text size. themeSubs = listeners.
-  const cur = { theme: 'day', otheme: 'ember', text: 'normal', density: 'auto', hints: true };
+  const cur = { theme: 'day', otheme: 'ember', text: 'normal', density: 'compact', hints: true }; // compact tickets by default: full-size ones were too big for a busy board
   const themeSubs = [];
   // Reads the saved look and text size from the notebook; only known values are accepted.
   function loadTheme() {

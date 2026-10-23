@@ -991,6 +991,20 @@ test('stagger: starter batches get different ages, the oldest nearest its limit,
   assert.equal(E.newState({ now: T0 }).batches.every((b) => b.enteredAt === T0), true);
 });
 
+test('starter false: the pit starts empty with no made-up readings, plain stock stays at par, and a reset can choose either start', () => {
+  const s = E.newState({ now: T0, starter: false });
+  assert.equal(s.batches.length, 0);
+  assert.equal(s.ingredients.filter((i) => !i.tcs).every((i) => s.stock[i.id] === i.parG), true);
+  assert.deepEqual(E.checkInvariants(s, T0), []);
+  assert.equal(E.newState({ now: T0 }).batches.length, 10, 'the default start is unchanged');
+  const k = new K(E.newState({ now: T0, stagger: true }), T0);
+  assert.equal(k.do('resetLive', { starter: false }).report, 'ok');
+  assert.equal(k.s.batches.length, 0);
+  assert.equal(k.do('resetLive', {}).report, 'ok');
+  assert.equal(k.s.batches.length, 10, 'resetLive keeps the old default when starter is not given');
+  k.do('resetLive', { starter: 'no' }, 'badPatch');
+});
+
 test('pullBatch: takes grams from the oldest batch first, keeps the books balanced, and undo puts them back', () => {
   const k = fresh({ stagger: true });
   const old = k.s.batches.find((b) => b.ing === 'brisket');
