@@ -90,3 +90,7 @@ test('coachText is silent when the range has data, and never mentions sample', (
     for (const f of [{}, { anyLive: true }]) assert.doesNotMatch(JSON.stringify(P.coachText(id, f)), /sample/i);
   }
 });
+
+test('a discard counts as data on Sales and money, so the thrown-away ledger is not hidden', () => {
+  assert.equal(P.coachText('money', { anyLive: true, tickets: 0, discards: 1 }), null);
+});
