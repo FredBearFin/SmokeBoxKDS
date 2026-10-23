@@ -73,7 +73,9 @@ test('start over takes a backup first, clears everything, keeps settings, and is
     assert.deepEqual(E.checkInvariants(s, S.now()), []);
     // same as a brand-new blank install (ids keep counting so they are never reused)
     const fresh = E.newState({ now: S.now(), blank: true, settings: s.settings, seq: s.seq });
-    assert.equal(body(s), body(Object.assign({}, fresh, { sanitize: s.sanitize, learned: s.learned })));
+    // except the food safety record, which outlives a start over
+    assert.ok(s.safetyKeep.length > 0 && s.safetyKeep.every((e) => e.type === 'batch_discard' || e.type === 'temp_logged' || e.type === 'sanitize_done' || e.type === 'batch_reheat'));
+    assert.equal(body(s), body(Object.assign({}, fresh, { sanitize: s.sanitize, learned: s.learned, safetyKeep: s.safetyKeep })));
     // the saved copy is the empty kitchen too
     assert.equal(E.validateBackup(b.m.get('smokebox.v1.state')).state.menu.length, 0);
     // the backup restores everything

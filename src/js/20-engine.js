@@ -3024,6 +3024,13 @@
       // Learned prep times belong to the dishes; when the dishes are replaced they go too (invariant I14).
       learned: keep && !fresh ? s.learned : undefined,
     });
+    // The food safety record outlives a reset: an inspector may ask for it, and only Erase everything clears it. The demo's
+    // sample load starts clean, and entries stamped after now (a demo clock that ran ahead) are not real records.
+    if (!sample) {
+      const kept = (Array.isArray(s.safetyKeep) ? s.safetyKeep : []).concat(allEvents(s).filter((e) => hasOwn(SAFETY_EVENT, e.type)))
+        .filter((e) => isObj(e) && isNum(e.t) && e.t <= tx.now).sort((a, b) => a.t - b.t);
+      ns.safetyKeep = keepSafety([], kept, tx.now);
+    }
     for (const k of Object.keys(ns)) tx.set(k, ns[k]);
     if (!ns.catalog && hasOwn(s, 'catalog')) tx.set('catalog', undefined);
     if (hasOwn(s, 'lastClose')) tx.set('lastClose', undefined); // a fresh board has never been closed

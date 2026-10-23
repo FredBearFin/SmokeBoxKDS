@@ -1267,7 +1267,8 @@
     // with.
     if (now() > realNow()) rebaseClock();
     const rep = dispatch('resetLive', opts || {}, { source: 'user' });
-    if (rep === 'ok') persistNow();
+    // Back to real time means the real pace too, not only the real hour.
+    if (rep === 'ok') { if (clk.speed !== 1) setSpeed(1); persistNow(); }
     return rep;
   }
 

@@ -330,3 +330,17 @@ test('an above-cold fridge batch cannot be taken out, and an old save with one o
   assert.equal(E.gate(batch(s), lim + MIN, s.settings.safety).action, 'DISCARD_LOCKOUT');
   assert.equal(batch(E.tick(s, lim + MIN).state).status, 'discard');
 });
+
+test('reset live data keeps the food safety record; loading the demo sample starts it clean', () => {
+  let s = kitchen({ fridgeDays: 3 });
+  s = ok(act(s, 'logTemp', { batchId: batch(s).id, tempF: 38 }, T + 10 * MIN));
+  const logged = (x) => x.safetyKeep.concat(E.allEvents(x)).filter((e) => e.type === 'temp_logged').length;
+  assert.ok(logged(s) >= 1);
+  const r = ok(act(s, 'resetLive', { starter: false }, T + H));
+  assert.equal(r.tickets.length, 0); assert.equal(r.batches.length, 0);
+  assert.equal(logged(r), logged(s));
+  assert.deepEqual(E.checkInvariants(r, T + H), []);
+  // a second reset does not copy the record twice
+  assert.equal(logged(ok(act(r, 'resetLive', { starter: false }, T + 2 * H))), logged(s));
+  assert.equal(logged(ok(act(s, 'resetLive', { catalog: 'sample', replaceOwn: true }, T + H))), 0);
+});
