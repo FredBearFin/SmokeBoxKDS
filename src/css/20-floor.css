@@ -556,6 +556,12 @@ button.slip-item.fl-item { cursor: pointer; }
 /* Toasts sit above the strip while the line is showing (--fl-lift is its height). */
 .sb-shell[data-view="floor"] .toast-host { bottom: calc(max(var(--sp-4, 16px), env(safe-area-inset-bottom)) + var(--fl-lift, 0px)); }
 
+/* With no sheet open, toasts sit at the top right just under the header, over the notice strip, so they never hide a
+   ticket button. While a sheet is open the board is dimmed and they stay at the bottom left. */
+@media (min-width: 900px) {
+  .sb-shell[data-view="floor"]:not(:has(.sheet-root)) .toast-host { bottom: auto; top: var(--fl-head-bottom, 90px); left: auto; right: var(--gutter); }
+}
+
 /* Toasts never block the board or a sheet: the message itself lets taps through to what is under it, and only its own
    buttons (Undo and the x) take a tap. */
 .sb-shell[data-view="floor"] .toast-host, .sb-shell[data-view="floor"] .toast { pointer-events: none; }
@@ -655,3 +661,21 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-strip-x:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -3px; }
 /* A sanitize chip that needs attention names itself ("Sanitize not logged"), so a bare "not logged" is never a puzzle. */
 .fl-san[data-urgent="true"] .fl-chip-w { display: inline; }
+/* Station tab names never break across lines (Cabinet once wrapped to "Cabine" and "t" on a phone). */
+.fl-seg .seg-opt, .fl-seg .seg-label { white-space: nowrap; }
+
+/* All-overdue board: only the worst ticket (tier 1) wears the heavy pulsing red and a "Do this first" tag; the next two
+   (tier 2) say "Next" and stop pulsing; every other late ticket (tier 3) is calm paper with a thin red edge and its
+   Overdue badge, so a wall of late tickets still shows where to start. */
+.fl-slip[data-tier="1"]::before, .fl-slip[data-tier="2"]::before {
+  position: absolute; z-index: 3; top: calc(5px * var(--fl-k)); left: calc(12px * var(--fl-k)); padding: 1px calc(8px * var(--fl-k));
+  font: var(--w-heavy) calc(12px * var(--fl-k)) / 1.5 var(--font-display); letter-spacing: 0.06em; text-transform: uppercase;
+  border-radius: 4px; color: var(--on-danger, #fff); background: var(--crimson);
+}
+.fl-slip[data-tier="1"], .fl-slip[data-tier="2"] { padding-top: calc(24px * var(--fl-k)); }
+.fl-slip[data-tier="1"]::before { content: "Do this first"; }
+.fl-slip[data-tier="2"]::before { content: "Next"; background: var(--ink); color: var(--bg); }
+.fl-slip[data-tier="2"][data-level="breach"] .slip-head, .fl-slip[data-tier="2"][data-level="breach"] .slip-body, .fl-slip[data-tier="2"][data-level="breach"] .slip-tear,
+.fl-slip[data-tier="3"][data-level="breach"] .slip-head, .fl-slip[data-tier="3"][data-level="breach"] .slip-body, .fl-slip[data-tier="3"][data-level="breach"] .slip-tear { animation: none; }
+.fl-slip[data-tier="3"][data-level="breach"] .slip-head { background: transparent; }
+.fl-slip[data-tier="3"][data-level="breach"] .slip-head, .fl-slip[data-tier="3"][data-level="breach"] .slip-body, .fl-slip[data-tier="3"][data-level="breach"] .slip-tear { box-shadow: none; }

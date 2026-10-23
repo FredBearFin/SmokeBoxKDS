@@ -327,6 +327,13 @@
       });
     });
 
+    // A kitchen with no dishes yet gets a friendly first step instead of a blank menu: the same setup wizard the welcome card opens.
+    if (!menuNow.length) {
+      const firstDish = h('button', { type: 'button', class: 'btn btn-primary ord-first-dish' }, ico('plus', 20), h('span', null, 'Add your first dish'));
+      firstDish.addEventListener('click', () => { host.close('setup'); try { SB.sheets.open('wizard'); } catch (e) { console.error('[smokebox] setup failed', e); } });
+      tilesEl.appendChild(h('div', { class: 'empty ord-nodishes' }, ico('receipt', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your first dish and it shows up here, ready to tap.'), firstDish));
+    }
+
     // RIGHT: order pane.
     const orderPane = h('section', { class: 'ord-order', 'aria-label': 'Order' });
     const countEl = h('span', { class: 'ord-count num' }, '');
@@ -368,7 +375,8 @@
       }
       view.recentBtns.forEach((b, nm) => b.setAttribute('aria-pressed', D.customer === nm ? 'true' : 'false'));
     }
-    custField.querySelector('.field-label').after(chipsEl);
+    // The name box comes first so it is always in view; the quick names sit under it.
+    custInput.after(chipsEl);
     chipsEl.after(recentEl);
     custField.classList.add('ord-cust');
     custField.appendChild(custCount);
@@ -579,7 +587,7 @@
         const any = view.tiles.some((t) => t.head === hd && !t.el.hidden);
         setHidden(hd, !(view.cat === 'all' && !toks.length && any));
       });
-      setHidden(noMatch, shown !== 0);
+      setHidden(noMatch, shown !== 0 || !view.tiles.length); // an empty menu has its own friendly block
       if (!shown) text(noMatch.querySelector('.ord-nomatch-copy'), 'Nothing on the menu matches "' + view.search.trim() + '". Check the spelling or clear the search.');
       setHidden(clearSearch, !view.search);
       if (toks.length) {
@@ -842,8 +850,13 @@
       if (!r.ok) {
         if (r.why === '86') {
           const a = r.a;
-          const why = a.reason === 'manual' ? 'marked 86 by hand' : a.reason === 'safety' ? 'on a safety hold' : a.reason === 'quality' ? 'past its quality limit' : 'sold out';
-          SB.ui.toast(t.mi.name + ' is ' + why + '. Pick something else.', { tone: 'warn' });
+          // Says in plain words what is wrong and what puts the dish back on sale.
+          const ing = ingName(a.ing);
+          const msg = a.reason === 'manual' ? t.mi.name + ' is turned off by hand. Turn it back on in the 86 board.'
+            : a.reason === 'safety' ? t.mi.name + ' is on a safety hold. Reheat or throw out the batch in the Hold cabinet.'
+            : a.reason === 'quality' ? t.mi.name + ' is past its quality limit. Taste it in the Hold cabinet, or log a fresh batch to sell it again.'
+            : 'Out of ' + ing + '. Log a batch to sell ' + t.mi.name + ' again.';
+          SB.ui.toast(msg, { tone: 'warn' });
           paintTiles();
         } else if (r.why === 'maxQty') SB.ui.toast('Up to ' + L.maxQty + ' of one item per line. Send this ticket and start another.', { tone: 'warn' });
         else if (r.why === 'maxLines') SB.ui.toast(SB.engine.REPORTS.tooManyItems, { tone: 'warn' });

@@ -38,3 +38,19 @@ Ticket levels read clearly with icon plus words (Running late, Overdue +N min). 
 ## Not checked
 
 Real audio, real touch, Safari and iPad, phone widths, role views (`?role=`), the Recall, 86 and Help sheets, Take payment with tip and discount, the guided tour, Far display at 1024.
+
+## Round 2 status
+
+Screenshots: `docs/ux-shots/night/a1/r2-*.png`. Test: `test/board-round2.e2e.mjs` (19 checks, all pass) and `test/strip-notices.e2e.mjs`. Everything is simulated in headless Chromium.
+
+Fixed:
+- P1-3 chrome: the sound bar and the "Sound paused" note no longer show together (the sound bar wins), and a screen under 900 px tall shows one warning row (the rest are counted in "(N more warnings after this one)"). With the backup banner hidden the first ticket starts at or above y=200 at 1280x800 and 1024x768. The backup banner (shell file) still adds 60 px after closing time.
+- Toasts: info clears after 5 s, warnings after 6 s, errors stay until cleared (`60-shell.js`, 2 lines). With no sheet open they sit under the header on the notice strip, not over ticket buttons; with a sheet open they stay bottom-left.
+- P1-4 New ticket: the customer name box is above the quick names.
+- Sold-out dish tap: says "Out of Brisket. Log a batch to sell Brisket, 1/2 lb again." (and a reason-specific line for hand-off, safety hold, quality limit).
+- Empty menu: "No dishes yet" and an "Add your first dish" button that opens the setup wizard.
+- P1-5 all-overdue board: worst ticket tagged "Do this first", next two "Next", the rest calm paper with a thin red edge and no pulsing.
+- B2 tab labels stay on one line; B4 a hidden "Hold cabinet" heading in the Cabinet view; B3 loudness slider and Channel sync row are 44 px tall; `SB.floor._alerts` made once.
+- Wording: no "safe"/"unsafe" claims in my files; Specs removed from the Menu sheet (still opens with `SB.sheets.open('specs')` and from Help while the demo is loaded); Pitcall mention removed; pretend, made-up, simulated and sample now say "practice" (the word "Demo" itself is kept for the button and tags, per the glossary option).
+
+Still open: P1-6 one-tap pay default method; P2 items 1-3, 5-11 above; the "New tablet?" toast stays 15 s (`77-floor-setup.js:171`, A2); the Demo and tag names; welcome buttons at 38 px (A2).

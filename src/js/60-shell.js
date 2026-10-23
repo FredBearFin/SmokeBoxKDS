@@ -709,8 +709,8 @@
     toastRaf = toasts.length ? requestAnimationFrame(toastLoop) : 0;
   }
   // Shows a small message strip; returns {el, close()}. o.tone: ok, warn, bad, info. o.undo (a function)
-  // adds an Undo button and keeps it for undoMs (10 000 ms = the 10 seconds you get to undo). Others stay 4
-  // s, or 6 s for warn and bad (starter estimates, owner to confirm); o.ms overrides.
+  // adds an Undo button and keeps it for undoMs (10 000 ms = the 10 seconds you get to undo). Others stay 5
+  // s, 6 s for warn, and an error (bad) stays until cleared (starter estimates, owner to confirm); o.ms overrides.
   // WATCH OUT: one undo toast at a time (the engine undoes only its newest action), and at most 3 toasts.
   ui.toast = function (message, o) {
     o = o || {};
@@ -719,7 +719,7 @@
     const tone = ['ok', 'warn', 'bad', 'info'].indexOf(o.tone) >= 0 ? o.tone : 'info';
     const undo = typeof o.undo === 'function' ? o.undo : null;
     const undoMs = (SB.config && Number(SB.config.undoMs)) || 10000;
-    const ms = Number.isFinite(+o.ms) && +o.ms > 0 ? +o.ms : undo ? undoMs : (tone === 'bad' || tone === 'warn' ? 6000 : 4000);
+    const ms = Number.isFinite(+o.ms) && +o.ms > 0 ? +o.ms : undo ? undoMs : tone === 'bad' ? 1e12 : tone === 'warn' ? 6000 : 5000; // errors stay until cleared
     if (undo) toasts.slice().forEach((t) => { if (t.undo) t.dismiss(true); }); // the engine only undoes its newest action
     while (toasts.length >= 3) toasts[0].dismiss(true);
     // Build the strip: icon, message, buttons and (for undo) the draining bar.

@@ -549,3 +549,11 @@
 .dp-h { margin-top: var(--sp-2); }
 .dp-links { gap: var(--sp-3); }
 .fl-first-dish { min-height: 72px; padding-inline: var(--sp-8, 40px); font-size: var(--fs-5, 1.4rem); }
+
+/* Touch size: the Warning loudness slider and the 86 board Channel sync row are at least 44 px tall. */
+input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
+.bd-sync > summary { min-height: var(--tap, 44px); display: flex; align-items: center; }
+
+/* An empty menu: the friendly "No dishes yet" block spans the whole tile grid and its button keeps one line. */
+.ord-nodishes { grid-column: 1 / -1; padding: var(--sp-5, 24px) var(--sp-3, 12px); text-align: center; }
+.ord-nodishes .btn { white-space: nowrap; }
