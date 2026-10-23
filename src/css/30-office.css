@@ -374,3 +374,18 @@ a.of-nav:active { background: var(--press); }
 .of-how summary { cursor: pointer; display: inline-block; padding: 6px 0; min-height: 32px; color: var(--ink2); text-decoration: underline; text-underline-offset: 3px; }
 .of-how p { margin: var(--sp-1) 0 0; line-height: 1.5; }
 .of-page[data-coach="on"] > .of-how { display: none; }
+
+/* Browser print (Ctrl+P) of an office page: the whole page column on white paper, without the rail, and no card split across two
+   pages. The script switches to the Paper look while printing, so text stays dark. The dedicated print pages (safety record, close
+   day, pilot report) hide all of this with their own rule. */
+@media print {
+  body:has(.layer-office:not([hidden])):not(:has(.layer-guide:not([hidden]))) .sb-shell { position: static !important; overflow: visible !important; background: #fff !important; }
+  body:has(.layer-office:not([hidden])):not(:has(.layer-guide:not([hidden]))) .sb-shell > :not(.layer-office) { display: none !important; }
+  .layer-office { position: static !important; display: block !important; overflow: visible !important; background: #fff !important; }
+  .layer-office[hidden] { display: none !important; }
+  .of { display: block; background: #fff; color: #000; }
+  .of-rail { display: none; }
+  .of-col { overflow: visible; height: auto; }
+  .of-main { max-width: none; padding: 0; }
+  .of-card, .ch { break-inside: avoid; }
+}
