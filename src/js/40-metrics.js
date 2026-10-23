@@ -1080,7 +1080,7 @@
   // Dollar words for a set of discards ({count, cost, noCostCount}): "cost not recorded" when none has a cost, and the
   // known part named as such when only some do, so an unknown cost never reads as $0.
   M.discardCostWords = (d, fmtMoney) => {
-    const f = fmtMoney || ((v) => U.fmtMoney(v, 0)), n = d && num(d.noCostCount) ? d.noCostCount : 0;
+    const f = typeof fmtMoney === 'function' ? fmtMoney : (v) => U.fmtMoney(v, 0), n = d && num(d.noCostCount) ? d.noCostCount : 0;
     if (!d || !d.count) return f(0);
     if (n >= d.count) return 'cost not recorded';
     return f(d.cost) + (n ? ' for the ' + (d.count - n) + ' with a recorded cost' : '');
