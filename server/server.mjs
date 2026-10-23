@@ -267,7 +267,7 @@ export async function createHub(opts = {}) {
   }
   // Keeps a replayed or applied entry in the recent log and, when it has an action id, its answer.
   function remember(e) {
-    const op = { seq: e.seq, opId: e.opId || null, actionType: e.type, payload: e.payload ?? {}, now: e.now, by: e.by ?? null, screen: e.screen || undefined, info: e.info };
+    const op = { seq: e.seq, opId: e.opId || null, actionType: e.type, payload: e.payload ?? {}, now: e.now, by: e.by ?? null, screen: e.screen || undefined, info: e.info, rev: state && state.rev };
     op.bytes = JSON.stringify(op).length;
     ops.push(op); opsBytes += op.bytes;
     while (ops.length > MAX_OPS || (opsBytes > MAX_OPS_BYTES && ops.length > 1)) opsBytes -= ops.shift().bytes || 0;
@@ -314,7 +314,7 @@ export async function createHub(opts = {}) {
   }
   const MAX_FOLLOW_BACKLOG = 4 * 1024 * 1024;
   // What a follower receives for one applied action or tick: its place in the order, what it was, and the hub clock.
-  const opMessage = (o) => ({ seq: o.seq, opId: o.opId, type: o.actionType, payload: o.payload, now: o.now, by: o.by, screen: o.screen, serverNow: now() });
+  const opMessage = (o) => ({ seq: o.seq, opId: o.opId, type: o.actionType, payload: o.payload, now: o.now, by: o.by, screen: o.screen, rev: o.rev, serverNow: now() });
 
   // Runs one action through the engine with the hub clock; repeats of a known opId get the first answer back.
   function runAction(body) {
@@ -482,6 +482,7 @@ export async function createHub(opts = {}) {
     }
     if (clients.size + followers.size >= MAX_CLIENTS) return fail(503, 'tooMany', { 'retry-after': '10' });
     const gzip = wantsGzip(req);
+    const trimDays = (() => { const n = Number(q.get('trim')); return q.get('trim') !== null && Number.isInteger(n) && n >= 1 && n <= 365 ? n : 0; })();
     res.writeHead(200, Object.assign({ 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', connection: 'keep-alive' }, gzip ? { 'content-encoding': 'gzip', vary: 'Accept-Encoding' } : {}, cors));
     if (gzip) gzipStream(req, res);
     followers.add(res);
@@ -496,7 +497,11 @@ export async function createHub(opts = {}) {
     if (missed && (missed.length === 0 || missed.reduce((a, o) => a + (o.bytes || 0), 0) <= stateBytes)) {
       for (const o of missed) send(res, 'op', opMessage(o));
       send(res, 'resumed', { seq, hubId, count: missed.length, serverNow: now() });
-    } else send(res, 'snapshot', { state, seq, hubId, proto: PROTO, serverNow: now(), opIds: ops.slice(-1000).map((o) => o.opId).filter(Boolean) });
+    } else {
+      // A screen that asked for ?trim=<days> gets only the recent part of the kitchen; the hub keeps everything.
+      const t = trimDays ? E.trimState(state, now(), trimDays) : null;
+      send(res, 'snapshot', Object.assign({ state: t ? t.state : state, seq, hubId, proto: PROTO, serverNow: now(), opIds: ops.slice(-1000).map((o) => o.opId).filter(Boolean) }, t && t.trimmed ? { trimmed: t.trimmed } : {}));
+    }
   }
   // Tells a screen about this hub without joining: its protocol, its history name, and whether it is empty (no action ever applied and
   // no kitchen sent to it), so a device can decide whether it may send its own kitchen here.

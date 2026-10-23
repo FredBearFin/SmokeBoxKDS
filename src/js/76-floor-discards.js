@@ -67,8 +67,8 @@
     }
     return out.sort((a, b) => b.t - a.t);
   }
-  // How far back the log reaches, in plain words, so nobody reads it as more than it is. The app keeps safety records for
-  // about six months (190 days); a kitchen newer than that has everything from its first record.
+  // How far back the log reaches, in plain words, so nobody reads it as more than it is. The keep time comes from the engine
+  // (SB.retention); a kitchen newer than that has everything from its first record.
   function coverageText(state, list, now) {
     if (!list.length) return '';
     const oldest = list[list.length - 1].t;
@@ -77,8 +77,10 @@
     for (const b of state.batches || []) if (b && Number.isFinite(b.enteredAt) && b.enteredAt < first) first = b.enteredAt;
     const since = U.fmtDateShort(U.dateKey(oldest));
     const n = list.length + ' ' + U.plural(list.length, 'batch', 'batches');
-    if (now - first < 175 * 86400e3) return 'Showing every batch thrown out since ' + U.fmtDateShort(U.dateKey(first)) + ' (' + n + '), the first record this app has.';
-    return 'Showing the ' + n + ' thrown out since ' + since + '. Records older than about six months are not kept, so older ones are not here.';
+    const keep = SB.retention ? SB.retention.days() : null;
+    // A kitchen younger than the keep time (less a two-week margin) has everything from its first record.
+    if (keep && now - first < (keep - 14) * 86400e3) return 'Showing every batch thrown out since ' + U.fmtDateShort(U.dateKey(first)) + ' (' + n + '), the first record this app has.';
+    return 'Showing the ' + n + ' thrown out since ' + since + '. ' + (SB.retention ? SB.retention.words() : '') + ' Older ones are not here.';
   }
   // Escapes text for safe use inside HTML.
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -132,7 +134,7 @@
     const status = h('p', { class: 'fs-sub', role: 'status' });
     const cover = h('p', { class: 'fs-sub dlog-cover' });
     // The plain words for how far back the log reaches, for the sheet, print and file.
-    const noteFor = (list) => coverageText(SB.store.getState(), list, SB.store.now());
+    const noteFor = (list) => { let t = null; try { t = SB.store.trimInfo ? SB.store.trimInfo() : null; } catch (e) { t = null; } return coverageText(SB.store.getState(), list, SB.store.now()) + (t && t.days > 0 ? ' This screen holds only the last ' + t.days + ' days; the full history is on the hub computer.' : ''); };
     const wrap = h('div', { class: 'dlog-wrap', style: 'overflow:auto' });
     const colsBox = h('div', { class: 'dlog-cols', hidden: true });
 

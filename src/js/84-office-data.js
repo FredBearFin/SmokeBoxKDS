@@ -1883,7 +1883,7 @@
     // A follower or hub-connected tablet: say so at the top, and shut the controls that would change or erase the shared kitchen.
     const conn = SB.office && SB.office.connection ? SB.office.connection() : 'solo';
     if (conn !== 'solo') {
-      headBox.appendChild(h('p', { class: 'od-p od-conn', role: 'note', 'data-conn': conn }, conn === 'follower' ? SB.office.FOLLOWER_WORDS : SB.office.HUB_WORDS));
+      headBox.appendChild(h('p', { class: 'od-p od-conn', role: 'note', 'data-conn': conn }, (conn === 'follower' ? SB.office.FOLLOWER_WORDS : SB.office.HUB_WORDS) + (SB.office.trimWords() ? ' This screen holds only part of the history, so a backup, a spreadsheet file or a report made here is partial. ' + SB.office.trimWords() : '')));
       lockShared(content, conn, [resetBtnsRef.live, resetBtnsRef.all], P);
     }
     root.append(headBox, h('div', { class: 'od-layout' }, toc, content));

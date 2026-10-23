@@ -966,7 +966,9 @@
    */
   M.stockBurn = (ds, opts) => {
     ds = unwrap(ds); ds = ds && typeof ds === 'object' ? ds : {}; opts = opts && typeof opts === 'object' ? opts : {};
-    const ctx = makeCtx(ds, { from: -Infinity, to: Infinity }); const im = ctx.ingMap(); const ing = opts.ing; const meta = im[ing];
+    // The whole-history context is remembered per dataset (the stock page asks for one day of each protein, dozens of times), so
+    // the day list, the items and the events are walked once instead of once per call.
+    const ctx = M.prepare(ds, { from: -Infinity, to: Infinity }); const im = ctx.ingMap(); const ing = opts.ing; const meta = im[ing];
     const empty = { day: null, ing: ing || null, name: meta ? meta.name : ing || null, unit: meta ? meta.unit : null, tcs: !!(meta && meta.tcs), thresholdG: meta && num(meta.thresholdG) ? meta.thresholdG : null, parG: meta && num(meta.parG) ? meta.parG : null,
       openingG: null, openingAssumed: false, openMs: null, closeMs: null, intakeG: 0, usedG: 0, wasteG: 0, endG: null, minG: null, minAt: null, points: [], batches: [] };
     if (!ing) return empty;
@@ -975,11 +977,17 @@
     if (!day) return empty;
     const res = Object.assign({}, empty, { day, openMs: hourMs(day, ctx.svc.openHour), closeMs: hourMs(day, ctx.svc.closeHour) });
     const deltas = []; const tcs = !!(meta && meta.tcs);
-    const dep = []; let anyBatchId = false;
-    for (const v of ctx.all) for (const it of v.items) {
-      if (!it || it.status !== 'done' || !num(it.doneAt) || !Array.isArray(it.depleted)) continue;
-      for (const d of it.depleted) if (d && d.ing === ing && num(d.g) && d.g > 0) { dep.push({ t: it.doneAt, g: d.g, b: d.batchId }); if (d.batchId) anyBatchId = true; }
-    }
+    // Every depletion of every ingredient and every restock, indexed once per context: [{t, g, b}] in the original walk order.
+    const idx = ctx.memo('stockIndex', () => {
+      const depBy = {}, anyBy = {}, restockBy = {}, byBatch = {};
+      for (const v of ctx.all) for (const it of v.items) {
+        if (!it || it.status !== 'done' || !num(it.doneAt) || !Array.isArray(it.depleted)) continue;
+        for (const d of it.depleted) if (d && d.ing && num(d.g) && d.g > 0) { const row = { t: it.doneAt, g: d.g, b: d.batchId, i: 0 }; const list = depBy[d.ing] || (depBy[d.ing] = []); row.i = list.length; list.push(row); if (d.batchId) { anyBy[d.ing] = true; const m = byBatch[d.ing] || (byBatch[d.ing] = {}); (m[d.batchId] || (m[d.batchId] = [])).push(row); } }
+      }
+      for (const e of arr(ds.events)) if (e && e.type === 'restock' && !e.reverted && e.ing && num(e.t) && num(e.g)) (restockBy[e.ing] || (restockBy[e.ing] = [])).push(e);
+      return { depBy, anyBy, restockBy, byBatch };
+    });
+    const dep = idx.depBy[ing] || []; const anyBatchId = !!idx.anyBy[ing];
     // Hot-held (TCS) food: stock is only what that day's batches brought in, minus use and discards.
     // Opening is 0.
     if (tcs) {
@@ -990,12 +998,14 @@
         deltas.push({ t: b.enteredAt, d: b.cookedG, kind: 'intake' }); res.batches.push({ id: b.id, label: b.label || b.id, enteredAt: b.enteredAt, cookedG: b.cookedG });
         if (num(b.discardedAt) && num(b.wasteG) && b.wasteG > 0) deltas.push({ t: b.discardedAt, d: -b.wasteG, kind: 'waste' });
       }
-      for (const x of dep) if (anyBatchId ? ids.has(x.b) : ctx.dateOf(x.t) === day) deltas.push({ t: x.t, d: -x.g, kind: 'use' });
+      // With batch ids on the depletions, only this day's batches are looked up (in the original walk order); otherwise the day is matched by time.
+      const mine = anyBatchId ? [].concat(...Array.from(ids).map((id) => (idx.byBatch[ing] || {})[id] || [])).sort((a, b) => a.i - b.i) : dep.filter((x) => ctx.dateOf(x.t) === day);
+      for (const x of mine) deltas.push({ t: x.t, d: -x.g, kind: 'use' });
     } else {
       // Other ingredients: start from the given opening count or the par level (openingAssumed says so),
       // plus restocks.
       res.openingG = num(opts.openingG) ? opts.openingG : (meta && num(meta.parG) ? meta.parG : 0); res.openingAssumed = !num(opts.openingG);
-      for (const e of arr(ds.events)) if (e && e.type === 'restock' && !e.reverted && e.ing === ing && num(e.t) && num(e.g) && ctx.dateOf(e.t) === day) deltas.push({ t: e.t, d: e.g, kind: 'restock' });
+      for (const e of idx.restockBy[ing] || []) if (ctx.dateOf(e.t) === day) deltas.push({ t: e.t, d: e.g, kind: 'restock' });
       for (const x of dep) if (ctx.dateOf(x.t) === day) deltas.push({ t: x.t, d: -x.g, kind: 'use' });
     }
     // At the same moment, stock coming in is counted before stock going out, so the level never dips below

@@ -1053,7 +1053,7 @@
   // Registers fn for status changes; returns a remover.
   function subscribeFollow(fn) { if (typeof fn !== 'function') return () => {}; followSubs.add(fn); return () => followSubs.delete(fn); }
   // Ends the first-attempt promise once.
-  function folSettle(res) { if (fol && fol.resolve) { const r = fol.resolve; fol.resolve = null; r(Object.assign({ status: followStatus() }, res)); } }
+  function folSettle(res) { if (fol && fol.resolve) { const r = fol.resolve; fol.resolve = null; r(Object.assign({ status: followStatus() }, res, res && res.ok === false && res.error ? { reason: FOLLOW_REASON[res.error] || '' } : {})); } }
   // Stops following: closes the stream and timers. The store keeps its last state until init is called again.
   function folStop() {
     if (!fol) return;
@@ -1079,7 +1079,7 @@
     const url = opts.url.replace(/\/+$/, '');
     const f = fol = { url, code: codeFor(opts), staleMs: isNum(opts.staleMs) && opts.staleMs > 0 ? opts.staleMs : 45000, offset: 0, seq: null, hubId: null, connected: false, everConnected: false,
       error: null, lastMsgAt: null, goodSince: null, retryInMs: 0, retryStep: 0, closed: false, gen: 0, ctrl: null, retryTimer: null, timer: null, lastKey: '', resolve: null, resyncs: 0,
-      base: null, hub: false, offsetKnown: false, pend: [], owners: new Map(), baseKey: null, topOwner: null, lastActKey: null, fromCache: false, cachedAt: null, cacheAt: 0, cacheDirty: false, name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
+      base: null, hub: false, trim: Number.isInteger(opts.trim) && opts.trim >= 1 && opts.trim <= 365 ? opts.trim : 0, trimmed: null, offsetKnown: false, pend: [], owners: new Map(), baseKey: null, topOwner: null, lastActKey: null, fromCache: false, cachedAt: null, cacheAt: 0, cacheDirty: false, name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
       fetchFn: opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null), Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
     f.hub = !!hub;
     const bound = hub ? tokenFor(url) : null;
@@ -1088,7 +1088,7 @@
     const p = new Promise((resolve) => { f.resolve = resolve; });
     if (hub && cache) {
       // The hub cannot be reached: show the last known kitchen, marked as such, and let taps be predicted and queued from the start.
-      f.base = cache.state; f.seq = cache.seq; f.hubId = cache.hubId; f.offset = cache.offset || 0; f.fromCache = true; f.cachedAt = cache.savedAt; f.everConnected = true;
+      f.base = cache.state; f.seq = cache.seq; f.hubId = cache.hubId; f.offset = cache.offset || 0; f.trimmed = f.trim && cache.trimmed ? cache.trimmed : null; f.fromCache = true; f.cachedAt = cache.savedAt; f.everConnected = true;
       hubHello({ hubId: cache.hubId });
       folShow();
       folSettle({ ok: true, cached: true });
@@ -1126,8 +1126,10 @@
     const gen = ++f.gen;
     if (!f.fetchFn || !f.Abort || !f.Dec) { f.error = 'error'; folRetry('error'); return; }
     f.ctrl = new f.Abort();
-    let q = '';
-    if (f.hubId != null && isNum(f.seq)) q = '?since=' + f.seq + '&hub=' + encodeURIComponent(f.hubId);
+    const qp = [];
+    if (f.hubId != null && isNum(f.seq)) qp.push('since=' + f.seq, 'hub=' + encodeURIComponent(f.hubId));
+    if (f.trim) qp.push('trim=' + f.trim);
+    const q = qp.length ? '?' + qp.join('&') : '';
     const hdr = hubHeaders(f.url, f.code, { accept: 'text/event-stream' });       // the token or code travels in a header, never in the address
     let res;
     try { res = await f.fetchFn(f.url + '/follow' + q, { signal: f.ctrl.signal, cache: 'no-store', headers: hdr }); } catch (e) { if (f.closed || gen !== f.gen) return; folRetry('unreachable'); return; }
@@ -1211,6 +1213,7 @@
       const v = E().validateBackup(d.state);
       if (!v.ok || !isNum(d.seq)) { folResync(); return; }
       f.base = v.state; f.seq = d.seq; f.hubId = d.hubId || f.pendingHub;
+      f.trimmed = f.trim && d.trimmed && isNum(d.trimmed.since) ? d.trimmed : null;      // what the hub left out, kept so pages can say so
       f.owners = new Map(); f.baseKey = null;
       if (f.hub) { f.fromCache = false; hubAfterSnapshot(d); hubCacheSave(true); }
       folShow();
@@ -1222,6 +1225,8 @@
       if (d.seq !== f.seq + 1 || typeof d.type !== 'string') { folResync(); return; }
       const r = d.type === 'tick' ? { report: 'ok', state: E().tick(f.base, d.now).state } : E().apply(f.base, d.type, d.payload, d.now, { screen: d.screen });
       if (r.report !== 'ok') { folResync(); return; }
+      // A trimmed copy that no longer matches the hub's change count has drifted (an action touched left-out history): start again from a fresh copy.
+      if (f.trimmed && isNum(d.rev) && isNum(r.state.rev) && d.rev !== r.state.rev) { folResync(); return; }
       f.base = r.state; f.seq = d.seq;
       if (f.hub && d.type !== 'tick' && d.type !== 'uiReport') {
         f.baseKey = d.opId || 'seq:' + d.seq;
@@ -1327,7 +1332,7 @@
     if (!force && realNow() - f.cacheAt < (f.cacheBytes > 200000 ? 15000 : 2000)) { f.cacheDirty = true; return; }
     f.cacheAt = realNow(); f.cacheDirty = false;
     try {
-      const rec = { v: 1, url: f.url, hubId: f.hubId, seq: f.seq, savedAt: realNow(), offset: Math.round(f.offset), state: f.base };
+      const rec = { v: 1, url: f.url, hubId: f.hubId, seq: f.seq, savedAt: realNow(), offset: Math.round(f.offset), state: f.base, trimmed: f.trimmed || undefined };
       f.cacheBytes = JSON.stringify(rec).length;
       if (f.cacheBytes > CACHE_MAX) { U.rawStorage.remove(CACHE_KEY); return; }
       U.rawStorage.set(CACHE_KEY, rec);
@@ -1339,7 +1344,7 @@
       const c = U.rawStorage.get(CACHE_KEY, null);
       if (!c || c.v !== 1 || c.url !== normUrl(url) || typeof c.hubId !== 'string' || !isNum(c.seq) || !isNum(c.savedAt)) return null;
       const v = E().validateBackup(c.state);
-      return v.ok ? { state: v.state, hubId: c.hubId, seq: c.seq, savedAt: c.savedAt, offset: isNum(c.offset) ? c.offset : 0 } : null;
+      return v.ok ? { state: v.state, hubId: c.hubId, seq: c.seq, savedAt: c.savedAt, offset: isNum(c.offset) ? c.offset : 0, trimmed: c.trimmed && isNum(c.trimmed.since) ? c.trimmed : null } : null;
     } catch (e) { return null; }
   }
   // How many taps this screen has sent or queued that the hub has not answered yet.
@@ -1548,7 +1553,7 @@
   async function initHubClient(opts) {
     opts = opts || {};
     // Builds the answer for a join that did not happen.
-    const fail = (error) => ({ ok: false, error, status: hubStatus() });
+    const fail = (error) => ({ ok: false, error, reason: FOLLOW_REASON[error] || '', status: hubStatus() });
     if (typeof opts.url !== 'string') return fail('notFound');
     if ((opts.adopt === 'hub') === (opts.seed === true)) return fail('choiceRequired');
     // The screen name is plain: letters, digits, spaces and a few marks, up to 20 characters; anything else is refused, not trimmed away.
@@ -1916,6 +1921,6 @@
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
-    initFollower, followStatus, subscribeFollow, isFollower, initHubClient, probeHub, rememberedCode, pairHub, pairedFor, unpair, hubScreens, hubNewPairingCode, hubRemoveScreen, hubStatus, subscribeHub: subscribeFollow, subscribeRefusals, pendingFor, isHubClient, isHub: isHubClient, leaveHub, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
+    initFollower, trimInfo: () => (fol && fol.trimmed ? Object.assign({}, fol.trimmed) : null), followStatus, subscribeFollow, isFollower, initHubClient, probeHub, rememberedCode, pairHub, pairedFor, unpair, hubScreens, hubNewPairingCode, hubRemoveScreen, hubStatus, subscribeHub: subscribeFollow, subscribeRefusals, pendingFor, isHubClient, isHub: isHubClient, leaveHub, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

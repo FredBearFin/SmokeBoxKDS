@@ -6,7 +6,7 @@ import { buildBig } from './_big-kitchen.mjs';
 import { loadSB } from './_load.mjs';
 
 const { SB, state } = await buildBig({ tickets: 300, days: 150, seed: 11 });
-await loadSB(['36-csv', '35-pilot', '76-floor-discards', '88-office-backup']);
+await loadSB(['36-csv', '37-retention', '35-pilot', '76-floor-discards', '88-office-backup']);
 const E = SB.engine;
 
 test('CSV cells: formulas are neutralized, numbers stay numbers, quotes are doubled', () => {
@@ -44,4 +44,25 @@ test('the thrown-out log lists every discard still on record, and says how far b
   assert.equal(SB.discardsPure.coverageText(state, [], now), '');
   // far in the future the oldest records are older than the keep time, so the words say older ones are not kept
   assert.ok(/not kept/.test(SB.discardsPure.coverageText(state, list, now + 400 * 86400e3)));
+});
+
+test('the keep time is read from the engine, never written into the words', () => {
+  const E2 = SB.engine, had = [E2.SAFETY_KEEP_DAYS, E2.SAFETY_KEEP_MS];
+  try {
+    delete E2.SAFETY_KEEP_DAYS; delete E2.SAFETY_KEEP_MS;
+    assert.equal(SB.retention.days(), null);
+    assert.ok(!/\d/.test(SB.retention.words()), 'no number claimed when the engine does not say');
+    E2.SAFETY_KEEP_MS = 400 * 86400e3;
+    assert.equal(SB.retention.days(), 400);
+    assert.ok(/about 400 days/.test(SB.retention.words()));
+    E2.SAFETY_KEEP_DAYS = 90;
+    assert.ok(/about 90 days/.test(SB.retention.words()), 'a day count wins over a millisecond count');
+    // the thrown-out log's reach follows the same number
+    const rec = { cols: [], initials: {}, extra: {} }, list = SB.discardsPure.rows(state, rec);
+    const now = state.events[state.events.length - 1].t;
+    E2.SAFETY_KEEP_DAYS = 400;
+    assert.ok(/first record this app has/.test(SB.discardsPure.coverageText(state, list, now)), 'a young kitchen has everything from its first record');
+    E2.SAFETY_KEEP_DAYS = 90;
+    assert.ok(/about 90 days/.test(SB.discardsPure.coverageText(state, list, now + 500 * 86400e3)));
+  } finally { E2.SAFETY_KEEP_DAYS = had[0]; E2.SAFETY_KEEP_MS = had[1]; if (had[0] === undefined) delete E2.SAFETY_KEEP_DAYS; if (had[1] === undefined) delete E2.SAFETY_KEEP_MS; }
 });

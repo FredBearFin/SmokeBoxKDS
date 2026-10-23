@@ -43,6 +43,8 @@ try {
   check('the manifest link is inside the folder', mf === base + 'manifest.webmanifest', mf);
   const mj = await (await fetch(base + 'manifest.webmanifest')).json();
   check('the manifest starts and scopes at the folder', mj.start_url === './' && mj.scope === './' && mj.icons.every((i) => !i.src.startsWith('/')), mj);
+  const TR = await open(base + '?follow&trim=3&code=FOLLOWCODE12345');
+  check('?follow&trim=3 asks for the trimmed copy and the page knows it', (await waitState(TR, 'following')) === 'following' && await TR.evaluate(() => { const t = SB.store.trimInfo(); return !!t && t.days === 3; }), await TR.evaluate(() => SB.store.trimInfo()));
   check('no page errors', [T, F, X].every((p) => p.errs.length === 0), [T, F, X].map((p) => p.errs));
   const R = await open(`http://127.0.0.1:${PROXY}/beta/`);
   check('a page with no ?hub at the prefix is a normal local kitchen', await R.evaluate(() => !(SB.store.isHubClient && SB.store.isHubClient())));
