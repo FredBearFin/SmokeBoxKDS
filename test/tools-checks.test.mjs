@@ -42,6 +42,22 @@ test('code fingerprint: accept with no file names refuses, and check fails on a 
   assert.equal(c.status, 1, c.stdout); assert.match(c.stdout, /NO BASELINE/);
 });
 
+test('guide builder: Markdown the Guide does not understand stops the build instead of turning into plain text', async () => {
+  const { parsePage } = await import('../tools/build-guide.mjs');
+  for (const bad of ['- [x] done', '1) first', '* item', '### Small heading', '```', '# A second title']) {
+    assert.throws(() => parsePage('01-x.md', '# Title\n\nSummary.\n\n' + bad + '\n'), /not understood/, bad);
+  }
+  const ok = parsePage('01-x.md', '# Title\n\nSummary.\n\n## Part\n\n1. one\n\n- two\n\n- [ ] three\n');
+  assert.equal(ok.title, 'Title'); assert.deepEqual(ok.blocks.map((b) => b.t), ['h', 'ol', 'ul', 'check']);
+});
+
+test('artifact builder: --no-build refuses a page older than the sources', () => {
+  const stale = path.join(tmp, 'stale.html'); fs.writeFileSync(stale, '<html><body>old</body></html>'); fs.utimesSync(stale, new Date(0), new Date(0));
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/build-artifact.mjs'), '--no-build', '--in', stale, '--out', path.join(tmp, 'a.html')], { encoding: 'utf8' });
+  assert.equal(r.status, 1, r.stdout + r.stderr); assert.match(r.stderr, /older than the sources/);
+  assert.ok(!fs.existsSync(path.join(tmp, 'a.html')));
+});
+
 test('contract check: failed inspections and broken contracts are problems, and only "performance:"/"timing:" tests count as timing', async () => {
   const { analyze, emptyScan } = await import('../tools/contract-check.mjs');
   const err = { __err: 'Execution context was destroyed' };
