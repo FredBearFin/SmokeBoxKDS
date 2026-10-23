@@ -14,15 +14,16 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-export const leaderUrl = (hub) => (process.env.SMOKEBOX_LEADER_URL || '{hub}/?connect={hub}').replaceAll('{hub}', hub);
-export const followerUrl = (hub) => (process.env.SMOKEBOX_FOLLOWER_URL || '{hub}/?follow={hub}').replaceAll('{hub}', hub);
+// Stage 1 has no tablet that writes through the hub, so the "leader" is plain HTTP posts of actions (httpLeader below), as a cooking tablet will send them.
+// A follower page is the hub's own page opened with ?follow (and &code=... when the hub has an access code).
+export const followerUrl = (hub, code) => (process.env.SMOKEBOX_FOLLOWER_URL || '{hub}/?follow').replaceAll('{hub}', hub) + (code ? (process.env.SMOKEBOX_FOLLOWER_URL ? '' : '&code=' + encodeURIComponent(code)) : '');
 
 /** True when the follower code is in this source tree (looks for the word in the store, util and boot files and the shell). */
 export function followerBuilt() {
-  const files = ['00-util.js', '30-store.js', '60-shell.js', '99-boot.js', '70-floor-board.js'].map((f) => path.join(ROOT, 'src/js', f));
-  return files.some((f) => fs.existsSync(f) && /follower|followHub|enterFollow|mode\s*===?\s*'follow/i.test(fs.readFileSync(f, 'utf8')));
+  const has = (f, re) => { const file = path.join(ROOT, 'src/js', f); return fs.existsSync(file) && re.test(fs.readFileSync(file, 'utf8')); };
+  return has('30-store.js', /function initFollower/) && has('70-floor-board.js', /SB\.followMode/) && /\/follow/.test(fs.readFileSync(path.join(ROOT, 'server/server.mjs'), 'utf8'));
 }
-export const SKIP_MESSAGE = 'SKIP: the read-only follower is not in this source tree yet (no "follower" mode in src/js). Merge night/a5-c1, night/a1-c1 and night/a2-c1, then run this again.';
+export const SKIP_MESSAGE = 'SKIP: the read-only follower is not in this source tree yet (initFollower, the follower screen or the /follow route of the hub is missing). Merge night/a5-c1, night/a1-c1 and night/a2-c1, then run this again.';
 
 /** Starts server/server.mjs as a child process (so it can be stopped hard, like a crash). Returns { port, origin, dir, file, stop(signal), restart(), log() }. */
 export async function startHub(opts = {}) {
@@ -91,3 +92,9 @@ export function stream(origin, { since, path: p = '/events', headers } = {}) {
   return s;
 }
 export async function until(fn, what, ms = 4000) { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return; await sleep(25); } throw new Error('timed out waiting for ' + what); }
+
+/** A leader that posts actions to the hub with an opId each, like a cooking tablet: act(type, payload) -> the hub's reply body. */
+export function httpLeader(origin, name = 'leader') {
+  let n = 0;
+  return { async act(type, payload, extra) { const r = await postAction(origin, Object.assign({ type, payload, clientId: name, opId: name + ':' + (++n) }, extra || {})); return r.body || { report: 'http' + r.status }; }, count: () => n };
+}
