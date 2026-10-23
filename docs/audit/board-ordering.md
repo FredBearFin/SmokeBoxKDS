@@ -129,3 +129,20 @@ Fixed:
 - **Wording (A4):** research-report sentence removed from Help, "step 1 of 2" and "step 2 of 2" for cooling, "throw it out".
 
 Left: a hint of how many tickets are below the fold (P2 6); countdown format switching between minutes and mm:ss (P2 7); bright slips at Night (P2 8); the Demo tag on every ticket (P2 11); wall names that are too long end in an ellipsis (no way to read the rest on a TV).
+
+## Round 8 status (final)
+
+Final screenshots with a "what to look for" list: `docs/ux-shots/final/README.md`. All board checks re-run on the merged build (e7e9c93 plus this branch): `board-round2` to `board-round5`, `board-contrast` (42 checks) and `strip-notices` pass.
+
+Done this round:
+- The "Demo" tag on tickets, Orders rows and Recall rows is hidden inside the demo (the demo bar already says it) and still shows beside real tickets.
+- On the notice strip the count of more warnings now reads "+N more" beside the batch name, where a long explanation can no longer cut it off.
+
+Known, not done:
+- **A hint of how many tickets are below the fold.** The tab count is the only hint. Needs a small "N more below" pill tied to the scroll position; not small enough to do safely this late.
+- **Countdown format.** The strip shows minutes ("25 min") until under 10 minutes, then mm:ss ("9:58"). It is consistent with itself, but the two forms look different at a glance. Left as the design.
+- **Bright slips at Night.** Paper slips stay light on the dark board. Readable (contrast checked) but bright in a dark kitchen. A dim-paper Night mode would be a design change.
+- "Show me how it works" shows twice when the setup card and the empty board are up together.
+- Wall list names that are too long end in an ellipsis.
+- A 32 in 2560x1440 monitor is too small for Far display from 10 feet (see `docs/ux-test-report.md`); the next-action line fails on a 43 in TV.
+- Nothing here was tested on a real tablet, TV or in a real kitchen.

@@ -1070,7 +1070,8 @@
     const ch = C.channelById[t.channel] || { name: String(t.channel), icon: 'plate' };
     const count = h('span', { class: 'fl-count' });
     const meta = h('div', { class: 'slip-meta' }, h('span', { class: 'fl-chan' }, ico(ch.icon, 18), h('span', null, ch.name)), count,
-      t.src === 'demo' ? h('span', { class: 'fl-demo-tag', title: 'Demo ticket: made by the demo, not a real order' }, 'Demo', h('span', { class: 'dt-more' }, ' ticket')) : null);
+      // Inside the demo every ticket is a demo ticket and the demo bar already says so, so the tag only shows beside real tickets.
+      t.src === 'demo' && !(store().isDemo && store().isDemo()) ? h('span', { class: 'fl-demo-tag', title: 'Demo ticket: made by the demo, not a real order' }, 'Demo', h('span', { class: 'dt-more' }, ' ticket')) : null);
     const timer = h('span', { class: 'slip-timer num', dataset: { level: 'ok' } }, '00:00');
     const badge = buildBadge();
     const progI = h('i');
@@ -1556,8 +1557,9 @@
       if (r.el.dataset.step !== stp) r.el.dataset.step = stp;
       if (r.el.dataset.snoozed !== sn) r.el.dataset.snoozed = sn;
       setTxt(r.when, d.kind === 'expired' ? 'OUT' : d.kind === 'past' ? 'PAST' : countdownText(d.msLeft));
-      setTxt(r.what, d.label);
-      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action + (i === top.length - 1 && moreRows > 0 ? ' (' + moreRows + ' more warning' + (moreRows > 1 ? 's' : '') + ' after this one.)' : ''));
+      // How many more warnings wait behind this one goes on the short name line, where a long explanation cannot cut it off.
+      setTxt(r.what, d.label + (i === top.length - 1 && moreRows > 0 ? '   +' + moreRows + ' more' : ''));
+      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action);
     });
   }
 
