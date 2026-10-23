@@ -167,6 +167,9 @@
     // Keeps what has been typed so far, so a closed tab or a stray tap loses nothing.
     function saveDraft() { U.storage.set(KEY_DRAFT, { name: nameIn.value, price: priceIn.value, zone }); }
     nameIn.addEventListener('input', saveDraft); priceIn.addEventListener('input', saveDraft);
+    // Enter (or Next on a tablet keyboard) in the name box moves to the price box instead of doing nothing.
+    nameIn.setAttribute('enterkeyhint', 'next'); priceIn.setAttribute('enterkeyhint', 'done');
+    nameIn.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); priceIn.focus(); } });
 
     // Checks the form and saves one dish. Returns true when it saved. Each problem shows beside its own box.
     function saveOne() {
