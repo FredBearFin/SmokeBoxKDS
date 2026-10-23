@@ -38,7 +38,7 @@ function loadSaved(E, file) {
   let why = 'unreadable';
   if (saved !== null && typeof saved === 'object') {
     const v = E.validateBackup(saved.state);
-    if (v.ok) return { state: v.state, seq: Number.isInteger(saved.seq) ? saved.seq : 0 };
+    if (v.ok) return { state: v.state, seq: Number.isInteger(saved.seq) ? saved.seq : 0, walN: Number.isInteger(saved.walN) ? saved.walN : 0, replies: Array.isArray(saved.replies) ? saved.replies.filter((x) => Array.isArray(x) && typeof x[0] === 'string' && x[1] && typeof x[1] === 'object') : [] };
     if (/^unsupported version \d/.test(v.error || '')) throw new Error('The saved file ' + file + ' was written by a different version (' + v.error + '). It was left untouched and the hub will not start. Start the build that wrote it, or move the file away on purpose.');
     why = 'not a valid kitchen (' + v.error + ')';
   }
@@ -51,10 +51,10 @@ function loadSaved(E, file) {
 // Writes state and seq to the JSON file through a temp file and a rename, so a crash never leaves half a file. The temp file is flushed to disk
 // first, and at most every bakEveryMs the file being replaced is copied to <file>.bak.
 let lastBak = 0;
-function writeSaved(file, state, seq, bakEveryMs) {
+function writeSaved(file, state, seq, bakEveryMs, extra) {
   const tmp = file + '.tmp';
   const fd = fs.openSync(tmp, 'w');
-  try { fs.writeSync(fd, JSON.stringify({ v: 1, seq, state })); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  try { fs.writeSync(fd, JSON.stringify(Object.assign({ v: 1, seq, state }, extra || {}))); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
   if (Date.now() - lastBak >= bakEveryMs && fs.existsSync(file)) { try { fs.copyFileSync(file, file + '.bak'); lastBak = Date.now(); } catch (e) { /* the save itself still goes ahead */ } }
   fs.renameSync(tmp, file);
 }
@@ -81,12 +81,54 @@ export async function createHub(opts = {}) {
   let lastAt = 0; // the time of the last applied action; action times never go backwards
   const replies = new Map(); // opId -> reply already given, so a resend is answered but not applied twice
   const MAX_REPLIES = 5000;
+  // Answers are saved with the state and every applied action is also written to a write-ahead log (<file>.wal) and flushed to disk before the
+  // answer is sent. After a restart or a crash the log is replayed on top of the saved file, so an action whose answer was lost and is sent again
+  // is recognized as a duplicate and the state is not behind what screens were told. walN counts log lines; a saved file says how many it holds.
+  const walFile = opts.walFile !== undefined ? opts.walFile : (dataFile ? dataFile + '.wal' : null);
+  let walFd = null, walN = saved ? saved.walN || 0 : 0;
+  if (saved) for (const [k, v] of saved.replies || []) replies.set(k, v);
   // Hard limits so one misbehaving screen cannot use up the hub's memory: the biggest action body, the most connected screens, and the
   // most bytes the recent-actions log may hold (oldest dropped first).
   const MAX_BODY = opts.maxBody ?? 256 * 1024, MAX_CLIENTS = opts.maxClients ?? 100, MAX_OPS_BYTES = opts.maxOpsBytes ?? 8 * 1024 * 1024;
   let opsBytes = 0;
   let saveTimer = null, dirty = false;
 
+  // Appends one line to the log and flushes it to disk. False when it could not be written.
+  function walAppend(entry) {
+    if (!walFile) return true;
+    try {
+      if (walFd === null) walFd = fs.openSync(walFile, 'a');
+      entry.n = ++walN;
+      fs.writeSync(walFd, JSON.stringify(entry) + '\n'); fs.fsyncSync(walFd);
+      return true;
+    } catch (e) { console.warn('[hub] could not record an action: ' + e.message); return false; }
+  }
+  // Empties the log once the saved file holds everything in it.
+  function walReset() {
+    if (!walFile) return;
+    try { if (walFd !== null) { fs.closeSync(walFd); walFd = null; } fs.writeFileSync(walFile, ''); } catch (e) { /* the next save tries again */ }
+  }
+  // Replays the log on top of the saved state: lines newer than the saved file are applied in order (each at the time it was first applied)
+  // and every answer is remembered. A half-written last line is ignored. Returns how many actions were applied.
+  function walReplay() {
+    if (!walFile || !fs.existsSync(walFile)) return 0;
+    let applied = 0;
+    const base = walN;
+    for (const line of fs.readFileSync(walFile, 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      let e = null;
+      try { e = JSON.parse(line); } catch (x) { e = null; }
+      if (!e || !Number.isInteger(e.n) || e.n <= base) continue;
+      walN = Math.max(walN, e.n);
+      if (typeof e.opId === 'string' && e.reply) replies.set(e.opId, e.reply);
+      if (e.ref || typeof e.type !== 'string') continue;
+      const r = E.apply(state, e.type, e.payload, e.at);
+      if (r.report === 'ok') { state = r.state; lastAt = Math.max(lastAt, e.at); seq = Math.max(seq + 1, Number.isInteger(e.seq) ? e.seq : 0); applied++; }
+    }
+    return applied;
+  }
+  if (saved) { if (walReplay()) scheduleSave(); }
+  else if (walFile && fs.existsSync(walFile)) { try { fs.renameSync(walFile, walFile + '.old'); } catch (e) { /* ignore */ } }
   // Writes the file soon (one write per burst of changes) when a data file is set.
   function scheduleSave() {
     if (!dataFile) return;
@@ -97,7 +139,7 @@ export async function createHub(opts = {}) {
   // Writes the file right now if anything changed since the last write.
   function flush() {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-    if (dataFile && dirty) { dirty = false; try { writeSaved(dataFile, state, seq, bakEveryMs); } catch (e) { console.warn('[hub] save failed: ' + e.message); } }
+    if (dataFile && dirty) { dirty = false; try { writeSaved(dataFile, state, seq, bakEveryMs, { walN, replies: Array.from(replies.entries()).slice(-2000) }); walReset(); } catch (e) { console.warn('[hub] save failed: ' + e.message); } }
   }
   // Builds the message every screen gets: the whole state, the hub clock and the change counter.
   // opIds lists the actions in the recent log, so a screen knows which of its own unconfirmed actions are already in this state.
@@ -137,7 +179,11 @@ export async function createHub(opts = {}) {
       while (ops.length > MAX_OPS || (opsBytes > MAX_OPS_BYTES && ops.length > 1)) opsBytes -= ops.shift().bytes || 0;
       changed({ by, opId: op.opId, type, op });
       reply = { report: 'ok', info: r.info, seq };
-    } else reply = { report: r.report, info: r.info, seq };
+      walAppend({ seq, opId: op.opId, type, payload: payload ?? {}, at: t, by, reply });
+    } else {
+      reply = { report: r.report, info: r.info, seq };
+      if (typeof opId === 'string') walAppend({ ref: true, opId, reply });
+    }
     if (typeof opId === 'string') {
       replies.set(opId, reply);
       if (replies.size > MAX_REPLIES) replies.delete(replies.keys().next().value);
