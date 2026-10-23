@@ -11,12 +11,12 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const NAME_OK = /^[\p{L}\p{N} .,'&()#_-]{1,20}$/u;
 // Plain words for each refusal, shared with the hub's answers.
 export const WORDS = {
-  unpaired: 'This screen is not paired with the hub. Ask the owner for a pairing code.',
-  revoked: 'This screen was removed from the hub. Ask the owner to pair it again.',
+  unpaired: 'This screen is not paired with the main computer. Ask the owner for a pairing code.',
+  revoked: 'This screen was removed from the kitchen. Ask the owner to pair it again.',
   badPairCode: 'That pairing code is wrong or has expired. Ask the owner for a new one.',
   tooManyTries: 'Too many wrong tries. Wait a few minutes, or ask the owner for a new code.',
   badName: 'The screen name may use letters, digits, spaces and . , \' & ( ) # _ - and up to 20 characters.',
-  wrongVersion: 'This screen and the hub run different versions. Reload the page from the hub.',
+  wrongVersion: 'This screen and the main computer run different versions. Reload the page from the main computer.',
   notOwner: 'Only an owner screen can do that.',
 };
 
