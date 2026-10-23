@@ -12340,6 +12340,135 @@ a.of-nav:active { background: var(--press); }
 
 }catch(e){console.error('[smokebox] module 30-store.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'30-store.js',message:String(e&&e.message||e)});}
 
+/* ===== 31-offline.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The page side of offline page load. SB.offline registers the service worker the hub serves (/sw.js), so a tablet that
+ *    reloads while the hub or the internet is down still opens the app from a stored copy. It reports what is stored, tells the page when a
+ *    newer version has been stored (the page decides when to reload: never automatically), answers "can this tablet open Smokebox with no
+ *    network", and can switch the whole thing off (reset, or ?nosw in the address).
+ * PARTS: status and subscribers, asking the worker, register, check, applyUpdate, reset.
+ * USES: nothing else. USED BY: the start-up sequence and the settings screens, tests.
+ * SAFE BY DESIGN: nothing happens from a file:// page, without service worker support, on a page that is not a secure context, or with
+ *    ?nosw. The worker only ever handles the page itself; the hub's actions and streams never go through it or into its store.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const O = (SB.offline = {});
+  const st = { supported: false, secure: false, state: 'none', cachedVersion: null, pageVersion: null, updateReady: false, reason: '' };
+  const subs = new Set();
+  let reg = null, started = false, timer = null;
+
+  // A copy of what is known now, for the screens.
+  O.status = () => Object.assign({}, st);
+  // Calls fn whenever the status changes; returns a function that stops it.
+  O.subscribe = (fn) => { if (typeof fn !== 'function') return () => {}; subs.add(fn); return () => subs.delete(fn); };
+  // Changes some status fields and tells the subscribers if anything differs.
+  function set(patch) {
+    let changed = false;
+    for (const k of Object.keys(patch)) if (st[k] !== patch[k]) { st[k] = patch[k]; changed = true; }
+    st.updateReady = !!st.cachedVersion && !!st.pageVersion && st.cachedVersion !== st.pageVersion;
+    if (st.updateReady && st.state === 'ready') st.state = 'update';
+    if (changed) subs.forEach((fn) => { try { fn(O.status()); } catch (e) { /* a screen's mistake must not stop the others */ } });
+  }
+  // True when the address asks for no service worker (?nosw).
+  const wantsNone = () => !!(g.location && /[?&]nosw(=|&|#|$)/.test(g.location.search || ''));
+  // The service worker container of this browser, or null.
+  const container = () => (g.navigator && g.navigator.serviceWorker ? g.navigator.serviceWorker : null);
+
+  // Asks a worker something and waits for its answer (up to 3 seconds); resolves null on silence.
+  function ask(worker, msg) {
+    return new Promise((resolve) => {
+      if (!worker || typeof g.MessageChannel !== 'function') { resolve(null); return; }
+      const ch = new g.MessageChannel(), t = setTimeout(() => resolve(null), 3000);
+      // The worker's answer ends the wait.
+      ch.port1.onmessage = (e) => { clearTimeout(t); resolve(e.data || null); };
+      try { worker.postMessage(msg, [ch.port2]); } catch (e) { clearTimeout(t); resolve(null); }
+    });
+  }
+  // Adds the web manifest link to the page (with credentials, so a login in front of the hub does not hide it).
+  function addManifest() {
+    const d = g.document;
+    if (!d || !d.head || d.querySelector('link[rel="manifest"]')) return;
+    const l = d.createElement('link');
+    l.rel = 'manifest'; l.href = '/manifest.webmanifest'; l.crossOrigin = 'use-credentials';
+    d.head.appendChild(l);
+  }
+
+  // Registers the worker (once). Resolves { ok, state, reason? }; never throws. Does nothing on file://, with ?nosw, or where workers cannot run.
+  O.register = async function register() {
+    if (started) return { ok: st.state === 'ready' || st.state === 'update', state: st.state, reason: st.reason || undefined };
+    const L = g.location, c = container();
+    if (!L || !/^https?:$/.test(L.protocol)) { set({ supported: false, reason: 'file' }); return { ok: false, state: st.state, reason: 'file' }; }
+    if (wantsNone()) { await O.reset({ reload: false }); set({ supported: false, state: 'none', reason: 'nosw' }); return { ok: false, state: 'none', reason: 'nosw' }; }
+    if (!c) { set({ supported: false, reason: 'unsupported' }); return { ok: false, state: st.state, reason: 'unsupported' }; }
+    if (g.isSecureContext === false) { set({ supported: false, secure: false, reason: 'insecure' }); return { ok: false, state: st.state, reason: 'insecure' }; }
+    started = true;
+    set({ supported: true, secure: true, reason: '' });
+    addManifest();
+    const wasControlled = !!c.controller;
+    // The worker announces a newer stored version after it has taken over.
+    c.addEventListener('message', (e) => {
+      const d = e.data;
+      if (d && d.type === 'smokebox-update' && typeof d.version === 'string') set({ cachedVersion: d.version });
+    });
+    try {
+      set({ state: 'installing' });
+      reg = await c.register('/sw.js', { scope: '/', updateViaCache: 'none' });
+      reg.addEventListener('updatefound', () => {
+        const w = reg.installing;
+        if (!w) return;
+        w.addEventListener('statechange', () => { if (w.state === 'redundant' && !st.cachedVersion) set({ state: 'error', reason: 'install failed' }); });
+      });
+      await c.ready;
+      const v = await ask(c.controller || reg.active, { type: 'version' });
+      if (v && typeof v.version === 'string') set({ cachedVersion: v.version, pageVersion: st.pageVersion || v.version });
+      if (!wasControlled && !st.pageVersion && v) set({ pageVersion: v.version });
+      set({ state: st.updateReady ? 'update' : 'ready' });
+      if (!timer && typeof setInterval === 'function') timer = setInterval(() => { try { reg.update(); } catch (e) { /* try again later */ } }, 30 * 60 * 1000);
+      return { ok: true, state: st.state };
+    } catch (e) {
+      set({ state: 'error', reason: String((e && e.message) || e || 'error').slice(0, 120) });
+      return { ok: false, state: 'error', reason: st.reason };
+    }
+  };
+
+  // Can this tablet open Smokebox with no network? Asks the worker to read the stored page and check it is the whole app.
+  O.check = async function check() {
+    const c = container();
+    if (!c) return { ok: false, reason: 'unsupported' };
+    if (g.isSecureContext === false) return { ok: false, reason: 'insecure' };
+    let w = c.controller || (reg && reg.active);
+    if (!w && c.getRegistration) { try { const r = await c.getRegistration(); w = r && r.active; } catch (e) { w = null; } }   // works on a fresh page load too, before register() ran
+    if (!w) return { ok: false, reason: 'noworker' };
+    const v = await ask(w, { type: 'version' });
+    if (!v) return { ok: false, reason: 'noanswer' };
+    if (!v.readable) return { ok: false, reason: 'nocopy', version: v.version };
+    return { ok: true, version: v.version };
+  };
+
+  // Loads the newer stored version now by reloading the page. Call it only from a person's button, never on a timer.
+  O.applyUpdate = function applyUpdate() { if (g.location && typeof g.location.reload === 'function') g.location.reload(); };
+
+  // Switches offline load off: removes every worker for this site and deletes the app's stored pages, then reloads unless reload is false.
+  O.reset = async function reset(opts) {
+    let unregistered = 0, deleted = 0;
+    try {
+      const c = container();
+      if (c && c.getRegistrations) for (const r of await c.getRegistrations()) { if (await r.unregister()) unregistered++; }
+      if (g.caches && g.caches.keys) for (const k of await g.caches.keys()) if (k.indexOf('smokebox-') === 0) { if (await g.caches.delete(k)) deleted++; }
+    } catch (e) { /* what could be removed was removed */ }
+    reg = null; started = false;
+    if (timer) { clearInterval(timer); timer = null; }
+    set({ state: 'none', cachedVersion: null, pageVersion: null, reason: '' });
+    if (!(opts && opts.reload === false) && g.location && typeof g.location.reload === 'function') g.location.reload();
+    return { ok: true, unregistered, cachesDeleted: deleted };
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 31-offline.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'31-offline.js',message:String(e&&e.message||e)});}
+
 /* ===== 35-pilot.js ===== */
 ;try{
 /*
@@ -20626,6 +20755,11 @@ a.of-nav:active { background: var(--press); }
     if (wakeState !== 'unsupported' && wakeState !== 'refused') return '';
     return 'This screen may go to sleep, and warnings stop while it sleeps. Keep the tablet plugged in with its screen set to stay on.';
   }
+  // A calm line when a newer version of the app has been stored on this tablet; it never reloads by itself.
+  function updateNote() {
+    const o = SB.offline && typeof SB.offline.status === 'function' ? SB.offline.status() : null;
+    return o && o.updateReady ? 'A new version is ready. Reload when it is quiet.' : '';
+  }
   // A sentence shown for a while after the board comes back from the background, since warnings were silent in between.
   function awayNote() {
     const a = m && m.away;
@@ -21703,7 +21837,7 @@ a.of-nav:active { background: var(--press); }
     const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear this notice', 'snd'));
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
-    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
+    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: (e) => { if (following) followMenu(e.currentTarget); else if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
     const pauseWrap = h('div', { class: 'fl-strip-bar fl-bar-pause', hidden: true }, pauseBar, clearBtn('Clear this notice', () => 'pause:' + (pauseBar.textContent || '')));
     el.appendChild(pauseWrap);
     for (let i = 0; i < 3; i++) {
@@ -21831,7 +21965,7 @@ a.of-nav:active { background: var(--press); }
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
-    const health = awayNote() || awakeNote();
+    const health = updateNote() || awayNote() || awakeNote();
     const note = following ? health : sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
@@ -22259,11 +22393,13 @@ a.of-nav:active { background: var(--press); }
       { label: 'Night colors', icon: 'moon', checked: SB.theme && SB.theme.get && SB.theme.get() === 'night', onClick: () => { if (SB.theme && SB.theme.set) SB.theme.set(SB.theme.get() === 'night' ? 'day' : 'night'); } },
       // Tapping 'Warning sounds on this screen' changes this screen only.
       { label: 'Warning sounds on this screen', icon: 'volume', checked: sound, onClick: () => F.setSound(!sound) },
+      // Shown only while a newer version is waiting; asks first, so it cannot be hit by accident.
+      { hide: !updateNote(), label: 'Reload to update', icon: 'refresh', onClick: () => SB.sheets && SB.sheets.reloadUpdate && SB.sheets.reloadUpdate() },
       { separator: true },
       // Tapping 'Back to my own kitchen' changes this screen only.
       { label: 'Back to my own kitchen', icon: 'chevron-left', onClick: () => { try { if (SB.setup && SB.setup.leaveFollow) SB.setup.leaveFollow(); else g.location.href = g.location.pathname; } catch (e) { g.location.href = g.location.pathname; } } },
     ];
-    SB.ui.menu(anchor, items, { label: 'This screen' });
+    SB.ui.menu(anchor, items.filter((it) => !it.hide), { label: 'This screen' });
   }
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.
@@ -25667,16 +25803,26 @@ a.of-nav:active { background: var(--press); }
   }
 
   // The About tab: what Smokebox is, what is simulated, and the small manager hint.
+  // One plain sentence about whether this tablet can open Smokebox without the internet right now (from the offline module).
+  function offlineLine() {
+    const o = SB.offline && typeof SB.offline.status === 'function' ? SB.offline.status() : null;
+    if (!o || !o.supported) return 'Not on this tablet yet' + (o && o.reason === 'insecure' ? ': it needs a secure (https) address.' : '. Open Smokebox from the kitchen\'s own address, not from a saved file.');
+    return o.state === 'ready' || o.state === 'update' ? 'Yes: a copy is stored on this tablet. Tablet checks can confirm it.' : o.state === 'installing' ? 'Storing a copy now...' : 'Not yet. Open Smokebox once with the kitchen connected.';
+  }
+  // The About tab: what Smokebox is, what is simulated, and the small manager hint.
   function helpAbout(sheet) {
     return h('div', { class: 'hp-pane' },
       helpList([
         helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants that cook food ahead: tickets, paced start times, a hold cabinet and a sold-out list.'),
         helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
+        helpItem('refresh', 'Opens without the internet', offlineLine()),
         helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
         helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
         helpItem('sparkle', 'Demo and sample data', 'Demo tickets and the sample history are made by the app. They are labeled wherever they appear.'),
       ]),
       h('div', { class: 'fs-row hp-links' },
+        // Removes the offline copy of the app if it ever misbehaves; asks first.
+        h('button', { type: 'button', class: 'btn', dataset: { act: 'reset-offline' }, onClick: resetOffline }, ico('refresh', 20), h('span', null, 'Reset the offline copy')),
         // All three buttons close Help first, so only one sheet is ever open.
         h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, runTour) }, ico('play', 20), h('span', null, 'Replay the walkthrough')),
         // The specs open after Help closes.
@@ -25686,6 +25832,27 @@ a.of-nav:active { background: var(--press); }
       h('p', { class: 'fs-sub hp-tiny' }, 'Smokebox version ' + C.version + '. Managers: tap Back office at the top of the board, or press Ctrl+Shift+O. To add a dish or change a price, open Back office, then Menu and settings.'));
   }
 
+  // Builds the Help sheet with its five tabs. opts.tab can pick the tab to open on.
+  // Asks before reloading for a new version, so a tap during service cannot take the board away by accident.
+  // Waiting taps and the saved board are kept; the board is gone for a few seconds.
+  async function reloadForUpdate() {
+    const ok = await SB.ui.confirm({ title: 'Reload to update?', body: 'The board goes away for a few seconds while it reloads. Do this when it is quiet. Your board and any taps waiting to be sent are kept.', confirmLabel: 'Reload now', cancelLabel: 'Not now' });
+    if (ok && SB.offline && typeof SB.offline.applyUpdate === 'function') SB.offline.applyUpdate();
+  }
+  SB.sheets.reloadUpdate = reloadForUpdate;
+  // Asks, then removes this tablet's offline copy of the app (the saved board is not touched) and reloads from the server.
+  async function resetOffline() {
+    const ok = await SB.ui.confirm({ title: 'Reset the offline copy?', body: 'This removes the copy of Smokebox this tablet keeps for opening without the internet, then loads it again from the server. Your board and orders are not touched. It needs the server to be reachable.', confirmLabel: 'Reset it', cancelLabel: 'Cancel', tone: 'danger' });
+    if (ok && SB.offline && typeof SB.offline.reset === 'function') SB.offline.reset({ reload: true });
+  }
+  // The block at the top of Settings while a newer version waits: one plain line and a button that asks first.
+  function updateBlock() {
+    const o = SB.offline && typeof SB.offline.status === 'function' ? SB.offline.status() : null;
+    if (!o || !o.updateReady) return null;
+    return h('section', { class: 'fs-section mn-block mn-update' }, h('h3', { class: 'fs-h' }, 'A new version is ready'),
+      h('p', { class: 'fs-sub' }, 'Reload when it is quiet. It never reloads by itself.'),
+      h('button', { type: 'button', class: 'btn', dataset: { act: 'reload-update' }, onClick: reloadForUpdate }, ico('refresh', 20), h('span', null, 'Reload to update')));
+  }
   // Builds the Help sheet with its five tabs. opts.tab can pick the tab to open on.
   function openHelp(opts) {
     opts = opts || {};
@@ -25901,6 +26068,7 @@ a.of-nav:active { background: var(--press); }
     const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Tablet checks: screen, sound, home screen', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), demoOn() || (SB.store.isDemo && SB.store.isDemo()) ? null : link('eye', 'Use one kitchen on several tablets', 'follow'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet: first steps', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
+      updateBlock(),
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
       SB.setup && SB.setup.leftoversCard ? SB.setup.leftoversCard() : null,
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
@@ -26896,32 +27064,48 @@ a.of-nav:active { background: var(--press); }
     // A temperature box in the units this tablet shows.
     const tempStep = (value, min, max, label) => SB.ui.stepper({ value: U.tempShown(value), min: U.tempShown(min), max: U.tempShown(max), step: 1, bigStep: 5, unit: U.unitLabel('temp'), label });
 
+    // A reading is only logged after the cook has typed or tapped a number: the box starts empty and its Log button waits, so a starting
+    // number can never be saved as if it had been measured. Returns reset() to empty the box again (when the kind changes).
+    function needsNumber(step, btn) {
+      let entered = false;
+      // Empties the box and switches the Log button off until a number is typed or tapped.
+      const reset = () => { entered = false; step.input.value = ''; step.input.placeholder = 'Type it'; btn.disabled = true; };
+      // Switches the Log button on once the box holds a number.
+      const seen = () => { const ok = step.input.value.trim() !== '' && Number.isFinite(Number(step.input.value)); if (ok !== entered) { entered = ok; btn.disabled = !ok; } };
+      step.addEventListener('input', seen); step.addEventListener('change', seen); step.addEventListener('click', () => setTimeout(seen, 0));
+      reset();
+      return { reset, seen };
+    }
     // 1. Fridge, freezer or display case
     let unit = UNITS.some((u) => u.id === rec.unit) ? rec.unit : 'cooler';
     const eqTemp = tempStep((UNITS.find((u) => u.id === unit) || UNITS[0]).f, -40, 200, 'Temperature of the fridge, freezer or case');
     const eqName = nameField('Name (optional)', 'labels', 'Walk-in, line cooler');
     const unitSeg = SB.ui.segmented({ label: 'Which one', class: 'rd-unit', value: unit, options: UNITS.map((u) => ({ id: u.id, label: u.label })),
-      // Picking another kind moves the number to a usual starting point for it.
-      onChange: (id) => { unit = id; eqTemp.setValue(U.tempShown((UNITS.find((u) => u.id === id) || UNITS[0]).f), { silent: true }); } });
+      // Picking another kind empties the box again: the number must be what the thermometer shows now.
+      onChange: (id) => { unit = id; if (eqGate) eqGate.reset(); } });
     const eqBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-equip' }, onClick: () => withWho('Log reading', (who) => {
       const label = eqName.input.value.trim();
       const res = run('logEquipmentTemp', Object.assign({ unit, f: U.tempStored(eqTemp.getValue()) }, label ? { label } : {}, who ? { who } : {}));
       if (res.report === 'ok') { rec.unit = unit; remember(rec, 'labels', label); save(rec); eqName.paint(); }
+      if (res.report === 'ok') eqGate.reset();
       done(res, 'Logged ' + (label || (UNITS.find((u) => u.id === unit) || {}).label) + ' at ' + U.tempText(U.tempStored(eqTemp.getValue())) + '.');
     }) }, ico('thermometer', 22), h('span', null, 'Log reading'));
+    const eqGate = needsNumber(eqTemp, eqBtn);
     const secEq = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Fridge, freezer or display case' }, h('h3', { class: 'fs-h' }, 'Fridge, freezer or display case'), unitSeg, eqName.el, h('div', { class: 'hc-fld' }, eqTemp), eqBtn);
 
     // 2. Food thermometer check
     let method = 'ice';
     const thTemp = tempStep(32, 0, 300, 'What the food thermometer says');
     const methodSeg = SB.ui.segmented({ label: 'How you checked it', class: 'rd-method', value: method, options: METHODS.map((m) => ({ id: m.id, label: m.label })),
-      // Ice water should read about freezing and boiling water about boiling, so the number starts there.
-      onChange: (id) => { method = id; thTemp.setValue(U.tempShown((METHODS.find((m) => m.id === id) || METHODS[0]).f), { silent: true }); } });
+      // The box starts empty: a check only counts with the number the thermometer really showed.
+      onChange: (id) => { method = id; if (thGate) thGate.reset(); } });
     const thBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-thermo' }, onClick: () => withWho('Log check', (who) => {
       const f = U.tempStored(thTemp.getValue());
       const res = run('logThermometerCheck', Object.assign({ f, method }, who ? { who } : {}));
+      if (res.report === 'ok') thGate.reset();
       done(res, 'Thermometer check logged: it read ' + U.tempText(f) + ' in ' + (method === 'ice' ? 'ice water' : method === 'boiling' ? 'boiling water' : 'the test') + '.');
     }) }, ico('check-circle', 22), h('span', null, 'Log check'));
+    const thGate = needsNumber(thTemp, thBtn);
     const secTh = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Food thermometer check' }, h('h3', { class: 'fs-h' }, 'Food thermometer check'), methodSeg, h('div', { class: 'hc-fld' }, thTemp), thBtn);
 
     // 3. Sanitizer strip
@@ -26933,10 +27117,12 @@ a.of-nav:active { background: var(--press); }
       const product = prodF.input.value.trim(), where = whereF.input.value.trim(), ppm = ppmStep.getValue();
       const res = run('sanitizeDone', Object.assign({ ppm }, product ? { product } : {}, where ? { where } : {}, who ? { who } : {}));
       if (res.report === 'ok') { rec.ppm = ppm; remember(rec, 'products', product); remember(rec, 'places', where); save(rec); prodF.paint(); whereF.paint(); }
+      if (res.report === 'ok') ppmGate.reset();
       done(res, 'Strip reading logged: ' + ppm + ' ppm. Surfaces are marked sanitized.');
     }) }, ico('shield-check', 22), h('span', null, 'Log strip reading'));
+    const ppmGate = needsNumber(ppmStep, sanBtn);
     const secSan = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Sanitizer strip' }, h('h3', { class: 'fs-h' }, 'Sanitizer strip'),
-      h('p', { class: 'fs-sub' }, 'Saving this also marks surfaces as sanitized.'), h('div', { class: 'hc-fld' }, ppmStep), prodF.el, whereF.el, sanBtn);
+      h('p', { class: 'fs-sub' }, 'Type the number on the strip. Saving this also marks surfaces as sanitized.'), h('div', { class: 'hc-fld' }, ppmStep), prodF.el, whereF.el, sanBtn);
 
     // The last few readings with who wrote them. Fix adds a note next to the entry; nothing is erased.
     function paintRecent() {
@@ -28439,10 +28625,10 @@ a.of-nav:active { background: var(--press); }
     function releaseWake() { try { if (sentinel && sentinel.release) sentinel.release(); } catch (e) { /* already released */ } sentinel = null; }
     // One check card: an icon (tick or do this), a title, a plain line, and room for buttons.
     const card = (id, title) => { const el = h('section', { class: 'fs-card rd-card', dataset: { check: id } }); return { el, title, set(ok, line, ...extra) { U.clear(el); el.dataset.ok = ok === true ? 'true' : ok === false ? 'false' : 'unknown'; el.append(h('div', { class: 'rd-head' }, ico(ok === true ? 'check-circle' : 'alert-circle', 26), h('h3', { class: 'fs-h' }, title), h('span', { class: 'rd-state' }, ok === true ? 'Ready' : ok === false ? 'Do this' : 'Not checked yet')), h('p', { class: 'fs-sub' }, line), ...extra.filter(Boolean)); } }; };
-    const cAwake = card('awake', 'Screen stays awake'), cSound = card('sound', 'Sound is on'), cVol = card('volume', 'Volume is loud enough'), cInst = card('installed', 'Added to the home screen'), cFull = card('full', 'Full screen');
+    const cAwake = card('awake', 'Screen stays awake'), cSound = card('sound', 'Sound is on'), cVol = card('volume', 'Volume is loud enough'), cOff = card('offline', 'Opens without the internet'), cInst = card('installed', 'Added to the home screen'), cFull = card('full', 'Full screen');
     const summary = h('p', { class: 'fs-sub rd-summary', role: 'status' });
     // Counts the ticks and says how many checks are done.
-    function paintSummary() { const n = [cAwake, cSound, cVol, cInst, cFull].filter((c) => c.el.dataset.ok === 'true').length; tell(summary, n + ' of 5 ready. A check mark means the tablet or you confirmed it; it is not a promise it stays that way all day.', n === 5 ? 'ok' : undefined); }
+    function paintSummary() { const n = [cAwake, cSound, cVol, cInst, cFull, cOff].filter((c) => c.el.dataset.ok === 'true').length; tell(summary, n + ' of 6 ready. A check mark means the tablet or you confirmed it; it is not a promise it stays that way all day.', n === 5 ? 'ok' : undefined); }
 
     // 1. Screen awake: ask the browser to hold the screen on now (a tap lets it), or say how to set the tablet itself.
     // Asks for the screen hold and shows the result; the tablet's own timeout is still the first thing to set.
@@ -28490,6 +28676,19 @@ a.of-nav:active { background: var(--press); }
       else cInst.set(false, 'You are in the browser. iPad (Safari): tap Share, then Add to Home Screen. Android (Chrome): open the menu, then Install app or Add to Home screen. Then open Smokebox from that icon. An installed app opens without the browser bars; Smokebox cannot promise it keeps your data safe, so keep taking backups.');
       paintSummary();
     }
+    // 6. Opens without the internet: asks the offline module to read the stored page back (a real test), and says the answer in words.
+    function checkOffline() {
+      const o = SB.offline && typeof SB.offline.status === 'function' ? SB.offline.status() : null;
+      // Tapping runs the check again and redraws this card.
+      const again = h('button', { type: 'button', class: 'btn', dataset: { act: 'offline-check' }, onClick: () => checkOffline() }, 'Check again');
+      if (!o || !o.supported) { cOff.set(false, o && o.reason === 'insecure' ? 'This address is not secure (https), so the browser will not keep a copy for opening without the internet. Ask whoever runs the kitchen for the secure address.' : 'This page was opened from a saved file or a browser that cannot keep a copy. Open Smokebox from the kitchen\'s own address.', again); paintSummary(); return; }
+      cOff.set(null, 'Checking...', again); paintSummary();
+      Promise.resolve(SB.offline.check()).then((r) => {
+        if (r && r.ok) cOff.set(true, 'Yes: this tablet can open Smokebox without the internet. A stored copy was read back whole.', again);
+        else cOff.set(false, 'Not yet. Open Smokebox once with the kitchen connected and wait a moment, then check again.' + (r && r.reason ? ' (' + r.reason + ')' : ''), again);
+        paintSummary();
+      }, () => { cOff.set(false, 'The check did not finish. Try again.', again); paintSummary(); });
+    }
     // 5. Full screen: ticked when installed or already full screen; otherwise a button where the browser allows it.
     // Shows whether the page fills the screen, with a button to ask for it where the browser allows.
     function checkFull() {
@@ -28501,9 +28700,9 @@ a.of-nav:active { background: var(--press); }
       else cFull.set(false, can ? 'The browser bars are showing. Tap Go full screen, or install the app (above) so it opens without them.' : 'This browser cannot go full screen from here. On iPad add Smokebox to the Home Screen (above); it then opens full screen.', go);
       paintSummary();
     }
-    root.append(h('p', { class: 'fs-sub' }, 'Five quick checks so the board keeps working on this tablet during service. Nothing here has been tried on your tablet until you do it.'),
-      cAwake.el, cSound.el, cVol.el, cInst.el, cFull.el, summary);
-    checkAwake(); checkSound(); checkVol(); checkInstalled(); checkFull();
+    root.append(h('p', { class: 'fs-sub' }, 'Six quick checks so the board keeps working on this tablet during service. Nothing here has been tried on your tablet until you do it.'),
+      cAwake.el, cSound.el, cVol.el, cInst.el, cFull.el, cOff.el, summary);
+    checkAwake(); checkSound(); checkVol(); checkInstalled(); checkFull(); checkOffline();
     tryWake(false);
     sheet.body.appendChild(root); keepInView(root);
     return sheet;
@@ -37069,12 +37268,18 @@ a.of-nav:active { background: var(--press); }
       // A small hook so tests and developers can read the state from the console.
       if (SB.store && typeof SB.store.getState === 'function') SB.dev = { state: () => SB.store.getState() };
       SB.booted = true;
+      startOffline();
       storageNotices();
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });
     } catch (e) { showBootError(e, stage); }
   }
 
+  // Asks the offline module to register its service worker (over https or localhost only; it does nothing on file:// or without
+  // support), so the app can open when the server or the internet is down. A failure here never stops the board.
+  function startOffline() {
+    try { if (SB.offline && typeof SB.offline.register === 'function') SB.offline.register(); } catch (e) { /* offline loading is optional */ }
+  }
   // Starts a follower screen: connects to the hub, then shows the board. A hub that is only unreachable still opens the board
   // (it keeps trying); a wrong code, a wrong address or a hub of another version shows a plain message instead.
   function bootFollower(kind) {
@@ -37085,6 +37290,7 @@ a.of-nav:active { background: var(--press); }
       try {
         SB.shell.mount(doc.getElementById('app') || doc.body);
         SB.booted = true;
+        startOffline();
       } catch (e) { showBootError(e, 'shell'); }
     };
     // Shows a plain message when the hub refuses this screen, with a way back to the device's own kitchen.
