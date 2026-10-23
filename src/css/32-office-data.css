@@ -47,6 +47,7 @@
   border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
   overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin;
 }
+.od-toc { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }   /* a soft right edge says the strip scrolls */
 .od-toc-list { display: flex; gap: var(--sp-2); width: max-content; min-width: 100%; }
 .od-toc-link {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-4); white-space: nowrap;
@@ -61,10 +62,10 @@
   .od-layout { grid-template-columns: 184px minmax(0, 1fr); gap: var(--sp-8); align-items: start; }
   .od-toc {
     top: calc(var(--od-sticky-top) + var(--sp-4)); margin: 0; padding: 0; overflow: visible;
-    background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0;
+    background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; -webkit-mask-image: none; mask-image: none;
   }
   .od-toc-list { display: grid; gap: 2px; width: auto; min-width: 0; }
-  .od-toc-link { min-height: 40px; padding: 0 var(--sp-3); border: 0; border-left: 2px solid var(--line-soft); border-radius: 0 var(--r-btn) var(--r-btn) 0; }
+  .od-toc-link { min-height: 44px; padding: 0 var(--sp-3); border: 0; border-left: 2px solid var(--line-soft); border-radius: 0 var(--r-btn) var(--r-btn) 0; }
   .od-toc-link[aria-current="location"] { border-left-color: var(--amber); }
 }
 
@@ -90,7 +91,7 @@
 .od-read:empty { display: none; }
 .od-ferr { display: flex; align-items: flex-start; gap: 6px; font-size: var(--fs-2); font-weight: var(--w-semi); line-height: 1.35; color: var(--crimson); }
 .od-ferr .icon { margin-top: 2px; }
-.od .stepper-input { font-size: var(--fs-4); flex: none; }
+.od .stepper-input { font-size: var(--fs-4); flex: none; min-width: 4.8ch; }   /* a 3-digit value must stay readable even when the stepper sized itself for two */
 .od .stepper-btn.is-big { width: auto; min-width: var(--tap-step); padding: 0 var(--sp-2); white-space: nowrap; }   /* "-1000" must stay on one line */
 .od .stepper-field { flex: none; }   /* a stepper may spill sideways before it may hide a digit */
 .od .stepper-unit { max-width: 7em; overflow: hidden; text-overflow: ellipsis; }

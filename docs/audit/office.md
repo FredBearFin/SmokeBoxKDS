@@ -298,3 +298,9 @@ Checked in the real app (headless browser, own blank kitchen and `?demo`) and in
   - Cash line: the box sits inside its label, and the sentence is `aria-live="polite"` and linked with `aria-describedby`.
   - Best day chart: it is the same bar chart as "How guests paid" (name sentence on the figure, "View as table" button with `aria-pressed`, table), so it inherits the checks on the other bar cards. I did not re-open its table view in a browser this round.
 - **Follower and screen names:** see the follower run below.
+
+**Settings page layout (from A2's sweep, fixed here):** the 24-odd number and time steppers were 34 px wide (a three-digit value was clipped); they now have a minimum width of 4.8 characters (43 px). The section chips are 44 px tall in the list too (they were 40 in the wide layout). On narrow screens the contents strip scrolls sideways by design; it now has a soft right edge so a cut-off chip is no longer the only hint. The page itself does not scroll sideways (document width equals the window at 390, 768 and 1024); `of-slot`, `od` and `od-layout` are 16 px wider inside because of the strip's side margins, which is its own scroller. The page header's "There is no Undo for settings" is true of the settings fields; the setup sheets have their own Undo.
+
+**Follower run:** `office-follower.e2e` passes on a scratch merge of `kds/connected` into this branch (not committed; deleted afterwards). The connected wording now says "the hub computer" everywhere (on night/a3-c3, 4eb036d).
+**Bugs found this round:** drawer cash survived Start over (fixed); CSV and reconciliation had none; the safety record table lacked a caption and column scopes (fixed); the pilot report text was not a named, announced region (fixed); settings steppers too narrow (fixed).
+**Not checked:** the Best day table view in a browser this round, a real CSV opened in Excel or Sheets, real devices.
