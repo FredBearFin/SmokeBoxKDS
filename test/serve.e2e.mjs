@@ -49,6 +49,20 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.getByRole('radio', { name: '€' }).click().catch(async () => { await page.locator('.so-serve .seg-opt', { hasText: '€' }).click(); }); await page.waitForTimeout(300);
   s = await svc(page); check('the currency symbol is saved', JSON.stringify(s.cur).includes('€'), s);
   await page.screenshot({ path: SHOT + '/serve-sheet-2.png' });
+  // Counter service end to end: with it on, a paid order leaves no ticket on the board; with it off, the ticket waits for the kitchen.
+  await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(300);
+  await page.evaluate(() => SB.store.dispatchEx('updateSettings', { patch: { service: { counter: true } } }, { source: 'ui' })); await page.waitForTimeout(300);
+  await page.click('.fl-new'); await page.waitForSelector('.ord-tile');
+  await page.locator('.ord-tile:not(.is-86)').first().click(); await page.click('.ord-pay [data-id="cash"]'); await page.click('.ord-send'); await page.waitForTimeout(700);
+  const paid1 = await page.evaluate(() => { const s = SB.store.getState(); return { orders: s.orders.filter((o) => o.paid || o.status === 'paid').length, active: s.tickets.filter((x) => x.status === 'active').length }; });
+  check('with counter service on, a paid order is recorded and its ticket is finished at once', paid1.orders === 1 && paid1.active === 0, paid1);
+  check('the board shows no ticket slip for it', (await page.locator('.fl-grid .fl-slip, .fl-grid [data-ticket], .fl-slip').count()) === 0);
+  await page.screenshot({ path: SHOT + '/serve-counter-paid.png' });
+  await page.evaluate(() => SB.store.dispatchEx('updateSettings', { patch: { service: { counter: false } } }, { source: 'ui' })); await page.waitForTimeout(300);
+  await page.click('.fl-new'); await page.waitForSelector('.ord-tile');
+  await page.locator('.ord-tile:not(.is-86)').first().click(); await page.click('.ord-pay [data-id="cash"]'); await page.click('.ord-send'); await page.waitForTimeout(700);
+  const paid2 = await page.evaluate(() => SB.store.getState().tickets.filter((x) => x.status === 'active').length);
+  check('with counter service off, the same order leaves a ticket for the kitchen', paid2 === 1, paid2);
   check('no page errors', logs.pageErrors.length === 0, logs.pageErrors);
 });
 process.exit(bad ? 1 : 0);

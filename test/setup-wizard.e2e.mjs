@@ -143,6 +143,29 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.click('[data-act=log-first-batch]'); await page.waitForTimeout(600);
   check('Log a first batch opens the cabinet on the new batch form with Brisket', await page.locator('.hc-form .hc-prod').isVisible() && await page.locator('.hc-form .hc-prod:has-text("Brisket")').count() === 1);
   await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(400);
+  // A cold item end to end: set up with days and hours out, make a batch, Take out, Put back, Undo (A1's cabinet card).
+  await page.evaluate(() => SB.sheets.open('cookahead')); await page.waitForTimeout(400);
+  const csh = '.sheet:has-text("Cooked-ahead food")';
+  await page.locator(csh + ' .seg-opt', { hasText: 'Cold' }).click(); await page.fill(csh + ' .dp-name', 'Chicken salad');
+  await page.fill(csh + ' [aria-label="Days it may stay in the fridge"]', '3'); await page.fill(csh + ' [aria-label="Hours it may be out of the fridge"]', '2');
+  await page.locator(csh + ' .dp-row').first().locator('input[type=checkbox]').check(); await page.click('[data-act=save-cooked]'); await page.waitForTimeout(500);
+  const cold = await page.evaluate(() => { const i = SB.store.getState().ingredients.find((x) => x.name === 'Chicken salad'); return i && { hold: i.hold, fridge: i.fridge, d: i.fridgeDays, o: i.outHours }; });
+  check('the cold item is saved as kept in a fridge with 3 days and 2 hours out', cold && cold.hold === 'cold' && cold.fridge === true && cold.d === 3 && cold.o === 2, cold);
+  await page.click('[data-act=log-first-batch]'); await page.waitForTimeout(600); await page.click('.hc-add'); await page.waitForTimeout(500);
+  const bt = await page.evaluate(() => SB.store.getState().batches.find((b) => b.ing === 'chicken_salad'));
+  check('the batch copies the limits and the made-on date', bt && bt.place === 'fridge' && bt.fridgeDays === 3 && bt.outHours === 2 && /^\d{4}-\d\d-\d\d$/.test(bt.madeOn), bt);
+  await page.locator('.sheet .seg-opt', { hasText: 'In the cabinet' }).click(); await page.waitForTimeout(400);
+  const card = await page.locator('.hc-card, .sheet').first().innerText();
+  check('the cabinet card shows the fridge date and the out-of-fridge limit', /Fridge date/.test(card) && /limit out of the fridge is 2/.test(card));
+  await page.locator('[data-act=take-out]:visible').first().click(); await page.waitForTimeout(400);
+  if (await page.locator('.sheet:has-text("Who is this")').count()) { await page.fill('.sheet:has-text("Who is this") input', 'JM'); await page.locator('.sheet:has-text("Who is this") button.btn-primary').click(); await page.waitForTimeout(500); }
+  check('Take out starts the out-of-fridge clock (Put back appears)', await page.locator('[data-act=put-back]:visible').count() === 1 && (await page.evaluate(() => SB.store.getState().batches.find((b) => b.ing === 'chicken_salad').place)) !== 'fridge');
+  await page.locator('[data-act=put-back]:visible').first().click(); await page.waitForTimeout(500);
+  if (await page.locator('.sheet:has-text("Who is this")').count()) { await page.fill('.sheet:has-text("Who is this") input', 'JM'); await page.locator('.sheet:has-text("Who is this") button.btn-primary').click(); await page.waitForTimeout(500); }
+  check('Put back returns it to the fridge', (await page.evaluate(() => SB.store.getState().batches.find((b) => b.ing === 'chicken_salad').place)) === 'fridge');
+  await page.getByRole('button', { name: 'Undo' }).last().click(); await page.waitForTimeout(500);
+  check('Undo puts it back out again (the last move is undone)', (await page.evaluate(() => SB.store.getState().batches.find((b) => b.ing === 'chicken_salad').place)) !== 'fridge');
+  await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(400);
   // Portions on hand for a dish that lists no ingredients.
   await page.evaluate(() => SB.sheets.open('dishes')); await page.waitForTimeout(500);
   const macRow = page.locator('.dp-row:has(input[aria-label="Name of Coleslaw"])').first();
