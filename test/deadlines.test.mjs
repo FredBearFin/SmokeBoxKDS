@@ -545,3 +545,12 @@ test('batch waste time-steps: a younger batch sells only after the older one run
   assert.ok(Math.abs(w.A - 7) < 1e-6, 'A wastes 7: ' + w.A);
   assert.ok(Math.abs(w.B - 5) < 1e-6, 'B wastes 5: ' + w.B);
 });
+
+test('close time sits at the clock hour set, also on a clock-change day (run with TZ=America/New_York to see it bite)', () => {
+  const st = { settings: { service: { closeHour: 21.5 } } };
+  for (const [y, m, d] of [[2026, 2, 8], [2026, 10, 1]]) {
+    const at = D.closeAtMs(st, new Date(y, m, d, 12, 0).getTime());
+    const c = new Date(at);
+    assert.equal(c.getDate(), d); assert.equal(c.getHours(), 21); assert.equal(c.getMinutes(), 30);
+  }
+});

@@ -142,7 +142,10 @@
     for (const day of [-1, 0]) {
       const d = new Date(now);
       d.setDate(d.getDate() + day); d.setHours(0, 0, 0, 0);
-      const at = d.getTime() + sv.closeHour * H;
+      // Whole hours go on the wall clock, so a clock-change day still closes at the clock time set; only the part
+      // of an hour is added as milliseconds.
+      const w = Math.floor(sv.closeHour);
+      const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), w, 0, 0, 0).getTime() + Math.round((sv.closeHour - w) * H);
       if (at > now && (best == null || at < best)) best = at;
     }
     return best;
