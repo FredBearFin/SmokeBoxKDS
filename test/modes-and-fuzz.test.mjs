@@ -10,6 +10,10 @@ const SB = await loadSB(['00-util', '10-config', '13-menu-import', '20-engine', 
 const { store: S, engine: E, config: C, menuImport: MI } = SB;
 const T0 = 1780326000000;
 const MIN = 60e3;
+// SB_FUZZ_MULT=3 runs three times as many random sequences (a release check); the default keeps the suite quick.
+const MULT = Number(process.env.SB_FUZZ_MULT) || 1;
+// SB_FUZZ_BASE moves every seed, so a second run covers different sequences.
+const BASE = Number(process.env.SB_FUZZ_BASE) || 0;
 // A small seeded random generator (mulberry32) so a failure can be replayed from its seed.
 function rng(seed) { let a = seed >>> 0; return { next() { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; } }; }
 const canon = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((y) => [y, v[y]])) : v));
@@ -94,13 +98,13 @@ const hasOwnProp = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 
 test('interleaved random actions keep every invariant (blank, legacy and sample starts)', () => {
   const bad = [];
-  for (let seed = 1; seed <= 120; seed++) for (const kind of ['blank', 'legacy', 'sample']) bad.push(...runSeq(seed * 7919 + kind.length, kind, 90));
+  for (let seed = 1; seed <= 120 * MULT; seed++) for (const kind of ['blank', 'legacy', 'sample']) bad.push(...runSeq(BASE + seed * 7919 + kind.length, kind, 90));
   assert.deepEqual(bad, []);
 });
 
 test('a longer family of seeds on blank kitchens', () => {
   const bad = [];
-  for (let seed = 1; seed <= 25; seed++) bad.push(...runSeq(900000 + seed, 'blank', 300));
+  for (let seed = 1; seed <= 25 * MULT; seed++) bad.push(...runSeq(BASE + 900000 + seed, 'blank', 300));
   assert.deepEqual(bad, []);
 });
 
