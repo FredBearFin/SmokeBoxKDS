@@ -10,11 +10,15 @@ ARCH="$(dpkg --print-architecture)"
 case "$ARCH" in amd64|arm64) ;; *) echo "Unsupported CPU: $ARCH"; exit 1 ;; esac
 
 # The Cloudflare connector, from its official release page.
-curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${ARCH}.deb" -o /tmp/cloudflared.deb
-dpkg -i /tmp/cloudflared.deb
-rm -f /tmp/cloudflared.deb
+TMPDEB="$(mktemp /var/tmp/cloudflared.XXXXXX.deb)"
+trap 'rm -f "$TMPDEB"' EXIT
+curl -fsSL --max-time 180 --retry 2 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${ARCH}.deb" -o "$TMPDEB"
+[ "$(wc -c < "$TMPDEB")" -ge 1000000 ] || { echo "The download is too small to be the connector; stopping."; exit 1; }
+dpkg-deb --info "$TMPDEB" >/dev/null || { echo "The download is not a valid package; stopping."; exit 1; }
+dpkg -i "$TMPDEB"
 
-# The tunnel goes through the same web server, so the password prompt is still in front of the app.
+# The tunnel goes through the same web server, so the password prompt is still in front of the app. Note: Cloudflare carries this traffic
+# (including the password you type) in a form it can read, and anyone who learns the random address can reach the sign-in page.
 cat > /etc/systemd/system/smokebox-tunnel.service <<UNIT
 [Unit]
 Description=Smokebox second address through Cloudflare
@@ -22,6 +26,13 @@ After=network-online.target caddy.service
 Wants=network-online.target
 
 [Service]
+User=nobody
+Group=nogroup
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
 ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --url https://127.0.0.1:443 --no-tls-verify --http-host-header ${DOMAIN} --origin-server-name ${DOMAIN}
 Restart=always
 RestartSec=5
