@@ -484,6 +484,11 @@
     if (wakeState !== 'unsupported' && wakeState !== 'refused') return '';
     return 'This screen may go to sleep, and warnings stop while it sleeps. Keep the tablet plugged in with its screen set to stay on.';
   }
+  // A calm line when a newer version of the app has been stored on this tablet; it never reloads by itself.
+  function updateNote() {
+    const o = SB.offline && typeof SB.offline.status === 'function' ? SB.offline.status() : null;
+    return o && o.updateReady ? 'A new version is ready. Reload when it is quiet.' : '';
+  }
   // A sentence shown for a while after the board comes back from the background, since warnings were silent in between.
   function awayNote() {
     const a = m && m.away;
@@ -1561,7 +1566,7 @@
     const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear this notice', 'snd'));
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
-    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
+    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: (e) => { if (following) followMenu(e.currentTarget); else if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
     const pauseWrap = h('div', { class: 'fl-strip-bar fl-bar-pause', hidden: true }, pauseBar, clearBtn('Clear this notice', () => 'pause:' + (pauseBar.textContent || '')));
     el.appendChild(pauseWrap);
     for (let i = 0; i < 3; i++) {
@@ -1689,7 +1694,7 @@
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
-    const health = awayNote() || awakeNote();
+    const health = updateNote() || awayNote() || awakeNote();
     const note = following ? health : sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
@@ -2117,11 +2122,13 @@
       { label: 'Night colors', icon: 'moon', checked: SB.theme && SB.theme.get && SB.theme.get() === 'night', onClick: () => { if (SB.theme && SB.theme.set) SB.theme.set(SB.theme.get() === 'night' ? 'day' : 'night'); } },
       // Tapping 'Warning sounds on this screen' changes this screen only.
       { label: 'Warning sounds on this screen', icon: 'volume', checked: sound, onClick: () => F.setSound(!sound) },
+      // Shown only while a newer version is waiting; asks first, so it cannot be hit by accident.
+      { hide: !updateNote(), label: 'Reload to update', icon: 'refresh', onClick: () => SB.sheets && SB.sheets.reloadUpdate && SB.sheets.reloadUpdate() },
       { separator: true },
       // Tapping 'Back to my own kitchen' changes this screen only.
       { label: 'Back to my own kitchen', icon: 'chevron-left', onClick: () => { try { if (SB.setup && SB.setup.leaveFollow) SB.setup.leaveFollow(); else g.location.href = g.location.pathname; } catch (e) { g.location.href = g.location.pathname; } } },
     ];
-    SB.ui.menu(anchor, items, { label: 'This screen' });
+    SB.ui.menu(anchor, items.filter((it) => !it.hide), { label: 'This screen' });
   }
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.

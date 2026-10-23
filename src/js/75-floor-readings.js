@@ -69,32 +69,48 @@
     // A temperature box in the units this tablet shows.
     const tempStep = (value, min, max, label) => SB.ui.stepper({ value: U.tempShown(value), min: U.tempShown(min), max: U.tempShown(max), step: 1, bigStep: 5, unit: U.unitLabel('temp'), label });
 
+    // A reading is only logged after the cook has typed or tapped a number: the box starts empty and its Log button waits, so a starting
+    // number can never be saved as if it had been measured. Returns reset() to empty the box again (when the kind changes).
+    function needsNumber(step, btn) {
+      let entered = false;
+      // Empties the box and switches the Log button off until a number is typed or tapped.
+      const reset = () => { entered = false; step.input.value = ''; step.input.placeholder = 'Type it'; btn.disabled = true; };
+      // Switches the Log button on once the box holds a number.
+      const seen = () => { const ok = step.input.value.trim() !== '' && Number.isFinite(Number(step.input.value)); if (ok !== entered) { entered = ok; btn.disabled = !ok; } };
+      step.addEventListener('input', seen); step.addEventListener('change', seen); step.addEventListener('click', () => setTimeout(seen, 0));
+      reset();
+      return { reset, seen };
+    }
     // 1. Fridge, freezer or display case
     let unit = UNITS.some((u) => u.id === rec.unit) ? rec.unit : 'cooler';
     const eqTemp = tempStep((UNITS.find((u) => u.id === unit) || UNITS[0]).f, -40, 200, 'Temperature of the fridge, freezer or case');
     const eqName = nameField('Name (optional)', 'labels', 'Walk-in, line cooler');
     const unitSeg = SB.ui.segmented({ label: 'Which one', class: 'rd-unit', value: unit, options: UNITS.map((u) => ({ id: u.id, label: u.label })),
-      // Picking another kind moves the number to a usual starting point for it.
-      onChange: (id) => { unit = id; eqTemp.setValue(U.tempShown((UNITS.find((u) => u.id === id) || UNITS[0]).f), { silent: true }); } });
+      // Picking another kind empties the box again: the number must be what the thermometer shows now.
+      onChange: (id) => { unit = id; if (eqGate) eqGate.reset(); } });
     const eqBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-equip' }, onClick: () => withWho('Log reading', (who) => {
       const label = eqName.input.value.trim();
       const res = run('logEquipmentTemp', Object.assign({ unit, f: U.tempStored(eqTemp.getValue()) }, label ? { label } : {}, who ? { who } : {}));
       if (res.report === 'ok') { rec.unit = unit; remember(rec, 'labels', label); save(rec); eqName.paint(); }
+      if (res.report === 'ok') eqGate.reset();
       done(res, 'Logged ' + (label || (UNITS.find((u) => u.id === unit) || {}).label) + ' at ' + U.tempText(U.tempStored(eqTemp.getValue())) + '.');
     }) }, ico('thermometer', 22), h('span', null, 'Log reading'));
+    const eqGate = needsNumber(eqTemp, eqBtn);
     const secEq = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Fridge, freezer or display case' }, h('h3', { class: 'fs-h' }, 'Fridge, freezer or display case'), unitSeg, eqName.el, h('div', { class: 'hc-fld' }, eqTemp), eqBtn);
 
     // 2. Food thermometer check
     let method = 'ice';
     const thTemp = tempStep(32, 0, 300, 'What the food thermometer says');
     const methodSeg = SB.ui.segmented({ label: 'How you checked it', class: 'rd-method', value: method, options: METHODS.map((m) => ({ id: m.id, label: m.label })),
-      // Ice water should read about freezing and boiling water about boiling, so the number starts there.
-      onChange: (id) => { method = id; thTemp.setValue(U.tempShown((METHODS.find((m) => m.id === id) || METHODS[0]).f), { silent: true }); } });
+      // The box starts empty: a check only counts with the number the thermometer really showed.
+      onChange: (id) => { method = id; if (thGate) thGate.reset(); } });
     const thBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-thermo' }, onClick: () => withWho('Log check', (who) => {
       const f = U.tempStored(thTemp.getValue());
       const res = run('logThermometerCheck', Object.assign({ f, method }, who ? { who } : {}));
+      if (res.report === 'ok') thGate.reset();
       done(res, 'Thermometer check logged: it read ' + U.tempText(f) + ' in ' + (method === 'ice' ? 'ice water' : method === 'boiling' ? 'boiling water' : 'the test') + '.');
     }) }, ico('check-circle', 22), h('span', null, 'Log check'));
+    const thGate = needsNumber(thTemp, thBtn);
     const secTh = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Food thermometer check' }, h('h3', { class: 'fs-h' }, 'Food thermometer check'), methodSeg, h('div', { class: 'hc-fld' }, thTemp), thBtn);
 
     // 3. Sanitizer strip
@@ -106,10 +122,12 @@
       const product = prodF.input.value.trim(), where = whereF.input.value.trim(), ppm = ppmStep.getValue();
       const res = run('sanitizeDone', Object.assign({ ppm }, product ? { product } : {}, where ? { where } : {}, who ? { who } : {}));
       if (res.report === 'ok') { rec.ppm = ppm; remember(rec, 'products', product); remember(rec, 'places', where); save(rec); prodF.paint(); whereF.paint(); }
+      if (res.report === 'ok') ppmGate.reset();
       done(res, 'Strip reading logged: ' + ppm + ' ppm. Surfaces are marked sanitized.');
     }) }, ico('shield-check', 22), h('span', null, 'Log strip reading'));
+    const ppmGate = needsNumber(ppmStep, sanBtn);
     const secSan = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Sanitizer strip' }, h('h3', { class: 'fs-h' }, 'Sanitizer strip'),
-      h('p', { class: 'fs-sub' }, 'Saving this also marks surfaces as sanitized.'), h('div', { class: 'hc-fld' }, ppmStep), prodF.el, whereF.el, sanBtn);
+      h('p', { class: 'fs-sub' }, 'Type the number on the strip. Saving this also marks surfaces as sanitized.'), h('div', { class: 'hc-fld' }, ppmStep), prodF.el, whereF.el, sanBtn);
 
     // The last few readings with who wrote them. Fix adds a note next to the entry; nothing is erased.
     function paintRecent() {

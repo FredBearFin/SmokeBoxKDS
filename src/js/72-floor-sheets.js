@@ -1941,16 +1941,26 @@
   }
 
   // The About tab: what Smokebox is, what is simulated, and the small manager hint.
+  // One plain sentence about whether this tablet can open Smokebox without the internet right now (from the offline module).
+  function offlineLine() {
+    const o = SB.offline && typeof SB.offline.status === 'function' ? SB.offline.status() : null;
+    if (!o || !o.supported) return 'Not on this tablet yet' + (o && o.reason === 'insecure' ? ': it needs a secure (https) address.' : '. Open Smokebox from the kitchen\'s own address, not from a saved file.');
+    return o.state === 'ready' || o.state === 'update' ? 'Yes: a copy is stored on this tablet. Tablet checks can confirm it.' : o.state === 'installing' ? 'Storing a copy now...' : 'Not yet. Open Smokebox once with the kitchen connected.';
+  }
+  // The About tab: what Smokebox is, what is simulated, and the small manager hint.
   function helpAbout(sheet) {
     return h('div', { class: 'hp-pane' },
       helpList([
         helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants that cook food ahead: tickets, paced start times, a hold cabinet and a sold-out list.'),
         helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
+        helpItem('refresh', 'Opens without the internet', offlineLine()),
         helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
         helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
         helpItem('sparkle', 'Demo and sample data', 'Demo tickets and the sample history are made by the app. They are labeled wherever they appear.'),
       ]),
       h('div', { class: 'fs-row hp-links' },
+        // Removes the offline copy of the app if it ever misbehaves; asks first.
+        h('button', { type: 'button', class: 'btn', dataset: { act: 'reset-offline' }, onClick: resetOffline }, ico('refresh', 20), h('span', null, 'Reset the offline copy')),
         // All three buttons close Help first, so only one sheet is ever open.
         h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, runTour) }, ico('play', 20), h('span', null, 'Replay the walkthrough')),
         // The specs open after Help closes.
@@ -1960,6 +1970,27 @@
       h('p', { class: 'fs-sub hp-tiny' }, 'Smokebox version ' + C.version + '. Managers: tap Back office at the top of the board, or press Ctrl+Shift+O. To add a dish or change a price, open Back office, then Menu and settings.'));
   }
 
+  // Builds the Help sheet with its five tabs. opts.tab can pick the tab to open on.
+  // Asks before reloading for a new version, so a tap during service cannot take the board away by accident.
+  // Waiting taps and the saved board are kept; the board is gone for a few seconds.
+  async function reloadForUpdate() {
+    const ok = await SB.ui.confirm({ title: 'Reload to update?', body: 'The board goes away for a few seconds while it reloads. Do this when it is quiet. Your board and any taps waiting to be sent are kept.', confirmLabel: 'Reload now', cancelLabel: 'Not now' });
+    if (ok && SB.offline && typeof SB.offline.applyUpdate === 'function') SB.offline.applyUpdate();
+  }
+  SB.sheets.reloadUpdate = reloadForUpdate;
+  // Asks, then removes this tablet's offline copy of the app (the saved board is not touched) and reloads from the server.
+  async function resetOffline() {
+    const ok = await SB.ui.confirm({ title: 'Reset the offline copy?', body: 'This removes the copy of Smokebox this tablet keeps for opening without the internet, then loads it again from the server. Your board and orders are not touched. It needs the server to be reachable.', confirmLabel: 'Reset it', cancelLabel: 'Cancel', tone: 'danger' });
+    if (ok && SB.offline && typeof SB.offline.reset === 'function') SB.offline.reset({ reload: true });
+  }
+  // The block at the top of Settings while a newer version waits: one plain line and a button that asks first.
+  function updateBlock() {
+    const o = SB.offline && typeof SB.offline.status === 'function' ? SB.offline.status() : null;
+    if (!o || !o.updateReady) return null;
+    return h('section', { class: 'fs-section mn-block mn-update' }, h('h3', { class: 'fs-h' }, 'A new version is ready'),
+      h('p', { class: 'fs-sub' }, 'Reload when it is quiet. It never reloads by itself.'),
+      h('button', { type: 'button', class: 'btn', dataset: { act: 'reload-update' }, onClick: reloadForUpdate }, ico('refresh', 20), h('span', null, 'Reload to update')));
+  }
   // Builds the Help sheet with its five tabs. opts.tab can pick the tab to open on.
   function openHelp(opts) {
     opts = opts || {};
@@ -2175,6 +2206,7 @@
     const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Tablet checks: screen, sound, home screen', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), demoOn() || (SB.store.isDemo && SB.store.isDemo()) ? null : link('eye', 'Use one kitchen on several tablets', 'follow'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet: first steps', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
+      updateBlock(),
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
       SB.setup && SB.setup.leftoversCard ? SB.setup.leftoversCard() : null,
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
