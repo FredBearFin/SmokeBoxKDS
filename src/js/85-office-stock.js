@@ -323,6 +323,7 @@
       const open = st.day >= b.today && isNum(sb.closeMs) && ctx.now() < sb.closeMs;
       const was = open ? 'has been' : 'was';
       parts.push((open ? 'So far today ' : 'That day ') + fmt.g(sb.intakeG) + ' ' + was + ' ' + (sb.tcs ? 'cooked' : 'restocked') + (sb.tcs && nb ? ' in ' + nb + ' ' + B.plural(nb, 'batch', 'batches') + ', the last at ' + fmt.clock(sb.batches[nb - 1].enteredAt) : '') + '; ' + fmt.g(sb.usedG) + ' ' + was + ' served' + (sb.wasteG > 0 ? ' and ' + fmt.g(sb.wasteG) + ' ' + was + ' thrown away' : '') + '.');
+      if (sb.overdrawnG > 0) parts.push(fmt.g(sb.overdrawnG) + ' more was used than was counted in' + (sb.openingAssumed ? ', so the day started with more than the par level the chart assumes.' : '.'));
       const typ = typicalDay(p, st.ing);
       if (typ.n >= MIN_DAYS) parts.push('A typical day in this range cooks ' + fmt.g(typ.medianIntake) + ' and serves ' + fmt.g(typ.medianUsed) + '.');
       let busy = null;

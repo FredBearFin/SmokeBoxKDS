@@ -552,6 +552,9 @@ describe('stock burn', () => {
     assert.deepEqual([s.openingG, s.openingAssumed, s.endG, s.usedG, s.intakeG], [6000, true, 6330, 170, 500]);
     const s2 = M.stockBurn(d, { ing: 'pickles', day: DAY, openingG: 1000 });
     assert.deepEqual([s2.openingAssumed, s2.endG], [false, 1330]);
+    // Using more than was counted in never shows a negative stock: the extra is reported apart.
+    const s3 = M.stockBurn(dataset({ tickets: [t] }), { ing: 'pickles', day: DAY, openingG: 100 });
+    assert.deepEqual([s3.endG, s3.minG, s3.overdrawnG, s3.usedG], [0, 0, 70, 170]);
   });
   it('no ingredient or unknown day gives an empty, well-formed result', () => {
     assert.deepEqual(M.stockBurn(sd(), {}).points, []);

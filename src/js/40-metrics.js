@@ -975,14 +975,16 @@
    * day's batches are tracked on their own (opening 0, depletions matched by batchId; if no depletion carries a batchId all of the day's depletions are
    * used). Non-TCS: opening = opts.openingG or the ingredient's par (openingAssumed = true) plus restock events.
    * @param {object} opts {day:'YYYY-MM-DD' (default: newest day with data), ing:'brisket', openingG?}
-   * @returns {{day,ing,name,unit,tcs,thresholdG,parG,openingG,openingAssumed,openMs,closeMs,intakeG,usedG,wasteG,endG,minG,minAt,
+   * The level never shows below zero: grams used beyond what was counted in are added up in overdrawnG instead (with an
+   * assumed opening that means the real opening was above par).
+   * @returns {{day,ing,name,unit,tcs,thresholdG,parG,openingG,openingAssumed,openMs,closeMs,intakeG,usedG,wasteG,endG,minG,minAt,overdrawnG,
    *   points:Array<{t,hour,g,d,kind:'intake'|'use'|'waste'|'restock'}>,batches:Array<{id,label,enteredAt,cookedG}>}}
    */
   M.stockBurn = (ds, opts) => {
     ds = unwrap(ds); ds = ds && typeof ds === 'object' ? ds : {}; opts = opts && typeof opts === 'object' ? opts : {};
     const ctx = makeCtx(ds, { from: -Infinity, to: Infinity }); const im = ctx.ingMap(); const ing = opts.ing; const meta = im[ing];
     const empty = { day: null, ing: ing || null, name: meta ? meta.name : ing || null, unit: meta ? meta.unit : null, tcs: !!(meta && meta.tcs), thresholdG: meta && num(meta.thresholdG) ? meta.thresholdG : null, parG: meta && num(meta.parG) ? meta.parG : null,
-      openingG: null, openingAssumed: false, openMs: null, closeMs: null, intakeG: 0, usedG: 0, wasteG: 0, endG: null, minG: null, minAt: null, points: [], batches: [] };
+      openingG: null, openingAssumed: false, openMs: null, closeMs: null, intakeG: 0, usedG: 0, wasteG: 0, endG: null, minG: null, minAt: null, overdrawnG: 0, points: [], batches: [] };
     if (!ing) return empty;
     let day = typeof opts.day === 'string' ? opts.day : null;
     if (!day) { const ds2 = []; for (const v of ctx.all) ds2.push(v.date); for (const b of arr(ds.batches)) if (b && num(b.enteredAt)) ds2.push(ctx.dateOf(b.enteredAt)); ds2.sort(); day = ds2.length ? ds2[ds2.length - 1] : null; }
@@ -1018,7 +1020,10 @@
     deltas.sort((a, b) => a.t - b.t || rank[a.kind] - rank[b.kind]);
     let lvl = res.openingG; res.endG = lvl;
     for (const d of deltas) {
-      lvl += d.d; res.points.push({ t: d.t, hour: wallHourOn(d.t, day), g: lvl, d: d.d, kind: d.kind });
+      lvl += d.d;
+      // A level below zero is not stock: the count in was too low (often an assumed par), so it is noted, not shown.
+      if (lvl < 0) { res.overdrawnG += -lvl; lvl = 0; }
+      res.points.push({ t: d.t, hour: wallHourOn(d.t, day), g: lvl, d: d.d, kind: d.kind });
       if (d.kind === 'intake' || d.kind === 'restock') res.intakeG += d.d; else if (d.kind === 'use') res.usedG += -d.d; else res.wasteG += -d.d;
       if (res.minG === null || lvl < res.minG) { res.minG = lvl; res.minAt = d.t; }
     }
