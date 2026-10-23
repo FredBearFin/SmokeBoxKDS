@@ -246,3 +246,5 @@ Deploy download: 164 MB before, 1.4 MB after the root `.gitattributes` (see `doc
 | backup-banner, bumpbar, config-names, order-note, order-page, orders-page, pay-ui, pin-recovery-ui, production-mode, quiet-board, serve, strip-notices | pass | |
 | chaos-store (unit) | 25 pass | A5's last-good copy fix is in; my todo test is now a real passing test |
 | qa journeys (45) | 45 pass after two drift fixes (re-run alone) | 02d: the overdue slip now leads, then rush slips; 07a: page title "Speed" |
+
+After a3-r14 landed and was merged: office, office-b, office-data, contract, shell, floor, board-round14, cold-items, board-contrast and all 45 qa journeys pass (45/45, 1,085 checks).
