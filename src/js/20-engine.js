@@ -27,7 +27,7 @@
  *   planFor(state, lines, now, rush?)     -> same as pacingPlan, using the state's settings/learned/menu
  *   ticketTiming(ticket, now, settings)   -> { elapsedMs, level: 'ok'|'warn'|'breach', warnMs, breachMs, pct }
  *   ticketProgress(ticket)                -> { total, done, queued, displayed, cooking, qtyTotal, qtyDone, pct, ready, byZone }
- *   checkInvariants(state, now?)          -> string[] (empty = healthy; I1-I15 of SPEC 10, structural parts)
+ *   checkInvariants(state, now?)          -> string[] (empty = healthy; I1-I17 of SPEC 10, structural parts)
  *   validateBackup(objOrText)             -> { ok, state?, error?, repaired: string[] }
  *   serialize(state) -> string             deserialize(text) -> validateBackup result
  *   allEvents(state)                      -> Event[] (archive chunks + recent window, oldest first; memoised)
@@ -54,7 +54,7 @@
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -109,6 +109,8 @@
     badUntil: 'Pick a time later than now, or choose 30 minutes or 1 hour.',
     badPlanTime: 'Pick a time when the batch comes off the smoker: within the next day and a half, and not already past its serving time.',
     unknownPlan: 'That planned batch is gone. It may have been used, cancelled or expired.',
+    ordersStillOpen: 'The day cannot be closed while orders are still open. Take payment on each open order, or void it, then close the day again.',
+    badLeftovers: 'Choose what happens to the batches still in the cabinet: keep them for tomorrow, or discard them.',
     badSnooze: 'A reminder can be put off for 1 to 30 minutes, only for a batch still on the menu, and never past 5 minutes before its last warning. The last warning, a past-quality batch and a thrown-out batch cannot be put off.',
   };
 
@@ -121,6 +123,7 @@
     payOrder: '{ orderId, method:"cash"|"card"|"other", tip?, discount? }',
     reopenOrder: '{ orderId }',
     voidOrder: '{ orderId, reason }',
+    closeDay: '{ leftovers?:"keep"|"discard" }',
     advanceItem: '{ ticketId, itemId }',
     completeItem: '{ ticketId, itemId }',
     fireNow: '{ ticketId, itemId, start?:true }',
@@ -1361,6 +1364,53 @@
     tx.info = { orderId: o.id };
     return 'ok';
   };
+  // Closes the service day that "now" falls in. Refused while any order is still open (each must be paid or
+  // voided first). Adds up that day's paid orders by cash, card and other, counts voided orders and tickets,
+  // optionally throws out every batch still in the cabinet, and logs one day_closed event. Closing again the
+  // same day is allowed: the new event covers the whole day, including late sales.
+  A.closeDay = function (tx, p) {
+    const lv = p.leftovers === undefined || p.leftovers === null ? 'keep' : p.leftovers;
+    if (lv !== 'keep' && lv !== 'discard') { tx.info.key = 'leftovers'; return 'badLeftovers'; }
+    const orders = tx.get('orders');
+    const open = orders.filter((o) => o.status === 'open');
+    if (open.length) {
+      tx.info = { count: open.length, orderIds: open.slice(0, 5).map((o) => o.id), customers: open.slice(0, 5).map((o) => o.customer) };
+      return 'ordersStillOpen';
+    }
+    const dsh = tx.get('settings').service.dayStartHour;
+    const day = U.serviceDate(tx.now, dsh);
+    const sums = {};
+    for (const m of C.payMethods) sums[m.id] = { count: 0, subtotal: 0, discount: 0, tax: 0, total: 0, tip: 0 };
+    let paid = 0, voidedOrders = 0, subtotal = 0, discount = 0, tax = 0, total = 0, tip = 0;
+    for (const o of orders) {
+      if (o.status === 'paid' && isNum(o.paidAt) && U.serviceDate(o.paidAt, dsh) === day && hasOwn(sums, o.method)) {
+        const T = o.totals, m = sums[o.method];
+        paid++; m.count++;
+        m.subtotal = cents(m.subtotal + T.subtotal); m.discount = cents(m.discount + T.discount); m.tax = cents(m.tax + T.tax); m.total = cents(m.total + T.total); m.tip = cents(m.tip + o.tip);
+        subtotal = cents(subtotal + T.subtotal); discount = cents(discount + T.discount); tax = cents(tax + T.tax); total = cents(total + T.total); tip = cents(tip + o.tip);
+      } else if (o.status === 'voided' && isNum(o.voidedAt) && U.serviceDate(o.voidedAt, dsh) === day) voidedOrders++;
+    }
+    let tickets = 0, voidedTickets = 0;
+    for (const t of tx.get('tickets')) {
+      if (t.serviceDate !== day) continue;
+      if (t.status === 'voided') voidedTickets++; else tickets++;
+    }
+    // Leftovers: with "discard", every batch that still holds food is thrown out (a plain discard, not a safety one).
+    let discarded = 0, discardedG = 0;
+    if (lv === 'discard') {
+      const bs = tx.get('batches');
+      for (let i = 0; i < bs.length; i++) {
+        if (bs[i].status === 'discard' || !(bs[i].remainingG > 0)) continue;
+        discarded++; discardedG += bs[i].remainingG;
+        discardInto(tx, i, 'other');
+      }
+    }
+    const prior = tx.get('lastClose');
+    tx.event('day_closed', { day, orders: paid, voidedOrders, tickets, voidedTickets, subtotal, discount, tax, total, tip, byMethod: sums, leftovers: lv, discarded, discardedG: round(discardedG, 1), again: !!(prior && prior.day === day) });
+    tx.set('lastClose', { day, at: tx.lastT, leftovers: lv });
+    tx.info = { day, orders: paid, total, tip, discarded };
+    return 'ok';
+  };
   // When there are more orders than max, drops the oldest paid or voided ones (never an open one, and never one
   // that still has a ticket on the board) to about 2 percent under max.
   function pruneOrdersInto(tx, max) {
@@ -2262,6 +2312,7 @@
       settings: keep ? s.settings : undefined, menu: keep ? s.menu : undefined, ingredients: keep ? s.ingredients : undefined, learned: keep ? s.learned : undefined,
     });
     for (const k of Object.keys(ns)) tx.set(k, ns[k]);
+    if (hasOwn(s, 'lastClose')) tx.set('lastClose', undefined); // a fresh board has never been closed
     tx.info = { keepSettings: keep };
     return 'ok';
   };
@@ -2965,6 +3016,12 @@
     // I9
     let lt = -Infinity;
     for (const e of allEvents(state)) { if (!(e.t >= lt)) { add('I9 event ' + e.id + ' t goes backwards'); break; } lt = e.t; }
+    // I17: lastClose, when present, names a real date, a time and a leftovers choice, and no order is open
+    // that was closed over (a later open order is fine, so only the shape is checked).
+    if (state.lastClose !== undefined) {
+      const lc = state.lastClose;
+      if (!isObj(lc) || typeof lc.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(lc.day) || !isNum(lc.at) || (lc.leftovers !== 'keep' && lc.leftovers !== 'discard')) add('I17 lastClose is malformed');
+    }
     // I14
     const mm = menuMap(state.menu);
     for (const id of Object.keys(state.learned || {})) {
@@ -3224,6 +3281,10 @@
         ledger[ing.id] = L;
       }
       out.ledger = ledger;
+      // lastClose (end-of-day marker): kept only when well formed; older saves simply have none.
+      const lcs = st.lastClose;
+      if (isObj(lcs) && typeof lcs.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lcs.day) && isNum(lcs.at) && (lcs.leftovers === 'keep' || lcs.leftovers === 'discard')) out.lastClose = { day: lcs.day, at: lcs.at, leftovers: lcs.leftovers };
+      else if (lcs !== undefined) repaired.push('lastClose dropped');
       for (const x of ledgerCheck(out)) { out.ledger[x.ing].open += x.have - x.expect; repaired.push('ledger ' + x.ing + ' re-opened at current stock'); }
       // availability (derived)
       const prevAvail = isObj(st.avail) ? st.avail : {};
@@ -3336,6 +3397,7 @@
         const mi = typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
         return mi + ' is ' + why + '. Take it off the order or pick something else.';
       }
+      case 'ordersStillOpen': return isInt(i.count) && i.count > 0 ? i.count + ' ' + U.plural(i.count, 'order') + ' still open. Take payment on ' + (i.count === 1 ? 'it' : 'each one') + ', or void ' + (i.count === 1 ? 'it' : 'them') + ', then close the day again.' : REPORTS.ordersStillOpen;
       case 'outOfBounds': return isNum(i.min) && isNum(i.max) ? 'That value is outside the allowed range (' + i.min + ' to ' + i.max + '). Enter a value inside it.' : REPORTS.outOfBounds;
       case 'nothingToDo': return i.why === 'onDeck' ? 'That item is still waiting for its start time. Tap Start now to begin it early.' : i.why === 'notBelow' ? 'This batch is not below the hold temperature, so it does not need a reheat.' : 'Nothing to change.';
       default: return hasOwn(REPORTS, report) ? REPORTS[report] : REPORTS.badPatch;
