@@ -130,11 +130,82 @@ for (const [label, w, h, theme, size] of [['390 day', 390, 844, 'day', 'normal']
   const reopen = p.locator('[data-act="reopen"], button:has-text("Reopen")').first();
   check('the paid order shows with a Reopen button', (await reopen.count()) > 0);
   if (await reopen.count()) {
-    await reopen.click(); await p.waitForTimeout(600);
+    await reopen.click({ force: true }); await p.waitForTimeout(600);
     const toast = await p.evaluate(() => [...document.querySelectorAll('.toast')].map((e) => e.innerText).join(' | '));
     check('refused with the plain reason: the day is closed, it would count twice, what to do', /already closed/.test(toast) && /count twice/.test(toast) && /correction/.test(toast), toast);
     check('the order stays paid', await p.evaluate(() => SB.store.getState().orders.every((o) => o.status === 'paid')));
     await p.screenshot({ path: SHOTS + '/reopen-refused-1024.png' });
+  }
+  await ctx.close();
+}
+
+// 5. The clock notice at 390 and in Night and Large text, with a toast up; the closed-day Reopen button on a phone; the clock question on an office page
+for (const [label, w, h, theme, size] of [['1024 day', 1024, 768, 'day', 'normal'], ['390 day', 390, 844, 'day', 'normal'], ['390 night large', 390, 844, 'night', 'large']]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: h } });
+  const p = await ctx.newPage();
+  p.on('pageerror', (e) => errs.push(String(e)));
+  await p.addInitScript(`(() => { try { localStorage.setItem('smokebox.v1.theme', JSON.stringify('${theme}')); localStorage.setItem('smokebox.v1.textsize', JSON.stringify('${size}')); } catch (e) {} })();`);
+  await p.goto(URL0); await p.waitForFunction(() => window.SB && SB.booted === true);
+  await p.evaluate(`SB.floor.setWelcome(false); ${addDish}`);
+  await p.evaluate(() => { const real = Date.now.bind(Date); Date.now = () => real() + 3 * 86400e3; });
+  await p.waitForSelector('.fl-bar-clock:not([hidden])', { timeout: 8000 });
+  await p.evaluate(() => SB.ui.toast('Order saved. Tap Undo to take it back.', { tone: 'info', ms: 20000, undo: () => {} }));
+  await p.waitForTimeout(1500);
+  const g = await p.evaluate(() => {
+    const r = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
+    const bs = [...document.querySelectorAll('.fl-bar-clock button')].map(r), ts = [...document.querySelectorAll('.toast')].map(r);
+    const hit = bs.some((a) => ts.some((t) => a.l < t.r && t.l < a.r && a.t < t.b && t.t < a.b));
+    const bar = document.querySelector('.fl-bar-clock');
+    return { hit, nb: bs.length, nt: ts.length, over: document.documentElement.scrollWidth > innerWidth + 1, barH: Math.round(bar.getBoundingClientRect().height), clipped: [...bar.querySelectorAll('button')].some((e) => e.getBoundingClientRect().right > innerWidth + 1) };
+  });
+  check('clock notice ' + label + ': a toast never covers its buttons', g.nb === 2 && g.nt > 0 && !g.hit, g);
+  check('clock notice ' + label + ': the sound bar waits behind it (one notice at a time)', await p.evaluate(() => { const e = document.querySelector('.fl-bar-sound'); return !e || e.hidden; }));
+  check('clock notice ' + label + ': buttons inside the screen, no sideways scroll', !g.clipped && !g.over, g);
+  await p.screenshot({ path: SHOTS + '/clock-notice-' + label.replace(/ /g, '-') + '.png' });
+  await ctx.close();
+}
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const p = await ctx.newPage();
+  p.on('pageerror', (e) => errs.push(String(e)));
+  await p.goto(URL0); await p.waitForFunction(() => window.SB && SB.booted === true);
+  await p.evaluate(`SB.floor.setWelcome(false); ${addDish} SB.store.dispatchEx('createTicket', { customer: 'Paid Pam', channel: 'dine_in', items: [{ menuId: SB.store.getState().menu[0].id, qty: 1 }], note: '', rush: false, pay: { method: 'cash' } }, { source: 'ui' }); SB.store.dispatchEx('closeDay', {}, { source: 'ui' });`);
+  await p.evaluate(() => SB.sheets.open('orders')); await p.waitForTimeout(600);
+  await p.click('.seg-opt[data-id="paid"], button:has-text("Paid today")').catch(() => {}); await p.waitForTimeout(400);
+  const rb = p.locator('[data-act="reopen"]').first();
+  if (await rb.count()) {
+    const lab = await rb.innerText();
+    check('closed day: the Reopen button says so before the tap', /Closed day: cannot reopen/.test(lab), lab);
+    const bx = await rb.boundingBox();
+    check('closed day button fits the phone and is at least 44 px tall', !!bx && bx.x >= 0 && bx.x + bx.width <= 391 && bx.height >= 44, bx);
+    await rb.click({ force: true }); await p.waitForTimeout(500);
+    const toast = await p.evaluate(() => [...document.querySelectorAll('.toast')].map((e) => ({ t: e.innerText, r: e.getBoundingClientRect().right, l: e.getBoundingClientRect().left })));
+    check('a tap gives the plain reason on a phone, inside the screen', toast.length > 0 && /already closed/.test(toast[0].t) && toast[0].l >= 0 && toast[0].r <= 391, toast);
+    await p.screenshot({ path: SHOTS + '/reopen-refused-390.png' });
+  } else check('closed day: a Reopen button exists to test', false);
+  await ctx.close();
+}
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const p = await ctx.newPage();
+  p.on('pageerror', (e) => errs.push(String(e)));
+  await p.goto(URL0); await p.waitForFunction(() => window.SB && SB.booted === true);
+  await p.evaluate(`SB.floor.setWelcome(false);`);
+  await p.evaluate(() => SB.shell.ignite({ section: 'data' })); await p.waitForTimeout(1500);
+  await p.evaluate(() => { const real = Date.now.bind(Date); Date.now = () => real() + 3 * 86400e3; });
+  await p.waitForSelector('.sb-banner[data-kind="clock"]', { timeout: 12000 }).catch(() => {});
+  const c = await p.evaluate(() => {
+    const b = document.querySelector('.sb-banner[data-kind="clock"]');
+    if (!b) return null;
+    const br = b.getBoundingClientRect(), lay = document.querySelector('.sb-shell > .layer');
+    return { h: Math.round(br.height), layerTop: lay ? Math.round(lay.getBoundingClientRect().top) : -1, dialog: !!document.querySelector('[role="alertdialog"], [role="dialog"]'), btn: [...b.querySelectorAll('button')].map((e) => e.textContent.trim() || e.title) };
+  });
+  check('office page: a slim strip asks about the clock, with no box over the page', !!c && !c.dialog && c.h <= 90, c);
+  check('office page: the page starts below the strip (its actions are not covered)', !!c && c.layerTop >= c.h - 1, c);
+  await p.screenshot({ path: SHOTS + '/clock-office-390.png' });
+  if (c) {
+    await p.click('.sb-banner[data-kind="clock"] button:has-text("Use the new time")'); await p.waitForTimeout(600);
+    check('office page: Use the new time accepts it and the strip goes', await p.evaluate(() => !SB.store.status().clockSuspect && !document.querySelector('.sb-banner[data-kind="clock"]')));
   }
   await ctx.close();
 }

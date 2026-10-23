@@ -846,7 +846,9 @@
   function measureToastTop() {
     if (!m || !m.main) return;
     // Everyday toasts sit just under the header, over the notice strip, where they hide no ticket button.
-    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(m.head.getBoundingClientRect().bottom + 6) + 'px');
+    // While the clock notice shows, toasts start below it so they never cover its two buttons.
+    const cb = m.strip && m.strip.clockBar && !m.strip.clockBar.hidden ? m.strip.clockBar.getBoundingClientRect().bottom : 0;
+    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(Math.max(m.head.getBoundingClientRect().bottom, cb) + 6) + 'px');
     if (m.cabOn) doc.documentElement.style.setProperty('--fl-toast-top', Math.round(m.main.getBoundingClientRect().top + 8) + 'px');
   }
   // Tells the stylesheet how tall the all-day strip is (--fl-lift) so toasts sit above it.
@@ -1712,7 +1714,9 @@
       if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
     }
     setHidden(m.strip.clockBar, !clockShown);
+    measureToastTop();
     const soundShown = needSound && !m.dis.has('snd') && !clockShown;
+    setHidden(m.strip.soundBar, !soundShown); // the clock notice goes first, so the sound bar waits behind it
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
     const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';

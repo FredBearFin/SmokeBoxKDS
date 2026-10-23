@@ -284,6 +284,16 @@
       const lines = foodLines(state, o.id), t = o.totals || {}, pm = C.payMethodById[o.method];
       text(rec.items, lines.length ? itemsLine(lines) : 'Items are no longer on the board.');
       text(rec.meta, 'Paid ' + U.fmtTime(o.paidAt) + ' by ' + (pm ? pm.name.toLowerCase() : o.method) + '.' + (o.tip > 0 ? ' Tip ' + money(o.tip) + '.' : '') + (t.discount > 0 ? ' Discount ' + money(t.discount) + '.' : '') + (t.rounds > 1 ? ' ' + t.rounds + ' rounds.' : ''));
+      // A sale from a day that was already closed cannot be opened again, so say so on the button before the tap.
+      const lc = state.lastClose, shut = !!(lc && isFinite(o.paidAt) && U.serviceDate(o.paidAt, state.settings.service.dayStartHour) <= lc.day);
+      if (rec.shut !== shut) {
+        rec.shut = shut;
+        U.clear(rec.reopen);
+        rec.reopen.append(ico('history', 20), h('span', null, shut ? 'Closed day: cannot reopen' : 'Reopen'));
+        rec.reopen.classList.toggle('is-shut', shut);
+        if (shut) rec.reopen.setAttribute('aria-disabled', 'true'); else rec.reopen.removeAttribute('aria-disabled');
+        rec.reopen.title = shut ? 'Tap to see why.' : '';
+      }
       text(rec.total, money(t.total));
       text(rec.sub, t.tax > 0 ? 'incl. ' + money(t.tax) + ' tax' : '');
     }
