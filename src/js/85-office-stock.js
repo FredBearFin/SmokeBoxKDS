@@ -446,7 +446,7 @@
     spellTable.el.querySelector('.of-card-body').appendChild(spellNote);
 
     // ---------- simulated channel sync ----------
-    page.section('Channel sync (practice only)', 'Practice only: Smokebox pretends to tell each ordering channel when an item is sold out and times how long that would take. It is not connected to any real ordering system.');
+    page.section('Channel sync (practice only)', 'Practice only: this shows how a sold-out dish would reach other ordering systems. Nothing is sent.');
     const syncParts = [page.lastSection];
     syncParts.push(page.panel({
       span: 5, title: 'How fast 86 reaches the channels', sub: 'Simulated: no live POS connected',

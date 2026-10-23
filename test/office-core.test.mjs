@@ -66,9 +66,9 @@ test('pickerKey shows the last day of a range and never a future day', () => {
 
 test('coachText tells a brand-new kitchen what to do first on every data page', () => {
   const fresh = { anyLive: false, tickets: 0, batches: 0, records: 0, label: 'Today' };
-  assert.match(P.coachText('pace', fresh).title, /first order/i);
+  assert.match(P.coachText('pace', fresh).title, /nothing to show yet/i);
   assert.match(P.coachText('tickets', fresh).body, /Take an order/);
-  assert.match(P.coachText('stations', fresh).title, /first order/i);
+  assert.match(P.coachText('stations', fresh).title, /nothing to show yet/i);
   assert.match(P.coachText('money', fresh).body, /pay it from Orders/);
   assert.match(P.coachText('safety', fresh).title, /first batch/i);
   assert.match(P.coachText('stock', fresh).title, /first batch/i);
@@ -93,4 +93,11 @@ test('coachText is silent when the range has data, and never mentions sample', (
 
 test('a discard counts as data on Sales and money, so the thrown-away ledger is not hidden', () => {
   assert.equal(P.coachText('money', { anyLive: true, tickets: 0, discards: 1 }), null);
+});
+
+test('coachText: tickets still on the line are not enough, so a page with none finished stays calm', () => {
+  const waiting = P.coachText('pace', { anyLive: true, tickets: 3, finished: 0, batches: 0, records: 0 });
+  assert.match(waiting.title, /nothing to show yet/i);
+  assert.match(waiting.body, /not finished/);
+  assert.equal(P.coachText('pace', { anyLive: true, tickets: 3, finished: 2, batches: 0, records: 0 }), null);
 });

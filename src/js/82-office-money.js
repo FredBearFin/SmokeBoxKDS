@@ -371,7 +371,7 @@
       caption: 'Sales is the food sold less discounts, and it is the number at the top of this page. Tax and tips are on top of it, and all three together are what was collected.',
       // Builds the figure rows and the notes under them; update repaints them in place.
       render: (body, p0) => {
-        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the line screen and the money shows up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
+        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the kitchen board and the money shows up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
         const stats = B.stats(body, { cls: 'ob-stats--3' });
         const open = h('p', { class: 'ob-note' });
         body.append(empty, open);
@@ -439,7 +439,7 @@
     const topCard = page.card({
       type: 'bar', span: 6, title: 'Top items', sub: scope(),
       caption: 'Whether your best sellers are also your best earners. Switch between how many were sold and how much they brought in.',
-      empty: { title: 'No sales in this range yet', body: 'Finished tickets with priced items fill this chart. Take and finish an order on the line screen, or pick a longer range.', icon: 'chart-bar' },
+      empty: { title: 'No sales in this range yet', body: 'Finished tickets with priced items fill this chart. Take and finish an order on the kitchen board, or pick a longer range.', icon: 'chart-bar' },
       // Top 10 items by the picked measure; items with no sales are left out.
       spec: (p) => {
         const by = st.itemsBy;
@@ -632,13 +632,13 @@
     });
 
     /* ---------------------------------------------------------------- yield */
-    page.section('Cooked yield', 'Smoked meat loses weight in the smoker and the hold cabinet. Pricing it at a fixed yield can quietly under- or over-charge every plate.');
+    page.section('Cooked yield', 'Cooked meat loses weight while it cooks and while it waits. Pricing it at a fixed yield can quietly under- or over-charge every plate.');
     const yieldSection = page.lastSection;
 
     const yieldCard = page.card({
       type: 'bar', span: 7, title: 'Cooked yield: assumed, modeled and real', sub: scope(),
       caption: 'How far the static yield you price with sits from the Texas A&M model and from what your own weighed batches really gave.',
-      empty: { title: 'Nothing to compare yet', body: 'Your main smoked meat needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
+      empty: { title: 'Nothing to compare yet', body: 'Your main cooked-ahead meat needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
       // Up to three bars: the fixed yield, the Texas A&M model and your weighed batches (two or more needed).
       spec: (p) => {
         const y = yieldPrimary(p);
@@ -676,7 +676,7 @@
 
     const costOfWrong = page.panel({
       span: 5, title: 'What a fixed yield costs you', sub: scope(),
-      caption: 'The real price of a cooked kilogram of your main smoked meat, and how wrong a fixed yield would have made it.',
+      caption: 'The real price of a cooked kilogram of your main cooked-ahead meat, and how wrong a fixed yield would have made it.',
       // Builds the big sentence, the three cost figures and the source line; update repaints them in place.
       render: (body, p0) => {
         const big = h('p', { class: 'ob-bigline', 'data-k': 'misprice' });
@@ -722,7 +722,7 @@
     const whatIf = page.panel({
       span: 12, title: 'Try it: what would a different cook do to the yield?',
       sub: 'Based on published brisket cooking research; a starting guess, confirm against your own weighed batches',
-      caption: 'Slide the end temperature and the hold time to see what the meat is worth after the smoker. A hotter finish or a longer hold means less meat on the board.',
+      caption: 'Slide the end temperature and the hold time to see what the meat is worth after cooking. A hotter finish or a longer hold means less meat on the board.',
       // Builds the three steppers and the result tiles; any stepper change repaints the result at once.
       render: (body, p0) => {
         // The +5 and -5 buttons need room: on a narrow phone only the plain minus and plus are shown,
@@ -737,11 +737,11 @@
         const sT = mkStep({ label: 'End temperature', value: st.endpointC, min: 75, max: 90, step: 1, bigStep: big ? 5 : undefined, unit: '\u00B0C', onChange: (v) => { st.endpointC = v; paint(); } });
         // Hold time in the cabinet, 0 to 3 hours in quarter-hour steps.
         const sH = mkStep({ label: 'Hold time', value: st.holdH, min: 0, max: 3, step: 0.25, bigStep: big ? 1 : undefined, unit: 'h', onChange: (v) => { st.holdH = v; paint(); } });
-        // Raw weight put in the smoker, 1 to 100 kg in half-kilogram steps (weights stay in g or kg).
+        // Raw weight put in to cook, 1 to 100 kg in half-kilogram steps (weights stay in g or kg).
         const sW = mkStep({ label: 'Raw weight', value: st.rawKg, min: 1, max: 100, step: 0.5, bigStep: big ? 5 : undefined, unit: 'kg', onChange: (v) => { st.rawKg = v; paint(); } });
         // Puts a visible label above a control so each stepper has a name on screen.
         const fld = (label, node) => h('div', { class: 'ob-ctl ob-ctl--step' }, h('span', { class: 'ob-ctl-l' }, label), node);
-        const controls = h('div', { class: 'ob-wi-ctl' }, fld('End temperature, 75 to 90 \u00B0C', sT), fld('Hold time, 0 to 3 hours', sH), fld('Raw weight put in the smoker', sW));
+        const controls = h('div', { class: 'ob-wi-ctl' }, fld('End temperature, 75 to 90 \u00B0C', sT), fld('Hold time, 0 to 3 hours', sH), fld('Raw weight put in to cook', sW));
         // One result tile: returns its list item and the two text spans to fill in later.
         const out = (k, label) => { const v = h('span', { class: 'ob-stat-v num', 'data-out': k }), n = h('span', { class: 'ob-stat-n' }); return { li: h('li', { class: 'ob-stat' }, h('span', { class: 'ob-stat-l' }, label), v, n), v, n }; };
         const oHot = out('hot', 'Hot yield'), oChill = out('chilled', 'Chilled yield'), oCooked = out('cooked', 'Cooked weight'), oCost = out('cost', 'True cost per cooked kg');
@@ -754,7 +754,7 @@
         function rawCost() {
           const y = yieldPrimary(ctx.prepared());
           if (y && isNum(y.costPerKgRaw)) return { cost: y.costPerKgRaw, name: y.name, staticY: y.staticYield };
-          return { cost: null, name: 'the main smoked meat', staticY: null };
+          return { cost: null, name: 'the main cooked-ahead meat', staticY: null };
         }
         // Runs the thermal model with the three stepper values and rewrites every result line.
         function paint() {
@@ -762,7 +762,7 @@
           const rawG = st.rawKg * 1000;
           // hotPct and chilledPct from thermal() are 0 to 100, unlike the fractions elsewhere.
           const t = M.thermal({ endpointC: st.endpointC, holdH: st.holdH, rawG, costPerKgRaw: rc.cost });
-          setText(oHot.v, t.hotPct.toFixed(1) + '%'); setText(oHot.n, 'of raw weight, straight from the smoker');
+          setText(oHot.v, t.hotPct.toFixed(1) + '%'); setText(oHot.n, 'of raw weight, straight from cooking');
           setText(oChill.v, t.chilledPct.toFixed(1) + '%'); setText(oChill.n, 'after chilling overnight');
           const cg = isNum(t.cookedG) ? Math.round(t.cookedG) : null;
           setText(oCooked.v, cg === null ? '-' : fmt.g(cg)); setText(oCooked.n, cg === null ? '' : fmt.g(cg) + ' from ' + fmt.g(rawG) + ' raw');

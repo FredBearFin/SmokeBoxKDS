@@ -1188,7 +1188,7 @@
       mkSeg('Back office theme', 'Ember is dark and warm, Paper is light. This page and every chart follow it.', themeOpts(['ember', 'Ember'], ['paper', 'Paper']), () => SB.theme.office(), (v) => SB.theme.setOffice(v)),
       mkSeg('Line theme', 'Day is the anti-glare parchment for bright kitchens, Night is for a dim prep corner.', themeOpts(['day', 'Day'], ['night', 'Night']), () => SB.theme.get(), (v) => SB.theme.set(v)),
       mkSeg('Text size', 'Large makes all text about 20% bigger on the line and in the back office.', themeOpts(['normal', 'Normal'], ['large', 'Large']), () => SB.theme.textSize(), (v) => SB.theme.setTextSize(v)),
-      mkSeg('Temperatures', 'Shows temperatures in Fahrenheit or Celsius. Food-safety limits are still stored in Fahrenheit, so the limits on the Food safety page are entered in F.', themeOpts(['F', '°F'], ['C', '°C']), () => ((cur() || {}).settings.ui || {}).tempUnit || 'F', (v) => saveUnit('tempUnit', v)),
+      mkSeg('Temperatures', 'Shows temperatures in Fahrenheit or Celsius. The limits on the Food safety page are always entered in °F.', themeOpts(['F', '°F'], ['C', '°C']), () => ((cur() || {}).settings.ui || {}).tempUnit || 'F', (v) => saveUnit('tempUnit', v)),
       mkSeg('Weights', 'Shows food weights in kilograms and grams, or in pounds and ounces. Amounts you type on the Ingredients page are still in grams.', themeOpts(['kg', 'kg and g'], ['lb', 'lb and oz']), () => ((cur() || {}).settings.ui || {}).weightUnit || 'kg', (v) => saveUnit('weightUnit', v)),
     ];
     const status = statusLine();
@@ -1674,12 +1674,14 @@
       const sync = () => { go.disabled = !(BPr ? BPr.resetWordOk(input.value, o.word) : input.value.trim().toLowerCase() === o.word.toLowerCase()); };
       input.addEventListener('input', sync);
       // Closes the box without doing anything.
-      const cancel = () => { dangerBox.hidden = true; dangerBox.replaceChildren(); };
+      const cancel = () => { dangerBox.hidden = true; dangerBox.replaceChildren(); if (o.opener && o.opener.focus) o.opener.focus(); };
       // Runs the erase once, then closes the box.
       const run = () => { if (go.disabled) return; cancel(); o.run(); };
       go.addEventListener('click', run);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); if (e.key === 'Escape') cancel(); });
-      dangerBox.replaceChildren(h('p', { class: 'od-danger-t' }, ico('alert', 20), h('strong', null, o.title)), ...o.lines.map((t) => h('p', { class: 'od-p' }, t)),
+      const descId = U.uid('oddesc');
+      input.setAttribute('aria-describedby', descId);
+      dangerBox.replaceChildren(h('p', { class: 'od-danger-t' }, ico('alert', 20), h('strong', null, o.title)), h('div', { id: descId }, ...o.lines.map((t) => h('p', { class: 'od-p' }, t))),
         h('label', { class: 'od-danger-l' }, 'Type ', h('strong', null, o.word), ' to confirm', input),
         h('div', { class: 'od-actions' }, go, btn('Keep my data', { onClick: cancel })));
       dangerBox.hidden = false;
@@ -1689,7 +1691,7 @@
     resetLiveBtn.addEventListener('click', () => {
       const s = stateNow(), k = keep.getValue();
       askTyped({
-        title: 'Clear live data?', word: 'RESET', label: 'Clear live data',
+        opener: resetLiveBtn, title: 'Clear live data?', word: 'RESET', label: 'Clear live data',
         lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any practice orders, and sets the clock back to real time.',
           k ? 'Your dishes, ingredient edits, limits, pacing and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
           'There is no undo. Back up first if you might want this data.'],
@@ -1705,7 +1707,7 @@
     resetAllBtn.addEventListener('click', () => {
       const s = stateNow();
       askTyped({
-        title: 'Erase everything on this device?', word: 'ERASE', label: 'Erase everything',
+        opener: resetAllBtn, title: 'Erase everything on this device?', word: 'ERASE', label: 'Erase everything',
         lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
           'Your Day or Night, Ember or Paper and text-size choices are kept.', 'There is no undo. Back up first if you might want any of it back.'],
         // Erases everything after the word was typed.
