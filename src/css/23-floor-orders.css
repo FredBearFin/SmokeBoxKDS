@@ -59,3 +59,8 @@
   .ox-acts .btn { flex: 1 1 100%; }
   .ox-pay-go { min-width: 0; flex: 1 1 auto; }
 }
+
+/* The "Paid by Cash" switch beside the one-tap Pay button: small label, the method in bold, a down arrow. */
+.ox-acts .ox-how { min-width: 140px; gap: var(--sp-1); }
+.ox-how-k { color: var(--ink2); font-weight: var(--w-semi); }
+.ox-how-v { font-weight: var(--w-heavy); }

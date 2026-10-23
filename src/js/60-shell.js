@@ -22,8 +22,11 @@
   // Device roles: all = today's all-in-one screen; kitchen, front (order entry) and manager are focused ones.
   const ROLES = ['all', 'kitchen', 'front', 'manager'];
 
+  // A Guide page name from an address: lower-case letters, digits and dashes only, or '' for the first page.
+  const guidePage = (x) => (typeof x === 'string' && /^[a-z0-9-]{1,40}$/.test(x) ? x : '');
+
   // Turns the part of the web address after the # (the hash, like #/office/money) into a view:
-  // {kind:'floor', zone}, {kind:'kitchen', zone}, {kind:'new'} or {kind:'office', section}. Never fails:
+  // {kind:'floor', zone}, {kind:'kitchen', zone}, {kind:'new'}, {kind:'guide', page} or {kind:'office', section}. Never fails:
   // garbage lands on the whole floor.
   function viewFor(hash) {
     // Cap the length, then undo %20-style codes; a broken code keeps the raw text.
@@ -34,6 +37,7 @@
     if (parts[0] === 'office') return { kind: 'office', section: SECTIONS.indexOf(parts[1]) >= 0 ? parts[1] : 'pace' };
     if (parts[0] === 'kitchen') return { kind: 'kitchen', zone: ZONES.indexOf(parts[1]) >= 0 ? parts[1] : 'all' };
     if (parts[0] === 'new') return { kind: 'new' };
+    if (parts[0] === 'guide') return { kind: 'guide', page: guidePage(parts[1]) };
     if (parts[0] === 's' && ZONES.indexOf(parts[1]) >= 0) return { kind: 'floor', zone: parts[1] };
     return { kind: 'floor', zone: 'all' };
   }
@@ -43,6 +47,7 @@
     if (!view || typeof view !== 'object') return { kind: 'floor', zone: 'all' };
     if (view.kind === 'office') return { kind: 'office', section: SECTIONS.indexOf(view.section) >= 0 ? view.section : 'pace' };
     if (view.kind === 'new') return { kind: 'new' };
+    if (view.kind === 'guide') return { kind: 'guide', page: guidePage(view.page) };
     if (view.kind === 'kitchen') return { kind: 'kitchen', zone: ZONES.indexOf(view.zone) >= 0 ? view.zone : 'all' };
     return { kind: 'floor', zone: ZONES.indexOf(view.zone) >= 0 ? view.zone : 'all' };
   }
@@ -52,6 +57,7 @@
     const v = normView(view);
     if (v.kind === 'office') return v.section === 'pace' ? '#/office' : '#/office/' + v.section;
     if (v.kind === 'new') return '#/new';
+    if (v.kind === 'guide') return v.page ? '#/guide/' + v.page : '#/guide';
     if (v.kind === 'kitchen') return v.zone === 'all' ? '#/kitchen' : '#/kitchen/' + v.zone;
     return v.zone === 'all' ? '#/' : '#/s/' + v.zone;
   }
@@ -437,7 +443,7 @@
   const h = U.h;
   const S = (SB.shell = {});
   const ui = (SB.ui = {});
-  const layers = { floor: null, office: null, order: null };
+  const layers = { floor: null, office: null, order: null, guide: null };
   const hosts = { shell: null, sheets: null, toasts: null, live: null, standalone: null };
   const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
   // True when the device asks for less motion; animations are then skipped or shortened.
@@ -525,6 +531,7 @@
     const anySheet = sheetStack.length > 0;
     setInert(layers.floor, anySheet || inOfficeNow());
     setInert(layers.office, anySheet || !inOfficeNow());
+    setInert(layers.guide, anySheet);
     sheetStack.forEach((r, i) => setInert(r.root, i < sheetStack.length - 1));
   }
   S._syncInert = syncInert;
@@ -708,9 +715,16 @@
     });
     toastRaf = toasts.length ? requestAnimationFrame(toastLoop) : 0;
   }
+  // Adds a small "?" to a sheet's header that opens one Guide page (the sheet closes first). Adds nothing when the Guide is missing.
+  ui.sheetHelp = function (sheet, page, label) {
+    const a = SB.guide && typeof SB.guide.link === 'function' ? SB.guide.link(page, label) : null;
+    if (!a || !sheet || !sheet.header) return;
+    a.addEventListener('click', () => sheet.close('help'));
+    sheet.header.insertBefore(a, sheet.header.lastChild);
+  };
   // Shows a small message strip; returns {el, close()}. o.tone: ok, warn, bad, info. o.undo (a function)
-  // adds an Undo button and keeps it for undoMs (10 000 ms = the 10 seconds you get to undo). Others stay 4
-  // s, or 6 s for warn and bad (starter estimates, owner to confirm); o.ms overrides.
+  // adds an Undo button and keeps it for undoMs (10 000 ms = the 10 seconds you get to undo). Others stay 5
+  // s, 6 s for warn, and an error (bad) stays until cleared (starter estimates, owner to confirm); o.ms overrides.
   // WATCH OUT: one undo toast at a time (the engine undoes only its newest action), and at most 3 toasts.
   ui.toast = function (message, o) {
     o = o || {};
@@ -719,7 +733,7 @@
     const tone = ['ok', 'warn', 'bad', 'info'].indexOf(o.tone) >= 0 ? o.tone : 'info';
     const undo = typeof o.undo === 'function' ? o.undo : null;
     const undoMs = (SB.config && Number(SB.config.undoMs)) || 10000;
-    const ms = Number.isFinite(+o.ms) && +o.ms > 0 ? +o.ms : undo ? undoMs : (tone === 'bad' || tone === 'warn' ? 6000 : 4000);
+    const ms = Number.isFinite(+o.ms) && +o.ms > 0 ? +o.ms : undo ? undoMs : tone === 'bad' ? 1e12 : tone === 'warn' ? 6000 : 5000; // errors stay until cleared
     if (undo) toasts.slice().forEach((t) => { if (t.undo) t.dismiss(true); }); // the engine only undoes its newest action
     while (toasts.length >= 3) toasts[0].dismiss(true);
     // Build the strip: icon, message, buttons and (for undo) the draining bar.
@@ -1322,7 +1336,14 @@
       for (let n = 1; n <= 9; n++) pad.appendChild(mkKey(String(n), 'Digit ' + n, () => push(String(n))));
       pad.append(mkKey('Clear', 'Clear all digits', () => { entry = ''; paint(); }, true), mkKey('0', 'Digit 0', () => push('0')), mkKey(ico('backspace', 26), 'Delete last digit', () => { entry = entry.slice(0, -1); paint(); }, true));
       const note = h('p', { class: 'pin-note' }, 'This PIN keeps line cooks out of the back office. It is not real security: it is stored on this device, and anyone who can use the device can get around it.');
-      sh.body.append(dots, msg, status, pad, note);
+      // What to do when the PIN is forgotten: said plainly, because there is no reset button and nothing here may pretend otherwise.
+      const forgot = h('details', { class: 'pin-forgot' },
+        h('summary', null, 'Forgot the PIN?'),
+        h('p', null, 'The PIN only locks the back office: sales, menu and settings. The kitchen board and New ticket stay open.'),
+        h('p', null, 'Smokebox cannot reset or recover a PIN. It is saved only on this device. First ask whoever set it.'),
+        h('p', null, 'If nobody knows it, the only way back in is to clear this site\'s saved data in your browser settings. That erases everything on this device: tickets, dishes and settings. Then open Smokebox and restore your latest backup (Back office, Data, Import). A backup brings back the PIN it was saved with, so use one made before the PIN was set or changed.'),
+        SB.guide && SB.guide.link ? SB.guide.link('empty-lost-or-locked', 'forgot the PIN') : null);
+      sh.body.append(dots, msg, status, pad, note, forgot);
       // The Cancel button closes the keypad and answers false.
       sh.footer.appendChild(h('button', { type: 'button', class: 'btn', onClick: () => finish(false) }, 'Cancel'));
       // Lights as many dots as digits typed and updates the spoken count.
@@ -1334,7 +1355,7 @@
       // Reads the saved lock: while it runs keys stay off and seconds count down; at the end they return.
       function tickLock() {
         const s = lockState(); const left = Math.ceil((s.until - Date.now()) / 1000);
-        if (left > 0) { setLocked(true); say('Too many wrong tries. Try again in ' + left + ' s.', 'bad'); return; }
+        if (left > 0) { setLocked(true); say('Too many wrong tries. Try again in ' + left + ' s. Forgot the PIN? See below.', 'bad'); return; }
         clearInterval(timer); if (locked) { setLocked(false); U.storage.set(KEY.pinlock, { fails: 0, until: 0 }); say('Enter the 4-digit PIN.'); }
       }
       // Starts checking the lock twice a second (every 500 ms).
@@ -1581,6 +1602,8 @@
   //   return to a locked office.
   function onRoute(view) {
     if (!st.mounted) return;
+    if (view.kind === 'guide') { openGuidePage(view.page); return; }
+    closeGuidePage();
     if (view.kind === 'office') {
       if (st.officeOpen) { navigateOffice(view.section); return; }
       guard().then((ok) => { if (ok) openOffice(view.section); else if (R.view().kind === 'office') R.go(R.home(), { replace: true }); });
@@ -1590,6 +1613,31 @@
       if (st.officeOpen) closeOffice();
       if (view.kind === 'new') openOrderPage(); else closeOrderPage();
     }
+  }
+  // Shows the Guide screen (SB.guide, 78-guide.js) in its own layer, or switches it to another page when it is
+  // already open. The board and order layers are only hidden, so they come back exactly as they were.
+  function openGuidePage(page) {
+    if (st.guideOpen) { try { if (SB.guide) SB.guide.show(page); } catch (e) { console.error('[smokebox] guide page failed', e); } return; }
+    if (!SB.guide || typeof SB.guide.mount !== 'function' || !layers.guide) {
+      // The Guide file is missing: say so and go back, instead of showing an empty screen.
+      try { ui.toast('The Guide did not load. Reload the page.', { tone: 'warn' }); } catch (e) { /* ignore */ }
+      R.go(R.home(), { replace: true });
+      return;
+    }
+    st.guideOpen = true;
+    if (st.officeOpen) closeOffice();
+    layers.floor.hidden = true; layers.order.hidden = true; layers.guide.hidden = false;
+    try { SB.guide.mount(layers.guide, { page }); } catch (e) { console.error('[smokebox] guide failed to open', e); }
+  }
+  // Takes the Guide down and shows the board (or the order page) again; does nothing if it was not open.
+  function closeGuidePage() {
+    if (!st.guideOpen) return;
+    st.guideOpen = false;
+    try { if (SB.guide && SB.guide.unmount) SB.guide.unmount(); } catch (e) { console.error('[smokebox] guide failed to close', e); }
+    if (layers.guide) { U.clear(layers.guide); layers.guide.hidden = true; }
+    if (st.orderOpen && layers.order) layers.order.hidden = false; else if (layers.floor) layers.floor.hidden = false;
+    // Put keyboard focus back on the board so Tab continues from a sensible place.
+    try { (st.orderOpen ? layers.order : layers.floor).focus({ preventScroll: true }); } catch (e) { /* focus is a nicety */ }
   }
   // Shows order entry for the front role. Uses the order page (SB.order.mount) once that exists; until then
   // it opens the New ticket sheet over the board.
@@ -1651,8 +1699,8 @@
     // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => S.ignite({ section: 'data' }) }, w.act);
     // Puts the nudge off for 45 minutes.
-    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } }, 'Later') : null;
-    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : 'download', 22), h('span', { class: 'sb-banner-t' }, w.text), act, later);
+    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: 'Hide for 45 minutes', onClick: () => { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } }, ico('x', 18), h('span', { class: 'visually-hidden' }, 'Later')) : null;
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
     st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip
@@ -1687,7 +1735,7 @@
     const body = h('div', { class: 'ph' },
       h('div', { class: 'ph-note' },
         h('h2', null, 'Floor placeholder'),
-        h('p', { class: 't-muted' }, 'SB.floor is not loaded in this build, so this panel stands in for the line. The shell around it is real: theme, router, sheets, toasts, PIN and the back office all work from here.')),
+        h('p', { class: 't-muted' }, 'The kitchen board did not load, so this stand-in panel is showing. Reload the page. Themes, sheets, the PIN and the back office still work from here.')),
       h('div', { class: 'row' },
         // Demo button: shows a plain toast message.
         h('button', { type: 'button', class: 'btn', onClick: () => ui.toast('Ticket #106 sent to 3 stations.', { tone: 'ok' }) }, 'Show a toast'),
@@ -1712,7 +1760,7 @@
     // Switches the office between Ember (dark) and Paper (light).
     const themeBtn = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => T.setOffice(T.office() === 'ember' ? 'paper' : 'ember') }, ico('sun', 18), h('span', null, 'Switch Ember and Paper'));
     const back = h('button', { type: 'button', class: 'btn btn-primary', dataset: { backToLine: '' } }, ico('door', 22), h('span', null, 'Back to the line'));
-    el.appendChild(h('div', { class: 'ph' }, h('div', { class: 'ph-note' }, title, h('p', { class: 't-muted' }, 'SB.office is not loaded in this build. The ignition, the layer and the way out are real.'), sec), nav, h('div', { class: 'row' }, themeBtn, back)));
+    el.appendChild(h('div', { class: 'ph' }, h('div', { class: 'ph-note' }, title, h('p', { class: 't-muted' }, 'The back office pages did not load. Use Back to the line to leave, then reload the page.'), sec), nav, h('div', { class: 'row' }, themeBtn, back)));
     // Shows the name of the current office page.
     const setSection = (s) => { sec.textContent = 'Section: ' + s; };
     setSection(section);
@@ -1734,19 +1782,20 @@
     const shell = h('div', { class: 'sb-shell', dataset: { view: 'floor' } });
     const floor = h('div', { class: 'layer layer-floor', id: 'sb-floor', role: 'region', 'aria-label': 'Kitchen board', tabindex: -1 });
     const order = h('div', { class: 'layer layer-order', id: 'sb-order', role: 'region', 'aria-label': 'Order entry', tabindex: -1, hidden: true });
+    const guide = h('div', { class: 'layer layer-guide', id: 'sb-guide', role: 'region', 'aria-label': 'Guide', tabindex: -1, hidden: true });
     const veil = h('div', { class: 'ignite-veil', 'aria-hidden': 'true' });
     const office = h('div', { class: 'layer layer-office office', id: 'sb-office', role: 'region', 'aria-label': 'Back office', tabindex: -1, hidden: true, dataset: { otheme: T.office() } });
     const fx = h('div', { class: 'ignite-fx', 'aria-hidden': 'true' });
     const live = h('div', { class: 'live-region', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
     const toastHost = h('div', { class: 'toast-host', role: 'region', 'aria-label': 'Notifications' });
     const sheetHost = h('div', { class: 'sheet-host' });
-    shell.append(floor, order, veil, office, fx, live, toastHost, sheetHost);
+    shell.append(floor, order, guide, veil, office, fx, live, toastHost, sheetHost);
     root.appendChild(shell);
     // Swap the temporary containers (if any) for the real ones and record the new state.
     if (hosts.standalone) { hosts.standalone.remove(); hosts.standalone = null; }
     Object.assign(hosts, { shell, sheets: sheetHost, toasts: toastHost, live });
-    layers.floor = floor; layers.office = office; layers.order = order;
-    Object.assign(st, { shell, veil, fx, mounted: true, orderOpen: false, orderCleanup: null, officeOpen: false, officeContent: false, ph: {}, taps: [] });
+    layers.floor = floor; layers.office = office; layers.order = order; layers.guide = guide;
+    Object.assign(st, { shell, veil, fx, mounted: true, orderOpen: false, guideOpen: false, orderCleanup: null, officeOpen: false, officeContent: false, ph: {}, taps: [] });
     st.offRoute = R.onChange(onRoute);
     // Floor board: if it throws, show an error card with Reload instead of a blank screen.
     try {
@@ -1768,6 +1817,7 @@
   // Takes the frame down: closes sheets, stops route listening, removes layers, dismisses toasts.
   S.unmount = function () {
     if (!st.mounted) return;
+    closeGuidePage();
     closeOrderPage();
     clearInterval(bn.timer); bn.el = null; bn.kind = '';
     sheets.closeAll();
@@ -1778,7 +1828,7 @@
     st.shell.remove();
     toasts.splice(0).forEach((r) => r.dismiss(true));
     Object.assign(hosts, { shell: null, sheets: null, toasts: null, live: null });
-    layers.floor = layers.office = layers.order = null;
+    layers.floor = layers.office = layers.order = layers.guide = null;
     st.mounted = false; st.officeOpen = false;
   };
   // Snapshot of shell and history state, for tests and debugging.

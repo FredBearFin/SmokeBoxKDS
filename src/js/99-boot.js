@@ -44,7 +44,7 @@
     const h2 = doc.createElement('h2'); h2.textContent = 'Smokebox could not start';
     const p = doc.createElement('p'); p.textContent = (err && err.message) || String(err || 'Unknown error');
     const how = doc.createElement('p'); how.className = 't-muted';
-    how.textContent = mods.length ? 'These modules failed to load: ' + mods.map((m) => m.file).join(', ') + '. Reload the page. If it keeps failing, copy the details and send them to whoever maintains this build.' : 'Reload the page. If it keeps failing, copy the details and send them to whoever maintains this build.';
+    how.textContent = mods.length ? 'These parts failed to load: ' + mods.map((m) => m.file).join(', ') + '. Reload the page. If it keeps failing, copy the details and send them to whoever set this up.' : 'Reload the page. If it keeps failing, copy the details and send them to whoever set this up.';
     const pre = doc.createElement('div'); pre.className = 'error-detail'; pre.tabIndex = 0; pre.setAttribute('aria-label', 'Technical details'); pre.textContent = text;
     const row = doc.createElement('div'); row.className = 'row';
     const reload = doc.createElement('button'); reload.type = 'button'; reload.className = 'btn btn-primary'; reload.textContent = 'Reload';
@@ -71,9 +71,9 @@
   function storageNotices() {
     const s = SB.store && typeof SB.store.status === 'function' ? SB.store.status() : null;
     if (!s || !SB.ui || typeof SB.ui.toast !== 'function') return;
-    if (s.corrupt) SB.ui.toast('Your saved board could not be read, so Smokebox started fresh. A copy of the old data was kept in this browser.', { tone: 'warn', ms: 15000 });
+    if (s.corrupt) SB.ui.toast('Your saved board could not be read, so Smokebox started with an empty board. A copy of the old data was kept on this device.', { tone: 'warn', ms: 15000 });
     else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox repaired ' + s.repaired.length + ' saved ' + (s.repaired.length === 1 ? 'detail' : 'details') + ' while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
-    if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts until you close the page. Use Data, then Back up, to keep a copy.', { tone: 'warn', ms: 15000 });
+    if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }
 
   // Runs the start-up steps in order and remembers which step it is on, so a failure can say where it
@@ -83,7 +83,9 @@
     let stage = 'start';
     try {
       stage = 'store';
-      if (SB.store && typeof SB.store.init === 'function') SB.store.init();
+      if (SB.store && typeof SB.store.init === 'function') SB.store.init({ blank: true, mode: SB.util.mode() }); // a brand-new install starts empty; saved data is never changed
+      // The demo (its own saved data) opens with its sample tickets the first time.
+      if (SB.store.isDemo && SB.store.isDemo() && SB.store.status().firstRun && SB.sim && SB.sim.seedFirstRun) SB.sim.seedFirstRun();
       // A first run is a real, empty kitchen: the demo tickets and batches only load when the user asks for the demo.
       stage = 'shell';
       if (!SB.shell || typeof SB.shell.mount !== 'function') throw new Error('The shell module (60-shell.js) is not available.');
@@ -93,7 +95,7 @@
       SB.booted = true;
       storageNotices();
       const errs = loadErrors();
-      if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest works. Reload to try again.', { tone: 'warn', ms: 12000 });
+      if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });
     } catch (e) { showBootError(e, stage); }
   }
 

@@ -1,0 +1,130 @@
+{
+ "runStart": "2026-10-23T04:07:20.643Z",
+ "results": [
+  {
+   "id": "13a-tour-full-loop",
+   "title": "Walkthrough: all nine steps with real clicks, from start to Done",
+   "owner": "board",
+   "status": "PASS",
+   "reason": "",
+   "error": null,
+   "ms": 12271,
+   "checks": 48,
+   "failed": [],
+   "skips": [],
+   "notes": [],
+   "shots": [
+    "test/.out/qa/tour-1-1280.png",
+    "test/.out/qa/tour-3-1280.png",
+    "test/.out/qa/tour-5-1280.png",
+    "test/.out/qa/tour-7-1280.png",
+    "test/.out/qa/tour-8-1280.png",
+    "test/.out/qa/tour-9-1280.png"
+   ],
+   "at": "2026-10-23T04:07:33.018Z"
+  },
+  {
+   "id": "13b-tour-skip-escape",
+   "title": "Walkthrough: Skip and Escape stop it cleanly and put the clock back; restart begins again",
+   "owner": "board",
+   "status": "PASS",
+   "reason": "",
+   "error": null,
+   "ms": 3388,
+   "checks": 13,
+   "failed": [],
+   "skips": [],
+   "notes": [],
+   "shots": [],
+   "at": "2026-10-23T04:07:36.406Z"
+  },
+  {
+   "id": "13c-tour-out-of-order",
+   "title": "Walkthrough: doing things in another order never strands the caption",
+   "owner": "board",
+   "status": "PASS",
+   "reason": "",
+   "error": null,
+   "ms": 3839,
+   "checks": 12,
+   "failed": [],
+   "skips": [],
+   "notes": [],
+   "shots": [],
+   "at": "2026-10-23T04:07:40.245Z"
+  },
+  {
+   "id": "13d-tour-pauses",
+   "title": "Walkthrough: the caption steps aside for a sheet or the office and comes back at the same step",
+   "owner": "board",
+   "status": "PASS",
+   "reason": "",
+   "error": null,
+   "ms": 7319,
+   "checks": 11,
+   "failed": [],
+   "skips": [],
+   "notes": [],
+   "shots": [],
+   "at": "2026-10-23T04:07:47.565Z"
+  },
+  {
+   "id": "13e-tour-layouts",
+   "title": "Walkthrough: the card stays on screen and off the ring on a phone and in Large text",
+   "owner": "board",
+   "status": "FAIL",
+   "reason": "",
+   "error": null,
+   "ms": 21251,
+   "checks": 57,
+   "failed": [
+    {
+     "name": "phone 390: step 2 every ringed element can be seen",
+     "detail": "{\"bumpCovered\":true,\"dock\":\"bottom\",\"band\":[167,769],\"inside\":true,\"top\":588,\"bottom\":757,\"w\":366,\"targets\":[{\"what\":\"slip-timer\",\"top\":411,\"bottom\":437,\"covered\":false,\"seen\":true},{\"what\":\"fl-bw\",\"top\":0,\"bottom\":0,\"covered\":false,\"seen\":false}]}",
+     "owner": "board"
+    },
+    {
+     "name": "large text 1280: step 2 every ringed element can be seen",
+     "detail": "{\"bumpCovered\":false,\"dock\":\"side\",\"band\":[83,725],\"inside\":true,\"top\":187,\"bottom\":397,\"w\":560,\"targets\":[{\"what\":\"slip-timer\",\"top\":240,\"bottom\":272,\"covered\":false,\"seen\":true},{\"what\":\"fl-bw\",\"top\":0,\"bottom\":0,\"covered\":false,\"seen\":false}]}",
+     "owner": "board"
+    }
+   ],
+   "skips": [],
+   "notes": [],
+   "shots": [
+    "test/.out/qa/tour-8-phone-390.png",
+    "test/.out/qa/tour-9-phone-390.png",
+    "test/.out/qa/tour-8-large-text-1280.png",
+    "test/.out/qa/tour-9-large-text-1280.png",
+    "test/.out/qa/fail-13e-tour-layouts.png",
+    "test/.out/qa/fail-13e-tour-layouts-1.png"
+   ],
+   "at": "2026-10-23T04:08:08.818Z"
+  },
+  {
+   "id": "13f-tour-busy-board",
+   "title": "Walkthrough: with other tickets on the board the new ticket is found and the card sits beside it",
+   "owner": "board",
+   "status": "FAIL",
+   "reason": "",
+   "error": null,
+   "ms": 10691,
+   "checks": 34,
+   "failed": [
+    {
+     "name": "busy board 1280: step 2 every ringed element can be seen",
+     "detail": "{\"bumpCovered\":false,\"dock\":\"side\",\"band\":[83,725],\"inside\":true,\"top\":276,\"bottom\":444,\"w\":560,\"targets\":[{\"what\":\"slip-timer\",\"top\":349,\"bottom\":371,\"covered\":false,\"seen\":true},{\"what\":\"fl-bw\",\"top\":0,\"bottom\":0,\"covered\":false,\"seen\":false}]}",
+     "owner": "board"
+    }
+   ],
+   "skips": [],
+   "notes": [],
+   "shots": [
+    "test/.out/qa/tour-8-busy-board-1280.png",
+    "test/.out/qa/tour-9-busy-board-1280.png",
+    "test/.out/qa/fail-13f-tour-busy-board.png"
+   ],
+   "at": "2026-10-23T04:08:19.509Z"
+  }
+ ]
+}

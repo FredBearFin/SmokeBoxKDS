@@ -21,15 +21,11 @@
     "notes": [
      {
       "kind": "info",
-      "text": "Screen shows the empty board, a welcome card showing, and a red 86 badge that counts 17 dishes already sold out on a brand-new install."
+      "text": "Empty board with one big \"Add your first dish\" button: true. Welcome card showing: false. 86 badge count: 0."
      },
      {
-      "kind": "prefilled",
-      "text": "21 sample dishes priced $3.50 to $29.00 (a barbecue menu), 15 sample ingredients with par and 86 levels."
-     },
-     {
-      "kind": "prefilled",
-      "text": "Sales tax 0%, hours 11 to 21 (starter estimates). Batches 0, tickets 0, orders 0 (the board itself starts empty)."
+      "kind": "info",
+      "text": "Dishes already on the menu that the owner did not enter: 0; ingredients 0; batches 0; tickets 0; orders 0."
      }
     ],
     "screen": "Kitchen board",
@@ -37,8 +33,8 @@
    },
    {
     "n": 2,
-    "name": "Tap Set up your kitchen",
-    "intent": "The welcome card says to set up first.",
+    "name": "Tap Add your first dish",
+    "intent": "The one big button.",
     "taps": 1,
     "typed": 0,
     "picks": 0,
@@ -46,133 +42,21 @@
     "notes": [
      {
       "kind": "tap",
-      "text": "Set up your kitchen"
-     },
-     {
-      "kind": "info",
-      "text": "Wizard sheet opens with five steps stacked on one long page: tax, hours, PIN, starter dishes, food already cooked."
-     },
-     {
-      "kind": "confusing",
-      "text": "Step 5 asks for kg and a probe temperature of food already cooked. A new owner with a barbecue menu has no idea yet; \"skip if the pit is empty\" is the last line of a long paragraph."
-     },
-     {
-      "kind": "confusing",
-      "text": "Hours are typed as 24-hour numbers (\"21 is 9 pm, 25 is 1 am\"). Tax asks the owner to \"ask your accountant\"."
+      "text": "Add your first dish"
      }
     ],
-    "screen": "Sheet: Set up your kitchen",
-    "shot": "02-A-wizard-open.png"
+    "screen": "Sheet: Dishes and prices",
+    "shot": "02-A-dishes-open.png"
    },
    {
     "n": 3,
-    "name": "Wizard step 1: sales tax",
-    "intent": "Type the tax rate and save.",
-    "taps": 2,
-    "typed": 1,
-    "picks": 0,
-    "chars": 1,
-    "notes": [
-     {
-      "kind": "type",
-      "text": "sales tax percent = \"6\""
-     },
-     {
-      "kind": "tap",
-      "text": "Save tax rate"
-     }
-    ],
-    "screen": "Sheet: Set up your kitchen",
-    "shot": "03-A-wizard-tax.png"
-   },
-   {
-    "n": 4,
-    "name": "Wizard steps 2 and 3: hours and PIN",
-    "intent": "The owner skims past hours and the optional PIN.",
-    "taps": 0,
-    "typed": 0,
-    "picks": 0,
-    "chars": 0,
-    "notes": [
-     {
-      "kind": "info",
-      "text": "Hours stay at the pre-filled 11 to 21 and no PIN is set by this run: two steps skipped by reading only (each has its own Save button; none is needed to continue)."
-     }
-    ],
-    "screen": "Sheet: Set up your kitchen",
-    "shot": "04-A-wizard-hours-pin.png"
-   },
-   {
-    "n": 5,
-    "name": "Wizard step 4: archive the sample dishes",
-    "intent": "The owner wants only their own menu.",
-    "taps": 2,
-    "typed": 0,
-    "picks": 0,
-    "chars": 0,
-    "notes": [
-     {
-      "kind": "tap",
-      "text": "Archive the starter dishes"
-     },
-     {
-      "kind": "tap",
-      "text": "confirm Archive them"
-     },
-     {
-      "kind": "info",
-      "text": "The app archives 21 dishes the owner never added. They are hidden, not deleted, so Menu and settings still lists them under Archived."
-     }
-    ],
-    "screen": "Sheet: Set up your kitchen",
-    "shot": "05-A-wizard-archive.png"
-   },
-   {
-    "n": 6,
-    "name": "Wizard step 4: open Menu and settings",
-    "intent": "The wizard has no place to type a dish, so it points at another page.",
-    "taps": 1,
-    "typed": 0,
-    "picks": 0,
-    "chars": 0,
-    "notes": [
-     {
-      "kind": "tap",
-      "text": "Open Menu and settings"
-     },
-     {
-      "kind": "confusing",
-      "text": "The wizard sheet closes and the back office opens. Wizard marked finished: false; welcome card still pending: true."
-     },
-     {
-      "kind": "confusing",
-      "text": "The Active list is empty after archiving, and it says: \"No items match. Change the filter above to see more.\". It tells the owner to change a filter, not to add a first dish; the Archived tab holds 21 dishes the owner never made."
-     },
-     {
-      "kind": "info",
-      "text": "The Menu section opens with two paragraphs of explanation, an \"Add a dish\" button and filters. The dish form is hidden until the button is tapped."
-     }
-    ],
-    "screen": "Back office: Menu and settings",
-    "shot": "06-A-menu-page.png"
-   },
-   {
-    "n": 7,
     "name": "Add dish 1: Pulled pork plate",
-    "intent": "Fill in the Add a dish form.",
-    "taps": 4,
+    "intent": "Name, price, tap where it is made.",
+    "taps": 2,
     "typed": 2,
     "picks": 0,
     "chars": 22,
     "notes": [
-     {
-      "kind": "tap",
-      "text": "Add a dish"
-     },
-     {
-      "kind": "info",
-      "text": "The form has 5 text boxes and 2 drop-down lists plus a two-way switch. Only name and price are required; station, category and prep time arrive pre-filled (Pit, Meats, 2 min 0 s, Start then done)."
-     },
      {
       "kind": "type",
       "text": "Dish name = \"Pulled pork plate\""
@@ -183,27 +67,23 @@
      },
      {
       "kind": "tap",
-      "text": "Add dish"
+      "text": "Where it is made: pit"
      },
      {
-      "kind": "info",
-      "text": "Result line: \"Added Pulled pork plate. It is on the order screen now. To track stock for it, add its ingredients in its row below.\""
-     },
-     {
-      "kind": "confusing",
-      "text": "The form stays open and the same Station and Category stay selected (good), but the 21 archived starters and the long dish list sit below it, so the new dish is hard to see."
+      "kind": "tap",
+      "text": "Save and add another"
      }
     ],
-    "screen": "Back office: Menu and settings",
-    "shot": "07-A-add-dish-1.png"
+    "screen": "Sheet: Dishes and prices",
+    "shot": "03-A-add-dish-1.png"
    },
    {
-    "n": 8,
+    "n": 4,
     "name": "Add dish 2: Mac and cheese",
-    "intent": "Fill in the Add a dish form.",
-    "taps": 3,
+    "intent": "Name, price, tap where it is made.",
+    "taps": 2,
     "typed": 2,
-    "picks": 2,
+    "picks": 0,
     "chars": 18,
     "notes": [
      {
@@ -215,32 +95,24 @@
       "text": "Price = \"4.50\""
      },
      {
-      "kind": "pick",
-      "text": "Station that cooks it (drop-down) = sides"
-     },
-     {
-      "kind": "pick",
-      "text": "Category on the order screen (drop-down) = side"
+      "kind": "tap",
+      "text": "Where it is made: sides"
      },
      {
       "kind": "tap",
-      "text": "Add dish"
-     },
-     {
-      "kind": "info",
-      "text": "Result line: \"Added Mac and cheese. It is on the order screen now. To track stock for it, add its ingredients in its row below.\""
+      "text": "Save and add another"
      }
     ],
-    "screen": "Back office: Menu and settings",
-    "shot": "08-A-add-dish-2.png"
+    "screen": "Sheet: Dishes and prices",
+    "shot": "04-A-add-dish-2.png"
    },
    {
-    "n": 9,
+    "n": 5,
     "name": "Add dish 3: Sweet tea",
-    "intent": "Fill in the Add a dish form.",
-    "taps": 4,
+    "intent": "Name, price, tap where it is made.",
+    "taps": 2,
     "typed": 2,
-    "picks": 2,
+    "picks": 0,
     "chars": 13,
     "notes": [
      {
@@ -252,61 +124,38 @@
       "text": "Price = \"3.00\""
      },
      {
-      "kind": "pick",
-      "text": "Station that cooks it (drop-down) = cold"
-     },
-     {
-      "kind": "pick",
-      "text": "Category on the order screen (drop-down) = cold"
+      "kind": "tap",
+      "text": "Where it is made: cold"
      },
      {
       "kind": "tap",
-      "text": "How it is cooked: One tap"
-     },
-     {
-      "kind": "tap",
-      "text": "Add dish"
-     },
-     {
-      "kind": "info",
-      "text": "Result line: \"Added Sweet tea. It is on the order screen now. To track stock for it, add its ingredients in its row below.\""
-     },
-     {
-      "kind": "info",
-      "text": "After Add dish the station stays at \"cold\": the app remembers the last station, but the owner had to change it by hand for every different kind of dish."
+      "text": "Save and finish"
      }
     ],
-    "screen": "Back office: Menu and settings",
-    "shot": "09-A-add-dish-3.png"
+    "screen": "Kitchen board",
+    "shot": "05-A-add-dish-3.png"
    },
    {
-    "n": 10,
-    "name": "Back to the board",
-    "intent": "Leave the back office and take a first order.",
-    "taps": 1,
+    "n": 6,
+    "name": "Back on the board",
+    "intent": "The sheet closes; the next-step card shows.",
+    "taps": 0,
     "typed": 0,
     "picks": 0,
     "chars": 0,
     "notes": [
      {
-      "kind": "tap",
-      "text": "Back to the line"
-     },
-     {
-      "kind": "confusing",
-      "text": "The welcome card still says \"Set up your kitchen first\" even though setup is done: the wizard was left through \"Open Menu and settings\", so it was never finished."
+      "kind": "info",
+      "text": "Next-step card: \"Your menu is ready Your menu has 3 dishes. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices. Add more dishes Show me h\""
      }
     ],
     "screen": "Kitchen board",
-    "toasts": [
-     "New tablet? Run the 6-step setup"
-    ],
-    "shot": "10-A-back-on-board.png"
+    "shot": "06-A-back-on-board.png"
    },
    {
-    "n": 11,
+    "n": 7,
     "name": "New ticket: three dishes",
-    "intent": "Tap the big New ticket button and pick three dishes.",
+    "intent": "Tap New ticket and pick the three dishes.",
     "taps": 1,
     "typed": 0,
     "picks": 0,
@@ -318,21 +167,18 @@
      },
      {
       "kind": "info",
-      "text": "3 dishes on the order screen, 0 shown sold out. The three own dishes are orderable at once because they list no ingredients (nothing to run out of)."
+      "text": "3 dishes on the order screen, 0 sold out."
      },
      {
       "kind": "tap",
-      "text": "tapped the first three dishes (3 taps)"
+      "text": "tapped the three dishes (3 taps)"
      }
     ],
     "screen": "Sheet: New ticket",
-    "toasts": [
-     "New tablet? Run the 6-step setup"
-    ],
-    "shot": "11-A-order-dishes.png"
+    "shot": "07-A-order-dishes.png"
    },
    {
-    "n": 12,
+    "n": 8,
     "name": "Pay now and send",
     "intent": "Choose Cash and send to the kitchen.",
     "taps": 2,
@@ -355,47 +201,39 @@
     ],
     "screen": "Kitchen board",
     "toasts": [
-     "New tablet? Run the 6-step setup",
-     "Ticket #101 sent to 3 stations. Paid $21.20 by cash."
+     "Ticket #101 sent to 3 stations. Paid $20.00 by cash."
     ],
-    "shot": "12-A-first-paid-ticket.png"
+    "shot": "08-A-first-paid-ticket.png"
    },
    {
-    "n": 13,
-    "name": "Wait for the optional setup offer",
-    "intent": "The 8-second \"New tablet?\" toast.",
+    "n": 9,
+    "name": "Wait: any late setup toast?",
+    "intent": "The old build showed \"New tablet?\" about 8 s in.",
     "taps": 0,
     "typed": 0,
     "picks": 0,
     "chars": 0,
     "notes": [
      {
-      "kind": "confusing",
-      "text": "Toasts on screen about 20 s after first open: \"New tablet? Run the 6-step setup\". The \"New tablet?\" offer arrives even though the owner has already used the kitchen wizard. There are two different setup lists (kitchen wizard, 5 steps; tablet checklist, 6 steps) with overlapping words."
-     },
-     {
-      "kind": "confusing",
-      "text": "An amber header badge reads \"not logged\" (spoken as \"Sanitize, not logged. Press to log a check.\"): a sanitizer-check reminder the owner never asked for and nothing in setup explains. It was showing at the first paid ticket."
+      "kind": "info",
+      "text": "Toasts on screen about 20 s after first open: \"\"."
      }
     ],
     "screen": "Kitchen board",
-    "toasts": [
-     "New tablet? Run the 6-step setup"
-    ],
-    "shot": "13-A-late-toast.png"
+    "shot": "09-A-late-toast.png"
    }
   ],
-  "taps": 24,
-  "typed": 7,
-  "picks": 4,
-  "chars": 54,
-  "reads": 13,
+  "taps": 13,
+  "typed": 6,
+  "picks": 0,
+  "chars": 53,
+  "reads": 9,
   "deadEnds": 0,
-  "confusing": 8,
-  "extraTaps": 2,
+  "confusing": 0,
+  "extraTaps": 0,
   "firstOpenInventory": {
-   "menuDishes": 21,
-   "ingredients": 15,
+   "menuDishes": 0,
+   "ingredients": 0,
    "batches": 0,
    "tickets": 0,
    "orders": 0,
@@ -404,35 +242,36 @@
    "closeHour": 21,
    "sampleHistory": null,
    "menuPriceRange": [
-    3.5,
-    29
+    null,
+    null
    ],
    "eightySixed": 0,
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 3076,
+  "addThreeDishesWallMs": 2547,
+  "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
-   "menuDishes": 24,
-   "ingredients": 15,
+   "menuDishes": 3,
+   "ingredients": 0,
    "batches": 0,
    "tickets": 1,
    "orders": 1,
-   "taxPct": 6,
+   "taxPct": 0,
    "openHour": 11,
    "closeHour": 21,
    "sampleHistory": null,
    "menuPriceRange": [
     3,
-    29
+    12.5
    ],
    "eightySixed": 0,
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
   "errors": 0,
-  "modeledSeconds": 123
+  "modeledSeconds": 83
  },
  "B": {
   "run": "B",
@@ -440,7 +279,7 @@
    {
     "n": 1,
     "name": "Naive: New ticket straight away",
-    "intent": "The owner ignores the welcome card and taps New ticket.",
+    "intent": "The owner taps the big New ticket button in the header.",
     "taps": 1,
     "typed": 0,
     "picks": 0,
@@ -451,38 +290,100 @@
       "text": "New ticket"
      },
      {
-      "kind": "prefilled",
-      "text": "The menu on the order screen is the sample barbecue menu: 21 dishes, 17 of them marked \"86 sold out - Brisket is low\"."
-     },
-     {
-      "kind": "deadend",
-      "text": "17 of 21 dishes cannot be ordered because no batch is logged. The reason (\"Brisket is low\") does not say \"log a batch in the Cabinet\" or \"this is a sample dish\"."
+      "kind": "info",
+      "text": "The screen that opens: Sheet: Dishes and prices (the add form, not an empty order screen)."
      }
     ],
-    "screen": "Sheet: New ticket",
-    "shot": "01-B-order-sample-menu.png"
-   },
+    "screen": "Sheet: Dishes and prices",
+    "shot": "01-B-new-ticket-no-dishes.png"
+   }
+  ],
+  "taps": 1,
+  "typed": 0,
+  "picks": 0,
+  "chars": 0,
+  "reads": 1,
+  "deadEnds": 0,
+  "confusing": 0,
+  "extraTaps": 0,
+  "modeledSeconds": 5
+ },
+ "C": {
+  "run": "C",
+  "steps": [
    {
-    "n": 2,
-    "name": "Naive: try the first dish",
-    "intent": "Tap the first dish.",
-    "taps": 0,
+    "n": 1,
+    "name": "Find the dish list: main menu",
+    "intent": "The owner wants to change a price.",
+    "taps": 1,
     "typed": 0,
     "picks": 0,
     "chars": 0,
     "notes": [
      {
-      "kind": "deadend",
-      "text": "Tapping a sold-out dish: nothing visible happens (no message, no hint to log a batch or edit the menu)."
+      "kind": "tap",
+      "text": "Menu (the button at the top right)"
      }
     ],
-    "screen": "Sheet: New ticket",
-    "shot": "02-B-sold-out-tap.png"
+    "screen": "Sheet: Settings",
+    "shot": "01-C-main-menu.png"
+   },
+   {
+    "n": 2,
+    "name": "Find the dish list: Dishes and prices",
+    "intent": "Pick the entry named Dishes and prices.",
+    "taps": 1,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "Dishes and prices"
+     }
+    ],
+    "screen": "Sheet: Dishes and prices",
+    "shot": "02-C-dishes-list.png"
    },
    {
     "n": 3,
-    "name": "Naive: only four dishes can be ordered",
-    "intent": "Pick what works: cornbread, pickles, hush puppies, tea.",
+    "name": "Change a price",
+    "intent": "Type a new price in the dish row.",
+    "taps": 1,
+    "typed": 1,
+    "picks": 0,
+    "chars": 5,
+    "notes": [
+     {
+      "kind": "type",
+      "text": "new price = \"13.00\""
+     },
+     {
+      "kind": "info",
+      "text": "Price in the store after leaving the box: 13."
+     }
+    ],
+    "screen": "Sheet: Dishes and prices",
+    "shot": "03-C-price-changed.png"
+   }
+  ],
+  "taps": 3,
+  "typed": 1,
+  "picks": 0,
+  "chars": 5,
+  "reads": 3,
+  "deadEnds": 0,
+  "confusing": 0,
+  "extraTaps": 0,
+  "modeledSeconds": 20
+ },
+ "D": {
+  "run": "D",
+  "steps": [
+   {
+    "n": 1,
+    "name": "First open",
+    "intent": "The owner opens smokebox.html for the first time.",
     "taps": 0,
     "typed": 0,
     "picks": 0,
@@ -490,25 +391,393 @@
     "notes": [
      {
       "kind": "info",
-      "text": "Orderable on a brand-new install: Cornbread with honey butter (2) $4.00; Fried pickle chips $7.00; Hush puppies (6) $5.50; Sweet tea, large $3.50. None is a main dish."
+      "text": "Empty board with one big \"Add your first dish\" button: true. Welcome card showing: false. 86 badge count: 0."
      },
      {
-      "kind": "confusing",
-      "text": "Sample prices ($3.50 to $29.00, combos up to $103.00) look real. A first ticket would be paid at prices the owner never chose."
+      "kind": "info",
+      "text": "Dishes already on the menu that the owner did not enter: 0; ingredients 0; batches 0; tickets 0; orders 0."
      }
     ],
-    "screen": "Sheet: New ticket",
-    "shot": "03-B-orderable-list.png"
+    "screen": "Kitchen board",
+    "shot": "01-D-first-open.png"
+   },
+   {
+    "n": 2,
+    "name": "Tap Add your first dish",
+    "intent": "The one big button.",
+    "taps": 1,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "Add your first dish"
+     }
+    ],
+    "screen": "Sheet: Dishes and prices",
+    "shot": "02-D-dishes-open.png"
+   },
+   {
+    "n": 3,
+    "name": "Add dish 1: Pulled pork plate",
+    "intent": "Name, price, tap where it is made.",
+    "taps": 1,
+    "typed": 2,
+    "picks": 0,
+    "chars": 22,
+    "notes": [
+     {
+      "kind": "type",
+      "text": "Dish name = \"Pulled pork plate\""
+     },
+     {
+      "kind": "type",
+      "text": "Price = \"12.50\""
+     },
+     {
+      "kind": "info",
+      "text": "Only one station is showing, so there is no \"Where is it made?\" question."
+     },
+     {
+      "kind": "tap",
+      "text": "Save and add another"
+     }
+    ],
+    "screen": "Sheet: Dishes and prices",
+    "shot": "03-D-add-dish-1.png"
    },
    {
     "n": 4,
-    "name": "Naive: send and pay a sample dish",
-    "intent": "Order the sample cornbread, pay cash.",
+    "name": "Add dish 2: Mac and cheese",
+    "intent": "Name, price, tap where it is made.",
+    "taps": 1,
+    "typed": 2,
+    "picks": 0,
+    "chars": 18,
+    "notes": [
+     {
+      "kind": "type",
+      "text": "Dish name = \"Mac and cheese\""
+     },
+     {
+      "kind": "type",
+      "text": "Price = \"4.50\""
+     },
+     {
+      "kind": "info",
+      "text": "Only one station is showing, so there is no \"Where is it made?\" question."
+     },
+     {
+      "kind": "tap",
+      "text": "Save and add another"
+     }
+    ],
+    "screen": "Sheet: Dishes and prices",
+    "shot": "04-D-add-dish-2.png"
+   },
+   {
+    "n": 5,
+    "name": "Add dish 3: Sweet tea",
+    "intent": "Name, price, tap where it is made.",
+    "taps": 1,
+    "typed": 2,
+    "picks": 0,
+    "chars": 13,
+    "notes": [
+     {
+      "kind": "type",
+      "text": "Dish name = \"Sweet tea\""
+     },
+     {
+      "kind": "type",
+      "text": "Price = \"3.00\""
+     },
+     {
+      "kind": "info",
+      "text": "Only one station is showing, so there is no \"Where is it made?\" question."
+     },
+     {
+      "kind": "tap",
+      "text": "Save and finish"
+     }
+    ],
+    "screen": "Kitchen board",
+    "shot": "05-D-add-dish-3.png"
+   },
+   {
+    "n": 6,
+    "name": "Back on the board",
+    "intent": "The sheet closes; the next-step card shows.",
+    "taps": 0,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "info",
+      "text": "Next-step card: \"Your menu is ready Your menu has 3 dishes. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices. Add more dishes Show me h\""
+     }
+    ],
+    "screen": "Kitchen board",
+    "shot": "06-D-back-on-board.png"
+   },
+   {
+    "n": 7,
+    "name": "New ticket: three dishes",
+    "intent": "Tap New ticket and pick the three dishes.",
+    "taps": 1,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "New ticket"
+     },
+     {
+      "kind": "info",
+      "text": "3 dishes on the order screen, 0 sold out."
+     },
+     {
+      "kind": "tap",
+      "text": "tapped the three dishes (3 taps)"
+     }
+    ],
+    "screen": "Sheet: New ticket",
+    "shot": "07-D-order-dishes.png"
+   },
+   {
+    "n": 8,
+    "name": "Pay now and send",
+    "intent": "Choose Cash and send to the kitchen.",
     "taps": 2,
     "typed": 0,
     "picks": 0,
     "chars": 0,
     "notes": [
+     {
+      "kind": "tap",
+      "text": "Payment: Cash"
+     },
+     {
+      "kind": "tap",
+      "text": "Send to kitchen"
+     },
+     {
+      "kind": "info",
+      "text": "Order recorded as paid in the store: true."
+     }
+    ],
+    "screen": "Kitchen board",
+    "toasts": [
+     "Ticket #101 sent to 1 station. Paid $20.00 by cash."
+    ],
+    "shot": "08-D-first-paid-ticket.png"
+   },
+   {
+    "n": 9,
+    "name": "Wait: any late setup toast?",
+    "intent": "The old build showed \"New tablet?\" about 8 s in.",
+    "taps": 0,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "info",
+      "text": "Toasts on screen about 20 s after first open: \"\"."
+     }
+    ],
+    "screen": "Kitchen board",
+    "shot": "09-D-late-toast.png"
+   }
+  ],
+  "taps": 10,
+  "typed": 6,
+  "picks": 0,
+  "chars": 53,
+  "reads": 9,
+  "deadEnds": 0,
+  "confusing": 0,
+  "extraTaps": 0,
+  "firstOpenInventory": {
+   "menuDishes": 0,
+   "ingredients": 0,
+   "batches": 0,
+   "tickets": 0,
+   "orders": 0,
+   "taxPct": 0,
+   "openHour": 11,
+   "closeHour": 21,
+   "sampleHistory": null,
+   "menuPriceRange": [
+    null,
+    null
+   ],
+   "eightySixed": 0,
+   "tilesShown": 0,
+   "tilesSoldOut": 0
+  },
+  "addThreeDishesWallMs": 1921,
+  "dishesAfter": 3,
+  "firstPaidTicket": true,
+  "inventoryAtEnd": {
+   "menuDishes": 3,
+   "ingredients": 0,
+   "batches": 0,
+   "tickets": 1,
+   "orders": 1,
+   "taxPct": 0,
+   "openHour": 11,
+   "closeHour": 21,
+   "sampleHistory": null,
+   "menuPriceRange": [
+    3,
+    12.5
+   ],
+   "eightySixed": 0,
+   "tilesShown": 0,
+   "tilesSoldOut": 0
+  },
+  "errors": 0,
+  "modeledSeconds": 79
+ },
+ "E": {
+  "run": "E",
+  "steps": [
+   {
+    "n": 1,
+    "name": "Add the dish",
+    "intent": "Brisket plate at the pit.",
+    "taps": 3,
+    "typed": 2,
+    "picks": 0,
+    "chars": 18,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "Add your first dish"
+     },
+     {
+      "kind": "type",
+      "text": "Dish name = \"Brisket plate\""
+     },
+     {
+      "kind": "type",
+      "text": "Price = \"14.00\""
+     },
+     {
+      "kind": "tap",
+      "text": "Where it is made: Pit"
+     },
+     {
+      "kind": "tap",
+      "text": "Save and add another"
+     }
+    ],
+    "screen": "Sheet: Dishes and prices",
+    "shot": "01-E-dish-added.png"
+   },
+   {
+    "n": 2,
+    "name": "Say yes to cooking ahead",
+    "intent": "The question appears under the form after the first dish.",
+    "taps": 1,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "info",
+      "text": "Question card: Do you cook any of this ahead and hold it? Brisket in the morning, slaw in the cooler. If you do, Smokebox can track eac"
+     },
+     {
+      "kind": "tap",
+      "text": "Yes, I cook ahead"
+     }
+    ],
+    "screen": "Sheet: Cooked-ahead food",
+    "shot": "02-E-cooked-ahead-sheet.png"
+   },
+   {
+    "n": 3,
+    "name": "Add Brisket and link it",
+    "intent": "Name, tick the dish, save.",
+    "taps": 2,
+    "typed": 1,
+    "picks": 0,
+    "chars": 7,
+    "notes": [
+     {
+      "kind": "type",
+      "text": "Cooked-ahead name = \"Brisket\""
+     },
+     {
+      "kind": "tap",
+      "text": "Brisket plate uses it"
+     },
+     {
+      "kind": "tap",
+      "text": "Save cooked-ahead item"
+     }
+    ],
+    "screen": "Sheet: Cooked-ahead food",
+    "shot": "03-E-brisket-added.png"
+   },
+   {
+    "n": 4,
+    "name": "Log a first batch",
+    "intent": "Straight to the cabinet with Brisket chosen.",
+    "taps": 2,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "Log a first batch"
+     },
+     {
+      "kind": "info",
+      "text": "Starting values are pre-filled from the product (raw weight, cook endpoint, first reading 150 F); this run accepts them as a cook would after checking the probe."
+     },
+     {
+      "kind": "tap",
+      "text": "Put in hold cabinet"
+     }
+    ],
+    "screen": "Sheet: Hold cabinet",
+    "toasts": [
+     "Brisket batch 1 is in the cabinet: 2.00 kg cooked, first reading 150 °F."
+    ],
+    "shot": "04-E-batch-logged.png"
+   },
+   {
+    "n": 5,
+    "name": "Take an order for it",
+    "intent": "Close the sheets, New ticket, the dish, cash, send.",
+    "taps": 5,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "Close a sheet"
+     },
+     {
+      "kind": "tap",
+      "text": "Close a sheet"
+     },
+     {
+      "kind": "tap",
+      "text": "New ticket"
+     },
+     {
+      "kind": "info",
+      "text": "1 dish tile(s) orderable after logging the batch."
+     },
      {
       "kind": "tap",
       "text": "Cash"
@@ -516,105 +785,27 @@
      {
       "kind": "tap",
       "text": "Send to kitchen"
-     },
-     {
-      "kind": "prefilled",
-      "text": "This paid ticket is for a made-up dish at a made-up price and would show in the real sales totals. Nothing marks it as a sample."
      }
     ],
     "screen": "Kitchen board",
     "toasts": [
-     "Ticket #101 sent to 1 station. Paid $4.00 by cash."
+     "Brisket batch 1 is in the cabinet: 2.00 kg cooked, first reading 150 °F.",
+     "Ticket #101 sent to 1 station. Paid $14.00 by cash."
     ],
-    "shot": "04-B-paid-sample-ticket.png"
+    "shot": "05-E-cook-ahead-paid.png"
    }
   ],
-  "taps": 5,
-  "typed": 0,
+  "taps": 14,
+  "typed": 3,
   "picks": 0,
-  "chars": 0,
-  "reads": 4,
-  "deadEnds": 2,
-  "confusing": 1,
-  "extraTaps": 1,
-  "modeledSeconds": 22
- },
- "C": {
-  "run": "C",
-  "steps": [
-   {
-    "n": 1,
-    "name": "Find menu editing: Back office",
-    "intent": "The owner closes the welcome card and looks for the menu.",
-    "taps": 2,
-    "typed": 0,
-    "picks": 0,
-    "chars": 0,
-    "notes": [
-     {
-      "kind": "tap",
-      "text": "close the welcome card"
-     },
-     {
-      "kind": "tap",
-      "text": "Back office"
-     },
-     {
-      "kind": "info",
-      "text": "Back office opens on Pace (an analytics page), not on menu editing. On a new install it shows \"$0.00 paid\", an 86 list of 17 sample dishes and a \"Brisket None No brisket is ready to serve right now.\" card about a food the owner may not even sell."
-     },
-     {
-      "kind": "confusing",
-      "text": "Menu editing is the 7th of 7 items in the side list, named \"Menu and settings\". There is no word \"dish\" or \"menu\" until the owner reads down."
-     }
-    ],
-    "screen": "Back office: Pace",
-    "shot": "01-C-back-office-landing.png"
-   },
-   {
-    "n": 2,
-    "name": "Find menu editing: Menu and settings",
-    "intent": "Choose the 7th item.",
-    "taps": 1,
-    "typed": 0,
-    "picks": 0,
-    "chars": 0,
-    "notes": [
-     {
-      "kind": "tap",
-      "text": "Menu and settings"
-     }
-    ],
-    "screen": "Back office: Menu and settings",
-    "shot": "02-C-menu-and-settings.png"
-   },
-   {
-    "n": 3,
-    "name": "Find menu editing: Add a dish",
-    "intent": "Open the form.",
-    "taps": 1,
-    "typed": 0,
-    "picks": 0,
-    "chars": 0,
-    "notes": [
-     {
-      "kind": "tap",
-      "text": "Add a dish"
-     }
-    ],
-    "screen": "Back office: Menu and settings",
-    "shot": "03-C-add-dish-form.png"
-   }
-  ],
-  "taps": 4,
-  "typed": 0,
-  "picks": 0,
-  "chars": 0,
-  "reads": 3,
+  "chars": 25,
+  "reads": 5,
   "deadEnds": 0,
-  "confusing": 1,
+  "confusing": 0,
   "extraTaps": 0,
-  "note": "Taps from the board to an open Add a dish form: 4 (including closing the welcome card).",
-  "modeledSeconds": 17
+  "batchesLogged": 1,
+  "firstPaidTicket": true,
+  "errors": 0,
+  "modeledSeconds": 52
  }
 }

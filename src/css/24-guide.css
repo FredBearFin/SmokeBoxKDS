@@ -1,0 +1,153 @@
+/* WHAT THIS FILE IS: the look of the in-app Guide screen (#/guide): a page list on the left and the text on the right.
+ * On narrow screens the list sits above the text. It uses only the shared tokens from 00-tokens.css, so Day and Night
+ * both work. Class names start with gd- (guide). USED BY: 78-guide.js.
+ */
+
+/* ---------- the layer that holds the Guide ---------- */
+/* Same full-screen layer as the board; it is drawn above the board while the Guide is open. */
+.layer-guide { z-index: calc(var(--zi-base) + 1); }
+.gd { display: flex; flex-direction: column; min-height: 100%; }
+
+/* ---------- top bar: back button and the word Guide ---------- */
+/* Sticks to the top so the way back is always one tap away. */
+.gd-top {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-3) var(--gutter); background: var(--paper); border-bottom: var(--bw-thin) solid var(--line-soft);
+}
+.gd-title { display: flex; align-items: center; gap: var(--sp-2); margin: 0; font: var(--w-bold) var(--fs-5)/var(--lh-snug) var(--font-display); color: var(--ink); }
+.gd-back { min-height: var(--tap); }
+
+/* ---------- two columns: page list and text ---------- */
+/* The list is 260 px wide; below 760 px the two stack and the list goes first. */
+.gd-body {
+  display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: var(--sp-6);
+  width: 100%; max-width: 1100px; margin: 0 auto; padding: var(--sp-5) var(--gutter) var(--sp-9); box-sizing: border-box;
+}
+.gd-main { min-width: 0; }
+.gd-nav { align-self: start; position: sticky; top: calc(var(--tap) + var(--sp-6)); }
+.gd-nav-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.gd-link {
+  display: flex; align-items: center; gap: var(--sp-3); min-height: var(--tap); padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-btn); border: var(--bw-thin) solid transparent; color: var(--ink); text-decoration: none;
+  font: var(--w-medium) var(--fs-3)/var(--lh-snug) var(--font-body);
+}
+.gd-link:hover { background: var(--hover); }
+.gd-link[aria-current="page"] { background: var(--paper); border-color: var(--line); box-shadow: inset 4px 0 0 var(--amber); font-weight: var(--w-semi); }
+.gd-link:focus-visible, .gd-pg:focus-visible, .gd-back:focus-visible, .gd-page-title:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: 2px; }
+.gd-num { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--r-pill); background: var(--sub); color: var(--ink2); font: var(--w-bold) var(--fs-1)/1 var(--font-display); }
+.gd-link[aria-current="page"] .gd-num { background: var(--amber); color: var(--on-primary); }
+
+/* The fold-away wrapper: on wide screens its title row is hidden and the list is always open. */
+.gd-navbox > summary { display: none; list-style: none; }
+.gd-navbox > summary::-webkit-details-marker { display: none; }
+
+/* ---------- the reading pane ---------- */
+/* One page of text on a white card, kept to a comfortable line length. */
+.gd-article { background: var(--paper); border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-panel); padding: var(--sp-6); max-width: calc(var(--measure) + 2 * var(--sp-6)); box-shadow: var(--shadow); }
+.gd-page-title { margin: 0 0 var(--sp-2); font: var(--w-bold) var(--fs-6)/var(--lh-snug) var(--font-display); color: var(--ink); }
+.gd-page-title:focus { outline: none; }
+.gd-lede { margin: 0 0 var(--sp-5); font-size: var(--fs-3); line-height: var(--lh-body); color: var(--ink2); }
+.gd-h { margin: var(--sp-6) 0 var(--sp-2); font: var(--w-bold) var(--fs-4)/var(--lh-snug) var(--font-display); color: var(--ink); }
+.gd-p, .gd-list { font-size: var(--fs-3); line-height: var(--lh-body); color: var(--ink); }
+.gd-p { margin: 0 0 var(--sp-3); }
+.gd-list { margin: 0 0 var(--sp-3); padding-left: var(--sp-6); }
+/* The base style removes list markers, so numbers and bullets are put back here. */
+ol.gd-list { list-style: decimal; }
+ul.gd-list { list-style: disc; }
+.gd-list li { margin: 0 0 var(--sp-2); padding-left: var(--sp-1); }
+/* The name of a button or screen, shown like a small label so it is easy to find on the real screen. */
+.gd-ui { display: inline-block; padding: 0 var(--sp-2); border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-chip); background: var(--sub); color: var(--ink); font-weight: var(--w-semi); }
+
+/* ---------- pictures (79-guide-art.js) ---------- */
+/* Every picture color is a token, so the same drawing works in Day and Night. Numbered badges match the list under each picture. */
+.gd-fig { margin: var(--sp-4) 0 var(--sp-5); padding: 0; }
+.gd-fig figcaption { margin-top: var(--sp-2); font-size: var(--fs-1); color: var(--ink3); text-align: center; }
+.ga { display: block; width: 100%; max-width: 560px; height: auto; margin: 0 auto; font-family: var(--font-body); }
+.ga-t { font-family: var(--font-body); }
+.ga-bg { fill: var(--sub); stroke: none; }
+.ga-ink { fill: var(--ink); } .ga-ink2 { fill: var(--ink2); } .ga-on { fill: var(--on-primary); }
+.ga-badge-t { fill: var(--bg); }
+.ga-slip { fill: var(--slip); stroke: var(--slip-line); stroke-width: 2; }
+.ga-slip-ink { fill: var(--slip-ink); } .ga-slip-ink3 { fill: var(--slip-ink3); } .ga-slip-amber { fill: var(--slip-amber); }
+.ga-slip-sub { fill: var(--slip-sub); }
+.ga-dash { stroke: var(--slip-line); stroke-width: 2; stroke-dasharray: 6 5; }
+.ga-fry { fill: var(--z-fry); } .ga-cold { fill: var(--z-cold); }
+.ga-tag { fill: var(--slip-sub); stroke: var(--slip-line); stroke-width: 1.5; }
+.ga-btn-primary { fill: var(--primary); } .ga-btn-ok { fill: var(--success); }
+.ga-btn-plain { fill: var(--slip); stroke: var(--slip-line); stroke-width: 2.5; }
+.ga-leader { fill: none; stroke: var(--amber); stroke-width: 2.5; }
+.ga-dot { fill: var(--amber); }
+.ga-badge { fill: var(--amber-ink); } .ga-badge-warn { fill: var(--amber-ink); } .ga-badge-bad { fill: var(--crimson); }
+.ga-spine { stroke: var(--line); stroke-width: 4; }
+.ga-step-1 { fill: var(--sage-ink); } .ga-step-2 { fill: var(--amber-ink); } .ga-step-3 { fill: var(--primary); } .ga-step-4 { fill: var(--crimson); }
+.ga-card { fill: var(--paper); stroke: var(--line); stroke-width: 2; }
+.ga-card-bad { stroke: var(--crimson); }
+.ga-note { fill: var(--tint-warn); stroke: var(--amber); stroke-width: 2.5; }
+.ga-fill-ink { fill: var(--ink); }
+.ga-wave { fill: none; stroke: var(--ink); stroke-width: 3; stroke-linecap: round; }
+.ga-arrow { fill: none; stroke: var(--ink2); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.ga-warn-t { fill: var(--amber-ink); } .ga-bad-t { fill: var(--crimson); }
+.gd-legend { margin-top: 0; }
+
+/* ---------- page title row, search, quick-card list ---------- */
+.gd-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; }
+.gd-print { flex: none; min-height: var(--tap); }
+.gd-search { margin: 0 0 var(--sp-3); }
+.gd-search-in { width: 100%; min-height: var(--tap); box-sizing: border-box; font-size: var(--fs-3); }
+.gd-search-n { margin: var(--sp-1) 0 0; font-size: var(--fs-1); color: var(--ink3); min-height: 1.2em; }
+.gd-results { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.gd-result { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-2) var(--sp-3); border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-btn); background: var(--paper); color: var(--ink); text-decoration: none; }
+.gd-result span { font-size: var(--fs-1); color: var(--ink2); }
+.gd-result:hover { background: var(--hover); }
+.gd-result:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: 2px; }
+.gd-group { margin: var(--sp-5) 0 var(--sp-1); padding: 0 var(--sp-3); font: var(--w-bold) var(--fs-1)/var(--lh-snug) var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+/* Checklist items get an empty box to tick with a pen. */
+.gd-check, ul.gd-check { list-style: none; padding-left: 0; }
+.gd-check li { position: relative; padding-left: 36px; }
+.gd-check li::before { content: ""; position: absolute; left: 0; top: 0.15em; width: 22px; height: 22px; border: 2px solid var(--ink2); border-radius: 4px; background: var(--paper); box-sizing: border-box; }
+.gd-legend { padding-left: var(--sp-6); }
+/* The small round ? that other screens place beside a heading or button (SB.guide.link). */
+.gd-help { display: inline-grid; place-items: center; width: 28px; height: 28px; min-width: 28px; border-radius: var(--r-pill); border: var(--bw) solid var(--line); background: var(--paper); color: var(--ink); font: var(--w-bold) var(--fs-2)/1 var(--font-display); text-decoration: none; }
+.gd-help:hover { background: var(--hover); }
+.gd-help:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: 2px; }
+
+/* ---------- Previous and Next ---------- */
+.gd-pager { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-3); margin-top: var(--sp-7); }
+.gd-pg { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: var(--tap); text-decoration: none; }
+.gd-pg-prev { margin-right: auto; }
+.gd-pg-next { margin-left: auto; }
+
+/* ---------- narrow screens: the list goes on top ---------- */
+@media (max-width: 760px) {
+  .gd-body { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); padding-top: var(--sp-4); }
+  .gd-nav { position: static; }
+  .gd-navbox > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-height: var(--tap); padding: var(--sp-2) var(--sp-4); border: var(--bw) solid var(--line); border-radius: var(--r-btn); background: var(--paper); color: var(--ink); font: var(--w-semi) var(--fs-3)/var(--lh-snug) var(--font-body); cursor: pointer; }
+  .gd-navbox > summary::after { content: "\25BE"; }
+  .gd-navbox[open] > summary::after { content: "\25B4"; }
+  .gd-navbox > summary:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: 2px; }
+  .gd-navbox[open] > summary { margin-bottom: var(--sp-3); }
+  .gd-link { min-height: 44px; font-size: var(--fs-2); }
+  .gd-article { padding: var(--sp-4); }
+  .gd-page-title { font-size: var(--fs-5); }
+  .gd-p, .gd-list, .gd-lede { font-size: var(--fs-2); }
+  .gd-back span { font-size: var(--fs-2); }
+}
+
+/* ---------- printing ---------- */
+/* Print shows only the open Guide page, in black on white, with no buttons or lists. Meant for the three quick cards. */
+@media print {
+  html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+  .sb-shell { position: static !important; overflow: visible !important; background: #fff !important; }
+  .sb-shell > :not(.layer-guide), .skip-link { display: none !important; }
+  .layer-guide { position: static !important; display: block !important; overflow: visible !important; background: #fff !important; }
+  .gd-top, .gd-nav, .gd-pager, .gd-print { display: none !important; }
+  .gd-body { display: block; max-width: none; padding: 0; }
+  .gd-article { border: 0; box-shadow: none; padding: 0; max-width: none; background: #fff; }
+  .gd-page-title { font-size: 28pt; color: #000; }
+  .gd-lede, .gd-p, .gd-list, .gd-h { color: #000; }
+  .gd-p, .gd-list, .gd-lede { font-size: 14pt; }
+  .gd-check li { font-size: 15pt; margin-bottom: 10pt; }
+  .gd-check li::before { border-color: #000; background: #fff; }
+  .gd-ui { border-color: #000; background: #fff; }
+  .gd-fig, .gd-list li { break-inside: avoid; }
+}

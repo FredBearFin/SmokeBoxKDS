@@ -1,6 +1,7 @@
 /*
  * WHAT THIS FILE IS: The "Show me how it works" walkthrough (SB.tour). It adds one demo ticket and guides a
  *    first-time user through it with a caption card and a pulsing ring, moving on only when the real ticket changes.
+ *    The dishes come from the menu the owner has now (no fixed dish names), so it also works with their own menu.
  * PARTS: constants, ticket lookups, step logic, captions, ring and card placement, the check that runs four
  *    times a second, start and stop.
  * USES: 30-store.js (state, createTicket, clock speed), 60-shell.js (toast, office view), the board markup
@@ -13,6 +14,8 @@
   if (!doc) return; // Node: the walkthrough is DOM only
 
   const U = SB.util, h = U.h;
+  // The shared config (station names come from it); an empty object when it is missing.
+  const C = () => SB.config || {};
 
   const POLL_MS = 250;      // four checks a second: quick enough to feel live, light enough to ignore
   const LAST = 9;           // the number of steps
@@ -22,12 +25,34 @@
   const MIN_SIDE = 340;     // the narrowest the card may be when it sits beside the ticket
   const MAX_W = 560;        // the widest the card gets
   const DWELL_MS = 5000;    // step 5 stays this long so the gray countdown can be read, even if it already ended
-  // The walkthrough order: menu id and quantity. Hush puppies are the slowest dish, tea the quickest.
-  const ORDER = [['hushpuppies', 1], ['brisket_sand', 1], ['tea', 1]];
+  // Dishes the starter menu offers for the walkthrough, tried first when they are on the menu and not 86:
+  // lead (the slowest, cooked in two steps), second (held back by pacing) and quick (finished with one tap).
+  const PREFER = { lead: 'hushpuppies', second: 'brisket_sand', quick: 'tea' };
   // Steps that wait for the Next button because there is nothing for the person to tap.
   const MANUAL = { 1: true, 2: true, 4: true, 5: true };
 
   let T = null; // the running walkthrough, or null when none is running
+
+  // The three dishes this walkthrough uses: { lead, second, quick }, each a menu item or null. Filled by start().
+  let PICK = { lead: null, second: null, quick: null };
+  // The dish name as the walkthrough says it: no portion note after a comma or in brackets.
+  const nameOf = (m) => (m ? String(m.name).replace(/\s*\(.*$/, '').replace(/,.*$/, '').trim() : '');
+  // Picks the lead, second and quick dishes from the current menu. Needs at least one dish that is not archived and
+  // not 86. The lead is a two-step dish (Start, then Done) when there is one; with only one-tap dishes the lead is
+  // missing and the walkthrough skips the Start steps. Returns null when no dish can be ordered.
+  function pickDishes() {
+    const menu = (SB.store.getState().menu || []).filter((m) => !m.archived && ((SB.store.select.availability(m.id) || {}).ok));
+    // The usable menu item with this id, or null.
+    const find = (id) => menu.find((m) => m.id === id) || null;
+    const twos = menu.filter((m) => m.track === 'two').sort((a, b) => b.prepSec - a.prepSec);
+    if (!menu.length) return null;
+    const lead = find(PREFER.lead) && find(PREFER.lead).track === 'two' ? find(PREFER.lead) : twos[0] || null;
+    const shorter = lead ? twos.filter((m) => m.id !== lead.id && m.prepSec < lead.prepSec) : [];
+    const second = lead && find(PREFER.second) && find(PREFER.second).track === 'two' && find(PREFER.second).prepSec < lead.prepSec ? find(PREFER.second) : shorter[0] || null;
+    const ones = menu.filter((m) => m.track === 'one').sort((a, b) => a.prepSec - b.prepSec);
+    const quick = find(PREFER.quick) && find(PREFER.quick).track === 'one' ? find(PREFER.quick) : ones[0] || null;
+    return { lead, second, quick };
+  }
 
   // The tour ticket in the current state, or undefined once it has been reset away.
   const ticket = () => SB.store.getState().tickets.find((t) => t.id === T.id);
@@ -75,7 +100,7 @@
   // Moves the step forward when the real ticket has moved on. Steps only go forward, and a step the person
   // already did by themselves is skipped, so doing things in a different order never leaves the caption behind.
   function advance(t) {
-    const hp = dish(t, 'hushpuppies'), bs = dish(t, 'brisket_sand');
+    const hp = PICK.lead ? dish(t, PICK.lead.id) : null, bs = PICK.second ? dish(t, PICK.second.id) : null;
     const all = t.items.every((i) => i.status === 'done');
     let s = T.step;
     for (let guard = 0; guard < 10; guard++) {
@@ -84,6 +109,8 @@
       else if (all && s < 8) s = 8;
       else if (begun(bs) && s >= 4 && s < 7) s = 7;
       else if (begun(hp) && s < 4) s = 4;
+      else if (!hp && s >= 3 && s < 7) s = 7;            // no two-step dish: there is no Start to show
+      else if (!bs && (s === 5 || s === 6)) s = 7;       // no second two-step dish: nothing is held back, skip the gray-dish steps
       else if (s === 5 && bs && bs.status !== 'queued' && Date.now() - T.at >= DWELL_MS) s = 6;
       if (s === before) break;
     }
@@ -99,30 +126,32 @@
   // The words for the current step. They are chosen from the real ticket so they never ask for a button
   // that is not there yet.
   function words(t) {
-    const hp = dish(t, 'hushpuppies'), bs = dish(t, 'brisket_sand'), tea = dish(t, 'tea');
+    const hp = PICK.lead ? dish(t, PICK.lead.id) : null, bs = PICK.second ? dish(t, PICK.second.id) : null, tea = PICK.quick ? dish(t, PICK.quick.id) : null;
+    const lead = nameOf(PICK.lead), second = nameOf(PICK.second), quick = nameOf(PICK.quick);
+    const zone = PICK.lead && C().zoneById ? C().zoneById[PICK.lead.zone] || null : null;
     switch (T.step) {
-      case 1: return "This is a ticket. It is one customer's order." + (hint() ? ' The line under the name always says what to do next.' : '');
-      case 2: return 'The clock counts up from the moment the order came in. It turns amber, then red, when the time limit for that kind of order runs out.';
-      case 3: return 'Each dish belongs to a station: FRY, PIT, CLD. Hush puppies take the longest, so they can start right now. Tap START when you begin cooking them.';
-      case 4: return 'The orange countdown under the dish is the estimated cooking time left. At zero the row flashes Check it. Smokebox cannot see your fryer, so it never marks a dish done by itself.';
-      case 5: return 'The other two dishes are gray on purpose. Smokebox is holding them back so everything finishes together. Watch the countdown: it says when to start.';
+      case 1: return "This is a ticket: one customer's order." + (hint() ? ' The line under the name says what to do next.' : '');
+      case 2: return 'The clock counts up from when the order came in. It turns amber, then red, when the order is taking too long.';
+      case 3: return 'Each dish belongs to a station' + (zone ? ' (' + zone.name + ' for ' + lead + ')' : '') + '. ' + lead + (second || quick ? ' is the slowest dish on this ticket, so it can start now.' : ' can start now.') + ' Tap Start when you begin cooking it.';
+      case 4: return 'The countdown under the dish is the cooking time left, as estimated. At zero the row flashes Check it. Smokebox cannot see your food, so it never marks a dish done by itself.';
+      case 5: return 'The other dishes are gray on purpose. Smokebox holds them back so everything finishes together. Watch the countdown: it says when to start.';
       case 6: return bs && bs.status === 'queued'
-        ? 'Almost there. When the countdown reaches zero, START appears on the brisket sandwich. You can also tap Start now to begin it early.'
-        : 'Its time has come. Tap START on the brisket sandwich.';
+        ? 'Almost there. When the countdown reaches zero, Start appears on ' + second + '. You can also tap Start now to begin it early.'
+        : 'Its time has come. Tap Start on ' + second + '.';
       case 7: {
         const open = [];
-        if (hp && !isDone(hp)) open.push('the hush puppies');
-        if (bs && !isDone(bs)) open.push('the brisket sandwich');
+        if (hp && !isDone(hp)) open.push(lead);
+        if (bs && !isDone(bs)) open.push(second);
         const teaReady = tea && tea.status === 'displayed';
-        let s = open.length || !teaReady ? 'When a dish is really finished, tap DONE on it. You are the one who says it is done.' : '';
+        let s = open.length || !teaReady ? 'When a dish is really finished, tap Done on it. You are the one who says it is done.' : '';
         if (open.length) s += ' Finish ' + open.join(' and ') + '.';
-        if (tea && !isDone(tea)) s += teaReady ? (open.length ? ' Then tap DONE on the sweet tea.' : 'Tap DONE on the sweet tea.') : ' The sweet tea is still waiting its turn; it joins in a moment.';
+        if (tea && !isDone(tea)) s += teaReady ? (open.length ? ' Then tap Done on ' + quick + '.' : 'Tap Done on ' + quick + '.') : ' ' + quick + ' is still waiting its turn; it joins in a moment.';
         return s;
       }
       case 8: return slip() && slip().querySelector('.fl-bump')
         ? 'Everything is done, so Bump is green. Tap Bump to send the ticket away. The clock stops.'
         : 'Everything is done. Tap the All tab, then tap Bump to send the ticket away. The clock stops.';
-      default: return 'That is the whole loop: a ticket arrives, you start what is ready, tap done, then bump. The back office turns these taps into charts: tap Back office at the top of the screen. To add dishes and set prices and prep times, open Menu and settings there.';
+      default: return 'That is the whole loop: a ticket arrives, you start what is ready, tap Done, then Bump. The back office turns these taps into charts: tap Back office at the top of the screen. To add dishes and set prices and prep times, open Menu and settings there.';
     }
   }
 
@@ -137,12 +166,12 @@
     switch (T.step) {
       case 1: return q('.slip-head').concat(hint() ? [hint()] : []);
       case 2: return q('.slip-timer, .fl-bw'); // the wrapper .slip-time has no box of its own, so ring the digits and the badge
-      case 3: case 4: return row('hushpuppies');
-      case 5: case 6: return row('brisket_sand');
+      case 3: case 4: return PICK.lead ? row(PICK.lead.id) : [];
+      case 5: case 6: return PICK.second ? row(PICK.second.id) : [];
       case 7: {
         const out = [];
         t.items.forEach((i) => { if (i.status === 'cooking' || (i.track === 'one' && i.status === 'displayed')) out.push(...row(i.menuId)); });
-        return out.length ? out : row('tea');
+        return out.length ? out : (PICK.quick ? row(PICK.quick.id) : []);
       }
       case 8: { const b = q('.fl-bump'); return b.length ? b : Array.from(doc.querySelectorAll('.fl-seg [data-id="all"]')); }
       default: return [];
@@ -229,7 +258,8 @@
     u.skip.hidden = s === LAST;
     u.next.hidden = !MANUAL[s];
     u.mine.hidden = u.demo.hidden = u.done.hidden = s !== LAST;
-    const els = targets(t);
+    // Only elements that are on screen get the ring (the On time badge is hidden unless a ticket is late).
+    const els = targets(t).filter((e) => e.getClientRects().length > 0);
     ring(els);
     const fresh = T.shown !== s && els.length > 0;
     if (fresh) { bring(els[0]); T.shown = s; }
@@ -291,17 +321,31 @@
     if (b && b.getAttribute('aria-selected') !== 'true') b.click();
   }
 
+  // Says why the walkthrough cannot start when there is no dish to use: with an empty menu it offers a button that opens
+  // Dishes and prices; when every dish is sold out or archived it says so.
+  function noDishNote() {
+    const menu = (SB.store.getState().menu || []).filter((m) => !m.archived);
+    if (menu.length) { toast('Every dish is sold out right now, so the walkthrough has nothing to order. Open the 86 board to see why, then try again.', { tone: 'warn' }); return; }
+    // Opens the Dishes and prices sheet, where the first dish is added.
+    const open = h('button', { type: 'button', class: 'btn', onClick: () => { try { SB.sheets.open('dishes'); } catch (e) { /* the sheet is optional */ } } }, 'Add your first dish');
+    toast(h('span', null, 'The walkthrough needs a dish to show. Add one first (a name and a price is enough), then try again. ', open), { tone: 'warn', ms: 12000 });
+  }
+
   // Adds the walkthrough ticket and starts the guide. Starting again while one is running begins again at
   // step 1 with a fresh ticket. Returns true when it started.
   function start(opts) {
     const S = SB.store;
     if (!S || typeof S.dispatchEx !== 'function') return false;
     if (T) stop(true);
-    const items = ORDER.map((x) => ({ menuId: x[0], qty: x[1] }));
+    // Choose the dishes from the owner's menu. With no usable dish the walkthrough says why instead of failing quietly.
+    const pick = pickDishes();
+    if (!pick) { noDishNote(); return false; }
+    PICK = pick;
+    const items = [pick.lead, pick.second, pick.quick].filter(Boolean).map((m) => ({ menuId: m.id, qty: 1 }));
     const r = S.dispatchEx('createTicket', { customer: 'Walk-up', channel: 'dine_in', items, note: '', rush: false, src: 'demo' }, { source: 'sim' });
     const id = r && r.report === 'ok' && r.info ? r.info.ticketId : null;
     if (!id) {
-      toast('The walkthrough ticket could not be added. Check that hush puppies, brisket sandwich and sweet tea are not marked 86.', { tone: 'warn' });
+      toast('The walkthrough ticket could not be added. Check that its dishes (' + items.map((x) => nameOf(SB.store.getState().menu.find((m) => m.id === x.menuId))).join(', ') + ') are not sold out.', { tone: 'warn' });
       return false;
     }
     goAll();

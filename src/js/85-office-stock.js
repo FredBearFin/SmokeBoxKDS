@@ -4,7 +4,7 @@
  * PARTS: 1 pure helpers, 2 numbers per refresh, 3 the story and the suggestions, 4 the page and its cards.
  * USES: 82-office-money.js (helpers), 80-office-core.js (the kit), 40-metrics.js.   USED BY: the office frame.
  * HONEST: suggestions come from the days in range (sample days are labeled), sync is simulated and labeled so, and refused order lines are
- * counted only where the app recorded them. The Pitcall note is a seam, not an integration.
+ * counted only where the app recorded them.
  */
 (function (g) {
   'use strict';
@@ -194,24 +194,21 @@
         const med = B.median(pool.map((d) => d.g));
         // Rounded up to the next 100 g so the number reads like one a cook would use.
         const suggest = Math.ceil((med * PADDING) / 100) * 100;
-        const basis = useWd ? 'the ' + sameWd.length + ' ' + WEEKDAY[tomorrowWd] + 's in this range' : 'all ' + demand.length + ' cooking days in this range';
         Object.assign(out, { suggestG: suggest, sold: soRows.length > 0 });
         // Where the days come from: simulated sample days must never read as the owner's own kitchen.
         const srcWord = b.ds.counts && b.ds.counts.sample > 0 ? 'Suggestion from days that include simulated sample data (not your kitchen)' : 'Suggestion from your own days in this range';
         const parts = [];
         if (soRows.length) {
           const earliest = soRows.slice().sort((x, y) => y.hoursBeforeClose - x.hoursBeforeClose)[0];
-          parts.push('Ran out on ' + soRows.length + ' of ' + so.dayCount + ' days, the earliest at ' + fmt.clock(earliest.t) + ', ' + B.hoursWords(earliest.hoursBeforeClose) + ' before close.');
-          const wanted = B.median(demand.filter((d) => d.est).map((d) => d.g));
-          parts.push('A normal day cooks ' + fmt.g(tp.medianIntake) + ' and serves ' + fmt.g(tp.medianUsed) + '; the days it ran out probably wanted about ' + fmt.g(wanted) + '.');
+          parts.push('Sold out on ' + soRows.length + ' of ' + so.dayCount + ' days, as early as ' + fmt.clock(earliest.t) + '. A normal day: cooks ' + fmt.g(tp.medianIntake) + ', serves ' + fmt.g(tp.medianUsed) + '.');
           const t = B.median(soRows.map((r) => r.hour)) - TOP_UP;
-          const topUp = 'have a top-up batch ready by about ' + U.fmtTime(B.dayMs(b.today) + t * HOUR) + ', an hour before the usual sell-out';
-          if (suggest > tp.medianIntake * 1.03) parts.push(srcWord + ': cook about ' + fmt.g(suggest) + ' (typical demand ' + fmt.g(med) + ' plus 10%, from ' + basis + '), ' + fmt.g(suggest - tp.medianIntake) + ' more than usual, and ' + topUp + '.');
-          else parts.push(srcWord + ': the total is about right (typical demand ' + fmt.g(med) + ' plus 10% is ' + fmt.g(suggest) + ', from ' + basis + '), so keep the amount and ' + topUp + '. The problem looks like timing, not quantity.');
+          const topUp = 'have a top-up batch ready by about ' + U.fmtTime(B.dayMs(b.today) + t * HOUR);
+          if (suggest > tp.medianIntake * 1.03) parts.push(srcWord + ': ' + fmt.g(suggest - tp.medianIntake) + ' more than usual, and ' + topUp + '.');
+          else parts.push(srcWord + ': keep the amount and ' + topUp + '. It looks like timing, not quantity.');
         } else {
-          parts.push('Never ran out. A normal day cooks ' + fmt.g(tp.medianIntake) + ' and serves ' + fmt.g(tp.medianUsed) + '.');
-          if (suggest < tp.medianIntake * 0.85) parts.push(srcWord + ': about ' + fmt.g(suggest) + ' covers typical demand plus 10% (' + basis + '), ' + fmt.g(tp.medianIntake - suggest) + ' less than usual.');
-          else parts.push(srcWord + ': the cook count looks about right. Typical demand plus 10% is ' + fmt.g(suggest) + '.');
+          parts.push('Never sold out. A normal day: cooks ' + fmt.g(tp.medianIntake) + ', serves ' + fmt.g(tp.medianUsed) + '.');
+          if (suggest < tp.medianIntake * 0.85) parts.push(srcWord + ': ' + fmt.g(tp.medianIntake - suggest) + ' less than usual would still cover it.');
+          else parts.push(srcWord + ': the cook count looks about right.');
         }
         out.parts = parts; out.text = parts.join(' ');
         return out;
@@ -233,7 +230,7 @@
         const n = b.so.rows.filter((r) => r.date === d.date).length;
         return { value: d.date, label: d.label + (n ? ', ' + n + ' ' + B.plural(n, 'food') + ' sold out' : '') };
       }));
-      const ings = (b.ds.ingredients || []).filter((i) => i && i.id).map((i) => i.id);
+      const ings = (b.ds.ingredients || []).filter((i) => i && i.id && !i.hidden).map((i) => i.id);
       const order = b.protein.concat(ings.filter((id) => b.protein.indexOf(id) < 0));
       ingSel.setOptions(order.map((id) => ({ value: id, label: B.ingName(b.ds, id) })));
       if (!days.length) { st.day = null; st.ing = null; return; }
@@ -271,14 +268,12 @@
 
     page.panel({
       span: 12, title: 'What to cook tomorrow', sub: 'A suggestion from the days in the range above, not a forecast. Simulated sample days are labeled when they are included.',
-      caption: 'A starting number per protein, worked out from how much was really used on the days in this range. Your own judgment about tomorrow comes first.',
-      // Builds the intro, the list and the Pitcall note once; update redraws the list only when it changed.
+      caption: 'A starting number per protein: the typical amount used on the days in this range, plus 10%. Your own judgment about tomorrow comes first.',
+      // Builds the intro and the list once; update redraws the list only when it changed.
       render: (body, p0) => {
         const intro = h('p', { class: 'ob-text', 'data-k': 'tomorrow-intro' });
         const list = h('ul', { class: 'ob-sugg', 'aria-label': 'Cook-count suggestions' });
-        // The Pitcall note is a hand-off point only: nothing is sent anywhere.
-        const seam = h('p', { class: 'ob-note ob-note--accent', 'data-k': 'seam' }, 'Pitcall can use the sell-out time to decide tomorrow\'s cook count. This page only shows the sell-out times; nothing is sent to Pitcall.');
-        body.append(intro, list, seam);
+        body.append(intro, list);
         let last = '';
         // Draws one card per protein with its suggestion; skipped when nothing changed, so there is no flicker.
         const paint = (p) => {
@@ -391,7 +386,7 @@
           series: [{ id: 'level', name: name + ' in the cabinet', points: pts, slot: ingSlot(b, st.ing) }],
           x: { type: 'time', min: x0, max: endT }, y: { format: 'g', min: 0 },
           refLines: refs, bands, annotations: notes, markers: 'none', height: 320,
-          ariaLabel: 'Line chart of the ' + name + ' stock level on ' + lbl + ', in grams, from ' + fmt.g(pts[0][1]) + ' to ' + fmt.g(pts[pts.length - 1][1]) + ', with a line where the menu items go 86 at ' + fmt.g(sb.thresholdG) + '.',
+          ariaLabel: 'Line chart of the ' + name + ' stock level on ' + lbl + ', from ' + fmt.g(pts[0][1]) + ' to ' + fmt.g(pts[pts.length - 1][1]) + ', with a line where the menu items go 86 at ' + fmt.g(sb.thresholdG) + '.',
         };
       },
     });
@@ -451,8 +446,9 @@
     spellTable.el.querySelector('.of-card-body').appendChild(spellNote);
 
     // ---------- simulated channel sync ----------
-    page.section('Channel sync (simulated)', 'When an item goes 86, Smokebox pretends to tell each ordering channel and times how long that would take.');
-    page.panel({
+    page.section('Channel sync (practice only)', 'Practice only: Smokebox pretends to tell each ordering channel when an item is sold out and times how long that would take. It is not connected to any real ordering system.');
+    const syncParts = [page.lastSection];
+    syncParts.push(page.panel({
       span: 5, title: 'How fast 86 reaches the channels', sub: 'Simulated: no live POS connected',
       caption: 'Whether a sold-out item would stop being sold everywhere quickly. The goal is every channel inside the target.',
       // Builds the simulated-sync chip, four figures and the source line; update rewrites them in place.
@@ -471,7 +467,7 @@
           // Tone of the within-target figure: good from 95%, warning from 80%, else bad (starter thresholds).
           stats.set([
             { k: 'median', label: 'Median', value: fmt.ms(s.medianMs), note: 'typical channel' },
-            { k: 'p90', label: 'Slowest 1 in 10', value: fmt.ms(s.p90Ms), note: '90th percentile' },
+            { k: 'p90', label: 'Slowest 1 in 10', value: fmt.ms(s.p90Ms), note: 'the slowest tenth' },
             { k: 'max', label: 'Slowest of all', value: fmt.ms(s.maxMs), note: 'worst single update' },
             { k: 'within', label: 'Within ' + s.targetSec + ' s', value: fmt.pct(s.withinPct, 0), note: s.withinCount + ' of ' + s.count + ' updates', tone: s.withinPct >= 0.95 ? 'good' : s.withinPct >= 0.8 ? 'warn' : 'bad' },
           ]);
@@ -480,8 +476,8 @@
         paint(p0);
         return { update: paint };
       },
-    });
-    page.card({
+    }));
+    syncParts.push(page.card({
       type: 'bar', span: 7, title: 'Sync time by channel (simulated)', sub: 'Simulated: no live POS connected',
       caption: 'Whether one channel is slower than the rest. Every bar should end before the target line.',
       empty: { title: 'No simulated sync events yet', body: 'They are logged each time an item goes 86 or comes back. Nothing here comes from a real POS.', icon: 'refresh' },
@@ -497,15 +493,23 @@
           ariaLabel: 'Bar chart of simulated sync time for each channel, median and slowest, against the ' + s.targetSec + ' second target. These are simulated figures: no live POS is connected.',
         };
       },
-    });
+    }));
+    // The channel sync strip is practice only: shown when demo tickets or sample history are in play, hidden for a real kitchen.
+    const paintSyncVisible = (p) => {
+      const b = base(p), demo = (b.ds.tickets || []).some((t) => t && t.src === 'demo');
+      const on = demo || !!(b.ds.counts && b.ds.counts.sample > 0);
+      syncParts.forEach((x) => { const el = x && x.el ? x.el : x; if (el) el.hidden = !on; });
+    };
 
     paintClockWords(ctx.prepared());
+    paintSyncVisible(ctx.prepared());
 
     return {
       // The frame calls this on every refresh: repaint only the words that depend on the data.
       update() {
         const p = ctx.prepared();
         paintClockWords(p);
+        paintSyncVisible(p);
         const sp = spellsOf(p);
         const inHours = sp.cl.filter((c) => c.openMs > 0);
         const after = sp.cl.length - inHours.length;

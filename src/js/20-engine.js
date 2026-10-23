@@ -54,7 +54,7 @@
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -113,6 +113,11 @@
     badLeftovers: 'Choose what happens to the batches still in the cabinet: keep them for tomorrow, or discard them.',
     badWho: 'Initials must be 1 to 12 characters. Shorten them, or leave them blank if the screen allows.',
     unknownSafetyEntry: 'That safety log entry is not here, or it is not a temperature, discard, cooling, reheat, sanitize or keep-serving entry. Pick one from the safety log.',
+    wrongBackupMode: 'That backup does not belong to this kitchen (one is from the demo, the other from a real kitchen). Nothing was changed. Choose a backup made from this kitchen.',
+    moduleOff: 'Cook-ahead tracking (batches, the hold cabinet, temperature checks and sanitizing) is switched off. Turn it on in Menu and settings first.',
+    nameTaken: 'Another ingredient already has that name. Pick a different name, or use the one that exists.',
+    tooManyIngredients: 'The ingredient list is full (' + 80 + ' ingredients). Archive one you no longer use, then add this one.',
+    portionsConflict: 'This dish already lists ingredients, so it cannot also count portions. Remove its ingredients first, or keep tracking it by ingredients.',
     badSnooze: 'A reminder can be put off for 1 to 30 minutes, only for a batch still on the menu, and never past 5 minutes before its last warning. The last warning, a past-quality batch and a thrown-out batch cannot be put off.',
   };
 
@@ -154,13 +159,15 @@
     updateMenuItem: '{ id, patch }',
     addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two" }',
     updateIngredient: '{ id, patch }',
-    resetLive: '{ keepSettings?=true }',
+    addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety" }',
+    setPortions: '{ menuId, on:boolean, count? }',
+    resetLive: '{ keepSettings?=true, starter?, stagger?, catalog?: "sample"|"blank", replaceOwn? }',
     undo: '{}',
     uiReport: '{ action, report }',
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -325,6 +332,30 @@
       office: { theme: 'ember', pinHash: null },
       alerts: { ladderThresholds: C.alerts ? C.alerts.ladderThresholds : null },
     };
+  }
+  // Settings for a brand-new kitchen that starts empty: the normal defaults, but meal pacing is off (no honest prep
+  // times are known yet) and the cook-ahead module (batches, hold cabinet, temperature checks, sanitize timer) is off.
+  // WATCH OUT: defaultSettings itself must not change, because the barbecue demo and every old save rely on it.
+  function blankSettings() {
+    const S = defaultSettings();
+    S.pacing.enabled = false;
+    S.modules = { cookAhead: false };
+    return S;
+  }
+  // True when an optional module is switched on. A state with no modules setting (every save made before the
+  // switch existed, and the demo) has every module on; only an explicit false turns one off.
+  function moduleOn(state, name) {
+    const m = state && state.settings && state.settings.modules;
+    return !(isObj(m) && m[name] === false);
+  }
+  // True when cook-ahead warnings, deadlines and sanitize reminders should run: the module is on, or the cabinet still
+  // holds food (turning the module off must never silence a batch that is actually sitting there).
+  // WATCH OUT: used by the deadline feed and the counts, so an empty kitchen with the module off stays quiet.
+  function cookAheadActive(state) {
+    if (moduleOn(state, 'cookAhead')) return true;
+    const bs = state && Array.isArray(state.batches) ? state.batches : [];
+    for (const b of bs) if (b && b.status !== 'discard' && (b.remainingG > 0 || b.kind === 'cooling')) return true;
+    return false;
   }
   // Warn and breach seconds for an order channel: the owner's setting if there is one, else the config
   // default, else 480 / 720.
@@ -642,7 +673,8 @@
       const ing = im.get(ln.ing);
       if (!ing) continue;
       const have = servableOf(st, ing);
-      if (have - ln.qty <= 0 || have <= (ing.thresholdG || 0)) return { ok: false, reason: 'stock', ing: ing.id };
+      // A counted ingredient (exact, used for "portions on hand") lets the last portion sell: out only when fewer than one portion is left.
+      if (ing.exact === true ? have < ln.qty : have - ln.qty <= 0 || have <= (ing.thresholdG || 0)) return { ok: false, reason: 'stock', ing: ing.id };
     }
     return { ok: true, reason: null, ing: null };
   }
@@ -933,9 +965,12 @@
     w.wasteG = g0; w.remainingG = 0; w.discardedAt = stampAfter(b.enteredAt, tx.now); w.discardReason = reason;
     w.status = 'discard'; w.action = 'DISCARD_LOCKOUT'; w.canServe = false;
     const ing = ingMap(tx.get('ingredients')).get(b.ing);
-    const unit = isNum(b.costPerCookedKg) ? b.costPerCookedKg / 1000 : nominalUnitCost(ing);
+    const unit = isNum(b.costPerCookedKg) ? b.costPerCookedKg / 1000 : ing && hasUnitCost(ing) ? nominalUnitCost(ing) : null;
     tx.event('batch_status', { batchId: b.id, from: b.status, to: 'discard', action: 'DISCARD_LOCKOUT' });
-    tx.event('batch_discard', whoField({ batchId: b.id, ing: b.ing, g: g0, reason, cost: round(g0 * unit, 4) }, who));
+    // Unknown is not zero: with no cost on record the event carries no cost field.
+    const df = { batchId: b.id, ing: b.ing, g: g0, reason };
+    if (unit !== null) df.cost = round(g0 * unit, 4);
+    tx.event('batch_discard', whoField(df, who));
   }
   // Re-runs the gate on every batch that is not already discarded (used when the safety settings change).
   function refreshAllBatches(tx) {
@@ -948,7 +983,7 @@
   // missing.
   function takeFifoInto(tx, ing, need) {
     const recs = [];
-    let cost = 0;
+    let cost = 0, unknown = false;
     const bs = tx.get('batches');
     const cand = [];
     for (let i = 0; i < bs.length; i++) { const b = bs[i]; if (b.ing === ing.id && servableBatch(b)) cand.push(i); }
@@ -965,14 +1000,20 @@
       w.remainingG = b.remainingG - take <= EPS ? 0 : b.remainingG - take;
       need = need - take <= EPS ? 0 : need - take;
       recs.push({ ing: ing.id, g: take, batchId: b.id });
-      cost += take * (isNum(b.costPerCookedKg) ? b.costPerCookedKg / 1000 : nominalUnitCost(ing));
+      if (isNum(b.costPerCookedKg)) cost += take * b.costPerCookedKg / 1000;
+      else if (hasUnitCost(ing)) cost += take * nominalUnitCost(ing);
+      else unknown = true;
     }
-    return { recs, cost, left: need };
+    return { recs, cost, left: need, unknown };
   }
 
   /* ======================================================================================================
    * 10. Depletion (FIFO from servable batches, never negative) and learning
    * ==================================================================================================== */
+  // True when the owner or the config has given this ingredient a cost (per kg, or each for counted items).
+  function hasUnitCost(ing) {
+    return ing.unit === 'ea' ? isNum(ing.costEach) : isNum(ing.costPerKg);
+  }
   // Takes the ingredients for one finished item out of stock (recipe quantity times item quantity). Returns
   // what was taken (needed for undo), the ingredient cost and any shortage in grams.
   // WATCH OUT: stock never goes negative (I1). If there is not enough, we take what exists, record the rest
@@ -980,11 +1021,13 @@
   function depleteInto(tx, item, mi, ticketId) {
     const im = ingMap(tx.get('ingredients'));
     const recs = [];
-    let cost = 0, shortG = 0;
+    let cost = 0, shortG = 0, priced = 0, unpriced = 0;
     const bom = Array.isArray(mi.bom) ? mi.bom : [];
     for (const ln of bom) {
       const ing = im.get(ln.ing);
       if (!ing) continue;
+      // Unknown is not zero: a line whose ingredient has no cost entered makes the whole dish cost unknown.
+      if (hasUnitCost(ing)) priced++; else unpriced++;
       let need = ln.qty * item.qty;
       if (!(need > 0)) continue;
       // TCS food comes from the oldest servable batches first (FIFO). Locked and cooling batches are never
@@ -993,6 +1036,7 @@
         const took = takeFifoInto(tx, ing, need);
         for (const r of took.recs) recs.push(r);
         cost += took.cost;
+        if (took.unknown) unpriced++;
         need = took.left;
       } else {
         // Everything else comes from the plain stock count.
@@ -1015,7 +1059,7 @@
         tx.event('stock_short', { ing: ing.id, g: need, ticketId, itemId: item.id });
       }
     }
-    return { recs, cost: round(cost, 4), shortG };
+    return { recs, cost: priced > 0 && unpriced === 0 ? round(cost, 4) : null, shortG };
   }
   /** Undo of a done: put back exactly what `depleted` says, to the same batches. Missing/discarded batch -> grams dropped (ledger.dropped). */
   function restoreInto(tx, recs) {
@@ -1114,10 +1158,13 @@
     let shortG = 0;
     if (mi) {
       const d = depleteInto(tx, w, mi, t.id);
-      w.depleted = d.recs; w.cost = d.cost; shortG = d.shortG;
+      w.depleted = d.recs; shortG = d.shortG;
+      // A dish with no recipe, or an ingredient with no cost, records no cost at all (never 0).
+      if (d.cost === null) delete w.cost; else w.cost = d.cost;
       if (!(opts && opts.noLearn)) learnInto(tx, w, mi, learnedBefore);
     } else { w.depleted = []; w.cost = 0; }
-    const ev = { ticketId: t.id, itemId: it.id, zone: it.zone, menuId: it.menuId, workMs: w.doneAt - (w.startedAt != null ? w.startedAt : w.firedAt), qty: it.qty, cost: w.cost };
+    const ev = { ticketId: t.id, itemId: it.id, zone: it.zone, menuId: it.menuId, workMs: w.doneAt - (w.startedAt != null ? w.startedAt : w.firedAt), qty: it.qty };
+    if (w.cost !== undefined) ev.cost = w.cost;
     if (shortG > 0) ev.shortG = shortG;
     tx.event('item_done', ev);
     return { itemId: it.id, before, after: timesOf(w) };
@@ -1716,8 +1763,9 @@
     if (!ing) return 'unknownIng';
     if (!isNum(p.g) || p.g <= 0 || p.g > 1e6) return 'badWeight';
     if (ing.tcs) {
+      if (!moduleOn(tx.state(), 'cookAhead')) return 'moduleOff';
       // TCS food enters the hold cabinet as a batch with NO temperature reading (unknown is not zero): it shows "check temp" at once.
-      const b = intakeInto(tx, ing, { cookedG: p.g, src: 'cook', costPerCookedKg: round(nominalUnitCost(ing) * 1000, 4) });
+      const b = intakeInto(tx, ing, { cookedG: p.g, src: 'cook', costPerCookedKg: hasUnitCost(ing) ? round(nominalUnitCost(ing) * 1000, 4) : undefined });
       tx.info = { ing: ing.id, batchId: b.id };
     } else {
       const ws = tx.mut('stock');
@@ -1752,6 +1800,7 @@
   // cookedG). Cooked grams come from what was entered, else the brisket yield model, else the ingredient's
   // starter yield.
   A.addBatch = function (tx, p) {
+    if (!moduleOn(tx.state(), 'cookAhead')) return 'moduleOff';
     const ing = typeof p.ing === 'string' ? ingMap(tx.get('ingredients')).get(p.ing) : undefined;
     if (!ing || !ing.tcs) return 'unknownIng';
     if (!isNum(p.tempF) || p.tempF < 32 || p.tempF > 300) return 'badTemp';
@@ -1787,7 +1836,7 @@
     }
     if (!(cookedG > 0)) return 'badWeight';
     if (rawG !== undefined) costPerCookedKg = round((rawG / 1000) * rawCost / (cookedG / 1000), 4);
-    else costPerCookedKg = round(nominalUnitCost(ing) * 1000, 4);
+    else costPerCookedKg = hasUnitCost(ing) ? round(nominalUnitCost(ing) * 1000, 4) : undefined;
     const b = intakeInto(tx, ing, { cookedG, rawG, yieldPct, costPerCookedKg, src, tempF: p.tempF, label,
       endpointC: ty && p.endpointC != null ? ty.endpointC : undefined, holdH: ty && p.holdH != null ? ty.holdH : undefined });
     tx.info = { batchId: b.id, cookedG, yieldPct, costPerCookedKg, status: b.status, canServe: b.canServe };
@@ -2016,6 +2065,7 @@
   const planExpiresAt = (e) => e.readyAt + PLAN_GRACE_MS;
   // Records that a batch will come off the smoker at offAt. Its serving time adds the product's rest time. Undoable.
   A.planBatch = function (tx, p) {
+    if (!moduleOn(tx.state(), 'cookAhead')) return 'moduleOff';
     const ing = typeof p.ing === 'string' ? ingMap(tx.get('ingredients')).get(p.ing) : undefined;
     if (!ing || !ing.tcs) return 'unknownIng';
     if (!isNum(p.grams) || p.grams <= 0 || p.grams > 1e6) return 'badWeight';
@@ -2144,6 +2194,7 @@
     ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, sound: { t: 'bool' }, tempUnit: { t: 'enum', v: ['F', 'C'] }, weightUnit: { t: 'enum', v: ['kg', 'lb'] } },
     office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' } },
     alerts: { ladderThresholds: { t: 'ladder' } },
+    modules: { cookAhead: { t: 'bool' } },
   };
   // Checks one list of warning minutes: 1 to 5 whole numbers, strictly falling, each from 5 to 240 (the last warning
   // needs time to act on).
@@ -2173,7 +2224,7 @@
   // Validates one leaf of the settings; returns null when fine, else { report, key, min?, max? }.
   function checkLeaf(spec, v, key) {
     if (spec.t === 'bool') return typeof v === 'boolean' ? null : { report: 'badPatch', key };
-    if (spec.t === 'enum') return typeof v === 'string' && spec.v.indexOf(v) >= 0 ? null : { report: 'badPatch', key };
+    if (spec.t === 'enum') { const list = typeof spec.vf === 'function' ? spec.vf() : spec.v; return typeof v === 'string' && list.indexOf(v) >= 0 ? null : { report: 'badPatch', key }; }
     if (spec.t === 'pin') return v === null || (typeof v === 'string' && v.length <= 128) ? null : { report: 'badPatch', key };
     if (spec.t === 'ladder') return checkLadder(v, key);
     if (spec.t === 'num') {
@@ -2282,14 +2333,15 @@
   const MENU_PATCH = {
     name: { t: 'text', max: 60 }, short: { t: 'text', max: 24 }, price: R(0, 1000), prepSec: R(5, 3600), prepConfirmed: { t: 'bool' },
     bom: { t: 'bom' }, zone: { t: 'enum', v: C.workZones }, archived: { t: 'bool' },
-    cat: { t: 'enum', v: C.categories.map((c) => c.id) }, track: { t: 'enum', v: ['one', 'two'] },
+    // cat is looked up at call time, so a category added after load is accepted.
+    cat: { t: 'enum', vf: () => C.categories.map((c) => c.id) }, track: { t: 'enum', v: ['one', 'two'] },
   };
   // The most dishes a menu may hold, so a typing slip cannot fill the saved data.
   const MENU_MAX = 150;
   const ING_PATCH = {
     name: { t: 'text', max: 60 }, thresholdG: R(0, 1e6), parG: R(0, 1e7), yield: R(0.05, 3), yieldConfirmed: { t: 'bool' },
     costPerKg: R(0, 10000), costEach: R(0, 10000), pullG: R(50, 50000),
-    maxHoldH: R(0.5, 12), restH: R(0, 12), cookH: R(0, 48), holdBasis: { t: 'enum', v: ['quality', 'safety'] },
+    maxHoldH: R(0.5, 12), restH: R(0, 12), cookH: R(0, 48), holdBasis: { t: 'enum', v: ['quality', 'safety'] }, archived: { t: 'bool' },
   };
   // Shared editor for menu items and ingredients. Checks each field, ignores unchanged ones (nothingToDo if
   // nothing changed), writes one new copy and logs settings_changed. Changing a starter prep time re-fits
@@ -2377,19 +2429,161 @@
     return 'ok';
   };
 
+  // The most ingredients a kitchen may hold, so a typing slip cannot fill the saved data.
+  const ING_MAX = 80;
+  // Makes an id from a name that no ingredient and no config ingredient already uses ("Hamburger Buns" becomes
+  // hamburger_buns, then hamburger_buns_2 if taken).
+  function freshIngId(list, base) {
+    const taken = new Set(list.map((x) => x.id));
+    let id = base || 'ingredient', n = 2;
+    while (taken.has(id) || hasOwn(C.ingredientById, id) || !safeKey(id)) id = (base || 'ingredient') + '_' + n++;
+    return id;
+  }
+  // Adds a new ingredient the owner buys or makes. Grams by default ('ea' for counted things like buns), with a cost
+  // per kg (or each), a typical opening amount and the amount at which dishes using it go 86. Plain ingredients are
+  // counted in the stock list. Cook-ahead food (tcs: true) is kept in timed batches in the hold cabinet instead and
+  // needs the cook-ahead module on; its hold rules default to the careful side (hot, 4 hours, time as a safety limit).
+  // The new ingredient starts with zero stock; restock adds some. Undo removes it while nothing uses it.
+  A.addIngredient = function (tx, p) {
+    const list = tx.get('ingredients');
+    if (list.length >= ING_MAX) { tx.info = { key: 'ingredients', min: 0, max: ING_MAX }; return 'tooManyIngredients'; }
+    if (typeof p.name !== 'string' || p.name.length > 400) { tx.info.key = 'ingredients.new.name'; return 'badPatch'; }
+    const name = cleanText(p.name);
+    if (!name || name.length > ING_PATCH.name.max) { tx.info = { key: 'ingredients.new.name', min: 1, max: ING_PATCH.name.max }; return 'outOfBounds'; }
+    if (list.some((x) => String(x.name).toLowerCase() === name.toLowerCase())) { tx.info.key = 'ingredients.new.name'; return 'nameTaken'; }
+    const unit = p.unit == null ? 'g' : p.unit;
+    if (unit !== 'g' && unit !== 'ea') { tx.info.key = 'ingredients.new.unit'; return 'badPatch'; }
+    const tcs = p.tcs == null ? false : p.tcs;
+    if (typeof tcs !== 'boolean') { tx.info.key = 'ingredients.new.tcs'; return 'badPatch'; }
+    if (tcs && unit !== 'g') { tx.info.key = 'ingredients.new.unit'; return 'badPatch'; }
+    if (tcs && !moduleOn(tx.state(), 'cookAhead')) return 'moduleOff';
+    // Optional numbers, each checked against the same range the edit form uses. A cost in the wrong unit is refused.
+    const out = { id: freshIngId(list, name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30)), name, unit, tcs };
+    const nums = [['costPerKg', unit === 'g'], ['costEach', unit === 'ea'], ['parG', true], ['thresholdG', true]];
+    for (const [k, allowed] of nums) {
+      if (p[k] == null) continue;
+      if (!allowed) { tx.info.key = 'ingredients.new.' + k; return 'badPatch'; }
+      const e = checkLeaf(ING_PATCH[k], p[k], 'ingredients.new.' + k);
+      if (e) { tx.info = { key: e.key, min: e.min, max: e.max }; return e.report; }
+      out[k] = p[k];
+    }
+    if (out.thresholdG === undefined) out.thresholdG = 0;
+    if (tcs) {
+      const hold = p.hold == null ? 'hot' : p.hold;
+      if (hold !== 'hot' && hold !== 'cold') { tx.info.key = 'ingredients.new.hold'; return 'badPatch'; }
+      const basis = p.holdBasis == null ? 'safety' : p.holdBasis;
+      const be = checkLeaf(ING_PATCH.holdBasis, basis, 'ingredients.new.holdBasis');
+      if (be) { tx.info.key = be.key; return be.report; }
+      const mh = p.maxHoldH == null ? 4 : p.maxHoldH;
+      const me = checkLeaf(ING_PATCH.maxHoldH, mh, 'ingredients.new.maxHoldH');
+      if (me) { tx.info = { key: me.key, min: me.min, max: me.max }; return me.report; }
+      Object.assign(out, { hold, holdBasis: basis, maxHoldH: mh, cookH: 2, restH: 0, pullG: 1000 });
+    }
+    tx.mut('ingredients').push(out);
+    if (!tcs) tx.mut('stock')[out.id] = 0;
+    tx.mut('ledger')[out.id] = { open: 0, in: 0, pulled: 0, prunedUsed: 0, prunedWaste: 0, prunedRemain: 0, dropped: 0 };
+    tx.event('settings_changed', { keys: ['ingredients.' + out.id + '.added'] });
+    pushUndo(tx, 'addIng', out.name + ' added', { id: out.id });
+    tx.info = { id: out.id, keys: ['ingredients.' + out.id + '.added'] };
+    return 'ok';
+  };
+  // Undo of a new ingredient: removed again, but only while nothing refers to it (no recipe line, no stock, no batch).
+  UNDO.addIng = function (tx, d) {
+    const list = tx.get('ingredients');
+    const i = list.findIndex((x) => x.id === d.id);
+    if (i < 0) return 'undoConflict';
+    if (tx.get('menu').some((m) => Array.isArray(m.bom) && m.bom.some((l) => l.ing === d.id))) return 'undoConflict';
+    if (tx.get('batches').some((b) => b.ing === d.id)) return 'undoConflict';
+    const st = tx.get('stock'), L = tx.get('ledger')[d.id] || {};
+    if ((hasOwn(st, d.id) && st[d.id] !== 0) || L.in || L.open || L.pulled || L.dropped) return 'undoConflict';
+    const w = tx.mut('ingredients'); w.splice(i, 1);
+    if (hasOwn(st, d.id)) delete tx.mut('stock')[d.id];
+    delete tx.mut('ledger')[d.id];
+    return 'ok';
+  };
+  // The hidden counted ingredient that tracks "portions on hand" for one dish, or undefined.
+  const portionIngOf = (ings, menuId) => ings.find((i) => i.forMenu === menuId);
+  // Turns portion counting on or off for a dish that lists no ingredients. On: makes (or revives) a hidden counted
+  // ingredient named "Portions of <dish>", gives the dish a recipe of one portion of it, and starts the count at
+  // count (default 0, so it is sold out until some are added; restock adds more later). Each finished portion takes
+  // one off, the dish goes sold out at zero, and undoing a done item puts the portion back. Off: the dish goes back
+  // to no recipe (never sold out by itself) and the hidden ingredient is archived with its books left whole.
+  A.setPortions = function (tx, p) {
+    const mi = getMenu(tx.get('menu'), p.menuId);
+    if (!mi) return 'unknownMenu';
+    if (typeof p.on !== 'boolean') { tx.info.key = 'on'; return 'badPatch'; }
+    const ings = tx.get('ingredients');
+    const own = portionIngOf(ings, mi.id);
+    const bom = Array.isArray(mi.bom) ? mi.bom : [];
+    const tracked = !!own && bom.some((l) => l.ing === own.id);
+    if (p.count != null && (!isNum(p.count) || !isInt(p.count) || p.count < 0 || p.count > 100000)) { tx.info = { key: 'count', min: 0, max: 100000 }; return 'outOfBounds'; }
+    const count = p.count == null ? 0 : p.count;
+    const mIdx = tx.get('menu').findIndex((m) => m.id === mi.id);
+    // Off: drop the recipe line and archive the hidden ingredient; its stock and books stay as they were.
+    if (!p.on) {
+      if (!tracked) return 'nothingToDo';
+      const wm = tx.mut('menu'); wm[mIdx] = Object.assign({}, mi, { bom: bom.filter((l) => l.ing !== own.id) });
+      const wi = tx.mut('ingredients'); wi[wi.findIndex((i) => i.id === own.id)] = Object.assign({}, own, { archived: true });
+      tx.event('settings_changed', { keys: ['menu.' + mi.id + '.portions.off'] });
+      tx.info = { id: mi.id, keys: ['menu.' + mi.id + '.portions.off'] };
+      return 'ok';
+    }
+    // On: a dish that already lists other ingredients is refused, so the two ways of counting never mix.
+    if (tracked && p.count == null) return 'nothingToDo';
+    if (!tracked && bom.length) return 'portionsConflict';
+    let id;
+    if (own) id = own.id;
+    else {
+      if (ings.length >= ING_MAX) { tx.info = { key: 'ingredients', min: 0, max: ING_MAX }; return 'tooManyIngredients'; }
+      id = freshIngId(ings, 'p_' + mi.id);
+      tx.mut('ingredients').push({ id, name: ('Portions of ' + mi.name).slice(0, ING_PATCH.name.max), unit: 'ea', tcs: false, thresholdG: 0, exact: true, hidden: true, forMenu: mi.id });
+      tx.mut('stock')[id] = 0;
+      tx.mut('ledger')[id] = { open: 0, in: 0, pulled: 0, prunedUsed: 0, prunedWaste: 0, prunedRemain: 0, dropped: 0 };
+    }
+    if (own && own.archived) { const wi = tx.mut('ingredients'); wi[wi.findIndex((i) => i.id === id)] = Object.assign({}, own, { archived: false }); }
+    if (!tracked) { const wm = tx.mut('menu'); wm[mIdx] = Object.assign({}, mi, { bom: [{ ing: id, qty: 1 }] }); }
+    // The starting count goes in through the books as an intake, so the stock check (I2) balances.
+    if (count > 0) {
+      const ws = tx.mut('stock'); ws[id] = (hasOwn(ws, id) && isNum(ws[id]) ? ws[id] : 0) + count;
+      const L = tx.ledger(id); L.in = (L.in || 0) + count;
+      tx.event('restock', { ing: id, g: count });
+    }
+    tx.event('settings_changed', { keys: ['menu.' + mi.id + '.portions.on'] });
+    tx.info = { id: mi.id, ing: id, count, keys: ['menu.' + mi.id + '.portions.on'] };
+    return 'ok';
+  };
+
   // Clears tickets, batches, events and undo and restores starter stock. Keeps settings, menu, ingredients
   // and learned times unless keepSettings is false. The id counters are kept, so ids are never reused.
   A.resetLive = function (tx, p) {
     const keep = p.keepSettings == null ? true : p.keepSettings;
     if (typeof keep !== 'boolean') { tx.info.key = 'keepSettings'; return 'badPatch'; }
     // starter false starts the pit empty; stagger true gives the demo batches different ages. Both default to the old behaviour.
-    for (const k of ['starter', 'stagger']) if (p[k] != null && typeof p[k] !== 'boolean') { tx.info.key = k; return 'badPatch'; }
+    for (const k of ['starter', 'stagger', 'replaceOwn']) if (p[k] != null && typeof p[k] !== 'boolean') { tx.info.key = k; return 'badPatch'; }
+    // catalog: 'sample' loads the barbecue sample dishes and ingredients (the demo); 'blank' loads an empty kitchen;
+    // absent keeps whatever kind of kitchen this is.
+    if (p.catalog != null && p.catalog !== 'sample' && p.catalog !== 'blank') { tx.info.key = 'catalog'; return 'badPatch'; }
     const s = tx.s0;
+    const own = s.catalog === 'own';
+    // WATCH OUT: loading the sample over a kitchen that began empty and now holds the owner's own dishes or orders
+    // would erase them, so it is refused unless the caller says replaceOwn.
+    if (p.catalog === 'sample' && own && (s.menu.length || s.orders.length || s.tickets.length) && p.replaceOwn !== true) { tx.info.key = 'catalog'; return 'badPatch'; }
+    const blank = p.catalog === 'blank' || (p.catalog == null && own);
+    const sample = p.catalog === 'sample';
+    const fresh = sample || p.catalog === 'blank';
+    // Settings: the sample over an own kitchen gets the normal defaults (so the demo's cook-ahead machinery is on); an
+    // empty restart keeps the owner's settings but switches the cook-ahead module off; otherwise keep or reset as asked.
+    let settings;
+    if (keep && !(sample && own)) {
+      settings = s.settings;
+      if (p.catalog === 'blank') settings = Object.assign({}, settings, { modules: Object.assign({}, settings.modules, { cookAhead: false }) });
+    }
     const ns = newState({
-      now: tx.now, seq: s.seq, starter: p.starter !== false, stagger: p.stagger === true,
-      settings: keep ? s.settings : undefined, menu: keep ? s.menu : undefined, ingredients: keep ? s.ingredients : undefined, learned: keep ? s.learned : undefined,
+      now: tx.now, seq: s.seq, starter: p.starter !== false, stagger: p.stagger === true, blank, settings,
+      menu: keep && !fresh ? s.menu : undefined, ingredients: keep && !fresh ? s.ingredients : undefined, learned: keep ? s.learned : undefined,
     });
     for (const k of Object.keys(ns)) tx.set(k, ns[k]);
+    if (!ns.catalog && hasOwn(s, 'catalog')) tx.set('catalog', undefined);
     if (hasOwn(s, 'lastClose')) tx.set('lastClose', undefined); // a fresh board has never been closed
     tx.info = { keepSettings: keep };
     return 'ok';
@@ -2781,9 +2975,12 @@
   function newState(opts) {
     opts = isObj(opts) ? opts : {};
     const now = isNum(opts.now) ? opts.now : 0;
-    const settings = isObj(opts.settings) ? opts.settings : defaultSettings();
-    const menu = Array.isArray(opts.menu) ? opts.menu : C.menu.map((m) => Object.assign({}, m, { bom: m.bom.map((l) => ({ ing: l.ing, qty: l.qty })), prepConfirmed: false, archived: false }));
-    const ingredients = Array.isArray(opts.ingredients) ? opts.ingredients : C.ingredients.map((i) => Object.assign({}, i));
+    // blank: a kitchen that starts with no dishes, no ingredients and no stock, marked catalog 'own' so a backup check
+    // never puts the sample menu back.
+    const blank = opts.blank === true;
+    const settings = isObj(opts.settings) ? opts.settings : blank ? blankSettings() : defaultSettings();
+    const menu = Array.isArray(opts.menu) ? opts.menu : blank ? [] : C.menu.map((m) => Object.assign({}, m, { bom: m.bom.map((l) => ({ ing: l.ing, qty: l.qty })), prepConfirmed: false, archived: false }));
+    const ingredients = Array.isArray(opts.ingredients) ? opts.ingredients : blank ? [] : C.ingredients.map((i) => Object.assign({}, i));
     const so = isObj(opts.seq) ? opts.seq : {};
     const seq = { ticket: isInt(so.ticket) ? so.ticket : 0, order: isInt(so.order) ? so.order : 0, batch: isInt(so.batch) ? so.batch : 0, event: isInt(so.event) ? so.event : 0, sync: isInt(so.sync) ? so.sync : 0, undo: isInt(so.undo) ? so.undo : 0, byDate: {} };
     const stock = {}, ledger = {}, batches = [];
@@ -2815,6 +3012,7 @@
       v: 1, rev: 0, settings, menu, ingredients, tickets: [], orders: [], batches, stock, manual86: {}, avail: {}, syncs: [], planned: [], alertSnoozes: {},
       learned: isObj(opts.learned) ? opts.learned : {}, sanitize: { dueAt: now }, seq, events: [], eventArchive: [], safetyKeep: [], undo: [], ledger,
     };
+    if (opts.own === true || blank) st.catalog = 'own';
     const av = computeAvail(st);
     for (const k of Object.keys(av)) av[k].since = now;
     st.avail = av;
@@ -2960,8 +3158,8 @@
       for (const mi of state.menu) { const a = state.avail[mi.id]; if (a && !a.ok && !mi.archived) c.out86++; }
       const sz = state.sanitize || {};
       const dueEff = sanitizeDueEff(state.settings, sz, now);
-      c.sanitizeDueAt = dueEff;
-      c.sanitizeOverdue = isNum(dueEff) && isNum(now) && now > dueEff;
+      // With cook-ahead off and nothing in the cabinet there is no sanitize reminder to raise.
+      if (cookAheadActive(state)) { c.sanitizeDueAt = dueEff; c.sanitizeOverdue = isNum(dueEff) && isNum(now) && now > dueEff; }
       return c;
     },
   };
@@ -3119,6 +3317,12 @@
       if (e.who !== undefined && !(typeof e.who === 'string' && e.who.length >= 1 && e.who.length <= 12)) { add('I18 event ' + e.id + ' bad initials'); break; }
       if (e.type === 'safety_correction' && !(typeof e.who === 'string' && typeof e.note === 'string' && e.note && typeof e.of === 'string')) { add('I18 correction ' + e.id + ' incomplete'); break; }
     }
+    // B1: every recipe line names an ingredient that exists, and a portion-counting ingredient belongs to a real dish.
+    {
+      const ids = new Set(state.ingredients.map((i) => i.id));
+      for (const mi of state.menu) for (const ln of Array.isArray(mi.bom) ? mi.bom : []) if (!ids.has(ln.ing)) add('B1 ' + mi.id + ' recipe names missing ingredient ' + ln.ing);
+      for (const i of state.ingredients) if (i.forMenu !== undefined && !state.menu.some((m) => m.id === i.forMenu)) add('B1 ingredient ' + i.id + ' counts portions of missing dish ' + i.forMenu);
+    }
     // I14
     const mm = menuMap(state.menu);
     for (const id of Object.keys(state.learned || {})) {
@@ -3159,6 +3363,8 @@
       if (st.v !== 1) return fail('unsupported version ' + st.v);
       for (const k of ['tickets', 'batches', 'menu', 'ingredients']) if (!Array.isArray(st[k])) return fail('missing ' + k);
       const def = newState({ now: 0, empty: true });
+      // A kitchen that began empty carries catalog 'own': the sample menu and ingredients are never restored for it.
+      const own = st.catalog === 'own';
       // settings
       const settings = defaultSettings();
       const savedSet = isObj(st.settings) ? st.settings : {};
@@ -3187,7 +3393,7 @@
       const seenIng = new Set();
       for (const x of st.ingredients) {
         if (!isObj(x) || !safeKey(x.id) || seenIng.has(x.id)) { repaired.push('dropped a bad ingredient'); continue; }
-        const base = hasOwn(C.ingredientById, x.id) ? C.ingredientById[x.id] : null;
+        const base = !own && hasOwn(C.ingredientById, x.id) ? C.ingredientById[x.id] : null;
         const out = Object.assign({}, base || {}, x);
         // For known ingredients the safety class, unit and hold type always come from the config, so an
         // edited file cannot turn a TCS food into an unchecked one.
@@ -3200,14 +3406,14 @@
         seenIng.add(x.id);
         ingredients.push(out);
       }
-      for (const base of C.ingredients) if (!seenIng.has(base.id)) { ingredients.push(Object.assign({}, base)); seenIng.add(base.id); repaired.push('restored ingredient ' + base.id); }
+      if (!own) for (const base of C.ingredients) if (!seenIng.has(base.id)) { ingredients.push(Object.assign({}, base)); seenIng.add(base.id); repaired.push('restored ingredient ' + base.id); }
       const im = ingMap(ingredients);
       // menu
       const menu = [];
       const seenMenu = new Set();
       for (const x of st.menu) {
         if (!isObj(x) || !safeKey(x.id) || seenMenu.has(x.id)) { repaired.push('dropped a bad menu item'); continue; }
-        const base = hasOwn(C.menuById, x.id) ? C.menuById[x.id] : null;
+        const base = !own && hasOwn(C.menuById, x.id) ? C.menuById[x.id] : null;
         const out = Object.assign({ prepConfirmed: false, archived: false }, base || {}, x);
         if (typeof out.name !== 'string' || !out.name) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.name = base.name; }
         if (C.workZones.indexOf(out.zone) < 0) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.zone = base.zone; repaired.push('menu ' + x.id + '.zone reset'); }
@@ -3222,7 +3428,7 @@
         seenMenu.add(x.id);
         menu.push(out);
       }
-      for (const base of C.menu) if (!seenMenu.has(base.id)) { menu.push(Object.assign({}, base, { bom: base.bom.map((l) => ({ ing: l.ing, qty: l.qty })), prepConfirmed: false, archived: false })); repaired.push('restored menu item ' + base.id); }
+      if (!own) for (const base of C.menu) if (!seenMenu.has(base.id)) { menu.push(Object.assign({}, base, { bom: base.bom.map((l) => ({ ing: l.ing, qty: l.qty })), prepConfirmed: false, archived: false })); repaired.push('restored menu item ' + base.id); }
       const mm = menuMap(menu);
       // tickets
       let tickets = [];
@@ -3380,11 +3586,12 @@
       for (const ing of ingredients) {
         const L0 = isObj(st.ledger) && hasOwn(st.ledger, ing.id) && isObj(st.ledger[ing.id]) ? st.ledger[ing.id] : {};
         const L = {};
-        for (const k of Object.keys(def.ledger[ing.id] || { open: 0 })) L[k] = isNum(L0[k]) && L0[k] >= 0 ? L0[k] : 0;
+        for (const k of Object.keys(def.ledger[ing.id] || { open: 0, in: 0, pulled: 0, prunedUsed: 0, prunedWaste: 0, prunedRemain: 0, dropped: 0 })) L[k] = isNum(L0[k]) && L0[k] >= 0 ? L0[k] : 0;
         for (const k of ['open', 'in', 'pulled', 'prunedUsed', 'prunedWaste', 'prunedRemain', 'dropped']) if (!isNum(L[k])) L[k] = 0;
         ledger[ing.id] = L;
       }
       out.ledger = ledger;
+      if (own) out.catalog = 'own';
       // lastClose (end-of-day marker): kept only when well formed; older saves simply have none.
       const lcs = st.lastClose;
       if (isObj(lcs) && typeof lcs.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lcs.day) && isNum(lcs.at) && (lcs.leftovers === 'keep' || lcs.leftovers === 'discard')) out.lastClose = { day: lcs.day, at: lcs.at, leftovers: lcs.leftovers };
@@ -3416,7 +3623,7 @@
         if (r.report) repaired.push(key + ' reset'); else target[k] = r.value;
       } else if (spec.t) {
         if (checkLeaf(spec, v, key)) repaired.push(key + ' reset'); else target[k] = v;
-      } else if (isObj(v)) repairInto(target[k], v, spec, key, repaired);
+      } else if (isObj(v)) { if (!isObj(target[k])) target[k] = {}; repairInto(target[k], v, spec, key, repaired); }
       else repaired.push(key + ' reset');
     }
   }
@@ -3501,6 +3708,7 @@
         const mi = typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
         return mi + ' is ' + why + '. Take it off the order or pick something else.';
       }
+      case 'wrongBackupMode': return i.backup === 'demo' ? 'That backup comes from the demo, not from your kitchen. Nothing was changed. Choose a backup made from your own kitchen.' : 'That backup comes from a real kitchen, so it cannot be loaded into the demo. Nothing was changed. Leave the demo first, then load it into your own kitchen.';
       case 'ordersStillOpen': return isInt(i.count) && i.count > 0 ? i.count + ' ' + U.plural(i.count, 'order') + ' still open. Take payment on ' + (i.count === 1 ? 'it' : 'each one') + ', or void ' + (i.count === 1 ? 'it' : 'them') + ', then close the day again.' : REPORTS.ordersStillOpen;
       case 'outOfBounds': return isNum(i.min) && isNum(i.max) ? 'That value is outside the allowed range (' + i.min + ' to ' + i.max + '). Enter a value inside it.' : REPORTS.outOfBounds;
       case 'nothingToDo': return i.why === 'onDeck' ? 'That item is still waiting for its start time. Tap Start now to begin it early.' : i.why === 'notBelow' ? 'This batch is not below the hold temperature, so it does not need a reheat.' : 'Nothing to change.';
@@ -3515,7 +3723,7 @@
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, defaultSettings, describe, safetyLog, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, defaultSettings, blankSettings, moduleOn, cookAheadActive, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.

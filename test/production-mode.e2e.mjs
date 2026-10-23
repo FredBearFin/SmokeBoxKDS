@@ -11,7 +11,7 @@ await withPage({ w: 1280, h: 800 }, async (page, logs) => {
   check('settings: no Specs link, no clock speed', !(await page.locator('.mn-link:has-text("Specs")').count()) && !(await page.locator('.dm-speed:visible').count()));
   await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(300);
   await page.evaluate(() => SB.sheets.open('demo')); await page.waitForTimeout(300);
-  check('demo sheet: no clock speed, pretend note shown', !(await page.locator('.dm-speed:visible').count()) && (await page.locator('.dm:has-text("Everything here is pretend")').count()) === 1);
+  check('demo sheet: no clock speed, practice note shown', !(await page.locator('.dm-speed:visible').count()) && (await page.locator('.dm:has-text("Everything here is for practice")').count()) === 1);
   check('demo sheet: reset says it erases demo orders', (await page.locator('.dm-reset:has-text("including all demo orders")').count()) === 1);
   await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(300);
   await page.evaluate(() => SB.sim.restartDemo()); await page.waitForTimeout(500);

@@ -12,6 +12,8 @@
   const U = SB.util;
   const doc = g.document || null;
   const F = (SB.floor = {});
+  // The record of sounds the warning ladder asked for (tests replay it); made once here so it always exists.
+  F._alerts = [];
 
   // Keys the board answers to; the help sheet lists them. Keep in step with onKey.
   F.shortcuts = [
@@ -59,6 +61,14 @@
   const C = SB.config;
   // The rules engine (SB.engine), looked up on each call and never kept.
   const E = () => SB.engine;
+  // True when the cook-ahead parts (batches, Cabinet tab, Hold button, temperature checks, sanitize timer) should show:
+  // the module is on (absent means on), or some batch still holds food, which is never hidden.
+  function cookOn() {
+    const s = store().getState();
+    if (E() && typeof E().cookAheadActive === 'function') return E().cookAheadActive(s);
+    if (!E() || typeof E().moduleOn !== 'function' || E().moduleOn(s, 'cookAhead')) return true;
+    return (s.batches || []).some((b) => b && b.status !== 'discard' && b.remainingG > 0);
+  }
   // Browser-storage keys: the sound switch, and whether the all-day strip is folded.
   const KEY_SOUND = 'smokebox.v1.sound';
   // Whether warnings are also spoken aloud (the tablet's own voice), on by default.
@@ -475,7 +485,6 @@
     m.offs.push(joinLeadership());
     // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
     if (SB.discards) { SB.discards.persist(); setTimeout(() => { try { SB.discards.remind(); } catch (e) { /* optional */ } }, 4000); }
-    if (SB.setup) setTimeout(() => { try { SB.setup.offer(); } catch (e) { /* optional */ } }, 8000);
     if (SB.sim && SB.sim.live && typeof SB.sim.live.onChange === 'function') {
       try { const off = SB.sim.live.onChange(() => { if (m) updateHeader(store().now()); }); if (typeof off === 'function') m.offs.push(off); } catch (e) { /* the simulator is optional */ }
     }
@@ -497,7 +506,7 @@
     if (i.io) i.io.disconnect();
     if (i.ro) i.ro.disconnect();
     cancelAnimationFrame(i.raf);
-    try { doc.documentElement.style.removeProperty('--fl-lift'); } catch (e) { /* ignore */ }
+    try { doc.documentElement.style.removeProperty('--fl-head-bottom'); doc.documentElement.style.removeProperty('--fl-lift'); } catch (e) { /* ignore */ }
     U.clear(i.el);
   };
 
@@ -588,7 +597,7 @@
     const grid = h('div', { class: 'fl-grid' });
     const empty = h('div', { class: 'fl-empty', hidden: true });
     const welcome = buildWelcome();
-    const cabEl = h('section', { class: 'fl-cabinet', hidden: true, 'aria-label': 'Hold cabinet' });
+    const cabEl = h('section', { class: 'fl-cabinet', hidden: true, 'aria-label': 'Hold cabinet' }, h('h2', { class: 'visually-hidden' }, 'Hold cabinet'));
     const main = h('main', { class: 'fl-main', id: 'fl-board', tabindex: -1, 'aria-label': 'Tickets' }, h('h1', { class: 'visually-hidden' }, 'Smokebox kitchen board'), welcome, grid, empty, cabEl);
 
     // ----- dock
@@ -615,6 +624,7 @@
 
     m.tabParts = {};
     TABS.forEach((id) => { const b = seg.querySelector('[data-id="' + id + '"]'); if (b) m.tabParts[id] = { count: b.querySelector('.seg-count'), n: -1 }; });
+    m.seg = seg; F.applyHiddenTabs();
     m.sanText = sanChip.querySelector('.fl-chip-t');
     Object.assign(m, { wl, wr, head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
 
@@ -747,8 +757,10 @@
   // In the cabinet view toasts move to the top right, under the header and the attention strip, so they never cover a card's buttons.
   // This tells the stylesheet where the page below the strip starts (--fl-toast-top).
   function measureToastTop() {
-    if (!m || !m.main || !m.cabOn) return;
-    doc.documentElement.style.setProperty('--fl-toast-top', Math.round(m.main.getBoundingClientRect().top + 8) + 'px');
+    if (!m || !m.main) return;
+    // Everyday toasts sit just under the header, over the notice strip, where they hide no ticket button.
+    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(m.head.getBoundingClientRect().bottom + 6) + 'px');
+    if (m.cabOn) doc.documentElement.style.setProperty('--fl-toast-top', Math.round(m.main.getBoundingClientRect().top + 8) + 'px');
   }
   // Tells the stylesheet how tall the all-day strip is (--fl-lift) so toasts sit above it.
   function measureDock() {
@@ -788,6 +800,7 @@
   // header stay. opts.batchId scrolls to one batch. Opened from the Cabinet tab, the Hold button, H and the strip rows.
   function showCabinet(on, opts) {
     if (on && roleNow() === 'front') return; // a front-of-house device has no cabinet
+    if (on && !cookOn()) return; // the cook-ahead module is off and no batch holds food
     if (!m || !SB.hold) { if (on) openSheet('hold'); return; }
     if (on) {
       if (!m.cab) m.cab = SB.hold.mount(m.cabEl, opts && opts.tab ? { tab: opts.tab } : {});
@@ -1412,7 +1425,7 @@
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
-    const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, clearBtn('Clear this notice', 'snd'));
+    const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear this notice', 'snd'));
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
     const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
@@ -1444,7 +1457,7 @@
   // alert. level: 1 chime, 2 voice, 3 loud tone, 4 expiry or past.
   function logCall(c) {
     const d = c.d;
-    const lg = F._alerts || (F._alerts = []);
+    const lg = F._alerts;
     const b = d.batchId ? (store().getState().batches.find((x) => x.id === d.batchId) || null) : null;
     const rec = { t: store().now(), id: d.id, kind: d.kind, batchId: d.batchId || null, level: c.level, repeat: !!c.repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG),
       remainingG: b ? Math.round(b.remainingG) : null, cookedG: b ? Math.round(b.cookedG) : null, status: b ? b.status : null, allowed: SB.deadlines.soundsAllowed(store().getState(), store().now()), unknown: !!d.unknown, leader: isLeader() };
@@ -1500,15 +1513,22 @@
     // The strip is for what needs a cook soon: a row waits until the deadline is within the hour (or is already bad, past or out), so a quiet kitchen has no strip.
     const soon = (d) => d.sev === 'bad' || d.kind === 'past' || d.kind === 'expired' || !(d.msLeft > 60 * 60e3);
     if (!m.dis) m.dis = new Set();
-    const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
-    const top = feed.slice(0, 2);
+    // With the cook-ahead part off (and no food in a batch) rows about batches, temperatures and sanitizing stay out of the strip.
+    const ck = cookOn();
+    const batchy = (d) => !ck && (d.batchId || d.kind === 'sanitize' || d.kind === 'check' || d.kind === 'shortfall' || d.kind === 'leftover' || d.kind === 'keepcheck' || d.kind === 'expiry' || d.kind === 'expired' || d.kind === 'past');
+    const feed = all.filter((d) => !d.trivial && !batchy(d) && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
+    // A tablet screen is short: one warning row there (the next shows when this one is cleared or done), two on a tall or far screen.
+    const maxRows = !F.wallActive() && (far || (g.innerHeight || 0) >= 900) ? 2 : 1;
+    const top = feed.slice(0, maxRows);
+    const moreRows = feed.length - top.length;
     const needSound = sound && !audioReady();
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
     const note = sound ? SB.deadlines.pauseNote(store().getState(), now) : 'Sound is off on this tablet: warnings will not be heard. Tap to turn it on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
-    const showNote = !!note && (!sound || top.length > 0) && !m.dis.has('pause:' + note);
+    // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
+    const showNote = !!note && (!sound || top.length > 0) && !m.dis.has('pause:' + note) && (needSound ? m.dis.has('snd') : true);
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
@@ -1526,8 +1546,21 @@
       if (r.el.dataset.snoozed !== sn) r.el.dataset.snoozed = sn;
       setTxt(r.when, d.kind === 'expired' ? 'OUT' : d.kind === 'past' ? 'PAST' : countdownText(d.msLeft));
       setTxt(r.what, d.label);
-      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action);
+      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action + (i === top.length - 1 && moreRows > 0 ? ' (' + moreRows + ' more warning' + (moreRows > 1 ? 's' : '') + ' after this one.)' : ''));
     });
+  }
+
+  // Shows or hides everything that belongs to the cook-ahead part: the Cabinet tab, the Hold button and the sanitize chip.
+  // A cabinet that is open when the part switches off goes back to the tickets.
+  function applyCook(on) {
+    if (m.ck === on) return;
+    m.ck = on;
+    const tab = m.seg.querySelector('[data-id="cabinet"]');
+    if (tab) tab.hidden = !on;
+    if (m.tool.hold && m.tool.hold.b) m.tool.hold.b.hidden = !on;
+    if (m.sanChip) m.sanChip.hidden = !on;
+    m.fitKey = null; // the header has different contents now, so fit it again
+    if (!on && m.cabOn) showCabinet(false);
   }
 
   // Refreshes what depends on data or time: tab counts and overdue dots, button counts, sanitize and
@@ -1537,6 +1570,7 @@
     const S = store();
     const c = S.select.counts();
     m.counts = c;
+    applyCook(cookOn());
     paintRole();
     updateStrip(now);
     driveCallouts(now);
@@ -1553,11 +1587,13 @@
       if (z.id === 'expo') tabCount('expo', c.expo, c.overdue > 0);
       else tabCount(z.id, c.zones[z.id] || 0, (c.overdueByZone[z.id] || 0) > 0);
     });
+    F.applyHiddenTabs();
     // tools with counts
     const recentN = recentCount(S, now);
     toolCount(m.tool.recall, recentN, '', recentN ? recentN + ' recently bumped' : '');
     toolCount(m.tool.hold, c.hold, 'warn', holdReason(c));
     m.seg.setCount('cabinet', c.hold, { alert: c.hold > 0 });
+    { const cc = m.seg.querySelector('[data-id="cabinet"] .seg-count'); if (cc) cc.dataset.zero = c.hold === 0 ? 'true' : 'false'; }
     toolCount(m.tool.board86, c.out86, 'bad', c.out86 ? c.out86 + ' ' + U.plural(c.out86, 'item') + ' off the menu' : '');
     // Orders still open, counted again only when the orders list itself changed.
     const ords = S.getState().orders || [];
@@ -1639,7 +1675,7 @@
   function sanitiseMenu(anchor) {
     SB.ui.menu(anchor, [
       // Logging a check goes through run(), so it can be undone like any action.
-      { label: 'Mark surfaces sanitized', icon: 'check-circle', onClick: () => run('sanitizeDone', {}) },
+      { label: 'Mark surfaces sanitized', icon: 'check-circle', onClick: () => { const go = (who) => run('sanitizeDone', who ? { who } : {}); if (SB.who && SB.who.ask) SB.who.ask(anchor, 'Mark sanitized', go); else go(''); } },
       { label: 'Open the hold cabinet', icon: 'thermometer', onClick: () => showCabinet(true) },
     ].filter((it) => !(roleNow() === 'front' && /cabinet/.test(it.label))), { label: 'Sanitize timer' });
   }
@@ -1658,14 +1694,15 @@
       { hide: kit, label: 'Orders' + (m.openOrders ? ' (' + m.openOrders + ' open)' : ''), icon: 'receipt', onClick: () => openSheet('orders') },
       // Recall and Hold open the same sheets as their header buttons, with the same counts.
       { label: 'Recall' + (recentCount(store(), store().now()) ? ' (' + recentCount(store(), store().now()) + ')' : ''), icon: 'history', onClick: () => openSheet('recall') },
-      { hide: front, label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
+      { hide: front || !cookOn(), label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
       // 86 and Demo open their sheets too.
       { label: '86 board' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
       { hide: kit, label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
       // The sanitize entry opens its own small menu on the same anchor.
-      { label: 'Sanitize timer' + (m.sanText.textContent ? ': ' + m.sanText.textContent : ''), icon: 'shield-check', onClick: () => sanitiseMenu(anchor) },
+      { hide: !cookOn(), label: 'Sanitize timer' + (m.sanText.textContent ? ': ' + m.sanText.textContent : ''), icon: 'shield-check', onClick: () => sanitiseMenu(anchor) },
       { separator: true },
       // Settings, help and the office sit behind the Menu sheet.
+      { hide: !(typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'), label: 'Guide', icon: 'info', onClick: () => SB.guide.open() },
       { label: 'Settings and help', icon: 'settings', onClick: () => openSheet('menu') },
     ].filter((it) => !it.hide);
     // Hiding rows can leave a separator at the top, the bottom or twice in a row; those go.
@@ -1687,29 +1724,30 @@
   function buildWelcome() {
     m.wText = h('p', { class: 'fl-welcome-p' });
     // Opens the "Set up your kitchen" wizard; the card stays until the wizard is finished or it is closed.
-    m.wBlank = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'setup' }, onClick: () => openSheet('wizard') }, ico('sliders', 22), h('span', null, 'Set up your kitchen'));
+    m.wBlank = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'setup' }, onClick: () => openSheet('dishes') }, ico('plus', 22), h('span', null, 'Add more dishes'));
     // Starting the walkthrough also puts this card away for good.
     const tour = h('button', { type: 'button', class: 'btn btn-lg', dataset: { act: 'tour' }, onClick: () => { F.setWelcome(false); startTour(); } }, ico('play', 22), h('span', null, 'Show me how it works'));
     // The x puts the card away for good.
     const close = h('button', { type: 'button', class: 'btn btn-icon fl-welcome-x', 'aria-label': 'Hide this welcome', onClick: () => F.setWelcome(false) }, ico('x', 22));
     m.welcome = h('section', { class: 'fl-welcome', hidden: true, 'aria-labelledby': 'fl-welcome-h' },
       h('span', { class: 'fl-welcome-mark', 'aria-hidden': 'true' }, ico('flame', 34, { stroke: 1.8 })),
-      h('div', { class: 'fl-welcome-body' }, h('h2', { id: 'fl-welcome-h' }, 'Welcome to your kitchen screen'), m.wText,
+      h('div', { class: 'fl-welcome-body' }, h('h2', { id: 'fl-welcome-h' }, 'Your menu is ready'), m.wText,
         h('div', { class: 'fl-welcome-actions' }, m.wBlank, tour)),
       close);
     return m.welcome;
   }
-  // Shows or hides the welcome card. It shows on the All tab while tickets are on the board and it has not
-  // been dismissed. The empty-board button only appears when nothing but pretend tickets are on the board.
+  // Shows or hides the next-step card. It shows on the All tab once there is at least one dish, until the first
+  // ticket exists or someone closes it. With no dishes the empty board's own button does the job instead.
   function paintWelcome() {
     if (!m || !m.welcome) return;
-    const tickets = store().getState().tickets.filter((t) => t.status === 'active');
-    const demoOnly = tickets.length > 0 && tickets.every((t) => t.src === 'demo');
-    const show = !welcomeDone() && m.zone === 'all';
+    const s = store().getState();
+    const n = SB.setup ? SB.setup.dishCount() : 0;
+    // Once any ticket or order exists the first-steps card is finished for good, even if the board is cleared later.
+    if ((s.tickets.length || (s.orders && s.orders.length)) && !welcomeDone()) U.storage.set(KEY_WELCOME, 'done');
+    const show = !welcomeDone() && m.zone === 'all' && n > 0;
     setHidden(m.welcome, !show);
     if (!show) return;
-    const txt = 'Set up your kitchen first: sales tax, hours, your dishes and the food already cooked. Then each paper ticket is an order: tap START when you begin a dish and DONE when it is ready.' + (demoOnly ? ' The tickets on the board are pretend.' : '');
-    put(m.wText, txt);
+    put(m.wText, 'Your menu has ' + n + ' ' + U.plural(n, 'dish', 'dishes') + '. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices.');
   }
   // Hides the card for good, or shows it again (a restarted demo starts with it).
   F.setWelcome = function (on) {
@@ -1719,6 +1757,20 @@
   };
   // True while the welcome card has not been dismissed.
   F.welcome = () => !welcomeDone();
+  // Hides the tab of every station the owner marked "Not used" in Dishes and prices. A station with open tickets or
+  // the one being looked at always keeps its tab, so no ticket is ever out of sight.
+  F.applyHiddenTabs = function () {
+    const sg = m && (m.seg || null);
+    if (!sg) return;
+    const hid = SB.setup && SB.setup.hiddenStations ? SB.setup.hiddenStations() : [];
+    const c = store().select.counts();
+    TABS.forEach((id) => {
+      const b = sg.querySelector('[data-id="' + id + '"]');
+      if (!b || id === 'all' || id === 'expo') return;
+      const keep = hid.indexOf(id) < 0 || id === m.zone || (c.zones[id] || 0) > 0;
+      b.style.display = keep ? '' : 'none';
+    });
+  };
   // Starts the guided walkthrough when it is part of this build; otherwise opens the Help sheet instead.
   function startTour() {
     if (SB.tour && typeof SB.tour.start === 'function') SB.tour.start();
@@ -1729,7 +1781,7 @@
   async function startEmpty() {
     const ok = await SB.ui.confirm({
       title: 'Start with an empty board?', confirmLabel: 'Clear the board', cancelLabel: 'Keep the tickets',
-      body: ['This removes the pretend tickets and anything else logged on this device. Settings stay.'],
+      body: ['This removes the practice tickets and anything else logged on this device. Settings stay.'],
     });
     if (!ok || !m) return;
     try { if (SB.sim && SB.sim.live) SB.sim.live.stop(); } catch (e) { /* the simulator may not be running */ }
@@ -1747,15 +1799,24 @@
   function paintEmpty(c) {
     const e = m.empty;
     const zone = m.zone, stationBusy = modeOf(zone) === 'station' && c && c.all > 0;
-    const title = stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
-    const text = stationBusy
+    const firstRun = !stationBusy && SB.setup && SB.setup.noDishes();
+    const title = firstRun ? 'Welcome. Let\'s build your menu.' : stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
+    const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
-      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or run the busy-night demo. Demo orders are pretend.';
+      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or run the busy-night demo. Demo orders are for practice.';
     const sig = title + '|' + text;
     if (e.dataset.sig === sig) return;
     e.dataset.sig = sig;
     U.clear(e);
     const actions = h('div', { class: 'fl-empty-actions' });
+    // First run: one big friendly button, then two quiet links. No New ticket or demo button competes with it.
+    if (firstRun) {
+      actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'Add your first dish')),
+        h('button', { type: 'button', class: 'btn fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
+        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Try the busy-night demo (practice)')));
+      e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
+      return;
+    }
     // A quiet station while others are busy offers a way back; New ticket is always there.
     if (stationBusy) actions.appendChild(h('button', { type: 'button', class: 'btn btn-lg', onClick: () => goZone('all') }, ico('grid', 22), h('span', null, 'Show all stations')));
     actions.appendChild(h('button', { type: 'button', class: 'btn btn-primary', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket')));
@@ -1767,6 +1828,8 @@
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.
   function startDemo() {
+    // A real kitchen never turns into the demo: the demo is a separate mode (own saved data), entered with a reload.
+    if (store().isolated && store().isolated() && !store().isDemo()) { store().enterDemo(); return; }
     // The pit starts empty now, so the demo first loads its own stocked kitchen (settings stay).
     if (SB.sim && SB.sim.restartDemo && !store().getState().batches.length) SB.sim.restartDemo();
     const live = SB.sim && SB.sim.live;
@@ -1774,7 +1837,7 @@
       try {
         live.start({ rate: 'normal' });
         if (typeof live.crew === 'function') live.crew(true);
-        toast('Busy-night demo started. Orders and the crew are pretend. Open Demo to stop it.', { tone: 'info' });
+        toast('Busy-night demo started. Orders and the crew are for practice. Open Demo to stop it.', { tone: 'info' });
         return;
       } catch (e) { console.error('[smokebox] demo failed to start', e); }
     }
@@ -2071,7 +2134,7 @@
     if (k === 'n') openSheet('order');
     else if (k === 'o') openSheet('orders');
     else if (k === 'r') openSheet('recall');
-    else if (k === 'h') toggleCabinet();
+    else if (k === 'h') { if (cookOn()) toggleCabinet(); }
     else if (k === '8') openSheet('board86');
     else if (k === 'd') openSheet('demo');
     else if (k === '?') openSheet('help');

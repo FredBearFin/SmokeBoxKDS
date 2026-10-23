@@ -41,7 +41,7 @@
   const patchFor = (path, v) => { const ks = path.split('.'); const root = {}; let c = root; ks.forEach((k, i) => { if (i === ks.length - 1) c[k] = v; else c = c[k] = {}; }); return root; };
   // The unit word for an ingredient, and an amount written with that unit.
   const unitWord = (ing) => (ing && ing.unit === 'ea' ? 'pieces' : 'g');
-  const amountText = (ing, v) => (ing && ing.unit === 'ea' ? num(v, 1) + ' ' + U.plural(v, 'piece') : U.fmtG(v));
+  const amountText = (ing, v) => (ing && ing.unit === 'ea' ? num(v, 1) + ' ' + U.plural(v, 'piece') : U.weightText(v));
   // Dollars with cents, as shown in field messages.
   const money = (v) => U.fmtMoney(v, 2);
   // An ingredient note from the config may quote a price per pound; show kilograms instead (this app never
@@ -214,15 +214,15 @@
 
   // Panels. The sticky table of contents links to them; each panel is a section with a focusable heading.
   const SECTIONS = [
-    { id: 'menu', label: 'Menu', title: 'Menu and bills of materials' },
-    { id: 'ingredients', label: 'Ingredients', title: 'Ingredients' },
-    { id: 'times', label: 'Time limits', title: 'Ticket time limits by channel' },
-    { id: 'pacing', label: 'Pacing', title: 'Meal pacing' },
-    { id: 'safety', label: 'Food safety', title: 'Food safety limits' },
-    { id: 'pin', label: 'PIN', title: 'Manager PIN' },
-    { id: 'look', label: 'Appearance', title: 'Appearance and service hours' },
-    { id: 'data', label: 'Data', title: 'Data, backup and reset' },
-    { id: 'about', label: 'About', title: 'About this build' },
+    { id: 'menu', label: 'Menu', title: 'Dishes and what goes in them', group: 'Shop' },
+    { id: 'ingredients', label: 'Ingredients', title: 'Ingredients', group: 'Kitchen' },
+    { id: 'times', label: 'Time limits', title: 'Ticket time limits by channel', group: 'Kitchen' },
+    { id: 'pacing', label: 'Pacing', title: 'Meal pacing', group: 'Advanced' },
+    { id: 'safety', label: 'Food safety', title: 'Food safety limits', group: 'Safety' },
+    { id: 'pin', label: 'PIN', title: 'Manager PIN', group: 'Shop' },
+    { id: 'look', label: 'Appearance', title: 'Appearance and service hours', group: 'Shop' },
+    { id: 'data', label: 'Data', title: 'Data, backup and reset', group: 'Devices' },
+    { id: 'about', label: 'About', title: 'About this build', group: 'Devices' },
   ];
   // One panel: a section with a focusable heading and an empty body. Returns {el, body, title, def}.
   function panel(def, intro) {
@@ -235,6 +235,10 @@
   }
   // Small builders for a sub-heading and a paragraph.
   const sub = (text, id) => h('h3', { class: 'od-sub', id }, text);
+  // The small round "?" that opens one Guide page, or nothing when the Guide did not load.
+  const helpLink = (page, label) => { try { return SB.guide && SB.guide.link ? SB.guide.link(page, label) : null; } catch (e) { return null; } };
+  // A sub-heading with a Guide help link beside it.
+  const subHelp = (text, page, label) => { const hd = sub(text); const hl = helpLink(page, label); if (hl) { hd.appendChild(doc.createTextNode(' ')); hd.appendChild(hl); } return hd; };
   const para = (text, cls) => h('p', { class: cls || 'od-p' }, text);
   // Builders for a quiet hint line and for a button with an optional icon.
   const hintLine = (text) => h('p', { class: 'od-hint' }, text);
@@ -250,7 +254,7 @@
   // A small status chip with an optional icon.
   const chip = (label, tone, icon) => SB.ui.chip({ label, tone, icon });
 
-  // 1. Menu and bills of materials
+  // 1. Dishes and what goes in them
   const BOM_META = { name: 'The amount per portion', unit: 'g', words: () => 'The amount per portion has to be more than 0 and at most 100,000.' };
 
   // The editable ingredient lines of one menu item: add, change or remove, each saved at once. Returns {el,
@@ -282,7 +286,7 @@
         const li = h('li', { class: 'od-bom-line' });
         const sel = h('select', { class: 'select od-bom-sel', 'aria-label': 'Ingredient for ' + itemName });
         sel.appendChild(h('option', { value: l.ing }, name));
-        s.ingredients.forEach((o) => { if (!used.has(o.id)) sel.appendChild(h('option', { value: o.id }, o.name)); });
+        s.ingredients.forEach((o) => { if (!o.hidden && !used.has(o.id)) sel.appendChild(h('option', { value: o.id }, o.name)); });
         sel.value = l.ing;
         const field = numField({
           label: unitWord(ing) === 'g' ? 'Grams' : 'Pieces', aria: name + ' in ' + itemName, hideLabel: true, value: l.qty, min: 1, max: 100000, step: 1, big: 10, unit: unitWord(ing), meta: BOM_META,
@@ -328,7 +332,7 @@
     addBtn.addEventListener('click', () => {
       const s = cur(); if (!s) return;
       const used = new Set(bomNow().map((l) => l.ing));
-      const cand = s.ingredients.find((i) => !used.has(i.id));
+      const cand = s.ingredients.find((i) => !i.hidden && !used.has(i.id));
       if (!cand) return;
       const q = cand.unit === 'ea' ? 1 : 100;
       const r = send('updateMenuItem', { id, patch: { bom: bomNow().concat([{ ing: cand.id, qty: q }]) } });
@@ -454,7 +458,15 @@
     const learnedEl = h('p', { class: 'od-hint od-learned', hidden: true });
     const bom = bomBlock(id, nm, getMi, status);
 
-    const root = h('article', { class: 'od-item', dataset: { id }, 'aria-label': nm },
+    // The compact summary row: name, station, price and prep time on one line; tapping it opens the full form below.
+    const sumName = h('span', { class: 'od-sum-n' }), sumMeta = h('span', { class: 'od-sum-m' }), sumPrice = h('span', { class: 'od-sum-p num' }), sumPrep = h('span', { class: 'od-sum-t num' });
+    const sumBtn = h('button', { type: 'button', class: 'od-sum', 'aria-expanded': 'false' }, sumName, sumMeta, sumPrice, sumPrep, h('span', { class: 'od-sum-i', 'aria-hidden': 'true' }, ico('chevron-down', 18)));
+    const body = h('div', { class: 'od-item-body', hidden: true });
+    // Opens or closes the full form for this dish.
+    const setOpen = (on) => { body.hidden = !on; sumBtn.setAttribute('aria-expanded', on ? 'true' : 'false'); root.dataset.open = on ? 'true' : 'false'; };
+    sumBtn.addEventListener('click', () => setOpen(body.hidden));
+    const root = h('article', { class: 'od-item', dataset: { id, open: 'false' }, 'aria-label': nm }, sumBtn, body);
+    body.append(
       h('div', { class: 'od-item-head' },
         nameField, zoneField, catField,
         h('div', { class: 'od-item-actions' }, archChip, archBtn)),
@@ -466,6 +478,8 @@
 
     return {
       root, id,
+      // Opens the full form, used when the list is filtered to the starter estimates.
+      open: () => setOpen(true),
       // Refreshes this row from the state without touching a field that has focus.
       sync(mi, s) {
         root.dataset.archived = mi.archived ? 'true' : 'false';
@@ -475,6 +489,10 @@
         if (doc.activeElement !== catSel) catSel.value = C.categories.some((c) => c.id === mi.cat) ? mi.cat : '';
         trackSeg.setValue(mi.track === 'two' ? 'two' : 'one');
         root.dataset.zone = mi.zone;
+        sumName.textContent = mi.name;
+        { const zn = C.zoneById[mi.zone] ? C.zoneById[mi.zone].name : '', cn = catName(mi.cat); sumMeta.textContent = (zn.toLowerCase() === cn.toLowerCase() ? zn : zn + ' · ' + cn) + (mi.archived ? ' · Archived' : mi.prepConfirmed ? '' : ' · Starter prep time'); }
+        sumPrice.textContent = money(mi.price); sumPrep.textContent = mmss(mi.prepSec);
+        sumBtn.setAttribute('aria-label', mi.name + ', ' + money(mi.price) + ', prep ' + mmss(mi.prepSec) + '. Tap to edit.');
         price.sync(mi.price); prep.sync(mi.prepSec);
         confSeg.setValue(mi.prepConfirmed ? 'confirmed' : 'starter');
         archChip.hidden = !mi.archived;
@@ -582,7 +600,7 @@
     const addForm = addDishForm((id) => {
       filter.status = 'active'; filter.zone = 'all'; filter.starter = false; applyFilter();
       // The new row is made when the store tells the page; give it a moment, then show it.
-      setTimeout(() => { const row = rows.get(id); if (row) row.root.scrollIntoView({ block: 'nearest', behavior: U.prefersReducedMotion() ? 'auto' : 'smooth' }); }, 80);
+      setTimeout(() => { const row = rows.get(id); if (row) { row.open(); row.root.scrollIntoView({ block: 'nearest', behavior: U.prefersReducedMotion() ? 'auto' : 'smooth' }); } }, 80);
     });
     const addOpenBtn = btn('Add a dish', { icon: 'plus', cls: 'btn-primary' });
     addOpenBtn.addEventListener('click', () => addForm.open());
@@ -625,7 +643,11 @@
     starterChip.classList.add('od-fchip');
     const filters = h('div', { class: 'od-filters' }, segStatus, zoneSel, starterChip);
     const list = h('div', { class: 'od-list' });
-    const emptyEl = h('div', { class: 'od-empty', hidden: true }, h('strong', null, 'No items match.'), h('span', null, ' Change the filter above to see more.'));
+    const emptyT = h('strong', null, 'No items match.'), emptyB = h('span', null, ' Change the filter above to see more.');
+    // The add-your-first-dish button only shows when the menu has no dishes at all; it opens the dishes sheet.
+    const emptyAdd = h('button', { type: 'button', class: 'btn btn-primary', hidden: true, dataset: { act: 'first-dish' } }, ico('plus', 20), h('span', null, 'Add your first dish'));
+    emptyAdd.addEventListener('click', () => { if (SB.sheets && SB.sheets.open) SB.sheets.open('dishes'); });
+    const emptyEl = h('div', { class: 'od-empty', hidden: true }, emptyT, emptyB, emptyAdd);
     list.appendChild(emptyEl);
     pn.body.append(filters, list);
 
@@ -644,6 +666,10 @@
         row.root.hidden = !ok; if (ok) shown++;
       }
       emptyEl.hidden = shown > 0;
+      const none = s.menu.length === 0;
+      emptyT.textContent = none ? 'No dishes yet.' : 'No items match.';
+      emptyB.textContent = none ? ' Add your first dish to start taking orders.' : ' Change the filter above to see more.';
+      emptyAdd.hidden = !none;
     }
     P.syncs.push((s) => {
       const seen = new Set();
@@ -678,17 +704,17 @@
       const r = send('updateIngredient', { id, patch });
       return good(r) ? { ok: true, text: okText } : { ok: false, text: refusal(r, meta) };
     };
-    const parMeta = { name: 'Par', unit: pieces ? 'pieces' : 'g' };
-    const thrMeta = { name: 'The 86 point', unit: pieces ? 'pieces' : 'g' };
+    const parMeta = { name: 'Opening amount', unit: pieces ? 'pieces' : 'g' };
+    const thrMeta = { name: 'The sold-out amount', unit: pieces ? 'pieces' : 'g' };
     const par = numField({
-      label: 'Par (opening stock)', aria: 'Par of ' + nm, value: ing0.parG, min: 0, max: 1e7, step: pieces ? 1 : 100, big: pieces ? 10 : 1000, unit: pieces ? 'pieces' : 'g', meta: parMeta,
-      read: pieces ? null : (u) => U.fmtG(u),
+      label: 'Opening amount (par)', aria: 'Opening amount of ' + nm, value: ing0.parG, min: 0, max: 1e7, step: pieces ? 1 : 100, big: pieces ? 10 : 1000, unit: pieces ? 'pieces' : 'g', meta: parMeta,
+      read: pieces ? null : (u) => U.weightText(u),
       // Par saves through the engine; the line under the row confirms it.
       save: (v) => mkPatch({ parG: v }, 'Saved. Par is ' + amountText(ing0, v) + '. After you reset live data and keep settings, opening stock starts at this amount.', parMeta), onSaved: (t) => status.ok(t),
     });
     const thr = numField({
-      label: '86 point', aria: '86 point of ' + nm, value: ing0.thresholdG, min: 0, max: 1e7, step: pieces ? 1 : 50, big: pieces ? 10 : 500, unit: pieces ? 'pieces' : 'g', meta: thrMeta,
-      read: pieces ? null : (u) => U.fmtG(u), hint: 'Items that use this are 86 at or below this amount.',
+      label: 'Sold out at', aria: 'Sold out at, ' + nm, value: ing0.thresholdG, min: 0, max: 1e7, step: pieces ? 1 : 50, big: pieces ? 10 : 500, unit: pieces ? 'pieces' : 'g', meta: thrMeta,
+      read: pieces ? null : (u) => U.weightText(u), hint: 'Dishes that use this are marked sold out at or below this amount.',
       // The 86 point saves the same way.
       save: (v) => mkPatch({ thresholdG: v }, 'Saved. Items using ' + lower1(nm) + ' go 86 at ' + amountText(ing0, v) + ' or less.', thrMeta), onSaved: (t) => status.ok(t),
     });
@@ -706,9 +732,9 @@
     if (ing0.tcs) {
       const pullMeta = { name: 'The pull size', unit: 'g' };
       pull = numField({
-        label: 'Pull size (one set unit)', aria: 'Pull size of ' + nm, value: ing0.pullG || 1000, min: 50, max: 50000, step: 100, big: 500, unit: 'g', meta: pullMeta,
+        label: 'Amount per take-out', aria: 'Amount per take-out of ' + nm, value: ing0.pullG || 1000, min: 50, max: 50000, step: 100, big: 500, unit: 'g', meta: pullMeta,
         // Shows the pull size in kilograms next to the field once it reaches a kilogram.
-        read: (u) => U.fmtG(u),
+        read: (u) => U.weightText(u),
         hint: 'What one tap on Pull takes out of the cabinet: one whole brisket, one rack, one pan.',
         // The pull size saves through the engine like the other fields.
         save: (v) => mkPatch({ pullG: v }, 'Saved. One tap on Pull takes ' + amountText(ing0, v) + ' out of the cabinet.', pullMeta), onSaved: (t) => status.ok(t),
@@ -753,7 +779,7 @@
       // Shows a yield fraction as a percentage in messages.
       const yMeta = { name: 'The yield', unit: '%', toUi: (v) => v * 100 };
       yField = numField({
-        label: 'Static yield (cooked weight as a share of raw)', aria: 'Static yield of ' + nm, value: ing0.yield, min: 5, max: 300, step: 1, big: 5, unit: '%', meta: yMeta,
+        label: 'Cooked yield (cooked weight as a percent of raw weight)', aria: 'Cooked yield of ' + nm, value: ing0.yield, min: 5, max: 300, step: 1, big: 5, unit: '%', meta: yMeta,
         // The field shows a percentage; the engine stores a fraction.
         toUi: (v) => Math.round(v * 10000) / 100, fromUi: (u) => Math.round(u * 100) / 10000,
         // A yield saves as a fraction; the confirmation names the percentage.
@@ -809,13 +835,15 @@
   // Panel 2: one row per ingredient, kept in step with the store.
   function buildIngredients(P) {
     const pn = panel(SECTIONS[1],
-      'Par is the stock you open with. When stock falls to the 86 point or below, every menu item that uses it goes 86. Weights are grams and kilograms; counted items such as buns and cornbread are pieces. Cooked yield is cooked weight divided by raw weight, and stays a starter estimate until you confirm it from weighed batches. Costs are starter numbers too: replace them with your supplier invoices. Changes save as you make them and apply from now on.');
+      'The opening amount (par) is the stock you start a day with. When stock falls to the sold-out amount or below, every dish that uses it is marked sold out. Weights are grams and kilograms; counted items such as buns and cornbread are pieces. Cooked yield is cooked weight divided by raw weight, and stays a starter estimate until you confirm it from weighed batches. Costs are starter numbers too: replace them with your supplier invoices. Changes save as you make them and apply from now on.');
     const list = h('div', { class: 'od-list' });
     pn.body.appendChild(list);
     const rows = new Map();
     P.syncs.push((s) => {
       const seen = new Set();
       for (const ing of s.ingredients) {
+        // Hidden counted-stock ingredients ("Portions of ...") are kept out of the settings list.
+        if (ing.hidden) continue;
         seen.add(ing.id);
         let row = rows.get(ing.id);
         if (!row) { row = ingRow(P, ing); rows.set(ing.id, row); list.appendChild(row.root); }
@@ -894,10 +922,10 @@
     { key: 'floorSec', name: 'Shortest prep time', min: 1, max: 600, step: 1, big: 15, unit: 's', mean: 'No item is planned for less time than this, even if its prep estimate is shorter.' },
     { key: 'qtyFactor', name: 'Extra time per extra portion', min: 0, max: 200, step: 5, big: 25, unit: '%', pct: true, mean: 'Each extra portion on the same line adds this much to its prep time.' },
     { key: 'qtyCap', name: 'Most a big line can grow', min: 1, max: 10, step: 0.5, unit: '×', mean: 'A line is never planned for more than this many times one portion\'s prep time.' },
-    { key: 'learnK', name: 'Learning strength', min: 0, max: 50, step: 1, unit: 'timings', mean: 'How many real timings it takes to count as much as your starter estimate. Higher learns more slowly; 0 trusts the line from the first timing.' },
-    { key: 'minFactor', name: 'Learned time never below', min: 0.1, max: 1, step: 0.05, unit: '× starter', mean: 'The learned prep time cannot fall under this share of your starter estimate.' },
-    { key: 'maxFactor', name: 'Learned time never above', min: 1, max: 10, step: 0.25, unit: '× starter', mean: 'The learned prep time cannot rise over this many times your starter estimate.' },
-    { key: 'outlierFactor', name: 'Trim a very long timing at', min: 1, max: 20, step: 0.5, unit: '× starter', mean: 'A timing longer than this is cut back to this length before it is learned from, so one forgotten tap cannot skew the estimate.' },
+    { key: 'learnK', name: 'How fast it learns your real times', min: 0, max: 50, step: 1, unit: 'timings', mean: 'How many real timings it takes to count as much as your starter estimate. Higher learns more slowly; 0 trusts the line from the first timing.' },
+    { key: 'minFactor', name: 'Learned time never below', min: 0.1, max: 1, step: 0.05, unit: 'times the starter time', mean: 'The learned prep time cannot fall under this share of your starter estimate.' },
+    { key: 'maxFactor', name: 'Learned time never above', min: 1, max: 10, step: 0.25, unit: 'times the starter time', mean: 'The learned prep time cannot rise over this many times your starter estimate.' },
+    { key: 'outlierFactor', name: 'Ignore a timing longer than', min: 1, max: 20, step: 0.5, unit: 'times the starter time', mean: 'A timing longer than this is cut back to this length before it is learned from, so one forgotten tap cannot skew the estimate.' },
   ];
 
   // Panel 4: the on/off switch and seven numbers, each inside the engine's range.
@@ -958,7 +986,7 @@
     { key: 'belowHotGraceH', name: 'Time allowed below hot hold', unit: 'hours', step: 0.5, legal: 'max', mean: 'Food can sit below hot hold this long before it must be thrown out. A reheat is only allowed inside this window.' },
     { key: 'aboveColdGraceH', name: 'Time allowed above cold hold', unit: 'hours', step: 0.5, legal: 'max', mean: 'Cold food can sit above cold hold this long before it must be thrown out.' },
     { key: 'defaultMaxHoldH', name: 'Hold limit for a product with none of its own', unit: 'hours', step: 0.5, mean: 'Every starter product has its own limit; this is only used for one that has not.' },
-    { key: 'hardCapH', name: 'Hard cap: longest any batch may stay', unit: 'hours', step: 0.5, mean: 'At this age any batch is thrown out, whatever its limit kind. A product whose own limit is at or above it has no quality stage: it is thrown out at the cap.' },
+    { key: 'hardCapH', name: 'Longest any batch may stay', unit: 'hours', step: 0.5, mean: 'At this age any batch is thrown out, whatever its limit kind. A product whose own limit is at or above it has no quality stage: it is thrown out at the cap.' },
     { key: 'tempCheckEveryMin', name: 'Temperature check every', unit: 'min', step: 5, mean: 'A temperature reading is due this often for every batch.' },
     { key: 'sanitizeEveryH', name: 'Sanitize food-contact surfaces every', unit: 'hours', step: 0.5, legal: 'max', mean: 'The sanitize timer on the line counts down from this.' },
   ];
@@ -972,10 +1000,10 @@
   ];
   // The legal reason shown under a field and added to its refusal.
   const LEGAL_NOTE = {
-    hotHoldF: 'Smokebox never lets hot hold go below 135\u00a0°F: that is the food-code minimum.',
-    reheatF: 'A reheat target below 165 °F is not allowed: that is the food-code minimum.',
-    coldHoldF: 'Cold hold cannot go above 41 °F: that is the food-code maximum.',
-    belowHotGraceH: '2 hours is the food-code maximum.', aboveColdGraceH: '4 hours is the food-code maximum.', sanitizeEveryH: '4 hours is the food-code maximum.',
+    hotHoldF: 'The FDA Food Code sets 135\u00a0°F as the minimum for hot holding. Your local health code applies and may be stricter.',
+    reheatF: 'The FDA Food Code sets 165 °F as the minimum reheat target. Your local health code applies.',
+    coldHoldF: 'The FDA Food Code sets 41 °F as the maximum for cold holding. Your local health code applies.',
+    belowHotGraceH: 'The FDA Food Code allows at most 2 hours. Your local health code applies.', aboveColdGraceH: 'The FDA Food Code allows at most 4 hours. Your local health code applies.', sanitizeEveryH: 'The FDA Food Code allows at most 4 hours between wipe-downs. Your local health code applies.',
   };
 
   // Panel 5: food-safety limits, always inside the legal bounds, with the legal note shown.
@@ -983,7 +1011,7 @@
     const pn = panel(SECTIONS[4]);
     pn.body.append(
       h('p', { class: 'od-safetyline' }, ico('shield-check', 20), h('span', null, C.safetyLine)),
-      para('Smokebox never lets hot hold go below 135\u00a0°F, and it refuses any limit outside the range shown under each field, naming the one that is wrong. These limits drive the hold cabinet, the temperature checks and the sanitize timer. A change applies from the next check on; batches already in the cabinet are re-checked against it.', 'od-intro'));
+      para('Smokebox refuses a hot-hold limit below 135\u00a0°F (the FDA Food Code minimum; your local health code applies and may be stricter), and it refuses any limit outside the range shown under each field, naming the one that is wrong. These limits drive the hold cabinet, the temperature checks and the sanitize timer. A change applies from the next check on; batches already in the cabinet are re-checked against it.', 'od-intro'));
     const status = statusLine();
     // Builds one safety field from its spec and the bounds in the config. Returns {f, path}.
     const mk = (spec, path, legalKey) => {
@@ -997,7 +1025,7 @@
       // Cross-field wording: the total cooling time has to be longer than the first stage.
       if (path === 'safety.cooling.totalH') meta.words = (info) => (info.min > lo ? 'The total cooling time has to be longer than the first stage (' + num(((cur() || {}).settings.safety.cooling || {}).stage1H) + ' hours): ' + num(info.min) + ' hours or more.' : null);
       META[path] = meta;
-      const legalWord = spec.legal === 'min' ? ' Legal minimum ' + lo + unitText + '.' : spec.legal === 'max' ? ' Legal maximum ' + hi + unitText + '.' : '';
+      const legalWord = spec.legal === 'min' ? ' FDA Food Code minimum ' + lo + unitText + '.' : spec.legal === 'max' ? ' FDA Food Code maximum ' + hi + unitText + '.' : '';
       const start = getPath((cur() || {}).settings, path);
       const f = numField({
         label: spec.name, value: start, min: lo, max: hi, step: spec.step, big: spec.big || 0, unit: spec.unit, meta, hint: spec.mean + ' Allowed: ' + num(lo) + ' to ' + num(hi) + unitText + '.' + legalWord,
@@ -1154,10 +1182,14 @@
       seg.setAttribute('aria-labelledby', lid);
       return { wrap, seg, get };
     };
+    // Saves a unit choice (temperature or weight) in the settings and redraws the back office numbers.
+    const saveUnit = (key, v) => { const r = send('updateSettings', { patch: { ui: { [key]: v } } }); if (good(r)) { try { if (SB.office && SB.office.refresh) SB.office.refresh(); } catch (e) { /* the next refresh catches up */ } } };
     const segs = [
       mkSeg('Back office theme', 'Ember is dark and warm, Paper is light. This page and every chart follow it.', themeOpts(['ember', 'Ember'], ['paper', 'Paper']), () => SB.theme.office(), (v) => SB.theme.setOffice(v)),
       mkSeg('Line theme', 'Day is the anti-glare parchment for bright kitchens, Night is for a dim prep corner.', themeOpts(['day', 'Day'], ['night', 'Night']), () => SB.theme.get(), (v) => SB.theme.set(v)),
       mkSeg('Text size', 'Large makes all text about 20% bigger on the line and in the back office.', themeOpts(['normal', 'Normal'], ['large', 'Large']), () => SB.theme.textSize(), (v) => SB.theme.setTextSize(v)),
+      mkSeg('Temperatures', 'Shows temperatures in Fahrenheit or Celsius. Food-safety limits are still stored in Fahrenheit, so the limits on the Food safety page are entered in F.', themeOpts(['F', '°F'], ['C', '°C']), () => ((cur() || {}).settings.ui || {}).tempUnit || 'F', (v) => saveUnit('tempUnit', v)),
+      mkSeg('Weights', 'Shows food weights in kilograms and grams, or in pounds and ounces. Amounts you type on the Ingredients page are still in grams.', themeOpts(['kg', 'kg and g'], ['lb', 'lb and oz']), () => ((cur() || {}).settings.ui || {}).weightUnit || 'kg', (v) => saveUnit('weightUnit', v)),
     ];
     const status = statusLine();
     const hasSound = !!(SB.floor && typeof SB.floor.setSound === 'function');
@@ -1212,10 +1244,10 @@
       },
     });
     // Minutes a dish off the menu for a quality limit waits before the channels hear it, in case it is kept serving.
-    const qMeta = { name: 'Channel update wait', fmt: (v) => v + ' min' };
+    const qMeta = { name: 'Wait before other apps are told', fmt: (v) => v + ' min' };
     META['service.qualitySyncHoldMin'] = qMeta;
     const qHold = numField({
-      label: 'Wait before channels hear a quality 86', value: (cur() || {}).settings.service.qualitySyncHoldMin, min: 0, max: 30, step: 1, unit: 'min', meta: qMeta,
+      label: 'Wait before other apps are told an item is past best-by', value: (cur() || {}).settings.service.qualitySyncHoldMin, min: 0, max: 30, step: 1, unit: 'min', meta: qMeta,
       hint: 'A dish past its quality limit may be tasted and kept. The delivery apps are told it is off only after this wait. A safety lock tells them at once.',
       // Saves the wait as a service setting and confirms it in words.
       save: (v) => saveSetting('service.qualitySyncHoldMin', v, 'Saved. Channels wait ' + v + ' min.', qMeta), onSaved: (t) => sst.ok(t),
@@ -1225,7 +1257,7 @@
 
     // Sales tax: one rate that is added to every order when it is paid.
     pn.body.appendChild(sub('Sales tax'));
-    pn.body.appendChild(para('Added on top of the food when an order is paid, and shown in Takings. Leave it at 0 if your menu prices already include tax, and ask your tax office for the right rate.', 'od-hint'));
+    pn.body.appendChild(para('Added on top of the food when an order is paid, and shown in Money collected. Leave it at 0 if your menu prices already include tax, and ask your tax office for the right rate.', 'od-hint'));
     const tst = statusLine();
     // How a tax rate is written in a refusal message, like 6.5%.
     const taxFmt = (v) => v + '%';
@@ -1325,7 +1357,7 @@
   // Turns a backup check error into a sentence a cook can understand.
   function backupReason(err) {
     const e = String(err || '');
-    if (/^not JSON/.test(e)) return 'It is not readable JSON: it is probably not a Smokebox backup, or it was cut off.';
+    if (/^not JSON/.test(e)) return 'The text could not be read: it is probably not a Smokebox backup, or it was cut off.';
     if (/^not an object/.test(e)) return 'It is not a Smokebox backup (the top level is not a record).';
     if (/^unsupported version undefined/.test(e)) return 'It does not say which Smokebox version made it, so it is probably not a backup.';
     if (/^unsupported version/.test(e)) return 'It was made by a different Smokebox version (' + e.replace('unsupported version ', 'version ') + ').';
@@ -1371,7 +1403,7 @@
     let lastRev = -1, lastSizeAt = 0;
     // Size of what is stored on this device, in characters; falls back to the live state.
     const storedChars = () => {
-      try { const raw = g.localStorage && g.localStorage.getItem(SB.store.KEY); if (raw) return raw.length; } catch (e) { /* fall through */ }
+      try { const raw = SB.util.storage.raw(SB.store.KEY); if (raw) return raw.length; } catch (e) { /* fall through */ }
       try { return JSON.stringify(cur()).length; } catch (e) { return null; }
     };
     // The simulator when it can switch sample history, otherwise null (the page then says it is not
@@ -1413,7 +1445,7 @@
     else sampleBox.append(h('p', { class: 'od-p od-warnline' }, ico('alert', 18), h('span', null, 'Simulator not loaded. This build has no sample history, so the back office shows only live tickets.')), para(SAMPLE_NOTE, 'od-hint'));
 
     // Export: JSON backup and CSV tables go through saveFile, with copy as the fallback.
-    pn.body.appendChild(sub('Export'));
+    pn.body.appendChild(subHelp('Export', 'backup-and-restore', 'backing up'));
     const exStatus = statusLine();
     const fbLabelId = U.uid('odfb');
     const fbText = h('textarea', { class: 'textarea od-fbtext', readonly: true, rows: 6, 'aria-labelledby': fbLabelId, spellcheck: 'false' });
@@ -1514,7 +1546,7 @@
       exStatus.el, fb);
 
     // Import: a chosen file or pasted text is checked and summarized before anything changes.
-    pn.body.appendChild(sub('Import'));
+    pn.body.appendChild(subHelp('Import', 'replacing-a-device', 'replacing a device'));
     const impHost = h('div', { class: 'od-import' });
     const impResult = h('div', { class: 'od-impresult', 'aria-live': 'polite' });
     const fileIn = h('input', { type: 'file', accept: '.json,application/json,text/plain', class: 'visually-hidden', tabindex: -1, 'aria-hidden': 'true', id: U.uid('odfile') });
@@ -1673,7 +1705,6 @@
       ['What is a starter estimate', 'Prep times, cooked yields and ingredient costs began as starter numbers. Prep times and yields keep the label "starter estimate" until you confirm them. Costs stay starter numbers until you replace them with your invoices.'],
       ['What has not been tested', 'It was tested in Chromium at phone, tablet and desktop sizes. Not tested: real sunlight on a real screen, and other devices and browsers. Try the line on the actual tablet before service.'],
       ['Several devices', 'Separate devices do not share data. Tablets open in the same browser on the same device do, and stay in step.'],
-      ['Pitcall', 'Smokebox is separate from Pitcall; later they can share the sell-out times.'],
     ];
     pn.body.appendChild(h('dl', { class: 'od-about' }, items.map(([k, v]) => h('div', { class: 'od-about-row' }, h('dt', null, k), h('dd', null, v)))));
     return pn;
@@ -1721,10 +1752,17 @@
     function goTo(id) {
       const el = doc.getElementById('od-' + id);
       if (!el) return;
+      const adv = el.closest('details'); if (adv) adv.open = true; // an Advanced panel opens before it is scrolled to
       el.scrollIntoView({ block: 'start', behavior: U.prefersReducedMotion() ? 'auto' : 'smooth' });
       const t = el.querySelector('.od-title'); if (t) t.focus({ preventScroll: true });
     }
-    SECTIONS.forEach((sec) => {
+    // The Settings are grouped by task. Panels keep their old numbers; only the order on the page changes.
+    // Group order: Shop, Kitchen, Safety, Devices, then Advanced (collapsed by default).
+    const ORDER = ['menu', 'look', 'pin', 'ingredients', 'times', 'safety', 'data', 'about', 'pacing'].map((id) => SECTIONS.findIndex((s) => s.id === id)).filter((i) => i >= 0);
+    let lastGroup = '';
+    ORDER.forEach((i) => {
+      const sec = SECTIONS[i];
+      if (sec.group !== lastGroup) { lastGroup = sec.group; tocList.appendChild(h('li', { class: 'od-toc-group', role: 'presentation' }, sec.group)); }
       const a = h('a', { class: 'od-toc-link', href: '#od-' + sec.id, dataset: { target: sec.id } }, sec.label);
       a.addEventListener('click', (ev) => { ev.preventDefault(); goTo(sec.id); }); // a real hash would be read by the router as "leave the office"
       links.push(a);
@@ -1742,7 +1780,12 @@
         return pn;
       }
     });
-    const content = h('div', { class: 'od-content' }, ...panels.map((p) => p.el));
+    // Panels go in group order; the Advanced ones sit inside a fold that starts closed.
+    const content = h('div', { class: 'od-content' });
+    ORDER.forEach((i) => {
+      if (SECTIONS[i].group !== 'Advanced') { content.appendChild(panels[i].el); return; }
+      content.appendChild(h('details', { class: 'od-adv' }, h('summary', null, 'Advanced: ' + SECTIONS[i].label), panels[i].el));
+    });
     root.append(headBox, h('div', { class: 'od-layout' }, toc, content));
 
     // the frame keeps its own sticky bar (the data banner) at the top of the scroll area: sit the contents
@@ -1766,9 +1809,9 @@
       const bar = frameBar();
       const line = (bar ? bar.getBoundingClientRect().bottom : 0) + 90;
       let best = SECTIONS[0].id;
-      panels.forEach((p, i) => { if (p.el.getBoundingClientRect().top <= line) best = SECTIONS[i].id; });
+      ORDER.forEach((i) => { const r = panels[i].el.getBoundingClientRect(); if (r.height > 0 && r.top <= line) best = SECTIONS[i].id; });
       const atEnd = scroller === g ? false : scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4; // the last panels are short and never reach the line
-      if (atEnd) best = SECTIONS[SECTIONS.length - 1].id;
+      if (atEnd) best = SECTIONS[ORDER[ORDER.length - 1]].id;
       links.forEach((a) => { if (a.dataset.target === best) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current'); });
     }
     // Runs markCurrent at most once per frame.

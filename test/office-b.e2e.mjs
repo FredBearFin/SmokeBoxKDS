@@ -201,7 +201,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
     return { revenue: cmp.kpis.revenue.current, avg: SB.metrics.avgTicketValue(p).avg, cost: SB.metrics.foodCostPct(p).costPct, sold: items.reduce((a, r) => a + (r.sold || 0), 0), err: yc ? yc.staticCostErr : null, staticY: yc ? yc.staticYield : null, trueCost: yc ? yc.trueCostPerCookedKg : null, raw: yc ? yc.costPerKgRaw : null };
   });
   const tiles = await page.evaluate(() => [...document.querySelectorAll('.of-tile')].map((t) => ({ label: t.querySelector('.of-tile-label').textContent.trim(), val: t.querySelector('.of-tile-val').textContent.trim() })));
-  check('tiles: Food sold, Average ticket value, Food cost, Items sold, in that order', tiles.map((t) => t.label).join('|') === 'Food sold|Average ticket value|Food cost|Items sold', tiles.map((t) => t.label));
+  check('tiles: Sales, Average order, Food cost, Items sold, in that order', tiles.map((t) => t.label).join('|') === 'Sales|Average order|Food cost|Items sold', tiles.map((t) => t.label));
   // Pulls the number out of a text such as 12.5 kg.
   const num = (s) => parseFloat(String(s).replace(/[^0-9.]/g, ''));
   check('tiles: revenue matches SB.metrics', num(tiles[0].val) === Math.round(ref.revenue), [tiles[0].val, ref.revenue]);
@@ -315,7 +315,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   check('verdict: a plain answer in a tone with a word, not colour alone', ['good', 'warn', 'bad'].indexOf(v.tone) >= 0 && v.word.length > 2 && v.title.length > 15, v);
   check('verdict: the body quotes the compliance numbers', v.body.indexOf(Math.round(ref.temp * 100) + '%') >= 0 && v.body.indexOf(String(ref.tempN)) >= 0, [v.body, ref]);
   if (v.tone !== 'good') check('verdict: the one problem is named with a day and a button to it', /Mon|Tue|Wed|Thu|Fri|Sat|Sun/.test(v.extra) && /^Show/.test(v.btn.trim()), v);
-  const ringTxt = await card(page, 'Compliance score').textContent();
+  const ringTxt = await card(page, 'Checks kept on time').textContent();
   check('ring: the compliance score is shown and matches', ringTxt.indexOf(Math.round(ref.score * 100) + '%') >= 0, [ringTxt.slice(-120), ref.score]);
   const tsub = await card(page, 'Temperature checks on time').locator('.of-card-sub').textContent();
   const ssub = await card(page, 'Sanitize rounds on time').locator('.of-card-sub').textContent();
@@ -349,7 +349,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   const heightAll2 = await card(page, 'Batch timeline').locator('.ch-svg').evaluate((s) => s.getBoundingClientRect().height);
   check('timeline: all batches draws a taller chart than problems only', heightAll2 >= heightAll, [heightAll, heightAll2]);
   const leg = await card(page, 'Batch timeline').textContent();
-  check('timeline: legend names the four colours in words', ['Safe to serve', 'Temperature check due', 'Reheat or chill now', 'Thrown away'].every((w) => leg.indexOf(w) >= 0));
+  check('timeline: legend names the four colours in words', ['In range', 'Temperature check due', 'Reheat or chill now', 'Thrown out'].every((w) => leg.indexOf(w) >= 0));
   // verdict button jumps
   if (v.tone !== 'good') {
     await page.locator('.ob-co-act .btn').click();
@@ -359,10 +359,10 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
     check('verdict button: moves the timeline to the problem day', sel.indexOf(day) === 0, [sel, day]);
   }
   // discards
-  const d0 = await svgLabel(page, 'Discards by reason');
-  await card(page, 'Discards by reason').locator('.seg-opt', { hasText: 'Cost' }).click();
+  const d0 = await svgLabel(page, 'Thrown out by reason');
+  await card(page, 'Thrown out by reason').locator('.seg-opt', { hasText: 'Cost' }).click();
   await wait(300);
-  const d1 = await svgLabel(page, 'Discards by reason');
+  const d1 = await svgLabel(page, 'Thrown out by reason');
   check('discards: the Weight/Cost switch changes the chart', d0 !== d1 && /by cost/.test(d1) && /by weight/.test(d0), [d0, d1]);
   check('waste by day has a watch line', /watch line/i.test(await svgLabel(page, 'Waste by day')));
   // lockouts
@@ -421,7 +421,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   const sg = await page.locator('.ob-sg').evaluateAll((els) => els.map((e) => e.textContent));
   check('cook tomorrow: one card per protein with the numbers it used', sg.length === ref.so.proteins.length && sg.every((s) => /Cook about [\d.]+ kg|Not enough/.test(s) && /Suggestion from (days that include simulated sample data|your own days)|Not enough/.test(s)), sg);
   check('cook tomorrow: clearly labelled as a suggestion from the days in range, not a forecast', /suggestion from the days in the range above, not a forecast/i.test(await card(page, 'What to cook tomorrow').locator('.of-card-sub').textContent()));
-  check('cook tomorrow: the Pitcall seam sentence is there, and says nothing is sent', /Pitcall can use the sell-out time to decide tomorrow's cook count\./.test(await mainText(page)) && /nothing is sent to Pitcall/.test(await mainText(page)));
+  check('cook tomorrow: no Pitcall note is shown to the owner', !/Pitcall/.test(await mainText(page)));
   // pickers
   const ingSel = card(page, 'Stock level').locator('select').nth(1), daySel = card(page, 'Stock level').locator('select').nth(0);
   const iOpts = await ingSel.locator('option').evaluateAll((os) => os.map((o) => [o.value, o.textContent]));

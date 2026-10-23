@@ -38,3 +38,47 @@ Ticket levels read clearly with icon plus words (Running late, Overdue +N min). 
 ## Not checked
 
 Real audio, real touch, Safari and iPad, phone widths, role views (`?role=`), the Recall, 86 and Help sheets, Take payment with tip and discount, the guided tour, Far display at 1024.
+
+## Round 2 status
+
+Screenshots: `docs/ux-shots/night/a1/r2-*.png`. Test: `test/board-round2.e2e.mjs` (19 checks, all pass) and `test/strip-notices.e2e.mjs`. Everything is simulated in headless Chromium.
+
+Fixed:
+- P1-3 chrome: the sound bar and the "Sound paused" note no longer show together (the sound bar wins), and a screen under 900 px tall shows one warning row (the rest are counted in "(N more warnings after this one)"). With the backup banner hidden the first ticket starts at or above y=200 at 1280x800 and 1024x768. The backup banner (shell file) still adds 60 px after closing time.
+- Toasts: info clears after 5 s, warnings after 6 s, errors stay until cleared (`60-shell.js`, 2 lines). With no sheet open they sit under the header on the notice strip, not over ticket buttons; with a sheet open they stay bottom-left.
+- P1-4 New ticket: the customer name box is above the quick names.
+- Sold-out dish tap: says "Out of Brisket. Log a batch to sell Brisket, 1/2 lb again." (and a reason-specific line for hand-off, safety hold, quality limit).
+- Empty menu: "No dishes yet" and an "Add your first dish" button that opens the setup wizard.
+- P1-5 all-overdue board: worst ticket tagged "Do this first", next two "Next", the rest calm paper with a thin red edge and no pulsing.
+- B2 tab labels stay on one line; B4 a hidden "Hold cabinet" heading in the Cabinet view; B3 loudness slider and Channel sync row are 44 px tall; `SB.floor._alerts` made once.
+- Wording: no "safe"/"unsafe" claims in my files; Specs removed from the Menu sheet (still opens with `SB.sheets.open('specs')` and from Help while the demo is loaded); Pitcall mention removed; pretend, made-up, simulated and sample now say "practice" (the word "Demo" itself is kept for the button and tags, per the glossary option).
+
+Still open: P1-6 one-tap pay default method; P2 items 1-3, 5-11 above; the "New tablet?" toast stays 15 s (`77-floor-setup.js:171`, A2); the Demo and tag names; welcome buttons at 38 px (A2).
+
+## Round 3 status
+
+Screenshots: `docs/ux-shots/night/a1/r3-*.png` (blank board with the module off, demo board, 1024 and 1280, Day and Night, Paid by menu, slim banner). Tests: `test/board-round3.e2e.mjs` (18 checks) and the updated `test/board-round2.e2e.mjs`. Simulated in headless Chromium only.
+
+Fixed:
+- **Cook-ahead parts hide when the module is off** (`70-floor-board.js` `cookOn`): Cabinet tab, Hold button, key H, Sanitize chip, batch and temperature rows in the notice strip, the Hold and Sanitize entries in the quick menu, the 86 board "Nothing is cooked yet" note, the stock food-safety note and the Thrown-out log entry. If any batch still holds food, everything stays. An open cabinet closes when the module switches off. Absent setting means on, so the barbecue demo is unchanged.
+- **Guide** entry in the quick menu and the Menu sheet, only when `SB.guide.open` exists.
+- **Wording:** Thrown-out log, "In range" for "Holding fine", smoker and pit wording made neutral ("Ready at", "Batch on its way", "second batch"), "(practice)" on the first-run demo link. The Demo restart confirm now says it erases the owner's dishes and the button reads "Erase my dishes and restart" when they have any; `Sim.restartDemo({ replaceOwn })` passes the confirmed choice through (3-line change in `45-sim.js`).
+- **Backup banner** is a 40 px bar: one line, a small action, and an X (the old "Later" is now the X, with "Later" kept for screen readers). The save-failure banner has no X on purpose.
+- **Polish:** zero badges are hidden; welcome buttons 44 px and the welcome text is no longer cut; the All-day strip fades at its right edge; wall mode shows one notice row and no sound-pause note.
+- **One-tap pay:** a "Paid by Cash" switch beside Pay (menu: Cash, Card, Other). The Pay button names the method, the choice is remembered on the device (`smokebox.v1.paymethod`), the Tip or discount sheet also remembers it, and the 10 s undo is unchanged.
+
+Left: P2 items 3, 6-11 of the first list; the "New tablet?" 15 s toast (A2); Help sheet text about the cabinet still shows when the module is off.
+
+## Round 4 status
+
+Screenshots: `docs/ux-shots/night/a1/r4-*.png` (blank with the module off and on, demo, 1024 and 1280, Day and Night, Large text, blank 86 board, blank New ticket page, thrown-out log, PIN fold, help links). Test: `test/board-round4.e2e.mjs`. Simulated in headless Chromium only.
+
+Fixed:
+- **Empty menu:** combos no longer appear unless every dish in them is on the menu; the blank New ticket page hides search and categories and shows "No dishes yet" with "Add your first dish" (which now opens the Dishes screen); the blank 86 board shows the same friendly block instead of two zero tabs, an empty Stock heading and Channel sync. Settings text no longer says "Hush puppies"; Stock and the sound line drop food and batch talk when cook-ahead is off.
+- **"?" help links** (guarded on `SB.guide`): Orders and Take payment sheets, New ticket sheet and page, Hold cabinet sheet and page, the sound bar, and the PIN pad. Not done by me: Set up this tablet (A2's file).
+- **Close the day** button in the Orders footer (shows only when `SB.office.openCloseDay` exists).
+- **Staff initials:** asked once per tablet (and again after 2 idle hours) when logging a temperature, reheating, discarding or marking surfaces sanitized, only with cook-ahead on; "Skip" never blocks the action. The cabinet shows "Entries are saved as JM" with Switch person, the batch card says "checked by JM 2:40 pm", and the thrown-out log fills initials from the entry.
+- **Fix an entry** in the thrown-out log uses `correctSafety`: the old entry stays, the fix is a new entry with initials and time, and the box says so in plain words.
+- **PIN lock-out:** a "Forgot the PIN?" fold under the keypad (what the PIN protects, that it cannot be recovered, ask whoever set it, clear site data, restore a backup that brings its old PIN back). The lock message points to it. Options for Freddy: `docs/audit/pin-recovery-options.md`. No PIN logic changed.
+
+Left: the tour toast on an empty menu (message sent to A4 with the new text); the "?" on Set up this tablet (A2); "Fix this entry" only covers thrown-out entries (not temperature or sanitize rows, which need a safety page owner); initials are not asked for start cooling or keep serving beyond the existing keep-serving box; P2 items 3 and 6 to 11 of the first list.

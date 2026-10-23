@@ -87,9 +87,11 @@ a.of-nav:active { background: var(--press); }
 .of-coach { max-width: 40em; padding: var(--sp-5) var(--sp-6); margin: 0 0 var(--sp-6); border: 1px dashed var(--line2, var(--line)); border-radius: var(--r-3, 12px); background: var(--ch-surface, transparent); }
 .of-coach-t { margin: 0 0 var(--sp-2); font: var(--w-semi) var(--fs-5, 22px)/1.2 var(--font-display); color: var(--ink); }
 .of-coach-b { margin: 0; font-size: var(--fs-3, 16px); line-height: 1.5; color: var(--ink2); }
+.of-coach-sample { margin-top: var(--sp-4); }
+.of-coach-n { margin: var(--sp-2) 0 0; font-size: var(--fs-1); color: var(--ink3); }
 .of-page[data-coach="on"] > .of-tiles-wrap, .of-page[data-coach="on"] > .of-grid { display: none; }
 .of-headline { margin: var(--sp-2) 0 var(--sp-6); max-width: 34em; font: var(--w-medium) clamp(24px, 2.7vw, 38px)/1.17 var(--font-display); letter-spacing: 0.003em; color: var(--ink2); text-wrap: balance; overflow-wrap: break-word; }
-.of-hn { font-weight: var(--w-bold); color: var(--ink); }
+.of-hn { font-weight: var(--w-bold); color: var(--ink); white-space: nowrap; }
 
 /* KPI strip: hairline cells instead of boxed cards */
 .of-tiles-wrap { margin: 0 0 var(--sp-2); }
@@ -275,8 +277,12 @@ a.of-nav:active { background: var(--press); }
   .of-ins-tone { gap: 6px; }
   .of .of-card-actions .ch-tbtn, .of .of-card-actions .btn { min-height: 38px; }
 }
-@media (max-width: 520px) {
+@media (max-width: 720px) {
   .of-theme-w { display: none; }
+  .of-theme { width: 44px; padding: 0; justify-content: center; }
+}
+.of-theme { flex: none; white-space: nowrap; }
+@media (max-width: 520px) {
   /* the title keeps its own width; the buttons drop under it only when both cannot share one row */
   .of-title { flex: 0 0 auto; overflow-wrap: normal; }
   .of-top-actions { flex-wrap: nowrap; margin-left: auto; }
@@ -337,3 +343,9 @@ a.of-nav:active { background: var(--press); }
 .sb-glance[data-size="wall"] .sb-g-l { font-size: clamp(18px, 2.2vw, 30px); }
 .sb-glance[data-size="wall"] .sb-g-v { font-size: clamp(44px, 7vw, 96px); }
 .sb-glance[data-size="wall"] .sb-g-s { font-size: clamp(16px, 1.8vw, 26px); }
+
+/* Pages with nothing to show because cooked-ahead food is not tracked: a quiet rail entry, no filter bar. */
+.of-nav-off { font-size: var(--fs-1); color: var(--ink3); }
+.of-nav.is-off { opacity: 0.8; }
+.of[data-gated="true"] .of-filters { display: none; }
+.of-section[hidden], .of-card[hidden] { display: none; }

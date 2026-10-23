@@ -382,6 +382,11 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--gutter);
   background: var(--tint-warn); color: var(--ink); border-bottom: 3px solid var(--amber);
 }
+/* A slim reminder bar (about 40 px): one line of text, a small action and a clear (x). */
+.sb-banner { min-height: 40px; padding-block: 2px; gap: var(--sp-2); font-size: var(--fs-2); border-bottom-width: 2px; }
+.sb-banner-t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-banner .btn { min-height: 34px; padding-block: 0; white-space: nowrap; flex: none; }
+.sb-banner .sb-banner-x { min-width: 40px; padding: 0; }
 .sb-banner[data-tone="bad"] { background: var(--tint-bad); border-bottom-color: var(--crimson); }
 .sb-banner-t { flex: 1 1 auto; min-width: 0; font-weight: 600; }
 .sb-shell[data-banner] > .layer { top: var(--sb-banner-h, 52px); }
@@ -717,3 +722,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
 /* A station, category or channel added by the owner has no hue of its own, so it gets a neutral one. */
 [data-zone]:not([data-zone="pit"], [data-zone="sides"], [data-zone="fry"], [data-zone="cold"], [data-zone="expo"]) { --zc: var(--ink3); }
+
+/* The "Forgot the PIN?" help folded under the keypad. */
+.pin-forgot { margin-top: var(--sp-3); font-size: var(--fs-2); color: var(--ink2); }
+.pin-forgot summary { cursor: pointer; font-weight: var(--w-semi); min-height: var(--tap); display: flex; align-items: center; }
+.pin-forgot p { margin: var(--sp-2) 0; }

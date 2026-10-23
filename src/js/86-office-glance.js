@@ -1,6 +1,6 @@
 /*
  * WHAT THIS FILE IS: The manager "at a glance" summary: money so far today, open orders, late tickets, the
- * 86 list and when brisket runs out. Read only, live data only, built for a phone or a wall screen.
+ * 86 list and when the main cooked-ahead item runs out. Read only, live data only, built for a phone or a wall screen.
  * PARTS: 1 pure model (runs in Node tests), 2 reading the live kitchen, 3 SB.office.glance(host).
  * USES: SB.util, SB.store, SB.metrics, SB.deadlines.   USED BY: 81-office-pace.js (top of the Pace page);
  * the board wall mode can call SB.office.glance(host) to draw the same panel.
@@ -21,24 +21,25 @@
   // estimate from today's own sales pace, and the sentence says so; it is never a promise.
   function runOutLine(b, now) {
     b = b || {};
-    if (!isNum(b.onHandG) || b.onHandG <= 0) return { tone: 'bad', text: 'No brisket is ready to serve right now.' };
-    const kg = U.fmtG(b.onHandG) + ' on hand. ';
+    const name = b.name ? String(b.name).toLowerCase() : 'cooked food';
+    if (!isNum(b.onHandG) || b.onHandG <= 0) return { tone: 'bad', text: 'No ' + name + ' is ready to serve right now.' };
+    const kg = (U.weightText || U.fmtG)(b.onHandG) + ' on hand. ';
     if (isNum(b.shortfallAt) && b.shortfallAt > now) return { tone: 'warn', text: kg + 'At the current pace it runs out around ' + U.fmtTime(b.shortfallAt) + ' (an estimate from the last 2 hours of sales).' };
     if (b.rateKnown) return { tone: 'good', text: kg + 'At the current pace it should last until close (an estimate from the last 2 hours of sales).' };
     return { tone: 'info', text: kg + 'Not enough sales yet to estimate when it runs out.' };
   }
 
   // Turns raw numbers into the five panel cards. in = {now, collected, paidOrders, openOrders, openValue,
-  // tickets, late, nearLate, out86: [names], brisket}. Each card has an id, label, value, a small line
+  // tickets, late, nearLate, out86: [names], runout}. runout = {name, onHandG, shortfallAt, rateKnown} or nothing. Each card has an id, label, value, a small line
   // under it and a tone (good, info, warn, bad).
   function glanceModel(inp) {
     inp = inp || {};
     // Picks the singular or plural word for a count.
     const plural = (n, one, many) => (n === 1 ? one : many);
     const late = inp.late || 0, near = inp.nearLate || 0, names = Array.isArray(inp.out86) && !inp.fresh ? inp.out86 : [];
-    const run = runOutLine(inp.brisket, inp.now);
+    const run = inp.runout ? runOutLine(inp.runout, inp.now) : null;
     // Before anything is cooked or ordered nothing is "out": say so, not "17 items 86'd and no brisket".
-    if (inp.fresh) { run.tone = 'info'; run.text = 'Nothing cooked yet. Log a batch to track brisket.'; }
+    if (inp.fresh && run) { run.tone = 'info'; run.text = 'Nothing cooked yet. Log a batch to track it.'; }
     return {
       cards: [
         { id: 'money', label: 'Paid so far today', value: U.fmtMoney(inp.collected || 0), tone: 'info',
@@ -49,8 +50,8 @@
           sub: late > 0 ? 'Past their overdue time' : near > 0 ? 'None late, ' + near + ' close to late' : 'Nothing late' },
         { id: 'out86', label: '86 list', value: String(names.length), tone: names.length ? 'warn' : 'good',
           sub: inp.fresh ? 'Nothing cooked yet, so nothing is 86' : names.length ? names.slice(0, 4).join(', ') + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '') : 'Everything is on the menu' },
-        { id: 'brisket', label: 'Brisket', value: run.tone === 'bad' ? 'None' : run.tone === 'warn' ? U.fmtTime(inp.brisket.shortfallAt) : run.tone === 'good' ? 'Lasts' : '-', tone: run.tone, sub: run.text, wide: true },
-      ],
+        run ? { id: 'runout', label: inp.runout.name || 'Cooked food', value: run.tone === 'bad' ? 'None' : run.tone === 'warn' ? U.fmtTime(inp.runout.shortfallAt) : run.tone === 'good' ? 'Lasts' : '-', tone: run.tone, sub: run.text, wide: true } : null,
+      ].filter(Boolean),
     };
   }
 
@@ -58,6 +59,28 @@
   if (!g.document) return; // Node: the pure model is all the tests need
 
   // ---- 2. Reading the live kitchen ----
+
+  // Picks the cooked-ahead item to show a run-out line for: the one that runs out soonest, else one with a known sales
+  // pace, else the one with the most on hand. Returns {name, onHandG, shortfallAt, rateKnown} or null when the kitchen
+  // is not tracking cooked-ahead food or nothing is ready to serve.
+  function pickRunout(state, now) {
+    try {
+      if (SB.engine && typeof SB.engine.moduleOn === 'function' && !SB.engine.moduleOn(state, 'cookAhead')) return null;
+      const onHand = {};
+      SB.store.select.batches().forEach((b) => { if (b.canServe !== false && b.kind !== 'cooling' && b.remainingG > 0 && b.ing) onHand[b.ing] = (onHand[b.ing] || 0) + b.remainingG; });
+      const ids = Object.keys(onHand);
+      if (!ids.length) return null;
+      let rows = [], rates = {};
+      try { rows = SB.deadlines.build(state, now); rates = SB.deadlines.salesRate(state, now).rate || {}; } catch (e) { /* no estimate: the card says there is not enough data */ }
+      const cands = ids.map((id) => {
+        const row = rows.find((x) => x.kind === 'shortfall' && x.ing === id);
+        const ing = (state.ingredients || []).find((i) => i.id === id);
+        return { name: ing ? ing.name : id, onHandG: onHand[id], shortfallAt: row && isNum(row.at) ? row.at : null, rateKnown: isNum(rates[id]) };
+      });
+      cands.sort((a, b) => (isNum(a.shortfallAt) ? a.shortfallAt : Infinity) - (isNum(b.shortfallAt) ? b.shortfallAt : Infinity) || (b.rateKnown - a.rateKnown) || (b.onHandG - a.onHandG));
+      return cands[0];
+    } catch (e) { return null; }
+  }
 
   // Reads everything the panel shows from the live store (never sample history) and returns the model
   // input. Any part that cannot be read comes back as nothing, so the panel still draws.
@@ -67,16 +90,9 @@
     const today = SB.metrics.rangePresets(now, dsh)[0];
     const sales = SB.metrics.sales(ds, { from: today.from, to: today.to, now });
     const counts = st.select.counts(), out = st.select.unavailable();
-    let shortfallAt = null, rateKnown = false;
-    try {
-      const rows = SB.deadlines.build(state, now);
-      const row = rows.find((r) => r.kind === 'shortfall' && r.ing === 'brisket');
-      if (row && isNum(row.at)) shortfallAt = row.at;
-      rateKnown = isNum(SB.deadlines.salesRate(state, now).rate.brisket);
-    } catch (e) { /* no estimate: the card then says there is not enough data */ }
-    const onHandG = st.select.batches().filter((b) => b.ing === 'brisket' && b.canServe !== false && b.kind !== 'cooling' && b.remainingG > 0).reduce((a, b) => a + b.remainingG, 0);
+    const runout = pickRunout(state, now);
     return { now, collected: sales.collected, paidOrders: sales.checks, openOrders: sales.open ? sales.open.orders : 0, openValue: sales.open ? sales.open.value : 0,
-      fresh: !state.batches.length && !counts.all, tickets: counts.all, late: counts.overdue, nearLate: counts.warn, out86: out.map((x) => x.name), brisket: { onHandG, shortfallAt, rateKnown } };
+      fresh: !state.batches.length && !counts.all, tickets: counts.all, late: counts.overdue, nearLate: counts.warn, out86: out.map((x) => x.name), runout };
   }
 
   // ---- 3. The panel ----

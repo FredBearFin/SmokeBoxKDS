@@ -255,3 +255,19 @@
 .od-steps { margin: 0; padding-left: var(--sp-5); display: grid; gap: var(--sp-2); }
 .od-steps li { line-height: 1.45; }
 .od-swap .od-steps { margin: var(--sp-3) 0; }
+
+/* The compact dish row: one line (name, station, price, prep time) that opens the full form on tap. */
+.od-sum { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr) auto auto 24px; align-items: center; gap: var(--sp-3); width: 100%; min-height: 48px; padding: var(--sp-1) var(--sp-2); text-align: left; color: var(--ink); background: transparent; border: 0; border-radius: var(--r-2, 8px); cursor: pointer; font-size: var(--fs-3, 16px); }
+.od-sum:hover { background: var(--surface2, rgba(127, 127, 127, 0.08)); }
+.od-sum-n { font-weight: var(--w-semi); overflow-wrap: anywhere; }
+.od-sum-m { color: var(--ink3); font-size: var(--fs-2); }
+.od-sum-p, .od-sum-t { text-align: right; color: var(--ink2); }
+.od-sum-i { display: inline-flex; transition: transform var(--dur, 150ms) ease; }
+.od-item[data-open="true"] .od-sum-i { transform: rotate(180deg); }
+.od-item-body { padding: var(--sp-2) var(--sp-2) var(--sp-3); }
+@media (max-width: 720px) { .od-sum { grid-template-columns: minmax(0, 1fr) auto auto 24px; } .od-sum-m { display: none; } }
+
+/* Settings groups: a small heading in the contents list, and the closed Advanced fold. */
+.od-toc-group { list-style: none; padding: var(--sp-2) var(--sp-3) 0; font: var(--w-bold) var(--fs-1, 0.75rem) / 1.2 var(--font-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+.od-adv { border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-panel); padding: 0 var(--sp-3); }
+.od-adv > summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; font-weight: var(--w-bold); }

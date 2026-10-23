@@ -36,6 +36,8 @@
   const say = (res) => E().describe(res.report, res.info, st().settings);
   // The food-safety limits in force: the owner's settings if present, else the starter values.
   const safety = () => (st().settings && st().settings.safety) || C.safety;
+  // True when the cook-ahead part should show: the module is on (absent means on) or a batch still holds food.
+  const cookOn = () => (E().cookAheadActive ? E().cookAheadActive(st()) : !E().moduleOn || E().moduleOn(st(), 'cookAhead') || st().batches.some((b) => b.status !== 'discard' && b.remainingG > 0));
   // Shows a short message at the bottom; tone is ok, warn, bad or info.
   const toast = (msg, tone, extra) => SB.ui.toast(msg, Object.assign({ tone: tone || 'info' }, extra || {}));
   // Removes the standard safety line from a message, because the screen already shows it once.
@@ -102,7 +104,7 @@
   function safetyNote(extra) {
     return h('div', { class: 'fs-note fs-safety' }, ico('shield-check', 20), h('div', null, extra ? h('p', null, extra) : null, h('p', null, C.safetyLine)));
   }
-  function simPill() { return h('span', { class: 'fs-sim' }, ico('info', 16), h('span', null, 'Simulated: no live POS connected')); }
+  function simPill() { return h('span', { class: 'fs-sim' }, ico('info', 16), h('span', null, 'Practice only: no live POS connected')); }
 
   // Keep `parent`'s children in the order of `items`. New keys are created
   // with make(item); existing nodes are never replaced and only
@@ -175,6 +177,59 @@
     return { sheet: sh, ok, cancel, copy };
   }
 
+  // Browser-storage key for the initials of whoever is working the cabinet; remembered per tablet.
+  const KEY_WHO = 'smokebox.v1.initials';
+  // Initials stay on the tablet for 2 hours of the app clock after their last use, so a shared tablet does not carry one person's name into the next shift.
+  const WHO_IDLE_MS = 2 * 3600e3;
+  // The remembered initials, or empty when none are saved or they have sat idle for more than 2 hours.
+  function savedWho() {
+    const v = U.storage.get(KEY_WHO, null);
+    if (!v || typeof v !== 'object' || typeof v.who !== 'string' || !U.isNum(v.at)) return '';
+    const age = nowMs() - v.at;
+    return age >= 0 && age <= WHO_IDLE_MS ? v.who : '';
+  }
+  // Remembers the initials just used, with the time of use (an empty string forgets them).
+  function saveWho(who) { U.storage.set(KEY_WHO, { who, at: nowMs() }); }
+  // Runs then(who) with the initials for a safety action. Asked once per tablet (and again after 2 idle hours); a
+  // person can skip, and the action still goes ahead without initials. With the cook-ahead part off nothing is asked.
+  function askWho(opener, verb, then) {
+    if (!cookOn()) { then(''); return; }
+    const pre = savedWho();
+    if (pre) { saveWho(pre); then(pre); return; }
+    const input = h('input', { class: 'input', type: 'text', maxlength: '12', autocomplete: 'off', placeholder: 'Your initials, like JM', 'aria-label': 'Your initials' });
+    let dl = null, done = false;
+    // Finishes once: closes the box and carries on with the given initials.
+    const go = (w) => { if (done) return; done = true; if (w) saveWho(w); dl.sheet.close('confirm'); then(w); };
+    dl = dialog({ title: 'Who is this?', name: 'who', opener, confirmLabel: verb, icon: 'check',
+      body: [h('p', null, 'Your initials go next to this entry in the log. You are asked once on this tablet. Tap Switch person in the cabinet to change them.'), h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'Your initials'), input)],
+      // Confirming carries on with the initials as typed.
+      onConfirm: () => go(input.value.trim()) });
+    dl.ok.disabled = true;
+    input.addEventListener('input', () => { dl.ok.disabled = !input.value.trim(); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && input.value.trim()) go(input.value.trim()); });
+    // Skip carries on without initials, so a missing name never blocks a temperature check or a discard.
+    const skipWho = () => go('');
+    dl.sheet.footer.insertBefore(h('button', { type: 'button', class: 'btn btn-ghost', dataset: { act: 'skip-who' }, onClick: skipWho }, 'Skip'), dl.ok);
+    setTimeout(() => input.focus(), 50);
+  }
+  // The last temperature check of each batch, "JM 2:40 pm", worked out once per change of the event list (not every second).
+  let checkMemo = { key: null, map: new Map() };
+  // Names who last logged a temperature on a batch and when (initials first when known); empty if nothing is logged.
+  function lastCheckBy(batchId) {
+    const evs = st().events;
+    const key = evs && evs.length + ':' + (evs.length ? evs[evs.length - 1].id : '');
+    if (checkMemo.key !== key) {
+      const map = new Map();
+      for (const row of E().safetyLog ? E().safetyLog(st()) : []) {
+        const e = row.event;
+        if (e.batchId && (e.type === 'temp_logged' || e.type === 'batch_reheat')) map.set(e.batchId, (e.who ? e.who + ' ' : '') + U.fmtTime(e.t));
+      }
+      checkMemo = { key, map };
+    }
+    return checkMemo.map.get(batchId) || '';
+  }
+  SB.who = { get: savedWho, set: saveWho, ask: askWho };
+
   // Close a sheet, then do something one frame later (so the history entry
   // of the closing sheet is gone before a new one is pushed).
   function closeThen(sheet, fn) { sheet.close('link'); setTimeout(fn, 60); }
@@ -231,7 +286,7 @@
       return { tone: 'warn', icon: 'snow', word: 'Cooling' };
     }
     switch (gt.action) {
-      case 'NONE': return { tone: 'ok', icon: 'check-circle', word: 'Holding fine' };
+      case 'NONE': return { tone: 'ok', icon: 'check-circle', word: 'In range' };
       case 'CHECK_TEMP': return { tone: gt.severity === 'bad' ? 'bad' : 'warn', icon: 'thermometer', word: 'Check temp' };
       case 'REHEAT_IMMEDIATE': return { tone: 'bad', icon: 'flame', word: 'Reheat now' };
       case 'CHILL_NOW': return { tone: 'bad', icon: 'snow', word: 'Chill now' };
@@ -278,13 +333,13 @@
     const grid = h('div', { class: 'hc-grid' });
     // An empty cabinet offers a button straight to the New batch tab.
     const emptyBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', onClick: () => tabs.show('new', false) }, ico('plus', 22), h('span', null, 'New batch'));
-    const empty = h('div', { class: 'empty hc-empty', hidden: true }, ico('thermometer', 40), h('h3', null, 'The cabinet is empty'), h('p', null, 'Add a batch when food comes out of the smoker or the kitchen. Every batch starts with a temperature reading.'), emptyBtn);
+    const empty = h('div', { class: 'empty hc-empty', hidden: true }, ico('thermometer', 40), h('h3', null, 'The cabinet is empty'), h('p', null, 'Add a batch when food is cooked and goes into the cabinet. Every batch starts with a temperature reading.'), emptyBtn);
     const recentList = h('div', { class: 'fs-list hc-recents' });
-    // The recent list links to the full discard log, the table an inspector reads.
-    const logBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'discard-log' }, onClick: () => closeThen(sheet, () => SB.sheets.open('discards')) }, ico('receipt', 20), h('span', null, 'Open the discard log'));
+    // The recent list links to the full thrown-out log, the table an inspector reads.
+    const logBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'discard-log' }, onClick: () => closeThen(sheet, () => SB.sheets.open('discards')) }, ico('receipt', 20), h('span', null, 'Open the thrown-out log'));
     const recentHead = h('h3', { class: 'fs-h' }, 'Discarded recently');
     const recentBox = h('section', { class: 'fs-section', hidden: true }, recentHead, recentList, logBtn);
-    // Batches still to come: a run-out with no batch planned asks when one comes off the smoker; plans can be cancelled.
+    // Batches still to come: a run-out with no batch planned asks when one will be ready; plans can be cancelled.
     const planList = h('div', { class: 'fs-list hc-plans' });
     const planBox = h('section', { class: 'fs-section hc-planbox', hidden: true }, h('h3', { class: 'fs-h' }, 'Batches still to come'), planList);
     let planSig = '';
@@ -301,11 +356,22 @@
     tabs = tabsWithPanels('Hold cabinet', [
       { id: 'batches', label: 'In the cabinet', icon: 'thermometer', count: 0, panel: batchesPanel },
       { id: 'new', label: 'New batch', icon: 'plus', panel: newPanel },
-    ], opts.tab === 'new' ? 'new' : 'batches', (id) => { setHidden(sheet.footer, id !== 'new'); if (id === 'new') form.shown(); });
+    ], opts.tab === 'new' ? 'new' : 'batches', (id) => { setHidden(sheet.footer, id !== 'new' || !st().ingredients.some((i) => i.tcs && !i.archived)); if (id === 'new') form.shown(); });
 
-    sheet.body.append(h('div', { class: 'hc' }, safetyNote(), tabs.seg, batchesPanel, newPanel));
+    if (sheet.header && SB.ui.sheetHelp) SB.ui.sheetHelp(sheet, 'hold-cabinet-and-warnings', 'the hold cabinet');
+    // Who is working the cabinet: the remembered initials with a one-tap Switch person (asked again at the next entry).
+    const whoText = h('span', null, '');
+    const whoBtn = h('button', { type: 'button', class: 'btn btn-sm btn-ghost', dataset: { act: 'switch-who' }, onClick: () => { saveWho(''); paintWho(); } }, 'Switch person');
+    const whoLine = h('div', { class: 'hc-who', hidden: true }, ico('check-circle', 18), whoText, whoBtn);
+    // Shows the line only while initials are remembered.
+    function paintWho() { const w = savedWho(); setHidden(whoLine, !w); text(whoText, 'Entries are saved as ' + w + '.'); }
+    paintWho();
+    const hcNote = safetyNote();
+    // The cabinet page (no sheet header) carries the "?" inside its note line instead.
+    if (!sheet.header && SB.guide && SB.guide.link) hcNote.appendChild(SB.guide.link('hold-cabinet-and-warnings', 'the hold cabinet'));
+    sheet.body.append(h('div', { class: 'hc' }, hcNote, whoLine, tabs.seg, batchesPanel, newPanel));
     sheet.footer.append(form.footer);
-    setHidden(sheet.footer, tabs.seg.getValue() !== 'new');
+    setHidden(sheet.footer, tabs.seg.getValue() !== 'new' || !st().ingredients.some((i) => i.tcs && !i.archived));
 
     // Builds one batch card once (ring, meter, facts, message, cooling steps, buttons).
     // updateCard fills it in and keeps it current.
@@ -404,7 +470,7 @@
       text(rec.name, b.label || 'Batch');
       attr(rec.el, 'aria-label', (b.label || 'Batch') + ': ' + sv.word);
       if (rec.kindKey !== b.kind) { rec.kindKey = b.kind; U.clear(rec.kindEl); rec.kindEl.append(ico(KIND_ICON[b.kind] || 'flame', 18), h('span', null, KIND_WORD[b.kind] || 'Hold')); }
-      const srcWord = b.src === 'sample' ? 'Sample batch' : b.src === 'starter' ? 'Starter stock' : '';
+      const srcWord = b.src === 'sample' ? 'Practice batch' : b.src === 'starter' ? 'Starter stock' : '';
       setHidden(rec.srcChip, !srcWord); if (srcWord) { text(rec.srcChip, srcWord); attr(rec.srcChip, 'data-tone', 'info'); }
       setState(rec.status, sv.tone, sv.icon, sv.word);
       attr(rec.el, 'data-tone', sv.tone); attr(rec.el, 'data-status', gt.status);
@@ -426,7 +492,7 @@
       text(rec.stockT, U.fmtG(b.remainingG) + ' left of ' + U.fmtG(b.cookedG));
 
       // facts
-      text(rec.ddLast, U.isNum(b.lastTempF) ? fmtF(b.lastTempF) + ', ' + agoText(now - b.lastTempAt) : 'No reading yet');
+      text(rec.ddLast, U.isNum(b.lastTempF) ? fmtF(b.lastTempF) + ', ' + agoText(now - b.lastTempAt) + (lastCheckBy(b.id) ? ', checked by ' + lastCheckBy(b.id) : '') : 'No reading yet');
       text(rec.ddSince, U.fmtTime(b.enteredAt));
       // Serve-by time with the kind of limit it is: quality (house limit, held at temperature) or safety (time as a health control).
       const coolingNow = b.kind === 'cooling';
@@ -556,7 +622,12 @@
     function saveReading(rec) {
       const b = batchOf(rec.id); if (!b) { closeEditor(rec, false); return; }
       const f = rec.ed.stepper.getValue(), mode = rec.mode;
-      const res = run(mode === 'reheat' ? 'reheatBatch' : 'logTemp', { batchId: b.id, tempF: f });
+      // Initials are asked once on this tablet; the reading is then saved with them.
+      askWho(null, 'Save reading', (who) => saveReadingAs(rec, b, f, mode, who));
+    }
+    // Saves the reading with the given initials and shows the plain-words result.
+    function saveReadingAs(rec, b, f, mode, who) {
+      const res = run(mode === 'reheat' ? 'reheatBatch' : 'logTemp', who ? { batchId: b.id, tempF: f, who } : { batchId: b.id, tempF: f });
       if (res.report !== 'ok') {
         U.clear(rec.ed.err); rec.ed.err.append(ico('alert-circle', 20), h('span', null, say(res))); setHidden(rec.ed.err, false);
         return;
@@ -599,10 +670,13 @@
         ],
         // Discards through the engine; the toast offers Undo and the waste is counted under the reason.
         onConfirm: (sh) => {
-          const res = run('discardBatch', { batchId: b.id, reason });
           sh.close('confirm');
-          if (res.report === 'ok') { undoToast(label + ' discarded. ' + U.fmtG(res.info && res.info.g) + ' counted as waste.', 'ok'); update(nowMs()); }
-          else toast(say(res), 'warn');
+          // Initials are asked once on this tablet; the discard is then logged with them.
+          setTimeout(() => askWho(opener, 'Discard batch', (who) => {
+            const res = run('discardBatch', who ? { batchId: b.id, reason, who } : { batchId: b.id, reason });
+            if (res.report === 'ok') { undoToast(label + ' discarded. ' + U.fmtG(res.info && res.info.g) + ' counted as waste.', 'ok'); update(nowMs()); }
+            else toast(say(res), 'warn');
+          }), 60);
         },
       });
       // Keeps the Discard batch button off until a reason is chosen.
@@ -610,19 +684,6 @@
       paint();
     }
     // Explains the two-stage cooling rule and, on confirm, moves the whole batch into cooling.
-    // Browser-storage key for the initials typed when a batch is kept serving; remembered per tablet.
-    const KEY_WHO = 'smokebox.v1.initials';
-    // Initials stay on the tablet for 2 hours of the app clock after their last use, so a shared tablet does not carry one person's name into the next shift.
-    const WHO_IDLE_MS = 2 * 3600e3;
-    // The remembered initials, or empty when none are saved or they have sat idle for more than 2 hours.
-    function savedWho() {
-      const v = U.storage.get(KEY_WHO, null);
-      if (!v || typeof v !== 'object' || typeof v.who !== 'string' || !U.isNum(v.at)) return '';
-      const age = nowMs() - v.at;
-      return age >= 0 && age <= WHO_IDLE_MS ? v.who : '';
-    }
-    // Remembers the initials just used, with the time of use.
-    function saveWho(who) { U.storage.set(KEY_WHO, { who, at: nowMs() }); }
     // The initials box for a confirm dialog: prefilled from the tablet's memory, with a "Not FW?" link that clears it.
     // The confirm button reads "<verb> as FW" and stays disabled while the box is empty.
     function whoField(dl, verb) {
@@ -765,22 +826,22 @@
       if (d.getTime() < now - 30 * 60000) d.setDate(d.getDate() + 1);
       return d.getTime();
     }
-    // Asks when a batch comes off the smoker and how much, then records it as planned supply. The rest time is added by the engine.
+    // Asks when a batch will be ready and how much, then records it as planned supply. The rest time is added by the engine.
     function openPlan(d, opener) {
       const ing = ingOf(d.planFor.ing); if (!ing) return;
       const rest = U.isNum(ing.restH) && ing.restH > 0 ? ing.restH : 0;
       const kgIn = h('input', { class: 'input', type: 'number', min: '0.5', max: '1000', step: '0.5', inputmode: 'decimal', value: String(Math.max(0.5, Math.ceil(d.planFor.grams / 500) / 2)), 'aria-label': 'Kilograms in the batch' });
       const at0 = Math.max(nowMs() + 15 * 60000, d.planFor.by - rest * 3600000);
-      const timeIn = h('input', { class: 'input', type: 'time', value: timeValue(at0), 'aria-label': 'Comes off the smoker at' });
+      const timeIn = h('input', { class: 'input', type: 'time', value: timeValue(at0), 'aria-label': 'Ready at' });
       const line = h('p', { class: 'fs-sub', role: 'status' });
       const err = h('div', { class: 'fs-note', 'data-tone': 'bad', role: 'alert', hidden: true });
       // Shows when the batch will be ready to serve once it has rested.
-      const paint = () => { const t = timeFromInput(timeIn.value); text(line, t == null ? '' : 'Comes off the smoker at ' + U.fmtTime(t) + (rest ? ', ready to serve about ' + U.fmtTime(t + rest * 3600000) + ' after resting' : ', ready to serve then') + '.'); };
+      const paint = () => { const t = timeFromInput(timeIn.value); text(line, t == null ? '' : 'Ready at ' + U.fmtTime(t) + (rest ? ', ready to serve about ' + U.fmtTime(t + rest * 3600000) + ' after resting' : ', ready to serve then') + '.'); };
       timeIn.addEventListener('input', paint); paint();
       dialog({
-        title: 'Comes off the smoker', name: 'plan', opener, confirmLabel: 'Plan this batch', icon: 'flame',
+        title: 'Batch on its way', name: 'plan', opener, confirmLabel: 'Add a planned batch', icon: 'flame',
         body: [h('p', null, 'Tell the board a batch of ' + ing.name + ' is coming. It counts as supply from when it is ready to serve, not as stock, and the real batch replaces it when you add it.'),
-          h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'How much (kg, cooked)'), kgIn), h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'Comes off the smoker at'), timeIn), line, err],
+          h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'How much (kg, cooked)'), kgIn), h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'Ready at'), timeIn), line, err],
         // Sends the plan to the engine and reports when it will be ready to serve.
         onConfirm: (sh) => {
           const t = timeFromInput(timeIn.value), kg = Number(kgIn.value);
@@ -788,7 +849,7 @@
           const res = run('planBatch', { ing: ing.id, grams: Math.round(kg * 1000), offAt: t });
           if (res.report !== 'ok') { err.textContent = say(res); err.hidden = false; return; }
           sh.close('confirm');
-          toast(ing.name + ' planned: off the smoker at ' + U.fmtTime(t) + '.', 'ok');
+          toast(ing.name + ' planned: ready at ' + U.fmtTime(t) + '.', 'ok');
           update(nowMs());
         },
       });
@@ -808,12 +869,12 @@
         const ask = (ev) => openPlan(d, ev.currentTarget);
         planList.appendChild(h('div', { class: 'fs-card fs-card-soft hc-plan-ask', style: 'display:flex;gap:12px;align-items:center;padding:12px' }, ico('alert', 18),
           h('span', { class: 'grow' }, h('strong', null, d.label), h('br'), h('span', { class: 'fs-sub' }, d.consequence + ' ' + d.action)),
-          h('button', { type: 'button', class: 'btn', dataset: { act: 'plan', ing: d.planFor.ing }, onClick: ask }, ico('flame', 20), h('span', null, 'Comes off the smoker at…'))));
+          h('button', { type: 'button', class: 'btn', dataset: { act: 'plan', ing: d.planFor.ing }, onClick: ask }, ico('flame', 20), h('span', null, 'Ready at…'))));
       }
       for (const e of plans) {
         const ing = ingOf(e.ing);
         planList.appendChild(h('div', { class: 'fs-card fs-card-soft hc-plan', dataset: { plan: e.id }, style: 'display:flex;gap:12px;align-items:center;padding:12px' }, ico('flame', 18),
-          h('span', { class: 'grow' }, h('strong', null, (ing ? ing.name : e.ing) + ', ' + U.fmtG(e.grams)), h('br'), h('span', { class: 'fs-sub' }, 'Comes off the smoker at ' + U.fmtTime(e.offAt) + (e.readyAt > e.offAt ? ', ready to serve about ' + U.fmtTime(e.readyAt) : '') + '.')),
+          h('span', { class: 'grow' }, h('strong', null, (ing ? ing.name : e.ing) + ', ' + U.fmtG(e.grams)), h('br'), h('span', { class: 'fs-sub' }, 'Ready at ' + U.fmtTime(e.offAt) + (e.readyAt > e.offAt ? ', ready to serve about ' + U.fmtTime(e.readyAt) : '') + '.')),
           h('button', { type: 'button', class: 'btn', dataset: { act: 'cancel-plan' }, onClick: () => { const res = run('cancelPlan', { planId: e.id }); if (res.report !== 'ok') toast(say(res), 'warn'); else { toast('Plan cancelled.', 'ok'); update(nowMs()); } } }, ico('x', 20), h('span', null, 'Cancel'))));
       }
     }
@@ -822,6 +883,7 @@
       const s = st();
       const feed = SB.deadlines.build(s, now);
       feedByBatch = new Map(feed.filter((d) => d.kind === 'expiry').map((d) => [d.batchId, d]));
+      paintWho();
       const live = s.batches.filter((b) => b.status !== 'discard' && b.remainingG > 0).sort((a, b) => a.enteredAt - b.enteredAt || (a.id < b.id ? -1 : 1));
       reconcile(grid, cards, live, (b) => b.id, makeCard, null);
       let check = 0, act = 0;
@@ -835,7 +897,7 @@
         const bits = [];
         if (act) bits.push(act + ' ' + plural(act, 'needs', 'need') + ' action now');
         if (check) bits.push(check + ' ' + plural(check, 'needs', 'need') + ' a temperature reading');
-        text(summary, live.length + ' ' + plural(live.length, 'batch', 'batches') + ' in the cabinet. ' + (bits.length ? bits.join('. ') + '.' : 'All are holding fine.'));
+        text(summary, live.length + ' ' + plural(live.length, 'batch', 'batches') + ' in the cabinet. ' + (bits.length ? bits.join('. ') + '.' : 'All are in range.'));
         cls(summary, 'is-alert', act > 0);
       }
       tabs.seg.setCount('batches', live.length, { alert: act + check > 0 });
@@ -934,7 +996,7 @@
     const tempFld = h('div', { class: 'hc-fld' }, h('div', { class: 'field-label', 'aria-hidden': 'true' }, 'First temperature reading'), tempStep, tempHintEl);
 
     const labelInput = h('input', { class: 'input', type: 'text', maxlength: '40', autocomplete: 'off', placeholder: 'Leave empty for an automatic name' });
-    const labelField = SB.ui.field({ label: 'Label (optional)', control: labelInput, hint: 'Up to 40 characters, for example "Brisket, second pit".' });
+    const labelField = SB.ui.field({ label: 'Label (optional)', control: labelInput, hint: 'Up to 40 characters, for example "Brisket, second batch".' });
 
     // The live numbers box: yield, cooked weight, cost, and the comparison with the flat 50 percent rule.
     const dYield = h('dd', { class: 'num' }), dCooked = h('dd', { class: 'num' }), dCost = h('dd', { class: 'num' });
@@ -951,10 +1013,15 @@
     const addBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg hc-add', onClick: () => add() }, ico('plus', 22), h('span', null, 'Put in hold cabinet'));
     const footer = h('div', { class: 'hc-foot' }, err, addBtn);
 
-    const el = h('div', { class: 'hc-panel hc-form' },
+    // With no cooked-ahead item yet the Product list is empty, so say so and offer the way to add one.
+    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cooked-ahead items yet. Add the food you cook ahead, like brisket, and then log a batch of it here.'),
+      // Opens the Cooked-ahead food sheet where the first item is added.
+      h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add a cooked-ahead item'))));
+    // With nothing to log yet, only the explanation and the Add button show; the weight steppers wait for a product.
+    const el = h('div', { class: 'hc-panel hc-form' + (list().length ? '' : ' hc-noprod') },
       h('h3', { class: 'fs-h' }, 'New batch'),
       h('p', { class: 'fs-sub' }, 'Log a pan when it goes into the cabinet. The first temperature starts its clock, so enter what your thermometer says.'),
-      vis('Product', prodSeg), rawFld, thermalBox, weighedBox, tempFld, labelField, calcBox);
+      noProd, vis('Product', prodSeg), rawFld, thermalBox, weighedBox, tempFld, labelField, calcBox);
 
     // A starting weight of about half the par level, so the box opens near a typical pan.
     function defaultKg(ing) { return Math.max(0.5, Math.round((ing.parG || 4000) / 2 / 100) / 10); }
@@ -1110,7 +1177,7 @@
     const syncSec = () => (st().settings && st().settings.syncTargetSec) || C.syncTargetSec;
     // Folded away by default and kept below the menu and stock, so the real controls come first.
     const syncBox = h('details', { class: 'fs-section bd-sync', 'aria-label': 'Channel sync' },
-      h('summary', { class: 'fs-row', style: 'cursor:pointer' }, h('h3', { class: 'fs-h grow' }, 'Channel sync (simulated)'), simPill()),
+      h('summary', { class: 'fs-row', style: 'cursor:pointer' }, h('h3', { class: 'fs-h grow' }, 'Channel sync (practice only)'), simPill()),
       syncGrid,
       h('p', { class: 'fs-sub bd-sync-note' }, 'There is no live POS or delivery app connected. These four chips show how a real 86 would reach each channel. Changes catch up within ' + syncSec() + ' seconds.'));
 
@@ -1183,7 +1250,7 @@
         return 'Marked 86 by hand' + (m && U.isNum(m.since) ? ', ' + agoText(now - m.since) : '') + '.';
       }
       const ing = ingOf(a.ing);
-      if (a.reason === 'safety') return ingName(a.ing) + ' is locked for safety. Reheat or discard the batch in the hold cabinet. It comes back on when a safe batch is in.';
+      if (a.reason === 'safety') return ingName(a.ing) + ' is locked for safety. Reheat or discard the batch in the hold cabinet. It comes back on when a batch that is in range is in.';
       if (a.reason === 'quality') {
         // A channel update still waiting out its hold can be cancelled by keeping the batch serving.
         const held = (st().syncs || []).filter((sy) => sy.menuId === mi.id && sy.kind === '86' && U.isNum(sy.holdUntil) && sy.holdUntil > now)[0];
@@ -1231,7 +1298,7 @@
       const res = run('toggle86', { menuId: mi.id, on });
       if (res.report !== 'ok') { toast(say(res), 'warn'); return; }
       const a = SB.store.select.availability(mi.id), nm = mi.short || mi.name;
-      if (on) undoToast(nm + ' is 86. The sync strip shows the simulated channels catching up.', 'ok');
+      if (on) undoToast(nm + ' is 86. The sync strip shows the practice channels catching up.', 'ok');
       else if (a && a.ok) undoToast(nm + ' is back on.', 'ok');
       else toast('Manual 86 removed, but ' + nm + ' is still ' + stateOf86(a).word.toLowerCase() + '. ' + whyLine(a, mi, nowMs()), 'warn');
       update(nowMs());
@@ -1252,7 +1319,7 @@
       rows.forEach((rec) => { const hide = filter === 'off' && !rec.off; setHidden(rec.el, hide); if (!hide) shown++; });
       cats.forEach((c) => { let any = false; c.map.forEach((r) => { if (!r.el.hidden) any = true; }); setHidden(c.el, !any); });
       setHidden(noneOff, !(filter === 'off' && shown === 0));
-      setHidden(nothingCooked, st().batches.some((b) => b.status !== 'discard' && b.remainingG > 0));
+      setHidden(nothingCooked, !cookOn() || st().batches.some((b) => b.status !== 'discard' && b.remainingG > 0));
     }
 
     // Builds one ingredient stock row once.
@@ -1344,13 +1411,19 @@
     const stockList = h('div', { class: 'bd-stock-list' });
     const stockBox = h('section', { class: 'fs-section bd-stock', 'aria-label': 'Stock' },
       h('h3', { class: 'fs-h' }, 'Stock'),
-      h('p', { class: 'fs-sub' }, 'Par and 86 levels are starter estimates. Cooked meat and cold sides live in the hold cabinet, so they are added as batches.'),
-      stockList, safetyNote());
-    sheet.body.append(h('div', { class: 'bd' }, h('div', { class: 'bd-cols' }, menuBox, stockBox), syncBox));
+      h('p', { class: 'fs-sub' }, cookOn() ? 'Par and 86 levels are starter estimates. Cooked meat and cold sides live in the hold cabinet, so they are added as batches.' : 'Par and 86 levels are starter estimates.'),
+      stockList, cookOn() ? safetyNote() : null);
+    // With no dishes yet there is nothing to mark sold out: one friendly line and the one next step.
+    const noDishBtn = h('button', { type: 'button', class: 'btn btn-primary', onClick: () => closeThen(sheet, () => SB.sheets.open('dishes')) }, ico('plus', 20), h('span', null, 'Add your first dish'));
+    const noDishBox = h('div', { class: 'empty bd-nodishes', hidden: true }, ico('ban', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your first dish. Then you can mark it sold out here, and Smokebox marks it for you when stock runs low.'), noDishBtn);
+    const bdCols = h('div', { class: 'bd-cols' }, menuBox, stockBox);
+    sheet.body.append(h('div', { class: 'bd' }, noDishBox, bdCols, syncBox));
 
+    // Repaints the dish rows and stock rows, and swaps in the no-dishes message when the menu is empty.
     function update(now) {
       const s = st();
       const menu = s.menu.filter((m) => !m.archived);
+      setHidden(noDishBox, menu.length > 0); setHidden(bdCols, menu.length === 0); setHidden(syncBox, menu.length === 0);
       // categories keep a stable order; a category appears the first time one of its items does
       const order = C.categories.map((c) => c.id);
       menu.forEach((m) => { if (order.indexOf(m.cat) < 0) order.push(m.cat); });
@@ -1522,7 +1595,7 @@
   const simLive = () => (SB.sim && SB.sim.live ? SB.sim.live : null);
   // What the simulator says it is doing (running, rate, crew), or an empty answer if it cannot say.
   const simStatus = () => { const l = simLive(); try { return l && typeof l.status === 'function' ? l.status() || {} : {}; } catch (e) { return {}; } };
-  const simDo = (what, fn) => { try { return fn(); } catch (e) { console.error('[smokebox] simulator ' + what + ' failed', e); toast('The simulator hit a problem (' + what + '). Try again, or reset live data.', 'bad'); return undefined; } };
+  const simDo = (what, fn) => { try { return fn(); } catch (e) { console.error('[smokebox] practice mode ' + what + ' failed', e); toast('The practice mode had a problem (' + what + '). Try again. If it keeps happening, reload the page.', 'bad'); return undefined; } };
   // The kitchen clock speed (1 is real time).
   const speedNow = () => (SB.store.speed ? SB.store.speed() : 1);
 
@@ -1582,12 +1655,12 @@
         toast((typeof n === 'number' ? n : 12) + ' demo tickets sent to the board.', 'ok'); paint();
       } }, ico('zap', 22), h('span', null, 'Add 12-ticket rush'));
       simBox.append(
-        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Automatic orders'), h('p', { class: 'fs-sub' }, 'Made-up tickets arrive on the kitchen clock, so a faster clock means faster orders. They are labeled Demo.'), ordersSeg),
-        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A pretend cook who works while automatic orders run. Turn it off to practice by hand.'), crewTog),
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Automatic orders'), h('p', { class: 'fs-sub' }, 'Practice tickets arrive on the kitchen clock, so a faster clock means faster orders. They are labeled Demo.'), ordersSeg),
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A practice cook who works while automatic orders run. Turn it off to practice by hand.'), crewTog),
         h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Rush'), h('p', { class: 'fs-sub' }, 'Twelve tickets at once, like a lunch rush.'), burstBtn));
     } else {
       simBox.append(h('div', { class: 'fs-note', 'data-tone': 'warn', role: 'status' }, ico('alert', 20),
-        h('div', null, h('strong', null, 'Simulator not loaded.'), h('p', null, 'Automatic orders, the auto crew, the 12-ticket rush and sample history come from a separate simulator module that is not in this build. The clock speed and Reset live data below still work.'))));
+        h('div', null, h('strong', null, 'Practice mode not loaded.'), h('p', null, 'Automatic orders, the auto crew, the 12-ticket rush and practice history come from a part of Smokebox that is not in this copy. The clock speed and Reset live data below still work.'))));
     }
 
     // clock
@@ -1595,56 +1668,58 @@
     const clockBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Clock speed (demo only)'), h('p', { class: 'fs-sub' }, 'Speeds up the whole kitchen so you can watch a busy night in a minute. It shows only while the demo is loaded. Never use it in real service.'), clockCtl.el);
     clockCtl.wrap = clockBox; setHidden(clockBox, !demoOn());
 
-    // sample history
+    // practice history
     const sampleBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Data counts'));
     const countsDl = h('dl', { class: 'fs-dl dm-counts' });
     const dLive = h('dd', { class: 'num' }), dDemo = h('dd', { class: 'num' }), dSample = h('dd', { class: 'num' });
-    countsDl.append(h('dt', null, 'Live tickets on this device'), dLive, h('dt', null, 'Demo tickets on this device'), dDemo, h('dt', null, 'Sample history'), dSample);
+    countsDl.append(h('dt', null, 'Live tickets on this device'), dLive, h('dt', null, 'Demo tickets on this device'), dDemo, h('dt', null, 'Practice history'), dSample);
     sampleBox.append(countsDl);
     const sim = SB.sim;
     if (sim && typeof sim.setSampleEnabled === 'function' && typeof sim.sampleEnabled === 'function') {
-      // Whether the back office includes the made-up sample history.
-      sampleTog = SB.ui.toggle({ label: 'Include sample history in the back office', checked: !!sim.sampleEnabled(), onChange: (on) => { simDo('sample history', () => sim.setSampleEnabled(on)); paintCounts(); } });
+      // Whether the back office includes the made-up practice history.
+      sampleTog = SB.ui.toggle({ label: 'Include practice history in the back office', checked: !!sim.sampleEnabled(), onChange: (on) => { simDo('practice history', () => sim.setSampleEnabled(on)); paintCounts(); } });
       sampleBox.append(sampleTog);
     }
-    sampleInfoBox = h('p', { class: 'fs-sub dm-sample-note' }, 'Sample history is generated by the simulator, not recorded in your kitchen. It is clearly labeled wherever it appears.');
+    sampleInfoBox = h('p', { class: 'fs-sub dm-sample-note' }, 'Practice history is made by the app, not recorded in your kitchen. It is clearly labeled wherever it appears.');
     sampleBox.append(sampleInfoBox);
 
     // Reset live data asks first (see doReset).
     const resetBtn = h('button', { type: 'button', class: 'btn btn-danger btn-lg', onClick: () => doReset() }, ico('trash', 22), h('span', null, 'Reset live data'));
-    const resetBox = h('section', { class: 'fs-section dm-reset' }, h('h3', { class: 'fs-h' }, 'Back to real service'), h('p', { class: 'fs-sub' }, 'Reset live data erases every ticket, batch and event on this device, including all demo orders, and puts the clock back to real time. The board and the pit start empty. Your settings and menu stay. This cannot be undone.'), resetBtn);
+    const resetBox = h('section', { class: 'fs-section dm-reset' }, h('h3', { class: 'fs-h' }, 'Back to real service'), h('p', { class: 'fs-sub' }, 'Reset live data erases every ticket, batch and event on this device, including all demo orders, and puts the clock back to real time. The board and the cabinet start empty. Your settings and menu stay. This cannot be undone.'), resetBtn);
 
     // Restart demo: start over with fresh tickets, the way the app looks on its first day.
     const restartBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg dm-restart', onClick: () => doRestart() }, ico('refresh', 22), h('span', null, 'Restart demo'));
     const tourBtn = h('button', { type: 'button', class: 'btn btn-lg', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', null, 'Show me how it works'));
     const startBox = h('section', { class: 'fs-section dm-start' }, h('h3', { class: 'fs-h' }, 'Load the demo'),
-      h('p', { class: 'fs-sub' }, 'For practice only. Loads pretend food in the cabinet and three pretend tickets, and erases what is on this device now. Nothing runs by itself: you tap START and DONE, and the timers show when each dish should begin.'),
+      h('p', { class: 'fs-sub' }, 'For practice only. Loads practice food in the cabinet and three practice tickets, and erases what is on this device now. Nothing runs by itself: you tap START and DONE, and the timers show when each dish should begin.'),
       h('div', { class: 'fs-row' }, restartBtn, tourBtn));
 
-    sheet.body.append(h('div', { class: 'dm' }, h('div', { class: 'fs-note', 'data-tone': 'warn' }, ico('alert', 20), h('div', null, h('strong', null, 'Everything here is pretend.'), h('p', null, 'Demo orders, the auto crew and the 14-day sample history are made up by the app. They are not your sales and not your food. Use Reset live data below to go back to real service.'))), statusBox, startBox, simBox, clockBox, sampleBox, resetBox));
+    sheet.body.append(h('div', { class: 'dm' }, h('div', { class: 'fs-note', 'data-tone': 'warn' }, ico('alert', 20), h('div', null, h('strong', null, 'Everything here is for practice.'), h('p', null, 'Demo orders, the auto crew and the 14-day practice history are made by the app for practice. They are not your sales and not your food. Use Reset live data below to go back to real service.'))), statusBox, startBox, simBox, clockBox, sampleBox, resetBox));
 
     // Clears the board after a confirm and puts the fresh demo tickets back. Settings stay.
     async function doRestart() {
       const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length, real = s.tickets.length - demo;
+      // A kitchen with its own dishes loses them too: the demo puts the sample barbecue menu in their place.
+      const own = s.catalog === 'own' && (s.menu.length > 0 || s.orders.length > 0 || s.tickets.length > 0);
       const ok = await SB.ui.confirm({
-        title: 'Restart the demo?', confirmLabel: 'Restart demo', cancelLabel: 'Keep everything', tone: real ? 'danger' : undefined,
-        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (real ? ' (' + real + ' not from the demo)' : '') + ' and everything logged on this device, then puts three fresh pretend tickets on the board. Settings stay.'],
+        title: 'Restart the demo?', confirmLabel: own ? 'Erase my dishes and restart' : 'Restart demo', cancelLabel: 'Keep everything', tone: real || own ? 'danger' : undefined,
+        body: [(own ? 'This erases YOUR dishes, prices and orders and loads the sample barbecue menu in their place. ' : '') + 'This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (real ? ' (' + real + ' not from the demo)' : '') + ' and everything logged on this device, then puts three fresh practice tickets on the board. Settings stay.'],
       });
       if (!ok) return;
       if (SB.tour && SB.tour.running && SB.tour.running() && SB.tour.stop) SB.tour.stop();
-      const n = SB.sim && SB.sim.restartDemo ? SB.sim.restartDemo() : -1;
+      const n = SB.sim && SB.sim.restartDemo ? SB.sim.restartDemo({ replaceOwn: own }) : -1;
       if (n < 0) { toast('The demo could not be restarted.', 'warn'); return; }
       if (SB.floor && SB.floor.setWelcome) SB.floor.setWelcome(true);
       toast('Demo restarted. Three fresh tickets are on the board.', 'ok');
       closeThen(sheet, () => { if (SB.router && SB.router.go) SB.router.go({ kind: 'floor', zone: 'all' }); });
     }
 
-    // Clears tickets, batches and events on this device after a confirm. Settings and sample history stay.
+    // Clears tickets, batches and events on this device after a confirm. Settings and practice history stay.
     async function doReset() {
       const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length;
       const ok = await SB.ui.confirm({
         title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep everything',
-        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and sample history stay. This cannot be undone.'],
+        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and practice history stay. This cannot be undone.'],
       });
       if (!ok) return;
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
@@ -1657,7 +1732,7 @@
     function paintStatus() {
       const sp = speedNow(), s = simStatus();
       let tone = 'info', icon = 'info', words;
-      if (!live) { tone = 'warn'; icon = 'alert'; words = 'The simulator is not loaded, so there are no automatic orders.'; }
+      if (!live) { tone = 'warn'; icon = 'alert'; words = 'Practice mode is not loaded, so there are no automatic orders.'; }
       else if (s.running) { tone = 'ok'; icon = 'play'; words = 'Demo running: ' + (RATE_WORD[s.rate] || 'orders') + '. ' + (U.isNum(s.sent) ? s.sent + ' sent, ' + (s.completed || 0) + ' finished.' : '') + (s.crew ? ' Auto crew on.' : ' Auto crew off.'); }
       else { words = 'Demo is off. The board shows only real tickets' + (st().tickets.some((t) => t.src === 'demo') ? ' and the demo tickets already on it.' : '.'); }
       if (sp !== 1) words += ' Clock x' + (Math.round(sp * 100) / 100) + '.';
@@ -1741,14 +1816,14 @@
         helpItem('plus', 'Send a ticket', 'Tap New ticket, tap the items, tap Send to kitchen. Four lines take fewer than ten taps.'),
         helpItem('check', 'Tap an item to work it', 'Tap an item row. A one-step item is done on that tap. A two-step item starts on the first tap, counts down from its usual cooking time, and finishes on the second.'),
         helpItem('bell', 'Check it', 'When a dish reaches its usual cooking time, its row flashes Check it (and chimes if Sound is on). Smokebox never marks a dish done for you: look at the food, then tap the row.'),
-        helpItem('arrow-right', 'The line under each ticket', 'Says what to do next, such as Tap START on Hush puppies. You can turn it off in Settings.'),
+        helpItem('arrow-right', 'The line under each ticket', 'Says what to do next, such as Tap Start on a dish. You can turn it off in Settings.'),
         helpItem('check-circle', 'All done here', 'Finishes every item your station still has on that ticket.'),
         helpItem('zap', 'Start now', 'Starts a waiting item before its planned time. Waiting items are dimmed and show Start in 2:08, so the slow dishes start first and the whole order finishes together.'),
         helpItem('receipt', 'Bump', 'Sends the ticket out when everything is done. If items are not done, Smokebox asks first.'),
         helpItem('undo', 'Undo', 'After a bump, done, void, 86 or discard, an Undo button stays for ' + undoS + ' seconds. The Z key does the same.'),
         helpItem('history', 'Recall', 'Brings a bumped ticket back. Open Recall, find the ticket and tap Recall.'),
         helpItem('list', 'The all-day bar', 'Counts what is still to make across every ticket. Tap an item to highlight it on the board.'),
-        helpItem('thermometer', 'Hold cabinet', 'Log a temperature when food goes in and at every check. Smokebox warns before a batch is unsafe and locks one that is.'),
+        helpItem('thermometer', 'Hold cabinet', 'Log a temperature when food goes in and at every check. Smokebox warns before a batch runs out of time and locks one that has.'),
         helpItem('ban', '86 board', 'Marks an item sold out. It also goes 86 by itself when stock runs low or a batch is locked for safety.'),
       ]));
   }
@@ -1784,7 +1859,7 @@
           wordRow(stateEl('bad', 'ban', '86 manual'), 'Someone marked it 86 on the 86 board.'))),
       h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Hold cabinet'),
         h('ul', { class: 'hp-words' },
-          wordRow(stateEl('ok', 'check-circle', 'Holding fine'), 'In range and checked on time.'),
+          wordRow(stateEl('ok', 'check-circle', 'In range'), 'In range and checked on time.'),
           wordRow(stateEl('warn', 'thermometer', 'Check temp'), 'A reading is due. Still being served.'),
           wordRow(stateEl('bad', 'flame', 'Reheat now'), 'Below the hot-hold limit. Not served until it is reheated once, or discarded.'),
           wordRow(stateEl('bad', 'snow', 'Chill now'), 'Above the cold-hold limit. Not served until it is back in range, or discarded.'),
@@ -1820,10 +1895,10 @@
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + S.hotHoldF + ' °F, reheat to ' + S.reheatF + ' °F within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
         rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + S.hotHoldF + ' °F, not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
-        rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit (time as a health control) throws the batch out. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
+        rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit means the batch must be thrown out when time is up. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
         rule('snow', 'Cooling', 'From ' + S.hotHoldF + ' °F to ' + c.stage1ToF + ' °F within ' + c.stage1H + ' hours, then to ' + c.finalF + ' °F within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
-        rule('lock', 'Locked batches', 'A batch that is not safe to serve is locked. Nothing is taken from it, and menu items that need it show 86 safety hold.'),
+        rule('lock', 'Locked batches', 'A batch that is out of range is locked. Nothing is taken from it, and menu items that need it show 86 safety hold.'),
       ]));
   }
 
@@ -1831,12 +1906,12 @@
   function helpAbout(sheet) {
     return h('div', { class: 'hp-pane' },
       helpList([
-        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for a BBQ line: tickets, paced start times, a hold cabinet and an 86 board. It is a separate app from Pitcall, the cook-count app.'),
+        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for a BBQ line: tickets, paced start times, a hold cabinet and an 86 board.'),
         helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
         helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
-        helpItem('info', 'Channel sync is simulated', 'There is no live POS or delivery app connected. The 86 board shows how a real sync would look and says so.'),
+        helpItem('info', 'Channel sync is for practice only', 'There is no live POS or delivery app connected. The 86 board shows how a real sync would look and says so.'),
         helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
-        helpItem('sparkle', 'Demo and sample data', 'Demo tickets and the sample history are made up by a simulator. They are labeled wherever they appear.'),
+        helpItem('sparkle', 'Demo and practice data', 'Demo tickets and the practice history are made by the app. They are labeled wherever they appear.'),
       ]),
       h('div', { class: 'fs-row hp-links' },
         // All three buttons close Help first, so only one sheet is ever open.
@@ -1964,16 +2039,16 @@
           helpItem('refresh', 'No whole-board redraw each second', 'The original rebuilt the board every second, so a tap could land on a node that was about to be replaced. Now only timer text changes each second.'),
           helpItem('eye', 'Contrast is measured, not typed in', 'The original printed a fixed 7.8:1. Its small amber text was 4.06:1, under the 4.5:1 minimum. Small amber text now uses a darker ink, and this screen does the maths.'),
           helpItem('clock', 'Paced start times', 'Each line starts so the whole order finishes together. Prep times are learned from real tickets and start as estimates.'),
-          helpItem('thermometer', 'A hold cabinet with safety rules', 'Temperature logs, reheat once, discard on time, and automatic 86 when a batch is locked. The two-hour clock starts at the first low reading (see Help, Food safety).'),
+          helpItem('thermometer', 'A hold cabinet that keeps checks on time', 'Temperature logs, reheat once, discard on time, and automatic 86 when a batch is locked. The two-hour clock starts at the first low reading (see Help, Food safety).'),
           helpItem('undo', 'Undo, keys and themes', 'Ten seconds of undo, keyboard shortcuts, Day and Night, and a large text option.'),
           helpItem('scale', 'Weights in grams and kilograms', 'Never cups.'),
         ])),
       sec('Honest notes',
         helpList([
           helpItem('sun', 'Not tested in real sunlight', 'Contrast is calculated from colors. It has not been measured on a screen in daylight, on a greasy glass, or through gloves.'),
-          helpItem('info', 'Simulated channels', 'There is no live POS or delivery connection. The 86 sync strip is a simulation and says so.'),
+          helpItem('info', 'Practice channels', 'There is no live POS or delivery connection. The 86 sync strip is practice only and says so.'),
           helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
-          helpItem('sparkle', 'Made-up data', 'Demo tickets and the sample history come from a simulator.'),
+          helpItem('sparkle', 'Practice data', 'Demo tickets and the practice history are made by the app.'),
           helpItem('shield', 'Local rules win', C.safetyLine),
         ]))));
 
@@ -2011,9 +2086,9 @@
 
     // Sound: the chime on a new ticket and the beeps when a dish needs checking. It lives in the board module, so it is optional here.
     const floorOk = !!(SB.floor && typeof SB.floor.setSound === 'function');
-    const soundTog = SB.ui.toggle({ label: 'Chime for new tickets, dishes to check and batch warnings', checked: floorOk ? !!SB.floor.sound() : false, disabled: !floorOk, onChange: (on) => { if (floorOk) SB.floor.setSound(on); } });
+    const soundTog = SB.ui.toggle({ label: cookOn() ? 'Chime for new tickets, dishes to check and batch warnings' : 'Chime for new tickets and dishes to check', checked: floorOk ? !!SB.floor.sound() : false, disabled: !floorOk, onChange: (on) => { if (floorOk) SB.floor.setSound(on); } });
     // Loudness of this tablet's warnings (20 to 100 percent); the sound switch above is the way to silence.
-    const volIn = h('input', { type: 'range', min: '20', max: '100', step: '10', value: String(Math.round((floorOk && SB.floor.volume ? SB.floor.volume() : 1) * 100)), 'aria-label': 'Warning loudness on this tablet', disabled: !floorOk });
+    const volIn = h('input', { type: 'range', min: '20', max: '100', step: '10', value: String(Math.round((floorOk && SB.floor.volume ? SB.floor.volume() : 1) * 100)), 'aria-label': 'Warning loudness on this tablet', class: 'mn-volume', disabled: !floorOk });
     volIn.addEventListener('change', () => { if (floorOk && SB.floor.setVolume) SB.floor.setVolume(Number(volIn.value) / 100); });
     // How much the voice talks: light, normal or full. The voice itself is always the loud chef.
     const levelOk = floorOk && typeof SB.floor.setVoiceLevel === 'function';
@@ -2048,15 +2123,18 @@
     const tourLink = h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', { class: 'grow' }, 'Show me how it works'), ico('chevron-right', 20));
     // Back office closes this sheet first, then opens the manager pages (the shell asks for the PIN if one is set).
     const officeLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'office' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({}); }) }, ico('gauge', 22), h('span', { class: 'grow' }, 'Back office'), ico('chevron-right', 20));
-    // Opens Menu and settings in the back office, where dishes, prices and prep times are edited.
-    const menuLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'menu-edit' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }) }, ico('sliders', 22), h('span', { class: 'grow' }, 'Edit the menu'), ico('chevron-right', 20));
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', 'Demo and clock', 'demo'));
+    // Opens Dishes and prices: add, rename, reprice or remove dishes without going to the back office.
+    const menuLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'menu-edit' }, onClick: () => closeThen(sheet, () => SB.sheets.open('dishes')) }, ico('sliders', 22), h('span', { class: 'grow' }, 'Dishes and prices'), ico('chevron-right', 20));
+    // The Guide opens only when the guide page is part of this copy of Smokebox.
+    const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
+      ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
       settingBlock('Text size', 'Large makes everything 20 percent bigger.', textSeg),
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
-      settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap START on Hush puppies.', hintsTog),
+      settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap Start on a dish.', hintsTog),
       settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
       settingBlock('Voice call-outs', 'A chef calls the line out loud. Light: "Fire brisket now! Ticket 12!" and "Ticket 12 is up! Ring it out!". Normal: adds "Order up!" for new tickets and one reminder if a dish is not started or a ticket not rung out. Full: keeps reminding until you start the dish or ring out the ticket. At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Not tried on a real tablet yet.', coTog, levelSeg),

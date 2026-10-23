@@ -1,7 +1,7 @@
 /*
  * WHAT THIS FILE IS: Styles for the sheets built in 71-floor-order.js and 72-floor-sheets.js.
  * PARTS: shared pieces (fs-), New ticket (ord-), Hold cabinet (hc-), 86 board (bd-), Recall (rc-), Demo (dm-),
- * Help (hp-), Specs (sp-), Settings (mn-). Touch targets are 48 px, or 56 px for primary actions.
+ * Help (hp-), Specs (sp-), Settings (mn-), Dishes and prices (dp-). Touch targets are 48 px, or 56 px for primary actions.
  * USES / USED BY: tokens from 00-tokens.css and base parts from 10-base.css. Local custom properties: --v is
  * the hold ring fill (0 to 100), --rc its colour, --tile-min the narrowest menu tile.
  */
@@ -525,3 +525,47 @@
 
 /* Every page grid gets one column that may shrink, so nothing pushes past the edge at 280 px. */
 .hc, .hc-panel, .bd, .rc, .rc-panel, .ox, .ox-panel, .dm, .dm-sim, .hp, .hp-pane, .sp, .mn, .hc-form, .hc-card { grid-template-columns: minmax(0, 1fr); }
+
+/* Dishes and prices (dp-): the add-a-dish form, big station tiles, the list of dishes and the folds. */
+.dp { display: grid; gap: var(--sp-4); min-width: 0; }
+.dp-form { display: grid; gap: var(--sp-4); padding: var(--sp-4); background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-panel); }
+.dp-name, .dp-price { font-size: var(--fs-4); min-height: 56px; }
+.dp-price { max-width: 12ch; }
+.dp-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-3); }
+.dp-tile { display: grid; justify-items: start; gap: 2px; min-height: 88px; padding: var(--sp-3) var(--sp-4); text-align: left; background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-panel); color: var(--ink); cursor: pointer; }
+.dp-tile strong { font: var(--w-bold) var(--fs-4) / 1.15 var(--font-display); }
+.dp-tile span { font-size: var(--fs-2); color: var(--ink3); }
+.dp-tile[aria-checked="true"] { background: var(--tint-ok); border-color: var(--sage); box-shadow: inset 0 0 0 2px var(--sage); }
+.dp-fold > summary { display: flex; align-items: center; gap: var(--sp-2); min-height: 48px; cursor: pointer; font-weight: var(--w-bold); }
+.dp-more { display: grid; gap: var(--sp-3); padding: var(--sp-2) 0 var(--sp-3); }
+.dp-num { max-width: 10ch; }
+.dp-actions { gap: var(--sp-3); }
+.dp-list { display: grid; gap: var(--sp-2); }
+.dp-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.dp-rn { flex: 1 1 16ch; min-width: 0; }
+.dp-rp { flex: 0 0 9ch; }
+.dp-rmsg { flex-basis: 100%; margin: 0; }
+.dp-rmsg:empty { display: none; }
+.dp-h { margin-top: var(--sp-2); }
+.dp-links { gap: var(--sp-3); }
+.fl-first-dish { min-height: 72px; padding-inline: var(--sp-8, 40px); font-size: var(--fs-5, 1.4rem); }
+
+/* Touch size: the Warning loudness slider and the 86 board Channel sync row are at least 44 px tall. */
+input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
+.bd-sync > summary { min-height: var(--tap, 44px); display: flex; align-items: center; }
+
+/* An empty menu: the friendly "No dishes yet" block spans the whole tile grid and its button keeps one line. */
+.ord-nodishes { grid-column: 1 / -1; padding: var(--sp-5, 24px) var(--sp-3, 12px); text-align: center; }
+.ord-nodishes .btn { white-space: nowrap; }
+.dp-stlist { display: grid; gap: var(--sp-2); }
+.dp-strow { display: flex; gap: var(--sp-2); align-items: center; }
+.dp-strow .input { flex: 1 1 auto; min-width: 0; }
+.dp-undo, .dp-back { align-items: center; gap: var(--sp-2); }
+.dp-back[hidden], .dp-undo[hidden] { display: none; }
+.dp-strow .btn { flex: none; white-space: nowrap; min-height: 44px; }
+.hc-noprod > :not(h3):not(p):not(.fs-note) { display: none; }
+.dp-por { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.dp-left { font: var(--w-bold) var(--fs-4) / 1.1 var(--font-display); margin-right: var(--sp-2); }
+.dp-ca { margin-top: var(--sp-2); }
+
+.hc-who { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0; color: var(--ink2); font-size: var(--fs-2); }

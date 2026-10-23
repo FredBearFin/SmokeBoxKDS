@@ -55,6 +55,8 @@
   // Display name of an ingredient from the data, then from the built-in config, else the plain id.
   B.ingName = (ds, id) => {
     const a = ((ds && ds.ingredients) || []).find((i) => i && i.id === id) || (SB.config && SB.config.ingredientById && SB.config.ingredientById[id]);
+    // A hidden counted-stock ingredient ("Portions of X") reads as the dish it counts, never as an ingredient.
+    if (a && a.hidden && a.name) return String(a.name).replace(/^Portions of /, '');
     return a ? a.name : id;
   };
   // The whole ingredient record (cost, yield, limits) for an id, or null when nothing knows it.
@@ -321,15 +323,24 @@
     // The main (brisket) yield comparison, or null when it cannot be worked out.
     const yieldPrimary = B.memoP((p) => { const yc = M.yieldComparison(p); return yc && yc.primary ? yc.primary : null; });
 
+    const salesOf = B.memoP((p) => M.sales(p));
     page.headline();
 
     page.tiles([
-      // Menu value of the finished food, in whole dollars (the real takings are in the Takings section below).
-      { id: 'revenue', kpi: 'revenue', label: 'Food sold', format: (v) => fmt.money(v, 0) },
-      // Average ticket value, shown with cents.
-      { id: 'avgTicket', kpi: 'avgTicketValue', label: 'Average ticket value', format: (v) => fmt.money(v, 2) },
-      // Food cost as a share of menu price, one decimal.
-      { id: 'foodCost', kpi: 'foodCostPct', label: 'Food cost', format: (v) => fmt.pct(v, 1) },
+      // The one main money figure: sales after discounts from paid orders (blank until an order is paid).
+      { id: 'revenue', kpi: 'revenue', label: 'Sales', kind: 'money', good: 'higher', format: (v) => fmt.money(v, 0),
+        // Sales after discounts for the range; blank when no order was paid.
+        value: (p) => { const s = salesOf(p); return s.checks ? { value: s.net, spark: s.byDay.map((d) => d.net) } : null; },
+        // The same figure for the previous period, or null when it had no paid orders.
+        previous: (p) => { const q = prevHandle(p); const s = q ? salesOf(q) : null; return s && s.checks ? s.net : null; } },
+      // Average paid order, before tax and tips, so it agrees with the Sales tile.
+      { id: 'avgTicket', kpi: 'avgTicketValue', label: 'Average order', format: (v) => fmt.money(v, 2),
+        // Sales divided by paid orders; blank when nothing is paid.
+        value: (p) => { const s = salesOf(p); return s.checks ? s.avgCheck : null; } },
+      // Food cost as a share of menu price; blank with a plain note when no item has a recorded cost.
+      { id: 'foodCost', kpi: 'foodCostPct', label: 'Food cost', format: (v) => fmt.pct(v, 1), noValue: 'Cost not recorded',
+        // Cost share of the items that have a recorded cost; null when none do, never a fake zero.
+        value: (p) => { const f = M.foodCostPct(p); return f && f.lines > 0 && isNum(f.costPct) ? f.costPct : null; } },
       // Items sold has no ready-made kpi, so it is summed here and compared with the previous period's handle.
       { id: 'items', label: 'Items sold', kind: 'count', good: 'neutral', format: (v) => fmt.num(v, 0),
         // Sum of all items sold in the range.
@@ -338,16 +349,29 @@
         previous: (p) => { const q = prevHandle(p); return q ? soldTotal(q) : null; } },
     ]);
 
+    /* ---------------------------------------------------------------- end of day */
+    page.panel({
+      span: 12, title: 'End of day', sub: 'When service is over',
+      // Builds the explanation and the button that opens the Close the day sheet.
+      render: (body) => {
+        const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
+        body.append(h('p', { class: 'ob-text' }, 'Close the day when the last order is paid. You get today\'s totals by cash, card and other, a cash-in-the-drawer line, a backup button and a page to print.', help ? h('span', null, ' ', help) : null),
+          h('button', { type: 'button', class: 'btn btn-primary', 'data-k': 'close-day', onClick: () => { if (O.openCloseDay) O.openCloseDay(); } }, 'Close the day'));
+        // The address #/office/money?close=1 opens the sheet straight away.
+        if (O.maybeOpenCloseDay) O.maybeOpenCloseDay();
+        return {};
+      },
+    });
+
     /* ---------------------------------------------------------------- takings */
-    const salesOf = B.memoP((p) => M.sales(p));
-    page.section('Takings', 'What the till took from orders that were paid in this range. Smokebox only records how an order was paid; it never charges a card.');
+    page.section('Money collected', 'Sales are the food you sold after discounts. Add tax and tips and you get everything collected. Smokebox only records how an order was paid; it never charges a card.');
 
     page.panel({
-      span: 5, title: 'What the till took', sub: scope(),
-      caption: 'Net sales is the food sold less discounts. Tax and tips are on top of it, and all three together are what was collected.',
+      span: 5, title: 'Sales, tax and tips', sub: scope(),
+      caption: 'Sales is the food sold less discounts, and it is the number at the top of this page. Tax and tips are on top of it, and all three together are what was collected.',
       // Builds the figure rows and the notes under them; update repaints them in place.
       render: (body, p0) => {
-        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the line screen and its takings show up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
+        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the line screen and the money shows up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
         const stats = B.stats(body, { cls: 'ob-stats--3' });
         const open = h('p', { class: 'ob-note' });
         body.append(empty, open);
@@ -358,10 +382,10 @@
           if (!s.checks) stats.set([]);
           else stats.set([
             { k: 'checks', label: 'Orders paid', value: fmt.num(s.checks, 0), note: isNum(s.avgCheck) ? fmt.money(s.avgCheck, 2) + ' average order' : '' },
-            { k: 'net', label: 'Net sales', value: fmt.money(s.net, 2), note: s.discounts > 0 ? fmt.money(s.discounts, 2) + ' given as discounts' : 'before tax and tips' },
+            { k: 'net', label: 'Sales', value: fmt.money(s.net, 2), note: s.discounts > 0 ? fmt.money(s.discounts, 2) + ' given as discounts' : 'before tax and tips' },
             { k: 'tax', label: 'Tax collected', value: fmt.money(s.tax, 2), note: s.tax > 0 ? '' : 'No tax rate is set' },
-            { k: 'tips', label: 'Tips', value: fmt.money(s.tips, 2), note: isNum(s.tipPct) ? fmt.pct(s.tipPct, 0) + ' of net sales' : '' },
-            { k: 'all', label: 'Collected in all', value: fmt.money(s.collected, 2), note: 'net sales, tax and tips' },
+            { k: 'tips', label: 'Tips', value: fmt.money(s.tips, 2), note: isNum(s.tipPct) ? fmt.pct(s.tipPct, 0) + ' of sales' : '' },
+            { k: 'all', label: 'Total collected', value: fmt.money(s.collected, 2), note: 'sales, tax and tips' },
           ]);
           const bits = [];
           if (s.open.orders) bits.push(s.open.orders + ' ' + U.plural(s.open.orders, 'order is', 'orders are') + ' still open, ' + fmt.money(s.open.value, 2) + ' of food not yet paid');
@@ -375,8 +399,8 @@
     });
 
     page.card({
-      type: 'bar', span: 7, title: 'Takings by day', sub: scope(),
-      caption: 'Net sales for each day, from the orders paid that day. A short bar is a slow day or a day with orders still open.',
+      type: 'bar', span: 7, title: 'Money collected by day', sub: scope(),
+      caption: 'Sales for each day, from the orders paid that day. A short bar is a slow day or a day with orders still open.',
       empty: { title: 'No paid orders to chart yet', body: 'Each day with a paid order gets one bar.', icon: 'chart-bar' },
       // One bar per day with paid orders.
       spec: (p) => {
@@ -385,9 +409,9 @@
         const best = days.reduce((a, d) => (d.net > a.net ? d : a), days[0]);
         return {
           orient: 'v', categories: days.map((d) => d.label), sort: 'none', format: 'money',
-          series: [{ id: 'net', name: 'Net sales', values: days.map((d) => d.net) }],
+          series: [{ id: 'net', name: 'Sales', values: days.map((d) => d.net) }],
           height: 270,
-          ariaLabel: 'Bar chart of net sales for each day. The best day is ' + best.label + ' with ' + fmt.money(best.net, 0) + '.',
+          ariaLabel: 'Bar chart of sales for each day. The best day is ' + best.label + ' with ' + fmt.money(best.net, 0) + '.',
         };
       },
     });
@@ -608,12 +632,13 @@
     });
 
     /* ---------------------------------------------------------------- yield */
-    page.section('Brisket yield', 'Brisket loses weight in the smoker and the hold cabinet. Pricing it at a fixed yield can quietly under- or over-charge every plate.');
+    page.section('Cooked yield', 'Smoked meat loses weight in the smoker and the hold cabinet. Pricing it at a fixed yield can quietly under- or over-charge every plate.');
+    const yieldSection = page.lastSection;
 
     const yieldCard = page.card({
-      type: 'bar', span: 7, title: 'Brisket yield: assumed, modeled and real', sub: scope(),
+      type: 'bar', span: 7, title: 'Cooked yield: assumed, modeled and real', sub: scope(),
       caption: 'How far the static yield you price with sits from the Texas A&M model and from what your own weighed batches really gave.',
-      empty: { title: 'Nothing to compare yet', body: 'Brisket needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
+      empty: { title: 'Nothing to compare yet', body: 'Your main smoked meat needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
       // Up to three bars: the fixed yield, the Texas A&M model and your weighed batches (two or more needed).
       spec: (p) => {
         const y = yieldPrimary(p);
@@ -624,7 +649,7 @@
           orient: 'h', categories: rows.map((r) => r[0]), sort: 'none', labels: 'all', format: 'pct100', emphasis: rows.length - 1,
           series: [{ id: 'yield', name: 'Cooked yield', values: rows.map((r) => r[1] * 100) }],
           height: 70 * rows.length + 60,
-          ariaLabel: 'Bar chart comparing cooked brisket yield: ' + rows.map((r) => r[0] + ' ' + fmt.pct(r[1], 1)).join(', ') + '.',
+          ariaLabel: 'Bar chart comparing cooked yield: ' + rows.map((r) => r[0] + ' ' + fmt.pct(r[1], 1)).join(', ') + '.',
         };
       },
     });
@@ -650,8 +675,8 @@
     paintYieldKey(ctx.prepared());
 
     const costOfWrong = page.panel({
-      span: 5, title: 'What the static yield costs you', sub: scope(),
-      caption: 'The real price of a cooked kilogram of brisket, and how wrong the static yield would have made it.',
+      span: 5, title: 'What a fixed yield costs you', sub: scope(),
+      caption: 'The real price of a cooked kilogram of your main smoked meat, and how wrong a fixed yield would have made it.',
       // Builds the big sentence, the three cost figures and the source line; update repaints them in place.
       render: (body, p0) => {
         const big = h('p', { class: 'ob-bigline', 'data-k': 'misprice' });
@@ -663,8 +688,8 @@
         const paint = (p) => {
           const y = yieldPrimary(p);
           if (!y) {
-            setText(big, 'Brisket yield cannot be compared yet.');
-            setText(detail, 'This needs a brisket cost per kilogram and a range with brisket batches. Nothing is guessed in the meantime.');
+            setText(big, 'Yield cannot be compared yet.');
+            setText(detail, 'This needs a cost per kilogram and a range with weighed batches. Nothing is guessed in the meantime.');
             stats.set([]); setText(src, ''); src.hidden = true; return;
           }
           src.hidden = false;
@@ -696,8 +721,8 @@
     /* ---------------------------------------------------------------- what-if */
     const whatIf = page.panel({
       span: 12, title: 'Try it: what would a different cook do to the yield?',
-      sub: 'Texas A&M regression, hot-hold yield; starter model, confirm against your own weighed batches',
-      caption: 'Slide the end temperature and the hold time to see what brisket is worth after the smoker. A hotter finish or a longer hold means less meat on the board.',
+      sub: 'Based on published brisket cooking research; a starting guess, confirm against your own weighed batches',
+      caption: 'Slide the end temperature and the hold time to see what the meat is worth after the smoker. A hotter finish or a longer hold means less meat on the board.',
       // Builds the three steppers and the result tiles; any stepper change repaints the result at once.
       render: (body, p0) => {
         // The +5 and -5 buttons need room: on a narrow phone only the plain minus and plus are shown,
@@ -729,8 +754,7 @@
         function rawCost() {
           const y = yieldPrimary(ctx.prepared());
           if (y && isNum(y.costPerKgRaw)) return { cost: y.costPerKgRaw, name: y.name, staticY: y.staticYield };
-          const meta = B.ingMeta(ctx.dataset(), 'brisket');
-          return { cost: meta && isNum(meta.costPerKg) ? meta.costPerKg : null, name: meta ? meta.name : 'Brisket', staticY: meta && isNum(meta.yield) ? meta.yield : null };
+          return { cost: null, name: 'the main smoked meat', staticY: null };
         }
         // Runs the thermal model with the three stepper values and rewrites every result line.
         function paint() {
@@ -741,7 +765,7 @@
           setText(oHot.v, t.hotPct.toFixed(1) + '%'); setText(oHot.n, 'of raw weight, straight from the smoker');
           setText(oChill.v, t.chilledPct.toFixed(1) + '%'); setText(oChill.n, 'after chilling overnight');
           const cg = isNum(t.cookedG) ? Math.round(t.cookedG) : null;
-          setText(oCooked.v, cg === null ? '-' : fmt.g(cg)); setText(oCooked.n, cg === null ? '' : fmt.num(cg, 0) + ' g from ' + fmt.g(rawG) + ' raw');
+          setText(oCooked.v, cg === null ? '-' : fmt.g(cg)); setText(oCooked.n, cg === null ? '' : fmt.g(cg) + ' from ' + fmt.g(rawG) + ' raw');
           setText(oCost.v, isNum(t.trueCostPerCookedKg) ? fmt.money(t.trueCostPerCookedKg, 2) : 'Not known'); setText(oCost.n, isNum(rc.cost) ? 'raw cost ' + fmt.money(rc.cost, 2) + ' per kg' : 'no raw cost recorded');
           if (isNum(rc.staticY) && cg !== null) {
             const sg = Math.round(rawG * rc.staticY);
@@ -758,12 +782,20 @@
 
     /* ---------------------------------------------------------------- page result */
     const slots = [topCard, hourCard, chanCard, costCard, marginCard, noCost, yieldCard, costOfWrong, whatIf];
+    const yieldBlock = [yieldSection, yieldCard.el, costOfWrong.el, whatIf.el];
+    // Shows the yield section only when cooked-ahead food is tracked and some ingredient has a yield to compare.
+    const paintYieldVisible = (p) => {
+      let on = true;
+      try { on = SB.engine.moduleOn(SB.store.getState(), 'cookAhead') && !!yieldPrimary(p); } catch (e) { on = true; }
+      yieldBlock.forEach((el) => { if (el) el.hidden = !on; });
+    };
     return {
       // Runs on every refresh: keeps the card subtitles and the yield key current.
       update() {
         const s = scope();
         [topCard, hourCard, chanCard, costCard, marginCard, noCost, yieldCard, costOfWrong].forEach((c) => B.setSub(c, s));
         paintYieldKey(ctx.prepared());
+        paintYieldVisible(ctx.prepared());
       },
       // Runs when the page is left: removes the stepper listeners and drops the card list.
       destroy() {
