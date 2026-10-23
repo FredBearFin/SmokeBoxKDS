@@ -31,8 +31,8 @@ export async function startHub(opts = {}) {
   const file = path.join(dir, 'state.json');
   let child = null, out = '', port = 0;
   async function launch() {
-    out = '';
-    child = spawn(process.execPath, [path.join(ROOT, 'server/server.mjs')], { env: Object.assign({}, process.env, { PORT: String(opts.port || 0), HOST: '127.0.0.1', SMOKEBOX_DATA: file, SMOKEBOX_STARTER: opts.starter === false ? '0' : '1', SMOKEBOX_TZ: 'America/New_York' }, opts.env || {}) });
+    out = ''; const prev = port; port = 0;
+    child = spawn(process.execPath, [path.join(ROOT, 'server/server.mjs')], { env: Object.assign({}, process.env, { PORT: String(opts.port || prev || 0), HOST: '127.0.0.1', SMOKEBOX_DATA: file, SMOKEBOX_STARTER: opts.starter === false ? '0' : '1', SMOKEBOX_TZ: 'America/New_York' }, opts.env || {}) });
     child.stdout.on('data', (d) => (out += d)); child.stderr.on('data', (d) => (out += d));
     for (let i = 0; i < 150; i++) { const m = /127\.0\.0\.1:(\d+)/.exec(out); if (m && Number(m[1]) > 0) { port = Number(m[1]); break; } await sleep(40); }
     if (!port) throw new Error('the hub did not start: ' + out);
@@ -97,4 +97,20 @@ export async function until(fn, what, ms = 4000) { const end = Date.now() + ms; 
 export function httpLeader(origin, name = 'leader') {
   let n = 0;
   return { async act(type, payload, extra) { const r = await postAction(origin, Object.assign({ type, payload, clientId: name, opId: name + ':' + (++n) }, extra || {})); return r.body || { report: 'http' + r.status }; }, count: () => n };
+}
+
+/** A TCP relay in front of a hub that can cut every open connection and refuse new ones (a Wi-Fi drop), then let them through again. Browser offline switches do not stop a stream that is already open. */
+export async function startRelay(targetPort) {
+  const net = await import('node:net');
+  const socks = new Set(); let cut = false;
+  const srv = net.createServer((c) => {
+    if (cut) { c.destroy(); return; }
+    const u = net.connect(targetPort, '127.0.0.1'); socks.add(c); socks.add(u);
+    c.pipe(u); u.pipe(c);
+    const end = () => { c.destroy(); u.destroy(); socks.delete(c); socks.delete(u); };
+    c.on('error', end); u.on('error', end); c.on('close', end); u.on('close', end);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+  return { port, origin: 'http://127.0.0.1:' + port, cut: () => { cut = true; for (const s of socks) s.destroy(); }, heal: () => { cut = false; }, close: () => { cut = true; for (const s of socks) s.destroy(); srv.close(); } };
 }
