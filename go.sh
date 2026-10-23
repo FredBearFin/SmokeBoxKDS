@@ -20,7 +20,7 @@ tar -xzf smokebox-server.tar.gz -C /root/smokebox-src --strip-components=1 --no-
 SMOKEBOX_PASS="$PASS" bash /root/smokebox-src/server/setup-server.sh "$TZNAME" "$LOGIN" < /dev/null
 
 # Nightly update: the updater lives in the repository (server/smokebox-update.sh). It downloads the latest deploy build, checks it, swaps it
-# in, restarts, and puts the old build back if the new one does not answer. Saved data is never touched.
+# in, restarts, and puts the old build back (with the saved file from before the update) if the new one does not answer or cannot read the data.
 install -m 755 /root/smokebox-src/server/smokebox-update.sh /usr/local/bin/smokebox-update
 cat > /etc/systemd/system/smokebox-update.service <<'EOF'
 [Unit]
