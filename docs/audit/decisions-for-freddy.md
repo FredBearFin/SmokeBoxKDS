@@ -1,6 +1,15 @@
-# Decisions for Freddy (A4, updated round 12)
+# Decisions for Freddy (A4, updated round 16)
 
-Decisions Freddy has made come first, then what is still open, then smaller items with my recommendation. Nobody who runs a restaurant has been asked yet, so a recommendation about owners is my guess. Longer detail: docs/audit/wording.md.
+An outside review said: a promising niche for small barbecue restaurants, but no real kitchen has used this yet and nobody has said they would pay. Its advice is one narrow, watched pilot next to the restaurant's own system, with a real price set before the visit. The pilot kit is in docs/pilot/. These four things are only yours to decide. Nothing else blocks the visit.
+
+## Yours to decide
+
+1. **The price.** One number a month before the visit, so the "would you pay" question is real. docs/pilot/offer-one-pager.md compares three ways to charge (flat monthly, setup fee plus smaller monthly, free trial then monthly) and leaves the price blank. No market figures were invented.
+2. **Which restaurant.** One small barbecue place with a pit and cooked-ahead food, owner on site, willing to let an observer stand in the kitchen for one service and keep their own system running.
+3. **Who answers when something goes wrong.** A name, a way to reach them (text or email) and how fast. The owner-facing pages say this is not decided yet.
+4. **Terms, liability and insurance.** What the owner agrees to, who is responsible if food is thrown out or spoiled, and whether you need insurance. These need a lawyer or a broker before any money is taken. The pilot itself can run on a one-page agreement: observer only, their own system stays primary, data used only for the report.
+
+For all four, the open list with proposals is docs/commercial-decisions.md.
 
 ## Decided (Freddy, round 12)
 
@@ -17,7 +26,7 @@ One line each. The Guide, FAQ, print cards and glossary follow these.
 - A **PIN recovery code** exists: shown once when the PIN is set, and Forgot PIN asks for it.
 - **Start over with an empty menu** (backup made at the moment of erasing). The old-demo-tickets offer (Clear them or Keep them) is built.
 
-## Still open
+## Open product questions (agents will keep working on these)
 
 1. **Limits for cold food and for cooked-ahead items.** Not decided, and no default should be invented. Two cases differ: food kept in a fridge (rules usually count days) and food out on the line with no temperature control (rules usually count hours). The exact numbers depend on the local health department. Proposal: the owner types the limit for each item, the app offers no legal-looking number of its own, and every screen says "set the limit your local health department gives you". A5's investigation will be in docs/audit/safety-defaults.md when it lands.
 2. **Station names.** New kitchens now start with neutral names (Kitchen, Prep, Fryer, Cold and drinks); the demo keeps its barbecue names. Say if you want something else.

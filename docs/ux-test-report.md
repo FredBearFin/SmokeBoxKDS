@@ -1,5 +1,7 @@
 # Smokebox UX test report (kitchen use), 2026-10-18
 
+> Historical. This is the October 18 baseline and parts of it describe screens that have since changed (a blank first run, Settings instead of Menu, the Guide, counter service, cold items). For the current build see `docs/setup-journey-after.md`, `docs/try-this-first.md` and `docs/pilot/risks-and-open-questions.md`. Everything in it was measured in a desktop test browser, never on a real tablet.
+
 Scope: how the kitchen board works for a cook, not whether the engine is correct. Everything below was measured or replayed in a real browser (Playwright, touch enabled) against the built app. Status as of 2026-10-18: the sections down to "Caveats" are the 2026-10-18 baseline, measured on the app as it stood before the Phase A work; code has changed since, and "Status of the original findings" below says what each finding became. Test scripts live in `ux-scripts/`.
 
 ## What was tested (2026-10-18 baseline)

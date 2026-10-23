@@ -1,5 +1,7 @@
 # Real-service pilot protocol ("visit two")
 
+> Refreshed for the current build. The day-of plan, the observer sheet, the four gates and the risk list are in `docs/pilot/` (start at `docs/pilot/README.md`). This page keeps the gate logic and the decision table. Nothing here has run on a real tablet or in a real kitchen.
+
 One real lunch rush beside the pilot's own system, observer only. This is the **gate**: the line board's big type, Square import, Phase C, D, E and Connected mode wait for its answer. It is one service in one kitchen with an observer in the room, so it can say "this does not work" much better than it can say "this works". It is not statistics.
 
 ## What the gate decides
@@ -16,8 +18,8 @@ Reported, not pass or fail: seconds per ticket (only if Smokebox tickets were us
 ## Before the visit (Freddy)
 
 - Fix the price and write it above and on the observer sheet.
-- On their tablet, run **Menu, Set up this tablet** (the six steps): sound test, screen kept on, protected data, installed as an app, tablet placed where the cutter can tap it without walking (a sketch or photo of where), and their real products entered (cost per kg, pull size, hold limit and kind, rest time). Slaw, potato salad and banana pudding start as quality limits: confirm each.
-- Check the hold limits and the temperature-check interval against their local health department. The app is a helper; the local code governs.
+- On their tablet, run **Settings, Set up this tablet** (seven steps): sound test, screen kept on, protected data, installed as an app, tablet placed where the cutter can tap it without walking (a sketch or photo of where), your dishes, and hold limits. Enter their real products (cost per kg, pull size, hold limit and kind, rest time). A new kitchen starts empty and answers "Do you cook food ahead?" itself. Cold items take days in the fridge and hours out that the owner types; leave a box empty rather than guess.
+- Check the hold limits and the temperature-check interval against their local health department. The limits the app starts with are starting values, not rules. The app is a helper; the local code governs.
 - Set service hours and "Warnings start at" to when their pit starts. Turn the demo clock and demo orders **off** (the report warns if they were on).
 - Test the loud tone from the pit position. Bring a speaker and a battery pack.
 - Open the Data page and take a **backup** so there is a clean starting point.
@@ -34,7 +36,7 @@ If a warning is wrong in a way that could cause a food-safety mistake, the cook 
 1. **Data page, Pilot report:** window "Since opening", type the number of cuts you counted, **Show report**, then **Download CSV**. Keep the file.
 2. Ask the discard question again ("what did you throw out last week and what did it cost?") and the price question. Write the exact words.
 3. Fill the decision table below.
-4. Take a backup, then **Reset live data** (settings are kept) so their next day starts clean.
+4. Take a backup, then **Erase tickets and records** (settings are kept) so their next day starts clean.
 
 ## Decision table
 

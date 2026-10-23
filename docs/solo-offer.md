@@ -1,13 +1,16 @@
 # Smokebox Solo: the first sellable offer (draft for Freddy to approve)
 
+> Refreshed for the current build. The owner-facing version is `docs/pilot/offer-one-pager.md`. Price, support and terms are still undecided. Nothing here has been tried on a real tablet.
+
 Scope is **Solo only**. Anything not listed under "What you get" is not part of the offer.
 
 ## What you get
 - One device running Smokebox from one HTML file (`smokebox.html`), no internet needed after install.
 - Kitchen board with batch warnings (strip, tones, spoken calls), hold cabinet, 86 board, order entry, payment **recording**, and the back office pages.
-- Far display mode (Menu, Far display) for a TV or a tablet read from across the kitchen.
+- Far display mode (Settings, Far display) for a TV or a tablet read from across the kitchen.
 - A first run that starts **empty**: no batches, no tickets, no sample history. Nothing pretend is mixed in with the kitchen's real data.
-- A **Busy-night demo** for showing the app to staff: the button is on the empty board (or Menu, Demo and clock). It loads a stocked pit and pretend tickets, labeled Demo; Reset live data clears it.
+- A **demo** for showing the app to staff: tap Try the demo (on the empty board or in Settings). It opens a separate demo kitchen with sample dishes, sample tickets and sample history, labeled Demo, and **Back to my kitchen** returns to the real one untouched.
+- **Setup tools:** Add your first dish, an optional menu import (spreadsheet or Square, Toast, Clover and Lightspeed exports), Start over with an empty menu (it saves a backup first), counter service and your own order buttons (Settings, How you serve), a currency symbol, and a PIN that shows a recovery code once.
 - A backup and restore of your data, a discard log, and a pilot report.
 
 ## What it is not (say this in every sales conversation)
@@ -26,11 +29,11 @@ Scope is **Solo only**. Anything not listed under "What you get" is not part of 
 
 The pilot fills in the real column: device model, OS and browser version, speaker, result of the tests in `docs/pilot-readiness.md`.
 
-## Setup (about 30 minutes on site)
+## Setup (about 30 minutes on site; the visit plan aims for 15, which is an estimate and not measured)
 1. Copy `smokebox.html` to the device and open it; install it as an app (Share, Add to Home Screen, or Install app).
-2. Menu, **Set up this tablet** (six steps: sound, screen on, protected data, installed, placement, products).
+2. Settings, **Set up this tablet** (seven steps: sound, screen on, protected data, installed, placement, dishes, hold limits).
 3. Enter real products, costs and hold limits. The pit and hold cabinet are empty until the cook logs a real batch, so items that need cooked meat show as 86 until then; confirm quality versus safety limits with the owner.
-4. Set service hours. The app starts empty, so there is nothing to clear; if you ran the Busy-night demo to show staff, open Demo and clock, stop it, then Back office, Data, **Reset live data** (settings are kept). The report warns if demo orders or the demo clock were left on.
+4. Set service hours. The app starts empty, so there is nothing to clear; if you showed the demo, tap Back to my kitchen. To clear a kitchen you tried out, use **Erase tickets and records** (settings are kept) or Start over with an empty menu. The report warns if demo orders or the demo clock were left on.
 5. Take a first backup.
 
 ## Where the data lives
@@ -39,7 +42,7 @@ Everything stays in the browser storage of that one device. Nothing is sent anyw
 ## Recovery
 - **App or browser reset, data gone:** restore the latest backup file from the Data page.
 - **Device replaced or broken:** install the same `smokebox.html` on the new device, run setup, restore the latest backup. Sound and loudness settings are per device and are redone.
-- **Wrong numbers after a bad day:** the Data page can reset live data; settings are kept.
+- **Wrong numbers after a bad day:** the Data page has **Erase tickets and records**; settings are kept.
 - **Two tabs open:** only one makes sound; close the extra tab.
 
 ## Updates and replacement
@@ -49,3 +52,9 @@ Decision needed (see `docs/commercial-decisions.md`): proposed default is that F
 - Pilot: Freddy on call during the observed service, then email or text with a next-business-day reply.
 - Covered: installing, restoring a backup, explaining a setting or a warning.
 - Not covered: the tablet, speaker, Wi-Fi, power, the owner's food-safety procedures, POS or payment hardware, any integration.
+
+## Cold items and limits
+Cold food kept in a fridge has two limits the owner types: days in the fridge and hours out of the fridge. Smokebox has no pre-filled number for these and says so. Every hold limit is the owner's, from their local health department.
+
+## Server and tunnel
+The Solo offer is one file on one tablet. The hub in `server/` is a prototype for a later connected mode and is not sold. The install and tunnel scripts were security-reviewed (`docs/audit/server-security-review.md`) but not run on a live machine.
