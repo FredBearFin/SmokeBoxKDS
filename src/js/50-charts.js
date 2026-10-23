@@ -205,14 +205,15 @@
   };
 
   /**
-   * Histogram binning. binValues(values, binSize, min, max) -> { lo, hi, binSize, counts, total, overflow, under, n }
+   * Histogram binning. binValues(values, binSize, min, max) -> { lo, hi, cap, binSize, counts, total, overflow, under, n }
    * Auto min/max snap to bin edges. When max is given, larger values pile into the last bin and count as `overflow`; values below
    * min are `under` and dropped. At most 200 bins (binSize grows by whole multiples).
+   * WATCH OUT: hi is max rounded up to a bin edge, so overflow is counted against max itself and cap keeps it for the note.
    */
   M.binValues = function binValues(values, binSize, min, max) {
     const v = [];
     if (values) for (let i = 0; i < values.length; i++) if (isNum(values[i])) v.push(values[i]);
-    if (!v.length) return { lo: isNum(min) ? min : 0, hi: isNum(max) ? max : 1, binSize: binSize > 0 ? binSize : 1, counts: [], total: 0, overflow: 0, under: 0, n: 0 };
+    if (!v.length) return { lo: isNum(min) ? min : 0, hi: isNum(max) ? max : 1, cap: isNum(max) ? max : 1, binSize: binSize > 0 ? binSize : 1, counts: [], total: 0, overflow: 0, under: 0, n: 0 };
     let dMin = Infinity, dMax = -Infinity;
     for (const x of v) { if (x < dMin) dMin = x; if (x > dMax) dMax = x; }
     const flat = dMax === dMin;                                // every value identical: show one bin with empty neighbours instead of one full-width bar
@@ -228,10 +229,11 @@
     for (const x of v) {
       if (x < lo) { under++; continue; }
       let i = Math.floor((x - lo) / binSize + 1e-9);
-      if (i >= n) { if (isNum(max) && x > hi + 1e-9) overflow++; i = n - 1; }
+      if (isNum(max) && x > max + 1e-9) overflow++;
+      if (i >= n) i = n - 1;
       counts[i]++;
     }
-    return { lo: fix(lo), hi, binSize: fix(binSize), counts, total: v.length - under, overflow, under, n };
+    return { lo: fix(lo), hi, cap: isNum(max) ? max : hi, binSize: fix(binSize), counts, total: v.length - under, overflow, under, n };
   };
 
   /** Stack values (per category) for visible series: returns { base[s][c], top[s][c] } with positives stacking up, negatives down. */
@@ -1292,8 +1294,11 @@
     if (stacked) {
       const xs = m.xsAll;
       // Stacking needs every series at the same x values, so missing ones are filled in by interpolation.
+      // WATCH OUT: a gap still stacks as 0 so the layers stay closed, but it is remembered so the tooltip says
+      // "no data" for it instead of a real-looking 0.
+      const miss = vis.map((s) => xs.map((x) => interpAt(s.pts, x) == null));
       const vals = vis.map((s) => xs.map((x) => { const v = interpAt(s.pts, x); return v == null ? 0 : Math.max(0, v); }));
-      stack = M.stackLayout(vals, xs.length); stack.xs = xs;
+      stack = M.stackLayout(vals, xs.length); stack.xs = xs; stack.miss = miss;
     }
     // y domain: the lowest and highest values any series, band, reference line or annotation needs.
     let yLo = Infinity, yHi = -Infinity;
@@ -1469,6 +1474,7 @@
         if (!near || d.ys[j] == null) return;
         any = true;
         if (s.band) rows.push({ key: { css: s.css, shape: 'box' }, v: fmtY.full(d.ys[j]) + ' to ' + fmtY.full(d.ys2[j]), k: s.name });
+        else if (stacked && stack.miss[d.stackIdx][j]) rows.push({ key: { css: s.css }, v: 'no data', k: s.name });
         else { rows.push({ key: { css: s.css }, v: fmtY.full(stacked ? (d.ys[j] - (stack.base[d.stackIdx][j] || 0)) : d.ys[j]), k: s.name }); total += stacked ? (d.ys[j] - stack.base[d.stackIdx][j]) : 0; }
       });
       if (stacked && rows.length > 1) rows.push({ key: null, v: fmtY.full(total), k: 'Total' });
@@ -1952,8 +1958,8 @@
     const empty = !pool.length;
     const counts = empty ? [] : (base.length ? M.binValues(base, b.binSize, b.lo, b.hi).counts : null);
     const ovCounts = ov.map((s) => M.binValues(s.values, b.binSize, b.lo, b.hi));
-    const overflow = isNum(spec.max) ? b.overflow : 0;
-    return { spec, b, base, counts, ov, ovCounts, empty, overflow, summary: pool.length + ' values in ' + b.n + ' bins' };
+    const overflow = isNum(spec.max) ? b.overflow : 0, under = isNum(spec.min) ? b.under : 0;
+    return { spec, b, base, counts, ov, ovCounts, empty, overflow, under, summary: pool.length + ' values in ' + b.n + ' bins' + (under ? ', ' + under + ' below ' + b.lo + ' left out' : '') };
   }
   // Draws a count bar per bin, optional step outlines for overlay series, axes and reference lines; a hover
   // area per bin. Returns the height.
@@ -1985,7 +1991,9 @@
       if (showBase) rows.push({ key: { css: css(baseKey), shape: 'box' }, v: String(m.counts[i]) + (total ? ' (' + F.pct100.full((m.counts[i] / total) * 100) + ')' : ''), k: visOv.length ? 'All' : (spec.unit || 'Count') });
       visOv.forEach((o) => rows.push({ key: { css: o.s.css }, v: String(o.c[i]), k: o.s.name }));
       const t = { head: xAx.full(a) + ' to ' + xAx.full(e), rows };
-      if (i === b.n - 1 && m.overflow) t.note = 'Includes ' + m.overflow + ' above ' + xAx.full(b.hi) + '.';
+      if (i === b.n - 1 && m.overflow) t.note = 'Includes ' + m.overflow + ' above ' + xAx.full(b.cap) + '.';
+      // Values below the chart's minimum are left out of the bars and the shares, so the first bin says so.
+      if (i === 0 && m.under) t.note = 'Leaves out ' + m.under + ' below ' + xAx.full(b.lo) + '; shares are of the rest.';
       return t;
     };
     for (let i = 0; i < b.n; i++) {
@@ -2629,7 +2637,8 @@
     const key = keyOfTone(spec.tone) || 'cat1';
     const all = m.vals.concat(m.prev || []).filter((v) => v != null);
     if (isNum(spec.ref)) all.push(spec.ref);
-    if (!all.length) { svg.appendChild(S('line', { x1: pad, x2: W - pad, y1: H0 / 2, y2: H0 / 2, style: 'stroke:var(--ch-axis);stroke-width:1.5;stroke-linecap:round' })); svg.setAttribute('aria-label', (spec.label || 'Trend') + ': no data'); return H0; }
+    // WATCH OUT: with nothing to draw, say "no data" in words; a flat line would read as a steady trend.
+    if (!all.length) { svg.appendChild(txt('no data', W / 2, H0 / 2, 'ch-t', 'middle', { dy: '.35em' })); svg.setAttribute('aria-label', (spec.label || 'Trend') + ': no data'); return H0; }
     let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
     if (hi === lo) { lo -= 1; hi += 1; }
     const n = Math.max(m.vals.length, m.prev ? m.prev.length : 0);

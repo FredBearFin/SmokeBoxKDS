@@ -157,6 +157,12 @@ describe('binValues (histogram)', () => {
     assert.equal(b.counts.reduce((a, c) => a + c, 0), 4);
     assert.equal(b.overflow, 2);
   });
+  it('counts overflow against the given max, not the bin edge it rounds up to', () => {
+    // max 95 with 10-wide bins rounds the last edge up to 100; 97 is still above the max the caller asked for.
+    const b = M.binValues([5, 50, 97, 120], 10, 0, 95);
+    assert.equal(b.hi, 100); assert.equal(b.cap, 95);
+    assert.equal(b.overflow, 2);
+  });
   it('drops values below min and counts them as under', () => {
     const b = M.binValues([-3, 1, 2], 1, 0, 5);
     assert.equal(b.under, 1); assert.equal(b.total, 2);
