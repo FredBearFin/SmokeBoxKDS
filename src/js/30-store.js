@@ -44,6 +44,10 @@
   // The 'before restore' copy stays in the last-good slot for 7 days, or until a close-day copy replaces it, so a wrong restore can be undone.
   const BEFORE_RESTORE = 'before restore', BEFORE_RESTORE_KEEP_MS = 7 * 24 * 3600e3;
   const SID_KEY = 'smokebox.v1.sid';
+  // Two tabs of one browser must not overwrite each other's save. Where the browser has Web Locks, a timed save waits for the lock named
+  // LOCK_NAME, so only one tab at a time reads the save id, builds the text and writes it. Where it does not, a tab writes its own tag to
+  // WRITER_KEY first and checks both the tag and the save id again before writing (the tab-sync fallback).
+  const LOCK_NAME = 'smokebox.v1.save', WRITER_KEY = 'smokebox.v1.writer', LOCK_WAIT = 'waiting-for-lock';
   // The actions this device has done that no server has confirmed yet (only used when a transport can push).
   const OUTBOX_KEY = 'smokebox.v1.outbox';
   const OUTBOX_MAX = 5000; // oldest unconfirmed actions are dropped past this, and st.outboxDropped says so
@@ -202,18 +206,44 @@
     // 400 ms and 5 seconds, so a busy rush never spends most of its time writing.
     const wait = Math.min(SAVE_MAX_MS, Math.max(SAVE_MS, Math.round(st.saveCostMs * 8)));
     st.saveDelayMs = wait;
-    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
+    saveTimer = setTimeout(timedSave, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
   }
+  // The browser's lock manager when it has one, else null.
+  const lockManager = () => { try { const n = g.navigator; return n && n.locks && typeof n.locks.request === 'function' ? n.locks : null; } catch (e) { return null; } };
+  // True while a save runs inside the lock (then no tag check is needed: no other tab can be saving).
+  let inLock = false;
+  // Runs when the save timer fires. With several tabs and Web Locks it takes the lock first, then saves; otherwise it saves at once.
+  function timedSave() {
+    const L = tr ? lockManager() : null;
+    if (!L) { saveTimer = null; persistNow(); return; }
+    saveTimer = LOCK_WAIT;
+    // Saves inside the lock if this save is still the wanted one (a direct flush may have saved already).
+    const run = () => { if (saveTimer !== LOCK_WAIT) return; saveTimer = null; inLock = true; try { persistNow(); } finally { inLock = false; } };
+    try { L.request(LOCK_NAME, run).catch(() => { run(); }); } catch (e) { run(); }
+  }
+  // Without Web Locks: writes this tab's tag, then reads the tag and the save id back. True when nobody else saved or claimed meanwhile.
+  function claimWrite() {
+    const tag = tabId + ':' + (++claimN);
+    try {
+      storage.set(WRITER_KEY, tag);
+      const sid = storage.get(SID_KEY, null), mine = storage.get(WRITER_KEY, null);
+      return mine === tag && (sid == null ? baseSid == null : sid === baseSid);
+    } catch (e) { return true; }
+  }
+  let claimN = 0;
   // Saves the state to the browser right now and returns true if it worked. If the browser says it is full,
   // it retries with less history (oldest finished tickets and events first), halving up to 12 times. After a
   // good save it announces the new revision to other tabs.
   function persistNow() {
     if (!storage || !state) return false;
-    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    if (saveTimer) { if (saveTimer !== LOCK_WAIT) clearTimeout(saveTimer); saveTimer = null; }
     // The saved text is a damaged copy nobody could keep elsewhere: it stays exactly as it is until the owner has saved it.
     if (writeBlocked) { st.lastSaveOk = false; return false; }
     // If another tab saved since this tab last loaded or saved, build on its copy first so nothing is lost.
+    const forced = skipRebase;
     if (skipRebase) skipRebase = false; else rebaseIfStale();
+    // With several tabs and no lock, claim the write and rebuild on the newest copy if another tab got in first (up to 3 times, then write anyway).
+    if (tr && !inLock && !lockManager()) for (let i = 0; i < 3 && !claimWrite(); i++) { if (forced) break; rebaseIfStale(); }
     const r = realNow();
     const v = now();
     let ok = false;
