@@ -11,7 +11,7 @@ An owner action in the back office, "Close the month". It saves the month's reco
 1. **A full backup** (`smokebox-backup-YYYY-MM-DD.json`): the whole kitchen as today, taken before anything is removed. DEFAULT: always the whole kitchen, not only the month, so the file alone restores the kitchen.
 2. **An orders file** (`smokebox-orders-YYYY-MM.csv`): every paid, voided and open order of the month, one row per order with date, order id, customer, channel, method, subtotal, discount, tax, total, tip (dollars with cents).
 3. **A tickets file** (`smokebox-tickets-YYYY-MM.csv`) and a **daily totals file** (`smokebox-days-YYYY-MM.csv`: from the close-day records: orders, subtotal, discount, tax, total, tip by method).
-4. **The safety log** for the month (`smokebox-safety-YYYY-MM.csv`): readings, discards, cooling, sanitize. The safety log is still kept inside the app for 190 days, so this is an extra copy, never a replacement.
+4. **The safety log** for the month (`smokebox-safety-YYYY-MM.csv`): readings, discards, cooling, sanitize. The safety log is still kept inside the app for 400 days, so this is an extra copy, never a replacement.
 
 The screen shows each file name and size and a download button for each; the next step stays locked until the owner confirms "I saved these files". DEFAULT: confirmation by checkbox (the browser cannot know a file really reached a safe place). The files are built from the same exporters the Data page already uses.
 

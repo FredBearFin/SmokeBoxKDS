@@ -41,8 +41,9 @@ WORK="$(mktemp -d $R/var/tmp/smokebox-beta.XXXXXX)"; trap 'rm -rf "$WORK" "$PREF
 curl -fsSL --max-time 180 --retry 2 "$URL" -o "$WORK/beta.tar.gz" || die "download failed; nothing was changed."
 [ "$(wc -c < "$WORK/beta.tar.gz")" -ge 100000 ] || die "the download is too small to be the app; nothing was changed."
 gzip -t "$WORK/beta.tar.gz" || die "the download is not a valid gzip file; nothing was changed."
-if tar -tzf "$WORK/beta.tar.gz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then die "the archive has unsafe paths; nothing was changed."; fi
-if tar -tvzf "$WORK/beta.tar.gz" | grep -Eq '^[lh]'; then die "the archive contains links; nothing was changed."; fi
+NAMES="$(tar -tzf "$WORK/beta.tar.gz")"; TYPES="$(tar -tvzf "$WORK/beta.tar.gz")"   # read fully first: a pipe into grep -q can cut tar off and look like "no match"
+if grep -Eq '(^/|(^|/)\.\.(/|$))' <<< "$NAMES"; then die "the archive has unsafe paths; nothing was changed."; fi
+if grep -Eq '^[^-d]' <<< "$TYPES"; then die "the archive contains links or special files; nothing was changed."; fi
 rm -rf "$PREFIX.new"; mkdir -p "$PREFIX.new"
 tar -xzf "$WORK/beta.tar.gz" -C "$PREFIX.new" --strip-components=1 --no-same-owner --no-same-permissions
 for f in server/server.mjs dist/smokebox.html src/js/30-store.js; do [ -s "$PREFIX.new/$f" ] || die "the build has no $f; nothing was changed."; done
@@ -156,11 +157,11 @@ Description=Update Smokebox beta from GitHub
 Type=oneshot
 ExecStart=$R/usr/local/bin/smokebox-beta-update
 EOF
-cat > $R/etc/systemd/system/smokebox-beta-update.timer <<'EOF'
+cat > $R/etc/systemd/system/smokebox-beta-update.timer <<EOF
 [Unit]
 Description=Nightly Smokebox beta update
 [Timer]
-OnCalendar=*-*-* 04:50:00
+OnCalendar=*-*-* 04:50:00 $TZNAME
 Persistent=true
 [Install]
 WantedBy=timers.target

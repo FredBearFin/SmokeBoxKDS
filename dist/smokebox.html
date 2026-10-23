@@ -4353,6 +4353,15 @@ a.of-nav:active { background: var(--press); }
   U.isNum = (n) => typeof n === 'number' && isFinite(n);
   // The folder the page was served from as an address prefix ('' at the site root, '/beta' behind a path prefix), for calls to its own hub.
   U.pageFolder = (g) => { try { const p = g && g.location && typeof g.location.pathname === 'string' ? g.location.pathname : '/'; return p.replace(/[^/]*$/, '').replace(/\/+$/, ''); } catch (e) { return ''; } };
+  // Removes characters nobody can see that can fool a reader: text-direction controls (U+202A to U+202E, U+2066 to U+2069) and zero-width
+  // characters (U+200B, U+200C, U+2060, U+FEFF). A zero-width joiner (U+200D) is kept only inside an emoji sequence (a pictograph on both
+  // sides, with an optional variation selector or skin tone before it), so family and flag emoji still work; anywhere else it is removed.
+  const INVISIBLE_RE = /[\u200B\u200C\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/g;
+  const ZWJ_RE = /(\p{Extended_Pictographic}[\uFE0F\u{1F3FB}-\u{1F3FF}]*\u200D(?=\p{Extended_Pictographic}))|\u200D/gu;
+  // Returns the text with those invisible characters removed (emoji joiners stay).
+  U.stripInvisible = (s) => String(s).replace(INVISIBLE_RE, '').replace(ZWJ_RE, (m, keep) => (keep ? m : ''));
+  // Cleans typed text for names and notes: strips the invisible characters, squeezes runs of white space to single spaces and trims both ends.
+  U.cleanText = (s) => U.stripInvisible(s).replace(/\s+/g, ' ').trim();
   /* ---------- secret hashing (PIN and recovery code) ---------- */
   // Rounds of PBKDF2 for a saved PIN or recovery code: about a tenth of a second on a tablet. A 4-digit PIN stays a door latch whatever this is.
   const KDF_ROUNDS = 100000;
@@ -4670,8 +4679,8 @@ a.of-nav:active { background: var(--press); }
   const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'callouts', 'far', 'wall', 'dock', 'follow.sound'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
-  const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'dropped', 'droppedat', 'dropped', 'droppedat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept', 'hubqueue', 'hubcache', 'hubtoken'].map((k) => 'smokebox.v1.' + k);
+  const DATA_KEYS = ['state', 'sid', 'writer', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'dropped', 'droppedat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept', 'hubqueue', 'hubcache', 'hubtoken'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -5251,8 +5260,8 @@ a.of-nav:active { background: var(--press); }
   const slug = (prefix, name) => prefix + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 16);
   // The first three letters of a name, upper case, for the small tag on tickets and tabs.
   const codeOf = (name) => String(name).replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || '???';
-  // Cleans one typed name: trims spaces, squeezes runs of spaces; returns '' when it is not usable.
-  const cleanName = (x) => (typeof x === 'string' ? x.replace(/\s+/g, ' ').trim() : '');
+  // Cleans one typed name: trims spaces, squeezes runs of spaces, strips invisible direction and zero-width characters; returns '' when it is not usable.
+  const cleanName = (x) => (typeof x === 'string' ? (SB.util && SB.util.cleanText ? SB.util.cleanText(x) : x.replace(/\s+/g, ' ').trim()) : '');
   // Checks a typed name against the others in a list (ignoring one id): true if another entry has it.
   const nameTaken = (list, name, exceptId) => list.some((e) => e.id !== exceptId && e.name.toLowerCase() === name.toLowerCase());
   // Rebuilds the lookup tables in place, so code that already holds them still sees the new entries.
@@ -5342,7 +5351,7 @@ a.of-nav:active { background: var(--press); }
   // The money symbol in use (the owner's, or $), for messages.
   const cs = () => (SB.util && SB.util.currencySymbol ? SB.util.currencySymbol() : '$');
   // Collapses runs of white space and trims, as the engine does to a dish name.
-  const clean = (s) => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
+  const clean = (s) => (SB.util && SB.util.stripInvisible ? SB.util.stripInvisible : (x) => x)(String(s == null ? '' : s)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
   // The name compared for duplicates: lower case, single spaces.
   const key = (s) => clean(s).toLowerCase();
 
@@ -6018,9 +6027,11 @@ a.of-nav:active { background: var(--press); }
   // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
   // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
   // safetyKeep bucket instead of being dropped.
-  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
-  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months). This is our own choice; no source gives a minimum, so ask your health department how long to keep records.
-  const SAFETY_KEEP_MS = 190 * 24 * H;
+  const SAFETY_EVENT = { safety_setting_changed: 1, temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  // 400 days: how long the safetyKeep bucket holds a safety entry (a year and a month, so a yearly inspection can look back a full year). This is our own
+  // choice; no source gives one minimum for everyone, so ask your health department how long to keep records. Safety entries are small and the bucket is
+  // never trimmed by size, only by age.
+  const SAFETY_KEEP_DAYS = 400, SAFETY_KEEP_MS = SAFETY_KEEP_DAYS * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
 
@@ -6055,8 +6066,18 @@ a.of-nav:active { background: var(--press); }
   }
   /** Simulated propagation delay for one channel target: 2..40 s, fixed per (syncId, target). */
   const syncDelayMs = (syncId, targetId) => 2000 + (hashStr(syncId + '|' + targetId) % 38001);
-  // Squeezes runs of spaces, tabs and line breaks into single spaces and trims both ends.
-  const cleanText = (s) => s.replace(/\s+/g, ' ').trim();
+  // Squeezes runs of spaces, tabs and line breaks into single spaces, trims both ends, and strips invisible direction and zero-width characters.
+  const cleanText = (s) => U.cleanText(s);
+  // Cuts text to at most max characters without leaving half of an emoji (a lone first half of a surrogate pair) at the end.
+  const cutText = (s, max) => { if (s.length <= max) return s; let t = s.slice(0, max); const c = t.charCodeAt(t.length - 1); if (c >= 0xD800 && c <= 0xDBFF) t = t.slice(0, -1); return t; };
+  // Cleans a text field of a loaded record and cuts it to max characters (names and labels squeeze white space; a note keeps its line breaks).
+  // Returns the fixed text, or null when the field was not text. Adds a line to repaired when anything changed.
+  function fitText(v, max, what, repaired, note) {
+    if (typeof v !== 'string') return null;
+    const c = cutText(note ? U.stripInvisible(v).trim() : cleanText(v), max).trim();
+    if (c !== v) repaired.push(what + ' cleaned or shortened');
+    return c;
+  }
   // True when the sorted list a contains x. Halves the search each step, so it stays fast on long lists.
   const sortedHas = (a, x) => { let lo = 0, hi = a.length - 1; while (lo <= hi) { const m = (lo + hi) >> 1; if (a[m] === x) return true; if (a[m] < x) lo = m + 1; else hi = m - 1; } return false; };
 
@@ -6362,7 +6383,7 @@ a.of-nav:active { background: var(--press); }
       return gateOut('NONE', true, 'onLine', 'ok', 'Out of the fridge, ' + used + ' min so far' + (isNum(b.outHours) ? ' of your ' + U.round(b.outHours, 2) + '-hour limit.' : '. No out-of-fridge limit set.'), end);
     }
     if (b.outSince != null) {
-      const lim = b.outSince + S.aboveColdGraceH * H;
+      const lim = coldOutLimit(b, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, end));
     }
@@ -6444,7 +6465,7 @@ a.of-nav:active { background: var(--press); }
         if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Below ' + f0(S.hotHoldF) + ' for more than ' + S.belowHotGraceH + ' hours. Discard.' + SAFETY);
         return gateOut('REHEAT_IMMEDIATE', false, 'belowHot', 'bad', 'Below ' + f0(S.hotHoldF) + '. Reheat to ' + f0(S.reheatF) + ' now (Smokebox allows one reheat per batch) or discard.' + SAFETY, Math.min(lim, exp));
       }
-      const lim = batch.outSince + S.aboveColdGraceH * H;
+      const lim = coldOutLimit(batch, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, exp));
     }
@@ -6481,7 +6502,7 @@ a.of-nav:active { background: var(--press); }
     if (b.outSince != null) {
       const want = b.kind === 'cold' ? 'chill' : 'reheat';
       if (b.status !== want || (b.kind !== 'cold' && b.reheats >= 1)) return -Infinity;
-      return Math.min(q ? hard : exp, b.outSince + (b.kind === 'cold' ? S.aboveColdGraceH : S.belowHotGraceH) * H);
+      return Math.min(q ? hard : exp, b.kind === 'cold' ? coldOutLimit(b, S) : b.outSince + S.belowHotGraceH * H);
     }
     // A past batch stays past (a late temperature check does not change it) until the hard cap.
     if (b.status === 'past') return q ? hard : -Infinity;
@@ -6599,7 +6620,7 @@ a.of-nav:active { background: var(--press); }
   }
   // Only the safety-log events from a list of events.
   function safetyOnly(list) { return list.filter((e) => hasOwn(SAFETY_EVENT, e.type)); }
-  // Adds newly dropped safety events to the retention bucket and lets go of entries older than 190 days
+  // Adds newly dropped safety events to the retention bucket and lets go of entries older than SAFETY_KEEP_DAYS
   // (measured from refT, the newest time known). The bucket is never trimmed by size, only by age.
   function keepSafety(prev, dropped, refT) {
     const all = (Array.isArray(prev) ? prev : []).concat(dropped);
@@ -7104,7 +7125,7 @@ a.of-nav:active { background: var(--press); }
     let note = p.note == null ? '' : p.note;
     if (typeof note !== 'string') { tx.info.key = 'note'; return 'badPatch'; }
     if (note.length > 4 * L.maxNoteLen) return 'noteTooLong';
-    note = note.trim();
+    note = U.stripInvisible(note).trim();
     if (note.length > L.maxNoteLen) return 'noteTooLong';
     const rush = p.rush == null ? false : p.rush;
     if (typeof rush !== 'boolean') { tx.info.key = 'rush'; return 'badPatch'; }
@@ -7813,6 +7834,9 @@ a.of-nav:active { background: var(--press); }
     const w = p.who.trim();
     return w.length > 12 ? null : w;
   }
+  // The moment cold food that is above its limit must be thrown out: the grace time (aboveColdGraceH) minus the time it already spent above the limit
+  // in earlier stretches (coldOutMs), counted from when it went out of range this time. One good reading does not wipe the earlier time away.
+  const coldOutLimit = (b, S) => b.outSince + Math.max(0, S.aboveColdGraceH * H - (isNum(b.coldOutMs) ? b.coldOutMs : 0));
   // Records a temperature reading, then re-runs the gate. A hot reading below the hot-hold limit, or a cold
   // one above its limit, starts the out-of-range clock (outSince); an in-range cold reading clears it. A
   // cooling batch records stage 1 and final. Also logs whether the check was on time.
@@ -7842,7 +7866,7 @@ a.of-nav:active { background: var(--press); }
       if (b.stage1At == null && f <= c.stage1ToF) { w.stage1At = t; w.stage1F = f; }
       if (w.stage1At != null && b.finalAt == null && f <= c.finalF) { w.finalAt = t; w.finalF = f; }
     } else if (b.kind === 'cold') {
-      if (f > S.coldHoldF) { if (b.outSince == null && b.place !== 'line') w.outSince = t; } else if (b.outSince != null) delete w.outSince;
+      if (f > S.coldHoldF) { if (b.outSince == null && b.place !== 'line') w.outSince = t; } else if (b.outSince != null) { w.coldOutMs = Math.round((isNum(b.coldOutMs) ? b.coldOutMs : 0) + Math.max(0, t - b.outSince)); delete w.outSince; }
     } else if (f < S.hotHoldF) {
       if (b.outSince == null) w.outSince = t;
     } else if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1) && t - b.outSince <= S.belowHotGraceH * H) {
@@ -8403,7 +8427,15 @@ a.of-nav:active { background: var(--press); }
       refreshAllBatches(tx);
     }
     if (S.pacing !== cur.pacing) recomputeLearned(tx);
-    tx.event('settings_changed', { keys });
+    // A change to a food-safety number is a safety record: one entry per number with the old and the new value (stored units: degrees F, hours, minutes).
+    const rest = [];
+    for (const k of keys) {
+      if (k.indexOf('safety.') !== 0) { rest.push(k); continue; }
+      // Reads the value at the dotted key path from a settings object, or undefined when any step is missing.
+      const at = (root) => k.split('.').reduce((o, part) => (o !== null && typeof o === 'object' ? o[part] : undefined), root);
+      tx.event('safety_setting_changed', { key: k, from: at(cur) === undefined ? null : at(cur), to: at(S) === undefined ? null : at(S) });
+    }
+    if (rest.length) tx.event('settings_changed', { keys: rest });
     tx.info = { keys };
     return 'ok';
   };
@@ -9633,6 +9665,9 @@ a.of-nav:active { background: var(--press); }
         if (out.tcs && out.holdBasis !== 'safety') out.holdBasis = 'quality';
         if (holdMigrate && base && x.maxHoldH === 4 && isNum(base.maxHoldH) && base.maxHoldH > 4) out.maxHoldH = base.maxHoldH;
         if (typeof out.tcs !== 'boolean' || (out.unit !== 'g' && out.unit !== 'ea') || typeof out.name !== 'string') { repaired.push('dropped ingredient ' + x.id); continue; }
+        out.name = fitText(out.name, ING_PATCH.name.max, 'ingredient ' + x.id + '.name', repaired);
+        if (!out.name) { if (!base) { repaired.push('dropped ingredient ' + x.id); continue; } out.name = base.name; }
+        if (out.note !== undefined) { const nt = fitText(out.note, C.limits.maxNoteLen, 'ingredient ' + x.id + '.note', repaired, true); if (nt === null) delete out.note; else out.note = nt; }
         for (const k of Object.keys(ING_PATCH)) if (ING_PATCH[k].t === 'num' && out[k] !== undefined && checkLeaf(ING_PATCH[k], out[k], k)) { out[k] = base && base[k] !== undefined ? base[k] : undefined; if (out[k] === undefined) delete out[k]; repaired.push('ingredient ' + x.id + '.' + k + ' reset'); }
         if (out.tcs && out.hold !== 'hot' && out.hold !== 'cold') out.hold = 'hot';
         // Fridge flag and the owner's two limits only on a cold cooked-ahead product.
@@ -9650,7 +9685,9 @@ a.of-nav:active { background: var(--press); }
         if (!isObj(x) || !safeKey(x.id) || seenMenu.has(x.id)) { repaired.push('dropped a bad menu item'); continue; }
         const base = !own && hasOwn(C.menuById, x.id) ? C.menuById[x.id] : null;
         const out = Object.assign({ prepConfirmed: false, archived: false }, base || {}, x);
+        if (typeof out.name === 'string') out.name = fitText(out.name, MENU_PATCH.name.max, 'menu ' + x.id + '.name', repaired);
         if (typeof out.name !== 'string' || !out.name) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.name = base.name; }
+        if (out.short !== undefined) { const sh = fitText(out.short, MENU_PATCH.short.max, 'menu ' + x.id + '.short', repaired); out.short = sh || cutText(out.name, MENU_PATCH.short.max).trim(); }
         if (C.workZones.indexOf(out.zone) < 0) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.zone = base.zone; repaired.push('menu ' + x.id + '.zone reset'); }
         if (!isNum(out.prepSec) || out.prepSec < 5 || out.prepSec > 3600) { out.prepSec = base ? base.prepSec : 120; repaired.push('menu ' + x.id + '.prepSec reset'); }
         if (!isNum(out.price) || out.price < 0 || out.price > C.limits.maxPrice) { out.price = base ? base.price : 0; repaired.push('menu ' + x.id + '.price reset'); }
@@ -9718,10 +9755,11 @@ a.of-nav:active { background: var(--press); }
         if (out.status === 'discard') { out.canServe = false; out.remainingG = 0; out.action = 'DISCARD_LOCKOUT'; if (DISCARD_REASONS.indexOf(out.discardReason) < 0) out.discardReason = 'other'; if (!isNum(out.discardedAt)) out.discardedAt = out.enteredAt; }
         if (typeof out.canServe !== 'boolean' || out.kind === 'cooling') out.canServe = out.kind === 'cooling' ? false : !!out.canServe;
         if (!isInt(out.reheats) || out.reheats < 0) out.reheats = 0;
+        if (out.label !== undefined) { const lb = fitText(out.label, 40, 'batch ' + b.id + '.label', repaired); if (lb) out.label = lb; else delete out.label; }
         if (!Array.isArray(out.temps)) out.temps = [];
         out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS)
           .map((x) => (typeof x.who === 'string' && x.who.length >= 1 && x.who.length <= 12 ? { t: x.t, f: x.f, who: x.who } : { t: x.t, f: x.f }));
-        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
+        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coldOutMs', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
         for (const k of ['stage1F', 'finalF', 'lineMs', 'lineSince', 'movedAt', 'fridgeDays', 'outHours']) if (out[k] !== undefined && !isNum(out[k])) delete out[k];
         // Place and the owner's limits exist only on a cold batch made from a fridge-kept product; anything else is cleared.
         if (out.fridge !== true || out.kind !== 'cold') { for (const k of ['fridge', 'place', 'lineMs', 'lineSince', 'movedAt', 'madeOn', 'fridgeDays', 'outHours']) delete out[k]; }
@@ -9881,14 +9919,14 @@ a.of-nav:active { background: var(--press); }
     if (!isInt(t.num) || t.num < 1) return null;
     const out = Object.assign({}, t);
     if (typeof out.serviceDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(out.serviceDate)) { out.serviceDate = U.serviceDate(out.createdAt); repaired.push('ticket ' + t.id + '.serviceDate recomputed'); }
-    if (typeof out.customer !== 'string') out.customer = 'Walk-up';
+    out.customer = fitText(out.customer, C.limits.maxCustomerLen, 'ticket ' + t.id + '.customer', repaired) || 'Walk-up';
     if (!hasOwn(C.channelById, out.channel)) { out.channel = 'dine_in'; repaired.push('ticket ' + t.id + '.channel reset'); }
     if (!isInt(out.recalls) || out.recalls < 0) out.recalls = 0;
     if (!hasOwn(SRC_TICKET, out.src)) out.src = 'live';
     out.rush = out.rush === true;
     out.pacing = out.pacing !== false;
     if (out.orderId !== undefined && !(typeof out.orderId === 'string' && safeKey(out.orderId) && oSeq(out.orderId) === oSeq(out.orderId))) { delete out.orderId; delete out.round; repaired.push('ticket ' + t.id + '.orderId cleared'); }
-    if (typeof out.note !== 'string') out.note = '';
+    out.note = fitText(out.note, C.limits.maxNoteLen, 'ticket ' + t.id + '.note', repaired, true) || '';
     if (!isNum(out.dmaxSec) || out.dmaxSec < 0) return null;
     if (out.status === 'voided' && !(typeof out.voidReason === 'string' && out.voidReason.trim())) { out.voidReason = 'other'; repaired.push('ticket ' + t.id + '.voidReason set'); }
     if (out.status !== 'expedited') { delete out.expeditedAt; delete out.forced; }
@@ -9899,6 +9937,8 @@ a.of-nav:active { background: var(--press); }
       const x = Object.assign({}, it);
       if (x.track !== 'one' && x.track !== 'two') x.track = 'one';
       if (!Array.isArray(x.mods)) x.mods = [];
+      else x.mods = x.mods.slice(0, 10).map((m) => (typeof m === 'string' ? cutText(cleanText(m), 60) : '')).filter(Boolean);
+      for (const [k, max] of [['name', MENU_PATCH.name.max], ['short', MENU_PATCH.short.max]]) if (x[k] !== undefined) { const v = fitText(x[k], max, 'ticket ' + t.id + ' item ' + k, repaired); if (v) x[k] = v; else delete x[k]; }
       if (!isNum(x.price) || x.price < 0 || x.price > C.limits.maxPrice) { if (isNum(x.price)) repaired.push('ticket ' + t.id + ' price reset'); x.price = 0; }
       if (x.qty > C.limits.maxQty) { x.qty = C.limits.maxQty; repaired.push('ticket ' + t.id + ' quantity lowered'); }
       for (const k of ['firedAt', 'startedAt', 'doneAt', 'cost']) if (x[k] !== undefined && !isNum(x[k])) return null;
@@ -9917,7 +9957,7 @@ a.of-nav:active { background: var(--press); }
     if (!isObj(o) || typeof o.id !== 'string' || !safeKey(o.id) || oSeq(o.id) !== oSeq(o.id) || !isNum(o.createdAt) || !hasOwn(ORDER_STATUS, o.status)) return null;
     const out = {
       id: o.id, serviceDate: typeof o.serviceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.serviceDate) ? o.serviceDate : U.serviceDate(o.createdAt),
-      customer: typeof o.customer === 'string' && o.customer ? o.customer.slice(0, C.limits.maxCustomerLen) : 'Walk-up',
+      customer: fitText(o.customer, C.limits.maxCustomerLen, 'order ' + o.id + '.customer', repaired) || 'Walk-up',
       channel: hasOwn(C.channelById, o.channel) ? o.channel : 'dine_in', createdAt: o.createdAt, status: o.status,
       src: hasOwn(SRC_TICKET, o.src) ? o.src : 'live', rounds: isInt(o.rounds) && o.rounds >= 0 ? o.rounds : 0,
     };
@@ -9972,7 +10012,7 @@ a.of-nav:active { background: var(--press); }
    * ==================================================================================================== */
   // The public door: everything other files may use. _internal is for tests and tools.
   Object.assign(E, {
-    apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
+    SAFETY_KEEP_DAYS, SAFETY_KEEP_MS, apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, totalsOf, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
     channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
@@ -10859,7 +10899,13 @@ a.of-nav:active { background: var(--press); }
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
   // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
   const SNAP_KEEP = { maxTickets: 300, maxEvents: 2000 };
+  // The 'before restore' copy stays in the last-good slot for 7 days, or until a close-day copy replaces it, so a wrong restore can be undone.
+  const BEFORE_RESTORE = 'before restore', BEFORE_RESTORE_KEEP_MS = 7 * 24 * 3600e3;
   const SID_KEY = 'smokebox.v1.sid';
+  // Two tabs of one browser must not overwrite each other's save. Where the browser has Web Locks, a timed save waits for the lock named
+  // LOCK_NAME, so only one tab at a time reads the save id, builds the text and writes it. Where it does not, a tab writes its own tag to
+  // WRITER_KEY first and checks both the tag and the save id again before writing (the tab-sync fallback).
+  const LOCK_NAME = 'smokebox-save-lock', WRITER_KEY = 'smokebox.v1.writer', LOCK_WAIT = 'waiting-for-lock';
   // The actions this device has done that no server has confirmed yet (only used when a transport can push).
   const OUTBOX_KEY = 'smokebox.v1.outbox';
   const OUTBOX_MAX = 5000; // oldest unconfirmed actions are dropped past this, and st.outboxDropped says so
@@ -11024,19 +11070,45 @@ a.of-nav:active { background: var(--press); }
     // 400 ms and 5 seconds, so a busy rush never spends most of its time writing.
     const wait = Math.min(SAVE_MAX_MS, Math.max(SAVE_MS, Math.round(st.saveCostMs * 8)));
     st.saveDelayMs = wait;
-    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
+    saveTimer = setTimeout(timedSave, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
   }
+  // The browser's lock manager when it has one, else null.
+  const lockManager = () => { try { const n = g.navigator; return n && n.locks && typeof n.locks.request === 'function' ? n.locks : null; } catch (e) { return null; } };
+  // True while a save runs inside the lock (then no tag check is needed: no other tab can be saving).
+  let inLock = false;
+  // Runs when the save timer fires. With several tabs and Web Locks it takes the lock first, then saves; otherwise it saves at once.
+  function timedSave() {
+    const L = tr ? lockManager() : null;
+    if (!L) { saveTimer = null; persistNow(); return; }
+    saveTimer = LOCK_WAIT;
+    // Saves inside the lock if this save is still the wanted one (a direct flush may have saved already).
+    const run = () => { if (saveTimer !== LOCK_WAIT) return; saveTimer = null; inLock = true; try { persistNow(); } finally { inLock = false; } };
+    try { L.request(LOCK_NAME, run).catch(() => { run(); }); } catch (e) { run(); }
+  }
+  // Without Web Locks: writes this tab's tag, then reads the tag and the save id back. True when nobody else saved or claimed meanwhile.
+  function claimWrite() {
+    const tag = tabId + ':' + (++claimN);
+    try {
+      storage.set(WRITER_KEY, tag);
+      const sid = storage.get(SID_KEY, null), mine = storage.get(WRITER_KEY, null);
+      return mine === tag && (sid == null ? baseSid == null : sid === baseSid);
+    } catch (e) { return true; }
+  }
+  let claimN = 0;
   // Saves the state to the browser right now and returns true if it worked. If the browser says it is full,
   // it retries with less history (oldest finished tickets and events first), halving up to 12 times. After a
   // good save it announces the new revision to other tabs.
   function persistNow() {
     if (fol) return true;                             // a follower never saves anything
     if (!storage || !state) return false;
-    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    if (saveTimer) { if (saveTimer !== LOCK_WAIT) clearTimeout(saveTimer); saveTimer = null; }
     // The saved text is a damaged copy nobody could keep elsewhere: it stays exactly as it is until the owner has saved it.
     if (writeBlocked) { st.lastSaveOk = false; return false; }
     // If another tab saved since this tab last loaded or saved, build on its copy first so nothing is lost.
+    const forced = skipRebase;
     if (skipRebase) skipRebase = false; else rebaseIfStale();
+    // With several tabs and no lock, claim the write and rebuild on the newest copy if another tab got in first (up to 3 times, then write anyway).
+    if (tr && !inLock && !lockManager()) for (let i = 0; i < 3 && !claimWrite(); i++) { if (forced) break; rebaseIfStale(); }
     const r = realNow();
     const v = now();
     let ok = false;
@@ -11082,6 +11154,8 @@ a.of-nav:active { background: var(--press); }
   function maybeSnapshot(r) {
     if (!strict || mode !== 'real' || !storage || !state) return false;
     if (!snapWanted && r - snapAt < SNAP_EVERY_MS) return false;
+    // A 'before restore' copy is the owner's way back from a wrong restore: the 6-hour refresh leaves it alone for 7 days.
+    if (!snapWanted) { const g = beforeRestoreCopy(r); if (g) return false; }
     try {
       const small = E().prune(state, SNAP_KEEP);
       const env = { v: 1, takenAt: r, reason: snapWanted || 'interval', rev: state.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
@@ -11092,6 +11166,44 @@ a.of-nav:active { background: var(--press); }
       st.lastGoodAt = r;
       return true;
     } catch (e) { return false; }
+  }
+  // The stored 'before restore' envelope when it is still within its 7 days at time r, else null.
+  function beforeRestoreCopy(r) {
+    try {
+      const g = storage.get(LASTGOOD_KEY, null);
+      return g && typeof g === 'object' && g.reason === BEFORE_RESTORE && isNum(g.takenAt) && r - g.takenAt < BEFORE_RESTORE_KEEP_MS && r >= g.takenAt ? g : null;
+    } catch (e) { return null; }
+  }
+  // Before a restore replaces the kitchen: keeps a whole copy of the current one in the last-good slot (full history if the
+  // browser has room, else the small rolling size). Returns the time it was taken, or null when there was nothing worth
+  // keeping (an empty kitchen, the demo, no storage) or the browser had no room. Never throws.
+  function snapshotBeforeRestore() {
+    if (!strict || mode !== 'real' || !storage || !state || isBlank()) return null;
+    const r = realNow();
+    for (const keep of [null, SNAP_KEEP]) {
+      try {
+        const small = keep ? E().prune(state, keep) : state;
+        const env = { v: 1, takenAt: r, reason: BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
+        if (!E().validateBackup(JSON.stringify(env)).ok) continue;
+        if (storage.set(LASTGOOD_KEY, env) === false) continue;
+        snapAt = r; snapWanted = null; st.lastGoodAt = r; st.beforeRestoreAt = r;
+        return r;
+      } catch (e) { /* try the smaller copy */ }
+    }
+    return null;
+  }
+  // Tells the screens about the 'before restore' copy: { takenAt, expiresAt } or null when there is none now.
+  function beforeRestoreInfo() {
+    if (!storage) return null;
+    const g = beforeRestoreCopy(realNow());
+    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS } : null;
+  }
+  // Puts the 'before restore' copy back as the kitchen (the way back from a wrong restore). Returns 'ok', or 'noCopy'.
+  // The copy it replaces is kept the same way, so this can be undone once too.
+  function undoRestore() {
+    const g = storage ? beforeRestoreCopy(realNow()) : null;
+    if (!g) { last = { type: 'undoRestore', report: 'noCopy', info: {}, events: [] }; return 'noCopy'; }
+    return importAll(JSON.stringify(g));
   }
   // Reads the rolling copy and returns { state, takenAt } if it is whole, else null.
   function readSnapshot() {
@@ -11598,6 +11710,8 @@ a.of-nav:active { background: var(--press); }
     }
     if (namesGiven && typeof C.saveCustom === 'function') { try { C.saveCustom(namesGiven); } catch (e) { /* the names stay applied for this session */ } }
     if (parsed && isObjLike(parsed.setup)) for (const k of SETUP_LISTS) if (Array.isArray(parsed.setup[k])) { try { storage.set(SETUP_KEYS[k], parsed.setup[k].filter((x) => typeof x === 'string').slice(0, 200)); } catch (e) { /* the list is a convenience */ } }
+    // Keep the kitchen being replaced, so a wrong restore can be undone: a visible copy in the last-good slot.
+    const beforeAt = snapshotBeforeRestore();
     const ns = v.state;
     // The revision must go up so other tabs treat the imported copy as newer; the clock must not be behind
     // its times.
@@ -11608,7 +11722,7 @@ a.of-nav:active { background: var(--press); }
     skipRebase = true; pending = [];   // an import or reset is meant to win over what another tab saved
     persistNow();
     scheduleNotify();
-    last = { type: 'import', report: 'ok', info: { repaired: v.repaired }, events: [] };
+    last = { type: 'import', report: 'ok', info: { repaired: v.repaired, beforeRestore: beforeAt != null, beforeRestoreAt: beforeAt, beforeRestoreKeepDays: beforeAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, events: [] };
     return 'ok';
   }
   // Time in ms as readable date text for spreadsheets, or empty text when missing.
@@ -12650,13 +12764,13 @@ a.of-nav:active { background: var(--press); }
   function isOwn() { return !!(state && state.catalog === 'own'); }
 
   // Public API: init, destroy, status, getState, now, tick, dispatch, dispatchEx, lastResult, subscribe,
-  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, exportCsv, reset,
+  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset,
   // resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY.
   SB.store = {
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
@@ -13060,15 +13174,52 @@ a.of-nav:active { background: var(--press); }
     for (const k of Object.keys(r.taps.jobs)) { add('taps', k, r.taps.jobs[k].n); add('taps', k + ' per hour', r.taps.jobs[k].perHour, '/h'); }
     add('tickets', 'count', r.tickets.n); add('tickets', 'median seconds to bump', r.tickets.medianSec, 's');
     add('settings', 'hot hold', r.settings.hotHoldF, 'F'); add('settings', 'temperature check', r.settings.tempCheckEveryMin, 'min'); add('settings', 'hard cap', r.settings.hardCapH, 'h');
-    // Quote a cell when it holds a comma, quote or line break; text cells never start with a formula sign.
-    const cell = (v) => { let s = String(v); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-    return rows.map((x) => x.map(cell).join(',')).join('\n') + '\n';
+    // Every cell goes through the shared guard (36-csv.js): text that could run as a formula gets a leading apostrophe.
+    return rows.map((x) => SB.csv.line(x)).join('\n') + '\n';
   }
 
   SB.pilot = { build, toText, toCsv, defaultFrom, KEY_ALERTLOG: 'smokebox.v1.alertlog', LOG_MAX: 400 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 35-pilot.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'35-pilot.js',message:String(e&&e.message||e)});}
+
+/* ===== 36-csv.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The one place that turns values into spreadsheet (CSV) cells safely. A text cell that starts with
+ *    = + - @ or a tab or carriage return could be run as a formula by a spreadsheet (a note typed as =HYPERLINK(...) in a
+ *    file handed to an inspector or an accountant), so such text gets a leading apostrophe. Real numbers and plain
+ *    number text stay numbers.
+ * PARTS: the cell, the line, the whole file.
+ * USES: nothing. USED BY: 35-pilot.js (pilot report), 76-floor-discards.js (thrown-out log), 88-office-backup.js (sales by day),
+ *    tests. The store has its own copy of the same rule for its five data files (30-store.js).
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  // Text that is only a number (an optional minus, digits, an optional decimal part): safe to leave as it is.
+  const PLAIN_NUMBER = /^-?\d+(?:\.\d+)?$/;
+  // Text that a spreadsheet may read as a formula or a command.
+  const DANGEROUS = /^[=+\-@\t\r]/;
+
+  // One CSV cell: numbers as digits, text with a leading apostrophe when it could be a formula, and quotes when it holds a comma, quote or line break.
+  function cell(v) {
+    if (v === undefined || v === null) return '';
+    if (typeof v === 'number') return isFinite(v) ? String(v) : '';
+    if (typeof v === 'boolean') return v ? 'true' : 'false';
+    let s = typeof v === 'string' ? v : String(v);
+    if (DANGEROUS.test(s) && !PLAIN_NUMBER.test(s)) s = "'" + s;
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  // One CSV line from a list of values (no line break at the end).
+  const line = (a) => a.map(cell).join(',');
+  // A whole CSV text from a list of lists, with a carriage return and line feed after each line.
+  const text = (rows) => rows.map(line).join('\r\n') + '\r\n';
+
+  SB.csv = { cell, line, text };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 36-csv.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'36-csv.js',message:String(e&&e.message||e)});}
 
 /* ===== 40-metrics.js ===== */
 ;try{
@@ -20112,7 +20263,11 @@ a.of-nav:active { background: var(--press); }
   };
   // Sets (4 digits) or removes (null or '') the manager PIN. Only the scramble is saved, through the store
   // (settings.office.pinHash); any unlock is forgotten. Resolves {ok, report}; bad input gives 'badPin'.
-  S.setPin = async function (pin) {
+  // Asks for the current PIN right now (the keypad), even inside the 2-minute grace. True at once when no PIN is set; false when cancelled.
+  S.requirePin = () => (S.hasPin() ? promptPin() : Promise.resolve(true));
+  S.setPin = async function (pin, opts) {
+    // With a PIN already set, changing or removing it needs proof that the current PIN was just entered (opts.verified from requirePin).
+    if (S.hasPin() && !(opts && opts.verified === true)) return { ok: false, report: 'pinRequired', message: 'The current PIN is needed to change or remove it.' };
     if (pin != null && pin !== '' && !/^\d{4}$/.test(String(pin))) return { ok: false, report: 'badPin', message: 'Use exactly 4 digits.' };
     const hash = pin == null || pin === '' ? null : await S.hashPin(pin);
     if (!SB.store || typeof SB.store.dispatch !== 'function') return { ok: false, report: 'noStore', message: 'The store is not available.' };
@@ -20675,6 +20830,39 @@ a.of-nav:active { background: var(--press); }
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 60-shell.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'60-shell.js',message:String(e&&e.message||e)});}
+
+/* ===== 66-order-math.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The money shown before an order is sent. It asks the engine's own order totals (whole cents, half-up tax) what a
+ *    draft would come to, so the preview on the order screen and the charge are always the same numbers. Nothing here does its own
+ *    rounding of tax. It also splits a tip percentage in whole cents.
+ * PARTS: previewTotals, pctOfDollars.
+ * USES: 20-engine.js (orderTotals). USED BY: 71-floor-order.js (the order screen), 73-floor-orders.js (tip choices), and tests.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  // What the order would come to if the draft lines were sent now: the food already on the order (if any) plus the draft lines at menu
+  // price, less nothing, plus tax, worked out by the engine's own orderTotals on a copy of the state that holds the draft as one more
+  // ticket. lines is [{ price, qty }]. order is the open order the round goes to, or null for a new order. Returns { sub, tax, total }.
+  function previewTotals(state, order, lines) {
+    const E = SB.engine;
+    const oid = order ? order.id : '_draft';
+    const items = (lines || []).map((l) => ({ price: l.price, qty: l.qty }));
+    const probe = Object.assign({}, state, { tickets: state.tickets.concat([{ id: '_draft', orderId: oid, status: 'active', items }]) });
+    const t = E.orderTotals(probe, order && order.status === 'open' ? order : { id: oid, status: 'open' });
+    return { sub: t.subtotal, tax: t.tax, total: t.total };
+  }
+  // A percentage of a dollar amount in whole cents, half a cent rounding up (15 percent of 23.50 is 3.53, not 3.52), for tip choices.
+  function pctOfDollars(amount, pct) {
+    const c = Math.round(Math.max(0, Number(amount) || 0) * 100 + 1e-7);
+    return Math.floor((c * pct + 50) / 100) / 100;
+  }
+  SB.orderMath = { previewTotals, pctOfDollars };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 66-order-math.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'66-order-math.js',message:String(e&&e.message||e)});}
 
 /* ===== 70-floor-board.js ===== */
 ;try{
@@ -23370,11 +23558,8 @@ a.of-nav:active { background: var(--press); }
   // What the bill comes to if this round is sent now: the food already on the open order plus this draft, with tax.
   function pendingTotal() {
     const s0 = st(), o = D.orderId ? SB.engine.findOrder(s0, D.orderId) : null;
-    let c = Math.round(subtotal() * 100);
-    if (o) c += Math.round(SB.engine.orderTotals(s0, o).subtotal * 100);
-    const sub = c / 100, rate = s0.settings && s0.settings.service && s0.settings.service.taxRatePct > 0 ? s0.settings.service.taxRatePct : 0;
-    const tax = Math.round(sub * rate) / 100;
-    return { sub, tax, total: Math.round((sub + tax) * 100) / 100 };
+    // The engine's own order totals do the sum and the tax, so what is shown is exactly what will be charged.
+    return SB.orderMath.previewTotals(s0, o, D.lines.map((l) => { const mi = menuById(l.menuId); return { price: mi ? mi.price : 0, qty: l.qty }; }));
   }
 
   /** Add one menu item (or qty) to the draft. Same item with no modifiers merges into the existing line. */
@@ -23695,7 +23880,7 @@ a.of-nav:active { background: var(--press); }
     });
     tipField.appendChild(tipChips);
     // The tip in dollars for a percent of the food on this bill (before tax), in whole cents.
-    const tipAmount = (pct) => (pct ? Math.round(pendingTotal().sub * pct) / 100 : 0);
+    const tipAmount = (pct) => (pct ? SB.orderMath.pctOfDollars(pendingTotal().sub, pct) : 0);
     const payNote = h('p', { class: 'ord-pay-note t-muted', role: 'status' });
     const payBox = h('div', { class: 'ord-block ord-paybox' }, h('div', { class: 'ord-label' }, 'Payment'), paySeg, tipField, payNote);
 
@@ -26091,6 +26276,8 @@ a.of-nav:active { background: var(--press); }
         body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
+      // With a PIN set, clearing live data asks for it.
+      if (SB.shell && SB.shell.requirePin && !(await SB.shell.requirePin())) { toast('The PIN was not entered. Nothing was cleared.', 'warn'); return; }
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
       const rep = SB.store.resetLive({ keepSettings: true, starter: false });
       if (rep === 'ok') toast('Live data cleared. The board is empty.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
@@ -26601,7 +26788,7 @@ a.of-nav:active { background: var(--press); }
   const cents = (v) => Math.round(v * 100) / 100;
   // Tip choices worked out from a base amount (the food after any discount): 15, 18, 20 and 25 percent in dollars.
   function tipPresets(base) {
-    return [15, 18, 20, 25].map((pct) => ({ pct, label: pct + '%', amount: cents((Math.max(0, base) * pct) / 100) }));
+    return [15, 18, 20, 25].map((pct) => ({ pct, label: pct + '%', amount: SB.orderMath ? SB.orderMath.pctOfDollars(base, pct) : cents((Math.max(0, base) * pct) / 100) }));
   }
   // The tip that brings the amount to collect up to a whole dollar (a total of 23.40 gives 0.60); 0 if already whole.
   function roundUpTip(total) { return cents(Math.ceil(cents(total) - 1e-9) - cents(total)); }
@@ -27029,7 +27216,7 @@ a.of-nav:active { background: var(--press); }
       if (tot.taxRate > 0) rows.push(['Tax (' + tot.taxRate + '%)', money(tot.tax)]);
       rows.push(['Order total', money(tot.total)]);
       const tip = r.err || Number.isNaN(r.t) ? 0 : r.t;
-      if (tip > 0) rows.push(['Tip', money(tip)], ['To collect', money(tot.total + tip)]);
+      if (tip > 0) rows.push(['Tip', money(tip)], ['To collect', money(Math.round(tot.total * 100 + tip * 100 + 1e-7) / 100)]);
       U.clear(calc);
       rows.forEach((row, i) => calc.append(h('dt', { class: i === rows.length - 1 ? 'is-last' : '' }, row[0]), h('dd', { class: 'num' + (i === rows.length - 1 ? ' is-last' : '') }, row[1])));
       quick.forEach((q) => {
@@ -27647,7 +27834,6 @@ a.of-nav:active { background: var(--press); }
   const SB = (g.SB = g.SB || {});
   const U = SB.util;
   const doc = g.document;
-  if (!doc || !SB.sheets) return;
   const h = U.h;
   // Builds an icon element, or an empty span when icons are missing.
   const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 20 }); } catch (e) { return doc.createElement('span'); } };
@@ -27678,8 +27864,10 @@ a.of-nav:active { background: var(--press); }
     // The engine's own discard entries by batch: who threw it out, the entry id for a fix, and fixes already made.
     const logged = new Map();
     for (const row of SB.engine.safetyLog(state)) if (row.event.type === 'batch_discard' && row.event.batchId) logged.set(row.event.batchId, row);
+    const seen = new Set();
     for (const b of state.batches) {
       if (b.status !== 'discard' || !Number.isFinite(b.discardedAt)) continue;
+      seen.add(b.id);
       out.push({
         id: b.id, t: b.discardedAt, date: U.fmtDateShort(U.dateKey(b.discardedAt)), food: b.label || b.ing,
         amount: U.weightText(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
@@ -27687,37 +27875,65 @@ a.of-nav:active { background: var(--press); }
         eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
     }
+    // Discards whose batch has since been dropped from the cabinet list are still in the safety record (kept about six months):
+    // show them from that entry, with what the entry holds (the amount, the reason, who) and nothing invented.
+    const ingName = (id) => { const i = (state.ingredients || []).find((x) => x && x.id === id); return i && i.name ? i.name : id || 'Food'; };
+    for (const [batchId, row] of logged) {
+      const e = row.event;
+      if (seen.has(batchId) || !Number.isFinite(e.t)) continue;
+      out.push({
+        id: batchId, t: e.t, date: U.fmtDateShort(U.dateKey(e.t)), food: ingName(e.ing), amount: Number.isFinite(e.g) ? U.weightText(e.g) : '',
+        since: '', out: U.fmtTime(e.t), reason: REASON[e.reason] || 'Other',
+        initials: rec.initials[batchId] || e.who || '', extra: rec.extra[batchId] || e.note || '', eventId: e.id || '', fixes: row.corrections || [],
+      });
+    }
     return out.sort((a, b) => b.t - a.t);
+  }
+  // How far back the log reaches, in plain words, so nobody reads it as more than it is. The app keeps safety records for
+  // about six months (190 days); a kitchen newer than that has everything from its first record.
+  function coverageText(state, list, now) {
+    if (!list.length) return '';
+    const oldest = list[list.length - 1].t;
+    let first = oldest;
+    for (const row of SB.engine.safetyLog(state)) if (Number.isFinite(row.event.t) && row.event.t < first) first = row.event.t;
+    for (const b of state.batches || []) if (b && Number.isFinite(b.enteredAt) && b.enteredAt < first) first = b.enteredAt;
+    const since = U.fmtDateShort(U.dateKey(oldest));
+    const n = list.length + ' ' + U.plural(list.length, 'batch', 'batches');
+    if (now - first < 175 * 86400e3) return 'Showing every batch thrown out since ' + U.fmtDateShort(U.dateKey(first)) + ' (' + n + '), the first record this app has.';
+    return 'Showing the ' + n + ' thrown out since ' + since + '. Records older than about six months are not kept, so older ones are not here.';
   }
   // Escapes text for safe use inside HTML.
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // Builds the log as plain HTML for printing: a heading and one table with the columns that are switched on.
-  function printHtml(list, rec) {
+  function printHtml(list, rec, note) {
     const cols = rec.cols.filter((c) => c.on);
     const head = '<tr>' + cols.map((c) => '<th>' + esc(c.label) + '</th>').join('') + '</tr>';
     const body = list.map((r) => '<tr>' + cols.map((c) => '<td>' + esc(r[c.key]) + '</td>').join('') + '</tr>').join('');
-    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p><table>' + head + body + '</table>';
+    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p>' + (note ? '<p>' + esc(note) + '</p>' : '') + '<table>' + head + body + '</table>';
   }
   // Builds the log as CSV text with the columns that are switched on.
-  function csv(list, rec) {
+  function csv(list, rec, note) {
     const cols = rec.cols.filter((c) => c.on);
-    // Wraps one value in quotes, doubling any quotes inside it, as CSV requires.
-    const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
-    return [cols.map((c) => q(c.label)).join(',')].concat(list.map((r) => cols.map((c) => q(r[c.key])).join(','))).join('\r\n') + '\r\n';
+    // Each cell goes through the shared guard (36-csv.js): quotes where needed and an apostrophe before anything a spreadsheet could run as a formula.
+    const rowsOut = [cols.map((c) => c.label)].concat(list.map((r) => cols.map((c) => r[c.key])));
+    if (note) rowsOut.push([note]);
+    return SB.csv.text(rowsOut);
   }
+  SB.discardsPure = { rows, coverageText, csv, printHtml };
+  if (!doc || !SB.sheets) return;
   // Prints the log through a hidden frame so the board behind the sheet is not printed with it.
-  function printLog(list, rec) {
+  function printLog(list, rec, note) {
     const f = doc.createElement('iframe');
     f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
     doc.body.appendChild(f);
-    f.srcdoc = printHtml(list, rec);
+    f.srcdoc = printHtml(list, rec, note);
     // Prints once the hidden frame has loaded its page, then removes it.
     f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { /* printing is optional */ } setTimeout(() => f.remove(), 2000); };
   }
   // Saves the log as a CSV file with the browser's normal download, and notes the save time.
-  function saveCsv(list, rec) {
+  function saveCsv(list, rec, note) {
     try {
-      const url = URL.createObjectURL(new Blob([csv(list, rec)], { type: 'text/csv' }));
+      const url = URL.createObjectURL(new Blob([csv(list, rec, note)], { type: 'text/csv' }));
       const a = doc.createElement('a');
       a.href = url; a.download = 'smokebox-thrown-out-log-' + new Date().toISOString().slice(0, 10) + '.csv'; a.style.display = 'none';
       doc.body.appendChild(a); a.click();
@@ -27734,8 +27950,11 @@ a.of-nav:active { background: var(--press); }
     // Stops listening to the store when the sheet closes.
     const onClose = () => offs.splice(0).forEach((f) => f());
     const sheet = SB.ui.sheet({ title: 'Thrown-out log', side: 'right', width: 'min(1040px, 96vw)', name: 'discards', onClose });
-    const note = h('p', { class: 'fs-sub' }, 'Every batch thrown out, newest first. Add initials on each row. Copy these to your health department\'s own form if it asks for a different layout. Save a copy every day: this log lives on this device only.');
+    const note = h('p', { class: 'fs-sub' }, 'Batches thrown out, newest first. Add initials on each row. Copy these to your health department\'s own form if it asks for a different layout. Save a copy every day: this log lives on this device only.');
     const status = h('p', { class: 'fs-sub', role: 'status' });
+    const cover = h('p', { class: 'fs-sub dlog-cover' });
+    // The plain words for how far back the log reaches, for the sheet, print and file.
+    const noteFor = (list) => coverageText(SB.store.getState(), list, SB.store.now());
     const wrap = h('div', { class: 'dlog-wrap', style: 'overflow:auto' });
     const colsBox = h('div', { class: 'dlog-cols', hidden: true });
 
@@ -27763,6 +27982,7 @@ a.of-nav:active { background: var(--press); }
     function draw() {
       U.clear(wrap);
       const list = rows(SB.store.getState(), rec);
+      cover.textContent = noteFor(list);
       const cols = rec.cols.filter((c) => c.on);
       if (!list.length) { wrap.appendChild(h('div', { class: 'empty' }, ico('trash', 40), h('h3', null, 'Nothing thrown out yet'), h('p', null, 'Batches you throw out show up here with their time and reason.'))); return; }
       const table = h('table', { class: 'dlog-table', style: 'border-collapse:collapse;width:100%' });
@@ -27801,15 +28021,15 @@ a.of-nav:active { background: var(--press); }
       });
     }
     // Prints the log as it stands.
-    const doPrint = () => printLog(rows(SB.store.getState(), rec), rec);
+    const doPrint = () => { const l = rows(SB.store.getState(), rec); printLog(l, rec, noteFor(l)); };
     // Saves a spreadsheet copy and says whether it worked.
-    const doCsv = () => { status.textContent = saveCsv(rows(SB.store.getState(), rec), rec) ? 'Saved a copy to your downloads.' : 'The browser blocked the download. Use Print instead.'; };
+    const doCsv = () => { const l = rows(SB.store.getState(), rec); status.textContent = saveCsv(l, rec, noteFor(l)) ? 'Saved a copy to your downloads.' : 'The browser blocked the download. Use Print instead.'; };
     // Shows or hides the column editor.
     const doCols = () => { colsBox.hidden = !colsBox.hidden; if (!colsBox.hidden) drawCols(); };
     const bPrint = h('button', { type: 'button', class: 'btn', onClick: doPrint }, ico('receipt', 20), h('span', null, 'Print or save as PDF'));
     const bCsv = h('button', { type: 'button', class: 'btn btn-primary', onClick: doCsv }, ico('package', 20), h('span', null, 'Save as spreadsheet'));
     const bCols = h('button', { type: 'button', class: 'btn', onClick: doCols }, ico('sliders', 20), h('span', null, 'Edit columns'));
-    sheet.body.append(note, h('div', { class: 'row', style: 'display:flex;gap:12px;flex-wrap:wrap;margin:12px 0' }, bCsv, bPrint, bCols), status, colsBox, wrap);
+    sheet.body.append(note, cover, h('div', { class: 'row', style: 'display:flex;gap:12px;flex-wrap:wrap;margin:12px 0' }, bCsv, bPrint, bCols), status, colsBox, wrap);
     draw();
     offs.push(SB.store.subscribe(() => draw()));
     return sheet;
@@ -27836,7 +28056,7 @@ a.of-nav:active { background: var(--press); }
   // Rows for the state, with the saved initials and notes filled in.
   const rowsFor = (state) => rows(state, load());
   // The whole log for the state as CSV text.
-  const csvFor = (state) => csv(rows(state, load()), load());
+  const csvFor = (state) => { const l = rows(state, load()); return csv(l, load(), coverageText(state, l, SB.store.now())); };
   SB.discards = { rows: rowsFor, csv: csvFor, remind, persist };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
@@ -28836,6 +29056,12 @@ a.of-nav:active { background: var(--press); }
   // Opens "Start over with an empty menu": three plain steps (what goes and what stays, save a backup, type the word). This cannot
   // be undone, so the screen says so first and offers a backup before anything is erased.
   function openStartOver() {
+    // With a PIN set, the keypad comes first; the sheet opens only for the right PIN.
+    if (SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.shell.requirePin) { SB.shell.requirePin().then((ok) => { if (ok) buildStartOver(); }); return null; }
+    return buildStartOver();
+  }
+  // Builds the Start over sheet (after the PIN, when one is set).
+  function buildStartOver() {
     const sheet = SB.ui.sheet({ title: 'Start over with an empty menu', side: 'right', width: 'min(640px, 96vw)', name: 'startover' });
     const root = h('div', { class: 'dp so' });
     const keep = h('input', { type: 'checkbox', checked: true, id: 'so-keep' });
@@ -28850,10 +29076,30 @@ a.of-nav:active { background: var(--press); }
     const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: about your backup');
     step1.appendChild(next1);
 
-    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' } }, 'Next: confirm');
+    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' }, disabled: true }, 'Next: confirm');
+    let backupInfo = null; // what the backup file was called and how big, once it was handed to the browser
+    const bkSt = h('p', { class: 'fs-sub dp-msg', role: 'status', dataset: { role: 'so-backup-msg' } });
+    // Saves the backup file now, before anything is erased, and asks the person to confirm they can find it.
+    const saveNow = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'so-save-backup' }, onClick: () => {
+      let text = null; try { text = SB.store.exportAll(); } catch (e) { text = null; }
+      if (!text) { tell(bkSt, 'The backup could not be made, so nothing can be erased. Nothing was changed.', 'bad'); return; }
+      // Pads a number to two digits so the backup file name sorts by time.
+      const d = new Date(), pad2 = (n) => String(n).padStart(2, '0');
+      const filename = 'smokebox-backup-before-start-over-' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '-' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.json';
+      try { const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' })); const a = doc.createElement('a'); a.href = url; a.download = filename; a.style.display = 'none'; doc.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 4000); }
+      catch (e) { tell(bkSt, 'This browser would not save the file. Nothing was erased. Try again, or back up from Back office, Data first.', 'bad'); return; }
+      backupInfo = { filename, chars: text.length };
+      tell(bkSt, 'Asked your browser to save ' + filename + ' (' + Math.max(1, Math.round(text.length / 1024)) + ' KB). Look in your downloads folder to be sure it is there.', 'ok');
+      sawIt.disabled = false; saveNow.textContent = 'Save it again';
+    } }, 'Save my backup file now');
+    const sawIt = h('input', { type: 'checkbox', id: 'so-saw', disabled: true, dataset: { act: 'so-saw' } });
+    // The next step opens only after the person says the file is saved and they can find it.
+    sawIt.addEventListener('change', () => { next2.disabled = !(sawIt.checked && backupInfo); });
     const step2 = h('section', { class: 'fs-section so-step', hidden: true },
       h('h3', { class: 'fs-h' }, '2. Your backup'),
-      h('p', { class: 'fs-sub' }, 'The moment you confirm, Smokebox saves a backup file with everything in your kitchen as it is now, then erases. The file goes to your downloads: keep a copy off this device. If the backup cannot be made, nothing is erased.'),
+      h('p', { class: 'fs-sub' }, 'First save a backup file with everything in your kitchen as it is now. It goes to your downloads: keep a copy off this device. Nothing is erased until you say you saved it.'),
+      saveNow, bkSt,
+      h('label', { class: 'dp-check-row', for: 'so-saw' }, sawIt, h('span', null, 'I saved the backup file and I can find it')),
       h('p', { class: 'fs-sub' }, 'To bring everything back later: Back office, Data, Restore.'), next2);
 
     const word = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': 'Type ' + START_OVER_WORD + ' to confirm', placeholder: START_OVER_WORD });
@@ -28875,13 +29121,14 @@ a.of-nav:active { background: var(--press); }
     go.addEventListener('click', () => {
       const keepIt = keep.checked;
       // The store makes its own backup first, clears the kitchen, my saved setup bits and (when asked) the settings and station names.
-      const res = SB.store.startOver({ confirm: word.value, keepSettings: keepIt });
+      const res = SB.store.startOver({ confirm: word.value, keepSettings: keepIt, backupSaved: backupInfo });
       if (!res.ok) {
         let w = res.report;
         try { w = SB.engine.describe(res.report, res.info, SB.store.getState().settings) || w; } catch (e) { /* keep the code */ }
-        if (res.report === 'confirmWord') w = 'Type ' + START_OVER_WORD + ' exactly, then try again. Nothing was erased.';
+        if (res.report === 'backupRequired') w = 'Save the backup file first (step 2). Nothing was erased.';
+        else if (res.report === 'confirmWord') w = 'Type ' + START_OVER_WORD + ' exactly, then try again. Nothing was erased.';
         else if (res.report === 'notInDemo') w = 'You are in the demo, so there is nothing of yours to erase here. Tap Back to my kitchen first.';
-        tell(goSt, w + (res.report === 'confirmWord' || res.report === 'notInDemo' ? '' : ' Nothing was erased.'), 'bad');
+        tell(goSt, w + (res.report === 'confirmWord' || res.report === 'notInDemo' || res.report === 'backupRequired' ? '' : ' Nothing was erased.'), 'bad');
         return;
       }
       const needsReload = !keepIt;
@@ -29037,9 +29284,11 @@ a.of-nav:active { background: var(--press); }
 
   // Makes a new recovery code and shows it once on a "write this down" screen with Copy and Print. The Done button stays off until the
   // owner selects "I saved it". Needs a PIN; says plainly why when it cannot make one. Used after a PIN is set, and from the PIN section.
-  async function showRecoveryCode() {
+  async function showRecoveryCode(opts) {
     const st = SB.store;
     if (!st || typeof st.createRecoveryCode !== 'function') return false;
+    // A new code replaces the old one, so with a PIN set the current PIN must be entered first (unless it was just entered).
+    if (!(opts && opts.verified) && SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.shell.requirePin && !(await SB.shell.requirePin())) { if (SB.ui.toast) SB.ui.toast('The PIN was not entered, so no recovery code was made.', { tone: 'warn' }); return false; }
     const r = await st.createRecoveryCode();
     if (!r.ok) { let w = r.report; try { w = SB.engine.describe(r.report, r.info, st.getState().settings) || w; } catch (e) { /* keep the code */ } if (SB.ui.toast) SB.ui.toast('The recovery code could not be made. ' + w, { tone: 'warn' }); return false; }
     const sheet = SB.ui.sheet({ title: 'Write down your recovery code', side: 'center', width: 'min(560px, 96vw)', name: 'recoverycode' });
@@ -29485,9 +29734,12 @@ a.of-nav:active { background: var(--press); }
       h('button', { type: 'button', class: 'btn', onClick: async () => {
         const v = pin.value.trim();
         if (!/^\d{4}$/.test(v)) { tell(pinSt, 'Use exactly 4 digits.'); return; }
-        const r = SB.shell && SB.shell.setPin ? await SB.shell.setPin(v) : { ok: false };
+        // With a PIN already set, the current PIN must be entered first, so a cook cannot take over the back office.
+        const hadPin = !!(SB.shell && SB.shell.hasPin && SB.shell.hasPin());
+        if (hadPin && !(await SB.shell.requirePin())) { tell(pinSt, 'The PIN was not changed. The current PIN is needed to change it.', 'bad'); return; }
+        const r = SB.shell && SB.shell.setPin ? await SB.shell.setPin(v, { verified: true }) : { ok: false };
         tell(pinSt, r.ok ? 'PIN set. The back office will ask for it.' : 'The PIN could not be saved.');
-        if (r.ok) { pin.value = ''; await showRecoveryCode(); }
+        if (r.ok) { pin.value = ''; await showRecoveryCode({ verified: true }); }
       } }, 'Set PIN'),
       // For a PIN set before recovery codes existed: makes the code now.
       SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.store.hasRecoveryCode && !SB.store.hasRecoveryCode() ? h('button', { type: 'button', class: 'btn', dataset: { act: 'make-recovery' }, onClick: () => showRecoveryCode() }, 'Make a recovery code') : null);
@@ -35739,7 +35991,7 @@ a.of-nav:active { background: var(--press); }
           pin = n1.input.value;
         }
         let res;
-        try { res = await SB.shell.setPin(pin); } catch (e) { res = { ok: false, report: 'error' }; }
+        try { res = await SB.shell.setPin(pin, { verified: true }); } catch (e) { res = { ok: false, report: 'error' }; }
         if (res && res.ok) {
           closeForm();
           SB.ui.toast(pin ? (m === 'set' ? 'PIN set. The back office will ask for it next time.' : 'PIN changed. The back office will ask for the new one next time.') : 'PIN removed. The back office opens without asking.', { tone: 'ok' });
@@ -36287,6 +36539,8 @@ a.of-nav:active { background: var(--press); }
           'There is no undo. If you might want what is here now, cancel and download a backup first.'],
       });
       if (!ok) return;
+      // With a PIN set, restoring a backup asks for it again, even inside the back office grace period.
+      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was restored.', { tone: 'warn' }); return; }
       const rep = SB.store.importAll(p.text);
       if (rep === 'ok') {
         clearImport(); pasteArea.value = ''; fileIn.value = '';
@@ -36349,7 +36603,9 @@ a.of-nav:active { background: var(--press); }
           k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
           'There is no undo. Back up first if you might want this data.'],
         // Clears the live data after the word was typed.
-        run: () => {
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
           const rep = SB.store.resetLive({ keepSettings: k, starter: false });
           if (rep === 'ok') { resetStatus.ok('Live data erased. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data erased.', { tone: 'ok' }); }
           else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
@@ -36364,7 +36620,9 @@ a.of-nav:active { background: var(--press); }
         lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
           'Your display choices (themes and text size) are kept.', 'There is no undo. Back up first if you might want any of it back.'],
         // Erases everything after the word was typed.
-        run: () => {
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
           const rep = SB.store.reset();
           if (rep === 'ok') { resetStatus.ok('Everything was reset to the starter values.'); SB.ui.toast('Everything was reset.', { tone: 'ok' }); }
           else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
@@ -37540,10 +37798,7 @@ a.of-nav:active { background: var(--press); }
 
 
   // Quotes one value for a CSV cell: wraps it in quotes when it holds a comma, quote or line break.
-  function csvCell(v) {
-    const t = v == null ? '' : String(v);
-    return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
-  }
+  function csvCell(v) { return SB.csv.cell(v); }
   // Whole cents as plain digits with two decimals (1240 gives "12.40"), with no dollar sign or thousands commas, so a spreadsheet adds them up.
   const plainMoney = (v) => (isNum(v) ? (Math.round(v) / 100).toFixed(2) : '0.00');
 

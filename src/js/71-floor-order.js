@@ -159,11 +159,8 @@
   // What the bill comes to if this round is sent now: the food already on the open order plus this draft, with tax.
   function pendingTotal() {
     const s0 = st(), o = D.orderId ? SB.engine.findOrder(s0, D.orderId) : null;
-    let c = Math.round(subtotal() * 100);
-    if (o) c += Math.round(SB.engine.orderTotals(s0, o).subtotal * 100);
-    const sub = c / 100, rate = s0.settings && s0.settings.service && s0.settings.service.taxRatePct > 0 ? s0.settings.service.taxRatePct : 0;
-    const tax = Math.round(sub * rate) / 100;
-    return { sub, tax, total: Math.round((sub + tax) * 100) / 100 };
+    // The engine's own order totals do the sum and the tax, so what is shown is exactly what will be charged.
+    return SB.orderMath.previewTotals(s0, o, D.lines.map((l) => { const mi = menuById(l.menuId); return { price: mi ? mi.price : 0, qty: l.qty }; }));
   }
 
   /** Add one menu item (or qty) to the draft. Same item with no modifiers merges into the existing line. */
@@ -484,7 +481,7 @@
     });
     tipField.appendChild(tipChips);
     // The tip in dollars for a percent of the food on this bill (before tax), in whole cents.
-    const tipAmount = (pct) => (pct ? Math.round(pendingTotal().sub * pct) / 100 : 0);
+    const tipAmount = (pct) => (pct ? SB.orderMath.pctOfDollars(pendingTotal().sub, pct) : 0);
     const payNote = h('p', { class: 'ord-pay-note t-muted', role: 'status' });
     const payBox = h('div', { class: 'ord-block ord-paybox' }, h('div', { class: 'ord-label' }, 'Payment'), paySeg, tipField, payNote);
 

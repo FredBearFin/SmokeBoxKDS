@@ -15,6 +15,15 @@
   U.isNum = (n) => typeof n === 'number' && isFinite(n);
   // The folder the page was served from as an address prefix ('' at the site root, '/beta' behind a path prefix), for calls to its own hub.
   U.pageFolder = (g) => { try { const p = g && g.location && typeof g.location.pathname === 'string' ? g.location.pathname : '/'; return p.replace(/[^/]*$/, '').replace(/\/+$/, ''); } catch (e) { return ''; } };
+  // Removes characters nobody can see that can fool a reader: text-direction controls (U+202A to U+202E, U+2066 to U+2069) and zero-width
+  // characters (U+200B, U+200C, U+2060, U+FEFF). A zero-width joiner (U+200D) is kept only inside an emoji sequence (a pictograph on both
+  // sides, with an optional variation selector or skin tone before it), so family and flag emoji still work; anywhere else it is removed.
+  const INVISIBLE_RE = /[\u200B\u200C\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/g;
+  const ZWJ_RE = /(\p{Extended_Pictographic}[\uFE0F\u{1F3FB}-\u{1F3FF}]*\u200D(?=\p{Extended_Pictographic}))|\u200D/gu;
+  // Returns the text with those invisible characters removed (emoji joiners stay).
+  U.stripInvisible = (s) => String(s).replace(INVISIBLE_RE, '').replace(ZWJ_RE, (m, keep) => (keep ? m : ''));
+  // Cleans typed text for names and notes: strips the invisible characters, squeezes runs of white space to single spaces and trims both ends.
+  U.cleanText = (s) => U.stripInvisible(s).replace(/\s+/g, ' ').trim();
   /* ---------- secret hashing (PIN and recovery code) ---------- */
   // Rounds of PBKDF2 for a saved PIN or recovery code: about a tenth of a second on a tablet. A 4-digit PIN stays a door latch whatever this is.
   const KDF_ROUNDS = 100000;
@@ -332,8 +341,8 @@
   const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'callouts', 'far', 'wall', 'dock', 'follow.sound'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
-  const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'dropped', 'droppedat', 'dropped', 'droppedat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept', 'hubqueue', 'hubcache', 'hubtoken'].map((k) => 'smokebox.v1.' + k);
+  const DATA_KEYS = ['state', 'sid', 'writer', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'dropped', 'droppedat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept', 'hubqueue', 'hubcache', 'hubtoken'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
