@@ -55,9 +55,10 @@
       window: { from, to, hours: r1(hours) },
       excluded: { reverted: all.length - ev.length, demoTickets: demoTickets.size, sampleOrStarterBatches: sampleBatches.size, demoClock: !!opts.demoClock },
       pulls: { n: 0, g: 0, byIng: {}, cutsCounted: U.isNum(opts.cutsCounted) && opts.cutsCounted > 0 ? Math.round(opts.cutsCounted) : null, tapRate: null },
-      sounds: { total: 0, firstSounds: 0, repeats: 0, byLevel: { 1: 0, 2: 0, 3: 0, 4: 0 }, acknowledged: 0, notLeader: 0, lapses: 0 },
+      sounds: { total: 0, firstSounds: 0, repeats: 0, byLevel: { 1: 0, 2: 0, 3: 0, 4: 0 }, acknowledged: 0, notLeader: 0, lapses: 0, warnings: 0, warningsAcked: 0, ackRate: null },
+      undos: 0, refused: 0,
       keeps: { kept: 0, corrected: 0, snoozed: 0 },
-      discards: { n: 0, g: 0, cost: 0, byIng: {}, byReason: {}, perDayCost: null, perWeekCost: null, days: r1(Math.max(hours / 24, 0)) },
+      discards: { n: 0, g: 0, cost: null, costKnownN: 0, costUnknownN: 0, byIng: {}, byReason: {}, perDayCost: null, perWeekCost: null, days: r1(Math.max(hours / 24, 0)) },
       taps: { hours: r1(hours), jobs: {} },
       tickets: { used: false, n: 0, medianSec: null },
       settings: {
@@ -72,6 +73,8 @@
     const recent = to - 2 * H;
     for (const e of ev) {
       if (e.type !== 'cabinet_pull' || !U.isNum(e.g)) continue;
+      // A pull drawn only from sample or starter batches is pretend food, left out like the other sample things.
+      if (Array.isArray(e.batchIds) && e.batchIds.length && e.batchIds.every((id) => sampleBatches.has(id))) continue;
       out.pulls.n++; out.pulls.g += e.g;
       const p = out.pulls.byIng[e.ing] || (out.pulls.byIng[e.ing] = { n: 0, g: 0, last2hG: 0, estGPerMin: null, realizedGPerMin: null });
       p.n++; p.g += e.g;
@@ -89,29 +92,43 @@
     }
     out.pulls.g = Math.round(out.pulls.g);
     if (out.pulls.cutsCounted) out.pulls.tapRate = Math.round(1000 * out.pulls.n / out.pulls.cutsCounted) / 10;
-    // Discards: grams, cost, per product and reason, and what a week would cost at this day's rate.
+    // Discards: grams, cost, per product and reason, and what a week would cost at this day's rate. A discard with no cost
+    // on record is counted as unknown: it never adds zero, and a group where nothing is known reads as unknown (null).
+    const money = (o) => { o.cost = o.known ? Math.round(o.sum * 100) / 100 : null; o.costUnknownN = o.unknown; delete o.sum; delete o.known; delete o.unknown; };
+    const grp = (o, k) => o[k] || (o[k] = { g: 0, sum: 0, known: 0, unknown: 0 });
+    let sumKnown = 0;
     for (const e of ev) {
       if (e.type !== 'batch_discard' || sampleBatches.has(e.batchId)) continue;
-      const g0 = U.isNum(e.g) ? e.g : 0, cost = U.isNum(e.cost) ? e.cost : 0;
-      out.discards.n++; out.discards.g += g0; out.discards.cost += cost;
-      const bi = out.discards.byIng[e.ing] || (out.discards.byIng[e.ing] = { g: 0, cost: 0 }); bi.g += g0; bi.cost += cost;
-      const br = out.discards.byReason[e.reason || 'other'] || (out.discards.byReason[e.reason || 'other'] = { g: 0, cost: 0 }); br.g += g0; br.cost += cost;
+      const g0 = U.isNum(e.g) ? e.g : 0, hasCost = U.isNum(e.cost);
+      out.discards.n++; out.discards.g += g0;
+      if (hasCost) { out.discards.costKnownN++; sumKnown += e.cost; } else out.discards.costUnknownN++;
+      for (const gp of [grp(out.discards.byIng, e.ing), grp(out.discards.byReason, e.reason || 'other')]) { gp.g += g0; if (hasCost) { gp.sum += e.cost; gp.known++; } else gp.unknown++; }
     }
-    out.discards.g = Math.round(out.discards.g); out.discards.cost = Math.round(out.discards.cost * 100) / 100;
-    for (const o of [out.discards.byIng, out.discards.byReason]) for (const k of Object.keys(o)) { o[k].g = Math.round(o[k].g); o[k].cost = Math.round(o[k].cost * 100) / 100; }
+    out.discards.g = Math.round(out.discards.g);
+    out.discards.cost = out.discards.costKnownN ? Math.round(sumKnown * 100) / 100 : out.discards.n ? null : 0;       // no discards is a calm 0; discards with no cost on record are unknown
+    for (const o of [out.discards.byIng, out.discards.byReason]) for (const k of Object.keys(o)) { o[k].g = Math.round(o[k].g); money(o[k]); }
     const days = Math.max(hours / 24, 1 / 3);
-    out.discards.perDayCost = Math.round(out.discards.cost / days * 100) / 100;
-    out.discards.perWeekCost = Math.round(out.discards.cost / days * 7 * 100) / 100;
+    out.discards.perDayCost = out.discards.cost == null ? null : Math.round(out.discards.cost / days * 100) / 100;
+    out.discards.perWeekCost = out.discards.cost == null ? null : Math.round(out.discards.cost / days * 7 * 100) / 100;
     // Sounds from the saved log (real tablets only keep what the board wrote).
+    const warned = new Set(), acked = new Set();
     for (const a of opts.alerts || []) {
       if (!inWin(a.t)) continue;
-      if (a.ack) { out.sounds.acknowledged++; continue; }
+      if (a.ack) { out.sounds.acknowledged++; if (typeof a.id === 'string') acked.add(a.id); continue; }
+      if (typeof a.id === 'string') warned.add(a.id);
       out.sounds.total++;
       if (a.repeat) out.sounds.repeats++; else out.sounds.firstSounds++;
       if (out.sounds.byLevel[a.level] !== undefined) out.sounds.byLevel[a.level]++;
       if (a.leader === false) out.sounds.notLeader++;
       if (a.kind === 'past' && !a.repeat && /:[1-9]\d*$/.test(a.id || '')) out.sounds.lapses++;
     }
+    // Each distinct warning counts once, however many times it repeated; it is acknowledged when someone tapped it.
+    out.sounds.warnings = warned.size;
+    out.sounds.warningsAcked = Array.from(warned).filter((id) => acked.has(id)).length;
+    out.sounds.ackRate = warned.size ? Math.round(1000 * out.sounds.warningsAcked / warned.size) / 10 : null;
+    // Undos and refused taps (the screen reports a refusal back to the log) in the window; undone events themselves stay excluded.
+    out.undos = ev.filter((e) => e.type === 'undo').length;
+    out.refused = ev.filter((e) => e.type === 'ui_report').length;
     for (const e of ev) {
       if (e.type === 'quality_extend') out.keeps.kept++;
       else if (e.type === 'quality_extend_corrected') out.keeps.corrected++;
@@ -139,7 +156,7 @@
 
   // ---------- 3. text and CSV ----------
   // Writes a money amount in dollars with two cents digits.
-  const usd = (n) => U.currencySymbol() + (U.isNum(n) ? n.toFixed(2) : '0.00');
+  const usd = (n) => (U.isNum(n) ? U.currencySymbol() + n.toFixed(2) : 'unknown');
   // Plain-words summary of a report, one line per fact, for the screen and for pasting into notes.
   function toText(r) {
     const L = [];
@@ -152,7 +169,9 @@
     for (const id of Object.keys(r.pulls.byIng)) { const p = r.pulls.byIng[id]; L.push('  ' + id + ': ' + p.n + ' pulls, ' + U.fmtG(p.g) + '; last 2 h pulled ' + p.realizedGPerMin + ' g/min, board estimates ' + (p.estGPerMin == null ? 'unknown' : p.estGPerMin + ' g/min') + '.'); }
     L.push('Sounds: ' + r.sounds.total + ' (' + r.sounds.firstSounds + ' first sounds, ' + r.sounds.repeats + ' repeats; chime ' + r.sounds.byLevel[1] + ', voice ' + r.sounds.byLevel[2] + ', loud ' + r.sounds.byLevel[3] + ', limit ' + r.sounds.byLevel[4] + '); ' + r.sounds.acknowledged + ' taps on a warning; ' + r.sounds.lapses + ' lapses after a keep; ' + r.sounds.notLeader + ' held back by another tab.');
     L.push('Batches kept serving: ' + r.keeps.kept + ' (' + r.keeps.corrected + ' corrected); reminders put off: ' + r.keeps.snoozed + '.');
-    L.push('Discards: ' + r.discards.n + ' batches, ' + U.fmtG(r.discards.g) + ', ' + usd(r.discards.cost) + (r.window.hours < 12 ? ' in this window. A week at this rate would be about ' + usd(r.discards.perWeekCost) + ' (one service only: a rough guess).' : '; about ' + usd(r.discards.perWeekCost) + ' a week at this rate.'));
+    const dc = r.discards;
+    L.push('Discards: ' + dc.n + ' batches, ' + U.fmtG(dc.g) + ', ' + (dc.cost == null ? (dc.n ? 'cost unknown (no ingredient cost on record)' : usd(0)) : usd(dc.cost) + (dc.costUnknownN ? ' plus ' + dc.costUnknownN + ' with no cost recorded' : '')) + (dc.perWeekCost == null ? '.' : r.window.hours < 12 ? ' in this window. A week at this rate would be about ' + usd(dc.perWeekCost) + ' (one service only: a rough guess).' : '; about ' + usd(dc.perWeekCost) + ' a week at this rate.'));
+    L.push('Warnings: ' + r.sounds.warnings + ' distinct, ' + r.sounds.warningsAcked + ' acknowledged' + (r.sounds.ackRate == null ? '' : ' (' + r.sounds.ackRate + ' percent)') + '. Undos: ' + r.undos + '. Refused taps: ' + r.refused + '.');
     L.push('Taps per hour: ' + Object.keys(r.taps.jobs).map((k) => k + ' ' + r.taps.jobs[k].n + (r.taps.jobs[k].perHour == null ? '' : ' (' + r.taps.jobs[k].perHour + '/h)')).join(', ') + '.');
     L.push(r.tickets.used ? 'Tickets: ' + r.tickets.n + ', median ' + (r.tickets.medianSec == null ? 'unknown' : r.tickets.medianSec + ' s') + ' to bump.' : 'Tickets: Smokebox tickets were not used.');
     L.push('Settings in force: hot hold ' + r.settings.hotHoldF + ' F, temperature check every ' + r.settings.tempCheckEveryMin + ' min, hard cap ' + r.settings.hardCapH + ' h, warning times ' + (typeof r.settings.ladder === 'string' ? r.settings.ladder : JSON.stringify(r.settings.ladder)) + '.');
@@ -170,7 +189,8 @@
     for (const k of Object.keys(r.sounds)) if (k !== 'byLevel') add('sounds', k, r.sounds[k]);
     for (const l of [1, 2, 3, 4]) add('sounds', 'level ' + l, r.sounds.byLevel[l]);
     for (const k of Object.keys(r.keeps)) add('keeps', k, r.keeps[k]);
-    add('discards', 'batches', r.discards.n); add('discards', 'grams', r.discards.g, 'g'); add('discards', 'cost', r.discards.cost, '$'); add('discards', 'cost per week at this rate', r.discards.perWeekCost, '$');
+    add('discards', 'batches', r.discards.n); add('discards', 'grams', r.discards.g, 'g'); add('discards', 'cost', r.discards.cost, '$'); add('discards', 'batches with no cost recorded', r.discards.costUnknownN);
+    add('warnings', 'distinct', r.sounds.warnings); add('warnings', 'acknowledged', r.sounds.warningsAcked); add('warnings', 'acknowledged rate', r.sounds.ackRate, '%'); add('undo', 'undos', r.undos); add('undo', 'refused taps', r.refused); add('discards', 'cost per week at this rate', r.discards.perWeekCost, '$');
     for (const id of Object.keys(r.discards.byIng)) add('discards ' + id, 'cost', r.discards.byIng[id].cost, '$');
     for (const k of Object.keys(r.discards.byReason)) add('discards by reason', k, r.discards.byReason[k].cost, '$');
     for (const k of Object.keys(r.taps.jobs)) { add('taps', k, r.taps.jobs[k].n); add('taps', k + ' per hour', r.taps.jobs[k].perHour, '/h'); }

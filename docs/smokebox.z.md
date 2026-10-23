@@ -381,3 +381,9 @@ When `startOver` succeeds it removes the saved outbox entries that came before t
 
 New safety-log entries, all in `SAFETY_EVENT`, so the safety log, retention and `correctSafety` pick them up unchanged: `logEquipmentTemp { unit: 'cooler'|'freezer'|'display'|'other', f, label?, who? }` writes `equip_temp`; `logThermometerCheck { f, method?: 'ice'|'boiling'|'other', who? }` writes `thermometer_checked`; `sanitizeDone` takes optional `ppm`, `product`, `where`; `discardBatch` takes an optional `note` and the new reason `datemark`. Everything is absent unless given.
 
+
+### 8.8 Pilot numbers and "pull again" (round 16)
+
+The pilot report (`35-pilot.js`) no longer turns an unknown cost into zero. A discard with no cost on record counts in `discards.costUnknownN`; `discards.cost` is the sum of the known ones, or `null` when discards exist and none has a cost (a pilot with no discards reads 0). The same holds per product and per reason, and the text and CSV say "cost unknown". The week figure is `null` when the cost is. Pulls drawn only from sample or starter batches are left out, like their discards. New numbers: `sounds.warnings` (distinct warnings), `sounds.warningsAcked`, `sounds.ackRate`, `undos` and `refused` (taps the screen reported as refused). `test/pilot-scenario.test.mjs` runs a simulated three day pilot against hand-kept tallies.
+
+`pullAgain { ing?, g? }` logs a pull with nothing to fill in: the last pull that was not undone (same product and weight), that product's last weight when only `ing` is given, or a new weight with the last product when only `g` is given. It is `pullBatch` underneath, so undo and refusals are the same; with nothing to repeat it answers `nothingToDo` with `info.why = 'noPullYet'`. `SB.engine.lastPull(state, ing?)` returns `{ ing, g, t }` or null for a button label.

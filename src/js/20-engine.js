@@ -173,6 +173,7 @@
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety", fridge?:boolean, fridgeDays?, outHours? }',
     logEquipmentTemp: '{ unit:"cooler"|"freezer"|"display"|"other", f, label?, who? }',
     logThermometerCheck: '{ f, method?:"ice"|"boiling"|"other", who? }',
+    pullAgain: '{ ing?, g? }',
     coldTakeOut: '{ batchId, who? }',
     coldReturn: '{ batchId, who? }',
     setPortions: '{ menuId, on:boolean, count? }',
@@ -182,7 +183,7 @@
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient', 'moveMenuItem', 'setChips', 'coldTakeOut', 'coldReturn'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient', 'moveMenuItem', 'setChips', 'coldTakeOut', 'coldReturn', 'pullAgain'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -1912,6 +1913,27 @@
     pushUndo(tx, 'pull', 'Pulled ' + Math.round(g) + ' g of ' + ing.name, { ing: ing.id, recs: took.recs });
     tx.info = { ing: ing.id, g, short: took.left > EPS ? took.left : 0, batchIds: took.recs.map((r) => r.batchId) };
     return 'ok';
+  };
+
+  // The most recent pull that was not undone, as { ing, g, t }, or null. With an ingredient id it looks for that product only.
+  // Screens use it to label a one-tap "pull the same again" button.
+  function lastPull(state, ingId) {
+    const ev = allEvents(state);
+    for (let i = ev.length - 1; i >= 0; i--) {
+      const e = ev[i];
+      if (e.type === 'cabinet_pull' && !e.reverted && isNum(e.g) && e.g > 0 && (ingId == null || e.ing === ingId)) return { ing: e.ing, g: e.g, t: e.t };
+    }
+    return null;
+  }
+  // Logs a pull with no fields to fill in: the same product and weight as the last pull that was not undone, or, with only
+  // an ingredient given, that product's last weight. An explicit g overrides the weight. Refuses with nothingToDo (why
+  // noPullYet) when there is nothing to repeat. Otherwise it is exactly pullBatch, including undo.
+  A.pullAgain = function (tx, p) {
+    p = p || {};
+    if (p.ing != null && typeof p.ing !== 'string') return 'unknownIng';
+    const last = lastPull(tx.state(), p.ing);
+    if (!last) { tx.info.why = 'noPullYet'; return 'nothingToDo'; }
+    return A.pullBatch(tx, { ing: last.ing, g: p.g != null ? p.g : last.g });
   };
 
   // Logs a cooked batch. Needs a TCS ingredient, a first temperature (32 to 300 F) and a weight (rawG or
@@ -4128,7 +4150,7 @@
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, coldInfo, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.
