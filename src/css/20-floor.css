@@ -653,3 +653,5 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-strip-x { flex: none; display: grid; place-items: center; width: calc(44px * var(--fl-k)); border: 0; background: transparent; color: inherit; opacity: 0.75; cursor: pointer; }
 .fl-strip-x:hover, .fl-strip-x:focus-visible { opacity: 1; background: rgba(127, 127, 127, 0.18); }
 .fl-strip-x:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -3px; }
+/* A sanitize chip that needs attention names itself ("Sanitize not logged"), so a bare "not logged" is never a puzzle. */
+.fl-san[data-urgent="true"] .fl-chip-w { display: inline; }
