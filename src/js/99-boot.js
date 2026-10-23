@@ -86,6 +86,8 @@
       stage = 'store';
       if (SB.store && typeof SB.store.init === 'function') SB.store.init({ blank: true, mode: SB.util.mode() }); // a brand-new install starts empty; saved data is never changed
       // The demo (its own saved data) opens with its sample tickets the first time.
+      // A brand-new empty kitchen gets neutral station and menu-section names (saved with it); old kitchens and the demo keep theirs.
+      if (SB.store && SB.store.isBlank && SB.store.isBlank() && SB.store.applyStarterNames) SB.store.applyStarterNames();
       if (SB.store && SB.store.isDemo && SB.store.isDemo() && SB.store.status().firstRun && SB.sim && SB.sim.seedFirstRun) SB.sim.seedFirstRun();
       // A first run is a real, empty kitchen: the demo tickets and batches only load when the user asks for the demo.
       stage = 'shell';

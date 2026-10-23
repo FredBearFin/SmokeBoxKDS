@@ -91,7 +91,7 @@ test('start over with settings reset also clears tax, PIN, hours and station nam
     assert.equal(r.ok, true);
     const s = S.getState();
     assert.deepEqual([s.settings.service.taxRatePct, s.settings.office.pinHash, s.settings.service.openHour], [0, null, 11]);
-    assert.deepEqual(C.customSpec(), { rename: {}, add: {} });
+    assert.deepEqual(C.customSpec(), S.STARTER_NAMES);                    // the barbecue-flavored names are gone; the neutral starter names take their place
     const copy = b.get('smokebox.v1.lastgood', null);
     assert.equal(copy.reason, 'startOver'); assert.ok(copy.state.menu.length >= 21);
     assert.equal(copy.state.settings.office.pinHash, 'sha256:' + 'ab12'.repeat(16));
@@ -277,4 +277,42 @@ test('a failed save shows on screen at once: the store announces it', async () =
     await new Promise((r) => setTimeout(r, 30));
     assert.equal(S.status().lastSaveOk, true); assert.ok(hits >= 1, 'and about the recovery');
   } finally { off(); S.destroy(); }
+});
+
+/* ---------------- neutral starter names for a new empty kitchen ---------------- */
+
+test('a new empty kitchen gets neutral station and section names; old kitchens, the demo and owner choices are left alone', () => {
+  const zoneNames = () => C.zones.map((z) => z.name).join('|'), catNames = () => C.categories.map((c) => c.name).join('|');
+  const orig = [zoneNames(), catNames()];
+  clock = T;
+  try {
+    const b = backend(); start(b);
+    assert.equal(S.applyStarterNames(), true);
+    assert.equal(zoneNames(), 'Kitchen|Prep|Fryer|Cold and drinks|Expo');
+    assert.equal(catNames(), 'Mains|Sides|Snacks|Desserts|Drinks');
+    assert.deepEqual(C.zones.map((z) => z.id), ['pit', 'sides', 'fry', 'cold', 'expo']);                 // ids never change
+    assert.equal(C.zoneById.pit.code, 'KIT');
+    assert.deepEqual(JSON.parse(S.exportAll()).names, S.STARTER_NAMES);                                   // saved with the kitchen and carried in backups
+    assert.equal(S.applyStarterNames(), false);                                                           // once only
+    assert.equal(S.dispatch('addMenuItem', { name: 'Slice', zone: 'pit', cat: 'meat', price: 4, prepSec: 60, track: 'one' }), 'ok');
+    S.destroy(); cleanNames();
+    // a kitchen with dishes, an old kitchen, the demo, and a kitchen whose owner chose names
+    const withDish = backend(); start(withDish); S.dispatch('addMenuItem', { name: 'Pie', zone: 'cold', cat: 'cold', price: 4, prepSec: 30, track: 'one' });
+    assert.equal(S.applyStarterNames(), false); S.destroy();
+    start(backend(), 'real', { blank: false, starter: true }); assert.equal(S.applyStarterNames(), false); S.destroy();
+    start(backend(), 'demo'); assert.equal(S.applyStarterNames(), false); S.destroy();
+    assert.deepEqual([zoneNames(), catNames()], orig);
+    const mine = { rename: { zones: { pit: 'Smoker' } }, add: {} }; C.applyCustom(mine); C.saveCustom(mine);
+    start(backend()); assert.equal(S.applyStarterNames(), false); assert.equal(C.zoneById.pit.name, 'Smoker'); S.destroy();
+    cleanNames();
+    // start over with settings reset puts the neutral names back instead of the barbecue ones
+    const b2 = backend(); busyKitchen(b2);
+    assert.equal(S.startOver({ confirm: WORD, keepSettings: false }).ok, true);
+    assert.equal(zoneNames(), 'Kitchen|Prep|Fryer|Cold and drinks|Expo'); S.destroy();
+    cleanNames();
+    const b3 = backend(); busyKitchen(b3);
+    S.startOver({ confirm: WORD, keepSettings: true });
+    assert.equal(C.zoneById.pit.name, 'Smoker'); S.destroy();                                            // kept names stay
+  } finally { cleanNames(); }
+  assert.deepEqual([zoneNames(), catNames()], orig);
 });
