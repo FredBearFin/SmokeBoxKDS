@@ -72,9 +72,11 @@
 
   /* motion */
   /* durations in ms (1000 ms = 1 second) and the speed curves used for movements */
-  --dur-fast: 100ms;
-  --dur: 180ms;
-  --dur-slow: 260ms;
+  /* --sb-motion is the one switch for movement: 1 = normal, 0 = none (reduced motion sets it to 0). Every duration below follows it. */
+  --sb-motion: 1;
+  --dur-fast: calc(100ms * var(--sb-motion));
+  --dur: calc(180ms * var(--sb-motion));
+  --dur-slow: calc(260ms * var(--sb-motion));
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-in-out: cubic-bezier(0.5, 0.05, 0.2, 1);
   --ease-ignite: cubic-bezier(0.55, 0.06, 0.3, 1);

@@ -1025,6 +1025,14 @@
     setTimeout(done, 900 + Math.min(i, 9) * 55);
   }
 
+  // Gives an element one soft highlight so a changed ticket or dish catches the eye, then removes the hook.
+  // WATCH OUT: no forced layout here, because 200 tickets can change state in the same second.
+  function flash(el) {
+    if (!el || reduced() || el.classList.contains('fl-flash')) return;
+    el.classList.add('fl-flash');
+    setTimeout(() => el.classList.remove('fl-flash'), 900);
+  }
+
   // Takes a finished slip off the board: it slides out (inert, so no tap lands on it), or goes at once
   // with reduced motion.
   function removeSlip(rec) {
@@ -1297,6 +1305,7 @@
     // Waiting and read-only rows change only with the status; tappable rows also refresh the timer.
     if (row.status === st && row.kind !== 'btn') { return; }
     const changed = row.status !== st;
+    if (changed && row.status != null) flash(row.li); // a dish that changes state gets one soft highlight
     row.status = st;
     row.li.dataset.state = st;
     if (row.kind === 'btn') {
@@ -1356,6 +1365,7 @@
       rec.refs.timer.dataset.level = lvl;
       rec.refs.badge.dataset.level = lvl;
       if (lvl !== 'breach') put(rec.refs.bw, WORDS[lvl]);
+      if (prev) flash(rec.el.querySelector('.slip-head')); // the head glows once when the ticket moves to a new time state
       if (announceBreach && lvl === 'breach' && prev && prev !== 'breach') say('Ticket #' + rec.num + ' is overdue.');
     }
   }

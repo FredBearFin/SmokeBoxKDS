@@ -129,7 +129,7 @@
     const ing = state.ingredients.find((x) => x.id === b.ing);
     const name = ing ? ing.name : b.ing;
     const left = state.batches.some((x) => x !== b && x.ing === b.ing && x.status !== 'discard' && x.canServe === true && x.remainingG > 0);
-    const amount = U.fmtG(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
+    const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
     out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
       consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or discard it.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
   }
@@ -212,7 +212,7 @@
     if (!ing || !U.isNum(ing.cookH) || !(ing.cookH > 0)) return null;
     const latest = runOutAt - (ing.cookH + (U.isNum(ing.restH) ? ing.restH : 0)) * H;
     if (latest > now) return { ahead: true, latestStart: latest, text: 'Start the next batch by ' + U.fmtTime(latest) + ', not counting anything still on the smoker.' };
-    return { ahead: false, latestStart: latest, text: 'Too late for a new batch to cover it: about ' + U.fmtG(unmetG) + ' of demand with nothing to sell. Shorten portions, stop preorders, run a special.' };
+    return { ahead: false, latestStart: latest, text: 'Too late for a new batch to cover it: about ' + U.weightText(unmetG) + ' of demand with nothing to sell. Shorten portions, stop preorders, run a special.' };
   }
   // Rows for one ingredient from its close sweep: grams left over at close (waste, silent) and demand with nothing to
   // sell (a silent caution with what to do). Either can raise a row. A shortfall that a quality limit causes has no row
@@ -222,17 +222,17 @@
     const { closeAt, stock, r } = info;
     if (r.leftoverG >= Math.max(NOTABLE_G, NOTABLE_SHARE * stock)) {
       out.push({ id: 'leftover:' + ing.id, kind: 'leftover', ing: ing.id, label: name, at: closeAt, msLeft: closeAt - now, rung: 0, rungs: 0, sev: 'info', leftoverG: r.leftoverG,
-        consequence: 'At the current pace about ' + U.fmtG(r.leftoverG) + ' of ' + name + ' will be left at close, not counting what is already on the block.', action: 'Sell it: run a special, tell the front.', unknown: false });
+        consequence: 'At the current pace about ' + U.weightText(r.leftoverG) + ' of ' + name + ' will be left at close, not counting what is already on the block.', action: 'Sell it: run a special, tell the front.', unknown: false });
     }
     if ((r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG) < NOTABLE_G || r.runOutAt == null || (r.runOutCause === 'limit' && r.limitQuality)) return;
     let consequence, action, sb = null;
     if (r.runOutCause === 'rest-gap') {
-      consequence = 'At the current pace ' + name + ' runs out at ' + U.fmtTime(r.runOutAt) + ', next batch ready at ' + U.fmtTime(r.gapEndAt) + ', about ' + U.fmtG(r.gapUnmetG) + ' of demand with nothing to sell in between.';
+      consequence = 'At the current pace ' + name + ' runs out at ' + U.fmtTime(r.runOutAt) + ', next batch ready at ' + U.fmtTime(r.gapEndAt) + ', about ' + U.weightText(r.gapUnmetG) + ' of demand with nothing to sell in between.';
       action = 'Shorten portions, stop preorders, run a special until then.';
     } else {
       sb = startBy(ing, now, r.runOutAt, r.unmetG);
       const verb = r.runOutCause === 'limit' ? ' is thrown out at ' : ' runs out at ';
-      consequence = 'At the current pace ' + name + verb + U.fmtTime(r.runOutAt) + '.' + (sb && !sb.ahead ? ' ' + sb.text.split(' Shorten')[0] : sb ? '' : ' About ' + U.fmtG(r.unmetG) + ' of demand will have nothing to sell.');
+      consequence = 'At the current pace ' + name + verb + U.fmtTime(r.runOutAt) + '.' + (sb && !sb.ahead ? ' ' + sb.text.split(' Shorten')[0] : sb ? '' : ' About ' + U.weightText(r.unmetG) + ' of demand will have nothing to sell.');
       action = sb && sb.ahead ? sb.text : 'Shorten portions, stop preorders, run a special.';
     }
     out.push({ id: 'shortfall:' + ing.id, kind: 'shortfall', ing: ing.id, label: name, at: r.runOutAt, msLeft: r.runOutAt - now, rung: 0, rungs: 0, sev: 'warn', leftoverG: r.leftoverG, shortG: r.unmetG, unmetG: r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG,
@@ -289,17 +289,17 @@
         const trivial = b.remainingG < TRIVIAL_G || (waste != null && waste < NOTABLE_G && waste < NOTABLE_SHARE * b.remainingG);
         const usd = waste != null && U.isNum(b.costPerCookedKg) ? waste / 1000 * b.costPerCookedKg : null;
         let consequence, action;
-        const amount = U.fmtG(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
+        const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
         const goes86 = lastOne ? ' and ' + name + ' goes 86' : '';
         const fate = q ? 'pass its quality limit' : 'be thrown out';
         if (msLeft <= 0) { consequence = 'Expired: ' + amount + ' must be thrown out' + goes86 + '.'; action = 'Discard and log it.'; }
         else if (waste == null) { consequence = 'Pace unknown (nothing pulled yet): up to ' + amount + ' may ' + (q ? 'pass its quality limit' : 'be thrown out') + goes86 + '.'; action = 'Use it first, and log pulls so the pace can be worked out.'; }
-        else if (waste > 50) { consequence = 'About ' + U.fmtG(waste) + ' of ' + U.fmtG(b.remainingG) + ' will ' + fate + (usd != null ? ' ($' + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
-        else { consequence = 'On pace to sell all ' + U.fmtG(b.remainingG) + ' in time.'; action = 'Nothing to do.'; }
+        else if (waste > 50) { consequence = 'About ' + U.weightText(waste) + ' of ' + U.weightText(b.remainingG) + ' will ' + fate + (usd != null ? ' ($' + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
+        else { consequence = 'On pace to sell all ' + U.weightText(b.remainingG) + ' in time.'; action = 'Nothing to do.'; }
         // A batch gets a row once a rung is crossed, or earlier when the pace says food will be thrown out within 2 hours.
         const isLim = !!lim && lim.limitBatchId === b.id;
         if (isLim) {
-          consequence = name + ' passes its quality limit at ' + U.fmtTime(exp) + ', with about ' + U.fmtG(lim.unmetG) + ' of demand after it' + (waste != null && waste > 50 ? ' and about ' + U.fmtG(waste) + ' of this batch unsold' : '') + '.';
+          consequence = name + ' passes its quality limit at ' + U.fmtTime(exp) + ', with about ' + U.weightText(lim.unmetG) + ' of demand after it' + (waste != null && waste > 50 ? ' and about ' + U.weightText(waste) + ' of this batch unsold' : '') + '.';
           action = limSb ? limSb.text : 'Shorten portions, stop preorders, run a special.';
         }
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H) || isLim) {
@@ -342,7 +342,7 @@
       const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');
       const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' ($' + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
       out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
-        consequence: 'Expired and thrown out: ' + U.fmtG(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
+        consequence: 'Expired and thrown out: ' + U.weightText(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
     }
   }
   // Rows for batches that are being kept serving: shown from 15 minutes before the extension ends, or when the last
@@ -353,7 +353,7 @@
       const stale = !U.isNum(b.lastTempAt) || now - b.lastTempAt > S.tempCheckEveryMin * MIN;
       if (b.keepUntil - now > 15 * MIN && !stale) continue;
       const cold = b.kind === 'cold';
-      const need = cold ? S.coldHoldF + ' °F or lower' : S.hotHoldF + ' °F or higher';
+      const need = cold ? U.tempText(S.coldHoldF) + ' or lower' : U.tempText(S.hotHoldF) + ' or higher';
       out.push({ id: 'keepcheck:' + b.id + ':' + b.keepUntil, epoch: b.keepUntil, kind: 'keepcheck', ing: b.ing, batchId: b.id, label: b.label || b.ing, at: b.keepUntil, msLeft: b.keepUntil - now, rung: 0, rungs: 0, sev: 'info',
         consequence: 'Kept serving until ' + U.fmtTime(b.keepUntil) + '. Log a temperature of ' + need + ' before then to keep it longer.', action: 'Log a temperature.', unknown: false });
     }

@@ -569,3 +569,28 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dp-ca { margin-top: var(--sp-2); }
 
 .hc-who { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0; color: var(--ink2); font-size: var(--fs-2); }
+
+/* ===== Round 5: one compact cabinet card =====
+   Every card has the same parts: a name line, a ring and three facts, one main button and a "..." for the rest. */
+.hc-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: var(--sp-3); }
+.hc-card { gap: var(--sp-2); padding: var(--sp-3); border-left-width: 6px; }
+.hc-head { align-items: center; flex-wrap: nowrap; }
+.hc-title { flex: 1 1 auto; }
+.hc-name { font-size: var(--fs-3); font-weight: var(--w-bold); }
+.hc-status { font-size: var(--fs-2); white-space: nowrap; }
+.hc-body { gap: var(--sp-3); }
+.hc-ring { width: 76px; height: 76px; flex: none; }
+.hc-ring::before { inset: 7px; }
+.hc-ring-t { font-size: var(--fs-3); }
+.hc-facts { gap: var(--sp-1); }
+.hc-dl { grid-template-columns: auto 1fr; font-size: var(--fs-2); }
+/* The rarely needed facts stay on the card only when they matter (late readings keep their red). */
+.hc-dl dt:nth-of-type(n+3), .hc-dl dd:nth-of-type(n+3) { display: none; }
+.hc-dl dt:nth-of-type(4), .hc-dl dd:nth-of-type(4) { display: block; }
+.hc-actions { flex-wrap: nowrap; gap: var(--sp-2); align-items: stretch; }
+.hc-actions .btn { flex: 1 1 auto; min-height: var(--tap); }
+.hc-actions .hc-sec { display: none; }
+.hc-actions .hc-more { flex: none; min-width: var(--tap); padding: 0; }
+.hc-actions .hc-more[hidden] { display: none; }
+.hc-discard { color: inherit; border-color: var(--line); }
+.hc-cost { display: none; } /* yield and cost notes belong in the back office, not on every card */

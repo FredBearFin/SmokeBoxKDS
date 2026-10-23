@@ -47,7 +47,7 @@
       if (b.status !== 'discard' || !Number.isFinite(b.discardedAt)) continue;
       out.push({
         id: b.id, t: b.discardedAt, date: U.fmtDateShort(U.dateKey(b.discardedAt)), food: b.label || b.ing,
-        amount: U.fmtG(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
+        amount: U.weightText(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
         initials: rec.initials[b.id] || (logged.get(b.id) && logged.get(b.id).event.who) || '', extra: rec.extra[b.id] || '',
         eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
@@ -131,7 +131,7 @@
       const cols = rec.cols.filter((c) => c.on);
       if (!list.length) { wrap.appendChild(h('div', { class: 'empty' }, ico('trash', 40), h('h3', null, 'Nothing thrown out yet'), h('p', null, 'Batches you throw out show up here with their time and reason.'))); return; }
       const table = h('table', { class: 'dlog-table', style: 'border-collapse:collapse;width:100%' });
-      table.appendChild(h('thead', null, h('tr', null, ...cols.map((c) => h('th', { style: 'text-align:left;padding:8px;border-bottom:2px solid var(--line)' }, c.label)), h('th', { style: 'padding:8px;border-bottom:2px solid var(--line)' }, h('span', { class: 'visually-hidden' }, 'Fix')))));
+      table.appendChild(h('thead', null, h('tr', null, ...cols.map((c) => h('th', { style: 'text-align:left;padding:8px;border-bottom:2px solid var(--line);' + (c.label.length <= 12 ? 'white-space:nowrap' : '') }, c.label)), h('th', { style: 'padding:8px;border-bottom:2px solid var(--line)' }, h('span', { class: 'visually-hidden' }, 'Fix')))));
       const tb = h('tbody');
       list.forEach((r) => {
         // Opens the fix box for this row.

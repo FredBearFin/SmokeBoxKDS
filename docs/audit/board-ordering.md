@@ -82,3 +82,23 @@ Fixed:
 - **PIN lock-out:** a "Forgot the PIN?" fold under the keypad (what the PIN protects, that it cannot be recovered, ask whoever set it, clear site data, restore a backup that brings its old PIN back). The lock message points to it. Options for Freddy: `docs/audit/pin-recovery-options.md`. No PIN logic changed.
 
 Left: the tour toast on an empty menu (message sent to A4 with the new text); the "?" on Set up this tablet (A2); "Fix this entry" only covers thrown-out entries (not temperature or sanitize rows, which need a safety page owner); initials are not asked for start cooling or keep serving beyond the existing keep-serving box; P2 items 3 and 6 to 11 of the first list.
+
+## Round 5 status
+
+Screenshots: `docs/ux-shots/night/a1/r5-before-slips-*` and `r5-after-slips-*` (4, 8, 12 and 30 tickets at 1024, 1280 and 1920; Day, Night, Large text) and `r5-after-cabinet-*`. Test: `test/board-round5.e2e.mjs`. Simulated in headless Chromium (software rendering), not on a tablet or TV.
+
+Fixed:
+- **Ticket slips:** tickets in one grid row now share one height (Bump stays right under the dishes, so it is never pushed out of reach). Item rows are about 15 px shorter (start time and station tag share a line), helper lines (start times, next-step line) are quieter and smaller, dish names a little larger, and waiting dishes are dimmed by colour, not by thin text. Far display keeps the bigger helper lines.
+- **Hold cabinet:** one compact card for every batch: name and status on one line, ring and the amount left, last reading, next reading and serve-by, one main button (Taste and keep, Reheat or Log temp) and a "..." for the rest (pull, remind me, cooling, discard, corrections). The card went from about 330 px to 227 px and three cards fit across at 1280, so six batches show on one screen instead of two. "Starter stock" is named once in the summary line, not on each card; yield and cost notes moved out of the cards.
+- **Units on the floor:** cabinet cards, sheets, toasts, help text, the thrown-out log, the notice strip text and the temperature boxes follow Fahrenheit/Celsius and kg/lb. The temperature boxes show the chosen unit and still store Fahrenheit (70 C is saved as 158 F). Cost per kg lines read per lb when pounds are chosen. Weight inputs in the New batch and restock forms still take kilograms (same as A3's office pages).
+- **Motion system:** one custom property, `--sb-motion` (in `00-tokens.css`; reduced motion sets it to 0), scales every duration. Print-in 240 ms, bump-out slides sideways and fades in 260 ms, time colours ease, and a changed ticket or dish gets one 800 ms highlight. The overdue pulse now runs 3 times and the "check it" row flash 6 times, then they hold still; nothing loops for ever.
+- **P2:** the "Amount" header in the thrown-out log no longer breaks.
+
+Performance (headless Chromium, software rendering, 4 s of a 120x clock with tickets changing state; frames per second are not a tablet figure):
+
+| Tickets | Motion on: avg / p95 / worst frame | Motion off: avg / p95 / worst frame |
+|---|---|---|
+| 60 | 16.7 / 16.8 / 33.3 ms | 17.4 / 16.8 / 66.7 ms |
+| 200 | 19.2 / 33.4 / 66.7 ms | 17.3 / 16.8 / 66.6 ms |
+
+Left: weight inputs in kg; "check this reading" and sanitize rows are not fixable from the log yet; P2 items 3 and 6 to 11 of the first list; no before/after of far display at 1024.
