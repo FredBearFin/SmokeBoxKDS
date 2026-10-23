@@ -16,6 +16,15 @@ Draft written on `night/a5-r9`. Everything below was tested in a simulated brows
 - **Money is exact to the cent.** Tax is worked in whole cents and a half cent rounds up (for example 7.25 percent on $2.00 is 15 cents). Prices and tips are kept to the cent. Orders paid before this version keep the totals they were paid with.
 - **Neutral names to start.** A new empty kitchen starts with stations called Kitchen, Prep, Fryer, Cold and drinks, and menu sections Mains, Sides, Snacks, Desserts, Drinks. Rename or add your own. Older kitchens keep the names they have.
 - **Costs are honest.** A dish with no ingredients, or an ingredient without a cost, shows cost as "not recorded", never $0.00 and never a 100 percent margin.
+- **Your own currency symbol.** Pick a symbol of one to three characters (for example €, £, KSh or R$); it is shown before the amount everywhere, and the menu import reads it too. The default is $.
+- **Counter service (optional, off by default).** When turned on, paying an order finishes its tickets and sends them off the board at once, for places that take payment up front. Those tickets are marked and left out of the kitchen speed numbers.
+- **Your own quick-note buttons.** Replace the order screen's preset notes (for example "No onions") with your own list of up to 12, 24 characters each.
+- **An unsent order survives a reload.** A half-built order is kept on the device for 12 hours and cleared when sent. It is not part of backups.
+- **PIN recovery code (optional).** From the PIN settings you can make a recovery code to write down. It is shown once and only a one-way fingerprint is saved. Five wrong tries lock recovery for 15 minutes; the code is used up when it works.
+- **Cold food kept in a fridge (optional).** For a cold cooked-ahead item you can type two limits of your own, days in the fridge and hours out of the fridge; there are no built-in numbers. The batch shows its made-on date, can be taken out and put back, and the out-of-fridge time adds up over every stay. Leave a limit blank and Smokebox only keeps the time and says "no limit set". Use the limits your local health department gives you.
+- **More for the safety record.** Readings at the two cooling marks are kept; a cooler, freezer or display temperature and a thermometer check can be logged; a sanitizer strip reading can be added to a sanitize entry; a thrown-out batch can carry a short note and the reason "past the date mark".
+- **Smokebox allows one reheat per batch.** That is our rule, not a health code rule. The starting limits (135, 41 and 165 F, the 2 hour cooling mark and so on) follow the FDA model Food Code; your county may differ, so change them in the settings.
+- **Prices in a menu file are dollars unless the file says cents.** A whole number such as 12 is $12.00. Choose "These prices are in cents" for files that use cents.
 - **A separate demo.** "Try the demo" opens a pretend barbecue kitchen with its own saved data. It cannot touch your real kitchen, and "Back to my kitchen" throws the demo away. A demo tab and a real tab can be open at once without mixing.
 - **Backups know which kitchen they belong to.** A demo backup will not load into your kitchen, and the reverse. Backups from earlier versions load as your real kitchen. A backup also carries your station and category names and your setup choices.
 
@@ -23,7 +32,7 @@ Draft written on `night/a5-r9`. Everything below was tested in a simulated brows
 
 - **Your data stays on this device.** There is no server and no online account.
 - **A last good copy.** On the first save, after every end-of-day close, and every 6 hours, Smokebox keeps one small copy of the important parts of your kitchen (dishes, ingredients, settings, PIN, safety records, today's orders). If the main save is found damaged when the page opens, that copy is loaded and you are told the time of the copy and that later orders are missing. The damaged text is kept aside for 30 days.
-- **When the browser is full.** Smokebox drops the last good copy first, then the oldest finished orders and history. It never drops your dishes, ingredients, settings, PIN, open orders, food in the cabinet, or the safety log (kept 190 days). If nothing fits, the app keeps running and shows a red strip saying the last save failed. The strip shows within a second or two.
+- **When the browser is full.** Smokebox drops the last good copy first, then the oldest finished orders and history. It never drops your dishes, ingredients, settings, PIN, open orders, food in the cabinet, or the safety log (kept about six months). If nothing fits, the app keeps running and shows a red strip saying the last save failed. The strip shows within a second or two.
 - **Back up anyway.** The copy lives in the same browser as the main save, so it does not help if the browser's data is cleared or the device is lost. Use Back up (in the Data page) and keep a copy off the device.
 
 ## Known limits
@@ -52,3 +61,8 @@ Draft written on `night/a5-r9`. Everything below was tested in a simulated brows
 
 - Nothing to install: it is one HTML file. The first page load on a new device starts an empty kitchen.
 - If the app says "Your saved board could not be read", follow the notice. If it says it restored the last good copy, check the orders since the time shown.
+
+## Start over and a hub
+
+- Start over erases the kitchen's last good copy and any set-aside damaged copy as well, then takes a fresh last good copy of the empty kitchen, so a later damaged save can never bring the erased customers back. The backup file it hands you is the only copy of the old kitchen.
+- On a device linked to a hub, actions that were queued but never confirmed are dropped when Start over succeeds; only the erase itself is sent. If Start over fails, nothing is dropped.

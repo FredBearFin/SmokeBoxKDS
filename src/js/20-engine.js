@@ -171,6 +171,8 @@
     setChips: '{ chips: string[] | null }',
     clearDemoTickets: '{}',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety", fridge?:boolean, fridgeDays?, outHours? }',
+    logEquipmentTemp: '{ unit:"cooler"|"freezer"|"display"|"other", f, label?, who? }',
+    logThermometerCheck: '{ f, method?:"ice"|"boiling"|"other", who? }',
     coldTakeOut: '{ batchId, who? }',
     coldReturn: '{ batchId, who? }',
     setPortions: '{ menuId, on:boolean, count? }',
@@ -194,7 +196,7 @@
   const PAST_LIMIT_MS = 48 * H;
   // The reasons a batch can be thrown out. SAFETY_DISCARDS are the three that mean a food-safety problem;
   // those put dishes on "safety hold". Manual, quality and other do not.
-  const DISCARD_REASONS = ['expired', 'temp', 'cooling', 'manual', 'quality', 'other', 'fridgeDate', 'outTime'];
+  const DISCARD_REASONS = ['expired', 'temp', 'cooling', 'manual', 'quality', 'other', 'fridgeDate', 'outTime', 'datemark'];
   const SAFETY_DISCARDS = { expired: 1, temp: 1, cooling: 1 };
   // Lists of allowed words. The 1 only means "is allowed" (tested with hasOwn). STATUS_OF turns a gate
   // action word into the status word stored on a batch.
@@ -208,7 +210,7 @@
   // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
   // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
   // safetyKeep bucket instead of being dropped.
-  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
   // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months). This is our own choice; no source gives a minimum, so ask your health department how long to keep records.
   const SAFETY_KEEP_MS = 190 * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
@@ -1038,7 +1040,7 @@
     tx.event('batch_status', { batchId: b.id, from: b.status, to: gt.status, action: gt.action });
   }
   // Throws a batch out: its grams become waste, it can never be served again, and the lost cost is logged.
-  function discardInto(tx, bi, reason, who) {
+  function discardInto(tx, bi, reason, who, note) {
     const b = tx.get('batches')[bi];
     const w = tx.batch(bi);
     const g0 = b.remainingG > 0 ? b.remainingG : 0;
@@ -1050,6 +1052,7 @@
     // Unknown is not zero: with no cost on record the event carries no cost field.
     const df = { batchId: b.id, ing: b.ing, g: g0, reason };
     if (unit !== null) df.cost = round(g0 * unit, 4);
+    if (note) df.note = note;
     tx.event('batch_discard', whoField(df, who));
   }
   // Re-runs the gate on every batch that is not already discarded (used when the safety settings change).
@@ -2069,7 +2072,9 @@
     refreshBatch(tx, bi);
     const nb = tx.get('batches')[bi];
     pushUndo(tx, 'coldMove', (b.label || 'Batch') + (to === 'line' ? ' taken out' : ' put back'), { batchId: b.id, before: b, at: t, discardedAt: nb.discardedAt });
-    tx.info = { batchId: b.id, place: nb.place, status: nb.status, canServe: nb.canServe, outMs: lineElapsedMs(nb, t) };
+    tx.info = { batchId: b.id, place: nb.place, status: nb.status, canServe: nb.canServe, outMs: lineElapsedMs(nb, t), discarded: nb.status === 'discard' };
+    // If this very move ended the batch, say so plainly: the move is recorded, and the batch was thrown out because of the owner's limit.
+    if (nb.status === 'discard') { tx.info.discardReason = nb.discardReason; tx.info.words = nb.discardReason === 'fridgeDate' ? 'Past your fridge limit, so it was thrown out.' : nb.discardReason === 'outTime' ? 'Past your out-of-fridge limit, so it was thrown out.' : 'It was thrown out.'; }
     return 'ok';
   }
   // Takes a fridge-kept cold batch out of the fridge (see coldMove).
@@ -2306,7 +2311,14 @@
     if (b.status === 'discard') return 'batchNotServable';
     const who = readWho(p);
     if (who === null) return 'badWho';
-    discardInto(tx, bi, p.reason, who);
+    // An optional few words of why, kept with the entry (most useful with the reason "other").
+    let note = '';
+    if (p.note != null) {
+      if (typeof p.note !== 'string' || p.note.length > 4 * C.limits.maxNoteLen) return 'noteTooLong';
+      note = cleanText(p.note);
+      if (note.length > C.limits.maxNoteLen) return 'noteTooLong';
+    }
+    discardInto(tx, bi, p.reason, who, note);
     const nb = tx.get('batches')[bi];
     pushUndo(tx, 'discard', (b.label || 'Batch') + ' discarded', { batchId: b.id, before: b, discardedAt: nb.discardedAt });
     tx.info = { batchId: b.id, g: nb.wasteG };
@@ -2318,15 +2330,54 @@
   A.sanitizeDone = function (tx, p) {
     const who = readWho(p || {});
     if (who === null) return 'badWho';
+    // Optional strip reading and where it was taken: a concentration in ppm, the product used and the place. All left out when not given.
+    const extra = {};
+    if (p && p.ppm != null) { if (!isNum(p.ppm) || p.ppm < 0 || p.ppm > 5000) { tx.info = { key: 'ppm', min: 0, max: 5000 }; return 'outOfBounds'; } extra.ppm = p.ppm; }
+    for (const k of ['product', 'where']) {
+      if (!p || p[k] == null) continue;
+      if (typeof p[k] !== 'string' || p[k].length > 200) { tx.info.key = k; return 'badPatch'; }
+      const v = cleanText(p[k]);
+      if (v.length > 30) { tx.info = { key: k, min: 0, max: 30 }; return 'outOfBounds'; }
+      if (v) extra[k] = v;
+    }
     const S = safetyOf(tx.get('settings'));
     const cur = tx.get('sanitize') || {};
     const due = sanitizeDueEff(tx.get('settings'), cur, tx.now);
     const lateMs = isNum(due) ? Math.max(0, tx.now - due) : 0;
     const lastAt = stampAfter(cur.lastAt, tx.now);
     tx.set('sanitize', { lastAt, dueAt: lastAt + S.sanitizeEveryH * H });
-    tx.event('sanitize_done', whoField({ onTime: lateMs === 0, lateMs }, who));
+    tx.event('sanitize_done', whoField(Object.assign({ onTime: lateMs === 0, lateMs }, extra), who));
     pushUndo(tx, 'sanitize', 'Sanitize logged', { before: cur, afterLastAt: lastAt });
     tx.info = { onTime: lateMs === 0, lateMs };
+    return 'ok';
+  };
+
+  // Logs a reading of a cooler, freezer or display case. Only a safety log entry: nothing in the kitchen state changes.
+  A.logEquipmentTemp = function (tx, p) {
+    const who = readWho(p || {});
+    if (who === null) return 'badWho';
+    if (!p || ['cooler', 'freezer', 'display', 'other'].indexOf(p.unit) < 0) { tx.info.key = 'unit'; return 'badPatch'; }
+    if (!isNum(p.f) || p.f < -60 || p.f > 200) { tx.info = { key: 'f', min: -60, max: 200 }; return 'outOfBounds'; }
+    const f = { unit: p.unit, f: p.f };
+    if (p.label != null) {
+      if (typeof p.label !== 'string' || p.label.length > 200) { tx.info.key = 'label'; return 'badPatch'; }
+      const v = cleanText(p.label);
+      if (v.length > 30) { tx.info = { key: 'label', min: 0, max: 30 }; return 'outOfBounds'; }
+      if (v) f.label = v;
+    }
+    tx.event('equip_temp', whoField(f, who));
+    tx.info = { unit: p.unit, f: p.f };
+    return 'ok';
+  };
+  // Logs that the food thermometer was checked against ice water or boiling water, with the reading it gave.
+  A.logThermometerCheck = function (tx, p) {
+    const who = readWho(p || {});
+    if (who === null) return 'badWho';
+    if (!p || !isNum(p.f) || p.f < 0 || p.f > 300) { tx.info = { key: 'f', min: 0, max: 300 }; return 'outOfBounds'; }
+    const method = p.method == null ? 'other' : p.method;
+    if (['ice', 'boiling', 'other'].indexOf(method) < 0) { tx.info.key = 'method'; return 'badPatch'; }
+    tx.event('thermometer_checked', whoField({ f: p.f, method }, who));
+    tx.info = { f: p.f, method };
     return 'ok';
   };
 

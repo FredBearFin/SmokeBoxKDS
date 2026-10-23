@@ -116,3 +116,31 @@ test('a duplicate opId is applied once, whether re-sent by a client or by a retr
     assert.equal(r.B.store.outbox().length, 0, 'a remote action is never queued back to the hub');
   } finally { await r.stop(); }
 });
+
+// Start over on an offline client: the actions it queued for the erased kitchen are dropped (the hub never sees those customers),
+// the erase itself is still sent so the hub is emptied too, and a failed Start over leaves the queue alone.
+test('Start over drops the erased kitchen\'s queued actions but still sends the erase', async () => {
+  const r = await rig();
+  try {
+    r.B.transport.setOnline(false);
+    r.clock.t += 1000;
+    assert.equal(r.B.store.dispatch('createTicket', order('Secret 1')), 'ok');
+    r.clock.t += 1000;
+    assert.equal(r.B.store.dispatch('createTicket', order('Secret 2')), 'ok');
+    assert.equal(r.B.store.outbox().length, 2);
+    // a refused Start over (wrong word) changes nothing
+    assert.equal(r.B.store.startOver({ confirm: 'nope' }).ok, false);
+    assert.equal(r.B.store.outbox().length, 2);
+    r.clock.t += 1000;
+    const res = r.B.store.startOver({ confirm: r.B.store.START_OVER_WORD });
+    assert.equal(res.ok, true, JSON.stringify(res));
+    assert.deepEqual(Array.from(r.B.store.outbox(), (x) => x.type), ['resetLive']);
+    assert.equal(r.B.store.getState().tickets.length, 0);
+    r.B.transport.setOnline(true); r.B.store.syncNow();
+    await until(() => r.B.store.outbox().length === 0, 'B outbox to empty');
+    await sleep(100);
+    assert.equal(JSON.stringify(r.hub.snapshot().state).includes('Secret'), false, 'the erased customers never reached the hub');
+    assert.equal(r.hub.snapshot().state.tickets.length, 0);
+    assert.equal(r.B.store.getState().tickets.length, 0);
+  } finally { await r.stop(); }
+});
