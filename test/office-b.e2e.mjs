@@ -415,8 +415,8 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   check('sell-out clock: the aria-label says how many and the earliest', new RegExp(ref.so.rows + ' sell-outs in ' + ref.so.dayCount + ' days').test(await svgLabel(page, 'When each protein went 86')), await svgLabel(page, 'When each protein went 86'));
   // suggestions
   const sg = await page.locator('.ob-sg').evaluateAll((els) => els.map((e) => e.textContent));
-  check('cook tomorrow: one card per protein with the numbers it used', sg.length === ref.so.proteins.length && sg.every((s) => /Cook about [\d.]+ kg|Not enough/.test(s) && /Suggestion from the sample|Not enough/.test(s)), sg);
-  check('cook tomorrow: clearly labelled as a suggestion from the sample, not a forecast', /suggestion from the sample, not a forecast/i.test(await card(page, 'What to cook tomorrow').locator('.of-card-sub').textContent()));
+  check('cook tomorrow: one card per protein with the numbers it used', sg.length === ref.so.proteins.length && sg.every((s) => /Cook about [\d.]+ kg|Not enough/.test(s) && /Suggestion from (days that include simulated sample data|your own days)|Not enough/.test(s)), sg);
+  check('cook tomorrow: clearly labelled as a suggestion from the days in range, not a forecast', /suggestion from the days in the range above, not a forecast/i.test(await card(page, 'What to cook tomorrow').locator('.of-card-sub').textContent()));
   check('cook tomorrow: the Pitcall seam sentence is there, and says nothing is sent', /Pitcall can use the sell-out time to decide tomorrow's cook count\./.test(await mainText(page)) && /nothing is sent to Pitcall/.test(await mainText(page)));
   // pickers
   const ingSel = card(page, 'Stock level').locator('select').nth(1), daySel = card(page, 'Stock level').locator('select').nth(0);
