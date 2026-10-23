@@ -1906,7 +1906,7 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl-slip[data-sel="true"] { outline: calc(5px * var(--fl-k)) solid var(--ink); outline-offset: calc(2px * var(--fl-k)); }
 
 /* In the cabinet view the cards have buttons along the bottom-left, where toasts normally sit: toasts go to the top right, under the strip. */
-html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto; top: var(--fl-toast-top, 130px); left: auto; right: var(--gutter); transform: none; width: min(400px, 34vw); }
+html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto; top: calc(var(--fl-toast-top, 130px) + 118px); left: auto; right: var(--gutter); transform: none; width: min(400px, 34vw); }
 
 /* The void sheet's reason chips. */
 .fl-reasons { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); margin: var(--sp-3, 12px) 0; }
@@ -2032,6 +2032,15 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 /* Touch size: the sound and pause bars and their clear (x) buttons are at least 44 px high. */
 .fl-strip-sound, .fl-strip-pause { min-height: max(44px, var(--tap)); }
 .fl-strip-x { min-height: max(44px, var(--tap)); min-width: max(44px, var(--tap)); }
+/* Keyboard focus is visible on every control: dish rows get a ring inside the row, and controls on the dark sound bar get a light ring. */
+.fl-item:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -4px; }
+.fl-bar-sound :focus-visible, .fl-bar-sound .gd-help:focus-visible { outline: var(--bw-focus) solid var(--bg); outline-offset: -3px; }
+.fl-bar-sound .gd-help:focus-visible { outline-offset: 2px; }
+/* Far display, the Overdue badge: much larger, on its own line under the customer, so "Overdue +23 min" reads from the doorway. */
+.fl[data-far="on"] .fl-slip .fl-badge { grid-column: 1 / -1; grid-row: 3; justify-self: start; font-size: calc(var(--fs-3) * 1.55); min-height: calc(32px * var(--fl-k) * 1.5); padding: 2px calc(14px * var(--fl-k)); }
+.fl[data-far="on"] .fl-slip .fl-badge .icon { width: 1.2em; height: 1.2em; }
+.fl[data-far="on"] .fl-slip .slip-meta { grid-row: 4; }
+.fl[data-far="on"] .fl-slip .slip-progress { grid-row: 5; }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -2651,6 +2660,7 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dp, .dp-form, .dp .fs-row { min-width: 0; max-width: 100%; }
 .dp .fs-row { flex-wrap: wrap; }
 .dp input[type="file"]::file-selector-button { min-height: 44px; padding: 0 var(--sp-4); margin-right: var(--sp-3); border-radius: var(--r-btn); font: inherit; cursor: pointer; }
+.dp-cat { flex: 0 1 14ch; min-width: 0; }
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -3320,6 +3330,8 @@ a.of-nav:active { background: var(--press); }
 
 @media (max-width: 1100px) { .of-nav-off { display: none; } }
 .of-page[data-coach="on"] > .of-headline { display: none; }
+.of-wdrow { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.of .of-wd { min-height: 34px; padding: 0 10px; }
 
 /* ===== 31-office-money.css ===== */
 /*
@@ -3774,7 +3786,7 @@ a.of-nav:active { background: var(--press); }
 .od-danger-h { margin-top: var(--sp-8, 40px); color: var(--crimson, #c0392b); }
 .od-danger-box { display: grid; gap: var(--sp-2); padding: var(--sp-4); border: 2px solid var(--crimson, #c0392b); border-radius: var(--r-3, 12px); max-width: 40em; }
 .od-danger-t { display: flex; gap: var(--sp-2); align-items: center; margin: 0; color: var(--crimson, #c0392b); }
-.od-danger-l { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; font-weight: var(--w-semi); }
+.od-danger-l { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-weight: var(--w-semi); }
 .od-danger-l input { flex: 1 0 100%; }
 .od-danger-in { max-width: 14em; }
 @media (min-width: 1700px) { .od-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -4454,7 +4466,7 @@ a.of-nav:active { background: var(--press); }
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.cookAheadSkipped'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.cookAheadSkipped', 'lastgood', 'corruptat'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -5313,6 +5325,8 @@ a.of-nav:active { background: var(--press); }
       else if (row.price === 0) P.push(prob('freeItem', 'warn', 'The price is $0.00.', 'Keep it if the dish is free, or enter a price.'));
       if (row.rounded) P.push(prob('priceRounded', 'warn', 'The price had more than two decimals and was rounded to the cent.', 'Check the price shown.'));
     }
+    if (row.extraCells) P.push(prob('extraColumns', 'warn', 'This row has ' + row.extraCells + ' more ' + (row.extraCells === 1 ? 'column' : 'columns') + ' than the header, so a value may have been split at a comma.' + (row.maybePrice ? ' The price may be ' + row.maybePrice + ', not ' + row.price + '.' : ''), 'Put quotes around a price with a comma (for example "4,50"), or use a dot (4.50), then read the file again.'));
+    else if (/^\d+([.,]\d+)?$/.test(row.categoryText || '')) P.push(prob('numericCategory', 'warn', 'The category "' + row.categoryText + '" is a number, which usually means a price was split in two.', 'Check the price and the category in the file.'));
     if (row.stationText && !row.station) P.push(prob('unknownStation', 'warn', 'The station "' + row.stationText + '" is not one of yours, so the default station is used.', 'Pick the station after adding the dish.'));
     if (row.categoryText && !row.category) P.push(prob('unknownCategory', 'warn', 'The category "' + row.categoryText + '" is not one of yours, so the default category is used.', 'Change the category after adding the dish.'));
     if (row.fromCents) P.push(prob('centsConverted', 'warn', 'The price was read in cents (' + row.priceText + ' becomes $' + (row.price != null ? row.price.toFixed(2) : '?') + ').', 'If this is wrong, choose "Prices are in dollars".'));
@@ -5399,6 +5413,14 @@ a.of-nav:active { background: var(--press); }
       const typ = col.priceType >= 0 ? clean(c(col.priceType)).toUpperCase() : '';
       if (typ === 'VARIABLE' || typ === 'PER_UNIT') { row.priceText = clean(c(col.price)) || typ.toLowerCase(); row.priceError = 'variable'; } else setPrice(row, c(col.price), cents);
       setWhere(row, c(col.station), c(col.category), opts);
+      // More filled cells than the header has columns: a comma inside an unquoted value pushed the rest along.
+      let used = d.cells.length;
+      while (used > 0 && !clean(d.cells[used - 1])) used--;
+      if (used > headers.length) {
+        row.extraCells = used - headers.length;
+        const next = clean(c(col.price + 1));
+        if (col.price >= 0 && /^\d{2}$/.test(next) && /^\d+$/.test(clean(c(col.price)))) row.maybePrice = clean(c(col.price)) + '.' + next;
+      }
       const desc = clean(c(col.description));
       if (desc) row.description = desc;
       if (col.hidden >= 0 && /^(true|yes|y|1|hidden|archived)$/i.test(clean(c(col.hidden)))) row.hidden = true;
@@ -6084,7 +6106,7 @@ a.of-nav:active { background: var(--press); }
     // after twice the interval.
     const iv = S.tempCheckEveryMin * MIN;
     // In range but past its quality limit: off the menu, still on the board, waiting for a taste test or a discard.
-    if (pastQ) return gateOut('PAST_QUALITY', false, 'pastQuality', 'bad', 'Past its quality limit. Taste it, then keep serving or discard it.', exp);
+    if (pastQ) return gateOut('PAST_QUALITY', false, 'pastQuality', 'bad', 'Past its quality limit. Taste it, then keep serving or throw it out.', exp);
     if (batch.lastTempAt == null) return gateOut('CHECK_TEMP', true, 'noReading', now - batch.enteredAt > iv ? 'bad' : 'warn', 'No temperature logged yet. Check it now.' + SAFETY, exp);
     const due = batch.lastTempAt + iv;
     if (now > due) return gateOut('CHECK_TEMP', true, 'checkDue', now > batch.lastTempAt + 2 * iv ? 'bad' : 'warn', 'Temperature check is due. Log a reading.' + SAFETY, exp);
@@ -9424,7 +9446,7 @@ a.of-nav:active { background: var(--press); }
     const left = state.batches.some((x) => x !== b && x.ing === b.ing && x.status !== 'discard' && x.canServe === true && x.remainingG > 0);
     const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
     out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
-      consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or discard it.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
+      consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or throw it out.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
   }
   // The next closing time after now, in ms, from the service hours (a close above 24 means after midnight, so last
   // night's close can still be ahead at 12:30 am). Null once today's close has passed.
@@ -9530,11 +9552,6 @@ a.of-nav:active { background: var(--press); }
     }
     out.push({ id: 'shortfall:' + ing.id, kind: 'shortfall', ing: ing.id, label: name, at: r.runOutAt, msLeft: r.runOutAt - now, rung: 0, rungs: 0, sev: 'warn', leftoverG: r.leftoverG, shortG: r.unmetG, unmetG: r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG,
       runOutCause: r.runOutCause, gapEndAt: r.gapEndAt, startBy: sb ? sb.latestStart : null, planFor: { ing: ing.id, grams: r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG, by: r.runOutAt }, consequence, action, unknown: false });
-  }
-  // A span of time in words: "45 min", "2 h 10 min".
-  function hmText(ms) {
-    const m = Math.max(0, Math.round(ms / MIN));
-    return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + m % 60 + ' min' : '');
   }
   // When a batch's early warnings are put off until, or 0 when they are not.
   function snoozeOf(state, batchId, now) { const t = state.alertSnoozes ? state.alertSnoozes[batchId] : 0; return U.isNum(t) && t > now ? t : 0; }
@@ -10002,6 +10019,14 @@ a.of-nav:active { background: var(--press); }
   const KEY = 'smokebox.v1.state';
   // A saved copy that fails the check is parked here instead of being deleted, so nothing is lost.
   const CORRUPT_KEY = 'smokebox.v1.corrupt';
+  // When the damaged copy was set aside (a time), so it can be cleared after 30 days.
+  const CORRUPT_AT_KEY = 'smokebox.v1.corruptat';
+  // One small rolling copy of the last good state (menu, ingredients, settings, PIN, safety records, recent history).
+  const LASTGOOD_KEY = 'smokebox.v1.lastgood';
+  // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
+  const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
+  // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
+  const SNAP_KEEP = { maxTickets: 300, maxEvents: 2000 };
   const SID_KEY = 'smokebox.v1.sid';
   // The actions this device has done that no server has confirmed yet (only used when a transport can push).
   const OUTBOX_KEY = 'smokebox.v1.outbox';
@@ -10010,6 +10035,8 @@ a.of-nav:active { background: var(--press); }
   const MAX_TEXT = 20e6; // characters; backups above this are refused (Pitcall PO4c)
   // 400 ms: wait this long after the last change before saving, so a burst of taps is one save.
   const SAVE_MS = 400;
+  // 5000 ms: the longest the save delay may grow to when saves are slow.
+  const SAVE_MAX_MS = 5000;
   // True for a plain object (not null, not a list).
   const isObjLike = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
   // True only for a real, finite number.
@@ -10046,8 +10073,10 @@ a.of-nav:active { background: var(--press); }
   // Which kitchen this store holds: 'real' or 'demo'. strict is true when the start-up named the mode (the app does;
   // plain tests do not): then the real kitchen refuses a fast clock and the sample history, and backups carry the mode.
   let mode = 'real', strict = false, baseStorage = null, reloadFn = null;
+  // snapAt is when the rolling copy was last taken (real time); snapWanted is set by close day so the next save takes one.
+  let snapAt = 0, snapWanted = null;
   let last = null;
-  let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0 };
+  let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: 400 };
   const tabId = 'tab_' + Math.floor(Math.random() * 1e9).toString(36);
 
   /* ---------- clock: now() = base + (real - realBase) * speed, clamped so it never goes backwards ---------- */
@@ -10120,6 +10149,9 @@ a.of-nav:active { background: var(--press); }
   function subscribeTick(fn) { if (typeof fn !== 'function') return () => {}; tickSubs.add(fn); return () => tickSubs.delete(fn); }
 
   /* ---------- persistence ---------- */
+
+  // A millisecond clock for timing the save itself (not the kitchen clock, which tests replace).
+  const perfNow = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
   // Marks the state as unsaved and arranges a save SAVE_MS later. broadcast true means tell other tabs after
   // saving.
   function schedulePersist(broadcast) {
@@ -10128,7 +10160,11 @@ a.of-nav:active { background: var(--press); }
     if (saveTimer || !storage) return;
     // Once a shared save exists and other tabs may be open, each tab waits a little differently, so two tabs rarely write in the
     // same instant. The very first save of a new board is not delayed, so a second tab opened right after sees it.
-    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, tr && baseSid ? SAVE_MS + Math.floor(Math.random() * 300) : SAVE_MS);
+    // A slow save (a big history) makes the next one wait longer: eight times what the last save took, between the normal
+    // 400 ms and 5 seconds, so a busy rush never spends most of its time writing.
+    const wait = Math.min(SAVE_MAX_MS, Math.max(SAVE_MS, Math.round(st.saveCostMs * 8)));
+    st.saveDelayMs = wait;
+    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
   }
   // Saves the state to the browser right now and returns true if it worked. If the browser says it is full,
   // it retries with less history (oldest finished tickets and events first), halving up to 12 times. After a
@@ -10141,6 +10177,8 @@ a.of-nav:active { background: var(--press); }
     const r = realNow();
     const v = now();
     let ok = false;
+    const t0 = perfNow();
+    let snapDropped = false;
     // full copy first; if the quota refuses it, keep halving the history (oldest completed tickets and events go first)
     let lim = null;
     // First trimmed attempt keeps at most 1500 tickets and 10 000 events. A failed save never loses the copy
@@ -10150,6 +10188,8 @@ a.of-nav:active { background: var(--press); }
       const s2 = lim ? E().prune(state, lim) : state;
       try { ok = storage.set(KEY, { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, state: s2 }) !== false; } catch (e) { ok = false; }
       if (ok) { st.trimmed = !!lim; break; }
+      // Under pressure the rolling copy goes first: it is only a convenience, the live save is the data.
+      if (!snapDropped && strict) { snapDropped = true; snapAt = 0; try { storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } tries--; continue; }
       // History is already tiny: trimming further will not help, so give up and report the failed save.
       if (nt < 20 && ne < 200) break;
       lim = { maxTickets: nt, maxEvents: ne };
@@ -10157,6 +10197,7 @@ a.of-nav:active { background: var(--press); }
     }
     st.lastSaveOk = ok;
     st.lastSaveAt = r;
+    st.saveCostMs = Math.round((perfNow() - t0) * 10) / 10; // how long this save took, which sets the next delay
     if (ok) dirty = false;
     let sid = null;
     if (ok) {
@@ -10164,9 +10205,35 @@ a.of-nav:active { background: var(--press); }
       try { storage.set(SID_KEY, sid); baseSid = sid; } catch (e) { sid = null; }
       pending = [];
     }
+    if (ok && !st.trimmed) maybeSnapshot(r);
     if (ok && pendingBroadcast && tr) { try { tr.post({ type: 'saved', rev: state.rev, tab: tabId, sid }); } catch (e) { /* ignore */ } }
     pendingBroadcast = false;
     return ok;
+  }
+  // Takes the rolling last-good copy when one is due (after close day, or every 6 hours) and the live save went in whole.
+  // Real kitchens only; the demo is disposable. The copy is a trimmed state, and if it does not fit it is dropped quietly.
+  function maybeSnapshot(r) {
+    if (!strict || mode !== 'real' || !storage || !state) return false;
+    if (!snapWanted && r - snapAt < SNAP_EVERY_MS) return false;
+    try {
+      const small = E().prune(state, SNAP_KEEP);
+      const env = { v: 1, takenAt: r, reason: snapWanted || 'interval', rev: state.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
+      const text = JSON.stringify(env);
+      if (!E().validateBackup(text).ok) return false; // never keep a copy that would not load
+      if (storage.set(LASTGOOD_KEY, env) === false) { storage.remove(LASTGOOD_KEY); return false; }
+      snapAt = r; snapWanted = null;
+      st.lastGoodAt = r;
+      return true;
+    } catch (e) { return false; }
+  }
+  // Reads the rolling copy and returns { state, takenAt } if it is whole, else null.
+  function readSnapshot() {
+    try {
+      const env = storage.get(LASTGOOD_KEY, null);
+      if (!env || typeof env !== 'object') return null;
+      const v = E().validateBackup(env);
+      return v.ok ? { state: v.state, takenAt: isNum(env.takenAt) ? env.takenAt : 0, repaired: v.repaired } : null;
+    } catch (e) { return null; }
   }
   // Public name for saving right now.
   function flush() { return persistNow(); }
@@ -10425,7 +10492,7 @@ a.of-nav:active { background: var(--press); }
     // Kitchen data goes to the demo's own keys in the demo, so the demo never reads or writes the real kitchen's data.
     baseStorage = given || U.rawStorage;
     storage = given ? (strict && mode === 'demo' ? U.storageFor(given, 'demo') : given) : (strict ? U.storageFor(U.rawStorage, mode) : U.storage);
-    st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0 };
+    st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: SAVE_MS };
     last = null;
     baseSid = null; pending = []; skipRebase = false;
     outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
@@ -10442,16 +10509,30 @@ a.of-nav:active { background: var(--press); }
     let loaded = null;
     if (unreadable !== null) {
       st.corrupt = 'The saved data is not readable text.';
-      try { storage.set(CORRUPT_KEY, unreadable); } catch (e) { /* ignore */ }
+      try { storage.set(CORRUPT_KEY, unreadable); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
     } else if (payload != null) {
       const v = E().validateBackup(payload);
       // A saved copy that fails the check is parked under CORRUPT_KEY and the app starts fresh. It never
       // crashes on bad storage.
       if (v.ok) { loaded = v.state; st.repaired = v.repaired; } else {
         st.corrupt = v.error;
-        try { storage.set(CORRUPT_KEY, payload); } catch (e) { /* ignore */ }
+        try { storage.set(CORRUPT_KEY, payload); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
       }
     } else st.firstRun = true;
+    // A damaged save: the rolling last-good copy takes its place (real kitchens), and the damaged one stays set aside.
+    if (!loaded && st.corrupt && strict && mode === 'real') {
+      const snap = readSnapshot();
+      if (snap) { loaded = snap.state; st.repaired = snap.repaired; st.restoredFromCopy = snap.takenAt; }
+    }
+    // A set-aside damaged copy is cleared after 30 days, once a working state is running.
+    if (!st.corrupt) {
+      try {
+        const at = storage.get(CORRUPT_AT_KEY, null);
+        if (isNum(at) && r - at > CORRUPT_KEEP_MS) { storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); st.corruptCleared = true; }
+      } catch (e) { /* ignore */ }
+    }
+    try { const g0 = storage.get(LASTGOOD_KEY, null); snapAt = g0 && isNum(g0.takenAt) ? g0.takenAt : 0; } catch (e) { snapAt = 0; }
+    snapWanted = null;
     // After a reload the virtual time continues from where it was saved, plus the real time spent away, and
     // never earlier than the real time. Speed goes back to 1.
     let vNow = r;
@@ -10470,7 +10551,7 @@ a.of-nav:active { background: var(--press); }
     const t = E().tick(state, now());
     state = t.state;
     syncUnits();
-    if (!loaded && st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
+    if (st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
     if (!opts.noTimers && typeof setInterval === 'function') interval = setInterval(tickNow, 1000);
     if (!opts.noSync) openTransport(opts.transport);
     if (!opts.noTimers) {
@@ -10521,6 +10602,7 @@ a.of-nav:active { background: var(--press); }
         pending.push({ type, payload, now: n, opId }); if (pending.length > 300) pending.shift();
         if (source === 'user') enqueueOp({ opId, type, payload, now: n });
       }
+      if (type === 'closeDay') snapWanted = 'closeDay';
       commit(r.state, true);
     }
     else if (source === 'user' && r.report !== 'nothingToDo' && type !== 'uiReport') {
@@ -12279,7 +12361,7 @@ a.of-nav:active { background: var(--press); }
       push(end, cur);
       const marks = arr(b.temps).filter((x) => x && num(x.t) && num(x.f)).map((x) => ({ at: x.t, label: Math.round(x.f) + 'F' }));
       for (const e of evs) if (e.type === 'batch_reheat') marks.push({ at: e.t, label: 'Reheat' + (num(e.f) ? ' to ' + Math.round(e.f) + 'F' : '') });
-      if (num(b.discardedAt)) marks.push({ at: b.discardedAt, label: 'Discarded' + (b.discardReason ? ' (' + b.discardReason + ')' : '') });
+      if (num(b.discardedAt)) marks.push({ at: b.discardedAt, label: 'Thrown out' + (b.discardReason ? ' (' + b.discardReason + ')' : '') });
       marks.sort((a, c) => a.at - c.at);
       res.rows.push({ batchId: b.id, label: b.label || b.id, ing: b.ing, name: im[b.ing] ? im[b.ing].name : b.ing, kind: b.kind || null, src: b.src || null, cookedG: num(b.cookedG) ? b.cookedG : null,
         remainingG: num(b.remainingG) ? b.remainingG : null, startMs: b.enteredAt, endMs: end, open, status: b.status || null, wasteG: num(b.wasteG) ? b.wasteG : null,
@@ -12821,7 +12903,7 @@ a.of-nav:active { background: var(--press); }
       }
       case 'safety': {
         const k = M.compliance(c); if (!k.tempChecks.count && !k.sanitize.count && !k.discards.count) return 'No food-safety records in this range yet.';
-        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' discarded (' + kgTxt(k.discards.g) + ', ' + money(k.discards.cost) + ').' : 'nothing was discarded.');
+        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + money(k.discards.cost) + ').' : 'nothing was discarded.');
       }
       case 'stock': {
         const so = M.sellOutClock(c), n = so.rows.length; if (!so.dayCount) return 'No sell-outs in this range yet.';
@@ -14401,6 +14483,14 @@ a.of-nav:active { background: var(--press); }
   const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   // Short date label such as "Fri 10/16".
   const dateShort = (ts) => { const d = new Date(ts); return WD[d.getDay()] + ' ' + (d.getMonth() + 1) + '/' + d.getDate(); };
+  // With three or more plain lines the colors alone are not enough for a colour-blind reader, so the third and fourth
+  // line get a dotted and a dashed pattern. Bands, areas, stacked charts and charts with fewer lines stay solid.
+  function autoDash(spec, s, i) {
+    const list = Array.isArray(spec.series) ? spec.series : [];
+    const plain = list.filter((x) => x && x.kind !== 'band' && !x.area).length;
+    if (spec.stacked || s.area || s.kind === 'band' || plain < 3) return null;
+    return [null, null, '2 4', '9 4'][i % 4];
+  }
   // Gram axis label: "850 g" below a thousand, "1.5 kg" from there.
   const fmtGAxis = (v) => (!isNum(v) ? '-' : U.units && U.units.weight === 'lb' && U.weightText ? U.weightText(v) : Math.abs(v) >= 1000 ? trim0((v / 1000).toFixed(1)) + ' kg' : Math.round(v) + ' g');
 
@@ -14556,8 +14646,6 @@ a.of-nav:active { background: var(--press); }
   const r1 = (n) => Math.round(n * 10) / 10;
   // Nearest pixel centre (whole number plus 0.5) so thin lines draw crisp.
   const px = (n) => Math.round(n) + 0.5;                       // 1px lines land on a pixel centre
-  // Number to text rounded to one decimal; "0" when not a number. Nothing calls it at the moment.
-  const num1 = (n) => (isNum(n) ? String(r1(n)) : '0');
 
   /** Rounded data-end bar path. dir = side the data end points to; the baseline end stays square. 'all' rounds every corner. */
   function barPath(x, y, w, h, r, dir) {
@@ -15074,7 +15162,7 @@ a.of-nav:active { background: var(--press); }
     const s = S('svg', { class: 'ch-sw', width: it.kind === 'line' ? 18 : 12, height: 12, viewBox: it.kind === 'line' ? '0 0 18 12' : '0 0 12 12', 'aria-hidden': 'true', focusable: 'false' });
     const fill = 'fill:' + it.css;
     if (it.kind === 'line') {
-      s.appendChild(S('line', { x1: 1, y1: 6, x2: 17, y2: 6, style: 'stroke:' + it.css + ';stroke-width:2;stroke-linecap:round', 'stroke-dasharray': it.dash ? '4 3' : null }));
+      s.appendChild(S('line', { x1: 1, y1: 6, x2: 17, y2: 6, style: 'stroke:' + it.css + ';stroke-width:2;stroke-linecap:round', 'stroke-dasharray': it.dash || null }));
       if (it.dot) s.appendChild(S('circle', { cx: 9, cy: 6, r: 3, style: fill + ';stroke:var(--ch-surface);stroke-width:1.5' }));
     } else if (it.kind === 'ring') {
       s.appendChild(S('circle', { cx: 6, cy: 6, r: 4, style: 'fill:var(--ch-surface);stroke:' + it.css + ';stroke-width:2' }));
@@ -15117,8 +15205,6 @@ a.of-nav:active { background: var(--press); }
   // Colour key for a reference line: its status tone if it has one, else 'muted' (grey and dashed).
   function refTone(r) { const t = keyOfTone(r && r.tone); return t === 'muted' || !t ? 'muted' : t; }
 
-  // Joins the non-empty pieces of text with semicolons. Nothing calls it at the moment.
-  const joinList = (arr) => arr.filter(Boolean).join('; ');
 
   /* =====================================================================================================
    * 6. CARTESIAN HELPERS (axes, grids, reference lines) shared by line, scatter, hist, bar, dumbbell, gantt
@@ -15301,7 +15387,7 @@ a.of-nav:active { background: var(--press); }
       let sorted = true; for (let k = 1; k < pts.length; k++) if (pts[k].x < pts[k - 1].x) { sorted = false; break; }
       if (!sorted) pts.sort((a, b) => a.x - b.x);
       const id = s.id != null ? String(s.id) : 'series' + i;
-      return { id, name: s.name != null ? String(s.name) : id, key: st.key, css: st.css, area: !!s.area || !!spec.stacked, dash: !!s.dash, band, pts, hidden: chart.hidden.has(id), raw: s };
+      return { id, name: s.name != null ? String(s.name) : id, key: st.key, css: st.css, area: !!s.area || !!spec.stacked, dash: s.dash ? '6 4' : autoDash(spec, s, i), band, pts, hidden: chart.hidden.has(id), raw: s };
     });
     const vis = series.filter((s) => !s.hidden);
     const has = vis.some((s) => s.pts.some((p) => p.y != null));
@@ -15463,7 +15549,7 @@ a.of-nav:active { background: var(--press); }
           for (let i = 0; i < dx.length; i++) { if (dy[i] == null) flush(); else run.push([dx[i], dy[i]]); }
           flush();
         }
-        marks.appendChild(S('path', { d, class: 'ch-ln', style: 'stroke:' + s.css, 'stroke-dasharray': s.dash ? '6 4' : null }));
+        marks.appendChild(S('path', { d, class: 'ch-ln', style: 'stroke:' + s.css, 'stroke-dasharray': s.dash || null }));
         drawn.push({ s, xs, ys });
       });
     }
@@ -15712,7 +15798,6 @@ a.of-nav:active { background: var(--press); }
     (spec.refLines || []).forEach((r) => { const v = r && (r.value != null ? r.value : orient === 'v' ? r.y : r.x); if (isNum(v)) { if (v > hi) hi = v; if (v < lo) lo = v; } });
     if (hi === 0 && lo === 0) hi = percent ? 100 : 1;
     // --- label strings (needed to size margins)
-    const lab = (v) => fmt.full(v);
     const pxText = (t, w) => chart.tw(t, 12, w || 600);
     const allVals = [];
     vis.forEach((s) => m.order.forEach((c) => { if (isNum(val(s, c))) allVals.push(val(s, c)); }));
@@ -16069,7 +16154,7 @@ a.of-nav:active { background: var(--press); }
     }
     // overlay step outlines
     const go = S('g', { class: 'ch-g-ov ch-rv-right' });
-    visOv.forEach((o) => {
+    visOv.forEach((o, oi) => {
       let d = '';
       for (let i = 0; i < b.n; i++) {
         const x0 = r1(X(b.lo + i * b.binSize)), x1 = r1(X(b.lo + (i + 1) * b.binSize)), y = r1(Y(o.c[i]));
@@ -16077,7 +16162,7 @@ a.of-nav:active { background: var(--press); }
       }
       d += 'V' + r1(bot);
       go.appendChild(S('path', { d: d + 'Z', style: 'fill:' + o.s.css + ';fill-opacity:.1;stroke:none' }));
-      go.appendChild(S('path', { d: d.replace(/Z$/, ''), class: 'ch-ln', style: 'stroke:' + o.s.css + ';stroke-linejoin:miter' }));
+      go.appendChild(S('path', { d: d.replace(/Z$/, ''), class: 'ch-ln', style: 'stroke:' + o.s.css + ';stroke-linejoin:miter', 'stroke-dasharray': visOv.length >= 3 ? [null, null, '2 4', '9 4'][oi % 4] : null }));
     });
     svg.appendChild(go);
     drawRefLines(svg, chart, (spec.refLines || []).map((q) => (q.value == null && q.x != null ? Object.assign({}, q, { value: q.x }) : q)), { orient: 'v', scale: X, l, r, t: top, b: bot });
@@ -19313,7 +19398,7 @@ a.of-nav:active { background: var(--press); }
     for (const w of want) {
       keep.add(w.key);
       let r = P.rows.get(w.key);
-      if (!r) { r = { li: h('li', { class: 'fl-wall-row' }, h('span', { class: 'fl-wall-name' }), h('span', { class: 'fl-wall-meta num' })), a: null, b: null }; r.a = r.li.firstChild; r.b = r.li.lastChild; P.rows.set(w.key, r); w.list.appendChild(r.li); }
+      if (!r) { r = { li: h('li', { class: 'fl-wall-row' }, h('span', { class: 'fl-wall-name', dir: 'auto' }), h('span', { class: 'fl-wall-meta num' })), a: null, b: null }; r.a = r.li.firstChild; r.b = r.li.lastChild; P.rows.set(w.key, r); w.list.appendChild(r.li); }
       setTxt(r.a, w.text); setTxt(r.b, w.meta);
     }
     for (const [k, r] of Array.from(P.rows)) if (!keep.has(k)) { r.li.remove(); P.rows.delete(k); }
@@ -19681,7 +19766,7 @@ a.of-nav:active { background: var(--press); }
     const zone = mode === 'station' ? m.zone : null;
     const num = h('span', { class: 'slip-num num', id: uid + '-n' }, h('span', { class: 'visually-hidden' }, 'Ticket '), '#' + t.num);
     const stampSlot = h('span', { class: 'fl-stamp-slot' });
-    const who = h('span', { class: 'slip-who', id: uid + '-w' }, t.customer);
+    const who = h('span', { class: 'slip-who', dir: 'auto', id: uid + '-w' }, t.customer);
     const ch = C.channelById[t.channel] || { name: String(t.channel), icon: 'plate' };
     const count = h('span', { class: 'fl-count' });
     const meta = h('div', { class: 'slip-meta' }, h('span', { class: 'fl-chan' }, ico(ch.icon, 18), h('span', null, ch.name)), count,
@@ -19850,7 +19935,7 @@ a.of-nav:active { background: var(--press); }
     const sr = h('span', { class: 'visually-hidden' });
     // Compact tickets show the short menu name; the full name stays in the reading order for screen readers.
     const short = it.short && it.short !== it.name ? it.short : null;
-    const name = h('span', { class: 'slip-name' }, short ? h('span', { class: 'nm-full' }, it.name) : it.name, short ? h('span', { class: 'nm-short', 'aria-hidden': 'true' }, short) : null, sr);
+    const name = h('span', { class: 'slip-name', dir: 'auto' }, short ? h('span', { class: 'nm-full' }, it.name) : it.name, short ? h('span', { class: 'nm-short', 'aria-hidden': 'true' }, short) : null, sr);
     const sub = h('span', { class: 'fl-sub' });
     row.sr = sr;
     if (kind === 'deck') {
@@ -20403,21 +20488,6 @@ a.of-nav:active { background: var(--press); }
     else openSheet('help');
   }
   F.startTour = startTour;
-  // Clears the pretend tickets after a confirm, so a new user can begin with a clean board. Settings stay.
-  async function startEmpty() {
-    const ok = await SB.ui.confirm({
-      title: 'Start with an empty board?', confirmLabel: 'Clear the board', cancelLabel: 'Keep the tickets',
-      body: ['This removes the demo tickets and anything else logged on this device. Settings stay.'],
-    });
-    if (!ok || !m) return;
-    try { if (SB.sim && SB.sim.live) SB.sim.live.stop(); } catch (e) { /* the simulator may not be running */ }
-    store().setSpeed(1);
-    const r = store().resetLive({ keepSettings: true, starter: false });
-    if (r !== 'ok') { toast(E().describe(r, {}, store().getState().settings), { tone: 'warn' }); return; }
-    F.setWelcome(false);
-    toast('The board is empty. Tap New ticket to send an order.', { tone: 'info' });
-  }
-
   // Empty state: shown when no slips match the current tab.
 
   // Fills the empty panel: New ticket and Start demo, or on a quiet station a way back to All.
@@ -21062,9 +21132,12 @@ a.of-nav:active { background: var(--press); }
     const clearSearch = h('button', { type: 'button', class: 'btn btn-ghost btn-icon btn-sm ord-search-clear', 'aria-label': 'Clear search', hidden: true }, ico('x', 18));
     const searchBox = h('div', { class: 'ord-search' }, ico('search', 20), searchInput, clearSearch);
     const searchHint = h('div', { class: 'ord-hint', role: 'status', 'aria-live': 'polite', hidden: true });
-    const catOptions = [{ id: 'all', label: 'All' }].concat(C.categories.map((c) => ({ id: c.id, label: c.name })));
+    // Only categories that have a dish get a tab; with one category or none there is nothing to pick, so the tabs hide.
+    const catsWithDishes = C.categories.filter((c) => st().menu.some((x) => !x.archived && x.cat === c.id));
+    const catOptions = [{ id: 'all', label: 'All' }].concat(catsWithDishes.map((c) => ({ id: c.id, label: c.name })));
     // Category tabs; typing in the search box ignores the tab so a search always looks at the whole menu.
     const catSeg = SB.ui.segmented({ kind: 'tabs', label: 'Menu category', class: 'ord-cats', options: catOptions, value: 'all', onChange: (id) => { view.cat = id; applyFilter(); } });
+    if (catsWithDishes.length < 2) catSeg.hidden = true;
     const sticky = h('div', { class: 'ord-sticky' }, searchBox, searchHint, catSeg);
     const combosEl = h('div', { class: 'ord-combos', role: 'group', 'aria-label': 'Quick combos' });
     const tilesEl = h('div', { class: 'ord-tiles', role: 'group', 'aria-label': 'Menu items' });
@@ -21107,7 +21180,7 @@ a.of-nav:active { background: var(--press); }
       const hd = h('h3', { class: 'ord-cat-head' }, c.name);
       tilesEl.appendChild(hd); view.heads.push(hd);
       items.forEach((mi) => {
-        const nameEl = h('span', { class: 'ord-tile-name' }, mi.name);
+        const nameEl = h('span', { class: 'ord-tile-name', dir: 'auto' }, mi.name);
         const priceEl = h('span', { class: 'ord-tile-price num' }, U.fmtMoney(mi.price));
         const countEl = h('span', { class: 'ord-tile-count', hidden: true }, h('span', { class: 'num' }, '0'), h('span', { class: 'visually-hidden' }, ' in order'));
         const wordEl = h('span', { class: 'ord-tile-86' }, ico('ban', 18), h('span', { class: 'ord-tile-86-word' }, ''));
@@ -21608,7 +21681,7 @@ a.of-nav:active { background: var(--press); }
       tipField.setError(D.pay && Number.isNaN(tip) ? 'Type dollars and cents, like 2.50.' : null);
       if (!D.pay) { text(payNote, 'The order stays open. Take payment later from Orders.'); return; }
       const pt = pendingTotal(), pm = C.payMethodById[D.pay];
-      text(payNote, 'Marked paid by ' + (pm ? pm.name.toLowerCase() : D.pay) + ' when sent: ' + U.fmtMoney(pt.total) + (pt.tax > 0 ? ' with ' + U.fmtMoney(pt.tax) + ' tax' : '') + (tip > 0 ? ', plus a ' + U.fmtMoney(tip) + ' tip' : '') + '. Smokebox only records this; it does not charge cards.');
+      text(payNote, 'Marked paid by ' + (pm ? pm.name.toLowerCase() : D.pay) + ' when sent: ' + U.fmtMoney(pt.total) + (pt.tax > 0 ? ' with ' + U.fmtMoney(pt.tax) + ' tax' : '') + (tip > 0 ? ', plus a ' + U.fmtMoney(tip) + ' tip' : '') + '. Smokebox only records this; it does not charge cards.' + ((st().settings.service.taxRatePct || 0) === 0 ? ' No sales tax is added. Set it under Menu, Tax, hours and PIN.' : ''));
     }
 
     function paintAll() {
@@ -21940,8 +22013,6 @@ a.of-nav:active { background: var(--press); }
   const menuOf = (id) => { const a = st().menu; for (let i = 0; i < a.length; i++) if (a[i].id === id) return a[i]; return null; };
   // An amount in words: pieces for counted items (cornbread), otherwise grams or kilograms.
   const qtyText = (ing, gm) => (ing && ing.unit === 'ea' ? Math.round(gm) + ' ' + plural(Math.round(gm), 'piece') : U.weightText(gm));
-  // Station details for an id, with a safe fallback so an unknown station still shows.
-  const zoneOf = (id) => C.zoneById[id] || { name: id, code: String(id || '').slice(0, 3).toUpperCase(), icon: 'flame' };
   // Order channel details for an id, with a safe fallback.
   const channelOf = (id) => C.channelById[id] || { name: id || 'Order', icon: 'plate' };
 
@@ -22169,8 +22240,8 @@ a.of-nav:active { background: var(--press); }
     }
     if (b.kind === 'cooling') {
       const c = S.cooling || C.safety.cooling;
-      if (b.stage1At == null) return f <= c.stage1ToF ? { tone: 'ok', text: U.tempText(f) + ' reaches stage 1 (' + U.tempText(c.stage1ToF) + ' or below).' } : { tone: 'warn', text: 'Stage 1 needs ' + U.tempText(c.stage1ToF) + ' or below. Keep chilling.' };
-      return f <= c.finalF ? { tone: 'ok', text: U.tempText(f) + ' finishes the cooling (' + U.tempText(c.finalF) + ' or below).' } : { tone: 'warn', text: 'Stage 2 needs ' + U.tempText(c.finalF) + ' or below. Keep chilling.' };
+      if (b.stage1At == null) return f <= c.stage1ToF ? { tone: 'ok', text: U.tempText(f) + ' reaches step 1 of 2 (' + U.tempText(c.stage1ToF) + ' or below).' } : { tone: 'warn', text: 'Stage 1 needs ' + U.tempText(c.stage1ToF) + ' or below. Keep chilling.' };
+      return f <= c.finalF ? { tone: 'ok', text: U.tempText(f) + ' finishes step 2 of 2 (' + U.tempText(c.finalF) + ' or below).' } : { tone: 'warn', text: 'Stage 2 needs ' + U.tempText(c.finalF) + ' or below. Keep chilling.' };
     }
     if (b.kind === 'cold') {
       return f > S.coldHoldF ? { tone: 'bad', text: 'Above ' + U.tempText(S.coldHoldF) + '. The batch goes on Chill now and stops being served.' } : { tone: 'ok', text: 'In range (' + U.tempText(S.coldHoldF) + ' or below).' };
@@ -22515,7 +22586,7 @@ a.of-nav:active { background: var(--press); }
       }
       const label = b.label || 'Batch', info = res.info || {};
       if (mode === 'reheat' || info.reheated) toast(label + ' reheated to ' + U.tempText(f) + '. It is being served again.', 'ok');
-      else if (info.status === 'reheat') toast(label + ' is below ' + U.tempText(safety().hotHoldF) + '. Reheat it to ' + U.tempText(safety().reheatF) + ' now, or discard it.', 'warn');
+      else if (info.status === 'reheat') toast(label + ' is below ' + U.tempText(safety().hotHoldF) + '. Reheat it to ' + U.tempText(safety().reheatF) + ' now, or throw it out.', 'warn');
       else if (info.status === 'chill') toast(label + ' is above ' + U.tempText(safety().coldHoldF) + '. Chill it now.', 'warn');
       else toast(label + ' logged at ' + U.tempText(f) + '.' + (info.onTime === false ? ' That check was ' + hmLong(info.lateMs) + ' late.' : ''), info.onTime === false ? 'warn' : 'ok');
       closeEditor(rec, true);
@@ -22904,8 +22975,8 @@ a.of-nav:active { background: var(--press); }
       h('p', { class: 'fs-sub' }, 'Log a pan when it goes into the cabinet. The first temperature starts its clock, so enter what your thermometer says.'),
       noProd, vis('Product', prodSeg), rawFld, thermalBox, weighedBox, tempFld, labelField, calcBox);
 
-    // A starting weight of about half the par level, so the box opens near a typical pan.
-    function defaultKg(ing) { return Math.max(0.5, Math.round((ing.parG || 4000) / 2 / 100) / 10); }
+    // A starting weight equal to the usual batch size (the par the owner typed), so the box opens at what they said they cook.
+    function defaultKg(ing) { return Math.max(0.5, Math.round((ing.parG || 4000) / 100) / 10); }
 
     // Switches product: relabels the weight box, resets defaults the cook has not touched,
     // and shows or hides the cook-model steppers.
@@ -23371,7 +23442,7 @@ a.of-nav:active { background: var(--press); }
 
     // Builds one ticket row once; a voided row has no Recall button.
     function makeRow(t, voided) {
-      const num = h('div', { class: 'rc-num num' }), who = h('span', { class: 'rc-who' });
+      const num = h('div', { class: 'rc-num num' }), who = h('span', { class: 'rc-who', dir: 'auto' });
       const ch = h('span', { class: 'chip rc-ch' }), demo = h('span', { class: 'chip', hidden: true, dataset: { tone: 'info' } }, 'Demo');
       const items = h('div', { class: 'rc-items' }), meta = h('div', { class: 'rc-meta' });
       const badge = h('span', { class: 'rc-badge' });
@@ -23778,7 +23849,7 @@ a.of-nav:active { background: var(--press); }
         rule('snow', 'Keep cold food cold', 'Cold food stays at ' + U.tempText(S.coldHoldF) + ' or below.'),
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + U.tempText(S.hotHoldF) + ', reheat to ' + U.tempText(S.reheatF) + ' within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
-        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
+        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
         rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit means the batch must be thrown out when time is up. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
         rule('snow', 'Cooling', 'From ' + U.tempText(S.hotHoldF) + ' to ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' hours, then to ' + U.tempText(c.finalF) + ' within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
@@ -24012,7 +24083,7 @@ a.of-nav:active { background: var(--press); }
     // The Guide opens only when the guide page is part of this copy of Smokebox.
     const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
@@ -24250,7 +24321,7 @@ a.of-nav:active { background: var(--press); }
 
     // Builds one open-order row once; updateOpenRow fills it in place.
     function makeOpenRow(o) {
-      const who = h('span', { class: 'ox-who' }), ch = h('span', { class: 'chip ox-ch' });
+      const who = h('span', { class: 'ox-who', dir: 'auto' }), ch = h('span', { class: 'chip ox-ch' });
       const round = h('span', { class: 'chip ox-round', hidden: true }), demo = h('span', { class: 'chip', dataset: { tone: 'info' }, hidden: true }, 'Demo');
       const items = h('div', { class: 'ox-items' }), meta = h('div', { class: 'ox-meta' });
       const total = h('span', { class: 'ox-total num' }), sub = h('span', { class: 'ox-sub num' });
@@ -24310,7 +24381,7 @@ a.of-nav:active { background: var(--press); }
     }
     // Builds one paid-order row once; updatePaidRow fills it in place.
     function makePaidRow(o) {
-      const who = h('span', { class: 'ox-who' }), ch = h('span', { class: 'chip ox-ch' });
+      const who = h('span', { class: 'ox-who', dir: 'auto' }), ch = h('span', { class: 'chip ox-ch' });
       const items = h('div', { class: 'ox-items' }), meta = h('div', { class: 'ox-meta' });
       const total = h('span', { class: 'ox-total num' }), sub = h('span', { class: 'ox-sub num' });
       const reopen = h('button', { type: 'button', class: 'btn ox-reopen', dataset: { act: 'reopen' } }, ico('history', 20), h('span', null, 'Reopen'));
@@ -25289,12 +25360,16 @@ a.of-nav:active { background: var(--press); }
     if (d && SB.config.categoryById[d.cat]) return d;
     return { cat: (SB.config.categories[0] || {}).id, sec: 180, track: 'two' };
   }
-  // Turns a typed price like "12.5" or "$12.50" into dollars, or null when it is not a price.
-  function parsePrice(text) {
+  // Reads a typed price the way a person writes it: "12.50", "12,50", "$14", "14.", "USD 12", "1 200". Gives {value, rounded}
+  // in dollars, or null when it is not one price. Uses the menu importer's reader when it is in this build.
+  function priceInfo(text) {
+    const M = SB.menuImport;
+    if (M && typeof M.readPrice === 'function') { const r = M.readPrice(text); return r && typeof r.value === 'number' ? { value: r.value, rounded: !!r.rounded } : null; }
     const raw = String(text || '').replace(/[$\s]/g, '').replace(',', '.');
-    if (!/^(\d+\.?\d{0,2}|\.\d{1,2})$/.test(raw)) return null;
-    return parseFloat(raw);
+    return /^(\d+\.?\d{0,2}|\.\d{1,2})$/.test(raw) ? { value: parseFloat(raw), rounded: false } : null;
   }
+  // The price in dollars, or null when the text is not a price.
+  function parsePrice(text) { const i = priceInfo(text); return i ? i.value : null; }
   // Adds one dish with every hidden default filled in. opts may carry prepSec, cat and short from "More options".
   // The prep time is marked as a guess unless the owner typed one. Returns the send() result.
   function addDish(name, price, zone, opts) {
@@ -25359,7 +25434,7 @@ a.of-nav:active { background: var(--press); }
     const store = SB.store;
     if (!store.enterDemo || store.isDemo()) return false;
     const ok = skipAsk || !SB.ui.confirm ? true : await SB.ui.confirm({ title: 'Try the demo?', confirmLabel: 'Try the demo', cancelLabel: 'Not now',
-      body: ['The demo is a practice kitchen with a sample barbecue menu and pretend tickets. Nothing in it is your kitchen.', 'Your own dishes and orders are kept safe. A bar at the top of every screen has a Back to my kitchen button.'] });
+      body: ['The demo is a demo kitchen with a sample menu and sample tickets. Nothing in it is your kitchen.', 'Your own dishes and orders are not touched. A bar at the top of every screen has a Back to my kitchen button.'] });
     if (!ok) return false;
     if (!store.enterDemo() && SB.ui.toast) SB.ui.toast('This browser would not open the demo. Try again, or add ?demo to the address.', { tone: 'warn' });
     return true;
@@ -25367,7 +25442,7 @@ a.of-nav:active { background: var(--press); }
   // The body of the Demo sheet in a real kitchen: what the demo is, and one button that opens it.
   function demoIntro() {
     return h('div', { class: 'dm' }, h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Try the demo'),
-      h('p', { class: 'fs-sub' }, 'A practice kitchen with a sample barbecue menu, pretend tickets and a crew that sends orders, so you can see Smokebox busy. Nothing in it is your kitchen, and nothing you do there reaches your real dishes, orders or numbers.'),
+      h('p', { class: 'fs-sub' }, 'A demo kitchen with a sample menu, sample tickets and a crew that sends orders, so you can see Smokebox busy. Nothing in it is your kitchen, and nothing you do there reaches your real dishes, orders or numbers.'),
       h('p', { class: 'fs-sub' }, 'A bar at the top of every demo screen says so and has a Back to my kitchen button. Leaving erases the demo.'),
       // Opens the demo after the plain-words question.
       h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'try-demo' }, onClick: () => tryDemo(true) }, ico('play', 22), h('span', null, 'Try the demo'))));
@@ -25387,6 +25462,10 @@ a.of-nav:active { background: var(--press); }
     const nameField = SB.ui.field({ label: 'What is it called?', control: nameIn });
     const priceIn = h('input', { class: 'input dp-price', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '12.50' });
     const priceField = SB.ui.field({ label: 'Price in dollars', control: priceIn });
+    const priceEcho = h('p', { class: 'fs-sub dp-echo', 'aria-live': 'polite' });
+    priceField.appendChild(priceEcho);
+    // Shows what Smokebox understood from the typed price before anything is saved, so "12,50" is never a surprise.
+    priceIn.addEventListener('input', () => { const i = priceInfo(priceIn.value); tell(priceEcho, i ? 'Reads as ' + U.fmtMoney(i.value) + (i.rounded ? ' (rounded to the cent)' : '') : '', 'ok'); });
     let zone = '';
     const tiles = h('div', { class: 'dp-tiles', role: 'radiogroup', 'aria-label': 'Where it is made' });
     const zoneErr = h('div', { class: 'field-error', role: 'alert', hidden: true });
@@ -25519,7 +25598,7 @@ a.of-nav:active { background: var(--press); }
         return false;
       }
       tell(status, 'Saved ' + name + ' at ' + U.fmtMoney(price) + '.');
-      nameIn.value = ''; priceIn.value = ''; minIn.value = ''; catSel.value = ''; shortIn.value = '';
+      nameIn.value = ''; priceIn.value = ''; tell(priceEcho, ''); minIn.value = ''; catSel.value = ''; shortIn.value = '';
       saveDraft();
       return true;
     }
@@ -25564,7 +25643,7 @@ a.of-nav:active { background: var(--press); }
     // Rebuilds the list of dishes when it has changed and no box in it is being typed in.
     function paintList() {
       const mine = activeDishes();
-      const sig = mine.map((m) => m.id + '|' + m.name + '|' + m.price + '|' + m.zone + '|' + portionLeft(m)).join(';');
+      const sig = mine.map((m) => m.id + '|' + m.name + '|' + m.price + '|' + m.zone + '|' + m.cat + '|' + portionLeft(m)).join(';');
       const typing = listBox.contains(doc.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(doc.activeElement.tagName);
       if (sig === listSig || typing) return;
       listSig = sig;
@@ -25598,8 +25677,12 @@ a.of-nav:active { background: var(--press); }
           h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + m.name + ' up', disabled: idx === 0, onClick: () => moveDish(m, -1) }, ico('arrow-up', 20)),
           // Moves this dish one place up in the menu order.
           h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + m.name + ' down', disabled: idx === mine.length - 1, onClick: () => moveDish(m, 1) }, ico('arrow-down', 20)));
+        // Move to: the category this dish sits in on the order screen, changed with one pick.
+        const catSelRow = h('select', { class: 'select dp-cat', 'aria-label': 'Category of ' + m.name }, SB.config.categories.map((c) => h('option', { value: c.id, selected: c.id === m.cat }, c.name)));
+        // Saves the new category for this dish and says so.
+        catSelRow.addEventListener('change', () => { const r = send('updateMenuItem', { id: m.id, patch: { cat: catSelRow.value } }); tell(msg, r.ok ? 'Moved to ' + (SB.config.categoryById[catSelRow.value] || {}).name + '.' : r.words); });
         const z = SB.config.zoneById[m.zone];
-        listBox.appendChild(h('div', { class: 'dp-row' }, moveBox, n, pr, h('span', { class: 'chip dp-zone' }, z ? z.name : m.zone), ex.indexOf(m.id) >= 0 ? h('span', { class: 'chip dp-ex', 'data-tone': 'warn' }, 'Example') : null, rm, msg, portionsRow(m)));
+        listBox.appendChild(h('div', { class: 'dp-row' }, moveBox, n, pr, catSelRow, h('span', { class: 'chip dp-zone' }, z ? z.name : m.zone), ex.indexOf(m.id) >= 0 ? h('span', { class: 'chip dp-ex', 'data-tone': 'warn' }, 'Example') : null, rm, msg, portionsRow(m)));
       });
     }
     paintList(); paintGone();
@@ -25670,7 +25753,7 @@ a.of-nav:active { background: var(--press); }
 
     // Restore a draft left by a closed tab, then the last station used.
     const d = U.storage.get(KEY_DRAFT, null);
-    if (d && typeof d === 'object') { nameIn.value = String(d.name || ''); priceIn.value = String(d.price || ''); }
+    if (d && typeof d === 'object') { nameIn.value = String(d.name || ''); priceIn.value = String(d.price || ''); priceIn.dispatchEvent(new g.Event('input')); }
     const last = (d && d.zone) || U.storage.get(KEY_LAST, '');
     if (last && visibleStations().some((z) => z.id === last) && visibleStations().length > 1) pickZone(last);
     setTimeout(() => nameIn.focus(), 50);
@@ -25699,6 +25782,9 @@ a.of-nav:active { background: var(--press); }
     const dishBox = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Which dishes use it?'), h('p', { class: 'fs-sub' }, 'Select each dish and enter the grams of it in one serving (150 is a starting guess). Smokebox takes that much off the batch when the dish is made.'), h('div', { class: 'dp-list' }, dishRows.map((r) => r.el)));
     const status = h('p', { class: 'fs-sub', role: 'status' });
     const after = h('div', { class: 'fs-row', hidden: true });
+    let warnedNoDish = false;
+    // Selecting a dish clears the one-time warning, so a later empty save warns again.
+    dishRows.forEach((x) => x.cb.addEventListener('change', () => { warnedNoDish = false; }));
     // Saves the item and links the ticked dishes; says plainly what happened and what to do next.
     const save = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'save-cooked' }, onClick: () => {
       nameField.setError(null); hoursField.setError(null); tell(status, '');
@@ -25706,6 +25792,12 @@ a.of-nav:active { background: var(--press); }
       if (!name) { nameField.setError('Type what you cook ahead.'); return; }
       if (hrs == null || hrs < 0.5 || hrs > 12) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
       if (kgIn.value.trim() && (kg == null || kg <= 0 || kg > 1000)) { tell(status, 'Batch size: type kilograms like 4, or leave it empty.'); return; }
+      // With dishes on the menu but none selected, nothing would use this item: say so once, and save only on a second tap.
+      if (dishRows.length && !dishRows.some((x) => x.cb.checked) && !warnedNoDish) {
+        warnedNoDish = true;
+        tell(status, 'No dish is selected, so nothing will use this item and it will not count down. Select a dish above, or tap Save again to keep it without one.', 'bad');
+        return;
+      }
       const payload = { name, unit: 'g', tcs: true, hold: kind.getValue(), maxHoldH: hrs, holdBasis: 'safety' };
       if (kg) payload.parG = Math.round(kg * 1000);
       const r = send('addIngredient', payload);
@@ -25755,6 +25847,13 @@ a.of-nav:active { background: var(--press); }
       const res = M.parse(text, { existing: SB.store.getState().menu });
       if (res.error) { tell(status, res.error); parsed = null; return; }
       parsed = res; rows = res.rows.map((r) => Object.assign({ keep: r.ok && !r.hidden }, r));
+      // A category that is only digits usually means a price like 4,50 was split at its comma: warn, and leave the row unticked.
+      rows.forEach((r) => {
+        // The importer's own warnings about extra columns or a digits-only category also leave the row unticked.
+        if ((r.problems || []).some((p) => p.code === 'extraColumns' || p.code === 'numericCategory')) { r.keep = false; return; }
+        if (/^\d+$/.test(String(r.categoryText || '').trim())) { r.problems = (r.problems || []).concat([{ code: 'priceSplit', level: 'warn', message: 'The category here is "' + r.categoryText + '", which looks like the end of a price split at a comma (4,50).', fix: 'Check the price, tick the row when it is right. In your file, put prices with commas inside quotes.' }]); r.keep = false; }
+      });
+      if (res.summary && res.summary.unmatched) res.summary.unmatched.categories = res.summary.unmatched.categories.filter((c) => !/^\d+$/.test(String(c).trim()));
       paintPreview(from);
     }
     // Says why a typed name cannot be used: 'removed' (a removed dish has it), 'menu' (a dish on the menu), 'list' (another row here), or ''.
@@ -25775,6 +25874,24 @@ a.of-nav:active { background: var(--press); }
       const sm = parsed.summary;
       preview.append(h('p', { class: 'fs-sub dp-fmt' }, 'Read ' + (from || 'the text') + ' as: ' + parsed.label + '. ' + sm.message));
       (sm.notes || []).forEach((n) => preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, n)));
+      // Words in the file that match none of the owner's categories or stations: say it once, and offer to add the categories.
+      const um = sm.unmatched || { stations: [], categories: [] };
+      if (um.categories.length) {
+        // Adds the file's category words as the owner's own categories, then reads the file again so each dish lands in its own.
+        const addCats = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'import-add-cats' }, onClick: () => {
+          const C = SB.config, spec = JSON.parse(JSON.stringify(C.customSpec()));
+          spec.add = spec.add || {}; spec.add.categories = (spec.add.categories || []).concat(um.categories.map((nm) => ({ name: nm })));
+          const before = C.customSpec(), res = C.applyCustom(spec);
+          if (res.rejected.length) { C.applyCustom(before); tell(status, 'Some of those category names could not be added (too long, a repeat, or the list is full). Change the category words in the file, or add them one by one in the Back office.', 'bad'); return; }
+          C.saveCustom(spec); check(area.value, 'the file');
+          tell(status, 'Added ' + um.categories.length + ' ' + U.plural(um.categories.length, 'category', 'categories') + '. Each dish now sits in its own.', 'ok');
+        } }, 'Add these categories');
+        preview.appendChild(h('div', { class: 'fs-note', 'data-tone': 'warn' }, h('div', null, h('p', null, 'Your file has categories that are not set up here: ' + um.categories.join(', ') + '. Until you add them, those dishes go in "' + ((SB.config.categories[0] || {}).name || 'the first category') + '".'), addCats)));
+      }
+      if (um.stations.length) preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'Your file names stations that are not set up here: ' + um.stations.join(', ') + '. Pick each dish\'s station below.'));
+      // One station for every dish that came with none, so a cafe does not pick it 22 times.
+      const bulk = h('select', { class: 'select', 'aria-label': 'Put every dish at this station' }, h('option', { value: '' }, 'Choose a station'), stations().map((z) => h('option', { value: z.id }, z.name)));
+      preview.appendChild(h('div', { class: 'fs-row dp-bulk' }, h('label', null, 'Put all these dishes at: '), bulk));
       const body = h('div', { class: 'dp-ptable', role: 'table', 'aria-label': 'Dishes found' });
       const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'import-go' } }, 'Import');
       // Updates the Import button's count and enabled state from the ticked, valid rows.
@@ -25801,9 +25918,11 @@ a.of-nav:active { background: var(--press); }
         // Typing a new name or price re-checks the row and ticks it in when it has become valid.
         const edit = () => { r.name = nm.value.replace(/\s+/g, ' ').trim(); const p = SB.menuImport.readPrice(pr.value); r.price = p && typeof p.value === 'number' ? p.value : null; r.station = zs.value; r.ok = rowOk(r); r.keep = r.ok; redo(); };
         nm.addEventListener('change', edit); pr.addEventListener('change', edit); zs.addEventListener('change', () => { r.station = zs.value; });
-        prob.textContent = (r.problems || []).map((p) => p.message + (p.fix ? ' ' + p.fix : '')).join(' ');
+        prob.textContent = (r.problems || []).filter((p) => p.code !== 'unknownCategory' && p.code !== 'unknownStation').map((p) => p.message + (p.fix ? ' ' + p.fix : '')).join(' ');
         body.appendChild(rowEl);
       });
+      // Choosing a station in the bulk list sets it on every row.
+      bulk.addEventListener('change', () => { if (!bulk.value) return; rows.forEach((r) => { r.station = bulk.value; }); body.querySelectorAll('select').forEach((s) => { s.value = bulk.value; }); });
       // Imports the ticked rows through the importer's actions, then offers one-tap undo of that batch.
       go.addEventListener('click', () => {
         const picked = rows.filter((r) => r.keep && r.ok).map((r) => Object.assign({}, r, { station: r.station || defaultZone() }));
@@ -25847,7 +25966,7 @@ a.of-nav:active { background: var(--press); }
         tell(status, 'Saved smokebox-menu.csv. Open it in a spreadsheet, or import it again later.');
       } catch (e) { area.value = text; tell(status, 'Your browser blocked the download. The menu is in the box above: copy it into a file named smokebox-menu.csv.'); }
     });
-    root.append(h('p', { class: 'fs-sub' }, 'Optional. Choose a spreadsheet (CSV) or an item export from Square, Toast or Clover, or paste a list. You will see every dish and can fix or untick any before anything is added. Adding dishes by hand in Dishes and prices is just as good.'),
+    root.append(h('p', { class: 'fs-sub' }, 'Optional. Choose a spreadsheet (CSV) or an item export from Square, Toast or Clover, or paste a list. You will see every dish and can fix or clear any before anything is added. Adding dishes by hand in Dishes and prices is just as good.'),
       h('div', { class: 'fs-row' }, fileIn), area, h('div', { class: 'fs-row' }, checkBtn, exp), status, preview);
     sheet.body.appendChild(root); keepInView(sheet.body);
     return sheet;
@@ -25867,7 +25986,7 @@ a.of-nav:active { background: var(--press); }
       return status;
     }
     const tax = h('input', { class: 'input', type: 'text', inputmode: 'decimal', value: String(set.service.taxRatePct || 0), 'aria-label': 'Sales tax percent' });
-    const taxSt = section('Sales tax', 'Orders add this percent when they are paid. Type 0 if you do not charge tax.', h('label', { class: 'fs-row' }, h('span', null, 'Percent'), tax),
+    const taxSt = section('Sales tax', 'The prices you type for dishes are before tax. Smokebox adds this percent to the bill when it is paid. Type 0 if you do not charge tax.', h('label', { class: 'fs-row' }, h('span', null, 'Percent'), tax),
       // Checks the tax box and saves the rate, or says what is wrong with it.
       h('button', { type: 'button', class: 'btn', onClick: () => {
         const v = readNum(tax);
@@ -25959,7 +26078,7 @@ a.of-nav:active { background: var(--press); }
     "id": "getting-started",
     "group": "guide",
     "title": "Getting started",
-    "summary": "Add your dishes, send a test order, take payment and save your first backup. About ten minutes.",
+    "summary": "Add dishes, send a test order, take payment and save a backup. About ten minutes.",
     "blocks": [
      {
       "t": "h",
@@ -25979,11 +26098,15 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
+      "x": "The arrow buttons beside each dish change the order they appear in."
+     },
+     {
+      "t": "p",
       "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**."
      },
      {
       "t": "p",
-      "x": "Want to see how a ticket works first? Tap **Show me how it works** for a one-minute walkthrough."
+      "x": "For a one-minute walkthrough, tap **Show me how it works**."
      },
      {
       "t": "h",
@@ -25995,11 +26118,11 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Do you cook food ahead and keep it hot or cold? Say so in **Dishes and prices** (see Cooked-ahead food and portions). If you cook everything to order, skip it."
+      "x": "Cook food ahead and keep it hot or cold? Say so in **Dishes and prices** (see Cooked-ahead food and portions)."
      },
      {
       "t": "p",
-      "x": "Temperatures show in °F and weights in kilograms. You can change both in the **Back office**, under **Menu and settings**."
+      "x": "Temperatures show in °F and weights in kilograms. Change them in the **Back office**, under **Menu and settings**."
      },
      {
       "t": "h",
@@ -26397,7 +26520,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "The Danger zone has **Reset live data** and **Reset everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either."
+      "x": "The Danger zone has **Erase live data** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either."
      }
     ]
    },
@@ -26731,6 +26854,79 @@ a.of-nav:active { background: var(--press); }
        "Dish missing: check the 86 board and Dishes and prices",
        "Opened empty: restore the last backup (Back office, Menu and settings)",
        "Forgot the PIN: see Empty, lost or locked in the Guide. There is no reset button"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "card-first-day-checklist",
+    "group": "cards",
+    "title": "First day checklist",
+    "summary": "Print this card. Check each box off with a pen.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Before opening"
+     },
+     {
+      "t": "check",
+      "x": [
+       "Dishes added, tax and hours set (Menu, Dishes and prices)",
+       "Tablet plugged in, set to never sleep, volume up",
+       "One test order sent and cancelled"
+      ]
+     },
+     {
+      "t": "h",
+      "x": "During service"
+     },
+     {
+      "t": "check",
+      "x": [
+       "On each ticket: Start, Done, then Bump",
+       "Wrong tap? Undo, within 10 seconds",
+       "Dish sold out? Mark it on the 86 board"
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Closing"
+     },
+     {
+      "t": "check",
+      "x": [
+       "Every order paid or cancelled, then Close the day",
+       "Backup saved, and a copy kept off the tablet"
+      ]
+     },
+     {
+      "t": "h",
+      "x": "If something goes wrong"
+     },
+     {
+      "t": "check",
+      "x": [
+       "Open the Guide. Troubleshooting covers sound and lost data"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "card-tablet-setup",
+    "group": "cards",
+    "title": "Tablet setup",
+    "summary": "Print this card and keep it with the tablet.",
+    "blocks": [
+     {
+      "t": "check",
+      "x": [
+       "Open Smokebox and add it to the home screen: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app",
+       "Keep it awake: set Auto-Lock (iPad) or Screen timeout (Android) to Never, and plug it in",
+       "Turn the volume up. Tap Menu, Set up this tablet, then Play a test warning",
+       "Wifi: not needed. Smokebox works without internet",
+       "Backups go where you save them: the Downloads folder, or an email to yourself. Smokebox does not send them anywhere",
+       "Keep a copy of every backup off this tablet",
+       "Replacing the tablet? Restore your newest backup (Guide, Replacing a device)"
       ]
      }
     ]
@@ -27332,8 +27528,6 @@ a.of-nav:active { background: var(--press); }
   const h = U.h;
   // Draws an icon by name. A missing icon gives an empty span, so the page still builds.
   const ico = (name, size, o) => { try { return SB.icons.svg(name, Object.assign({ size: size || 20 }, o || {})); } catch (e) { return doc.createElement('span'); } };
-  // True when the person asked their device for less animation.
-  const reduced = () => (U.prefersReducedMotion ? U.prefersReducedMotion() : false);
   const warnOnce = (() => { const seen = new Set(); return (key, err) => { if (seen.has(key)) return; seen.add(key); if (seen.size > 200) seen.clear(); try { console.error('[smokebox] office: ' + key, err); } catch (e) { /* ignore */ } }; })();
 
   // Number formats: thin wrappers over SB.util that give a dash for an unknown value instead of NaN.
@@ -27400,10 +27594,18 @@ a.of-nav:active { background: var(--press); }
     return p ? { id: p.id, from: p.from, to: p.to, label: p.label, fromKey: p.fromKey, toKey: p.toKey } : { id: 'today', from: nowMs() - DAY, to: nowMs() + 1, label: 'Today' };
   }
   // Where the filters start: Last 14 days with sample data when it is loaded, otherwise Today with live
-  // data only.
+  // data only (or the last 7 days when today has no tickets yet but the week does).
   function defaultFilters() {
     const sampleOk = sampleFlag() && sampleLoaded();
-    return sampleOk ? { range: presetRange('last14'), channel: 'all', source: 'all' } : { range: presetRange('today'), channel: 'all', source: 'live' };
+    if (sampleOk) return { range: presetRange('last14'), channel: 'all', source: 'all' };
+    // With nothing sold yet today but tickets in the past week, start on the last 7 days so the first screen is not empty.
+    try {
+      const tickets = (storeDataset(false).tickets || []), today = presetRange('today'), week = presetRange('last7');
+      // True when any ticket was created inside the range.
+      const inR = (r) => tickets.some((t) => t && isNum(t.createdAt) && t.createdAt >= r.from && t.createdAt < r.to);
+      if (!inR(today) && inR(week)) return { range: week, channel: 'all', source: 'live' };
+    } catch (e) { /* fall back to today */ }
+    return { range: presetRange('today'), channel: 'all', source: 'live' };
   }
 
   // Builds the ctx a page receives: filters, the data, the one shared metrics handle and a few helpers.
@@ -28152,7 +28354,22 @@ a.of-nav:active { background: var(--press); }
     const srcNote = h('span', { class: 'of-fnote', hidden: true });
 
     // The Day group only shows for Yesterday or One day, so the other filters fit on one row.
-    const dayGroup = h('div', { class: 'of-fg', hidden: true }, h('span', { class: 'of-fl' }, 'Day'), dayBox, dayErr);
+    // Seven weekday buttons: each jumps to the most recent such day (today counts once something was ordered), so "Friday" is one tap.
+    const wdRow = h('div', { class: 'of-wdrow', role: 'group', 'aria-label': 'Jump to a weekday' });
+    // Shows the most recent day with this weekday number (0 is Sunday), looking back up to a week.
+    const jumpWeekday = (wd) => {
+      const today = U.serviceDate(nowMs(), svcHour());
+      let todayHas = false;
+      try { todayHas = (storeDataset(false).tickets || []).some((t) => t && t.serviceDate === today); } catch (e) { todayHas = false; }
+      // Today only counts when something was ordered today; otherwise the same weekday last week is meant.
+      for (let i = todayHas ? 0 : 1; i < 8; i++) { const k = U.addDays(today, -i); if (U.weekday(k) === wd) { showDay(k, true); return; } }
+    };
+    [1, 2, 3, 4, 5, 6, 0].forEach((wd) => {
+      // Handles a tap on one weekday button.
+      const onTap = () => jumpWeekday(wd);
+      wdRow.appendChild(h('button', { type: 'button', class: 'btn btn-sm of-wd', onClick: onTap }, U.WEEKDAYS[wd]));
+    });
+    const dayGroup = h('div', { class: 'of-fg', hidden: true }, h('span', { class: 'of-fl' }, 'Day'), dayBox, wdRow, dayErr);
     body.append(
       h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Range'), rangeSeg),
       dayGroup,
@@ -29450,20 +29667,6 @@ a.of-nav:active { background: var(--press); }
         previous: (p) => { const q = prevHandle(p); return q ? soldTotal(q) : null; } },
     ]);
 
-    /* ---------------------------------------------------------------- end of day */
-    page.panel({
-      span: 12, title: 'End of day', sub: 'When service is over',
-      // Builds the explanation and the button that opens the Close the day sheet.
-      render: (body) => {
-        const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
-        body.append(h('p', { class: 'ob-text' }, 'Close the day when the last order is paid. You get today\'s totals by cash, card and other, a cash-in-the-drawer line, a backup button and a page to print.', help ? h('span', null, ' ', help) : null),
-          h('button', { type: 'button', class: 'btn btn-primary', 'data-k': 'close-day', onClick: () => { if (O.openCloseDay) O.openCloseDay(); } }, 'Close the day'));
-        // The address #/office/money?close=1 opens the sheet straight away.
-        if (O.maybeOpenCloseDay) O.maybeOpenCloseDay();
-        return {};
-      },
-    });
-
     /* ---------------------------------------------------------------- takings */
     page.section('Money collected', 'Sales are the food you sold after discounts. Add tax and tips and you get everything collected. Smokebox only records how an order was paid; it never charges a card.');
 
@@ -29878,6 +30081,20 @@ a.of-nav:active { background: var(--press); }
         paint();
         // update repaints from the live brisket cost; destroy removes the stepper listeners.
         return { update: () => paint(), destroy: () => { cleanups.splice(0).forEach((f) => f()); } };
+      },
+    });
+
+    /* ---------------------------------------------------------------- end of day */
+    page.panel({
+      span: 12, title: 'End of day', sub: 'When service is over',
+      // Builds the explanation and the button that opens the Close the day sheet.
+      render: (body) => {
+        const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
+        body.append(h('p', { class: 'ob-text' }, 'Close the day when the last order is paid. You get today\'s totals by cash, card and other, a cash-in-the-drawer line, a backup button and a page to print.', help ? h('span', null, ' ', help) : null),
+          h('button', { type: 'button', class: 'btn btn-primary', 'data-k': 'close-day', onClick: () => { if (O.openCloseDay) O.openCloseDay(); } }, 'Close the day'));
+        // The address #/office/money?close=1 opens the sheet straight away.
+        if (O.maybeOpenCloseDay) O.maybeOpenCloseDay();
+        return {};
       },
     });
 
@@ -30591,8 +30808,6 @@ a.of-nav:active { background: var(--press); }
   const sub = (text, id) => h('h3', { class: 'od-sub', id }, text);
   // The small round "?" that opens one Guide page, or nothing when the Guide did not load.
   const helpLink = (page, label) => { try { return SB.guide && SB.guide.link ? SB.guide.link(page, label) : null; } catch (e) { return null; } };
-  // A sub-heading with a Guide help link beside it.
-  const subHelp = (text, page, label) => { const hd = sub(text); const hl = helpLink(page, label); if (hl) { hd.appendChild(doc.createTextNode(' ')); hd.appendChild(hl); } return hd; };
   const para = (text, cls) => h('p', { class: cls || 'od-p' }, text);
   // Builders for a quiet hint line and for a button with an optional icon.
   const hintLine = (text) => h('p', { class: 'od-hint' }, text);
@@ -30825,7 +31040,7 @@ a.of-nav:active { background: var(--press); }
         nameField, zoneField, catField,
         h('div', { class: 'od-item-actions' }, archChip, archBtn)),
       h('div', { class: 'od-item-grid' },
-        h('div', { class: 'od-block' }, price.el, h('div', { class: 'od-lab' }, 'How it is cooked'), trackSeg, h('p', { class: 'od-hint' }, 'One tap: done when it is plated, like tea or slaw. Start, then done: the cook taps Start, and Done when it is finished, like brisket or fries.')),
+        h('div', { class: 'od-block' }, price.el, h('div', { class: 'od-lab' }, 'How it is cooked'), trackSeg, h('p', { class: 'od-hint' }, 'One tap: done when it is plated, like a drink or a cold side. Start, then done: the cook taps Start, and Done when it is finished, like a roast or fries.')),
         h('div', { class: 'od-block' }, prep.el, confSeg, learnedEl),
         h('div', { class: 'od-block od-block-bom' }, bom.el)),
       status.el);
@@ -31889,6 +32104,18 @@ a.of-nav:active { background: var(--press); }
     const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn),
       btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: showReport }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: saveReport }));
     repRow.dataset.pilot = 'report';
+    // Saves the sales-by-day file for an accountant: one row per day with sales, tax, tips and how it was paid.
+    async function downloadSalesCsv() {
+      const BPs = SB.office && SB.office.backupPure;
+      if (!BPs) { exStatus.bad('Could not make the sales file. Reload and try again.'); return; }
+      const s = stateNow();
+      const text = BPs.salesCsv(s, s.settings.service && s.settings.service.dayStartHour);
+      const fname = 'smokebox-sales-by-day' + (SB.store.mode && SB.store.mode() === 'demo' ? '-demo' : '') + '-' + todayKey() + '.csv';
+      const days = Math.max(0, text.split('\r\n').length - 3);
+      const res = await saveFile(fname, text, 'text/csv');
+      if (res.how === 'host' || res.how === 'browser') exStatus.ok((res.how === 'host' ? 'Saved ' : 'Download started: ') + fname + (days ? ' (' + days + ' ' + U.plural(days, 'day') + ' of sales).' : ': it has only the column names because no order has been paid yet.'));
+      else reportSave(res, fname, text, 'sales file');
+    }
     const csvBtns = [['tickets', 'Tickets'], ['items', 'Items'], ['orders', 'Orders'], ['events', 'Events'], ['batches', 'Batches']].map(([k, l]) => {
       // Each spreadsheet button downloads its own table.
       const b = btn(l, { icon: 'download', cls: 'btn-sm', onClick: () => downloadCsv(k, l.toLowerCase()) });
@@ -31896,6 +32123,9 @@ a.of-nav:active { background: var(--press); }
       b.dataset.csv = k;
       return b;
     });
+    const salesBtn = btn('Sales by day (for your accountant)', { icon: 'download', cls: 'btn-sm', onClick: downloadSalesCsv });
+    salesBtn.dataset.csv = 'sales';
+    csvBtns.unshift(salesBtn);
     // Says when the last backup was made on this device, so a stale one is easy to spot.
     const BP = SB.office && SB.office.backupPure;
     const lastLine = para('', 'od-p od-lastbackup');
@@ -32012,10 +32242,10 @@ a.of-nav:active { background: var(--press); }
     // Danger zone: two reset buttons, each opening a box that asks for a typed word before it will act.
     pn.body.appendChild(h('h3', { class: 'od-sub od-danger-h', id: undefined }, 'Danger zone: erase data'));
     const resetStatus = statusLine();
-    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I clear live data', checked: true });
-    const resetLiveBtn = btn('Reset live data', { icon: 'trash', cls: 'btn-danger' });
+    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I erase live data', checked: true });
+    const resetLiveBtn = btn('Erase live data', { icon: 'trash', cls: 'btn-danger' });
     resetLiveBtn.dataset.action = 'reset-live';
-    const resetAllBtn = btn('Reset everything', { icon: 'trash', cls: 'btn-danger' });
+    const resetAllBtn = btn('Erase everything', { icon: 'trash', cls: 'btn-danger' });
     resetAllBtn.dataset.action = 'reset-all';
     const dangerBox = h('div', { class: 'od-danger-box', hidden: true, role: 'group', 'aria-label': 'Confirm erasing data' });
     // Shows the confirm box: what will be erased, a field to type the word into, and a button that stays off until it matches.
@@ -32045,14 +32275,14 @@ a.of-nav:active { background: var(--press); }
     resetLiveBtn.addEventListener('click', () => {
       const s = stateNow(), k = keep.getValue();
       askTyped({
-        opener: resetLiveBtn, title: 'Clear live data?', word: 'RESET', label: 'Clear live data',
+        opener: resetLiveBtn, title: 'Erase live data?', word: 'ERASE', label: 'Erase live data',
         lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any practice orders, and sets the clock back to real time.',
           k ? 'Your dishes, ingredient edits, limits, pacing and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
           'There is no undo. Back up first if you might want this data.'],
         // Clears the live data after the word was typed.
         run: () => {
           const rep = SB.store.resetLive({ keepSettings: k, starter: false });
-          if (rep === 'ok') { resetStatus.ok('Live data cleared. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data cleared.', { tone: 'ok' }); }
+          if (rep === 'ok') { resetStatus.ok('Live data erased. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data erased.', { tone: 'ok' }); }
           else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
         },
       });
@@ -32063,7 +32293,7 @@ a.of-nav:active { background: var(--press); }
       askTyped({
         opener: resetAllBtn, title: 'Erase everything on this device?', word: 'ERASE', label: 'Erase everything',
         lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
-          'Your Day or Night, Ember or Paper and text-size choices are kept.', 'There is no undo. Back up first if you might want any of it back.'],
+          'Your display choices (themes and text size) are kept.', 'There is no undo. Back up first if you might want any of it back.'],
         // Erases everything after the word was typed.
         run: () => {
           const rep = SB.store.reset();
@@ -32073,7 +32303,7 @@ a.of-nav:active { background: var(--press); }
       });
     });
     pn.body.append(
-      para('Clearing live data removes tickets, records and batches. Resetting everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
+      para('Erasing live data removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
       h('div', { class: 'od-toggle-row' }, keep),
       h('div', { class: 'od-actions' }, resetLiveBtn, resetAllBtn), dangerBox, resetStatus.el);
 
@@ -32349,7 +32579,9 @@ a.of-nav:active { background: var(--press); }
         if (rows.length) return { ing: top.ing, day: rows[0].date };
       }
       const last = so.days[so.days.length - 1];
-      return last ? { ing: (so.proteins[0] && so.proteins[0].ing) || 'brisket', day: last.date } : null;
+      // No hard-coded fallback food: a kitchen with no tracked protein simply has no default pick.
+      const first = so.proteins[0] && so.proteins[0].ing;
+      return last && first ? { ing: first, day: last.date } : null;
     });
 
     // What a normal day looks like for one food: median cooked and median served over the days with any intake.
@@ -33220,7 +33452,7 @@ a.of-nav:active { background: var(--press); }
     const orders = Array.isArray(s.orders) ? s.orders.length : 0;
     const tickets = Array.isArray(s.tickets) ? s.tickets.length : 0;
     const mode = res.mode === 'demo' ? 'demo' : 'real';
-    const kindText = mode === 'demo' ? 'Practice kitchen (the demo)' : 'Your own kitchen';
+    const kindText = mode === 'demo' ? 'Demo kitchen' : 'Your own kitchen';
     const pin = s.settings && s.settings.office && s.settings.office.pinHash ? 'Set (this device will ask for it)' : 'Not set';
     const rows = [];
     if (isNum(res.savedAt)) rows.push(['Saved', U.fmtDateShort(U.dateKey(res.savedAt)) + ', ' + U.fmtTime(res.savedAt)]);
@@ -33231,9 +33463,42 @@ a.of-nav:active { background: var(--press); }
     rows.push(['Manager PIN', pin]);
     const wrongKitchen = !!storeMode && mode !== storeMode;
     const refusal = wrongKitchen
-      ? (mode === 'demo' ? 'This backup comes from the practice kitchen (the demo), not from your own kitchen, so it cannot be restored here.' : 'This backup comes from a real kitchen, so it cannot be restored into the practice kitchen.')
+      ? (mode === 'demo' ? 'This backup comes from the demo kitchen, not from your own kitchen, so it cannot be restored here.' : 'This backup comes from a real kitchen, so it cannot be restored into the demo kitchen.')
       : '';
     return { rows, wrongKitchen, kindText, refusal };
+  }
+
+
+  // Quotes one value for a CSV cell: wraps it in quotes when it holds a comma, quote or line break.
+  function csvCell(v) {
+    const t = v == null ? '' : String(v);
+    return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  }
+  // Dollars as plain digits with two decimals ("12.40"), with no dollar sign or thousands commas, so a spreadsheet adds them up.
+  const plainMoney = (v) => (isNum(v) ? (Math.round(v * 100) / 100).toFixed(2) : '0.00');
+
+  // The sales-by-day CSV for an accountant, from the saved state: one row per service day with paid orders, then a Total row.
+  // Columns: Date, Orders paid, Sales (after discounts), Discounts given, Tax, Tips, Total collected, then collected by Cash, Card and Other.
+  // Paid orders count on the service day they were paid; voided and open orders are left out.
+  function salesCsv(state, dayStartHour) {
+    const dsh = isNum(dayStartHour) ? dayStartHour : U.DAY_START_HOUR;
+    const days = {};
+    const orders = state && Array.isArray(state.orders) ? state.orders : [];
+    orders.forEach((o) => {
+      if (!o || o.status !== 'paid' || !isNum(o.paidAt) || !o.totals) return;
+      const day = U.serviceDate(o.paidAt, dsh);
+      const d = days[day] || (days[day] = { orders: 0, sales: 0, discounts: 0, tax: 0, tips: 0, total: 0, cash: 0, card: 0, other: 0 });
+      const T = o.totals, tip = isNum(o.tip) ? o.tip : 0;
+      const collected = (isNum(T.total) ? T.total : 0) + tip;
+      d.orders++; d.sales += (T.subtotal || 0) - (T.discount || 0); d.discounts += T.discount || 0; d.tax += T.tax || 0; d.tips += tip; d.total += collected;
+      d[o.method === 'cash' ? 'cash' : o.method === 'card' ? 'card' : 'other'] += collected;
+    });
+    const head = ['Date', 'Orders paid', 'Sales (after discounts)', 'Discounts given', 'Tax', 'Tips', 'Total collected', 'Collected in cash', 'Collected by card', 'Collected other'];
+    const sum = { orders: 0, sales: 0, discounts: 0, tax: 0, tips: 0, total: 0, cash: 0, card: 0, other: 0 };
+    // One CSV line for a day or for the totals.
+    const line = (label, d) => [label, d.orders, plainMoney(d.sales), plainMoney(d.discounts), plainMoney(d.tax), plainMoney(d.tips), plainMoney(d.total), plainMoney(d.cash), plainMoney(d.card), plainMoney(d.other)].map(csvCell).join(',');
+    const rows = Object.keys(days).sort().map((k) => { Object.keys(sum).forEach((f) => { sum[f] += days[k][f]; }); return line(k, days[k]); });
+    return [head.map(csvCell).join(',')].concat(rows, rows.length ? [line('Total', sum)] : []).join('\r\n') + '\r\n';
   }
 
   // True when the typed text is the confirming word (any capitals, spaces around it ignored).
@@ -33241,7 +33506,7 @@ a.of-nav:active { background: var(--press); }
     return String(typed == null ? '' : typed).trim().toLowerCase() === String(word || 'reset').toLowerCase();
   }
 
-  O.backupPure = { backupFreshness, describeBackup, resetWordOk };
+  O.backupPure = { backupFreshness, describeBackup, resetWordOk, salesCsv };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 88-office-backup.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'88-office-backup.js',message:String(e&&e.message||e)});}
@@ -33265,7 +33530,7 @@ a.of-nav:active { background: var(--press); }
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const KIND = {
     temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
-    sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept past best-by', quality_extend_corrected: 'Best-by note corrected',
+    sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
   };
   const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other' };
 
@@ -33476,7 +33741,8 @@ a.of-nav:active { background: var(--press); }
   function storageNotices() {
     const s = SB.store && typeof SB.store.status === 'function' ? SB.store.status() : null;
     if (!s || !SB.ui || typeof SB.ui.toast !== 'function') return;
-    if (s.corrupt) SB.ui.toast('Your saved board could not be read, so Smokebox started with an empty board. A copy of the old data was kept on this device.', { tone: 'warn', ms: 15000 });
+    if (s.corrupt && s.restoredFromCopy) SB.ui.toast('Your saved board could not be read, so Smokebox restored the last good copy from ' + new Date(s.restoredFromCopy).toLocaleString() + '. Orders and history after that time are missing. A copy of the damaged data was kept in this browser.', { tone: 'warn', ms: 20000 });
+    else if (s.corrupt) SB.ui.toast('Your saved board could not be read, so Smokebox started with an empty board. A copy of the old data was kept on this device.', { tone: 'warn', ms: 15000 });
     else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox repaired ' + s.repaired.length + ' saved ' + (s.repaired.length === 1 ? 'detail' : 'details') + ' while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
     if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }

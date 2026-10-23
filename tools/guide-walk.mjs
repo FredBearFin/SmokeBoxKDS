@@ -81,7 +81,7 @@ async function blank(browser) {
   for (const t of ['Sales and money', 'Safety', 'Menu and settings']) check('back office nav: ' + t, await seen(p, t, '#sb-office'));
   await p.click('#sb-office nav >> text=Menu and settings'); await p.waitForTimeout(1400);
   for (const t of ['Data, backup and reset', 'Back up now', 'Restore from a backup', 'Replacing this device', 'Danger zone: erase data']) check('data page: ' + t, await has(p, t, '#sb-office'));
-  for (const t of ['Download backup (JSON)', 'Copy backup', 'Choose a backup file', 'Check pasted backup', 'Reset live data', 'Reset everything']) check('data page: ' + t, await seen(p, t, '#sb-office'));
+  for (const t of ['Download backup (JSON)', 'Copy backup', 'Choose a backup file', 'Check pasted backup', 'Erase live data', 'Erase everything']) check('data page: ' + t, await seen(p, t, '#sb-office'));
   await p.close();
 }
 
@@ -135,6 +135,8 @@ async function cooked(browser) {
   await p.fill('.sheet-root:last-of-type input >> nth=0', 'Pulled pork');
   await p.click('.sheet-root:last-of-type input[type=checkbox] >> nth=0').catch(() => {});
   await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700);
+  // With no dish picked the first save warns once; a second tap keeps the item anyway.
+  if (!(await seen(p, 'Log a first batch', '.sheet-root:last-of-type'))) { await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700); }
   for (const t of ['Log a first batch', 'Done for now']) check('cooked-ahead saved: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
   await tap(p, 'Log a first batch'); await p.waitForTimeout(700);
   for (const t of ['New batch', 'Product', 'Put in hold cabinet']) check('cabinet new batch: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
