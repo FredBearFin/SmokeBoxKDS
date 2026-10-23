@@ -569,3 +569,10 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dp-ca { margin-top: var(--sp-2); }
 
 .hc-who { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0; color: var(--ink2); font-size: var(--fs-2); }
+.dp-ptable { display: grid; gap: var(--sp-2); }
+.dp-prow { display: grid; grid-template-columns: 32px minmax(0, 2fr) 9ch minmax(0, 1.2fr); gap: var(--sp-2); align-items: center; padding-bottom: var(--sp-2); border-bottom: var(--bw-thin) solid var(--line-soft); }
+.dp-prow[data-ok="false"] { background: var(--tint-warn); }
+.dp-prow .dp-prob { grid-column: 2 / -1; margin: 0; }
+.dp-prob:empty { display: none; }
+@media (max-width: 640px) { .dp-prow { grid-template-columns: 32px minmax(0, 1fr) 8ch; } .dp-prow select { grid-column: 2 / -1; } }
+.btn-link { background: none; border: 0; text-decoration: underline; min-height: 44px; padding-inline: 0; }

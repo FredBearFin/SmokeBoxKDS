@@ -249,7 +249,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 2645,
+  "addThreeDishesWallMs": 2571,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -619,7 +619,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 1930,
+  "addThreeDishesWallMs": 2028,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
