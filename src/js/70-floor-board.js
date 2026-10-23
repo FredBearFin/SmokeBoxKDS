@@ -798,10 +798,11 @@
     const on = wall && g.innerWidth >= WALL_MIN_PX;
     const v = on ? 'on' : 'off';
     if (m.root.dataset.wall !== v) { m.root.dataset.wall = v; m.fitKey = null; setTimeout(() => { if (m) { paintDensity(); fitHead(); } }, 0); }
-    // The glance panel is made the first time the wall shows and removed with the board.
+    // The glance panel is made when the wall shows and taken down when it hides (or with the board), so its 5-second
+    // refresh never runs behind a board that is not showing it.
     if (on && !m.glance && SB.office && typeof SB.office.glance === 'function') {
-      try { const gh = SB.office.glance(m.wr.body, { size: 'wall' }); m.glance = gh; m.offs.push(() => gh.destroy()); } catch (e) { console.error('[smokebox] glance failed', e); }
-    }
+      try { const gh = SB.office.glance(m.wr.body, { size: 'wall' }); m.glance = gh; m.offs.push(() => { if (m && m.glance === gh) m.glance = null; gh.destroy(); }); } catch (e) { console.error('[smokebox] glance failed', e); }
+    } else if (!on && m.glance) { const gh = m.glance; m.glance = null; try { gh.destroy(); } catch (e) { /* already gone */ } }
     if (on) updateWall(store().now());
   }
   // Builds a pane: a title and a body, with the parts the updates change handed back.

@@ -1654,7 +1654,8 @@
     closeGuidePage();
     if (view.kind === 'office') {
       if (st.officeOpen) { navigateOffice(view.section); return; }
-      guard().then((ok) => { if (ok) openOffice(view.section); else if (R.view().kind === 'office') R.go(R.home(), { replace: true }); });
+      // After the PIN the route is read again: if it moved back to the floor while the keypad was up, the office stays shut.
+      guard().then((ok) => { const now = R.view(); if (ok) { if (now.kind === 'office' && !st.officeOpen) openOffice(now.section); } else if (now.kind === 'office') R.go(R.home(), { replace: true }); });
     } else {
       const zone = view.kind === 'new' ? 'all' : view.zone;
       try { if (SB.floor && typeof SB.floor.setZone === 'function') SB.floor.setZone(zone); else if (st.ph && st.ph.floor) st.ph.floor.setZone(zone); } catch (e) { console.error('[smokebox] floor.setZone failed', e); }
