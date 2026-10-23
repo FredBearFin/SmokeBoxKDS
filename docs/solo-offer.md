@@ -6,6 +6,8 @@ Scope is **Solo only**. Anything not listed under "What you get" is not part of 
 - One device running Smokebox from one HTML file (`smokebox.html`), no internet needed after install.
 - Kitchen board with batch warnings (strip, tones, spoken calls), hold cabinet, 86 board, order entry, payment **recording**, and the back office pages.
 - Far display mode (Menu, Far display) for a TV or a tablet read from across the kitchen.
+- A first run that starts **empty**: no batches, no tickets, no sample history. Nothing pretend is mixed in with the kitchen's real data.
+- A **Busy-night demo** for showing the app to staff: the button is on the empty board (or Menu, Demo and clock). It loads a stocked pit and pretend tickets, labeled Demo; Reset live data clears it.
 - A backup and restore of your data, a discard log, and a pilot report.
 
 ## What it is not (say this in every sales conversation)
@@ -27,8 +29,8 @@ The pilot fills in the real column: device model, OS and browser version, speake
 ## Setup (about 30 minutes on site)
 1. Copy `smokebox.html` to the device and open it; install it as an app (Share, Add to Home Screen, or Install app).
 2. Menu, **Set up this tablet** (six steps: sound, screen on, protected data, installed, placement, products).
-3. Enter real products, costs and hold limits; confirm quality versus safety limits with the owner.
-4. Set service hours; turn demo clock and demo orders off; reset live data.
+3. Enter real products, costs and hold limits. The pit and hold cabinet are empty until the cook logs a real batch, so items that need cooked meat show as 86 until then; confirm quality versus safety limits with the owner.
+4. Set service hours. The app starts empty, so there is nothing to clear; if you ran the Busy-night demo to show staff, open Demo and clock, stop it, then Back office, Data, **Reset live data** (settings are kept). The report warns if demo orders or the demo clock were left on.
 5. Take a first backup.
 
 ## Where the data lives
