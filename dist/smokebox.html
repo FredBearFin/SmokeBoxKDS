@@ -2060,6 +2060,9 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl[data-counter="on"] .fl-slip[data-level="breach"], .fl[data-counter="on"] .fl-slip[data-tier] { outline: none; }
 .fl[data-counter="on"] .slip[data-level] .slip-head, .fl[data-counter="on"] .slip[data-level] .slip-body, .fl[data-counter="on"] .slip[data-level] .slip-tear { animation: none; box-shadow: none; }
 .fl[data-counter="on"] .slip-timer { color: var(--slip-ink); }
+/* The last-checked stamp sits at the right end of the all-day strip, quiet and small. */
+.fl-checked { flex: none; margin-left: auto; padding: 0 var(--sp-3); font-size: var(--fs-1); color: var(--ink2); white-space: nowrap; }
+.mn-test { display: grid; gap: var(--sp-2); }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -2697,6 +2700,20 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* Pilot visit checklist (pv-): numbered steps with a tick box each. */
 .pv-list { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
 .pv-step { display: grid; gap: var(--sp-1); }
+/* Greasy hands: the buttons on a cabinet card are at least 52 px tall. */
+.hc-actions .btn { min-height: max(var(--tap), 52px); }
+.hc-actions .hc-more { min-width: max(var(--tap), 52px); }
+/* Readings sheet: one block per kind of reading, big buttons, a short list of recent entries. */
+.rd { display: grid; gap: var(--sp-4); }
+.rd-sec { display: grid; gap: var(--sp-3); }
+.rd-sec .btn-lg { min-height: 52px; }
+.rd-row { display: grid; gap: var(--sp-2); padding: var(--sp-2) 0; border-top: var(--bw) solid var(--line-soft); }
+.rd-line { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; }
+.rd-what { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.rd-fix { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.rd-fix .input { flex: 1 1 180px; }
+.rd-fix[hidden] { display: none; }
+[data-tone="bad"].fs-sub { color: var(--crimson); }
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -4530,7 +4547,7 @@ a.of-nav:active { background: var(--press); }
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -10576,7 +10593,7 @@ a.of-nav:active { background: var(--press); }
   // Letters and digits for a recovery code, leaving out I, O, 0 and 1 so a handwritten card is not misread. 32 characters, 10 in a code: 50 bits.
   const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const START_OVER_KEYS = ['smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
-    'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.setup.serveSkipped', 'smokebox.v1.setup.serveAnswer', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
+    'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.setup.serveSkipped', 'smokebox.v1.setup.serveAnswer', 'smokebox.v1.readings', 'smokebox.v1.lastproduct', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
   // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
@@ -19918,11 +19935,36 @@ a.of-nav:active { background: var(--press); }
   function requestWake() {
     try {
       if (!g.navigator || !g.navigator.wakeLock) { wakeState = 'unsupported'; return; }
-      g.navigator.wakeLock.request('screen').then((sn) => { wakeSentinel = sn; wakeState = 'on'; sn.addEventListener('release', () => { wakeState = 'released'; }); }, () => { wakeState = 'refused'; });
+      g.navigator.wakeLock.request('screen').then((sn) => {
+        wakeSentinel = sn; wakeState = 'on';
+        // The system may take the lock back (low battery, another app); when the board is still showing it asks again.
+        sn.addEventListener('release', () => { wakeState = 'released'; wakeSentinel = null; if (m && doc.visibilityState === 'visible') setTimeout(requestWake, 800); });
+      }, () => { wakeState = 'refused'; });
     } catch (e) { wakeState = 'refused'; }
   }
   // Reports the screen wake lock state: unknown, on, released, refused or unsupported.
   F.wakeLock = () => wakeState;
+  // A calm sentence when the screen may go to sleep (the browser has no wake lock or refused it); empty when all is well.
+  function awakeNote() {
+    if (wakeState !== 'unsupported' && wakeState !== 'refused') return '';
+    return 'This screen may go to sleep, and warnings stop while it sleeps. Keep the tablet plugged in with its screen set to stay on.';
+  }
+  // A sentence shown for a while after the board comes back from the background, since warnings were silent in between.
+  function awayNote() {
+    const a = m && m.away;
+    if (!a || Date.now() - a.at > 10 * 60e3) return '';
+    return 'The board was in the background for ' + (a.min < 1 ? 'a moment' : a.min + (a.min === 1 ? ' minute' : ' minutes')) + '. Warnings are silent while it is hidden.';
+  }
+  // Plays a test chime and a spoken line so a cook can hear that this tablet makes sound, and says what happened.
+  F.testSound = function () {
+    if (!sound) F.setSound(true);
+    hookAudioUnlock();
+    const a = resumeAudio();
+    playHere(() => { chime(); speak('Sound is on. This is a test.'); });
+    return F.audioState();
+  };
+  // Whether this tablet can make sound right now: running, suspended (needs a tap), unsupported or off.
+  F.audioState = () => (!sound ? 'off' : !(g.AudioContext || g.webkitAudioContext) ? 'unsupported' : audio && audio.state === 'running' ? 'running' : 'needs-tap');
 
   // Mounting: the board is built once into the element the shell provides.
 
@@ -19965,9 +20007,18 @@ a.of-nav:active { background: var(--press); }
     m.offs.push(() => doc.removeEventListener('keydown', onKey));
     // Keep the screen awake while the board shows, and ask again when the page returns to the front.
     requestWake();
-    const onVis = () => { if (doc.visibilityState === 'visible') requestWake(); };
+    // The first tap or key press asks again if the browser had refused (some only allow it after a gesture).
+    const onGesture = () => { if (wakeState === 'refused' || wakeState === 'released' || wakeState === 'unknown') requestWake(); };
+    doc.addEventListener('pointerdown', onGesture, true);
+    // When the page returns to the front it asks for the wake lock again and remembers how long it was away; hiding notes the time.
+    const onVis = () => {
+      if (doc.visibilityState === 'visible') {
+        requestWake();
+        if (m && m.hiddenAt) { const min = Math.round((Date.now() - m.hiddenAt) / 60e3); if (min >= 1) m.away = { at: Date.now(), min }; m.hiddenAt = null; }
+      } else if (m) m.hiddenAt = Date.now();
+    };
     doc.addEventListener('visibilitychange', onVis);
-    m.offs.push(() => { doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
+    m.offs.push(() => { doc.removeEventListener('pointerdown', onGesture, true); doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
     if (sound) hookAudioUnlock();
     m.offs.push(joinLeadership());
     // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
@@ -20102,7 +20153,10 @@ a.of-nav:active { background: var(--press); }
     const dockClear = h('button', { type: 'button', class: 'btn fl-dock-clear', hidden: true, onClick: () => F.highlight(null) }, ico('x', 18), h('span', null, 'Clear highlight'));
     const dockList = h('div', { class: 'fl-dock-list', id: 'fl-dock-list', role: 'group', 'aria-label': 'Items still to make, tap one to highlight it on the board' });
     const dockEmpty = h('span', { class: 'fl-dock-empty' }, 'Nothing waiting.');
-    const dock = h('footer', { class: 'fl-dock' }, dockToggle, dockClear, dockList, dockEmpty);
+    // A quiet stamp of the last time the board checked its warnings, so a frozen or sleeping screen shows an old time.
+    const checked = h('span', { class: 'fl-checked num', title: 'The last time this board checked its warnings' });
+    const dock = h('footer', { class: 'fl-dock' }, dockToggle, dockClear, dockList, dockEmpty, checked);
+    m.checked = checked;
     // While a pointer is over the strip its chips stay put, see renderDock.
     dock.addEventListener('pointerenter', () => { m.dockHover = true; });
     dock.addEventListener('pointerleave', () => { m.dockHover = false; });
@@ -21059,6 +21113,7 @@ a.of-nav:active { background: var(--press); }
   // Rewrites the strip from the deadline feed: the top three rows, or hidden when the feed is empty.
   function updateStrip(now) {
     if (!m || !m.strip || !SB.deadlines) return;
+    if (m.checked) { const t = U.fmtTime(Date.now()); if (m.checkedT !== t) { m.checkedT = t; m.checked.textContent = 'Checked ' + t; } }
     const all = SB.deadlines.build(store().getState(), now);
     m.feed = all;
     // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
@@ -21093,10 +21148,11 @@ a.of-nav:active { background: var(--press); }
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
-    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) : 'Sound is off on this tablet: warnings will not be heard. Tap to turn it on.';
+    const health = awayNote() || awakeNote();
+    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
-    const showNote = !!note && (!sound || top.length > 0) && !m.dis.has('pause:' + note) && (needSound ? m.dis.has('snd') : true);
+    const showNote = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note) && (note === health || (needSound ? m.dis.has('snd') : true));
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
@@ -21249,6 +21305,8 @@ a.of-nav:active { background: var(--press); }
     SB.ui.menu(anchor, [
       // Logging a check goes through run(), so it can be undone like any action.
       { label: 'Mark surfaces sanitized', icon: 'check-circle', onClick: () => { const go = (who) => run('sanitizeDone', who ? { who } : {}); if (SB.who && SB.who.ask) SB.who.ask(anchor, 'Mark sanitized', go); else go(''); } },
+      // Readings opens the sheet for fridge, thermometer and sanitizer strip numbers.
+      { label: 'Readings: fridge, thermometer, strip', icon: 'thermometer', onClick: () => openSheet('readings') },
       { label: 'Open the hold cabinet', icon: 'thermometer', onClick: () => showCabinet(true) },
     ].filter((it) => !(roleNow() === 'front' && /cabinet/.test(it.label))), { label: 'Sanitize timer' });
   }
@@ -21272,6 +21330,7 @@ a.of-nav:active { background: var(--press); }
       { label: '86 board' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
       { hide: kit, label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
       // The sanitize entry opens its own small menu on the same anchor.
+      { hide: !cookOn(), label: 'Readings', icon: 'thermometer', onClick: () => openSheet('readings') },
       { hide: !cookOn(), label: 'Sanitize timer' + (m.sanText.textContent ? ': ' + m.sanText.textContent : ''), icon: 'shield-check', onClick: () => sanitiseMenu(anchor) },
       { separator: true },
       // Settings, help and the office sit behind the Menu sheet.
@@ -23286,7 +23345,7 @@ a.of-nav:active { background: var(--press); }
           h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
             h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, dtSince, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept))),
         coldLine, costLine, msg, lock, cool, actions, editorSlot);
-      rec.bMore = bMore; rec.bOut = bOut; rec.bBack = bBack; rec.coldLine = coldLine; rec.dtSince = dtSince;
+      rec.bMore = bMore; rec.bPull = bPull; rec.bOut = bOut; rec.bBack = bBack; rec.coldLine = coldLine; rec.dtSince = dtSince;
       rec.acts = [bKeep, bOut, bBack, bReheat, bLog, bUnkeep, bSnooze, bUnsnooze, bPull, bCool, bDiscard];
       Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept, bKeep, bUnkeep, bSnooze, bUnsnooze, unsnoozeT, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
       // The "..." button lists the secondary actions that are available right now; choosing one presses that button.
@@ -23484,6 +23543,8 @@ a.of-nav:active { background: var(--press); }
       // buttons
       const showPull = isPullSource(b);
       setHidden(rec.bPull, !showPull);
+      // Hot and cold items from the cabinet both keep Pull visible; it is only hidden behind "..." when the batch has nothing to pull.
+      rec.bPull.dataset.keep = 'on';
       if (showPull) { const pg = ingOf(b.ing); text(rec.pullT, 'Pull ' + qtyText(pg, Math.min(b.remainingG, pg && U.isNum(pg.pullG) ? pg.pullG : 1000))); }
       cls(rec.bLog, 'btn-primary', gt.action === 'CHECK_TEMP');
       setHidden(rec.bReheat, gt.action !== 'REHEAT_IMMEDIATE');
@@ -23501,7 +23562,9 @@ a.of-nav:active { background: var(--press); }
       const main = [rec.bKeep, rec.bReheat, rec.bOut, rec.bBack, rec.bLog].find((a) => !a.hidden) || rec.bLog;
       rec.primary = main;
       let others = 0;
-      rec.acts.forEach((a) => { const sec = a !== main; if (a.classList.contains('hc-sec') !== sec) a.classList.toggle('hc-sec', sec); if (sec && !a.hidden) others++; });
+      // Pull is the action done most often, so it stays one tap away beside the main button when this batch is the pull source.
+      const keepPull = !rec.bPull.hidden && main !== rec.bPull && rec.bPull.dataset.keep === 'on';
+      rec.acts.forEach((a) => { const sec = a !== main && !(keepPull && a === rec.bPull); if (a.classList.contains('hc-sec') !== sec) a.classList.toggle('hc-sec', sec); if (sec && !a.hidden) others++; });
       cls(main, 'btn-primary', main !== rec.bLog || rec.bLog.classList.contains('btn-primary'));
       setHidden(rec.bMore, others === 0);
     }
@@ -23880,13 +23943,17 @@ a.of-nav:active { background: var(--press); }
   // The numbers used for the last batch of one product, or null when there is none yet.
   function lastBatchOf(ingId) { const m = U.storage.get(KEY_LASTBATCH, null); const x = m && typeof m === 'object' ? m[ingId] : null; return x && U.isNum(x.rawKg) && x.rawKg > 0 ? x : null; }
   // Remembers the numbers used for a product's batch so "same as last batch" can start from them.
-  function rememberBatch(ingId, v) { const m = U.storage.get(KEY_LASTBATCH, null); const all = m && typeof m === 'object' ? m : {}; all[ingId] = v; U.storage.set(KEY_LASTBATCH, all); }
+  // The product of the last batch made, so the form opens on it: the same product again is the usual next batch.
+  const KEY_LASTPROD = 'smokebox.v1.lastproduct';
+  function rememberBatch(ingId, v) {
+    U.storage.set(KEY_LASTPROD, ingId); const m = U.storage.get(KEY_LASTBATCH, null); const all = m && typeof m === 'object' ? m : {}; all[ingId] = v; U.storage.set(KEY_LASTBATCH, all); }
   function buildBatchForm(onAdded, opts) {
     const F = { ing: null, rawKg: 8, endC: 85, holdH: 2, weighed: false, cookedKg: 1, tempF: 150, wTouched: false, tTouched: false };
     // Products that can go in the cabinet: the ones that need temperature control.
     const list = () => st().ingredients.filter((i) => i.tcs && !i.archived);
     const first = list()[0];
-    F.ing = opts && opts.ing && ingOf(opts.ing) && ingOf(opts.ing).tcs ? opts.ing : first ? first.id : null;
+    const lastProd = U.storage.get(KEY_LASTPROD, null);
+    F.ing = opts && opts.ing && ingOf(opts.ing) && ingOf(opts.ing).tcs ? opts.ing : lastProd && list().some((i) => i.id === lastProd) ? lastProd : first ? first.id : null;
     // Gives a stepper and its number box the same spoken label.
     const relabel = (stepper, label) => { attr(stepper, 'aria-label', label); attr(stepper.input, 'aria-label', label); };
     // A labelled field; the visible label is hidden from screen
@@ -24947,8 +25014,8 @@ a.of-nav:active { background: var(--press); }
   // Settings (the floor menu, SPEC 14.4).
 
   // One labelled settings block: a heading, a short help line (left out when empty) and the control.
-  function settingBlock(title, help, node, node2, node3) {
-    return h('section', { class: 'fs-section mn-block' }, h('h3', { class: 'fs-h' }, title), help ? h('p', { class: 'fs-sub' }, help) : null, node, node2 || null, node3 || null);
+  function settingBlock(title, help, node, node2, node3, node4) {
+    return h('section', { class: 'fs-section mn-block' }, h('h3', { class: 'fs-h' }, title), help ? h('p', { class: 'fs-sub' }, help) : null, node, node2 || null, node3 || null, node4 || null);
   }
 
   // Builds the Settings sheet (look, text size, sound, station, clock speed, links) and returns it.
@@ -24982,6 +25049,13 @@ a.of-nav:active { background: var(--press); }
     const levelSeg = SB.ui.segmented({ label: 'How much the voice talks', class: 'mn-vlevel', value: levelOk ? SB.floor.voiceLevel() : 'normal', options: [{ id: 'light', label: 'Light' }, { id: 'normal', label: 'Normal' }, { id: 'full', label: 'Full' }], onChange: (id) => { if (levelOk) SB.floor.setVoiceLevel(id); } });
     const speechOk = floorOk && typeof SB.floor.setSpeech === 'function';
     const speechTog = SB.ui.toggle({ label: 'Speak batch warnings aloud', checked: speechOk ? !!SB.floor.speech() : false, disabled: !speechOk, onChange: (on) => { if (speechOk) SB.floor.setSpeech(on); } });
+    // Test the sound: plays a chime and a spoken line, then says in words whether this tablet let it play.
+    const testSay = h('p', { class: 'fs-sub mn-test-say', role: 'status' });
+    const testBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'test-sound' }, disabled: !floorOk, onClick: () => {
+      const r = SB.floor.testSound ? SB.floor.testSound() : 'unsupported';
+      text(testSay, r === 'running' ? 'You should have heard a chime and a voice. If not, turn the tablet volume up.' : r === 'unsupported' ? 'This browser cannot play sound. Warnings will only show on screen.' : 'The browser has not let the board play sound yet. Tap the button once more.');
+    } }, ico('volume', 20), h('span', null, 'Test the sound'));
+    const testRow = h('div', { class: 'mn-test' }, testBtn, testSay);
     const soundHelp = floorOk ? 'On by default, because a missed warning can cost a whole batch. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
 
     // Far display: for a screen read from across the kitchen. Per tablet; needs the board module.
@@ -25015,7 +25089,7 @@ a.of-nav:active { background: var(--press); }
     // The Guide opens only when the guide page is part of this copy of Smokebox.
     const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Get this tablet ready', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Get this tablet ready', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
@@ -25024,7 +25098,7 @@ a.of-nav:active { background: var(--press); }
       settingBlock('Text size', 'Large makes everything 20 percent bigger.', textSeg),
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap Start on a dish.', hintsTog),
-      settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
+      settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn), testRow),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
       settingBlock('Voice call-outs', 'A chef calls the line out loud. Light: "Fire the pizza now! Ticket 12!" and "Ticket 12 is up! Ring it out!". Normal: adds "Order up!" for new tickets and one reminder if a dish is not started or a ticket not rung out. Full: keeps reminding until you start the dish or ring out the ticket. At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Not tried on a real tablet yet.', coTog, levelSeg),
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),
@@ -25939,6 +26013,153 @@ a.of-nav:active { background: var(--press); }
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 74-floor-tour.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'74-floor-tour.js',message:String(e&&e.message||e)});}
+
+/* ===== 75-floor-readings.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The Readings sheet. A cook writes down what a thermometer or test strip says: the temperature of a
+ *    fridge, freezer or display case, a check of the food thermometer in ice or boiling water, and a sanitizer strip reading.
+ *    Few fields, plain words, the last names used are remembered, and a wrong entry is fixed with a note (nothing is erased).
+ * PARTS: remembered names, one form per kind of reading, the list of recent entries, the fix box.
+ * USES: 00-util.js, 05-icons.js, 20-engine.js (logEquipmentTemp, logThermometerCheck, sanitizeDone, correctSafety), 60-shell.js
+ *    (sheets, toasts), 72-floor-sheets.js (sheet registry, SB.who). USED BY: the board's sanitize menu, quick menu and Settings sheet.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util;
+  const doc = g.document;
+  if (!doc || !SB.sheets) return;
+  const h = U.h;
+  // Builds an icon element, or an empty span when icons are missing.
+  const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 20 }); } catch (e) { return doc.createElement('span'); } };
+  const KEY = 'smokebox.v1.readings';
+  // Sends one action to the engine as a person's tap.
+  const run = (type, payload) => SB.store.dispatchEx(type, payload, { source: 'ui' });
+  // What was used last time: the names of fridges, sanitizer products and places, the last unit and the last strip number.
+  function load() {
+    const r = U.storage.get(KEY, null);
+    const o = r && typeof r === 'object' ? r : {};
+    // Keeps only real names, at most five of them.
+    const list = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x).slice(0, 5) : []);
+    return { labels: list(o.labels), products: list(o.products), places: list(o.places), unit: typeof o.unit === 'string' ? o.unit : 'cooler', ppm: U.isNum(o.ppm) ? o.ppm : 200 };
+  }
+  // Saves the remembered names back to the browser.
+  function save(rec) { U.storage.set(KEY, rec); }
+  // Puts a name first in its list (no repeats, at most five).
+  function remember(rec, key, name) {
+    const n = (name || '').trim();
+    if (!n) return;
+    rec[key] = [n].concat(rec[key].filter((x) => x.toLowerCase() !== n.toLowerCase())).slice(0, 5);
+  }
+  const UNITS = [{ id: 'cooler', label: 'Cooler', f: 38 }, { id: 'freezer', label: 'Freezer', f: 0 }, { id: 'display', label: 'Display case', f: 38 }, { id: 'other', label: 'Other', f: 38 }];
+  const METHODS = [{ id: 'ice', label: 'Ice water', f: 32 }, { id: 'boiling', label: 'Boiling water', f: 212 }, { id: 'other', label: 'Other', f: 100 }];
+  const KIND_WORD = { equip_temp: 'Fridge or freezer', thermometer_checked: 'Thermometer check', sanitize_done: 'Sanitizer' };
+
+  // Opens the Readings sheet.
+  // Opens the Readings sheet and builds its three forms.
+  function openReadings() {
+    const rec = load();
+    const sheet = SB.ui.sheet({ title: 'Readings', side: 'right', width: 'min(640px, 96vw)', name: 'readings' });
+    const status = h('p', { class: 'fs-sub', role: 'status' });
+    const recent = h('div', { class: 'rd-recent' });
+    // Runs then(who) with the remembered initials (asked once per tablet), then says the result.
+    const withWho = (verb, then) => { if (SB.who && SB.who.ask) SB.who.ask(null, verb, then); else then(''); };
+    // Tells the cook what happened, in words, and refreshes the recent list.
+    const done = (res, okText) => {
+      if (res.report !== 'ok') { status.textContent = SB.engine && SB.engine.describe ? (SB.engine.describe(res.report, res.info, SB.store.getState().settings) || 'That was not saved.') : 'That was not saved.'; status.dataset.tone = 'bad'; return; }
+      status.textContent = okText; status.dataset.tone = 'ok'; paintRecent();
+    };
+    // A text box with the last names as one-tap chips under it.
+    function nameField(label, key, placeholder) {
+      const input = h('input', { class: 'input', type: 'text', maxlength: '30', autocomplete: 'off', placeholder, 'aria-label': label });
+      const chips = h('div', { class: 'ord-chips', role: 'group', 'aria-label': label + ', recent' });
+      // Draws the remembered names as one-tap chips.
+      const paint = () => {
+        U.clear(chips);
+        // Fills the box with the name that was tapped.
+        rec[key].forEach((n) => chips.appendChild(h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { input.value = n; } }, n)));
+        chips.hidden = rec[key].length === 0;
+      };
+      paint();
+      return { el: h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, label), input, chips), input, paint };
+    }
+    // A temperature box in the units this tablet shows.
+    const tempStep = (value, min, max, label) => SB.ui.stepper({ value: U.tempShown(value), min: U.tempShown(min), max: U.tempShown(max), step: 1, bigStep: 5, unit: U.unitLabel('temp'), label });
+
+    // 1. Fridge, freezer or display case
+    let unit = UNITS.some((u) => u.id === rec.unit) ? rec.unit : 'cooler';
+    const eqTemp = tempStep((UNITS.find((u) => u.id === unit) || UNITS[0]).f, -40, 200, 'Temperature of the fridge, freezer or case');
+    const eqName = nameField('Name (optional)', 'labels', 'Walk-in, line cooler');
+    const unitSeg = SB.ui.segmented({ label: 'Which one', class: 'rd-unit', value: unit, options: UNITS.map((u) => ({ id: u.id, label: u.label })),
+      // Picking another kind moves the number to a usual starting point for it.
+      onChange: (id) => { unit = id; eqTemp.setValue(U.tempShown((UNITS.find((u) => u.id === id) || UNITS[0]).f), { silent: true }); } });
+    const eqBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-equip' }, onClick: () => withWho('Log reading', (who) => {
+      const label = eqName.input.value.trim();
+      const res = run('logEquipmentTemp', Object.assign({ unit, f: U.tempStored(eqTemp.getValue()) }, label ? { label } : {}, who ? { who } : {}));
+      if (res.report === 'ok') { rec.unit = unit; remember(rec, 'labels', label); save(rec); eqName.paint(); }
+      done(res, 'Logged ' + (label || (UNITS.find((u) => u.id === unit) || {}).label) + ' at ' + U.tempText(U.tempStored(eqTemp.getValue())) + '.');
+    }) }, ico('thermometer', 22), h('span', null, 'Log reading'));
+    const secEq = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Fridge, freezer or display case' }, h('h3', { class: 'fs-h' }, 'Fridge, freezer or display case'), unitSeg, eqName.el, h('div', { class: 'hc-fld' }, eqTemp), eqBtn);
+
+    // 2. Food thermometer check
+    let method = 'ice';
+    const thTemp = tempStep(32, 0, 300, 'What the food thermometer says');
+    const methodSeg = SB.ui.segmented({ label: 'How you checked it', class: 'rd-method', value: method, options: METHODS.map((m) => ({ id: m.id, label: m.label })),
+      // Ice water should read about freezing and boiling water about boiling, so the number starts there.
+      onChange: (id) => { method = id; thTemp.setValue(U.tempShown((METHODS.find((m) => m.id === id) || METHODS[0]).f), { silent: true }); } });
+    const thBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-thermo' }, onClick: () => withWho('Log check', (who) => {
+      const f = U.tempStored(thTemp.getValue());
+      const res = run('logThermometerCheck', Object.assign({ f, method }, who ? { who } : {}));
+      done(res, 'Thermometer check logged: it read ' + U.tempText(f) + ' in ' + (method === 'ice' ? 'ice water' : method === 'boiling' ? 'boiling water' : 'the test') + '.');
+    }) }, ico('check-circle', 22), h('span', null, 'Log check'));
+    const secTh = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Food thermometer check' }, h('h3', { class: 'fs-h' }, 'Food thermometer check'), methodSeg, h('div', { class: 'hc-fld' }, thTemp), thBtn);
+
+    // 3. Sanitizer strip
+    const ppmStep = SB.ui.stepper({ value: rec.ppm, min: 0, max: 5000, step: 25, bigStep: 100, unit: 'ppm', label: 'Sanitizer strip reading in parts per million' });
+    const prodF = nameField('Sanitizer (optional)', 'products', 'Quat, chlorine');
+    const whereF = nameField('Where (optional)', 'places', 'Prep sink, bucket');
+    // Logs the strip reading and marks surfaces as sanitized.
+    const sanBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-strip' }, onClick: () => withWho('Log strip reading', (who) => {
+      const product = prodF.input.value.trim(), where = whereF.input.value.trim(), ppm = ppmStep.getValue();
+      const res = run('sanitizeDone', Object.assign({ ppm }, product ? { product } : {}, where ? { where } : {}, who ? { who } : {}));
+      if (res.report === 'ok') { rec.ppm = ppm; remember(rec, 'products', product); remember(rec, 'places', where); save(rec); prodF.paint(); whereF.paint(); }
+      done(res, 'Strip reading logged: ' + ppm + ' ppm. Surfaces are marked sanitized.');
+    }) }, ico('shield-check', 22), h('span', null, 'Log strip reading'));
+    const secSan = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Sanitizer strip' }, h('h3', { class: 'fs-h' }, 'Sanitizer strip'),
+      h('p', { class: 'fs-sub' }, 'Saving this also marks surfaces as sanitized.'), h('div', { class: 'hc-fld' }, ppmStep), prodF.el, whereF.el, sanBtn);
+
+    // The last few readings with who wrote them. Fix adds a note next to the entry; nothing is erased.
+    function paintRecent() {
+      U.clear(recent);
+      const rows = (SB.engine.safetyLog ? SB.engine.safetyLog(SB.store.getState()) : []).filter((r) => KIND_WORD[r.event.type]).slice(-6).reverse();
+      if (!rows.length) { recent.appendChild(h('p', { class: 'fs-sub' }, 'No readings yet.')); return; }
+      rows.forEach((r) => {
+        const e = r.event;
+        const what = e.type === 'equip_temp' ? (e.label || (UNITS.find((u) => u.id === e.unit) || {}).label || 'Fridge') + ': ' + U.tempText(e.f)
+          : e.type === 'thermometer_checked' ? 'Thermometer check: ' + U.tempText(e.f) : 'Sanitizer strip' + (U.isNum(e.ppm) ? ': ' + e.ppm + ' ppm' : '') + (e.product ? ', ' + e.product : '') + (e.where ? ', ' + e.where : '');
+        const fixed = r.corrections.length ? ' (fixed: ' + r.corrections[r.corrections.length - 1].note + ')' : '';
+        const fixBox = h('div', { class: 'rd-fix', hidden: true });
+        const note = h('input', { class: 'input', type: 'text', maxlength: '120', 'aria-label': 'What was wrong', placeholder: 'What was wrong' });
+        // Shows or hides the box where a fix is typed.
+        const fixBtn = h('button', { type: 'button', class: 'btn btn-sm btn-ghost', onClick: () => { fixBox.hidden = !fixBox.hidden; if (!fixBox.hidden) note.focus(); } }, 'Fix');
+        // Saves the fix as a note next to the entry.
+        const saveFix = h('button', { type: 'button', class: 'btn btn-sm btn-primary', onClick: () => withWho('Save fix', (who) => {
+          const res = run('correctSafety', { eventId: e.id, note: note.value, who: who || (SB.who && SB.who.get()) || 'NA' });
+          done(res, 'Fix saved next to the entry.');
+        }) }, 'Save fix');
+        fixBox.append(note, saveFix);
+        recent.appendChild(h('div', { class: 'rd-row' }, h('div', { class: 'rd-line' }, h('span', { class: 'num' }, U.fmtTime(e.t)), h('span', { class: 'rd-what' }, what + (e.who ? ', ' + e.who : '') + fixed), fixBtn), fixBox));
+      });
+    }
+    paintRecent();
+    sheet.body.append(h('div', { class: 'rd' }, h('p', { class: 'fs-sub' }, 'Write down what the thermometer or strip says. Each entry goes in the safety record with your initials.'), status, secEq, secTh, secSan, h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Recent readings'), recent)));
+    return sheet;
+  }
+  SB.sheets.register('readings', openReadings);
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 75-floor-readings.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'75-floor-readings.js',message:String(e&&e.message||e)});}
 
 /* ===== 76-floor-discards.js ===== */
 ;try{
