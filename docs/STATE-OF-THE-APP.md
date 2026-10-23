@@ -58,8 +58,8 @@ Run on this machine today, on the main track, headless Chromium, simulated data:
 | Guide test (`node --test test/guide.test.mjs`) | 15 of 15 |
 | Guide walk (`tools/guide-walk.mjs`) | 273 of 273 on the last run |
 | Guide accessibility (`tools/guide-a11y.mjs`) | 34 of 34 |
-| Browser journeys (`node tools/qa.mjs`) | see the end of this page (result added when the run finished) |
-| Other browser suites | 47 `test/*.e2e.mjs` files plus `test/e2e/` journeys. `docs/audit/e2e-triage.md` is from round 1 and is out of date. |
+| Browser journeys (`node tools/qa.mjs`, `test/e2e/`) | 45 of 45 journeys pass, 1095 checks, about 17 minutes |
+| Other browser suites | 47 `test/*.e2e.mjs` files exist; I did not run them today (individual agents ran the ones for their own changes). `docs/audit/e2e-triage.md` is from round 1 and is out of date. |
 
 Everything above runs in a desktop browser. "Passes" never means "works on a tablet".
 
