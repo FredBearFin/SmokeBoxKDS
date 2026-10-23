@@ -795,3 +795,16 @@ html[data-follow="on"] .hc-actions, html[data-follow="on"] .hc-editor-slot, html
 .fl-fstale[hidden] { display: none; }
 .fl[data-stale="on"] .fl-main { filter: grayscale(0.6); opacity: 0.8; }
 .follow-fail { max-width: 520px; margin: 18vh auto 0; padding: var(--sp-5); display: grid; gap: var(--sp-4); }
+/* Hub mode (this tablet writes through the hub): one small, calm line under the header. It never covers or blocks the board. */
+.fl-hub { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: 2px var(--sp-4); min-height: 28px; background: var(--paper); border-bottom: var(--bw) solid var(--line-soft); }
+.fl-hchip { display: inline-flex; align-items: center; gap: 8px; min-height: 24px; padding: 0 10px; border-radius: 999px; border: 2px solid var(--line); background: var(--bg); font: var(--w-bold) var(--fs-1) / 1.1 var(--font-body); }
+.fl-hdot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--ink3); }
+.fl-hchip[data-tone="ok"] { border-color: var(--sage); }
+.fl-hchip[data-tone="ok"] .fl-hdot { background: var(--sage); }
+.fl-hchip[data-tone="wait"] { border-color: var(--amber); }
+.fl-hchip[data-tone="wait"] .fl-hdot { background: var(--amber); }
+.fl-hsub, .fl-hnote { font: var(--w-semi) var(--fs-1) / 1.2 var(--font-body); color: var(--ink2); }
+.fl-hnote[hidden] { display: none; }
+.slip-pending { padding: 2px var(--sp-3); font: var(--w-bold) var(--fs-1) / 1.2 var(--font-body); color: var(--amber-ink); background: var(--tint-warn, var(--paper)); border-bottom: 1px dashed var(--amber); }
+.fl-slip[data-pending="on"] { box-shadow: inset 4px 0 0 var(--amber); }
+html[data-hub="on"] .fl-demo-chip, html[data-hub="on"] .fl-start-demo, html[data-hub="on"] .fl-tool[data-tool="demo"] { display: none !important; }

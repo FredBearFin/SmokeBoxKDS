@@ -86,6 +86,8 @@
       stage = 'store';
       // A follower screen (?follow=<hub address>) shows the hub's kitchen and never touches this device's own saved one.
       if (SB.followMode && SB.followMode().on) { bootFollower(); return; }
+      // A tablet that writes through the hub (?hub) opens the board once the hub has answered, or keeps trying while it is unreachable.
+      if (SB.hubMode && SB.hubMode().on) { bootFollower('hub'); return; }
       if (SB.store && typeof SB.store.init === 'function') SB.store.init({ blank: true, mode: SB.util.mode() }); // a brand-new install starts empty; saved data is never changed
       // The demo (its own saved data) opens with its sample tickets the first time.
       // A brand-new empty kitchen gets neutral station and menu-section names (saved with it); old kitchens and the demo keep theirs.
@@ -106,8 +108,9 @@
 
   // Starts a follower screen: connects to the hub, then shows the board. A hub that is only unreachable still opens the board
   // (it keeps trying); a wrong code, a wrong address or a hub of another version shows a plain message instead.
-  function bootFollower() {
-    const f = SB.followMode();
+  function bootFollower(kind) {
+    const f = kind === 'hub' ? SB.hubMode() : SB.followMode();
+    const starter = kind === 'hub' ? 'initHubClient' : 'initFollower';
     // Mounts the shell once the store has something (or is retrying in the background).
     const show = () => {
       try {
@@ -117,12 +120,12 @@
     };
     // Shows a plain message when the hub refuses this screen, with a way back to the device's own kitchen.
     const fail = (res) => {
-      const words = { noFollower: 'This version of Smokebox cannot show another screen. Update it and try again.', badCode: 'The access code was not accepted. Check it and try again.', notFound: 'This address is not a Smokebox hub.', wrongVersion: 'This hub runs another version of Smokebox. Update this page and try again.', tooMany: 'The hub has too many screens connected right now. Try again in a minute.' };
+      const words = { noFollower: 'This version of Smokebox cannot show another screen. Update it and try again.', badCode: 'The access code was not accepted. Check it and try again.', notFound: 'This address is not a Smokebox kitchen.', wrongVersion: 'The kitchen runs another version of Smokebox. Update this page and try again.', tooMany: 'The kitchen has too many screens connected right now. Try again in a minute.' };
       const wrap = doc.createElement('div');
       wrap.className = 'follow-fail';
       wrap.setAttribute('role', 'alert');
-      const h2 = doc.createElement('h2'); h2.textContent = 'This screen could not follow the kitchen';
-      const p = doc.createElement('p'); p.textContent = words[res.error] || 'The hub could not be reached or answered with an error.';
+      const h2 = doc.createElement('h2'); h2.textContent = kind === 'hub' ? 'This tablet could not join the kitchen' : 'This screen could not follow the kitchen';
+      const p = doc.createElement('p'); p.textContent = words[res.error] || 'The kitchen could not be reached or answered with an error.';
       const back = doc.createElement('button'); back.type = 'button'; back.className = 'btn btn-primary btn-lg'; back.textContent = 'Back to my own kitchen';
       back.addEventListener('click', () => { try { if (SB.setup && SB.setup.leaveFollow) SB.setup.leaveFollow(); else g.location.href = g.location.pathname; } catch (e) { g.location.href = g.location.pathname; } });
       wrap.append(h2, p, back);
@@ -130,10 +133,10 @@
       SB.booted = true;
     };
     // A page that cannot follow (an older store) never falls back to opening a kitchen of its own.
-    if (!SB.store || typeof SB.store.initFollower !== 'function') { fail({ error: 'noFollower' }); return; }
+    if (!SB.store || typeof SB.store[starter] !== 'function') { fail({ error: 'noFollower' }); return; }
     let p;
     // The browser's own fetch must be called on the page, so it is handed over wrapped.
-    try { p = SB.store.initFollower({ url: f.url, code: f.code, fetch: (u, o) => g.fetch(u, o), AbortController: g.AbortController, TextDecoder: g.TextDecoder }); } catch (e) { fail({ error: 'unreachable' }); return; }
+    try { p = SB.store[starter](Object.assign({ url: f.url, code: f.code, fetch: (u, o) => g.fetch(u, o), AbortController: g.AbortController, TextDecoder: g.TextDecoder }, kind === 'hub' ? { adopt: 'hub' } : {})); } catch (e) { fail({ error: 'unreachable' }); return; }
     Promise.resolve(p).then((res) => { if (res && res.ok === false && res.error && res.error !== 'unreachable') fail(res); else show(); }, () => show());
   }
 
