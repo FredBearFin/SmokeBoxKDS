@@ -1654,6 +1654,8 @@
   // Removes a screen from the hub (owner screens only); it is cut off at once.
   const hubRemoveScreen = (opts) => ownerCall(opts, 'POST', '/screen/revoke', { id: opts && opts.id });
   const QUEUE_KEY = 'smokebox.v1.hubqueue';
+  // The packer for the saved hub snapshot (its own tables, apart from the kitchen's own save).
+  const cacheP = U.makePacker();
   const CACHE_KEY = 'smokebox.v1.hubcache', CACHE_MAX = 1500000;      // the last hub snapshot kept on the device, and the most characters it may use
   // Keeps the hub's latest state on the device (not the shown state) so a reload while the hub is unreachable can show the last known kitchen.
   // Throttled (see below) unless forced; skipped when it would be bigger than the cap; the browser refusing it is not an error.
@@ -1664,7 +1666,9 @@
     if (!force && realNow() - f.cacheAt < (f.cacheBytes > 200000 ? 15000 : 2000)) { f.cacheDirty = true; return; }
     f.cacheAt = realNow(); f.cacheDirty = false;
     try {
-      const rec = { v: 1, url: f.url, hubId: f.hubId, seq: f.seq, savedAt: realNow(), offset: Math.round(f.offset), state: f.base, trimmed: f.trimmed || undefined };
+      const rec = { v: 1, url: f.url, hubId: f.hubId, seq: f.seq, savedAt: realNow(), offset: Math.round(f.offset), trimmed: f.trimmed || undefined };
+      // A big kitchen's copy is kept compact (about half the characters), so a busy hub's kitchen still fits under the cap and can be shown offline.
+      if (wantCompact(f.base)) { rec.fmt = 2; rec.p = cacheP.pack(f.base); } else rec.state = f.base;
       f.cacheBytes = JSON.stringify(rec).length;
       if (f.cacheBytes > CACHE_MAX) { U.rawStorage.remove(CACHE_KEY); return; }
       U.rawStorage.set(CACHE_KEY, rec);
@@ -1675,7 +1679,7 @@
     try {
       const c = U.rawStorage.get(CACHE_KEY, null);
       if (!c || c.v !== 1 || c.url !== normUrl(url) || typeof c.hubId !== 'string' || !isNum(c.seq) || !isNum(c.savedAt)) return null;
-      const v = E().validateBackup(c.state);
+      const v = E().validateBackup(c.fmt === undefined ? c.state : c.fmt === 2 ? cacheP.unpack(c.p) : undefined);
       return v.ok ? { state: v.state, hubId: c.hubId, seq: c.seq, savedAt: c.savedAt, offset: isNum(c.offset) ? c.offset : 0, trimmed: c.trimmed && isNum(c.trimmed.since) ? c.trimmed : null } : null;
     } catch (e) { return null; }
   }

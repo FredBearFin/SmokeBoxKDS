@@ -12858,6 +12858,8 @@ a.of-nav:active { background: var(--press); }
   // Removes a screen from the hub (owner screens only); it is cut off at once.
   const hubRemoveScreen = (opts) => ownerCall(opts, 'POST', '/screen/revoke', { id: opts && opts.id });
   const QUEUE_KEY = 'smokebox.v1.hubqueue';
+  // The packer for the saved hub snapshot (its own tables, apart from the kitchen's own save).
+  const cacheP = U.makePacker();
   const CACHE_KEY = 'smokebox.v1.hubcache', CACHE_MAX = 1500000;      // the last hub snapshot kept on the device, and the most characters it may use
   // Keeps the hub's latest state on the device (not the shown state) so a reload while the hub is unreachable can show the last known kitchen.
   // Throttled (see below) unless forced; skipped when it would be bigger than the cap; the browser refusing it is not an error.
@@ -12868,7 +12870,9 @@ a.of-nav:active { background: var(--press); }
     if (!force && realNow() - f.cacheAt < (f.cacheBytes > 200000 ? 15000 : 2000)) { f.cacheDirty = true; return; }
     f.cacheAt = realNow(); f.cacheDirty = false;
     try {
-      const rec = { v: 1, url: f.url, hubId: f.hubId, seq: f.seq, savedAt: realNow(), offset: Math.round(f.offset), state: f.base, trimmed: f.trimmed || undefined };
+      const rec = { v: 1, url: f.url, hubId: f.hubId, seq: f.seq, savedAt: realNow(), offset: Math.round(f.offset), trimmed: f.trimmed || undefined };
+      // A big kitchen's copy is kept compact (about half the characters), so a busy hub's kitchen still fits under the cap and can be shown offline.
+      if (wantCompact(f.base)) { rec.fmt = 2; rec.p = cacheP.pack(f.base); } else rec.state = f.base;
       f.cacheBytes = JSON.stringify(rec).length;
       if (f.cacheBytes > CACHE_MAX) { U.rawStorage.remove(CACHE_KEY); return; }
       U.rawStorage.set(CACHE_KEY, rec);
@@ -12879,7 +12883,7 @@ a.of-nav:active { background: var(--press); }
     try {
       const c = U.rawStorage.get(CACHE_KEY, null);
       if (!c || c.v !== 1 || c.url !== normUrl(url) || typeof c.hubId !== 'string' || !isNum(c.seq) || !isNum(c.savedAt)) return null;
-      const v = E().validateBackup(c.state);
+      const v = E().validateBackup(c.fmt === undefined ? c.state : c.fmt === 2 ? cacheP.unpack(c.p) : undefined);
       return v.ok ? { state: v.state, hubId: c.hubId, seq: c.seq, savedAt: c.savedAt, offset: isNum(c.offset) ? c.offset : 0, trimmed: c.trimmed && isNum(c.trimmed.since) ? c.trimmed : null } : null;
     } catch (e) { return null; }
   }
@@ -35188,9 +35192,10 @@ a.of-nav:active { background: var(--press); }
       // Builds the explanation and the button that opens the Close the day sheet.
       render: (body) => {
         const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
-        body.append(h('p', { class: 'ob-text' }, 'Close the day when the last order is paid. You get today\'s totals by cash, card and other, a cash-in-the-drawer line, a backup button and a page to print.', help ? h('span', null, ' ', help) : null),
+        // Native append writes the word "null" for a null argument, so the optional follower note is filtered out when it is absent.
+        body.append(...[h('p', { class: 'ob-text' }, 'Close the day when the last order is paid. You get today\'s totals by cash, card and other, a cash-in-the-drawer line, a backup button and a page to print.', help ? h('span', null, ' ', help) : null),
           h('button', { type: 'button', class: 'btn btn-primary', 'data-k': 'close-day', onClick: () => { if (O.openCloseDay) O.openCloseDay(); } }, 'Close the day'),
-          O.connection && O.connection() === 'follower' ? h('p', { class: 'ob-text' }, 'This screen only shows the shared kitchen. The sheet opens so you can read and print the day, but closing it is done on the hub computer.') : null);
+          O.connection && O.connection() === 'follower' ? h('p', { class: 'ob-text' }, 'This screen only shows the shared kitchen. The sheet opens so you can read and print the day, but closing it is done on the hub computer.') : null].filter(Boolean));
         // The address #/office/money?close=1 opens the sheet straight away.
         if (O.maybeOpenCloseDay) O.maybeOpenCloseDay();
         return {};

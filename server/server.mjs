@@ -133,6 +133,7 @@ function acquireLock(file) {
   }
   throw new Error('Could not lock ' + file + ' (another hub is starting there).');
 }
+// Gives up the data-folder lock file this hub holds, when it holds one.
 function releaseLock(lf) { if (!lf) return; HELD_LOCKS.delete(lf); try { fs.unlinkSync(lf); } catch (e) { /* already gone */ } }
 process.on('exit', () => { for (const lf of HELD_LOCKS) { try { fs.unlinkSync(lf); } catch (e) { /* gone */ } } });
 
