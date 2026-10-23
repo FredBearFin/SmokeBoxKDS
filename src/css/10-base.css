@@ -467,7 +467,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   overflow: auto; overscroll-behavior: contain; background: var(--bg); color: var(--ink);
 }
 .layer:focus { outline: none; }
-.layer-floor { z-index: var(--zi-base); }
+.layer-floor, .layer-order { z-index: var(--zi-base); }
 .layer-office { z-index: var(--zi-layer-office); }
 /* Promote the office to its own compositor layer while its clip-path circle animates. Without this, Chromium culls the floor and the veil
    beneath the circle's whole bounding box, leaving undimmed or black patches outside the circle (seen in headless Chromium with software raster). */

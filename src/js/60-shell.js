@@ -19,8 +19,12 @@
   const ZONES = ['pit', 'sides', 'fry', 'cold', 'expo'];
   const SECTIONS = ['pace', 'tickets', 'stations', 'money', 'safety', 'stock', 'data'];
 
+  // Device roles: all = today's all-in-one screen; kitchen, front (order entry) and manager are focused ones.
+  const ROLES = ['all', 'kitchen', 'front', 'manager'];
+
   // Turns the part of the web address after the # (the hash, like #/office/money) into a view:
-  // {kind:'floor', zone} or {kind:'office', section}. Never fails: garbage lands on the whole floor.
+  // {kind:'floor', zone}, {kind:'kitchen', zone}, {kind:'new'} or {kind:'office', section}. Never fails:
+  // garbage lands on the whole floor.
   function viewFor(hash) {
     // Cap the length, then undo %20-style codes; a broken code keeps the raw text.
     let s = typeof hash === 'string' ? hash.slice(0, 300) : '';
@@ -28,6 +32,8 @@
     s = s.replace(/^\s*#!?/, '').split(/[?#]/)[0];
     const parts = s.toLowerCase().split('/').map((x) => x.trim()).filter(Boolean);
     if (parts[0] === 'office') return { kind: 'office', section: SECTIONS.indexOf(parts[1]) >= 0 ? parts[1] : 'pace' };
+    if (parts[0] === 'kitchen') return { kind: 'kitchen', zone: ZONES.indexOf(parts[1]) >= 0 ? parts[1] : 'all' };
+    if (parts[0] === 'new') return { kind: 'new' };
     if (parts[0] === 's' && ZONES.indexOf(parts[1]) >= 0) return { kind: 'floor', zone: parts[1] };
     return { kind: 'floor', zone: 'all' };
   }
@@ -36,14 +42,34 @@
     if (typeof view === 'string') return viewFor(view);
     if (!view || typeof view !== 'object') return { kind: 'floor', zone: 'all' };
     if (view.kind === 'office') return { kind: 'office', section: SECTIONS.indexOf(view.section) >= 0 ? view.section : 'pace' };
+    if (view.kind === 'new') return { kind: 'new' };
+    if (view.kind === 'kitchen') return { kind: 'kitchen', zone: ZONES.indexOf(view.zone) >= 0 ? view.zone : 'all' };
     return { kind: 'floor', zone: ZONES.indexOf(view.zone) >= 0 ? view.zone : 'all' };
   }
-  // Opposite of viewFor: a view becomes its address ('#/office/money', '#/s/pit', '#/'); it round-trips.
+  // Opposite of viewFor: a view becomes its address ('#/office/money', '#/kitchen', '#/new', '#/s/pit', '#/');
+  // it round-trips.
   function hashFor(view) {
     const v = normView(view);
     if (v.kind === 'office') return v.section === 'pace' ? '#/office' : '#/office/' + v.section;
+    if (v.kind === 'new') return '#/new';
+    if (v.kind === 'kitchen') return v.zone === 'all' ? '#/kitchen' : '#/kitchen/' + v.zone;
     return v.zone === 'all' ? '#/' : '#/s/' + v.zone;
   }
+  // Reads ?role=kitchen|front|manager|all from the address's query text; returns the role or null.
+  function roleFor(search) {
+    const m = /[?&]role=([a-z]+)/i.exec(typeof search === 'string' ? search.slice(0, 300) : '');
+    const r = m ? m[1].toLowerCase() : '';
+    return ROLES.indexOf(r) >= 0 ? r : null;
+  }
+  // The screen a device with this role opens on when the address names no screen; null means the usual floor.
+  function startViewFor(role) {
+    if (role === 'kitchen') return { kind: 'kitchen', zone: 'all' };
+    if (role === 'front') return { kind: 'new' };
+    if (role === 'manager') return { kind: 'office', section: 'pace' };
+    return null;
+  }
+  // The role a view belongs to when someone opens it by address: kitchen and new pin the device; others do not.
+  function roleOfView(v) { return v.kind === 'kitchen' ? 'kitchen' : v.kind === 'new' ? 'front' : null; }
 
   /* ====================================================================================================================
    * SHA-256 (pure JS). crypto.subtle is preferred; this is the fallback and produces identical digests.
@@ -113,7 +139,7 @@
    * ================================================================================================================== */
   const T = (SB.theme = {});
   // Notebook (local storage) entry names for this file's saved choices.
-  const KEY = { theme: 'smokebox.v1.theme', otheme: 'smokebox.v1.otheme', text: 'smokebox.v1.textsize', density: 'smokebox.v1.density', hints: 'smokebox.v1.hints', zone: 'smokebox.v1.zone', pinlock: 'smokebox.v1.pinlock' };
+  const KEY = { theme: 'smokebox.v1.theme', otheme: 'smokebox.v1.otheme', text: 'smokebox.v1.textsize', density: 'smokebox.v1.density', hints: 'smokebox.v1.hints', zone: 'smokebox.v1.zone', role: 'smokebox.v1.role', pinlock: 'smokebox.v1.pinlock' };
   // Colour of the browser's top bar for each look; each matches that look's background colour.
   const THEME_COLOR = { day: '#F5F2EB', night: '#15181A', ember: '#181513', paper: '#F0ECE3' };
   // Current choices: floor look, office look (ember dark / paper light), text size. themeSubs = listeners.
@@ -196,17 +222,24 @@
    * ================================================================================================================== */
   const R = (SB.router = {});
   R.viewFor = viewFor; R.hashFor = hashFor; R.zones = ZONES.slice(); R.sections = SECTIONS.slice();
+  R.roleFor = roleFor; R.startViewFor = startViewFor; R.roles = ROLES.slice();
   // Router state. idx counts our history entries (stamped into each as sbIdx); pendingBacks = Back jumps
   // the browser has not reported yet; officePushed / officeEntry = the office's own history entry;
   // overlayStack = open sheets, one entry each; queued = history writes waiting; lastZone = the way back
   // out of the office.
   let current = { kind: 'floor', zone: 'all' };
   let lastZone = 'all';
+  let role = 'all'; // this device's job: all, kitchen, front or manager (kept in the notebook)
   let idx = 0, routerReady = false, pendingBacks = 0, flushTimer = 0, officePushed = false, officeEntry = null;
   const listeners = [], overlayStack = [], queued = [];
 
   // Remembers the last station viewed (memory and notebook) so a pinned tablet reopens on it.
-  const rememberZone = (v) => { if (v.kind === 'floor') { lastZone = v.zone; if (U) U.storage.set(KEY.zone, v.zone); } };
+  // Also pins the device role when a role screen (#/kitchen, #/new) is opened.
+  const rememberZone = (v) => {
+    if (v.kind === 'floor') { lastZone = v.zone; if (U) U.storage.set(KEY.zone, v.zone); }
+    const r = roleOfView(v);
+    if (r && r !== role) { role = r; if (U) U.storage.set(KEY.role, r); }
+  };
   // Our history number from the current history entry, or null if it has none. Never throws.
   const readIdx = () => { try { const s = g.history && g.history.state; return s && typeof s.sbIdx === 'number' ? s.sbIdx : null; } catch (e) { return null; } };
   // Tells router listeners the new view (a copy) and info.source: 'go' (our move) or 'pop' (Back, typed).
@@ -259,8 +292,16 @@
     if (found == null) { try { g.history.replaceState({ sbIdx: 0 }, '', g.location.href); } catch (e) { /* ignore */ } }
     const stored = U ? U.storage.get(KEY.zone, 'all') : 'all';
     lastZone = ZONES.indexOf(stored) >= 0 ? stored : 'all';
+    const storedRole = U ? U.storage.get(KEY.role, 'all') : 'all';
+    role = ROLES.indexOf(storedRole) >= 0 ? storedRole : 'all';
+    const asked = roleFor(g.location.search); // ?role=kitchen on the address picks this device's job
+    if (asked) { role = asked; if (U) U.storage.set(KEY.role, asked); }
     let v = viewFor(g.location.hash);
-    if (!g.location.hash && lastZone !== 'all') { // a tablet pinned to a station opens on it
+    const start = startViewFor(role);
+    if (start && (asked || !g.location.hash)) { // a role device opens on its own screen
+      v = start;
+      try { g.history.replaceState({ sbIdx: idx }, '', hashFor(v)); } catch (e) { /* ignore */ }
+    } else if (!g.location.hash && lastZone !== 'all') { // a tablet pinned to a station opens on it
       v = { kind: 'floor', zone: lastZone };
       try { g.history.replaceState({ sbIdx: idx }, '', hashFor(v)); } catch (e) { /* ignore */ }
     }
@@ -274,6 +315,19 @@
   R.view = () => Object.assign({}, current);
   // The last station viewed ('all' if none).
   R.lastZone = () => lastZone;
+  // This device's role: 'all' (everything on one screen), 'kitchen', 'front' or 'manager'.
+  R.role = () => role;
+  // Sets and remembers the device role ('all' clears it); unknown names are ignored. Returns the role.
+  R.setRole = function (r) {
+    if (ROLES.indexOf(r) < 0) return role;
+    role = r; if (U) U.storage.set(KEY.role, r);
+    return role;
+  };
+  // The screen this device returns to after the office: its role screen, or the last station.
+  R.home = function () {
+    const s = role === 'manager' ? null : startViewFor(role);
+    return s || { kind: 'floor', zone: lastZone };
+  };
   // Sign up to hear about every view change: fn(view, info). Returns a function that cancels the sign-up.
   R.onChange = function (fn) { listeners.push(fn); return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; };
   R.hashFor = hashFor; R.viewFor = viewFor;
@@ -303,7 +357,7 @@
   // or, for a pasted link, rewrite the entry to the floor. False if not in the office.
   R.leaveOffice = function () {
     if (current.kind !== 'office') return false;
-    const target = { kind: 'floor', zone: lastZone };
+    const target = R.home();
     if (officePushed && officeEntry != null && officeEntry > 0) {
       // Steps back to the entry just before the office.
       const delta = idx - (officeEntry - 1);
@@ -362,7 +416,7 @@
   const h = U.h;
   const S = (SB.shell = {});
   const ui = (SB.ui = {});
-  const layers = { floor: null, office: null };
+  const layers = { floor: null, office: null, order: null };
   const hosts = { shell: null, sheets: null, toasts: null, live: null, standalone: null };
   const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
   // True when the device asks for less motion; animations are then skipped or shortened.
@@ -1477,7 +1531,7 @@
     if (st.officeOpen) return st.officeDone;
     const section = (o && SECTIONS.indexOf(o.section) >= 0 && o.section) || (R.view().kind === 'office' ? R.view().section : st.officeSection) || 'pace';
     return guard().then((ok) => {
-      if (!ok) { if (R.view().kind === 'office') R.go({ kind: 'floor', zone: R.lastZone() }, { replace: true }); return false; }
+      if (!ok) { if (R.view().kind === 'office') R.go(R.home(), { replace: true }); return false; }
       R.go({ kind: 'office', section });
       return openOffice(section);
     });
@@ -1498,11 +1552,38 @@
     if (!st.mounted) return;
     if (view.kind === 'office') {
       if (st.officeOpen) { navigateOffice(view.section); return; }
-      guard().then((ok) => { if (ok) openOffice(view.section); else if (R.view().kind === 'office') R.go({ kind: 'floor', zone: R.lastZone() }, { replace: true }); });
+      guard().then((ok) => { if (ok) openOffice(view.section); else if (R.view().kind === 'office') R.go(R.home(), { replace: true }); });
     } else {
-      try { if (SB.floor && typeof SB.floor.setZone === 'function') SB.floor.setZone(view.zone); else if (st.ph && st.ph.floor) st.ph.floor.setZone(view.zone); } catch (e) { console.error('[smokebox] floor.setZone failed', e); }
+      const zone = view.kind === 'new' ? 'all' : view.zone;
+      try { if (SB.floor && typeof SB.floor.setZone === 'function') SB.floor.setZone(zone); else if (st.ph && st.ph.floor) st.ph.floor.setZone(zone); } catch (e) { console.error('[smokebox] floor.setZone failed', e); }
       if (st.officeOpen) closeOffice();
+      if (view.kind === 'new') openOrderPage(); else closeOrderPage();
     }
+  }
+  // Shows order entry for the front role. Uses the order page (SB.order.mount) once that exists; until then
+  // it opens the New ticket sheet over the board.
+  // WATCH OUT: SB.order.mount(el) must return nothing or a cleanup function; SB.order.unmount(el) is optional.
+  function openOrderPage() {
+    if (st.orderOpen) return;
+    st.orderOpen = true;
+    try {
+      if (SB.order && typeof SB.order.mount === 'function' && layers.order) {
+        layers.order.hidden = false; layers.floor.hidden = true;
+        st.orderCleanup = SB.order.mount(layers.order) || null;
+      } else if (sheets.open) sheets.open('order');
+    } catch (e) { console.error('[smokebox] order page failed to open', e); }
+  }
+  // Takes the order page down and shows the board again; does nothing if it was not open.
+  function closeOrderPage() {
+    if (!st.orderOpen) return;
+    st.orderOpen = false;
+    try {
+      if (typeof st.orderCleanup === 'function') st.orderCleanup();
+      else if (SB.order && typeof SB.order.unmount === 'function' && layers.order) SB.order.unmount(layers.order);
+    } catch (e) { console.error('[smokebox] order page failed to close', e); }
+    st.orderCleanup = null;
+    if (layers.order) { U.clear(layers.order); layers.order.hidden = true; }
+    if (layers.floor) layers.floor.hidden = false;
   }
 
   /* ---------- placeholders so the shell is testable alone ---------- */
@@ -1580,19 +1661,20 @@
     // Build the layers in drawing order; region labels name the floor and office for screen readers.
     const shell = h('div', { class: 'sb-shell', dataset: { view: 'floor' } });
     const floor = h('div', { class: 'layer layer-floor', id: 'sb-floor', role: 'region', 'aria-label': 'Kitchen board', tabindex: -1 });
+    const order = h('div', { class: 'layer layer-order', id: 'sb-order', role: 'region', 'aria-label': 'Order entry', tabindex: -1, hidden: true });
     const veil = h('div', { class: 'ignite-veil', 'aria-hidden': 'true' });
     const office = h('div', { class: 'layer layer-office office', id: 'sb-office', role: 'region', 'aria-label': 'Back office', tabindex: -1, hidden: true, dataset: { otheme: T.office() } });
     const fx = h('div', { class: 'ignite-fx', 'aria-hidden': 'true' });
     const live = h('div', { class: 'live-region', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
     const toastHost = h('div', { class: 'toast-host', role: 'region', 'aria-label': 'Notifications' });
     const sheetHost = h('div', { class: 'sheet-host' });
-    shell.append(floor, veil, office, fx, live, toastHost, sheetHost);
+    shell.append(floor, order, veil, office, fx, live, toastHost, sheetHost);
     root.appendChild(shell);
     // Swap the temporary containers (if any) for the real ones and record the new state.
     if (hosts.standalone) { hosts.standalone.remove(); hosts.standalone = null; }
     Object.assign(hosts, { shell, sheets: sheetHost, toasts: toastHost, live });
-    layers.floor = floor; layers.office = office;
-    Object.assign(st, { shell, veil, fx, mounted: true, officeOpen: false, officeContent: false, ph: {}, taps: [] });
+    layers.floor = floor; layers.office = office; layers.order = order;
+    Object.assign(st, { shell, veil, fx, mounted: true, orderOpen: false, orderCleanup: null, officeOpen: false, officeContent: false, ph: {}, taps: [] });
     st.offRoute = R.onChange(onRoute);
     // Floor board: if it throws, show an error card with Reload instead of a blank screen.
     try {
@@ -1611,6 +1693,7 @@
   // Takes the frame down: closes sheets, stops route listening, removes layers, dismisses toasts.
   S.unmount = function () {
     if (!st.mounted) return;
+    closeOrderPage();
     sheets.closeAll();
     if (st.offRoute) st.offRoute();
     resetFx();
@@ -1619,7 +1702,7 @@
     st.shell.remove();
     toasts.splice(0).forEach((r) => r.dismiss(true));
     Object.assign(hosts, { shell: null, sheets: null, toasts: null, live: null });
-    layers.floor = layers.office = null;
+    layers.floor = layers.office = layers.order = null;
     st.mounted = false; st.officeOpen = false;
   };
   // Snapshot of shell and history state, for tests and debugging.
