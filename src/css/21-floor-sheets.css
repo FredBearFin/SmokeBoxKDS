@@ -668,3 +668,13 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .rd .stepper { display: flex; width: 100%; }
 .rd .stepper .stepper-field { flex: 1 1 auto; min-width: 0; }
 .rd .stepper .stepper-input { flex: 1 1 auto; min-width: 0; width: auto; text-align: center; }
+
+/* Screens in this kitchen (sc-): the list, tags, the big new code. */
+.sc-list { display: grid; gap: var(--sp-2); }
+.sc-row { display: grid; gap: var(--sp-1); padding: var(--sp-2) 0; border-bottom: 1px solid var(--line); }
+.sc-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.sc-tag { font: var(--w-bold) var(--fs-2) / 1 var(--font-body); padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; }
+.sc-confirm { display: grid; gap: var(--sp-2); }
+.sc-codebox { display: grid; gap: var(--sp-2); }
+.sc-code { font-size: 40px; letter-spacing: 0.12em; text-align: center; }
+.sc-code[data-expired="true"] { opacity: 0.4; text-decoration: line-through; }
