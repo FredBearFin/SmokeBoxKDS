@@ -67,7 +67,9 @@
   function csv(list, rec) {
     const cols = rec.cols.filter((c) => c.on);
     // Wraps one value in quotes, doubling any quotes inside it, as CSV requires.
-    const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
+    // A cell that starts with = + - @ (or a tab or return) gets a leading apostrophe, so a spreadsheet shows it as text and never runs it as a formula
+    // (initials and notes are typed by people); a plain negative number is left alone.
+    const q = (v) => { let t = String(v); if (/^[=+\-@\t\r]/.test(t) && !/^-?\d+([.,]\d+)?$/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; };
     return [cols.map((c) => q(c.label)).join(',')].concat(list.map((r) => cols.map((c) => q(r[c.key])).join(','))).join('\r\n') + '\r\n';
   }
   // Prints the log through a hidden frame so the board behind the sheet is not printed with it.
