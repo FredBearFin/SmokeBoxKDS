@@ -8,7 +8,7 @@ The shell already provides the office layer, the ignition, the PIN gate, `SB.rou
 
 | order | id | title | icon | owner |
 |---|---|---|---|---|
-| 1 | `pace` | Pace | `gauge` | A |
+| 1 | `pace` | Speed | `gauge` | A |
 | 2 | `tickets` | Tickets | `receipt` | A |
 | 3 | `stations` | Stations | `layers` | A |
 | 4 | `money` | Sales and money | `dollar` | B |

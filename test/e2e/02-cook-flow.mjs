@@ -228,7 +228,8 @@ export default function (h) {
     await settle(page, 500);
     const afterOrder = (await boardSummary(page)).slips.map((s) => s.customer);
     t.check('Make it a rush adds the RUSH stamp', await page.locator('.fl-slip .stamp').count() === stampsBefore + 1, await page.locator('.fl-slip .stamp').count());
-    t.check('rush slips sort first, oldest rush first (Drive-thru 7, then Walk-up)', afterOrder[0] === 'Drive-thru 7' && afterOrder[1] === 'Walk-up', afterOrder);
+    // The overdue slip (Table 4) leads the board now; after it the rush slips, oldest rush first.
+    t.check('rush slips sort next after the overdue one, oldest rush first (Table 4, Drive-thru 7, then Walk-up)', afterOrder[0] === 'Table 4' && afterOrder[1] === 'Drive-thru 7' && afterOrder[2] === 'Walk-up', afterOrder);
     await walk.getByRole('button', { name: /More for ticket/ }).click();
     await page.getByRole('menuitem', { name: 'Take off rush' }).click();
     await settle(page, 500);

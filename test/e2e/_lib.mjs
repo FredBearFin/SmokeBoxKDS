@@ -12,7 +12,7 @@ export const BAD_TEXT = /\bNaN\b|\bundefined\b|\bInfinity\b|-Infinity|\[object O
 export const ZONES = ['pit', 'sides', 'fry', 'cold', 'expo'];
 export const ZONE_CODE = { pit: 'PIT', sides: 'HOT', fry: 'FRY', cold: 'CLD', expo: 'EXP' };
 export const OFFICE_PAGES = [
-  { id: 'pace', title: 'Pace' }, { id: 'tickets', title: 'Tickets' }, { id: 'stations', title: 'Stations' }, { id: 'money', title: 'Sales and money' },
+  { id: 'pace', title: 'Speed' }, { id: 'tickets', title: 'Tickets' }, { id: 'stations', title: 'Stations' }, { id: 'money', title: 'Sales and money' },
   { id: 'safety', title: 'Safety' }, { id: 'stock', title: 'Stock and 86' }, { id: 'data', title: 'Menu and settings' },
 ];
 

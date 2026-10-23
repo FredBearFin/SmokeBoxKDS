@@ -229,3 +229,20 @@ Round 12 removed the pretend channel sync strip from the 86 board and changed th
 | board-contrast, board-round2 to 5, 10, 11, 12 | pass |
 | backup-banner, bumpbar, config-names, order-note, order-page, orders-page, pay-ui, pin-recovery-ui, production-mode, quiet-board, serve, strip-notices | pass |
 | qa journeys (45) | 45 pass after the 04c fix (it was 44/45 in the first run: 04c still looked for the removed sync strip) |
+
+# Round 14 run (deploy 4a7c559 plus night/a1-r14, a2-r14, a4-r14, a5-r14; a3-r14 had not landed)
+
+`test/.out/` is no longer tracked (it is generated: screenshots, private bundles, data caches, tool state). Nothing reads committed screenshots: the only readers are `test/_office-data.mjs` (a data cache that is rebuilt and whose folder is created on demand), `tools/contract-check.mjs` (its own state folder, created on demand) and `tools/qa.mjs` (`results.json`, rebuilt each run). Proven by running `artifact`, `order-page` and the whole `office` suite (140/0) in a fresh worktree that had no `test/.out`.
+
+Deploy download: 164 MB before, 1.4 MB after the root `.gitattributes` (see `docs/audit/server-security-review.md`, finding 10). The size limits in the scripts (100,000 bytes) still fit; `test/updater.test.mjs` runs the updater on the real small archive and starts the hub from it.
+
+| Suite | Result | Note |
+|---|---|---|
+| floor | 202 pass, 0 fail, 1 KNOWN | A1 fixed the keyboard order of overdue slips (that check is now a normal check); still KNOWN: header wraps at 1920 px with the demo chip |
+| floor-sheets, shell, office, artifact | pass | |
+| contract | 18/18 after drift fix | the Pace page is now titled "Speed"; `tools/contract-check.mjs` and `docs/office-contract.md` follow |
+| start-over, setup-wizard, demo-mode, menu-import-ui, office-closeday, office-sales-csv | pass | |
+| office-b, office-data, board-round2 to 5, 10, 11, 12, 14, board-contrast, cold-items | pass | |
+| backup-banner, bumpbar, config-names, order-note, order-page, orders-page, pay-ui, pin-recovery-ui, production-mode, quiet-board, serve, strip-notices | pass | |
+| chaos-store (unit) | 25 pass | A5's last-good copy fix is in; my todo test is now a real passing test |
+| qa journeys (45) | 45 pass after two drift fixes (re-run alone) | 02d: the overdue slip now leads, then rush slips; 07a: page title "Speed" |
