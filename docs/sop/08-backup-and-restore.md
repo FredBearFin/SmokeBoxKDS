@@ -21,4 +21,4 @@ A file that is not a valid backup is refused, and nothing is changed. A backup f
 
 ## Erasing
 
-The Danger zone has **Reset live data** and **Reset everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either.
+The Danger zone has **Erase live data** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either.

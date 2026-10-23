@@ -349,20 +349,6 @@
         previous: (p) => { const q = prevHandle(p); return q ? soldTotal(q) : null; } },
     ]);
 
-    /* ---------------------------------------------------------------- end of day */
-    page.panel({
-      span: 12, title: 'End of day', sub: 'When service is over',
-      // Builds the explanation and the button that opens the Close the day sheet.
-      render: (body) => {
-        const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
-        body.append(h('p', { class: 'ob-text' }, 'Close the day when the last order is paid. You get today\'s totals by cash, card and other, a cash-in-the-drawer line, a backup button and a page to print.', help ? h('span', null, ' ', help) : null),
-          h('button', { type: 'button', class: 'btn btn-primary', 'data-k': 'close-day', onClick: () => { if (O.openCloseDay) O.openCloseDay(); } }, 'Close the day'));
-        // The address #/office/money?close=1 opens the sheet straight away.
-        if (O.maybeOpenCloseDay) O.maybeOpenCloseDay();
-        return {};
-      },
-    });
-
     /* ---------------------------------------------------------------- takings */
     page.section('Money collected', 'Sales are the food you sold after discounts. Add tax and tips and you get everything collected. Smokebox only records how an order was paid; it never charges a card.');
 
@@ -777,6 +763,20 @@
         paint();
         // update repaints from the live brisket cost; destroy removes the stepper listeners.
         return { update: () => paint(), destroy: () => { cleanups.splice(0).forEach((f) => f()); } };
+      },
+    });
+
+    /* ---------------------------------------------------------------- end of day */
+    page.panel({
+      span: 12, title: 'End of day', sub: 'When service is over',
+      // Builds the explanation and the button that opens the Close the day sheet.
+      render: (body) => {
+        const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
+        body.append(h('p', { class: 'ob-text' }, 'Close the day when the last order is paid. You get today\'s totals by cash, card and other, a cash-in-the-drawer line, a backup button and a page to print.', help ? h('span', null, ' ', help) : null),
+          h('button', { type: 'button', class: 'btn btn-primary', 'data-k': 'close-day', onClick: () => { if (O.openCloseDay) O.openCloseDay(); } }, 'Close the day'));
+        // The address #/office/money?close=1 opens the sheet straight away.
+        if (O.maybeOpenCloseDay) O.maybeOpenCloseDay();
+        return {};
       },
     });
 

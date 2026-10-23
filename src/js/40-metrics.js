@@ -1222,7 +1222,7 @@
       push(end, cur);
       const marks = arr(b.temps).filter((x) => x && num(x.t) && num(x.f)).map((x) => ({ at: x.t, label: Math.round(x.f) + 'F' }));
       for (const e of evs) if (e.type === 'batch_reheat') marks.push({ at: e.t, label: 'Reheat' + (num(e.f) ? ' to ' + Math.round(e.f) + 'F' : '') });
-      if (num(b.discardedAt)) marks.push({ at: b.discardedAt, label: 'Discarded' + (b.discardReason ? ' (' + b.discardReason + ')' : '') });
+      if (num(b.discardedAt)) marks.push({ at: b.discardedAt, label: 'Thrown out' + (b.discardReason ? ' (' + b.discardReason + ')' : '') });
       marks.sort((a, c) => a.at - c.at);
       res.rows.push({ batchId: b.id, label: b.label || b.id, ing: b.ing, name: im[b.ing] ? im[b.ing].name : b.ing, kind: b.kind || null, src: b.src || null, cookedG: num(b.cookedG) ? b.cookedG : null,
         remainingG: num(b.remainingG) ? b.remainingG : null, startMs: b.enteredAt, endMs: end, open, status: b.status || null, wasteG: num(b.wasteG) ? b.wasteG : null,
@@ -1764,7 +1764,7 @@
       }
       case 'safety': {
         const k = M.compliance(c); if (!k.tempChecks.count && !k.sanitize.count && !k.discards.count) return 'No food-safety records in this range yet.';
-        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' discarded (' + kgTxt(k.discards.g) + ', ' + money(k.discards.cost) + ').' : 'nothing was discarded.');
+        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + money(k.discards.cost) + ').' : 'nothing was discarded.');
       }
       case 'stock': {
         const so = M.sellOutClock(c), n = so.rows.length; if (!so.dayCount) return 'No sell-outs in this range yet.';

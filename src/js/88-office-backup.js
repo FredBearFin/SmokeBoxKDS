@@ -36,7 +36,7 @@
     const orders = Array.isArray(s.orders) ? s.orders.length : 0;
     const tickets = Array.isArray(s.tickets) ? s.tickets.length : 0;
     const mode = res.mode === 'demo' ? 'demo' : 'real';
-    const kindText = mode === 'demo' ? 'Practice kitchen (the demo)' : 'Your own kitchen';
+    const kindText = mode === 'demo' ? 'Demo kitchen' : 'Your own kitchen';
     const pin = s.settings && s.settings.office && s.settings.office.pinHash ? 'Set (this device will ask for it)' : 'Not set';
     const rows = [];
     if (isNum(res.savedAt)) rows.push(['Saved', U.fmtDateShort(U.dateKey(res.savedAt)) + ', ' + U.fmtTime(res.savedAt)]);
@@ -47,9 +47,42 @@
     rows.push(['Manager PIN', pin]);
     const wrongKitchen = !!storeMode && mode !== storeMode;
     const refusal = wrongKitchen
-      ? (mode === 'demo' ? 'This backup comes from the practice kitchen (the demo), not from your own kitchen, so it cannot be restored here.' : 'This backup comes from a real kitchen, so it cannot be restored into the practice kitchen.')
+      ? (mode === 'demo' ? 'This backup comes from the demo kitchen, not from your own kitchen, so it cannot be restored here.' : 'This backup comes from a real kitchen, so it cannot be restored into the demo kitchen.')
       : '';
     return { rows, wrongKitchen, kindText, refusal };
+  }
+
+
+  // Quotes one value for a CSV cell: wraps it in quotes when it holds a comma, quote or line break.
+  function csvCell(v) {
+    const t = v == null ? '' : String(v);
+    return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  }
+  // Dollars as plain digits with two decimals ("12.40"), with no dollar sign or thousands commas, so a spreadsheet adds them up.
+  const plainMoney = (v) => (isNum(v) ? (Math.round(v * 100) / 100).toFixed(2) : '0.00');
+
+  // The sales-by-day CSV for an accountant, from the saved state: one row per service day with paid orders, then a Total row.
+  // Columns: Date, Orders paid, Sales (after discounts), Discounts given, Tax, Tips, Total collected, then collected by Cash, Card and Other.
+  // Paid orders count on the service day they were paid; voided and open orders are left out.
+  function salesCsv(state, dayStartHour) {
+    const dsh = isNum(dayStartHour) ? dayStartHour : U.DAY_START_HOUR;
+    const days = {};
+    const orders = state && Array.isArray(state.orders) ? state.orders : [];
+    orders.forEach((o) => {
+      if (!o || o.status !== 'paid' || !isNum(o.paidAt) || !o.totals) return;
+      const day = U.serviceDate(o.paidAt, dsh);
+      const d = days[day] || (days[day] = { orders: 0, sales: 0, discounts: 0, tax: 0, tips: 0, total: 0, cash: 0, card: 0, other: 0 });
+      const T = o.totals, tip = isNum(o.tip) ? o.tip : 0;
+      const collected = (isNum(T.total) ? T.total : 0) + tip;
+      d.orders++; d.sales += (T.subtotal || 0) - (T.discount || 0); d.discounts += T.discount || 0; d.tax += T.tax || 0; d.tips += tip; d.total += collected;
+      d[o.method === 'cash' ? 'cash' : o.method === 'card' ? 'card' : 'other'] += collected;
+    });
+    const head = ['Date', 'Orders paid', 'Sales (after discounts)', 'Discounts given', 'Tax', 'Tips', 'Total collected', 'Collected in cash', 'Collected by card', 'Collected other'];
+    const sum = { orders: 0, sales: 0, discounts: 0, tax: 0, tips: 0, total: 0, cash: 0, card: 0, other: 0 };
+    // One CSV line for a day or for the totals.
+    const line = (label, d) => [label, d.orders, plainMoney(d.sales), plainMoney(d.discounts), plainMoney(d.tax), plainMoney(d.tips), plainMoney(d.total), plainMoney(d.cash), plainMoney(d.card), plainMoney(d.other)].map(csvCell).join(',');
+    const rows = Object.keys(days).sort().map((k) => { Object.keys(sum).forEach((f) => { sum[f] += days[k][f]; }); return line(k, days[k]); });
+    return [head.map(csvCell).join(',')].concat(rows, rows.length ? [line('Total', sum)] : []).join('\r\n') + '\r\n';
   }
 
   // True when the typed text is the confirming word (any capitals, spaces around it ignored).
@@ -57,5 +90,5 @@
     return String(typed == null ? '' : typed).trim().toLowerCase() === String(word || 'reset').toLowerCase();
   }
 
-  O.backupPure = { backupFreshness, describeBackup, resetWordOk };
+  O.backupPure = { backupFreshness, describeBackup, resetWordOk, salesCsv };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

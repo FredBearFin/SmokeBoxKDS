@@ -271,10 +271,18 @@
     return p ? { id: p.id, from: p.from, to: p.to, label: p.label, fromKey: p.fromKey, toKey: p.toKey } : { id: 'today', from: nowMs() - DAY, to: nowMs() + 1, label: 'Today' };
   }
   // Where the filters start: Last 14 days with sample data when it is loaded, otherwise Today with live
-  // data only.
+  // data only (or the last 7 days when today has no tickets yet but the week does).
   function defaultFilters() {
     const sampleOk = sampleFlag() && sampleLoaded();
-    return sampleOk ? { range: presetRange('last14'), channel: 'all', source: 'all' } : { range: presetRange('today'), channel: 'all', source: 'live' };
+    if (sampleOk) return { range: presetRange('last14'), channel: 'all', source: 'all' };
+    // With nothing sold yet today but tickets in the past week, start on the last 7 days so the first screen is not empty.
+    try {
+      const tickets = (storeDataset(false).tickets || []), today = presetRange('today'), week = presetRange('last7');
+      // True when any ticket was created inside the range.
+      const inR = (r) => tickets.some((t) => t && isNum(t.createdAt) && t.createdAt >= r.from && t.createdAt < r.to);
+      if (!inR(today) && inR(week)) return { range: week, channel: 'all', source: 'live' };
+    } catch (e) { /* fall back to today */ }
+    return { range: presetRange('today'), channel: 'all', source: 'live' };
   }
 
   // Builds the ctx a page receives: filters, the data, the one shared metrics handle and a few helpers.
@@ -1023,7 +1031,22 @@
     const srcNote = h('span', { class: 'of-fnote', hidden: true });
 
     // The Day group only shows for Yesterday or One day, so the other filters fit on one row.
-    const dayGroup = h('div', { class: 'of-fg', hidden: true }, h('span', { class: 'of-fl' }, 'Day'), dayBox, dayErr);
+    // Seven weekday buttons: each jumps to the most recent such day (today counts once something was ordered), so "Friday" is one tap.
+    const wdRow = h('div', { class: 'of-wdrow', role: 'group', 'aria-label': 'Jump to a weekday' });
+    // Shows the most recent day with this weekday number (0 is Sunday), looking back up to a week.
+    const jumpWeekday = (wd) => {
+      const today = U.serviceDate(nowMs(), svcHour());
+      let todayHas = false;
+      try { todayHas = (storeDataset(false).tickets || []).some((t) => t && t.serviceDate === today); } catch (e) { todayHas = false; }
+      // Today only counts when something was ordered today; otherwise the same weekday last week is meant.
+      for (let i = todayHas ? 0 : 1; i < 8; i++) { const k = U.addDays(today, -i); if (U.weekday(k) === wd) { showDay(k, true); return; } }
+    };
+    [1, 2, 3, 4, 5, 6, 0].forEach((wd) => {
+      // Handles a tap on one weekday button.
+      const onTap = () => jumpWeekday(wd);
+      wdRow.appendChild(h('button', { type: 'button', class: 'btn btn-sm of-wd', onClick: onTap }, U.WEEKDAYS[wd]));
+    });
+    const dayGroup = h('div', { class: 'of-fg', hidden: true }, h('span', { class: 'of-fl' }, 'Day'), dayBox, wdRow, dayErr);
     body.append(
       h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Range'), rangeSeg),
       dayGroup,

@@ -54,7 +54,27 @@ test('a backup from the other kind of kitchen is flagged with a plain refusal', 
   const state = E.newState({ now: T0 });
   const d = BP.describeBackup({ state, savedAt: T0, mode: 'demo' }, 'real');
   assert.equal(d.wrongKitchen, true);
-  assert.match(d.refusal, /practice kitchen/);
+  assert.match(d.refusal, /demo kitchen/);
   assert.equal(BP.describeBackup({ state, savedAt: T0, mode: 'real' }, 'real').wrongKitchen, false);
   assert.ok(d.rows.some((r) => r[0] === 'Dishes'));
+});
+
+test('the sales CSV has plain headers, one row per day, a Total row, and plain money digits', () => {
+  const k = { s: E.newState({ now: T0 }), now: T0 };
+  const step = (type, payload, dt = MIN) => { k.now += dt; const r = E.apply(k.s, type, payload, k.now); assert.equal(r.report, 'ok', type + ' ' + r.report); k.s = r.state; return r; };
+  const a = step('createTicket', { customer: 'A', items: [{ menuId: 'tea' }, { menuId: 'slaw' }] }).info.orderId;
+  const b = step('createTicket', { customer: 'B', items: [{ menuId: 'tea' }] }).info.orderId;
+  step('payOrder', { orderId: a, method: 'cash', tip: 2 });
+  step('payOrder', { orderId: b, method: 'card', tip: 1.5 });
+  const csv = BP.salesCsv(k.s, 4);
+  const lines = csv.trim().split('\r\n');
+  assert.equal(lines[0], 'Date,Orders paid,Sales (after discounts),Discounts given,Tax,Tips,Total collected,Collected in cash,Collected by card,Collected other');
+  assert.equal(lines.length, 3, 'header, one day, total');
+  const day = lines[1].split(','), tot = lines[2].split(',');
+  assert.equal(day[1], '2');
+  assert.equal(tot[0], 'Total');
+  assert.equal(day[5], '3.50', 'tips add up');
+  assert.equal(Number(day[7]) + Number(day[8]) + Number(day[9]), Number(day[6]), 'methods add up to the total collected');
+  assert.doesNotMatch(csv, /\$/);
+  assert.equal(BP.salesCsv(E.newState({ now: T0 }), 4).trim().split('\r\n').length, 1, 'no paid orders: only the header');
 });

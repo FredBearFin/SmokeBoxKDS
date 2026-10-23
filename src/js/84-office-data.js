@@ -469,7 +469,7 @@
         nameField, zoneField, catField,
         h('div', { class: 'od-item-actions' }, archChip, archBtn)),
       h('div', { class: 'od-item-grid' },
-        h('div', { class: 'od-block' }, price.el, h('div', { class: 'od-lab' }, 'How it is cooked'), trackSeg, h('p', { class: 'od-hint' }, 'One tap: done when it is plated, like tea or slaw. Start, then done: the cook taps Start, and Done when it is finished, like brisket or fries.')),
+        h('div', { class: 'od-block' }, price.el, h('div', { class: 'od-lab' }, 'How it is cooked'), trackSeg, h('p', { class: 'od-hint' }, 'One tap: done when it is plated, like a drink or a cold side. Start, then done: the cook taps Start, and Done when it is finished, like a roast or fries.')),
         h('div', { class: 'od-block' }, prep.el, confSeg, learnedEl),
         h('div', { class: 'od-block od-block-bom' }, bom.el)),
       status.el);
@@ -1533,6 +1533,18 @@
     const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn),
       btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: showReport }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: saveReport }));
     repRow.dataset.pilot = 'report';
+    // Saves the sales-by-day file for an accountant: one row per day with sales, tax, tips and how it was paid.
+    async function downloadSalesCsv() {
+      const BPs = SB.office && SB.office.backupPure;
+      if (!BPs) { exStatus.bad('Could not make the sales file. Reload and try again.'); return; }
+      const s = stateNow();
+      const text = BPs.salesCsv(s, s.settings.service && s.settings.service.dayStartHour);
+      const fname = 'smokebox-sales-by-day' + (SB.store.mode && SB.store.mode() === 'demo' ? '-demo' : '') + '-' + todayKey() + '.csv';
+      const days = Math.max(0, text.split('\r\n').length - 3);
+      const res = await saveFile(fname, text, 'text/csv');
+      if (res.how === 'host' || res.how === 'browser') exStatus.ok((res.how === 'host' ? 'Saved ' : 'Download started: ') + fname + (days ? ' (' + days + ' ' + U.plural(days, 'day') + ' of sales).' : ': it has only the column names because no order has been paid yet.'));
+      else reportSave(res, fname, text, 'sales file');
+    }
     const csvBtns = [['tickets', 'Tickets'], ['items', 'Items'], ['orders', 'Orders'], ['events', 'Events'], ['batches', 'Batches']].map(([k, l]) => {
       // Each spreadsheet button downloads its own table.
       const b = btn(l, { icon: 'download', cls: 'btn-sm', onClick: () => downloadCsv(k, l.toLowerCase()) });
@@ -1540,6 +1552,9 @@
       b.dataset.csv = k;
       return b;
     });
+    const salesBtn = btn('Sales by day (for your accountant)', { icon: 'download', cls: 'btn-sm', onClick: downloadSalesCsv });
+    salesBtn.dataset.csv = 'sales';
+    csvBtns.unshift(salesBtn);
     // Says when the last backup was made on this device, so a stale one is easy to spot.
     const BP = SB.office && SB.office.backupPure;
     const lastLine = para('', 'od-p od-lastbackup');
@@ -1656,10 +1671,10 @@
     // Danger zone: two reset buttons, each opening a box that asks for a typed word before it will act.
     pn.body.appendChild(h('h3', { class: 'od-sub od-danger-h', id: undefined }, 'Danger zone: erase data'));
     const resetStatus = statusLine();
-    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I clear live data', checked: true });
-    const resetLiveBtn = btn('Reset live data', { icon: 'trash', cls: 'btn-danger' });
+    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I erase live data', checked: true });
+    const resetLiveBtn = btn('Erase live data', { icon: 'trash', cls: 'btn-danger' });
     resetLiveBtn.dataset.action = 'reset-live';
-    const resetAllBtn = btn('Reset everything', { icon: 'trash', cls: 'btn-danger' });
+    const resetAllBtn = btn('Erase everything', { icon: 'trash', cls: 'btn-danger' });
     resetAllBtn.dataset.action = 'reset-all';
     const dangerBox = h('div', { class: 'od-danger-box', hidden: true, role: 'group', 'aria-label': 'Confirm erasing data' });
     // Shows the confirm box: what will be erased, a field to type the word into, and a button that stays off until it matches.
@@ -1689,14 +1704,14 @@
     resetLiveBtn.addEventListener('click', () => {
       const s = stateNow(), k = keep.getValue();
       askTyped({
-        opener: resetLiveBtn, title: 'Clear live data?', word: 'RESET', label: 'Clear live data',
+        opener: resetLiveBtn, title: 'Erase live data?', word: 'ERASE', label: 'Erase live data',
         lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any practice orders, and sets the clock back to real time.',
           k ? 'Your dishes, ingredient edits, limits, pacing and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
           'There is no undo. Back up first if you might want this data.'],
         // Clears the live data after the word was typed.
         run: () => {
           const rep = SB.store.resetLive({ keepSettings: k, starter: false });
-          if (rep === 'ok') { resetStatus.ok('Live data cleared. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data cleared.', { tone: 'ok' }); }
+          if (rep === 'ok') { resetStatus.ok('Live data erased. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data erased.', { tone: 'ok' }); }
           else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
         },
       });
@@ -1707,7 +1722,7 @@
       askTyped({
         opener: resetAllBtn, title: 'Erase everything on this device?', word: 'ERASE', label: 'Erase everything',
         lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
-          'Your Day or Night, Ember or Paper and text-size choices are kept.', 'There is no undo. Back up first if you might want any of it back.'],
+          'Your display choices (themes and text size) are kept.', 'There is no undo. Back up first if you might want any of it back.'],
         // Erases everything after the word was typed.
         run: () => {
           const rep = SB.store.reset();
@@ -1717,7 +1732,7 @@
       });
     });
     pn.body.append(
-      para('Clearing live data removes tickets, records and batches. Resetting everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
+      para('Erasing live data removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
       h('div', { class: 'od-toggle-row' }, keep),
       h('div', { class: 'od-actions' }, resetLiveBtn, resetAllBtn), dangerBox, resetStatus.el);
 
