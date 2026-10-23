@@ -5811,6 +5811,8 @@ a.of-nav:active { background: var(--press); }
     setChips: '{ chips: string[] | null }',
     clearDemoTickets: '{}',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety", fridge?:boolean, fridgeDays?, outHours? }',
+    logEquipmentTemp: '{ unit:"cooler"|"freezer"|"display"|"other", f, label?, who? }',
+    logThermometerCheck: '{ f, method?:"ice"|"boiling"|"other", who? }',
     coldTakeOut: '{ batchId, who? }',
     coldReturn: '{ batchId, who? }',
     setPortions: '{ menuId, on:boolean, count? }',
@@ -5834,7 +5836,7 @@ a.of-nav:active { background: var(--press); }
   const PAST_LIMIT_MS = 48 * H;
   // The reasons a batch can be thrown out. SAFETY_DISCARDS are the three that mean a food-safety problem;
   // those put dishes on "safety hold". Manual, quality and other do not.
-  const DISCARD_REASONS = ['expired', 'temp', 'cooling', 'manual', 'quality', 'other', 'fridgeDate', 'outTime'];
+  const DISCARD_REASONS = ['expired', 'temp', 'cooling', 'manual', 'quality', 'other', 'fridgeDate', 'outTime', 'datemark'];
   const SAFETY_DISCARDS = { expired: 1, temp: 1, cooling: 1 };
   // Lists of allowed words. The 1 only means "is allowed" (tested with hasOwn). STATUS_OF turns a gate
   // action word into the status word stored on a batch.
@@ -5848,7 +5850,7 @@ a.of-nav:active { background: var(--press); }
   // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
   // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
   // safetyKeep bucket instead of being dropped.
-  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
   // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months). This is our own choice; no source gives a minimum, so ask your health department how long to keep records.
   const SAFETY_KEEP_MS = 190 * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
@@ -6678,7 +6680,7 @@ a.of-nav:active { background: var(--press); }
     tx.event('batch_status', { batchId: b.id, from: b.status, to: gt.status, action: gt.action });
   }
   // Throws a batch out: its grams become waste, it can never be served again, and the lost cost is logged.
-  function discardInto(tx, bi, reason, who) {
+  function discardInto(tx, bi, reason, who, note) {
     const b = tx.get('batches')[bi];
     const w = tx.batch(bi);
     const g0 = b.remainingG > 0 ? b.remainingG : 0;
@@ -6690,6 +6692,7 @@ a.of-nav:active { background: var(--press); }
     // Unknown is not zero: with no cost on record the event carries no cost field.
     const df = { batchId: b.id, ing: b.ing, g: g0, reason };
     if (unit !== null) df.cost = round(g0 * unit, 4);
+    if (note) df.note = note;
     tx.event('batch_discard', whoField(df, who));
   }
   // Re-runs the gate on every batch that is not already discarded (used when the safety settings change).
@@ -7709,7 +7712,9 @@ a.of-nav:active { background: var(--press); }
     refreshBatch(tx, bi);
     const nb = tx.get('batches')[bi];
     pushUndo(tx, 'coldMove', (b.label || 'Batch') + (to === 'line' ? ' taken out' : ' put back'), { batchId: b.id, before: b, at: t, discardedAt: nb.discardedAt });
-    tx.info = { batchId: b.id, place: nb.place, status: nb.status, canServe: nb.canServe, outMs: lineElapsedMs(nb, t) };
+    tx.info = { batchId: b.id, place: nb.place, status: nb.status, canServe: nb.canServe, outMs: lineElapsedMs(nb, t), discarded: nb.status === 'discard' };
+    // If this very move ended the batch, say so plainly: the move is recorded, and the batch was thrown out because of the owner's limit.
+    if (nb.status === 'discard') { tx.info.discardReason = nb.discardReason; tx.info.words = nb.discardReason === 'fridgeDate' ? 'Past your fridge limit, so it was thrown out.' : nb.discardReason === 'outTime' ? 'Past your out-of-fridge limit, so it was thrown out.' : 'It was thrown out.'; }
     return 'ok';
   }
   // Takes a fridge-kept cold batch out of the fridge (see coldMove).
@@ -7946,7 +7951,14 @@ a.of-nav:active { background: var(--press); }
     if (b.status === 'discard') return 'batchNotServable';
     const who = readWho(p);
     if (who === null) return 'badWho';
-    discardInto(tx, bi, p.reason, who);
+    // An optional few words of why, kept with the entry (most useful with the reason "other").
+    let note = '';
+    if (p.note != null) {
+      if (typeof p.note !== 'string' || p.note.length > 4 * C.limits.maxNoteLen) return 'noteTooLong';
+      note = cleanText(p.note);
+      if (note.length > C.limits.maxNoteLen) return 'noteTooLong';
+    }
+    discardInto(tx, bi, p.reason, who, note);
     const nb = tx.get('batches')[bi];
     pushUndo(tx, 'discard', (b.label || 'Batch') + ' discarded', { batchId: b.id, before: b, discardedAt: nb.discardedAt });
     tx.info = { batchId: b.id, g: nb.wasteG };
@@ -7958,15 +7970,54 @@ a.of-nav:active { background: var(--press); }
   A.sanitizeDone = function (tx, p) {
     const who = readWho(p || {});
     if (who === null) return 'badWho';
+    // Optional strip reading and where it was taken: a concentration in ppm, the product used and the place. All left out when not given.
+    const extra = {};
+    if (p && p.ppm != null) { if (!isNum(p.ppm) || p.ppm < 0 || p.ppm > 5000) { tx.info = { key: 'ppm', min: 0, max: 5000 }; return 'outOfBounds'; } extra.ppm = p.ppm; }
+    for (const k of ['product', 'where']) {
+      if (!p || p[k] == null) continue;
+      if (typeof p[k] !== 'string' || p[k].length > 200) { tx.info.key = k; return 'badPatch'; }
+      const v = cleanText(p[k]);
+      if (v.length > 30) { tx.info = { key: k, min: 0, max: 30 }; return 'outOfBounds'; }
+      if (v) extra[k] = v;
+    }
     const S = safetyOf(tx.get('settings'));
     const cur = tx.get('sanitize') || {};
     const due = sanitizeDueEff(tx.get('settings'), cur, tx.now);
     const lateMs = isNum(due) ? Math.max(0, tx.now - due) : 0;
     const lastAt = stampAfter(cur.lastAt, tx.now);
     tx.set('sanitize', { lastAt, dueAt: lastAt + S.sanitizeEveryH * H });
-    tx.event('sanitize_done', whoField({ onTime: lateMs === 0, lateMs }, who));
+    tx.event('sanitize_done', whoField(Object.assign({ onTime: lateMs === 0, lateMs }, extra), who));
     pushUndo(tx, 'sanitize', 'Sanitize logged', { before: cur, afterLastAt: lastAt });
     tx.info = { onTime: lateMs === 0, lateMs };
+    return 'ok';
+  };
+
+  // Logs a reading of a cooler, freezer or display case. Only a safety log entry: nothing in the kitchen state changes.
+  A.logEquipmentTemp = function (tx, p) {
+    const who = readWho(p || {});
+    if (who === null) return 'badWho';
+    if (!p || ['cooler', 'freezer', 'display', 'other'].indexOf(p.unit) < 0) { tx.info.key = 'unit'; return 'badPatch'; }
+    if (!isNum(p.f) || p.f < -60 || p.f > 200) { tx.info = { key: 'f', min: -60, max: 200 }; return 'outOfBounds'; }
+    const f = { unit: p.unit, f: p.f };
+    if (p.label != null) {
+      if (typeof p.label !== 'string' || p.label.length > 200) { tx.info.key = 'label'; return 'badPatch'; }
+      const v = cleanText(p.label);
+      if (v.length > 30) { tx.info = { key: 'label', min: 0, max: 30 }; return 'outOfBounds'; }
+      if (v) f.label = v;
+    }
+    tx.event('equip_temp', whoField(f, who));
+    tx.info = { unit: p.unit, f: p.f };
+    return 'ok';
+  };
+  // Logs that the food thermometer was checked against ice water or boiling water, with the reading it gave.
+  A.logThermometerCheck = function (tx, p) {
+    const who = readWho(p || {});
+    if (who === null) return 'badWho';
+    if (!p || !isNum(p.f) || p.f < 0 || p.f > 300) { tx.info = { key: 'f', min: 0, max: 300 }; return 'outOfBounds'; }
+    const method = p.method == null ? 'other' : p.method;
+    if (['ice', 'boiling', 'other'].indexOf(method) < 0) { tx.info.key = 'method'; return 'badPatch'; }
+    tx.event('thermometer_checked', whoField({ f: p.f, method }, who));
+    tx.info = { f: p.f, method };
     return 'ok';
   };
 
@@ -11527,6 +11578,13 @@ a.of-nav:active { background: var(--press); }
     // customers and orders, so both are dropped and the last-good copy is retaken from the new empty kitchen.
     try { storage.remove(LASTGOOD_KEY); storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); } catch (e) { /* ignore */ }
     st.corrupt = null;
+    // Actions queued for a hub that it never confirmed belong to the erased kitchen: they are dropped (and marked, so another
+    // tab's saved copy cannot bring them back), and only the erase itself stays in the queue so the hub is told. Nothing queued
+    // is touched when the erase failed, because we returned above.
+    const ri = outbox.map((x) => x.type).lastIndexOf('resetLive');
+    for (const x of outbox.slice(0, ri < 0 ? outbox.length : ri)) acked.add(x.opId);
+    outbox = ri < 0 ? [] : outbox.slice(ri);
+    if (ri < 0) { try { storage.remove(OUTBOX_KEY); } catch (e) { /* ignore */ } } else saveOutbox();
     snapWanted = 'startOver'; persistNow(); maybeSnapshot(savedAt);
     if (!keep && SB.config && typeof SB.config.applyCustom === 'function') {
       try { SB.config.applyCustom({}); SB.config.saveCustom({ rename: {}, add: {} }); } catch (e) { /* the names stay as they were */ }
@@ -35130,9 +35188,11 @@ a.of-nav:active { background: var(--press); }
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const KIND = {
     temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
-    batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
+    equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
   };
-  const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit' };
+  const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit', datemark: 'Past the date mark' };
+  const UNIT = { cooler: 'Cooler', freezer: 'Freezer', display: 'Display case', other: 'Equipment' };
+  const METHOD = { ice: 'ice water', boiling: 'boiling water', other: 'other method' };
 
   // ---- 1. Pure rows ----
 
@@ -35156,10 +35216,12 @@ a.of-nav:active { background: var(--press); }
     switch (e.type) {
       case 'temp_logged': return (isNum(e.f) ? U.tempText(e.f) : '') + (lateWords(e) ? ', ' + lateWords(e) : '');
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
-      case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '');
+      case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
+      case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '');
+      case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '');
       case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
       case 'cooling_started': return isNum(e.g) ? U.weightText(e.g) : '';
-      case 'sanitize_done': return lateWords(e);
+      case 'sanitize_done': return [lateWords(e), isNum(e.ppm) ? 'strip ' + e.ppm + ' ppm' : '', e.product || '', e.where ? 'at ' + e.where : ''].filter(Boolean).join(', ');
       case 'quality_extend': return isNum(e.until) ? 'Until ' + U.fmtTime(e.until) : '';
       default: return e.note || '';
     }
@@ -35181,6 +35243,8 @@ a.of-nav:active { background: var(--press); }
     const S = (state.settings || {}).safety || {};
     if (b.kind === 'cooling') {
       out.push('Cooling began ' + U.fmtDateShort(U.dateKey(made)) + ' ' + U.fmtTime(made));
+      if (e.type === 'temp_logged' && isNum(e.t) && isNum(b.stage1At) && e.t === b.stage1At) out.push('First cooling mark reached');
+      if (e.type === 'temp_logged' && isNum(e.t) && isNum(b.finalAt) && e.t === b.finalAt) out.push('Final cooling mark reached');
       if (isNum(e.t) && e.type === 'temp_logged' && e.t >= made) out.push(spanWords(e.t - made) + ' into cooling');
       const c = S.cooling || {};
       if (isNum(c.stage1ToF) && isNum(c.stage1H) && isNum(c.finalF) && isNum(c.totalH)) out.push('Your limit: ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' h, ' + U.tempText(c.finalF) + ' within ' + c.totalH + ' h');
@@ -35255,7 +35319,7 @@ a.of-nav:active { background: var(--press); }
   }
 
   // The honest line about what this record does not hold, so nobody reads it as the whole paperwork.
-  const NOT_COVERED = 'This record covers batches only. It has no cooler or freezer readings, sanitizer strip readings or thermometer checks; keep those on your own sheet and ask your health department what to keep and for how long.';
+  const NOT_COVERED = 'Cooler, freezer, thermometer-check and sanitizer strip entries appear here only if someone logged them in Smokebox; keep anything else on your own sheet and ask your health department what to keep and for how long.';
 
   // Opens the sheet: pick a date range, see the record, print it.
   function openInspectorLog() {
