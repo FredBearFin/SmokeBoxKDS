@@ -1932,6 +1932,8 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-strip-x { flex: none; display: grid; place-items: center; width: calc(44px * var(--fl-k)); border: 0; background: transparent; color: inherit; opacity: 0.75; cursor: pointer; }
 .fl-strip-x:hover, .fl-strip-x:focus-visible { opacity: 1; background: rgba(127, 127, 127, 0.18); }
 .fl-strip-x:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -3px; }
+/* A sanitize chip that needs attention names itself ("Sanitize not logged"), so a bare "not logged" is never a puzzle. */
+.fl-san[data-urgent="true"] .fl-chip-w { display: inline; }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -2641,8 +2643,9 @@ a.of-nav:active { background: var(--press); }
 .of-filters { position: sticky; top: 0; z-index: 6; background: color-mix(in srgb, var(--bg) 94%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
 .of-filters > * { max-width: 1480px; margin-left: auto; margin-right: auto; }
 .of-fsum { display: none; }
-.of-fbody { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2) var(--sp-5); padding: var(--sp-3) var(--of-gut) var(--sp-2); }
+.of-fbody { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--of-gut) var(--sp-2); }
 .of-fg { display: grid; gap: 4px; min-width: 0; }
+.of-fg[hidden] { display: none; }
 .of-fl, .of-flab > span { font-size: var(--fs-1); font-weight: var(--w-semi); color: var(--ink2); }
 .of-flab { display: grid; gap: 4px; }
 .of-seg { gap: 2px; }
@@ -18678,14 +18681,14 @@ a.of-nav:active { background: var(--press); }
     const rows = [];
     const el = h('section', { class: 'fl-strip', role: 'region', 'aria-label': 'Needs attention', 'aria-live': 'polite', hidden: true });
     // The sound check: shown while sound is on but the browser has not yet allowed it. One tap allows it and plays a test.
-    const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', hidden: true, onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); playHere(() => { chime(); speak('Sound is on.'); }); } },
+    const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); playHere(() => { chime(); speak('Sound is on.'); }); } },
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
     const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, clearBtn('Clear this notice', 'snd'));
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
-    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', hidden: true, onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
+    const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
     const pauseWrap = h('div', { class: 'fl-strip-bar fl-bar-pause', hidden: true }, pauseBar, clearBtn('Clear this notice', () => 'pause:' + (pauseBar.textContent || '')));
     el.appendChild(pauseWrap);
     for (let i = 0; i < 3; i++) {
@@ -24688,15 +24691,17 @@ a.of-nav:active { background: var(--press); }
     srcSeg.classList.add('of-seg');
     const srcNote = h('span', { class: 'of-fnote', hidden: true });
 
+    // The Day group only shows for Yesterday or One day, so the other filters fit on one row.
+    const dayGroup = h('div', { class: 'of-fg', hidden: true }, h('span', { class: 'of-fl' }, 'Day'), dayBox, dayErr);
     body.append(
       h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Range'), rangeSeg),
-      h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Day'), dayBox, dayErr),
+      dayGroup,
       custom,
       h('div', { class: 'of-fg' }, h('label', { class: 'of-fl', for: 'of-channel' }, 'Channel'), chanSel),
       h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Source'), srcSeg, srcNote));
     const banner = h('p', { class: 'of-banner', role: 'status' }, h('span', { class: 'of-chip', hidden: true }, 'Sample data'), h('span', { class: 'of-banner-t' }));
     f.filters.append(summary, body, banner);
-    Object.assign(M, { dayPrev, dayNext, dayIn, dayErr, rangeSeg, srcSeg, chanSel, dFrom, dTo, dErr, custom, banner, summary, srcNote, fbody: body });
+    Object.assign(M, { dayGroup, dayPrev, dayNext, dayIn, dayErr, rangeSeg, srcSeg, chanSel, dFrom, dTo, dErr, custom, banner, summary, srcNote, fbody: body });
 
     sc.on(summary, 'click', () => { const open = f.filters.dataset.open !== 'true'; f.filters.dataset.open = open ? 'true' : 'false'; summary.setAttribute('aria-expanded', open ? 'true' : 'false'); });
     sc.on(chanSel, 'change', () => { F.channel = chanSel.value; filtersChanged('Channel: ' + (chanSel.selectedOptions[0] ? chanSel.selectedOptions[0].textContent : F.channel)); });
@@ -24720,6 +24725,7 @@ a.of-nav:active { background: var(--press); }
     M.dayIn.max = today; M.dayIn.value = key;
     M.dayNext.disabled = key >= today;
     M.dayErr.hidden = true; M.dayIn.removeAttribute('aria-invalid');
+    M.dayGroup.hidden = !(M.filters.range.id === 'day' || M.filters.range.id === 'yesterday');
   }
   // Shows exactly one service day. Stepping onto today gives the live Today preset so it keeps rolling
   // forward; any other day (or the One day button, fixed = true) is a fixed 'day' range.
@@ -29205,8 +29211,10 @@ a.of-nav:active { background: var(--press); }
     inp = inp || {};
     // Picks the singular or plural word for a count.
     const plural = (n, one, many) => (n === 1 ? one : many);
-    const late = inp.late || 0, near = inp.nearLate || 0, names = Array.isArray(inp.out86) ? inp.out86 : [];
+    const late = inp.late || 0, near = inp.nearLate || 0, names = Array.isArray(inp.out86) && !inp.fresh ? inp.out86 : [];
     const run = runOutLine(inp.brisket, inp.now);
+    // Before anything is cooked or ordered nothing is "out": say so, not "17 items 86'd and no brisket".
+    if (inp.fresh) { run.tone = 'info'; run.text = 'Nothing cooked yet. Log a batch to track brisket.'; }
     return {
       cards: [
         { id: 'money', label: 'Paid so far today', value: U.fmtMoney(inp.collected || 0), tone: 'info',
@@ -29216,7 +29224,7 @@ a.of-nav:active { background: var(--press); }
         { id: 'late', label: 'Late tickets', value: String(late), tone: late > 0 ? 'bad' : 'good',
           sub: late > 0 ? 'Past their overdue time' : near > 0 ? 'None late, ' + near + ' close to late' : 'Nothing late' },
         { id: 'out86', label: '86 list', value: String(names.length), tone: names.length ? 'warn' : 'good',
-          sub: names.length ? names.slice(0, 4).join(', ') + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '') : 'Everything is on the menu' },
+          sub: inp.fresh ? 'Nothing cooked yet, so nothing is 86' : names.length ? names.slice(0, 4).join(', ') + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '') : 'Everything is on the menu' },
         { id: 'brisket', label: 'Brisket', value: run.tone === 'bad' ? 'None' : run.tone === 'warn' ? U.fmtTime(inp.brisket.shortfallAt) : run.tone === 'good' ? 'Lasts' : '-', tone: run.tone, sub: run.text, wide: true },
       ],
     };
@@ -29244,7 +29252,7 @@ a.of-nav:active { background: var(--press); }
     } catch (e) { /* no estimate: the card then says there is not enough data */ }
     const onHandG = st.select.batches().filter((b) => b.ing === 'brisket' && b.canServe !== false && b.kind !== 'cooling' && b.remainingG > 0).reduce((a, b) => a + b.remainingG, 0);
     return { now, collected: sales.collected, paidOrders: sales.checks, openOrders: sales.open ? sales.open.orders : 0, openValue: sales.open ? sales.open.value : 0,
-      tickets: counts.all, late: counts.overdue, nearLate: counts.warn, out86: out.map((x) => x.name), brisket: { onHandG, shortfallAt, rateKnown } };
+      fresh: !state.batches.length && !counts.all, tickets: counts.all, late: counts.overdue, nearLate: counts.warn, out86: out.map((x) => x.name), brisket: { onHandG, shortfallAt, rateKnown } };
   }
 
   // ---- 3. The panel ----
