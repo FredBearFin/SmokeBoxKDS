@@ -16,7 +16,7 @@
   const cents = (v) => Math.round(v * 100) / 100;
   // Tip choices worked out from a base amount (the food after any discount): 15, 18, 20 and 25 percent in dollars.
   function tipPresets(base) {
-    return [15, 18, 20, 25].map((pct) => ({ pct, label: pct + '%', amount: cents((Math.max(0, base) * pct) / 100) }));
+    return [15, 18, 20, 25].map((pct) => ({ pct, label: pct + '%', amount: SB.orderMath ? SB.orderMath.pctOfDollars(base, pct) : cents((Math.max(0, base) * pct) / 100) }));
   }
   // The tip that brings the amount to collect up to a whole dollar (a total of 23.40 gives 0.60); 0 if already whole.
   function roundUpTip(total) { return cents(Math.ceil(cents(total) - 1e-9) - cents(total)); }
@@ -444,7 +444,7 @@
       if (tot.taxRate > 0) rows.push(['Tax (' + tot.taxRate + '%)', money(tot.tax)]);
       rows.push(['Order total', money(tot.total)]);
       const tip = r.err || Number.isNaN(r.t) ? 0 : r.t;
-      if (tip > 0) rows.push(['Tip', money(tip)], ['To collect', money(tot.total + tip)]);
+      if (tip > 0) rows.push(['Tip', money(tip)], ['To collect', money(Math.round(tot.total * 100 + tip * 100 + 1e-7) / 100)]);
       U.clear(calc);
       rows.forEach((row, i) => calc.append(h('dt', { class: i === rows.length - 1 ? 'is-last' : '' }, row[0]), h('dd', { class: 'num' + (i === rows.length - 1 ? ' is-last' : '') }, row[1])));
       quick.forEach((q) => {
