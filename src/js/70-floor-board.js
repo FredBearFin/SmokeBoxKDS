@@ -38,9 +38,12 @@
   // Keys each device role may use. A kitchen device has no order entry, orders or demo; a front device has no hold
   // cabinet; all-in-one and manager devices keep every key exactly as before.
   const ROLE_KEYS = { kitchen: 'rh8z?123456jksfbl', front: 'nor8dz?123456jksfbl' };
-  // True when a device with this role may use this shortcut key (lower-case letter, digit or ?; Escape always may).
+  // Named keys a USB bump bar can send (Enter bumps, arrows select). Every role may use them, like Escape.
+  const BAR_KEYS = ['Escape', 'Enter', 'ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'];
+  // True when a device with this role may use this shortcut key (lower-case letter, digit or ?; Escape, Enter and
+  // the arrows always may, so a bump bar that sends them works on a kitchen device).
   F.roleAllows = function (role, key) {
-    if (key === 'Escape') return true;
+    if (BAR_KEYS.indexOf(key) >= 0) return true;
     const set = ROLE_KEYS[role];
     return set ? set.indexOf(String(key).toLowerCase()) >= 0 && String(key).length === 1 : true;
   };
