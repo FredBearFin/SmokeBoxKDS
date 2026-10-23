@@ -249,7 +249,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 2595,
+  "addThreeDishesWallMs": 2547,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -619,7 +619,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 1928,
+  "addThreeDishesWallMs": 1921,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -642,5 +642,170 @@
   },
   "errors": 0,
   "modeledSeconds": 79
+ },
+ "E": {
+  "run": "E",
+  "steps": [
+   {
+    "n": 1,
+    "name": "Add the dish",
+    "intent": "Brisket plate at the pit.",
+    "taps": 3,
+    "typed": 2,
+    "picks": 0,
+    "chars": 18,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "Add your first dish"
+     },
+     {
+      "kind": "type",
+      "text": "Dish name = \"Brisket plate\""
+     },
+     {
+      "kind": "type",
+      "text": "Price = \"14.00\""
+     },
+     {
+      "kind": "tap",
+      "text": "Where it is made: Pit"
+     },
+     {
+      "kind": "tap",
+      "text": "Save and add another"
+     }
+    ],
+    "screen": "Sheet: Dishes and prices",
+    "shot": "01-E-dish-added.png"
+   },
+   {
+    "n": 2,
+    "name": "Say yes to cooking ahead",
+    "intent": "The question appears under the form after the first dish.",
+    "taps": 1,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "info",
+      "text": "Question card: Do you cook any of this ahead and hold it? Brisket in the morning, slaw in the cooler. If you do, Smokebox can track eac"
+     },
+     {
+      "kind": "tap",
+      "text": "Yes, I cook ahead"
+     }
+    ],
+    "screen": "Sheet: Cooked-ahead food",
+    "shot": "02-E-cooked-ahead-sheet.png"
+   },
+   {
+    "n": 3,
+    "name": "Add Brisket and link it",
+    "intent": "Name, tick the dish, save.",
+    "taps": 2,
+    "typed": 1,
+    "picks": 0,
+    "chars": 7,
+    "notes": [
+     {
+      "kind": "type",
+      "text": "Cooked-ahead name = \"Brisket\""
+     },
+     {
+      "kind": "tap",
+      "text": "Brisket plate uses it"
+     },
+     {
+      "kind": "tap",
+      "text": "Save cooked-ahead item"
+     }
+    ],
+    "screen": "Sheet: Cooked-ahead food",
+    "shot": "03-E-brisket-added.png"
+   },
+   {
+    "n": 4,
+    "name": "Log a first batch",
+    "intent": "Straight to the cabinet with Brisket chosen.",
+    "taps": 2,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "Log a first batch"
+     },
+     {
+      "kind": "info",
+      "text": "Starting values are pre-filled from the product (raw weight, cook endpoint, first reading 150 F); this run accepts them as a cook would after checking the probe."
+     },
+     {
+      "kind": "tap",
+      "text": "Put in hold cabinet"
+     }
+    ],
+    "screen": "Sheet: Hold cabinet",
+    "toasts": [
+     "Brisket batch 1 is in the cabinet: 2.00 kg cooked, first reading 150 °F."
+    ],
+    "shot": "04-E-batch-logged.png"
+   },
+   {
+    "n": 5,
+    "name": "Take an order for it",
+    "intent": "Close the sheets, New ticket, the dish, cash, send.",
+    "taps": 5,
+    "typed": 0,
+    "picks": 0,
+    "chars": 0,
+    "notes": [
+     {
+      "kind": "tap",
+      "text": "Close a sheet"
+     },
+     {
+      "kind": "tap",
+      "text": "Close a sheet"
+     },
+     {
+      "kind": "tap",
+      "text": "New ticket"
+     },
+     {
+      "kind": "info",
+      "text": "1 dish tile(s) orderable after logging the batch."
+     },
+     {
+      "kind": "tap",
+      "text": "Cash"
+     },
+     {
+      "kind": "tap",
+      "text": "Send to kitchen"
+     }
+    ],
+    "screen": "Kitchen board",
+    "toasts": [
+     "Brisket batch 1 is in the cabinet: 2.00 kg cooked, first reading 150 °F.",
+     "Ticket #101 sent to 1 station. Paid $14.00 by cash."
+    ],
+    "shot": "05-E-cook-ahead-paid.png"
+   }
+  ],
+  "taps": 14,
+  "typed": 3,
+  "picks": 0,
+  "chars": 25,
+  "reads": 5,
+  "deadEnds": 0,
+  "confusing": 0,
+  "extraTaps": 0,
+  "batchesLogged": 1,
+  "firstPaidTicket": true,
+  "errors": 0,
+  "modeledSeconds": 52
  }
 }

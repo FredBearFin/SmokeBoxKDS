@@ -76,3 +76,29 @@ Tests: `test/setup-wizard.e2e.mjs` now has 31 checks (all pass), including Undo,
 Not checked in round 3: the new settings grouping on phone width and in Night; a station renamed then restored on another device (names are per browser, as the config warns; a backup does not carry them); more than 8 added stations (the config's limit); Reload button wording on a real tablet; the board's own station tabs after hiding (they still show every station); what A1 and A3 hide when cook-ahead is No (their gating was not merged when I wired the setting).
 
 Questions for Freddy: (a) Should hiding a station also hide its board tab? That needs a small change in the shared config and board. (b) Is "Change stations" too much for a first run, or fine because it is folded shut? (c) Do you want dish reorder? It needs an engine action first.
+
+## Round 4 additions (branch night/a2-r4)
+
+New measured run E: the cook-ahead path from a blank kitchen. The owner adds one dish (Brisket plate), taps "Yes, I cook ahead", adds Brisket (hot, 4 h default), links the dish, logs a first batch in the cabinet with the pre-filled values, then takes a paid order for it. Same model and limits as above (modeled time, headless Chromium, no real person).
+
+| Run | Taps | Typed fields | List choices | Modeled time | Result |
+|---|---|---|---|---|---|
+| A: three dishes, four stations | 13 | 6 | 0 | about 1.4 min | paid |
+| D: three dishes, one station | 10 | 6 | 0 | about 1.3 min | paid |
+| **E: one cooked-ahead dish, Brisket added and linked, first batch logged, order paid** | **14** | **3** (dish name, price, Brisket) | 0 | **about 0.9 min** | 1 batch logged, paid |
+
+The batch is logged with the form's starting values (raw weight, cook endpoint, first reading 150 F). A real cook would check the probe and change them, so real time is longer. Cooked-ahead is optional: runs A and D never touch it.
+
+What changed:
+1. **Cooked-ahead food.** After the first dish the Dishes sheet asks "Do you cook any of this ahead and hold it?" with "Yes, I cook ahead" (turns the cook-ahead setting on and opens the sheet) and "No, skip this" (remembered). The "Cooked-ahead food" sheet takes a name, hot or cold, how long it may stay (4 h default, with a note that the local health code decides and to ask the health department), an optional usual batch size in kg, and a tick list of dishes with grams per serving (150 is a starting guess). It calls addIngredient, then updateMenuItem with a bom for each ticked dish; the dish's existing recipe lines are kept. "Log a first batch" opens the cabinet on the new batch form with the product chosen. An empty cabinet Product list now says "No cooked-ahead items yet" with an "Add a cooked-ahead item" button, and hides the weight form and the Put in hold cabinet button until there is a product.
+2. **Portions on hand.** A dish row has "I count what I made" (starting number, then Start counting). A counted dish shows "N left" (or "0 left (sold out)"), "+10", a custom Add, and Stop counting. A dish that already lists ingredients gets the plain refusal. The hidden "Portions of X" ingredient is never listed in my sheets.
+3. **Stations: Not used.** Hide is now "Not used" / "Use again". A station marked Not used leaves the add-form tiles and its board tab, unless it has open tickets or is the tab being viewed (so no ticket is ever out of sight). Done with a small `F.applyHiddenTabs` in the board plus a CSS hide, no shared-config edit.
+4. A list bug found while testing: the dish list did not redraw after a button press inside a row. Fixed (it now waits only while a text box is being typed in).
+
+Tests: `test/setup-wizard.e2e.mjs` has 38 checks, all pass (adds the cooked-ahead question, Brisket added and linked, first batch form, portions 20 left and +10 to 30, the hidden ingredient not shown, a Not used station losing its tab). Unit suite 543 or 544 pass; one run showed 1 failure that did not repeat in two re-runs (0 fail), so a flaky timing test; I did not find which.
+
+Screenshots looked at: `r4-question-blank` (module off, question after the first dish), `r4-portions`, `r4-added-night` (Night), `r4-cooked-phone-390`, `r4-portions-phone-390`, `r4-cabinet-no-product`, and the E run steps.
+
+Not checked: the order screen's wording when a counted dish runs out (A1's sentence; I only saw the row text); real cooking yields (a new item has no yield or cook model, so a batch counts cooked weight 1 to 1 with raw until the owner enters real numbers); cold items and a batch size above 1000 kg; undo of Add item (the engine supports it, my sheet does not expose it); Stock and 86 office lists still need A3 to filter the hidden "Portions of" ingredients.
+
+Questions for Freddy: (a) Is 4 hours the right careful default, and should the sheet name a typical value for cold food? (b) Is 150 grams per serving a sensible starting guess, or should the owner be asked? (c) Should "Yes, I cook ahead" turn the whole cook-ahead part on right there, or ask once more?

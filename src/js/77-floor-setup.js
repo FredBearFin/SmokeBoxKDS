@@ -54,6 +54,7 @@
 
   const KEY_DRAFT = 'smokebox.v1.setup.draft'; // the half-typed dish {name, price, zone}, kept so a closed tab loses nothing
   const KEY_LAST = 'smokebox.v1.setup.lastZone'; // the station chosen for the last saved dish
+  const KEY_CASKIP = 'smokebox.v1.setup.cookAheadSkipped'; // true once the owner said no to the cooked-ahead question
   const KEY_HIDDEN = 'smokebox.v1.setup.hiddenStations'; // station ids the owner hid from the Where is it made? tiles
   const KEY_EXAMPLES = 'smokebox.v1.setup.examples'; // ids of dishes that came from the example menu
 
@@ -127,6 +128,51 @@
     return r;
   }
 
+  // The hidden "Portions of <dish>" ingredient that counts one dish, or undefined. Never shown as an ingredient.
+  function portionIng(m) {
+    const s = SB.store.getState();
+    return s.ingredients.find((i) => i.forMenu === m.id && !i.archived && (m.bom || []).some((l) => l.ing === i.id));
+  }
+  // How many portions are left for a dish that is counted, or -1 when the dish is not counted.
+  function portionLeft(m) {
+    const ing = portionIng(m);
+    if (!ing) return -1;
+    const v = SB.store.getState().stock[ing.id];
+    return typeof v === 'number' ? v : 0;
+  }
+  // The small "I count what I made" part of a dish row: a start link, or "N left" with +10, a custom add and Stop.
+  function portionsRow(m) {
+    const left = portionLeft(m), msg = h('span', { class: 'fs-sub', role: 'status' });
+    const box = h('div', { class: 'dp-por' });
+    // Says what went wrong in plain words, such as a dish that already lists ingredients.
+    const say = (r) => { msg.textContent = r.ok ? '' : (r.report === 'portionsConflict' ? 'This dish already uses ingredients, so it cannot be counted by portions too.' : r.words); };
+    if (left < 0) {
+      const cnt = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', placeholder: 'How many', 'aria-label': 'How many ' + m.name + ' you made' });
+      // Starts counting portions for this dish at the typed number.
+      const go = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => {
+        const n = cnt.value.trim() === '' ? 0 : Number(cnt.value);
+        if (!Number.isInteger(n) || n < 0) { msg.textContent = 'Type a whole number, like 20.'; return; }
+        say(send('setPortions', { menuId: m.id, on: true, count: n }));
+      } }, 'Start counting');
+      const fold = h('details', { class: 'dp-fold' }, h('summary', null, h('span', null, 'I count what I made')), h('div', { class: 'fs-row' }, cnt, go, h('span', { class: 'fs-sub' }, 'Sells out when the count reaches zero.')));
+      box.append(fold, msg);
+      return box;
+    }
+    const more = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', placeholder: 'Add', 'aria-label': 'Portions of ' + m.name + ' to add' });
+    box.append(h('strong', { class: 'dp-left' }, left + ' left' + (left < 1 ? ' (sold out)' : '')),
+      // Adds ten portions to the count in one tap.
+      h('button', { type: 'button', class: 'btn btn-sm', onClick: () => say(send('restock', { ing: portionIng(m).id, g: 10 })) }, '+10'),
+      // Adds the typed number of portions to the count.
+      more, h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { const n = Number(more.value); if (!Number.isInteger(n) || n <= 0) { msg.textContent = 'Type how many you made, like 12.'; return; } say(send('restock', { ing: portionIng(m).id, g: n })); more.value = ''; } }, 'Add'),
+      // Stops counting portions for this dish; the books stay whole.
+      h('button', { type: 'button', class: 'btn btn-sm', onClick: () => say(send('setPortions', { menuId: m.id, on: false })) }, 'Stop counting'), msg);
+    return box;
+  }
+  // True when the cook-ahead module is on (an old saved kitchen with no setting counts as on).
+  function cookOn() { return SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : true; }
+  // The cooked-ahead items the owner has made: cook-ahead food that is not archived.
+  function cookItems() { return SB.store.getState().ingredients.filter((i) => i.tcs && !i.archived); }
+
   /* ---------- the Dishes and prices sheet ---------- */
 
   // Opens "Dishes and prices": the add form on top, the dishes added so far, and a small fold of extra ways to start.
@@ -198,10 +244,11 @@
         const hideBtn = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => {
           const now = U.storage.get(KEY_HIDDEN, []).filter((x) => x !== z.id);
           if (!isHid) now.push(z.id);
-          if (stations().every((s) => now.indexOf(s.id) >= 0)) { stSt.textContent = 'Keep at least one station showing.'; return; }
-          U.storage.set(KEY_HIDDEN, now); stSt.textContent = isHid ? z.name + ' is showing again.' : z.name + ' is hidden from the tiles. Dishes already made there keep it.';
+          if (stations().every((s) => now.indexOf(s.id) >= 0)) { stSt.textContent = 'Keep at least one station in use.'; return; }
+          U.storage.set(KEY_HIDDEN, now); stSt.textContent = isHid ? z.name + ' is in use again.' : z.name + ' is marked not used: it leaves the tiles here and its tab on the board while it has no tickets. Dishes already made there keep it.';
           paintStations(); paintTiles();
-        } }, isHid ? 'Show' : 'Hide');
+          if (SB.floor && SB.floor.applyHiddenTabs) SB.floor.applyHiddenTabs();
+        } }, isHid ? 'Use again' : 'Not used');
         stList.appendChild(h('div', { class: 'dp-strow' }, inp, hideBtn));
       });
       const addIn = h('input', { class: 'input', type: 'text', maxlength: SB.config.customLimits.name, placeholder: 'New station, like Bar', 'aria-label': 'New station name' });
@@ -209,7 +256,7 @@
       stList.appendChild(h('div', { class: 'dp-strow' }, addIn, h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { if (addIn.value.trim()) commitNames((sp) => { sp.add.zones = (sp.add.zones || []).concat([{ name: addIn.value }]); }); } }, ico('plus', 18), h('span', null, 'Add station'))));
     }
     const stFold = h('details', { class: 'dp-fold dp-stfold' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Change stations')),
-      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'Name the places in your kitchen the way your cooks say them. Hide any you do not use. If you only have one, you will not be asked.'), stList, stSt, stReload));
+      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'Name the places in your kitchen the way your cooks say them. Tap Not used on any you do not have. If you only have one, you will not be asked.'), stList, stSt, stReload));
     paintStations(); paintTiles();
     const whereBlock = h('div', { class: 'field' }, whereLabel, tiles, zoneErr, stFold);
 
@@ -308,8 +355,9 @@
     // Rebuilds the list of dishes when it has changed and no box in it is being typed in.
     function paintList() {
       const mine = activeDishes();
-      const sig = mine.map((m) => m.id + '|' + m.name + '|' + m.price + '|' + m.zone).join(';');
-      if (sig === listSig || listBox.contains(doc.activeElement)) return;
+      const sig = mine.map((m) => m.id + '|' + m.name + '|' + m.price + '|' + m.zone + '|' + portionLeft(m)).join(';');
+      const typing = listBox.contains(doc.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(doc.activeElement.tagName);
+      if (sig === listSig || typing) return;
       listSig = sig;
       dishesHead.hidden = mine.length === 0;
       const ex = U.storage.get(KEY_EXAMPLES, []);
@@ -336,11 +384,40 @@
           if (send('updateMenuItem', { id: m.id, patch: { archived: true } }).ok) showUndo(m);
         } }, ico('x', 18), h('span', null, 'Remove'));
         const z = SB.config.zoneById[m.zone];
-        listBox.appendChild(h('div', { class: 'dp-row' }, n, pr, h('span', { class: 'chip dp-zone' }, z ? z.name : m.zone), ex.indexOf(m.id) >= 0 ? h('span', { class: 'chip dp-ex', 'data-tone': 'warn' }, 'Example') : null, rm, msg));
+        listBox.appendChild(h('div', { class: 'dp-row' }, n, pr, h('span', { class: 'chip dp-zone' }, z ? z.name : m.zone), ex.indexOf(m.id) >= 0 ? h('span', { class: 'chip dp-ex', 'data-tone': 'warn' }, 'Example') : null, rm, msg, portionsRow(m)));
       });
     }
     paintList(); paintGone();
     offs.push(SB.store.subscribe(() => { paintList(); paintGone(); }));
+
+    // Cooked-ahead food: shown only when that module is on and there is a dish. Optional; never needed to order.
+    const caBox = h('section', { class: 'fs-card dp-ca', hidden: true });
+    // Paints the question (before any item), or the list of cooked-ahead items with Add another.
+    function paintCook() {
+      const items = cookItems();
+      const on = cookOn();
+      const show = activeDishes().length > 0 && (on ? (items.length > 0 || !U.storage.get(KEY_CASKIP, false)) : (!U.storage.get(KEY_CASKIP, false) && items.length === 0));
+      caBox.hidden = !show;
+      if (!show) return;
+      U.clear(caBox);
+      // Opens the sheet that adds one cooked-ahead item.
+      const add = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => {
+        // Saying yes while the cook-ahead part is off turns it on first, then opens the sheet for the first item.
+        if (!cookOn()) send('updateSettings', { patch: { modules: { cookAhead: true } } });
+        SB.sheets.open('cookahead');
+      } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Add a cooked-ahead item' : 'Yes, I cook ahead'));
+      if (!items.length) {
+        caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook any of this ahead and hold it?'),
+          h('p', { class: 'fs-sub' }, 'Brisket in the morning, slaw in the cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. You can skip this and still take orders.'),
+          // Remembers the owner said no, so the question goes away.
+          h('div', { class: 'fs-row' }, add, h('button', { type: 'button', class: 'btn', dataset: { act: 'skip-cooked' }, onClick: () => { U.storage.set(KEY_CASKIP, true); paintCook(); } }, 'No, skip this')));
+      } else {
+        caBox.append(h('h3', { class: 'fs-h' }, 'Cooked-ahead food'),
+          h('div', { class: 'dp-list' }, items.map((i) => h('div', { class: 'dp-row' }, h('strong', null, i.name), h('span', { class: 'chip' }, (i.hold === 'cold' ? 'Cold' : 'Hot') + ', up to ' + i.maxHoldH + ' h')))), h('div', { class: 'fs-row' }, add));
+      }
+    }
+    paintCook();
+    offs.push(SB.store.subscribe(() => paintCook()));
 
     // More ways to add dishes: for now only an example menu, clearly marked as an example.
     const exStatus = h('p', { class: 'fs-sub', role: 'status' });
@@ -371,7 +448,7 @@
     // Links to the other small settings and to the full menu editor in the back office.
     const shopBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('shop'), 60); } }, ico('sliders', 20), h('span', null, 'Tax, hours and PIN'));
     const fullBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); } }, ico('gauge', 20), h('span', null, 'Full menu editor (ingredients, prep times)'));
-    root.append(lead, form, dishesHead, undoBar, listBox, goneFold, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
+    root.append(lead, form, dishesHead, undoBar, listBox, goneFold, caBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
     sheet.body.appendChild(root);
 
     // Restore a draft left by a closed tab, then the last station used.
@@ -379,6 +456,61 @@
     if (d && typeof d === 'object') { nameIn.value = String(d.name || ''); priceIn.value = String(d.price || ''); }
     const last = (d && d.zone) || U.storage.get(KEY_LAST, '');
     if (last && visibleStations().some((z) => z.id === last) && visibleStations().length > 1) pickZone(last);
+    setTimeout(() => nameIn.focus(), 50);
+    return sheet;
+  }
+
+  /* ---------- the Cooked-ahead food sheet ---------- */
+
+  // Opens "Cooked-ahead food": name, hot or cold, how long it may stay, a usual batch size and which dishes use it.
+  // Saves the item with addIngredient, then gives each chosen dish a recipe line. Nothing here is needed to take orders.
+  function openCookAhead() {
+    const sheet = SB.ui.sheet({ title: 'Cooked-ahead food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
+    const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Brisket' });
+    const nameField = SB.ui.field({ label: 'What do you cook ahead?', control: nameIn });
+    const kind = SB.ui.segmented({ label: 'Is it kept hot or cold?', value: 'hot', options: [{ id: 'hot', label: 'Hot' }, { id: 'cold', label: 'Cold' }] });
+    const hoursIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: '4', 'aria-label': 'Hours it may stay' });
+    const hoursField = SB.ui.field({ label: 'How long may it stay, in hours?', control: hoursIn, hint: '4 hours is a careful starting point. Your local health code decides what is allowed: ask your health department and change this to match.' });
+    const kgIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Usual batch size in kilograms' });
+    const kgField = SB.ui.field({ label: 'Usual batch size, in kg', control: kgIn, hint: 'A normal pan or batch, like 4. Leave it empty if you are not sure.' });
+    // One checkbox row per dish: tick the dishes that use this food and say about how many grams each takes.
+    const dishRows = activeDishes().map((m) => {
+      const cb = h('input', { type: 'checkbox', 'aria-label': m.name + ' uses it', disabled: portionLeft(m) >= 0 });
+      const gIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', value: '150', 'aria-label': 'Grams of it in one ' + m.name });
+      return { m, cb, gIn, el: h('div', { class: 'dp-row' }, h('label', { class: 'grow' }, cb, ' ' + m.name + (portionLeft(m) >= 0 ? ' (counted by portions)' : '')), h('span', { class: 'fs-sub' }, 'grams in one:'), gIn) };
+    });
+    const dishBox = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Which dishes use it?'), h('p', { class: 'fs-sub' }, 'Tick each dish and the grams of it in one serving (150 is a starting guess). Smokebox takes that much off the batch when the dish is made.'), h('div', { class: 'dp-list' }, dishRows.map((r) => r.el)));
+    const status = h('p', { class: 'fs-sub', role: 'status' });
+    const after = h('div', { class: 'fs-row', hidden: true });
+    // Saves the item and links the ticked dishes; says plainly what happened and what to do next.
+    const save = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'save-cooked' }, onClick: () => {
+      nameField.setError(null); hoursField.setError(null); status.textContent = '';
+      const name = nameIn.value.replace(/\s+/g, ' ').trim(), hrs = readNum(hoursIn), kg = kgIn.value.trim() ? readNum(kgIn) : null;
+      if (!name) { nameField.setError('Type what you cook ahead.'); return; }
+      if (hrs == null || hrs < 0.5 || hrs > 12) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
+      if (kgIn.value.trim() && (kg == null || kg <= 0 || kg > 1000)) { status.textContent = 'Batch size: type kilograms like 4, or leave it empty.'; return; }
+      const payload = { name, unit: 'g', tcs: true, hold: kind.getValue(), maxHoldH: hrs, holdBasis: 'safety' };
+      if (kg) payload.parG = Math.round(kg * 1000);
+      const r = send('addIngredient', payload);
+      if (!r.ok) { if (r.report === 'nameTaken') nameField.setError('You already have an item called ' + name + '.'); else status.textContent = r.words; return; }
+      let linked = 0;
+      dishRows.filter((x) => x.cb.checked).forEach((x) => {
+        const grams = Number(x.gIn.value);
+        if (!Number.isFinite(grams) || grams <= 0) return;
+        const cur = SB.store.getState().menu.find((mm) => mm.id === x.m.id);
+        const bom = (cur.bom || []).concat([{ ing: r.info.id, qty: grams }]);
+        if (send('updateMenuItem', { id: x.m.id, patch: { bom } }).ok) linked++;
+      });
+      status.textContent = 'Added ' + name + (linked ? ' and linked it to ' + linked + ' ' + U.plural(linked, 'dish', 'dishes') : '') + '. Log your first batch in the cabinet when you cook one.';
+      save.hidden = true; after.hidden = false;
+      U.clear(after);
+      // Opens the cabinet on a new batch of the item just added.
+      after.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-first-batch' }, onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('hold', { tab: 'new', ing: r.info.id }), 60); } }, 'Log a first batch'),
+        // Closes the sheet without logging a batch.
+        h('button', { type: 'button', class: 'btn btn-lg', onClick: () => sheet.close('done') }, 'Done for now'));
+    } }, ico('check', 22), h('span', null, 'Save cooked-ahead item'));
+    sheet.body.appendChild(h('div', { class: 'dp' }, h('p', { class: 'fs-sub' }, 'Optional. Skip this and you can still take every order. Later you can add more from the Cabinet.'),
+      h('div', { class: 'dp-form' }, nameField, h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Hot or cold'), kind), hoursField, kgField, dishBox, h('div', { class: 'fs-row' }, save), status, after)));
     setTimeout(() => nameIn.focus(), 50);
     return sheet;
   }
@@ -456,7 +588,8 @@
   SB.sheets.register('setup', openSetup);
   SB.sheets.register('dishes', openDishes);
   SB.sheets.register('shop', openShop);
+  SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
