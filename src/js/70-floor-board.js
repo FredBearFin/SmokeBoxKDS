@@ -491,10 +491,32 @@
     const o = SB.offline && typeof SB.offline.status === 'function' ? SB.offline.status() : null;
     return o && o.updateReady ? 'A new version is ready. Reload when it is quiet.' : '';
   }
+  // What was already late or past its limit when the page went to the background, so waking can say only what is new.
+  function sleepSnapshot() {
+    try {
+      const st = store().getState(), now = store().now();
+      const past = new Set(SB.deadlines.build(st, now).filter((d) => d.kind === 'past' || d.kind === 'expired').map((d) => d.batchId || d.id));
+      return { overdue: SB.engine.views.counts(st, now).overdue, past };
+    } catch (e) { return null; }
+  }
+  // One calm sentence about what changed while the page slept ("2 batches passed their time and 3 tickets went late"), or '' when nothing did.
+  function sleepSummary(snap) {
+    if (!snap) return '';
+    try {
+      const st = store().getState(), now = store().now();
+      const nb = SB.deadlines.build(st, now).filter((d) => (d.kind === 'past' || d.kind === 'expired') && !snap.past.has(d.batchId || d.id)).length;
+      const nt = Math.max(0, SB.engine.views.counts(st, now).overdue - snap.overdue);
+      const bits = [];
+      if (nb) bits.push(nb + ' ' + U.plural(nb, 'batch', 'batches') + ' passed ' + U.plural(nb, 'its', 'their') + ' time');
+      if (nt) bits.push(nt + ' ' + U.plural(nt, 'ticket') + ' went late');
+      return bits.length ? 'While this screen was asleep: ' + bits.join(' and ') + '.' : '';
+    } catch (e) { return ''; }
+  }
   // A sentence shown for a while after the board comes back from the background, since warnings were silent in between.
   function awayNote() {
     const a = m && m.away;
     if (!a || Date.now() - a.at > 10 * 60e3) return '';
+    if (a.summary) return a.summary;
     return 'The board was in the background for ' + (a.min < 1 ? 'a moment' : a.min + (a.min === 1 ? ' minute' : ' minutes')) + '. Warnings are silent while it is hidden.';
   }
   // Plays a test chime and a spoken line so a cook can hear that this tablet makes sound, and says what happened.
@@ -574,8 +596,13 @@
     const onVis = () => {
       if (doc.visibilityState === 'visible') {
         requestWake();
-        if (m && m.hiddenAt) { const min = Math.round((Date.now() - m.hiddenAt) / 60e3); if (min >= 1) m.away = { at: Date.now(), min }; m.hiddenAt = null; }
-      } else if (m) m.hiddenAt = Date.now();
+        if (m && m.hiddenAt) {
+          const min = Math.round((Date.now() - m.hiddenAt) / 60e3);
+          // The first look after waking: one tick right now (not a loop of missed seconds), then one summary of what changed while asleep.
+          if (min >= 1) { try { store().tick(); } catch (e) { /* the next timer tick does it */ } m.away = { at: Date.now(), min, summary: sleepSummary(m.sleepSnap) }; }
+          m.hiddenAt = null; m.sleepSnap = null;
+        }
+      } else if (m) { m.hiddenAt = Date.now(); m.sleepSnap = sleepSnapshot(); }
     };
     doc.addEventListener('visibilitychange', onVis);
     m.offs.push(() => { doc.removeEventListener('pointerdown', onGesture, true); doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });

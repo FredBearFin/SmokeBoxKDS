@@ -15,7 +15,7 @@
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const KIND = {
     temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
-    settings_changed: 'Changed a safety limit', equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
+    settings_changed: 'Changed a safety limit', safety_setting_changed: 'Changed a safety limit', month_closed: 'History saved and cleared', equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
   };
   const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit', datemark: 'Past the date mark' };
   const UNIT = { cooler: 'Cooler', freezer: 'Freezer', display: 'Display case', other: 'Equipment' };
@@ -63,13 +63,33 @@
     return 'Changed ' + (SETTING_NAME[last] || (key || 'a setting')) + ' from ' + settingValue(last, from) + ' to ' + settingValue(last, to);
   }
 
+  // For a cold-food reading: whether it was above the cold limit and how much time above the limit the batch has used up so far.
+  // The engine adds up the time across separate stretches (an in-range reading does not wipe it), so this replays the batch's
+  // readings in order the same way. Returns '' when the batch is not cold food or the limit is unknown.
+  function coldNote(state, e) {
+    const b = (state.batches || []).find((x) => x && x.id === e.batchId);
+    const lim = state.settings && state.settings.safety ? state.settings.safety.coldHoldF : null;
+    if (!b || b.kind !== 'cold' || !isNum(lim) || !isNum(e.f) || !SB.engine || !SB.engine.allEvents) return '';
+    let since = null, used = 0;
+    for (const x of SB.engine.allEvents(state)) {
+      if (x.type !== 'temp_logged' || x.batchId !== e.batchId || x.reverted || !isNum(x.f) || !isNum(x.t) || x.t > e.t) continue;
+      if (x.f > lim) { if (since == null) since = x.t; } else if (since != null) { used += x.t - since; since = null; }
+      if (x === e || x.id === e.id) break;
+    }
+    const mins = Math.round(used / 60000);
+    const above = e.f > lim;
+    if (above) return 'above the cold limit' + (mins > 0 ? '; ' + mins + ' min above it earlier, which still counts' : '');
+    return mins > 0 ? 'back in range; ' + mins + ' min above the cold limit so far, which still counts' : '';
+  }
+
   // The detail words for one entry: what was read, weighed or thrown out.
   function detailOf(e) {
     switch (e.type) {
       case 'temp_logged': return (isNum(e.f) ? U.tempText(e.f) : '') + (lateWords(e) ? ', ' + lateWords(e) : '');
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
       case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
-      case 'settings_changed': return changeLine(e);
+      case 'settings_changed': case 'safety_setting_changed': return changeLine(e);
+      case 'month_closed': return 'Saved ' + (isNum(e.days) ? e.days + ' ' + (e.days === 1 ? 'day' : 'days') : 'old days') + ' before ' + (e.before ? U.fmtDateShort(e.before) : 'a set date') + ' to a backup and cleared them from this tablet' + (isNum(e.tickets) ? ' (' + e.tickets + ' tickets, ' + (isNum(e.orders) ? e.orders : 0) + ' orders)' : '');
       case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '');
       case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '');
       case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
@@ -135,7 +155,7 @@
     if (!state || !SB.engine || !SB.engine.safetyLog) return [];
     const rows = SB.engine.safetyLog(state).filter((r) => r.event.type !== 'safety_correction' && isNum(r.event.t) && r.event.t >= from && r.event.t < to);
     return rows.map((r) => ({
-      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), facts: factsOf(state, r.event), screen: screenOf(r.event), who: r.event.who || '',
+      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: [detailOf(r.event), r.event.type === 'temp_logged' ? coldNote(state, r.event) : ''].filter(Boolean).join(', '), facts: factsOf(state, r.event), screen: screenOf(r.event), who: r.event.who || '',
       corrections: r.corrections.map((c) => ({ at: c.t, who: c.who || '', note: c.note || '' })),
     }));
   }
@@ -153,7 +173,7 @@
   }
 
   // One row for one safety entry (the same shape inspectorRows gives), for tests and for entries read without the engine's log.
-  function rowFor(e, state) { return { id: e.id, at: e.t, kind: KIND[e.type] || 'Safety entry', food: foodOf(state, e), detail: detailOf(e), facts: factsOf(state, e), screen: screenOf(e), who: e.who || '', corrections: [] }; }
+  function rowFor(e, state) { return { id: e.id, at: e.t, kind: KIND[e.type] || 'Safety entry', food: foodOf(state, e), detail: [detailOf(e), e.type === 'temp_logged' ? coldNote(state, e) : ''].filter(Boolean).join(', '), facts: factsOf(state, e), screen: screenOf(e), who: e.who || '', corrections: [] }; }
 
   O.inspectorPure = { inspectorRows, rowFor, factsOf, rangeFor, RANGES };
   if (!g.document) return; // Node: the pure rows are all the tests need

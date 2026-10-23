@@ -115,7 +115,6 @@
 /* Inside a chart card the sentences sit above the chart in columns, with no rule of their own. */
 .ob-sentences--card { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: var(--sp-2) var(--sp-6); margin: 0 0 var(--sp-4); padding: var(--sp-3) 0 0; border-top: 0; }
 .ob-sentences--card.ob-keys { margin: var(--sp-4) 0 0; border-top: 1px solid var(--line-soft); }
-.ob-sim-chip { margin: 0 0 var(--sp-3); max-width: 100%; }
 
 /* Tables: sort buttons and the Previous and Next buttons are 48 px, and on a phone a long column title wraps so the table fits. */
 .ob-tbl .of-sortbtn, .ob-tbl .of-tpager .btn { min-height: 48px; }

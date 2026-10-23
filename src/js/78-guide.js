@@ -576,6 +576,14 @@
      {
       "t": "p",
       "x": "Open the entry in **Recent readings** and tap **Save fix**. The old entry stays, with your fix next to it."
+     },
+     {
+      "t": "h",
+      "x": "The safety record"
+     },
+     {
+      "t": "p",
+      "x": "In **Back office**, open **Safety** and tap **Print the safety record**. It lists thrown-out batches, your readings and checks, and changes to limits, like \"Changed the cold limit from X to Y\". A cold reading says \"above the cold limit\" and how many minutes above it the batch has already used. The record says how long Smokebox keeps entries; ask your health department how long you must."
      }
     ]
    },
@@ -645,7 +653,7 @@
      {
       "t": "ol",
       "x": [
-       "Open the thrown-out log from the board's menu. It says which period it covers.",
+       "Open the thrown-out log from the board's menu. It starts by saying how far back it goes, like \"Showing every batch thrown out since\" a date.",
        "Tap **Fix this entry** on the row.",
        "Say what was wrong, add your initials and tap **Save the fix**."
       ]
@@ -693,6 +701,10 @@
      },
      {
       "t": "p",
+      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. What was here is kept too, so you can undo once more."
+     },
+     {
+      "t": "p",
       "x": "A file that is not a valid backup is refused, and nothing is changed. A backup from the demo is refused too."
      },
      {
@@ -714,6 +726,52 @@
      {
       "t": "p",
       "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first."
+     }
+    ]
+   },
+   {
+    "id": "close-the-month",
+    "group": "guide",
+    "title": "Close the month",
+    "summary": "Move old, finished history out of this tablet so it stays quick. You save everything to files first. Nothing is removed until step 3.",
+    "blocks": [
+     {
+      "t": "p",
+      "x": "The screen is called **Close the month**. If a PIN is set, the PIN pad opens first."
+     },
+     {
+      "t": "ol",
+      "x": [
+       "**What this does**. Under **Close everything before**, the date starts on the first of this month. Smokebox shows what moves out (days, orders, tickets and activity records) and what stays: the last 35 days, today, every open order and open ticket, your menu and settings, the end-of-day totals, and all food-safety records. If you pick a date inside the last 35 days, it tells you where it stops instead. Tap **Next: save the files**.",
+       "**Save the month files now**. Tap **Save the month files now**. Your browser downloads five files: a backup of the whole kitchen, three spreadsheets (orders, tickets and days) and a list of what is in them. Look in your downloads folder and check each one is there. If the browser asks to allow several downloads, say yes. Select **I saved the files and I can find them**, then tap **Next: confirm**.",
+       "Type CLOSE. Type the word CLOSE, in any case. Then the red **Close the month** button works."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "After step 3 the history is gone from this tablet, and your files are the only copy of it. For 7 days Smokebox also keeps your kitchen as it was. The last screen says \"Done. The month is closed.\" and has **Undo**, which says \"Undone. Your kitchen is back as it was, with all the history.\" Tap **Done** to leave."
+     },
+     {
+      "t": "p",
+      "x": "To bring everything back later: Back office, Data, Restore, and pick the backup file."
+     },
+     {
+      "t": "h",
+      "x": "When it refuses"
+     },
+     {
+      "t": "p",
+      "x": "Each refusal ends with \"Nothing was removed.\""
+     },
+     {
+      "t": "ul",
+      "x": [
+       "Something changed since you saved the files (a new day started or a record changed): save the files again in step 2, then close. A page reload does the same.",
+       "On a tablet that works through the main computer, it cannot be closed there. Do it on the main computer's own screen or the main tablet.",
+       "In the demo there is no real history. Tap **Back to my kitchen** first.",
+       "If no finished day is older than 35 days before the date, there is nothing to close yet.",
+       "If the browser would not save the change, nothing was removed."
+      ]
      }
     ]
    },

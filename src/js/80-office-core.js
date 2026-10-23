@@ -211,6 +211,15 @@
   O.FOLLOWER_WORDS = 'This screen only shows the shared kitchen. You can read every page, print and download a copy, but changes, closing the day, restoring and erasing are done on the hub computer.';
   // The plain words for a tablet that writes to a shared kitchen.
   O.HUB_WORDS = 'This tablet is connected to the shared kitchen. A backup here is a copy of the whole shared kitchen. Restoring or erasing here would erase it for every screen, so those are done on the hub computer.';
+  // The calm note for a range that reaches days already saved to the month files and cleared from this tablet, or '' when it does
+  // not. `before` is the state's archivedBefore day, `from` the range start (ms), `dsh` the day-start hour.
+  function archivedWords(before, from, dsh) {
+    if (typeof before !== 'string' || !/^\d{4}-\d\d-\d\d$/.test(before)) return '';
+    if (isNum(from) && from >= dayStartMs(before, isNum(dsh) ? dsh : 4)) return '';
+    return 'Days before ' + U.fmtDateShort(before) + ' were saved to your month files and cleared from this tablet. Totals for those days are not shown here.';
+  }
+  O.archivedWords = archivedWords;
+
   O.pure = { PAGES, customRange, coachText, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
 
   if (!doc) return; // Node: the pure helpers are all the tests need
@@ -1231,6 +1240,8 @@
     // A screen that keeps only the last N days of a shared kitchen says so: ranges older than that are partial here.
     const trimW = O.trimWords();
     if (trimW) b.text += ' ' + trimW;
+    // Pages that add up history say when the range reaches days that were cleared from this tablet (the safety record keeps its own).
+    if (M.pageId !== 'safety' && M.pageId !== 'data') { const aw = O.archivedWords(ds && ds.archivedBefore, F.range.from, svcHour()); if (aw) b.text += ' ' + aw; }
     const t = M.banner.querySelector('.of-banner-t');
     if (t.textContent !== b.text) t.textContent = b.text;
     M.banner.dataset.kind = b.kind;

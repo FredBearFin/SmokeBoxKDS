@@ -678,3 +678,5 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .sc-codebox { display: grid; gap: var(--sp-2); }
 .sc-code { font-size: 40px; letter-spacing: 0.12em; text-align: center; }
 .sc-code[data-expired="true"] { opacity: 0.4; text-decoration: line-through; }
+/* Close the month: the counts block and the list of files to save. */
+.cm-counts { display: grid; gap: var(--sp-2); } .cm-files { margin: 0; padding-left: var(--sp-5); display: grid; gap: var(--sp-1); overflow-wrap: anywhere; } .cm-files:empty { display: none; }

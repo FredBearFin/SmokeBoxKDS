@@ -217,7 +217,7 @@
   // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
   // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
   // safetyKeep bucket instead of being dropped.
-  const SAFETY_EVENT = { safety_setting_changed: 1, temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  const SAFETY_EVENT = { month_closed: 1, safety_setting_changed: 1, temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
   // 400 days: how long the safetyKeep bucket holds a safety entry (a year and a month, so a yearly inspection can look back a full year). This is our own
   // choice; no source gives one minimum for everyone, so ask your health department how long to keep records. Safety entries are small and the bucket is
   // never trimmed by size, only by age.
@@ -3251,6 +3251,113 @@
     return tx.dirty() ? tx.commit() : state;
   }
 
+  /* ---------- close the month: what would leave the live save, and the one step that removes it ---------- */
+  // Days of history that Close the month always leaves alone (counted back from today), unless the caller asks for another number.
+  const MONTH_KEEP_DAYS = 35;
+  // True for a real calendar date written YYYY-MM-DD.
+  const isDayText = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && U.dateKey(U.dateKeyToMs(d) + 12 * 3600e3) === d;
+  // Works out exactly what Close the month would remove at time now, without changing anything. opts: { before: 'YYYY-MM-DD' (service days
+  // before this one may go), keepDays (default 35) }. A day may go only if it is before the boundary, is not within keepDays of today, and has a
+  // day_closed record. A finished ticket goes with its day; a paid or voided order goes only when its service day and its paying day are both
+  // such days and every ticket it still has goes too. Open tickets and orders never go. Of the events only the plain activity of those days
+  // goes: safety entries, day_closed and month_closed entries always stay. Returns { ok, report?, plan } where plan has the id sets and counts.
+  function monthPlan(state, opts, now) {
+    if (!isState(state)) return { ok: false, report: 'invalidBackup' };
+    opts = isObj(opts) ? opts : {};
+    if (!isDayText(opts.before)) return { ok: false, report: 'badPatch', info: { key: 'before' } };
+    const keepDays = opts.keepDays === undefined ? MONTH_KEEP_DAYS : opts.keepDays;
+    if (!isInt(keepDays) || keepDays < 1 || keepDays > 3650) return { ok: false, report: 'badPatch', info: { key: 'keepDays' } };
+    if (!isNum(now)) return { ok: false, report: 'badPatch', info: { key: 'now' } };
+    const dsh = state.settings.service.dayStartHour;
+    const today = U.serviceDate(now, dsh);
+    const cutoff = U.addDays(today, -keepDays);
+    const bound = opts.before < cutoff ? opts.before : cutoff;
+    const flat = allEvents(state);
+    const closed = new Set();
+    for (const e of flat) if (e.type === 'day_closed' && typeof e.day === 'string') closed.add(e.day);
+    // A day may go: before the boundary and closed.
+    const goes = (day) => typeof day === 'string' && day < bound && closed.has(day);
+    const orders = Array.isArray(state.orders) ? state.orders : [];
+    const tickCand = new Set(), ordCand = new Set();
+    for (const t of state.tickets) if (t.status !== 'active' && goes(t.serviceDate)) tickCand.add(t.id);
+    const ticketsOf = new Map();
+    for (const t of state.tickets) if (t.orderId !== undefined) { let l = ticketsOf.get(t.orderId); if (!l) ticketsOf.set(t.orderId, l = []); l.push(t); }
+    for (const o of orders) {
+      if (o.status === 'open') continue;
+      const endAt = o.status === 'paid' ? o.paidAt : o.voidedAt;
+      if (!goes(o.serviceDate) || (isNum(endAt) && !goes(U.serviceDate(endAt, dsh)))) continue;
+      if ((ticketsOf.get(o.id) || []).every((t) => tickCand.has(t.id))) ordCand.add(o.id);
+    }
+    const tickets = new Set();
+    for (const t of state.tickets) if (tickCand.has(t.id) && (t.orderId === undefined || ordCand.has(t.orderId) || !orders.some((o) => o.id === t.orderId))) tickets.add(t.id);
+    const eventIds = new Set(); let safetyKept = 0, dayRecordsKept = 0;
+    for (const e of flat) {
+      if (hasOwn(SAFETY_EVENT, e.type)) { safetyKept++; continue; }
+      if (e.type === 'day_closed') { dayRecordsKept++; continue; }
+      if (goes(U.serviceDate(e.t, dsh))) eventIds.add(e.id);
+    }
+    const days = new Set();
+    for (const t of state.tickets) if (tickets.has(t.id)) days.add(t.serviceDate);
+    for (const o of orders) if (ordCand.has(o.id)) days.add(o.serviceDate);
+    for (const e of flat) if (eventIds.has(e.id)) days.add(U.serviceDate(e.t, dsh));
+    const dayList = Array.from(days).sort();
+    // Days before the boundary that still hold records but have no day_closed: they stay, and the screen can tell the owner to close them first.
+    const uncovered = new Set();
+    for (const t of state.tickets) if (t.status !== 'active' && typeof t.serviceDate === 'string' && t.serviceDate < bound && !closed.has(t.serviceDate)) uncovered.add(t.serviceDate);
+    for (const o of orders) if (o.status !== 'open' && typeof o.serviceDate === 'string' && o.serviceDate < bound && !closed.has(o.serviceDate)) uncovered.add(o.serviceDate);
+    let money = 0;
+    for (const o of orders) if (ordCand.has(o.id) && o.status === 'paid') money = cents(money + o.totals.total);
+    return { ok: true, plan: {
+      requestedBefore: opts.before, before: bound, keepDays, today, from: dayList.length ? dayList[0] : null, days: dayList,
+      ticketIds: tickets, orderIds: ordCand, eventIds,
+      tickets: tickets.size, orders: ordCand.size, events: eventIds.size, safetyEventsKept: safetyKept, dayRecordsKept,
+      openTicketsKept: state.tickets.filter((t) => t.status === 'active').length, openOrdersKept: orders.filter((o) => o.status === 'open').length,
+      uncoveredDays: Array.from(uncovered).sort(), paidTotal: money,
+    } };
+  }
+  // The day before which history was archived by Close the month (YYYY-MM-DD), or null when it never was. A day earlier than this with no records
+  // in the live save is "archived", not missing or an error: its day totals (day_closed) are still here, the details are in the owner's files.
+  function archivedBefore(state) { return isState(state) && isDayText(state.archivedBefore) ? state.archivedBefore : null; }
+  // True when the day (YYYY-MM-DD) is before the archive boundary.
+  function isArchivedDay(state, day) { const b = archivedBefore(state); return b !== null && typeof day === 'string' && day < b; }
+  // Removes what monthPlan chose and logs one month_closed entry with the counts (and the saved-backup proof when given). Not an action and not
+  // undoable: the backup file is the way back. opts as monthPlan plus backup { filename, chars, sha256 }. Returns { state, report, info }.
+  function closeMonth(state, opts, now) {
+    try {
+      const r = monthPlan(state, opts, now);
+      if (!r.ok) return { state, report: r.report, info: r.info || {} };
+      const pl = r.plan;
+      if (!pl.tickets && !pl.orders && !pl.events) return { state, report: 'nothingToDo', info: { before: pl.before } };
+      const base = Array.isArray(state.orders) ? state : Object.assign({}, state, { orders: [] });
+      const t1 = tick(base, now);
+      const tx = new Tx(t1.state, now);
+      const ts = tx.get('tickets');
+      const keepT = [];
+      for (const t of ts) {
+        if (!pl.ticketIds.has(t.id)) { keepT.push(t); continue; }
+        for (const it of t.items) for (const d of it.depleted || []) if (d.g > 0) { const L = tx.ledger(d.ing); L.prunedUsed = (L.prunedUsed || 0) + d.g; }
+      }
+      tx.own.add(keepT); tx.set('tickets', keepT);
+      const keepO = tx.get('orders').filter((o) => !pl.orderIds.has(o.id)); tx.own.add(keepO); tx.set('orders', keepO);
+      let evs = allEvents(t1.state).filter((e) => !pl.eventIds.has(e.id));
+      const ar = [];
+      while (evs.length >= 2 * EVENT_CHUNK) { ar.push(evs.slice(0, EVENT_CHUNK)); evs = evs.slice(EVENT_CHUNK); }
+      tx.set('eventArchive', ar); tx.set('events', evs);
+      tx.set('undo', []);
+      const prev = archivedBefore(t1.state);
+      tx.set('archivedBefore', prev !== null && prev > pl.before ? prev : pl.before);
+      const b = isObj(opts.backup) ? opts.backup : null;
+      tx.event('month_closed', {
+        before: pl.before, from: pl.from, days: pl.days.length, tickets: pl.tickets, orders: pl.orders, events: pl.events, safetyEventsKept: pl.safetyEventsKept, paidTotal: pl.paidTotal,
+        backup: b ? { filename: String(b.filename).slice(0, 120), chars: b.chars, sha256: String(b.sha256 || '').slice(0, 64) } : null,
+      });
+      finalize(tx, true);
+      return { state: tx.commit(), report: 'ok', info: { before: pl.before, from: pl.from, days: pl.days.length, tickets: pl.tickets, orders: pl.orders, events: pl.events, safetyEventsKept: pl.safetyEventsKept } };
+    } catch (err) {
+      return { state, report: 'badPatch', info: { internalError: String((err && err.stack) || err) } };
+    }
+  }
+
   /* ======================================================================================================
    * 13. tick and apply
    * ==================================================================================================== */
@@ -3746,6 +3853,8 @@
     // I9
     let lt = -Infinity;
     for (const e of allEvents(state)) { if (!(e.t >= lt)) { add('I9 event ' + e.id + ' t goes backwards'); break; } lt = e.t; }
+    // I21: archivedBefore, when present, is a real date
+    if (state.archivedBefore !== undefined && !isDayText(state.archivedBefore)) add('I21 archivedBefore is not a date');
     // I17: lastClose, when present, names a real date, a time and a leftovers choice, and no order is open
     // that was closed over (a later open order is fine, so only the shape is checked).
     if (state.lastClose !== undefined) {
@@ -4071,6 +4180,7 @@
       const lcs = st.lastClose;
       if (isObj(lcs) && typeof lcs.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lcs.day) && isNum(lcs.at) && (lcs.leftovers === 'keep' || lcs.leftovers === 'discard')) out.lastClose = { day: lcs.day, at: lcs.at, leftovers: lcs.leftovers };
       else if (lcs !== undefined) repaired.push('lastClose dropped');
+      if (isDayText(st.archivedBefore)) out.archivedBefore = st.archivedBefore; else if (st.archivedBefore !== undefined) repaired.push('archivedBefore dropped');
       for (const x of ledgerCheck(out)) { out.ledger[x.ing].open += x.have - x.expect; repaired.push('ledger ' + x.ing + ' re-opened at current stock'); }
       // availability (derived)
       const prevAvail = isObj(st.avail) ? st.avail : {};
@@ -4228,7 +4338,7 @@
   Object.assign(E, {
     SAFETY_KEEP_DAYS, SAFETY_KEEP_MS, apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, totalsOf, checkInvariants, validateBackup, trimState, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
+    monthPlan, closeMonth, archivedBefore, isArchivedDay, MONTH_KEEP_DAYS, channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.

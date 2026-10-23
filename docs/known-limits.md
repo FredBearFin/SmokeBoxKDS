@@ -26,6 +26,12 @@ A single HTML file (`dist/smokebox.html`) that runs in a browser. It is a kitche
   - Not verified: a hub restart that changes the hub's identity, and what happens to waiting taps in every reload case.
 - **Opening without the internet is a test feature.** The hub serves a service worker so a tablet can load Smokebox with the network down, after it has been opened once with the hub reachable. It needs a secure (https) address or the hub computer itself (localhost). A plain http address on a local network cannot do it. iPad Safari may clear stored data after about a week unless Smokebox is added to the home screen (reported, not verified on an iPad). The Tablet checks card "Opens without the internet" reads the stored copy back. "A new version is ready" never reloads by itself. "Reset the offline copy" removes the stored copy and does not touch the board. How to try it: `docs/connected-howto.md`.
 
+## Records
+
+- The safety record (thrown-out batches, readings, entries) keeps entries for about 400 days. That is the app's own setting, not a legal rule. Ask your health department how long you must keep records.
+- Restoring a backup keeps what it replaced for 7 days inside the app, and the Data page shows **Undo this restore** for that time (the PIN is asked if one is set).
+- Close the month moves finished days older than 35 days out of this tablet. You save five files first (a backup of the whole kitchen, three spreadsheets and a list of what is in them), tick that you can find them, and type CLOSE. The last 35 days, today, open orders and tickets, and all food-safety records stay; safety records are never pruned by it. After it, the files are the only copy of the removed history, apart from the 7 days the app keeps your kitchen as it was (**Undo** on the last screen). It is refused on a tablet that works through the main computer, in the demo, and when the files are out of date. In this build the Close the month screen has no button on the Data page yet (it opens by its sheet name only), so the Guide page describes the screen and not where to tap to reach it.
+
 ## Warnings
 
 Warnings sound only while the screen is on and Smokebox is open on the board, with the volume up and within your opening hours. A sleeping tablet, a closed page or a muted device means silence. A page that was hidden catches up once when it comes back.

@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { withPage, ROOT } from '../tools/pw.mjs';
-const OUT = path.join(ROOT, 'docs/ux-shots/night/a2/audit');
+const OUT = process.env.OUTDIR || path.join(ROOT, 'docs/ux-shots/night/a2/audit');
 fs.mkdirSync(OUT, { recursive: true });
 const SIZES = [[390, 844], [768, 1024], [1024, 768], [1920, 1080]];
 const LOOKS = [['day', 'normal'], ['night', 'normal'], ['day', 'large']];
@@ -40,6 +40,7 @@ for (const [w, h] of SIZES) for (const [theme, text] of LOOKS) {
     // Opens Start over; when the earlier snaps set a PIN, types it on the keypad first.
     const openStartOver = async () => { await page.evaluate(() => SB.sheets.open('startover')); await page.waitForTimeout(400); if (await page.locator('.keypad').count()) { for (const d of ['1', '2', '3', '4']) await page.locator('.keypad button', { hasText: new RegExp('^' + d + '$') }).first().click(); await page.waitForTimeout(500); } };
     const snap = async (name, prep) => {
+      if (process.env.ONLY && !name.includes(process.env.ONLY)) return;
       await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(250);
       await prep(); await page.waitForTimeout(450);
       const m = await page.evaluate(measure);
@@ -80,6 +81,19 @@ for (const [w, h] of SIZES) for (const [theme, text] of LOOKS) {
     await snap('cold-edit', async () => { await page.evaluate(() => { const r = SB.store.dispatchEx('addIngredient', { name: 'Coleslaw', unit: 'g', tcs: true, hold: 'cold', maxHoldH: 4, holdBasis: 'safety' }, { source: 'ui' }); SB.sheets.open('cookahead', { id: r.info.id }); }); });
     await snap('recovery-code', async () => { await page.evaluate(() => SB.sheets.open('shop')); await page.waitForTimeout(300); await page.fill('[aria-label="Manager PIN, 4 digits"]', '1234'); await page.getByRole('button', { name: 'Set PIN' }).click(); await page.waitForTimeout(700); });
     await snap('serve', async () => { await page.evaluate(() => SB.sheets.open('serve')); });
+    // Close the month, step by step, with a stand-in for the store's preview and export so the counts and file list have realistic content.
+    const monthStubs = () => {
+      const csv = (n) => 'a,b\n'.repeat(n);
+      SB.store.closeMonthPreview = () => ({ ok: true, report: 'ok', preview: { tickets: 412, orders: 398, events: 3120, days: Array.from({ length: 28 }, (_, i) => '2026-08-' + String(i + 1).padStart(2, '0')), from: '2026-08-01', before: '2026-08-29', safetyEventsKept: 640, openTicketsKept: 2, openOrdersKept: 1, uncoveredDays: [] } });
+      SB.store.closeMonthExport = () => ({ ok: true, report: 'ok', files: [['smokebox-before-month-close-20260929.json', 'backup', 820000], ['smokebox-orders-2026-08-01-to-2026-08-28.csv', 'orders', 31000], ['smokebox-tickets-2026-08-01-to-2026-08-28.csv', 'tickets', 52000], ['smokebox-days-2026-08-01-to-2026-08-28.csv', 'days', 4000], ['smokebox-month-manifest-2026-08-01-to-2026-08-28.json', 'manifest', 1200]].map(([name, kind, chars]) => ({ name, kind, mime: 'text/plain', text: csv(3), chars, sha256: 'a'.repeat(64) })) });
+      SB.store.closeMonthPrune = () => ({ ok: true, report: 'ok', info: { before: '2026-08-29', from: '2026-08-01', days: 28, tickets: 412, orders: 398, events: 3120, safetyEventsKept: 640, copyKept: true, copyKeepDays: 7 } });
+      SB.store.undoRestore = () => 'ok';
+    };
+    const openMonth = async () => { await page.evaluate(monthStubs); await page.evaluate(() => SB.sheets.open('closemonth')); await page.waitForTimeout(400); };
+    await snap('month-1', async () => { await openMonth(); });
+    await snap('month-2', async () => { await openMonth(); await page.click('[data-act=cm-next1]'); await page.click('[data-act=cm-save-files]'); });
+    await snap('month-3', async () => { await openMonth(); await page.click('[data-act=cm-next1]'); await page.click('[data-act=cm-save-files]'); await page.check('#cm-saw'); await page.click('[data-act=cm-next2]'); await page.fill('input[aria-label="Type CLOSE to confirm"]', 'CLOSE'); });
+    await snap('month-done', async () => { await openMonth(); await page.click('[data-act=cm-next1]'); await page.click('[data-act=cm-save-files]'); await page.check('#cm-saw'); await page.click('[data-act=cm-next2]'); await page.fill('input[aria-label="Type CLOSE to confirm"]', 'CLOSE'); await page.click('[data-act=cm-go]'); });
     await snap('startover-1', async () => { await openStartOver(); });
     await snap('startover-2', async () => { await openStartOver(); await page.waitForTimeout(300); await page.click('[data-act=so-next1]'); });
     await snap('startover-3', async () => { await openStartOver(); await page.waitForTimeout(300); await page.click('[data-act=so-next1]'); await page.click('[data-act=so-save-backup]'); await page.check('#so-saw'); await page.click('[data-act=so-next2]'); });

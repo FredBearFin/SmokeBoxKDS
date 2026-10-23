@@ -611,7 +611,7 @@ await withPage({ w: 1280, h: 800, file: SHELL_OUT }, async (page, logs) => {
   await page.locator('.sheet-foot .btn', { hasText: 'Cancel' }).click(); await wait(400);
   check('cancelling the keypad on a pasted link falls back to the floor', await page.evaluate(() => SB.router.view().kind === 'floor' && !SB.shell.inOffice()));
   // PIN off
-  const off = await page.evaluate(async () => { await SB.shell.setPin(null); return { has: SB.shell.hasPin(), hash: SB.store.getState().settings.office.pinHash }; });
+  const off = await page.evaluate(async () => { await SB.shell.setPin(null, { verified: true }); return { has: SB.shell.hasPin(), hash: SB.store.getState().settings.office.pinHash }; });
   check('setPin(null) removes the PIN', off.has === false && off.hash === null, off);
   await wait(300);
   noErrors('pin', logs);

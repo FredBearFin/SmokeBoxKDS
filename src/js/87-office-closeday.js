@@ -285,7 +285,7 @@
       demo ? h('p', { class: 'cd-pnote' }, 'This is a demo kitchen, so these numbers are demo numbers.') : null,
       h('table', { class: 'cd-ptable' }, h('tbody', null,
         prow('Paid orders', String(m.paid)), prow('Sales (after discounts)', money(m.sales)), prow('Tax', money(m.tax)), prow('Tips', money(m.tip)), prow('Total collected', money(m.collected)),
-        ...m.methods.filter((x) => x.count > 0).map((x) => prow('  Paid with ' + x.name.toLowerCase(), x.count + ' orders, ' + money(x.collected))),
+        ...m.methods.filter((x) => x.count > 0).map((x) => prow('  Paid with ' + x.name.toLowerCase(), x.count + ' ' + U.plural(x.count, 'order') + ', ' + money(x.collected))),
         prow('Cash payments today', money(m.cashExpected) + ' (add your starting cash to count the drawer)'),
         prow('Orders voided', String(m.voidedOrders)), prow('Tickets voided', String(m.voidedTickets)),
         prow('Food thrown out', (thrown.count || 0) + ' ' + U.plural(thrown.count || 0, 'batch', 'batches') + ', ' + U.weightText(thrown.g || 0) + (thrown.cost > 0 ? ', about ' + money(thrown.cost) + ' (only items with a recorded cost)' : '')))),
