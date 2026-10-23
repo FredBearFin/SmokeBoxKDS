@@ -26,6 +26,7 @@ Report ::= ok | unknownAction | unknownTicket | unknownItem | unknownMenu | unkn
          | notAllDone | alreadyDone | alreadyFired | notQueued | nothingToDo | reasonRequired | badTemp | tempTooLow
          | notReheatable | notEnoughData | batchNotServable | badWeight | badPatch | outOfBounds | undoExpired | undoNothing
          | undoConflict | invalidBackup | exportTooLarge | storageBlocked
+         | moduleOff | nameTaken | tooManyIngredients | portionsConflict       (added with the clean start; the list above is not complete, the code's REPORT_IDS is)
 ```
 
 Pacing constants come from `state.settings.pacing` (owner-editable within bounds): `floorSec, qtyFactor, qtyCap, learnK, minFactor, maxFactor, outlierFactor`. The safety constants come from `state.settings.safety`, each bounded by `C.safetyBounds` (`hotHoldF >= 135` always).
@@ -176,6 +177,8 @@ availability(s, m) =
 
 The first sanitise is due at once: it is honestly unknown when surfaces were last done.
 
+**BlankKitchen.** `newState({ blank: true })` is the start of a brand-new install: `menu' = <>; ingredients' = <>; batches' = <>; stock' = {}; ledger' = {}`, `catalog' = 'own'`, `settings' = blankSettings()` (the normal defaults with `pacing.enabled = false` and `modules.cookAhead = false`). `defaultSettings()` and every other start are unchanged. `catalog` is absent on every older save and on the demo.
+
 ## 6. Operations
 
 Every operation is `apply(s, type, payload, now)`. It first catches up the kitchen to `now` (`Tick`), then runs the action. Totality:
@@ -296,9 +299,20 @@ I13, as tested: `strip(undo(apply(s, a, now), now)) = strip(tick(s, now))` for e
 
 `tick` never changes `rev`, because only actions are announced to other tabs. Sanitise overdue is a warning, never a block, so `tick` does not touch it.
 
+### 6.4b Ingredients, portions on hand and the cook-ahead switch
+
+| Operation | Rules | Effect |
+|---|---|---|
+| AddIngredient `{ name, unit?, costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?, maxHoldH?, holdBasis? }` | name 1..60 and not used by another ingredient (`nameTaken`); at most 80 ingredients (`tooManyIngredients`); `unit` is `g` (default) or `ea`; `costPerKg` only for `g` and `costEach` only for `ea` (`badPatch`); numbers in the edit ranges (`outOfBounds`); `tcs` needs unit `g` and the cook-ahead module on (`moduleOff`); the id is made from the name and never equals a config ingredient id or an existing id | appends the ingredient, `stock(id) = 0` (not for `tcs`), a zero ledger entry, `settings_changed`. A `tcs` ingredient defaults to hot, 4 hours, hold basis `safety`, cook 2 h, rest 0, pull 1000 g. Undoable: undo removes it while no recipe, stock, batch or books entry refers to it (`undoConflict` otherwise). |
+| SetPortions `{ menuId, on, count? }` | dish exists (`unknownMenu`); `on` boolean; `count` a whole number 0..100000 (`outOfBounds`); turning on a dish that lists other ingredients gives `portionsConflict`; no change gives `nothingToDo` | on: makes or revives a hidden ingredient `forMenu = menuId` (`unit ea`, `exact`, `hidden`), sets the dish's recipe to one portion of it, and adds `count` to stock and to the ledger intake. off: the recipe line goes, the ingredient is archived, stock and books stay. |
+
+A recipe is set with `UpdateMenuItem { bom }` (known ingredients, no repeats, up to 12 lines). Availability uses `exact` ingredients differently: a counted ingredient is out only when fewer than one portion is left (no safety margin and no 86 level), so "I made 20" sells 20. A dish with no recipe is never sold out by itself and records no cost (`cost` is absent, never 0); the same holds for a dish whose ingredient has no cost entered, and for a batch with no cost on record (`batch_discard` then carries no `cost`). `ItemDone` and the cost analytics treat an absent cost as unrecorded.
+
+`E.moduleOn(state, 'cookAhead')` is false only when `settings.modules.cookAhead === false`. While it is false, `AddBatch`, `PlanBatch` and a `restock` of cook-ahead food give `moduleOff`. `E.cookAheadActive(state)` is the module being on or any batch still holding food; when it is false, `views.counts` reports no sanitize reminder and the deadline feed (`SB.deadlines.build`) has no batch, safety or sanitize rows (ticket rows stay). Invariant B1: every recipe line names an existing ingredient, and every `forMenu` names an existing dish. `ResetLive` accepts `catalog: 'sample'` (loads the sample dishes and ingredients; refused with `badPatch` over an own kitchen that already has dishes, orders or tickets unless `replaceOwn`) and `catalog: 'blank'`.
+
 ## 7. Backups
 
-`validateBackup(x)` is total. It returns `{ok: true, state, repaired}` or `{ok: false, error}` and changes nothing. It repairs fields one at a time: settings out of bounds fall back to defaults, negative stock becomes 0, unsafe ids are dropped, a ticket whose own invariants fail is dropped, and a ledger that no longer balances is re-opened at the current physical stock. Anything left inconsistent is refused. `serialize` then `validateBackup` is the identity up to the undo stack (tested).
+`validateBackup(x)` is total. It returns `{ok: true, state, repaired}` or `{ok: false, error}` and changes nothing. It repairs fields one at a time: settings out of bounds fall back to defaults, negative stock becomes 0, unsafe ids are dropped, a ticket whose own invariants fail is dropped, and a ledger that no longer balances is re-opened at the current physical stock. Anything left inconsistent is refused. A state with `catalog = 'own'` is never topped up from the sample menu or ingredients; any other state still gets missing sample entries restored as before. `serialize` then `validateBackup` is the identity up to the undo stack (tested).
 
 ## 8. Store obligations (SB.store)
 

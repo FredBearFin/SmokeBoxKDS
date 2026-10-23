@@ -669,11 +669,15 @@
     const out = [];
     if (!state || !U.isNum(now)) return out;
     const S = state.settings && state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety;
-    const sales = salesRate(state, now);
-    batchRows(state, now, S, sales, out);
-    safetyRows(state, now, S, out);
-    expiredRows(state, now, out);
-    keepRows(state, now, S, out);
+    // With the cook-ahead module off and nothing in the cabinet there are no batch, safety or sanitize rows; ticket rows stay.
+    const cook = E().cookAheadActive ? E().cookAheadActive(state) : true;
+    if (cook) {
+      const sales = salesRate(state, now);
+      batchRows(state, now, S, sales, out);
+      safetyRows(state, now, S, out);
+      expiredRows(state, now, out);
+      keepRows(state, now, S, out);
+    }
     otherRows(state, now, out);
     // Rows whose reminder was put off come after the others of the same severity, so they do not take a strip slot from a live one.
     out.sort((a, b) => (SEV_RANK[a.sev] - SEV_RANK[b.sev]) || ((a.snoozedUntil ? 1 : 0) - (b.snoozedUntil ? 1 : 0)) || (a.msLeft - b.msLeft) || (a.id < b.id ? -1 : 1));
