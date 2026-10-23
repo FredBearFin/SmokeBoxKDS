@@ -9,7 +9,7 @@ import { readPages, dataBlock, inject, faqText } from '../tools/build-guide.mjs'
 
 const SB = await loadSB(['00-util', '10-config', '60-shell', '78-guide']);
 const G = SB.guide;
-const GUIDE = ['getting-started', 'setup-recipes', 'how-you-serve', 'import-a-menu', 'taking-an-order', 'running-the-line', 'cooked-ahead-and-portions', 'hold-cabinet-and-warnings', 'cold-items-in-the-fridge', 'readings', 'closing-the-day', 'who-made-this-entry', 'backup-and-restore', 'replacing-a-device', 'get-the-tablet-ready', 'troubleshooting', 'empty-lost-or-locked', 'trying-the-demo', 'questions-and-answers', 'what-this-app-does-not-replace'];
+const GUIDE = ['getting-started', 'setup-recipes', 'how-you-serve', 'import-a-menu', 'taking-an-order', 'running-the-line', 'cooked-ahead-and-portions', 'hold-cabinet-and-warnings', 'cold-items-in-the-fridge', 'readings', 'closing-the-day', 'who-made-this-entry', 'backup-and-restore', 'start-over', 'replacing-a-device', 'get-the-tablet-ready', 'troubleshooting', 'empty-lost-or-locked', 'saved-data-that-cannot-be-read', 'trying-the-demo', 'questions-and-answers', 'what-this-app-does-not-replace'];
 const CARDS = ['card-opening-checklist', 'card-closing-checklist', 'card-when-something-goes-wrong', 'card-first-day-checklist', 'card-tablet-setup', 'card-during-service'];
 const FIGURES = ['ticket', 'ladder', 'cabinet'];
 // Every piece of text on a page (picture descriptions included), in one list, for the word checks.

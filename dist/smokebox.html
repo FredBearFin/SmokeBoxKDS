@@ -2080,6 +2080,12 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
   .fl-main[data-density="compact"] .slip-next { margin-top: 2px; padding-block: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 }
+/* The device-clock notice on the strip: calm, wraps, two plain buttons that are not the width of the screen. */
+.fl-bar-clock { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-4); background: var(--tint-warn, var(--paper)); border-bottom: var(--bw) solid var(--amber); }
+.fl-bar-clock[hidden] { display: none; }
+.fl-clock-t { flex: 1 1 260px; min-width: 0; font: var(--w-semi) var(--fs-3) / 1.3 var(--font-body); }
+.fl-bar-clock .btn { min-height: var(--tap, 44px); flex: 0 1 auto; }
+.fl-bar-clock > .icon { flex: none; margin-left: var(--sp-4); }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -4293,6 +4299,15 @@ a.of-nav:active { background: var(--press); }
   // True only for a real, finite number (not text, not "not a number", not infinity).
   // Used before any maths on values that may be missing.
   U.isNum = (n) => typeof n === 'number' && isFinite(n);
+  // Removes characters nobody can see that can fool a reader: text-direction controls (U+202A to U+202E, U+2066 to U+2069) and zero-width
+  // characters (U+200B, U+200C, U+2060, U+FEFF). A zero-width joiner (U+200D) is kept only inside an emoji sequence (a pictograph on both
+  // sides, with an optional variation selector or skin tone before it), so family and flag emoji still work; anywhere else it is removed.
+  const INVISIBLE_RE = /[\u200B\u200C\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/g;
+  const ZWJ_RE = /(\p{Extended_Pictographic}[\uFE0F\u{1F3FB}-\u{1F3FF}]*\u200D(?=\p{Extended_Pictographic}))|\u200D/gu;
+  // Returns the text with those invisible characters removed (emoji joiners stay).
+  U.stripInvisible = (s) => String(s).replace(INVISIBLE_RE, '').replace(ZWJ_RE, (m, keep) => (keep ? m : ''));
+  // Cleans typed text for names and notes: strips the invisible characters, squeezes runs of white space to single spaces and trims both ends.
+  U.cleanText = (s) => U.stripInvisible(s).replace(/\s+/g, ' ').trim();
   /* ---------- secret hashing (PIN and recovery code) ---------- */
   // Rounds of PBKDF2 for a saved PIN or recovery code: about a tenth of a second on a tablet. A 4-digit PIN stays a door latch whatever this is.
   const KDF_ROUNDS = 100000;
@@ -4610,7 +4625,7 @@ a.of-nav:active { background: var(--press); }
   const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'callouts', 'far', 'wall', 'dock'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
-  const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
+  const DATA_KEYS = ['state', 'sid', 'writer', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
     'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'dropped', 'droppedat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
@@ -5191,8 +5206,8 @@ a.of-nav:active { background: var(--press); }
   const slug = (prefix, name) => prefix + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 16);
   // The first three letters of a name, upper case, for the small tag on tickets and tabs.
   const codeOf = (name) => String(name).replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || '???';
-  // Cleans one typed name: trims spaces, squeezes runs of spaces; returns '' when it is not usable.
-  const cleanName = (x) => (typeof x === 'string' ? x.replace(/\s+/g, ' ').trim() : '');
+  // Cleans one typed name: trims spaces, squeezes runs of spaces, strips invisible direction and zero-width characters; returns '' when it is not usable.
+  const cleanName = (x) => (typeof x === 'string' ? (SB.util && SB.util.cleanText ? SB.util.cleanText(x) : x.replace(/\s+/g, ' ').trim()) : '');
   // Checks a typed name against the others in a list (ignoring one id): true if another entry has it.
   const nameTaken = (list, name, exceptId) => list.some((e) => e.id !== exceptId && e.name.toLowerCase() === name.toLowerCase());
   // Rebuilds the lookup tables in place, so code that already holds them still sees the new entries.
@@ -5282,7 +5297,7 @@ a.of-nav:active { background: var(--press); }
   // The money symbol in use (the owner's, or $), for messages.
   const cs = () => (SB.util && SB.util.currencySymbol ? SB.util.currencySymbol() : '$');
   // Collapses runs of white space and trims, as the engine does to a dish name.
-  const clean = (s) => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
+  const clean = (s) => (SB.util && SB.util.stripInvisible ? SB.util.stripInvisible : (x) => x)(String(s == null ? '' : s)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
   // The name compared for duplicates: lower case, single spaces.
   const key = (s) => clean(s).toLowerCase();
 
@@ -5953,9 +5968,11 @@ a.of-nav:active { background: var(--press); }
   // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
   // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
   // safetyKeep bucket instead of being dropped.
-  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
-  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months). This is our own choice; no source gives a minimum, so ask your health department how long to keep records.
-  const SAFETY_KEEP_MS = 190 * 24 * H;
+  const SAFETY_EVENT = { safety_setting_changed: 1, temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  // 400 days: how long the safetyKeep bucket holds a safety entry (a year and a month, so a yearly inspection can look back a full year). This is our own
+  // choice; no source gives one minimum for everyone, so ask your health department how long to keep records. Safety entries are small and the bucket is
+  // never trimmed by size, only by age.
+  const SAFETY_KEEP_DAYS = 400, SAFETY_KEEP_MS = SAFETY_KEEP_DAYS * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
 
@@ -5990,8 +6007,18 @@ a.of-nav:active { background: var(--press); }
   }
   /** Simulated propagation delay for one channel target: 2..40 s, fixed per (syncId, target). */
   const syncDelayMs = (syncId, targetId) => 2000 + (hashStr(syncId + '|' + targetId) % 38001);
-  // Squeezes runs of spaces, tabs and line breaks into single spaces and trims both ends.
-  const cleanText = (s) => s.replace(/\s+/g, ' ').trim();
+  // Squeezes runs of spaces, tabs and line breaks into single spaces, trims both ends, and strips invisible direction and zero-width characters.
+  const cleanText = (s) => U.cleanText(s);
+  // Cuts text to at most max characters without leaving half of an emoji (a lone first half of a surrogate pair) at the end.
+  const cutText = (s, max) => { if (s.length <= max) return s; let t = s.slice(0, max); const c = t.charCodeAt(t.length - 1); if (c >= 0xD800 && c <= 0xDBFF) t = t.slice(0, -1); return t; };
+  // Cleans a text field of a loaded record and cuts it to max characters (names and labels squeeze white space; a note keeps its line breaks).
+  // Returns the fixed text, or null when the field was not text. Adds a line to repaired when anything changed.
+  function fitText(v, max, what, repaired, note) {
+    if (typeof v !== 'string') return null;
+    const c = cutText(note ? U.stripInvisible(v).trim() : cleanText(v), max).trim();
+    if (c !== v) repaired.push(what + ' cleaned or shortened');
+    return c;
+  }
   // True when the sorted list a contains x. Halves the search each step, so it stays fast on long lists.
   const sortedHas = (a, x) => { let lo = 0, hi = a.length - 1; while (lo <= hi) { const m = (lo + hi) >> 1; if (a[m] === x) return true; if (a[m] < x) lo = m + 1; else hi = m - 1; } return false; };
 
@@ -6297,7 +6324,7 @@ a.of-nav:active { background: var(--press); }
       return gateOut('NONE', true, 'onLine', 'ok', 'Out of the fridge, ' + used + ' min so far' + (isNum(b.outHours) ? ' of your ' + U.round(b.outHours, 2) + '-hour limit.' : '. No out-of-fridge limit set.'), end);
     }
     if (b.outSince != null) {
-      const lim = b.outSince + S.aboveColdGraceH * H;
+      const lim = coldOutLimit(b, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, end));
     }
@@ -6379,7 +6406,7 @@ a.of-nav:active { background: var(--press); }
         if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Below ' + f0(S.hotHoldF) + ' for more than ' + S.belowHotGraceH + ' hours. Discard.' + SAFETY);
         return gateOut('REHEAT_IMMEDIATE', false, 'belowHot', 'bad', 'Below ' + f0(S.hotHoldF) + '. Reheat to ' + f0(S.reheatF) + ' now (Smokebox allows one reheat per batch) or discard.' + SAFETY, Math.min(lim, exp));
       }
-      const lim = batch.outSince + S.aboveColdGraceH * H;
+      const lim = coldOutLimit(batch, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, exp));
     }
@@ -6416,7 +6443,7 @@ a.of-nav:active { background: var(--press); }
     if (b.outSince != null) {
       const want = b.kind === 'cold' ? 'chill' : 'reheat';
       if (b.status !== want || (b.kind !== 'cold' && b.reheats >= 1)) return -Infinity;
-      return Math.min(q ? hard : exp, b.outSince + (b.kind === 'cold' ? S.aboveColdGraceH : S.belowHotGraceH) * H);
+      return Math.min(q ? hard : exp, b.kind === 'cold' ? coldOutLimit(b, S) : b.outSince + S.belowHotGraceH * H);
     }
     // A past batch stays past (a late temperature check does not change it) until the hard cap.
     if (b.status === 'past') return q ? hard : -Infinity;
@@ -6534,7 +6561,7 @@ a.of-nav:active { background: var(--press); }
   }
   // Only the safety-log events from a list of events.
   function safetyOnly(list) { return list.filter((e) => hasOwn(SAFETY_EVENT, e.type)); }
-  // Adds newly dropped safety events to the retention bucket and lets go of entries older than 190 days
+  // Adds newly dropped safety events to the retention bucket and lets go of entries older than SAFETY_KEEP_DAYS
   // (measured from refT, the newest time known). The bucket is never trimmed by size, only by age.
   function keepSafety(prev, dropped, refT) {
     const all = (Array.isArray(prev) ? prev : []).concat(dropped);
@@ -7038,7 +7065,7 @@ a.of-nav:active { background: var(--press); }
     let note = p.note == null ? '' : p.note;
     if (typeof note !== 'string') { tx.info.key = 'note'; return 'badPatch'; }
     if (note.length > 4 * L.maxNoteLen) return 'noteTooLong';
-    note = note.trim();
+    note = U.stripInvisible(note).trim();
     if (note.length > L.maxNoteLen) return 'noteTooLong';
     const rush = p.rush == null ? false : p.rush;
     if (typeof rush !== 'boolean') { tx.info.key = 'rush'; return 'badPatch'; }
@@ -7747,6 +7774,9 @@ a.of-nav:active { background: var(--press); }
     const w = p.who.trim();
     return w.length > 12 ? null : w;
   }
+  // The moment cold food that is above its limit must be thrown out: the grace time (aboveColdGraceH) minus the time it already spent above the limit
+  // in earlier stretches (coldOutMs), counted from when it went out of range this time. One good reading does not wipe the earlier time away.
+  const coldOutLimit = (b, S) => b.outSince + Math.max(0, S.aboveColdGraceH * H - (isNum(b.coldOutMs) ? b.coldOutMs : 0));
   // Records a temperature reading, then re-runs the gate. A hot reading below the hot-hold limit, or a cold
   // one above its limit, starts the out-of-range clock (outSince); an in-range cold reading clears it. A
   // cooling batch records stage 1 and final. Also logs whether the check was on time.
@@ -7776,7 +7806,7 @@ a.of-nav:active { background: var(--press); }
       if (b.stage1At == null && f <= c.stage1ToF) { w.stage1At = t; w.stage1F = f; }
       if (w.stage1At != null && b.finalAt == null && f <= c.finalF) { w.finalAt = t; w.finalF = f; }
     } else if (b.kind === 'cold') {
-      if (f > S.coldHoldF) { if (b.outSince == null && b.place !== 'line') w.outSince = t; } else if (b.outSince != null) delete w.outSince;
+      if (f > S.coldHoldF) { if (b.outSince == null && b.place !== 'line') w.outSince = t; } else if (b.outSince != null) { w.coldOutMs = Math.round((isNum(b.coldOutMs) ? b.coldOutMs : 0) + Math.max(0, t - b.outSince)); delete w.outSince; }
     } else if (f < S.hotHoldF) {
       if (b.outSince == null) w.outSince = t;
     } else if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1) && t - b.outSince <= S.belowHotGraceH * H) {
@@ -8337,7 +8367,15 @@ a.of-nav:active { background: var(--press); }
       refreshAllBatches(tx);
     }
     if (S.pacing !== cur.pacing) recomputeLearned(tx);
-    tx.event('settings_changed', { keys });
+    // A change to a food-safety number is a safety record: one entry per number with the old and the new value (stored units: degrees F, hours, minutes).
+    const rest = [];
+    for (const k of keys) {
+      if (k.indexOf('safety.') !== 0) { rest.push(k); continue; }
+      // Reads the value at the dotted key path from a settings object, or undefined when any step is missing.
+      const at = (root) => k.split('.').reduce((o, part) => (o !== null && typeof o === 'object' ? o[part] : undefined), root);
+      tx.event('safety_setting_changed', { key: k, from: at(cur) === undefined ? null : at(cur), to: at(S) === undefined ? null : at(S) });
+    }
+    if (rest.length) tx.event('settings_changed', { keys: rest });
     tx.info = { keys };
     return 'ok';
   };
@@ -9566,6 +9604,9 @@ a.of-nav:active { background: var(--press); }
         if (out.tcs && out.holdBasis !== 'safety') out.holdBasis = 'quality';
         if (holdMigrate && base && x.maxHoldH === 4 && isNum(base.maxHoldH) && base.maxHoldH > 4) out.maxHoldH = base.maxHoldH;
         if (typeof out.tcs !== 'boolean' || (out.unit !== 'g' && out.unit !== 'ea') || typeof out.name !== 'string') { repaired.push('dropped ingredient ' + x.id); continue; }
+        out.name = fitText(out.name, ING_PATCH.name.max, 'ingredient ' + x.id + '.name', repaired);
+        if (!out.name) { if (!base) { repaired.push('dropped ingredient ' + x.id); continue; } out.name = base.name; }
+        if (out.note !== undefined) { const nt = fitText(out.note, C.limits.maxNoteLen, 'ingredient ' + x.id + '.note', repaired, true); if (nt === null) delete out.note; else out.note = nt; }
         for (const k of Object.keys(ING_PATCH)) if (ING_PATCH[k].t === 'num' && out[k] !== undefined && checkLeaf(ING_PATCH[k], out[k], k)) { out[k] = base && base[k] !== undefined ? base[k] : undefined; if (out[k] === undefined) delete out[k]; repaired.push('ingredient ' + x.id + '.' + k + ' reset'); }
         if (out.tcs && out.hold !== 'hot' && out.hold !== 'cold') out.hold = 'hot';
         // Fridge flag and the owner's two limits only on a cold cooked-ahead product.
@@ -9583,7 +9624,9 @@ a.of-nav:active { background: var(--press); }
         if (!isObj(x) || !safeKey(x.id) || seenMenu.has(x.id)) { repaired.push('dropped a bad menu item'); continue; }
         const base = !own && hasOwn(C.menuById, x.id) ? C.menuById[x.id] : null;
         const out = Object.assign({ prepConfirmed: false, archived: false }, base || {}, x);
+        if (typeof out.name === 'string') out.name = fitText(out.name, MENU_PATCH.name.max, 'menu ' + x.id + '.name', repaired);
         if (typeof out.name !== 'string' || !out.name) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.name = base.name; }
+        if (out.short !== undefined) { const sh = fitText(out.short, MENU_PATCH.short.max, 'menu ' + x.id + '.short', repaired); out.short = sh || cutText(out.name, MENU_PATCH.short.max).trim(); }
         if (C.workZones.indexOf(out.zone) < 0) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.zone = base.zone; repaired.push('menu ' + x.id + '.zone reset'); }
         if (!isNum(out.prepSec) || out.prepSec < 5 || out.prepSec > 3600) { out.prepSec = base ? base.prepSec : 120; repaired.push('menu ' + x.id + '.prepSec reset'); }
         if (!isNum(out.price) || out.price < 0 || out.price > C.limits.maxPrice) { out.price = base ? base.price : 0; repaired.push('menu ' + x.id + '.price reset'); }
@@ -9651,10 +9694,11 @@ a.of-nav:active { background: var(--press); }
         if (out.status === 'discard') { out.canServe = false; out.remainingG = 0; out.action = 'DISCARD_LOCKOUT'; if (DISCARD_REASONS.indexOf(out.discardReason) < 0) out.discardReason = 'other'; if (!isNum(out.discardedAt)) out.discardedAt = out.enteredAt; }
         if (typeof out.canServe !== 'boolean' || out.kind === 'cooling') out.canServe = out.kind === 'cooling' ? false : !!out.canServe;
         if (!isInt(out.reheats) || out.reheats < 0) out.reheats = 0;
+        if (out.label !== undefined) { const lb = fitText(out.label, 40, 'batch ' + b.id + '.label', repaired); if (lb) out.label = lb; else delete out.label; }
         if (!Array.isArray(out.temps)) out.temps = [];
         out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS)
           .map((x) => (typeof x.who === 'string' && x.who.length >= 1 && x.who.length <= 12 ? { t: x.t, f: x.f, who: x.who } : { t: x.t, f: x.f }));
-        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
+        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coldOutMs', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
         for (const k of ['stage1F', 'finalF', 'lineMs', 'lineSince', 'movedAt', 'fridgeDays', 'outHours']) if (out[k] !== undefined && !isNum(out[k])) delete out[k];
         // Place and the owner's limits exist only on a cold batch made from a fridge-kept product; anything else is cleared.
         if (out.fridge !== true || out.kind !== 'cold') { for (const k of ['fridge', 'place', 'lineMs', 'lineSince', 'movedAt', 'madeOn', 'fridgeDays', 'outHours']) delete out[k]; }
@@ -9814,14 +9858,14 @@ a.of-nav:active { background: var(--press); }
     if (!isInt(t.num) || t.num < 1) return null;
     const out = Object.assign({}, t);
     if (typeof out.serviceDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(out.serviceDate)) { out.serviceDate = U.serviceDate(out.createdAt); repaired.push('ticket ' + t.id + '.serviceDate recomputed'); }
-    if (typeof out.customer !== 'string') out.customer = 'Walk-up';
+    out.customer = fitText(out.customer, C.limits.maxCustomerLen, 'ticket ' + t.id + '.customer', repaired) || 'Walk-up';
     if (!hasOwn(C.channelById, out.channel)) { out.channel = 'dine_in'; repaired.push('ticket ' + t.id + '.channel reset'); }
     if (!isInt(out.recalls) || out.recalls < 0) out.recalls = 0;
     if (!hasOwn(SRC_TICKET, out.src)) out.src = 'live';
     out.rush = out.rush === true;
     out.pacing = out.pacing !== false;
     if (out.orderId !== undefined && !(typeof out.orderId === 'string' && safeKey(out.orderId) && oSeq(out.orderId) === oSeq(out.orderId))) { delete out.orderId; delete out.round; repaired.push('ticket ' + t.id + '.orderId cleared'); }
-    if (typeof out.note !== 'string') out.note = '';
+    out.note = fitText(out.note, C.limits.maxNoteLen, 'ticket ' + t.id + '.note', repaired, true) || '';
     if (!isNum(out.dmaxSec) || out.dmaxSec < 0) return null;
     if (out.status === 'voided' && !(typeof out.voidReason === 'string' && out.voidReason.trim())) { out.voidReason = 'other'; repaired.push('ticket ' + t.id + '.voidReason set'); }
     if (out.status !== 'expedited') { delete out.expeditedAt; delete out.forced; }
@@ -9832,6 +9876,8 @@ a.of-nav:active { background: var(--press); }
       const x = Object.assign({}, it);
       if (x.track !== 'one' && x.track !== 'two') x.track = 'one';
       if (!Array.isArray(x.mods)) x.mods = [];
+      else x.mods = x.mods.slice(0, 10).map((m) => (typeof m === 'string' ? cutText(cleanText(m), 60) : '')).filter(Boolean);
+      for (const [k, max] of [['name', MENU_PATCH.name.max], ['short', MENU_PATCH.short.max]]) if (x[k] !== undefined) { const v = fitText(x[k], max, 'ticket ' + t.id + ' item ' + k, repaired); if (v) x[k] = v; else delete x[k]; }
       if (!isNum(x.price) || x.price < 0 || x.price > C.limits.maxPrice) { if (isNum(x.price)) repaired.push('ticket ' + t.id + ' price reset'); x.price = 0; }
       if (x.qty > C.limits.maxQty) { x.qty = C.limits.maxQty; repaired.push('ticket ' + t.id + ' quantity lowered'); }
       for (const k of ['firedAt', 'startedAt', 'doneAt', 'cost']) if (x[k] !== undefined && !isNum(x[k])) return null;
@@ -9850,7 +9896,7 @@ a.of-nav:active { background: var(--press); }
     if (!isObj(o) || typeof o.id !== 'string' || !safeKey(o.id) || oSeq(o.id) !== oSeq(o.id) || !isNum(o.createdAt) || !hasOwn(ORDER_STATUS, o.status)) return null;
     const out = {
       id: o.id, serviceDate: typeof o.serviceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.serviceDate) ? o.serviceDate : U.serviceDate(o.createdAt),
-      customer: typeof o.customer === 'string' && o.customer ? o.customer.slice(0, C.limits.maxCustomerLen) : 'Walk-up',
+      customer: fitText(o.customer, C.limits.maxCustomerLen, 'order ' + o.id + '.customer', repaired) || 'Walk-up',
       channel: hasOwn(C.channelById, o.channel) ? o.channel : 'dine_in', createdAt: o.createdAt, status: o.status,
       src: hasOwn(SRC_TICKET, o.src) ? o.src : 'live', rounds: isInt(o.rounds) && o.rounds >= 0 ? o.rounds : 0,
     };
@@ -9905,7 +9951,7 @@ a.of-nav:active { background: var(--press); }
    * ==================================================================================================== */
   // The public door: everything other files may use. _internal is for tests and tools.
   Object.assign(E, {
-    apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
+    SAFETY_KEEP_DAYS, SAFETY_KEEP_MS, apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, totalsOf, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
     channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
@@ -10792,7 +10838,13 @@ a.of-nav:active { background: var(--press); }
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
   // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
   const SNAP_KEEP = { maxTickets: 300, maxEvents: 2000 };
+  // The 'before restore' copy stays in the last-good slot for 7 days, or until a close-day copy replaces it, so a wrong restore can be undone.
+  const BEFORE_RESTORE = 'before restore', BEFORE_RESTORE_KEEP_MS = 7 * 24 * 3600e3;
   const SID_KEY = 'smokebox.v1.sid';
+  // Two tabs of one browser must not overwrite each other's save. Where the browser has Web Locks, a timed save waits for the lock named
+  // LOCK_NAME, so only one tab at a time reads the save id, builds the text and writes it. Where it does not, a tab writes its own tag to
+  // WRITER_KEY first and checks both the tag and the save id again before writing (the tab-sync fallback).
+  const LOCK_NAME = 'smokebox-save-lock', WRITER_KEY = 'smokebox.v1.writer', LOCK_WAIT = 'waiting-for-lock';
   // The actions this device has done that no server has confirmed yet (only used when a transport can push).
   const OUTBOX_KEY = 'smokebox.v1.outbox';
   const OUTBOX_MAX = 5000; // oldest unconfirmed actions are dropped past this, and st.outboxDropped says so
@@ -10951,18 +11003,44 @@ a.of-nav:active { background: var(--press); }
     // 400 ms and 5 seconds, so a busy rush never spends most of its time writing.
     const wait = Math.min(SAVE_MAX_MS, Math.max(SAVE_MS, Math.round(st.saveCostMs * 8)));
     st.saveDelayMs = wait;
-    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
+    saveTimer = setTimeout(timedSave, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
   }
+  // The browser's lock manager when it has one, else null.
+  const lockManager = () => { try { const n = g.navigator; return n && n.locks && typeof n.locks.request === 'function' ? n.locks : null; } catch (e) { return null; } };
+  // True while a save runs inside the lock (then no tag check is needed: no other tab can be saving).
+  let inLock = false;
+  // Runs when the save timer fires. With several tabs and Web Locks it takes the lock first, then saves; otherwise it saves at once.
+  function timedSave() {
+    const L = tr ? lockManager() : null;
+    if (!L) { saveTimer = null; persistNow(); return; }
+    saveTimer = LOCK_WAIT;
+    // Saves inside the lock if this save is still the wanted one (a direct flush may have saved already).
+    const run = () => { if (saveTimer !== LOCK_WAIT) return; saveTimer = null; inLock = true; try { persistNow(); } finally { inLock = false; } };
+    try { L.request(LOCK_NAME, run).catch(() => { run(); }); } catch (e) { run(); }
+  }
+  // Without Web Locks: writes this tab's tag, then reads the tag and the save id back. True when nobody else saved or claimed meanwhile.
+  function claimWrite() {
+    const tag = tabId + ':' + (++claimN);
+    try {
+      storage.set(WRITER_KEY, tag);
+      const sid = storage.get(SID_KEY, null), mine = storage.get(WRITER_KEY, null);
+      return mine === tag && (sid == null ? baseSid == null : sid === baseSid);
+    } catch (e) { return true; }
+  }
+  let claimN = 0;
   // Saves the state to the browser right now and returns true if it worked. If the browser says it is full,
   // it retries with less history (oldest finished tickets and events first), halving up to 12 times. After a
   // good save it announces the new revision to other tabs.
   function persistNow() {
     if (!storage || !state) return false;
-    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    if (saveTimer) { if (saveTimer !== LOCK_WAIT) clearTimeout(saveTimer); saveTimer = null; }
     // The saved text is a damaged copy nobody could keep elsewhere: it stays exactly as it is until the owner has saved it.
     if (writeBlocked) { st.lastSaveOk = false; return false; }
     // If another tab saved since this tab last loaded or saved, build on its copy first so nothing is lost.
+    const forced = skipRebase;
     if (skipRebase) skipRebase = false; else rebaseIfStale();
+    // With several tabs and no lock, claim the write and rebuild on the newest copy if another tab got in first (up to 3 times, then write anyway).
+    if (tr && !inLock && !lockManager()) for (let i = 0; i < 3 && !claimWrite(); i++) { if (forced) break; rebaseIfStale(); }
     const r = realNow();
     const v = now();
     let ok = false;
@@ -11007,6 +11085,8 @@ a.of-nav:active { background: var(--press); }
   function maybeSnapshot(r) {
     if (!strict || mode !== 'real' || !storage || !state) return false;
     if (!snapWanted && r - snapAt < SNAP_EVERY_MS) return false;
+    // A 'before restore' copy is the owner's way back from a wrong restore: the 6-hour refresh leaves it alone for 7 days.
+    if (!snapWanted) { const g = beforeRestoreCopy(r); if (g) return false; }
     try {
       const small = E().prune(state, SNAP_KEEP);
       const env = { v: 1, takenAt: r, reason: snapWanted || 'interval', rev: state.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
@@ -11017,6 +11097,44 @@ a.of-nav:active { background: var(--press); }
       st.lastGoodAt = r;
       return true;
     } catch (e) { return false; }
+  }
+  // The stored 'before restore' envelope when it is still within its 7 days at time r, else null.
+  function beforeRestoreCopy(r) {
+    try {
+      const g = storage.get(LASTGOOD_KEY, null);
+      return g && typeof g === 'object' && g.reason === BEFORE_RESTORE && isNum(g.takenAt) && r - g.takenAt < BEFORE_RESTORE_KEEP_MS && r >= g.takenAt ? g : null;
+    } catch (e) { return null; }
+  }
+  // Before a restore replaces the kitchen: keeps a whole copy of the current one in the last-good slot (full history if the
+  // browser has room, else the small rolling size). Returns the time it was taken, or null when there was nothing worth
+  // keeping (an empty kitchen, the demo, no storage) or the browser had no room. Never throws.
+  function snapshotBeforeRestore() {
+    if (!strict || mode !== 'real' || !storage || !state || isBlank()) return null;
+    const r = realNow();
+    for (const keep of [null, SNAP_KEEP]) {
+      try {
+        const small = keep ? E().prune(state, keep) : state;
+        const env = { v: 1, takenAt: r, reason: BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
+        if (!E().validateBackup(JSON.stringify(env)).ok) continue;
+        if (storage.set(LASTGOOD_KEY, env) === false) continue;
+        snapAt = r; snapWanted = null; st.lastGoodAt = r; st.beforeRestoreAt = r;
+        return r;
+      } catch (e) { /* try the smaller copy */ }
+    }
+    return null;
+  }
+  // Tells the screens about the 'before restore' copy: { takenAt, expiresAt } or null when there is none now.
+  function beforeRestoreInfo() {
+    if (!storage) return null;
+    const g = beforeRestoreCopy(realNow());
+    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS } : null;
+  }
+  // Puts the 'before restore' copy back as the kitchen (the way back from a wrong restore). Returns 'ok', or 'noCopy'.
+  // The copy it replaces is kept the same way, so this can be undone once too.
+  function undoRestore() {
+    const g = storage ? beforeRestoreCopy(realNow()) : null;
+    if (!g) { last = { type: 'undoRestore', report: 'noCopy', info: {}, events: [] }; return 'noCopy'; }
+    return importAll(JSON.stringify(g));
   }
   // Reads the rolling copy and returns { state, takenAt } if it is whole, else null.
   function readSnapshot() {
@@ -11514,6 +11632,8 @@ a.of-nav:active { background: var(--press); }
     }
     if (namesGiven && typeof C.saveCustom === 'function') { try { C.saveCustom(namesGiven); } catch (e) { /* the names stay applied for this session */ } }
     if (parsed && isObjLike(parsed.setup)) for (const k of SETUP_LISTS) if (Array.isArray(parsed.setup[k])) { try { storage.set(SETUP_KEYS[k], parsed.setup[k].filter((x) => typeof x === 'string').slice(0, 200)); } catch (e) { /* the list is a convenience */ } }
+    // Keep the kitchen being replaced, so a wrong restore can be undone: a visible copy in the last-good slot.
+    const beforeAt = snapshotBeforeRestore();
     const ns = v.state;
     // The revision must go up so other tabs treat the imported copy as newer; the clock must not be behind
     // its times.
@@ -11524,7 +11644,7 @@ a.of-nav:active { background: var(--press); }
     skipRebase = true; pending = [];   // an import or reset is meant to win over what another tab saved
     persistNow();
     scheduleNotify();
-    last = { type: 'import', report: 'ok', info: { repaired: v.repaired }, events: [] };
+    last = { type: 'import', report: 'ok', info: { repaired: v.repaired, beforeRestore: beforeAt != null, beforeRestoreAt: beforeAt, beforeRestoreKeepDays: beforeAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, events: [] };
     return 'ok';
   }
   // Time in ms as readable date text for spreadsheets, or empty text when missing.
@@ -11935,13 +12055,13 @@ a.of-nav:active { background: var(--press); }
   function isOwn() { return !!(state && state.catalog === 'own'); }
 
   // Public API: init, destroy, status, getState, now, tick, dispatch, dispatchEx, lastResult, subscribe,
-  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, exportCsv, reset,
+  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset,
   // resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY.
   SB.store = {
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
@@ -21448,6 +21568,12 @@ a.of-nav:active { background: var(--press); }
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
+    // The clock notice: the tablet's clock jumped far ahead, the board keeps the old time and asks. Calm, two plain choices, and the board keeps working.
+    const clockT = h('span', { class: 'fl-clock-t' });
+    const clockKeep = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-keep' }, onClick: () => { if (m) { m.clockDis = Date.now() + 10 * 60e3; updateStrip(store().now()); } } }, 'Keep the old time');
+    const clockUse = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-use' }, onClick: askClockUse }, 'Use the new time');
+    const clockWrap = h('div', { class: 'fl-strip-bar fl-bar-clock', role: 'alert', hidden: true }, ico('clock', 22), clockT, clockKeep, clockUse);
+    el.appendChild(clockWrap);
     const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear all notices', () => { if (m && m.noteKey) m.dis.add(m.noteKey); return 'snd'; }));
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
@@ -21470,7 +21596,7 @@ a.of-nav:active { background: var(--press); }
     // A visually hidden live region that changes only when a warning is announced (the leader tab), so a screen reader hears each warning once, never the ticking countdown.
     const announce = h('span', { class: 'visually-hidden', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
     el.appendChild(announce);
-    return { el, rows, soundBar: soundWrap, pauseBar: pauseWrap, pauseBtn: pauseBar, announce };
+    return { el, rows, clockBar: clockWrap, clockText: clockT, soundBar: soundWrap, pauseBar: pauseWrap, pauseBtn: pauseBar, announce };
   }
   // Shows the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { showCabinet(true, { batchId }); } catch (e) { console.error('[smokebox] cabinet failed', e); } }
@@ -21514,6 +21640,14 @@ a.of-nav:active { background: var(--press); }
     if (top.level === 4) { tell(PH('expired', { who, many }), 'expired'); return; }
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
     tell(PH('expire', { who, many, mins, goes86: first.goes86, approx: top.level === 2 }), top.level >= 3 ? 'start' : 'expire');
+  }
+  // Asks, in a small box, whether to use the tablet's new time. It needs a second deliberate tap, and "Keep the old time" is the way out.
+  function askClockUse() {
+    const cs = store().status().clockSuspect;
+    if (!cs || !SB.ui || !SB.ui.confirm) return;
+    const days = Math.round(cs.aheadMs / 86400000);
+    SB.ui.confirm({ title: 'Use the new time?', body: 'Timers and ages on every open ticket will jump forward by about ' + (days >= 2 ? days + ' days' : Math.round(cs.aheadMs / 3600000) + ' hours') + '. Only do this if the date and time on this tablet are right.', confirmLabel: 'Use the new time', cancelLabel: 'Keep the old time', tone: 'danger' })
+      .then((yes) => { if (yes) { store().acceptClockJump(); if (m) updateStrip(store().now()); } else if (m) m.clockDis = Date.now() + 10 * 60e3; });
   }
   // Says a cold item's low-time row once when it first shows (or gets worse), in plain words that name the owner's limit.
   // The first pass after the board opens only remembers what is already there, so a reload does not read old news aloud.
@@ -21583,15 +21717,24 @@ a.of-nav:active { background: var(--press); }
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
     // Only one notice shows at a time (the "tap for sound" bar first, then the note); the bar says how many more wait behind it, and
     // its X clears them all. Warning rows above are separate and always show.
-    const soundShown = needSound && !m.dis.has('snd');
+    // A device clock that jumped ahead comes first: it changes every timer on the board. It never hides the tickets.
+    const cs = store().status().clockSuspect;
+    const clockShown = !!cs && Date.now() >= (m.clockDis || 0);
+    if (clockShown) {
+      const dd = Math.round(cs.aheadMs / 86400000);
+      const t = 'This tablet\'s clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(cs.aheadMs / 3600000) + ' hours') + '. Smokebox is still using the old time, so tickets and timers keep running.';
+      if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
+    }
+    setHidden(m.strip.clockBar, !clockShown);
+    const soundShown = needSound && !m.dis.has('snd') && !clockShown;
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
-    const showNote = noteWanted && !soundShown;
+    const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
     if (moreEl) { const t = 'Tap here to turn on warning sounds. This browser needs one tap first.' + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
-    setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
+    setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote && !clockShown);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
       setHidden(r.wrap, !d);
@@ -28957,7 +29100,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Closing does not lock anything. You can still take orders, and closing again later includes them. The app's day turns over at 4 am."
+      "x": "Closing does not lock new orders, and closing again later includes them. A paid order from a day you already closed cannot be opened again. The app's day turns over at 4 am."
      },
      {
       "t": "h",
@@ -29000,7 +29143,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "ol",
       "x": [
-       "Open the thrown-out log from the board's menu.",
+       "Open the thrown-out log from the board's menu. It says which period it covers.",
        "Tap **Fix this entry** on the row.",
        "Say what was wrong, add your initials and tap **Save the fix**."
       ]
@@ -29056,14 +29199,34 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "h",
-      "x": "Start over with an empty menu"
+      "x": "Start over"
      },
+     {
+      "t": "p",
+      "x": "To empty your kitchen and begin again with a blank menu, see Start over with an empty menu."
+     },
+     {
+      "t": "h",
+      "x": "Erasing"
+     },
+     {
+      "t": "p",
+      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first."
+     }
+    ]
+   },
+   {
+    "id": "start-over",
+    "group": "guide",
+    "title": "Start over with an empty menu",
+    "summary": "Empty your kitchen and begin again with a blank menu. A backup file is saved first.",
+    "blocks": [
      {
       "t": "ol",
       "x": [
-       "Tap **Settings**. At the bottom, tap **Start over with an empty menu**.",
+       "Tap **Settings**. At the bottom, tap **Start over with an empty menu**. If a PIN is set, the PIN pad opens first.",
        "Read what goes and what stays. Clear **Keep my tax, hours, PIN and station names** to reset those too. Tap **Next: about your backup**.",
-       "This step only explains: the backup is saved at the moment of erasing, and if it fails, nothing is erased. Tap **Next: confirm**.",
+       "Tap **Save my backup file now**. The file downloads before anything is erased. Look in your downloads folder, select **I saved the backup file and I can find it**, then tap **Next: confirm**.",
        "Type ERASE, then tap **Erase everything and start over**.",
        "At \"Done. Your kitchen is empty.\" tap **Save the backup again** or **Go to the first screen**."
       ]
@@ -29073,12 +29236,8 @@ a.of-nav:active { background: var(--press); }
       "x": "There is no undo. To go back, restore the backup file. Left-over old demo tickets get **Clear them** or **Keep them**."
      },
      {
-      "t": "h",
-      "x": "Erasing"
-     },
-     {
       "t": "p",
-      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either."
+      "x": "With a PIN set, the PIN pad opens first. If the backup cannot be saved, nothing is erased."
      }
     ]
    },
@@ -29197,6 +29356,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "ul",
       "x": [
+       "A strip says the tablet's clock jumped ahead? Smokebox keeps the old time, so tickets and timers keep running. Tap **Keep the old time** to hide it for 10 minutes and fix the clock in the device settings. Tap **Use the new time** only if the new time is right. It asks once more before anything changes.",
        "Check the date range and the filters at the top of the Back office page.",
        "Choose **Live only** to leave out the sample history, which is made up.",
        "Unpaid orders are not counted as money collected.",
@@ -29217,7 +29377,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Smokebox saves every change on this device as you go. Open it again the same way, in the same browser, and the board comes back. The clocks kept running while it was closed, and no warning sounded."
+      "x": "Smokebox saves every change as you go. Open it again in the same browser and the board comes back. The clocks kept running, and no warning sounded while it was closed."
      },
      {
       "t": "h",
@@ -29225,7 +29385,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Your data lives only in the browser on one device. Clearing the browser data, using another browser, another file location or a private window shows an empty Smokebox. Restore your last backup (see Backup and restore)."
+      "x": "Your data lives only in the browser on one device. Clearing the browser data, or using another browser or a private window, shows an empty Smokebox. Restore your last backup (see Backup and restore)."
      },
      {
       "t": "h",
@@ -29233,15 +29393,15 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "When you set a PIN, Smokebox shows a recovery code once. Tap **Copy** or **Print**, keep it away from the tablet, select **I saved it**, then tap **Done**. On the PIN pad, open **Forgot the PIN?**, type the recovery code and a new PIN (or leave it empty to remove the PIN), and tap **Reset the PIN with my code**. A PIN from before codes existed can get one: **Settings**, **Tax, hours and PIN**, **Make a recovery code**."
+      "x": "When you set a PIN, a recovery code shows once. Tap **Copy** or **Print**, keep it away from the tablet, select **I saved it**, then tap **Done**. On the PIN pad, open **Forgot the PIN?**, type the recovery code and a new PIN (or leave it empty to remove the PIN), and tap **Reset the PIN with my code**. A PIN from before codes existed can get one: **Settings**, **Tax, hours and PIN**, **Make a recovery code**."
      },
      {
       "t": "p",
-      "x": "No code? The only way back is to clear this site's saved data in your browser settings. That erases everything on this device, including today's tickets and your menu. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before the PIN was set."
+      "x": "No code? The only way back is to clear this site's saved data in your browser settings. That erases everything on this device. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before it was set."
      },
      {
       "t": "p",
-      "x": "Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not real security."
+      "x": "With a PIN set, changing it or making a new recovery code asks for the current PIN. Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not security."
      },
      {
       "t": "h",
@@ -29249,7 +29409,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "That is by design for a new Smokebox. It starts with no dishes, tickets or food in the cabinet, and it never guesses. Add dishes under **Dishes and prices**. If it was full yesterday, see \"The tablet was replaced or cleared\" above."
+      "x": "That is by design for a new Smokebox. It starts with no dishes and never guesses. Add dishes under **Dishes and prices**. If it was full yesterday, see \"The tablet was replaced or cleared\" above."
      },
      {
       "t": "h",
@@ -29260,8 +29420,24 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "Tickets, dishes, settings and the PIN: in this browser on this device only.",
        "Sound, loudness, Day or Night and text size: on this device only.",
-       "Other devices do not see your board. A backup file is the only copy you can move."
+       "Only a backup file can be moved."
       ]
+     }
+    ]
+   },
+   {
+    "id": "saved-data-that-cannot-be-read",
+    "group": "guide",
+    "title": "Saved data that cannot be read",
+    "summary": "What to do when Smokebox says some of its saved data could not be read.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "A message at the top"
+     },
+     {
+      "t": "p",
+      "x": "If a message says some saved records could not be read and were left out, the data as it was is kept. Do not clear the browser data. Ask whoever set up Smokebox. If a full-screen message says the saved data could not be read, tap **Download the old data** or **Show the data so I can copy it**. Only then can you continue."
      }
     ]
    },
@@ -36549,26 +36725,38 @@ a.of-nav:active { background: var(--press); }
   // damaged text is offered as a file; nothing is written over it until the person says they have saved it.
   function showHeldData(text) {
     const wrap = doc.createElement('div');
-    wrap.id = 'held-data'; wrap.setAttribute('role', 'alertdialog');
-    wrap.style.cssText = 'position:fixed;inset:0;overflow:auto;padding:16px;background:#F5F2EB;color:#1E2224;font-family:system-ui,sans-serif;z-index:99999';
+    wrap.id = 'held-data'; wrap.setAttribute('role', 'alertdialog'); wrap.setAttribute('aria-labelledby', 'held-data-h');
+    // Follows the tablet's look: Night colors and Large text apply here too, so the screen reads the same as the board behind it.
+    let night = false, large = false;
+    try { night = !!(SB.theme && SB.theme.get && SB.theme.get() === 'night'); large = !!(SB.theme && SB.theme.textSize && SB.theme.textSize() === 'large'); } catch (e) { /* default look */ }
+    wrap.style.cssText = 'position:fixed;inset:0;overflow:auto;padding:16px;font-family:system-ui,sans-serif;z-index:99999;font-size:' + (large ? '120%' : '100%') + ';background:' + (night ? '#1E2224' : '#F5F2EB') + ';color:' + (night ? '#F5F2EB' : '#1E2224');
     const card = doc.createElement('div'); card.className = 'error-card';
-    const h2 = doc.createElement('h2'); h2.textContent = 'Your saved data could not be read, and could not be kept safe';
+    if (night) card.style.cssText = 'background:#2B3033;color:#F5F2EB;border-color:#6B7478';
+    const h2 = doc.createElement('h2'); h2.id = 'held-data-h'; h2.textContent = 'Your saved data could not be read, and could not be kept safe';
     const p = doc.createElement('p'); p.textContent = 'This browser is too full to set the old data aside, so Smokebox has not touched it. Nothing new will be saved on this device until you choose below. Download the old data now and keep the file. Then free some space, or continue and let Smokebox replace the old data.';
-    const row = doc.createElement('div'); row.className = 'row';
-    const dl = doc.createElement('button'); dl.type = 'button'; dl.className = 'btn btn-primary'; dl.textContent = 'Download the old data';
+    const row = doc.createElement('div'); row.className = 'row'; row.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-top:12px';
+    const bstyle = 'min-height:48px;flex:1 1 220px';
+    const dl = doc.createElement('button'); dl.type = 'button'; dl.className = 'btn btn-primary'; dl.style.cssText = bstyle; dl.textContent = 'Download the old data';
+    const show = doc.createElement('button'); show.type = 'button'; show.className = 'btn'; show.style.cssText = bstyle; show.textContent = 'Show the data so I can copy it';
+    const go = doc.createElement('button'); go.type = 'button'; go.className = 'btn'; go.style.cssText = bstyle; go.textContent = 'I have the file: continue and replace it';
+    const hint = doc.createElement('p'); hint.setAttribute('role', 'status'); hint.style.cssText = 'margin-top:8px;font-size:90%'; hint.textContent = 'The last button turns on after you download the data or show it to copy.';
+    const box = doc.createElement('textarea'); box.readOnly = true; box.hidden = true; box.value = text; box.rows = 8; box.style.cssText = 'width:100%;margin-top:12px';
+    box.setAttribute('aria-label', 'The old data, to copy by hand');
+    // The way forward is only offered once the person has the old data in hand (downloaded or shown), so it cannot be replaced by a stray tap.
+    go.disabled = true; go.setAttribute('aria-disabled', 'true');
+    const unlock = () => { go.disabled = false; go.setAttribute('aria-disabled', 'false'); hint.textContent = 'Keep the file somewhere safe, then continue.'; };
     dl.addEventListener('click', () => {
       try {
         const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' }));
         const a = doc.createElement('a'); a.href = url; a.download = 'smokebox-damaged-data.json'; doc.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => { try { g.URL.revokeObjectURL(url); } catch (e) { /* ignore */ } }, 5000);
-      } catch (e) { box.hidden = false; box.focus(); }
+        unlock();
+      } catch (e) { box.hidden = false; box.focus(); hint.textContent = 'The download did not work here. Copy the data from the box below, then continue.'; unlock(); }
     });
-    const go = doc.createElement('button'); go.type = 'button'; go.className = 'btn'; go.textContent = 'I have the file: continue and replace it';
-    go.addEventListener('click', () => { try { SB.store.releaseHold(); } catch (e) { /* ignore */ } wrap.remove(); });
-    const box = doc.createElement('textarea'); box.readOnly = true; box.hidden = true; box.value = text; box.rows = 8; box.style.cssText = 'width:100%;margin-top:12px';
-    box.setAttribute('aria-label', 'The old data, to copy by hand');
-    row.append(dl, go);
-    card.append(h2, p, row, box);
+    show.addEventListener('click', () => { box.hidden = false; box.focus(); box.select(); unlock(); });
+    go.addEventListener('click', () => { if (go.disabled) return; try { SB.store.releaseHold(); } catch (e) { /* ignore */ } wrap.remove(); });
+    row.append(dl, show, go);
+    card.append(h2, p, row, hint, box);
     wrap.appendChild(card);
     doc.body.appendChild(wrap);
     try { dl.focus(); } catch (e) { /* ignore */ }
@@ -36581,6 +36769,8 @@ a.of-nav:active { background: var(--press); }
       try {
         const s = SB.store.status();
         if (s.clockWrong && !toldWrong && SB.ui && SB.ui.toast) { toldWrong = true; SB.ui.toast("This device's clock looks wrong: some saved times are far ahead of it. Smokebox kept the device clock. Check the date and time in the device's settings.", { tone: 'warn', ms: 20000 }); }
+        // On the board the calm strip notice asks instead (a box over the screen would block tickets).
+        if (SB.floor && SB.floor.isMounted && SB.floor.isMounted()) return;
         if (!s.clockSuspect || asking || !SB.ui || !SB.ui.confirm) return;
         asking = true;
         const days = Math.round(s.clockSuspect.aheadMs / 86400000);

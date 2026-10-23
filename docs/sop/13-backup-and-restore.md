@@ -21,15 +21,10 @@ A file that is not a valid backup is refused, and nothing is changed. A backup f
 
 Spreadsheet files, like the sales file, cannot be restored.
 
-## Start over with an empty menu
-1. Tap **Settings**. At the bottom, tap **Start over with an empty menu**.
-2. Read what goes and what stays. Clear **Keep my tax, hours, PIN and station names** to reset those too. Tap **Next: about your backup**.
-3. This step only explains: the backup is saved at the moment of erasing, and if it fails, nothing is erased. Tap **Next: confirm**.
-4. Type ERASE, then tap **Erase everything and start over**.
-5. At "Done. Your kitchen is empty." tap **Save the backup again** or **Go to the first screen**.
+## Start over
 
-There is no undo. To go back, restore the backup file. Left-over old demo tickets get **Clear them** or **Keep them**.
+To empty your kitchen and begin again with a blank menu, see Start over with an empty menu.
 
 ## Erasing
 
-The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either.
+The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first.
