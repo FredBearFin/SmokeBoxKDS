@@ -185,3 +185,7 @@ Prices show "$" everywhere (`U.fmtMoney`). A currency setting would need one set
 7. First ticket: New ticket, tap dishes, choose Cash or Card, Send to kitchen.
 8. Coming back: the board is the first screen. Menu, then "Dishes and prices" is two taps.
 9. Demo: "Try the demo" opens a separate demo kitchen; "Back to my kitchen" returns and erases the demo.
+
+## Round 8 (final): merged-build re-check (branch night/a2-r8)
+
+On the merged build (e7e9c93): the three browser tests, the second-run script (12 checks), the first-time-owners script and the touch audit (90 screens) all pass or run clean. One new check was added: a spreadsheet row with a price split at its comma ("Cappuccino,4,50,Coffee") arrives **unticked** in the real preview with the importer's "more columns than the header ... price may be 4.50, not 4" line, and a normal row beside it stays ticked. The diner script needed one change (a second Save after the "no dish selected" warning), which is the intended behavior since round 7. Final scripted numbers are in `docs/setup-timing.md`; the checklist for timing it with a stopwatch is there too, and the ten-step first look is `docs/try-this-first.md`.

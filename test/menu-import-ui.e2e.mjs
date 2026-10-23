@@ -37,6 +37,11 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.click('[data-act=import-go]'); await page.waitForTimeout(500);
   check('the dishes land in the new categories', await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).map((m) => (SB.config.categoryById[m.cat] || {}).name).sort().join() === 'Coffee,Coffee,Pastry'));
   await page.click('[data-act=import-undo]'); await page.waitForTimeout(400);
+  // A price split at its comma arrives unticked with the importer's warning (A5's extraColumns), the rest are ticked.
+  await page.fill('textarea', 'Item,Price,Category\nCappuccino,4,50,Coffee\nFlat white,$4.50,Coffee');
+  await page.click('[data-act=import-check]'); await page.waitForTimeout(400);
+  check('a comma-split price row is unticked and says why', await page.locator('.dp-prow').first().locator('input[type=checkbox]').isChecked() === false && /more column|split/.test(await page.locator('.dp-prow').first().locator('.dp-prob').textContent()));
+  check('a normal row beside it stays ticked', await page.locator('.dp-prow').nth(1).locator('input[type=checkbox]').isChecked());
   // A messy pasted list with a row to fix.
   await page.fill('textarea', 'Pulled pork plate 12.50\nBad one\nLemonade 3');
   await page.click('[data-act=import-check]'); await page.waitForTimeout(400);

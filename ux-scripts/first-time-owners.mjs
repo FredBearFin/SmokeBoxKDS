@@ -133,7 +133,9 @@ await withPage({ w: 1024, h: 768, touch: true }, async (page, logs) => {
   await shot(page, '02-cooked-sheet');
   await page.click('[data-act=save-cooked]'); await page.waitForTimeout(400);
   say('saved with no dish selected -> ' + JSON.stringify(await words(page)).slice(0, 220));
-  // The owner meant to link the dish: close the sheet, and try again with a new item.
+  // The first save stopped with a warning (no dish selected); the owner reads it and taps Save again to keep it without one.
+  await page.click('[data-act=save-cooked]'); await page.waitForTimeout(400);
+  say('second Save -> ' + JSON.stringify(await words(page)).slice(0, 200));
   await page.click('[data-act=log-first-batch]'); await page.waitForTimeout(600);
   say('cabinet new-batch form shows product: ' + JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('.hc-prod .seg-opt')].map((b) => b.textContent.trim().replace('needs attention', '')))));
   await shot(page, '03-cabinet-form');
