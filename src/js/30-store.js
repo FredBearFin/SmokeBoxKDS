@@ -1073,6 +1073,13 @@
     // customers and orders, so both are dropped and the last-good copy is retaken from the new empty kitchen.
     try { storage.remove(LASTGOOD_KEY); storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); } catch (e) { /* ignore */ }
     st.corrupt = null;
+    // Actions queued for a hub that it never confirmed belong to the erased kitchen: they are dropped (and marked, so another
+    // tab's saved copy cannot bring them back), and only the erase itself stays in the queue so the hub is told. Nothing queued
+    // is touched when the erase failed, because we returned above.
+    const ri = outbox.map((x) => x.type).lastIndexOf('resetLive');
+    for (const x of outbox.slice(0, ri < 0 ? outbox.length : ri)) acked.add(x.opId);
+    outbox = ri < 0 ? [] : outbox.slice(ri);
+    if (ri < 0) { try { storage.remove(OUTBOX_KEY); } catch (e) { /* ignore */ } } else saveOutbox();
     snapWanted = 'startOver'; persistNow(); maybeSnapshot(savedAt);
     if (!keep && SB.config && typeof SB.config.applyCustom === 'function') {
       try { SB.config.applyCustom({}); SB.config.saveCustom({ rename: {}, add: {} }); } catch (e) { /* the names stay as they were */ }

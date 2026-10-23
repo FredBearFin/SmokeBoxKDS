@@ -269,3 +269,45 @@ test('old saves from earlier builds load with no cold fields and the same batch 
   }
   assert.ok(seen >= 4);
 });
+
+test('the result of a move tells the truth: discarded is false normally, and a batch already thrown out is refused by name', () => {
+  let s = kitchen({ outHours: 1 });
+  const id = batch(s).id;
+  const r = act(s, 'coldTakeOut', { batchId: id }, T + MIN);
+  assert.equal(r.info.discarded, false); assert.equal(r.info.words, undefined);
+  s = r.state;
+  // an hour later the hours are used up: the catch-up throws it out first, so the move is refused with the specific code, never a plain ok
+  const late = act(s, 'coldReturn', { batchId: id }, T + 3 * H);
+  assert.equal(late.report, 'batchNotServable');
+  assert.equal(batch(E.tick(s, T + 3 * H).state).discardReason, 'outTime');
+});
+
+test('safety log extras: equipment temperature, thermometer check, sanitizer strip details, a note on a discard, and the date mark reason', () => {
+  let s = E.newState({ now: T, stagger: true });
+  s = ok(act(s, 'logEquipmentTemp', { unit: 'cooler', f: 38, label: 'Walk-in', who: 'AB' }, T));
+  let ev = s.events.at(-1);
+  assert.deepEqual([ev.type, ev.unit, ev.f, ev.label, ev.who], ['equip_temp', 'cooler', 38, 'Walk-in', 'AB']);
+  assert.equal(act(s, 'logEquipmentTemp', { unit: 'sky', f: 38 }, T).report, 'badPatch');
+  assert.equal(act(s, 'logEquipmentTemp', { unit: 'freezer', f: 999 }, T).report, 'outOfBounds');
+  assert.equal(act(s, 'logEquipmentTemp', { unit: 'freezer', f: 0, label: 'x'.repeat(40) }, T).report, 'outOfBounds');
+  s = ok(act(s, 'logThermometerCheck', { f: 32, method: 'ice' }, T + MIN));
+  ev = s.events.at(-1); assert.deepEqual([ev.type, ev.f, ev.method], ['thermometer_checked', 32, 'ice']);
+  assert.equal(act(s, 'logThermometerCheck', { f: 32, method: 'moon' }, T).report, 'badPatch');
+  assert.equal(act(s, 'logThermometerCheck', { f: 'cold' }, T).report, 'outOfBounds');
+  s = ok(act(s, 'sanitizeDone', { who: 'AB', ppm: 200, product: 'Quat', where: 'Prep table' }, T + 2 * MIN));
+  ev = s.events.at(-1); assert.deepEqual([ev.type, ev.ppm, ev.product, ev.where], ['sanitize_done', 200, 'Quat', 'Prep table']);
+  assert.equal(act(s, 'sanitizeDone', { ppm: -1 }, T + 3 * MIN).report, 'outOfBounds');
+  const plain = ok(act(s, 'sanitizeDone', {}, T + 3 * MIN)); ev = plain.events.at(-1);
+  assert.equal(ev.ppm, undefined); assert.equal(ev.product, undefined);                       // nothing extra when not given
+  const hot = s.batches.find((b) => b.remainingG > 0);
+  s = ok(act(s, 'discardBatch', { batchId: hot.id, reason: 'other', note: '  dropped on the floor ', who: 'AB' }, T + 4 * MIN));
+  assert.equal(s.events.filter((e) => e.type === 'batch_discard').at(-1).note, 'dropped on the floor');
+  const other = s.batches.find((b) => b.remainingG > 0);
+  s = ok(act(s, 'discardBatch', { batchId: other.id, reason: 'datemark' }, T + 5 * MIN));
+  assert.equal(s.batches.find((b) => b.id === other.id).discardReason, 'datemark');
+  assert.equal(act(s, 'discardBatch', { batchId: s.batches.find((b) => b.remainingG > 0).id, reason: 'other', note: 'x'.repeat(2000) }, T + 6 * MIN).report, 'noteTooLong');
+  // they are safety entries, so they are kept with the rest and can be corrected
+  const log = E.safetyLog(s).map((x) => x.event.type);
+  assert.ok(['equip_temp', 'thermometer_checked', 'sanitize_done', 'batch_discard'].every((t) => log.includes(t)));
+  s = ok(act(s, 'correctSafety', { eventId: s.events.find((e) => e.type === 'equip_temp').id, note: 'wrong unit', who: 'AB' }, T + 7 * MIN));
+});
