@@ -70,7 +70,7 @@
 
   // The tour ticket's slip on the board. Looked up fresh every time because the board redraws its rows.
   function slip() {
-    const id = g.CSS && g.CSS.escape ? g.CSS.escape(T.id) : T.id;
+    const id = g.CSS && g.CSS.escape ? g.CSS.escape(String(T.id)) : String(T.id).replace(/["\\]/g, '\\$&');
     return doc.querySelector('.fl-slip[data-ticket="' + id + '"]');
   }
 
