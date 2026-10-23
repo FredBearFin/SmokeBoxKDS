@@ -189,6 +189,23 @@
     return { dir, better, word, text, deltaPct: dp, delta };
   }
 
+  // How this screen relates to a shared kitchen: 'follower' (read only), 'hub' (writes to a shared kitchen) or 'solo'.
+  O.connection = function () {
+    try {
+      if (SB.store && SB.store.isFollower && SB.store.isFollower()) return 'follower';
+      if (SB.store && SB.store.isHub && SB.store.isHub()) return 'hub';
+    } catch (e) { /* treat an unreadable store as a single device */ }
+    return 'solo';
+  };
+  // The name of the screen an event or ticket came from, trimmed and short, or '' when none was recorded.
+  O.screenName = function (x) {
+    const n = x && typeof x.screen === 'string' ? x.screen.trim() : '';
+    return n.slice(0, 24);
+  };
+  // The plain words for what a follower screen can and cannot do in the back office.
+  O.FOLLOWER_WORDS = 'This screen only shows the shared kitchen. You can read every page, print and download a copy, but changes, closing the day, restoring and erasing are done on the main screen.';
+  // The plain words for a tablet that writes to a shared kitchen.
+  O.HUB_WORDS = 'This tablet is connected to the shared kitchen. A backup here is a copy of the whole shared kitchen. Restoring or erasing here would erase it for every screen, so those are done on the main computer.';
   O.pure = { PAGES, customRange, coachText, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
 
   if (!doc) return; // Node: the pure helpers are all the tests need

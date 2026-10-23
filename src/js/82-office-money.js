@@ -819,7 +819,8 @@
       render: (body) => {
         const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
         body.append(h('p', { class: 'ob-text' }, 'Close the day when the last order is paid. You get today\'s totals by cash, card and other, a cash-in-the-drawer line, a backup button and a page to print.', help ? h('span', null, ' ', help) : null),
-          h('button', { type: 'button', class: 'btn btn-primary', 'data-k': 'close-day', onClick: () => { if (O.openCloseDay) O.openCloseDay(); } }, 'Close the day'));
+          h('button', { type: 'button', class: 'btn btn-primary', 'data-k': 'close-day', onClick: () => { if (O.openCloseDay) O.openCloseDay(); } }, 'Close the day'),
+          O.connection && O.connection() === 'follower' ? h('p', { class: 'ob-text' }, 'This screen only shows the shared kitchen. The sheet opens so you can read and print the day, but closing it is done on the main screen.') : null);
         // The address #/office/money?close=1 opens the sheet straight away.
         if (O.maybeOpenCloseDay) O.maybeOpenCloseDay();
         return {};

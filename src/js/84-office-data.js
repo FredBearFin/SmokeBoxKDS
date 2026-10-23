@@ -1383,6 +1383,33 @@
   }
 
   // Panel 8: what is stored, sample history, export, import and reset.
+  // Which erase buttons the Data page made, so the shared-kitchen lock can find them.
+  const resetBtnsRef = { live: null, all: null };
+
+  // Shuts the controls that would change or erase a shared kitchen. A follower can change nothing (every edit control is
+  // disabled; downloads and copies stay); a hub tablet keeps its edits but loses restore and both erase buttons.
+  function lockShared(content, conn, eraseBtns, P) {
+    // True for the controls that stay usable: downloads, copies, spreadsheet files and section summaries.
+    const keep = (el) => el.closest('[data-shared-ok]') || el.matches('[data-action="backup-download"],[data-action="backup-copy"]') || el.closest('.od-csv') || el.closest('summary');
+    // Disables one control and tells assistive tech why it does nothing.
+    const shut = (el) => { el.disabled = true; el.setAttribute('aria-disabled', 'true'); };
+    if (conn === 'follower') content.querySelectorAll('input,select,textarea,button').forEach((el) => { if (!keep(el)) shut(el); });
+    else content.querySelectorAll('[data-action="import-choose"],[data-action="import-check-paste"],[data-action="import-replace"],.od-paste').forEach(shut);
+    // Locks everything now and again whenever rows are redrawn later, since many controls are built after the first paint.
+    const apply = () => {
+      if (conn === 'follower') content.querySelectorAll('input,select,textarea,button').forEach((el) => { if (!el.disabled && !keep(el)) shut(el); });
+      else content.querySelectorAll('[data-action="import-choose"],[data-action="import-check-paste"],[data-action="import-replace"],.od-paste').forEach((el) => { if (!el.disabled) shut(el); });
+    };
+    if (typeof g.MutationObserver === 'function' && P) {
+      let pending = false;
+      const mo = new g.MutationObserver(() => { if (pending) return; pending = true; setTimeout(() => { pending = false; apply(); }, 0); });
+      mo.observe(content, { childList: true, subtree: true });
+      P.disposers.push(() => mo.disconnect());
+    }
+    for (const b of eraseBtns) if (b) { shut(b); b.title = conn === 'follower' ? 'Done on the main screen.' : 'Done on the main computer, because it erases the shared kitchen.'; }
+    content.querySelectorAll('.od-danger-h').forEach((h3) => { const n = document.createElement('p'); n.className = 'od-p'; n.textContent = conn === 'follower' ? 'Erasing is done on the main screen.' : 'Erasing is done on the main computer, because it would erase the shared kitchen for every screen.'; h3.after(n); });
+  }
+
   function buildData(P) {
     const pn = panel(SECTIONS[7], 'Everything Smokebox knows lives in this browser, on this device. Back it up before you reset, import or clear browser data.');
     // The one-time offer to clear old demo tickets from real reports; nothing is shown when there are none.
@@ -1676,6 +1703,7 @@
     const resetLiveBtn = btn('Erase tickets and records', { icon: 'trash', cls: 'btn-danger' });
     resetLiveBtn.dataset.action = 'reset-live';
     const resetAllBtn = btn('Erase everything', { icon: 'trash', cls: 'btn-danger' });
+    resetBtnsRef.live = resetLiveBtn; resetBtnsRef.all = resetAllBtn;
     resetAllBtn.dataset.action = 'reset-all';
     const dangerBox = h('div', { class: 'od-danger-box', hidden: true, role: 'group', 'aria-label': 'Confirm erasing data' });
     // Shows the confirm box: what will be erased, a field to type the word into, and a button that stays off until it matches.
@@ -1833,6 +1861,12 @@
       if (SECTIONS[i].group !== 'Advanced') { content.appendChild(panels[i].el); return; }
       content.appendChild(h('details', { class: 'od-adv' }, h('summary', null, 'Advanced: ' + SECTIONS[i].label), panels[i].el));
     });
+    // A follower or hub-connected tablet: say so at the top, and shut the controls that would change or erase the shared kitchen.
+    const conn = SB.office && SB.office.connection ? SB.office.connection() : 'solo';
+    if (conn !== 'solo') {
+      headBox.appendChild(h('p', { class: 'od-p od-conn', role: 'note', 'data-conn': conn }, conn === 'follower' ? SB.office.FOLLOWER_WORDS : SB.office.HUB_WORDS));
+      lockShared(content, conn, [resetBtnsRef.live, resetBtnsRef.all], P);
+    }
     root.append(headBox, h('div', { class: 'od-layout' }, toc, content));
 
     // the frame keeps its own sticky bar (the data banner) at the top of the scroll area: sit the contents

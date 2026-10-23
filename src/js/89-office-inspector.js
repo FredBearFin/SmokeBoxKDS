@@ -23,6 +23,9 @@
 
   // ---- 1. Pure rows ----
 
+  // The name of the screen an entry came from (a shared kitchen), or '' when none was recorded.
+  function screenOf(e) { return e && typeof e.screen === 'string' ? e.screen.trim().slice(0, 24) : ''; }
+
   // The plain "late by 12 min" / "on time" words for a reading or round.
   function lateWords(e) {
     if (e.onTime === true || (isNum(e.lateMs) && e.lateMs <= 0)) return 'on time';
@@ -109,7 +112,7 @@
     if (!state || !SB.engine || !SB.engine.safetyLog) return [];
     const rows = SB.engine.safetyLog(state).filter((r) => r.event.type !== 'safety_correction' && isNum(r.event.t) && r.event.t >= from && r.event.t < to);
     return rows.map((r) => ({
-      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), facts: factsOf(state, r.event), who: r.event.who || '',
+      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), facts: factsOf(state, r.event), screen: screenOf(r.event), who: r.event.who || '',
       corrections: r.corrections.map((c) => ({ at: c.t, who: c.who || '', note: c.note || '' })),
     }));
   }
@@ -138,7 +141,7 @@
   // Builds the printable table for a window as an element (used for both the preview and the print block).
   function recordTable(rows) {
     const body = rows.map((r) => h('tr', null,
-      h('td', null, U.fmtDateShort(U.dateKey(r.at)) + ' ' + U.fmtTime(r.at)), h('td', null, r.kind), h('td', null, r.food), h('td', null, r.detail, (r.facts || []).map((f) => h('div', { class: 'si-fact' }, f))), h('td', null, r.who || 'not recorded'),
+      h('td', null, U.fmtDateShort(U.dateKey(r.at)) + ' ' + U.fmtTime(r.at)), h('td', null, r.kind), h('td', null, r.food), h('td', null, r.detail, (r.facts || []).map((f) => h('div', { class: 'si-fact' }, f))), h('td', null, r.who || 'not recorded', r.screen ? h('div', { class: 'si-fact' }, 'at ' + r.screen) : null),
       h('td', null, r.corrections.map((c) => h('div', { class: 'si-corr' }, 'Correction ' + U.fmtDateShort(U.dateKey(c.at)) + ' ' + U.fmtTime(c.at) + (c.who ? ' by ' + c.who : '') + ': ' + c.note)))));
     return h('table', { class: 'si-table' },
       h('thead', null, h('tr', null, ['When', 'What', 'Food', 'Detail', 'Logged by', 'Corrections added later'].map((t) => h('th', null, t)))),
