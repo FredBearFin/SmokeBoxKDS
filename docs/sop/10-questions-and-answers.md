@@ -26,6 +26,10 @@ Sold out or off the menu. The **86 board** lists what is out and why.
 
 A number that came with the app, such as a prep time or a cost. It is a guess until you replace it with your own.
 
+## Why is there no Cabinet tab?
+
+The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN**, and choose Yes under Cooking ahead.
+
 ## Can I change a price on an open order?
 
 New tickets use the new price. Tickets already on the board keep theirs.

@@ -36,7 +36,11 @@
      },
      {
       "t": "p",
-      "x": "Change dishes and prices later: tap **Menu**, then **Dishes and prices**."
+      "x": "Change dishes and prices later: tap **Menu**, then **Dishes and prices**. A dish you remove goes to **Removed dishes**, and **Bring it back** puts it back with its price."
+     },
+     {
+      "t": "p",
+      "x": "Want to see how a ticket works first? Tap **Show me how it works** for a one-minute walkthrough."
      },
      {
       "t": "h",
@@ -44,7 +48,11 @@
      },
      {
       "t": "p",
-      "x": "Tap **Menu**, then **Tax, hours and PIN**. Enter your sales tax (0 if you add none) and your opening hours. A PIN is optional. It keeps line cooks out of the back office."
+      "x": "Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN** at the bottom. Enter your sales tax (0 if you add none) and your opening hours. A PIN is optional. It keeps line cooks out of the back office."
+     },
+     {
+      "t": "p",
+      "x": "The same page asks if you cook food ahead. Leave it on No if you cook to order. Yes adds the **Cabinet** for batches you cook ahead."
      },
      {
       "t": "h",
@@ -112,7 +120,7 @@
      },
      {
       "t": "p",
-      "x": "Tap **Any food allergy?** and tap what the customer is allergic to. Put allergies first in the note. Cooks read the first line first."
+      "x": "Under Any food allergy?, tap **Allergy**, then tap what the customer is allergic to. Put allergies first in the note. Cooks read the first line first."
      },
      {
       "t": "h",
@@ -230,18 +238,22 @@
       "cap": "A batch in the hold cabinet."
      },
      {
+      "t": "p",
+      "x": "No **Cabinet** tab? Set Cooking ahead to Yes under **Tax, hours and PIN** (Menu, then Dishes and prices)."
+     },
+     {
       "t": "ol",
       "x": [
        "Open the **Cabinet** tab or the **Hold cabinet**. Tap **New batch** and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
        "Take a reading at every check with **Log temp**. A reading in range keeps the batch on the menu.",
        "Tap **Pull** as portions leave the cabinet. The amount left goes down.",
-       "A batch that is too cool can be reheated once with **Reheat**. Then log the new reading.",
+       "A batch that is too cool can be reheated once with **Reheat**.",
        "A batch out of time or out of range is thrown out: tap **Discard** and pick a reason."
       ]
      },
      {
       "t": "p",
-      "x": "The cabinet tracks food by ingredient. If the Product list in New batch is empty, your kitchen has no tracked ingredients yet, and Smokebox cannot track a batch."
+      "x": "The cabinet tracks food by ingredient. If the Product list in New batch is empty, Smokebox has no ingredient to track yet."
      },
      {
       "t": "h",
@@ -264,7 +276,7 @@
      },
      {
       "t": "p",
-      "x": "Some foods warn earlier, and you can change the times in Menu and settings. A batch that is almost empty, or on pace to sell out in time, stays quiet."
+      "x": "Some foods warn earlier. You can change the times in Menu and settings. A batch that is almost empty, or on pace to sell out in time, stays quiet."
      },
      {
       "t": "p",
@@ -286,8 +298,8 @@
       "t": "ol",
       "x": [
        "Finish the open orders. Tap **Orders**. For each open order tap Pay, or void it if the customer left.",
-       "Look in the **Hold cabinet**. Decide what to do with each batch that is left, using your own rules. To throw a batch out, tap **Discard** and pick a reason.",
-       "Wipe down food-contact surfaces and tap the **Sanitize** button on the board to log it."
+       "If you cook ahead, look in the **Hold cabinet**. Decide what to do with each batch that is left, using your own rules. To throw a batch out, tap **Discard** and pick a reason.",
+       "If you cook ahead, wipe down food-contact surfaces and tap the **Sanitize** button on the board to log it."
       ]
      },
      {
@@ -409,7 +421,8 @@
       "x": [
        "Clear the search box and choose the All category on the New ticket screen.",
        "Open the **86 board**. A dish that is sold out or off the menu is listed there with the reason.",
-       "Open **Dishes and prices** to see every dish you have added."
+       "Open **Dishes and prices** to see every dish you have added. A dish you removed is under **Removed dishes**: tap **Bring it back**.",
+       "No **Cabinet** tab or **Sanitize** button? Those show only when Cooking ahead is Yes (Menu, Dishes and prices, Tax, hours and PIN)."
       ]
      },
      {
@@ -539,6 +552,14 @@
      },
      {
       "t": "h",
+      "x": "Why is there no Cabinet tab?"
+     },
+     {
+      "t": "p",
+      "x": "The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN**, and choose Yes under Cooking ahead."
+     },
+     {
+      "t": "h",
       "x": "Can I change a price on an open order?"
      },
      {
@@ -588,8 +609,8 @@
        "Volume up. Smokebox open on the kitchen board",
        "Tap the warning bar once, or use Play a test warning under Set up this tablet",
        "Check the 86 board: what is out today?",
-       "Cooked food in the Hold cabinet: log a first temperature on each batch",
-       "Wipe food-contact surfaces and tap Sanitize",
+       "If you cook ahead: log a first temperature on each batch in the Hold cabinet",
+       "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
        "Yesterday's backup saved and a copy kept off the device"
       ]
      }
@@ -605,8 +626,8 @@
       "t": "check",
       "x": [
        "Every open order paid or voided (Orders)",
-       "Every batch left in the cabinet decided: keep, or throw out with a reason",
-       "Surfaces wiped and Sanitize logged",
+       "If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)",
+       "If you cook ahead: surfaces wiped and Sanitize logged",
        "Sales and money looks right in the Back office",
        "Log of thrown-out batches saved or printed",
        "Backup downloaded and a copy kept off the device",

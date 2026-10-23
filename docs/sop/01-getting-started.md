@@ -8,11 +8,15 @@ Add your dishes, send a test order, take payment and save your first backup. Abo
 2. Type what the dish is called and its price. Tap where it is made: Pit, Hot sides, Fry or Cold and drinks.
 3. Tap **Save and add another** until your menu is in. Then tap **Save and finish**.
 
-Change dishes and prices later: tap **Menu**, then **Dishes and prices**.
+Change dishes and prices later: tap **Menu**, then **Dishes and prices**. A dish you remove goes to **Removed dishes**, and **Bring it back** puts it back with its price.
+
+Want to see how a ticket works first? Tap **Show me how it works** for a one-minute walkthrough.
 
 ## 2. Set your tax and hours
 
-Tap **Menu**, then **Tax, hours and PIN**. Enter your sales tax (0 if you add none) and your opening hours. A PIN is optional. It keeps line cooks out of the back office.
+Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN** at the bottom. Enter your sales tax (0 if you add none) and your opening hours. A PIN is optional. It keeps line cooks out of the back office.
+
+The same page asks if you cook food ahead. Leave it on No if you cook to order. Yes adds the **Cabinet** for batches you cook ahead.
 
 ## 3. Send a test order
 
