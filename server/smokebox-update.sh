@@ -56,8 +56,11 @@ for f in server/server.mjs dist/smokebox.html src/js/20-engine.js; do
 done
 HTML_BYTES="$(wc -c < "$NEW/dist/smokebox.html")"
 [ "$HTML_BYTES" -ge "$MIN_BYTES" ] || fail "the new page is only $HTML_BYTES bytes; the running version is kept"
-# Integrity. With a public key installed, the build must carry deploy.manifest (a sha256 line for every file) and deploy.manifest.sig (its signature):
+# Integrity. SMOKEBOX_REQUIRE_SIGNED=1 makes a missing public key an error instead of a warning. With a public key installed, the build must carry deploy.manifest (a sha256 line for every file) and deploy.manifest.sig (its signature):
 # the signature must verify, every file must match its line and no file may be missing from or extra to the list. Without a key nothing is verified.
+if [ "${SMOKEBOX_REQUIRE_SIGNED:-0}" = "1" ] && [ ! -f "$PUBKEY" ]; then
+  fail "signing is required (SMOKEBOX_REQUIRE_SIGNED=1) but $PUBKEY is missing; the running version is kept"
+fi
 if [ -f "$PUBKEY" ]; then
   command -v openssl >/dev/null || fail "openssl is needed to check the signature; the running version is kept"
   [ -s "$NEW/deploy.manifest" ] && [ -s "$NEW/deploy.manifest.sig" ] || fail "the build is not signed (deploy.manifest.sig is missing) and $PUBKEY exists; the running version is kept"
@@ -85,15 +88,17 @@ rollback() {
   exit 1
 }
 "$SYSTEMCTL" restart smokebox || rollback "the service would not restart"
-healthy=0
+healthy=0; DATA_PROBLEM=""
 for _ in $(seq 1 "$HEALTH_TRIES"); do
   # The new build must say {"ok":true}; a build too old to have /health (404) is accepted if the page itself answers.
   body=$(curl -sS --max-time 3 -w '\n%{http_code}' "$HEALTH_URL" 2>/dev/null) || body=""
   code=${body##*$'\n'}
+  if [ "$code" = "200" ] && printf '%s' "$body" | grep -q '"dataProblem"'; then DATA_PROBLEM="the new build set the saved data aside and started with an empty kitchen (dataProblem in $HEALTH_URL: $(printf '%s' "$body" | head -n1 | cut -c1-300)); the data was NOT deleted, look for state.json.bad-* in the data folder"; break; fi
   if [ "$code" = "200" ] && printf '%s' "$body" | grep -q '"ok":true'; then healthy=1; break; fi
   if [ "$code" = "404" ] && curl -fsS --max-time 3 "${HEALTH_URL%/health}/" -o /dev/null 2>/dev/null; then healthy=1; break; fi
   sleep 1
 done
+[ -z "$DATA_PROBLEM" ] || rollback "$DATA_PROBLEM"
 [ "$healthy" -eq 1 ] || rollback "the new build did not answer at $HEALTH_URL"
 
 # 5. Refresh this script from the new build (atomic), so improvements to the updater arrive too.

@@ -127,3 +127,15 @@ Then test it: from another computer type 8 wrong passwords at the sign-in page; 
 - The password prompt is the only gate, and the password you type travels through Cloudflare in a form Cloudflare can read.
 - Traffic through the tunnel reaches Caddy from 127.0.0.1, so the fail2ban jail above cannot ban the real caller (it sees only the local connector). Guessing through the tunnel is therefore not slowed down. Use a long password (a phrase), and switch the tunnel off when you do not need it: `systemctl disable --now smokebox-tunnel`.
 - The connector (`cloudflared`) is installed from Cloudflare's "latest" release page with only a size check; it is not pinned or signed here.
+
+## Hub protections added after the second review
+**Not run on a real server** (tests use fake services and in-process hubs).
+- **Permissions per action.** Every engine action has a class in `ACTION_CLASS` (`server/server.mjs`): `any` (service work, every screen) or `owner` (settings, menu, money corrections, closing the day, resetting the kitchen). A paired non-owner screen is refused (`notOwner`, 403) for owner actions. A hub with no pairing at all (a trusted network) works as before. A test fails if a new engine action has no class.
+- **`/events`** (the old whole-kitchen stream) now needs the same token or access code as `/follow`, and the same version check.
+- **Host check.** The hub refuses (421) a request whose `Host` is some other dotted name, which closes DNS rebinding on a hub reachable without a login. Accepted: names in `SMOKEBOX_ALLOWED_HOSTS` (comma separated), `localhost`, IP addresses, names without a dot and `.local`, `.lan`, `.home.arpa`. Behind Caddy with `SMOKEBOX_TRUST_PROXY=1` any Host is accepted unless `SMOKEBOX_ALLOWED_HOSTS` is set, because Caddy serves only its own names.
+- **Torn record line.** At start the hub cuts off a last line of the record that was not finished (it was never acknowledged), so the next action cannot be glued to it.
+- **One hub per data folder.** A lock file `<data file>.lock` holds the process id; a second hub on the same folder refuses to start with a clear message. A lock left by a dead process is taken over.
+- **Pairing limits.** Each address is still held to 5 wrong codes; the hub-wide limit that burns every open code is now 300 wrong guesses in 10 minutes (it was 30, so a stranger could keep pairing blocked). The right admin key is never refused because of wrong keys tried by others; the owner's own command line has a lockout bucket of its own.
+- **Caddy's log** (`harden.sh`) no longer records the token and code headers or `?code=` in an address.
+- **Updater.** A health answer that carries `dataProblem` makes the update roll back (the saved data was set aside by the new build); `SMOKEBOX_REQUIRE_SIGNED=1` makes a missing public key an error instead of a warning.
+- **`tunnel.sh`** installs the Cloudflare package only if its sha256 matches the one you pass (`bash tunnel.sh <sha256>`, copied from the release page); run without it, it shows the sha256 of what it downloaded and stops. `SMOKEBOX_CLOUDFLARED_VERSION=...` pins a version.

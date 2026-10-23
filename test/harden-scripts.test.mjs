@@ -48,7 +48,7 @@ test('installs: log snippet, import in every site block (main and beta), jail wi
   assert.match(main, /1-2-3-4\.sslip\.io \{\n\timport smokebox_log\n/); assert.match(beta, /beta\.1-2-3-4\.sslip\.io \{\n\timport smokebox_log\n/);
   assert.equal((main.match(/import smokebox_log/g) || []).length, 1, 'inner blocks (reverse_proxy, basic_auth) get no import');
   assert.match(main, /\nimport \/etc\/caddy\/harden-log\.caddy\n$/);
-  const snip = rd('etc/caddy/harden-log.caddy'); assert.match(snip, /^\(smokebox_log\) \{/); assert.match(snip, /output file \/var\/log\/caddy\/access\.log/); assert.match(snip, /mode 0640/); assert.match(snip, /roll_size 10MiB/); assert.match(snip, /format json/);
+  const snip = rd('etc/caddy/harden-log.caddy'); assert.match(snip, /^\(smokebox_log\) \{/); assert.match(snip, /output file \/var\/log\/caddy\/access\.log/); assert.match(snip, /mode 0640/); assert.match(snip, /roll_size 10MiB/); assert.match(snip, /wrap json/);
   const jail = rd('etc/fail2ban/jail.d/caddy-401.local'); assert.match(jail, /maxretry = 8/); assert.match(jail, /ignoreip = 127\.0\.0\.0\/8 ::1/); assert.match(jail, /logpath  = \/var\/log\/caddy\/access\.log/);
   assert.match(rd('etc/apt/apt.conf.d/20auto-upgrades'), /Unattended-Upgrade "1"/); assert.ok(!/Automatic-Reboot/.test(rd('etc/apt/apt.conf.d/20auto-upgrades')), 'no automatic reboot');
   const calls = fs.readFileSync(path.join(tmp, 'calls.log'), 'utf8'); assert.ok(calls.indexOf('caddy validate') < calls.indexOf('systemctl reload caddy'), 'validated before reload');
@@ -81,4 +81,14 @@ test('if Caddy refuses the log settings: Caddy files restored, jail and filter r
   assert.equal(rd('etc/caddy/Caddyfile'), MAIN + '\nimport /etc/caddy/beta.caddy\n'); assert.equal(rd('etc/caddy/beta.caddy'), BETA);
   for (const p of ['etc/caddy/harden-log.caddy', 'etc/fail2ban/jail.d/caddy-401.local', 'etc/fail2ban/filter.d/caddy-401.conf']) assert.ok(!fs.existsSync(path.join(R, p)), p + ' removed');
   assert.ok(!/systemctl restart fail2ban/.test(fs.readFileSync(path.join(tmp, 'calls.log'), 'utf8').split('caddy-refuses')[0] && ''), 'n/a'); fs.rmSync(path.join(tmp, 'caddy-refuses'));
+});
+
+test('#10 (second review): the access log leaves out the token and code headers and the code in the address', () => {
+  files(); const r = run('harden.sh'); assert.equal(r.status, 0, r.stderr);
+  const snip = rd('etc/caddy/harden-log.caddy');
+  assert.match(snip, /format filter \{/); assert.match(snip, /wrap json/);
+  for (const line of ['request>headers>X-Smokebox-Token delete', 'request>headers>X-Smokebox-Code delete']) assert.ok(snip.includes(line), line);
+  assert.match(snip, /request>uri query \{\s*delete code\s*\}/);
+  assert.ok(!/^\s*format json\s*$/m.test(snip), 'the plain json format (which writes every header) is gone');
+  run('harden-remove.sh');
 });
