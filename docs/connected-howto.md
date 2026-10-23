@@ -53,7 +53,7 @@ PORT=8787 SMOKEBOX_FOLLOW_CODE=ABC123 SMOKEBOX_STARTER=1 node server/server.mjs
 
 - **Real devices.** No real tablet, TV, phone or iPad has shown a follower. Safari's handling of a long-lived stream is untested.
 - **Real networks.** Wi-Fi dropping, a captive portal, a sleeping device, a proxy or tunnel that buffers the stream (Caddy and the Cloudflare tunnel were not tried with it).
-- **Two writers on real hardware.** Two tablets taking orders through one hub was tested in desktop browsers with a simulated network drop (`hub-client.e2e`, `hub-join-real.e2e`), not on real tablets or a real network. A hub restart that changes its identity and a tablet that reloads with taps waiting were not checked.
+- **Two writers on real hardware.** Two tablets taking orders through one hub was tested in desktop browsers with a simulated network drop (`hub-client.e2e`, `hub-join-real.e2e`), not on real tablets or a real network. A hub restart that changes its identity, a tablet that reloads with taps waiting, and Undo after a refused tap were not checked.
 - **Long runs.** Days of uptime, memory over a long service, a crowded day.
 - **Clocks on real devices.** The follower follows the hub's clock by an offset; real devices with wrong clocks were not tried.
 - **Security in practice.** The access code travels in the address (`?code=` on the stream request), so it can appear in browser history and server logs. When a code is set the hub answers any website (`access-control-allow-origin: *`), so the code is the only gate. Do not put a hub on the open internet without the login in front of it described in `docs/audit/server-security-review.md`.

@@ -4,7 +4,7 @@ Print this card and keep it by the tablet.
 
 - [ ] Tablet plugged in, and set to never sleep
 - [ ] Volume up. Smokebox open on the kitchen board
-- [ ] Tap the warning bar once, or use Play a test warning under Set up this tablet
+- [ ] Tap the warning bar once, or use Play a test warning under Set up this tablet: first steps
 - [ ] Check the 86 board: what is out today?
 - [ ] Counted dishes: how many did you make today?
 - [ ] Hand sink works and is stocked. Anyone unwell? Tell the manager
