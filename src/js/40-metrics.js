@@ -127,6 +127,14 @@
     return v;
   }
   // Service date of a moment: the day starts at 4 am, so 12:45 am Saturday is Friday's date (F-M2).
+  // Hours since midnight of the service date on the WALL clock (12:45 am the next morning is 24.75), so a day with a clock
+  // change still puts noon in hour 12. si is the slotInfo of ts.
+  function wallHours(ts, si) {
+    const d = new Date(ts), key = U.dateKey(ts);
+    const extra = key === si.date ? 0 : 24 * Math.max(1, Math.round((dayMs(key) - si.ms) / 86400e3));
+    return extra + d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600 + d.getMilliseconds() / 3600e3;
+  }
+  // The service date of a moment for a given day-start hour.
   const serviceDateOf = (ts, dsh) => slotInfo(ts, dsh).date;
   /**
    * Channel thresholds: settings.channels override config.channels (per field). An unknown channel uses the
@@ -243,7 +251,7 @@
       if (o.zone) { let has = false; for (let i = 0; i < items.length; i++) if (items[i] && items[i].zone === o.zone) { has = true; break; } if (!has) continue; }
       const si = slotInfo(t.createdAt, dsh), date = si.date;
       // sh = hours since midnight of the service date (12:45 am = 24.75); hk numbers each date+hour slot.
-      const sh = (t.createdAt - si.ms) / H;
+      const sh = wallHours(t.createdAt, si);
       all.push({
         t, items, id: t.id, num: t.num, channel: t.channel, createdAt: t.createdAt, date, sh, hour: Math.floor(sh), hk: Math.round(si.ms / H) + Math.floor(sh), wd: si.wd,
         voided: t.status === 'voided', forced: t.forced === true, recalls: num(t.recalls) ? t.recalls : 0,
@@ -868,20 +876,20 @@
 
   /* ================= pacing A/B and calibration ================= */
   /**
-   * Pacing on vs off, from ticket.pacing. Rush tickets are left out of both sides (they skip pacing by design).
+   * Finish together on vs off, from ticket.pacing. Rush tickets are left out of both sides (they skip pacing by design).
    * Spread/lamp use tickets with >= 2 done items; medianTotalMs uses every finished ticket of that side.
    * @returns {{comparable:boolean,on:Side,off:Side,lampSavedMs:number|null,lampCutPct:number|null,spreadSavedMs:number|null,medianDeltaMs:number|null}}
    *   Side = {pacing:boolean,label,tickets,syncTickets,days,medianTotalMs,avgTotalMs,avgSpreadMs,avgLampMs,medianSpreadMs,medianLampMs}
-   *   saved = off minus on (positive = less food waiting with pacing on); medianDeltaMs = on minus off (can be positive: pacing is not meant to cut ticket time)
+   *   saved = off minus on (positive = less food waiting with Finish together on); medianDeltaMs = on minus off (can be positive: pacing is not meant to cut ticket time)
    */
   M.pacingCompare = (ds, opts) => {
     const ctx = makeCtx(ds, opts); const sync = syncRows(ctx);
-    // Stats for tickets with pacing on (true) or off (false). Rush tickets skip pacing by design, so both
+    // Stats for tickets with Finish together on (true) or off (false). Rush tickets skip pacing by design, so both
     // sides leave them out.
     const side = (flag) => {
       const tix = ctx.spd.filter((r) => r.pacing === flag && !r.rush), sy = sync.filter((r) => r.pacing === flag && !r.rush);
       const t = stats(tix.map((r) => r.totalMs)), sp = stats(sy.map((r) => r.spreadMs)), lp = stats(sy.map((r) => r.lampMs));
-      return { pacing: flag, label: flag ? 'Pacing on' : 'Pacing off', tickets: t.n, syncTickets: sy.length, days: new Set(tix.map((r) => r.date)).size,
+      return { pacing: flag, label: flag ? 'Finish together on' : 'Finish together off', tickets: t.n, syncTickets: sy.length, days: new Set(tix.map((r) => r.date)).size,
         medianTotalMs: t.median, avgTotalMs: t.avg, avgSpreadMs: sp.avg, avgLampMs: lp.avg, medianSpreadMs: sp.median, medianLampMs: lp.median };
     };
     const on = side(true), off = side(false); const both = on.syncTickets > 0 && off.syncTickets > 0;
@@ -1306,7 +1314,7 @@
         if (ctx.o.channel && o.channel !== ctx.o.channel) continue;
         const tt = o.totals, si = slotInfo(o.paidAt, ctx.dsh);
         const sub = num(tt.subtotal) ? tt.subtotal : 0, disc = num(tt.discount) ? tt.discount : 0, tax = num(tt.tax) ? tt.tax : 0, tip = num(o.tip) && o.tip > 0 ? o.tip : 0;
-        out.push({ o, date: si.date, hour: Math.floor((o.paidAt - si.ms) / H), channel: o.channel, method: o.method, gross: sub, discount: disc, net: sub - disc, tax, tip, total: sub - disc + tax });
+        out.push({ o, date: si.date, hour: Math.floor(wallHours(o.paidAt, si)), channel: o.channel, method: o.method, gross: sub, discount: disc, net: sub - disc, tax, tip, total: sub - disc + tax });
       }
       out.sort((a, b) => a.o.paidAt - b.o.paidAt);
       return out;
@@ -1575,22 +1583,22 @@
       const planned = r.learnedSec !== null && Math.abs(r.learnedSec - r.observedSec) / r.observedSec <= 0.15 && c.pacingCfg.enabled !== false;
       const tail = others > 0 ? ' ' + others + ' other ' + U.plural(others, 'item') + ' also drift.' : '';
       if (r.drift === 'slow') return F(this.id, r.ratio >= 1.6 ? 'bad' : 'warn', 58 + Math.min(20, (r.ratio - 1) * 20), r.name + ' takes ' + mmss(r.observedSec * 1000) + ' on your line',
-        'That is ' + mmss(r.deltaSec * 1000) + ' over the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples). ' + (planned ? 'Pacing now plans for it.' : r.learnedSec !== null ? 'Pacing plans for ' + mmss(r.learnedSec * 1000) + ' so far; confirm the new time in Menu and settings.' : 'Confirm the new time in Menu and settings.') + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
+        'That is ' + mmss(r.deltaSec * 1000) + ' over the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples). ' + (planned ? 'Finish together now plans for it.' : r.learnedSec !== null ? 'Pacing plans for ' + mmss(r.learnedSec * 1000) + ' so far; confirm the new time in Menu and settings.' : 'Confirm the new time in Menu and settings.') + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
       return F(this.id, 'info', 40, r.name + ' is quicker than planned',
-        r.name + ' takes ' + mmss(r.observedSec * 1000) + ', ' + mmss(-r.deltaSec * 1000) + ' under the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples), so pacing may fire it too early.' + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
+        r.name + ' takes ' + mmss(r.observedSec * 1000) + ', ' + mmss(-r.deltaSec * 1000) + ' under the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples), so Finish together may fire it too early.' + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
     } },
-    // pacing-effect: do plates finish together, with less finished food waiting? Pacing on vs off. Needs 15
-    // multi-item tickets per side. It never claims faster tickets: pacing holds early items on purpose, so
+    // pacing-effect: do plates finish together, with less finished food waiting? Finish together on vs off. Needs 15
+    // multi-item tickets per side. It never claims faster tickets: Finish together holds early items on purpose, so
     // the median ticket time can rise. The two sides are different tickets, not a controlled test.
     { id: 'pacing-effect', run(c) {
       const p = M.pacingCompare(c); if (!p.comparable || p.on.syncTickets < 15 || p.off.syncTickets < 15) return null;
       const cut = p.lampCutPct, longer = isFinite(p.medianDeltaMs) && p.medianDeltaMs > 0;
-      const body = 'Finished food waited ' + mmss(p.off.avgLampMs) + ' per plate with pacing off and ' + mmss(p.on.avgLampMs) + ' with it on, and the plate spread went from ' + mmss(p.off.avgSpreadMs) + ' to ' + mmss(p.on.avgSpreadMs) + '. ' +
-        'Median ticket time was ' + mmss(p.off.medianTotalMs) + ' with pacing off and ' + mmss(p.on.medianTotalMs) + ' with it on' + (longer ? '; pacing holds early items on purpose so the plate finishes together, so it is not meant to make tickets faster' : '') + '. ' +
+      const body = 'Finished food waited ' + mmss(p.off.avgLampMs) + ' per plate with Finish together off and ' + mmss(p.on.avgLampMs) + ' with it on, and the plate spread went from ' + mmss(p.off.avgSpreadMs) + ' to ' + mmss(p.on.avgSpreadMs) + '. ' +
+        'Median ticket time was ' + mmss(p.off.medianTotalMs) + ' with Finish together off and ' + mmss(p.on.medianTotalMs) + ' with it on' + (longer ? '; Finish together holds early items on purpose so the plate finishes together, so it is not meant to make tickets faster' : '') + '. ' +
         'Based on ' + p.on.syncTickets + ' paced and ' + p.off.syncTickets + ' unpaced multi-item tickets. These are different tickets, so treat it as a hint, not a controlled test.';
-      if (p.lampSavedMs >= 15000 && cut >= 0.2) return F(this.id, 'good', 70, 'With pacing on, plates finished together: food waited ' + mmss(p.on.avgLampMs) + ' instead of ' + mmss(p.off.avgLampMs), body, { label: 'Less food waiting', value: cut, unit: 'share' });
-      if (p.lampSavedMs <= -15000) return F(this.id, 'warn', 62, 'Pacing is not helping plates finish together yet', body, { label: 'Waiting change', value: p.lampSavedMs, unit: 'ms' });
-      return F(this.id, 'info', 32, 'Pacing made little difference to plates finishing together', body, { label: 'Waiting change', value: p.lampSavedMs, unit: 'ms' });
+      if (p.lampSavedMs >= 15000 && cut >= 0.2) return F(this.id, 'good', 70, 'With Finish together on, plates finished together: food waited ' + mmss(p.on.avgLampMs) + ' instead of ' + mmss(p.off.avgLampMs), body, { label: 'Less food waiting', value: cut, unit: 'share' });
+      if (p.lampSavedMs <= -15000) return F(this.id, 'warn', 62, 'Finish together is not helping plates finish together yet', body, { label: 'Waiting change', value: p.lampSavedMs, unit: 'ms' });
+      return F(this.id, 'info', 32, 'Finish together made little difference to plates finishing together', body, { label: 'Waiting change', value: p.lampSavedMs, unit: 'ms' });
     } },
     // sellout-early: a protein went 86 at least 1.5 h before close on a day with 30+ tickets; estimates
     // grams per hour.
@@ -1684,12 +1692,6 @@
       const y = M.yieldComparison(c).primary; if (!y || y.batches < 3 || y.staticCostErr === null || Math.abs(y.staticCostErr) < 0.05) return null;
       return F(this.id, y.staticCostErr < -0.1 ? 'bad' : 'warn', 50, 'The static ' + y.name.toLowerCase() + ' yield misprices cost by ' + (Math.abs(y.staticCostErr) * 100).toFixed(1) + '%',
         y.line + ' Starter yields stay estimates until you confirm them.', { label: 'Static vs true cost', value: y.staticCostErr, unit: 'share' });
-    } },
-    // sync-slow: under 95 percent of simulated 86 updates reached every channel in time. Needs 8 events.
-    { id: 'sync-slow', run(c) {
-      const s = M.syncLatency(c); if (s.count < 8 || s.withinPct >= 0.95) return null;
-      return F(this.id, s.withinPct < 0.8 ? 'bad' : 'warn', s.withinPct < 0.8 ? 66 : 48, pctTxt(s.withinPct) + ' of 86 updates reached every channel within ' + s.targetSec + ' s',
-        'Median ' + mmss(s.medianMs) + ', slowest ' + mmss(s.maxMs) + ' over ' + s.count + ' updates. This is simulated sync; no live POS is connected.', { label: 'Within target', value: s.withinPct, unit: 'share' });
     } },
     // voids: 4+ percent of tickets were voided. Needs 30 tickets and 3 voids.
     { id: 'voids', run(c) {

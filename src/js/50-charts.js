@@ -360,7 +360,7 @@
     pct: { full: (v) => (isNum(v) ? trim0((v * 100).toFixed(Math.abs(v * 100) < 10 ? 1 : 0)) + '%' : '-'), axis: (v) => Math.round(v * 100) + '%', scale: 100, steps: [1, 2, 5, 10, 20, 25, 50, 100, 200] },
     pct100: { full: (v) => (isNum(v) ? trim0(v.toFixed(Math.abs(v) < 10 ? 1 : 0)) + '%' : '-'), axis: (v) => Math.round(v) + '%', steps: [1, 2, 5, 10, 20, 25, 50, 100, 200] },
     // money: dollars, whole dollars from 100 up. dur: durations in milliseconds.
-    money: { full: (v) => (U.fmtMoney ? U.fmtMoney(v, Math.abs(v) >= 100 ? 0 : 2) : '$' + numFull(v)), axis: (v) => (isNum(v) ? (v < 0 ? '-$' : '$') + compact(Math.abs(v), 0) : '-') },
+    money: { full: (v) => (U.fmtMoney ? U.fmtMoney(v, Math.abs(v) >= 100 ? 0 : 2) : '$' + numFull(v)), axis: (v) => (isNum(v) ? (v < 0 ? '-' : '') + ((U.currencySymbol && U.currencySymbol()) || '$') + compact(Math.abs(v), 0) : '-') },
     dur: { full: fmtDurMs, axis: durAxis, steps: M.MS_STEPS },
     // durS: durations in seconds. clock: elapsed clock text such as 05:14 from milliseconds.
     durS: { full: (s) => fmtDurMs(s * 1000), axis: (s) => durAxis(s * 1000), steps: M.SEC_STEPS },

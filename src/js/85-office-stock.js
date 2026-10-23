@@ -1,9 +1,9 @@
 /*
  * WHAT THIS FILE IS: The "Stock and 86" back-office page: why one protein ran out, a plain cook-count
- * suggestion per protein, the sell-out clock, the stock level through a day, what 86 cost, simulated sync.
+ * suggestion per protein, the sell-out clock, the stock level through a day, what 86 cost.
  * PARTS: 1 pure helpers, 2 numbers per refresh, 3 the story and the suggestions, 4 the page and its cards.
  * USES: 82-office-money.js (helpers), 80-office-core.js (the kit), 40-metrics.js.   USED BY: the office frame.
- * HONEST: suggestions come from the days in range (sample days are labeled), sync is simulated and labeled so, and refused order lines are
+ * HONEST: suggestions come from the days in range (sample days are labeled), and refused order lines are
  * counted only where the app recorded them.
  */
 (function (g) {
@@ -198,7 +198,7 @@
         const suggest = Math.ceil((med * PADDING) / 100) * 100;
         Object.assign(out, { suggestG: suggest, sold: soRows.length > 0 });
         // Where the days come from: simulated sample days must never read as the owner's own kitchen.
-        const srcWord = b.ds.counts && b.ds.counts.sample > 0 ? 'Suggestion from days that include simulated sample data (not your kitchen)' : 'Suggestion from your own days in this range';
+        const srcWord = b.ds.counts && b.ds.counts.sample > 0 ? 'Suggestion from days that include sample history (not your kitchen)' : 'Suggestion from your own days in this range';
         const parts = [];
         if (soRows.length) {
           const earliest = soRows.slice().sort((x, y) => y.hoursBeforeClose - x.hoursBeforeClose)[0];
@@ -269,7 +269,7 @@
     });
 
     page.panel({
-      span: 12, title: 'What to cook tomorrow', sub: 'A suggestion from the days in the range above, not a forecast. Simulated sample days are labeled when they are included.',
+      span: 12, title: 'What to cook tomorrow', sub: 'A suggestion from the days in the range above, not a forecast. Sample history days are labeled when they are included.',
       caption: 'A starting number per protein: the typical amount used on the days in this range, plus 10%. Your own judgment about tomorrow comes first.',
       // Builds the intro and the list once; update redraws the list only when it changed.
       render: (body, p0) => {
@@ -447,71 +447,13 @@
     const spellNote = h('p', { class: 'ob-note', 'data-k': 'spell-note' });
     spellTable.el.querySelector('.of-card-body').appendChild(spellNote);
 
-    // ---------- simulated channel sync ----------
-    page.section('Channel sync (practice only)', 'Practice only: this shows how a sold-out dish would reach other ordering systems. Nothing is sent.');
-    const syncParts = [page.lastSection];
-    syncParts.push(page.panel({
-      span: 5, title: 'How fast 86 reaches the channels', sub: 'Simulated: no live POS connected',
-      caption: 'Whether a sold-out item would stop being sold everywhere quickly. The goal is every channel inside the target.',
-      // Builds the simulated-sync chip, four figures and the source line; update rewrites them in place.
-      render: (body, p0) => {
-        const chip = kit.chip({ label: 'Simulated: no live POS connected', icon: 'info', tone: 'info' });
-        chip.classList.add('ob-sim-chip');
-        const stats = B.stats(body);
-        const txt = h('p', { class: 'ob-text', 'data-k': 'sync-text' });
-        const src = B.src('Source: simulated sync events logged whenever an item goes 86. There is no real POS, online ordering or delivery connection in this build, so these times show what you should expect to measure once there is one.');
-        body.insertBefore(chip, stats.el);
-        body.append(txt, src);
-        // Shows median, slowest 1 in 10, slowest of all and share within target, or a note if none logged.
-        const paint = (p) => {
-          const s = M.syncLatency(p);
-          if (!s.count) { stats.set([]); setText(txt, 'No simulated sync events in this range yet. They are logged each time an item goes 86 or comes back.'); return; }
-          // Tone of the within-target figure: good from 95%, warning from 80%, else bad (starter thresholds).
-          stats.set([
-            { k: 'median', label: 'Median', value: fmt.ms(s.medianMs), note: 'typical channel' },
-            { k: 'p90', label: 'Slowest 1 in 10', value: fmt.ms(s.p90Ms), note: 'the slowest tenth' },
-            { k: 'max', label: 'Slowest of all', value: fmt.ms(s.maxMs), note: 'worst single update' },
-            { k: 'within', label: 'Within ' + s.targetSec + ' s', value: fmt.pct(s.withinPct, 0), note: s.withinCount + ' of ' + s.count + ' updates', tone: s.withinPct >= 0.95 ? 'good' : s.withinPct >= 0.8 ? 'warn' : 'bad' },
-          ]);
-          setText(txt, s.withinPct >= 1 ? 'Every update would reach every channel inside ' + s.targetSec + ' seconds.' : s.withinPct >= 0.95 ? 'Nearly every update would reach every channel inside ' + s.targetSec + ' seconds.' : fmt.pct(1 - s.withinPct, 0) + ' of updates took longer than the ' + s.targetSec + '-second target, so an 86\'d item could still be sold for a while.');
-        };
-        paint(p0);
-        return { update: paint };
-      },
-    }));
-    syncParts.push(page.card({
-      type: 'bar', span: 7, title: 'Sync time by channel (simulated)', sub: 'Simulated: no live POS connected',
-      caption: 'Whether one channel is slower than the rest. Every bar should end before the target line.',
-      empty: { title: 'No simulated sync events yet', body: 'They are logged each time an item goes 86 or comes back. Nothing here comes from a real POS.', icon: 'refresh' },
-      // Median and slowest sync time per channel against the target line; empty when nothing was logged.
-      spec: (p) => {
-        const s = M.syncLatency(p);
-        if (!s.count || !s.byTarget.length) return null;
-        return {
-          orient: 'h', categories: s.byTarget.map((t) => t.name), sort: 'none', format: 'dur', labels: 'all',
-          series: [{ id: 'median', name: 'Median', values: s.byTarget.map((t) => t.medianMs), slot: 2 }, { id: 'max', name: 'Slowest', values: s.byTarget.map((t) => t.maxMs), slot: 1 }],
-          refLines: [{ value: s.targetSec * 1000, label: 'Target ' + s.targetSec + ' s', tone: 'warn' }],
-          height: Math.max(190, 70 * s.byTarget.length + 40),
-          ariaLabel: 'Bar chart of simulated sync time for each channel, median and slowest, against the ' + s.targetSec + ' second target. These are simulated figures: no live POS is connected.',
-        };
-      },
-    }));
-    // The channel sync strip is practice only: shown when demo tickets or sample history are in play, hidden for a real kitchen.
-    const paintSyncVisible = (p) => {
-      const b = base(p), demo = (b.ds.tickets || []).some((t) => t && t.src === 'demo');
-      const on = demo || !!(b.ds.counts && b.ds.counts.sample > 0);
-      syncParts.forEach((x) => { const el = x && x.el ? x.el : x; if (el) el.hidden = !on; });
-    };
-
     paintClockWords(ctx.prepared());
-    paintSyncVisible(ctx.prepared());
 
     return {
       // The frame calls this on every refresh: repaint only the words that depend on the data.
       update() {
         const p = ctx.prepared();
         paintClockWords(p);
-        paintSyncVisible(p);
         const sp = spellsOf(p);
         const inHours = sp.cl.filter((c) => c.openMs > 0);
         const after = sp.cl.length - inHours.length;

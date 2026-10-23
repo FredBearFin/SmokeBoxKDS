@@ -101,3 +101,9 @@ test('coachText: tickets still on the line are not enough, so a page with none f
   assert.match(waiting.body, /not finished/);
   assert.equal(P.coachText('pace', { anyLive: true, tickets: 3, finished: 2, batches: 0, records: 0 }), null);
 });
+
+test('headline numbers in other currencies are set in bold like dollars', () => {
+  const parts = P.splitNumbers('You sold €1,234.50 in 3 orders and £20 of tips.').filter((x) => x.num).map((x) => x.t);
+  assert.deepEqual(parts, ['€1,234.50', '3', '£20']);
+  assert.deepEqual(P.splitNumbers('Sold $12.40').filter((x) => x.num).map((x) => x.t), ['$12.40']);
+});

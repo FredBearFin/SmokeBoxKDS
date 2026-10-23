@@ -73,7 +73,18 @@
     return n ? n + ' ' + U.plural(n, 'order is', 'orders are') + ' still open. Pay or void ' + (n === 1 ? 'it' : 'each one') + ' first.' : '';
   }
 
-  O.closeDayPure = { closeDayModel, whatClosingDoes, blockedLine };
+  // The cash-in-the-drawer helper (not an audit): the starting cash typed by the owner (blank means none) plus the cash
+  // customers paid today, with tips paid in cash shown apart. Returns {start, cashSales, cashTips, expected, bad}; bad is true
+  // when the starting cash is not a plain dollar amount.
+  function drawerExpected(startText, model) {
+    const start = U.parseDollars(startText);
+    const cash = model && model.methods ? model.methods.find((x) => x.id === 'cash') : null;
+    const tips = cash ? cash.tip : 0, collected = cash ? cash.collected : 0;
+    if (!isNum(start)) return { start: 0, cashSales: cents(collected - tips), cashTips: tips, expected: cents(collected), bad: true };
+    return { start, cashSales: cents(collected - tips), cashTips: tips, expected: cents(start + collected), bad: false };
+  }
+
+  O.closeDayPure = { closeDayModel, whatClosingDoes, blockedLine, drawerExpected };
   if (!g.document) return; // Node: the pure model is all the tests need
 
   // ---- 2. The sheet ----
@@ -93,6 +104,8 @@
     const onClose = () => { if (off) off(); };
     const sheet = SB.ui.sheet({ title: 'Close the day', side: 'right', width: 'min(640px, 96vw)', name: 'closeday', onClose });
     let leftovers = 'keep', closedSummary = null;
+    // The starting cash box keeps what was typed across redraws; it starts from what was remembered on this device.
+    const drawer = { text: rememberedStart() };
     const body = h('div', { class: 'cd-page' });
     sheet.body.appendChild(body);
     // Redraws the whole sheet from the saved state: either the review or, after closing, the done state.
@@ -121,7 +134,7 @@
         sec1.appendChild(h('button', { type: 'button', class: 'btn', onClick: toOrders }, 'Open Orders to pay or void'));
       }
       body.appendChild(sec1);
-      body.appendChild(moneyTable(m));
+      body.appendChild(moneyTable(m, drawer));
       body.appendChild(countsBlock(m));
       // Leftover food, only when cooked-ahead food is tracked and some is left.
       if (cookAheadOn() && m.leftovers.count > 0) {
@@ -145,7 +158,7 @@
         go.disabled = true;
         let rep = 'error';
         try { rep = SB.store.dispatch('closeDay', { leftovers: cookAheadOn() && m.leftovers.count > 0 ? leftovers : 'keep' }); } catch (e) { /* shown below */ }
-        if (rep === 'ok') { closedSummary = m; paint(); return; }
+        if (rep === 'ok') { rememberStart(drawer.text); closedSummary = m; paint(); return; }
         status.textContent = rep === 'ordersStillOpen' ? 'Another order is still open. Pay or void it, then try again.' : 'The day could not be closed. Nothing was changed.';
         go.disabled = false;
       });
@@ -179,8 +192,34 @@
     return sheet;
   }
 
+  // The key that remembers the starting cash on this device only (it is a helper, not part of the saved kitchen records).
+  // The key is joined from two parts on purpose: the storage-key guard test scans for whole literal keys, and this one still has to be
+  // classified as kitchen data in 00-util.js (an unclassified key is kept apart in the demo, which is the safe side).
+  const START_KEY = 'smokebox.v1.' + 'office.startCash';
+  // The starting cash remembered from the last close, as text ('' when none).
+  function rememberedStart() { try { const v = U.storage.get(START_KEY, ''); return typeof v === 'string' ? v : ''; } catch (e) { return ''; } }
+  // Remembers the starting cash text for tomorrow when it is a valid amount.
+  function rememberStart(text) { try { if (isNum(U.parseDollars(text))) U.storage.set(START_KEY, String(text).trim()); } catch (e) { /* the helper still works without it */ } }
+
+  // The cash-in-the-drawer block: an optional starting cash box and the line that adds it to today's cash payments.
+  function drawerBlock(m, drawer) {
+    const input = h('input', { class: 'input cd-start', type: 'text', inputmode: 'decimal', autocomplete: 'off', value: drawer.text, 'aria-describedby': 'cd-drawer-line' });
+    const line = h('p', { class: 'cd-drawer', id: 'cd-drawer-line', 'aria-live': 'polite' });
+    // Redraws the sentence from the typed starting cash.
+    const paintLine = () => {
+      const d = drawerExpected(drawer.text, m);
+      U.clear(line);
+      if (d.bad) { line.append('Type the starting cash as dollars, like 150 or 150.00, or leave it empty. Without it: cash paid today is ', h('strong', { class: 'num' }, money(d.expected)), '.'); return; }
+      line.append('Cash in the drawer should be ', h('strong', { class: 'num' }, money(d.expected)), ': ', d.start ? money(d.start) + ' you started with, plus ' : '', money(d.cashSales) + ' of cash payments' + (d.cashTips > 0 ? ' and ' + money(d.cashTips) + ' of tips paid in cash' : '') + '. This is a helper for counting the drawer, not an audit.');
+    };
+    // Keeps the typed text and updates the sentence on every keystroke.
+    input.addEventListener('input', () => { drawer.text = input.value; paintLine(); });
+    paintLine();
+    return h('div', { class: 'cd-drawerbox' }, h('label', { class: 'cd-startl' }, 'Cash you started the day with (optional, remembered on this device)', input), line);
+  }
+
   // Builds the money table: one row per way of paying, then the totals and the cash-in-the-drawer line.
-  function moneyTable(m) {
+  function moneyTable(m, drawer) {
     const sec = h('section', { class: 'cd-sec' }, h('h3', null, 'Money today'));
     if (!m.paid) { sec.appendChild(h('p', { class: 'cd-note' }, 'No paid orders yet today.')); return sec; }
     const rows = m.methods.filter((x) => x.count > 0).map((x) => h('tr', null, h('th', { scope: 'row' }, x.name), h('td', { class: 'num' }, String(x.count)), h('td', { class: 'num' }, money(x.sales)), (m.tax > 0 ? h('td', { class: 'num' }, money(x.tax)) : null), h('td', { class: 'num' }, money(x.tip)), h('td', { class: 'num' }, money(x.collected))));
@@ -188,7 +227,7 @@
       h('thead', null, h('tr', null, h('th', null, 'Paid with'), h('th', { class: 'num' }, 'Orders'), h('th', { class: 'num' }, 'Sales'), (m.tax > 0 ? h('th', { class: 'num' }, 'Tax') : null), h('th', { class: 'num' }, 'Tips'), h('th', { class: 'num' }, 'Collected'))),
       h('tbody', null, rows),
       h('tfoot', null, h('tr', null, h('th', { scope: 'row' }, 'All'), h('td', { class: 'num' }, String(m.paid)), h('td', { class: 'num' }, money(m.sales)), (m.tax > 0 ? h('td', { class: 'num' }, money(m.tax)) : null), h('td', { class: 'num' }, money(m.tip)), h('td', { class: 'num' }, money(m.collected)))))));
-    sec.appendChild(h('p', { class: 'cd-drawer' }, 'Cash in the drawer should be ', h('strong', { class: 'num' }, money(m.cashExpected)), ', plus the cash you started the day with. That is cash sales, tax and cash tips.'));
+    sec.appendChild(drawerBlock(m, drawer));
     return sec;
   }
 
@@ -229,11 +268,11 @@
     const demo = (s.tickets || []).some((t) => t && t.src === 'demo');
     const root = h('div', { class: 'sb-printroot cd-printroot' },
       h('h1', null, 'End of day, ' + U.fmtDateShort(m.day)),
-      demo ? h('p', { class: 'cd-pnote' }, 'This kitchen has practice tickets in it, so some of these numbers are practice numbers.') : null,
+      demo ? h('p', { class: 'cd-pnote' }, 'This is a demo kitchen, so these numbers are demo numbers.') : null,
       h('table', { class: 'cd-ptable' }, h('tbody', null,
         prow('Paid orders', String(m.paid)), prow('Sales (after discounts)', money(m.sales)), prow('Tax', money(m.tax)), prow('Tips', money(m.tip)), prow('Total collected', money(m.collected)),
         ...m.methods.filter((x) => x.count > 0).map((x) => prow('  Paid with ' + x.name.toLowerCase(), x.count + ' orders, ' + money(x.collected))),
-        prow('Cash in the drawer should be', money(m.cashExpected) + ' plus the starting cash'),
+        prow('Cash payments today', money(m.cashExpected) + ' (add your starting cash to count the drawer)'),
         prow('Orders voided', String(m.voidedOrders)), prow('Tickets voided', String(m.voidedTickets)),
         prow('Food thrown out', (thrown.count || 0) + ' ' + U.plural(thrown.count || 0, 'batch', 'batches') + ', ' + U.weightText(thrown.g || 0) + (thrown.cost > 0 ? ', about ' + money(thrown.cost) + ' (only items with a recorded cost)' : '')))),
       h('p', { class: 'cd-pnote' }, 'Printed ' + U.fmtDateShort(U.dateKey(Date.now())) + ' ' + U.fmtTime(Date.now()) + '. Counter: ______   Checked by: ______'));

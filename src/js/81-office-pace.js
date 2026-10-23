@@ -86,7 +86,7 @@
   }
 
   O.registerPage('pace', {
-    title: 'Pace', icon: 'gauge', order: 1,
+    title: 'Speed', icon: 'gauge', order: 1,
     // The Pace page: headline, KPI tiles, the hero chart, the pace ring, tickets per 15 minutes, the
     // pacing check and the findings.
     render(container, ctx) {
@@ -96,7 +96,7 @@
       container.insertBefore(glanceHost, page.el);
       const glance = typeof O.glance === 'function' ? O.glance(glanceHost) : null;
       page.headline();
-      page.how('These numbers come from tickets that were sent out in the range above. Ticket time runs from when the ticket was entered until it was sent out, and the median is the middle one: half the tickets were faster. Slowest 1 in 10 is the time that nine in ten tickets beat. On time means a ticket finished before its warning time, which depends on the order type (Menu and settings, Time limits). Tickets per hour is tickets placed divided by the hours in which at least one ticket was placed.');
+      page.how('These numbers come from tickets that were sent out in the range above. Ticket time runs from when the ticket was entered until it was sent out, and the middle ticket is the typical one: half the tickets were faster. Slowest 1 in 10 is the time that nine in ten tickets beat. On time means a ticket finished before its warning time, which depends on the order type (Menu and settings, Time limits). Tickets per hour is tickets placed divided by the hours in which at least one ticket was placed.');
       page.tiles(paceTiles());
 
       page.card({
@@ -132,7 +132,7 @@
 
       page.more('Show more charts and findings');
       page.card({
-        type: 'ring', span: 4, title: 'Pace right now', sub: 'The last 10 tickets from the past 45 minutes. This one ignores the date range above.',
+        type: 'ring', span: 4, title: 'Speed right now', sub: 'The last 10 tickets from the past 45 minutes. This one ignores the date range above.',
         caption: 'Under 80% of target is comfortable. At 100% the median ticket is as slow as its warning time, so the line is falling behind.',
         empty: { title: 'No tickets finished in the last 45 minutes', body: 'The ring wakes up when the line is moving. It reads only the last live minutes. Take an order and bump it to light it up.', icon: 'gauge' },
         // The ring: how close the last 10 tickets are to their warning time. It ignores the date range on
@@ -175,20 +175,20 @@
 
       page.card({
         type: 'bar', span: 4, height: 230, title: 'Do plates finish together?',
-        // The subtitle says how much pacing cut the wait for the last item, once pacing on and off can be
+        // The subtitle says how much pacing cut the wait for the last item, once Finish together on and off can be
         // compared.
-        sub: (p) => { const c = M.pacingCompare(p); return c.comparable && isNum(c.lampCutPct) ? 'With pacing on, finished food waited ' + Math.round(Math.abs(c.lampCutPct) * 100) + '% ' + (c.lampCutPct >= 0 ? 'less' : 'more') + ' (different tickets, not a controlled test)' : 'Average wait for the last item, pacing off against on'; },
-        caption: 'Shorter is better. This is how long finished food sits waiting for the rest of the plate. Pacing holds early items so the plate finishes together; it is not meant to make tickets faster, and the median ticket time can go up.',
-        empty: { title: 'Pacing cannot be compared yet', body: 'This needs finished multi-item tickets with pacing on and with pacing off in the same range. Run a day with pacing off to see its effect.', icon: 'timer' },
-        // Two bars: the average wait for the last item with pacing off and with pacing on.
+        sub: (p) => { const c = M.pacingCompare(p); return c.comparable && isNum(c.lampCutPct) ? 'With Finish together on, finished food waited ' + Math.round(Math.abs(c.lampCutPct) * 100) + '% ' + (c.lampCutPct >= 0 ? 'less' : 'more') + ' (different tickets, not a controlled test)' : 'Average wait for the last item, Finish together off against on'; },
+        caption: 'Shorter is better. This is how long finished food sits waiting for the rest of the plate. Finish together holds early items so the plate finishes together; it is not meant to make tickets faster, and the median ticket time can go up.',
+        empty: { title: 'Finish together cannot be compared yet', body: 'This needs finished multi-item tickets with Finish together on and with Finish together off in the same range. Run a day with Finish together off to see its effect.', icon: 'timer' },
+        // Two bars: the average wait for the last item with Finish together off and with Finish together on.
         spec(p) {
           const c = M.pacingCompare(p);
           if (!c.comparable || !isNum(c.on.avgLampMs) || !isNum(c.off.avgLampMs)) return null;
-          return { orient: 'v', categories: ['Pacing off', 'Pacing on'], series: [{ id: 'lamp', name: 'Average wait for the last item', values: [c.off.avgLampMs, c.on.avgLampMs] }], format: 'dur', emphasis: 1, labels: 'all', ariaLabel: 'Average wait for the last item: pacing off ' + fmt.ms(c.off.avgLampMs) + ', pacing on ' + fmt.ms(c.on.avgLampMs) };
+          return { orient: 'v', categories: ['Finish together off', 'Finish together on'], series: [{ id: 'lamp', name: 'Average wait for the last item', values: [c.off.avgLampMs, c.on.avgLampMs] }], format: 'dur', emphasis: 1, labels: 'all', ariaLabel: 'Average wait for the last item: Finish together off ' + fmt.ms(c.off.avgLampMs) + ', Finish together on ' + fmt.ms(c.on.avgLampMs) };
         },
       });
 
-      page.insights({ limit: 6, only: ['pace-overview', 'pacing-effect', 'slow-hour', 'channel-gap', 'expo-dwell', 'forced-bumps'], empty: 'Findings about pace appear once there are about 20 finished tickets in the range.' });
+      page.insights({ limit: 6, only: ['pace-overview', 'pacing-effect', 'slow-hour', 'channel-gap', 'expo-dwell', 'forced-bumps'], empty: 'Findings about speed appear once there are about 20 finished tickets in the range.' });
       // The kit removes every card, chart and listener when the page closes.
       return { destroy() { if (glance) glance.destroy(); glanceHost.remove(); page.destroy(); } };
     },
@@ -270,7 +270,7 @@
     render(container, ctx) {
       const page = K.page(container, ctx, { id: 'tickets' });
       page.headline();
-      page.how('Finished tickets are tickets that were sent out and not voided, counted on the day they were placed. Ticket time runs from when the ticket was entered until it was sent out; the median is the middle ticket. Overdue means a ticket took longer than the overdue limit for its order type. Voided tickets were cancelled before they were sent out. The arrows compare with the same number of days just before this range.');
+      page.how('Finished tickets are tickets that were sent out and not voided, counted on the day they were placed. Ticket time runs from when the ticket was entered until it was sent out; the middle ticket is the typical one. Overdue means a ticket took longer than the overdue limit for its order type. Voided tickets were cancelled before they were sent out. The arrows compare with the same number of days just before this range.');
       page.tiles([
         { id: 'count', kpi: 'count', label: 'Finished tickets' },
         { id: 'median', kpi: 'medianMs', label: 'Median ticket time' },
