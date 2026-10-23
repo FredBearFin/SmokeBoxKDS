@@ -826,4 +826,6 @@ html[data-hub="on"] .fl-demo-chip, html[data-hub="on"] .fl-start-demo, html[data
   /* The next-step line is one line with an ellipsis (each dish row already shows its own "Start in" time), and sits closer to the dishes. */
   .fl-main[data-density="compact"] .slip-next { margin-top: 2px; padding-block: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
-}
+
+/* On a show-only screen the next step on each dish stays as a quiet word (it says what the line should do next) but no longer looks like a button to press. */
+.fl[data-follow="on"] .fl-item .fl-act, .fl[data-follow="on"] .fl-item[data-state] .fl-act { background: transparent; border-color: transparent !important; box-shadow: none !important; opacity: 0.75; }
