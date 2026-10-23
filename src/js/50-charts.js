@@ -338,13 +338,13 @@
   const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   // Short date label such as "Fri 10/16".
   const dateShort = (ts) => { const d = new Date(ts); return WD[d.getDay()] + ' ' + (d.getMonth() + 1) + '/' + d.getDate(); };
-  // With three or more plain lines the colors alone are not enough for a colour-blind reader, so the third and fourth
-  // line get a dotted and a dashed pattern. Bands, areas, stacked charts and charts with fewer lines stay solid.
+  // With two or more plain lines the colors alone are not enough for a colour-blind reader or a black-and-white print, so
+  // the second, third and fourth line get a dashed, dotted and dash-dot pattern. Bands, areas, stacked charts and charts with fewer lines stay solid.
   function autoDash(spec, s, i) {
     const list = Array.isArray(spec.series) ? spec.series : [];
     const plain = list.filter((x) => x && x.kind !== 'band' && !x.area).length;
-    if (spec.stacked || s.area || s.kind === 'band' || plain < 3) return null;
-    return [null, null, '2 4', '9 4'][i % 4];
+    if (spec.stacked || s.area || s.kind === 'band' || plain < 2) return null;
+    return [null, '9 4', '2 4', '9 4 2 4'][i % 4];
   }
   // Gram axis label: "850 g" below a thousand, "1.5 kg" from there.
   const fmtGAxis = (v) => (!isNum(v) ? '-' : U.units && U.units.weight === 'lb' && U.weightText ? U.weightText(v) : Math.abs(v) >= 1000 ? trim0((v / 1000).toFixed(1)) + ' kg' : Math.round(v) + ' g');
@@ -2017,7 +2017,7 @@
       }
       d += 'V' + r1(bot);
       go.appendChild(S('path', { d: d + 'Z', style: 'fill:' + o.s.css + ';fill-opacity:.1;stroke:none' }));
-      go.appendChild(S('path', { d: d.replace(/Z$/, ''), class: 'ch-ln', style: 'stroke:' + o.s.css + ';stroke-linejoin:miter', 'stroke-dasharray': visOv.length >= 3 ? [null, null, '2 4', '9 4'][oi % 4] : null }));
+      go.appendChild(S('path', { d: d.replace(/Z$/, ''), class: 'ch-ln', style: 'stroke:' + o.s.css + ';stroke-linejoin:miter', 'stroke-dasharray': visOv.length >= 2 ? [null, '9 4', '2 4', '9 4 2 4'][oi % 4] : null }));
     });
     svg.appendChild(go);
     drawRefLines(svg, chart, (spec.refLines || []).map((q) => (q.value == null && q.x != null ? Object.assign({}, q, { value: q.x }) : q)), { orient: 'v', scale: X, l, r, t: top, b: bot });
