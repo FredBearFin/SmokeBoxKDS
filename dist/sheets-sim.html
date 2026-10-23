@@ -933,6 +933,17 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   .sheet-foot > .btn { flex-basis: 100%; }
 }
 
+/* ---------- banner: save failure and daily backup nudge, a strip across the top of the shell ---------- */
+/* The strip sits above the layers; while it shows, the layers start below it (--sb-banner-h). */
+.sb-banner {
+  position: absolute; top: 0; left: 0; right: 0; z-index: calc(var(--zi-sheet) - 1); min-height: var(--sb-banner-h, 52px); /* above the pages, below sheets, so a sheet's title and close button are never covered */
+  display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--gutter);
+  background: var(--tint-warn); color: var(--ink); border-bottom: 3px solid var(--amber);
+}
+.sb-banner[data-tone="bad"] { background: var(--tint-bad); border-bottom-color: var(--crimson); }
+.sb-banner-t { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+.sb-shell[data-banner] > .layer { top: var(--sb-banner-h, 52px); }
+
 /* ---------- toast: inverse strip, one action, drain bar flush on the bottom edge ---------- */
 /* Toasts: dark message strips at the bottom centre, each with a tone stripe, one action, a draining bar. */
 .toast-host {
@@ -1025,7 +1036,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   overflow: auto; overscroll-behavior: contain; background: var(--bg); color: var(--ink);
 }
 .layer:focus { outline: none; }
-.layer-floor { z-index: var(--zi-base); }
+.layer-floor, .layer-order { z-index: var(--zi-base); }
 .layer-office { z-index: var(--zi-layer-office); }
 /* Promote the office to its own compositor layer while its clip-path circle animates. Without this, Chromium culls the floor and the veil
    beneath the circle's whole bounding box, leaving undimmed or black patches outside the circle (seen in headless Chromium with software raster). */
@@ -1262,6 +1273,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   .stamp, .is-printing { animation: none !important; }
 }
 
+/* A station, category or channel added by the owner has no hue of its own, so it gets a neutral one. */
+[data-zone]:not([data-zone="pit"], [data-zone="sides"], [data-zone="fry"], [data-zone="cold"], [data-zone="expo"]) { --zc: var(--ink3); }
+
 /* ===== 21-floor-sheets.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the sheets built in 71-floor-order.js and 72-floor-sheets.js.
@@ -1311,6 +1325,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px);
 }
 .ord-switch { display: none; }
+/* New ticket as a full page (SB.order.mount): a slim top bar, then the same menu/order body and footer as the sheet. */
+.ord-page { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg); }
+.ord-page-bar { flex: none; display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); min-height: 64px; background: var(--sub); border-bottom: var(--bw) solid var(--line); }
+.ord-page-title { font-size: var(--fs-5); font-weight: var(--w-bold); line-height: var(--lh-snug); }
+.ord-page > .sheet-body { flex: 1 1 auto; }
+.ord-page > .sheet-foot { border-radius: 0; }
 .ord-menu, .ord-order { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--sp-4); }
 .ord-menu { padding-top: 0; }
 .ord-order { display: flex; flex-direction: column; gap: var(--sp-4); background: var(--paper); border-left: var(--bw) solid var(--line); }
@@ -1952,6 +1972,45 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // Whole degrees Fahrenheit with the degree sign, like "135 F". Not a number gives "-".
   U.fmtTemp = (f) => (U.isNum(f) ? Math.round(f) + '°F' : '-');
 
+  /* ---------- units setting: store in degrees F and grams, format only at the edges ---------- */
+  // The units the owner chose (settings.ui.tempUnit and weightUnit). The store keeps this in step with the
+  // settings; screens call the helpers below and never read it directly.
+  U.units = { temp: 'F', weight: 'kg' };
+  // Takes the ui part of the settings and remembers the temperature unit (F or C) and weight unit (kg or lb).
+  // Anything else leaves the old choice alone.
+  U.setUnits = (ui) => {
+    if (!ui || typeof ui !== 'object') return U.units;
+    if (ui.tempUnit === 'F' || ui.tempUnit === 'C') U.units.temp = ui.tempUnit;
+    if (ui.weightUnit === 'kg' || ui.weightUnit === 'lb') U.units.weight = ui.weightUnit;
+    return U.units;
+  };
+  const G_PER_LB = 453.59237;
+  // Degrees Celsius to Fahrenheit, and back. Stored temperatures stay Fahrenheit (the food code is in F).
+  U.cToF = (c) => (c * 9) / 5 + 32;
+  U.fToC = (f) => ((f - 32) * 5) / 9;
+  // The unit word shown next to a temperature or weight: "°F", "°C", "kg" or "lb". kind is "temp" or "weight".
+  U.unitLabel = (kind) => (kind === 'weight' ? U.units.weight : '°' + U.units.temp);
+  // A stored Fahrenheit value as the number to show (whole degrees) in the chosen unit; NaN when not a number.
+  U.tempShown = (f) => (U.isNum(f) ? Math.round(U.units.temp === 'C' ? U.fToC(f) : f) : NaN);
+  // A number the person typed (in the chosen unit) back to stored Fahrenheit, rounded to a tenth.
+  U.tempStored = (v) => (U.isNum(v) ? Math.round((U.units.temp === 'C' ? U.cToF(v) : v) * 10) / 10 : NaN);
+  // Stored Fahrenheit as text in the chosen unit: 135 gives "135 °F" or "57 °C". Not a number gives "-".
+  U.tempText = (f) => (U.isNum(f) ? U.tempShown(f) + ' ' + U.unitLabel('temp') : '-');
+  // Stored degrees Celsius (cook endpoints are kept in C) as text in the chosen unit: 85 gives "85 °C" or "185 °F".
+  U.tempTextC = (c) => (U.isNum(c) ? U.tempText(U.cToF(c)) : '-');
+  // Stored grams as the number to show in the chosen weight unit (kg or lb), not rounded. NaN when not a number.
+  U.weightShown = (g) => (U.isNum(g) ? (U.units.weight === 'lb' ? g / G_PER_LB : g / 1000) : NaN);
+  // A weight typed in the chosen unit back to stored grams, rounded to a tenth of a gram.
+  U.weightStored = (v) => (U.isNum(v) ? Math.round((U.units.weight === 'lb' ? v * G_PER_LB : v * 1000) * 10) / 10 : NaN);
+  // Stored grams as text in the chosen unit. Kilograms read like fmtG ("850 g", "2.40 kg"); pounds read
+  // "7.0 oz" under a pound and "5.29 lb" above.
+  U.weightText = (g) => {
+    if (!U.isNum(g)) return '-';
+    if (U.units.weight !== 'lb') return U.fmtG(g);
+    const lb = g / G_PER_LB;
+    return Math.abs(lb) < 1 ? (lb * 16).toFixed(1) + ' oz' : lb.toFixed(2) + ' lb';
+  };
+
   /* ---------- dates (all local time). The "service day" runs from dayStartHour (4 am) so a 12:45 am sale belongs to last night. ---------- */
   // 4 am: the service day turns over at 4 am, so a 12:45 am sale still belongs to the night before.
   U.DAY_START_HOUR = 4;
@@ -2532,6 +2591,84 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   C.payMethodById = byId(C.payMethods);
   C.comboById = byId(C.combos);
   C.syncTargetById = byId(C.syncTargets);
+
+  /* ---------- owner names and extra entries for stations, categories and channels ---------- */
+  // The owner can rename stations, menu categories and order channels, and add one or more of each. The
+  // choices are kept in this browser (not in the saved kitchen state) under CUSTOM_KEY and applied right
+  // here, while this file loads, so the engine, the board and the office all see the same lists. Ids never
+  // change: a rename only changes what people read. A change made in the app takes effect after a reload.
+  // WATCH OUT: a backup file does not carry these names. Restoring on a device without them would drop
+  // tickets that sit on an added station, so copy the names too (Data page) when moving devices.
+  const CUSTOM_KEY = 'smokebox.v1.names';
+  // Size limits so a typing slip cannot grow the screen without end: names up to 24 letters.
+  const CUSTOM_MAX = { zones: 8, categories: 12, channels: 8, name: 24 };
+  // Turns a name into a short id: lower-case letters and digits joined by underscores, with a prefix.
+  const slug = (prefix, name) => prefix + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 16);
+  // The first three letters of a name, upper case, for the small tag on tickets and tabs.
+  const codeOf = (name) => String(name).replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || '???';
+  // Cleans one typed name: trims spaces, squeezes runs of spaces; returns '' when it is not usable.
+  const cleanName = (x) => (typeof x === 'string' ? x.replace(/\s+/g, ' ').trim() : '');
+  // Checks a typed name against the others in a list (ignoring one id): true if another entry has it.
+  const nameTaken = (list, name, exceptId) => list.some((e) => e.id !== exceptId && e.name.toLowerCase() === name.toLowerCase());
+  // Rebuilds the lookup tables in place, so code that already holds them still sees the new entries.
+  const reindex = () => {
+    for (const [tbl, list] of [['zoneById', C.zones], ['channelById', C.channels], ['categoryById', C.categories]]) {
+      C[tbl] = C[tbl] || {};
+      for (const k of Object.keys(C[tbl])) delete C[tbl][k];
+      for (const e of list) C[tbl][e.id] = e;
+    }
+  };
+  // The built-in lists as they were before any custom change, so a spec is always applied to the starters.
+  const BASE = { zones: C.zones.map((x) => Object.assign({}, x)), categories: C.categories.map((x) => Object.assign({}, x)), channels: C.channels.map((x) => Object.assign({}, x)) };
+  // Applies a custom spec {rename:{zones,categories,channels}, add:{zones,categories,channels}} to the
+  // lists. Bad entries are skipped and named in the returned rejected list. Safe to call again with a new spec.
+  C.applyCustom = function (spec) {
+    const rejected = [];
+    const sp = spec && typeof spec === 'object' ? spec : {};
+    const ren = sp.rename && typeof sp.rename === 'object' ? sp.rename : {}, add = sp.add && typeof sp.add === 'object' ? sp.add : {};
+    const kinds = [['zones', C.zones, 'z_'], ['categories', C.categories, 'c_'], ['channels', C.channels, 'ch_']];
+    // Start from the starter entries, then restore the work-station list to the same array object.
+    for (const [k, list] of kinds) { list.length = 0; BASE[k].forEach((x) => list.push(Object.assign({}, x))); }
+    C.workZones.length = 0; C.zones.forEach((z) => { if (z.id !== 'expo') C.workZones.push(z.id); });
+    for (const [k, list] of kinds) {
+      const r = ren[k] && typeof ren[k] === 'object' ? ren[k] : {};
+      for (const id of Object.keys(r)) {
+        const e = list.find((x) => x.id === id), nm = cleanName(r[id]);
+        if (!e || !nm || nm.length > CUSTOM_MAX.name || nameTaken(list, nm, id)) { rejected.push(k + '.' + id); continue; }
+        e.name = nm;
+        if (k === 'zones') { e.long = nm; e.code = codeOf(nm); }
+        if (k === 'channels') e.short = nm.slice(0, 5);
+      }
+      const extra = Array.isArray(add[k]) ? add[k] : [];
+      for (const x of extra) {
+        const nm = cleanName(x && x.name);
+        const id = x && typeof x.id === 'string' && /^[a-z0-9_]{2,24}$/.test(x.id) ? x.id : slug(k === 'zones' ? 'z_' : k === 'categories' ? 'c_' : 'ch_', nm);
+        if (!nm || nm.length > CUSTOM_MAX.name || list.length >= BASE[k].length + CUSTOM_MAX[k] || list.some((e) => e.id === id) || nameTaken(list, nm)) { rejected.push(k + '+' + nm); continue; }
+        if (k === 'zones') { list.splice(list.length - 1, 0, { id, name: nm, long: nm, code: codeOf(nm), icon: 'pot' }); C.workZones.push(id); } // expo stays last
+        else if (k === 'categories') list.push({ id, name: nm });
+        else list.push({ id, name: nm, short: nm.slice(0, 5), icon: 'plate', warnSec: 480, breachSec: 720 });
+      }
+    }
+    reindex();
+    return { rejected };
+  };
+  // The spec saved in this browser, or an empty one.
+  C.customSpec = function () {
+    const U = SB.util;
+    let v = null;
+    try { v = U && U.storage ? U.storage.get(CUSTOM_KEY, null) : null; } catch (e) { v = null; }
+    return v && typeof v === 'object' ? v : { rename: {}, add: {} };
+  };
+  // Saves a spec for the next start. Returns false if it holds nothing usable or storage refused it.
+  // The change shows on the screens after a reload.
+  C.saveCustom = function (spec) {
+    const U = SB.util;
+    if (!U || !U.storage) return false;
+    return U.storage.set(CUSTOM_KEY, spec) !== false;
+  };
+  C.customLimits = CUSTOM_MAX;
+  reindex();
+  C.applyCustom(C.customSpec());
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 10-config.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'10-config.js',message:String(e&&e.message||e)});}
@@ -2555,7 +2692,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
  * Public API (other modules code against these names; see docs/smokebox.z.md for the formal statement):
  *   apply(state, type, payload, now)      -> { state, report, events, info }      (ACTIONS lists every type + payload)
  *   tick(state, now)                      -> { state, events }   same ref when nothing is due
- *   newState({ now, empty?, stagger?, settings?, menu?, ingredients?, learned?, seq? }) -> state
+ *   newState({ now, empty?, starter?, stagger?, settings?, menu?, ingredients?, learned?, seq? }) -> state
  *   availability(state, menuId)           -> { ok, reason: null|'manual'|'safety'|'stock', ing }
  *   computeAvail(state)                   -> { [menuId]: { ok, reason, ing } }
  *   servable(state, ingId)                -> grams (or 'ea') that can be served now
@@ -2567,7 +2704,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
  *   planFor(state, lines, now, rush?)     -> same as pacingPlan, using the state's settings/learned/menu
  *   ticketTiming(ticket, now, settings)   -> { elapsedMs, level: 'ok'|'warn'|'breach', warnMs, breachMs, pct }
  *   ticketProgress(ticket)                -> { total, done, queued, displayed, cooking, qtyTotal, qtyDone, pct, ready, byZone }
- *   checkInvariants(state, now?)          -> string[] (empty = healthy; I1-I15 of SPEC 10, structural parts)
+ *   checkInvariants(state, now?)          -> string[] (empty = healthy; I1-I19 of SPEC 10, structural parts)
  *   validateBackup(objOrText)             -> { ok, state?, error?, repaired: string[] }
  *   serialize(state) -> string             deserialize(text) -> validateBackup result
  *   allEvents(state)                      -> Event[] (archive chunks + recent window, oldest first; memoised)
@@ -2594,7 +2731,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -2649,6 +2786,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     badUntil: 'Pick a time later than now, or choose 30 minutes or 1 hour.',
     badPlanTime: 'Pick a time when the batch comes off the smoker: within the next day and a half, and not already past its serving time.',
     unknownPlan: 'That planned batch is gone. It may have been used, cancelled or expired.',
+    ordersStillOpen: 'The day cannot be closed while orders are still open. Take payment on each open order, or void it, then close the day again.',
+    badLeftovers: 'Choose what happens to the batches still in the cabinet: keep them for tomorrow, or discard them.',
+    badWho: 'Initials must be 1 to 12 characters. Shorten them, or leave them blank if the screen allows.',
+    unknownSafetyEntry: 'That safety log entry is not here, or it is not a temperature, discard, cooling, reheat, sanitize or keep-serving entry. Pick one from the safety log.',
     badSnooze: 'A reminder can be put off for 1 to 30 minutes, only for a batch still on the menu, and never past 5 minutes before its last warning. The last warning, a past-quality batch and a thrown-out batch cannot be put off.',
   };
 
@@ -2661,6 +2802,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     payOrder: '{ orderId, method:"cash"|"card"|"other", tip?, discount? }',
     reopenOrder: '{ orderId }',
     voidOrder: '{ orderId, reason }',
+    closeDay: '{ leftovers?:"keep"|"discard" }',
     advanceItem: '{ ticketId, itemId }',
     completeItem: '{ ticketId, itemId }',
     fireNow: '{ ticketId, itemId, start?:true }',
@@ -2672,9 +2814,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     toggle86: '{ menuId, on:boolean }',
     restock: '{ ing, g }',
     addBatch: '{ ing, tempF, rawG?, cookedG?, endpointC?, holdH?, label?, src?:"cook"|"sample"|"starter" }',
-    logTemp: '{ batchId, tempF }',
-    reheatBatch: '{ batchId, tempF }',
-    startCooling: '{ batchId, g? }',
+    logTemp: '{ batchId, tempF, who? }',
+    reheatBatch: '{ batchId, tempF, who? }',
+    startCooling: '{ batchId, g?, who? }',
+    correctSafety: '{ eventId, note, who }',
     pullBatch: '{ ing, g }',
     keepServing: '{ batchIds:string[], forMin?, until?, who }',
     endKeepServing: '{ batchId, who, note? }',
@@ -2682,8 +2825,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     cancelPlan: '{ planId }',
     snoozeAlert: '{ batchId, forMin }',
     clearSnooze: '{ batchId }',
-    discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other" }',
-    sanitizeDone: '{}',
+    discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other", who? }',
+    sanitizeDone: '{ who? }',
     updateSettings: '{ patch }',
     updateMenuItem: '{ id, patch }',
     addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two" }',
@@ -2719,6 +2862,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   const BATCH_STATUS = { ok: 1, check: 1, reheat: 1, chill: 1, past: 1, discard: 1 };
   const BATCH_KIND = { hot: 1, cold: 1, cooling: 1 };
   const STATUS_OF = { NONE: 'ok', CHECK_TEMP: 'check', REHEAT_IMMEDIATE: 'reheat', CHILL_NOW: 'chill', PAST_QUALITY: 'past', DISCARD_LOCKOUT: 'discard' };
+  // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
+  // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
+  // safetyKeep bucket instead of being dropped.
+  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, cooling_started: 1, sanitize_done: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months, the minimum to keep).
+  const SAFETY_KEEP_MS = 190 * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
 
@@ -2849,7 +2998,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       channels: C.channels.map((c) => ({ id: c.id, warnSec: c.warnSec, breachSec: c.breachSec })),
       undoMs: C.undoMs,
       syncTargetSec: C.syncTargetSec,
-      ui: { theme: 'day', textSize: 'normal', sound: false },
+      ui: { theme: 'day', textSize: 'normal', sound: false, tempUnit: 'F', weightUnit: 'kg' },
       office: { theme: 'ember', pinHash: null },
       alerts: { ladderThresholds: C.alerts ? C.alerts.ladderThresholds : null },
     };
@@ -3203,6 +3352,18 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (ar && ar.length) { const c = ar[ar.length - 1]; if (c.length) return c[c.length - 1].t; }
     return undefined;
   }
+  // Only the safety-log events from a list of events.
+  function safetyOnly(list) { return list.filter((e) => hasOwn(SAFETY_EVENT, e.type)); }
+  // Adds newly dropped safety events to the retention bucket and lets go of entries older than 190 days
+  // (measured from refT, the newest time known). The bucket is never trimmed by size, only by age.
+  function keepSafety(prev, dropped, refT) {
+    const all = (Array.isArray(prev) ? prev : []).concat(dropped);
+    if (!isNum(refT)) return all;
+    const cut = refT - SAFETY_KEEP_MS;
+    let i = 0;
+    while (i < all.length && all[i].t < cut) i++;
+    return i ? all.slice(i) : all;
+  }
   // Adds new events to the log and keeps it small. When the recent window reaches 2048 events, the oldest
   // 1024 move into a frozen archive chunk (F-E2). The whole log is capped at the maxEvents limit by
   // dropping the oldest. owned says the window array is already our private copy. Returns the new window
@@ -3217,12 +3378,14 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     }
     const max = C.limits.maxEvents;
     let total = ev.length; for (const c of ar) total += c.length;
+    // Safety entries among the dropped events are handed back, so the caller can move them to safetyKeep.
+    let dropped = [];
     if (total > max) {
       ar = ar === archive ? ar.slice() : ar;
-      while (total > max && ar.length) { total -= ar[0].length; ar.shift(); }
-      if (total > max) ev = ev.slice(total - max);
+      while (total > max && ar.length) { total -= ar[0].length; dropped = dropped.concat(safetyOnly(ar[0])); ar.shift(); }
+      if (total > max) { dropped = dropped.concat(safetyOnly(ev.slice(0, total - max))); ev = ev.slice(total - max); }
     }
-    return { events: ev, archive: ar };
+    return { events: ev, archive: ar, dropped };
   }
   const FLAT = new WeakMap();
   // Every event, oldest first: archive chunks, then the recent window. The joined list is remembered, so
@@ -3311,6 +3474,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       const ev = this.get('events');
       const r = appendEvents(ev, this.get('eventArchive') || [], this.evs, this.own.has(ev));
       s.events = r.events; s.eventArchive = r.archive;
+      if (r.dropped.length) s.safetyKeep = keepSafety(this.get('safetyKeep'), r.dropped, this.evs[this.evs.length - 1].t);
     }
     if (s.tickets !== this.s0.tickets && !this.pruned) {
       const old = ACTIVE.get(this.s0.tickets);
@@ -3439,7 +3603,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     tx.event('batch_status', { batchId: b.id, from: b.status, to: gt.status, action: gt.action });
   }
   // Throws a batch out: its grams become waste, it can never be served again, and the lost cost is logged.
-  function discardInto(tx, bi, reason) {
+  function discardInto(tx, bi, reason, who) {
     const b = tx.get('batches')[bi];
     const w = tx.batch(bi);
     const g0 = b.remainingG > 0 ? b.remainingG : 0;
@@ -3448,7 +3612,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const ing = ingMap(tx.get('ingredients')).get(b.ing);
     const unit = isNum(b.costPerCookedKg) ? b.costPerCookedKg / 1000 : nominalUnitCost(ing);
     tx.event('batch_status', { batchId: b.id, from: b.status, to: 'discard', action: 'DISCARD_LOCKOUT' });
-    tx.event('batch_discard', { batchId: b.id, ing: b.ing, g: g0, reason, cost: round(g0 * unit, 4) });
+    tx.event('batch_discard', whoField({ batchId: b.id, ing: b.ing, g: g0, reason, cost: round(g0 * unit, 4) }, who));
   }
   // Re-runs the gate on every batch that is not already discarded (used when the safety settings change).
   function refreshAllBatches(tx) {
@@ -3901,6 +4065,53 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     tx.info = { orderId: o.id };
     return 'ok';
   };
+  // Closes the service day that "now" falls in. Refused while any order is still open (each must be paid or
+  // voided first). Adds up that day's paid orders by cash, card and other, counts voided orders and tickets,
+  // optionally throws out every batch still in the cabinet, and logs one day_closed event. Closing again the
+  // same day is allowed: the new event covers the whole day, including late sales.
+  A.closeDay = function (tx, p) {
+    const lv = p.leftovers === undefined || p.leftovers === null ? 'keep' : p.leftovers;
+    if (lv !== 'keep' && lv !== 'discard') { tx.info.key = 'leftovers'; return 'badLeftovers'; }
+    const orders = tx.get('orders');
+    const open = orders.filter((o) => o.status === 'open');
+    if (open.length) {
+      tx.info = { count: open.length, orderIds: open.slice(0, 5).map((o) => o.id), customers: open.slice(0, 5).map((o) => o.customer) };
+      return 'ordersStillOpen';
+    }
+    const dsh = tx.get('settings').service.dayStartHour;
+    const day = U.serviceDate(tx.now, dsh);
+    const sums = {};
+    for (const m of C.payMethods) sums[m.id] = { count: 0, subtotal: 0, discount: 0, tax: 0, total: 0, tip: 0 };
+    let paid = 0, voidedOrders = 0, subtotal = 0, discount = 0, tax = 0, total = 0, tip = 0;
+    for (const o of orders) {
+      if (o.status === 'paid' && isNum(o.paidAt) && U.serviceDate(o.paidAt, dsh) === day && hasOwn(sums, o.method)) {
+        const T = o.totals, m = sums[o.method];
+        paid++; m.count++;
+        m.subtotal = cents(m.subtotal + T.subtotal); m.discount = cents(m.discount + T.discount); m.tax = cents(m.tax + T.tax); m.total = cents(m.total + T.total); m.tip = cents(m.tip + o.tip);
+        subtotal = cents(subtotal + T.subtotal); discount = cents(discount + T.discount); tax = cents(tax + T.tax); total = cents(total + T.total); tip = cents(tip + o.tip);
+      } else if (o.status === 'voided' && isNum(o.voidedAt) && U.serviceDate(o.voidedAt, dsh) === day) voidedOrders++;
+    }
+    let tickets = 0, voidedTickets = 0;
+    for (const t of tx.get('tickets')) {
+      if (t.serviceDate !== day) continue;
+      if (t.status === 'voided') voidedTickets++; else tickets++;
+    }
+    // Leftovers: with "discard", every batch that still holds food is thrown out (a plain discard, not a safety one).
+    let discarded = 0, discardedG = 0;
+    if (lv === 'discard') {
+      const bs = tx.get('batches');
+      for (let i = 0; i < bs.length; i++) {
+        if (bs[i].status === 'discard' || !(bs[i].remainingG > 0)) continue;
+        discarded++; discardedG += bs[i].remainingG;
+        discardInto(tx, i, 'other');
+      }
+    }
+    const prior = tx.get('lastClose');
+    tx.event('day_closed', { day, orders: paid, voidedOrders, tickets, voidedTickets, subtotal, discount, tax, total, tip, byMethod: sums, leftovers: lv, discarded, discardedG: round(discardedG, 1), again: !!(prior && prior.day === day) });
+    tx.set('lastClose', { day, at: tx.lastT, leftovers: lv });
+    tx.info = { day, orders: paid, total, tip, discarded };
+    return 'ok';
+  };
   // When there are more orders than max, drops the oldest paid or voided ones (never an open one, and never one
   // that still has a ticket on the board) to about 2 percent under max.
   function pruneOrdersInto(tx, max) {
@@ -4260,6 +4471,14 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     return 'ok';
   };
 
+  // Reads the optional initials on a safety action. Returns '' when none were given (old screens and old saves
+  // have none), the trimmed initials, or null when they are unusable (not text, or over 12 characters).
+  function readWho(p) {
+    if (p.who === undefined || p.who === null) return '';
+    if (typeof p.who !== 'string') return null;
+    const w = p.who.trim();
+    return w.length > 12 ? null : w;
+  }
   // Records a temperature reading, then re-runs the gate. A hot reading below the hot-hold limit, or a cold
   // one above its limit, starts the out-of-range clock (outSince); an in-range cold reading clears it. A
   // cooling batch records stage 1 and final. Also logs whether the check was on time.
@@ -4268,6 +4487,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const bi = findBatchIdx(bs, p.batchId);
     if (bi < 0) return 'unknownBatch';
     if (!isNum(p.tempF) || p.tempF < 32 || p.tempF > 300) return 'badTemp';
+    const who = readWho(p);
+    if (who === null) return 'badWho';
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
     const S = safetyOf(tx.get('settings'));
@@ -4277,7 +4498,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const lateMs = Math.max(0, tx.now - dueAt);
     const w = tx.batch(bi);
     const t = stampAfter(b.lastTempAt, stampAfter(b.enteredAt, tx.now));
-    const temps = (b.temps || []).concat([{ t, f }]);
+    const temps = (b.temps || []).concat([who ? { t, f, who } : { t, f }]);
     w.temps = temps.length > MAX_TEMPS ? temps.slice(temps.length - MAX_TEMPS) : temps;
     w.lastTempF = f; w.lastTempAt = t;
     // What a reading means depends on the kind of batch: cooling, cold or hot.
@@ -4294,8 +4515,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       // a logged reading at reheat temperature inside the grace window IS the reheat (honest input is never refused)
       delete w.outSince; w.reheats = (b.reheats || 0) + 1; reheated = true;
     }
-    tx.event('temp_logged', { batchId: b.id, f, onTime: lateMs === 0, lateMs });
-    if (reheated) tx.event('batch_reheat', { batchId: b.id, f });
+    tx.event('temp_logged', whoField({ batchId: b.id, f, onTime: lateMs === 0, lateMs }, who));
+    if (reheated) tx.event('batch_reheat', whoField({ batchId: b.id, f }, who));
     refreshBatch(tx, bi);
     const nb = tx.get('batches')[bi];
     tx.info = { batchId: b.id, status: nb.status, canServe: nb.canServe, onTime: lateMs === 0, lateMs, reheated };
@@ -4310,6 +4531,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const bi = findBatchIdx(bs, p.batchId);
     if (bi < 0) return 'unknownBatch';
     if (!isNum(p.tempF) || p.tempF < 32 || p.tempF > 300) return 'badTemp';
+    const who = readWho(p);
+    if (who === null) return 'badWho';
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
     const S = safetyOf(tx.get('settings'));
@@ -4327,10 +4550,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       delete w.outSince;
     }
     w.reheats = (b.reheats || 0) + 1;
-    const temps = (b.temps || []).concat([{ t, f: p.tempF }]);
+    const temps = (b.temps || []).concat([who ? { t, f: p.tempF, who } : { t, f: p.tempF }]);
     w.temps = temps.length > MAX_TEMPS ? temps.slice(temps.length - MAX_TEMPS) : temps;
     w.lastTempF = p.tempF; w.lastTempAt = t;
-    tx.event('batch_reheat', { batchId: b.id, f: p.tempF });
+    tx.event('batch_reheat', whoField({ batchId: b.id, f: p.tempF }, who));
     refreshBatch(tx, bi);
     const nb = tx.get('batches')[bi];
     tx.info = { batchId: b.id, status: nb.status, canServe: nb.canServe };
@@ -4349,6 +4572,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (!(b.remainingG > 0)) return 'nothingToDo';
     let gm = p.g == null ? b.remainingG : p.g;
     if (!isNum(gm) || gm <= 0 || gm > b.remainingG + 0.5) return 'badWeight';
+    const who = readWho(p);
+    if (who === null) return 'badWho';
     gm = Math.min(gm, b.remainingG);
     const w = tx.batch(bi);
     w.remainingG = b.remainingG - gm <= EPS ? 0 : b.remainingG - gm;
@@ -4364,7 +4589,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     tx.own.add(nb);
     tx.mut('batches').push(nb);
     tx.batchTouched = true;
-    tx.event('cooling_started', { batchId: id, from: b.id, ing: b.ing, g: gm });
+    tx.event('cooling_started', whoField({ batchId: id, from: b.id, ing: b.ing, g: gm }, who));
     refreshBatch(tx, tx.get('batches').length - 1);
     tx.info = { batchId: id, g: gm };
     return 'ok';
@@ -4424,6 +4649,42 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     tx.info = { batchId: b.id };
     return 'ok';
   };
+
+  // Adds the initials to an event's fields only when there are some, so old-style events keep their exact shape.
+  function whoField(fields, who) { if (who) fields.who = who; return fields; }
+  // Adds a correction to the safety log: a note and the initials of the person making it, pointing at an
+  // earlier entry. WATCH OUT: the original entry is never edited or removed; corrections are new entries, and
+  // an entry can be corrected more than once.
+  A.correctSafety = function (tx, p) {
+    const who = typeof p.who === 'string' ? p.who.trim() : '';
+    if (!who || who.length > 12) return 'whoRequired';
+    if (typeof p.note !== 'string' || p.note.length > 4 * C.limits.maxNoteLen) return 'noteTooLong';
+    const note = cleanText(p.note);
+    if (!note) return 'reasonRequired';
+    if (note.length > C.limits.maxNoteLen) return 'noteTooLong';
+    if (typeof p.eventId !== 'string') return 'unknownSafetyEntry';
+    const evs = allEvents(tx.state());
+    let hit = null;
+    for (let i = evs.length - 1; i >= 0; i--) if (evs[i].id === p.eventId) { hit = evs[i]; break; }
+    if (!hit || !hasOwn(SAFETY_EVENT, hit.type)) return 'unknownSafetyEntry';
+    const f = { of: hit.id, ofType: hit.type, who, note };
+    if (typeof hit.batchId === 'string') f.batchId = hit.batchId;
+    tx.event('safety_correction', f);
+    tx.info = { of: hit.id };
+    return 'ok';
+  };
+  // The safety log, oldest first: each entry is { event, corrections } where corrections are the later
+  // safety_correction entries that point at it. Read-only; nothing here changes the state.
+  function safetyLog(state) {
+    const out = [], byId = new Map();
+    if (!isState(state)) return out;
+    for (const e of (Array.isArray(state.safetyKeep) ? state.safetyKeep : []).concat(allEvents(state))) {
+      // A correction hangs under the entry it points at; every other safety entry is a row of its own.
+      if (e.type === 'safety_correction' && byId.has(e.of)) byId.get(e.of).corrections.push(e);
+      else if (hasOwn(SAFETY_EVENT, e.type)) { const row = { event: e, corrections: [] }; out.push(row); byId.set(e.id, row); }
+    }
+    return out;
+  }
 
   // Planned batches: "this comes off the smoker at HH:MM". Supply for the close projection from the moment it has
   // rested, never stock: it creates no 86 and counts in no ledger. The real batch of the same product used
@@ -4514,7 +4775,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (typeof p.reason !== 'string' || DISCARD_REASONS.indexOf(p.reason) < 0) return 'reasonRequired';
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
-    discardInto(tx, bi, p.reason);
+    const who = readWho(p);
+    if (who === null) return 'badWho';
+    discardInto(tx, bi, p.reason, who);
     const nb = tx.get('batches')[bi];
     pushUndo(tx, 'discard', (b.label || 'Batch') + ' discarded', { batchId: b.id, before: b, discardedAt: nb.discardedAt });
     tx.info = { batchId: b.id, g: nb.wasteG };
@@ -4523,14 +4786,16 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
   // Logs that food-contact surfaces were sanitised and sets the next due time. Records whether it was on
   // time. Overdue is a warning only, never a block.
-  A.sanitizeDone = function (tx) {
+  A.sanitizeDone = function (tx, p) {
+    const who = readWho(p || {});
+    if (who === null) return 'badWho';
     const S = safetyOf(tx.get('settings'));
     const cur = tx.get('sanitize') || {};
     const due = sanitizeDueEff(tx.get('settings'), cur, tx.now);
     const lateMs = isNum(due) ? Math.max(0, tx.now - due) : 0;
     const lastAt = stampAfter(cur.lastAt, tx.now);
     tx.set('sanitize', { lastAt, dueAt: lastAt + S.sanitizeEveryH * H });
-    tx.event('sanitize_done', { onTime: lateMs === 0, lateMs });
+    tx.event('sanitize_done', whoField({ onTime: lateMs === 0, lateMs }, who));
     pushUndo(tx, 'sanitize', 'Sanitize logged', { before: cur, afterLastAt: lastAt });
     tx.info = { onTime: lateMs === 0, lateMs };
     return 'ok';
@@ -4553,7 +4818,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
     syncTargetSec: R(10, 600),
-    ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, sound: { t: 'bool' } },
+    ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, sound: { t: 'bool' }, tempUnit: { t: 'enum', v: ['F', 'C'] }, weightUnit: { t: 'enum', v: ['kg', 'lb'] } },
     office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' } },
     alerts: { ladderThresholds: { t: 'ladder' } },
   };
@@ -4794,12 +5059,15 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   A.resetLive = function (tx, p) {
     const keep = p.keepSettings == null ? true : p.keepSettings;
     if (typeof keep !== 'boolean') { tx.info.key = 'keepSettings'; return 'badPatch'; }
+    // starter false starts the pit empty; stagger true gives the demo batches different ages. Both default to the old behaviour.
+    for (const k of ['starter', 'stagger']) if (p[k] != null && typeof p[k] !== 'boolean') { tx.info.key = k; return 'badPatch'; }
     const s = tx.s0;
     const ns = newState({
-      now: tx.now, seq: s.seq,
+      now: tx.now, seq: s.seq, starter: p.starter !== false, stagger: p.stagger === true,
       settings: keep ? s.settings : undefined, menu: keep ? s.menu : undefined, ingredients: keep ? s.ingredients : undefined, learned: keep ? s.learned : undefined,
     });
     for (const k of Object.keys(ns)) tx.set(k, ns[k]);
+    if (hasOwn(s, 'lastClose')) tx.set('lastClose', undefined); // a fresh board has never been closed
     tx.info = { keepSettings: keep };
     return 'ok';
   };
@@ -5011,6 +5279,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (isInt(lim.maxEvents) && lim.maxEvents >= 0) {
       let flat = allEvents(state);
       if (flat.length > lim.maxEvents) {
+        const gone = safetyOnly(flat.slice(0, flat.length - lim.maxEvents));
+        if (gone.length) tx.set('safetyKeep', keepSafety(state.safetyKeep, gone, flat[flat.length - 1].t));
         flat = flat.slice(flat.length - lim.maxEvents);
         const ar = [];
         while (flat.length >= 2 * EVENT_CHUNK) { ar.push(flat.slice(0, EVENT_CHUNK)); flat = flat.slice(EVENT_CHUNK); }
@@ -5181,7 +5451,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
    * 14. newState
    * ==================================================================================================== */
   // Builds a fresh state: starter stock and one starter batch per TCS ingredient (155 F hot, 38 F cold)
-  // unless empty is true. The ledger opens at that stock. Sanitising is due at once, because nobody knows
+  // unless empty is true. With starter false the plain stock stays at par but the pit and cabinet start empty
+  // (a real kitchen logs what it really cooked, so nothing is made up). The ledger opens at that stock. Sanitising is due at once, because nobody knows
   // when it was last done. The options let a reset keep settings, menu, ingredients, learned times and id
   // counters.
   function newState(opts) {
@@ -5199,7 +5470,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     for (const ing of ingredients) {
       ledger[ing.id] = { open: 0, in: 0, pulled: 0, prunedUsed: 0, prunedWaste: 0, prunedRemain: 0, dropped: 0 };
       if (!ing.tcs) { stock[ing.id] = opts.empty ? 0 : isNum(ing.parG) && ing.parG > 0 ? ing.parG : 0; ledger[ing.id].open = stock[ing.id]; continue; }
-      if (opts.empty || !(ing.parG > 0)) continue;
+      if (opts.empty || opts.starter === false || !(ing.parG > 0)) continue;
       // starter batches: labelled src 'starter' (demo opening stock) with a starter reading so the line can open
       const hot = ing.hold !== 'cold';
       const f = hot ? 155 : 38;
@@ -5219,7 +5490,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // The whole state. The clock is not stored here; the store keeps it.
     const st = {
       v: 1, rev: 0, settings, menu, ingredients, tickets: [], orders: [], batches, stock, manual86: {}, avail: {}, syncs: [], planned: [], alertSnoozes: {},
-      learned: isObj(opts.learned) ? opts.learned : {}, sanitize: { dueAt: now }, seq, events: [], eventArchive: [], undo: [], ledger,
+      learned: isObj(opts.learned) ? opts.learned : {}, sanitize: { dueAt: now }, seq, events: [], eventArchive: [], safetyKeep: [], undo: [], ledger,
     };
     const av = computeAvail(st);
     for (const k of Object.keys(av)) av[k].since = now;
@@ -5502,6 +5773,29 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // I9
     let lt = -Infinity;
     for (const e of allEvents(state)) { if (!(e.t >= lt)) { add('I9 event ' + e.id + ' t goes backwards'); break; } lt = e.t; }
+    // I17: lastClose, when present, names a real date, a time and a leftovers choice, and no order is open
+    // that was closed over (a later open order is fine, so only the shape is checked).
+    if (state.lastClose !== undefined) {
+      const lc = state.lastClose;
+      if (!isObj(lc) || typeof lc.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(lc.day) || !isNum(lc.at) || (lc.leftovers !== 'keep' && lc.leftovers !== 'discard')) add('I17 lastClose is malformed');
+    }
+    // I19: the safety bucket holds only safety entries, oldest first.
+    if (state.safetyKeep !== undefined) {
+      if (!Array.isArray(state.safetyKeep)) add('I19 safetyKeep is not a list');
+      else {
+        let pt = -Infinity;
+        for (const e of state.safetyKeep) {
+          if (!isObj(e) || typeof e.id !== 'string' || !isNum(e.t) || !hasOwn(SAFETY_EVENT, e.type)) { add('I19 safetyKeep holds a non-safety entry'); break; }
+          if (e.t < pt) { add('I19 safetyKeep goes backwards at ' + e.id); break; }
+          pt = e.t;
+        }
+      }
+    }
+    // I18: initials on a safety entry are 1 to 12 characters; a correction names who, says why and points at an earlier entry.
+    for (const e of allEvents(state)) {
+      if (e.who !== undefined && !(typeof e.who === 'string' && e.who.length >= 1 && e.who.length <= 12)) { add('I18 event ' + e.id + ' bad initials'); break; }
+      if (e.type === 'safety_correction' && !(typeof e.who === 'string' && typeof e.note === 'string' && e.note && typeof e.of === 'string')) { add('I18 correction ' + e.id + ' incomplete'); break; }
+    }
     // I14
     const mm = menuMap(state.menu);
     for (const id of Object.keys(state.learned || {})) {
@@ -5661,7 +5955,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
         if (typeof out.canServe !== 'boolean' || out.kind === 'cooling') out.canServe = out.kind === 'cooling' ? false : !!out.canServe;
         if (!isInt(out.reheats) || out.reheats < 0) out.reheats = 0;
         if (!Array.isArray(out.temps)) out.temps = [];
-        out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS);
+        out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS)
+          .map((x) => (typeof x.who === 'string' && x.who.length >= 1 && x.who.length <= 12 ? { t: x.t, f: x.f, who: x.who } : { t: x.t, f: x.f }));
         for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
         if (!hasOwn(SRC_BATCH, out.src)) out.src = 'cook';
         bIds.add(b.id);
@@ -5710,6 +6005,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       for (const e of flat) { if (!evOk(e)) { bad++; continue; } if (goodEv.length && e.t < goodEv[goodEv.length - 1].t) unsorted = true; goodEv.push(e); }
       if (bad) repaired.push('dropped ' + bad + ' bad events');
       if (unsorted) { goodEv.sort((a, b) => a.t - b.t); repaired.push('events re-sorted by time'); }
+      // Safety entries pushed out by the event cap, and any saved safetyKeep bucket, stay in the bucket.
+      const overflow = goodEv.length > C.limits.maxEvents ? safetyOnly(goodEv.slice(0, goodEv.length - C.limits.maxEvents)) : [];
+      const evIds = new Set(goodEv.map((e) => e.id));
+      const savedKeep = Array.isArray(st.safetyKeep) ? st.safetyKeep.filter((e) => evOk(e) && hasOwn(SAFETY_EVENT, e.type) && !evIds.has(e.id)) : [];
+      savedKeep.sort((a, b) => a.t - b.t);
+      const keepList = keepSafety(savedKeep, overflow, goodEv.length ? goodEv[goodEv.length - 1].t : undefined);
       let rest = goodEv.length > C.limits.maxEvents ? goodEv.slice(goodEv.length - C.limits.maxEvents) : goodEv;
       while (rest.length >= 2 * EVENT_CHUNK) { archive.push(rest.slice(0, EVENT_CHUNK)); rest = rest.slice(EVENT_CHUNK); }
       events = rest;
@@ -5727,7 +6028,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       // Counters never fall below the highest id already used, so a new id can never repeat an old one.
       const so = isObj(st.seq) ? st.seq : {};
       const maxId = (arr, pre) => { let m = 0; for (const x of arr) { const id = x && x.id; if (typeof id === 'string' && id.indexOf(pre) === 0) { const n = Number(id.slice(pre.length)); if (isInt(n) && n > m) m = n; } } return m; };
-      const allEv = archive.reduce((a, c) => a.concat(c), []).concat(events);
+      const allEv = keepList.concat(archive.reduce((a, c) => a.concat(c), [])).concat(events);
       const seq = {
         ticket: Math.max(isInt(so.ticket) ? so.ticket : 0, maxId(tickets, 't_')),
         order: Math.max(isInt(so.order) ? so.order : 0, maxId(orders, 'o_')),
@@ -5749,7 +6050,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       sanitize.dueAt = isNum(sz.dueAt) ? sz.dueAt : isNum(sanitize.lastAt) ? sanitize.lastAt + settings.safety.sanitizeEveryH * H : 0;
       const out = {
         v: 1, rev: isInt(st.rev) && st.rev >= 0 ? st.rev : 0, settings, menu, ingredients, tickets, orders, batches, stock, manual86, avail: {}, syncs, planned, alertSnoozes, learned, sanitize, seq,
-        events, eventArchive: archive, undo: [], ledger: {},
+        events, eventArchive: archive, safetyKeep: keepList, undo: [], ledger: {},
       };
       // ledger: keep stored counters; if they do not balance, re-open the books at the current physical stock
       const ledger = {};
@@ -5761,6 +6062,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
         ledger[ing.id] = L;
       }
       out.ledger = ledger;
+      // lastClose (end-of-day marker): kept only when well formed; older saves simply have none.
+      const lcs = st.lastClose;
+      if (isObj(lcs) && typeof lcs.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lcs.day) && isNum(lcs.at) && (lcs.leftovers === 'keep' || lcs.leftovers === 'discard')) out.lastClose = { day: lcs.day, at: lcs.at, leftovers: lcs.leftovers };
+      else if (lcs !== undefined) repaired.push('lastClose dropped');
       for (const x of ledgerCheck(out)) { out.ledger[x.ing].open += x.have - x.expect; repaired.push('ledger ' + x.ing + ' re-opened at current stock'); }
       // availability (derived)
       const prevAvail = isObj(st.avail) ? st.avail : {};
@@ -5873,6 +6178,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
         const mi = typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
         return mi + ' is ' + why + '. Take it off the order or pick something else.';
       }
+      case 'ordersStillOpen': return isInt(i.count) && i.count > 0 ? i.count + ' ' + U.plural(i.count, 'order') + ' still open. Take payment on ' + (i.count === 1 ? 'it' : 'each one') + ', or void ' + (i.count === 1 ? 'it' : 'them') + ', then close the day again.' : REPORTS.ordersStillOpen;
       case 'outOfBounds': return isNum(i.min) && isNum(i.max) ? 'That value is outside the allowed range (' + i.min + ' to ' + i.max + '). Enter a value inside it.' : REPORTS.outOfBounds;
       case 'nothingToDo': return i.why === 'onDeck' ? 'That item is still waiting for its start time. Tap Start now to begin it early.' : i.why === 'notBelow' ? 'This batch is not below the hold temperature, so it does not need a reheat.' : 'Nothing to change.';
       default: return hasOwn(REPORTS, report) ? REPORTS[report] : REPORTS.badPatch;
@@ -5886,7 +6192,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, defaultSettings, describe, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, defaultSettings, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.
@@ -5920,6 +6226,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // A saved copy that fails the check is parked here instead of being deleted, so nothing is lost.
   const CORRUPT_KEY = 'smokebox.v1.corrupt';
   const SID_KEY = 'smokebox.v1.sid';
+  // The actions this device has done that no server has confirmed yet (only used when a transport can push).
+  const OUTBOX_KEY = 'smokebox.v1.outbox';
+  const OUTBOX_MAX = 5000; // oldest unconfirmed actions are dropped past this, and st.outboxDropped says so
   // 20 million characters: bigger backups are refused on both export and import (Pitcall finding PO4c).
   const MAX_TEXT = 20e6; // characters; backups above this are refused (Pitcall PO4c)
   // 400 ms: wait this long after the last change before saving, so a burst of taps is one save.
@@ -5941,18 +6250,22 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   let lastNow = -Infinity;
   let subs = new Set(), tickSubs = new Set();
   let notifyPending = false;
-  let interval = null, saveTimer = null, bc = null;
+  let interval = null, saveTimer = null, tr = null;
   let pendingBroadcast = false;
   // Two tabs saving at the same moment must not drop each other's work (F-L9). baseSid names the save this tab last
   // loaded or wrote; pending lists this tab's actions since then, so they can be replayed on top of a newer save.
   let baseSid = null, pending = [], skipRebase = false, sidN = 0;
   let dirty = false; // unsaved changes exist (page-lifecycle flushes only write when dirty)
   let listeners = [];
+  // Server-ready bookkeeping. opN numbers this tab's actions. outbox is the saved list of unconfirmed
+  // actions. seenOps remembers opIds already applied so a repeat delivery does nothing. pushing and
+  // retryAt keep one push in flight with a back-off after a failure.
+  let opN = 0, outbox = [], seenOps = new Set(), pushing = false, retryAt = 0, retryMs = 2000;
   // simRef is the simulator (if attached). last is the result of the most recent action. st is the save
   // status. tabId names this tab in tab-sync messages.
   let simRef = null;
   let last = null;
-  let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [] };
+  let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0 };
   const tabId = 'tab_' + Math.floor(Math.random() * 1e9).toString(36);
 
   /* ---------- clock: now() = base + (real - realBase) * speed, clamped so it never goes backwards ---------- */
@@ -6032,7 +6345,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (saveTimer || !storage) return;
     // Once a shared save exists and other tabs may be open, each tab waits a little differently, so two tabs rarely write in the
     // same instant. The very first save of a new board is not delayed, so a second tab opened right after sees it.
-    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, bc && baseSid ? SAVE_MS + Math.floor(Math.random() * 300) : SAVE_MS);
+    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, tr && baseSid ? SAVE_MS + Math.floor(Math.random() * 300) : SAVE_MS);
   }
   // Saves the state to the browser right now and returns true if it worked. If the browser says it is full,
   // it retries with less history (oldest finished tickets and events first), halving up to 12 times. After a
@@ -6068,7 +6381,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       try { storage.set(SID_KEY, sid); baseSid = sid; } catch (e) { sid = null; }
       pending = [];
     }
-    if (ok && pendingBroadcast && bc) { try { bc.postMessage({ type: 'saved', rev: state.rev, tab: tabId, sid }); } catch (e) { /* ignore */ } }
+    if (ok && pendingBroadcast && tr) { try { tr.post({ type: 'saved', rev: state.rev, tab: tabId, sid }); } catch (e) { /* ignore */ } }
     pendingBroadcast = false;
     return ok;
   }
@@ -6105,18 +6418,22 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (!theirs) return;
     atLeast(lastStamp(theirs));
     state = E().tick(replayOnto(theirs), now()).state;
+    syncUnits();
     scheduleNotify();
   }
   // Listeners for alert messages from other tabs.
   const bcListeners = new Set();
   // Sends a message to the other tabs of this browser. Returns false when there is no channel (then each tab acts alone).
-  function broadcast(msg) { if (!bc) return false; try { bc.postMessage(Object.assign({}, msg, { tab: tabId })); return true; } catch (e) { return false; } }
+  function broadcast(msg) { if (!tr) return false; try { return tr.post(Object.assign({}, msg, { tab: tabId })) !== false; } catch (e) { return false; } }
   // Registers fn for messages from other tabs; returns a function that stops it.
   function onBroadcast(fn) { bcListeners.add(fn); return () => bcListeners.delete(fn); }
   // Another tab announced a save. With nothing unsaved here, adopt its copy and redraw. With unsaved actions
   // here, replay them on top of its copy and save the merged result. Ignores our own messages.
-  function onMessage(ev) {
-    const d = ev && ev.data;
+  function onMessage(d) {
+    // A server (or another device) can hand over a confirmation or an action done elsewhere.
+    if (d && d.tab !== tabId && d.type === 'ack') { ackOps(d.opIds); return; }
+    if (d && d.tab !== tabId && d.type === 'action') { applyRemote(d); return; }
+    if (d && d.tab !== tabId && d.type === 'state') { adoptState(d); return; }
     // Messages about alerts (sound leader, played, acknowledged) go to whoever listens; they are not saves.
     if (d && d.tab !== tabId && typeof d.type === 'string' && d.type.indexOf('alert-') === 0) { bcListeners.forEach((fn) => { try { fn(d); } catch (e) { /* a listener must not stop the others */ } }); return; }
     if (!d || d.tab === tabId || d.type !== 'saved' || !storage) return;
@@ -6129,8 +6446,166 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     atLeast(lastStamp(theirs));
     if (d.sid) baseSid = d.sid;
     if (pending.length) { state = replayOnto(theirs); schedulePersist(true); } else state = theirs;
-    state = E().tick(state, now()).state;
+    state = E().tick(state, now()).state; syncUnits();
     scheduleNotify();
+  }
+
+  /* ---------- transport: how this store talks to other tabs, other devices and a server ---------- */
+  /*
+   * TRANSPORT INTERFACE (for the hub prototype and any future server link)
+   *
+   * A transport is a plain object. Pass one to SB.store.init({ transport }) either as the object itself or as a
+   * function that returns it. With no transport given, the store uses channelTransport() (same-browser tabs).
+   *
+   *   name                string, for debugging.
+   *   open(deliver)       Start. Call deliver(msg) for every message that arrives from outside. Return false
+   *                       when the transport cannot work here (the store then runs alone, like noSync).
+   *   post(msg)           Best-effort broadcast of a small message to the peers. Return false if it was not
+   *                       handed off. Never throw. The store adds msg.tab (this tab's id).
+   *   push(entries)       OPTIONAL. Makes the store keep a saved outbox (key smokebox.v1.outbox). entries is a
+   *                       copy of the unconfirmed list, oldest first: [{ opId, type, payload, now }]. Return
+   *                       (or resolve to) an array of opIds the server accepted, or { acked: [opIds] }. A
+   *                       rejection, a throw or no answer means "try later": the store retries about every 2 s,
+   *                       backing off to 60 s. The server must treat a repeated opId as already done.
+   *   close()             Stop and release resources. Must be safe to call twice.
+   *
+   * Messages coming in through deliver(msg), all objects with a string type:
+   *   { type: 'ack', opIds: [...] }                 the server confirms these actions; they leave the outbox.
+   *   { type: 'action', opId, actionType, payload, now }   an action done on another device. It is applied
+   *                       once (repeats of an opId are ignored), is not queued again, and a refusal is dropped.
+   *   { type: 'state', state, opIds }               the authoritative state (an object or backup text). The
+   *                       store adopts it, treats opIds as confirmed (they leave the outbox), then replays any
+   *                       actions still in the outbox on top, so a device's own unconfirmed work is kept while
+   *                       its numbering follows the hub. An invalid state is ignored.
+   *   { type: 'saved', ... } and { type: 'alert-*', ... }  same-browser tab messages (see the tab channel).
+   * Messages carrying tab equal to this tab's id are ignored, so a transport may echo.
+   *
+   * Every dispatched action gets an opId (tabId + ':' + a counter, unique per page load) returned by
+   * dispatchEx and kept in lastResult(). Only successful actions from a person are queued (not simulator ones).
+   * The engine itself never sees an opId: it stays pure.
+   *
+   * Helpers: store.outbox() copies the queue, store.syncNow() pushes now, store.ackOps(ids) confirms by hand.
+   */
+  // Builds the default transport: a BroadcastChannel to the other tabs of this browser (name defaults to smokebox).
+  function channelTransport(name) {
+    let ch = null;
+    return {
+      name: 'broadcast-channel',
+      // Opens the channel; false when this browser has none.
+      open(deliver) {
+        if (typeof g.BroadcastChannel !== 'function') return false;
+        // Messages arrive wrapped in an event; hand the store just the data.
+        const unwrap = (ev) => deliver(ev && ev.data);
+        try { ch = new g.BroadcastChannel(name || 'smokebox'); ch.onmessage = unwrap; return true; } catch (e) { ch = null; return false; }
+      },
+      // Sends one message to the other tabs.
+      post(msg) { if (!ch) return false; try { ch.postMessage(msg); return true; } catch (e) { return false; } },
+      // Closes the channel and lets go of it.
+      close() { if (ch) { try { ch.close(); } catch (e) { /* ignore */ } ch = null; } },
+    };
+  }
+  // Starts the chosen transport (a given one, or the tab channel) and keeps it in tr when it opened.
+  function openTransport(given) {
+    let t = given;
+    try { if (typeof t === 'function') t = t(); } catch (e) { t = null; }
+    if (!t) t = channelTransport();
+    if (typeof t.open !== 'function' || typeof t.post !== 'function') return;
+    let ok = false;
+    try { ok = t.open((msg) => { if (tr === t && msg && typeof msg === 'object') onMessage(msg); }) !== false; } catch (e) { ok = false; }
+    if (!ok) { try { if (typeof t.close === 'function') t.close(); } catch (e) { /* ignore */ } return; }
+    tr = t;
+    if (typeof t.push === 'function') loadOutbox();
+  }
+  // Reads the saved outbox into memory (only entries that look right).
+  function loadOutbox() {
+    let raw = null;
+    try { raw = storage.get(OUTBOX_KEY, null); } catch (e) { raw = null; }
+    outbox = Array.isArray(raw) ? raw.filter((x) => x && typeof x.opId === 'string' && typeof x.type === 'string' && isNum(x.now)) : [];
+  }
+  // Saves the outbox so a reload or a dead connection does not lose unconfirmed actions. Merges with what other
+  // tabs wrote (by opId), so two tabs do not overwrite each other.
+  function saveOutbox() {
+    if (!storage) return;
+    try {
+      const other = storage.get(OUTBOX_KEY, null);
+      const have = new Set(outbox.map((x) => x.opId));
+      if (Array.isArray(other)) for (const x of other) if (x && typeof x.opId === 'string' && !have.has(x.opId) && !acked.has(x.opId)) { outbox.push(x); have.add(x.opId); }
+      outbox.sort((a, b) => a.now - b.now);
+      while (outbox.length > OUTBOX_MAX) { outbox.shift(); st.outboxDropped++; }
+      storage.set(OUTBOX_KEY, outbox);
+    } catch (e) { /* a full or blocked store keeps the in-memory queue */ }
+  }
+  // opIds confirmed during this page load, so a merge never brings a confirmed action back.
+  const acked = new Set();
+  // Adds one successful action to the outbox when the transport can push. Does nothing otherwise.
+  function enqueueOp(entry) {
+    if (!tr || typeof tr.push !== 'function') return;
+    outbox.push(entry);
+    saveOutbox();
+    retryAt = 0;
+    if (typeof setTimeout === 'function') setTimeout(pushOutbox, 0);
+  }
+  // Removes confirmed actions from the outbox and saves it. Unknown ids are ignored.
+  function ackOps(ids) {
+    if (!Array.isArray(ids) || !ids.length) return;
+    const set = new Set(ids.filter((x) => typeof x === 'string'));
+    for (const id of set) acked.add(id);
+    outbox = outbox.filter((x) => !set.has(x.opId));
+    saveOutbox();
+    retryMs = 2000;
+  }
+  // Offers the whole outbox to the transport, one push at a time. A failure waits retryMs (2 s, doubling to 60 s).
+  function pushOutbox() {
+    if (!tr || typeof tr.push !== 'function' || pushing || !outbox.length) return;
+    if (realNow() < retryAt) return;
+    pushing = true;
+    const t = tr;
+    // A failed push: wait longer (2 s, doubling up to 60 s) before the next try.
+    const fail = () => { pushing = false; retryAt = realNow() + retryMs; retryMs = Math.min(60000, retryMs * 2); };
+    // The transport answered: confirmed ids leave the outbox, anything else counts as a failure.
+    const done = (res) => {
+      if (tr !== t) { pushing = false; return; }
+      pushing = false;
+      const ids = Array.isArray(res) ? res : res && Array.isArray(res.acked) ? res.acked : null;
+      if (ids) ackOps(ids); else fail();
+    };
+    try {
+      const out = t.push(outbox.map((x) => Object.assign({}, x)));
+      if (out && typeof out.then === 'function') out.then(done, fail); else done(out);
+    } catch (e) { fail(); }
+  }
+  // Takes the authoritative state sent by a hub: confirmed actions leave the outbox, the state replaces ours,
+  // and actions still unconfirmed are replayed on top (a refused one is dropped). Ticket numbers then follow
+  // the hub's order, not the order this device did things in.
+  function adoptState(d) {
+    if (!state || !storage) return;
+    const v = E().validateBackup(d.state);
+    if (!v.ok) return;
+    const ids = Array.isArray(d.opIds) ? d.opIds.filter((x) => typeof x === 'string') : [];
+    for (const id of ids) seenOps.add(id);
+    ackOps(ids);
+    let ns = v.state;
+    atLeast(lastStamp(ns));
+    for (const p of outbox) {
+      const r = E().apply(ns, p.type, p.payload, Math.max(p.now, lastStamp(ns)));
+      if (r.report === 'ok') ns = r.state;
+    }
+    ns = E().tick(ns, now()).state;
+    ns.rev = Math.max(ns.rev, (state.rev || 0) + 1);
+    state = ns;
+    pending = []; skipRebase = true; pendingBroadcast = true;
+    persistNow();
+    scheduleNotify();
+  }
+  // Applies an action that another device did. Each opId is applied once; the action is not queued again.
+  function applyRemote(d) {
+    if (!state || typeof d.opId !== 'string' || seenOps.has(d.opId) || typeof d.actionType !== 'string') return;
+    seenOps.add(d.opId);
+    if (seenOps.size > 5000) seenOps.delete(seenOps.values().next().value);
+    const n = Math.max(now(), isNum(d.now) ? d.now : 0);
+    atLeast(n);
+    const r = E().apply(state, d.actionType, d.payload, n);
+    if (r.report === 'ok') commit(r.state, true);
   }
 
   /* ---------- lifecycle ---------- */
@@ -6143,7 +6618,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (interval) clearInterval(interval);
     if (saveTimer) clearTimeout(saveTimer);
     interval = null; saveTimer = null;
-    if (bc) { try { bc.close(); } catch (e) { /* ignore */ } bc = null; }
+    if (tr) { try { tr.close(); } catch (e) { /* ignore */ } tr = null; }
+    pushing = false; retryAt = 0; retryMs = 2000;
     for (const [t, ty, fn] of listeners) { try { t.removeEventListener(ty, fn); } catch (e) { /* ignore */ } }
     listeners = [];
     subs = new Set(); tickSubs = new Set();
@@ -6158,9 +6634,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     destroy();
     realNow = typeof opts.now === 'function' ? opts.now : () => Date.now();
     storage = opts.storage && typeof opts.storage.get === 'function' && typeof opts.storage.set === 'function' ? opts.storage : U.storage;
-    st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [] };
+    st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0 };
     last = null;
     baseSid = null; pending = []; skipRebase = false;
+    outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
     const r = realNow();
     let payload = null;
     try { payload = storage.get(KEY, null); } catch (e) { payload = null; }
@@ -6193,15 +6670,14 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
     if (loaded) atLeast(lastStamp(loaded));
-    state = loaded || E().newState({ now: now(), stagger: true });
+    state = loaded || E().newState({ now: now(), starter: opts.starter === true, stagger: opts.starter === true }); // a real kitchen starts with an empty pit; init({ starter: true }) gives the demo stock
     // Catch up anything that became due while the page was closed.
     const t = E().tick(state, now());
     state = t.state;
+    syncUnits();
     if (!loaded && st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
     if (!opts.noTimers && typeof setInterval === 'function') interval = setInterval(tickNow, 1000);
-    if (!opts.noSync && typeof g.BroadcastChannel === 'function') {
-      try { bc = new g.BroadcastChannel('smokebox'); bc.onmessage = onMessage; } catch (e) { bc = null; }
-    }
+    if (!opts.noSync) openTransport(opts.transport);
     if (!opts.noTimers) {
       if (typeof g.addEventListener === 'function') on(g, 'pagehide', () => flushIfDirty());
       if (g.document && typeof g.document.addEventListener === 'function') on(g.document, 'visibilitychange', () => { if (g.document.visibilityState === 'hidden') flushIfDirty(); });
@@ -6212,11 +6688,15 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // trimmed, repaired, speed.
   function status() { return Object.assign({}, st, { speed: clk.speed }); }
 
+  // Tells the formatting helpers which units the saved settings ask for (degrees F or C, kg or lb).
+  function syncUnits() { try { if (state && state.settings) U.setUnits(state.settings.ui); } catch (e) { /* formatting keeps its old choice */ } }
   // Makes ns the current state if it differs, then schedules a save and a redraw. broadcast tells other
   // tabs.
   function commit(ns, broadcast) {
     if (ns === state) return;
+    const sameSettings = state && ns.settings === state.settings;
     state = ns;
+    if (!sameSettings) syncUnits();
     schedulePersist(broadcast);
     scheduleNotify();
   }
@@ -6227,6 +6707,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const n = now();
     const r = E().tick(state, n);
     if (r.state !== state) commit(r.state, false);
+    if (outbox.length) pushOutbox();
     tickSubs.forEach((fn) => { try { fn(n); } catch (e) { if (g.console) console.error('[smokebox] tick subscriber failed', e); } });
   }
   // Gives one action to the engine and returns { report, info, events }. The report is the word "ok" or the
@@ -6237,15 +6718,22 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (!state) init({ noTimers: true, noSync: true });
     const source = opts && opts.source === 'sim' ? 'sim' : 'user';
     const n = now();
+    const opId = tabId + ':' + (++opN);
     const r = E().apply(state, type, payload, n);
-    last = { type: typeof type === 'string' ? type : String(type), report: r.report, info: r.info, events: r.events };
-    if (r.report === 'ok') { if (r.state !== state) { pending.push({ type, payload, now: n }); if (pending.length > 300) pending.shift(); } commit(r.state, true); }
+    last = { type: typeof type === 'string' ? type : String(type), report: r.report, info: r.info, events: r.events, opId };
+    if (r.report === 'ok') {
+      if (r.state !== state) {
+        pending.push({ type, payload, now: n, opId }); if (pending.length > 300) pending.shift();
+        if (source === 'user') enqueueOp({ opId, type, payload, now: n });
+      }
+      commit(r.state, true);
+    }
     else if (source === 'user' && r.report !== 'nothingToDo' && type !== 'uiReport') {
       // instrumentation (UI guide): a user action that was refused is recorded as a ui_report event
       const r2 = E().apply(state, 'uiReport', { action: String(type).slice(0, 40) || '?', report: r.report }, n);
       if (r2.report === 'ok') commit(r2.state, false);
     }
-    return { report: r.report, info: r.info, events: r.events };
+    return { report: r.report, info: r.info, events: r.events, opId };
   }
   // Same as dispatchEx but returns only the report word.
   const dispatch = (type, payload, opts) => dispatchEx(type, payload, opts).report;
@@ -6253,7 +6741,25 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   /* ---------- backups ---------- */
   // Wraps the current state with version, save time, revision and clock: the one shape used for saving and
   // for backups.
-  function envelope() { const r = realNow(); return { v: 1, savedAt: r, rev: state.rev, clock: { virtual: now(), real: r, speed: clk.speed }, state }; }
+  function envelope() {
+    const r = realNow();
+    const env = { v: 1, savedAt: r, rev: state.rev, clock: { virtual: now(), real: r, speed: clk.speed }, state };
+    const nm = ownerNames();
+    if (nm) env.names = nm;
+    return env;
+  }
+  // The owner's station, category and channel names (SB.config.customSpec), or null when there are none or the
+  // config has no such feature. Backups carry them so tickets on an added station survive a restore.
+  function ownerNames() {
+    const C = SB.config;
+    if (!C || typeof C.customSpec !== 'function') return null;
+    try {
+      const sp = C.customSpec();
+      // True when a part of the spec holds at least one rename or added entry.
+      const has = (o) => o && typeof o === 'object' && Object.keys(o).some((k) => (Array.isArray(o[k]) ? o[k].length : o[k] && typeof o[k] === 'object' && Object.keys(o[k]).length));
+      return sp && (has(sp.rename) || has(sp.add)) ? JSON.parse(JSON.stringify(sp)) : null;
+    } catch (e) { return null; }
+  }
   // Backup as one JSON text (text that holds a whole list of records). Returns null and sets lastResult to
   // the reason when it refuses: too big, or it would not pass its own import check.
   function exportAll() {
@@ -6272,14 +6778,30 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   function importAll(text) {
     if (typeof text !== 'string') { last = { type: 'import', report: 'invalidBackup', info: { error: 'not text' }, events: [] }; return 'invalidBackup'; }
     if (text.length > MAX_TEXT) { last = { type: 'import', report: 'exportTooLarge', info: { chars: text.length, max: MAX_TEXT }, events: [] }; return 'exportTooLarge'; }
+    // A backup that carries owner names puts them in place BEFORE the check, so tickets on an added station are
+    // not dropped. A backup without names (an older one) leaves the current names alone. A refused import
+    // puts the old names back.
+    const C = SB.config;
+    let namesBefore = null, namesGiven = null;
+    if (C && typeof C.applyCustom === 'function' && typeof C.customSpec === 'function') {
+      try {
+        const o = JSON.parse(text);
+        if (o && typeof o === 'object' && o.names && typeof o.names === 'object') { namesGiven = o.names; namesBefore = C.customSpec(); C.applyCustom(namesGiven); }
+      } catch (e) { namesGiven = null; }
+    }
     const v = E().validateBackup(text);
-    if (!v.ok) { last = { type: 'import', report: 'invalidBackup', info: { error: v.error, repaired: v.repaired }, events: [] }; return 'invalidBackup'; }
+    if (!v.ok) {
+      if (namesGiven) { try { C.applyCustom(namesBefore); } catch (e) { /* keep going */ } }
+      last = { type: 'import', report: 'invalidBackup', info: { error: v.error, repaired: v.repaired }, events: [] };
+      return 'invalidBackup';
+    }
+    if (namesGiven && typeof C.saveCustom === 'function') { try { C.saveCustom(namesGiven); } catch (e) { /* the names stay applied for this session */ } }
     const ns = v.state;
     // The revision must go up so other tabs treat the imported copy as newer; the clock must not be behind
     // its times.
     ns.rev = Math.max(ns.rev, (state ? state.rev : 0) + 1);
     atLeast(lastStamp(ns));
-    state = E().tick(ns, now()).state;
+    state = E().tick(ns, now()).state; syncUnits();
     pendingBroadcast = true;
     skipRebase = true; pending = [];   // an import or reset is meant to win over what another tab saved
     persistNow();
@@ -6360,7 +6882,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   function reset() {
     rebaseClock();
     const old = state;
-    const ns = E().newState({ now: now(), stagger: true, seq: old ? old.seq : undefined });
+    const ns = E().newState({ now: now(), starter: false, seq: old ? old.seq : undefined });
     ns.rev = (old ? old.rev : 0) + 1;
     commit(ns, true);
     skipRebase = true; pending = [];
@@ -6480,7 +7002,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
     flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
-    broadcast, onBroadcast, canBroadcast: () => !!bc, tabId,
+    broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
+    // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
+    channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
@@ -7374,12 +7898,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     };
   };
 
-  /* ---------- whether the back office shows the sample (persisted, default on) ---------- */
+  /* ---------- whether the back office shows the sample (persisted, default off: a real kitchen sees real numbers) ---------- */
   let enabled = null;       // null until first read from storage
   const enabledListeners = new Set();
-  // True when the back office should show the sample. Read from storage on first use; the default is on.
+  // True when the back office should show the sample. Read from storage on first use; the default is off.
   Sim.sampleEnabled = function () {
-    if (enabled === null) enabled = U.storage.get(ENABLED_KEY, true) !== false;
+    if (enabled === null) enabled = U.storage.get(ENABLED_KEY, false) === true;
     return enabled;
   };
   // Turns the sample on or off, saves the choice, and tells listeners. Returns the new setting.
@@ -7655,7 +8179,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const st = SB.store;
     try { live.stop(); } catch (e) { /* the simulator may not be running */ }
     st.setSpeed(1);
-    if (st.resetLive({ keepSettings: true }) !== 'ok') return -1;
+    if (st.resetLive({ keepSettings: true, starter: true, stagger: true }) !== 'ok') return -1;
     return Sim.seedFirstRun({ force: true });
   };
   /** True when the dish can be sold in this store right now (unknown counts as yes). */
@@ -7690,8 +8214,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   const ZONES = ['pit', 'sides', 'fry', 'cold', 'expo'];
   const SECTIONS = ['pace', 'tickets', 'stations', 'money', 'safety', 'stock', 'data'];
 
+  // Device roles: all = today's all-in-one screen; kitchen, front (order entry) and manager are focused ones.
+  const ROLES = ['all', 'kitchen', 'front', 'manager'];
+
   // Turns the part of the web address after the # (the hash, like #/office/money) into a view:
-  // {kind:'floor', zone} or {kind:'office', section}. Never fails: garbage lands on the whole floor.
+  // {kind:'floor', zone}, {kind:'kitchen', zone}, {kind:'new'} or {kind:'office', section}. Never fails:
+  // garbage lands on the whole floor.
   function viewFor(hash) {
     // Cap the length, then undo %20-style codes; a broken code keeps the raw text.
     let s = typeof hash === 'string' ? hash.slice(0, 300) : '';
@@ -7699,6 +8227,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     s = s.replace(/^\s*#!?/, '').split(/[?#]/)[0];
     const parts = s.toLowerCase().split('/').map((x) => x.trim()).filter(Boolean);
     if (parts[0] === 'office') return { kind: 'office', section: SECTIONS.indexOf(parts[1]) >= 0 ? parts[1] : 'pace' };
+    if (parts[0] === 'kitchen') return { kind: 'kitchen', zone: ZONES.indexOf(parts[1]) >= 0 ? parts[1] : 'all' };
+    if (parts[0] === 'new') return { kind: 'new' };
     if (parts[0] === 's' && ZONES.indexOf(parts[1]) >= 0) return { kind: 'floor', zone: parts[1] };
     return { kind: 'floor', zone: 'all' };
   }
@@ -7707,14 +8237,34 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (typeof view === 'string') return viewFor(view);
     if (!view || typeof view !== 'object') return { kind: 'floor', zone: 'all' };
     if (view.kind === 'office') return { kind: 'office', section: SECTIONS.indexOf(view.section) >= 0 ? view.section : 'pace' };
+    if (view.kind === 'new') return { kind: 'new' };
+    if (view.kind === 'kitchen') return { kind: 'kitchen', zone: ZONES.indexOf(view.zone) >= 0 ? view.zone : 'all' };
     return { kind: 'floor', zone: ZONES.indexOf(view.zone) >= 0 ? view.zone : 'all' };
   }
-  // Opposite of viewFor: a view becomes its address ('#/office/money', '#/s/pit', '#/'); it round-trips.
+  // Opposite of viewFor: a view becomes its address ('#/office/money', '#/kitchen', '#/new', '#/s/pit', '#/');
+  // it round-trips.
   function hashFor(view) {
     const v = normView(view);
     if (v.kind === 'office') return v.section === 'pace' ? '#/office' : '#/office/' + v.section;
+    if (v.kind === 'new') return '#/new';
+    if (v.kind === 'kitchen') return v.zone === 'all' ? '#/kitchen' : '#/kitchen/' + v.zone;
     return v.zone === 'all' ? '#/' : '#/s/' + v.zone;
   }
+  // Reads ?role=kitchen|front|manager|all from the address's query text; returns the role or null.
+  function roleFor(search) {
+    const m = /[?&]role=([a-z]+)/i.exec(typeof search === 'string' ? search.slice(0, 300) : '');
+    const r = m ? m[1].toLowerCase() : '';
+    return ROLES.indexOf(r) >= 0 ? r : null;
+  }
+  // The screen a device with this role opens on when the address names no screen; null means the usual floor.
+  function startViewFor(role) {
+    if (role === 'kitchen') return { kind: 'kitchen', zone: 'all' };
+    if (role === 'front') return { kind: 'new' };
+    if (role === 'manager') return { kind: 'office', section: 'pace' };
+    return null;
+  }
+  // The role a view belongs to when someone opens it by address: kitchen and new pin the device; others do not.
+  function roleOfView(v) { return v.kind === 'kitchen' ? 'kitchen' : v.kind === 'new' ? 'front' : null; }
 
   /* ====================================================================================================================
    * SHA-256 (pure JS). crypto.subtle is preferred; this is the fallback and produces identical digests.
@@ -7780,15 +8330,36 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   }
 
   /* ====================================================================================================================
+   * Backup nudge: pure decision (works in Node)
+   * ================================================================================================================== */
+  // Decides whether to nudge for the daily backup. a = {service, lastBackupAt, snoozeUntil, now, hasData}.
+  // It is due from closing time until 10 hours after, when no backup was made in the 2 hours before closing
+  // or since, and nothing is snoozed. An empty kitchen (no tickets or batches) has nothing to lose.
+  // WATCH OUT: closeHour above 24 means after midnight, so last night's close is still checked at 12:30 am.
+  function backupDue(a) {
+    const H = 3600000, sv = a && a.service;
+    if (!a || !sv || typeof sv.closeHour !== 'number' || !a.hasData) return false;
+    if (typeof a.snoozeUntil === 'number' && a.snoozeUntil > a.now) return false;
+    let closeAt = null;
+    for (const day of [0, -1]) {
+      const d = new Date(a.now); d.setDate(d.getDate() + day); d.setHours(0, 0, 0, 0);
+      const at = d.getTime() + sv.closeHour * H;
+      if (at <= a.now && (closeAt == null || at > closeAt)) closeAt = at;
+    }
+    if (closeAt == null || a.now - closeAt > 10 * H) return false;
+    return !(typeof a.lastBackupAt === 'number' && a.lastBackupAt >= closeAt - 2 * H);
+  }
+
+  /* ====================================================================================================================
    * Theme
    * ================================================================================================================== */
   const T = (SB.theme = {});
   // Notebook (local storage) entry names for this file's saved choices.
-  const KEY = { theme: 'smokebox.v1.theme', otheme: 'smokebox.v1.otheme', text: 'smokebox.v1.textsize', density: 'smokebox.v1.density', hints: 'smokebox.v1.hints', zone: 'smokebox.v1.zone', pinlock: 'smokebox.v1.pinlock' };
+  const KEY = { theme: 'smokebox.v1.theme', otheme: 'smokebox.v1.otheme', text: 'smokebox.v1.textsize', density: 'smokebox.v1.density', hints: 'smokebox.v1.hints', zone: 'smokebox.v1.zone', role: 'smokebox.v1.role', pinlock: 'smokebox.v1.pinlock', lastBackup: 'smokebox.v1.lastbackup' };
   // Colour of the browser's top bar for each look; each matches that look's background colour.
   const THEME_COLOR = { day: '#F5F2EB', night: '#15181A', ember: '#181513', paper: '#F0ECE3' };
   // Current choices: floor look, office look (ember dark / paper light), text size. themeSubs = listeners.
-  const cur = { theme: 'day', otheme: 'ember', text: 'normal', density: 'auto', hints: true };
+  const cur = { theme: 'day', otheme: 'ember', text: 'normal', density: 'compact', hints: true }; // compact tickets by default: full-size ones were too big for a busy board
   const themeSubs = [];
   // Reads the saved look and text size from the notebook; only known values are accepted.
   function loadTheme() {
@@ -7867,17 +8438,24 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
    * ================================================================================================================== */
   const R = (SB.router = {});
   R.viewFor = viewFor; R.hashFor = hashFor; R.zones = ZONES.slice(); R.sections = SECTIONS.slice();
+  R.roleFor = roleFor; R.startViewFor = startViewFor; R.roles = ROLES.slice();
   // Router state. idx counts our history entries (stamped into each as sbIdx); pendingBacks = Back jumps
   // the browser has not reported yet; officePushed / officeEntry = the office's own history entry;
   // overlayStack = open sheets, one entry each; queued = history writes waiting; lastZone = the way back
   // out of the office.
   let current = { kind: 'floor', zone: 'all' };
   let lastZone = 'all';
+  let role = 'all'; // this device's job: all, kitchen, front or manager (kept in the notebook)
   let idx = 0, routerReady = false, pendingBacks = 0, flushTimer = 0, officePushed = false, officeEntry = null;
   const listeners = [], overlayStack = [], queued = [];
 
   // Remembers the last station viewed (memory and notebook) so a pinned tablet reopens on it.
-  const rememberZone = (v) => { if (v.kind === 'floor') { lastZone = v.zone; if (U) U.storage.set(KEY.zone, v.zone); } };
+  // Also pins the device role when a role screen (#/kitchen, #/new) is opened.
+  const rememberZone = (v) => {
+    if (v.kind === 'floor') { lastZone = v.zone; if (U) U.storage.set(KEY.zone, v.zone); }
+    const r = roleOfView(v);
+    if (r && r !== role) { role = r; if (U) U.storage.set(KEY.role, r); }
+  };
   // Our history number from the current history entry, or null if it has none. Never throws.
   const readIdx = () => { try { const s = g.history && g.history.state; return s && typeof s.sbIdx === 'number' ? s.sbIdx : null; } catch (e) { return null; } };
   // Tells router listeners the new view (a copy) and info.source: 'go' (our move) or 'pop' (Back, typed).
@@ -7930,8 +8508,16 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (found == null) { try { g.history.replaceState({ sbIdx: 0 }, '', g.location.href); } catch (e) { /* ignore */ } }
     const stored = U ? U.storage.get(KEY.zone, 'all') : 'all';
     lastZone = ZONES.indexOf(stored) >= 0 ? stored : 'all';
+    const storedRole = U ? U.storage.get(KEY.role, 'all') : 'all';
+    role = ROLES.indexOf(storedRole) >= 0 ? storedRole : 'all';
+    const asked = roleFor(g.location.search); // ?role=kitchen on the address picks this device's job
+    if (asked) { role = asked; if (U) U.storage.set(KEY.role, asked); }
     let v = viewFor(g.location.hash);
-    if (!g.location.hash && lastZone !== 'all') { // a tablet pinned to a station opens on it
+    const start = startViewFor(role);
+    if (start && (asked || !g.location.hash)) { // a role device opens on its own screen
+      v = start;
+      try { g.history.replaceState({ sbIdx: idx }, '', hashFor(v)); } catch (e) { /* ignore */ }
+    } else if (!g.location.hash && lastZone !== 'all') { // a tablet pinned to a station opens on it
       v = { kind: 'floor', zone: lastZone };
       try { g.history.replaceState({ sbIdx: idx }, '', hashFor(v)); } catch (e) { /* ignore */ }
     }
@@ -7945,6 +8531,19 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   R.view = () => Object.assign({}, current);
   // The last station viewed ('all' if none).
   R.lastZone = () => lastZone;
+  // This device's role: 'all' (everything on one screen), 'kitchen', 'front' or 'manager'.
+  R.role = () => role;
+  // Sets and remembers the device role ('all' clears it); unknown names are ignored. Returns the role.
+  R.setRole = function (r) {
+    if (ROLES.indexOf(r) < 0) return role;
+    role = r; if (U) U.storage.set(KEY.role, r);
+    return role;
+  };
+  // The screen this device returns to after the office: its role screen, or the last station.
+  R.home = function () {
+    const s = role === 'manager' ? null : startViewFor(role);
+    return s || { kind: 'floor', zone: lastZone };
+  };
   // Sign up to hear about every view change: fn(view, info). Returns a function that cancels the sign-up.
   R.onChange = function (fn) { listeners.push(fn); return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; };
   R.hashFor = hashFor; R.viewFor = viewFor;
@@ -7974,7 +8573,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // or, for a pasted link, rewrite the entry to the floor. False if not in the office.
   R.leaveOffice = function () {
     if (current.kind !== 'office') return false;
-    const target = { kind: 'floor', zone: lastZone };
+    const target = R.home();
     if (officePushed && officeEntry != null && officeEntry > 0) {
       // Steps back to the entry just before the office.
       const delta = idx - (officeEntry - 1);
@@ -8021,7 +8620,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
   // In Node (tests with no page) stop here: only the router parsing and SHA-256 above are usable there.
   if (!doc) { // Node: pure parts only
-    SB.shell = { sha256: sha256hex };
+    SB.shell = { sha256: sha256hex, backupDue };
     return;
   }
 
@@ -8033,7 +8632,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   const h = U.h;
   const S = (SB.shell = {});
   const ui = (SB.ui = {});
-  const layers = { floor: null, office: null };
+  const layers = { floor: null, office: null, order: null };
   const hosts = { shell: null, sheets: null, toasts: null, live: null, standalone: null };
   const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
   // True when the device asks for less motion; animations are then skipped or shortened.
@@ -8833,6 +9432,16 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
   // True while the back office is open.
   S.inOffice = () => st.officeOpen;
+  // True while pretend data is in play: demo tickets on the board, demo orders running, or a clock faster
+  // than real time. The developer-only tools (clock speeds, contrast checker) show only then.
+  S.demoLoaded = function () {
+    try {
+      const sp = SB.store && SB.store.speed ? SB.store.speed() : 1;
+      const live = SB.sim && SB.sim.live && SB.sim.live.status ? SB.sim.live.status() || {} : {};
+      const s = SB.store && SB.store.getState ? SB.store.getState() : null;
+      return sp > 1 || !!live.running || !!(s && s.tickets.some((t) => t.src === 'demo'));
+    } catch (e) { return false; }
+  };
   // True once mount has built the frame.
   S.isMounted = () => st.mounted;
   S.sha256 = sha256hex;
@@ -9148,7 +9757,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (st.officeOpen) return st.officeDone;
     const section = (o && SECTIONS.indexOf(o.section) >= 0 && o.section) || (R.view().kind === 'office' ? R.view().section : st.officeSection) || 'pace';
     return guard().then((ok) => {
-      if (!ok) { if (R.view().kind === 'office') R.go({ kind: 'floor', zone: R.lastZone() }, { replace: true }); return false; }
+      if (!ok) { if (R.view().kind === 'office') R.go(R.home(), { replace: true }); return false; }
       R.go({ kind: 'office', section });
       return openOffice(section);
     });
@@ -9169,11 +9778,79 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (!st.mounted) return;
     if (view.kind === 'office') {
       if (st.officeOpen) { navigateOffice(view.section); return; }
-      guard().then((ok) => { if (ok) openOffice(view.section); else if (R.view().kind === 'office') R.go({ kind: 'floor', zone: R.lastZone() }, { replace: true }); });
+      guard().then((ok) => { if (ok) openOffice(view.section); else if (R.view().kind === 'office') R.go(R.home(), { replace: true }); });
     } else {
-      try { if (SB.floor && typeof SB.floor.setZone === 'function') SB.floor.setZone(view.zone); else if (st.ph && st.ph.floor) st.ph.floor.setZone(view.zone); } catch (e) { console.error('[smokebox] floor.setZone failed', e); }
+      const zone = view.kind === 'new' ? 'all' : view.zone;
+      try { if (SB.floor && typeof SB.floor.setZone === 'function') SB.floor.setZone(zone); else if (st.ph && st.ph.floor) st.ph.floor.setZone(zone); } catch (e) { console.error('[smokebox] floor.setZone failed', e); }
       if (st.officeOpen) closeOffice();
+      if (view.kind === 'new') openOrderPage(); else closeOrderPage();
     }
+  }
+  // Shows order entry for the front role. Uses the order page (SB.order.mount) once that exists; until then
+  // it opens the New ticket sheet over the board.
+  // WATCH OUT: SB.order.mount(el) must return nothing or a cleanup function; SB.order.unmount(el) is optional.
+  function openOrderPage() {
+    if (st.orderOpen) return;
+    st.orderOpen = true;
+    try {
+      if (SB.order && typeof SB.order.mount === 'function' && layers.order) {
+        layers.order.hidden = false; layers.floor.hidden = true;
+        st.orderCleanup = SB.order.mount(layers.order) || null;
+      } else if (sheets.open) sheets.open('order');
+    } catch (e) { console.error('[smokebox] order page failed to open', e); }
+  }
+  // Takes the order page down and shows the board again; does nothing if it was not open.
+  function closeOrderPage() {
+    if (!st.orderOpen) return;
+    st.orderOpen = false;
+    try {
+      if (typeof st.orderCleanup === 'function') st.orderCleanup();
+      else if (SB.order && typeof SB.order.unmount === 'function' && layers.order) SB.order.unmount(layers.order);
+    } catch (e) { console.error('[smokebox] order page failed to close', e); }
+    st.orderCleanup = null;
+    if (layers.order) { U.clear(layers.order); layers.order.hidden = true; }
+    if (layers.floor) layers.floor.hidden = false;
+  }
+
+  /* ---------- banner: save failure and daily backup nudge ---------- */
+  // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
+  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '' };
+  // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
+  S.noteBackup = function (at) {
+    const t = typeof at === 'number' ? at : Date.now();
+    if (U) U.storage.set(KEY.lastBackup, t);
+    paintBanner();
+  };
+  // When the last backup was made on this device (ms), or null if never.
+  S.lastBackupAt = () => { const t = U ? U.storage.get(KEY.lastBackup, null) : null; return typeof t === 'number' ? t : null; };
+  // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
+  function bannerWanted() {
+    const store = SB.store;
+    if (!store || !store.status || !store.getState) return null;
+    const ss = store.status(), s = store.getState();
+    if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
+    if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
+    if (!s) return null;
+    const due = backupDue({ service: s.settings && s.settings.service, lastBackupAt: S.lastBackupAt(), snoozeUntil: bn.snoozeUntil, now: Date.now(), hasData: s.tickets.length + s.batches.length > 0 });
+    return due ? { kind: 'nudge', tone: 'warn', text: 'Service is over. Save today\'s backup now and keep a copy off this device (email it or use a USB drive).', act: 'Back up now', later: true } : null;
+  }
+  // Shows, updates or removes the strip at the top of the screen so a problem is seen from the kitchen board.
+  function paintBanner() {
+    if (!st.mounted || !st.shell) return;
+    let w = null;
+    try { w = bannerWanted(); } catch (e) { w = null; }
+    if (!w) { if (bn.el) { bn.el.remove(); bn.el = null; bn.kind = ''; st.shell.removeAttribute('data-banner'); } return; }
+    if (bn.el && bn.kind === w.kind) return;
+    if (bn.el) bn.el.remove();
+    bn.kind = w.kind;
+    // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
+    const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => S.ignite({ section: 'data' }) }, w.act);
+    // Puts the nudge off for 45 minutes.
+    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } }, 'Later') : null;
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : 'download', 22), h('span', { class: 'sb-banner-t' }, w.text), act, later);
+    st.shell.appendChild(bn.el);
+    st.shell.setAttribute('data-banner', w.kind);
+    st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip
   }
 
   /* ---------- placeholders so the shell is testable alone ---------- */
@@ -9251,19 +9928,20 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // Build the layers in drawing order; region labels name the floor and office for screen readers.
     const shell = h('div', { class: 'sb-shell', dataset: { view: 'floor' } });
     const floor = h('div', { class: 'layer layer-floor', id: 'sb-floor', role: 'region', 'aria-label': 'Kitchen board', tabindex: -1 });
+    const order = h('div', { class: 'layer layer-order', id: 'sb-order', role: 'region', 'aria-label': 'Order entry', tabindex: -1, hidden: true });
     const veil = h('div', { class: 'ignite-veil', 'aria-hidden': 'true' });
     const office = h('div', { class: 'layer layer-office office', id: 'sb-office', role: 'region', 'aria-label': 'Back office', tabindex: -1, hidden: true, dataset: { otheme: T.office() } });
     const fx = h('div', { class: 'ignite-fx', 'aria-hidden': 'true' });
     const live = h('div', { class: 'live-region', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
     const toastHost = h('div', { class: 'toast-host', role: 'region', 'aria-label': 'Notifications' });
     const sheetHost = h('div', { class: 'sheet-host' });
-    shell.append(floor, veil, office, fx, live, toastHost, sheetHost);
+    shell.append(floor, order, veil, office, fx, live, toastHost, sheetHost);
     root.appendChild(shell);
     // Swap the temporary containers (if any) for the real ones and record the new state.
     if (hosts.standalone) { hosts.standalone.remove(); hosts.standalone = null; }
     Object.assign(hosts, { shell, sheets: sheetHost, toasts: toastHost, live });
-    layers.floor = floor; layers.office = office;
-    Object.assign(st, { shell, veil, fx, mounted: true, officeOpen: false, officeContent: false, ph: {}, taps: [] });
+    layers.floor = floor; layers.office = office; layers.order = order;
+    Object.assign(st, { shell, veil, fx, mounted: true, orderOpen: false, orderCleanup: null, officeOpen: false, officeContent: false, ph: {}, taps: [] });
     st.offRoute = R.onChange(onRoute);
     // Floor board: if it throws, show an error card with Reload instead of a blank screen.
     try {
@@ -9275,6 +9953,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       U.clear(floor); floor.appendChild(ui.errorCard(e, { title: 'The board could not load', module: '70-floor-board.js', onRetry: () => g.location.reload() }));
     }
     updateThemeColor();
+    bn.el = null; bn.kind = '';
+    paintBanner();
+    clearInterval(bn.timer); bn.timer = setInterval(paintBanner, 5000); // also reacts when a save starts failing
     const v = R.view();
     onRoute(v);
     return S;
@@ -9282,6 +9963,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // Takes the frame down: closes sheets, stops route listening, removes layers, dismisses toasts.
   S.unmount = function () {
     if (!st.mounted) return;
+    closeOrderPage();
+    clearInterval(bn.timer); bn.el = null; bn.kind = '';
     sheets.closeAll();
     if (st.offRoute) st.offRoute();
     resetFx();
@@ -9290,7 +9973,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     st.shell.remove();
     toasts.splice(0).forEach((r) => r.dismiss(true));
     Object.assign(hosts, { shell: null, sheets: null, toasts: null, live: null });
-    layers.floor = layers.office = null;
+    layers.floor = layers.office = layers.order = null;
     st.mounted = false; st.officeOpen = false;
   };
   // Snapshot of shell and history state, for tests and debugging.
@@ -9313,6 +9996,55 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   'use strict';
   const SB = (g.SB = g.SB || {});
   const doc = g.document;
+
+  // The customer names to offer as one-tap "Recent" buttons: newest orders first, no blanks, no repeats (ignoring
+  // capital letters), and never a name that is already a quick name. state is the app state; quick is the quick names.
+  function recentNames(state, quick, limit) {
+    const skip = new Set((quick || []).map((n) => String(n).trim().toLowerCase()));
+    const orders = ((state && state.orders) || []).slice().sort((a, b) => b.createdAt - a.createdAt);
+    const out = [];
+    for (let i = 0; i < orders.length && out.length < (limit || 4); i++) {
+      const nm = String(orders[i].customer || '').trim(), key = nm.toLowerCase();
+      if (!nm || skip.has(key)) continue;
+      skip.add(key); out.push(nm);
+    }
+    return out;
+  }
+  // Short text for the last order: up to three dishes then "and N more", used under the Repeat button.
+  function summarize(items, nameOf) {
+    const parts = items.map((it) => nameOf(it.menuId) + (it.qty > 1 ? ' x' + it.qty : ''));
+    return parts.length <= 3 ? parts.join(', ') : parts.slice(0, 3).join(', ') + ' and ' + (parts.length - 3) + ' more';
+  }
+
+  // Splits a note into its allergy list and the rest. A note that starts "ALLERGY: peanut, dairy. Sauce on side"
+  // gives { list: ['peanut', 'dairy'], rest: 'Sauce on side' }. A note without that start has an empty list.
+  function parseAllergy(note) {
+    const m = /^\s*allergy:\s*([^.]*)\.\s*/i.exec(String(note || ''));
+    if (!m) return { list: [], rest: String(note || '').trim() };
+    const list = m[1].split(',').map((x) => x.trim()).filter(Boolean);
+    return { list, rest: String(note).slice(m[0].length).trim() };
+  }
+  // Puts a note back together with the allergy first, so cooks read it before anything else.
+  function buildNote(list, rest) {
+    const r = String(rest || '').trim();
+    return list.length ? 'ALLERGY: ' + list.join(', ') + '.' + (r ? ' ' + r : '') : r;
+  }
+  // Adds one allergen to the list or takes it off again (ignoring capital letters). Returns the new note.
+  function toggleAllergen(note, name) {
+    const p = parseAllergy(note), at = p.list.findIndex((x) => x.toLowerCase() === name.toLowerCase());
+    if (at >= 0) p.list.splice(at, 1); else p.list.push(name);
+    return buildNote(p.list, p.rest);
+  }
+  // Adds a ready-made phrase (like "Sauce on the side") at the end of the note. Returns { note, ok }; ok is false and the
+  // note unchanged when the phrase is already there or would pass the length limit.
+  function addPhrase(note, phrase, max) {
+    const cur = String(note || '').trim();
+    if (cur.toLowerCase().indexOf(phrase.toLowerCase()) >= 0) return { note: cur, ok: false, why: 'there' };
+    const next = cur ? cur.replace(/[.\s]+$/, '') + '. ' + phrase : phrase;
+    return next.length > max ? { note: cur, ok: false, why: 'long' } : { note: next, ok: true };
+  }
+  SB.orderLogic = { recentNames, summarize, parseAllergy, buildNote, toggleAllergen, addPhrase };
+
   if (!doc) return; // Node: the sheet is DOM only
 
   const U = SB.util, C = SB.config, h = U.h;
@@ -9355,7 +10087,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // It is cleared on send, Clear order or Discard.
   // orderId is the open order this round is added to (null starts a new one); pay is how it is paid when sent
   // ('' leaves it open); tip is the tip text as typed.
-  const D = { lines: [], customer: '', channel: 'dine_in', note: '', rush: false, orderId: null, pay: '', tip: '' };
+  const D = { lines: [], customer: '', channel: 'dine_in', note: '', rush: false, orderId: null, pay: '', tip: '', allergy: '' };
+  // How the last order was paid when it was sent ('' = left open). A counter that takes cash all day starts the next
+  // order on cash, one tap fewer; Pay later is still one tap away.
+  let payDefault = '';
   let seq = 0;
   let lastSent = null; // { num, channel, items } of the last order sent from this sheet
   let live = null;     // the open view, or null
@@ -9367,8 +10102,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   const subtotal = () => D.lines.reduce((s, l) => { const mi = menuById(l.menuId); return s + (mi ? mi.price * l.qty : 0); }, 0);
   // A separate copy of the order, kept so Undo can put it back.
   const copyDraft = () => JSON.parse(JSON.stringify(D));
-  function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; }
-  function resetDraft() { D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = ''; D.tip = ''; }
+  function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; D.allergy = snap.allergy || ''; }
+  function resetDraft() { D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = payDefault; D.tip = ''; D.allergy = ''; }
   // The orders still open, oldest first, for the Add to open order list.
   function openOrdersList() { return (st().orders || []).filter((o) => o.status === 'open').sort((a, b) => a.createdAt - b.createdAt); }
   // A short name for an order in a list: who it is for and where, like "Table 4 (Dine-in)".
@@ -9447,27 +10182,67 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     return parts.join(', ') + '. All ready together in about ' + mmss(plan.readySec) + '.';
   }
 
-  // Builds and opens the New ticket sheet and returns it. The draft
-  // lives outside, so closing never loses an order.
+  // Builds and opens the New ticket sheet and returns it. The draft lives outside, so closing never loses an order.
+  // The sheet only supplies the frame; buildOrder fills it, so the same screen can also be a full page.
   function openOrder(opts) {
+    let built = null;
+    // Esc is handled by the order screen, not by the shell, because an order with items must ask before it closes.
+    const sheet = SB.ui.sheet({
+      title: 'New ticket', side: 'right', width: 'min(1180px, 96vw)', name: 'order', closeOnEsc: false,
+      // Only focus the search box with a mouse or keyboard, so a touch tablet keeps its on-screen keyboard down.
+      initialFocus: () => (built ? built.startFocus() : null),
+      // Whatever closes the sheet, drop the listeners and timers this screen added.
+      onClose: () => { if (built) built.teardown(); },
+    });
+    built = buildOrder({ body: sheet.body, footer: sheet.footer, el: sheet.el, close: sheet.close, isPage: false }, opts);
+    return sheet;
+  }
+
+  // Shows New ticket as a full page inside `host` (any empty element) and returns { el, close, leave, destroy }.
+  // opts.onExit(reason) runs when the page closes (sent, discarded, back); the default goes back to the board.
+  // WATCH OUT: the draft D is shared with the sheet version, so an unsent order survives either way of opening.
+  function mountPage(host, opts) {
+    opts = opts || {};
+    let built = null, closed = false;
+    const page = h('div', { class: 'ord-page', dataset: { name: 'order' } });
+    // The page's own back button asks first when the order has items, like Esc does.
+    const backBtn = h('button', { type: 'button', class: 'btn btn-ghost ord-page-back', 'aria-label': 'Back to the board' }, ico('chevron-left', 22), h('span', null, 'Board'));
+    const bar = h('header', { class: 'ord-page-bar' }, backBtn, h('h1', { class: 'ord-page-title' }, 'New ticket'));
+    const body = h('div', { class: 'sheet-body ord-host' }), footer = h('footer', { class: 'sheet-foot' });
+    page.append(bar, body, footer);
+    host.appendChild(page);
+    // Closes the page once: stops listeners, takes the page off the screen, then tells the caller why.
+    // Closes the page once and reports why.
+    const close = (why) => {
+      if (closed) return;
+      closed = true;
+      if (built) built.teardown();
+      page.remove();
+      if (typeof opts.onExit === 'function') opts.onExit(why || 'api');
+      else if (why !== 'destroy' && SB.router && SB.router.go) SB.router.go({ kind: 'floor', zone: SB.router.lastZone() });
+    };
+    built = buildOrder({ body, footer, el: page, close, isPage: true }, opts);
+    // Asks before leaving when the order has items; closes straight away when it is empty.
+    const leave = () => built.leave();
+    // Closes the page without asking, for the router when it moves to another screen.
+    const destroy = () => close('destroy');
+    backBtn.addEventListener('click', leave);
+    const f = built.startFocus(); if (f) f.focus({ preventScroll: true });
+    return { el: page, close, leave, destroy };
+  }
+
+  // Fills a frame (a sheet or a page) with the whole New ticket screen. host = { body, footer, el, close(why),
+  // isPage }. Returns { teardown, startFocus, leave } so the frame can focus it, close it and ask before leaving.
+  function buildOrder(host, opts) {
     // Opened from the Orders screen to add another round: pick that order when it is still open.
     if (opts && opts.orderId) { const o0 = SB.engine.findOrder(st(), opts.orderId); if (o0 && o0.status === 'open') D.orderId = o0.id; }
     const fine = (() => { try { return g.matchMedia('(pointer: fine)').matches; } catch (e) { return false; } })();
     let searchInput = null;
-    // Esc is handled here, not by the shell, because an order with items must ask before it closes.
-    const sheet = SB.ui.sheet({
-      title: 'New ticket', side: 'right', width: 'min(1180px, 96vw)', name: 'order', closeOnEsc: false,
-      // Only focus the search box with a mouse or keyboard, so a
-      // touch tablet keeps its on-screen keyboard down.
-      initialFocus: () => (fine && searchInput ? searchInput : null),
-      // Whatever closes the sheet, drop the listeners and timers this screen added.
-      onClose: () => teardown(),
-    });
-    sheet.body.classList.add('ord-host');
+    host.body.classList.add('ord-host');
 
-    const view = { cat: 'all', search: '', pane: 'menu', editing: null, tiles: [], heads: [], lineViews: new Map(), chipBtns: new Map(), offs: [] };
+    const view = { cat: 'all', search: '', pane: 'menu', editing: null, tiles: [], heads: [], lineViews: new Map(), chipBtns: new Map(), recentBtns: new Map(), offs: [] };
     const root = h('div', { class: 'ord', dataset: { pane: 'menu' } });
-    sheet.body.appendChild(root);
+    host.body.appendChild(root);
 
     // On a phone the menu and the order are two panes, with a
     // switch on top (hidden on wide screens by the CSS).
@@ -9478,7 +10253,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       onChange: (id) => setPane(id),
     });
     // Shows one pane (menu or order) and keeps the switch and the footer buttons in step.
-    function setPane(id) { view.pane = id; root.dataset.pane = id; sheet.footer.dataset.pane = id; paneSeg.setValue(id); }
+    function setPane(id) { view.pane = id; root.dataset.pane = id; host.footer.dataset.pane = id; paneSeg.setValue(id); }
 
     // LEFT: menu pane.
     const menuPane = h('section', { class: 'ord-menu', 'aria-label': 'Menu' });
@@ -9562,7 +10337,25 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       b.addEventListener('click', () => { D.customer = D.customer === nm ? '' : nm; custInput.value = D.customer; paintCustomer(); touched(); });
       chipsEl.appendChild(b); view.chipBtns.set(nm, b);
     });
+    // Names of recent orders that are not quick names, as one-tap buttons; rebuilt only when the list changes.
+    const recentEl = h('div', { class: 'ord-chips ord-recent', role: 'group', 'aria-label': 'Recent customers', hidden: true });
+    // Rebuilds the Recent buttons when the newest orders bring a different set of names.
+    function paintRecent() {
+      const names = recentNames(st(), C.quickNames, 4);
+      const sig = names.join('\u0001');
+      if (recentEl.dataset.sig !== sig) {
+        recentEl.dataset.sig = sig; U.clear(recentEl); view.recentBtns.clear();
+        names.forEach((nm) => {
+          const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, nm));
+          b.addEventListener('click', () => { D.customer = D.customer === nm ? '' : nm; custInput.value = D.customer; paintCustomer(); touched(); });
+          recentEl.appendChild(b); view.recentBtns.set(nm, b);
+        });
+        setHidden(recentEl, !names.length);
+      }
+      view.recentBtns.forEach((b, nm) => b.setAttribute('aria-pressed', D.customer === nm ? 'true' : 'false'));
+    }
     custField.querySelector('.field-label').after(chipsEl);
+    chipsEl.after(recentEl);
     custField.classList.add('ord-cust');
     custField.appendChild(custCount);
 
@@ -9608,6 +10401,18 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     tipInput.addEventListener('input', () => { D.tip = tipInput.value; hideError(); paintCheck(); });
     const tipField = SB.ui.field({ label: 'Tip in dollars (optional)', control: tipInput });
     tipField.classList.add('ord-tip');
+    // Tip buttons for pay-now orders: No tip and 15, 18, 20, 25 percent of the food, with the dollar amount shown.
+    const tipChips = h('div', { class: 'ord-chips ord-tip-chips', role: 'group', 'aria-label': 'Quick tips' });
+    const tipBtns = [{ pct: 0, label: 'No tip' }, { pct: 15 }, { pct: 18 }, { pct: 20 }, { pct: 25 }].map((d) => {
+      const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, d.label || ''));
+      // Writes this tip into the draft (or clears it) so closing the screen never loses it.
+      b.addEventListener('click', () => { const a = tipAmount(d.pct); D.tip = a > 0 ? a.toFixed(2) : ''; tipInput.value = D.tip; paintCheck(); });
+      tipChips.appendChild(b);
+      return { b, d };
+    });
+    tipField.appendChild(tipChips);
+    // The tip in dollars for a percent of the food on this bill (before tax), in whole cents.
+    const tipAmount = (pct) => (pct ? Math.round(pendingTotal().sub * pct) / 100 : 0);
     const payNote = h('p', { class: 'ord-pay-note t-muted', role: 'status' });
     const payBox = h('div', { class: 'ord-block ord-paybox' }, h('div', { class: 'ord-label' }, 'Payment'), paySeg, tipField, payNote);
 
@@ -9617,6 +10422,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       ico('receipt', 30),
       h('p', { class: 'ord-empty-title' }, 'No items yet'),
       h('p', { class: 't-muted' }, 'Tap an item on the menu to add it.'),
+      h('p', { class: 't-muted ord-empty-last', hidden: true }),
       h('button', { type: 'button', class: 'btn btn-sm ord-empty-repeat' }, ico('history', 18), h('span', null, 'Repeat last order')));
     const toMenu = h('button', { type: 'button', class: 'btn btn-sm ord-to-menu' }, ico('plus', 18), h('span', null, 'Add items'));
     emptyEl.appendChild(toMenu);
@@ -9634,14 +10440,75 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const noteField = SB.ui.field({ label: 'Note for the line', control: noteInput, hint: 'Put allergies first. Cooks read the first line.' });
     noteField.classList.add('ord-note');
     noteField.appendChild(noteCount);
-    const allergyHint = h('div', { class: 'ord-allergy', hidden: true, role: 'status' }, ico('alert', 18), h('span', null, 'A line says allergy, see note. Write the allergy in the note.'));
+    const allergyHint = h('div', { class: 'ord-allergy', hidden: true, role: 'status' }, ico('alert', 18), h('span', null, 'A line says allergy, see note. Tap Allergy above and pick it, or write it in the note.'));
     noteField.appendChild(allergyHint);
     // Rush skips pacing: every item starts now and the ticket goes to the front.
-    const rushToggle = SB.ui.toggle({ label: 'Rush', checked: D.rush, onChange: (on) => { D.rush = on; touched(); } });
-    const rushBox = h('div', { class: 'ord-rush' }, rushToggle, h('p', { class: 'ord-rush-copy t-muted' }, 'Rush skips pacing: every item starts now and the ticket goes to the front.'));
+    const rushToggle = SB.ui.toggle({ label: 'Rush ticket', checked: D.rush, onChange: (on) => { D.rush = on; touched(); } });
+    const rushCopy = h('p', { class: 'ord-rush-copy t-muted' }, '');
+    const rushBox = h('div', { class: 'ord-rush' }, rushToggle, rushCopy);
+    // Says in words what the Rush switch does right now, so a cook never has to guess whether it is on.
+    function paintRush() {
+      text(rushCopy, D.rush ? 'RUSH is on: every item starts now and this ticket goes to the front of the board.' : 'Rush is off: items start on the kitchen plan above. Switch it on only when the guest is waiting.');
+      rushBox.classList.toggle('is-on', D.rush);
+    }
+
+    /* allergy first: asked before anything else, written as the first words of the note */
+    const ALLERGENS = ['Peanut', 'Tree nut', 'Dairy', 'Egg', 'Gluten', 'Soy', 'Fish', 'Shellfish', 'Sesame'];
+    const allergyNo = h('button', { type: 'button', class: 'chip ord-allergy-no', 'aria-pressed': 'false' }, h('span', null, 'No allergy'));
+    const allergyYes = h('button', { type: 'button', class: 'chip ord-allergy-yes', 'aria-pressed': 'false' }, ico('alert', 16), h('span', null, 'Allergy'));
+    const allergyChips = h('div', { class: 'ord-chips ord-allergens', role: 'group', 'aria-label': 'Allergens', hidden: true });
+    const allergenBtns = new Map();
+    const allergyWarn = h('p', { class: 'ord-allergy-pick', role: 'status', hidden: true }, 'Tap what the guest is allergic to.');
+    const allergyBox = h('div', { class: 'ord-block ord-allergybox' },
+      h('div', { class: 'ord-label' }, 'Any food allergy?'), h('div', { class: 'ord-chips' }, allergyNo, allergyYes), allergyChips, allergyWarn);
+    // Sets the note text from code and redraws everything that shows it.
+    function setNote(v) { D.note = v; noteInput.value = v; hideError(); paintNote(); }
+    allergyNo.addEventListener('click', () => {
+      // Saying "No allergy" removes any allergy words from the note.
+      const p = SB.orderLogic.parseAllergy(D.note);
+      D.allergy = D.allergy === 'no' ? '' : 'no';
+      setNote(p.rest); touched();
+    });
+    allergyYes.addEventListener('click', () => { D.allergy = D.allergy === 'yes' ? '' : 'yes'; if (D.allergy === '') setNote(SB.orderLogic.parseAllergy(D.note).rest); touched(); });
+    // Makes one button per allergen, plus any other allergy already typed into the note.
+    function paintAllergy() {
+      const parsed = SB.orderLogic.parseAllergy(D.note);
+      if (parsed.list.length && D.allergy !== 'yes') D.allergy = 'yes';
+      const yes = D.allergy === 'yes';
+      allergyNo.setAttribute('aria-pressed', D.allergy === 'no' ? 'true' : 'false');
+      allergyYes.setAttribute('aria-pressed', yes ? 'true' : 'false');
+      setHidden(allergyChips, !yes);
+      setHidden(allergyWarn, !(yes && !parsed.list.length));
+      const all = ALLERGENS.concat(parsed.list.filter((x) => !ALLERGENS.some((a) => a.toLowerCase() === x.toLowerCase())));
+      all.forEach((nm) => {
+        let b = allergenBtns.get(nm);
+        if (!b) {
+          b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, nm));
+          // Each tap adds the allergen to the front of the note, or takes it off again.
+          b.addEventListener('click', () => { setNote(SB.orderLogic.toggleAllergen(D.note, nm)); touched(); });
+          allergenBtns.set(nm, b); allergyChips.appendChild(b);
+        }
+        b.setAttribute('aria-pressed', parsed.list.some((x) => x.toLowerCase() === nm.toLowerCase()) ? 'true' : 'false');
+      });
+      allergenBtns.forEach((b, nm) => { if (all.indexOf(nm) < 0) { b.remove(); allergenBtns.delete(nm); } });
+    }
+
+    /* note templates: one tap adds a common phrase after the allergy words */
+    const TEMPLATES = ['Sauce on the side', 'No sauce', 'Cut in half', 'Extra napkins', 'Birthday', 'Pack to go'];
+    const tplRow = h('div', { class: 'ord-chips ord-templates', role: 'group', 'aria-label': 'Note phrases' });
+    TEMPLATES.forEach((t) => {
+      const b = h('button', { type: 'button', class: 'chip' }, h('span', null, t));
+      // Adds the phrase unless it is already there or the note would pass its length limit.
+      b.addEventListener('click', () => {
+        const r = SB.orderLogic.addPhrase(D.note, t, L.maxNoteLen);
+        if (r.ok) { setNote(r.note); touched(); } else if (r.why === 'long') showNotice('That phrase does not fit: the note holds ' + L.maxNoteLen + ' characters. Keep the allergy and cut the rest.');
+      });
+      tplRow.appendChild(b);
+    });
+    noteField.querySelector('.field-label').after(tplRow);
 
     const details = h('div', { class: 'ord-details', dataset: { add: 'false' } }, orderBox, custField, channelBox, payBox);
-    orderPane.append(head, notice, linesBox, details, plan, noteField, rushBox);
+    orderPane.append(head, notice, allergyBox, linesBox, details, plan, noteField, rushBox);
     root.append(paneSeg, menuPane, orderPane);
 
     // Footer: total, inline error, Send.
@@ -9653,8 +10520,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const total = h('div', { class: 'ord-total' }, totalN, totalSum);
     const reviewBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg ord-review' }, ico('receipt', 22), h('span', null, 'View order'));
     const sendBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg ord-send' }, ico('ticket', 22), h('span', null, 'Send to kitchen'));
-    sheet.footer.classList.add('ord-foot'); sheet.footer.dataset.pane = 'menu';
-    sheet.footer.append(errEl, total, reviewBtn, sendBtn);
+    host.footer.classList.add('ord-foot'); host.footer.dataset.pane = 'menu';
+    host.footer.append(errEl, total, reviewBtn, sendBtn);
 
     // painting: every function updates nodes in place
     // Updates every menu tile in place: price, 86 state, and how many are on the order.
@@ -9713,6 +10580,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // Updates the quick-name buttons and the length counter, and shows an error when the name is too long.
     function paintCustomer() {
       view.chipBtns.forEach((b, nm) => b.setAttribute('aria-pressed', D.customer === nm ? 'true' : 'false'));
+      paintRecent();
       const len = D.customer.trim().length;
       const over = len > L.maxCustomerLen;
       setHidden(custCount, len < 28 && !over);
@@ -9730,6 +10598,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       noteField.setError(over ? 'The note is ' + len + ' characters. The limit is ' + L.maxNoteLen + '. Keep the allergy and cut the rest.' : null);
       const needs = D.lines.some((l) => l.mods.some((m) => /allergy/i.test(m))) && len === 0;
       setHidden(allergyHint, !needs);
+      paintAllergy();
     }
     // Refreshes everything that depends on the size of the order:
     // counts, total, button words and the empty state.
@@ -9748,9 +10617,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       text(repeatBtn.lastChild, lbl);
       const er = emptyEl.querySelector('.ord-empty-repeat');
       setHidden(er, !last); text(er.lastChild, lbl);
+      const lastEl = emptyEl.querySelector('.ord-empty-last');
+      setHidden(lastEl, !last); if (last) text(lastEl, 'Last order: ' + summarize(last.items, (id) => { const mi = menuById(id); return mi ? mi.short || mi.name : id; }) + '.');
       setHidden(emptyEl, !draftEmpty());
       setHidden(linesEl, draftEmpty());
       rushStamp.hidden = !D.rush;
+      paintRush();
     }
 
     /* the plan: rebuilt as a whole on purpose (it has nothing to press), cheap even at 30 lines */
@@ -9913,6 +10785,11 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       setHidden(tipField, !D.pay);
       if (tipInput.value !== D.tip) tipInput.value = D.tip;
       const tip = dollars(D.tip);
+      tipBtns.forEach((t) => {
+        const a = tipAmount(t.d.pct);
+        if (t.d.pct) text(t.b.lastChild, t.d.pct + '% ' + U.fmtMoney(a));
+        t.b.setAttribute('aria-pressed', !Number.isNaN(tip) && (t.d.pct ? Math.abs(tip - a) < 0.005 && tip > 0 : D.tip === '') ? 'true' : 'false');
+      });
       tipField.setError(D.pay && Number.isNaN(tip) ? 'Type dollars and cents, like 2.50.' : null);
       if (!D.pay) { text(payNote, 'The order stays open. Take payment later from Orders.'); return; }
       const pt = pendingTotal(), pm = C.payMethodById[D.pay];
@@ -9989,7 +10866,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
           if (!r.ok) { const mi = menuById(it.menuId); skipped.push(mi ? mi.short || mi.name : it.menuId); }
         });
         D.channel = last.channel || 'dine_in'; channelSeg.setValue(D.channel);
-        D.customer = ''; custInput.value = ''; D.note = ''; noteInput.value = ''; D.rush = false; rushToggle.setValue(false);
+        D.customer = ''; custInput.value = ''; D.note = ''; noteInput.value = ''; D.allergy = ''; D.rush = false; rushToggle.setValue(false);
         touched();
         if (skipped.length) showNotice('Order #' + last.num + ' copied. Left out because they are 86 right now: ' + skipped.join(', ') + '.');
         else showNotice('Order #' + last.num + ' copied. Add the customer and send.');
@@ -10038,8 +10915,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
         const info = res.info || {};
         const zones = Array.isArray(info.zones) ? info.zones.length : 0;
         lastSent = { num: info.num, channel: D.channel, items: items.map((it) => ({ menuId: it.menuId, qty: it.qty, mods: (it.mods || []).slice() })) };
+        payDefault = D.pay;
         resetDraft();
-        sheet.close('sent');
+        host.close('sent');
         const where = addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent to ' : ' sent to ';
         SB.ui.toast('Ticket #' + info.num + where + zones + ' ' + U.plural(zones, 'station') + '.' + (info.paid ? ' Paid ' + U.fmtMoney(info.total) + ' by ' + payWord + '.' : ''), { tone: 'ok' });
         return;
@@ -10082,19 +10960,20 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     function onEscape(e) {
       e.preventDefault();
       if (view.editing) { const k = view.editing; view.editing = null; syncLines(); const v = view.lineViews.get(k); if (v) v.el.querySelector('.ord-mods-btn').focus({ preventScroll: true }); return; }
-      if (draftEmpty()) sheet.close('esc'); else askLeave(sheet, () => { if (fine) searchInput.focus({ preventScroll: true }); });
+      if (draftEmpty()) host.close('esc'); else askLeave(host, () => { if (fine) searchInput.focus({ preventScroll: true }); });
     }
     // When the button that had focus disappears (Repeat last order, a removed
     // line), focus falls to the page and Esc would do nothing
     // because the sheet is built with closeOnEsc off. This catches that
     // case, but only while this sheet is the top one.
     function onDocKey(e) {
-      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || sheet.el.contains(document.activeElement)) return;
+      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || host.el.contains(document.activeElement)) return;
       const roots = document.querySelectorAll('.sheet-root:not(.is-closing)');
-      if (roots.length && roots[roots.length - 1].contains(sheet.el)) onEscape(e);
+      // A page has no sheet of its own: it acts only when no sheet is open on top of it.
+      if (host.isPage ? !roots.length : roots.length && roots[roots.length - 1].contains(host.el)) onEscape(e);
     }
     document.addEventListener('keydown', onDocKey);
-    sheet.el.addEventListener('keydown', (e) => {
+    host.el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); send(); return; }
       if (e.key === 'Escape' && !e.isComposing) { onEscape(e); return; }
       // typing in this sheet must never trigger the board's single-key shortcuts
@@ -10122,11 +11001,15 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     live = view;
     paintAll();
     if (!draftEmpty()) { showNotice('Your unsent order is back. Clear it to start fresh.'); setPane('order'); }
-    return sheet;
+    // The search box when a mouse or keyboard is in use, so a touch tablet keeps its on-screen keyboard down.
+    const startFocus = () => (fine && searchInput ? searchInput : null);
+    // Leaving the screen the way Esc does: close an empty order, ask first when there are items.
+    const leave = () => onEscape({ preventDefault() {} });
+    return { teardown, startFocus, leave };
   }
 
   /** Esc on an order that has items: close and keep the draft, keep editing, or discard it. */
-  function askLeave(sheet, back) {
+  function askLeave(host, back) {
     const n = qtyTotal();
     const dlg = SB.ui.sheet({ title: 'Leave this order?', side: 'center', width: 480, role: 'alertdialog', name: 'order-leave' });
     dlg.body.appendChild(h('div', { class: 'sheet-copy' },
@@ -10135,15 +11018,19 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // Keep editing: closes this question and goes back to the order.
     const keep = h('button', { type: 'button', class: 'btn', onClick: () => { dlg.close('keep-editing'); if (back) back(); } }, 'Keep editing');
     // Discard order: forgets the draft and closes both sheets.
-    const discard = h('button', { type: 'button', class: 'btn btn-danger', onClick: () => { resetDraft(); dlg.close('discard'); sheet.close('discard'); SB.ui.toast('Order discarded.', { tone: 'info' }); } }, ico('trash', 20), h('span', null, 'Discard order'));
+    const discard = h('button', { type: 'button', class: 'btn btn-danger', onClick: () => { resetDraft(); dlg.close('discard'); host.close('discard'); SB.ui.toast('Order discarded.', { tone: 'info' }); } }, ico('trash', 20), h('span', null, 'Discard order'));
     // Close, keep draft: closes the order sheet but remembers the items for next time.
-    const close = h('button', { type: 'button', class: 'btn btn-primary', 'data-autofocus': '', onClick: () => { dlg.close('close'); sheet.close('esc'); } }, ico('check', 20), h('span', null, 'Close, keep draft'));
+    const close = h('button', { type: 'button', class: 'btn btn-primary', 'data-autofocus': '', onClick: () => { dlg.close('close'); host.close('esc'); } }, ico('check', 20), h('span', null, 'Close, keep draft'));
     dlg.footer.append(keep, discard, close);
     dlg.focus(close);
     return dlg;
   }
 
   SB.sheets.register('order', openOrder);
+  // The page version is for the router: SB.order.mountPage(hostElement, { onExit }) shows New ticket as a full page.
+  // The router layer calls SB.order.mount(el) and keeps the cleanup function it gets back.
+  const mountForRouter = (el, opts) => mountPage(el, opts).destroy;
+  SB.order = { mount: mountForRouter, mountPage, open: openOrder };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 71-floor-order.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'71-floor-order.js',message:String(e&&e.message||e)});}
@@ -11301,7 +12188,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const menuBox = h('section', { class: 'fs-section bd-menu', 'aria-label': 'Menu availability' }, h('div', { class: 'fs-row' }, h('h3', { class: 'fs-h grow' }, 'Menu'), filterSeg));
     const catHost = h('div', { class: 'bd-cats' });
     const noneOff = h('div', { class: 'empty bd-none', hidden: true }, ico('check-circle', 36), h('h3', null, 'Everything is on the menu'), h('p', null, 'Nothing is 86 right now. Tap 86 it on an item that has run out.'));
-    menuBox.append(catHost, noneOff);
+    // Shown while no cooked food is in the cabinet, so a board full of 86 items is not a mystery.
+    const nothingCooked = h('p', { class: 'fs-sub bd-nocook', hidden: true, role: 'status' }, 'Nothing is cooked yet. Meat and sides show as 86 until you put a batch in the hold cabinet.');
+    menuBox.append(nothingCooked, catHost, noneOff);
 
     // Builds one menu row (name, price, state, reason, buttons) once; updateRow keeps it current.
     function makeRow(mi) {
@@ -11402,6 +12291,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       rows.forEach((rec) => { const hide = filter === 'off' && !rec.off; setHidden(rec.el, hide); if (!hide) shown++; });
       cats.forEach((c) => { let any = false; c.map.forEach((r) => { if (!r.el.hidden) any = true; }); setHidden(c.el, !any); });
       setHidden(noneOff, !(filter === 'off' && shown === 0));
+      setHidden(nothingCooked, st().batches.some((b) => b.status !== 'discard' && b.remainingG > 0));
     }
 
     // Builds one ingredient stock row once.
@@ -11694,9 +12584,13 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       setHidden(warn, sp === 1);
       text(warn.querySelector('.dm-warn-t'), 'The clock is running x' + (Math.round(sp * 100) / 100) + '.');
     }
+    // wrap (set by the caller) is hidden unless the demo is loaded: faster clocks are developer-only.
+    const api = { el, paint: () => { paint(); if (api.wrap) setHidden(api.wrap, !demoOn()); }, seg, wrap: null };
     paint();
-    return { el, paint, seg };
+    return api;
   }
+  // True while the demo is loaded, so developer-only tools should show (clock speeds, contrast checker).
+  const demoOn = () => !!(SB.shell && SB.shell.demoLoaded && SB.shell.demoLoaded());
 
   // Builds the Demo and clock sheet. Without the simulator it says so plainly and keeps the clock and Reset.
   function openDemo() {
@@ -11737,7 +12631,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
     // clock
     const clockCtl = clockControl('Clock speed');
-    const clockBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Clock speed'), h('p', { class: 'fs-sub' }, 'Speeds up the whole kitchen so you can watch a busy night in a minute.'), clockCtl.el);
+    const clockBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Clock speed (demo only)'), h('p', { class: 'fs-sub' }, 'Speeds up the whole kitchen so you can watch a busy night in a minute. It shows only while the demo is loaded. Never use it in real service.'), clockCtl.el);
+    clockCtl.wrap = clockBox; setHidden(clockBox, !demoOn());
 
     // sample history
     const sampleBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Data counts'));
@@ -11756,16 +12651,16 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
     // Reset live data asks first (see doReset).
     const resetBtn = h('button', { type: 'button', class: 'btn btn-danger btn-lg', onClick: () => doReset() }, ico('trash', 22), h('span', null, 'Reset live data'));
-    const resetBox = h('section', { class: 'fs-section dm-reset' }, h('h3', { class: 'fs-h' }, 'Start fresh'), h('p', { class: 'fs-sub' }, 'Clears every ticket, batch and event on this device and puts starter stock back. Settings stay. Sample history is not touched.'), resetBtn);
+    const resetBox = h('section', { class: 'fs-section dm-reset' }, h('h3', { class: 'fs-h' }, 'Back to real service'), h('p', { class: 'fs-sub' }, 'Reset live data erases every ticket, batch and event on this device, including all demo orders, and puts the clock back to real time. The board and the pit start empty. Your settings and menu stay. This cannot be undone.'), resetBtn);
 
     // Restart demo: start over with fresh tickets, the way the app looks on its first day.
     const restartBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg dm-restart', onClick: () => doRestart() }, ico('refresh', 22), h('span', null, 'Restart demo'));
     const tourBtn = h('button', { type: 'button', class: 'btn btn-lg', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', null, 'Show me how it works'));
-    const startBox = h('section', { class: 'fs-section dm-start' }, h('h3', { class: 'fs-h' }, 'Start over'),
-      h('p', { class: 'fs-sub' }, 'Puts three fresh pretend tickets on the board, as on the first day. Nothing runs by itself: you tap START and DONE, and the timers show when each dish should begin.'),
+    const startBox = h('section', { class: 'fs-section dm-start' }, h('h3', { class: 'fs-h' }, 'Load the demo'),
+      h('p', { class: 'fs-sub' }, 'For practice only. Loads pretend food in the cabinet and three pretend tickets, and erases what is on this device now. Nothing runs by itself: you tap START and DONE, and the timers show when each dish should begin.'),
       h('div', { class: 'fs-row' }, restartBtn, tourBtn));
 
-    sheet.body.append(h('div', { class: 'dm' }, statusBox, startBox, simBox, clockBox, sampleBox, resetBox));
+    sheet.body.append(h('div', { class: 'dm' }, h('div', { class: 'fs-note', 'data-tone': 'warn' }, ico('alert', 20), h('div', null, h('strong', null, 'Everything here is pretend.'), h('p', null, 'Demo orders, the auto crew and the 14-day sample history are made up by the app. They are not your sales and not your food. Use Reset live data below to go back to real service.'))), statusBox, startBox, simBox, clockBox, sampleBox, resetBox));
 
     // Clears the board after a confirm and puts the fresh demo tickets back. Settings stay.
     async function doRestart() {
@@ -11788,12 +12683,12 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length;
       const ok = await SB.ui.confirm({
         title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep everything',
-        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and puts the starter stock back.', 'Settings and sample history stay. This cannot be undone.'],
+        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
-      const rep = SB.store.resetLive({ keepSettings: true });
-      if (rep === 'ok') toast('Live data cleared. Starter stock is back.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
+      const rep = SB.store.resetLive({ keepSettings: true, starter: false });
+      if (rep === 'ok') toast('Live data cleared. The board is empty.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
       paint();
     }
 
@@ -11986,7 +12881,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
         // All three buttons close Help first, so only one sheet is ever open.
         h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, runTour) }, ico('play', 20), h('span', null, 'Replay the walkthrough')),
         // The specs open after Help closes.
-        h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, () => SB.sheets.open('specs')) }, ico('book', 20), h('span', null, 'See the specs')),
+        demoOn() ? h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, () => SB.sheets.open('specs')) }, ico('book', 20), h('span', null, 'See the specs')) : null,
         // The demo sheet opens after Help closes.
         h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, () => SB.sheets.open('demo')) }, ico('play', 20), h('span', null, 'Demo and clock'))),
       h('p', { class: 'fs-sub hp-tiny' }, 'Smokebox version ' + C.version + '. Managers: tap Back office at the top of the board, or press Ctrl+Shift+O. To add a dish or change a price, open Back office, then Menu and settings.'));
@@ -12159,9 +13054,20 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     // Loudness of this tablet's warnings (20 to 100 percent); the sound switch above is the way to silence.
     const volIn = h('input', { type: 'range', min: '20', max: '100', step: '10', value: String(Math.round((floorOk && SB.floor.volume ? SB.floor.volume() : 1) * 100)), 'aria-label': 'Warning loudness on this tablet', disabled: !floorOk });
     volIn.addEventListener('change', () => { if (floorOk && SB.floor.setVolume) SB.floor.setVolume(Number(volIn.value) / 100); });
+    // How much the voice talks: light, normal or full. The voice itself is always the loud chef.
+    const levelOk = floorOk && typeof SB.floor.setVoiceLevel === 'function';
+    const levelSeg = SB.ui.segmented({ label: 'How much the voice talks', class: 'mn-vlevel', value: levelOk ? SB.floor.voiceLevel() : 'normal', options: [{ id: 'light', label: 'Light' }, { id: 'normal', label: 'Normal' }, { id: 'full', label: 'Full' }], onChange: (id) => { if (levelOk) SB.floor.setVoiceLevel(id); } });
     const speechOk = floorOk && typeof SB.floor.setSpeech === 'function';
     const speechTog = SB.ui.toggle({ label: 'Speak batch warnings aloud', checked: speechOk ? !!SB.floor.speech() : false, disabled: !speechOk, onChange: (on) => { if (speechOk) SB.floor.setSpeech(on); } });
     const soundHelp = floorOk ? 'On by default, because a missed warning can cost a whole batch. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
+
+    // Far display: for a screen read from across the kitchen. Per tablet; needs the board module.
+    const farTog = SB.ui.toggle({ label: 'Far display (big type, quiet board)', checked: floorOk && SB.floor.farDisplay ? SB.floor.farDisplay() : false, disabled: !(floorOk && SB.floor.setFarDisplay), onChange: (on) => { if (floorOk && SB.floor.setFarDisplay) SB.floor.setFarDisplay(on); } });
+
+    // Voice call-outs: on by default, with a switch per tablet; they follow the station tab showing and need sound and speech on.
+    const coTog = SB.ui.toggle({ label: 'Voice call-outs for new tickets and "start now"', checked: floorOk && SB.floor.callouts ? SB.floor.callouts() : false, disabled: !(floorOk && SB.floor.setCallouts), onChange: (on) => { if (floorOk && SB.floor.setCallouts) SB.floor.setCallouts(on); } });
+    // Wall mode: three panes on a screen 1700 px wide or more. Per screen; needs the board module.
+    const wallTog = SB.ui.toggle({ label: 'Wall mode (three panes on a wide screen)', checked: floorOk && SB.floor.wall ? SB.floor.wall() : false, disabled: !(floorOk && SB.floor.setWall), onChange: (on) => { if (floorOk && SB.floor.setWall) SB.floor.setWall(on); } });
 
     // Station: the board opens on this station and reopens on it after a reload.
     const stations = [{ id: 'all', label: 'All', icon: 'grid' }].concat(C.zones.map((z) => ({ id: z.id, label: z.name, icon: z.icon })));
@@ -12173,6 +13079,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
     // Clock speed shortcut: the same control as the Demo sheet, so both always agree.
     const clockCtl = clockControl('Clock speed');
+    const clockBlock = settingBlock('Clock speed', 'Only for demos and training. Real service runs at x1.', clockCtl.el);
+    clockCtl.wrap = clockBlock; setHidden(clockBlock, !demoOn());
 
     // Links to the other support sheets. Each closes this one first.
     const link = (icon, label, name) => h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, () => SB.sheets.open(name)) }, ico(icon, 22), h('span', { class: 'grow' }, label), ico('chevron-right', 20));
@@ -12181,7 +13089,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const officeLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'office' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({}); }) }, ico('gauge', 22), h('span', { class: 'grow' }, 'Back office'), ico('chevron-right', 20));
     // Opens Menu and settings in the back office, where dishes, prices and prep times are edited.
     const menuLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'menu-edit' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }) }, ico('sliders', 22), h('span', { class: 'grow' }, 'Edit the menu'), ico('chevron-right', 20));
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('check-circle', 'Set up this tablet', 'setup'), link('book', 'Specs', 'specs'), link('play', 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
@@ -12189,8 +13097,11 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap START on Hush puppies.', hintsTog),
       settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
+      settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
+      settingBlock('Voice call-outs', 'A chef calls the line out loud. Light: "Fire brisket now! Ticket 12!" and "Ticket 12 is up! Ring it out!". Normal: adds "Order up!" for new tickets and one reminder if a dish is not started or a ticket not rung out. Full: keeps reminding until you start the dish or ring out the ticket. At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Not tried on a real tablet yet.', coTog, levelSeg),
+      settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
-      settingBlock('Clock speed', 'Only for demos and training. Real service runs at x1.', clockCtl.el),
+      clockBlock,
       settingBlock('More', '', links)));
 
     // Keep every control in step when something else changes the look, the station or the clock.
@@ -12216,7 +13127,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 ;try{
 /*
  * WHAT THIS FILE IS: The start-up sequence, loaded last, in the order of SPEC section 19: page ready,
- *    store.init (load saved data), on a first run seed the demo tickets, then mount the shell (draw the
+ *    store.init (load saved data; a first run is an empty kitchen), then mount the shell (draw the
  *    screen). If any step fails it shows a plain "Smokebox could not start" card with Reload and Copy details
  *    buttons, never a white screen.
  * PARTS: loadErrors, detailsText, showBootError, storageNotices, boot.
@@ -12298,15 +13209,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   function boot() {
     let stage = 'start';
     try {
-      const U = SB.util;
       stage = 'store';
-      // Fallback for first-run detection if the store does not report it: was anything saved before?
-      const hadState = !!(U && U.storage && U.storage.get('smokebox.v1.state', null));
-      let res;
-      if (SB.store && typeof SB.store.init === 'function') res = SB.store.init();
-      const first = res && typeof res.firstRun === 'boolean' ? res.firstRun : !hadState;
-      stage = 'seed';
-      if (first && SB.sim && typeof SB.sim.seedFirstRun === 'function') SB.sim.seedFirstRun();
+      if (SB.store && typeof SB.store.init === 'function') SB.store.init();
+      // A first run is a real, empty kitchen: the demo tickets and batches only load when the user asks for the demo.
       stage = 'shell';
       if (!SB.shell || typeof SB.shell.mount !== 'function') throw new Error('The shell module (60-shell.js) is not available.');
       SB.shell.mount(doc.getElementById('app') || doc.body);
