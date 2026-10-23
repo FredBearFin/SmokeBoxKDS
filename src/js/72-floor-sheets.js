@@ -314,7 +314,7 @@
       return f > S.coldHoldF ? { tone: 'bad', text: 'Above ' + U.tempText(S.coldHoldF) + '. The batch goes on Chill now and stops being served.' } : { tone: 'ok', text: 'In range (' + U.tempText(S.coldHoldF) + ' or below).' };
     }
     if (f < S.hotHoldF) return { tone: 'bad', text: 'Below ' + U.tempText(S.hotHoldF) + '. The batch goes on Reheat now and stops being served.' };
-    if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1)) return { tone: 'ok', text: U.tempText(f) + ' counts as the reheat (one reheat only).' };
+    if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1)) return { tone: 'ok', text: U.tempText(f) + ' counts as the reheat (Smokebox allows one reheat per batch).' };
     return { tone: 'ok', text: 'In range (' + U.tempText(S.hotHoldF) + ' or above).' };
   }
   // The temperature the editor starts at: the last reading, or a typical value for that kind of batch.
@@ -754,7 +754,7 @@
       const dl = dialog({
         title: 'Keep serving', name: 'keep', opener, confirmLabel: 'Keep serving', icon: 'check-circle',
         body: [
-          h('p', null, 'Past its quality limit means the food is off the menu until someone tastes it. If it is still good, keep it on the menu for a set time. Your local health department\'s rules apply to quality extensions.'),
+          h('p', null, 'Past its quality limit means the food is off the menu until someone checks it. If it is still good, keep it on the menu for a set time. Your local health department\'s rules apply to quality extensions.'),
           list, h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'How long'), dur, untilIn), err,
         ],
         // Sends the ticked batches to the engine with the chosen length and the initials, then reports what was kept.
@@ -1834,7 +1834,7 @@
         h('ul', { class: 'hp-words' },
           wordRow(stateEl('ok', 'check-circle', 'In range'), 'In range and checked on time.'),
           wordRow(stateEl('warn', 'thermometer', 'Check temp'), 'A reading is due. Still being served.'),
-          wordRow(stateEl('bad', 'flame', 'Reheat now'), 'Below the hot-hold limit. Not served until it is reheated once, or discarded.'),
+          wordRow(stateEl('bad', 'flame', 'Reheat now'), 'Below the hot-hold limit. Not served until it is reheated (Smokebox allows one reheat per batch), or discarded.'),
           wordRow(stateEl('bad', 'snow', 'Chill now'), 'Above the cold-hold limit. Not served until it is back in range, or discarded.'),
           wordRow(stateEl('bad', 'alert', 'Discard'), 'Out of time or out of range for too long. Locked, and discarded automatically.'))));
   }
@@ -1861,12 +1861,12 @@
     const rule = (icon, title, body) => helpItem(icon, title, body);
     return h('div', { class: 'hp-pane' },
       safetyNote(),
-      h('p', { class: 'fs-sub' }, 'These are the limits Smokebox is using right now. They start from the FDA Food Code (3-501.14, 3-501.16, 3-403.11 and 4-602.11) and are starter values until the owner confirms them.'),
+      h('p', { class: 'fs-sub' }, 'These are the limits Smokebox is using right now. They start from the FDA Food Code (3-501.14, 3-501.16, 3-403.11 and 4-602.11) and are starter values until the owner confirms them. Some rules, such as one reheat per batch, are Smokebox's own and not part of the code.'),
       helpList([
         rule('flame', 'Keep hot food hot', 'Hot food stays at ' + U.tempText(S.hotHoldF) + ' or above.'),
         rule('snow', 'Keep cold food cold', 'Cold food stays at ' + U.tempText(S.coldHoldF) + ' or below.'),
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
-        rule('refresh', 'Reheat once', 'Below ' + U.tempText(S.hotHoldF) + ', reheat to ' + U.tempText(S.reheatF) + ' within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
+        rule('refresh', 'Reheating', 'Below ' + U.tempText(S.hotHoldF) + ', reheat to ' + U.tempText(S.reheatF) + ' within ' + S.belowHotGraceH + ' hours of the first low reading. Smokebox allows one reheat per batch (our rule, not a health code rule). After that, discard it.'),
         rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat.'),
         rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A throw-out time means the batch must be thrown out when time is up. A quality limit takes it off the menu: check it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
         rule('snow', 'Cooling', 'From ' + U.tempText(S.hotHoldF) + ' to ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' hours, then to ' + U.tempText(c.finalF) + ' within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
@@ -2011,7 +2011,7 @@
           helpItem('refresh', 'No whole-board redraw each second', 'The original rebuilt the board every second, so a tap could land on a node that was about to be replaced. Now only timer text changes each second.'),
           helpItem('eye', 'Contrast is measured, not typed in', 'The original printed a fixed 7.8:1. Its small amber text was 4.06:1, under the 4.5:1 minimum. Small amber text now uses a darker ink, and this screen does the maths.'),
           helpItem('clock', 'Paced start times', 'Each line starts so the whole order finishes together. Prep times are learned from real tickets and start as estimates.'),
-          helpItem('thermometer', 'A hold cabinet that keeps checks on time', 'Temperature logs, reheat once, discard on time, and automatic 86 when a batch is locked. The two-hour clock starts at the first low reading (see Help, Food safety).'),
+          helpItem('thermometer', 'A hold cabinet that keeps checks on time', 'Temperature logs, one reheat per batch (our rule), discard on time, and automatic 86 when a batch is locked. The two-hour clock starts at the first low reading (see Help, Food safety).'),
           helpItem('undo', 'Undo, keys and themes', 'Ten seconds of undo, keyboard shortcuts, Day and Night, and a large text option.'),
           helpItem('scale', 'Weights in grams and kilograms', 'Never cups.'),
         ])),
