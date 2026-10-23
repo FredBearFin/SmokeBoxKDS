@@ -202,7 +202,7 @@ test('brute force: five wrong pairing codes lock that address even for the right
   let t = T0;
   const S = createScreens({ now: () => t });
   const code = S.issueCode().code;
-  for (let i = 0; i < 31; i++) S.exchange('ZZZZZ' + (i % 10), 'x', 'addr-' + i);
+  for (let i = 0; i < 301; i++) S.exchange('ZZZZZ' + (i % 10), 'x', 'addr-' + i);   // more than 300 in ten minutes (raised from 30: a few dozen guesses from elsewhere must not burn the owner's code)
   const r = S.exchange(code, 'Real', 'addr-new');
   assert.deepEqual([r.ok, r.report], [false, 'tooManyTries'], 'the code was burned and pairing is paused');
   t += 11 * 60 * 1000;

@@ -67,13 +67,14 @@ test('trust proxy: admin key tries are counted per real address too, and the set
   const { h, port } = await hub({ trustProxy: true });
   try {
     for (let i = 0; i < 10; i++) await post('127.0.0.1', port, '/admin/pair', {}, { authorization: 'Bearer wrong', 'x-forwarded-for': '10.1.1.1' });
-    assert.equal((await post('127.0.0.1', port, '/admin/pair', {}, { authorization: 'Bearer ' + h.adminKey, 'x-forwarded-for': '10.1.1.1' })).status, 429);
+    assert.equal((await post('127.0.0.1', port, '/admin/pair', {}, { authorization: 'Bearer wrong', 'x-forwarded-for': '10.1.1.1' })).status, 429, 'wrong keys from that address are held off');
+    assert.equal((await post('127.0.0.1', port, '/admin/pair', {}, { authorization: 'Bearer ' + h.adminKey, 'x-forwarded-for': '10.1.1.1' })).status, 200, 'but the right key is never refused because of someone else\'s wrong tries');
     assert.equal((await post('127.0.0.1', port, '/admin/pair', {}, { authorization: 'Bearer ' + h.adminKey, 'x-forwarded-for': '10.1.1.2' })).status, 200);
   } finally { await h.close(); }
   const env = process.env.SMOKEBOX_TRUST_PROXY; delete process.env.SMOKEBOX_TRUST_PROXY;
   const off = await hub({});
   try {
     for (let i = 0; i < 10; i++) await post('127.0.0.1', off.port, '/admin/pair', {}, { authorization: 'Bearer wrong', 'x-forwarded-for': '10.1.1.1' });
-    assert.equal((await post('127.0.0.1', off.port, '/admin/pair', {}, { authorization: 'Bearer ' + off.h.adminKey, 'x-forwarded-for': '10.1.1.2' })).status, 429, 'off by default: one address for everyone');
+    assert.equal((await post('127.0.0.1', off.port, '/admin/pair', {}, { authorization: 'Bearer wrong', 'x-forwarded-for': '10.1.1.2' })).status, 429, 'off by default: one address for everyone');
   } finally { await off.h.close(); if (env !== undefined) process.env.SMOKEBOX_TRUST_PROXY = env; }
 });

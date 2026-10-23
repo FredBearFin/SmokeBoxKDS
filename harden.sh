@@ -2,6 +2,7 @@
 # OPTIONAL hardening for a Smokebox server that already ran go.sh. Run as root: bash harden.sh     Undo it with: bash harden-remove.sh
 # What it does (and prints each step):
 #   1. Turns on Caddy's access log (JSON, /var/log/caddy/access.log, rolled at 10 MB, 3 kept) through one snippet that is imported by the site blocks.
+#      The log leaves out the screens' token and code headers and the ?code= in an address, so a long-lived secret never lands in a file.
 #   2. Installs fail2ban with a jail "caddy-401": an address that gets 8 "401 wrong password" answers within 10 minutes is blocked for 1 hour
 #      (ports 80 and 443). Each wrong password costs the small server a bcrypt check, so this stops an anonymous caller from burning its CPU.
 #   3. Turns on automatic SECURITY upgrades (no automatic reboot: a restart in the middle of service is your decision).
@@ -36,7 +37,16 @@ cat > "$SNIPPET" <<'CADDY'
 			roll_size 10MiB
 			roll_keep 3
 		}
-		format json
+		format filter {
+			wrap json
+			fields {
+				request>headers>X-Smokebox-Token delete
+				request>headers>X-Smokebox-Code delete
+				request>uri query {
+					delete code
+				}
+			}
+		}
 	}
 }
 CADDY

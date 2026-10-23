@@ -77,8 +77,8 @@ export function createScreens(opts = {}) {
       addrFails.set(addr, { n, until: n >= 5 ? t + 10 * 60 * 1000 : 0 });
       if (addrFails.size > 500) addrFails.delete(addrFails.keys().next().value);
       wrong = wrong.filter((x) => x > t - 10 * 60 * 1000); wrong.push(t);
-      // Many wrong guesses from anywhere: every open code is burned and pairing pauses for ten minutes, so a spread-out guesser gets nowhere.
-      if (wrong.length > 30) { codes.clear(); lockedUntil = t + 10 * 60 * 1000; wrong = []; return { ok: false, report: 'tooManyTries' }; }
+      // Very many wrong guesses from anywhere (more than 300 in ten minutes; each address is already held to 5): every open code is burned and pairing pauses for ten minutes, so a spread-out guesser gets nowhere.
+      if (wrong.length > 300) { codes.clear(); lockedUntil = t + 10 * 60 * 1000; wrong = []; return { ok: false, report: 'tooManyTries' }; }
       return { ok: false, report: n >= 5 ? 'tooManyTries' : 'badPairCode' };
     }
     codes.delete(hit[0]); addrFails.delete(addr);

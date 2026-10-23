@@ -22,7 +22,7 @@ const kids = [];
 function hub(dir, port, env) { const c = spawn(process.execPath, [path.join(dir, 'server/server.mjs')], { env: Object.assign({}, process.env, { PORT: String(port), HOST: '127.0.0.1', SMOKEBOX_DATA: path.join(tmp, 'data-' + port, 'state.json') }, env) }); fs.mkdirSync(path.join(tmp, 'data-' + port), { recursive: true }); kids.push(c); return c; }
 const MAIN = 28787, BETA = 28788, PROXY = 28800;
 const KEY = 'k'.repeat(40); const TRUST = 28801, NOTRUST = 28802;
-hub(ROOT, MAIN, { SMOKEBOX_STARTER: '0' }); hub(ROOT, TRUST, { SMOKEBOX_TRUST_PROXY: '1', SMOKEBOX_ADMIN_KEY: KEY, SMOKEBOX_REQUIRE_TOKENS: '1' }); hub(ROOT, NOTRUST, { SMOKEBOX_ADMIN_KEY: KEY, SMOKEBOX_REQUIRE_TOKENS: '1' }); hub(conn, BETA, { SMOKEBOX_STARTER: '1', SMOKEBOX_WRITE_CODE: 'WRITECODE12345', SMOKEBOX_FOLLOW_CODE: 'FOLLOWCODE12345' });
+hub(ROOT, MAIN, { SMOKEBOX_STARTER: '0', SMOKEBOX_ALLOWED_HOSTS: 'main.test' }); hub(ROOT, TRUST, { SMOKEBOX_TRUST_PROXY: '1', SMOKEBOX_ADMIN_KEY: KEY, SMOKEBOX_REQUIRE_TOKENS: '1' }); hub(ROOT, NOTRUST, { SMOKEBOX_ALLOWED_HOSTS: 'notrust.test', SMOKEBOX_ADMIN_KEY: KEY, SMOKEBOX_REQUIRE_TOKENS: '1' }); hub(conn, BETA, { SMOKEBOX_ALLOWED_HOSTS: 'beta.test,main.test', SMOKEBOX_STARTER: '1', SMOKEBOX_WRITE_CODE: 'WRITECODE12345', SMOKEBOX_FOLLOW_CODE: 'FOLLOWCODE12345' });
 // the stand-in for Caddy: hosts main.test and beta.test, and the path /beta/ on main.test sent to the beta with the prefix removed; flush at once (no buffering)
 const proxy = http.createServer((req, res) => {
   const host = String(req.headers.host || '').split(':')[0]; let target = MAIN, url = req.url;

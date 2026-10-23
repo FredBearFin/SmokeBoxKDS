@@ -109,7 +109,7 @@ test('the data file is written only at its own path and an unreadable or hostile
   await post(port, { type: 'createTicket', payload: { items: [{ menuId: 'brisket_half' }] } });
   hub.flush();
   const files = fs.readdirSync(dir);
-  assert.ok(files.every((f) => f === 'state.json' || /^state\.json\.(tmp|bak|bad-.*|wal|wal\.tmp|screens|screens\.tmp|admin)$/.test(f)), 'only the data file and its own companions: ' + files);
+  assert.ok(files.every((f) => f === 'state.json' || /^state\.json\.(tmp|bak|bad-.*|wal|wal\.tmp|screens|screens\.tmp|admin|lock)$/.test(f)), 'only the data file and its own companions: ' + files);
   if (fs.existsSync(file)) JSON.parse(fs.readFileSync(file, 'utf8'));   // a damaged file is set aside, so a file exists only once something was saved
 });
 

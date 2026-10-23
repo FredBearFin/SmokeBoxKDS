@@ -50,6 +50,7 @@ async function withHealth(mode, fn) {
     else if (mode === 'old') { res.statusCode = isHealth ? 404 : 200; res.end(isHealth ? 'not found' : '<html></html>'); }
     else if (mode === 'old-down') { res.statusCode = isHealth ? 404 : 500; res.end('x'); }
     else if (mode === 'garbage') { res.statusCode = 200; res.end(isHealth ? '<html>captive portal</html>' : '<html></html>'); }
+    else if (mode === 'dataproblem') { res.statusCode = 200; res.end(isHealth ? '{"ok":true,"dataProblem":{"words":"set aside","kept":"state.json.bad-1"}}' : '<html></html>'); }
     else if (mode === 'notok') { res.statusCode = 200; res.end(isHealth ? '{"ok":false}' : '<html></html>'); }
     else { res.statusCode = 500; res.end('x'); }
   });
@@ -268,4 +269,22 @@ test('the install scripts put the zone in the update times, and refuse an unknow
   assert.match(beta, /OnCalendar=\*-\*-\* 04:50:00 \$TZNAME/); assert.match(beta, /beta-update\.timer <<EOF/);
   const r = spawnSync('bash', ['-c', 'cd /tmp && bash ' + path.join(ROOT, 'go.sh') + ' u pw Nowhere/Bogus 2>&1'], { encoding: 'utf8' });
   assert.notEqual(r.status, 0);   // not root, or unknown zone: it must stop before downloading anything
+});
+
+test('health check: {"ok":true} with a dataProblem (the new build set the saved data aside and started empty) -> the old build is put back and the log says so', { skip }, async () => {
+  const t = setup('h-dataproblem'); const tgz = tarball(t.tmp, 'h', (d) => makeTree(d, 'NEW'));
+  await withHealth('dataproblem', async (port) => {
+    const r = await runWith(t, tgz, port, { SMOKEBOX_PUBKEY: path.join(t.tmp, 'absent') });
+    assert.notEqual(r.status, 0); assert.match(r.stdout, /putting the previous version back/); assert.match(r.stdout, /set the saved data aside|dataProblem|state\.json\.bad-1/); assert.equal(marker(t.prefix), 'OLD');
+  });
+});
+
+test('SMOKEBOX_REQUIRE_SIGNED=1: without a public key the update is refused (and with one, a signed build goes through)', { skip: skip || !haveSsl }, async () => {
+  const t = setup('require-signed'); const tgz = tarball(t.tmp, 'u', (d) => makeTree(d, 'NEW'));
+  await withHealth(true, async (port) => {
+    const r = await runWith(t, tgz, port, { SMOKEBOX_PUBKEY: path.join(t.tmp, 'absent'), SMOKEBOX_REQUIRE_SIGNED: '1' });
+    assert.notEqual(r.status, 0); assert.match(r.stdout, /signing is required/i); assert.equal(marker(t.prefix), 'OLD'); assert.ok(!fs.existsSync(t.prefix + '.old'));
+  });
+  const key = keys(t.tmp); const signed = signedTarball(t, 'sg', key);
+  await withHealth(true, async (port) => { const r = await runWith(t, signed, port, { SMOKEBOX_PUBKEY: key.pub, SMOKEBOX_REQUIRE_SIGNED: '1' }); assert.equal(r.status, 0, r.stdout + r.stderr); assert.equal(marker(t.prefix), 'NEW'); });
 });
