@@ -618,6 +618,5 @@
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts };
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, wallOrders };
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
