@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSB } from './_load.mjs';
 
-const SB = await loadSB(['00-util', '10-config', '20-engine', '88-office-backup', '89-office-inspector']);
+const SB = await loadSB(['00-util', '10-config', '20-engine', '36-csv', '88-office-backup', '89-office-inspector']);
 const E = SB.engine;
 const { inspectorRows, rangeFor } = SB.office.inspectorPure;
 const BP = SB.office.backupPure;

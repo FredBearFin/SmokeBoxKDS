@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSB } from './_load.mjs';
 
-const SB = await loadSB(['00-util', '10-config', '20-engine', '40-metrics', '45-sim', '87-office-closeday', '88-office-backup', '89-office-inspector', '82-office-money']);
+const SB = await loadSB(['00-util', '10-config', '20-engine', '36-csv', '40-metrics', '45-sim', '87-office-closeday', '88-office-backup', '89-office-inspector', '82-office-money']);
 const E = SB.engine, M = SB.metrics, U = SB.util, BP = SB.office.backupPure, CD = SB.office.closeDayPure;
 const H = 3600e3, MIN = 60e3;
 const c100 = (v) => Math.round(v * 100);
