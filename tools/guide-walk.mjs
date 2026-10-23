@@ -47,6 +47,8 @@ async function blank(browser) {
   const sh = '.sheet-root';
   for (const t of ['Dishes and prices', 'What is it called?', 'Price in dollars', 'Where is it made?', 'Pit', 'Hot sides', 'Fry', 'Cold and drinks', 'Save and add another', 'Save and finish', 'Tax, hours and PIN']) check('dishes sheet: ' + t, await seen(p, t, sh));
   await p.fill(sh + ' input >> nth=0', 'Hush puppies'); await p.fill(sh + ' input >> nth=1', '5.50');
+  check('price read-back: Reads as', await has(p, 'Reads as $5.50', sh));
+  check('dishes sheet: Have a menu file? Import it', await seen(p, 'Have a menu file? Import it', sh));
   await p.click(sh + ' >> text=Fry'); await p.click('text=Save and add another'); await p.waitForTimeout(400);
   check('dishes sheet: Remove', await seen(p, 'Remove', sh));
   await p.click(sh + ' >> text=Remove >> nth=0'); await p.waitForTimeout(400);
@@ -60,7 +62,7 @@ async function blank(browser) {
   check('no Cabinet tab while Cooking ahead is No', !(await seen(p, 'Cabinet', '.fl-head')));
   // Menu list.
   await p.click('button:has-text("Menu")'); await p.waitForTimeout(500);
-  for (const t of ['Dishes and prices', 'Guide', 'Set up this tablet', 'Help and about', 'Back office', 'Show me how it works']) check('menu: ' + t, await seen(p, t, sh));
+  for (const t of ['Dishes and prices', 'Tax, hours and PIN', 'Guide', 'Set up this tablet', 'Help and about', 'Back office', 'Show me how it works']) check('menu: ' + t, await seen(p, t, sh));
   await p.keyboard.press('Escape'); await p.waitForTimeout(300);
   // Order, cook, pay.
   await p.click('.fl-new'); await p.waitForTimeout(600);
@@ -81,7 +83,7 @@ async function blank(browser) {
   for (const t of ['Sales and money', 'Safety', 'Menu and settings']) check('back office nav: ' + t, await seen(p, t, '#sb-office'));
   await p.click('#sb-office nav >> text=Menu and settings'); await p.waitForTimeout(1400);
   for (const t of ['Data, backup and reset', 'Back up now', 'Restore from a backup', 'Replacing this device', 'Danger zone: erase data']) check('data page: ' + t, await has(p, t, '#sb-office'));
-  for (const t of ['Download backup (JSON)', 'Copy backup', 'Choose a backup file', 'Check pasted backup', 'Erase live data', 'Erase everything']) check('data page: ' + t, await seen(p, t, '#sb-office'));
+  for (const t of ['Sales by day (for your accountant)', 'Download backup (JSON)', 'Copy backup', 'Choose a backup file', 'Check pasted backup', 'Erase live data', 'Erase everything']) check('data page: ' + t, await seen(p, t, '#sb-office'));
   await p.close();
 }
 
@@ -119,6 +121,7 @@ async function cooked(browser) {
   await p.click('button:has-text("Menu")'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
   const sh = '.sheet-root';
   check('dishes: up and down arrows beside each dish', await p.evaluate(() => !!document.querySelector('.sheet-root button[aria-label="Move Hush puppies down"]') && !!document.querySelector('.sheet-root button[aria-label="Move Pulled pork sandwich up"]')));
+  check('dishes: category list on each dish row', await p.evaluate(() => !!document.querySelector('.sheet-root select[aria-label="Category of Hush puppies"]')));
   check('portions: I count what I made', await seen(p, 'I count what I made', sh));
   await tap(p, 'I count what I made'); await p.waitForTimeout(300);
   await p.fill('input[aria-label="How many Hush puppies you made"]', '20');

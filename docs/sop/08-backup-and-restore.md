@@ -19,6 +19,8 @@ Back up every day at close. If the browser data is cleared or the device is repl
 
 A file that is not a valid backup is refused, and nothing is changed. A backup from the demo is refused too.
 
+Spreadsheet files, like the sales file, are for reading. You cannot restore from them.
+
 ## Erasing
 
 The Danger zone has **Erase live data** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either.
