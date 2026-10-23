@@ -11085,12 +11085,14 @@ a.of-nav:active { background: var(--press); }
   function wallOrders(state, now) {
     const out = { paidCount: 0, open: [], paid: [] };
     if (!state || !U.isNum(now)) return out;
-    const day = U.serviceDate(now, state.settings && state.settings.service ? state.settings.service.dayStartHour : undefined);
+    const dsh = state.settings && state.settings.service ? state.settings.service.dayStartHour : undefined;
+    const day = U.serviceDate(now, dsh);
     const totals = E().openOrderTotals(state);
     for (const o of Array.isArray(state.orders) ? state.orders : []) {
       const t = totals.get(o.id);
       if (o.status === 'open') out.open.push({ id: o.id, name: o.customer, rounds: t ? t.rounds : 0, total: t ? t.total : 0, at: o.createdAt });
-      else if (o.status === 'paid' && o.serviceDate === day && o.totals) { out.paidCount++; out.paid.push({ id: o.id, name: o.customer, total: o.totals.total, method: o.method, at: o.paidAt }); }
+      // Paid today goes by when it was paid (as the day close counts it), not the day the order was opened.
+      else if (o.status === 'paid' && U.isNum(o.paidAt) && U.serviceDate(o.paidAt, dsh) === day && o.totals) { out.paidCount++; out.paid.push({ id: o.id, name: o.customer, total: o.totals.total, method: o.method, at: o.paidAt }); }
     }
     out.open.sort((a, b) => a.at - b.at);
     out.paid.sort((a, b) => b.at - a.at);
@@ -19124,7 +19126,9 @@ a.of-nav:active { background: var(--press); }
     if (asked) { role = asked; if (U) U.storage.set(KEY.role, asked); }
     let v = viewFor(g.location.hash);
     const start = startViewFor(role);
-    if (start && (asked || !g.location.hash)) { // a role device opens on its own screen
+    // A role device opens on its own screen. An address that names the office (?role=kitchen#/office) still opens the
+    // office (behind its PIN) instead of silently showing the role screen.
+    if (start && (!g.location.hash || (asked && v.kind !== 'office'))) {
       v = start;
       try { g.history.replaceState({ sbIdx: idx }, '', hashFor(v)); } catch (e) { /* ignore */ }
     } else if (!g.location.hash && lastZone !== 'all') { // a tablet pinned to a station opens on it
@@ -19483,7 +19487,9 @@ a.of-nav:active { background: var(--press); }
   // focused, not opened twice. An opener that throws is logged and toasted.
   sheets.open = function (name, opts) {
     const fn = reg[name];
-    if (typeof fn !== 'function') { ui.toast('That screen is not part of this build yet.', { tone: 'warn' }); return null; }
+    // When a file failed to load at start-up that is the likely cause, so the message says so and offers the fix.
+    const failedLoad = Array.isArray(g.__sbLoadErrors) && g.__sbLoadErrors.length > 0;
+    if (typeof fn !== 'function') { ui.toast(failedLoad ? 'That screen did not load. Reload the page to try again.' : 'That screen is not part of this build yet.', { tone: 'warn' }); return null; }
     const existing = sheetStack.find((r) => r.name === name && !r.closed);
     if (existing) { try { existing.el.focus({ preventScroll: true }); } catch (e) { /* ignore */ } return existing.api; }
     openingName = name;
@@ -20016,8 +20022,11 @@ a.of-nav:active { background: var(--press); }
       if (S.inOffice()) { e.preventDefault(); S.extinguish(); }
       return;
     }
+    // WATCH OUT: the office key does nothing while a sheet, the PIN keypad or a menu is open. Otherwise it stacked a second
+    // keypad, opened the office under a floor sheet, or closed the office while one of its own sheets was still open.
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'O' || e.key === 'o') && st.mounted) {
       e.preventDefault();
+      if (sheetStack.length || menuState) return;
       if (S.inOffice()) S.extinguish(); else S.ignite();
     }
   });
@@ -20446,7 +20455,8 @@ a.of-nav:active { background: var(--press); }
     closeGuidePage();
     if (view.kind === 'office') {
       if (st.officeOpen) { navigateOffice(view.section); return; }
-      guard().then((ok) => { if (ok) openOffice(view.section); else if (R.view().kind === 'office') R.go(R.home(), { replace: true }); });
+      // After the PIN the route is read again: if it moved back to the floor while the keypad was up, the office stays shut.
+      guard().then((ok) => { const now = R.view(); if (ok) { if (now.kind === 'office' && !st.officeOpen) openOffice(now.section); } else if (now.kind === 'office') R.go(R.home(), { replace: true }); });
     } else {
       const zone = view.kind === 'new' ? 'all' : view.zone;
       try { if (SB.floor && typeof SB.floor.setZone === 'function') SB.floor.setZone(zone); else if (st.ph && st.ph.floor) st.ph.floor.setZone(zone); } catch (e) { console.error('[smokebox] floor.setZone failed', e); }
@@ -20467,7 +20477,17 @@ a.of-nav:active { background: var(--press); }
     st.guideOpen = true;
     if (st.officeOpen) closeOffice();
     layers.floor.hidden = true; layers.order.hidden = true; layers.guide.hidden = false;
-    try { SB.guide.mount(layers.guide, { page }); } catch (e) { console.error('[smokebox] guide failed to open', e); }
+    try { SB.guide.mount(layers.guide, { page }); } catch (e) {
+      console.error('[smokebox] guide failed to open', e);
+      // A failed Guide gets an error card and a way back, never an empty screen with the board hidden behind it.
+      try {
+        U.clear(layers.guide);
+        // Back to the board leaves the Guide address, which takes the failed Guide down.
+        const back = h('button', { type: 'button', class: 'btn btn-primary', onClick: () => R.go(R.home(), { replace: true }) }, ico('chevron-left', 20), h('span', null, 'Back to the board'));
+        layers.guide.append(ui.errorCard(e, { title: 'The Guide could not open', module: '78-guide.js' }), back);
+        back.focus({ preventScroll: true });
+      } catch (e2) { R.go(R.home(), { replace: true }); }
+    }
   }
   // Takes the Guide down and shows the board (or the order page) again; does nothing if it was not open.
   function closeGuidePage() {
@@ -20490,7 +20510,16 @@ a.of-nav:active { background: var(--press); }
         layers.order.hidden = false; layers.floor.hidden = true;
         st.orderCleanup = SB.order.mount(layers.order) || null;
       } else if (sheets.open) sheets.open('order');
-    } catch (e) { console.error('[smokebox] order page failed to open', e); }
+    } catch (e) {
+      console.error('[smokebox] order page failed to open', e);
+      // A failed order page falls back to the New ticket sheet over the board, so orders can still be taken.
+      try {
+        if (layers.order) { U.clear(layers.order); layers.order.hidden = true; }
+        if (layers.floor) layers.floor.hidden = false;
+        ui.toast('The order page did not load, so New ticket opens over the board instead. Reload the page to try again.', { tone: 'warn' });
+        if (sheets.open) sheets.open('order');
+      } catch (e2) { /* the toast above or the board is all that is left */ }
+    }
   }
   // Takes the order page down and shows the board again; does nothing if it was not open.
   function closeOrderPage() {
@@ -20507,7 +20536,7 @@ a.of-nav:active { background: var(--press); }
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, kind: '', sub: null };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, kind: '', text: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -20544,9 +20573,10 @@ a.of-nav:active { background: var(--press); }
     let w = null;
     try { w = bannerWanted(); } catch (e) { w = null; }
     if (!w) { if (bn.el) { bn.el.remove(); bn.el = null; bn.kind = ''; st.shell.removeAttribute('data-banner'); } return; }
-    if (bn.el && bn.kind === w.kind) return;
+    // The same kind with new words (the two save messages differ) is drawn again, so the text always matches its cause.
+    if (bn.el && bn.kind === w.kind && bn.text === w.text) return;
     if (bn.el) bn.el.remove();
-    bn.kind = w.kind;
+    bn.kind = w.kind; bn.text = w.text;
     // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
@@ -20751,7 +20781,7 @@ a.of-nav:active { background: var(--press); }
     { key: '8', keys: ['8'], label: '86 board' },
     { key: 'D', keys: ['D'], label: 'Demo' },
     { key: '1 to 6', keys: ['1', '2', '3', '4', '5', '6'], label: 'Station: All, PIT, HOT, FRY, CLD, EXP' },
-    { key: 'Z', keys: ['Z'], label: 'Undo the last action (10 seconds)' },
+    { key: 'Z', keys: ['Z'], label: 'Undo the last action' }, // the help sheet adds this kitchen's undo seconds
     // Ticket keys for a USB bump bar (it types like a keyboard): pick a ticket, then act on it.
     { key: 'J or Right', keys: ['J', 'Right'], label: 'Bump bar: select the next ticket (the first press selects the first)' },
     { key: 'K or Left', keys: ['K', 'Left'], label: 'Bump bar: select the previous ticket' },
@@ -20765,9 +20795,12 @@ a.of-nav:active { background: var(--press); }
   // Keys each device role may use. A kitchen device has no order entry, orders or demo; a front device has no hold
   // cabinet; all-in-one and manager devices keep every key exactly as before.
   const ROLE_KEYS = { kitchen: 'rh8z?123456jksfbl', front: 'nor8dz?123456jksfbl' };
-  // True when a device with this role may use this shortcut key (lower-case letter, digit or ?; Escape always may).
+  // Named keys a USB bump bar can send (Enter bumps, arrows select). Every role may use them, like Escape.
+  const BAR_KEYS = ['Escape', 'Enter', 'ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'];
+  // True when a device with this role may use this shortcut key (lower-case letter, digit or ?; Escape, Enter and
+  // the arrows always may, so a bump bar that sends them works on a kitchen device).
   F.roleAllows = function (role, key) {
-    if (key === 'Escape') return true;
+    if (BAR_KEYS.indexOf(key) >= 0) return true;
     const set = ROLE_KEYS[role];
     return set ? set.indexOf(String(key).toLowerCase()) >= 0 && String(key).length === 1 : true;
   };
@@ -20837,7 +20870,7 @@ a.of-nav:active { background: var(--press); }
   const WALL_MIN_PX = 1700;
   // The ticket picked with the bump-bar keys (by id); null until a key picks one.
   let selId = null, selIdx = 0;
-  let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0;
+  let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0, checkLater = 0;
   let volume = (() => { const v = U.storage.get(KEY_VOLUME, 1); return U.isNum(v) ? Math.min(1, Math.max(VOL_MIN, v)) : 1; })();
 
   // Small helpers used by every part below.
@@ -20929,22 +20962,25 @@ a.of-nav:active { background: var(--press); }
     o.connect(gn); gn.connect(a.destination);
     o.start(t); o.stop(t + dur + 0.03);
   }
-  // Plays the two-note chime for a new ticket when sound is on.
-  // WATCH OUT: calls within 600 ms of the last are dropped, so a burst of tickets makes one ding.
-  function chime() {
+  // Plays the two-note chime for a new ticket when sound is on. warn is true for a warning-ladder call.
+  // WATCH OUT: new-ticket calls within 600 ms of the last are dropped, so a burst of tickets makes one ding. A warning
+  // call always plays (playCalls already makes one sound per moment), so a new ticket never swallows a heads-up.
+  function chime(warn) {
     if (!audible()) return;
     const nowMs = performance.now();
-    if (nowMs - lastChime < 600) return; // a burst of tickets is one ding, not twelve
+    if (!warn && nowMs - lastChime < 600) return; // a burst of tickets is one ding, not twelve
     lastChime = nowMs;
     const a = resumeAudio();
     if (!a) return;
     try { const t0 = a.currentTime + 0.01; tone(a, 784, t0, 0.2, 0.16); tone(a, 1175, t0 + 0.15, 0.42, 0.16); } catch (e) { /* audio is optional */ }
   }
   // Plays three short high beeps when a dish's time is up (when sound is on). Several dishes at once make one set.
+  // WATCH OUT: a call within 1.5 s of the last set is not dropped: one more set plays when the 1.5 s are up, so a
+  // second dish that reaches "Check it" just after the first still gets its beeps.
   function checkChime() {
     if (!audible()) return;
-    const nowMs = performance.now();
-    if (nowMs - lastCheck < 1500) return;
+    const nowMs = performance.now(), wait = 1500 - (nowMs - lastCheck);
+    if (wait > 0) { if (!checkLater) checkLater = setTimeout(() => { checkLater = 0; if (m) checkChime(); }, wait); return; }
     lastCheck = nowMs;
     const a = resumeAudio();
     if (!a) return;
@@ -20956,6 +20992,7 @@ a.of-nav:active { background: var(--press); }
   F.setSound = function (on) {
     sound = !!on;
     U.storage.set(KEY_SOUND, sound);
+    if (!sound) hush();
     if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; playHere(chime); }
     syncLeadership();
     return sound;
@@ -21016,12 +21053,18 @@ a.of-nav:active { background: var(--press); }
   F.setSpeech = function (on) {
     speech = !!on;
     U.storage.set(KEY_SPEECH, speech);
+    if (!speech) hush();
     if (speech && sound) playHere(() => speak('Spoken warnings are on.'));
     return speech;
   };
+  // Stops any phrase being spoken now (sound or speech switched off, or another tab took over the sound).
+  function hush() {
+    try { if (g.speechSynthesis) g.speechSynthesis.cancel(); } catch (e) { /* speech is optional */ }
+    lastUtter = null; voiceFreeAt = 0;
+  }
   // When the tablet's voice is expected to be free again (browser clock, ms). A call-out waits for it, so it never talks
   // over a warning or over the call before it.
-  let voiceFreeAt = 0;
+  let voiceFreeAt = 0, lastUtter = null;
   // Says one short phrase with the tablet's voice when sound and speech are both on. A warning replaces whatever is
   // being said; a call-out (queued) waits its turn instead and never cuts anything off.
   function speak(text, queued, kind) {
@@ -21031,6 +21074,8 @@ a.of-nav:active { background: var(--press); }
       if (!ss || !U2) return false;
       if (!queued) ss.cancel();
       const u = new U2(text);
+      // Kept here until the next phrase: some tablets drop a phrase whose object nothing holds on to.
+      lastUtter = u;
       // The chef voice: fast and sharp, on the best-sounding English voice this device has.
       const cv = SB.deadlines && SB.deadlines.CHEF_VOICE ? SB.deadlines.CHEF_VOICE : { rate: 1.1, pitch: 1 };
       // Calm for a heads-up, brisk for a new ticket, fast and loud for "fire now": the style of the line sets rate, pitch and volume.
@@ -21076,6 +21121,8 @@ a.of-nav:active { background: var(--press); }
   }
   // True once the browser has let this page make sound (it needs one tap first).
   const audioReady = () => !!audio && audio.state === 'running';
+  // True when this browser has no Web Audio at all: no tap can ever turn tones on, but spoken warnings may still work.
+  const noWebAudio = () => !(g.AudioContext || g.webkitAudioContext);
 
   // Sound leader. With several tabs of this app open on one device, only one makes sound; the others still draw the
   // strip. The tab that holds a Web Lock named smokebox-sound is the leader (a tab that cannot make sound, because
@@ -21093,8 +21140,9 @@ a.of-nav:active { background: var(--press); }
   const audible = () => sound && isLeader();
   // Runs fn so that the sounds it makes play here whatever the leader is: a tap on "turn sound on" is a local test.
   function playHere(fn) { lead.forced = true; try { fn(); } finally { lead.forced = false; } }
-  // A tab can lead when the board is showing, sound is on and the browser lets it play.
-  const canLead = () => !!m && sound && audioReady();
+  // A tab can lead when the board is showing, sound is on and the browser lets it play. A browser with no Web Audio
+  // can still lead, so its spoken warnings are not held back forever waiting for tones it can never play.
+  const canLead = () => !!m && sound && (audioReady() || noWebAudio());
   // Says to the other tabs whether this tab is visible, can lead, and leads.
   function sayHello() {
     if (SB.store && SB.store.broadcast) SB.store.broadcast({ type: 'alert-hello', visible: doc.visibilityState !== 'hidden', eligible: canLead(), lead: lead.isLeader });
@@ -21103,6 +21151,7 @@ a.of-nav:active { background: var(--press); }
   function setLeader(on) {
     if (on === lead.isLeader) return;
     lead.isLeader = on;
+    if (!on) hush(); // the new leader speaks from now on; this tab stops mid-phrase so two voices do not overlap
     if (on) lead.needDrain = true;
     if (g.console && console.debug) console.debug('[smokebox] sound leader:', on ? 'this tab' : 'another tab');
     sayHello();
@@ -21168,9 +21217,13 @@ a.of-nav:active { background: var(--press); }
     try {
       if (!g.navigator || !g.navigator.wakeLock) { wakeState = 'unsupported'; return; }
       g.navigator.wakeLock.request('screen').then((sn) => {
+        // The board was closed while the request was out: let the lock go at once instead of holding it with no owner.
+        if (!m) { try { sn.release(); } catch (e) { /* ignore */ } return; }
+        if (wakeSentinel && wakeSentinel !== sn) { try { wakeSentinel.release(); } catch (e) { /* ignore */ } }
         wakeSentinel = sn; wakeState = 'on';
         // The system may take the lock back (low battery, another app); when the board is still showing it asks again.
-        sn.addEventListener('release', () => { wakeState = 'released'; wakeSentinel = null; if (m && doc.visibilityState === 'visible') setTimeout(requestWake, 800); });
+        // Only the lock in use clears the slot, so an older lock released late does not forget a newer one.
+        sn.addEventListener('release', () => { if (wakeSentinel !== sn) return; wakeState = 'released'; wakeSentinel = null; if (m && doc.visibilityState === 'visible') setTimeout(requestWake, 800); });
       }, () => { wakeState = 'refused'; });
     } catch (e) { wakeState = 'refused'; }
   }
@@ -21502,10 +21555,11 @@ a.of-nav:active { background: var(--press); }
     const on = wall && g.innerWidth >= WALL_MIN_PX;
     const v = on ? 'on' : 'off';
     if (m.root.dataset.wall !== v) { m.root.dataset.wall = v; m.fitKey = null; setTimeout(() => { if (m) { paintDensity(); fitHead(); } }, 0); }
-    // The glance panel is made the first time the wall shows and removed with the board.
+    // The glance panel is made when the wall shows and taken down when it hides (or with the board), so its 5-second
+    // refresh never runs behind a board that is not showing it.
     if (on && !m.glance && SB.office && typeof SB.office.glance === 'function') {
-      try { const gh = SB.office.glance(m.wr.body, { size: 'wall' }); m.glance = gh; m.offs.push(() => gh.destroy()); } catch (e) { console.error('[smokebox] glance failed', e); }
-    }
+      try { const gh = SB.office.glance(m.wr.body, { size: 'wall' }); m.glance = gh; m.offs.push(() => { if (m && m.glance === gh) m.glance = null; gh.destroy(); }); } catch (e) { console.error('[smokebox] glance failed', e); }
+    } else if (!on && m.glance) { const gh = m.glance; m.glance = null; try { gh.destroy(); } catch (e) { /* already gone */ } }
     if (on) updateWall(store().now());
   }
   // Builds a pane: a title and a body, with the parts the updates change handed back.
@@ -22372,7 +22426,7 @@ a.of-nav:active { background: var(--press); }
     if (!isLeader()) { calls.forEach((c) => pending.add(c)); return; }
     if (lead.coordinated && SB.store.broadcast) SB.store.broadcast({ type: 'alert-played', keys: calls.map((c) => c.d.id + ':' + c.level + ':' + (c.d.epoch || 0)) });
     const top = calls.reduce((a, c) => (c.level > a.level ? c : a), calls[0]);
-    if (top.level === 4) expiryTone(); else if (top.level === 3) alarmTone(); else chime();
+    if (top.level === 4) expiryTone(); else if (top.level === 3) alarmTone(); else chime(true);
     if (top.level < 2 || top.repeat) return;
     const same = calls.filter((c) => c.level === top.level);
     const first = same.slice().sort((x, y) => x.d.msLeft - y.d.msLeft)[0].d;
@@ -22412,7 +22466,7 @@ a.of-nav:active { background: var(--press); }
     const text = d.kind === 'coldOut'
       ? d.label + (d.msLeft > 0 ? ': ' + mins + (mins === 1 ? ' minute' : ' minutes') + ' left of your out-of-fridge limit.' : ' is past your out-of-fridge limit.')
       : d.label + ': the last day of your fridge limit ends at midnight.';
-    chime(); speak(SB.deadlines.spoken ? SB.deadlines.spoken(text) : text, false, 'expire');
+    chime(true); speak(SB.deadlines.spoken ? SB.deadlines.spoken(text) : text, false, 'expire');
     if (m.strip && m.strip.announce) m.strip.announce.textContent = text;
   }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
@@ -22451,7 +22505,9 @@ a.of-nav:active { background: var(--press); }
     const maxRows = !F.wallActive() && (far ? (g.innerHeight || 0) >= 1300 : (g.innerHeight || 0) >= 900) ? 2 : 1;
     const top = feed.slice(0, maxRows);
     const moreRows = feed.length - top.length;
-    const needSound = sound && !audioReady();
+    // Another tab on this device already leads and plays the sounds: this tab needs no tap, so it shows no bar.
+    const otherLeads = lead.coordinated && !lead.isLeader && Array.from(lead.peers.values()).some((p) => p.lead && Date.now() - p.t < 3 * HELLO_MS);
+    const needSound = sound && !audioReady() && !otherLeads;
     // Clearing the sound bar lasts only while the sound stays blocked: once it plays again, the next block shows the bar again.
     if (!needSound) m.dis.delete('snd');
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
@@ -22479,7 +22535,7 @@ a.of-nav:active { background: var(--press); }
     const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
-    if (moreEl) { const t = 'Tap here to turn on warning sounds. This browser needs one tap first.' + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
+    if (moreEl) { const t = (noWebAudio() ? 'This browser cannot play warning tones. Open Smokebox in another browser for sound.' : 'Tap here to turn on warning sounds. This browser needs one tap first.') + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote && !clockShown);
@@ -22864,7 +22920,8 @@ a.of-nav:active { background: var(--press); }
     if (rec) say('Ticket #' + rec.num + ' selected.');
   }
   // Does one bump-bar action on the picked ticket: start, done or bump. With nothing picked the first ticket is picked
-  // first. WATCH OUT: the same 450 ms guard as a tap applies, so a bar that bounces cannot start and finish a dish.
+  // first. WATCH OUT: the same 450 ms guard as a tap applies, so a bar that bounces cannot start and finish a dish
+  // (bump has its own guard inside bump()).
   function barAct(what) {
     if (!liveSlips().length) return;
     if (!selId || !m.slips.has(selId)) selectTicket(1);
@@ -22912,7 +22969,12 @@ a.of-nav:active { background: var(--press); }
   function notDoneItems(ticket) { return ticket.items.filter((it) => it.status !== 'done'); }
   // Sends a ticket off the line. With items not done it asks first ("N items not done. Bump anyway?"),
   // then bumps with force, which the office numbers count as a forced bump.
+  // WATCH OUT: a second bump within 450 ms (a double tap, or a bar that bounces) is ignored. The first bump moves the
+  // pick to the next ticket, so without this guard the bounce would bump that one too.
   function bump(rec) {
+    const nowMs = performance.now();
+    if (nowMs - (m.lastBump || 0) < 450) return;
+    m.lastBump = nowMs;
     const t = E().findTicket(store().getState(), rec.id);
     if (!t) { toast(E().REPORTS.unknownTicket, { tone: 'warn' }); return; }
     const left = notDoneItems(t);
@@ -23229,9 +23291,6 @@ a.of-nav:active { background: var(--press); }
   // orderId is the open order this round is added to (null starts a new one); pay is how it is paid when sent
   // ('' leaves it open); tip is the tip text as typed.
   const D = { lines: [], customer: '', channel: 'dine_in', note: '', rush: false, orderId: null, pay: '', tip: '', allergy: '' };
-  // How the last order was paid when it was sent ('' = left open). A counter that takes cash all day starts the next
-  // order on cash, one tap fewer; Pay later is still one tap away.
-  let payDefault = '';
   let seq = 0;
   let lastSent = null; // { num, channel, items } of the last order sent from this sheet
   let live = null;     // the open view, or null
@@ -23244,7 +23303,9 @@ a.of-nav:active { background: var(--press); }
   // A separate copy of the order, kept so Undo can put it back.
   const copyDraft = () => JSON.parse(JSON.stringify(D));
   function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; D.allergy = snap.allergy || ''; saveDraftNow(); }
-  function resetDraft() { clearStoredDraft(); D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = payDefault; D.tip = ''; D.allergy = ''; }
+  // WATCH OUT: every new order starts on Pay later. Carrying the last order's payment over would let the next order be
+  // recorded as paid (cash, say) by a cook who never looked at the payment box.
+  function resetDraft() { clearStoredDraft(); D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = ''; D.tip = ''; D.allergy = ''; }
   // The half-built order is also kept in the browser, so a reload or a closed tab brings it back. Uses the store's own draft
   // calls (saveDraft, loadDraft, clearDraft) when this copy has them, and a plain browser-storage key until then.
   const KEY_DRAFT = 'smokebox.v1.orderdraft';
@@ -24117,7 +24178,6 @@ a.of-nav:active { background: var(--press); }
         const info = res.info || {};
         const zones = Array.isArray(info.zones) ? info.zones.length : 0;
         lastSent = { num: info.num, channel: D.channel, items: items.map((it) => ({ menuId: it.menuId, qty: it.qty, mods: (it.mods || []).slice() })) };
-        payDefault = D.pay;
         resetDraft();
         host.close('sent');
         const where = addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent to ' : ' sent to ';
@@ -24126,10 +24186,13 @@ a.of-nav:active { background: var(--press); }
         SB.ui.toast('Ticket #' + info.num + (oneStation ? (addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent' : ' sent') : where + zones + ' ' + U.plural(zones, 'station')) + '.' + (info.paid ? ' Paid ' + U.fmtMoney(info.total) + ' by ' + payWord + '.' : ''), { tone: 'ok' });
         return;
       }
-      const words = SB.engine.describe(res.report, res.info, st().settings);
+      let words = SB.engine.describe(res.report, res.info, st().settings);
+      // A dish taken off the menu (on another tablet, say) while this order was open: name it, so the cook knows which line to remove.
+      const gone = res.report === 'unknownMenu' && res.info ? menuById(res.info.menuId) : null;
+      if (gone) words = (gone.short || gone.name) + ' was taken off the menu. Remove it from this order, then send.';
       showError(words);
       setPane('order');
-      if (res.report === 'itemUnavailable') {
+      if (res.report === 'itemUnavailable' || res.report === 'unknownMenu') {
         paintTiles(); syncLines();
         const bad = D.lines.find((l) => l.menuId === (res.info && res.info.menuId));
         const v = bad && view.lineViews.get(bad.key);
@@ -24396,11 +24459,20 @@ a.of-nav:active { background: var(--press); }
   const endDot = (s) => (/[.!?]$/.test(s) ? s : s + '.');
   const listWords = (a) => (a.length <= 3 ? a.join(', ') : a.slice(0, 3).join(', ') + ' and ' + (a.length - 3) + ' more');
 
+  // The id of the engine's newest undo record, or null (the action an Undo button would revert right now).
+  function topUndoId() {
+    const s = st(), u = s && Array.isArray(s.undo) ? s.undo : [];
+    return u.length && u[u.length - 1] ? u[u.length - 1].id || null : null;
+  }
   // Toast with Undo that runs the engine's own undo.
+  // WATCH OUT: the engine only undoes its newest action. The toast remembers which record that was when it was raised,
+  // and refuses when another action (from another tablet, say) came after, so Undo never reverts what it does not name.
   function undoToast(msg, tone) {
+    const mine = topUndoId();
     toast(msg, tone || 'ok', {
       // Undo asks the engine to undo its newest action (only the newest one can be undone).
       undo: () => {
+        if (mine && topUndoId() !== mine) { toast('Cannot undo: something else was done after it. Fix it by hand instead.', 'warn'); return; }
         const r = run('undo', {});
         if (r.report !== 'ok') toast(say(r), 'warn'); else SB.ui.announce('Undone.');
       },
@@ -24515,8 +24587,16 @@ a.of-nav:active { background: var(--press); }
   // audit:data-end
   const H1 = 3600e3;
 
-  // How long a batch may stay in the cabinet: its own limit or the shop limit, whichever is shorter.
-  const holdLimitMs = (b) => Math.min(U.isNum(b.maxHoldH) ? b.maxHoldH : Infinity, safety().defaultMaxHoldH) * H1;
+  // The safety settings with every default filled in, the same way the engine and the warnings read them.
+  const fullSafety = () => Object.assign({}, C.safety, safety());
+  // The hard cap in hours: no batch stays longer than this, whatever its own limit (engine hardCapH).
+  const hardCapH = () => { const S = fullSafety(); return U.isNum(S.hardCapH) ? S.hardCapH : S.defaultMaxHoldH; };
+  // How long a batch may stay in the cabinet: the engine's own number (its limit, or the default, capped by the hard
+  // cap), so the card shows the time the engine will act on.
+  const holdLimitMs = (b) => E()._internal.holdLimitMs(b, fullSafety());
+  // True when going past the limit only takes the batch off the menu for a check (a quality limit below the hard cap);
+  // otherwise the batch is thrown out at that time.
+  const qualityStage = (b) => b.fridge !== true && b.holdBasis === 'quality' && (U.isNum(b.maxHoldH) ? b.maxHoldH : fullSafety().defaultMaxHoldH) < hardCapH();
   // A number with at most one decimal, like 1.5 or 2.
   const trimNum = (n) => String(Math.round(n * 10) / 10);
 
@@ -24797,7 +24877,7 @@ a.of-nav:active { background: var(--press); }
       const coolingNow = b.kind === 'cooling';
       setHidden(rec.dtServe, coolingNow); setHidden(rec.ddServe, coolingNow);
       // One answer per row: the label says which kind of limit it is and the value is just the time.
-      if (!coolingNow) { text(rec.dtServe, b.holdBasis === 'safety' ? 'Throw out at' : 'Quality limit'); text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b))); }
+      if (!coolingNow) { text(rec.dtServe, qualityStage(b) ? 'Quality limit' : 'Throw out at'); text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b))); }
       // A cold item shows its fridge date instead: the last day in the fridge, or that no days were set.
       if (ci) {
         text(rec.dtServe, 'Fridge date');
@@ -25984,8 +26064,8 @@ a.of-nav:active { background: var(--press); }
       // A kitchen with its own dishes loses them too: the demo puts the sample barbecue menu in their place.
       const own = s.catalog === 'own' && (s.menu.length > 0 || s.orders.length > 0 || s.tickets.length > 0);
       const ok = await SB.ui.confirm({
-        title: 'Restart the demo?', confirmLabel: own ? 'Erase my dishes and restart' : 'Restart demo', cancelLabel: 'Keep everything', tone: real || own ? 'danger' : undefined,
-        body: [(own ? 'This erases your dishes, prices and orders and loads the sample barbecue menu in their place. ' : '') + 'This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (real ? ' (' + real + ' not from the demo)' : '') + ' and everything logged on this device, then puts three fresh demo tickets on the board. Settings stay.'],
+        title: 'Restart the demo?', confirmLabel: own ? 'Erase my dishes and restart' : 'Restart demo', cancelLabel: 'Keep everything', tone: 'danger',
+        body: [(own ? 'This erases your dishes, prices and orders and loads the sample barbecue menu in their place. ' : '') + 'This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (real ? ' (' + real + ' not from the demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' in the cabinet and the event log on this device, then puts three fresh demo tickets on the board. Settings stay.'],
       });
       if (!ok) return;
       if (SB.tour && SB.tour.running && SB.tour.running() && SB.tour.stop) SB.tour.stop();
@@ -25996,12 +26076,13 @@ a.of-nav:active { background: var(--press); }
       closeThen(sheet, () => { if (SB.router && SB.router.go) SB.router.go({ kind: 'floor', zone: 'all' }); });
     }
 
-    // Clears tickets, batches and events on this device after a confirm. Settings and sample history stay.
+    // Clears tickets, orders, batches and events on this device after a confirm. Settings, menu, the food safety record and
+    // sample history stay (A.resetLive in 20-engine.js).
     async function doReset() {
       const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length;
       const ok = await SB.ui.confirm({
         title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep everything',
-        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings, the food safety record and sample history stay. This cannot be undone.'],
+        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.orders.length + ' ' + plural(s.orders.length, 'order') + ' with their payments, ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ', the 86 list, stock counts and the event log, so the sales figures start again from zero. It also sets the clock back to real time.', 'Settings, the menu, the food safety record and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
       // With a PIN set, clearing live data asks for it.
@@ -26067,7 +26148,7 @@ a.of-nav:active { background: var(--press); }
   // audit:data-start
   const FALLBACK_KEYS = [
     { key: 'N', label: 'New ticket' }, { key: 'R', label: 'Recall a bumped ticket' }, { key: 'H', label: 'Hold cabinet' }, { key: '8', label: '86 board' },
-    { key: 'D', label: 'Demo' }, { key: '1 to 6', label: 'Station: All, PIT, HOT, FRY, CLD, EXP' }, { key: 'Z', label: 'Undo the last action (10 seconds)' },
+    { key: 'D', label: 'Demo' }, { key: '1 to 6', label: 'Station: All, PIT, HOT, FRY, CLD, EXP' }, { key: 'Z', label: 'Undo the last action' },
     { key: '?', label: 'Help' }, { key: 'Esc', label: 'Close a screen' },
   ];
   // audit:data-end
@@ -26153,9 +26234,12 @@ a.of-nav:active { background: var(--press); }
   // The Keys tab. The shortcuts come from the board, with a built-in list if the board is not loaded.
   function helpKeys() {
     const list = (SB.floor && Array.isArray(SB.floor.shortcuts) && SB.floor.shortcuts.length ? SB.floor.shortcuts : FALLBACK_KEYS);
+    // The undo window is a setting, so the Z line names this kitchen's own number of seconds.
+    const undoS = Math.round((st().settings.undoMs || C.undoMs) / 1000);
+    const label = (k) => (k.key === 'Z' ? k.label + ' (' + undoS + ' seconds)' : k.label);
     return h('div', { class: 'hp-pane' },
       h('p', { class: 'fs-sub' }, 'On the board, these keys work when no screen is open and you are not typing in a field.'),
-      h('ul', { class: 'hp-keys' }, ...list.map((k) => h('li', { class: 'hp-key' }, h('span', { class: 'kbd' }, k.key), h('span', null, k.label)))),
+      h('ul', { class: 'hp-keys' }, ...list.map((k) => h('li', { class: 'hp-key' }, h('span', { class: 'kbd' }, k.key), h('span', null, label(k))))),
       h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Inside New ticket'),
         h('ul', { class: 'hp-keys' },
           h('li', { class: 'hp-key' }, h('span', { class: 'kbd' }, 'Enter'), h('span', null, 'In the search box: add the first match.')),
@@ -26783,7 +26867,8 @@ a.of-nav:active { background: var(--press); }
       const state = st(), now = nowMs();
       const sd = U.serviceDate(now, state.settings.service.dayStartHour);
       const open = (state.orders || []).filter((o) => o.status === 'open').sort((a, b) => a.createdAt - b.createdAt);
-      const paid = (state.orders || []).filter((o) => o.status === 'paid' && o.serviceDate === sd).sort((a, b) => b.paidAt - a.paidAt);
+      // Paid today goes by the time of payment, as the day close counts it: a tab opened yesterday and paid today is today's.
+      const paid = (state.orders || []).filter((o) => o.status === 'paid' && U.isNum(o.paidAt) && U.serviceDate(o.paidAt, state.settings.service.dayStartHour) === sd).sort((a, b) => b.paidAt - a.paidAt);
       const totals = E().openOrderTotals(state);
       reconcile(openList, openRows, open, makeOpenRow, (rec, o) => updateOpenRow(rec, o, state, totals, now));
       reconcile(paidList, paidRows, paid.slice(0, 80), makePaidRow, (rec, o) => updatePaidRow(rec, o, state));
@@ -26843,8 +26928,9 @@ a.of-nav:active { background: var(--press); }
     function chipRow(label, defs, key, base) {
       const row = h('div', { class: 'ox-chips', role: 'group', 'aria-label': label });
       defs.forEach((d) => {
-        // The dollars this chip stands for right now (a share of the base figure, or a fixed amount).
-        const amount = () => (d.roundUp ? roundUpTip(orderTotal()) : d.pct ? r2(base() * d.pct) : d.fixed || 0);
+        // The dollars this chip stands for right now (a share of the base figure, or a fixed amount). A share uses the
+        // same half-cent rule as the New ticket screen (orderMath.pctOfDollars), so 15% shows the same cents on both.
+        const amount = () => (d.roundUp ? roundUpTip(orderTotal()) : d.pct ? SB.orderMath.pctOfDollars(base(), Math.round(d.pct * 100)) : d.fixed || 0);
         const b = SB.ui.chip({
           label: d.label, pressed: false,
           // Writes this chip's amount into the box (or clears it) and repaints the totals.
@@ -26944,11 +27030,15 @@ a.of-nav:active { background: var(--press); }
     tipInput.addEventListener('input', () => { P.tip = tipInput.value; paint(); });
     cashInput.addEventListener('input', () => { P.cash = cashInput.value; paint(); });
     // Mark paid sends the payment to the engine; a refusal is shown in words and nothing is lost.
+    // WATCH OUT: once paid, a second tap (a double tap while the box closes) does nothing, so it shows no "not open" error.
+    let paidDone = false;
     payBtn.addEventListener('click', () => {
+      if (paidDone) return;
       const r = read();
       if (r.err) { setHidden(err, false); text(err, r.err); r.box.focus(); return; }
       const res = run('payOrder', { orderId, method: P.method, tip: r.t, discount: r.d });
       if (res.report === 'ok') {
+        paidDone = true;
         setMethod(P.method);
         sheet.close('paid');
         const info = res.info || {}, pm = C.payMethodById[P.method];
@@ -27818,16 +27908,16 @@ a.of-nav:active { background: var(--press); }
     const btn = (label, icon, fn) => (status) => h('button', { type: 'button', class: 'btn', onClick: () => runStep(status, fn) }, ico(icon, 20), h('span', null, label));
 
     step('1. Sound', 'Warnings use tones and a spoken voice. Browsers only allow sound after a tap, so test it here. Turn the volume up, or plug in a cheap Bluetooth speaker: a tablet speaker is easy to miss in a loud kitchen.',
-      btn('Play a test warning', 'volume', () => { if (SB.floor && SB.floor.setSound) { SB.floor.setSound(true); if (SB.floor.setSpeech) SB.floor.setSpeech(true); return 'You should have heard a chime and a voice. If not, turn the tablet volume up and tap again.'; } return 'The kitchen board is not loaded.'; }));
+      btn('Play a test warning', 'volume', () => { if (SB.floor && SB.floor.setSound) { SB.floor.setSound(true); if (SB.floor.setSpeech) SB.floor.setSpeech(true); return 'Warning sounds and the spoken voice are now on for this tablet. You should have heard a chime and a voice. If not, turn the tablet volume up and tap again.'; } return 'The kitchen board is not loaded.'; }));
     const wake = SB.floor && SB.floor.wakeLock ? SB.floor.wakeLock() : 'unknown';
     step('2. Keep the screen on', 'The board asks the browser to keep the screen awake' + (wake === 'on' ? ' (it is on now).' : wake === 'unsupported' ? ', but this browser does not support that.' : ', but this browser has not allowed it.') + ' Also set the tablet itself: Settings, Display, Auto-Lock (iPad) or Screen timeout (Android), to Never. Plug the tablet into power.');
     const prot = step('3. Protect your data', 'Everything is saved in this browser only. Ask the browser to keep it safe, and save a backup every day (Menu and settings, then Data). If you cook ahead, save the thrown-out log too.',
-      btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Your browser agreed to keep this data. Still save a backup every day.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save a backup every day.'; }));
+      btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Your browser agreed to keep this data. Still save a backup every day.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }, () => { prot.textContent = 'The browser could not answer. Installing the app (step 4) usually helps. Save a backup every day.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save a backup every day.'; }));
     step('4. Install as an app', 'On an iPad: Share, then Add to Home Screen. In Chrome on Android or a computer: the menu, then Install app or Add to Home screen. An installed app opens full screen and the browser is less likely to clear its data.');
     step('5. Where the tablet sits', 'Put the tablet where the person at the cutting board can tap it without walking. If it is out of reach, batch times will not get logged and the waste numbers will be wrong.');
     // Closes this sheet and opens the Menu and settings page of the back office.
     const openData = () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); };
-    step('6. Your dishes', 'Add your dishes under Dishes and prices, in Settings. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
+    step('6. Your dishes', 'Add your dishes under Dishes and prices, in Settings. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them, all of these are starter values, the hold limits too.',
       () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu and settings')));
     step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a throw-out time. Ask your health department which applies to each food you hold, then set it in Settings.');
     sheet.body.appendChild(list); keepInView(sheet.body);
@@ -28383,7 +28473,10 @@ a.of-nav:active { background: var(--press); }
     // Paints the question until it is answered or skipped; after an answer it says what was set and where to change it.
     function paintServe(answer) {
       const answered = answer || U.storage.get(KEY_SERVEANS, '');
-      const show = activeDishes().length > 0 && !U.storage.get(KEY_SERVESKIP, false);
+      // An owner who already set How you serve (own order buttons, or counter service on) is not asked again.
+      const svc = SB.store.getState().settings.service || {};
+      const setUp = Array.isArray(svc.chips) || svc.counter === true;
+      const show = activeDishes().length > 0 && !U.storage.get(KEY_SERVESKIP, false) && (!!answered || !setUp);
       svBox.hidden = !show;
       if (!show) return;
       U.clear(svBox);
@@ -28396,10 +28489,11 @@ a.of-nav:active { background: var(--press); }
           // Remembers the owner skipped, so the question goes away.
           h('button', { type: 'button', class: 'btn btn-link', dataset: { act: 'serve-skip' }, onClick: () => { U.storage.set(KEY_SERVESKIP, true); paintServe(); } }, 'Skip')));
     }
-    // Saves one answer: counter service on or off, and the order buttons (the starting list when none are given).
+    // Saves one answer: counter service on or off, and the order buttons. WATCH OUT: the table answer has no buttons of
+    // its own, so it leaves any saved order buttons alone instead of wiping them back to the starting list.
     function answerServe(c) {
       const r1 = send('updateSettings', { patch: { service: { counter: c.sets.counter } } });
-      const r = r1.ok || r1.report === 'nothingToDo' ? send('setChips', { chips: c.sets.chips }) : r1;
+      const r = (r1.ok || r1.report === 'nothingToDo') && c.sets.chips ? send('setChips', { chips: c.sets.chips }) : r1;
       if (!r.ok && r.report !== 'nothingToDo') { svBox.appendChild(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'bad', role: 'alert' }, r.words)); return; }
       U.storage.set(KEY_SERVEANS, c.id); paintServe(c.id);
     }
@@ -28873,7 +28967,7 @@ a.of-nav:active { background: var(--press); }
     exportStale: 'Something changed since you saved the files (a new day started or a record changed). Save the files again in step 2, then close. Nothing was removed.',
     notInDemo: 'You are in the demo, so there is no real history to close here. Tap Back to my kitchen first. Nothing was removed.',
     hubKitchen: 'This tablet works through the main computer, so the month cannot be closed here. Do this on the main computer\'s own screen or the main tablet. Nothing was removed.',
-    nothingToDo: 'There is nothing to close yet. Only finished days older than 35 days can be moved out, and none are left before that date. Nothing was removed.',
+    nothingToDo: 'There is nothing to close yet. Only finished days older than the recent days that always stay can be moved out, and none are left before that date. Nothing was removed.',
     storageBlocked: 'This browser would not save the change, so nothing was removed. Your kitchen is exactly as it was. Allow site data or use a normal window, then try again.',
     badPatch: 'That date is not one Smokebox can use. Pick a date and try again. Nothing was removed.',
   };
@@ -28912,10 +29006,13 @@ a.of-nav:active { background: var(--press); }
       if (!p.tickets && !p.orders && !p.events) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords({ report: 'nothingToDo' }))); return; }
       // Writes a count with the right singular or plural word.
       const n = (x, one, many) => Number(x).toLocaleString() + ' ' + U.plural(x, one, many);
+      // How many recent days stay: 35, or fewer on a busy kitchen whose saved history is near its limits (engine adaptiveKeepDays).
+      let keep = 35;
+      try { const hf = store.historyFill ? store.historyFill() : null; if (hf && Number.isInteger(hf.keepDays)) keep = hf.keepDays; } catch (e) { /* 35 */ }
       counts.append(...[
         h('p', null, h('strong', null, 'This moves out of your kitchen: '), n(Array.isArray(p.days) ? p.days.length : p.days, 'day') + ' of history (' + monthDay(p.from) + ' up to, not including, ' + monthDay(p.before) + '), with ' + n(p.orders, 'order') + ', ' + n(p.tickets, 'ticket') + ' and ' + n(p.events, 'activity record', 'activity records') + '.'),
-        p.before !== before ? h('p', { class: 'fs-sub' }, 'You picked ' + monthDay(before) + ', but the last 35 days always stay, so it stops at ' + monthDay(p.before) + '.') : null,
-        h('p', null, h('strong', null, 'This stays: '), 'the last 35 days, today, every open order and open ticket' + (p.openOrdersKept || p.openTicketsKept ? ' (' + n(p.openOrdersKept || 0, 'open order') + ', ' + n(p.openTicketsKept || 0, 'open ticket') + ' right now)' : '') + ', your menu and settings, the end-of-day totals, and all food-safety records (' + n(p.safetyEventsKept || 0, 'record') + ').'),
+        p.before !== before ? h('p', { class: 'fs-sub' }, 'You picked ' + monthDay(before) + ', but the last ' + n(keep, 'day') + ' always stay, so it stops at ' + monthDay(p.before) + '.') : null,
+        h('p', null, h('strong', null, 'This stays: '), 'the last ' + n(keep, 'day') + ', today, every open order and open ticket' + (p.openOrdersKept || p.openTicketsKept ? ' (' + n(p.openOrdersKept || 0, 'open order') + ', ' + n(p.openTicketsKept || 0, 'open ticket') + ' right now)' : '') + ', your menu and settings, the end-of-day totals, and all food-safety records (' + n(p.safetyEventsKept || 0, 'record') + ').'),
         p.uncoveredDays && p.uncoveredDays.length ? h('p', { class: 'fs-sub' }, n(p.uncoveredDays.length, 'older day') + ' with records but no end-of-day close stay where they are.') : null].filter(Boolean));
       next1.disabled = false;
     }
@@ -29201,7 +29298,7 @@ a.of-nav:active { background: var(--press); }
   function openReady() {
     const sheet = SB.ui.sheet({ title: 'Tablet checks', side: 'right', width: 'min(720px, 96vw)', name: 'ready', onClose: () => { releaseWake(); } });
     const root = h('div', { class: 'dp rd' });
-    let sentinel = null, wakeNow = 'unknown', heard = null, played = false;
+    let sentinel = null, wakeNow = 'unknown', heard = null, played = false, loud = null;
     // Lets go of the screen hold this sheet took, when it closes.
     function releaseWake() { try { if (sentinel && sentinel.release) sentinel.release(); } catch (e) { /* already released */ } sentinel = null; }
     // One check card: an icon (tick or do this), a title, a plain line, and room for buttons.
@@ -29218,7 +29315,9 @@ a.of-nav:active { background: var(--press); }
       // Tapping asks the browser again, then redraws this card.
       const again = h('button', { type: 'button', class: 'btn', dataset: { act: 'awake-check' }, onClick: () => tryWake(true) }, 'Check again');
       const how = h('p', { class: 'fs-sub' }, 'Also set the tablet itself so it never sleeps in service. iPad: Settings, Display & Brightness, Auto-Lock, Never. Android: Settings, Display, Screen timeout, the longest or Never. Plug it into power.');
-      if (wakeNow === 'on' || boardState === 'on') cAwake.set(true, 'The board is holding the screen awake while it is open. Still set Auto-Lock to Never and keep the tablet plugged in.', again);
+      // Only the board's own hold keeps the screen on in service; this card's test hold ends when the sheet closes.
+      if (boardState === 'on') cAwake.set(true, 'The board is holding the screen awake while it is open. Still set Auto-Lock to Never and keep the tablet plugged in.', again);
+      else if (wakeNow === 'on') cAwake.set(true, 'This browser lets Smokebox hold the screen awake. The board asks for it each time it opens. Still set Auto-Lock to Never and keep the tablet plugged in.', again);
       else cAwake.set(false, wakeNow === 'unsupported' || boardState === 'unsupported' ? 'This browser cannot hold the screen awake by itself.' : 'The browser did not agree to hold the screen awake yet.', how, again);
       paintSummary();
     }
@@ -29243,11 +29342,19 @@ a.of-nav:active { background: var(--press); }
       } else cSound.set(null, 'Browsers only allow sound after a tap, so test it here. Turn the volume up first.', test);
       paintSummary();
     }
-    // 3. Volume: it cannot be read, so it follows the beep answer and tells the owner how loud to aim for.
-    // Shows the volume line: ticked once the beep was heard, with the aim for a loud kitchen.
+    // 3. Volume: it cannot be read, so the person is asked a second, separate question once the beep was heard.
+    // Shows the volume question: ticked only when the person says the beep carries to the pit or the line over the fans.
     function checkVol() {
       const line = 'Aim for a beep you can hear from the pit or the line over the fans. A tablet speaker is easy to miss in a loud kitchen: a cheap Bluetooth speaker near the cutting board helps.';
-      if (heard === true) cVol.set(true, line); else if (heard === false) cVol.set(false, line); else cVol.set(null, 'Test the sound above first. ' + line);
+      if (heard !== true) { loud = null; cVol.set(heard === false ? false : null, (heard === false ? '' : 'Test the sound above first. ') + line); paintSummary(); return; }
+      if (loud === true) cVol.set(true, 'You said it carries over the kitchen noise. ' + line);
+      else if (loud === false) cVol.set(false, 'Turn the volume up or add a speaker, then play the beep again. ' + line);
+      else {
+        cVol.set(null, 'Play the beep again from where the cooks stand, with the fans on. Could you hear it there?',
+          // Two answers: yes ticks the volume check, no says what to try.
+          h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn', dataset: { act: 'vol-yes' }, onClick: () => { loud = true; checkVol(); } }, 'Yes, loud enough'),
+            h('button', { type: 'button', class: 'btn', dataset: { act: 'vol-no' }, onClick: () => { loud = false; checkVol(); } }, 'No, too quiet')));
+      }
       paintSummary();
     }
     // 4. Home screen: the page can tell whether it was opened as an installed app.
@@ -38051,10 +38158,13 @@ a.of-nav:active { background: var(--press); }
       } catch (e) { box.hidden = false; box.focus(); hint.textContent = 'The download did not work here. Copy the data from the box below, then continue.'; unlock(); }
     });
     show.addEventListener('click', () => { box.hidden = false; box.focus(); box.select(); unlock(); });
-    go.addEventListener('click', () => { if (go.disabled) return; try { SB.store.releaseHold(); } catch (e) { /* ignore */ } wrap.remove(); });
+    // Everything behind this screen is made inert (no taps, no Tab), so no order can be entered while nothing is being saved.
+    const behind = Array.from(doc.body.children).filter((el) => el.tagName !== 'SCRIPT');
+    go.addEventListener('click', () => { if (go.disabled) return; try { SB.store.releaseHold(); } catch (e) { /* ignore */ } behind.forEach((el) => el.removeAttribute('inert')); wrap.remove(); });
     row.append(dl, show, go);
     card.append(h2, p, row, hint, box);
     wrap.appendChild(card);
+    behind.forEach((el) => el.setAttribute('inert', ''));
     doc.body.appendChild(wrap);
     try { dl.focus(); } catch (e) { /* ignore */ }
   }
@@ -38110,11 +38220,14 @@ a.of-nav:active { background: var(--press); }
       // A small hook so tests and developers can read the state from the console.
       if (SB.store && typeof SB.store.getState === 'function') SB.dev = { state: () => SB.store.getState() };
       SB.booted = true;
-      storageNotices();
-      watchClock();
+    } catch (e) { showBootError(e, stage); return; }
+    // The app is running from here on: a failure in these extras is logged, never shown as "could not start" over a working board.
+    try { storageNotices(); } catch (e) { console.error('[smokebox] start-up notices failed', e); }
+    try { watchClock(); } catch (e) { console.error('[smokebox] clock watcher failed', e); }
+    try {
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });
-    } catch (e) { showBootError(e, stage); }
+    } catch (e) { console.error('[smokebox] load warning failed', e); }
   }
 
   // Exposed so tests can run the start-up again or show the error card on purpose.
