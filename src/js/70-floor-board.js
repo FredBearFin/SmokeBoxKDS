@@ -26,6 +26,15 @@
     { key: '?', keys: ['?'], label: 'Help' },
     { key: 'Esc', keys: ['Esc'], label: 'Close a screen, or clear the all-day highlight' },
   ];
+  // Keys each device role may use. A kitchen device has no order entry, orders or demo; a front device has no hold
+  // cabinet; all-in-one and manager devices keep every key exactly as before.
+  const ROLE_KEYS = { kitchen: 'rh8z?123456', front: 'nor8dz?123456' };
+  // True when a device with this role may use this shortcut key (lower-case letter, digit or ?; Escape always may).
+  F.roleAllows = function (role, key) {
+    if (key === 'Escape') return true;
+    const set = ROLE_KEYS[role];
+    return set ? set.indexOf(String(key).toLowerCase()) >= 0 && String(key).length === 1 : true;
+  };
   // With no page (loaded under plain Node) every call does nothing, so loading never throws.
   if (!doc) { F.mount = F.unmount = F.setZone = F.highlight = F.setSound = () => {}; F.sound = () => false; return; }
 
@@ -82,6 +91,8 @@
   // The current settings (alert times, undo window), or null before the store loads.
   const settingsNow = () => { const s = store().getState(); return s ? s.settings : null; };
 
+  // This device's job (all, kitchen, front or manager) from the router; all when the router is not there.
+  const roleNow = () => { try { return SB.router && SB.router.role ? SB.router.role() : 'all'; } catch (e) { return 'all'; } };
   // Opens a named sheet (order, hold, 86...). A missing or broken sheet logs an error and nothing more.
   function openSheet(name) { try { if (SB.sheets) SB.sheets.open(name); } catch (e) { console.error('[smokebox] sheet failed', e); } }
 
@@ -632,6 +643,7 @@
   // Shows the hold cabinet in the page in place of the tickets (on), or goes back to the tickets (off). The strip and
   // header stay. opts.batchId scrolls to one batch. Opened from the Cabinet tab, the Hold button, H and the strip rows.
   function showCabinet(on, opts) {
+    if (on && roleNow() === 'front') return; // a front-of-house device has no cabinet
     if (!m || !SB.hold) { if (on) openSheet('hold'); return; }
     if (on) {
       if (!m.cab) m.cab = SB.hold.mount(m.cabEl, opts && opts.tab ? { tab: opts.tab } : {});
@@ -1185,6 +1197,17 @@
     }
   }
 
+  // Applies the device role to the header in place: the stylesheet hides what the role does not use (kitchen: New
+  // ticket, Orders, Demo and Back office; front: the Cabinet tab). Runs every tick but only acts when the role changes.
+  function paintRole() {
+    const r = roleNow();
+    if (m.role === r) return;
+    m.role = r;
+    m.root.dataset.role = r;
+    if (r === 'front' && m.cabOn) showCabinet(false);
+    m.fitKey = null; fitHead();
+  }
+
   // Header: counters, chips and buttons, updated in place.
 
   // Sets hidden only when it changes, so layout is not redone for nothing.
@@ -1324,6 +1347,7 @@
     const S = store();
     const c = S.select.counts();
     m.counts = c;
+    paintRole();
     updateStrip(now);
     // station tabs
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
@@ -1425,31 +1449,36 @@
       // Logging a check goes through run(), so it can be undone like any action.
       { label: 'Mark surfaces sanitized', icon: 'check-circle', onClick: () => run('sanitizeDone', {}) },
       { label: 'Open the hold cabinet', icon: 'thermometer', onClick: () => showCabinet(true) },
-    ], { label: 'Sanitize timer' });
+    ].filter((it) => !(roleNow() === 'front' && /cabinet/.test(it.label))), { label: 'Sanitize timer' });
   }
   // On a narrow screen the Menu button opens this list: the buttons that no longer fit, plus settings.
   function quickMenu(anchor) {
-    const c = m.counts || {};
-    SB.ui.menu(anchor, [
+    const c = m.counts || {}, role = roleNow();
+    // Kitchen devices skip order entry, orders, demo and the back office; front devices skip the cabinet.
+    const kit = role === 'kitchen', front = role === 'front';
+    const items = [
       // The back office is the first row so a manager never has to hunt for it.
-      { label: 'Back office', icon: 'gauge', onClick: () => openOffice(anchor) },
+      { hide: kit, label: 'Back office', icon: 'gauge', onClick: () => openOffice(anchor) },
       // Menu and settings is one tap away too: add a dish, change a price or a prep time.
-      { label: 'Edit the menu', icon: 'sliders', onClick: () => openOffice(anchor, 'data') },
+      { hide: kit, label: 'Edit the menu', icon: 'sliders', onClick: () => openOffice(anchor, 'data') },
       { separator: true },
       // Orders opens the open-orders screen, with how many are open.
-      { label: 'Orders' + (m.openOrders ? ' (' + m.openOrders + ' open)' : ''), icon: 'receipt', onClick: () => openSheet('orders') },
+      { hide: kit, label: 'Orders' + (m.openOrders ? ' (' + m.openOrders + ' open)' : ''), icon: 'receipt', onClick: () => openSheet('orders') },
       // Recall and Hold open the same sheets as their header buttons, with the same counts.
       { label: 'Recall' + (recentCount(store(), store().now()) ? ' (' + recentCount(store(), store().now()) + ')' : ''), icon: 'history', onClick: () => openSheet('recall') },
-      { label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
+      { hide: front, label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
       // 86 and Demo open their sheets too.
       { label: '86 board' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
-      { label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
+      { hide: kit, label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
       // The sanitize entry opens its own small menu on the same anchor.
       { label: 'Sanitize timer' + (m.sanText.textContent ? ': ' + m.sanText.textContent : ''), icon: 'shield-check', onClick: () => sanitiseMenu(anchor) },
       { separator: true },
       // Settings, help and the office sit behind the Menu sheet.
       { label: 'Settings and help', icon: 'settings', onClick: () => openSheet('menu') },
-    ], { label: 'Menu' });
+    ].filter((it) => !it.hide);
+    // Hiding rows can leave a separator at the top, the bottom or twice in a row; those go.
+    const clean = items.filter((it, i) => !(it.separator && (i === 0 || i === items.length - 1 || items[i - 1].separator)));
+    SB.ui.menu(anchor, clean, { label: 'Menu' });
   }
 
   // Opens the back office from a visible button; the shell asks for the manager PIN first when one is set.
@@ -1796,6 +1825,7 @@
     if (SB.sheets && SB.sheets.count && SB.sheets.count() > 0) return;
     if (doc.querySelector('.menu-layer')) return;
     const k = e.key && e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (!F.roleAllows(roleNow(), k)) return;
     let used = true;
     if (k === 'n') openSheet('order');
     else if (k === 'o') openSheet('orders');
