@@ -20,6 +20,11 @@ A single HTML file (`dist/smokebox.html`) that runs in a browser. It is a kitche
 - **Sound, loudness, theme and text size are per device** and are not in a backup.
 - **A prototype server exists** (`server/`, with `go.sh` and `tunnel.sh`) for a possible connected mode. The app does not use it. It is not part of the single-file app and has not been run on a live machine.
 
+## Records
+
+- The safety record (thrown-out batches, readings, entries) keeps entries for about 400 days. That is the app's own setting, not a legal rule. Ask your health department how long you must keep records.
+- Restoring a backup keeps what it replaced for 7 days inside the app, so a wrong restore can be undone in the code. There is no button for it on screen yet.
+
 ## Warnings
 
 Warnings sound only while the screen is on and Smokebox is open on the board, with the volume up and within your opening hours. A sleeping tablet, a closed page or a muted device means silence. A page that was hidden catches up once when it comes back.
