@@ -36,7 +36,7 @@ export async function startHub(opts = {}) {
     child.stdout.on('data', (d) => (out += d)); child.stderr.on('data', (d) => (out += d));
     for (let i = 0; i < 150; i++) { const m = /127\.0\.0\.1:(\d+)/.exec(out); if (m && Number(m[1]) > 0) { port = Number(m[1]); break; } await sleep(40); }
     if (!port) throw new Error('the hub did not start: ' + out);
-    hub.port = port; hub.origin = 'http://127.0.0.1:' + port;
+    hub.port = port; hub.origin = 'http://127.0.0.1:' + port; hub.pid = child.pid;
   }
   const hub = {
     dir, file, port: 0, origin: '',
