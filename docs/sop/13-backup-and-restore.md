@@ -17,6 +17,8 @@ Back up every day at close. If the browser data is cleared or the device is repl
 3. If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN. There is no undo, so back up what is here first if you might want it.
 4. Open the board and check your menu and your food. Sound and loudness are set per device, so test them again.
 
+After a restore the Data page says "Your kitchen before this restore is kept for" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. What was here is kept too, so you can undo once more.
+
 A file that is not a valid backup is refused, and nothing is changed. A backup from the demo is refused too.
 
 Spreadsheet files, like the sales file, cannot be restored.

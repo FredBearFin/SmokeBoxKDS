@@ -1292,6 +1292,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 /* On touch-sized screens the buttons in the reminder and demo bars are full 44 px targets. */
 @media (max-width: 1024px), (pointer: coarse) { .sb-banner .btn { min-height: 44px; } }
 
+/* The clock question may use two lines so a phone can read it all; the page below starts under the whole strip. */
+.sb-banner[data-kind="clock"] { min-height: 40px; align-items: center; }
+.sb-banner[data-kind="clock"] .sb-banner-t { white-space: normal; overflow: visible; line-height: 1.25; }
+
 /* ===== 20-floor.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the floor board: the header with station tabs, the paper ticket slips, item
@@ -2079,13 +2083,19 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
   /* The next-step line is one line with an ellipsis (each dish row already shows its own "Start in" time), and sits closer to the dishes. */
   .fl-main[data-density="compact"] .slip-next { margin-top: 2px; padding-block: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
-}
 /* The device-clock notice on the strip: calm, wraps, two plain buttons that are not the width of the screen. */
 .fl-bar-clock { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-4); background: var(--tint-warn, var(--paper)); border-bottom: var(--bw) solid var(--amber); }
 .fl-bar-clock[hidden] { display: none; }
 .fl-clock-t { flex: 1 1 260px; min-width: 0; font: var(--w-semi) var(--fs-3) / 1.3 var(--font-body); }
 .fl-bar-clock .btn { min-height: var(--tap, 44px); flex: 0 1 auto; }
 .fl-bar-clock > .icon { flex: none; margin-left: var(--sp-4); }
+
+/* On a phone the clock notice puts its words on the full width and the two choices side by side below them. */
+@media (max-width: 640px) {
+  .fl-clock-t { flex: 1 1 calc(100% - 64px); }
+  .fl-bar-clock .btn { flex: 1 1 40%; align-self: stretch; }
+  .fl-bar-clock > .icon { margin-left: 0; }
+}
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -2873,6 +2883,9 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .ox-acts .ox-how { min-width: 140px; gap: var(--sp-1); }
 .ox-how-k { color: var(--ink2); font-weight: var(--w-semi); }
 .ox-how-v { font-weight: var(--w-heavy); }
+
+/* A closed-day sale keeps a quiet, dashed Reopen button that explains itself; a tap still gives the full reason. */
+.ox-acts .ox-reopen.is-shut { border-style: dashed; color: var(--muted, inherit); white-space: normal; text-align: center; }
 
 /* ===== 24-guide.css ===== */
 /* WHAT THIS FILE IS: the look of the in-app Guide screen (#/guide): a page list on the left and the text on the right.
@@ -12800,6 +12813,9 @@ a.of-nav:active { background: var(--press); }
   function hourMs(key, h) { const p = key.split('-').map(Number); const w = Math.floor(h); return new Date(p[0], p[1] - 1, p[2], w, 0, 0, 0).getTime() + Math.round((h - w) * H); }
   // Local-time offset from UTC at that moment, in ms.
   const tzOff = (ts) => -new Date(ts).getTimezoneOffset() * MIN;
+  // Hours on the wall clock from midnight of a service date to a moment (12:45 am the next morning is 24.75). On a clock-change
+  // day this is the hour the kitchen's clock shows, not the hours that really passed.
+  function wallHourOn(t, date) { const m = dayMs(date); return (t + tzOff(t) - (m + tzOff(m))) / H; }
   // Service-date lookups dominate large datasets, so cache them per 15-minute slot (every real UTC offset is a multiple of 15 minutes and the
   // service-day boundary is a whole number of quarter hours, so a slot never straddles two service dates).
   const slotCache = new Map();
@@ -12940,7 +12956,7 @@ a.of-nav:active { background: var(--press); }
       // sh = hours since midnight of the service date (12:45 am = 24.75); hk numbers each date+hour slot.
       const sh = wallHours(t.createdAt, si);
       all.push({
-        t, items, id: t.id, num: t.num, channel: t.channel, createdAt: t.createdAt, date, sh, hour: Math.floor(sh), hk: Math.round(si.ms / H) + Math.floor(sh), wd: si.wd,
+        t, items, id: t.id, num: t.num, channel: t.channel, createdAt: t.createdAt, date, sh, hour: Math.floor(sh), hk: Math.round(si.ms / 86400e3) * 100 + Math.floor(sh), wd: si.wd,
         voided: t.status === 'voided', forced: t.forced === true, recalls: num(t.recalls) ? t.recalls : 0,
         pacing: typeof t.pacing === 'boolean' ? t.pacing : null, rush: !!t.rush, expeditedAt: null, totalMs: null, level: null,
       });
@@ -13404,7 +13420,7 @@ a.of-nav:active { background: var(--press); }
     return points.filter((p, i) => p.date in first && i >= first[p.date] && i <= last[p.date]);
   }
   // A moment as its service date plus its hour on that date (12:45 am is 24.75 of the previous date).
-  function stamp(ctx, t) { const date = ctx.dateOf(t); return { t, date, hour: (t - dayMs(date)) / H }; }
+  function stamp(ctx, t) { const date = ctx.dateOf(t); return { t, date, hour: wallHourOn(t, date) }; }
   /** Average absolute buckets over service days into time-of-day slots. */
   function foldPoints(ctx, points, bmin, fields) {
     const days = new Set(points.map((p) => p.date)).size; const slots = {};
@@ -13435,18 +13451,24 @@ a.of-nav:active { background: var(--press); }
     const stamps = []; for (const v of ctx.vol) stamps.push(v.createdAt); for (const v of ctx.spd) stamps.push(v.expeditedAt);
     if (!stamps.length) return res;
     let t0 = Infinity, t1 = -Infinity; for (const s of stamps) { if (s < t0) t0 = s; if (s > t1) t1 = s; }
-    // Buckets are cut on local clock time: the UTC offset is added so a bucket starts on :00, :15, :30 or
-    // :45 on the wall clock.
-    const off = tzOff(t0), cm = {}, dm = {};
-    for (const v of ctx.vol) { const k = Math.floor((v.createdAt + off) / bm); cm[k] = (cm[k] || 0) + 1; }
-    for (const v of ctx.spd) { const k = Math.floor((v.expeditedAt + off) / bm); dm[k] = (dm[k] || 0) + 1; }
-    const k0 = Math.floor((t0 + off) / bm), k1 = Math.floor((t1 + off) / bm); let pts = [];
+    // Buckets are cut on the wall clock: each moment gets its own UTC offset, so a bucket starts on :00, :15, :30 or :45 of the kitchen's clock
+    // also after a clock change inside the range. Bucket number k is "wall minutes since 1970 / width"; the repeated hour of a fall-back
+    // night is one bucket, and the hour that does not exist in spring has no bucket.
+    const cm = {}, dm = {};
+    for (const v of ctx.vol) { const k = Math.floor((v.createdAt + tzOff(v.createdAt)) / bm); cm[k] = (cm[k] || 0) + 1; }
+    for (const v of ctx.spd) { const k = Math.floor((v.expeditedAt + tzOff(v.expeditedAt)) / bm); dm[k] = (dm[k] || 0) + 1; }
+    const k0 = Math.floor((t0 + tzOff(t0)) / bm), k1 = Math.floor((t1 + tzOff(t1)) / bm); let pts = [];
     // A huge span (over 30 000 buckets) keeps only buckets that have tickets, to avoid a giant list of
     // zeros.
-    if (k1 - k0 > 30000) { const ks = Object.keys(cm).concat(Object.keys(dm)).map(Number).filter((k, i, a) => a.indexOf(k) === i).sort((a, b) => a - b); for (const k of ks) pts.push(mkT(k)); }
-    else for (let k = k0; k <= k1; k++) pts.push(mkT(k));
-    // Builds the point for bucket number k.
-    function mkT(k) { const st = stamp(ctx, k * bm - off); return Object.assign(st, { x: st.t, completed: dm[k] || 0, created: cm[k] || 0, v: { completed: dm[k] || 0, created: cm[k] || 0 } }); }
+    if (k1 - k0 > 30000) { const ks = Object.keys(cm).concat(Object.keys(dm)).map(Number).filter((k, i, a) => a.indexOf(k) === i).sort((a, b) => a - b); for (const k of ks) { const pt = mkT(k); if (pt) pts.push(pt); } }
+    else for (let k = k0; k <= k1; k++) { const pt = mkT(k); if (pt) pts.push(pt); }
+    // The real moment a wall-clock reading happened, or null when the kitchen's clock never showed it (spring forward).
+    function realOf(wall) {
+      const w = new Date(wall), t = new Date(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate(), w.getUTCHours(), w.getUTCMinutes(), w.getUTCSeconds(), 0).getTime();
+      return t + tzOff(t) === wall ? t : null;
+    }
+    // Builds the point for bucket number k (null for a wall-clock time that does not exist).
+    function mkT(k) { const t = realOf(k * bm); if (t === null) return null; const st = stamp(ctx, t); return Object.assign(st, { x: st.t, completed: dm[k] || 0, created: cm[k] || 0, v: { completed: dm[k] || 0, created: cm[k] || 0 } }); }
     pts = trimDays(pts, (p) => p.completed + p.created > 0);
     if (fold) {
       const f = foldPoints(ctx, pts, bmin, ['completed', 'created']); res.days = f.days;
@@ -13691,7 +13713,7 @@ a.of-nav:active { background: var(--press); }
     deltas.sort((a, b) => a.t - b.t || rank[a.kind] - rank[b.kind]);
     let lvl = res.openingG; res.endG = lvl;
     for (const d of deltas) {
-      lvl += d.d; res.points.push({ t: d.t, hour: (d.t - dayMs(day)) / H, g: lvl, d: d.d, kind: d.kind });
+      lvl += d.d; res.points.push({ t: d.t, hour: wallHourOn(d.t, day), g: lvl, d: d.d, kind: d.kind });
       if (d.kind === 'intake' || d.kind === 'restock') res.intakeG += d.d; else if (d.kind === 'use') res.usedG += -d.d; else res.wasteG += -d.d;
       if (res.minG === null || lvl < res.minG) { res.minG = lvl; res.minAt = d.t; }
     }
@@ -13722,7 +13744,7 @@ a.of-nav:active { background: var(--press); }
     const dates = new Set(ctx.dates()); for (const k in first) dates.add(first[k].date);
     const rows = Object.keys(first).map((k) => {
       const f = first[k], closeMs = hourMs(f.date, close);
-      return { date: f.date, ing: f.ing, name: im[f.ing] ? im[f.ing].name : f.ing, t: f.e.t, hour: (f.e.t - dayMs(f.date)) / H, hoursBeforeClose: (closeMs - f.e.t) / H, reason: f.e.reason, menuId: f.e.menuId, menuName: mm[f.e.menuId] ? mm[f.e.menuId].name : f.e.menuId };
+      return { date: f.date, ing: f.ing, name: im[f.ing] ? im[f.ing].name : f.ing, t: f.e.t, hour: wallHourOn(f.e.t, f.date), hoursBeforeClose: (closeMs - f.e.t) / H, reason: f.e.reason, menuId: f.e.menuId, menuName: mm[f.e.menuId] ? mm[f.e.menuId].name : f.e.menuId };
     }).sort((a, b) => a.t - b.t);
     const days = Array.from(dates).sort().map((d) => ({ date: d, label: U.fmtDateShort(d), weekday: U.weekday(d), closeMs: hourMs(d, close), items: rows.filter((r) => r.date === d).map((r) => ({ ing: r.ing, name: r.name, t: r.t, hour: r.hour, hoursBeforeClose: r.hoursBeforeClose, reason: r.reason, menuId: r.menuId, menuName: r.menuName })) }));
     const pc = {}; for (const r of rows) pc[r.ing] = (pc[r.ing] || 0) + 1;
@@ -20117,7 +20139,7 @@ a.of-nav:active { background: var(--press); }
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '', sub: null };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, kind: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -20126,6 +20148,10 @@ a.of-nav:active { background: var(--press); }
   };
   // When the last backup was made on this device (ms), or null if never.
   S.lastBackupAt = () => { const t = U ? U.storage.get(KEY.lastBackup, null) : null; return typeof t === 'number' ? t : null; };
+  // Accepts the device's new time after the person says it is right, then refreshes the strip.
+  function useNewTime() { SB.store.acceptClockJump(); paintBanner(); }
+  // Keeps the old time and stays quiet about the jump for ten minutes.
+  function keepOldTime() { bn.clockSnooze = Date.now() + 10 * 60000; paintBanner(); }
   // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
   function bannerWanted() {
     const store = SB.store;
@@ -20135,6 +20161,11 @@ a.of-nav:active { background: var(--press); }
     if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
+    // Off the board (a back-office page), a device clock that jumped far ahead is asked about here: a slim strip, not a box over the page.
+    if (ss.clockSuspect && Date.now() >= (bn.clockSnooze || 0) && (R.view().kind === 'office' || !(SB.floor && SB.floor.isMounted && SB.floor.isMounted()))) {
+      const dd = Math.round(ss.clockSuspect.aheadMs / 86400000);
+      return { kind: 'clock', tone: 'warn', text: 'The clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(ss.clockSuspect.aheadMs / 3600000) + ' hours') + '. Still on the old time.', act: 'Use the new time', onAct: useNewTime, later: true, laterLabel: 'Keep the old time', onLater: keepOldTime };
+    }
     if (!s) return null;
     const due = backupDue({ service: s.settings && s.settings.service, lastBackupAt: S.lastBackupAt(), snoozeUntil: bn.snoozeUntil, now: Date.now(), hasData: s.tickets.length + s.batches.length > 0 });
     return due ? { kind: 'nudge', tone: 'warn', text: 'Service is over. Save today\'s backup now and keep a copy off this device (email it or use a USB drive).', act: 'Back up now', later: true } : null;
@@ -20151,7 +20182,7 @@ a.of-nav:active { background: var(--press); }
     // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
-    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: 'Hide for 45 minutes', onClick: () => { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } }, ico('x', 18), h('span', { class: 'visually-hidden' }, 'Later')) : null;
+    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: w.laterLabel || 'Hide for 45 minutes', onClick: () => { if (w.onLater) w.onLater(); else { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } } }, ico('x', 18), h('span', { class: 'visually-hidden' }, w.laterLabel || 'Later')) : null;
     bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
@@ -20957,7 +20988,7 @@ a.of-nav:active { background: var(--press); }
       if (!b) return;
       if (id !== 'all') b.dataset.zone = id;
       b.insertBefore(h('span', { class: 'visually-hidden' }, (id === 'all' ? 'All stations' : zoneById(id).long) + ', '), b.firstChild);
-      b.appendChild(h('span', { class: 'visually-hidden' }, id === 'all' || id === 'expo' ? ' tickets' : ' tickets with work here'));
+      b.appendChild(h('span', { class: 'visually-hidden fl-tab-what', dataset: { here: id === 'all' || id === 'expo' ? 'no' : 'yes' } }, tabWhat(0, id)));
     });
     const tabs = h('div', { class: 'fl-tabs' }, seg);
 
@@ -21162,6 +21193,8 @@ a.of-nav:active { background: var(--press); }
     }
     m.fitKey = headKey();
   }
+  // The hidden words after a tab's count: "ticket" for one, "tickets" for the rest, and "with work here" on a station tab.
+  function tabWhat(n, id) { return ' ' + U.plural(n, 'ticket') + (id === 'all' || id === 'expo' ? '' : ' with work here'); }
   // Runs every second: refits the header only when its width or chip text changed, so most ticks cost nothing.
   function refit() {
     if (m && m.head && headKey() !== m.fitKey) fitHead();
@@ -21174,7 +21207,9 @@ a.of-nav:active { background: var(--press); }
   function measureToastTop() {
     if (!m || !m.main) return;
     // Everyday toasts sit just under the header, over the notice strip, where they hide no ticket button.
-    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(m.head.getBoundingClientRect().bottom + 6) + 'px');
+    // While the clock notice shows, toasts start below it so they never cover its two buttons.
+    const cb = m.strip && m.strip.clockBar && !m.strip.clockBar.hidden ? m.strip.clockBar.getBoundingClientRect().bottom : 0;
+    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(Math.max(m.head.getBoundingClientRect().bottom, cb) + 6) + 'px');
     if (m.cabOn) doc.documentElement.style.setProperty('--fl-toast-top', Math.round(m.main.getBoundingClientRect().top + 8) + 'px');
   }
   // Tells the stylesheet how tall the all-day strip is (--fl-lift) so toasts sit above it.
@@ -22040,7 +22075,9 @@ a.of-nav:active { background: var(--press); }
       if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
     }
     setHidden(m.strip.clockBar, !clockShown);
+    measureToastTop();
     const soundShown = needSound && !m.dis.has('snd') && !clockShown;
+    setHidden(m.strip.soundBar, !soundShown); // the clock notice goes first, so the sound bar waits behind it
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
     const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
@@ -22101,6 +22138,8 @@ a.of-nav:active { background: var(--press); }
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
     const tabCount = (id, n, alert) => {
       m.seg.setCount(id, n, { alert });
+      const what = m.seg.querySelector('[data-id="' + id + '"] .fl-tab-what');
+      if (what) { const t = tabWhat(n, id); if (what.textContent !== t) what.textContent = t; }
       const p = m.tabParts[id];
       if (p && p.n !== n) { p.n = n; p.count.dataset.zero = n === 0 ? 'true' : 'false'; }
     };
@@ -23616,7 +23655,7 @@ a.of-nav:active { background: var(--press); }
       });
       touched();
       if (skipped.length) SB.ui.toast(cb.name + ': left out ' + skipped.join(', ') + ' because ' + (skipped.length === 1 ? 'it is' : 'they are') + ' 86 or at the limit.', { tone: 'warn' });
-      else say(cb.name + ' added, ' + added.length + ' lines');
+      else say(cb.name + ' added, ' + added.length + ' ' + U.plural(added.length, 'line'));
     }
     // Repeat last order: copies the previous order into this one, asking first if this one already has items.
     function doRepeat() {
@@ -25596,7 +25635,7 @@ a.of-nav:active { background: var(--press); }
       text(dLive, String(s.tickets.length - demo)); text(dDemo, String(demo));
       if (!sim || typeof sim.sampleInfo !== 'function') { text(dSample, 'Not loaded'); return; }
       if (sim.sampleEnabled && !sim.sampleEnabled()) { text(dSample, 'Switched off'); return; }
-      if (paintCounts.info) { text(dSample, U.fmtNum(paintCounts.info.tickets) + ' tickets over ' + paintCounts.info.days + ' days'); return; }
+      if (paintCounts.info) { text(dSample, U.fmtNum(paintCounts.info.tickets) + ' ' + plural(paintCounts.info.tickets, 'ticket') + ' over ' + paintCounts.info.days + ' ' + plural(paintCounts.info.days, 'day')); return; }
       text(dSample, 'Counting...');
       if (!paintCounts.asked) {
         paintCounts.asked = true;
@@ -26316,6 +26355,16 @@ a.of-nav:active { background: var(--press); }
       const lines = foodLines(state, o.id), t = o.totals || {}, pm = C.payMethodById[o.method];
       text(rec.items, lines.length ? itemsLine(lines) : 'Items are no longer on the board.');
       text(rec.meta, 'Paid ' + U.fmtTime(o.paidAt) + ' by ' + (pm ? pm.name.toLowerCase() : o.method) + '.' + (o.tip > 0 ? ' Tip ' + money(o.tip) + '.' : '') + (t.discount > 0 ? ' Discount ' + money(t.discount) + '.' : '') + (t.rounds > 1 ? ' ' + t.rounds + ' rounds.' : ''));
+      // A sale from a day that was already closed cannot be opened again, so say so on the button before the tap.
+      const lc = state.lastClose, shut = !!(lc && isFinite(o.paidAt) && U.serviceDate(o.paidAt, state.settings.service.dayStartHour) <= lc.day);
+      if (rec.shut !== shut) {
+        rec.shut = shut;
+        U.clear(rec.reopen);
+        rec.reopen.append(ico('history', 20), h('span', null, shut ? 'Closed day: cannot reopen' : 'Reopen'));
+        rec.reopen.classList.toggle('is-shut', shut);
+        if (shut) rec.reopen.setAttribute('aria-disabled', 'true'); else rec.reopen.removeAttribute('aria-disabled');
+        rec.reopen.title = shut ? 'Tap to see why.' : '';
+      }
       text(rec.total, money(t.total));
       text(rec.sub, t.tax > 0 ? 'incl. ' + money(t.tax) + ' tax' : '');
     }
@@ -29537,6 +29586,14 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "p",
       "x": "Open the entry in **Recent readings** and tap **Save fix**. The old entry stays, with your fix next to it."
+     },
+     {
+      "t": "h",
+      "x": "The safety record"
+     },
+     {
+      "t": "p",
+      "x": "In **Back office**, open **Safety** and tap **Print the safety record**. It lists thrown-out batches, your readings and checks, and changes to limits, like \"Changed the cold limit from X to Y\". A cold reading says \"above the cold limit\" and how many minutes above it the batch has already used. The record says how long Smokebox keeps entries; ask your health department how long you must."
      }
     ]
    },
@@ -29606,7 +29663,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "ol",
       "x": [
-       "Open the thrown-out log from the board's menu. It says which period it covers.",
+       "Open the thrown-out log from the board's menu. It starts by saying how far back it goes, like \"Showing every batch thrown out since\" a date.",
        "Tap **Fix this entry** on the row.",
        "Say what was wrong, add your initials and tap **Save the fix**."
       ]
@@ -29651,6 +29708,10 @@ a.of-nav:active { background: var(--press); }
        "If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN. There is no undo, so back up what is here first if you might want it.",
        "Open the board and check your menu and your food. Sound and loudness are set per device, so test them again."
       ]
+     },
+     {
+      "t": "p",
+      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. What was here is kept too, so you can undo once more."
      },
      {
       "t": "p",
@@ -32364,7 +32425,7 @@ a.of-nav:active { background: var(--press); }
     render(container, ctx) {
       const page = K.page(container, ctx, { id: 'tickets' });
       page.headline();
-      page.how('Finished tickets are tickets that were sent out and not voided, counted on the day they were placed. Ticket time runs from when the ticket was entered until it was sent out; the middle ticket is the typical one. Overdue means a ticket took longer than the overdue limit for its order type. Voided tickets were cancelled before they were sent out. The arrows compare with the same number of days just before this range.');
+      page.how('Finished tickets are tickets that were sent out and not voided, counted on the day they were placed. Ticket time runs from when the ticket was entered until it was sent out; the middle ticket is the typical one. Overdue means a ticket reached or passed the overdue limit for its order type. Voided tickets were cancelled before they were sent out. The arrows compare with the same number of days just before this range.');
       page.tiles([
         { id: 'count', kpi: 'count', label: 'Finished tickets' },
         { id: 'median', kpi: 'medianMs', label: 'Median ticket time' },
@@ -36947,7 +37008,7 @@ a.of-nav:active { background: var(--press); }
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const KIND = {
     temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
-    safety_setting_changed: 'Changed a safety limit', equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
+    safety_setting_changed: 'Changed a safety limit', month_closed: 'History saved and cleared', equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
   };
   const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit', datemark: 'Past the date mark' };
   const UNIT = { cooler: 'Cooler', freezer: 'Freezer', display: 'Display case', other: 'Equipment' };
@@ -37101,7 +37162,7 @@ a.of-nav:active { background: var(--press); }
   }
 
   // One row for one safety entry (the same shape inspectorRows gives), for tests and for entries read without the engine's log.
-  function rowFor(e, state) { return { id: e.id, at: e.t, kind: KIND[e.type] || 'Safety entry', food: foodOf(state, e), detail: [detailOf(e), e.type === 'temp_logged' ? coldNote(state, e) : ''].filter(Boolean).join(', '), facts: factsOf(state, e), screen: screenOf(e), who: e.who || '', corrections: [] }; }
+  function rowFor(e, state) { return { id: e.id, at: e.t, kind: KIND[e.type] || 'Safety entry', food: foodOf(state, e), detail: [detailOf(e), e.type === 'temp_logged' ? coldNote(state, e) : ''].filter(Boolean).join(', '), facts: factsOf(state, e), who: e.who || '', corrections: [] }; }
 
   O.inspectorPure = { inspectorRows, rowFor, factsOf, rangeFor, RANGES };
   if (!g.document) return; // Node: the pure rows are all the tests need
@@ -37303,18 +37364,12 @@ a.of-nav:active { background: var(--press); }
 
   // Watches for a device clock that jumped far ahead (or saved times far ahead of it) and asks the owner, once per episode, whether the new time is right.
   function watchClock() {
-    let asking = false, toldWrong = false;
+    let toldWrong = false;
     setInterval(() => {
       try {
         const s = SB.store.status();
         if (s.clockWrong && !toldWrong && SB.ui && SB.ui.toast) { toldWrong = true; SB.ui.toast("This device's clock looks wrong: some saved times are far ahead of it. Smokebox kept the device clock. Check the date and time in the device's settings.", { tone: 'warn', ms: 20000 }); }
-        // On the board the calm strip notice asks instead (a box over the screen would block tickets).
-        if (SB.floor && SB.floor.isMounted && SB.floor.isMounted()) return;
-        if (!s.clockSuspect || asking || !SB.ui || !SB.ui.confirm) return;
-        asking = true;
-        const days = Math.round(s.clockSuspect.aheadMs / 86400000);
-        SB.ui.confirm({ title: "This device's clock jumped ahead", body: ["The date or time on this device just moved ahead by about " + (days >= 2 ? days + ' days' : Math.round(s.clockSuspect.aheadMs / 3600000) + ' hours') + '. Smokebox is still counting from the old time so no batch is thrown out by mistake.', 'If the new time is right (the device was off or asleep that long), choose Use the new time. If the clock is wrong, fix it in the device settings and choose Keep the old time.'], confirmLabel: 'Use the new time', cancelLabel: 'Keep the old time', tone: 'danger' })
-          .then((yes) => { if (yes) { SB.store.acceptClockJump(); asking = false; } else setTimeout(() => { asking = false; }, 10 * 60e3); });
+        // The board's strip notice and the slim banner on back-office pages (60-shell.js) ask about a clock jump; no box covers the screen.
       } catch (e) { /* the watcher must never break the board */ }
     }, 5000);
   }

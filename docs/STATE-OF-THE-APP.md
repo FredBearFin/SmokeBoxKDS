@@ -53,12 +53,12 @@ Run on this machine today, on the main track, headless Chromium, simulated data:
 
 | Check | Result |
 |---|---|
-| Unit suite (`node tools/test.mjs`, 72 files) | 868 tests: 865 pass, 3 fail. The 3: two timing limits in `test/metrics.test.mjs` (the 5000-ticket performance test fails on this machine alone too: about 4 s against a 400 ms limit), and `hub-sync` "offline client queues actions" (fails under load, passes alone). |
+| Unit suite (`node tools/test.mjs`) | 880 of 880 pass on this run. An earlier run the same day, with other agents loading the machine, had 3 timing failures (`metrics.test.mjs` performance limits and `hub-sync` "offline client"). |
 | Smoke (`node tools/smoke.mjs`) | 11 of 11 |
 | Guide test (`node --test test/guide.test.mjs`) | 15 of 15 |
-| Guide walk (`tools/guide-walk.mjs`) | 273 of 273 on the last run |
+| Guide walk (`tools/guide-walk.mjs`) | 286 of 286 |
 | Guide accessibility (`tools/guide-a11y.mjs`) | 34 of 34 |
-| Browser journeys (`node tools/qa.mjs`, `test/e2e/`) | 45 of 45 journeys pass, 1095 checks, about 17 minutes |
+| Browser journeys (`node tools/qa.mjs`, `test/e2e/`) | 44 of 45 journeys pass (1085 checks). The one failure is `11c-sixty-tickets`, a timing journey: the 1 Hz tick median (25 ms limit) failed in the full run and the worst single tick (120 ms limit) failed when run alone. The same journey passed in the earlier run today. Machine-dependent. About 17 minutes. |
 | Other browser suites | 47 `test/*.e2e.mjs` files exist; I did not run them today (individual agents ran the ones for their own changes). `docs/audit/e2e-triage.md` is from round 1 and is out of date. |
 
 Everything above runs in a desktop browser. "Passes" never means "works on a tablet".
@@ -86,7 +86,7 @@ An outside reviewer read the code cold (`docs/audit/independent-review.md` on `k
 | 15 | Update and install trust one unsigned branch download as root | Partly. Special files in the archive are rejected, and signed builds are checked only if a public key is installed. `tunnel.sh` still installs the latest `cloudflared` without a checksum. No Content-Security-Policy. |
 | 16 | Start over was not behind the PIN and erased before the backup download | Fixed. PIN first, backup file downloaded and confirmed before anything is erased |
 
-The 8 "suspected" items: cold time above the limit now adds up across readings (fixed); two tabs overwriting each other (fixed, `review-fix-twotabs`); the safety record keeps entries for 400 days (changed, the app's own setting); safety-limit changes are recorded with old and new values (recorded; the screen that shows them was not on main when I checked); a restore keeps a copy for 7 days (kept in the store; the **Undo this restore** button was not on main when I checked); invisible direction characters are stripped from names (fixed, `review-fix-text`); Caddy password rate limit (`harden.sh` adds a fail2ban jail, not run on a real host); hostile backup data in the screens (A1's pass, `docs/audit/dom-injection.md`, found one tour selector, since fixed).
+The 8 "suspected" items: cold time above the limit now adds up across readings (fixed); two tabs overwriting each other (fixed, `review-fix-twotabs`); the safety record keeps entries for about 400 days (changed; the app's own setting, read from the engine); safety-limit changes are recorded with old and new values (done, shown in the safety record); a restore keeps a copy for 7 days (done, with **Undo this restore** on the Data page); invisible direction characters are stripped from names (fixed, `review-fix-text`); Caddy password rate limit (`harden.sh` adds a fail2ban jail, not run on a real host); hostile backup data in the screens (A1's pass, `docs/audit/dom-injection.md`, found one tour selector, since fixed).
 
 Not covered by the review: real browsers, the connected branch, `tools/`, performance.
 
@@ -112,12 +112,11 @@ Not covered by the review: real browsers, the connected branch, `tools/`, perfor
 | Main-track hub has no write-ahead log; an answered action resent after a hub restart can be applied twice | A5 |
 | Updates are unsigned unless a public key is installed; `tunnel.sh` takes the latest `cloudflared` with no checksum; no Content-Security-Policy | A6 |
 | A 4-digit PIN stays a door latch; a copy of a backup can be attacked offline (slowed, not stopped) | A5 |
-| Timing tests in `metrics.test.mjs` fail on a slow or loaded machine; `hub-sync` "offline client" is flaky under load | A6 |
+| Timing tests (`metrics.test.mjs` performance limits, `11c-sixty-tickets`) fail on a slow or loaded machine; `hub-sync` "offline client" is flaky under load | A6 |
 | `docs/audit/e2e-triage.md` is round 1 and out of date | A6 |
-| The thrown-out log screen text still says "about six months (190 days)" on main while the engine keeps 400 days | A3 (fix on `night/a3-fix2`) |
-| The "Undo this restore" button and the limit-change rows in the safety record are not on main yet | A3 (`night/a3-fix2`) |
-| The Guide cannot describe the cabinet limit row relabel until it is on the same track | A4 |
 | Demo kitchen and the first starter names are barbecue; new kitchens start with neutral names | A2 |
+
+Done since the first version of this page: the thrown-out log and safety record read the keep time from the engine (about 400 days, no number repeated in the Guide) and the log says how far back it goes; **Undo this restore** on the Data page (kept for N days, confirm, then the PIN if one is set); the safety record has "Changed the cold limit from X to Y" lines and cold readings say "above the cold limit" with the minutes already used. The Guide describes each and the walk checks each label.
 
 ## 6. Change log by day part
 
@@ -148,7 +147,7 @@ Times are commit timestamps on `kds/main` (465 commits). The first 41 were the h
 - *Pilot report:* unknown discard cost stays unknown, acknowledged warnings, undo counts, a Gates block (on A3's branch history).
 - *Guide:* cold items page, Readings page, Get the tablet ready, owner quick start, a research cross-check, PIN recovery code and Start over flow updates.
 - *Review fixes (1 to 3, 7, 12, 13, thrown-out log, CSV guard)*, optional hardening scripts, the cold-time accumulation fix, new Start over flow and PIN guards, clock-jump strip.
-- *Merged into main late:* A5's fix2 (restore copy, 400 days, limit-change recording).
+- *Merged into main late:* A5's fix2 (restore copy, 400 days, limit-change recording) and A3's fix2 (Undo this restore, the new safety record lines, the log range sentence, keep time read from the engine).
 
 The connected track (118 commits not on main) added: the follower, tablets writing through the hub, undo rules, last-known kitchen, pairing, offline loading, beta scripts, and their docs.
 
@@ -172,6 +171,6 @@ Needs Node 22 or later. The browser tools need Playwright and the Guide and audi
 | `npm run bootcheck` | old saved kitchens still load | seconds |
 | `node tools/extract-strings.mjs` | writes `docs/audit/strings.tsv` (every owner-visible string) | seconds |
 
-Known flaky or machine-dependent: the 5000-ticket performance tests in `metrics.test.mjs` (timing limits); `hub-sync` "an offline client queues actions" under load; the follower "Out of date" banner check in the Guide walk if two walks run at once (they use fixed local ports); `ux-sound-leader` under load (round 1 note). Run the walk and the `qa` journeys one at a time.
+Known flaky or machine-dependent: `11c-sixty-tickets` in `tools/qa.mjs` (timing limits); the 5000-ticket performance tests in `metrics.test.mjs` (timing limits); `hub-sync` "an offline client queues actions" under load; the follower "Out of date" banner check in the Guide walk if two walks run at once (they use fixed local ports); `ux-sound-leader` under load (round 1 note). Run the walk and the `qa` journeys one at a time.
 
 Never run a test file in `test/e2e/` with plain `node`: it "passes" having run nothing. Use `tools/qa.mjs`.
