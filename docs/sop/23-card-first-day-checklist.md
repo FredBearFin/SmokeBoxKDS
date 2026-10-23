@@ -4,7 +4,7 @@ Print this card. Check each box off with a pen.
 
 ## Before opening
 
-- [ ] Dishes added, tax and hours set (Menu, Dishes and prices)
+- [ ] Dishes added, tax and hours set (Settings, Dishes and prices)
 - [ ] Tablet plugged in, set to never sleep, volume up
 - [ ] One test order sent and cancelled
 

@@ -30,13 +30,13 @@
       "t": "ol",
       "x": [
        "A new Smokebox starts empty on purpose. Tap **Add your first dish** on the welcome screen.",
-       "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made. The starting stations are Kitchen, Prep, Fryer and Cold and drinks. Rename or drop any of them (see Setup recipes).",
+       "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made. The starting stations are Kitchen, Prep, Fryer and Cold and drinks. Rename or drop any (see Setup recipes).",
        "Tap **Save and add another** until your menu is in. Then tap **Save and finish**."
       ]
      },
      {
       "t": "p",
-      "x": "Change dishes and prices later: tap **Menu**, then **Dishes and prices**. A dish you remove goes to **Removed dishes**. Tap **Bring it back** to put it back."
+      "x": "Change dishes and prices later: tap **Settings** (the three-line button at the top right of the board), then **Dishes and prices**. A dish you remove goes to **Removed dishes**. Tap **Bring it back** to put it back."
      },
      {
       "t": "p",
@@ -44,7 +44,7 @@
      },
      {
       "t": "p",
-      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything. New menu sections in the file? Tap **Add these categories**."
+      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything. New menu sections in the file? Tap **Add these sections**."
      },
      {
       "t": "h",
@@ -52,11 +52,11 @@
      },
      {
       "t": "p",
-      "x": "Tap **Menu**, then **Tax, hours and PIN**. Enter your sales tax (0 if you charge none) and your opening hours. A PIN is optional. It keeps your cooks out of the back office."
+      "x": "Tap **Settings**, then **Tax, hours and PIN**. Enter your sales tax (0 if you charge none) and your opening hours. A PIN is optional. It keeps your cooks out of the back office."
      },
      {
       "t": "p",
-      "x": "Cook food ahead and keep it hot or cold? Say so in **Dishes and prices** (see Cooked-ahead food and portions)."
+      "x": "Dishes and prices asks if you cook food ahead. See Cooked-ahead food and portions."
      },
      {
       "t": "h",
@@ -108,14 +108,14 @@
      },
      {
       "t": "p",
-      "x": "Smokebox has no setting to skip kitchen tickets. Every order makes one, so here a ticket is a quick receipt you clear with one tap."
+      "x": "Every order makes a ticket. With Counter service on, a paid order's ticket clears itself."
      },
      {
       "t": "ul",
       "x": [
-       "Stations: tap **Menu**, **Dishes and prices**, then **Change stations**. Rename one to \"Counter\" and tap **Not used** on the others.",
-       "Settings: set tax and hours in **Tax, hours and PIN**. Choose **No, skip this** for cooking ahead. For a batch you bake, like 24 croissants, tap **I count what I made**.",
-       "The board: with one station in use there are no station tabs. A ticket shows at once. Tap **Done**, then **Bump**."
+       "Stations: tap **Settings**, **Dishes and prices**, then **Change stations**. Rename one to \"Counter\" and tap **Not used** on the others.",
+       "Settings: set tax and hours in **Tax, hours and PIN**. Answer **No** to cooking ahead. For a batch you bake, like 24 croissants, tap **I count what I made**. In **Settings**, **How you serve**, turn on **Counter service**.",
+       "The board: one list of orders, no station tabs. Pay with **Cash** or **Card** as you send, and the ticket clears itself. With **Pay later**, tap **Bump** or pay from **Orders**."
       ]
      },
      {
@@ -126,7 +126,7 @@
       "t": "ul",
       "x": [
        "Stations: keep two, like \"Grill\" and \"Window\". Tap **Not used** on the rest.",
-       "Settings: enter your tax. Set a PIN if others use the tablet. Tap **Takeout** on each order. Tap **Cash** or **Card** before **Send to kitchen**.",
+       "Settings: enter your tax. Set a PIN if others use the tablet. For How do you serve?, tap **Food truck / one person** to keep two order buttons, Walk-up and Pickup. Tap **Takeout** on each order. Tap **Cash** or **Card** before **Send to kitchen**.",
        "The board: tabs for All stations, your two stations and Expo. One tablet does both jobs. **New ticket** takes the order and All stations shows what to cook. **Orders** lists unpaid orders."
       ]
      },
@@ -153,6 +153,54 @@
        "Settings: in **Dishes and prices**, tap **Yes, I cook ahead**. Add each pot or tray as a cooked-ahead item, Hot or Cold, with the time limit your health department gives you.",
        "The board: a **Cabinet** tab appears. Tap **New batch** and **Log temp** at every check. See Cabinet and warnings."
       ]
+     }
+    ]
+   },
+   {
+    "id": "how-you-serve",
+    "group": "guide",
+    "title": "How you serve",
+    "summary": "Counter or table, kitchen tickets or none, your own order buttons and your own currency symbol.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Open it"
+     },
+     {
+      "t": "p",
+      "x": "Tap **Settings**, then **How you serve**. Every change saves at once, and a bar offers **Undo**. Under your dishes you may also see the question \"How do you serve?\". Its answers only set the options below."
+     },
+     {
+      "t": "h",
+      "x": "Counter service"
+     },
+     {
+      "t": "p",
+      "x": "Turn on **Counter service** if you hand food over at the counter. The board shows one list of orders, with no station tabs, no Start step and no late colors. When an order is paid, its tickets finish and clear themselves. With **Pay later**, the ticket waits until you pay from **Orders** or tap **Bump**. Leave it off if cooks work from tickets."
+     },
+     {
+      "t": "h",
+      "x": "Order buttons"
+     },
+     {
+      "t": "p",
+      "x": "These are the quick buttons on the order screen, like Walk-up, Pickup and tables. Type over a name to rename it. The arrows move a button. Tap **Remove** to delete one, **Add button** to add one (up to 12), or **Reset to the starting list** to start again."
+     },
+     {
+      "t": "h",
+      "x": "Currency symbol"
+     },
+     {
+      "t": "p",
+      "x": "Pick $, € or £, or **Your own**: one to three characters, like kr. It shows with every price. It does not convert anything."
+     },
+     {
+      "t": "h",
+      "x": "An order you did not finish"
+     },
+     {
+      "t": "p",
+      "x": "If the page closes or reloads in the middle of an order, tap **New ticket**. Your dishes come back with the note \"Restored your unfinished order\". Tap **Clear order** to start fresh."
      }
     ]
    },
@@ -273,6 +321,10 @@
      },
      {
       "t": "p",
+      "x": "To bump a ticket is kitchen talk for sending it off the board. Smokebox keeps that word."
+     },
+     {
+      "t": "p",
       "x": "If a dish is not done, Bump asks first. Bumped by mistake? **Undo** brings it back for 10 seconds. After that, use **Recall**."
      },
      {
@@ -302,7 +354,7 @@
      {
       "t": "ol",
       "x": [
-       "Tap **Menu**, then **Dishes and prices**. Under the dish, tap **I count what I made**.",
+       "Tap **Settings**, then **Dishes and prices**. Under the dish, tap **I count what I made**.",
        "Type how many you made and tap **Start counting**.",
        "The dish shows how many are left, like \"20 left\". Tap **+10** or **Add** when you make more.",
        "At zero the dish shows as sold out. **Stop counting** turns it off."
@@ -325,14 +377,14 @@
       "x": [
        "In **Dishes and prices**, find \"Do you cook any of this ahead and hold it?\" and tap **Yes, I cook ahead**. Then tap **Add a cooked-ahead item**.",
        "Type what you cook ahead and choose Hot or Cold.",
-       "Set how long it may stay. 4 hours is a careful starting point. Ask your health department and change it to match.",
+       "Set how long it may stay. Set the limit your local health department gives you.",
        "Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.",
        "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**."
       ]
      },
      {
       "t": "p",
-      "x": "Choose **No, skip this** if you cook everything to order. You can add cooked-ahead items later from the Cabinet."
+      "x": "The question \"Do you cook food ahead?\" has three answers. Choose **No** if you cook everything to order. **Not sure** counts as No for now. You can turn it on later in **Settings**, then **Tax, hours and PIN**."
      }
     ]
    },
@@ -386,7 +438,7 @@
      },
      {
       "t": "p",
-      "x": "Some foods warn earlier. You can change the times in Menu and settings. A batch that is almost empty, or on pace to sell out in time, stays quiet."
+      "x": "Some foods warn earlier. You can change the times in Settings. A batch that is almost empty, or on pace to sell out in time, stays quiet."
      },
      {
       "t": "p",
@@ -427,7 +479,7 @@
       "t": "ul",
       "x": [
        "Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.",
-       "If your health department asks, save or print the thrown-out log. Open it from the **Menu** button on the board.",
+       "If your health department asks, save or print the thrown-out log. Open it from the **Settings** button on the board.",
        "Keep a copy of the backup off this device (see Backup and restore).",
        "For your accountant: in **Menu and settings**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other."
       ]
@@ -520,8 +572,8 @@
      {
       "t": "ol",
       "x": [
-       "Tap **Menu**. At the bottom, tap **Start over with an empty menu**.",
-       "Read what goes and what stays. Clear **Keep my tax, hours, PIN and station names** to reset those too. Tap **Next: save a backup**.",
+       "Tap **Settings**. At the bottom, tap **Start over with an empty menu**.",
+       "Read what goes and what stays. Clear **Keep my tax, hours, PIN and station names** to reset those too. Tap **Next: about your backup**.",
        "This step only explains: the backup is saved at the moment of erasing, and if it fails, nothing is erased. Tap **Next: confirm**.",
        "Type ERASE, then tap **Erase everything and start over**.",
        "At \"Done. Your kitchen is empty.\" tap **Save the backup again** or **Go to the first screen**."
@@ -529,7 +581,7 @@
      },
      {
       "t": "p",
-      "x": "There is no undo. To go back, restore the backup file. Left-over practice tickets get **Clear them** or **Keep them**."
+      "x": "There is no undo. To go back, restore the backup file. Left-over old demo tickets get **Clear them** or **Keep them**."
      },
      {
       "t": "h",
@@ -552,7 +604,7 @@
       "x": [
        "On the old device, if it still works, download a backup (see Backup and restore). Copy the file somewhere else: email it to yourself or use a USB drive.",
        "On the new device, copy the same smokebox.html file onto it and open it. Install it as an app: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app.",
-       "Tap **Menu**, then **Set up this tablet**. Sound and keeping the screen on are set on each device, so do them again here.",
+       "Tap **Settings**, then **Set up this tablet**. Sound and keeping the screen on are set on each device, so do them again here.",
        "Tap **Back office**, then **Menu and settings**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
        "Check the board and your menu. Save a fresh backup from the new device, then retire the old one."
       ]
@@ -582,8 +634,8 @@
       "x": [
        "If the board says \"Tap here to turn on warning sounds\", tap it. Browsers need one tap first.",
        "Turn the tablet volume up and check its silent switch.",
-       "Tap **Menu** and check that Sound is on and the loudness is not low.",
-       "Tap **Menu**, then **Set up this tablet**, then **Play a test warning**.",
+       "Tap **Settings** and check that Sound is on and the loudness is not low.",
+       "Tap **Settings**, then **Set up this tablet**, then **Play a test warning**.",
        "If the bar says \"Sound paused\", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.",
        "Close any second Smokebox tab. Only the tab on screen makes sound."
       ]
@@ -689,7 +741,7 @@
      {
       "t": "ol",
       "x": [
-       "On the welcome screen, or in the **Menu**, tap **Try the demo**. Then tap **Try the demo** again to confirm. Tap **Not now** to stay where you are.",
+       "On the welcome screen, or in the **Settings**, tap **Try the demo**. Then tap **Try the demo** again to confirm. Tap **Not now** to stay where you are.",
        "The demo opens with sample dishes, three sample tickets and food in the cabinet. A bar at the top says \"You are trying the demo\". Cook, bump, pay and throw out food as much as you like.",
        "Nothing you do there reaches your own kitchen.",
        "Tap **Back to my kitchen** on the bar to return. Your own dishes and orders are as you left them."
@@ -773,7 +825,7 @@
      },
      {
       "t": "p",
-      "x": "The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Menu**, then **Dishes and prices**, and tap **Yes, I cook ahead**."
+      "x": "The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Settings**, then **Dishes and prices**, and tap **Yes, I cook ahead**."
      },
      {
       "t": "h",
@@ -811,7 +863,7 @@
       "t": "ul",
       "x": [
        "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Your own food-safety plan, your training and your thermometer checks still apply.",
-       "Your local health code. The starting limits come from the FDA Food Code. Your state or county may require something different. Ask your health department, then change the limits in Menu and settings.",
+       "Your local health code. The limits Smokebox starts with are examples, not your local rules. Set the limits your local health department gives you.",
        "Card processing. Smokebox only writes down how an order was paid. Keep your card reader and your processor.",
        "Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.",
        "Allergy care. A note on a ticket is a reminder. Tell your staff about every allergy, and follow your own allergen rules.",
@@ -871,7 +923,7 @@
      {
       "t": "check",
       "x": [
-       "No sound: tap the warning bar, turn the volume up, then Menu, Set up this tablet, Play a test warning",
+       "No sound: tap the warning bar, turn the volume up, then Settings, Set up this tablet, Play a test warning",
        "Screen asleep: wake it and check the times on the cards. Set it to never sleep",
        "Wrong tap: Undo, within 10 seconds",
        "Bumped by mistake: Recall it from the board header",
@@ -896,7 +948,7 @@
      {
       "t": "check",
       "x": [
-       "Dishes added, tax and hours set (Menu, Dishes and prices)",
+       "Dishes added, tax and hours set (Settings, Dishes and prices)",
        "Tablet plugged in, set to never sleep, volume up",
        "One test order sent and cancelled"
       ]
@@ -947,7 +999,7 @@
       "x": [
        "Open Smokebox and add it to the home screen: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app",
        "Keep it awake: set Auto-Lock (iPad) or Screen timeout (Android) to Never, and plug it in",
-       "Turn the volume up. Tap Menu, Set up this tablet, then Play a test warning",
+       "Turn the volume up. Tap Settings, Set up this tablet, then Play a test warning",
        "Wifi: not needed. Smokebox works without internet",
        "Backups go where you save them: the Downloads folder, or an email to yourself. Smokebox does not send them anywhere",
        "Keep a copy of every backup off this tablet",

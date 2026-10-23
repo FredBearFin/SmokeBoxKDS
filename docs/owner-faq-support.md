@@ -1,6 +1,6 @@
 # Fifteen questions a first-time owner will ask
 
-Plain answers that match what Smokebox does today. Where something is not decided or not built, the answer says so. The in-app Guide (Menu, then Guide) has the steps. See also docs/README-for-owners.md.
+Plain answers that match what Smokebox does today. Where something is not decided or not built, the answer says so. The in-app Guide (Settings, then Guide) has the steps. See also docs/README-for-owners.md.
 
 ## 1. What if the internet goes out?
 
@@ -56,7 +56,7 @@ Yes, from a file. In Dishes and prices tap "Have a menu file? Import it". Smokeb
 
 ## 14. How do I handle sales tax?
 
-One flat percentage that you set under Menu, Tax, hours and PIN. Dish prices are before tax. It does not file taxes or handle different rates for different dishes.
+One flat percentage that you set under Settings, Tax, hours and PIN. Dish prices are before tax. It does not file taxes or handle different rates for different dishes.
 
 ## 15. Who do I ask when something goes wrong?
 

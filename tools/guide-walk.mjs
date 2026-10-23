@@ -61,7 +61,7 @@ async function blank(browser) {
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(300);
   check('no Cabinet tab while Cooking ahead is No', !(await seen(p, 'Cabinet', '.fl-head')));
   // Menu list.
-  await p.click('button:has-text("Menu")'); await p.waitForTimeout(500);
+  await p.click('button.fl-menu'); await p.waitForTimeout(500);
   for (const t of ['Dishes and prices', 'Tax, hours and PIN', 'Guide', 'Set up this tablet', 'Help and about', 'Back office', 'Show me how it works']) check('menu: ' + t, await seen(p, t, sh));
   await p.keyboard.press('Escape'); await p.waitForTimeout(300);
   // Order, cook, pay.
@@ -92,7 +92,7 @@ async function cookAhead(browser) {
   console.log('Cooking ahead on');
   const p = await fresh(browser);
   await p.evaluate(() => SB.store.dispatchEx('addMenuItem', { name: 'Hush puppies', short: 'Hush puppies', zone: 'fry', cat: 'fried', price: 5.5, prepSec: 240, track: 'two' }, { source: 'ui' }));
-  await p.click('button:has-text("Menu")'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(500);
+  await p.click('button.fl-menu'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(500);
   await p.click('.sheet-root >> text=Tax, hours and PIN'); await p.waitForTimeout(500);
   await p.click('.sheet-root >> text=Yes >> nth=0'); await p.waitForTimeout(400);
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(400);
@@ -118,10 +118,10 @@ async function cooked(browser) {
   const p = await fresh(browser);
   await addDish(p, { name: 'Hush puppies', short: 'Hush puppies', zone: 'fry', price: 5.5 });
   await addDish(p, { name: 'Pulled pork sandwich', short: 'Pork sand', zone: 'pit', cat: 'sandwich', price: 11 });
-  await p.click('button:has-text("Menu")'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
+  await p.click('button.fl-menu'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
   const sh = '.sheet-root';
   check('dishes: up and down arrows beside each dish', await p.evaluate(() => !!document.querySelector('.sheet-root button[aria-label="Move Hush puppies down"]') && !!document.querySelector('.sheet-root button[aria-label="Move Pulled pork sandwich up"]')));
-  check('dishes: category list on each dish row', await p.evaluate(() => !!document.querySelector('.sheet-root select[aria-label="Category of Hush puppies"]')));
+  check('dishes: menu section list on each dish row', await p.evaluate(() => !!document.querySelector('.sheet-root select[aria-label="Section of Hush puppies"]')));
   check('portions: I count what I made', await seen(p, 'I count what I made', sh));
   await tap(p, 'I count what I made'); await p.waitForTimeout(300);
   await p.fill('input[aria-label="How many Hush puppies you made"]', '20');
@@ -129,11 +129,10 @@ async function cooked(browser) {
   // The sheet does not redraw by itself after Start counting (reported to the setup owner), so close and reopen it to see the count.
   check('portions: the count is saved (20 portions on hand)', (await p.evaluate(() => SB.store.getState().ingredients.some((i) => i.unit === 'ea' && SB.store.getState().stock[i.id] === 20))));
   await p.keyboard.press('Escape'); await p.waitForTimeout(300);
-  await p.click('button:has-text("Menu")'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
+  await p.click('button.fl-menu'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
   for (const t of ['20 left', '+10', 'Stop counting']) check('portions: ' + t, await seen(p, t, sh));
-  for (const t of ['Do you cook any of this ahead and hold it?', 'Yes, I cook ahead', 'No, skip this']) check('cook ahead question: ' + t, await seen(p, t, sh));
-  await tap(p, 'Yes, I cook ahead'); await p.waitForTimeout(400);
-  check('cook ahead: Add a cooked-ahead item', await tap(p, 'Add a cooked-ahead item')); await p.waitForTimeout(600);
+  for (const t of ['Do you cook food ahead?', 'Yes, I cook ahead', 'No', 'Not sure']) check('cook ahead question: ' + t, await seen(p, t, sh));
+  check('cook ahead: Yes opens the cooked-ahead sheet', await tap(p, 'Yes, I cook ahead')); await p.waitForTimeout(700);
   for (const t of ['What do you cook ahead?', 'Hot or cold', 'How long may it stay, in hours?', 'Usual batch size, in kg', 'Which dishes use it?', 'Save cooked-ahead item']) check('cooked-ahead form: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
   await p.fill('.sheet-root:last-of-type input >> nth=0', 'Pulled pork');
   await p.click('.sheet-root:last-of-type input[type=checkbox] >> nth=0').catch(() => {});
@@ -157,7 +156,7 @@ async function cooked(browser) {
   await tap(p, 'Cabinet'); await p.waitForTimeout(500);
   check('cabinet: Entries are saved as JM, and Switch person', (await has(p, 'Entries are saved as JM')) && (await seen(p, 'Switch person')));
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(400);
-  await p.click('button:has-text("Menu")'); await p.waitForTimeout(400);
+  await p.click('button.fl-menu'); await p.waitForTimeout(400);
   check('menu: Thrown-out log', await tap(p, 'Thrown-out log')); await p.waitForTimeout(600);
   for (const t of ['Save as spreadsheet', 'Print or save as PDF']) check('thrown-out log: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
   check('thrown-out log: Fix this entry button', await p.evaluate(() => !!document.querySelector('.sheet-root:last-of-type button[data-act="fix-entry"]')));
@@ -189,7 +188,7 @@ async function settings(browser) {
   console.log('Units, stations, PIN');
   const p = await fresh(browser);
   await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
-  await p.click('button:has-text("Menu")'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
+  await p.click('button.fl-menu'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
   check('stations: Change stations', await tap(p, 'Change stations')); await p.waitForTimeout(400);
   for (const t of ['Not used', 'Add station']) check('stations: ' + t, await seen(p, t, '.sheet-root'));
   await p.keyboard.press('Escape'); await p.waitForTimeout(300);
@@ -228,11 +227,11 @@ async function startOver(browser) {
   console.log('Start over with an empty menu');
   const p = await fresh(browser);
   await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
-  await p.click('button:has-text("Menu")'); await p.waitForTimeout(500);
+  await p.click('button.fl-menu'); await p.waitForTimeout(500);
   check('menu: Start over with an empty menu', await tap(p, 'Start over with an empty menu')); await p.waitForTimeout(600);
   const sh = '.sheet-root:last-of-type';
-  for (const t of ['What happens', 'Keep my tax, hours, PIN and station names', 'Next: save a backup']) check('start over step 1: ' + t, await has(p, t, sh));
-  await tap(p, 'Next: save a backup'); await p.waitForTimeout(500);
+  for (const t of ['What happens', 'Keep my tax, hours, PIN and station names', 'Next: about your backup']) check('start over step 1: ' + t, await has(p, t, sh));
+  await tap(p, 'Next: about your backup'); await p.waitForTimeout(500);
   check('start over step 2: the backup is made at the moment of erasing', await seen(p, 'The moment you confirm', sh));
   await tap(p, 'Next: confirm'); await p.waitForTimeout(500);
   check('start over step 3: Erase everything and start over', await has(p, 'Erase everything and start over', sh));
@@ -258,7 +257,8 @@ async function recipes(browser) {
   check('cafe: Not used', await seen(p, 'Use again', sh));
   await tap(p, 'Save and add another'); await p.waitForTimeout(500);
   check('cafe: I count what I made', await has(p, 'I count what I made', sh));
-  check('cafe: No, skip this', await has(p, 'No, skip this', sh));
+  for (const t of ['Do you cook food ahead?', 'Yes, I cook ahead', 'Not sure']) check('cafe: ' + t, await has(p, t, sh));
+  check('cafe: No', await seen(p, 'No', sh));
   await p.reload(); await p.waitForTimeout(900);
   const t1 = await tabTexts(p);
   check('cafe: one station in use shows no station tabs', t1.length === 0, t1);
@@ -270,6 +270,23 @@ async function recipes(browser) {
   check('cafe: Done on the ticket', await seen(p, 'Done'));
   await tap(p, 'Done'); await p.waitForTimeout(400);
   check('cafe: Bump', await seen(p, 'Bump'));
+  // How you serve: Counter service, Order buttons and Currency symbol, then a paid order clears itself and a half-built order comes back.
+  await p.click('button.fl-menu'); await p.waitForTimeout(500);
+  check('settings: How you serve', await tap(p, 'How you serve')); await p.waitForTimeout(500);
+  const hs = '.sheet-root:last-of-type';
+  for (const t of ['Counter service', 'Order buttons', 'Add button', 'Reset to the starting list', 'Currency symbol', 'Your own']) check('how you serve: ' + t, await has(p, t, hs));
+  await p.evaluate(() => document.querySelector('.sheet-root:last-of-type [role=switch]').click()); await p.waitForTimeout(400);
+  check('how you serve: Undo bar after a change', await has(p, 'Undo', hs));
+  await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(400);
+  await tap(p, 'New ticket'); await p.waitForTimeout(500); await tap(p, 'Latte'); await p.waitForTimeout(300);
+  await p.reload(); await p.waitForTimeout(900); await tap(p, 'New ticket'); await p.waitForTimeout(600);
+  check('draft: Restored your unfinished order', await has(p, 'Restored your unfinished order'));
+  check('draft: Clear order', await has(p, 'Clear order'));
+  await tap(p, 'Cash'); await tap(p, 'Send to kitchen'); await p.waitForTimeout(900);
+  check('counter service: a paid order clears itself', (await p.evaluate(() => SB.store.getState().tickets.filter((t) => t.status === 'active').length)) === 0);
+  await tap(p, 'New ticket'); await p.waitForTimeout(500); await tap(p, 'Latte'); await tap(p, 'Pay later'); await tap(p, 'Send to kitchen'); await p.waitForTimeout(900);
+  check('counter service: Pay later keeps the ticket until Bump', (await p.evaluate(() => SB.store.getState().tickets.filter((t) => t.status === 'active').length)) === 1 && (await seen(p, 'Bump')));
+  check('counter service: no station tabs, no Done wording', (await tabTexts(p)).length === 0 && !(await seen(p, 'Done')));
   // The During service card opens from the Guide and names buttons the board has.
   await p.goto(FILE + '#/guide/card-during-service'); await p.waitForTimeout(700);
   check('card: During service opens', (await has(p, 'Counter and expo')) && (await has(p, 'Frozen or offline')));
@@ -293,7 +310,7 @@ async function recipes(browser) {
   // Cooks food ahead: saying yes adds the Cabinet tab and New batch.
   p = await fresh(browser);
   await addDish(p, { name: 'Chili', short: 'Chili', zone: 'sides', cat: 'side', price: 6 });
-  await p.click('button:has-text("Menu")'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
+  await p.click('button.fl-menu'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
   check('ahead: Yes, I cook ahead', await tap(p, 'Yes, I cook ahead')); await p.waitForTimeout(500);
   await p.evaluate(() => SB.sheets.closeAll && SB.sheets.closeAll()); await p.waitForTimeout(400);
   check('ahead: Cabinet tab', (await tabTexts(p)).some((t) => /Cabinet/.test(t)));
