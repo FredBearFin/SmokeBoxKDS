@@ -177,9 +177,15 @@ async function closeDay(browser) {
   await tap(p, 'Open Orders to pay or void'); await p.waitForTimeout(600);
   await tap(p, 'Pay $'); await p.waitForTimeout(700);
   await tap(p, 'Close the day'); await p.waitForTimeout(600);
-  for (const t of ['No open orders', 'Money today', 'Cash in the drawer should be', "Print today's summary"]) check('close the day (paid): ' + t, await seen(p, t, '.sheet-root:last-of-type'));
+  for (const t of ['No open orders', 'Money today', 'Cash you started the day with', 'Cash in the drawer should be', "Print today's summary"]) check('close the day (paid): ' + t, await seen(p, t, '.sheet-root:last-of-type'));
+  await p.fill('.sheet-root:last-of-type .cd-start', '100'); await p.waitForTimeout(300);
+  check('close the day: the drawer line adds the starting cash', await has(p, '$100.00 you started with', '.sheet-root:last-of-type'));
   await tap(p, 'Close the day'); await p.waitForTimeout(800);
   for (const t of ['The day is closed.', "Back up today's data now", "Print today's summary", 'Done']) check('closed: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
+  await p.evaluate(() => SB.sheets.closeAll && SB.sheets.closeAll()); await p.waitForTimeout(300);
+  await tap(p, 'Back office'); await p.waitForTimeout(1200);
+  await p.click('#sb-office nav >> text=Sales and money'); await p.waitForTimeout(1500);
+  check('sales and money: Best day of the week', await has(p, 'Best day of the week', '#sb-office'));
   await p.close();
 }
 
@@ -317,6 +323,9 @@ async function recipes(browser) {
   await addDish(p, { name: 'Chili', short: 'Chili', zone: 'sides', cat: 'side', price: 6 });
   await p.click('button.fl-menu'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
   check('ahead: Yes, I cook ahead', await tap(p, 'Yes, I cook ahead')); await p.waitForTimeout(500);
+  const cs = '.sheet-root:last-of-type';
+  check('ahead: Cold', await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-root:last-of-type button, .sheet-root:last-of-type [role=radio]')].find((e) => e.getClientRects().length && e.textContent.trim().indexOf('Cold') === 0); if (b) b.click(); return !!b; })); await p.waitForTimeout(300);
+  for (const t of ['How many days may it stay in the fridge?', 'How many hours may it be out of the fridge?', 'Use the limits your local health department gives you']) check('ahead (cold): ' + t, await has(p, t, cs));
   await p.evaluate(() => SB.sheets.closeAll && SB.sheets.closeAll()); await p.waitForTimeout(400);
   check('ahead: Cabinet tab', (await tabTexts(p)).some((t) => /Cabinet/.test(t)));
   await p.close();
@@ -345,6 +354,28 @@ async function pinCode(browser) {
   await p.close();
 }
 
+// The import walk: paste a file, check it, and see the preview words the Import a menu page names.
+async function importMenu(browser) {
+  console.log('Import a menu');
+  const p = await fresh(browser);
+  await p.click('[data-act="first-dish"]'); await p.waitForTimeout(500);
+  const sh = '.sheet-root';
+  check('import: More ways to add dishes', await tap(p, 'More ways to add dishes')); await p.waitForTimeout(300);
+  check('import: Have a menu file? Import it', await tap(p, 'Have a menu file? Import it')); await p.waitForTimeout(600);
+  const is = '.sheet-root:last-of-type';
+  check('import: intro names Lightspeed', await has(p, 'Lightspeed', is));
+  await p.fill(is + ' textarea', 'Name,Price,Description,Calories\nLatte,450,Hot or iced,120\nScone,325,Fresh daily,300\nBagel,1400,With cream cheese,280');
+  check('import: Check it', await tap(p, 'Check it')); await p.waitForTimeout(700);
+  for (const t of ['Read as', 'These prices are in cents', 'Ignored column: Calories', 'Notes and descriptions in your file are not kept', 'Put all these dishes at', 'Import ']) check('import preview: ' + t, await has(p, t, is));
+  check('import: tapping cents works', await tap(p, 'These prices are in cents')); await p.waitForTimeout(600);
+  check('import preview: These prices are in dollars', await has(p, 'These prices are in dollars', is));
+  check('import preview: Read as $4.50', await has(p, 'Read as $4.50', is));
+  check('import: Import 3 dishes', await tap(p, 'Import 3')); await p.waitForTimeout(700);
+  check('import: Remove these', await has(p, 'Remove these', is));
+  check('import: the dishes are on the menu', (await p.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).length)) === 3);
+  await p.close();
+}
+
 // The demo walk: a fresh browser context opened with ?demo has sample dishes and tickets, and a normal tab in the same context stays empty.
 async function demoMode(browser) {
   console.log('Demo mode (?demo)');
@@ -360,7 +391,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);

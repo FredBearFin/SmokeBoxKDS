@@ -13,7 +13,7 @@ truck: New ticket opens: New ticket
 truck: browser Back with the Dishes sheet open (history length 3): app alive true, sheet still open 0, url /user/nt-a2/dist/smokebox.html
 truck: after reload the half-typed name is "Brisket taco" and price "9"
 truck: dishes now: 6
-truck: pay note: Marked paid by cash when sent: $21.50. Smokebox only records this; it does not charge cards. No sales tax is added. Set it under Menu, Tax, hours and PIN.
+truck: pay note: Marked paid by cash when sent: $21.50. Smokebox only records this; it does not charge cards. No sales tax is added. Set it in Settings.
 truck: toast after send: ["Ticket #101 sent to 1 station. Paid $21.50 by cash."]
 truck: page errors: 0, console errors: 0
 cafe: import link visible after opening "More ways to add dishes": true

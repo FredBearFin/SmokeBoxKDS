@@ -16,7 +16,7 @@ These are the quick buttons on the order screen, like Walk-up, Pickup and tables
 
 ## Currency symbol
 
-Pick $, € or £, or **Your own**: one to three characters, like kr. It shows with every price. It does not convert anything.
+Pick $, € or £, or **Your own**: one to three characters, like kr. It shows with every price, and open screens update when you close the sheet. It does not convert anything.
 
 ## An order you did not finish
 
