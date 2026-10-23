@@ -22,7 +22,7 @@
     const sheet = SB.ui.sheet({ title: 'Set up this tablet', side: 'right', width: 'min(720px, 96vw)', name: 'setup' });
     const list = h('div', { class: 'setup-list' });
     // The quick way in: the five checks with ticks, so the long list below is only for reading.
-    list.appendChild(h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'open-ready' }, onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('ready'), 60); } }, ico('check-circle', 22), h('span', null, 'Get this tablet ready')), h('button', { type: 'button', class: 'btn', dataset: { act: 'open-pilot' }, onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('pilot'), 60); } }, 'Pilot visit checklist')));
+    list.appendChild(h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'open-ready' }, onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('ready'), 60); } }, ico('check-circle', 22), h('span', null, 'Tablet checks: screen, sound, home screen')), h('button', { type: 'button', class: 'btn', dataset: { act: 'open-pilot' }, onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('pilot'), 60); } }, 'Pilot visit checklist')));
     // A small "?" help line at the top: the guide pages about setting up and about sound trouble, when the guide is in this build.
     const gl = SB.guide && typeof SB.guide.link === 'function' ? [SB.guide.link('getting-started', 'setting up'), SB.guide.link('troubleshooting', 'no sound')].filter(Boolean) : [];
     // Each help link gets words beside its round ? so it is clear what it opens.
@@ -1221,7 +1221,7 @@
     return true;
   }
 
-  /* ---------- Get this tablet ready ---------- */
+  /* ---------- Tablet checks ---------- */
 
   // Plays one short, clear beep through the browser's own audio, at this tablet's saved loudness. Returns true when a beep was started.
   // A tap is needed first on most tablets: it is only called from a button.
@@ -1244,10 +1244,10 @@
   function isInstalled() {
     try { return !!(g.navigator && g.navigator.standalone) || !!(g.matchMedia && (g.matchMedia('(display-mode: standalone)').matches || g.matchMedia('(display-mode: fullscreen)').matches)); } catch (e) { return false; }
   }
-  // Opens "Get this tablet ready": five checks in plain words, each with a green tick or a plain "do this" line. It only reports what the
+  // Opens "Tablet checks": five checks in plain words, each with a green tick or a plain "do this" line. It only reports what the
   // browser can really tell (screen awake, installed, full screen); sound and volume are confirmed by the person who hears the beep.
   function openReady() {
-    const sheet = SB.ui.sheet({ title: 'Get this tablet ready', side: 'right', width: 'min(720px, 96vw)', name: 'ready', onClose: () => { releaseWake(); } });
+    const sheet = SB.ui.sheet({ title: 'Tablet checks', side: 'right', width: 'min(720px, 96vw)', name: 'ready', onClose: () => { releaseWake(); } });
     const root = h('div', { class: 'dp rd' });
     let sentinel = null, wakeNow = 'unknown', heard = null, played = false;
     // Lets go of the screen hold this sheet took, when it closes.
@@ -1257,7 +1257,7 @@
     const cAwake = card('awake', 'Screen stays awake'), cSound = card('sound', 'Sound is on'), cVol = card('volume', 'Volume is loud enough'), cInst = card('installed', 'Added to the home screen'), cFull = card('full', 'Full screen');
     const summary = h('p', { class: 'fs-sub rd-summary', role: 'status' });
     // Counts the ticks and says how many checks are done.
-    function paintSummary() { const n = [cAwake, cSound, cVol, cInst, cFull].filter((c) => c.el.dataset.ok === 'true').length; tell(summary, n + ' of 5 ready. A tick means the tablet or you confirmed it; it is not a promise it stays that way all day.', n === 5 ? 'ok' : undefined); }
+    function paintSummary() { const n = [cAwake, cSound, cVol, cInst, cFull].filter((c) => c.el.dataset.ok === 'true').length; tell(summary, n + ' of 5 ready. A check mark means the tablet or you confirmed it; it is not a promise it stays that way all day.', n === 5 ? 'ok' : undefined); }
 
     // 1. Screen awake: ask the browser to hold the screen on now (a tap lets it), or say how to set the tablet itself.
     // Asks for the screen hold and shows the result; the tablet's own timeout is still the first thing to set.
@@ -1328,7 +1328,7 @@
 
   // The visit steps, in order: what to do, where in the app, and minutes allowed. Kept as plain data so the printed card and the doc match.
   const PILOT_STEPS = [
-    { min: 3, what: 'Get this tablet ready', how: 'Settings, Get this tablet ready. Screen never sleeps, plugged in, sound test heard, added to the home screen, full screen.' },
+    { min: 3, what: 'Tablet checks', how: 'Settings, Tablet checks. Screen never sleeps, plugged in, sound test heard, added to the home screen, full screen.' },
     { min: 3, what: 'Put the menu in', how: 'Import their spreadsheet (Settings, Dishes and prices, More ways to add dishes) or add the first dishes by hand. Check the preview before saving.' },
     { min: 2, what: 'Tax, hours and PIN', how: 'Settings, Tax, hours and PIN. Set the manager PIN and write down the recovery code with the owner.' },
     { min: 2, what: 'Name stations and menu sections', how: 'Use their words. Hide stations they do not have (Change stations).' },
@@ -1348,7 +1348,7 @@
   function openPilot() {
     const sheet = SB.ui.sheet({ title: 'Pilot visit checklist', side: 'right', width: 'min(720px, 96vw)', name: 'pilot' });
     const msg = h('p', { class: 'fs-sub', role: 'status' });
-    const body = h('div', { class: 'dp pv' }, h('p', { class: 'fs-sub pv-total' }, 'About ' + pilotMinutes() + ' minutes in all. Tick each step as you go.'),
+    const body = h('div', { class: 'dp pv' }, h('p', { class: 'fs-sub pv-total' }, 'About ' + pilotMinutes() + ' minutes in all. Check each step as you go.'),
       h('ol', { class: 'pv-list' }, ...PILOT_STEPS.map((s) => h('li', { class: 'fs-card pv-step' }, h('label', { class: 'dp-check-row' }, h('input', { type: 'checkbox' }), h('span', null, h('strong', null, s.what), ' (' + s.min + ' min)')), h('p', { class: 'fs-sub' }, s.how)))));
     // Prints the card through a hidden frame so the board is not printed with it.
     const print = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'pilot-print' }, onClick: () => {
