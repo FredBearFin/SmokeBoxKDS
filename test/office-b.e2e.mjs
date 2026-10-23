@@ -166,7 +166,8 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   for (const id of PAGES) {
     await boot(page, id);
     const f = await page.evaluate(() => {
-      const cards = [...document.querySelectorAll('.of-card')];
+      // The End of day panel is a button panel, not a chart or table card, so it has no "What to look for" caption.
+      const cards = [...document.querySelectorAll('.of-card')].filter((c) => !/^End of day/.test((c.querySelector('.of-card-title') || {}).textContent || ''));
       const chartCards = cards.filter((c) => ['bar', 'line', 'gantt', 'ring', 'meter', 'scatter'].indexOf(c.dataset.type) >= 0);
       return {
         h1: document.querySelector('h1.of-title').textContent, headline: document.querySelector('.of-headline').textContent, hn: document.querySelectorAll('.of-headline .of-hn').length,
@@ -198,7 +199,8 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
     const ds = SB.store.dataset({ sample: true }), F = SB.office.filters();
     const p = SB.metrics.prepare(ds, { from: F.range.from, to: F.range.to, channel: F.channel, now: Date.now() });
     const cmp = SB.metrics.compare(p), items = SB.metrics.byItem(p), yc = SB.metrics.yieldComparison(p).primary;
-    return { revenue: cmp.kpis.revenue.current, avg: SB.metrics.avgTicketValue(p).avg, cost: SB.metrics.foodCostPct(p).costPct, sold: items.reduce((a, r) => a + (r.sold || 0), 0), err: yc ? yc.staticCostErr : null, staticY: yc ? yc.staticYield : null, trueCost: yc ? yc.trueCostPerCookedKg : null, raw: yc ? yc.costPerKgRaw : null };
+    return { revenue: SB.metrics.sales(p).net, avg: SB.metrics.sales(p).avgCheck, // the Sales tile is money from paid orders after discounts (M.sales), not ticket revenue
+       cost: SB.metrics.foodCostPct(p).costPct, sold: items.reduce((a, r) => a + (r.sold || 0), 0), err: yc ? yc.staticCostErr : null, staticY: yc ? yc.staticYield : null, trueCost: yc ? yc.trueCostPerCookedKg : null, raw: yc ? yc.costPerKgRaw : null };
   });
   const tiles = await page.evaluate(() => [...document.querySelectorAll('.of-tile')].map((t) => ({ label: t.querySelector('.of-tile-label').textContent.trim(), val: t.querySelector('.of-tile-val').textContent.trim() })));
   check('tiles: Sales, Average order, Food cost, Items sold, in that order', tiles.map((t) => t.label).join('|') === 'Sales|Average order|Food cost|Items sold', tiles.map((t) => t.label));
@@ -226,16 +228,16 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
 
   // sections the owner asked for
   const t = await mainText(page);
-  for (const w of ['Top items', 'Sales by hour of the day', 'Average ticket value by channel', 'Food cost by day', 'Margin by item', 'Cost not recorded', 'Brisket yield', 'What the static yield costs you', 'Try it: what would a different cook do to the yield?']) check('section present: ' + w, t.indexOf(w) >= 0);
+  for (const w of ['Top items', 'Sales by hour of the day', 'Average ticket value by channel', 'Food cost by day', 'Margin by item', 'Cost not recorded', 'Cooked yield: assumed, modeled and real', 'What a fixed yield costs you', 'Try it: what would a different cook do to the yield?']) check('section present: ' + w, t.indexOf(w) >= 0);
   check('food cost line has a labelled reference band and says it is a rule of thumb', /rule of thumb/i.test(t));
 
   // yield
-  const yp = await page.locator('.of-card', { has: page.locator('.of-card-title', { hasText: 'What the static yield costs you' }) }).textContent();
+  const yp = await page.locator('.of-card', { has: page.locator('.of-card-title', { hasText: 'What a fixed yield costs you' }) }).textContent();
   const m = yp.match(/If you had priced brisket with the static yield you would have been off by ([0-9.]+|less than 0\.1)%\./);
   check('yield: the sentence "If you had priced brisket with the static yield you would have been off by X%." is there', !!m, yp.slice(0, 200));
   check('yield: X is the metric (staticCostErr as a percent)', !!m && near(parseFloat(m[1]), Math.abs(ref.err) * 100, 0.06), [m && m[1], ref.err]);
   check('yield: the true cooked cost per kg is shown', yp.indexOf('$' + ref.trueCost.toFixed(2)) >= 0, ref.trueCost);
-  const yl = await svgLabel(page, 'Brisket yield: assumed, modeled and real');
+  const yl = await svgLabel(page, 'Cooked yield: assumed, modeled and real');
   check('yield: static, Texas A&M model and realised batches are all compared', /Static assumption/.test(yl) && /Texas A&M model/.test(yl) && /Your weighed batches/.test(yl), yl);
 
   // what-if against the engine
@@ -379,7 +381,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   const joined = rules.rows.join(' | ');
   check('rules: hot 135 F, cold 41 F, reheat 165 F once, own hold limits, 2 hour grace, 2 hour checks, 4 hour sanitize', ['135', '41', '165', 'once', 'own hold limit', 'Grace of 2 hours', 'every 2 hours', 'every 4 hours'].every((w) => joined.indexOf(w) >= 0), joined);
   check('rules: always ends with the safety line from the config', rules.last.trim() === (await page.evaluate(() => SB.config.safetyLine)), rules.last);
-  check('rules: says the grace clock differs from the report (finding F-E1)', /research report/.test(rules.note) && /first reading below/.test(rules.note), rules.note);
+  check('rules: says the grace clock differs from the report (finding F-E1)', /first reading below/.test(rules.note) && /stricter|health department/.test(rules.note), rules.note);
   // live from settings
   const rep = await page.evaluate(() => SB.store.dispatchEx('updateSettings', { patch: { safety: { hotHoldF: 140, tempCheckEveryMin: 20 } } }, { source: 'ui' }).report);
   check('settings change accepted by the engine (hot hold 140, checks every 20 minutes)', rep === 'ok', rep);
@@ -517,7 +519,7 @@ for (const [name, ds] of variants) {
     for (const id of PAGES) {
       await boot(page, id, { ds });
       const f = await page.evaluate(() => {
-        const cards = [...document.querySelectorAll('.of-card')];
+        const cards = [...document.querySelectorAll('.of-card')].filter((c) => !/^End of day/.test((c.querySelector('.of-card-title') || {}).textContent || '')); // the End of day panel has no caption
         return { cards: cards.length, looks: cards.filter((c) => c.querySelector('.of-look')).length, errors: document.querySelectorAll('.of-error').length, empties: [...document.querySelectorAll('.of-empty .of-empty-b, .ch-empty')].filter((e) => e.offsetParent).map((e) => e.textContent.trim()), headline: document.querySelector('.of-headline').textContent, coach: (() => { const c = document.querySelector('.of-coach'); return c && c.offsetParent ? c.textContent.trim() : ''; })() };
       });
       check(name + ' ' + id + ': draws, with captions and no error cards', f.cards >= 5 && f.looks === f.cards && f.errors === 0, f);
