@@ -601,6 +601,8 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl-wall-glance .fl-wall-body { overflow-y: auto; }
 .fl-wall-glance .sb-glance[data-size="wall"] .sb-g-s { font-size: calc(15px * var(--fl-k)); }
 .fl-wall-glance .sb-glance-note { display: none; }
+/* The ticket picked with the bump-bar keys: a heavy dark outline that no state colour hides. */
+.fl-slip[data-sel="true"] { outline: calc(5px * var(--fl-k)) solid var(--ink); outline-offset: calc(2px * var(--fl-k)); }
 
 /* In the cabinet view the cards have buttons along the bottom-left, where toasts normally sit: toasts go to the top right, under the strip. */
 html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto; top: var(--fl-toast-top, 130px); left: auto; right: var(--gutter); transform: none; width: min(400px, 34vw); }
