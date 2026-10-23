@@ -16,10 +16,10 @@ export const DIST = path.join(root, 'dist/smokebox.html');
 export const ROOT = root;
 
 // Opens the page (dist/smokebox.html unless file is given) at size w by h and runs fn(page, logs); returns
-// what fn returns and always closes the browser. Options: hash, scale, touch, colorScheme, reducedMotion,
+// what fn returns and always closes the browser. Options: hash, query, scale, touch, colorScheme, reducedMotion,
 // init (a script run before the app) and clearStorage (default true: start from empty storage once per run).
 export async function withPage(opts, fn) {
-  const { w = 1280, h = 800, hash = '', file = DIST, scale = 1, touch = false, colorScheme = 'light', reducedMotion = 'no-preference', clearStorage = true, init } = opts || {};
+  const { w = 1280, h = 800, hash = '', file = DIST, scale = 1, touch = false, colorScheme = 'light', reducedMotion = 'no-preference', clearStorage = true, init, query = '' } = opts || {};
   const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: scale, hasTouch: touch, isMobile: false, colorScheme, reducedMotion });
   const page = await ctx.newPage();
@@ -36,7 +36,7 @@ export async function withPage(opts, fn) {
   // occasionally came back without sessionStorage and wiped what the test had just saved). An init script runs before the app's own code, so the store never
   // sees (or re-saves on page close) stale data, and later reloads inside a test keep what the test saved.
   if (clearStorage) await page.addInitScript(() => { try { if (!sessionStorage.getItem('__pwcleared') && window.name !== '__pwcleared') { localStorage.clear(); sessionStorage.setItem('__pwcleared', '1'); } window.name = '__pwcleared'; } catch (e) { /* storage blocked */ } });
-  const url = pathToFileURL(file).href + hash;
+  const url = pathToFileURL(file).href + query + hash; // query: '?demo' opens the barbecue demo kitchen (a normal page starts blank)
   await page.goto(url, { waitUntil: 'load' });
   try { return await fn(page, logs); } finally { await browser.close(); }
 }

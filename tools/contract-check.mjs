@@ -575,7 +575,7 @@ export async function runBrowser(S) {
   const allPaths = [...new Set([...refPaths, ...contractPaths, 'SB.booted', 'SB.dev'])];
   R.metricsDocFns = mfns;
 
-  await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, hash: '#/', reducedMotion: 'reduce' }, async (page, logs) => {
+  await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, hash: '#/', query: '?demo', reducedMotion: 'reduce' }, async (page, logs) => { // the demo kitchen has dishes; a normal page starts blank
     let ei = 0, pi = 0;
     const take = (tag) => {
       const e = logs.errors.slice(ei).map((m) => ({ phase: tag, kind: 'console', text: mapStack(m) })); ei = logs.errors.length;
@@ -840,6 +840,8 @@ export function analyze(S, R, CSS, extras) {
       if (exists(r.path)) continue;
       // A name that starts with an underscore (SB.floor._alerts) is a private slot made on first use, not part of the contract.
       if (r.path.split('.').some((seg, i) => i > 1 && seg.startsWith('_'))) continue;
+      // page.lastSection is set by kit.page() as each section is added, so it is absent from the first look at the object.
+      if (/\.lastSection$/.test(r.path)) continue;
       const k = r.file + '|' + r.path;
       if (!grouped.has(k)) grouped.set(k, { file: r.file, path: r.path, sites: [] });
       grouped.get(k).sites.push(r);
@@ -944,7 +946,7 @@ export function analyze(S, R, CSS, extras) {
       const pm = new Set((R.probe.pages[0] && R.probe.pages[0].methods) || PAGE_METHODS);
       const seenP = new Set();
       for (const c of S.calls.pageUse) {
-        if (pm.has(c.name) || seenP.has(c.file + c.name)) continue; seenP.add(c.file + c.name);
+        if (pm.has(c.name) || c.name === 'lastSection' || seenP.has(c.file + c.name)) continue; // lastSection is set as each section is added seenP.add(c.file + c.name);
         problem('page-member', c.file, c.line, c.name, c.via + '.' + c.name + ' does not exist on the object kit.page() returns (' + [...pm].join(' ') + ').', 'Use a documented page method' + (nearest(c.name, [...pm]) ? '; did you mean ' + nearest(c.name, [...pm]) + '?' : '') + '.');
       }
     }
@@ -985,6 +987,7 @@ export function analyze(S, R, CSS, extras) {
     for (const s of R.smoke.sheets) {
       const f = s.name === 'order' ? '71-floor-order.js' : '72-floor-sheets.js';
       if (s.registered === false) continue;
+      if (s.name === 'wizard') continue; // an old name kept for older links: it opens the dishes setup, not a plain dialog
       if (s.__err) continue;
       if (s.err) problem('sheet-open', f, 0, s.name + ':err', 'SB.sheets.open("' + s.name + '") threw: ' + s.err, 'Fix the exception in the sheet function.');
       else {

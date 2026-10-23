@@ -1,5 +1,5 @@
 // Journey 1: first run. A new tablet opens the file for the first time.
-import { boardSummary, wait, has, head, settle } from './_lib.mjs';
+import { boardSummary, wait, has, head, settle, startKitchen } from './_lib.mjs';
 
 export default function (h) {
   h.test('01-first-run', 'First run boots clean and the board is ready to use', { owner: 'board', timeout: 40000 }, async (t) => {
@@ -35,10 +35,8 @@ export default function (h) {
     // A brand-new kitchen is empty on purpose: no demo tickets, no starter batches, no sample history.
     t.check('first run starts with no tickets on the board', s.slips.length === 0, s.slips.length);
     const emptyText = await page.evaluate(() => (document.querySelector('.fl-empty') && !document.querySelector('.fl-empty').hidden) ? document.querySelector('.fl-empty').innerText : '');
-    t.check('the empty state says "No tickets right now." and offers New ticket, Show me how it works and Busy-night demo', /No tickets right now/.test(emptyText) && await page.locator('.fl-empty').getByRole('button', { name: 'New ticket' }).isVisible() && await page.locator('.fl-empty').getByRole('button', { name: /Show me how it works/ }).isVisible() && await page.locator('.fl-empty').getByRole('button', { name: /Busy-night demo/ }).isVisible(), emptyText);
-    const welcome = page.locator('.fl-welcome');
-    t.check('a welcome card leads with "Set up your kitchen" and also offers "Show me how it works"', await welcome.isVisible() && await welcome.getByRole('button', { name: /Set up your kitchen/ }).isVisible() && await welcome.getByRole('button', { name: /Show me how it works/ }).isVisible(), await welcome.innerText().catch(() => ''));
-    t.check('the welcome card is not a modal (the board stays usable)', await page.locator('.fl-welcome[role=dialog], .fl-welcome[aria-modal]').count() === 0);
+    t.check('the empty board says "Let\'s build your menu" and offers Add your first dish, Show me how it works and the practice demo', /build your menu/i.test(emptyText) && await page.locator('.fl-empty').getByRole('button', { name: 'Add your first dish' }).isVisible() && await page.locator('.fl-empty').getByRole('button', { name: /Show me how it works/ }).isVisible() && await page.locator('.fl-empty').getByRole('button', { name: /busy-night demo/i }).isVisible(), emptyText);
+    t.check('the next-step card stays hidden until there is a dish on the menu (the empty board has its own buttons)', await page.locator('.fl-welcome').isHidden());
     t.check('nothing is shown as late on an empty board', !/Overdue|Running late/.test(s.text), s.text.slice(0, 200));
     t.check('every tab count is zero on an empty board', s.tabs.every((x) => x.count === 0), s.tabs);
     t.check('no seeded demo tickets: boot does not call SB.sim.seedFirstRun', seeded ? (await page.evaluate(() => SB.store.getState().tickets.length)) === 0 : true);
@@ -52,5 +50,13 @@ export default function (h) {
     // the seeded board must keep ticking without console errors
     await wait(2500);
     await t.clean(page, 'after 2.5 s of ticking');
+
+    // The blank install offers to build the menu; once a menu exists (here: the demo kitchen) the next-step card points at the first order.
+    await startKitchen(page);
+    await page.evaluate(() => SB.floor.setWelcome(true)); await settle(page, 400);
+    const card = await page.evaluate(() => { const e = document.querySelector('.fl-welcome'); return e && !e.hidden ? e.innerText.replace(/\s+/g, ' ') : ''; });
+    t.check('with a menu and no ticket yet the next-step card says how many dishes there are and to tap New ticket', /Your menu has \d+ dishes/.test(card) && /New ticket/.test(card), card.slice(0, 200));
+    await page.evaluate(() => SB.store.dispatchEx('createTicket', { customer: 'First', channel: 'dine_in', items: [{ menuId: 'mac' }], src: 'live' }, { source: 'ui' })); await settle(page, 400);
+    t.check('the card is finished for good once a ticket exists', await page.evaluate(() => document.querySelector('.fl-welcome').hidden));
   });
 }

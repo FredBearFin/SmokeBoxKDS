@@ -11,7 +11,6 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { scanStatic, analyze, runBrowser, ROOT, DIST_FILE } from '../tools/contract-check.mjs';
 import { spawnSync } from 'node:child_process';
-import { startKitchen } from './_kitchen.mjs';
 
 const { withPage } = await import(pathToFileURL(path.join(ROOT, 'tools/pw.mjs')).href);
 const PAGES = ['pace', 'tickets', 'stations', 'money', 'safety', 'stock', 'data'];
@@ -66,7 +65,7 @@ describe('behaviour across files', () => {
   test('no horizontal page scroll from 280 to 2560 px (floor, every sheet, every office page)', async () => {
     const widths = [280, 390, 768, 1280, 2560];
     const found = [];
-    await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, hash: '#/', reducedMotion: 'reduce' }, async (page, logs) => {
+    await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, query: '?demo', hash: '#/', reducedMotion: 'reduce' }, async (page, logs) => {
       await page.waitForFunction(() => window.SB && window.SB.booted, null, { timeout: 25000 });
       const over = () => page.evaluate(() => {
         const de = document.documentElement; const out = { doc: de.scrollWidth - window.innerWidth, wide: [] };
@@ -104,7 +103,7 @@ describe('behaviour across files', () => {
   });
 
   test('Esc closes a sheet and focus goes back to where it was', async () => {
-    await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, hash: '#/', reducedMotion: 'reduce' }, async (page) => {
+    await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, query: '?demo', hash: '#/', reducedMotion: 'reduce' }, async (page) => {
       await page.waitForFunction(() => window.SB && window.SB.booted, null, { timeout: 25000 });
       for (const n of SHEETS) {
         await page.evaluate(() => { const b = document.querySelector('#sb-floor button, #sb-floor [tabindex]'); if (b) b.focus(); });
@@ -120,7 +119,7 @@ describe('behaviour across files', () => {
   });
 
   test('the office: [ and ] step through the pages, every page opens with a headline and charts, Back to the line returns to the floor', async () => {
-    await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, hash: '#/office/pace', reducedMotion: 'reduce' }, async (page, logs) => {
+    await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, query: '?demo', hash: '#/office/pace', reducedMotion: 'reduce' }, async (page, logs) => {
       await page.waitForFunction(() => window.SB && SB.office && SB.office.isMounted && SB.office.isMounted(), null, { timeout: 20000 });
       await page.waitForTimeout(900);
       const seen = [await page.evaluate(() => SB.office.current())];
@@ -158,7 +157,7 @@ describe('behaviour across files', () => {
   });
 
   test('honesty labels from the agent brief: safety line on food-safety screens, simulated sync, sample data, starter estimates', async () => {
-    await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, hash: '#/', reducedMotion: 'reduce' }, async (page) => {
+    await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, query: '?demo', hash: '#/', reducedMotion: 'reduce' }, async (page) => {
       await page.waitForFunction(() => window.SB && window.SB.booted, null, { timeout: 25000 });
       const line = await page.evaluate(() => SB.config.safetyLine);
       assert.ok(line && line.length > 20, 'SB.config.safetyLine is missing');
@@ -171,26 +170,25 @@ describe('behaviour across files', () => {
         return t;
       };
       assert.ok((await sheetText('hold')).includes(line), 'the hold cabinet must show SB.config.safetyLine');
-      assert.match(await sheetText('board86'), /simulated/i, 'the 86 board must say the channel sync is simulated');
+      assert.match(await sheetText('board86'), /simulated|practice/i, 'the 86 board must say the channel sync is practice only');
       await page.evaluate(() => { location.hash = '#/office/pace'; });
       await page.waitForFunction(() => SB.office.isMounted(), null, { timeout: 8000 });
       await page.waitForTimeout(900);
       const pageText = async (id) => { await page.evaluate((p) => SB.office.navigate(p), id); await page.waitForTimeout(900); return page.evaluate(() => (document.querySelector('#of-main') || document.body).textContent); };
       const sampleOn = await page.evaluate(() => SB.sim.sampleEnabled());
       const banner = await page.evaluate(() => (document.querySelector('.of-banner') || {}).textContent || '');
-      if (sampleOn) assert.match(banner, /sample/i, 'the data banner must say sample data is in the range: "' + banner + '"');
+      if (sampleOn) assert.match(banner, /sample|practice/i, 'the data banner must say sample data is in the range: "' + banner + '"');
       assert.ok((await pageText('safety')).includes(line), 'the Safety page must show SB.config.safetyLine');
       assert.match(await pageText('money'), /starter estimate/i, 'the Sales and money page must label starter numbers as starter estimates');
-      assert.match(await pageText('stock'), /simulated/i, 'the Stock and 86 page must say channel sync is simulated');
+      assert.match(await pageText('stock'), /simulated|practice/i, 'the Stock and 86 page must say channel sync is practice only');
       assert.ok((await pageText('data')).includes(line), 'the Data page must show SB.config.safetyLine');
     });
   });
 
   test('no rebuild on a timer: ticket slips and office cards keep the same DOM nodes across ticks and refreshes', async () => {
-    await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, hash: '#/', reducedMotion: 'reduce' }, async (page) => {
+    await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, query: '?demo', hash: '#/', reducedMotion: 'reduce' }, async (page) => {
       await page.waitForFunction(() => window.SB && window.SB.booted, null, { timeout: 25000 });
-      await startKitchen(page, { sample: true }); // known state, then three demo tickets (a first run is an empty kitchen)
-      await page.evaluate(() => SB.sim.restartDemo());
+      // The demo kitchen (opened with ?demo) starts with its three sample tickets; stop the simulator so nothing arrives during the check.
       await page.evaluate(() => { SB.sim.live.stop(); SB.sim.live.crew(false); });
       await page.waitForTimeout(500);
       const tag = (sel, key) => page.evaluate(([q, k]) => { const els = [...document.querySelectorAll(q)]; els.forEach((e, i) => { e[k] = i + 1; }); return els.length; }, [sel, key]);

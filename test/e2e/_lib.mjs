@@ -2,7 +2,8 @@
 // Everything here drives the app the way a person would (roles, visible words); the few page.evaluate calls only READ state
 // or set up a scene (tickets, clock speed) that a journey needs, never to make a check pass.
 
-export { startKitchen } from '../_kitchen.mjs';
+import { startKitchen } from '../_kitchen.mjs';
+export { startKitchen };
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Words that must never appear in rendered text. */
@@ -29,15 +30,17 @@ export async function settle(page, ms = 150) {
 
 /** A brand-new kitchen is empty (no tickets, no stock). Journeys that need a known board call this: it clears live data and puts the starter hold batches in, so every dish can be sold. */
 export async function clearBoard(page) {
-  await page.evaluate(() => { SB.store.resetLive({ keepSettings: true, starter: true }); SB.store.tick(); });
+  await startKitchen(page); // the barbecue demo kitchen with starter stock and no tickets
+  await page.evaluate(() => { SB.store.tick(); });
   await settle(page, 250);
 }
 
 /** Four tickets of known shape (same scene the floor owner uses, so the words are predictable): Table 4 overdue, Pickup running late, Drive-thru rush, Walk-up on time. */
 export async function seedStandard(page, { clearFirst = true } = {}) {
+  if (clearFirst) await startKitchen(page); // the dishes live in the barbecue demo kitchen (a real install starts blank)
   const bad = await page.evaluate((clearFirst) => {
     const S = SB.store, bad = [];
-    if (clearFirst && S.resetLive) S.resetLive({ keepSettings: true, starter: true });
+    
     const now = S.now();
     const mk = (customer, channel, items, o = {}) => { const r = S.dispatchEx('createTicket', Object.assign({ customer, channel, items, src: 'demo', allowPast: true }, o), { source: 'sim' }); if (r.report !== 'ok') bad.push(customer + ': ' + r.report); };
     mk('Table 4', 'dine_in', [{ menuId: 'brisket_half', qty: 2 }, { menuId: 'mac' }, { menuId: 'slaw' }, { menuId: 'cornbread', qty: 2 }], { createdAt: now - 14 * 60e3 });

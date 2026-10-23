@@ -1,6 +1,23 @@
 {
- "runStart": "2026-10-23T04:07:20.643Z",
+ "runStart": "2026-10-23T05:20:29.618Z",
  "results": [
+  {
+   "id": "01-first-run",
+   "title": "First run boots clean and the board is ready to use",
+   "owner": "board",
+   "status": "PASS",
+   "reason": "",
+   "error": null,
+   "ms": 6582,
+   "checks": 24,
+   "failed": [],
+   "skips": [],
+   "notes": [],
+   "shots": [
+    "test/.out/qa/first-run-1280.png"
+   ],
+   "at": "2026-10-23T05:20:36.307Z"
+  },
   {
    "id": "13a-tour-full-loop",
    "title": "Walkthrough: all nine steps with real clicks, from start to Done",
