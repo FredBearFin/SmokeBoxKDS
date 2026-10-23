@@ -203,9 +203,9 @@
     return n.slice(0, 24);
   };
   // The plain words for what a follower screen can and cannot do in the back office.
-  O.FOLLOWER_WORDS = 'This screen only shows the shared kitchen. You can read every page, print and download a copy, but changes, closing the day, restoring and erasing are done on the main screen.';
+  O.FOLLOWER_WORDS = 'This screen only shows the shared kitchen. You can read every page, print and download a copy, but changes, closing the day, restoring and erasing are done on the hub computer.';
   // The plain words for a tablet that writes to a shared kitchen.
-  O.HUB_WORDS = 'This tablet is connected to the shared kitchen. A backup here is a copy of the whole shared kitchen. Restoring or erasing here would erase it for every screen, so those are done on the main computer.';
+  O.HUB_WORDS = 'This tablet is connected to the shared kitchen. A backup here is a copy of the whole shared kitchen. Restoring or erasing here would erase it for every screen, so those are done on the hub computer.';
   O.pure = { PAGES, customRange, coachText, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
 
   if (!doc) return; // Node: the pure helpers are all the tests need
