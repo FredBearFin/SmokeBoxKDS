@@ -871,7 +871,7 @@
    * Spread/lamp use tickets with >= 2 done items; medianTotalMs uses every finished ticket of that side.
    * @returns {{comparable:boolean,on:Side,off:Side,lampSavedMs:number|null,lampCutPct:number|null,spreadSavedMs:number|null,medianDeltaMs:number|null}}
    *   Side = {pacing:boolean,label,tickets,syncTickets,days,medianTotalMs,avgTotalMs,avgSpreadMs,avgLampMs,medianSpreadMs,medianLampMs}
-   *   saved = off minus on (positive = pacing helped); medianDeltaMs = on minus off (negative = pacing faster)
+   *   saved = off minus on (positive = less food waiting with pacing on); medianDeltaMs = on minus off (can be positive: pacing is not meant to cut ticket time)
    */
   M.pacingCompare = (ds, opts) => {
     const ctx = makeCtx(ds, opts); const sync = syncRows(ctx);
@@ -1577,15 +1577,18 @@
       return F(this.id, 'info', 40, r.name + ' is quicker than planned',
         r.name + ' takes ' + mmss(r.observedSec * 1000) + ', ' + mmss(-r.deltaSec * 1000) + ' under the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples), so pacing may fire it too early.' + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
     } },
-    // pacing-effect: finished-food waiting (lamp time) with pacing on vs off. Needs 15 multi-item tickets
-    // per side.
+    // pacing-effect: do plates finish together, with less finished food waiting? Pacing on vs off. Needs 15
+    // multi-item tickets per side. It never claims faster tickets: pacing holds early items on purpose, so
+    // the median ticket time can rise. The two sides are different tickets, not a controlled test.
     { id: 'pacing-effect', run(c) {
       const p = M.pacingCompare(c); if (!p.comparable || p.on.syncTickets < 15 || p.off.syncTickets < 15) return null;
-      const cut = p.lampCutPct, body = 'Finished-food waiting went from ' + mmss(p.off.avgLampMs) + ' to ' + mmss(p.on.avgLampMs) + ' per plate and the plate spread from ' + mmss(p.off.avgSpreadMs) + ' to ' + mmss(p.on.avgSpreadMs) +
-        '. Median ticket time went from ' + mmss(p.off.medianTotalMs) + ' to ' + mmss(p.on.medianTotalMs) + ' (' + p.on.syncTickets + ' paced and ' + p.off.syncTickets + ' unpaced multi-item tickets).';
-      if (p.lampSavedMs >= 15000 && cut >= 0.2) return F(this.id, 'good', 70, 'Pacing cut finished-food waiting from ' + mmss(p.off.avgLampMs) + ' to ' + mmss(p.on.avgLampMs) + ' per plate', body, { label: 'Waiting cut', value: cut, unit: 'share' });
-      if (p.lampSavedMs <= -15000) return F(this.id, 'warn', 62, 'Pacing is not helping plate sync yet', body, { label: 'Waiting change', value: p.lampSavedMs, unit: 'ms' });
-      return F(this.id, 'info', 32, 'Pacing made little difference to plate sync', body, { label: 'Waiting change', value: p.lampSavedMs, unit: 'ms' });
+      const cut = p.lampCutPct, longer = isFinite(p.medianDeltaMs) && p.medianDeltaMs > 0;
+      const body = 'Finished food waited ' + mmss(p.off.avgLampMs) + ' per plate with pacing off and ' + mmss(p.on.avgLampMs) + ' with it on, and the plate spread went from ' + mmss(p.off.avgSpreadMs) + ' to ' + mmss(p.on.avgSpreadMs) + '. ' +
+        'Median ticket time was ' + mmss(p.off.medianTotalMs) + ' with pacing off and ' + mmss(p.on.medianTotalMs) + ' with it on' + (longer ? '; pacing holds early items on purpose so the plate finishes together, so it is not meant to make tickets faster' : '') + '. ' +
+        'Based on ' + p.on.syncTickets + ' paced and ' + p.off.syncTickets + ' unpaced multi-item tickets. These are different tickets, so treat it as a hint, not a controlled test.';
+      if (p.lampSavedMs >= 15000 && cut >= 0.2) return F(this.id, 'good', 70, 'With pacing on, plates finished together: food waited ' + mmss(p.on.avgLampMs) + ' instead of ' + mmss(p.off.avgLampMs), body, { label: 'Less food waiting', value: cut, unit: 'share' });
+      if (p.lampSavedMs <= -15000) return F(this.id, 'warn', 62, 'Pacing is not helping plates finish together yet', body, { label: 'Waiting change', value: p.lampSavedMs, unit: 'ms' });
+      return F(this.id, 'info', 32, 'Pacing made little difference to plates finishing together', body, { label: 'Waiting change', value: p.lampSavedMs, unit: 'ms' });
     } },
     // sellout-early: a protein went 86 at least 1.5 h before close on a day with 30+ tickets; estimates
     // grams per hour.

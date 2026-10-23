@@ -3,7 +3,7 @@
  * suggestion per protein, the sell-out clock, the stock level through a day, what 86 cost, simulated sync.
  * PARTS: 1 pure helpers, 2 numbers per refresh, 3 the story and the suggestions, 4 the page and its cards.
  * USES: 82-office-money.js (helpers), 80-office-core.js (the kit), 40-metrics.js.   USED BY: the office frame.
- * HONEST: suggestions come from the sample, sync is simulated and labeled so, and refused order lines are
+ * HONEST: suggestions come from the days in range (sample days are labeled), sync is simulated and labeled so, and refused order lines are
  * counted only where the app recorded them. The Pitcall note is a seam, not an integration.
  */
 (function (g) {
@@ -196,6 +196,8 @@
         const suggest = Math.ceil((med * PADDING) / 100) * 100;
         const basis = useWd ? 'the ' + sameWd.length + ' ' + WEEKDAY[tomorrowWd] + 's in this range' : 'all ' + demand.length + ' cooking days in this range';
         Object.assign(out, { suggestG: suggest, sold: soRows.length > 0 });
+        // Where the days come from: simulated sample days must never read as the owner's own kitchen.
+        const srcWord = b.ds.counts && b.ds.counts.sample > 0 ? 'Suggestion from days that include simulated sample data (not your kitchen)' : 'Suggestion from your own days in this range';
         const parts = [];
         if (soRows.length) {
           const earliest = soRows.slice().sort((x, y) => y.hoursBeforeClose - x.hoursBeforeClose)[0];
@@ -204,12 +206,12 @@
           parts.push('A normal day cooks ' + fmt.g(tp.medianIntake) + ' and serves ' + fmt.g(tp.medianUsed) + '; the days it ran out probably wanted about ' + fmt.g(wanted) + '.');
           const t = B.median(soRows.map((r) => r.hour)) - TOP_UP;
           const topUp = 'have a top-up batch ready by about ' + U.fmtTime(B.dayMs(b.today) + t * HOUR) + ', an hour before the usual sell-out';
-          if (suggest > tp.medianIntake * 1.03) parts.push('Suggestion from the sample: cook about ' + fmt.g(suggest) + ' (typical demand ' + fmt.g(med) + ' plus 10%, from ' + basis + '), ' + fmt.g(suggest - tp.medianIntake) + ' more than usual, and ' + topUp + '.');
-          else parts.push('Suggestion from the sample: the total is about right (typical demand ' + fmt.g(med) + ' plus 10% is ' + fmt.g(suggest) + ', from ' + basis + '), so keep the amount and ' + topUp + '. The problem looks like timing, not quantity.');
+          if (suggest > tp.medianIntake * 1.03) parts.push(srcWord + ': cook about ' + fmt.g(suggest) + ' (typical demand ' + fmt.g(med) + ' plus 10%, from ' + basis + '), ' + fmt.g(suggest - tp.medianIntake) + ' more than usual, and ' + topUp + '.');
+          else parts.push(srcWord + ': the total is about right (typical demand ' + fmt.g(med) + ' plus 10% is ' + fmt.g(suggest) + ', from ' + basis + '), so keep the amount and ' + topUp + '. The problem looks like timing, not quantity.');
         } else {
           parts.push('Never ran out. A normal day cooks ' + fmt.g(tp.medianIntake) + ' and serves ' + fmt.g(tp.medianUsed) + '.');
-          if (suggest < tp.medianIntake * 0.85) parts.push('Suggestion from the sample: about ' + fmt.g(suggest) + ' covers typical demand plus 10% (' + basis + '), ' + fmt.g(tp.medianIntake - suggest) + ' less than usual.');
-          else parts.push('Suggestion from the sample: the cook count looks about right. Typical demand plus 10% is ' + fmt.g(suggest) + '.');
+          if (suggest < tp.medianIntake * 0.85) parts.push(srcWord + ': about ' + fmt.g(suggest) + ' covers typical demand plus 10% (' + basis + '), ' + fmt.g(tp.medianIntake - suggest) + ' less than usual.');
+          else parts.push(srcWord + ': the cook count looks about right. Typical demand plus 10% is ' + fmt.g(suggest) + '.');
         }
         out.parts = parts; out.text = parts.join(' ');
         return out;
@@ -268,7 +270,7 @@
     });
 
     page.panel({
-      span: 12, title: 'What to cook tomorrow', sub: 'A suggestion from the sample, not a forecast',
+      span: 12, title: 'What to cook tomorrow', sub: 'A suggestion from the days in the range above, not a forecast. Simulated sample days are labeled when they are included.',
       caption: 'A starting number per protein, worked out from how much was really used on the days in this range. Your own judgment about tomorrow comes first.',
       // Builds the intro, the list and the Pitcall note once; update redraws the list only when it changed.
       render: (body, p0) => {

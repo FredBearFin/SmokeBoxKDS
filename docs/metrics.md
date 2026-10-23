@@ -105,7 +105,7 @@ Formula notes: `p(x)` is the linear-interpolation percentile (the same as `SB.ut
 | `slow-hour` | "<span> is your slowest hour" (warn, bad under 60 % on time) | >= 40 finished tickets, >= 15 in that hour, hour median >= 1.25x overall and >= 60 s over |
 | `channel-gap` | "Takeout ran 2m 10s slower than dine-in" in one hour (warn) | two channels each with >= 5 tickets in an hour, gap >= 90 s |
 | `calibration-drift` | "Mac and cheese takes 6m 30s on your line" (warn / bad; info when faster) | item flagged by `calibration` with >= 8 samples |
-| `pacing-effect` | "Pacing cut finished-food waiting from 3m 05s to 0m 48s per plate" (good / info / warn) | `pacingCompare` comparable with >= 15 multi-item tickets on each side |
+| `pacing-effect` | "With pacing on, plates finished together: food waited 0m 48s instead of 3m 05s" (good / info / warn). Never says tickets got faster: median ticket time can rise with pacing on, and the body says the two sides are different tickets, not a controlled test | `pacingCompare` comparable with >= 15 multi-item tickets on each side |
 | `sellout-early` | "Brisket went 86 at 1:42 pm" with hours before close and a gram estimate (warn / bad) | an 86 >= 1.5 h before close on a day with >= 30 tickets |
 | `sellout-repeat` | "Brisket sold out on 3 of 4 days" (bad) | >= 4 days, a protein sold out on >= 3 days and >= 40 % of them |
 | `waste` | "Discards cost $X (N kg)" (good / info / warn / bad at 3 / 8 / 15 %) | >= 5 kg cooked intake or >= 3 discards |

@@ -178,11 +178,11 @@
       });
 
       page.card({
-        type: 'bar', span: 4, height: 230, title: 'Does pacing help?',
+        type: 'bar', span: 4, height: 230, title: 'Do plates finish together?',
         // The subtitle says how much pacing cut the wait for the last item, once pacing on and off can be
         // compared.
-        sub: (p) => { const c = M.pacingCompare(p); return c.comparable && isNum(c.lampCutPct) ? 'Pacing ' + (c.lampCutPct >= 0 ? 'cut' : 'added') + ' ' + Math.round(Math.abs(c.lampCutPct) * 100) + '% of the wait for the last item' : 'Average wait for the last item, pacing off against on'; },
-        caption: 'Shorter is better. This is how long finished food sits under the lamp waiting for the rest of the plate.',
+        sub: (p) => { const c = M.pacingCompare(p); return c.comparable && isNum(c.lampCutPct) ? 'With pacing on, finished food waited ' + Math.round(Math.abs(c.lampCutPct) * 100) + '% ' + (c.lampCutPct >= 0 ? 'less' : 'more') + ' (different tickets, not a controlled test)' : 'Average wait for the last item, pacing off against on'; },
+        caption: 'Shorter is better. This is how long finished food sits under the lamp waiting for the rest of the plate. Pacing holds early items so the plate finishes together; it is not meant to make tickets faster, and the median ticket time can go up.',
         empty: { title: 'Pacing cannot be compared yet', body: 'This needs finished multi-item tickets with pacing on and with pacing off in the same range. Run a day with pacing off to see its effect.', icon: 'timer' },
         // Two bars: the average wait for the last item with pacing off and with pacing on.
         spec(p) {
@@ -312,7 +312,7 @@
       page.section('Where the time goes', 'Every ticket splits into four waits that add up to its total.');
       page.card({
         type: 'stack', span: 6, title: 'By channel', sub: 'Average per ticket',
-        caption: 'Look for the widest part of each bar. A wide “Waiting at expo” part means finished food is sitting, not cooking.',
+        caption: 'Look for the widest part of each bar. A wide “Waiting at expo” part means finished food is sitting, not cooking. Items cooked in one step have no start tap, so their “Waiting for a cook” counts as zero and their work time runs from firing (estimated).',
         empty: { title: 'No finished tickets yet', body: 'Each channel gets a bar once it has finished tickets in this range.' },
         // Average ticket time per channel, split into its four waits.
         spec(p) {
@@ -443,7 +443,7 @@
 
       page.card({
         type: 'bar', span: 6, title: 'Response and work time by station', sub: 'Median, from the moment an item fires',
-        caption: 'Response is how long an item waits before a cook touches it; work is the hands-on time. A long response means the station is short of hands, a long work time means the dish itself is slow.',
+        caption: 'Response is how long an item waits before a cook touches it; work is the hands-on time. Items with no start tap show zero response and count work from firing, so those times are estimated. A long response means the station is short of hands, a long work time means the dish itself is slow.',
         empty: { title: 'No finished items yet', body: 'Each station gets bars once it has finished items in this range.' },
         // Two bars per station: the median wait before a cook touches an item, and the median hands-on
         // time.
