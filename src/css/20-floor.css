@@ -629,7 +629,7 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-cabinet { flex: 1 1 auto; min-width: 0; }
 .fl-cabinet[hidden] { display: none; }
 .fl-cabinet .hc { max-width: none; }
-.fl-cabinet .hc-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(420px * var(--fl-k))), 1fr)); }
+.fl-cabinet .hc-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(330px * var(--fl-k))), 1fr)); }
 .fl-cabinet .hc-name { font-size: calc(var(--fs-4) * var(--fl-k)); }
 .fl-cabinet .hc-status { font-size: calc(var(--fs-4) * var(--fl-k)); }
 .fl-cabinet .hc-stock-t, .fl-cabinet .hc-dl, .fl-cabinet .hc-msg { font-size: calc(var(--fs-3) * var(--fl-k)); }
@@ -688,3 +688,40 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-dock-list { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
 /* Wall mode keeps one notice row and no sound-pause note: the TV is for glancing, and the three panes need the height. */
 .fl[data-wall="on"] .fl-bar-pause { display: none; }
+
+/* ===== Round 5: slip density and hierarchy, motion system ===== */
+/* Motion: --sb-motion (set in 00-tokens.css) is the one switch. Reduced motion turns it to 0; set it to 0 anywhere to stop all movement. */
+@media (prefers-reduced-motion: reduce) { :root { --sb-motion: 0; } }
+/* Print-in, a little quicker; bump-out slides sideways and fades; time colours ease instead of jumping. */
+.fl-slip.is-printing { animation-duration: calc(240ms * var(--sb-motion)); }
+.fl-slip.fl-leaving { animation: fl-leave calc(260ms * var(--sb-motion)) var(--ease-in-out) both; }
+@keyframes fl-leave { 0% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(calc(36px * var(--fl-k))) scale(0.97); } }
+.fl-slip .slip-head, .fl-slip .slip-timer, .fl-badge, .fl-row > .slip-item, .slip-next { transition: background-color var(--dur-slow) var(--ease-out), color var(--dur-slow) var(--ease-out), border-color var(--dur-slow) var(--ease-out), box-shadow var(--dur-slow) var(--ease-out); }
+/* One soft highlight when a ticket changes time state or a dish changes state. It plays once and leaves nothing behind. */
+.fl-flash { animation: fl-flash calc(800ms * var(--sb-motion)) var(--ease-out) 1; }
+@keyframes fl-flash { 0% { box-shadow: inset 0 0 0 999px rgba(255, 190, 40, 0.38); } 100% { box-shadow: inset 0 0 0 999px rgba(255, 190, 40, 0); } }
+/* Warnings get the eye for a few seconds, then hold still: no loop runs for ever on a busy board. */
+.slip[data-level="breach"] .slip-head, .slip[data-level="breach"] .slip-body, .slip[data-level="breach"] .slip-tear { animation-iteration-count: 3; }
+.fl-row[data-cook="check"] > .slip-item, .fl-row[data-cook="check"] .fl-act[data-act="cook"] { animation-iteration-count: 6; }
+
+/* Density: tickets in one grid row stretch to the same height so a row looks even; Bump stays right under the dishes so it is never pushed out of reach. */
+.fl-grid { align-items: stretch; gap: var(--sp-5) var(--sp-4); }
+.fl-slip { display: flex; flex-direction: column; }
+.fl-slip .slip-body { flex: 1 1 auto; display: flex; flex-direction: column; }
+/* Hierarchy: number and timer first, dish names large, helper lines (start times, the next-step line) quiet. */
+.fl-row .slip-item { min-height: calc(52px * var(--fl-k)); padding: calc(5px * var(--fl-k)) var(--sp-3); gap: 0 var(--sp-3); }
+.fl-row .slip-name { font-size: calc(var(--fs-item) * 1.15); }
+.fl-row[data-state="queued"] .slip-name { font-weight: var(--w-bold); color: var(--ink2); }
+.fl-sub { padding-left: calc(var(--qty-w) + var(--sp-3)); gap: 0 var(--sp-2); }
+.fl-sub .chip { min-height: calc(22px * var(--fl-k)); padding-block: 0; font-size: var(--fs-1); }
+.fl-deck, .fl-cook { font-size: var(--fs-1); }
+.fl-deck { color: var(--ink3); }
+.slip-next { margin: var(--sp-1) var(--sp-3) 0; padding: calc(4px * var(--fl-k)) var(--sp-2); font-size: var(--fs-2); font-weight: var(--w-semi); }
+.fl-slip .slip-head { padding-bottom: var(--sp-3); }
+.fl-slip .slip-meta { margin-top: var(--sp-1); }
+.fl-slip .slip-progress { margin-top: var(--sp-1); }
+/* Far display keeps the roomier, bigger helper lines so they read from across the kitchen. */
+.fl[data-far="on"] .fl-deck, .fl[data-far="on"] .fl-cook { font-size: var(--fs-3); }
+.fl[data-far="on"] .fl-sub .chip { min-height: calc(28px * var(--fl-k)); font-size: var(--fs-2); }
+.fl[data-far="on"] .slip-next { font-size: var(--fs-3); }
+.fl-fire { min-height: calc(44px * var(--fl-k)); }

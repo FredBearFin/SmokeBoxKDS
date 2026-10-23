@@ -8,6 +8,7 @@ let fail = 0;
 // Records one check and prints it.
 function check(name, ok, detail) { if (!ok) fail++; console.log((ok ? '  ok    ' : '  FAIL  ') + name + (ok ? '' : ' -> ' + JSON.stringify(detail))); }
 const ready = (page) => page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 8000 });
+const goDemo = async (page) => { await page.goto(page.url().split('#')[0].split('?')[0] + '?demo'); await ready(page); };
 const demo = (page) => page.evaluate(() => { SB.floor.setWelcome(false); SB.sim.live.crew(false); return SB.store.resetLive({ keepSettings: true, starter: true, stagger: true, catalog: 'sample', replaceOwn: true }); });
 const seen = (page) => page.evaluate(() => { const v = (s) => { const e = document.querySelector(s); return !!e && e.offsetParent !== null; }; return { cab: v('.fl-seg [data-id="cabinet"]'), san: v('.fl-san'), holdBtn: v('[data-tool="hold"]') }; });
 
@@ -52,7 +53,7 @@ await withPage({ w: 1280, h: 800 }, async (page, logs) => {
 });
 
 await withPage({ w: 1280, h: 800 }, async (page) => {
-  await ready(page); await demo(page);
+  await ready(page); await goDemo(page); await demo(page);
   await page.evaluate(() => { SB.sim.restartDemo({ replaceOwn: true }); SB.sim.live.crew(false); });
   await page.evaluate(() => SB.sheets.open('orders')); await page.waitForSelector('.ox-row');
   const btn0 = await page.locator('.ox-quick').first().textContent();
@@ -63,7 +64,9 @@ await withPage({ w: 1280, h: 800 }, async (page) => {
   await page.waitForTimeout(400);
   const btn1 = await page.locator('.ox-quick').first().textContent();
   check('after choosing Card the Pay button says card', /card/i.test(btn1), btn1);
-  check('the choice is remembered', await page.evaluate(() => /card/.test(localStorage.getItem('smokebox.v1.paymethod') || '')));
+  await page.keyboard.press('Escape'); await page.waitForTimeout(400);
+  await page.evaluate(() => SB.sheets.open('orders')); await page.waitForSelector('.ox-row');
+  check('the choice is remembered when the sheet is opened again', /card/i.test(await page.locator('.ox-quick').first().textContent()));
   await page.locator('.ox-quick').first().click(); await page.waitForTimeout(500);
   const method = await page.evaluate(() => { const o = SB.store.getState().orders.filter((x) => x.status === 'paid'); return o.length ? (o[0].payment && o[0].payment.method) || o[0].method || o[0].payMethod : null; });
   check('the order was recorded as card', method === 'card', method);

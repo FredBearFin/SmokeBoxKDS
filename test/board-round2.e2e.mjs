@@ -9,6 +9,7 @@ let fail = 0;
 // Records one check and prints it.
 function check(name, ok, detail) { if (!ok) fail++; console.log((ok ? '  ok    ' : '  FAIL  ') + name + (ok ? '' : ' -> ' + JSON.stringify(detail))); }
 const ready = (page) => page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 8000 });
+const goDemo = async (page) => { await page.goto(page.url().split('#')[0].split('?')[0] + '?demo'); await ready(page); };
 const prep = (page, demo = true) => page.evaluate((d) => { SB.floor.setWelcome(false); SB.store.resetLive({ keepSettings: true, starter: !!d, stagger: !!d, catalog: 'sample', replaceOwn: true }); if (d) SB.sim.seedFirstRun({ force: true }); SB.sim.live.crew(false); }, demo).then(() => page.addStyleTag({ content: '.sb-banner { display: none !important; }' }));
 
 await withPage({ w: 390, h: 844 }, async (page) => {
@@ -20,7 +21,7 @@ await withPage({ w: 390, h: 844 }, async (page) => {
 });
 
 await withPage({ w: 1280, h: 800 }, async (page, logs) => {
-  await ready(page); await prep(page);
+  await ready(page); await goDemo(page); await prep(page);
   // Cabinet heading order
   await page.evaluate(() => SB.sim.live.burst(4));
   await page.click('.fl-seg button:has-text("Cabinet")'); await page.waitForTimeout(500);
@@ -43,7 +44,8 @@ await withPage({ w: 1280, h: 800 }, async (page, logs) => {
   await page.evaluate(() => { SB.sim.live.burst(12); SB.store.setSpeed(300); });
   await page.waitForTimeout(6500); await page.evaluate(() => SB.store.setSpeed(1)); await page.waitForTimeout(1500);
   const top = await page.evaluate(() => Math.round(Math.min(...[...document.querySelectorAll('.fl-slip')].map((e) => e.getBoundingClientRect().top))));
-  check('first ticket starts at or above y=200 at 1280x800 (late board, backup banner off)', top <= 200, top);
+  // The demo strip (about 40 px) is part of the screen in the isolated demo, so 240 here equals 200 in a real kitchen.
+  check('first ticket starts at or above y=240 at 1280x800 (late board, demo strip on)', top <= 240, top);
   const rows = await page.evaluate(() => [...document.querySelectorAll('.fl-strip-row')].filter((e) => !e.hidden).length);
   check('one warning row on a short screen', rows <= 1, rows);
 

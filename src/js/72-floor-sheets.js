@@ -48,7 +48,11 @@
   const uid = (p) => U.uid(p || 'fs');
 
   // A temperature in words, like 155 degrees F, or 'no reading'.
-  const fmtF = (f) => (U.isNum(f) ? Math.round(f) + ' °F' : 'no reading');
+  // The weight word for the chosen unit, "kg" or "lb", used in cost-per-weight lines.
+  const unitW = () => (U.units.weight === 'lb' ? 'lb' : 'kg');
+  // A price stored per kilogram, as the price per shown unit (per pound when pounds are chosen).
+  const perUnit = (perKg) => (U.units.weight === 'lb' && U.isNum(perKg) ? perKg * 0.45359237 : perKg);
+  const fmtF = (f) => (U.isNum(f) ? U.tempText(f) : 'no reading');
   // 7500 s -> "2 h 05 min"; 90 s -> "2 min"; 20 s -> "20 s" (always rounded up to
   // the minute from a minute on, so a countdown never reads 0 early).
   function hmLong(ms) {
@@ -76,7 +80,7 @@
   // Finds a menu item by id in the current state, or null.
   const menuOf = (id) => { const a = st().menu; for (let i = 0; i < a.length; i++) if (a[i].id === id) return a[i]; return null; };
   // An amount in words: pieces for counted items (cornbread), otherwise grams or kilograms.
-  const qtyText = (ing, gm) => (ing && ing.unit === 'ea' ? Math.round(gm) + ' ' + plural(Math.round(gm), 'piece') : U.fmtG(gm));
+  const qtyText = (ing, gm) => (ing && ing.unit === 'ea' ? Math.round(gm) + ' ' + plural(Math.round(gm), 'piece') : U.weightText(gm));
   // Station details for an id, with a safe fallback so an unknown station still shows.
   const zoneOf = (id) => C.zoneById[id] || { name: id, code: String(id || '').slice(0, 3).toUpperCase(), icon: 'flame' };
   // Order channel details for an id, with a safe fallback.
@@ -301,20 +305,20 @@
     const S = safety();
     if (mode === 'reheat') {
       return f >= S.reheatF
-        ? { tone: 'ok', text: f + ' °F counts as a reheat. The batch can be served again.' }
-        : { tone: 'warn', text: 'A reheat needs at least ' + S.reheatF + ' °F. Keep heating, then log it.' };
+        ? { tone: 'ok', text: U.tempText(f) + ' counts as a reheat. The batch can be served again.' }
+        : { tone: 'warn', text: 'A reheat needs at least ' + U.tempText(S.reheatF) + '. Keep heating, then log it.' };
     }
     if (b.kind === 'cooling') {
       const c = S.cooling || C.safety.cooling;
-      if (b.stage1At == null) return f <= c.stage1ToF ? { tone: 'ok', text: f + ' °F reaches stage 1 (' + c.stage1ToF + ' °F or below).' } : { tone: 'warn', text: 'Stage 1 needs ' + c.stage1ToF + ' °F or below. Keep chilling.' };
-      return f <= c.finalF ? { tone: 'ok', text: f + ' °F finishes the cooling (' + c.finalF + ' °F or below).' } : { tone: 'warn', text: 'Stage 2 needs ' + c.finalF + ' °F or below. Keep chilling.' };
+      if (b.stage1At == null) return f <= c.stage1ToF ? { tone: 'ok', text: U.tempText(f) + ' reaches stage 1 (' + U.tempText(c.stage1ToF) + ' or below).' } : { tone: 'warn', text: 'Stage 1 needs ' + U.tempText(c.stage1ToF) + ' or below. Keep chilling.' };
+      return f <= c.finalF ? { tone: 'ok', text: U.tempText(f) + ' finishes the cooling (' + U.tempText(c.finalF) + ' or below).' } : { tone: 'warn', text: 'Stage 2 needs ' + U.tempText(c.finalF) + ' or below. Keep chilling.' };
     }
     if (b.kind === 'cold') {
-      return f > S.coldHoldF ? { tone: 'bad', text: 'Above ' + S.coldHoldF + ' °F. The batch goes on Chill now and stops being served.' } : { tone: 'ok', text: 'In range (' + S.coldHoldF + ' °F or below).' };
+      return f > S.coldHoldF ? { tone: 'bad', text: 'Above ' + U.tempText(S.coldHoldF) + '. The batch goes on Chill now and stops being served.' } : { tone: 'ok', text: 'In range (' + U.tempText(S.coldHoldF) + ' or below).' };
     }
-    if (f < S.hotHoldF) return { tone: 'bad', text: 'Below ' + S.hotHoldF + ' °F. The batch goes on Reheat now and stops being served.' };
-    if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1)) return { tone: 'ok', text: f + ' °F counts as the reheat (one reheat only).' };
-    return { tone: 'ok', text: 'In range (' + S.hotHoldF + ' °F or above).' };
+    if (f < S.hotHoldF) return { tone: 'bad', text: 'Below ' + U.tempText(S.hotHoldF) + '. The batch goes on Reheat now and stops being served.' };
+    if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1)) return { tone: 'ok', text: U.tempText(f) + ' counts as the reheat (one reheat only).' };
+    return { tone: 'ok', text: 'In range (' + U.tempText(S.hotHoldF) + ' or above).' };
   }
   // The temperature the editor starts at: the last reading, or a typical value for that kind of batch.
   const defaultTemp = (b) => (U.isNum(b.lastTempF) ? b.lastTempF : b.kind === 'cold' ? 38 : b.kind === 'cooling' ? 70 : 150);
@@ -411,7 +415,9 @@
       const bSnooze = h('button', { type: 'button', class: 'btn', dataset: { act: 'snooze' }, hidden: true }, ico('clock', 20), snoozeT);
       const unsnoozeT = h('span', null, 'Cancel reminder');
       const bUnsnooze = h('button', { type: 'button', class: 'btn', dataset: { act: 'unsnooze' }, hidden: true }, ico('x', 20), unsnoozeT);
-      const actions = h('div', { class: 'hc-actions' }, bKeep, bUnkeep, bSnooze, bUnsnooze, bPull, bLog, bReheat, bCool, bDiscard);
+      // One main action per card; every other action sits behind the "..." button so all cards look the same.
+      const bMore = h('button', { type: 'button', class: 'btn btn-icon hc-more', 'aria-label': 'More for this batch', title: 'More', hidden: true }, ico('more', 22));
+      const actions = h('div', { class: 'hc-actions' }, bKeep, bUnkeep, bSnooze, bUnsnooze, bPull, bLog, bReheat, bCool, bDiscard, bMore);
       const editorSlot = h('div', { class: 'hc-editor-slot' });
       // Card layout: heading, ring and facts, message and lock note, cooling steps, then the buttons.
       const el = h('article', { class: 'hc-card', dataset: { batch: b.id, tone: 'ok' }, 'aria-label': 'Batch' },
@@ -420,7 +426,13 @@
           h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
             h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept))),
         costLine, msg, lock, cool, actions, editorSlot);
+      rec.bMore = bMore; rec.acts = [bKeep, bReheat, bLog, bUnkeep, bSnooze, bUnsnooze, bPull, bCool, bDiscard];
       Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept, bKeep, bUnkeep, bSnooze, bUnsnooze, unsnoozeT, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
+      // The "..." button lists the secondary actions that are available right now; choosing one presses that button.
+      bMore.addEventListener('click', () => {
+        const items = rec.acts.filter((a) => !a.hidden && a !== rec.primary).map((a) => ({ label: a.textContent.trim(), icon: a.dataset.act === 'discard' ? 'trash' : 'chevron-right', onClick: () => a.click() }));
+        if (items.length) SB.ui.menu(bMore, items, { label: 'More for this batch' });
+      });
       bLog.addEventListener('click', () => toggleEditor(rec, 'log'));
       bReheat.addEventListener('click', () => toggleEditor(rec, 'reheat'));
       bCool.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openCooling(bb, bCool); });
@@ -470,7 +482,7 @@
       text(rec.name, b.label || 'Batch');
       attr(rec.el, 'aria-label', (b.label || 'Batch') + ': ' + sv.word);
       if (rec.kindKey !== b.kind) { rec.kindKey = b.kind; U.clear(rec.kindEl); rec.kindEl.append(ico(KIND_ICON[b.kind] || 'flame', 18), h('span', null, KIND_WORD[b.kind] || 'Hold')); }
-      const srcWord = b.src === 'sample' ? 'Practice batch' : b.src === 'starter' ? 'Starter stock' : '';
+      const srcWord = b.src === 'sample' ? 'Practice batch' : ''; // starter stock is named once in the summary line, not on every card
       setHidden(rec.srcChip, !srcWord); if (srcWord) { text(rec.srcChip, srcWord); attr(rec.srcChip, 'data-tone', 'info'); }
       setState(rec.status, sv.tone, sv.icon, sv.word);
       attr(rec.el, 'data-tone', sv.tone); attr(rec.el, 'data-status', gt.status);
@@ -489,7 +501,7 @@
       const left = b.cookedG > 0 ? Math.max(0, Math.min(1, b.remainingG / b.cookedG)) : 0;
       const lv = (left * 100).toFixed(1);
       if (rec.meter._v !== lv) { rec.meter._v = lv; rec.meter.style.setProperty('--v', lv); attr(rec.meter, 'aria-valuenow', left.toFixed(3)); attr(rec.meter, 'aria-valuemax', 1); }
-      text(rec.stockT, U.fmtG(b.remainingG) + ' left of ' + U.fmtG(b.cookedG));
+      text(rec.stockT, U.weightText(b.remainingG) + ' left of ' + U.weightText(b.cookedG));
 
       // facts
       text(rec.ddLast, U.isNum(b.lastTempF) ? fmtF(b.lastTempF) + ', ' + agoText(now - b.lastTempAt) + (lastCheckBy(b.id) ? ', checked by ' + lastCheckBy(b.id) : '') : 'No reading yet');
@@ -529,7 +541,7 @@
       const ing = ingOf(b.ing);
       const bits = [];
       if (U.isNum(b.yieldPct)) bits.push('Yield ' + pctText(b.yieldPct, 1));
-      if (U.isNum(b.costPerCookedKg)) bits.push('cost ' + U.fmtMoney(b.costPerCookedKg) + ' per cooked kg');
+      if (U.isNum(b.costPerCookedKg)) bits.push('cost ' + U.fmtMoney(perUnit(b.costPerCookedKg)) + ' per cooked ' + unitW());
       const costWord = bits.length ? bits.join(', ') + '.' + (ing && ing.yieldConfirmed ? '' : ' Starter estimate.') : '';
       setHidden(rec.costLine, !costWord); text(rec.costLine, costWord);
 
@@ -551,13 +563,13 @@
         const c = S.cooling || C.safety.cooling;
         const s1 = since + c.stage1H * H1, fin = since + c.totalH * H1;
         stepLine(rec.step1, b.stage1At != null, b.stage1At == null && now > s1,
-          'Stage 1 done: ' + c.stage1ToF + ' °F reached at ' + U.fmtTime(b.stage1At || 0),
-          'Stage 1: reach ' + c.stage1ToF + ' °F within ' + trimNum(c.stage1H) + ' h (' + hmLong(s1 - now) + ' left)',
-          'Stage 1 missed: ' + c.stage1ToF + ' °F was not reached within ' + trimNum(c.stage1H) + ' h');
+          'Stage 1 done: ' + U.tempText(c.stage1ToF) + ' reached at ' + U.fmtTime(b.stage1At || 0),
+          'Stage 1: reach ' + U.tempText(c.stage1ToF) + ' within ' + trimNum(c.stage1H) + ' h (' + hmLong(s1 - now) + ' left)',
+          'Stage 1 missed: ' + U.tempText(c.stage1ToF) + ' was not reached within ' + trimNum(c.stage1H) + ' h');
         stepLine(rec.step2, b.finalAt != null, b.finalAt == null && now > fin,
-          'Stage 2 done: ' + c.finalF + ' °F reached at ' + U.fmtTime(b.finalAt || 0),
-          'Stage 2: reach ' + c.finalF + ' °F by ' + trimNum(c.totalH) + ' h in all (' + hmLong(fin - now) + ' left)',
-          'Stage 2 missed: ' + c.finalF + ' °F was not reached within ' + trimNum(c.totalH) + ' h');
+          'Stage 2 done: ' + U.tempText(c.finalF) + ' reached at ' + U.fmtTime(b.finalAt || 0),
+          'Stage 2: reach ' + U.tempText(c.finalF) + ' by ' + trimNum(c.totalH) + ' h in all (' + hmLong(fin - now) + ' left)',
+          'Stage 2 missed: ' + U.tempText(c.finalF) + ' was not reached within ' + trimNum(c.totalH) + ' h');
       }
 
       // buttons
@@ -567,17 +579,27 @@
       cls(rec.bLog, 'btn-primary', gt.action === 'CHECK_TEMP');
       setHidden(rec.bReheat, gt.action !== 'REHEAT_IMMEDIATE');
       setHidden(rec.bCool, !(b.kind === 'hot' && b.remainingG > 0 && gt.action !== 'DISCARD_LOCKOUT'));
+      layoutActions(rec);
       if (rec.ed && rec.mode) refreshHint(rec, b);
       return gt;
     }
 
+    // Picks the one main button of a card (taste and keep, then reheat, then log temp) and moves the others behind "...".
+    function layoutActions(rec) {
+      const main = [rec.bKeep, rec.bReheat, rec.bLog].find((a) => !a.hidden) || rec.bLog;
+      rec.primary = main;
+      let others = 0;
+      rec.acts.forEach((a) => { const sec = a !== main; if (a.classList.contains('hc-sec') !== sec) a.classList.toggle('hc-sec', sec); if (sec && !a.hidden) others++; });
+      cls(main, 'btn-primary', main !== rec.bLog || rec.bLog.classList.contains('btn-primary'));
+      setHidden(rec.bMore, others === 0);
+    }
     // Builds the inline temperature box once per card. Log temp and Reheat both use it.
     function buildEditor(rec) {
       const ed = { err: h('div', { class: 'fs-note', 'data-tone': 'bad', role: 'alert', hidden: true }), hint: h('p', { class: 'hc-hint', role: 'status' }) };
       ed.title = h('div', { class: 'hc-ed-t' });
       // Wide range on purpose: a reading of 40 or 250 degrees must be
       // typeable so it can be recorded and flagged.
-      ed.stepper = SB.ui.stepper({ value: 150, min: 32, max: 300, step: 1, bigStep: 5, unit: '°F', label: 'Temperature in degrees Fahrenheit', onChange: () => { const b = batchOf(rec.id); if (b) refreshHint(rec, b); setHidden(ed.err, true); } });
+      ed.stepper = SB.ui.stepper({ value: U.tempShown(150), min: U.tempShown(32), max: U.tempShown(300), step: 1, bigStep: 5, unit: U.unitLabel('temp'), label: U.units.temp === 'C' ? 'Temperature in degrees Celsius' : 'Temperature in degrees Fahrenheit', onChange: () => { const b = batchOf(rec.id); if (b) refreshHint(rec, b); setHidden(ed.err, true); } });
       // Saves the reading through the engine.
       ed.save = h('button', { type: 'button', class: 'btn btn-primary btn-lg', onClick: () => saveReading(rec) }, ico('check', 22), h('span', null, 'Save reading'));
       // Closes the box without saving anything.
@@ -599,7 +621,7 @@
       const S = safety();
       text(rec.ed.title, mode === 'reheat' ? 'Reheated to' : b.kind === 'cooling' ? 'Cooling reading' : 'Temperature now');
       text(rec.ed.save.querySelector('span'), mode === 'reheat' ? 'Log reheat' : 'Save reading');
-      rec.ed.stepper.setValue(mode === 'reheat' ? S.reheatF : defaultTemp(b), { silent: true });
+      rec.ed.stepper.setValue(U.tempShown(mode === 'reheat' ? S.reheatF : defaultTemp(b)), { silent: true });
       setHidden(rec.ed.err, true); setHidden(rec.ed.el, false);
       refreshHint(rec, b);
       rec.bLog.setAttribute('aria-expanded', mode === 'log' ? 'true' : 'false'); rec.bReheat.setAttribute('aria-expanded', mode === 'reheat' ? 'true' : 'false');
@@ -615,13 +637,13 @@
     }
     // Updates the one-line verdict under the stepper to match the number in it.
     function refreshHint(rec, b) {
-      const hnt = tempHint(b, rec.mode, rec.ed.stepper.getValue());
+      const hnt = tempHint(b, rec.mode, U.tempStored(rec.ed.stepper.getValue()));
       text(rec.ed.hint, hnt.text); attr(rec.ed.hint, 'data-tone', hnt.tone);
     }
     // Saves the reading (or the reheat) through the engine. A refusal is shown inside the box in plain words.
     function saveReading(rec) {
       const b = batchOf(rec.id); if (!b) { closeEditor(rec, false); return; }
-      const f = rec.ed.stepper.getValue(), mode = rec.mode;
+      const f = U.tempStored(rec.ed.stepper.getValue()), mode = rec.mode;
       // Initials are asked once on this tablet; the reading is then saved with them.
       askWho(null, 'Save reading', (who) => saveReadingAs(rec, b, f, mode, who));
     }
@@ -633,10 +655,10 @@
         return;
       }
       const label = b.label || 'Batch', info = res.info || {};
-      if (mode === 'reheat' || info.reheated) toast(label + ' reheated to ' + f + ' °F. It is being served again.', 'ok');
-      else if (info.status === 'reheat') toast(label + ' is below ' + safety().hotHoldF + ' °F. Reheat it to ' + safety().reheatF + ' °F now, or discard it.', 'warn');
-      else if (info.status === 'chill') toast(label + ' is above ' + safety().coldHoldF + ' °F. Chill it now.', 'warn');
-      else toast(label + ' logged at ' + f + ' °F.' + (info.onTime === false ? ' That check was ' + hmLong(info.lateMs) + ' late.' : ''), info.onTime === false ? 'warn' : 'ok');
+      if (mode === 'reheat' || info.reheated) toast(label + ' reheated to ' + U.tempText(f) + '. It is being served again.', 'ok');
+      else if (info.status === 'reheat') toast(label + ' is below ' + U.tempText(safety().hotHoldF) + '. Reheat it to ' + U.tempText(safety().reheatF) + ' now, or discard it.', 'warn');
+      else if (info.status === 'chill') toast(label + ' is above ' + U.tempText(safety().coldHoldF) + '. Chill it now.', 'warn');
+      else toast(label + ' logged at ' + U.tempText(f) + '.' + (info.onTime === false ? ' That check was ' + hmLong(info.lateMs) + ' late.' : ''), info.onTime === false ? 'warn' : 'ok');
       closeEditor(rec, true);
       update(nowMs());
       flash(rec.el);
@@ -674,7 +696,7 @@
           // Initials are asked once on this tablet; the discard is then logged with them.
           setTimeout(() => askWho(opener, 'Discard batch', (who) => {
             const res = run('discardBatch', who ? { batchId: b.id, reason, who } : { batchId: b.id, reason });
-            if (res.report === 'ok') { undoToast(label + ' discarded. ' + U.fmtG(res.info && res.info.g) + ' counted as waste.', 'ok'); update(nowMs()); }
+            if (res.report === 'ok') { undoToast(label + ' discarded. ' + U.weightText(res.info && res.info.g) + ' counted as waste.', 'ok'); update(nowMs()); }
             else toast(say(res), 'warn');
           }), 60);
         },
@@ -725,7 +747,7 @@
         picks.set(x.id, cb);
         const reading = U.isNum(x.lastTempF) ? 'Last reading ' + fmtF(x.lastTempF) + ', ' + agoText(nowMs() - x.lastTempAt) : 'No reading yet';
         list.appendChild(h('label', { class: 'fs-card fs-card-soft', style: 'display:flex;gap:12px;align-items:center;padding:12px' }, cb,
-          h('span', { class: 'grow' }, h('strong', null, x.label || 'Batch'), h('br'), h('span', { class: 'fs-sub' }, ok ? reading : reading + '. Log a temperature of ' + (x.kind === 'cold' ? S.coldHoldF + ' °F or lower' : S.hotHoldF + ' °F or higher') + ' first.'))));
+          h('span', { class: 'grow' }, h('strong', null, x.label || 'Batch'), h('br'), h('span', { class: 'fs-sub' }, ok ? reading : reading + '. Log a temperature of ' + (x.kind === 'cold' ? U.tempText(S.coldHoldF) + ' or lower' : U.tempText(S.hotHoldF) + ' or higher') + ' first.'))));
       });
       const dur = SB.ui.segmented({ label: 'How long', value: '30', options: [{ id: '30', label: '30 minutes' }, { id: '60', label: '1 hour' }, { id: 'until', label: 'Until a time' }] });
       const untilIn = h('input', { class: 'input', type: 'time', 'aria-label': 'Keep serving until', hidden: true });
@@ -790,7 +812,7 @@
         title: 'Start cooling ' + label + '?', name: 'cooling', opener, confirmLabel: 'Start cooling', icon: 'snow',
         body: [
           h('p', null, 'All ' + qtyText(ing, b.remainingG) + ' moves to cooling and stops being served.'),
-          h('p', null, 'Get it from ' + S.hotHoldF + ' °F to ' + c.stage1ToF + ' °F within ' + trimNum(c.stage1H) + ' hours, then to ' + c.finalF + ' °F within ' + trimNum(c.totalH - c.stage1H) + ' more hours (' + trimNum(c.totalH) + ' hours in all). Log a reading as it cools.'),
+          h('p', null, 'Get it from ' + U.tempText(S.hotHoldF) + ' to ' + U.tempText(c.stage1ToF) + ' within ' + trimNum(c.stage1H) + ' hours, then to ' + U.tempText(c.finalF) + ' within ' + trimNum(c.totalH - c.stage1H) + ' more hours (' + trimNum(c.totalH) + ' hours in all). Log a reading as it cools.'),
           fx && fx.off.length ? h('div', { class: 'fs-note', 'data-tone': 'warn' }, ico('alert', 20), h('div', null, 'These menu items go 86: ' + endDot(listWords(fx.off)))) : null,
           h('p', { class: 'fs-sub' }, C.safetyLine),
         ],
@@ -812,7 +834,7 @@
     }
     // Refreshes one recently discarded line: what, why, how much and when.
     function updateRecent(rec, b, now) {
-      text(rec.t, (b.label || 'Batch') + ': ' + (REASON_WORDS[b.discardReason] || 'Discarded').toLowerCase() + ', ' + U.fmtG(b.wasteG || 0) + ' wasted');
+      text(rec.t, (b.label || 'Batch') + ': ' + (REASON_WORDS[b.discardReason] || 'Discarded').toLowerCase() + ', ' + U.weightText(b.wasteG || 0) + ' wasted');
       text(rec.when, agoText(now - (b.discardedAt || now)));
     }
 
@@ -874,7 +896,7 @@
       for (const e of plans) {
         const ing = ingOf(e.ing);
         planList.appendChild(h('div', { class: 'fs-card fs-card-soft hc-plan', dataset: { plan: e.id }, style: 'display:flex;gap:12px;align-items:center;padding:12px' }, ico('flame', 18),
-          h('span', { class: 'grow' }, h('strong', null, (ing ? ing.name : e.ing) + ', ' + U.fmtG(e.grams)), h('br'), h('span', { class: 'fs-sub' }, 'Ready at ' + U.fmtTime(e.offAt) + (e.readyAt > e.offAt ? ', ready to serve about ' + U.fmtTime(e.readyAt) : '') + '.')),
+          h('span', { class: 'grow' }, h('strong', null, (ing ? ing.name : e.ing) + ', ' + U.weightText(e.grams)), h('br'), h('span', { class: 'fs-sub' }, 'Ready at ' + U.fmtTime(e.offAt) + (e.readyAt > e.offAt ? ', ready to serve about ' + U.fmtTime(e.readyAt) : '') + '.')),
           h('button', { type: 'button', class: 'btn', dataset: { act: 'cancel-plan' }, onClick: () => { const res = run('cancelPlan', { planId: e.id }); if (res.report !== 'ok') toast(say(res), 'warn'); else { toast('Plan cancelled.', 'ok'); update(nowMs()); } } }, ico('x', 20), h('span', null, 'Cancel'))));
       }
     }
@@ -897,7 +919,7 @@
         const bits = [];
         if (act) bits.push(act + ' ' + plural(act, 'needs', 'need') + ' action now');
         if (check) bits.push(check + ' ' + plural(check, 'needs', 'need') + ' a temperature reading');
-        text(summary, live.length + ' ' + plural(live.length, 'batch', 'batches') + ' in the cabinet. ' + (bits.length ? bits.join('. ') + '.' : 'All are in range.'));
+        text(summary, live.length + ' ' + plural(live.length, 'batch', 'batches') + ' in the cabinet. ' + (bits.length ? bits.join('. ') + '.' : 'All are in range.') + (live.some((x) => x.src === 'starter') ? ' ' + live.filter((x) => x.src === 'starter').length + ' are starter stock (starting amounts, not weighed).' : ''));
         cls(summary, 'is-alert', act > 0);
       }
       tabs.seg.setCount('batches', live.length, { alert: act + check > 0 });
@@ -980,7 +1002,7 @@
     // The cook endpoint is in Celsius (the research model uses it), so the same number is shown in Fahrenheit beside it.
     const endF = h('p', { class: 'fs-sub hc-sub' });
     // Writes the endpoint in Fahrenheit under its stepper.
-    const paintEndF = () => text(endF, '= ' + Math.round(F.endC * 9 / 5 + 32) + ' °F');
+    const paintEndF = () => text(endF, '= ' + U.tempTextC(F.endC));
     const thermalBox = h('div', { class: 'hc-two' }, vis('Cook endpoint', endStep, endF), vis('Rested before slicing', holdStep));
 
     // Cooked weight typed by the cook; it replaces the model when 'I weighed it' is on.
@@ -991,7 +1013,7 @@
     const weighedBox = h('div', { class: 'hc-weighed' }, weighedTog, cookedFld);
 
     // The first temperature reading; it starts the batch's clock.
-    const tempStep = SB.ui.stepper({ value: F.tempF, min: 32, max: 300, step: 1, bigStep: 5, unit: '°F', label: 'First temperature reading in degrees Fahrenheit', onChange: (v) => { F.tempF = v; F.tTouched = true; tempHintPaint(); } });
+    const tempStep = SB.ui.stepper({ value: U.tempShown(F.tempF), min: U.tempShown(32), max: U.tempShown(300), step: 1, bigStep: 5, unit: U.unitLabel('temp'), label: U.units.temp === 'C' ? 'First temperature reading in degrees Celsius' : 'First temperature reading in degrees Fahrenheit', onChange: (v) => { F.tempF = U.tempStored(v); F.tTouched = true; tempHintPaint(); } });
     const tempHintEl = h('p', { class: 'hc-hint', role: 'status' });
     const tempFld = h('div', { class: 'hc-fld' }, h('div', { class: 'field-label', 'aria-hidden': 'true' }, 'First temperature reading'), tempStep, tempHintEl);
 
@@ -1044,7 +1066,7 @@
       setHidden(thermalBox, !ing.thermal);
       setHidden(weighedBox, !meat);
       if (!meat && F.weighed) { F.weighed = false; weighedTog.setValue(false); setHidden(cookedFld, true); }
-      if (!F.tTouched) { F.tempF = ing.hold === 'cold' ? 38 : 150; tempStep.setValue(F.tempF, { silent: true }); }
+      if (!F.tTouched) { F.tempF = ing.hold === 'cold' ? 38 : 150; tempStep.setValue(U.tempShown(F.tempF), { silent: true }); }
       if (F.weighed) { F.cookedTouched = false; syncCooked(); }
       tempHintPaint(); calc();
     }
@@ -1078,21 +1100,21 @@
       const meat = m.ing.thermal || (U.isNum(m.ing.yield) && m.ing.yield < 1);
       text(dtYield, m.kind === 'weighed' ? 'Yield from your weights' : meat ? 'Expected yield' : 'Yield');
       text(dYield, pctText(m.yieldPct, 1) + (m.kind === 'model' ? ' (cook-loss model)' : m.kind === 'static' && meat ? ' (starter estimate)' : ''));
-      text(dCooked, U.fmtG(m.cookedG));
-      text(dtCost, 'Cost per cooked kg');
+      text(dCooked, U.weightText(m.cookedG));
+      text(dtCost, 'Cost per cooked ' + unitW());
       text(dCost, U.fmtMoney(m.costPerKg) + ' (starter cost)');
       if (m.cmp) {
         const c = m.cmp;
         const wTxt = Math.abs(Math.round(c.weightErrorPct)) + '% too ' + (c.weightErrorPct < 0 ? 'little' : 'much');
         const cTxt = Math.abs(Math.round(c.costErrorPct)) + '% too ' + (c.costErrorPct > 0 ? 'high' : 'low');
-        text(cmpLine, 'The flat ' + c.staticPct + '% rule would plan ' + U.fmtG(c.staticCookedG) + ' of cooked meat (' + wTxt + ') and price it at ' + U.fmtMoney(c.staticCostPerKg) + ' per kg (' + cTxt + '). This model says ' + U.fmtG(c.modelCookedG) + ' at ' + U.fmtMoney(c.modelCostPerKg) + ' per kg.');
+        text(cmpLine, 'The flat ' + c.staticPct + '% rule would plan ' + U.weightText(c.staticCookedG) + ' of cooked meat (' + wTxt + ') and price it at ' + U.fmtMoney(perUnit(c.staticCostPerKg)) + ' per ' + unitW() + ' (' + cTxt + '). This model says ' + U.weightText(c.modelCookedG) + ' at ' + U.fmtMoney(perUnit(c.modelCostPerKg)) + ' per ' + unitW() + '.');
         setHidden(cmpLine, false);
       } else if (m.ing.thermal && m.kind === 'weighed') {
         const staticCost = m.rawCost / 0.5;
-        text(cmpLine, 'The flat 50% rule would have priced this at ' + U.fmtMoney(staticCost) + ' per kg and planned ' + U.fmtG(m.rawG * 0.5) + '. Your weights say ' + U.fmtG(m.cookedG) + ' at ' + U.fmtMoney(m.costPerKg) + ' per kg.');
+        text(cmpLine, 'The flat 50% rule would have priced this at ' + U.fmtMoney(perUnit(staticCost)) + ' per ' + unitW() + ' and planned ' + U.weightText(m.rawG * 0.5) + '. Your weights say ' + U.weightText(m.cookedG) + ' at ' + U.fmtMoney(perUnit(m.costPerKg)) + ' per ' + unitW() + '.');
         setHidden(cmpLine, false);
       } else setHidden(cmpLine, true);
-      text(honest, (m.ing.thermal ? 'Brisket yield comes from the Texas A&M cook-loss model. ' : 'Yield is a starter estimate until you weigh a batch. ') + 'Raw cost of ' + U.fmtMoney(m.rawCost) + ' per kg is a starter estimate.');
+      text(honest, (m.ing.thermal ? 'Brisket yield comes from the Texas A&M cook-loss model. ' : 'Yield is a starter estimate until you weigh a batch. ') + 'Raw cost of ' + U.fmtMoney(perUnit(m.rawCost)) + ' per ' + unitW() + ' is a starter estimate.');
     }
 
     // Shows or clears the error above the Put in hold cabinet button.
@@ -1110,8 +1132,8 @@
       showErr(null);
       rememberBatch(m.ing.id, { rawKg: F.rawKg, endC: F.endC, holdH: F.holdH });
       const info = res.info || {}, b = st().batches.find((x) => x.id === info.batchId), label = b ? b.label : m.ing.name + ' batch';
-      if (info.status === 'ok') toast(label + ' is in the cabinet: ' + U.fmtG(info.cookedG) + ' cooked, first reading ' + F.tempF + ' °F.', 'ok');
-      else toast(label + ' is in the cabinet but not being served: ' + (m.ing.hold === 'cold' ? 'above ' + safety().coldHoldF + ' °F, chill it now.' : 'below ' + safety().hotHoldF + ' °F, reheat it to ' + safety().reheatF + ' °F.'), 'warn');
+      if (info.status === 'ok') toast(label + ' is in the cabinet: ' + U.weightText(info.cookedG) + ' cooked, first reading ' + U.tempText(F.tempF) + '.', 'ok');
+      else toast(label + ' is in the cabinet but not being served: ' + (m.ing.hold === 'cold' ? 'above ' + U.tempText(safety().coldHoldF) + ', chill it now.' : 'below ' + U.tempText(safety().hotHoldF) + ', reheat it to ' + U.tempText(safety().reheatF) + '.'), 'warn');
       labelInput.value = ''; F.tTouched = false; setIng(F.ing);
       onAdded(info.batchId);
     }
@@ -1893,13 +1915,13 @@
       safetyNote(),
       h('p', { class: 'fs-sub' }, 'These are the limits Smokebox is using right now. They start from the FDA Food Code (3-501.14, 3-501.16, 3-403.11 and 4-602.11) and are starter values until the owner confirms them.'),
       helpList([
-        rule('flame', 'Keep hot food hot', 'Hot food stays at ' + S.hotHoldF + ' °F or above.'),
-        rule('snow', 'Keep cold food cold', 'Cold food stays at ' + S.coldHoldF + ' °F or below.'),
+        rule('flame', 'Keep hot food hot', 'Hot food stays at ' + U.tempText(S.hotHoldF) + ' or above.'),
+        rule('snow', 'Keep cold food cold', 'Cold food stays at ' + U.tempText(S.coldHoldF) + ' or below.'),
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
-        rule('refresh', 'Reheat once', 'Below ' + S.hotHoldF + ' °F, reheat to ' + S.reheatF + ' °F within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
-        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + S.hotHoldF + ' °F, not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
+        rule('refresh', 'Reheat once', 'Below ' + U.tempText(S.hotHoldF) + ', reheat to ' + U.tempText(S.reheatF) + ' within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
+        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
         rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit means the batch must be thrown out when time is up. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
-        rule('snow', 'Cooling', 'From ' + S.hotHoldF + ' °F to ' + c.stage1ToF + ' °F within ' + c.stage1H + ' hours, then to ' + c.finalF + ' °F within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
+        rule('snow', 'Cooling', 'From ' + U.tempText(S.hotHoldF) + ' to ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' hours, then to ' + U.tempText(c.finalF) + ' within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
         rule('lock', 'Locked batches', 'A batch that is out of range is locked. Nothing is taken from it, and menu items that need it show 86 safety hold.'),
       ]));
