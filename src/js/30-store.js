@@ -910,7 +910,7 @@
     const url = opts.url.replace(/\/+$/, '');
     const f = fol = { url, code: typeof opts.code === 'string' ? opts.code : '', staleMs: isNum(opts.staleMs) && opts.staleMs > 0 ? opts.staleMs : 45000, offset: 0, seq: null, hubId: null, connected: false, everConnected: false,
       error: null, lastMsgAt: null, goodSince: null, retryInMs: 0, retryStep: 0, closed: false, gen: 0, ctrl: null, retryTimer: null, timer: null, lastKey: '', resolve: null, resyncs: 0,
-      fetchFn: opts.fetch || g.fetch, Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
+      fetchFn: opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null), Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
     f.timer = opts.noTimers ? null : setInterval(folTick, 1000);
     const p = new Promise((resolve) => { f.resolve = resolve; });
     folConnect();
