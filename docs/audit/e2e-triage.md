@@ -211,3 +211,21 @@ All suites run once, two at a time. Every suite is green; the qa journeys were 4
 | 09, 12, 13 journeys incl. tour step 9 | pass | A1/A3 code fixes confirmed |
 
 11a (`SB.sim.sample()` cold): for A5. Measured in a plain page: 1,629 to 1,992 ms with `?demo` and 1,945 to 2,130 ms in a real kitchen, for 2,466 tickets, so the call is the same cost on both paths and sits right at the old 2,000 ms limit (it failed once of three runs alone). It is generated on request, not at boot. The limit is now 3,000 ms (5,000 ms when the machine is busy); A5 may want to make the generator faster. `tools/run-slow.mjs` lists every `test/*.e2e.mjs` automatically (so the new suites are included), runs the qa journeys as `qa`, and has the optional `ux-other-kitchens`, `ux-hidden-restore` and `ux-sound-leader` that run only when named.
+
+# Round 13 run (deploy 65031c1 merged into night/a6-r13)
+
+New in this round: `test/chaos-store.test.mjs` (25 engine/store attack tests, 1 marked todo for A5), `test/hub-security.test.mjs` (9 hub attack tests), `test/updater.test.mjs` (11 updater tests). Unit suite: 732 tests, 731 pass, 1 todo. See `docs/audit/engine-chaos-review.md` and `docs/audit/server-security-review.md`.
+
+Round 12 removed the pretend channel sync strip from the 86 board and changed the About text, so floor-sheets, contract and qa 04c followed (the board must now make no sync claim). The merge of `night/a1-r12` into deploy conflicts in `src/js/25-deadlines.js`; that is for A1 to resolve, so this run is on deploy alone (a2-r13, a4-r13 and a5-r13 were not in deploy either and were not merged).
+
+| Suite | Result |
+|---|---|
+| floor | pass |
+| floor-sheets | 177 pass, 0 fail (1 KNOWN: Hold sheet 9 px overflow at 280 px, large text, A1) |
+| contract, shell, artifact | pass |
+| office | pass |
+| office-b, office-data | pass |
+| start-over, setup-wizard, demo-mode, menu-import-ui, office-closeday, office-sales-csv | pass |
+| board-contrast, board-round2 to 5, 10, 11, 12 | pass |
+| backup-banner, bumpbar, config-names, order-note, order-page, orders-page, pay-ui, pin-recovery-ui, production-mode, quiet-board, serve, strip-notices | pass |
+| qa journeys (45) | 45 pass after the 04c fix (it was 44/45 in the first run: 04c still looked for the removed sync strip) |

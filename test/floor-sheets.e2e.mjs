@@ -316,7 +316,8 @@ async function testBoard86() {
   await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
     await boot(page);
     await openSheet(page, 'board86');
-    check('the sync strip says it is practice only', /(Practice|Demo) only: no live POS connected/.test(await text(page, TOP) || ''));
+    // The pretend channel sync strip was taken off the 86 board (round 12): the board no longer claims to sync anywhere.
+    check('the 86 board has no channel sync strip', !/Channel sync|no live POS/i.test(await text(page, TOP) || ''));
     check('all menu items are listed as rows', (await page.locator('.bd-row').count()) === 21);
     const row = '.bd-row[data-menu="brisket_qtr"]';
     await page.click(row + ' [data-act="toggle"]'); await page.waitForTimeout(250);
@@ -536,7 +537,7 @@ async function testHelp() {
     check('Food safety carries the guidance line', /health-code/i.test(fs1));
     await tapSeg(page, TOP, 'about'); await page.waitForTimeout(100);
     const ab = await text(page, '.hp [role="tabpanel"]:not([hidden])');
-    check('About says what it is and that nothing is connected to a real POS', /Smokebox/.test(ab) && /practice|demo|simulated/i.test(ab) && /POS/.test(ab), ab.slice(0, 300));
+    check('About says what it is and that it works offline', /Smokebox/.test(ab) && /offline|one file/i.test(ab), ab.slice(0, 300));
     check('the manager hint is small and plain', /Managers: tap Back office/i.test(await text(page, TOP) || ''));
     noErrors('help', logs);
   });
