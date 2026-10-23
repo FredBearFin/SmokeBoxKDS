@@ -214,7 +214,7 @@
 
   // Panels. The sticky table of contents links to them; each panel is a section with a focusable heading.
   const SECTIONS = [
-    { id: 'menu', label: 'Menu', title: 'Menu and bills of materials' },
+    { id: 'menu', label: 'Menu', title: 'Dishes and what goes in them' },
     { id: 'ingredients', label: 'Ingredients', title: 'Ingredients' },
     { id: 'times', label: 'Time limits', title: 'Ticket time limits by channel' },
     { id: 'pacing', label: 'Pacing', title: 'Meal pacing' },
@@ -250,7 +250,7 @@
   // A small status chip with an optional icon.
   const chip = (label, tone, icon) => SB.ui.chip({ label, tone, icon });
 
-  // 1. Menu and bills of materials
+  // 1. Dishes and what goes in them
   const BOM_META = { name: 'The amount per portion', unit: 'g', words: () => 'The amount per portion has to be more than 0 and at most 100,000.' };
 
   // The editable ingredient lines of one menu item: add, change or remove, each saved at once. Returns {el,
@@ -692,17 +692,17 @@
       const r = send('updateIngredient', { id, patch });
       return good(r) ? { ok: true, text: okText } : { ok: false, text: refusal(r, meta) };
     };
-    const parMeta = { name: 'Par', unit: pieces ? 'pieces' : 'g' };
-    const thrMeta = { name: 'The 86 point', unit: pieces ? 'pieces' : 'g' };
+    const parMeta = { name: 'Opening amount', unit: pieces ? 'pieces' : 'g' };
+    const thrMeta = { name: 'The sold-out amount', unit: pieces ? 'pieces' : 'g' };
     const par = numField({
-      label: 'Par (opening stock)', aria: 'Par of ' + nm, value: ing0.parG, min: 0, max: 1e7, step: pieces ? 1 : 100, big: pieces ? 10 : 1000, unit: pieces ? 'pieces' : 'g', meta: parMeta,
+      label: 'Opening amount (par)', aria: 'Opening amount of ' + nm, value: ing0.parG, min: 0, max: 1e7, step: pieces ? 1 : 100, big: pieces ? 10 : 1000, unit: pieces ? 'pieces' : 'g', meta: parMeta,
       read: pieces ? null : (u) => U.fmtG(u),
       // Par saves through the engine; the line under the row confirms it.
       save: (v) => mkPatch({ parG: v }, 'Saved. Par is ' + amountText(ing0, v) + '. After you reset live data and keep settings, opening stock starts at this amount.', parMeta), onSaved: (t) => status.ok(t),
     });
     const thr = numField({
-      label: '86 point', aria: '86 point of ' + nm, value: ing0.thresholdG, min: 0, max: 1e7, step: pieces ? 1 : 50, big: pieces ? 10 : 500, unit: pieces ? 'pieces' : 'g', meta: thrMeta,
-      read: pieces ? null : (u) => U.fmtG(u), hint: 'Items that use this are 86 at or below this amount.',
+      label: 'Sold out at', aria: 'Sold out at, ' + nm, value: ing0.thresholdG, min: 0, max: 1e7, step: pieces ? 1 : 50, big: pieces ? 10 : 500, unit: pieces ? 'pieces' : 'g', meta: thrMeta,
+      read: pieces ? null : (u) => U.fmtG(u), hint: 'Dishes that use this are marked sold out at or below this amount.',
       // The 86 point saves the same way.
       save: (v) => mkPatch({ thresholdG: v }, 'Saved. Items using ' + lower1(nm) + ' go 86 at ' + amountText(ing0, v) + ' or less.', thrMeta), onSaved: (t) => status.ok(t),
     });
@@ -720,7 +720,7 @@
     if (ing0.tcs) {
       const pullMeta = { name: 'The pull size', unit: 'g' };
       pull = numField({
-        label: 'Pull size (one set unit)', aria: 'Pull size of ' + nm, value: ing0.pullG || 1000, min: 50, max: 50000, step: 100, big: 500, unit: 'g', meta: pullMeta,
+        label: 'Amount per take-out', aria: 'Amount per take-out of ' + nm, value: ing0.pullG || 1000, min: 50, max: 50000, step: 100, big: 500, unit: 'g', meta: pullMeta,
         // Shows the pull size in kilograms next to the field once it reaches a kilogram.
         read: (u) => U.fmtG(u),
         hint: 'What one tap on Pull takes out of the cabinet: one whole brisket, one rack, one pan.',
@@ -767,7 +767,7 @@
       // Shows a yield fraction as a percentage in messages.
       const yMeta = { name: 'The yield', unit: '%', toUi: (v) => v * 100 };
       yField = numField({
-        label: 'Static yield (cooked weight as a share of raw)', aria: 'Static yield of ' + nm, value: ing0.yield, min: 5, max: 300, step: 1, big: 5, unit: '%', meta: yMeta,
+        label: 'Cooked yield (cooked weight as a percent of raw weight)', aria: 'Cooked yield of ' + nm, value: ing0.yield, min: 5, max: 300, step: 1, big: 5, unit: '%', meta: yMeta,
         // The field shows a percentage; the engine stores a fraction.
         toUi: (v) => Math.round(v * 10000) / 100, fromUi: (u) => Math.round(u * 100) / 10000,
         // A yield saves as a fraction; the confirmation names the percentage.
@@ -823,7 +823,7 @@
   // Panel 2: one row per ingredient, kept in step with the store.
   function buildIngredients(P) {
     const pn = panel(SECTIONS[1],
-      'Par is the stock you open with. When stock falls to the 86 point or below, every menu item that uses it goes 86. Weights are grams and kilograms; counted items such as buns and cornbread are pieces. Cooked yield is cooked weight divided by raw weight, and stays a starter estimate until you confirm it from weighed batches. Costs are starter numbers too: replace them with your supplier invoices. Changes save as you make them and apply from now on.');
+      'The opening amount (par) is the stock you start a day with. When stock falls to the sold-out amount or below, every dish that uses it is marked sold out. Weights are grams and kilograms; counted items such as buns and cornbread are pieces. Cooked yield is cooked weight divided by raw weight, and stays a starter estimate until you confirm it from weighed batches. Costs are starter numbers too: replace them with your supplier invoices. Changes save as you make them and apply from now on.');
     const list = h('div', { class: 'od-list' });
     pn.body.appendChild(list);
     const rows = new Map();
@@ -908,10 +908,10 @@
     { key: 'floorSec', name: 'Shortest prep time', min: 1, max: 600, step: 1, big: 15, unit: 's', mean: 'No item is planned for less time than this, even if its prep estimate is shorter.' },
     { key: 'qtyFactor', name: 'Extra time per extra portion', min: 0, max: 200, step: 5, big: 25, unit: '%', pct: true, mean: 'Each extra portion on the same line adds this much to its prep time.' },
     { key: 'qtyCap', name: 'Most a big line can grow', min: 1, max: 10, step: 0.5, unit: '×', mean: 'A line is never planned for more than this many times one portion\'s prep time.' },
-    { key: 'learnK', name: 'Learning strength', min: 0, max: 50, step: 1, unit: 'timings', mean: 'How many real timings it takes to count as much as your starter estimate. Higher learns more slowly; 0 trusts the line from the first timing.' },
-    { key: 'minFactor', name: 'Learned time never below', min: 0.1, max: 1, step: 0.05, unit: '× starter', mean: 'The learned prep time cannot fall under this share of your starter estimate.' },
-    { key: 'maxFactor', name: 'Learned time never above', min: 1, max: 10, step: 0.25, unit: '× starter', mean: 'The learned prep time cannot rise over this many times your starter estimate.' },
-    { key: 'outlierFactor', name: 'Trim a very long timing at', min: 1, max: 20, step: 0.5, unit: '× starter', mean: 'A timing longer than this is cut back to this length before it is learned from, so one forgotten tap cannot skew the estimate.' },
+    { key: 'learnK', name: 'How fast it learns your real times', min: 0, max: 50, step: 1, unit: 'timings', mean: 'How many real timings it takes to count as much as your starter estimate. Higher learns more slowly; 0 trusts the line from the first timing.' },
+    { key: 'minFactor', name: 'Learned time never below', min: 0.1, max: 1, step: 0.05, unit: 'times the starter time', mean: 'The learned prep time cannot fall under this share of your starter estimate.' },
+    { key: 'maxFactor', name: 'Learned time never above', min: 1, max: 10, step: 0.25, unit: 'times the starter time', mean: 'The learned prep time cannot rise over this many times your starter estimate.' },
+    { key: 'outlierFactor', name: 'Ignore a timing longer than', min: 1, max: 20, step: 0.5, unit: 'times the starter time', mean: 'A timing longer than this is cut back to this length before it is learned from, so one forgotten tap cannot skew the estimate.' },
   ];
 
   // Panel 4: the on/off switch and seven numbers, each inside the engine's range.
@@ -972,7 +972,7 @@
     { key: 'belowHotGraceH', name: 'Time allowed below hot hold', unit: 'hours', step: 0.5, legal: 'max', mean: 'Food can sit below hot hold this long before it must be thrown out. A reheat is only allowed inside this window.' },
     { key: 'aboveColdGraceH', name: 'Time allowed above cold hold', unit: 'hours', step: 0.5, legal: 'max', mean: 'Cold food can sit above cold hold this long before it must be thrown out.' },
     { key: 'defaultMaxHoldH', name: 'Hold limit for a product with none of its own', unit: 'hours', step: 0.5, mean: 'Every starter product has its own limit; this is only used for one that has not.' },
-    { key: 'hardCapH', name: 'Hard cap: longest any batch may stay', unit: 'hours', step: 0.5, mean: 'At this age any batch is thrown out, whatever its limit kind. A product whose own limit is at or above it has no quality stage: it is thrown out at the cap.' },
+    { key: 'hardCapH', name: 'Longest any batch may stay', unit: 'hours', step: 0.5, mean: 'At this age any batch is thrown out, whatever its limit kind. A product whose own limit is at or above it has no quality stage: it is thrown out at the cap.' },
     { key: 'tempCheckEveryMin', name: 'Temperature check every', unit: 'min', step: 5, mean: 'A temperature reading is due this often for every batch.' },
     { key: 'sanitizeEveryH', name: 'Sanitize food-contact surfaces every', unit: 'hours', step: 0.5, legal: 'max', mean: 'The sanitize timer on the line counts down from this.' },
   ];
@@ -986,10 +986,10 @@
   ];
   // The legal reason shown under a field and added to its refusal.
   const LEGAL_NOTE = {
-    hotHoldF: 'Smokebox never lets hot hold go below 135\u00a0°F: that is the food-code minimum.',
-    reheatF: 'A reheat target below 165 °F is not allowed: that is the food-code minimum.',
-    coldHoldF: 'Cold hold cannot go above 41 °F: that is the food-code maximum.',
-    belowHotGraceH: '2 hours is the food-code maximum.', aboveColdGraceH: '4 hours is the food-code maximum.', sanitizeEveryH: '4 hours is the food-code maximum.',
+    hotHoldF: 'The FDA Food Code sets 135\u00a0°F as the minimum for hot holding. Your local health code applies and may be stricter.',
+    reheatF: 'The FDA Food Code sets 165 °F as the minimum reheat target. Your local health code applies.',
+    coldHoldF: 'The FDA Food Code sets 41 °F as the maximum for cold holding. Your local health code applies.',
+    belowHotGraceH: 'The FDA Food Code allows at most 2 hours. Your local health code applies.', aboveColdGraceH: 'The FDA Food Code allows at most 4 hours. Your local health code applies.', sanitizeEveryH: 'The FDA Food Code allows at most 4 hours between wipe-downs. Your local health code applies.',
   };
 
   // Panel 5: food-safety limits, always inside the legal bounds, with the legal note shown.
@@ -997,7 +997,7 @@
     const pn = panel(SECTIONS[4]);
     pn.body.append(
       h('p', { class: 'od-safetyline' }, ico('shield-check', 20), h('span', null, C.safetyLine)),
-      para('Smokebox never lets hot hold go below 135\u00a0°F, and it refuses any limit outside the range shown under each field, naming the one that is wrong. These limits drive the hold cabinet, the temperature checks and the sanitize timer. A change applies from the next check on; batches already in the cabinet are re-checked against it.', 'od-intro'));
+      para('Smokebox refuses a hot-hold limit below 135\u00a0°F (the FDA Food Code minimum; your local health code applies and may be stricter), and it refuses any limit outside the range shown under each field, naming the one that is wrong. These limits drive the hold cabinet, the temperature checks and the sanitize timer. A change applies from the next check on; batches already in the cabinet are re-checked against it.', 'od-intro'));
     const status = statusLine();
     // Builds one safety field from its spec and the bounds in the config. Returns {f, path}.
     const mk = (spec, path, legalKey) => {
@@ -1011,7 +1011,7 @@
       // Cross-field wording: the total cooling time has to be longer than the first stage.
       if (path === 'safety.cooling.totalH') meta.words = (info) => (info.min > lo ? 'The total cooling time has to be longer than the first stage (' + num(((cur() || {}).settings.safety.cooling || {}).stage1H) + ' hours): ' + num(info.min) + ' hours or more.' : null);
       META[path] = meta;
-      const legalWord = spec.legal === 'min' ? ' Legal minimum ' + lo + unitText + '.' : spec.legal === 'max' ? ' Legal maximum ' + hi + unitText + '.' : '';
+      const legalWord = spec.legal === 'min' ? ' FDA Food Code minimum ' + lo + unitText + '.' : spec.legal === 'max' ? ' FDA Food Code maximum ' + hi + unitText + '.' : '';
       const start = getPath((cur() || {}).settings, path);
       const f = numField({
         label: spec.name, value: start, min: lo, max: hi, step: spec.step, big: spec.big || 0, unit: spec.unit, meta, hint: spec.mean + ' Allowed: ' + num(lo) + ' to ' + num(hi) + unitText + '.' + legalWord,
@@ -1226,10 +1226,10 @@
       },
     });
     // Minutes a dish off the menu for a quality limit waits before the channels hear it, in case it is kept serving.
-    const qMeta = { name: 'Channel update wait', fmt: (v) => v + ' min' };
+    const qMeta = { name: 'Wait before other apps are told', fmt: (v) => v + ' min' };
     META['service.qualitySyncHoldMin'] = qMeta;
     const qHold = numField({
-      label: 'Wait before channels hear a quality 86', value: (cur() || {}).settings.service.qualitySyncHoldMin, min: 0, max: 30, step: 1, unit: 'min', meta: qMeta,
+      label: 'Wait before other apps are told an item is past best-by', value: (cur() || {}).settings.service.qualitySyncHoldMin, min: 0, max: 30, step: 1, unit: 'min', meta: qMeta,
       hint: 'A dish past its quality limit may be tasted and kept. The delivery apps are told it is off only after this wait. A safety lock tells them at once.',
       // Saves the wait as a service setting and confirms it in words.
       save: (v) => saveSetting('service.qualitySyncHoldMin', v, 'Saved. Channels wait ' + v + ' min.', qMeta), onSaved: (t) => sst.ok(t),
@@ -1239,7 +1239,7 @@
 
     // Sales tax: one rate that is added to every order when it is paid.
     pn.body.appendChild(sub('Sales tax'));
-    pn.body.appendChild(para('Added on top of the food when an order is paid, and shown in Takings. Leave it at 0 if your menu prices already include tax, and ask your tax office for the right rate.', 'od-hint'));
+    pn.body.appendChild(para('Added on top of the food when an order is paid, and shown in Money collected. Leave it at 0 if your menu prices already include tax, and ask your tax office for the right rate.', 'od-hint'));
     const tst = statusLine();
     // How a tax rate is written in a refusal message, like 6.5%.
     const taxFmt = (v) => v + '%';
@@ -1339,7 +1339,7 @@
   // Turns a backup check error into a sentence a cook can understand.
   function backupReason(err) {
     const e = String(err || '');
-    if (/^not JSON/.test(e)) return 'It is not readable JSON: it is probably not a Smokebox backup, or it was cut off.';
+    if (/^not JSON/.test(e)) return 'The text could not be read: it is probably not a Smokebox backup, or it was cut off.';
     if (/^not an object/.test(e)) return 'It is not a Smokebox backup (the top level is not a record).';
     if (/^unsupported version undefined/.test(e)) return 'It does not say which Smokebox version made it, so it is probably not a backup.';
     if (/^unsupported version/.test(e)) return 'It was made by a different Smokebox version (' + e.replace('unsupported version ', 'version ') + ').';
@@ -1687,7 +1687,6 @@
       ['What is a starter estimate', 'Prep times, cooked yields and ingredient costs began as starter numbers. Prep times and yields keep the label "starter estimate" until you confirm them. Costs stay starter numbers until you replace them with your invoices.'],
       ['What has not been tested', 'It was tested in Chromium at phone, tablet and desktop sizes. Not tested: real sunlight on a real screen, and other devices and browsers. Try the line on the actual tablet before service.'],
       ['Several devices', 'Separate devices do not share data. Tablets open in the same browser on the same device do, and stay in step.'],
-      ['Pitcall', 'Smokebox is separate from Pitcall; later they can share the sell-out times.'],
     ];
     pn.body.appendChild(h('dl', { class: 'od-about' }, items.map(([k, v]) => h('div', { class: 'od-about-row' }, h('dt', null, k), h('dd', null, v)))));
     return pn;

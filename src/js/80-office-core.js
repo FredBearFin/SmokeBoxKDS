@@ -705,7 +705,8 @@
       },
       // Adds a full-width heading with an optional one-line explanation.
       section(title, sub) {
-        grid.appendChild(h('div', { class: 'of-section' }, h('h2', { class: 'of-section-t' }, title), sub ? h('p', { class: 'of-section-s' }, sub) : null));
+        const sec = h('div', { class: 'of-section' }, h('h2', { class: 'of-section-t' }, title), sub ? h('p', { class: 'of-section-s' }, sub) : null);
+        grid.appendChild(sec); page.lastSection = sec;
         return page;
       },
       // card adds a chart card and panel adds a free-form box. Both go in the grid in the order they are
@@ -950,7 +951,9 @@
     const a = h('a', { class: 'of-nav', href: '#/office' + (p.id === 'pace' ? '' : '/' + p.id), dataset: { page: p.id }, title });
     a.setAttribute('aria-label', title);
     if (current) a.setAttribute('aria-current', 'page');
-    a.append(ico(icon, 22), h('span', { class: 'of-nav-w' }, h('span', { class: 'of-nav-full' }, title), h('span', { class: 'of-nav-short' }, p.short)));
+    const off = pageIsOff(p.id);
+    if (off) { a.classList.add('is-off'); a.title = title + ' (not tracking cooked-ahead food)'; }
+    a.append(ico(icon, 22), h('span', { class: 'of-nav-w' }, h('span', { class: 'of-nav-full' }, title), h('span', { class: 'of-nav-short' }, p.short), off ? h('span', { class: 'of-nav-off' }, 'Not tracking') : null));
     a.addEventListener('click', (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return; e.preventDefault(); O.navigate(p.id); });
     return h('li', { class: 'of-rail-li' }, a);
   }
@@ -1177,7 +1180,12 @@
     U.clear(f.main); f.main.appendChild(rec.container);
     f.col.scrollTop = 0;
     const ctx = makeCtx(rec); rec.ctx = ctx;
-    if (!reg) {
+    f.root.dataset.gated = pageIsOff(id) ? 'true' : 'false';
+    if (pageIsOff(id)) {
+      // Nothing to chart: say so in one plain card with a way to turn the tracking on.
+      const g = GATED[id];
+      rec.container.appendChild(kit.empty({ title: g.title, body: g.body, icon: base.icon, action: { label: 'Yes, I cook food ahead', onClick: () => turnOnCookAhead(id) } }).el);
+    } else if (!reg) {
       rec.placeholder = true;
       // A page that is not registered yet shows a 'coming soon' box with a way back to Pace.
       rec.container.appendChild(kit.empty({ title: base.title + ' is coming soon', body: 'This page is not part of this build yet. The other pages work, and your data is not affected.', icon: base.icon, action: id === 'pace' ? null : { label: 'Go to Pace', onClick: () => O.navigate('pace') } }).el);
@@ -1194,6 +1202,25 @@
     paintBanner(ctx);
     if (o.focus) { try { f.title.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   }
+  // Pages that only make sense when the owner tracks cooked-ahead food (batches, hold cabinet, temperature checks).
+  const GATED = {
+    safety: { title: 'Safety records are off', body: 'You are not tracking cooked-ahead food, so there are no batches, temperature checks or hold times to report on. Turn it on in Settings if you cook food ahead and hold it hot or cold.' },
+    stock: { title: 'Stock tracking is off', body: 'You are not tracking cooked-ahead food, so this page has no stock to show. Turn it on in Settings if you cook food ahead and want to know when it runs out.' },
+  };
+  // True when the cook-ahead module is on; a missing setting counts as on, so old saves and the demo are unchanged.
+  function cookAheadOn() {
+    try { return !(SB.engine && SB.store && typeof SB.engine.moduleOn === 'function') || SB.engine.moduleOn(SB.store.getState(), 'cookAhead'); } catch (e) { return true; }
+  }
+  // True when this page is one of the gated pages and the owner is not tracking cooked-ahead food.
+  const pageIsOff = (id) => !!GATED[id] && !cookAheadOn();
+  // Turns the cook-ahead module on from the explanation card, then shows the page again.
+  function turnOnCookAhead(id) {
+    let rep = 'error';
+    try { rep = SB.store.dispatch('updateSettings', { patch: { modules: { cookAhead: true } } }); } catch (e) { /* shown below */ }
+    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. Open Menu and settings and try there.', { tone: 'bad' }); return; }
+    if (M) showPage(id, { focus: false });
+  }
+
   // Destroys every kit page that this page built, then forgets them.
   function destroyKitPages(rec) { Array.from(rec.kitPages).forEach((kp) => { try { kp.destroy(); } catch (e) { warnOnce('kit page destroy', e); } }); rec.kitPages.clear(); }
   // Tears down the page on screen: its own destroy, its kit pages and its listeners.
@@ -1243,6 +1270,8 @@
   // updates the cards and repaints the banner.
   function refreshNow(force) {
     if (!M || M.refreshing) return;
+    // The cook-ahead switch changed somewhere else (a setup sheet): redraw a gated page the other way.
+    if (GATED[M.pageId] && (M.f.root.dataset.gated === 'true') !== pageIsOff(M.pageId)) { showPage(M.pageId, { focus: false }); return; }
     M.refreshing = true;
     try {
       clrT(M.timer); M.timer = 0; M.dirty = false; M.deferredSince = 0;

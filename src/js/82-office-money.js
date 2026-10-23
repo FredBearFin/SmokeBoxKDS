@@ -616,12 +616,13 @@
     });
 
     /* ---------------------------------------------------------------- yield */
-    page.section('Brisket yield', 'Brisket loses weight in the smoker and the hold cabinet. Pricing it at a fixed yield can quietly under- or over-charge every plate.');
+    page.section('Cooked yield', 'Smoked meat loses weight in the smoker and the hold cabinet. Pricing it at a fixed yield can quietly under- or over-charge every plate.');
+    const yieldSection = page.lastSection;
 
     const yieldCard = page.card({
-      type: 'bar', span: 7, title: 'Brisket yield: assumed, modeled and real', sub: scope(),
+      type: 'bar', span: 7, title: 'Cooked yield: assumed, modeled and real', sub: scope(),
       caption: 'How far the static yield you price with sits from the Texas A&M model and from what your own weighed batches really gave.',
-      empty: { title: 'Nothing to compare yet', body: 'Brisket needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
+      empty: { title: 'Nothing to compare yet', body: 'Your main smoked meat needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
       // Up to three bars: the fixed yield, the Texas A&M model and your weighed batches (two or more needed).
       spec: (p) => {
         const y = yieldPrimary(p);
@@ -632,7 +633,7 @@
           orient: 'h', categories: rows.map((r) => r[0]), sort: 'none', labels: 'all', format: 'pct100', emphasis: rows.length - 1,
           series: [{ id: 'yield', name: 'Cooked yield', values: rows.map((r) => r[1] * 100) }],
           height: 70 * rows.length + 60,
-          ariaLabel: 'Bar chart comparing cooked brisket yield: ' + rows.map((r) => r[0] + ' ' + fmt.pct(r[1], 1)).join(', ') + '.',
+          ariaLabel: 'Bar chart comparing cooked yield: ' + rows.map((r) => r[0] + ' ' + fmt.pct(r[1], 1)).join(', ') + '.',
         };
       },
     });
@@ -658,8 +659,8 @@
     paintYieldKey(ctx.prepared());
 
     const costOfWrong = page.panel({
-      span: 5, title: 'What the static yield costs you', sub: scope(),
-      caption: 'The real price of a cooked kilogram of brisket, and how wrong the static yield would have made it.',
+      span: 5, title: 'What a fixed yield costs you', sub: scope(),
+      caption: 'The real price of a cooked kilogram of your main smoked meat, and how wrong a fixed yield would have made it.',
       // Builds the big sentence, the three cost figures and the source line; update repaints them in place.
       render: (body, p0) => {
         const big = h('p', { class: 'ob-bigline', 'data-k': 'misprice' });
@@ -671,8 +672,8 @@
         const paint = (p) => {
           const y = yieldPrimary(p);
           if (!y) {
-            setText(big, 'Brisket yield cannot be compared yet.');
-            setText(detail, 'This needs a brisket cost per kilogram and a range with brisket batches. Nothing is guessed in the meantime.');
+            setText(big, 'Yield cannot be compared yet.');
+            setText(detail, 'This needs a cost per kilogram and a range with weighed batches. Nothing is guessed in the meantime.');
             stats.set([]); setText(src, ''); src.hidden = true; return;
           }
           src.hidden = false;
@@ -704,8 +705,8 @@
     /* ---------------------------------------------------------------- what-if */
     const whatIf = page.panel({
       span: 12, title: 'Try it: what would a different cook do to the yield?',
-      sub: 'Texas A&M regression, hot-hold yield; starter model, confirm against your own weighed batches',
-      caption: 'Slide the end temperature and the hold time to see what brisket is worth after the smoker. A hotter finish or a longer hold means less meat on the board.',
+      sub: 'Based on published brisket cooking research; a starting guess, confirm against your own weighed batches',
+      caption: 'Slide the end temperature and the hold time to see what the meat is worth after the smoker. A hotter finish or a longer hold means less meat on the board.',
       // Builds the three steppers and the result tiles; any stepper change repaints the result at once.
       render: (body, p0) => {
         // The +5 and -5 buttons need room: on a narrow phone only the plain minus and plus are shown,
@@ -737,8 +738,7 @@
         function rawCost() {
           const y = yieldPrimary(ctx.prepared());
           if (y && isNum(y.costPerKgRaw)) return { cost: y.costPerKgRaw, name: y.name, staticY: y.staticYield };
-          const meta = B.ingMeta(ctx.dataset(), 'brisket');
-          return { cost: meta && isNum(meta.costPerKg) ? meta.costPerKg : null, name: meta ? meta.name : 'Brisket', staticY: meta && isNum(meta.yield) ? meta.yield : null };
+          return { cost: null, name: 'the main smoked meat', staticY: null };
         }
         // Runs the thermal model with the three stepper values and rewrites every result line.
         function paint() {
@@ -766,12 +766,20 @@
 
     /* ---------------------------------------------------------------- page result */
     const slots = [topCard, hourCard, chanCard, costCard, marginCard, noCost, yieldCard, costOfWrong, whatIf];
+    const yieldBlock = [yieldSection, yieldCard.el, costOfWrong.el, whatIf.el];
+    // Shows the yield section only when cooked-ahead food is tracked and some ingredient has a yield to compare.
+    const paintYieldVisible = (p) => {
+      let on = true;
+      try { on = SB.engine.moduleOn(SB.store.getState(), 'cookAhead') && !!yieldPrimary(p); } catch (e) { on = true; }
+      yieldBlock.forEach((el) => { if (el) el.hidden = !on; });
+    };
     return {
       // Runs on every refresh: keeps the card subtitles and the yield key current.
       update() {
         const s = scope();
         [topCard, hourCard, chanCard, costCard, marginCard, noCost, yieldCard, costOfWrong].forEach((c) => B.setSub(c, s));
         paintYieldKey(ctx.prepared());
+        paintYieldVisible(ctx.prepared());
       },
       // Runs when the page is left: removes the stepper listeners and drops the card list.
       destroy() {

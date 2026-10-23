@@ -446,8 +446,9 @@
     spellTable.el.querySelector('.of-card-body').appendChild(spellNote);
 
     // ---------- simulated channel sync ----------
-    page.section('Channel sync (simulated)', 'When an item goes 86, Smokebox pretends to tell each ordering channel and times how long that would take.');
-    page.panel({
+    page.section('Channel sync (practice only)', 'Practice only: Smokebox pretends to tell each ordering channel when an item is sold out and times how long that would take. It is not connected to any real ordering system.');
+    const syncParts = [page.lastSection];
+    syncParts.push(page.panel({
       span: 5, title: 'How fast 86 reaches the channels', sub: 'Simulated: no live POS connected',
       caption: 'Whether a sold-out item would stop being sold everywhere quickly. The goal is every channel inside the target.',
       // Builds the simulated-sync chip, four figures and the source line; update rewrites them in place.
@@ -475,8 +476,8 @@
         paint(p0);
         return { update: paint };
       },
-    });
-    page.card({
+    }));
+    syncParts.push(page.card({
       type: 'bar', span: 7, title: 'Sync time by channel (simulated)', sub: 'Simulated: no live POS connected',
       caption: 'Whether one channel is slower than the rest. Every bar should end before the target line.',
       empty: { title: 'No simulated sync events yet', body: 'They are logged each time an item goes 86 or comes back. Nothing here comes from a real POS.', icon: 'refresh' },
@@ -492,15 +493,23 @@
           ariaLabel: 'Bar chart of simulated sync time for each channel, median and slowest, against the ' + s.targetSec + ' second target. These are simulated figures: no live POS is connected.',
         };
       },
-    });
+    }));
+    // The channel sync strip is practice only: shown when demo tickets or sample history are in play, hidden for a real kitchen.
+    const paintSyncVisible = (p) => {
+      const b = base(p), demo = (b.ds.tickets || []).some((t) => t && t.src === 'demo');
+      const on = demo || !!(b.ds.counts && b.ds.counts.sample > 0);
+      syncParts.forEach((x) => { const el = x && x.el ? x.el : x; if (el) el.hidden = !on; });
+    };
 
     paintClockWords(ctx.prepared());
+    paintSyncVisible(ctx.prepared());
 
     return {
       // The frame calls this on every refresh: repaint only the words that depend on the data.
       update() {
         const p = ctx.prepared();
         paintClockWords(p);
+        paintSyncVisible(p);
         const sp = spellsOf(p);
         const inHours = sp.cl.filter((c) => c.openMs > 0);
         const after = sp.cl.length - inHours.length;

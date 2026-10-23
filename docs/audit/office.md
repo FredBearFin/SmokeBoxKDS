@@ -59,3 +59,19 @@ Fixed since round 1, with the finding numbers above:
 - **Theme switch.** Between 521 and 720 px the Ember/Paper button showed its word squeezed into vertical letters (48 x 101 px); it is now an icon button below 720 px and never shrinks.
 
 Still open: 12 to 20 (P2), the Safety compliance ring (19), the "New tablet?" toast (A2 is removing it; it still showed on the round-1 deploy build I started from, so verify in the merged build), "channel" and "protein" words on Stock, remaining jargon in 84-office-data (not renamed here: wording decisions for A2/Freddy).
+
+---
+
+## Round 3 update (branch night/a3-r3)
+
+Screenshots: `docs/ux-shots/night/a3/r3-*` (blank kitchen 1280x800 Ember; demo with sample history 1280x2400 Ember; demo with four tickets sent out 1280x800 Paper and 390x844 Ember; 1920x1080 Paper for Pace, Money, Stock). Demo loaded with `resetLive({keepSettings, starter, stagger, catalog:'sample', replaceOwn})`, then nine demo tickets.
+
+Fixed:
+- **Blank kitchen is honest.** When the cook-ahead module is off (`SB.engine.moduleOn(state,'cookAhead')`; absent means on, so the demo and old saves are unchanged), the Safety and Stock pages show one card instead of empty charts: "You are not tracking cooked-ahead food... Turn it on in Settings", with a button "Yes, I cook food ahead" that sets the same flag as A2's setup question. Their rail entries say "Not tracking", and the filter bar is hidden on those pages. Turning the switch on or off elsewhere redraws the page within a refresh. Checked live: button works, switch off hides the page again.
+- **Cooked yield section on Money** is no longer brisket-only. It uses the first ingredient that has a yield model, and the whole block (section, yield chart, cost of a fixed yield, what-if) is hidden when cook-ahead is off or no ingredient has a yield to compare. Plain titles ("Cooked yield", "What a fixed yield costs you"); the what-if says its model is based on published brisket research.
+- **Pace glance** no longer hard-codes brisket. It shows the cooked-ahead item that runs out soonest (else one with a known pace, else the one with most on hand) under its own name, and no card at all when nothing is cooked ahead or the module is off.
+- **Settings labels** (labels and help text only, ids and grouping untouched): "Menu and bills of materials" now "Dishes and what goes in them"; "Par (opening stock)" now "Opening amount (par)"; "86 point" now "Sold out at"; "Pull size (one set unit)" now "Amount per take-out"; "Static yield" now "Cooked yield"; "Learning strength" now "How fast it learns your real times"; "Trim a very long timing at" now "Ignore a timing longer than" (units "times the starter time"); "Hard cap" now "Longest any batch may stay"; "Wait before channels hear a quality 86" now "Wait before other apps are told an item is past best-by". "Legal minimum/maximum" now "FDA Food Code minimum/maximum" with a note that the local health code applies and may be stricter; the "never lets hot hold go below 135" promise is reworded to "refuses a limit below 135 F (the FDA Food Code minimum...)". Backup import errors say "could not be read" instead of "not readable JSON". The About list no longer mentions Pitcall. "Takings" in the tax help text now says "Money collected".
+- **Channel sync** on Stock is labeled "practice only" and only shows when demo tickets or sample history are in play; a real kitchen does not see it.
+- The compliance ring wording was already handled by A4 in Safety.
+
+Left: "Meal pacing" section title (Freddy's call on Finish together), the About "What is simulated" row, "protein" wording on Stock, Day/Night vs Ember/Paper, P2 items 12 to 17 and 20, a forgot-the-PIN path (60-shell, not mine). Not re-checked by eye: Paper at 1920 for every page, Safety and Stock pages with real cooked-ahead data other than the demo.
