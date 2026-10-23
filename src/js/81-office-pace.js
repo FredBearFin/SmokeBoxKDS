@@ -270,7 +270,7 @@
     render(container, ctx) {
       const page = K.page(container, ctx, { id: 'tickets' });
       page.headline();
-      page.how('Finished tickets are tickets that were sent out and not voided, counted on the day they were placed. Ticket time runs from when the ticket was entered until it was sent out; the middle ticket is the typical one. Overdue means a ticket took longer than the overdue limit for its order type. Voided tickets were cancelled before they were sent out. The arrows compare with the same number of days just before this range.');
+      page.how('Finished tickets are tickets that were sent out and not voided, counted on the day they were placed. Ticket time runs from when the ticket was entered until it was sent out; the middle ticket is the typical one. Overdue means a ticket reached or passed the overdue limit for its order type. Voided tickets were cancelled before they were sent out. The arrows compare with the same number of days just before this range.');
       page.tiles([
         { id: 'count', kpi: 'count', label: 'Finished tickets' },
         { id: 'median', kpi: 'medianMs', label: 'Median ticket time' },

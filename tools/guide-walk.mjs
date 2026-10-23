@@ -416,7 +416,145 @@ async function coldItem(browser) {
   check('cold: tapping Put back', await tap(p, 'Put back')); await p.waitForTimeout(500);
   await p.evaluate(() => document.querySelector('[data-act="skip-who"]').click()); await p.waitForTimeout(800);
   check('cold: the clock is paused', await p.evaluate(() => /put back\. The out-of-fridge clock is paused/.test(document.body.innerText)));
+  // The safety record: a limit change line, a cold reading above the limit, and the keep time from the engine.
+  const ev = await p.evaluate(() => {
+    const S = SB.store, d = (t, pl) => S.dispatchEx(t, pl, { source: 'ui' }), b = S.getState().batches.find((x) => x.kind === 'cold' || x.fridge);
+    const a1 = d('updateSettings', { patch: { safety: { coldHoldF: 39 } } });
+    const a2 = b ? d('logTemp', { batchId: b.id, tempF: 46 }) : null;
+    return { limit: a1.report, temp: a2 && a2.report, batch: !!b, keep: SB.retention && SB.retention.days() };
+  });
+  check('safety record: a limit change and a cold reading were logged', ev.limit === 'ok' && ev.temp === 'ok', ev);
+  await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(300);
+  await tap(p, 'Back office'); await p.waitForTimeout(1200);
+  await p.click('#sb-office nav >> text=Safety'); await p.waitForTimeout(1500);
+  check('safety page: Print the safety record', await tap(p, 'Print the safety record')); await p.waitForTimeout(900);
+  const rec = await p.evaluate(() => (document.querySelector('.sheet-root:last-of-type') || document.body).innerText);
+  check('safety record: Changed the cold limit from X to Y', /Changed the cold limit from .* to .*/.test(rec), rec.slice(0, 400));
+  check('safety record: a reading above the cold limit', /above the cold limit/.test(rec), rec.slice(0, 400));
+  check('safety record: the keep time comes from the engine', ev.keep ? new RegExp('Safety records are kept for about ' + ev.keep + ' days').test(rec) : /not kept forever/.test(rec), rec.slice(-300));
+  await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(300);
+  const dr = await p.evaluate(() => { const b = SB.store.getState().batches[0]; return b ? SB.store.dispatchEx('discardBatch', { batchId: b.id, reason: 'quality' }, { source: 'ui' }).report : 'nobatch'; });
+  check('thrown-out log: a batch was discarded', dr === 'ok', dr);
+  await p.evaluate(() => { if (SB.office && SB.office.close) SB.office.close(); }); 
+  await p.goto(FILE); await p.waitForTimeout(1000);
+  await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
+  await tap(p, 'Thrown-out log'); await p.waitForTimeout(800);
+  check('thrown-out log: Showing every batch thrown out since', await p.evaluate(() => /Showing (every batch|the \d+ batch)/.test(document.body.innerText)), await p.evaluate(() => document.body.innerText.slice(-300)));
   await p.close();
+}
+
+// The restore walk: after a restore the Data page says how long the old kitchen is kept and offers Undo this restore.
+async function restoreUndo(browser) {
+  console.log('Undo this restore');
+  const p = await fresh(browser);
+  await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  const backup = await p.evaluate(() => SB.store.exportAll());
+  await addDish(p, { name: 'Wings', short: 'Wings', zone: 'fry', price: 9 });
+  await tap(p, 'Back office'); await p.waitForTimeout(1200);
+  await p.click('#sb-office nav >> text=Menu and settings'); await p.waitForTimeout(1500);
+  await p.evaluate((t) => { const b = [...document.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Check pasted backup'); let n = b; let a = null; while (n && !a) { n = n.parentElement; a = n && n.querySelector('textarea'); } if (a) { const d = a.closest('details'); if (d) d.open = true; a.value = t; a.dispatchEvent(new Event('input', { bubbles: true })); } }, backup);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Check pasted backup'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } }); await p.waitForTimeout(1200);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.getClientRects().length && e.textContent.trim() === 'Replace everything with this backup'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } }); await p.waitForTimeout(800);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].reverse().find((e) => e.getClientRects().length && e.textContent.trim() === 'Replace everything'); if (b) b.click(); }); await p.waitForTimeout(1500);
+  const txt = () => p.evaluate(() => document.body.innerText);
+  check('restore: Your kitchen before this restore is kept for N days', /Your kitchen before this restore is kept for \d+ days?/.test(await txt()));
+  check('restore: Undo this restore', await p.evaluate(() => [...document.querySelectorAll('button')].some((e) => e.getClientRects().length && e.textContent.trim() === 'Undo this restore')));
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.getClientRects().length && e.textContent.trim() === 'Undo this restore'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } }); await p.waitForTimeout(800);
+  for (const t of ['Undo this restore?', 'Put my old kitchen back', 'Keep what I have']) check('restore undo confirm: ' + t, (await txt()).indexOf(t) >= 0);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].reverse().find((e) => e.getClientRects().length && e.textContent.trim() === 'Put my old kitchen back'); if (b) b.click(); }); await p.waitForTimeout(1500);
+  check('restore undo: the old kitchen is back (Wings again)', await p.evaluate(() => SB.store.getState().menu.some((m) => m.name === 'Wings')));
+  await p.close();
+}
+
+// The Close the month walk: three steps, five downloaded files, the typed word, Undo, and each plain refusal.
+async function closeMonth(browser) {
+  console.log('Close the month');
+  const { loadSB } = await import('../test/_load.mjs');
+  const SBn = await loadSB(['00-util', '10-config', '20-engine']);
+  const E = SBn.engine; const end = Date.now() - 3600e3; const days = 60;
+  let now = new Date(end - (days - 1) * 86400e3).setHours(9, 0, 0, 0);
+  let st = E.newState({ now, blank: true });
+  const go = (type, pl, at) => { if (at > now) now = at; const r = E.apply(st, type, pl, now); if (r.report !== 'ok') throw new Error(type + ' ' + r.report); st = r.state; return r; };
+  const dish = go('addMenuItem', { name: 'Plain dish', zone: 'pit', cat: 'meat', price: 6.5, prepSec: 120, track: 'one', prepGuess: false }, now + 1000).info.id;
+  const first = now;
+  for (let d = 0; d < days; d++) {
+    const base = new Date(first); base.setDate(base.getDate() + d); base.setHours(11, 0, 0, 0); const at = base.getTime();
+    const r = go('createTicket', { customer: 'C', channel: 'dine_in', items: [{ menuId: dish, qty: 1 }], allowPast: true }, at);
+    const tk = st.tickets[st.tickets.length - 1];
+    for (const it of tk.items) for (let i = 0; i < 2; i++) { const cur = st.tickets.find((x) => x.id === tk.id).items.find((x) => x.id === it.id); if (cur.status !== 'done') go('advanceItem', { ticketId: tk.id, itemId: it.id }, at + 20000 * (i + 1)); }
+    go('bumpTicket', { ticketId: tk.id }, at + 70000); go('payOrder', { orderId: r.info.orderId, method: 'cash', tip: 0 }, at + 80000);
+    go('sanitizeDone', { who: 'JM' }, at + 9 * 3600e3); go('closeDay', {}, at + 10 * 3600e3);
+  }
+  const t = Math.max(now, end); st = E.tick(st, t).state;
+  const saved = JSON.stringify({ v: 1, savedAt: t, rev: st.rev, clock: { virtual: t, real: t, speed: 1 }, state: st });
+  const open = async (init, url) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, acceptDownloads: true });
+    const p = await ctx.newPage(); p.on('pageerror', (e) => check('no page error', false, String(e)));
+    if (init) await p.addInitScript((tx) => { try { if (!localStorage.getItem('__seeded')) { localStorage.setItem('__seeded', '1'); localStorage.setItem('smokebox.v1.state', tx); } } catch (e) { /* blocked */ } }, init);
+    await p.goto(url || FILE); await p.waitForFunction(() => window.SB && SB.booted === true); await p.waitForTimeout(500); return p;
+  };
+  const sh = '.sheet-root:last-of-type';
+  const btn = (p, t) => p.evaluate((x) => { const b = [...document.querySelectorAll('button')].reverse().find((e) => e.getClientRects().length && e.textContent.trim().replace(/\s+/g, ' ') === x); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); return true; } return false; }, t);
+  const vis = (p) => p.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
+  const p = await open(saved);
+  await p.evaluate(() => SB.sheets.open('closemonth')); await p.waitForTimeout(800);
+  check('closemonth: sheet title Close the month', await p.evaluate(() => /Close the month/.test((document.querySelector('.sheet-root:last-of-type') || document.body).innerText)));
+  for (const x of ['1. What this does', 'Close everything before']) check('closemonth step 1: ' + x, await has(p, x, sh));
+  let tx = await vis(p);
+  check('closemonth step 1: This moves out of your kitchen', /This moves out of your kitchen: [\d,]+ days? of history \(.* up to, not including, .*\), with [\d,]+ orders?, [\d,]+ tickets? and [\d,]+ activity records?\./.test(tx), tx.slice(0, 600));
+  check('closemonth step 1: This stays (last 35 days, safety records)', /This stays: the last 35 days, today, every open order and open ticket.*your menu and settings, the end-of-day totals, and all food-safety records \(/.test(tx));
+  check('closemonth step 1: the history-gone warning with 7 days', /After step 3 the history is gone from this tablet\. Your files are the only copy of it\. For 7 days Smokebox also keeps your kitchen as it was, and you can undo\./.test(tx));
+  await p.evaluate(() => { const i = document.getElementById('cm-before'); const d = new Date(); i.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); i.dispatchEvent(new Event('change', { bubbles: true })); }); await p.waitForTimeout(400);
+  check('closemonth step 1: You picked X, but the last 35 days always stay', /You picked .*, but the last 35 days always stay, so it stops at /.test(await vis(p)));
+  check('closemonth: Next: save the files', await btn(p, 'Next: save the files')); await p.waitForTimeout(500);
+  check('closemonth step 2: heading', await has(p, '2. Save the month files now', sh));
+  const downloads = []; p.on('download', (d) => downloads.push(d.suggestedFilename()));
+  check('closemonth step 2: Save the month files now', await btn(p, 'Save the month files now')); await p.waitForTimeout(2800);
+  const names = await p.locator('[data-role="cm-files"] li strong').allInnerTexts();
+  check('closemonth step 2: five files, backup first, three spreadsheets, a list', names.length === 5 && /^smokebox-before-month-close-\d{8}\.json$/.test(names[0]) && /^smokebox-orders-.*\.csv$/.test(names[1]) && /^smokebox-tickets-.*\.csv$/.test(names[2]) && /^smokebox-days-.*\.csv$/.test(names[3]) && /^smokebox-month-manifest-.*\.json$/.test(names[4]), names);
+  check('closemonth step 2: the browser was handed all five', downloads.length === 5, downloads);
+  tx = await vis(p);
+  for (const x of ['Backup of the whole kitchen', 'Orders being closed', 'Tickets being closed', 'Days being closed', 'List of what is in these files', 'Save the files again', 'I saved the files and I can find them', 'Back office, Data, Restore, and pick the backup file.']) check('closemonth step 2: ' + x, tx.indexOf(x) >= 0);
+  check('closemonth step 2: Next: confirm waits for the box', await p.locator('[data-act="cm-next2"]').isDisabled());
+  await p.check('#cm-saw'); await p.waitForTimeout(200);
+  check('closemonth step 2: ticking the box turns Next: confirm on', await p.locator('[data-act="cm-next2"]').isEnabled());
+  check('closemonth: Next: confirm', await btn(p, 'Next: confirm')); await p.waitForTimeout(400);
+  check('closemonth step 3: heading 3. Type CLOSE', await has(p, '3. Type CLOSE', sh));
+  check('closemonth step 3: red button off until the word', await p.locator('[data-act="cm-go"]').isDisabled());
+  await p.fill('input[aria-label="Type CLOSE to confirm"]', 'close');
+  check('closemonth step 3: any case turns the red Close the month button on', await p.locator('[data-act="cm-go"]').isEnabled());
+  const before = await p.evaluate(() => SB.store.getState().tickets.length);
+  await p.click('[data-act="cm-go"]'); await p.waitForTimeout(1200);
+  tx = await vis(p);
+  check('closemonth done: Done. The month is closed.', tx.indexOf('Done. The month is closed.') >= 0);
+  check('closemonth done: Moved out ... Food-safety records all stayed', /Moved out: [\d,]+ days? \(.*\), [\d,]+ orders?, [\d,]+ tickets? and [\d,]+ activity records?\. Food-safety records all stayed \(\d+\)\./.test(tx));
+  check('closemonth done: Your kitchen before this is kept for 7 days', /Your kitchen before this is kept for 7 days:/.test(tx));
+  check('closemonth done: tickets were removed', (await p.evaluate(() => SB.store.getState().tickets.length)) < before);
+  check('closemonth done: Undo', await btn(p, 'Undo')); await p.waitForTimeout(900);
+  check('closemonth done: Undone. Your kitchen is back as it was, with all the history.', (await vis(p)).indexOf('Undone. Your kitchen is back as it was, with all the history.') >= 0 && (await p.evaluate(() => SB.store.getState().tickets.length)) === before);
+  check('closemonth done: Done button', await p.evaluate(() => [...document.querySelectorAll('button')].some((e) => e.getClientRects().length && e.textContent.trim() === 'Done')));
+  await p.context().close();
+  const q = await open(saved);
+  await q.evaluate(() => SB.sheets.open('closemonth')); await q.waitForTimeout(700);
+  await btn(q, 'Next: save the files'); await q.waitForTimeout(300); await btn(q, 'Save the month files now'); await q.waitForTimeout(2800);
+  await q.check('#cm-saw'); await btn(q, 'Next: confirm'); await q.waitForTimeout(300);
+  // A real change is hard to cause in a walk, so the store is made to answer as it does when the records changed after saving.
+  await q.evaluate(() => { SB.store.closeMonthPrune = () => ({ ok: false, report: 'exportStale', info: {} }); });
+  await q.fill('input[aria-label="Type CLOSE to confirm"]', 'CLOSE'); await q.click('[data-act="cm-go"]'); await q.waitForTimeout(800);
+  tx = await vis(q);
+  const goMsg = await q.evaluate(() => document.querySelector('[data-role="cm-go-msg"]').textContent);
+  check('closemonth refusal: files out of date', /Something changed since you saved the files \(a new day started or a record changed\)\. Save the files again in step 2, then close\. Nothing was removed\./.test(goMsg), goMsg);
+  check('closemonth refusal: back at step 2 with Save the files again, then continue.', tx.indexOf('2. Save the month files now') >= 0 && tx.indexOf('Save the files again, then continue.') >= 0);
+  await q.context().close();
+  const hb = await open(saved); await hb.evaluate(() => { SB.store.isHubClient = () => true; SB.sheets.open('closemonth'); }); await hb.waitForTimeout(700);
+  check('closemonth refusal: hub tablet', (await vis(hb)).indexOf("This tablet works through the main computer, so the month cannot be closed here. Do this on the main computer's own screen or the main tablet. Nothing was removed.") >= 0);
+  await hb.context().close();
+  const dm = await open(null, FILE + '?demo'); await dm.evaluate(() => SB.sheets.open('closemonth')); await dm.waitForTimeout(700);
+  check('closemonth refusal: demo', (await vis(dm)).indexOf('You are in the demo, so there is no real history to close here. Tap Back to my kitchen first. Nothing was removed.') >= 0);
+  await dm.context().close();
+  const nw = await open(null); await nw.evaluate(() => SB.sheets.open('closemonth')); await nw.waitForTimeout(700);
+  check('closemonth refusal: nothing to close', (await vis(nw)).indexOf('There is nothing to close yet. Only finished days older than 35 days can be moved out, and none are left before that date. Nothing was removed.') >= 0);
+  await nw.context().close();
 }
 
 // The Readings and Tablet checks walk: the three logs on the Readings sheet and the five checks on Tablet checks: screen, sound, home screen.
@@ -527,7 +665,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'startover') await startOver(browser); else if (process.env.WALK_ONLY === 'notices') await notices(browser); else if (process.env.WALK_ONLY === 'readings') await readingsAndChecks(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await readingsAndChecks(browser); await startOver(browser); await notices(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'month') await closeMonth(browser); else if (process.env.WALK_ONLY === 'restore') await restoreUndo(browser); else if (process.env.WALK_ONLY === 'startover') await startOver(browser); else if (process.env.WALK_ONLY === 'notices') await notices(browser); else if (process.env.WALK_ONLY === 'readings') await readingsAndChecks(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await restoreUndo(browser); await closeMonth(browser); await readingsAndChecks(browser); await startOver(browser); await notices(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);

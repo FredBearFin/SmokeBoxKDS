@@ -17,6 +17,7 @@ let fail = 0; const check = (n, ok, d) => { if (!ok) fail++; console.log((ok ? '
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sbproxy-')), conn = path.join(tmp, 'conn'); fs.mkdirSync(conn);
 let ref = ''; for (const r of [process.env.SMOKEBOX_BETA_REF, 'kds/connected', 'origin/connected', 'connected'].filter(Boolean)) { if (spawnSync('sh', ['-c', `git -C ${ROOT} archive ${r} | tar -x -C ${conn}`]).status === 0 && fs.existsSync(path.join(conn, 'server/server.mjs'))) { ref = r; break; } }
 if (!ref) { console.log('SKIP: the connected branch is not available (set SMOKEBOX_BETA_REF)'); process.exit(0); }
+if (!/TRUST_PROXY/.test(fs.readFileSync(path.join(ROOT, 'server/server.mjs'), 'utf8')) || !/\/pair/.test(fs.readFileSync(path.join(ROOT, 'server/server.mjs'), 'utf8'))) { console.log('SKIP: this source tree has no pairing or TRUST_PROXY in its hub (the connected track only)'); process.exit(0); }
 const kids = [];
 function hub(dir, port, env) { const c = spawn(process.execPath, [path.join(dir, 'server/server.mjs')], { env: Object.assign({}, process.env, { PORT: String(port), HOST: '127.0.0.1', SMOKEBOX_DATA: path.join(tmp, 'data-' + port, 'state.json') }, env) }); fs.mkdirSync(path.join(tmp, 'data-' + port), { recursive: true }); kids.push(c); return c; }
 const MAIN = 28787, BETA = 28788, PROXY = 28800;

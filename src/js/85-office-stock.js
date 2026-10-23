@@ -48,6 +48,172 @@
   // Shared on SB.officeB so the share maths can be checked from the browser console.
   B.stockPure = { cumulativeShare };
 
+  // Builds the What 86 cost section of the Stock page (how often and for how long food was taken off the menu) and returns the parts the page result needs.
+  function buildCostSection(env) {
+    const { page, base, M, scope, fmt, dayLabel, paintClockWords, ctx } = env;
+    // ---------- what 86 cost ----------
+    page.section('What 86 cost', 'Every time food was taken off the menu, and for how long it stayed off while the restaurant was open.');
+    // Times (ms) of orders refused because an item was unavailable. The event does not say which item.
+    const refusedTimes = B.memoP((p) => {
+      const from = ctx.filters.range.from, to = ctx.filters.range.to;
+      return (ctx.dataset().events || []).filter((e) => e && !e.reverted && e.type === 'ui_report' && e.report === 'itemUnavailable' && isNum(e.t) && e.t >= from && e.t < to).map((e) => e.t);
+    });
+    // The 86 spells grouped into events, with the open-hours part of each and the refused order lines that can
+    // be pinned on it. A refusal counts for a spell only when exactly one food was off at that moment; the rest
+    // are reported as not pinned down.
+    const spellsOf = B.memoP((p) => {
+      const b = base(p);
+      const cl = B.clusterSpells(M.eightySixes(p), { S: b.S, nowMs: ctx.now() });
+      const ev = refusedTimes(p);
+      const recorded = ev.length > 0;
+      let loose = 0;
+      cl.forEach((c) => { c.refused = recorded ? 0 : null; });
+      ev.forEach((t) => {
+        const live = cl.filter((c) => c.startT <= t && (c.endT === null || t <= c.endT));
+        const foods = new Set(live.map((c) => c.ing || c.items[0]));
+        if (foods.size === 1) live[0].refused++; else loose++;
+      });
+      return { cl, recorded, loose, total: ev.length };
+    });
+    const spellTable = page.table({
+      span: 12, title: 'Times food went off the menu', sub: scope,
+      caption: 'Long spells at busy hours are the expensive ones. Only time inside opening hours counts. The last column counts order lines staff tried to add while the item was off, where the app recorded them.',
+      empty: { title: 'Nothing was taken off the menu in opening hours', body: 'Each time food runs out, is turned off by hand or is locked out for safety, it is listed here with how long it stayed off while you were open.', icon: 'package' },
+      columns: [
+        { key: 'label', label: 'Day', sort: true, sortKey: 'date', nowrap: true },
+        // Name, plus (on phones only) the reason and refused count, since those columns are hidden there.
+        { key: 'what', label: 'What went off', sort: true, firstDir: 'asc', format: (v, r) => h('span', null, v, h('span', { class: 'ob-why-n' }, ', ' + r.why.toLowerCase() + (r.refused > 0 ? ', ' + fmt.num(r.refused, 0) + ' order ' + B.plural(r.refused, 'line', 'lines') + ' refused' : ''))) },
+        { key: 'why', label: 'Why', sort: true, firstDir: 'asc', wideOnly: true },
+        // Start time of the spell, shown as a clock time.
+        { key: 'startT', label: 'From', align: 'right', sort: true, wideOnly: true, format: (v) => fmt.clock(v) },
+        // Time off during opening hours; under a minute is said in words.
+        { key: 'openMs', label: 'Off during opening hours', align: 'right', sort: true, format: (v) => (v < 60000 ? 'Under a minute' : fmt.ms(v)) },
+        // Refused order lines; reads Not recorded when the app logged none in this range.
+        { key: 'refused', label: 'Order lines refused', align: 'right', sort: true, wideOnly: true, format: (v) => (v === null ? 'Not recorded' : fmt.num(v, 0)) },
+      ],
+      defaultSort: 'openMs', defaultDir: 'desc', pageSize: 8,
+      // Rows are the spells with some time inside opening hours, one per event.
+      rows: (p) => spellsOf(p).cl.filter((c) => c.openMs > 0).map((c) => ({
+        date: c.date, label: dayLabel(c.date), startT: c.startT, openMs: c.openMs, refused: c.refused,
+        what: c.ing ? B.ingName(base(p).ds, c.ing) + (c.items.length > 1 ? ' (' + c.items.length + ' menu items)' : '') : c.names[0],
+        why: WHY[c.reason] || 'Other',
+      })),
+    });
+    spellTable.el.classList.add('ob-tbl');
+    const spellNote = h('p', { class: 'ob-note', 'data-k': 'spell-note' });
+    spellTable.el.querySelector('.of-card-body').appendChild(spellNote);
+
+    paintClockWords(ctx.prepared());
+    return { spellsOf, spellTable, spellNote };
+  }
+
+  // Builds the Stock through the day section of the Stock page (the stock curve for one food on one day with its day picker) and returns the parts the page result needs.
+  function buildBurnSection(env) {
+    const { page, scope, syncPick, st, burn, base, dayLabel, M, fmt, ingSlot, ingSel, daySel, ctx } = env;
+    // ---------- stock through the day ----------
+    page.section('Stock through the day', 'How the level in the cabinet moved for one food on one day.');
+    const burnCard = page.card({
+      type: 'line', span: 12, title: 'Stock level', sub: scope,
+      caption: 'The line falls as plates go out and jumps when a batch lands. When it touches the red line the menu items made from it go 86. The gray line is your par.',
+      empty: { title: 'No stock movements to show', body: 'Pick a day and a food that was cooked and sold. The chart fills as batches land in the cabinet and tickets use them.', icon: 'chart-line' },
+      // Stock level of the picked food on the picked day, with the 86 line, par line, sold-out bands, labels.
+      spec: (p) => {
+        syncPick(p);
+        if (!st.day || !st.ing) return null;
+        const sb = burn(p, st.day, st.ing);
+        const b = base(p);
+        const name = B.ingName(b.ds, st.ing), lbl = dayLabel(st.day);
+        if (!sb || !(sb.points && sb.points.length)) return { series: [], empty: 'No stock movements for ' + name + ' on ' + lbl + '. Nothing was cooked into the cabinet or used from it that day.', ariaLabel: 'Stock level of ' + name + ' on ' + lbl + ': no movements.' };
+        const pts = sb.points.map((pt) => [pt.t, pt.g]);
+        const lastT = pts[pts.length - 1][0];
+        // Run to closing time, or to the last movement if that came after closing; today only runs to now.
+        let endT = Math.max(isNum(sb.closeMs) ? sb.closeMs : lastT, lastT);
+        if (st.day >= b.today) endT = Math.min(endT, Math.max(ctx.now(), lastT));
+        if (endT > lastT) pts.push([endT, pts[pts.length - 1][1]]);
+        const cl = B.clusterSpells(M.eightySixes(p).filter((s) => s.ing === st.ing && s.date === st.day && s.reason !== 'safety'));
+        const bands = cl.map((c) => ({ x0: c.startT, x1: c.endT === null ? endT : Math.min(c.endT, endT), label: 'Sold out' })).filter((x) => x.x1 - x.x0 >= 5 * MIN);
+        const refs = [];
+        if (isNum(sb.thresholdG) && sb.thresholdG > 0) refs.push({ y: sb.thresholdG, label: 'Goes 86 at ' + fmt.g(sb.thresholdG), tone: 'bad' });
+        if (isNum(sb.parG) && sb.parG > 0) refs.push({ y: sb.parG, label: 'Par ' + fmt.g(sb.parG), tone: 'muted' });
+        // Label the sell-outs, and the batches that landed, except where a batch label would sit on top of a
+        // sell-out label or on the par label, which is drawn at the right-hand end of its line. A phone is too
+        // narrow for any of these labels; the story above the chart gives the time.
+        const sold = cl.slice(0, 3), narrow = (g.innerWidth || 1280) < 520;
+        const x0 = Math.min(pts[0][0], isNum(sb.openMs) ? sb.openMs : pts[0][0]);
+        // True for a batch label that would sit on top of the par label at the right-hand end of the line.
+        const nearPar = (pt) => isNum(sb.parG) && Math.abs(pt.g - sb.parG) < 0.12 * sb.parG && pt.t > endT - 0.2 * (endT - x0);
+        const notes = narrow ? [] : sb.points.filter((pt) => (pt.kind === 'intake' || pt.kind === 'restock') && !nearPar(pt) && !sold.some((c) => Math.abs(c.startT - pt.t) < 40 * MIN)).slice(0, 6).map((pt) => ({ x: pt.t, y: pt.g, label: '+' + fmt.g(pt.d) }));
+        if (!narrow) sold.forEach((c) => notes.push({ x: c.startT, y: isNum(sb.thresholdG) ? sb.thresholdG : 0, label: 'Went 86, ' + fmt.clock(c.startT), tone: 'bad' }));
+        return {
+          series: [{ id: 'level', name: name + ' in the cabinet', points: pts, slot: ingSlot(b, st.ing) }],
+          x: { type: 'time', min: x0, max: endT }, y: { format: 'g', min: 0 },
+          refLines: refs, bands, annotations: notes, markers: 'none', height: 320,
+          ariaLabel: 'Line chart of the ' + name + ' stock level on ' + lbl + ', from ' + fmt.g(pts[0][1]) + ' to ' + fmt.g(pts[pts.length - 1][1]) + ', with a line where the menu items go 86 at ' + fmt.g(sb.thresholdG) + '.',
+        };
+      },
+    });
+    B.addAction(burnCard, ingSel.el);
+    B.addAction(burnCard, daySel.el);
+    return { burnCard };
+  }
+
+  // Builds the Sell-out clock section of the Stock page (one dot for the first sell-out of each protein on each day) and returns the parts the page result needs.
+  function buildClockSection(env) {
+    const { page, scope, st, refreshPicks, base, ingSlot, dayLabel, fmt } = env;
+    // ---------- the sell-out clock ----------
+    page.section('Sell-out clock', 'Each dot is the moment a protein went 86 on one day. The dashed line is closing time.');
+    const clock = page.card({
+      type: 'scatter', span: 12, title: 'When each protein went 86', sub: scope,
+      caption: 'Dots near the closing line are fine. Dots in the early afternoon mean guests were turned away at the busiest part of the day; a day with no dot means everything lasted.',
+      empty: { title: 'Nothing sold out', body: 'A dot appears here each time a protein goes 86 because it ran out or was turned off by hand. No dots in a busy range means the cook count is right.', icon: 'package' },
+      // Clicking a dot picks that day and food, then redraws the story and the stock chart.
+      onSelect: (sel) => {
+        if (!sel || !isNum(sel.x)) return;
+        st.ing = sel.series; st.day = U.dateKey(sel.x); st.picked = true;
+        refreshPicks();
+      },
+      // One dot per sell-out, by day (across) and time of day (up), one series per protein.
+      spec: (p) => {
+        const b = base(p), so = b.so;
+        if (!so.rows.length) return null;
+        const names = {};
+        so.proteins.forEach((x) => { names[x.ing] = x.name; });
+        const series = so.proteins.filter((x) => x.days > 0).map((x) => ({
+          id: x.ing, name: x.name, slot: ingSlot(b, x.ing),
+          points: so.rows.filter((r) => r.ing === x.ing).map((r) => [B.dayMs(r.date), r.hour, dayLabel(r.date) + ', ' + names[r.ing] + ' (' + r.menuName + ')']),
+        }));
+        const first = so.days[0], last = so.days[so.days.length - 1];
+        const early = so.rows.slice().sort((x, y) => y.hoursBeforeClose - x.hoursBeforeClose)[0];
+        // The time axis is padded by dayWindow so a short range does not print the same date twice.
+        return {
+          series, x: Object.assign({ type: 'time', format: 'date' }, B.dayWindow(B.dayMs(first.date), B.dayMs(last.date))),
+          y: { format: 'hour', min: b.S.openHour, max: b.S.closeHour + 1, label: 'Time of day' },
+          refLines: [{ y: so.closeHour, label: 'Closing time, ' + U.fmtHour(so.closeHour), tone: 'muted' }], height: 320,
+          ariaLabel: 'Scatter plot with one dot for each time a protein went 86, by day and time of day, against closing time at ' + U.fmtHour(so.closeHour) + '. ' + so.rows.length + ' sell-outs in ' + so.dayCount + ' days. The earliest was ' + early.name + ' at ' + fmt.clock(early.t) + '.',
+        };
+      },
+    });
+    // One sentence per protein above the dots, so the numbers are readable without the chart.
+    const clockWords = h('ul', { class: 'ob-sentences ob-sentences--card', 'aria-label': 'Sell-outs by protein', 'data-k': 'clock-words' });
+    const clockBody = clock.el.querySelector('.of-card-body');
+    clockBody.insertBefore(clockWords, clockBody.firstChild);
+    let lastWords = '';
+    // Writes one sentence per protein that sold out and one for those that never did; skipped if unchanged.
+    function paintClockWords(p) {
+      const b = base(p);
+      const sentences = b.so.proteins.filter((x) => x.days > 0).sort((a, c) => c.days - a.days).map((x) => {
+        const e = b.so.rows.filter((r) => r.ing === x.ing).sort((a, c) => c.hoursBeforeClose - a.hoursBeforeClose)[0];
+        return x.name + ' sold out on ' + x.days + ' of ' + b.so.dayCount + ' ' + B.plural(b.so.dayCount, 'day') + ', the earliest at ' + fmt.clock(e.t) + ', ' + B.hoursWords(e.hoursBeforeClose) + ' before close.';
+      });
+      const none = b.so.proteins.filter((x) => x.days === 0).map((x) => x.name);
+      if (none.length && b.so.dayCount) sentences.push(B.list(none) + ' never sold out.');
+      const sig = sentences.join('|');
+      if (sig !== lastWords) { lastWords = sig; U.clear(clockWords); sentences.forEach((s) => clockWords.appendChild(h('li', null, s))); }
+      clockWords.hidden = !sentences.length;
+    }
+    return { paintClockWords };
+  }
+
   // Builds the Stock and 86 page into the container and returns {update, destroy} for the frame.
   function render(container, ctx) {
     const kit = ctx.kit || (SB.office && SB.office.kit);
@@ -240,11 +406,13 @@
       if (!st.picked) { const dp = defaultPick(p); st.day = dp ? dp.day : days[days.length - 1].date; st.ing = dp ? dp.ing : order[0]; }
       daySel.set(st.day); ingSel.set(st.ing);
     }
+    // The stock curve card, made by buildBurnSection below; the pickers redraw it through refreshPicks.
+    let burnCard = null;
     // After the owner picks a day or food (or clicks a dot in the sell-out clock), redraw the chart and story.
     function refreshPicks() {
       const p = ctx.prepared();
       syncPick(p);
-      burnCard.update(p, ctx);
+      if (burnCard) burnCard.update(p, ctx);
       story.update(p, ctx);
     }
 
@@ -298,156 +466,11 @@
       },
     });
 
-    // ---------- the sell-out clock ----------
-    page.section('Sell-out clock', 'Each dot is the moment a protein went 86 on one day. The dashed line is closing time.');
-    const clock = page.card({
-      type: 'scatter', span: 12, title: 'When each protein went 86', sub: scope,
-      caption: 'Dots near the closing line are fine. Dots in the early afternoon mean guests were turned away at the busiest part of the day; a day with no dot means everything lasted.',
-      empty: { title: 'Nothing sold out', body: 'A dot appears here each time a protein goes 86 because it ran out or was turned off by hand. No dots in a busy range means the cook count is right.', icon: 'package' },
-      // Clicking a dot picks that day and food, then redraws the story and the stock chart.
-      onSelect: (sel) => {
-        if (!sel || !isNum(sel.x)) return;
-        st.ing = sel.series; st.day = U.dateKey(sel.x); st.picked = true;
-        refreshPicks();
-      },
-      // One dot per sell-out, by day (across) and time of day (up), one series per protein.
-      spec: (p) => {
-        const b = base(p), so = b.so;
-        if (!so.rows.length) return null;
-        const names = {};
-        so.proteins.forEach((x) => { names[x.ing] = x.name; });
-        const series = so.proteins.filter((x) => x.days > 0).map((x) => ({
-          id: x.ing, name: x.name, slot: ingSlot(b, x.ing),
-          points: so.rows.filter((r) => r.ing === x.ing).map((r) => [B.dayMs(r.date), r.hour, dayLabel(r.date) + ', ' + names[r.ing] + ' (' + r.menuName + ')']),
-        }));
-        const first = so.days[0], last = so.days[so.days.length - 1];
-        const early = so.rows.slice().sort((x, y) => y.hoursBeforeClose - x.hoursBeforeClose)[0];
-        // The time axis is padded by dayWindow so a short range does not print the same date twice.
-        return {
-          series, x: Object.assign({ type: 'time', format: 'date' }, B.dayWindow(B.dayMs(first.date), B.dayMs(last.date))),
-          y: { format: 'hour', min: b.S.openHour, max: b.S.closeHour + 1, label: 'Time of day' },
-          refLines: [{ y: so.closeHour, label: 'Closing time, ' + U.fmtHour(so.closeHour), tone: 'muted' }], height: 320,
-          ariaLabel: 'Scatter plot with one dot for each time a protein went 86, by day and time of day, against closing time at ' + U.fmtHour(so.closeHour) + '. ' + so.rows.length + ' sell-outs in ' + so.dayCount + ' days. The earliest was ' + early.name + ' at ' + fmt.clock(early.t) + '.',
-        };
-      },
-    });
-    // One sentence per protein above the dots, so the numbers are readable without the chart.
-    const clockWords = h('ul', { class: 'ob-sentences ob-sentences--card', 'aria-label': 'Sell-outs by protein', 'data-k': 'clock-words' });
-    const clockBody = clock.el.querySelector('.of-card-body');
-    clockBody.insertBefore(clockWords, clockBody.firstChild);
-    let lastWords = '';
-    // Writes one sentence per protein that sold out and one for those that never did; skipped if unchanged.
-    function paintClockWords(p) {
-      const b = base(p);
-      const sentences = b.so.proteins.filter((x) => x.days > 0).sort((a, c) => c.days - a.days).map((x) => {
-        const e = b.so.rows.filter((r) => r.ing === x.ing).sort((a, c) => c.hoursBeforeClose - a.hoursBeforeClose)[0];
-        return x.name + ' sold out on ' + x.days + ' of ' + b.so.dayCount + ' ' + B.plural(b.so.dayCount, 'day') + ', the earliest at ' + fmt.clock(e.t) + ', ' + B.hoursWords(e.hoursBeforeClose) + ' before close.';
-      });
-      const none = b.so.proteins.filter((x) => x.days === 0).map((x) => x.name);
-      if (none.length && b.so.dayCount) sentences.push(B.list(none) + ' never sold out.');
-      const sig = sentences.join('|');
-      if (sig !== lastWords) { lastWords = sig; U.clear(clockWords); sentences.forEach((s) => clockWords.appendChild(h('li', null, s))); }
-      clockWords.hidden = !sentences.length;
-    }
+    const { paintClockWords } = buildClockSection({ page, scope, st, refreshPicks, base, ingSlot, dayLabel, fmt });
 
-    // ---------- stock through the day ----------
-    page.section('Stock through the day', 'How the level in the cabinet moved for one food on one day.');
-    const burnCard = page.card({
-      type: 'line', span: 12, title: 'Stock level', sub: scope,
-      caption: 'The line falls as plates go out and jumps when a batch lands. When it touches the red line the menu items made from it go 86. The gray line is your par.',
-      empty: { title: 'No stock movements to show', body: 'Pick a day and a food that was cooked and sold. The chart fills as batches land in the cabinet and tickets use them.', icon: 'chart-line' },
-      // Stock level of the picked food on the picked day, with the 86 line, par line, sold-out bands, labels.
-      spec: (p) => {
-        syncPick(p);
-        if (!st.day || !st.ing) return null;
-        const sb = burn(p, st.day, st.ing);
-        const b = base(p);
-        const name = B.ingName(b.ds, st.ing), lbl = dayLabel(st.day);
-        if (!sb || !(sb.points && sb.points.length)) return { series: [], empty: 'No stock movements for ' + name + ' on ' + lbl + '. Nothing was cooked into the cabinet or used from it that day.', ariaLabel: 'Stock level of ' + name + ' on ' + lbl + ': no movements.' };
-        const pts = sb.points.map((pt) => [pt.t, pt.g]);
-        const lastT = pts[pts.length - 1][0];
-        // Run to closing time, or to the last movement if that came after closing; today only runs to now.
-        let endT = Math.max(isNum(sb.closeMs) ? sb.closeMs : lastT, lastT);
-        if (st.day >= b.today) endT = Math.min(endT, Math.max(ctx.now(), lastT));
-        if (endT > lastT) pts.push([endT, pts[pts.length - 1][1]]);
-        const cl = B.clusterSpells(M.eightySixes(p).filter((s) => s.ing === st.ing && s.date === st.day && s.reason !== 'safety'));
-        const bands = cl.map((c) => ({ x0: c.startT, x1: c.endT === null ? endT : Math.min(c.endT, endT), label: 'Sold out' })).filter((x) => x.x1 - x.x0 >= 5 * MIN);
-        const refs = [];
-        if (isNum(sb.thresholdG) && sb.thresholdG > 0) refs.push({ y: sb.thresholdG, label: 'Goes 86 at ' + fmt.g(sb.thresholdG), tone: 'bad' });
-        if (isNum(sb.parG) && sb.parG > 0) refs.push({ y: sb.parG, label: 'Par ' + fmt.g(sb.parG), tone: 'muted' });
-        // Label the sell-outs, and the batches that landed, except where a batch label would sit on top of a
-        // sell-out label or on the par label, which is drawn at the right-hand end of its line. A phone is too
-        // narrow for any of these labels; the story above the chart gives the time.
-        const sold = cl.slice(0, 3), narrow = (g.innerWidth || 1280) < 520;
-        const x0 = Math.min(pts[0][0], isNum(sb.openMs) ? sb.openMs : pts[0][0]);
-        // True for a batch label that would sit on top of the par label at the right-hand end of the line.
-        const nearPar = (pt) => isNum(sb.parG) && Math.abs(pt.g - sb.parG) < 0.12 * sb.parG && pt.t > endT - 0.2 * (endT - x0);
-        const notes = narrow ? [] : sb.points.filter((pt) => (pt.kind === 'intake' || pt.kind === 'restock') && !nearPar(pt) && !sold.some((c) => Math.abs(c.startT - pt.t) < 40 * MIN)).slice(0, 6).map((pt) => ({ x: pt.t, y: pt.g, label: '+' + fmt.g(pt.d) }));
-        if (!narrow) sold.forEach((c) => notes.push({ x: c.startT, y: isNum(sb.thresholdG) ? sb.thresholdG : 0, label: 'Went 86, ' + fmt.clock(c.startT), tone: 'bad' }));
-        return {
-          series: [{ id: 'level', name: name + ' in the cabinet', points: pts, slot: ingSlot(b, st.ing) }],
-          x: { type: 'time', min: x0, max: endT }, y: { format: 'g', min: 0 },
-          refLines: refs, bands, annotations: notes, markers: 'none', height: 320,
-          ariaLabel: 'Line chart of the ' + name + ' stock level on ' + lbl + ', from ' + fmt.g(pts[0][1]) + ' to ' + fmt.g(pts[pts.length - 1][1]) + ', with a line where the menu items go 86 at ' + fmt.g(sb.thresholdG) + '.',
-        };
-      },
-    });
-    B.addAction(burnCard, ingSel.el);
-    B.addAction(burnCard, daySel.el);
+    burnCard = buildBurnSection({ page, scope, syncPick, st, burn, base, dayLabel, M, fmt, ingSlot, ingSel, daySel, ctx }).burnCard;
 
-    // ---------- what 86 cost ----------
-    page.section('What 86 cost', 'Every time food was taken off the menu, and for how long it stayed off while the restaurant was open.');
-    // Times (ms) of orders refused because an item was unavailable. The event does not say which item.
-    const refusedTimes = B.memoP((p) => {
-      const from = ctx.filters.range.from, to = ctx.filters.range.to;
-      return (ctx.dataset().events || []).filter((e) => e && !e.reverted && e.type === 'ui_report' && e.report === 'itemUnavailable' && isNum(e.t) && e.t >= from && e.t < to).map((e) => e.t);
-    });
-    // The 86 spells grouped into events, with the open-hours part of each and the refused order lines that can
-    // be pinned on it. A refusal counts for a spell only when exactly one food was off at that moment; the rest
-    // are reported as not pinned down.
-    const spellsOf = B.memoP((p) => {
-      const b = base(p);
-      const cl = B.clusterSpells(M.eightySixes(p), { S: b.S, nowMs: ctx.now() });
-      const ev = refusedTimes(p);
-      const recorded = ev.length > 0;
-      let loose = 0;
-      cl.forEach((c) => { c.refused = recorded ? 0 : null; });
-      ev.forEach((t) => {
-        const live = cl.filter((c) => c.startT <= t && (c.endT === null || t <= c.endT));
-        const foods = new Set(live.map((c) => c.ing || c.items[0]));
-        if (foods.size === 1) live[0].refused++; else loose++;
-      });
-      return { cl, recorded, loose, total: ev.length };
-    });
-    const spellTable = page.table({
-      span: 12, title: 'Times food went off the menu', sub: scope,
-      caption: 'Long spells at busy hours are the expensive ones. Only time inside opening hours counts. The last column counts order lines staff tried to add while the item was off, where the app recorded them.',
-      empty: { title: 'Nothing was taken off the menu in opening hours', body: 'Each time food runs out, is turned off by hand or is locked out for safety, it is listed here with how long it stayed off while you were open.', icon: 'package' },
-      columns: [
-        { key: 'label', label: 'Day', sort: true, sortKey: 'date', nowrap: true },
-        // Name, plus (on phones only) the reason and refused count, since those columns are hidden there.
-        { key: 'what', label: 'What went off', sort: true, firstDir: 'asc', format: (v, r) => h('span', null, v, h('span', { class: 'ob-why-n' }, ', ' + r.why.toLowerCase() + (r.refused > 0 ? ', ' + fmt.num(r.refused, 0) + ' order ' + B.plural(r.refused, 'line', 'lines') + ' refused' : ''))) },
-        { key: 'why', label: 'Why', sort: true, firstDir: 'asc', wideOnly: true },
-        // Start time of the spell, shown as a clock time.
-        { key: 'startT', label: 'From', align: 'right', sort: true, wideOnly: true, format: (v) => fmt.clock(v) },
-        // Time off during opening hours; under a minute is said in words.
-        { key: 'openMs', label: 'Off during opening hours', align: 'right', sort: true, format: (v) => (v < 60000 ? 'Under a minute' : fmt.ms(v)) },
-        // Refused order lines; reads Not recorded when the app logged none in this range.
-        { key: 'refused', label: 'Order lines refused', align: 'right', sort: true, wideOnly: true, format: (v) => (v === null ? 'Not recorded' : fmt.num(v, 0)) },
-      ],
-      defaultSort: 'openMs', defaultDir: 'desc', pageSize: 8,
-      // Rows are the spells with some time inside opening hours, one per event.
-      rows: (p) => spellsOf(p).cl.filter((c) => c.openMs > 0).map((c) => ({
-        date: c.date, label: dayLabel(c.date), startT: c.startT, openMs: c.openMs, refused: c.refused,
-        what: c.ing ? B.ingName(base(p).ds, c.ing) + (c.items.length > 1 ? ' (' + c.items.length + ' menu items)' : '') : c.names[0],
-        why: WHY[c.reason] || 'Other',
-      })),
-    });
-    spellTable.el.classList.add('ob-tbl');
-    const spellNote = h('p', { class: 'ob-note', 'data-k': 'spell-note' });
-    spellTable.el.querySelector('.of-card-body').appendChild(spellNote);
-
-    paintClockWords(ctx.prepared());
+    const { spellsOf, spellTable, spellNote } = buildCostSection({ page, base, M, scope, fmt, dayLabel, paintClockWords, ctx });
 
     return {
       // The frame calls this on every refresh: repaint only the words that depend on the data.
