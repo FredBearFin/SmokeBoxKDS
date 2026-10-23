@@ -62,6 +62,21 @@
   // The way of paying used last, offered first next time (a counter usually takes the same kind all day).
   let lastMethod = C.payMethods[0].id;
 
+  // The short lowercase word for a way of paying, like cash or card.
+  const methodWord = (id) => (C.payMethodById[id] ? C.payMethodById[id].name.toLowerCase() : id);
+  // One-tap payment: marks the order paid with the way of paying used last, no tip, no discount. An Undo in the
+  // message reopens the order (that clears the payment), so a wrong tap costs one more tap.
+  function quickPay(orderId) {
+    const method = lastMethod;
+    const res = run('payOrder', { orderId, method, tip: 0, discount: 0 });
+    if (res.report !== 'ok') { toast(say(res), 'warn'); return; }
+    const info = res.info || {};
+    toast('Paid ' + money(info.total) + ' by ' + methodWord(method) + '.', 'ok', {
+      // Undo puts the order back in Open with its payment cleared.
+      undo: () => { const r = run('reopenOrder', { orderId }); if (r.report !== 'ok') toast(say(r), 'warn'); },
+    });
+  }
+
   // How long ago, in plain words (just now, 5 min ago, 2 h 10 min ago).
   function ago(ms) {
     if (ms < 45e3) return 'just now';
@@ -107,12 +122,44 @@
    * ------------------------------------------------------------------------------------------- */
 
   // Builds and opens the Orders sheet: Open orders (add, pay, void) and Paid today (reopen).
+  // The sheet only supplies the frame; buildOrders fills it, so the same list can also be a full page.
   function openOrders(opts) {
+    let built = null;
+    // Nothing here takes focus by itself, so a touch tablet keeps its keyboard down.
+    const sheet = SB.ui.sheet({ title: 'Orders', side: 'right', width: 'min(760px, 96vw)', name: 'orders', onClose: () => { if (built) built.teardown(); } });
+    built = buildOrders({ body: sheet.body, close: sheet.close, isPage: false }, opts);
+    return sheet;
+  }
+
+  // Shows the Orders list as a full page inside `host` and returns { el, close, destroy }.
+  // opts.onExit(reason) runs when the page closes; with no onExit the page just goes away.
+  function mountPage(host, opts) {
+    opts = opts || {};
+    let built = null, closed = false;
+    const page = h('div', { class: 'ord-page ox-page', dataset: { name: 'orders' } });
+    const body = h('div', { class: 'sheet-body' });
+    page.append(h('header', { class: 'ord-page-bar' }, h('h1', { class: 'ord-page-title' }, 'Orders')), body);
+    host.appendChild(page);
+    // Closes the page once: stops the live updates, removes the page, then tells the caller why.
+    const close = (why) => {
+      if (closed) return;
+      closed = true;
+      if (built) built.teardown();
+      page.remove();
+      if (typeof opts.onExit === 'function') opts.onExit(why || 'api');
+    };
+    built = buildOrders({ body, close, isPage: true }, opts);
+    // Closes the page without asking, for the router when it moves to another screen.
+    const destroy = () => close('destroy');
+    return { el: page, close, destroy };
+  }
+
+  // Fills a frame (a sheet or a page) with the Orders list. host = { body, close(why), isPage }.
+  // Returns { teardown } so the frame can stop the live updates when it goes away.
+  function buildOrders(host, opts) {
     opts = opts || {};
     const offs = [];
     const openRows = new Map(), paidRows = new Map();
-    // Nothing here takes focus by itself, so a touch tablet keeps its keyboard down.
-    const sheet = SB.ui.sheet({ title: 'Orders', side: 'right', width: 'min(760px, 96vw)', name: 'orders', onClose: () => offs.splice(0).forEach((f) => f()) });
 
     const openList = h('ul', { class: 'ox-list', 'aria-label': 'Open orders' }), paidList = h('ul', { class: 'ox-list', 'aria-label': 'Orders paid today' });
     const openEmpty = h('div', { class: 'empty ox-empty', hidden: true }, ico('receipt', 40), h('h3', null, 'No open orders'),
@@ -121,7 +168,10 @@
       h('p', null, 'Paid orders show up here, newest first, so a wrong payment can be reopened.'));
     const newBtn = h('button', { type: 'button', class: 'btn btn-primary ox-new' }, ico('plus', 22), h('span', null, 'New ticket'));
     // New ticket closes this screen and opens the New ticket screen for a fresh order.
-    newBtn.addEventListener('click', () => { sheet.close('new'); setTimeout(() => SB.sheets.open('order'), 60); });
+    newBtn.addEventListener('click', () => {
+      if (host.isPage) { SB.sheets.open('order'); return; } // a page stays under the New ticket sheet
+      host.close('new'); setTimeout(() => SB.sheets.open('order'), 60);
+    });
     const paidSum = h('p', { class: 'ox-sum', role: 'status' }), paidDrawer = h('p', { class: 'ox-sum ox-drawer' });
     const openPanel = h('div', { class: 'ox-panel' }, openList, openEmpty);
     const paidPanel = h('div', { class: 'ox-panel', hidden: true }, paidSum, paidDrawer, paidList, paidEmpty);
@@ -135,7 +185,7 @@
     openPanel.id = U.uid('ox-open'); paidPanel.id = U.uid('ox-paid');
     tabs.querySelector('[data-id="open"]').setAttribute('aria-controls', openPanel.id);
     tabs.querySelector('[data-id="paid"]').setAttribute('aria-controls', paidPanel.id);
-    sheet.body.append(h('div', { class: 'ox' }, h('div', { class: 'ox-bar' }, tabs, newBtn), openPanel, paidPanel));
+    host.body.append(h('div', { class: 'ox' }, h('div', { class: 'ox-bar' }, tabs, newBtn), openPanel, paidPanel));
     // Shows one list and hides the other.
     function showTab(id) { setHidden(openPanel, id !== 'open'); setHidden(paidPanel, id !== 'paid'); }
 
@@ -146,17 +196,23 @@
       const items = h('div', { class: 'ox-items' }), meta = h('div', { class: 'ox-meta' });
       const total = h('span', { class: 'ox-total num' }), sub = h('span', { class: 'ox-sub num' });
       const add = h('button', { type: 'button', class: 'btn ox-add', dataset: { act: 'add' } }, ico('plus', 20), h('span', null, 'Add items'));
-      const pay = h('button', { type: 'button', class: 'btn btn-primary ox-take', dataset: { act: 'pay' } }, ico('dollar', 20), h('span', null, 'Take payment'));
+      const quick = h('button', { type: 'button', class: 'btn btn-primary ox-quick', dataset: { act: 'quickpay' } }, ico('dollar', 20), h('span', null, 'Pay'));
+      const pay = h('button', { type: 'button', class: 'btn ox-take', dataset: { act: 'pay' } }, ico('receipt', 20), h('span', null, 'Tip or discount'));
       const del = h('button', { type: 'button', class: 'btn btn-ghost ox-void', dataset: { act: 'void' }, hidden: true }, ico('trash', 20), h('span', null, 'Void empty order'));
       const el = h('li', { class: 'ox-row', dataset: { order: o.id } },
         h('div', { class: 'ox-main' }, h('div', { class: 'ox-top' }, who, ch, round, demo), items, meta),
         h('div', { class: 'ox-money' }, total, sub),
-        h('div', { class: 'ox-acts' }, add, pay, del));
-      const rec = { el, o, who, ch, round, demo, items, meta, total, sub, add, pay, del, chKey: '' };
+        h('div', { class: 'ox-acts' }, add, pay, quick, del));
+      const rec = { el, o, who, ch, round, demo, items, meta, total, sub, add, pay, quick, del, chKey: '' };
       // Add items closes this screen and opens New ticket already pointed at this order.
-      add.addEventListener('click', () => { const id = rec.o.id; sheet.close('add'); setTimeout(() => SB.sheets.open('order', { orderId: id }), 60); });
-      // Take payment opens the payment box for this order.
+      add.addEventListener('click', () => {
+        const id = rec.o.id;
+        if (host.isPage) { SB.sheets.open('order', { orderId: id }); return; }
+        host.close('add'); setTimeout(() => SB.sheets.open('order', { orderId: id }), 60);
+      });
+      // Tip or discount opens the payment box; Pay marks it paid at once the usual way, with Undo.
       pay.addEventListener('click', () => openPay(rec.o.id));
+      quick.addEventListener('click', () => quickPay(rec.o.id));
       // Void order closes an order that has no food left on it, and says so.
       del.addEventListener('click', () => {
         const r = run('voidOrder', { orderId: rec.o.id, reason: 'nothing ordered' });
@@ -181,6 +237,9 @@
       text(rec.total, money(tot.total));
       text(rec.sub, tot.tax > 0 ? money(tot.subtotal) + ' food + ' + money(tot.tax) + ' tax' : lines.length ? 'before tip' : '');
       rec.pay.disabled = !(tot.subtotal > 0);
+      rec.quick.disabled = !(tot.subtotal > 0);
+      text(rec.quick.lastChild, 'Pay ' + money(tot.total) + ' ' + methodWord(lastMethod));
+      setHidden(rec.quick, live.length === 0);
       setHidden(rec.del, live.length > 0);
       setHidden(rec.pay, live.length === 0);
     }
@@ -243,7 +302,9 @@
     offs.push(SB.store.subscribeTick(() => update()));
     update();
     showTab(tabs.getValue());
-    return sheet;
+    // Stops the store and clock listeners once the frame is closed.
+    const teardown = () => offs.splice(0).forEach((f) => f());
+    return { teardown };
   }
 
   /* ---------------------------------------------------------------------------------------------
@@ -409,4 +470,7 @@
   }
 
   SB.sheets.register('orders', openOrders);
+  // The router layer calls SB.orders.mount(el) and keeps the cleanup function it gets back.
+  const mountForRouter = (el, opts) => mountPage(el, opts).destroy;
+  SB.orders = { mount: mountForRouter, mountPage, open: openOrders };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
