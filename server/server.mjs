@@ -55,6 +55,9 @@ export async function createHub(opts = {}) {
   let state = saved ? saved.state : E.newState({ now: now(), starter: opts.starter ?? process.env.SMOKEBOX_STARTER === '1' });
   let seq = saved ? saved.seq : 0;
   const clients = new Set();
+  const ops = []; // recent applied actions {seq, opId, actionType, payload, now, by}, so a returning screen can catch up
+  const MAX_OPS = 5000;
+  let lastAt = 0; // the time of the last applied action; action times never go backwards
   const replies = new Map(); // opId -> reply already given, so a resend is answered but not applied twice
   const MAX_REPLIES = 5000;
   let saveTimer = null, dirty = false;
@@ -84,14 +87,21 @@ export async function createHub(opts = {}) {
 
   // Runs one action through the engine with the hub clock; repeats of a known opId get the first answer back.
   function runAction(body) {
-    const { type, payload, clientId, opId } = body || {};
+    const { type, payload, clientId, opId, at } = body || {};
     if (typeof type !== 'string') return { status: 400, body: { report: 'unknownAction', info: {}, seq } };
     if (typeof opId === 'string' && replies.has(opId)) return { status: 200, body: Object.assign({}, replies.get(opId), { duplicate: true }) };
-    const r = E.apply(state, type, payload, now());
+    // A client may say when it did the action (a queued action replayed after being offline). The hub trusts that
+    // time only between the last applied action and its own clock, so time never runs backwards or into the future.
+    const t = typeof at === 'number' && isFinite(at) ? Math.min(now(), Math.max(lastAt, at)) : Math.max(lastAt, now());
+    const r = E.apply(state, type, payload, t);
     let reply;
     if (r.report === 'ok') {
       state = r.state;
-      changed({ by: typeof clientId === 'string' ? clientId : null, opId: typeof opId === 'string' ? opId : null, type });
+      lastAt = t;
+      const by = typeof clientId === 'string' ? clientId : null;
+      const op = { seq: seq + 1, opId: typeof opId === 'string' ? opId : null, actionType: type, payload: payload ?? {}, now: t, by };
+      ops.push(op); if (ops.length > MAX_OPS) ops.shift();
+      changed({ by, opId: op.opId, type, op });
       reply = { report: 'ok', info: r.info, seq };
     } else reply = { report: r.report, info: r.info, seq };
     if (typeof opId === 'string') {
@@ -115,7 +125,13 @@ export async function createHub(opts = {}) {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
       clients.add(res);
       req.on('close', () => clients.delete(res));
-      send(res, 'snapshot', view());
+      // ?since=N: a screen that was away asks for the actions after N. If the log still reaches back that far it gets
+      // them as one catchup message; otherwise it gets a full snapshot.
+      const sinceText = new URL(req.url, 'http://x').searchParams.get('since');
+      const since = sinceText === null || sinceText === '' ? NaN : Number(sinceText);
+      const covered = Number.isInteger(since) && since >= 0 && since <= seq && (since === seq || (ops.length && ops[0].seq <= since + 1) || (!ops.length && since === seq));
+      if (covered) send(res, 'catchup', { ops: ops.filter((o) => o.seq > since), serverNow: now(), seq });
+      else send(res, 'snapshot', view());
       return;
     }
     if (req.method === 'POST' && url === '/action') {
