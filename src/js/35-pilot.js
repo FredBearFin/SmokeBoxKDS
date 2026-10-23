@@ -247,9 +247,8 @@
     for (const k of Object.keys(r.taps.jobs)) { add('taps', k, r.taps.jobs[k].n); add('taps', k + ' per hour', r.taps.jobs[k].perHour, '/h'); }
     add('tickets', 'count', r.tickets.n); add('tickets', 'median seconds to bump', r.tickets.medianSec, 's');
     add('settings', 'hot hold', r.settings.hotHoldF, 'F'); add('settings', 'temperature check', r.settings.tempCheckEveryMin, 'min'); add('settings', 'hard cap', r.settings.hardCapH, 'h');
-    // Quote a cell when it holds a comma, quote or line break; text cells never start with a formula sign.
-    const cell = (v) => { let s = String(v); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-    return rows.map((x) => x.map(cell).join(',')).join('\n') + '\n';
+    // Every cell goes through the shared guard (36-csv.js): text that could run as a formula gets a leading apostrophe.
+    return rows.map((x) => SB.csv.line(x)).join('\n') + '\n';
   }
 
   SB.pilot = { build, toText, toCsv, defaultFrom, KEY_ALERTLOG: 'smokebox.v1.alertlog', LOG_MAX: 400 };

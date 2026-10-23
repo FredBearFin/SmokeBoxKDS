@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSB } from './_load.mjs';
 
-const SB = await loadSB(['00-util', '10-config', '20-engine', '25-deadlines', '35-pilot']);
+const SB = await loadSB(['00-util', '10-config', '20-engine', '36-csv', '25-deadlines', '35-pilot']);
 const E = SB.engine, P = SB.pilot;
 const T0 = new Date(2026, 9, 19, 11, 0, 0).getTime(), MIN = 60e3, HR = 60 * MIN;
 
