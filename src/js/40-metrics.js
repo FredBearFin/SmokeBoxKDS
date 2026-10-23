@@ -173,7 +173,7 @@
   function lineModel(it, v, pc) {
     const qty = lineQty(it), price = it.price, cost = it.cost, done = it.status === 'done';
     let work = null, resp = null;
-    if (done) {
+    if (done && it.auto !== true) {      // an item finished by counter service has no work or response time to learn from
       const f = it.firedAt, d = it.doneAt, st = it.startedAt;
       if (num(f) && num(d) && d >= f) {
         if (num(st)) { if (st >= f && st <= d) { work = d - st; resp = st - f; } }
@@ -259,7 +259,8 @@
       const t = v.t;
       if (t.status === 'expedited' && num(t.expeditedAt) && t.expeditedAt >= t.createdAt) {
         v.expeditedAt = t.expeditedAt; v.totalMs = t.expeditedAt - t.createdAt; v.level = levelOf(v.totalMs, ctx.th(v.channel));
-        spd.push(v);
+        // Counter service closes a ticket when it is paid: that is not a kitchen time, so it stays out of every speed statistic.
+        if (t.auto !== true) spd.push(v);
       }
     }
     ctx.all = all;                                     // every ticket in scope (any status)

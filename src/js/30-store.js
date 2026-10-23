@@ -26,7 +26,10 @@
   const START_OVER_WORD = 'ERASE';
   // Neutral starter names for a new empty kitchen. The ids (pit, meat ...) never change, only what people read.
   const STARTER_NAMES = { rename: { zones: { pit: 'Kitchen', sides: 'Prep', fry: 'Fryer' }, categories: { meat: 'Mains', sandwich: 'Sides', side: 'Snacks', fried: 'Desserts', cold: 'Drinks' } }, add: {} };
-  const START_OVER_KEYS = ['smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
+  // The half-built order on the New ticket screen: kept so a reload or closed tab loses nothing. At most 20,000 characters, and a
+  // draft older than 12 hours is forgotten (yesterday's half-order should not come back).
+  const DRAFT_KEY = 'smokebox.v1.orderdraft', DRAFT_MAX_CHARS = 20000, DRAFT_MAX_AGE_MS = 12 * 3600e3;
+  const START_OVER_KEYS = ['smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
     'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
@@ -573,7 +576,7 @@
   function status() { return Object.assign({}, st, { speed: clk.speed }); }
 
   // Tells the formatting helpers which units the saved settings ask for (degrees F or C, kg or lb).
-  function syncUnits() { try { if (state && state.settings) U.setUnits(state.settings.ui); } catch (e) { /* formatting keeps its old choice */ } }
+  function syncUnits() { try { if (state && state.settings) { U.setUnits(state.settings.ui); U.setCurrency(state.settings.ui && state.settings.ui.currency); } } catch (e) { /* formatting keeps its old choice */ } }
   // Makes ns the current state if it differs, then schedules a save and a redraw. broadcast tells other
   // tabs.
   function commit(ns, broadcast) {
@@ -611,6 +614,7 @@
         if (source === 'user') enqueueOp({ opId, type, payload, now: n });
       }
       if (type === 'closeDay') snapWanted = 'closeDay';
+      if (type === 'createTicket' && source === 'user') clearDraft();
       commit(r.state, true);
     }
     else if (source === 'user' && r.report !== 'nothingToDo' && type !== 'uiReport') {
@@ -945,6 +949,33 @@
       return C.saveCustom(STARTER_NAMES) !== false;
     } catch (e) { return false; }
   }
+  // Saves the half-built order from the New ticket screen (any plain JSON object the screen can rebuild from). Returns true when
+  // saved; false when it is not a plain object, too big (20,000 characters) or the browser refuses. Not part of backups.
+  // In the demo it is saved under the demo's own key. A successful createTicket by a person clears it.
+  function saveDraft(draft) {
+    if (!storage || !draft || typeof draft !== 'object' || Array.isArray(draft)) return false;
+    try {
+      const rec = { v: 1, at: realNow(), draft };
+      if (JSON.stringify(rec).length > DRAFT_MAX_CHARS) return false;
+      return storage.set(DRAFT_KEY, rec) !== false;
+    } catch (e) { return false; }
+  }
+  // The saved half-built order, or null when there is none, it is older than 12 hours, or the saved text is damaged (a damaged
+  // or stale draft is removed). Returns a copy the screen may change.
+  function loadDraft() {
+    if (!storage) return null;
+    try {
+      let rec = null;
+      try { rec = storage.get(DRAFT_KEY, null); } catch (e) { rec = null; }
+      if (rec == null) { if (storage.raw && storage.raw(DRAFT_KEY) != null) storage.remove(DRAFT_KEY); return null; }
+      const ok = rec && typeof rec === 'object' && rec.v === 1 && isNum(rec.at) && rec.draft && typeof rec.draft === 'object' && !Array.isArray(rec.draft)
+        && realNow() - rec.at <= DRAFT_MAX_AGE_MS && rec.at <= realNow() + DRAFT_MAX_AGE_MS && JSON.stringify(rec).length <= DRAFT_MAX_CHARS;
+      if (!ok) { storage.remove(DRAFT_KEY); return null; }
+      return JSON.parse(JSON.stringify(rec.draft));
+    } catch (e) { return null; }
+  }
+  // Throws the saved half-built order away (the order was sent or cancelled).
+  function clearDraft() { try { if (storage) storage.remove(DRAFT_KEY); } catch (e) { /* ignore */ } }
   // Starts the real kitchen over with an empty menu. Needs opts.confirm to be the typed word (SB.store.START_OVER_WORD, any case),
   // refuses in the demo, and takes a full backup first: if the backup cannot be made nothing is cleared. Then it clears dishes,
   // ingredients, stock, batches, tickets, orders and history (resetLive, catalog 'blank') and the setup-progress choices, so the
@@ -1015,7 +1046,7 @@
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
