@@ -1,4 +1,4 @@
-# Close the month: export and prune (design only, not built)
+# Close the month: export and prune (built in the engine and store on night/a5-month; the screens are others' work; see docs/smokebox.z.md for what was decided)
 
 Written on `night/a5-r11`. Product decisions that were open are marked DEFAULT with the least risky choice; Freddy can change any of them.
 
