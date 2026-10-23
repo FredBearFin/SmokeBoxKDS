@@ -75,19 +75,13 @@
     });
   }
 
-  // The six KPI tiles of the Pace page. Items 86'd is worked out here; the other five come from the
-  // metrics comparison.
+  // The four KPI tiles of the Pace page, all from the metrics comparison.
   function paceTiles() {
     return [
       { id: 'median', kpi: 'medianMs', label: 'Median ticket time' },
       { id: 'p90', kpi: 'p90Ms', label: 'Slowest 1 in 10' },
       { id: 'ontime', kpi: 'onTimePct', label: 'Tickets on time' },
       { id: 'rate', kpi: 'perHour', label: 'Tickets per hour' },
-      { id: 'spread', kpi: 'avgSpreadMs', label: 'First to last item' },
-      // The 86 tile counts items taken off the menu, compares with the earlier period and draws one dot
-      // per day.
-      { id: 'e86', label: 'Items sold out', kind: 'count', good: 'lower', format: 'num', value: (p) => M.eightySixes(p).length, previous: (p, c) => M.eightySixes(c.previous()).length,
-        spark: (p) => { const by = {}; M.eightySixes(p).forEach((e) => { by[e.date] = (by[e.date] || 0) + 1; }); return M.byDay(p).map((d) => by[d.date] || 0); } },
     ];
   }
 
@@ -105,7 +99,7 @@
       page.tiles(paceTiles());
 
       page.card({
-        type: 'line', span: 8, height: 300, title: 'Ticket time by hour of service',
+        type: 'line', span: 12, height: 300, title: 'Ticket time by hour of service',
         // The hero card's subtitle and its 'what to look for' line change with the range and with whether
         // a baseline exists.
         sub: (p, c) => { const m = heroModel(p, c); return (m.base ? c.filters.range.label + ' against the middle 80% of the 14 days before it' : 'Median ticket time in each hour, ' + lc(c.filters.range.label)) + (m.dropped ? '. ' + m.dropped + ' ' + plural(m.dropped, 'hour') + ' with fewer than ' + MIN_N + ' tickets left out' : ''); },
@@ -135,6 +129,7 @@
         },
       });
 
+      page.more('Show more charts and findings');
       page.card({
         type: 'ring', span: 4, title: 'Pace right now', sub: 'The last 10 tickets from the past 45 minutes. This one ignores the date range above.',
         caption: 'Under 80% of target is comfortable. At 100% the median ticket is as slow as its warning time, so the line is falling behind.',
@@ -278,7 +273,6 @@
         { id: 'count', kpi: 'count', label: 'Finished tickets' },
         { id: 'median', kpi: 'medianMs', label: 'Median ticket time' },
         { id: 'overdue', kpi: 'overdue', label: 'Overdue tickets' },
-        { id: 'lamp', kpi: 'avgLampMs', label: 'Finished food waiting' },
         { id: 'voids', kpi: 'voids', label: 'Voided tickets' },
       ]);
 
@@ -309,6 +303,7 @@
         },
       });
 
+      page.more('Show more charts and findings');
       page.section('Where the time goes', 'Every ticket splits into four waits that add up to its total.');
       page.card({
         type: 'stack', span: 6, title: 'By channel', sub: 'Average per ticket',
@@ -419,7 +414,6 @@
         // Items finished per hour has no ready-made KPI, so it reads the summary for this and the earlier
         // period.
         { id: 'items', label: 'Items finished per hour', kind: 'count', good: 'neutral', format: 'num', value: (p) => { const s = M.summary(p); return s.count ? s.itemsPerHour : null; }, previous: (p, c) => { const s = M.summary(c.previous()); return s.count ? s.itemsPerHour : null; } },
-        { id: 'voids', kpi: 'voids', label: 'Voided tickets' },
       ]);
 
       page.card({
@@ -441,6 +435,7 @@
         },
       });
 
+      page.more('Show more charts and findings');
       page.card({
         type: 'bar', span: 6, title: 'Response and work time by station', sub: 'Median, from the moment an item fires',
         caption: 'Response is how long an item waits before a cook touches it; work is the hands-on time. Items with no start tap show zero response and count work from firing, so those times are estimated. A long response means the station is short of hands, a long work time means the dish itself is slow.',

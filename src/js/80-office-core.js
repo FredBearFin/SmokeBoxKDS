@@ -707,6 +707,23 @@
       section(title, sub) {
         const sec = h('div', { class: 'of-section' }, h('h2', { class: 'of-section-t' }, title), sub ? h('p', { class: 'of-section-s' }, sub) : null);
         grid.appendChild(sec); page.lastSection = sec;
+        if (state.moreOn) sec.dataset.more = '1';
+        return page;
+      },
+      // more adds a quiet button row; everything added after it stays folded away until the button is pressed.
+      more(label) {
+        state.moreOn = true;
+        const btn = h('button', { type: 'button', class: 'btn of-more-btn', 'aria-expanded': 'false' }, label || 'Show more');
+        // Opens or folds the extra cards, then nudges charts to measure themselves again.
+        const toggle = () => {
+          const open = grid.dataset.moreOpen !== 'true';
+          grid.dataset.moreOpen = open ? 'true' : 'false'; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          btn.textContent = open ? 'Show less' : (label || 'Show more');
+          if (open) { try { g.dispatchEvent(new Event('resize')); } catch (e) { /* charts catch up on the next refresh */ } }
+        };
+        btn.addEventListener('click', toggle);
+        grid.dataset.moreOpen = 'false';
+        grid.appendChild(h('div', { class: 'of-more' }, btn));
         return page;
       },
       // card adds a chart card and panel adds a free-form box. Both go in the grid in the order they are
@@ -740,6 +757,7 @@
     // Adds a built card to the grid, remembers it for refresh and clean-up, and draws it once.
     function addSlot(slot) {
       state.slots.push(slot); grid.appendChild(slot.el);
+      if (state.moreOn) slot.el.dataset.more = '1';
       cardsLive.add(slot);
       // Wraps the card's destroy so it also leaves the live-card list that the leak counters read.
       const orig = slot.destroy; slot.destroy = () => { cardsLive.delete(slot); orig(); };

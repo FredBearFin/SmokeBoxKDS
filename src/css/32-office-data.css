@@ -283,7 +283,8 @@
 .od-danger-h { margin-top: var(--sp-8, 40px); color: var(--crimson, #c0392b); }
 .od-danger-box { display: grid; gap: var(--sp-2); padding: var(--sp-4); border: 2px solid var(--crimson, #c0392b); border-radius: var(--r-3, 12px); max-width: 40em; }
 .od-danger-t { display: flex; gap: var(--sp-2); align-items: center; margin: 0; color: var(--crimson, #c0392b); }
-.od-danger-l { display: grid; gap: 4px; font-weight: var(--w-semi); }
+.od-danger-l { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; font-weight: var(--w-semi); }
+.od-danger-l input { flex: 1 0 100%; }
 .od-danger-in { max-width: 14em; }
 @media (min-width: 1700px) { .od-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .od-fcard .od-steps { list-style: decimal; padding-left: 1.4em; display: grid; gap: var(--sp-2); }
