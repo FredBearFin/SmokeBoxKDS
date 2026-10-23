@@ -116,3 +116,26 @@ Screenshots looked at: `r5-import-phone-390`, `r5-import-night`, `r5-demo-bar-ph
 
 Not checked in round 5: real Square, Toast or Clover exports through the screen; files over 1 MB; the demo bar with Large text; the browser Back button inside a demo tab; two tabs (one demo, one real) open at once; importing into a menu that already has about 150 dishes.
 Questions for Freddy: (a) Is a one-question confirm before the demo right, or should the button just open it? (b) Should the demo bar be allowed to say more (for example "your own kitchen is safe")? (c) Do you want imported dishes ticked by default, or all unticked until the owner reviews?
+
+## Round 6 additions (branch night/a2-r6), final numbers
+
+Journey runs after all changes (modeled time, headless Chromium; not a person or a real tablet):
+
+| Run | Taps | Typed fields | List choices | Modeled time | Dead ends |
+|---|---|---|---|---|---|
+| A: fresh install to first paid ticket, three dishes | 13 (target about 17) | 6 (target 6) | 0 | about 1.4 min | 0 |
+| D: same with one station | 10 | 6 | 0 | about 1.3 min | 0 |
+| E: one cooked-ahead dish, Brisket linked, first batch logged, paid | 14 | 3 | 0 | about 0.9 min | 0 |
+| Three dishes alone | 6 taps | 6 | 0 | about 54 s (target under 2 min) | 0 |
+| Back next day: board to Dishes and prices | 2 taps (Menu, Dishes and prices) | | | | |
+
+What changed in round 6:
+1. **Reorder.** Each dish row has Up and Down buttons (44 px, switched off at the ends) using the engine's `moveMenuItem`. A move offers "Moved X up. Undo". The order screen reads the menu list in order within each category (`71-floor-order.js` builds tiles from `menu.filter` per category), so a move shows there with no change to that file; moving a dish never moves it into another category's group. I did not add drag: it is not simple to do keyboard-accessibly on a tablet sheet.
+2. **Touch audit** (`ux-scripts/touch-audit.mjs`): 10 screens x 3 sizes (390x844, 768x1024, 1024x768) x Day, Night and Large text = 90 screens, shots in `docs/ux-shots/night/a2/audit/`. Found and fixed: small round "?" help links (28 px; now have a 44 px tap area), 24 px checkboxes in the cooked-ahead and import lists (now 44 px rows), a sideways scroll in the import sheet at 390 wide with Large text, and the file chooser button. Left: two strips on the first-run board (the "Tap here to turn on warning sounds" bar is 34 px tall and its clear button 44x34); they are the board's, not setup's, so I did not change them (A1). Forms: name box has `autocapitalize=words`, Enter or Next moves to price, price is `inputmode=decimal` with `enterkeyhint=done`, which saves; every box scrolls itself to the middle when focused so a tablet keyboard does not cover it. Not tried with a real on-screen keyboard.
+3. **One way to show messages.** Every message in my screens goes through one helper and style (green for done, red and bold for a problem; problems are announced as alerts). Common refusals now say what happened and what to do next in one line: price out of range, name too long, name taken (and, in Dishes and prices, a one-tap "Bring it back" when a removed dish has the name), menu full (150 dishes), too many cooked-ahead items, cook-ahead switched off. Destructive actions are all undoable: Remove, a move and Stop counting show an Undo bar; Not used has "Use again"; an import has "Remove these N".
+4. **Second run** (`ux-scripts/setup-second-run.mjs`, 12 checks pass): a new tab after a half-typed dish shows the board (not setup), keeps the saved dishes and shows the first-steps card until a first ticket; Dishes and prices is two taps away and the half-typed name and price come back; after the first paid ticket the card is gone; the next day the board shows with no card and all dishes; after a restore from a backup into a clean browser the dishes are back, no first-run screen and no card; after leaving the demo the real kitchen is back and the board shows.
+
+Tests: setup-wizard.e2e.mjs (reorder, undo, Stop counting undo, refusal line added), demo-mode.e2e.mjs, menu-import-ui.e2e.mjs all pass singly. Unit suite 585 pass; one run showed 1 failure that passed on re-run (same intermittent timing test A5 mentioned).
+
+Not checked in round 6: a real tablet or phone (on-screen keyboard, thumb reach); drag reorder (not built); the board's own touch sizes (A1); the guide pages themselves; moving a dish between categories (the category follows the station tile unless set under More options; there is no move across groups); restore from a backup made on a different device with renamed stations (names are per browser).
+Questions for Freddy: (a) Is "up and down one place" enough, or do you want to drag dishes? (b) Should the order screen sort dishes in a category by this order (as it does now) or alphabetically? (c) The sound-warning strip on the board is shorter than a finger; do you want it taller or removed from first run?

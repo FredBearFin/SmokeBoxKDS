@@ -570,11 +570,11 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 
 .hc-who { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0; color: var(--ink2); font-size: var(--fs-2); }
 .dp-ptable { display: grid; gap: var(--sp-2); }
-.dp-prow { display: grid; grid-template-columns: 32px minmax(0, 2fr) 9ch minmax(0, 1.2fr); gap: var(--sp-2); align-items: center; padding-bottom: var(--sp-2); border-bottom: var(--bw-thin) solid var(--line-soft); }
+.dp-prow { display: grid; grid-template-columns: 44px minmax(0, 2fr) 9ch minmax(0, 1.2fr); gap: var(--sp-2); align-items: center; padding-bottom: var(--sp-2); border-bottom: var(--bw-thin) solid var(--line-soft); }
 .dp-prow[data-ok="false"] { background: var(--tint-warn); }
 .dp-prow .dp-prob { grid-column: 2 / -1; margin: 0; }
 .dp-prob:empty { display: none; }
-@media (max-width: 640px) { .dp-prow { grid-template-columns: 32px minmax(0, 1fr) 8ch; } .dp-prow select { grid-column: 2 / -1; } }
+@media (max-width: 640px) { .dp-prow { grid-template-columns: 44px minmax(0, 1fr) 8ch; } .dp-prow select { grid-column: 2 / -1; } }
 .btn-link { background: none; border: 0; text-decoration: underline; min-height: 44px; padding-inline: 0; }
 
 
@@ -602,3 +602,16 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .hc-actions .hc-more[hidden] { display: none; }
 .hc-discard { color: inherit; border-color: var(--line); }
 .hc-cost { display: none; } /* yield and cost notes belong in the back office, not on every card */
+.dp-msg[data-tone="bad"] { color: var(--crimson); font-weight: var(--w-semi); }
+.dp-msg[data-tone="ok"] { color: var(--sage-ink); }
+
+/* Touch size: the small round "?" help links get a 44 px tap area (a hidden ring round them); checkbox rows and the file box fit narrow screens. */
+.gd-help { position: relative; }
+.gd-help::after { content: ""; position: absolute; inset: -9px; }
+.dp-check { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; cursor: pointer; }
+.dp-check input { width: 26px; height: 26px; }
+.dp label.grow { display: flex; align-items: center; gap: var(--sp-2); min-height: 44px; }
+.dp input[type="file"] { max-width: 100%; }
+.dp, .dp-form, .dp .fs-row { min-width: 0; max-width: 100%; }
+.dp .fs-row { flex-wrap: wrap; }
+.dp input[type="file"]::file-selector-button { min-height: 44px; padding: 0 var(--sp-4); margin-right: var(--sp-3); border-radius: var(--r-btn); font: inherit; cursor: pointer; }
