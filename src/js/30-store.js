@@ -350,7 +350,25 @@
   /* ---------- backups ---------- */
   // Wraps the current state with version, save time, revision and clock: the one shape used for saving and
   // for backups.
-  function envelope() { const r = realNow(); return { v: 1, savedAt: r, rev: state.rev, clock: { virtual: now(), real: r, speed: clk.speed }, state }; }
+  function envelope() {
+    const r = realNow();
+    const env = { v: 1, savedAt: r, rev: state.rev, clock: { virtual: now(), real: r, speed: clk.speed }, state };
+    const nm = ownerNames();
+    if (nm) env.names = nm;
+    return env;
+  }
+  // The owner's station, category and channel names (SB.config.customSpec), or null when there are none or the
+  // config has no such feature. Backups carry them so tickets on an added station survive a restore.
+  function ownerNames() {
+    const C = SB.config;
+    if (!C || typeof C.customSpec !== 'function') return null;
+    try {
+      const sp = C.customSpec();
+      // True when a part of the spec holds at least one rename or added entry.
+      const has = (o) => o && typeof o === 'object' && Object.keys(o).some((k) => (Array.isArray(o[k]) ? o[k].length : o[k] && typeof o[k] === 'object' && Object.keys(o[k]).length));
+      return sp && (has(sp.rename) || has(sp.add)) ? JSON.parse(JSON.stringify(sp)) : null;
+    } catch (e) { return null; }
+  }
   // Backup as one JSON text (text that holds a whole list of records). Returns null and sets lastResult to
   // the reason when it refuses: too big, or it would not pass its own import check.
   function exportAll() {
@@ -369,8 +387,24 @@
   function importAll(text) {
     if (typeof text !== 'string') { last = { type: 'import', report: 'invalidBackup', info: { error: 'not text' }, events: [] }; return 'invalidBackup'; }
     if (text.length > MAX_TEXT) { last = { type: 'import', report: 'exportTooLarge', info: { chars: text.length, max: MAX_TEXT }, events: [] }; return 'exportTooLarge'; }
+    // A backup that carries owner names puts them in place BEFORE the check, so tickets on an added station are
+    // not dropped. A backup without names (an older one) leaves the current names alone. A refused import
+    // puts the old names back.
+    const C = SB.config;
+    let namesBefore = null, namesGiven = null;
+    if (C && typeof C.applyCustom === 'function' && typeof C.customSpec === 'function') {
+      try {
+        const o = JSON.parse(text);
+        if (o && typeof o === 'object' && o.names && typeof o.names === 'object') { namesGiven = o.names; namesBefore = C.customSpec(); C.applyCustom(namesGiven); }
+      } catch (e) { namesGiven = null; }
+    }
     const v = E().validateBackup(text);
-    if (!v.ok) { last = { type: 'import', report: 'invalidBackup', info: { error: v.error, repaired: v.repaired }, events: [] }; return 'invalidBackup'; }
+    if (!v.ok) {
+      if (namesGiven) { try { C.applyCustom(namesBefore); } catch (e) { /* keep going */ } }
+      last = { type: 'import', report: 'invalidBackup', info: { error: v.error, repaired: v.repaired }, events: [] };
+      return 'invalidBackup';
+    }
+    if (namesGiven && typeof C.saveCustom === 'function') { try { C.saveCustom(namesGiven); } catch (e) { /* the names stay applied for this session */ } }
     const ns = v.state;
     // The revision must go up so other tabs treat the imported copy as newer; the clock must not be behind
     // its times.
