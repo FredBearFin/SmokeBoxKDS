@@ -1473,7 +1473,7 @@
       tell(hMsg, 'Pairing...');
       Promise.resolve(SB.store.pairHub({ url: a.url, code, name: n.slice(0, 20) })).then((r) => {
         if (!r || !r.ok) { tell(hMsg, hubErrorWords(r && r.error), 'bad'); return; }
-        hPair.value = ''; tell(hMsg, 'Paired as ' + String(r.name || n).slice(0, 24) + '.', 'ok'); // a name from the hub is shown short lookAtHub();
+        hPair.value = ''; tell(hMsg, 'Paired as ' + String(r.name || n).slice(0, 24) /* a name from the hub is shown short */ + '.', 'ok'); lookAtHub();
       }, () => tell(hMsg, hubErrorWords('unreachable'), 'bad'));
     }
     // Draws the explicit choice after the hub was looked at: use the hub's kitchen, or send this tablet's kitchen (only into an empty hub).
