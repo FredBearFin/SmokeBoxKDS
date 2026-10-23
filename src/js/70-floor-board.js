@@ -1465,15 +1465,16 @@
   // button are kept current by paintWelcome.
   function buildWelcome() {
     m.wText = h('p', { class: 'fl-welcome-p' });
-    m.wBlank = h('button', { type: 'button', class: 'btn btn-lg', onClick: startEmpty }, ico('trash', 22), h('span', null, 'Start with an empty board'));
+    // Opens the "Set up your kitchen" wizard; the card stays until the wizard is finished or it is closed.
+    m.wBlank = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'setup' }, onClick: () => openSheet('wizard') }, ico('sliders', 22), h('span', null, 'Set up your kitchen'));
     // Starting the walkthrough also puts this card away for good.
-    const tour = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'tour' }, onClick: () => { F.setWelcome(false); startTour(); } }, ico('play', 22), h('span', null, 'Show me how it works'));
+    const tour = h('button', { type: 'button', class: 'btn btn-lg', dataset: { act: 'tour' }, onClick: () => { F.setWelcome(false); startTour(); } }, ico('play', 22), h('span', null, 'Show me how it works'));
     // The x puts the card away for good.
     const close = h('button', { type: 'button', class: 'btn btn-icon fl-welcome-x', 'aria-label': 'Hide this welcome', onClick: () => F.setWelcome(false) }, ico('x', 22));
     m.welcome = h('section', { class: 'fl-welcome', hidden: true, 'aria-labelledby': 'fl-welcome-h' },
       h('span', { class: 'fl-welcome-mark', 'aria-hidden': 'true' }, ico('flame', 34, { stroke: 1.8 })),
       h('div', { class: 'fl-welcome-body' }, h('h2', { id: 'fl-welcome-h' }, 'Welcome to your kitchen screen'), m.wText,
-        h('div', { class: 'fl-welcome-actions' }, tour, m.wBlank)),
+        h('div', { class: 'fl-welcome-actions' }, m.wBlank, tour)),
       close);
     return m.welcome;
   }
@@ -1483,12 +1484,11 @@
     if (!m || !m.welcome) return;
     const tickets = store().getState().tickets.filter((t) => t.status === 'active');
     const demoOnly = tickets.length > 0 && tickets.every((t) => t.src === 'demo');
-    const show = !welcomeDone() && m.zone === 'all' && m.slips.size > 0;
+    const show = !welcomeDone() && m.zone === 'all';
     setHidden(m.welcome, !show);
     if (!show) return;
-    const txt = 'Each paper ticket is an order. Tap START when you begin a dish and DONE when it is ready. The timers tell you when each dish should start, so the whole order finishes together.' + (demoOnly ? ' These tickets are pretend.' : '');
+    const txt = 'Set up your kitchen first: sales tax, hours, your dishes and the food already cooked. Then each paper ticket is an order: tap START when you begin a dish and DONE when it is ready.' + (demoOnly ? ' The tickets on the board are pretend.' : '');
     put(m.wText, txt);
-    setHidden(m.wBlank, !demoOnly);
   }
   // Hides the card for good, or shows it again (a restarted demo starts with it).
   F.setWelcome = function (on) {
