@@ -16,12 +16,14 @@ const TARGET = path.join(ROOT, 'src', 'js', '78-guide.js');
 const START = '  // guide:data-start (written by tools/build-guide.mjs from docs/sop; do not edit by hand)';
 const END = '  // guide:data-end';
 
-// Reads one Markdown file into a page: { id, title, summary, blocks }. Understands only what the Guide uses:
-// one "# Title", a first paragraph (the summary), "## Heading", paragraphs, "1." lists and "- " lists.
+// Reads one Markdown file into a page: { id, group, title, summary, blocks }. Understands only what the Guide uses:
+// one "# Title", a first paragraph (the summary), "## Heading", paragraphs, "1." lists, "- " lists, "- [ ] " checklists
+// and a picture line: ![alt text](fig:name "caption"). Files numbered 20 and up are printable quick cards.
 function parsePage(file, text) {
   const id = path.basename(file, '.md').replace(/^\d+-/, '');
   const lines = text.replace(/\r/g, '').split('\n');
-  const page = { id, title: '', summary: '', blocks: [] };
+  const num = Number((path.basename(file).match(/^(\d+)-/) || [0, 0])[1]);
+  const page = { id, group: num >= 20 ? 'cards' : 'guide', title: '', summary: '', blocks: [] };
   let para = [], list = null;
   // Closes the paragraph or list being collected and files it as the summary or a block.
   const flush = () => {
@@ -38,6 +40,8 @@ function parsePage(file, text) {
     if (!line.trim()) { flush(); continue; }
     if ((m = /^# (.+)$/.exec(line))) { flush(); page.title = m[1].trim(); continue; }
     if ((m = /^## (.+)$/.exec(line))) { flush(); page.blocks.push({ t: 'h', x: m[1].trim() }); continue; }
+    if ((m = /^!\[([^\]]*)\]\(fig:([a-z0-9-]+)(?: "([^"]*)")?\)$/.exec(line))) { flush(); page.blocks.push({ t: 'fig', id: m[2], alt: m[1].trim(), cap: (m[3] || '').trim() }); continue; }
+    if ((m = /^- \[ \] (.+)$/.exec(line))) { if (!list || list.t !== 'check') { flush(); list = { t: 'check', items: [] }; } list.items.push(m[1].trim()); continue; }
     if ((m = /^\d+\. (.+)$/.exec(line))) { if (!list || list.t !== 'ol') { flush(); list = { t: 'ol', items: [] }; } list.items.push(m[1].trim()); continue; }
     if ((m = /^- (.+)$/.exec(line))) { if (!list || list.t !== 'ul') { flush(); list = { t: 'ul', items: [] }; } list.items.push(m[1].trim()); continue; }
     if (list) flush();
