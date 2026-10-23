@@ -131,7 +131,7 @@
     const left = state.batches.some((x) => x !== b && x.ing === b.ing && x.status !== 'discard' && x.canServe === true && x.remainingG > 0);
     const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
     out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
-      consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or discard it.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
+      consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or throw it out.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
   }
   // The next closing time after now, in ms, from the service hours (a close above 24 means after midnight, so last
   // night's close can still be ahead at 12:30 am). Null once today's close has passed.
@@ -237,11 +237,6 @@
     }
     out.push({ id: 'shortfall:' + ing.id, kind: 'shortfall', ing: ing.id, label: name, at: r.runOutAt, msLeft: r.runOutAt - now, rung: 0, rungs: 0, sev: 'warn', leftoverG: r.leftoverG, shortG: r.unmetG, unmetG: r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG,
       runOutCause: r.runOutCause, gapEndAt: r.gapEndAt, startBy: sb ? sb.latestStart : null, planFor: { ing: ing.id, grams: r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG, by: r.runOutAt }, consequence, action, unknown: false });
-  }
-  // A span of time in words: "45 min", "2 h 10 min".
-  function hmText(ms) {
-    const m = Math.max(0, Math.round(ms / MIN));
-    return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + m % 60 + ' min' : '');
   }
   // When a batch's early warnings are put off until, or 0 when they are not.
   function snoozeOf(state, batchId, now) { const t = state.alertSnoozes ? state.alertSnoozes[batchId] : 0; return U.isNum(t) && t > now ? t : 0; }

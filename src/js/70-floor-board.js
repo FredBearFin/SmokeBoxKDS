@@ -1788,21 +1788,6 @@
     else openSheet('help');
   }
   F.startTour = startTour;
-  // Clears the pretend tickets after a confirm, so a new user can begin with a clean board. Settings stay.
-  async function startEmpty() {
-    const ok = await SB.ui.confirm({
-      title: 'Start with an empty board?', confirmLabel: 'Clear the board', cancelLabel: 'Keep the tickets',
-      body: ['This removes the demo tickets and anything else logged on this device. Settings stay.'],
-    });
-    if (!ok || !m) return;
-    try { if (SB.sim && SB.sim.live) SB.sim.live.stop(); } catch (e) { /* the simulator may not be running */ }
-    store().setSpeed(1);
-    const r = store().resetLive({ keepSettings: true, starter: false });
-    if (r !== 'ok') { toast(E().describe(r, {}, store().getState().settings), { tone: 'warn' }); return; }
-    F.setWelcome(false);
-    toast('The board is empty. Tap New ticket to send an order.', { tone: 'info' });
-  }
-
   // Empty state: shown when no slips match the current tab.
 
   // Fills the empty panel: New ticket and Start demo, or on a quiet station a way back to All.

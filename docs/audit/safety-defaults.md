@@ -52,7 +52,15 @@ Written on `night/a5-r6`. Nothing here was changed in round 6. This is not legal
 - Importing a menu never creates ingredients or cook-ahead rules; imported dishes have no recipe and no safety tracking.
 - Reheat is allowed once, only within the grace period (code rule, not a setting).
 
-## Questions
+## Recommendations on the open questions (round 7)
+
+1. **Slaw, potato salad, banana pudding in the sample: use the safety basis.** Yes. They are commonly made with mayonnaise, egg or dairy, and a safety limit discards at the limit instead of offering "keep serving". Change `holdBasis` to `'safety'` for those three in `10-config.js` and delete the wizard sentence that states a rule; this alters the sample byte-for-byte, so it is a deliberate golden-hash change and should be done by one person with the hashes updated in the same commit. Not done here, as asked.
+2. **Make the cook-ahead question unskippable?** Not blocking, but never silent: the setup flow should ask "Do you cook food ahead and hold it hot or cold?" with Yes and No as the only choices and no "later", and the board should show a small standing reminder ("Cook-ahead tracking is off") on kitchens that answered No. Rationale: a kitchen that holds food and never turns it on gets no reminders at all, which is the unsafe failure; a hard block on a tiny kitchen that does not cook ahead is only friction. A2 has built the "Yes, I cook ahead" switch; the reminder is not built.
+3. **Corrupt-save copy cleanup after 30 days:** done in round 7 (`smokebox.v1.corruptat`, cleared once a working save runs; tested). The copy is still kept untouched for those 30 days.
+4. **Close the month (export then prune): design only.** An office action "Close the month" that (a) exports a full backup file and an orders CSV for the month, (b) asks the owner to confirm the file saved, (c) removes finished tickets, orders and events older than that month from the live state (the existing `prune` already keeps the books balanced and moves safety records to the 190-day bucket), and (d) records `lastClose`-style `monthClosed` so the backup reminder knows. Never automatic, never without the export. It also answers the 12 MB history problem in `performance.md` without a new storage format.
+5. **Last good copy:** built in round 7 (see `storage-budget.md`). It is a convenience; it does not replace the backup reminder.
+
+## Questions (answered above; kept for the record)
 
 1. Should slaw, potato salad and banana pudding in the sample use the safety basis (recommended yes)?
 2. Should the cook-ahead switch ask a yes/no question in setup that cannot be skipped, so an owner never ends up with it off by accident?

@@ -11,7 +11,9 @@ Kitchen data (separate copy in the demo, saved as `smokebox.demo.<name>`): see `
 | `smokebox.v1.state` | the whole kitchen: settings (including the PIN hash), menu, ingredients, tickets, orders, batches, stock, events, the books | blank 1.4 KB; sample kitchen 15 KB; 150 dishes with two-line recipes 38 KB; 80 ingredients 9 KB; one finished one-line ticket 0.55 KB plus its order 0.3 KB plus about 8 events (1 KB); a full 5,000-ticket history of two-line tickets 12.6 MB |
 | `smokebox.v1.sid` | the id of the last save, for two-tab sync | under 40 characters |
 | `smokebox.v1.outbox` | actions not yet confirmed by a server (only with a server transport) | up to 5,000 actions, about 1.5 MB at the worst; empty in the Solo package |
-| `smokebox.v1.corrupt` | a copy of a damaged save, kept aside | as big as the damaged save (it can double the storage in use) |
+| `smokebox.v1.corrupt` | a copy of a damaged save, kept aside | as big as the damaged save (it can double the storage in use). Cleared automatically 30 days after it was set aside, once a working save is running. |
+| `smokebox.v1.corruptat` | when that copy was set aside (a time) | 13 characters |
+| `smokebox.v1.lastgood` | one rolling "last good copy": the menu, ingredients, settings (PIN), batches, safety records and the latest 300 tickets and 2,000 events | 8 percent of the live save at full size (about 1 MB against 12 MB); about the same as the live save for a small kitchen |
 | `smokebox.v1.names` | owner station, category and channel names | under 2 KB (at most 8 stations, 12 categories, 8 channels, 24 characters each) |
 | `smokebox.v1.sample` | whether the back office shows sample history | 5 characters |
 | `smokebox.v1.welcome`, `lastbackup`, `pinlock`, `paymethod`, `initials` | small flags and times | under 100 characters each |
@@ -25,12 +27,17 @@ Device settings (same in the demo and the real kitchen, `U.sharedKeys`): theme, 
 
 In `sessionStorage`: `smokebox.mode` ('demo' or absent), one word, per tab.
 
+## The last good copy (round 7)
+
+Taken after a whole (untrimmed) live save in a real kitchen only (never in the demo): the first save of a session, after every close day, and every 6 hours. It is validated before it is kept and replaces the previous copy. If the live save is found damaged at start-up, the copy is loaded in its place, the damaged text stays set aside under `smokebox.v1.corrupt`, and a notice tells the owner the time of the copy and that later orders are missing. Under quota pressure it is the first thing dropped: when a live save is refused, the copy is deleted and the save retried before any history is trimmed; when the copy itself does not fit it is simply not kept. It is trimmed history, so it never competes for the bulk of the space.
+
 ## What happens when the browser is full
 
 `persistNow` (30-store.js) saves everything in one value. If the browser refuses it:
-1. It tries again with at most 1,500 tickets and 10,000 events kept (about 2.7 MB for one-line tickets).
-2. Then it halves both, up to 12 times (750/5,000 is 1.4 MB, 375/2,500 is 0.7 MB, 100/500 is 0.16 MB), stopping when history is already tiny.
-3. If nothing fits, the copy in memory stays whole, `status().lastSaveOk` is false and the start-up toast already warns "This browser is not letting Smokebox save".
+1. The last good copy (next section up) is deleted and the full save is tried once more.
+2. It tries again with at most 1,500 tickets and 10,000 events kept (about 2.7 MB for one-line tickets).
+2. (Before that, the last good copy is deleted and the full save retried once.) Then it halves both, up to 12 times (750/5,000 is 1.4 MB, 375/2,500 is 0.7 MB, 100/500 is 0.16 MB), stopping when history is already tiny.
+4. If nothing fits, the copy in memory stays whole, `status().lastSaveOk` is false and the start-up toast already warns "This browser is not letting Smokebox save".
 
 What is trimmed: the oldest finished tickets and the oldest events. The books stay balanced (used and wasted grams of trimmed tickets move into the ledger).
 

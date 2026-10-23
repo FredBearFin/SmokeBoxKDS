@@ -81,8 +81,6 @@
   const menuOf = (id) => { const a = st().menu; for (let i = 0; i < a.length; i++) if (a[i].id === id) return a[i]; return null; };
   // An amount in words: pieces for counted items (cornbread), otherwise grams or kilograms.
   const qtyText = (ing, gm) => (ing && ing.unit === 'ea' ? Math.round(gm) + ' ' + plural(Math.round(gm), 'piece') : U.weightText(gm));
-  // Station details for an id, with a safe fallback so an unknown station still shows.
-  const zoneOf = (id) => C.zoneById[id] || { name: id, code: String(id || '').slice(0, 3).toUpperCase(), icon: 'flame' };
   // Order channel details for an id, with a safe fallback.
   const channelOf = (id) => C.channelById[id] || { name: id || 'Order', icon: 'plate' };
 

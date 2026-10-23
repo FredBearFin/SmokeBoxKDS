@@ -16,6 +16,14 @@
   const KEY = 'smokebox.v1.state';
   // A saved copy that fails the check is parked here instead of being deleted, so nothing is lost.
   const CORRUPT_KEY = 'smokebox.v1.corrupt';
+  // When the damaged copy was set aside (a time), so it can be cleared after 30 days.
+  const CORRUPT_AT_KEY = 'smokebox.v1.corruptat';
+  // One small rolling copy of the last good state (menu, ingredients, settings, PIN, safety records, recent history).
+  const LASTGOOD_KEY = 'smokebox.v1.lastgood';
+  // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
+  const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
+  // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
+  const SNAP_KEEP = { maxTickets: 300, maxEvents: 2000 };
   const SID_KEY = 'smokebox.v1.sid';
   // The actions this device has done that no server has confirmed yet (only used when a transport can push).
   const OUTBOX_KEY = 'smokebox.v1.outbox';
@@ -24,6 +32,8 @@
   const MAX_TEXT = 20e6; // characters; backups above this are refused (Pitcall PO4c)
   // 400 ms: wait this long after the last change before saving, so a burst of taps is one save.
   const SAVE_MS = 400;
+  // 5000 ms: the longest the save delay may grow to when saves are slow.
+  const SAVE_MAX_MS = 5000;
   // True for a plain object (not null, not a list).
   const isObjLike = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
   // True only for a real, finite number.
@@ -60,8 +70,10 @@
   // Which kitchen this store holds: 'real' or 'demo'. strict is true when the start-up named the mode (the app does;
   // plain tests do not): then the real kitchen refuses a fast clock and the sample history, and backups carry the mode.
   let mode = 'real', strict = false, baseStorage = null, reloadFn = null;
+  // snapAt is when the rolling copy was last taken (real time); snapWanted is set by close day so the next save takes one.
+  let snapAt = 0, snapWanted = null;
   let last = null;
-  let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0 };
+  let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: 400 };
   const tabId = 'tab_' + Math.floor(Math.random() * 1e9).toString(36);
 
   /* ---------- clock: now() = base + (real - realBase) * speed, clamped so it never goes backwards ---------- */
@@ -134,6 +146,9 @@
   function subscribeTick(fn) { if (typeof fn !== 'function') return () => {}; tickSubs.add(fn); return () => tickSubs.delete(fn); }
 
   /* ---------- persistence ---------- */
+
+  // A millisecond clock for timing the save itself (not the kitchen clock, which tests replace).
+  const perfNow = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
   // Marks the state as unsaved and arranges a save SAVE_MS later. broadcast true means tell other tabs after
   // saving.
   function schedulePersist(broadcast) {
@@ -142,7 +157,11 @@
     if (saveTimer || !storage) return;
     // Once a shared save exists and other tabs may be open, each tab waits a little differently, so two tabs rarely write in the
     // same instant. The very first save of a new board is not delayed, so a second tab opened right after sees it.
-    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, tr && baseSid ? SAVE_MS + Math.floor(Math.random() * 300) : SAVE_MS);
+    // A slow save (a big history) makes the next one wait longer: eight times what the last save took, between the normal
+    // 400 ms and 5 seconds, so a busy rush never spends most of its time writing.
+    const wait = Math.min(SAVE_MAX_MS, Math.max(SAVE_MS, Math.round(st.saveCostMs * 8)));
+    st.saveDelayMs = wait;
+    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
   }
   // Saves the state to the browser right now and returns true if it worked. If the browser says it is full,
   // it retries with less history (oldest finished tickets and events first), halving up to 12 times. After a
@@ -155,6 +174,8 @@
     const r = realNow();
     const v = now();
     let ok = false;
+    const t0 = perfNow();
+    let snapDropped = false;
     // full copy first; if the quota refuses it, keep halving the history (oldest completed tickets and events go first)
     let lim = null;
     // First trimmed attempt keeps at most 1500 tickets and 10 000 events. A failed save never loses the copy
@@ -164,6 +185,8 @@
       const s2 = lim ? E().prune(state, lim) : state;
       try { ok = storage.set(KEY, { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, state: s2 }) !== false; } catch (e) { ok = false; }
       if (ok) { st.trimmed = !!lim; break; }
+      // Under pressure the rolling copy goes first: it is only a convenience, the live save is the data.
+      if (!snapDropped && strict) { snapDropped = true; snapAt = 0; try { storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } tries--; continue; }
       // History is already tiny: trimming further will not help, so give up and report the failed save.
       if (nt < 20 && ne < 200) break;
       lim = { maxTickets: nt, maxEvents: ne };
@@ -171,6 +194,7 @@
     }
     st.lastSaveOk = ok;
     st.lastSaveAt = r;
+    st.saveCostMs = Math.round((perfNow() - t0) * 10) / 10; // how long this save took, which sets the next delay
     if (ok) dirty = false;
     let sid = null;
     if (ok) {
@@ -178,9 +202,35 @@
       try { storage.set(SID_KEY, sid); baseSid = sid; } catch (e) { sid = null; }
       pending = [];
     }
+    if (ok && !st.trimmed) maybeSnapshot(r);
     if (ok && pendingBroadcast && tr) { try { tr.post({ type: 'saved', rev: state.rev, tab: tabId, sid }); } catch (e) { /* ignore */ } }
     pendingBroadcast = false;
     return ok;
+  }
+  // Takes the rolling last-good copy when one is due (after close day, or every 6 hours) and the live save went in whole.
+  // Real kitchens only; the demo is disposable. The copy is a trimmed state, and if it does not fit it is dropped quietly.
+  function maybeSnapshot(r) {
+    if (!strict || mode !== 'real' || !storage || !state) return false;
+    if (!snapWanted && r - snapAt < SNAP_EVERY_MS) return false;
+    try {
+      const small = E().prune(state, SNAP_KEEP);
+      const env = { v: 1, takenAt: r, reason: snapWanted || 'interval', rev: state.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
+      const text = JSON.stringify(env);
+      if (!E().validateBackup(text).ok) return false; // never keep a copy that would not load
+      if (storage.set(LASTGOOD_KEY, env) === false) { storage.remove(LASTGOOD_KEY); return false; }
+      snapAt = r; snapWanted = null;
+      st.lastGoodAt = r;
+      return true;
+    } catch (e) { return false; }
+  }
+  // Reads the rolling copy and returns { state, takenAt } if it is whole, else null.
+  function readSnapshot() {
+    try {
+      const env = storage.get(LASTGOOD_KEY, null);
+      if (!env || typeof env !== 'object') return null;
+      const v = E().validateBackup(env);
+      return v.ok ? { state: v.state, takenAt: isNum(env.takenAt) ? env.takenAt : 0, repaired: v.repaired } : null;
+    } catch (e) { return null; }
   }
   // Public name for saving right now.
   function flush() { return persistNow(); }
@@ -439,7 +489,7 @@
     // Kitchen data goes to the demo's own keys in the demo, so the demo never reads or writes the real kitchen's data.
     baseStorage = given || U.rawStorage;
     storage = given ? (strict && mode === 'demo' ? U.storageFor(given, 'demo') : given) : (strict ? U.storageFor(U.rawStorage, mode) : U.storage);
-    st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0 };
+    st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: SAVE_MS };
     last = null;
     baseSid = null; pending = []; skipRebase = false;
     outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
@@ -456,16 +506,30 @@
     let loaded = null;
     if (unreadable !== null) {
       st.corrupt = 'The saved data is not readable text.';
-      try { storage.set(CORRUPT_KEY, unreadable); } catch (e) { /* ignore */ }
+      try { storage.set(CORRUPT_KEY, unreadable); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
     } else if (payload != null) {
       const v = E().validateBackup(payload);
       // A saved copy that fails the check is parked under CORRUPT_KEY and the app starts fresh. It never
       // crashes on bad storage.
       if (v.ok) { loaded = v.state; st.repaired = v.repaired; } else {
         st.corrupt = v.error;
-        try { storage.set(CORRUPT_KEY, payload); } catch (e) { /* ignore */ }
+        try { storage.set(CORRUPT_KEY, payload); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
       }
     } else st.firstRun = true;
+    // A damaged save: the rolling last-good copy takes its place (real kitchens), and the damaged one stays set aside.
+    if (!loaded && st.corrupt && strict && mode === 'real') {
+      const snap = readSnapshot();
+      if (snap) { loaded = snap.state; st.repaired = snap.repaired; st.restoredFromCopy = snap.takenAt; }
+    }
+    // A set-aside damaged copy is cleared after 30 days, once a working state is running.
+    if (!st.corrupt) {
+      try {
+        const at = storage.get(CORRUPT_AT_KEY, null);
+        if (isNum(at) && r - at > CORRUPT_KEEP_MS) { storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); st.corruptCleared = true; }
+      } catch (e) { /* ignore */ }
+    }
+    try { const g0 = storage.get(LASTGOOD_KEY, null); snapAt = g0 && isNum(g0.takenAt) ? g0.takenAt : 0; } catch (e) { snapAt = 0; }
+    snapWanted = null;
     // After a reload the virtual time continues from where it was saved, plus the real time spent away, and
     // never earlier than the real time. Speed goes back to 1.
     let vNow = r;
@@ -484,7 +548,7 @@
     const t = E().tick(state, now());
     state = t.state;
     syncUnits();
-    if (!loaded && st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
+    if (st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
     if (!opts.noTimers && typeof setInterval === 'function') interval = setInterval(tickNow, 1000);
     if (!opts.noSync) openTransport(opts.transport);
     if (!opts.noTimers) {
@@ -535,6 +599,7 @@
         pending.push({ type, payload, now: n, opId }); if (pending.length > 300) pending.shift();
         if (source === 'user') enqueueOp({ opId, type, payload, now: n });
       }
+      if (type === 'closeDay') snapWanted = 'closeDay';
       commit(r.state, true);
     }
     else if (source === 'user' && r.report !== 'nothingToDo' && type !== 'uiReport') {

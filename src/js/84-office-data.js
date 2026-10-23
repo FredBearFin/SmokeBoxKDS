@@ -237,8 +237,6 @@
   const sub = (text, id) => h('h3', { class: 'od-sub', id }, text);
   // The small round "?" that opens one Guide page, or nothing when the Guide did not load.
   const helpLink = (page, label) => { try { return SB.guide && SB.guide.link ? SB.guide.link(page, label) : null; } catch (e) { return null; } };
-  // A sub-heading with a Guide help link beside it.
-  const subHelp = (text, page, label) => { const hd = sub(text); const hl = helpLink(page, label); if (hl) { hd.appendChild(doc.createTextNode(' ')); hd.appendChild(hl); } return hd; };
   const para = (text, cls) => h('p', { class: cls || 'od-p' }, text);
   // Builders for a quiet hint line and for a button with an optional icon.
   const hintLine = (text) => h('p', { class: 'od-hint' }, text);

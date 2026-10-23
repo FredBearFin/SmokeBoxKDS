@@ -205,8 +205,6 @@
   const h = U.h;
   // Draws an icon by name. A missing icon gives an empty span, so the page still builds.
   const ico = (name, size, o) => { try { return SB.icons.svg(name, Object.assign({ size: size || 20 }, o || {})); } catch (e) { return doc.createElement('span'); } };
-  // True when the person asked their device for less animation.
-  const reduced = () => (U.prefersReducedMotion ? U.prefersReducedMotion() : false);
   const warnOnce = (() => { const seen = new Set(); return (key, err) => { if (seen.has(key)) return; seen.add(key); if (seen.size > 200) seen.clear(); try { console.error('[smokebox] office: ' + key, err); } catch (e) { /* ignore */ } }; })();
 
   // Number formats: thin wrappers over SB.util that give a dash for an unknown value instead of NaN.

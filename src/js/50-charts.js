@@ -493,8 +493,6 @@
   const r1 = (n) => Math.round(n * 10) / 10;
   // Nearest pixel centre (whole number plus 0.5) so thin lines draw crisp.
   const px = (n) => Math.round(n) + 0.5;                       // 1px lines land on a pixel centre
-  // Number to text rounded to one decimal; "0" when not a number. Nothing calls it at the moment.
-  const num1 = (n) => (isNum(n) ? String(r1(n)) : '0');
 
   /** Rounded data-end bar path. dir = side the data end points to; the baseline end stays square. 'all' rounds every corner. */
   function barPath(x, y, w, h, r, dir) {
@@ -1054,8 +1052,6 @@
   // Colour key for a reference line: its status tone if it has one, else 'muted' (grey and dashed).
   function refTone(r) { const t = keyOfTone(r && r.tone); return t === 'muted' || !t ? 'muted' : t; }
 
-  // Joins the non-empty pieces of text with semicolons. Nothing calls it at the moment.
-  const joinList = (arr) => arr.filter(Boolean).join('; ');
 
   /* =====================================================================================================
    * 6. CARTESIAN HELPERS (axes, grids, reference lines) shared by line, scatter, hist, bar, dumbbell, gantt
@@ -1649,7 +1645,6 @@
     (spec.refLines || []).forEach((r) => { const v = r && (r.value != null ? r.value : orient === 'v' ? r.y : r.x); if (isNum(v)) { if (v > hi) hi = v; if (v < lo) lo = v; } });
     if (hi === 0 && lo === 0) hi = percent ? 100 : 1;
     // --- label strings (needed to size margins)
-    const lab = (v) => fmt.full(v);
     const pxText = (t, w) => chart.tw(t, 12, w || 600);
     const allVals = [];
     vis.forEach((s) => m.order.forEach((c) => { if (isNum(val(s, c))) allVals.push(val(s, c)); }));
