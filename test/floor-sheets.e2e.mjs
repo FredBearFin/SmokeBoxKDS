@@ -19,7 +19,7 @@ const OUT_SIM = path.join(ROOT, 'dist/sheets-sim.html');
 const SHOTS = path.join(ROOT, 'test/.out/sheets') + path.sep;
 fs.mkdirSync(SHOTS, { recursive: true });
 const CSS = ['00-tokens.css', '10-base.css', '21-floor-sheets.css'];
-const JS = ['00-util.js', '05-icons.js', '10-config.js', '20-engine.js', '25-deadlines.js', '30-store.js', '60-shell.js', '71-floor-order.js', '72-floor-sheets.js', '99-boot.js'];
+const JS = ['00-util.js', '05-icons.js', '10-config.js', '20-engine.js', '25-deadlines.js', '30-store.js', '60-shell.js', '66-order-math.js', '71-floor-order.js', '72-floor-sheets.js', '99-boot.js'];
 const HAS_SIM_FILE = fs.existsSync(path.join(ROOT, 'src/js/45-sim.js'));
 if (FULL) {
   const r = spawnSync('node', [path.join(ROOT, 'tools/build.mjs'), '--out', 'dist/sheets.html', '--quiet'], { cwd: ROOT, encoding: 'utf8' });
