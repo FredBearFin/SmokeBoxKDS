@@ -12650,6 +12650,37 @@ a.of-nav:active { background: var(--press); }
 
 }catch(e){console.error('[smokebox] module 36-csv.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'36-csv.js',message:String(e&&e.message||e)});}
 
+/* ===== 37-retention.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: How long the app keeps safety records, in one place, so every screen and printout that talks about
+ *    "how far back" reads the engine's own number instead of repeating one. If the engine does not tell us, no number is
+ *    claimed.
+ * PARTS: days, words.
+ * USES: 20-engine.js (SAFETY_KEEP_DAYS or SAFETY_KEEP_MS, when exported).   USED BY: 76-floor-discards.js, 89-office-inspector.js, tests.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+
+  // The number of days the engine keeps a safety record, or null when the engine does not say.
+  function days() {
+    const E = SB.engine || {};
+    if (typeof E.SAFETY_KEEP_DAYS === 'number' && E.SAFETY_KEEP_DAYS > 0) return Math.round(E.SAFETY_KEEP_DAYS);
+    if (typeof E.SAFETY_KEEP_MS === 'number' && E.SAFETY_KEEP_MS > 0) return Math.round(E.SAFETY_KEEP_MS / 86400e3);
+    return null;
+  }
+  // Plain words for the keep time: "Records are kept for about 400 days." or, when unknown, a line that claims no number.
+  function words() {
+    const d = days();
+    return d ? 'Safety records are kept for about ' + d + ' days; older ones are not kept.' : 'Safety records are not kept forever; older ones may be gone.';
+  }
+
+  SB.retention = { days, words };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 37-retention.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'37-retention.js',message:String(e&&e.message||e)});}
+
 /* ===== 40-metrics.js ===== */
 ;try{
 /*
@@ -27102,7 +27133,7 @@ a.of-nav:active { background: var(--press); }
         eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
     }
-    // Discards whose batch has since been dropped from the cabinet list are still in the safety record (kept about six months):
+    // Discards whose batch has since been dropped from the cabinet list are still in the safety record (kept for the engine's keep time):
     // show them from that entry, with what the entry holds (the amount, the reason, who) and nothing invented.
     const ingName = (id) => { const i = (state.ingredients || []).find((x) => x && x.id === id); return i && i.name ? i.name : id || 'Food'; };
     for (const [batchId, row] of logged) {
@@ -27116,8 +27147,8 @@ a.of-nav:active { background: var(--press); }
     }
     return out.sort((a, b) => b.t - a.t);
   }
-  // How far back the log reaches, in plain words, so nobody reads it as more than it is. The app keeps safety records for
-  // about six months (190 days); a kitchen newer than that has everything from its first record.
+  // How far back the log reaches, in plain words, so nobody reads it as more than it is. The keep time comes from the engine
+  // (SB.retention); a kitchen newer than that has everything from its first record.
   function coverageText(state, list, now) {
     if (!list.length) return '';
     const oldest = list[list.length - 1].t;
@@ -27126,8 +27157,10 @@ a.of-nav:active { background: var(--press); }
     for (const b of state.batches || []) if (b && Number.isFinite(b.enteredAt) && b.enteredAt < first) first = b.enteredAt;
     const since = U.fmtDateShort(U.dateKey(oldest));
     const n = list.length + ' ' + U.plural(list.length, 'batch', 'batches');
-    if (now - first < 175 * 86400e3) return 'Showing every batch thrown out since ' + U.fmtDateShort(U.dateKey(first)) + ' (' + n + '), the first record this app has.';
-    return 'Showing the ' + n + ' thrown out since ' + since + '. Records older than about six months are not kept, so older ones are not here.';
+    const keep = SB.retention ? SB.retention.days() : null;
+    // A kitchen younger than the keep time (less a two-week margin) has everything from its first record.
+    if (keep && now - first < (keep - 14) * 86400e3) return 'Showing every batch thrown out since ' + U.fmtDateShort(U.dateKey(first)) + ' (' + n + '), the first record this app has.';
+    return 'Showing the ' + n + ' thrown out since ' + since + '. ' + (SB.retention ? SB.retention.words() : '') + ' Older ones are not here.';
   }
   // Escapes text for safe use inside HTML.
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -35364,6 +35397,33 @@ a.of-nav:active { background: var(--press); }
     // Opens the system file picker for a backup.
     const chooseBtn = btn('Choose a backup file', { icon: 'upload', onClick: () => fileIn.click() });
     chooseBtn.dataset.action = 'import-choose';
+    const undoBox = h('div', { class: 'od-undo-restore', 'data-region': 'undo-restore' });
+    // Shows the way back from a restore: how long the old kitchen is kept and a button to put it back (PIN-guarded like the restore).
+    function paintUndo() {
+      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
+      if (!info) { undoBox.replaceChildren(); undoBox.hidden = true; return; }
+      undoBox.hidden = false;
+      const days = Math.max(1, Math.round((info.expiresAt - info.takenAt) / 86400e3));
+      // The button asks first, then puts the old kitchen back.
+      const b = btn('Undo this restore', { icon: 'history', cls: 'btn-sm', onClick: () => undoRestoreNow() });
+      b.dataset.action = 'undo-restore';
+      undoBox.replaceChildren(
+        h('p', { class: 'od-p od-undo-line' }, 'Your kitchen before this restore is kept for ' + days + ' ' + U.plural(days, 'day') + ' (until ' + U.fmtDateShort(U.dateKey(info.expiresAt)) + ' ' + U.fmtTime(info.expiresAt) + '). It was saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + '.'),
+        h('div', { class: 'od-actions' }, b));
+    }
+    // After a confirm dialog and the PIN, puts the kitchen from before the restore back. Nothing changes if the PIN is not entered.
+    async function undoRestoreNow() {
+      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
+      if (!info) { paintUndo(); return; }
+      const ok = await SB.ui.confirm({ title: 'Undo this restore?', tone: 'danger', confirmLabel: 'Put my old kitchen back', cancelLabel: 'Keep what I have',
+        body: ['This puts back the kitchen you had before the restore (saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + ') and replaces what is here now. What is here now is kept for the same time, so this can be undone once too.'] });
+      if (!ok) return;
+      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
+      const rep = SB.store.undoRestore();
+      if (rep === 'ok') SB.ui.toast('Your kitchen from before the restore is back.', { tone: 'ok' });
+      else SB.ui.toast(rep === 'noCopy' ? 'The copy from before the restore is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings), { tone: 'warn' });
+      paintUndo();
+    }
     const pasteLabelId = U.uid('odpl');
     const pasteArea = h('textarea', { class: 'textarea od-paste', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-labelledby': pasteLabelId, placeholder: 'Paste the whole backup text here' });
     // Checks pasted text the same way as a chosen file.
@@ -35372,7 +35432,7 @@ a.of-nav:active { background: var(--press); }
     const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
     card2.body.append(
       para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
-      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult);
+      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
     card3.body.append(
       h('ol', { class: 'od-steps' },
         h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
@@ -35382,6 +35442,7 @@ a.of-nav:active { background: var(--press); }
         h('li', null, 'Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.')),
       h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
 
+    paintUndo();
     let pending = null;
     // Throws away the checked backup and clears the result card.
     function clearImport() { pending = null; impResult.replaceChildren(); }
@@ -35435,6 +35496,7 @@ a.of-nav:active { background: var(--press); }
         clearImport(); pasteArea.value = ''; fileIn.value = '';
         impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.'))));
         SB.ui.toast('Backup restored.', { tone: 'ok' });
+        paintUndo();
       } else {
         const lr = SB.store.lastResult() || {};
         showBad(rep === 'invalidBackup' && lr.info && lr.info.error ? backupReason(lr.info.error) : SB.engine.describe(rep, lr.info, (stateNow() || {}).settings), 'backup');
@@ -35594,7 +35656,7 @@ a.of-nav:active { background: var(--press); }
     let lastGroup = '';
     ORDER.forEach((i) => {
       const sec = SECTIONS[i];
-      if (sec.group !== lastGroup) { lastGroup = sec.group; tocList.appendChild(h('li', { class: 'od-toc-group', role: 'presentation' }, sec.group)); }
+      if (sec.group !== lastGroup) { lastGroup = sec.group; tocList.appendChild(h('li', { class: 'od-toc-group' }, sec.group)); }
       const a = h('a', { class: 'od-toc-link', href: '#od-' + sec.id, dataset: { target: sec.id } }, sec.label);
       a.addEventListener('click', (ev) => { ev.preventDefault(); goTo(sec.id); }); // a real hash would be read by the router as "leave the office"
       links.push(a);
@@ -36736,7 +36798,7 @@ a.of-nav:active { background: var(--press); }
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const KIND = {
     temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
-    equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
+    safety_setting_changed: 'Changed a safety limit', equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
   };
   const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit', datemark: 'Past the date mark' };
   const UNIT = { cooler: 'Cooler', freezer: 'Freezer', display: 'Display case', other: 'Equipment' };
@@ -36759,12 +36821,54 @@ a.of-nav:active { background: var(--press); }
     return b && b.label ? b.label + (name && b.label.indexOf(name) < 0 ? ' (' + name + ')' : '') : name;
   }
 
+  // The plain names of the food-safety settings an owner can change, by the last part of the setting's name.
+  const SETTING_NAME = {
+    hotHoldF: 'the hot-hold limit', coldHoldF: 'the cold limit', reheatF: 'the reheat temperature', tempCheckEveryMin: 'how often temperatures are checked',
+    belowHotGraceH: 'the time allowed below the hot limit', aboveColdGraceH: 'the time allowed above the cold limit', sanitizeEveryH: 'how often surfaces are sanitized',
+    hardCapH: 'the longest hold time', defaultMaxHoldH: 'the default hold time', stage1ToF: 'the first cooling target', stage1H: 'the first cooling time',
+    totalH: 'the total cooling time', finalF: 'the final cooling target',
+  };
+  // A setting's value in plain words, by what its name ends with: degrees, hours or minutes; anything else as it is.
+  function settingValue(key, v) {
+    if (!isNum(v)) return v == null ? 'nothing' : String(v);
+    if (/F$/.test(key)) return U.tempText(v);
+    if (/Min$/.test(key)) return v + ' min';
+    if (/H$/.test(key)) return v + (v === 1 ? ' hour' : ' hours');
+    return String(v);
+  }
+  // The one plain line for a changed setting: "Changed the cold limit from 41 °F to 45 °F". Reads key, from and to (also old/new).
+  function changeLine(e) {
+    const key = String(e.key || e.setting || ''), last = key.split('.').pop();
+    const from = e.from !== undefined ? e.from : e.old, to = e.to !== undefined ? e.to : e.new;
+    return 'Changed ' + (SETTING_NAME[last] || (key || 'a setting')) + ' from ' + settingValue(last, from) + ' to ' + settingValue(last, to);
+  }
+
+  // For a cold-food reading: whether it was above the cold limit and how much time above the limit the batch has used up so far.
+  // The engine adds up the time across separate stretches (an in-range reading does not wipe it), so this replays the batch's
+  // readings in order the same way. Returns '' when the batch is not cold food or the limit is unknown.
+  function coldNote(state, e) {
+    const b = (state.batches || []).find((x) => x && x.id === e.batchId);
+    const lim = state.settings && state.settings.safety ? state.settings.safety.coldHoldF : null;
+    if (!b || b.kind !== 'cold' || !isNum(lim) || !isNum(e.f) || !SB.engine || !SB.engine.allEvents) return '';
+    let since = null, used = 0;
+    for (const x of SB.engine.allEvents(state)) {
+      if (x.type !== 'temp_logged' || x.batchId !== e.batchId || x.reverted || !isNum(x.f) || !isNum(x.t) || x.t > e.t) continue;
+      if (x.f > lim) { if (since == null) since = x.t; } else if (since != null) { used += x.t - since; since = null; }
+      if (x === e || x.id === e.id) break;
+    }
+    const mins = Math.round(used / 60000);
+    const above = e.f > lim;
+    if (above) return 'above the cold limit' + (mins > 0 ? '; ' + mins + ' min above it earlier, which still counts' : '');
+    return mins > 0 ? 'back in range; ' + mins + ' min above the cold limit so far, which still counts' : '';
+  }
+
   // The detail words for one entry: what was read, weighed or thrown out.
   function detailOf(e) {
     switch (e.type) {
       case 'temp_logged': return (isNum(e.f) ? U.tempText(e.f) : '') + (lateWords(e) ? ', ' + lateWords(e) : '');
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
       case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
+      case 'safety_setting_changed': return changeLine(e);
       case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '');
       case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '');
       case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
@@ -36830,7 +36934,7 @@ a.of-nav:active { background: var(--press); }
     if (!state || !SB.engine || !SB.engine.safetyLog) return [];
     const rows = SB.engine.safetyLog(state).filter((r) => r.event.type !== 'safety_correction' && isNum(r.event.t) && r.event.t >= from && r.event.t < to);
     return rows.map((r) => ({
-      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), facts: factsOf(state, r.event), who: r.event.who || '',
+      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: [detailOf(r.event), r.event.type === 'temp_logged' ? coldNote(state, r.event) : ''].filter(Boolean).join(', '), facts: factsOf(state, r.event), who: r.event.who || '',
       corrections: r.corrections.map((c) => ({ at: c.t, who: c.who || '', note: c.note || '' })),
     }));
   }
@@ -36847,7 +36951,10 @@ a.of-nav:active { background: var(--press); }
     return { from: at(first), to: at(next), label: r.days === 1 ? U.fmtDateShort(today) : U.fmtDateShort(first) + ' to ' + U.fmtDateShort(today) };
   }
 
-  O.inspectorPure = { inspectorRows, factsOf, rangeFor, RANGES };
+  // One row for one safety entry (the same shape inspectorRows gives), for tests and for entries read without the engine's log.
+  function rowFor(e, state) { return { id: e.id, at: e.t, kind: KIND[e.type] || 'Safety entry', food: foodOf(state, e), detail: [detailOf(e), e.type === 'temp_logged' ? coldNote(state, e) : ''].filter(Boolean).join(', '), facts: factsOf(state, e), screen: screenOf(e), who: e.who || '', corrections: [] }; }
+
+  O.inspectorPure = { inspectorRows, rowFor, factsOf, rangeFor, RANGES };
   if (!g.document) return; // Node: the pure rows are all the tests need
 
   // ---- 2. The sheet and printing ----
@@ -36868,6 +36975,8 @@ a.of-nav:active { background: var(--press); }
   }
 
   // The honest line about what this record does not hold, so nobody reads it as the whole paperwork.
+  // What this record leaves out and how long it keeps things; the keep time is the engine's own number (37-retention.js).
+  const keepWords = () => (SB.retention ? ' ' + SB.retention.words() : '');
   const NOT_COVERED = 'Cooler, freezer, thermometer-check and sanitizer strip entries appear here only if someone logged them in Smokebox; keep anything else on your own sheet and ask your health department what to keep and for how long.';
 
   // Opens the sheet: pick a date range, see the record, print it.
@@ -36891,7 +37000,7 @@ a.of-nav:active { background: var(--press); }
     const doPrint = () => printRecord(rangeId);
     sheet.body.append(
       h('p', { class: 'si-lead' }, 'This is your own record of readings, reheats, cooling, sanitize rounds and thrown-out food. It is not an inspection result. Entries are never edited; if something was wrong, a correction is added under it.'),
-      h('p', { class: 'si-lead si-notcovered' }, NOT_COVERED),
+      h('p', { class: 'si-lead si-notcovered' }, NOT_COVERED + keepWords()),
       h('div', { class: 'si-actions' }, h('label', null, 'Range ', sel), h('button', { type: 'button', class: 'btn btn-primary', onClick: doPrint }, 'Print')), preview);
     paint();
     return sheet;
@@ -36909,7 +37018,7 @@ a.of-nav:active { background: var(--press); }
       h('p', { class: 'si-note' }, 'The owner\'s own record of what was logged in this kitchen. It is not an inspection result. Entries are never edited; corrections are added under the entry they correct.'),
       demo ? h('p', { class: 'si-note' }, 'This is a demo kitchen, so these entries are demo entries.') : null,
       recordTable(rows),
-      h('p', { class: 'si-note' }, NOT_COVERED),
+      h('p', { class: 'si-note' }, NOT_COVERED + keepWords()),
       h('p', { class: 'si-note' }, 'Printed ' + U.fmtDateShort(U.dateKey(Date.now())) + ' ' + U.fmtTime(Date.now()) + '. Reviewed by: ______________   Date: ________'));
     document.body.appendChild(root);
     // Removes the print-only block once the print dialog is done (or at once when printing is unavailable).

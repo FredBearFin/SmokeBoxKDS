@@ -26,7 +26,8 @@ async function rig() {
     return { id, store, transport };
   };
   const A = mk('A'), B = mk('B');
-  await sleep(50); // let both event streams open
+  // Wait until both event streams have really opened (each gets a snapshot first); a fixed sleep is too short on a loaded machine.
+  await until(() => A.transport.snapshots >= 1 && B.transport.snapshots >= 1, 'both event streams to open');
   return { clock, hub, A, B, stop: async () => { A.store.destroy(); B.store.destroy(); await hub.close(); } };
 }
 // Arrays from the other VM context have another Array prototype, so copy them into this realm before comparing.
