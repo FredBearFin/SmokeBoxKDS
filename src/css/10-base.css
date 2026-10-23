@@ -375,6 +375,17 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   .sheet-foot > .btn { flex-basis: 100%; }
 }
 
+/* ---------- banner: save failure and daily backup nudge, a strip across the top of the shell ---------- */
+/* The strip sits above the layers; while it shows, the layers start below it (--sb-banner-h). */
+.sb-banner {
+  position: absolute; top: 0; left: 0; right: 0; z-index: var(--zi-toast); min-height: var(--sb-banner-h, 52px);
+  display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--gutter);
+  background: var(--tint-warn); color: var(--ink); border-bottom: 3px solid var(--amber);
+}
+.sb-banner[data-tone="bad"] { background: var(--tint-bad); border-bottom-color: var(--crimson); }
+.sb-banner-t { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+.sb-shell[data-banner] > .layer { top: var(--sb-banner-h, 52px); }
+
 /* ---------- toast: inverse strip, one action, drain bar flush on the bottom edge ---------- */
 /* Toasts: dark message strips at the bottom centre, each with a tone stripe, one action, a draining bar. */
 .toast-host {
