@@ -120,7 +120,7 @@ test('store quota trimming never drops temperature readings or discards', () => 
   assert.equal(S.flush(), true);
   assert.equal(S.status().trimmed, true, 'the tiny quota should have forced trimming');
   const live = S.getState();
-  const saved = E.validateBackup(storage.get(S.KEY).state);
+  const saved = E.validateBackup(S.decodeSaved(storage.get(S.KEY)).state);
   assert.equal(saved.ok, true, saved.error);
   const logged = (st, type) => (st.safetyKeep || []).concat(E.allEvents(st)).filter((e) => e.type === type).length;
   assert.equal(logged(saved.state, 'temp_logged'), logged(live, 'temp_logged'));

@@ -84,8 +84,9 @@ downgrade to the old build still loads the hot state (it just does not see old d
 1. **Event diet (cheap, no new store).** Drop non-safety, non-day-closed events older than 3 days from the saved copy (or never write
    `item_fired`/`item_done`/`order_opened` events once the ticket carries the same timestamps). Events are 51 percent of the bytes, so
    250 a day goes from 7 to about 14 days, 80 a day from 27 to about 55. **1 round.** Risk: metrics that read events (check each).
-2. **Compact tickets and orders** (shorter keys on disk only, expanded at load): another 15 to 25 percent. 1 round; moderate risk (every
-   saved state passes through it; the golden hashes and old-save tests are the net).
+2. **Compact saved form: DONE on `night/a5-compact`** (keys and repeated strings dictionary-coded, lossless, 56 percent of the plain size, 250 tickets a day now
+   lasts about 15 days instead of 7). The event diet in step 1 was not done: the events are read by metrics, undo and the event export, so removing them is not
+   lossless for those readers.
 3. **Cold store module:** an IndexedDB wrapper with per-day records, checksums, lock, in-memory fake for tests, feature test, fallbacks. **2 rounds.**
 4. **Roll-off and hot window, migration.** **2 rounds.** Riskiest part for data (the order of write and prune, the first run on real saves).
 5. **Async dataset for office pages and metrics.** **2 to 3 rounds** (A3's pages; every page that reads `dataset()`); riskiest for regressions.
