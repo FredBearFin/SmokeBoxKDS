@@ -17,7 +17,8 @@ if [ ! -f smokebox-server.tar.gz ]; then
 fi
 [ "$(wc -c < smokebox-server.tar.gz)" -ge 100000 ] || { echo "smokebox-server.tar.gz is too small to be the app; stopping."; exit 1; }
 gzip -t smokebox-server.tar.gz
-if tar -tzf smokebox-server.tar.gz | grep -Eq '(^/|(^|/)\.\.(/|$))'; then echo "The archive has unsafe paths; stopping."; exit 1; fi
+NAMES="$(tar -tzf smokebox-server.tar.gz)"   # read fully first: a pipe into grep -q can cut tar off and look like "no match"
+if grep -Eq '(^/|(^|/)\.\.(/|$))' <<< "$NAMES"; then echo "The archive has unsafe paths; stopping."; exit 1; fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y

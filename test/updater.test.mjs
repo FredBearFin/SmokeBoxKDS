@@ -182,3 +182,67 @@ test('the updater accepts the real (small) deploy archive with its default size 
   assert.ok(fs.existsSync(path.join(t.prefix, 'server/server.mjs')) && marker(t.prefix) === null, 'the new build replaced the old one');
   assert.equal(marker(t.prefix + '.old'), 'OLD');
 });
+
+// ---- integrity: optional signature, pinned reference, special files, update time zone ----
+const haveSsl = spawnSync('bash', ['-c', 'openssl version | grep -q "OpenSSL 3"']).status === 0;
+function keys(tmp, name = 'k') {
+  const priv = path.join(tmp, name + '.pem'), pub = path.join(tmp, name + '-pub.pem');
+  execFileSync('openssl', ['genpkey', '-algorithm', 'ed25519', '-out', priv], { stdio: 'pipe' }); execFileSync('openssl', ['pkey', '-in', priv, '-pubout', '-out', pub], { stdio: 'pipe' });
+  return { priv, pub };
+}
+const SIGN = path.join(ROOT, 'tools/sign-deploy.sh');
+const signedTarball = (t, name, key, { tamper, drop, extra } = {}) => tarball(t.tmp, name, (d) => { makeTree(d, 'NEW'); execFileSync('bash', [SIGN, key.priv, d], { stdio: 'pipe' }); if (tamper) fs.appendFileSync(path.join(d, 'src/js/20-engine.js'), '// tampered\n'); if (extra) fs.writeFileSync(path.join(d, 'server/extra.mjs'), 'x'); if (drop) fs.rmSync(path.join(d, 'deploy.manifest.sig')); });
+const runWith = (t, tgz, port, env = {}) => run(Object.assign({ SMOKEBOX_PREFIX: t.prefix, SMOKEBOX_UPDATE_URL: 'file://' + tgz, SMOKEBOX_SYSTEMCTL: t.fakeSystemctl, SMOKEBOX_HEALTH_URL: 'http://127.0.0.1:' + port + '/health', SMOKEBOX_SELF_DEST: path.join(t.tmp, 'self'), SMOKEBOX_LOCK: path.join(t.tmp, 'lock') }, env));
+
+test('no public key installed: the update goes ahead and the log says loudly that nothing is verified', { skip }, async () => {
+  const t = setup('nosig'); const tgz = tarball(t.tmp, 'u', (d) => makeTree(d, 'NEW'));
+  await withHealth(true, async (port) => { const r = await runWith(t, tgz, port, { SMOKEBOX_PUBKEY: path.join(t.tmp, 'absent') }); assert.equal(r.status, 0, r.stdout + r.stderr); assert.match(r.stdout, /WARNING: updates are NOT verified/); assert.equal(marker(t.prefix), 'NEW'); });
+});
+test('public key installed and a correct signature: the update goes ahead', { skip: skip || !haveSsl }, async () => {
+  const t = setup('sig-ok'); const key = keys(t.tmp); const tgz = signedTarball(t, 'u', key);
+  await withHealth(true, async (port) => { const r = await runWith(t, tgz, port, { SMOKEBOX_PUBKEY: key.pub }); assert.equal(r.status, 0, r.stdout + r.stderr); assert.match(r.stdout, /signature OK/); assert.equal(marker(t.prefix), 'NEW'); });
+});
+for (const [label, mk, re] of [
+  ['a file changed after signing', (t, k) => signedTarball(t, 'u', k, { tamper: true }), /does not match the signed list|signature/],
+  ['a file added that is not on the signed list', (t, k) => signedTarball(t, 'u', k, { extra: true }), /not on the signed list/],
+  ['the signature file is missing', (t, k) => signedTarball(t, 'u', k, { drop: true }), /not signed/],
+  ['an unsigned build', (t) => tarball(t.tmp, 'u', (d) => makeTree(d, 'NEW')), /not signed/],
+  ['signed with a different key', (t) => signedTarball(t, 'u', keys(t.tmp, 'other')), /signature does not match/],
+]) {
+  test('public key installed, ' + label + ': refused, the running version is kept', { skip: skip || !haveSsl }, async () => {
+    const t = setup('sig-bad'); const key = keys(t.tmp); const tgz = mk(t, key);
+    await withHealth(true, async (port) => { const r = await runWith(t, tgz, port, { SMOKEBOX_PUBKEY: key.pub }); assert.notEqual(r.status, 0); assert.match(r.stdout, re); assert.equal(marker(t.prefix), 'OLD'); assert.ok(!fs.existsSync(t.prefix + '.old'), 'nothing was swapped'); });
+  });
+}
+
+test('an archive with a FIFO or a device file is refused (only plain files and folders are allowed)', { skip }, async () => {
+  const t = setup('fifo'); const tgz = tarball(t.tmp, 'u', (d) => { makeTree(d, 'NEW'); execFileSync('mkfifo', [path.join(d, 'pipe')]); });
+  await withHealth(true, async (port) => { const r = await runWith(t, tgz, port); assert.notEqual(r.status, 0, r.stdout + r.stderr); assert.match(r.stdout, /special files/); assert.equal(marker(t.prefix), 'OLD'); });
+});
+
+test('SMOKEBOX_UPDATE_REF pins a tag or a commit: the download address is built from it, bad values are refused', { skip }, async () => {
+  const t = setup('ref'); const tgz = tarball(t.tmp, 'u', (d) => makeTree(d, 'NEW'));
+  const fakeBin = path.join(t.tmp, 'bin'); fs.mkdirSync(fakeBin); const seen = path.join(t.tmp, 'curl.log');
+  fs.writeFileSync(path.join(fakeBin, 'curl'), `#!/bin/bash\nfor a in "$@"; do case "$a" in http*) echo "$a" >> ${seen};; esac; done\nwhile [ $# -gt 0 ]; do [ "$1" = -o ] && cp ${tgz} "$2"; shift; done\nexit 0\n`, { mode: 0o755 });
+  await withHealth(true, async (port) => {
+    const env = { PATH: fakeBin + ':' + process.env.PATH };
+    // curl is faked for the download; the health check talks to the real server, so give it a second fake path through the same stub
+    fs.writeFileSync(path.join(fakeBin, 'curl'), `#!/bin/bash\nurl=""; out=""; while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift;; http*) url="$1";; esac; shift; done\necho "$url" >> ${seen}\ncase "$url" in *github.com*) cp ${tgz} "$out";; *) /usr/bin/curl -sS --max-time 3 "$url" ${'${out:+-o "$out"}'};; esac\n`, { mode: 0o755 });
+    let r = await run({ SMOKEBOX_PREFIX: t.prefix, SMOKEBOX_SYSTEMCTL: t.fakeSystemctl, SMOKEBOX_HEALTH_URL: 'http://127.0.0.1:' + port + '/health', SMOKEBOX_SELF_DEST: path.join(t.tmp, 'self'), SMOKEBOX_LOCK: path.join(t.tmp, 'lock'), SMOKEBOX_PUBKEY: path.join(t.tmp, 'absent'), SMOKEBOX_UPDATE_REF: 'v1.2.3' }, env);
+    assert.equal(r.status, 0, r.stdout + r.stderr); assert.match(r.stdout, /pinned to v1.2.3/);
+    assert.match(fs.readFileSync(seen, 'utf8'), /archive\/refs\/tags\/v1\.2\.3\.tar\.gz/);
+    const sha = 'a'.repeat(40); fs.writeFileSync(seen, '');
+    const t2 = setup('ref2'); r = await run({ SMOKEBOX_PREFIX: t2.prefix, SMOKEBOX_SYSTEMCTL: t2.fakeSystemctl, SMOKEBOX_HEALTH_URL: 'http://127.0.0.1:' + port + '/health', SMOKEBOX_SELF_DEST: path.join(t2.tmp, 'self'), SMOKEBOX_LOCK: path.join(t2.tmp, 'lock'), SMOKEBOX_PUBKEY: path.join(t.tmp, 'absent'), SMOKEBOX_UPDATE_REF: sha }, env);
+    assert.equal(r.status, 0, r.stdout + r.stderr); assert.match(fs.readFileSync(seen, 'utf8'), new RegExp('archive/' + sha + '\\.tar\\.gz'));
+    const t3 = setup('ref3'); r = await run({ SMOKEBOX_PREFIX: t3.prefix, SMOKEBOX_SYSTEMCTL: t3.fakeSystemctl, SMOKEBOX_LOCK: path.join(t3.tmp, 'lock'), SMOKEBOX_UPDATE_REF: '../../evil' }, env);
+    assert.notEqual(r.status, 0); assert.match(r.stdout, /not allowed/); assert.equal(marker(t3.prefix), 'OLD');
+  });
+});
+
+test('the install scripts put the zone in the update times, and refuse an unknown zone', () => {
+  const go = fs.readFileSync(path.join(ROOT, 'go.sh'), 'utf8'), beta = fs.readFileSync(path.join(ROOT, 'beta.sh'), 'utf8');
+  assert.match(go, /OnCalendar=\*-\*-\* 04:30:00 \$\{TZNAME\}/); assert.match(go, /smokebox-update\.timer <<EOF/); assert.match(go, /zoneinfo\/\$TZNAME/);
+  assert.match(beta, /OnCalendar=\*-\*-\* 04:50:00 \$TZNAME/); assert.match(beta, /beta-update\.timer <<EOF/);
+  const r = spawnSync('bash', ['-c', 'cd /tmp && bash ' + path.join(ROOT, 'go.sh') + ' u pw Nowhere/Bogus 2>&1'], { encoding: 'utf8' });
+  assert.notEqual(r.status, 0);   // not root, or unknown zone: it must stop before downloading anything
+});
