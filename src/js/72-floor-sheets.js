@@ -401,7 +401,7 @@
       const bCool = h('button', { type: 'button', class: 'btn', dataset: { act: 'cool' }, hidden: true }, ico('snow', 20), h('span', null, 'Start cooling'));
       const bDiscard = h('button', { type: 'button', class: 'btn hc-discard', dataset: { act: 'discard' } }, ico('trash', 20), h('span', null, 'Discard'));
       // Past its quality limit: taste it, then keep serving. While kept, a small link corrects a mistaken tap.
-      const bKeep = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'keep' }, hidden: true }, ico('check-circle', 20), h('span', null, 'Taste it, keep serving'));
+      const bKeep = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'keep' }, hidden: true }, ico('check-circle', 20), h('span', null, 'Keep serving'));
       const bUnkeep = h('button', { type: 'button', class: 'btn', dataset: { act: 'unkeep' }, hidden: true }, ico('x', 20), h('span', null, 'Correct: not kept'));
       const dtKept = h('dt', null, 'Kept serving'), ddKept = h('dd', { class: 'num' });
       dtKept.hidden = true; ddKept.hidden = true;
@@ -506,7 +506,7 @@
       // Serve-by time with the kind of limit it is: quality (house limit, held at temperature) or safety (time as a health control).
       const coolingNow = b.kind === 'cooling';
       setHidden(rec.dtServe, coolingNow); setHidden(rec.ddServe, coolingNow);
-      if (!coolingNow) text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b)) + ', ' + (b.holdBasis === 'safety' ? 'safety limit' : 'quality limit'));
+      if (!coolingNow) text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b)) + ', ' + (b.holdBasis === 'safety' ? 'throw-out time' : 'quality limit'));
       const resting = U.isNum(b.restUntil) && b.restUntil > now && !coolingNow;
       setHidden(rec.dtRest, !resting); setHidden(rec.ddRest, !resting);
       if (resting) text(rec.ddRest, U.fmtTime(b.restUntil));
@@ -752,7 +752,7 @@
       let wf = null;
       dur.addEventListener('click', () => setTimeout(() => { untilIn.hidden = dur.getValue() !== 'until'; }, 0));
       const dl = dialog({
-        title: 'Taste it and keep serving', name: 'keep', opener, confirmLabel: 'Keep serving', icon: 'check-circle',
+        title: 'Keep serving', name: 'keep', opener, confirmLabel: 'Keep serving', icon: 'check-circle',
         body: [
           h('p', null, 'Past its quality limit means the food is off the menu until someone tastes it. If it is still good, keep it on the menu for a set time. Your local health department\'s rules apply to quality extensions.'),
           list, h('div', { class: 'hc-fld' }, h('div', { class: 'field-label' }, 'How long'), dur, untilIn), err,
@@ -1225,7 +1225,7 @@
       if (a.reason === 'quality') {
         // A channel update still waiting out its hold can be cancelled by keeping the batch serving.
         const held = (st().syncs || []).filter((sy) => sy.menuId === mi.id && sy.kind === '86' && U.isNum(sy.holdUntil) && sy.holdUntil > now)[0];
-        return ingName(a.ing) + ' is held until someone tastes it. Taste it in the hold cabinet to keep it serving, or throw it out.' + (held ? ' Channels update at ' + U.fmtTime(held.holdUntil) + ' unless kept.' : '');
+        return ingName(a.ing) + ' is held until someone checks it. Open the hold cabinet to keep it serving, or throw it out.' + (held ? ' Channels update at ' + U.fmtTime(held.holdUntil) + ' unless kept.' : '');
       }
       const have = E().servable(st(), a.ing);
       return ingName(a.ing) + ' is low: ' + qtyText(ing, have) + ' left, 86 at ' + qtyText(ing, ing ? ing.thresholdG || 0 : 0) + '.';
@@ -1868,7 +1868,7 @@
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + U.tempText(S.hotHoldF) + ', reheat to ' + U.tempText(S.reheatF) + ' within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
         rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat.'),
-        rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit means the batch must be thrown out when time is up. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
+        rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A throw-out time means the batch must be thrown out when time is up. A quality limit takes it off the menu: check it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
         rule('snow', 'Cooling', 'From ' + U.tempText(S.hotHoldF) + ' to ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' hours, then to ' + U.tempText(c.finalF) + ' within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
         rule('lock', 'Locked batches', 'A batch that is out of range is locked. Nothing is taken from it, and menu items that need it show 86 safety hold.'),
@@ -2111,7 +2111,7 @@
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap Start on a dish.', hintsTog),
       settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
-      settingBlock('Voice call-outs', 'A chef calls the line out loud. Light: "Fire brisket now! Ticket 12!" and "Ticket 12 is up! Ring it out!". Normal: adds "Order up!" for new tickets and one reminder if a dish is not started or a ticket not rung out. Full: keeps reminding until you start the dish or ring out the ticket. At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Not tried on a real tablet yet.', coTog, levelSeg),
+      settingBlock('Voice call-outs', 'A chef calls the line out loud. Light: "Fire the pizza now! Ticket 12!" and "Ticket 12 is up! Ring it out!". Normal: adds "Order up!" for new tickets and one reminder if a dish is not started or a ticket not rung out. Full: keeps reminding until you start the dish or ring out the ticket. At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Not tried on a real tablet yet.', coTog, levelSeg),
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       clockBlock,

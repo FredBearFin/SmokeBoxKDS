@@ -44,7 +44,7 @@
      },
      {
       "t": "p",
-      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything, and says which columns it ignored. New menu sections in the file? Tap **Add these sections**."
+      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Problem rows are flagged before anything is added. New menu sections in the file? Tap **Add these sections**."
      },
      {
       "t": "h",
