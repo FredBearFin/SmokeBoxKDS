@@ -163,7 +163,7 @@
   // Shows New ticket as a full page inside `host` (any empty element) and returns { el, close, leave, destroy }.
   // opts.onExit(reason) runs when the page closes (sent, discarded, back); the default goes back to the board.
   // WATCH OUT: the draft D is shared with the sheet version, so an unsent order survives either way of opening.
-  function mount(host, opts) {
+  function mountPage(host, opts) {
     opts = opts || {};
     let built = null, closed = false;
     const page = h('div', { class: 'ord-page', dataset: { name: 'order' } });
@@ -181,7 +181,7 @@
       if (built) built.teardown();
       page.remove();
       if (typeof opts.onExit === 'function') opts.onExit(why || 'api');
-      else if (SB.router && SB.router.go) SB.router.go({ kind: 'floor', zone: SB.router.lastZone() });
+      else if (why !== 'destroy' && SB.router && SB.router.go) SB.router.go({ kind: 'floor', zone: SB.router.lastZone() });
     };
     built = buildOrder({ body, footer, el: page, close, isPage: true }, opts);
     // Asks before leaving when the order has items; closes straight away when it is empty.
@@ -886,6 +886,8 @@
   }
 
   SB.sheets.register('order', openOrder);
-  // The page version is for the router: SB.order.mount(hostElement, { onExit }) shows New ticket as a full page.
-  SB.order = { mount, open: openOrder };
+  // The page version is for the router: SB.order.mountPage(hostElement, { onExit }) shows New ticket as a full page.
+  // The router layer calls SB.order.mount(el) and keeps the cleanup function it gets back.
+  const mountForRouter = (el, opts) => mountPage(el, opts).destroy;
+  SB.order = { mount: mountForRouter, mountPage, open: openOrder };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

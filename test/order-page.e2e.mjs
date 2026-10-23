@@ -29,7 +29,7 @@ await withPage({ w: 1280, h: 800 }, async (page, logs) => {
   check('sheet: closing keeps the draft (no sheet left open)', (await page.locator('.sheet-root:not(.is-closing)').count()) === 0);
 
   // 2. The page shows the same draft.
-  await page.evaluate(() => { window.__host = document.createElement('div'); window.__host.style.cssText = 'position:fixed;inset:0;z-index:50'; document.body.appendChild(window.__host); window.__exit = []; window.__pg = SB.order.mount(window.__host, { onExit: (w) => window.__exit.push(w) }); });
+  await page.evaluate(() => { window.__exit = []; window.__pg = SB.order.mountPage(document.getElementById('sb-order'), { onExit: (w) => window.__exit.push(w) }); document.getElementById('sb-order').hidden = false; });
   await page.waitForSelector('.ord-page .ord');
   check('page: the unsent draft is back', (await page.locator('.ord-page .ord-line').count()) === 1);
   check('page: customer name kept', (await page.inputValue('.ord-page .ord-cust-input')) === 'Page test');
@@ -53,11 +53,18 @@ await withPage({ w: 1280, h: 800 }, async (page, logs) => {
   check('page: closed with reason sent and left the DOM', (await page.evaluate(() => window.__exit.join())) === 'sent' && (await page.locator('.ord-page').count()) === 0);
 
   // 5. After sending, a new page opens with an empty draft; destroy closes without asking.
-  await page.evaluate(() => { window.__pg = SB.order.mount(window.__host, { onExit: (w) => window.__exit.push(w) }); });
+  await page.evaluate(() => { window.__pg = SB.order.mountPage(document.getElementById('sb-order'), { onExit: (w) => window.__exit.push(w) }); });
   await page.waitForSelector('.ord-page .ord');
   check('page: next order starts empty', (await page.locator('.ord-page .ord-line').count()) === 0);
   await page.evaluate(() => window.__pg.destroy());
   check('page: destroy removes it', (await page.locator('.ord-page').count()) === 0);
+  // 6. The router's #/new route mounts the page and leaving the route takes it down.
+  await page.evaluate(() => SB.router.go({ kind: 'new' }));
+  await page.waitForTimeout(300);
+  check('route #/new shows the order page', (await page.locator('#sb-order .ord-page .ord').count()) === 1, await page.evaluate(() => location.hash));
+  await page.evaluate(() => SB.router.go({ kind: 'floor', zone: 'all' }));
+  await page.waitForTimeout(300);
+  check('leaving #/new removes the page', (await page.locator('.ord-page').count()) === 0);
   check('console clean', logs.errors.length === 0 && logs.pageErrors.length === 0, { e: logs.errors.slice(0, 3), p: logs.pageErrors.slice(0, 3) });
 });
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
