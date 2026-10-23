@@ -740,9 +740,11 @@
     // The station used for a row that names none: the first station still in use.
     const defaultZone = () => visibleStations()[0].id;
     // Runs the importer on the text and draws the preview, or says plainly what is wrong with the text.
-    function check(text, from) {
+    let unitChoice = ''; // '' lets the importer decide; 'cents' or 'dollars' when the owner chose
+    function check(text, from, unit) {
       U.clear(preview); tell(status, '');
-      const res = M.parse(text, { existing: SB.store.getState().menu });
+      if (unit !== undefined) unitChoice = unit;
+      const res = M.parse(text, unitChoice ? { existing: SB.store.getState().menu, priceUnit: unitChoice } : { existing: SB.store.getState().menu });
       if (res.error) { tell(status, res.error); parsed = null; return; }
       parsed = res; rows = res.rows.map((r) => Object.assign({ keep: r.ok && !r.hidden }, r));
       // A category that is only digits usually means a price like 4,50 was split at its comma: warn, and leave the row unticked.
@@ -774,6 +776,13 @@
       (sm.notes || []).forEach((n) => preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, n)));
       // Columns the importer did not use (like Notes), named once so nothing is dropped without a word.
       const ign = Array.isArray(sm.ignoredColumns) ? sm.ignoredColumns : [];
+      // Prices that look like cents (whole numbers, some over $1,000): offer to read them as cents; and when read as cents, offer the way back.
+      if (sm.maybeCents) preview.appendChild(h('div', { class: 'fs-note', 'data-tone': 'warn' }, h('div', null, h('p', null, 'Every price in this file is a whole number and some are very large. Are the prices in cents (1400 meaning $14.00)?'),
+        // Reads the same text again with prices in cents.
+        h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'prices-cents' }, onClick: () => check(area.value, from, 'cents') }, 'These prices are in cents'))));
+      if (sm.priceUnit === 'cents') preview.appendChild(h('div', { class: 'fs-note', 'data-tone': 'warn' }, h('div', null, h('p', null, 'Prices are being read as cents (1400 is $14.00).'),
+        // Goes back to reading prices as dollars.
+        h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'prices-dollars' }, onClick: () => check(area.value, from, 'dollars') }, 'These prices are in dollars'))));
       // Notes or descriptions are read but not stored with a dish, so say that too.
       if (rows.some((r) => r.description)) preview.appendChild(h('p', { class: 'fs-sub dp-ignored', dataset: { act: 'notes-ignored' } }, 'Notes and descriptions in your file are not kept: Smokebox stores only the name, price, station and section.'));
       if (ign.length) preview.appendChild(h('p', { class: 'fs-sub dp-ignored', dataset: { act: 'ignored-columns' } }, (ign.length === 1 ? 'Ignored column: ' : 'Ignored columns: ') + ign.join(', ') + '. Smokebox does not keep ' + (ign.length === 1 ? 'it' : 'them') + '.'));
@@ -810,9 +819,11 @@
         const keepWrap = h('label', { class: 'dp-check' }, keepBox);
         const nm = h('input', { class: 'input', type: 'text', maxlength: 60, value: r.name || '', 'aria-label': 'Name, line ' + r.line });
         const pr = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: typeof r.price === 'number' ? r.price.toFixed(2) : '', 'aria-label': 'Price, line ' + r.line });
+        const readAs = h('span', { class: 'fs-sub dp-readas', dataset: { act: 'read-as' } }, r.readAs ? 'Read as ' + r.readAs : '');
+        const prCell = h('div', { class: 'dp-prcell' }, pr, readAs);
         const zs = h('select', { class: 'select', 'aria-label': 'Station, line ' + r.line }, stations().map((z) => h('option', { value: z.id, selected: (r.station || defaultZone()) === z.id }, z.name)));
         const prob = h('div', { class: 'fs-sub dp-prob' });
-        const rowEl = h('div', { class: 'dp-prow', role: 'row', dataset: { ok: r.ok ? 'true' : 'false' } }, keepWrap, nm, pr, zs, prob);
+        const rowEl = h('div', { class: 'dp-prow', role: 'row', dataset: { ok: r.ok ? 'true' : 'false' } }, keepWrap, nm, prCell, zs, prob);
         // Redraws this row's plain problems and its tick after any edit.
         const redo = () => {
           r.ok = rowOk(r); if (!r.ok) r.keep = false;
@@ -824,7 +835,7 @@
         // Selecting a row in or out changes only whether it is imported.
         keep.addEventListener('change', () => { r.keep = keep.checked && (r.ok = rowOk(r)); keep.checked = r.keep; paintGo(); });
         // Typing a new name or price re-checks the row and ticks it in when it has become valid.
-        const edit = () => { r.name = nm.value.replace(/\s+/g, ' ').trim(); const p = SB.menuImport.readPrice(pr.value); r.price = p && typeof p.value === 'number' ? p.value : null; r.station = zs.value; r.ok = rowOk(r); r.keep = r.ok; redo(); };
+        const edit = () => { r.name = nm.value.replace(/\s+/g, ' ').trim(); const p = SB.menuImport.readPrice(pr.value); r.price = p && typeof p.value === 'number' ? p.value : null; readAs.textContent = r.price == null ? '' : 'Read as ' + U.fmtMoney(r.price); r.station = zs.value; r.ok = rowOk(r); r.keep = r.ok; redo(); };
         nm.addEventListener('change', edit); pr.addEventListener('change', edit); zs.addEventListener('change', () => { r.station = zs.value; });
         prob.textContent = (r.problems || []).filter((p) => p.code !== 'unknownCategory' && p.code !== 'unknownStation').map((p) => p.message + (p.fix ? ' ' + p.fix : '')).join(' ');
         body.appendChild(rowEl);
@@ -855,13 +866,13 @@
       if (f.size > M.limits.textMax) { tell(status, 'That file is too big to read. Use a file under 1 MB.'); return; }
       const rd = new g.FileReader();
       // When the file is read, check its text; a failed read says so.
-      rd.onload = () => { area.value = String(rd.result || ''); check(area.value, 'the file'); };
+      rd.onload = () => { area.value = String(rd.result || ''); check(area.value, 'the file', ''); };
       rd.onerror = () => { tell(status, 'That file could not be read.'); };
       rd.readAsText(f);
     });
     const checkBtn = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'import-check' } }, ico('check', 20), h('span', null, 'Check it'));
     // Checks the pasted text.
-    checkBtn.addEventListener('click', () => check(area.value, 'the pasted text'));
+    checkBtn.addEventListener('click', () => check(area.value, 'the pasted text', ''));
     // Export: the menu as a spreadsheet file, so it can be edited elsewhere or kept as a copy.
     const exp = h('button', { type: 'button', class: 'btn', dataset: { act: 'export-menu' } }, ico('download', 20), h('span', null, 'Export my menu'));
     // Builds the menu CSV and starts a download; says so if the browser blocks it.
@@ -874,7 +885,7 @@
         tell(status, 'Saved smokebox-menu.csv. Open it in a spreadsheet, or import it again later.');
       } catch (e) { area.value = text; tell(status, 'Your browser blocked the download. The menu is in the box above: copy it into a file named smokebox-menu.csv.'); }
     });
-    root.append(h('p', { class: 'fs-sub' }, 'Optional. Choose a spreadsheet (CSV) or an item export from Square, Toast or Clover, or paste a list. You will see every dish and can fix or clear any before anything is added. Adding dishes by hand in Dishes and prices is just as good.'),
+    root.append(h('p', { class: 'fs-sub' }, 'Optional. Choose a spreadsheet (CSV) or an item export from Square, Toast, Clover or Lightspeed, or paste a list. You will see every dish and can fix or clear any before anything is added. Adding dishes by hand in Dishes and prices is just as good.'),
       h('div', { class: 'fs-row' }, fileIn), area, h('div', { class: 'fs-row' }, checkBtn, exp), status, preview);
     sheet.body.appendChild(root); keepInView(sheet.body);
     return sheet;
