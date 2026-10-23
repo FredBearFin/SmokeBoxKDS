@@ -83,7 +83,7 @@ test('start over takes a backup first, clears everything, keeps settings, and is
   } finally { S.destroy(); cleanNames(); }
 });
 
-test('start over with settings reset also clears tax, PIN, hours and station names; the last good copy holds the old kitchen', () => {
+test('start over with settings reset also clears tax, PIN, hours and station names; the last good copy is retaken from the empty kitchen', () => {
   clock = T;
   const b = backend(); busyKitchen(b);
   try {
@@ -93,8 +93,9 @@ test('start over with settings reset also clears tax, PIN, hours and station nam
     assert.deepEqual([s.settings.service.taxRatePct, s.settings.office.pinHash, s.settings.service.openHour], [0, null, 11]);
     assert.deepEqual(C.customSpec(), S.STARTER_NAMES);                    // the barbecue-flavored names are gone; the neutral starter names take their place
     const copy = b.get('smokebox.v1.lastgood', null);
-    assert.equal(copy.reason, 'startOver'); assert.ok(copy.state.menu.length >= 21);
-    assert.equal(copy.state.settings.office.pinHash, 'sha256:' + 'ab12'.repeat(16));
+    assert.equal(copy.reason, 'startOver'); assert.equal(copy.state.menu.length, 0);           // never the erased kitchen
+    assert.equal(copy.state.tickets.length, 0); assert.equal(copy.state.settings.office.pinHash, null);
+    assert.equal(b.get('smokebox.v1.corrupt', null), null);
   } finally { S.destroy(); cleanNames(); }
 });
 
