@@ -15,6 +15,47 @@
   U.isNum = (n) => typeof n === 'number' && isFinite(n);
   // The folder the page was served from as an address prefix ('' at the site root, '/beta' behind a path prefix), for calls to its own hub.
   U.pageFolder = (g) => { try { const p = g && g.location && typeof g.location.pathname === 'string' ? g.location.pathname : '/'; return p.replace(/[^/]*$/, '').replace(/\/+$/, ''); } catch (e) { return ''; } };
+  /* ---------- secret hashing (PIN and recovery code) ---------- */
+  // Rounds of PBKDF2 for a saved PIN or recovery code: about a tenth of a second on a tablet. A 4-digit PIN stays a door latch whatever this is.
+  const KDF_ROUNDS = 100000;
+  // Turns bytes into lowercase hex text, two characters each.
+  const toHex = (buf) => Array.from(new Uint8Array(buf)).map((b) => (b < 16 ? '0' : '') + b.toString(16)).join('');
+  // The browser's crypto when it can do PBKDF2 and random bytes, else null.
+  const subtleOf = () => { const c = g.crypto; return c && c.subtle && typeof c.subtle.deriveBits === 'function' && typeof c.getRandomValues === 'function' && typeof TextEncoder !== 'undefined' ? c.subtle : null; };
+  // Runs PBKDF2-SHA256 over text with a salt and a round count and returns the bytes.
+  async function derive(sub, text, salt, rounds) {
+    const key = await sub.importKey('raw', new TextEncoder().encode(text), 'PBKDF2', false, ['deriveBits']);
+    return sub.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: rounds }, key, 256);
+  }
+  // Scrambles a secret into 'pbkdf2:<rounds>:<salt>:<hash>' with a fresh random salt; null where this browser cannot (the caller then keeps the old plain
+  // SHA-256 form). domain is a fixed label put in front of the secret so a PIN hash and a recovery hash never match each other.
+  U.secretHash = async (domain, plain) => {
+    const sub = subtleOf();
+    if (!sub) return null;
+    try {
+      const salt = g.crypto.getRandomValues(new Uint8Array(16));
+      return 'pbkdf2:' + KDF_ROUNDS + ':' + toHex(salt) + ':' + toHex(await derive(sub, domain + String(plain), salt, KDF_ROUNDS));
+    } catch (e) { return null; }
+  };
+  // Checks a secret against a saved scramble of either form. Returns { ok, legacy }: legacy is true for the old unsalted 'sha256:' form, which still
+  // works; the caller should save a fresh U.secretHash after an ok legacy check. ok is false (never a throw) for anything unreadable.
+  U.secretCheck = async (domain, plain, stored) => {
+    try {
+      const sub = g.crypto && g.crypto.subtle;
+      if (typeof stored !== 'string' || !sub) return { ok: false, legacy: false };
+      if (stored.indexOf('pbkdf2:') === 0) {
+        const m = /^pbkdf2:(\d{1,7}):([0-9a-f]{2,128}):([0-9a-f]{64})$/.exec(stored);
+        const sk = subtleOf();
+        if (!m || !sk || Number(m[1]) < 1 || Number(m[1]) > 2000000) return { ok: false, legacy: false };
+        const salt = new Uint8Array(m[2].match(/../g).map((h) => parseInt(h, 16)));
+        return { ok: toHex(await derive(sk, domain + String(plain), salt, Number(m[1]))) === m[3], legacy: false };
+      }
+      if (stored.indexOf('sha256:') === 0 && typeof sub.digest === 'function' && typeof TextEncoder !== 'undefined') {
+        return { ok: 'sha256:' + toHex(await sub.digest('SHA-256', new TextEncoder().encode(domain + String(plain)))) === stored, legacy: true };
+      }
+    } catch (e) { /* unreadable: no match */ }
+    return { ok: false, legacy: false };
+  };
   // Forces a number into the range lo to hi, so clamp(15, 0, 10) gives 10.
   U.clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   // Slides from a to b by the fraction t (t = 0 gives a, t = 1 gives b).
@@ -293,6 +334,7 @@
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
     'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept', 'hubqueue', 'hubcache', 'hubtoken'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'dropped', 'droppedat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {

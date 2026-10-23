@@ -53,7 +53,7 @@
     'emptyOrder', 'badQty', 'tooManyItems', 'badCustomer', 'badChannel', 'noteTooLong', 'itemUnavailable', 'ticketNotActive',
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
-    'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
+    'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'dayClosed', 'orderEmpty',
     'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'followerReadOnly', 'hubKitchen', 'hubChanged', 'hubConnecting', 'undoElsewhere', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
@@ -106,6 +106,7 @@
     unknownOrder: 'That order is no longer here. It may have been cleared; check the open orders list.',
     orderNotOpen: 'That order is already paid or voided. Reopen it first if it needs changing.',
     orderNotPaid: 'Only a paid order can be reopened.',
+    dayClosed: 'That sale belongs to a day that is already closed, so it cannot be opened again: it would move to another day and count twice. Make the correction in your own records, or ask whoever keeps the books.',
     orderEmpty: 'There is nothing on this order to pay. Add items first, or void the order.',
     orderNotEmpty: 'That order still has food on it. Void its tickets first, or take payment.',
     badPayment: 'Pick how it was paid (cash, card or other), and enter the tip and discount as dollar amounts.',
@@ -1432,6 +1433,16 @@
     const taxC = Math.floor((taxableC * Math.round(rate * 1e4) + 500000) / 1e6);
     return { subtotal: subCents / 100, discount: discC / 100, taxRate: rate, tax: taxC / 100, total: (taxableC + taxC) / 100, qty, rounds };
   }
+  // Totals for lines that are not on an order yet (the draft on the order screen), with the same whole-cent rule the charge uses, so what the
+  // screen shows is what the register charges. items are { price, qty }; opts: extraSubtotalCents (food already on the order), discount, taxRatePct.
+  function totalsOf(items, opts) {
+    let sub = isNum(opts && opts.extraSubtotalCents) ? Math.max(0, Math.round(opts.extraSubtotalCents)) : 0, qty = 0;
+    for (const it of Array.isArray(items) ? items : []) {
+      const q = isNum(it && it.qty) && it.qty > 0 ? Math.round(it.qty) : 0;
+      sub += toCents(isNum(it && it.price) ? it.price : 0) * q; qty += q;
+    }
+    return totalsFrom(sub, qty, 0, opts && opts.discount, opts && opts.taxRatePct);
+  }
   // The sales tax rate in force now, in percent (0 when none is set).
   const taxRateOf = (settings) => (settings && settings.service && isNum(settings.service.taxRatePct) ? settings.service.taxRatePct : 0);
   // What an order adds up to: the food on its tickets that are not voided, less the discount, plus tax. A paid
@@ -1484,6 +1495,7 @@
     const o = tx.get('orders')[oi];
     const t0 = orderTotals(tx.state(), o, { discount: pay.discount });
     if (!(t0.subtotal > 0)) return 'orderEmpty';
+    if (!Number.isFinite(t0.total) || t0.total > C.limits.maxOrderMoney) { tx.info = { key: 'total', min: 0, max: C.limits.maxOrderMoney }; return 'outOfBounds'; }
     if (pay.discount > t0.subtotal + 1e-9) { tx.info = { key: 'discount', min: 0, max: t0.subtotal }; return 'outOfBounds'; }
     const w = tx.mutIn(tx.mut('orders'), oi);
     w.status = 'paid'; w.paidAt = stampAfter(o.createdAt, tx.now); w.method = pay.method; w.tip = pay.tip; w.discount = t0.discount; w.totals = t0;
@@ -1529,6 +1541,9 @@
     if (oi < 0) return 'unknownOrder';
     const o = tx.get('orders')[oi];
     if (o.status !== 'paid') return 'orderNotPaid';
+    // A sale stays in the day it was made: once that day is closed, paying it again would count it in two day_closed records.
+    const lc = tx.get('lastClose');
+    if (lc && isNum(o.paidAt) && U.serviceDate(o.paidAt, tx.get('settings').service.dayStartHour) <= lc.day) { tx.info = { day: lc.day }; return 'dayClosed'; }
     const w = tx.mutIn(tx.mut('orders'), oi);
     w.status = 'open'; delete w.paidAt; delete w.method; delete w.tip; delete w.discount; delete w.totals;
     tx.event('order_reopened', { orderId: o.id });
@@ -3837,7 +3852,7 @@
         if (typeof out.name !== 'string' || !out.name) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.name = base.name; }
         if (C.workZones.indexOf(out.zone) < 0) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.zone = base.zone; repaired.push('menu ' + x.id + '.zone reset'); }
         if (!isNum(out.prepSec) || out.prepSec < 5 || out.prepSec > 3600) { out.prepSec = base ? base.prepSec : 120; repaired.push('menu ' + x.id + '.prepSec reset'); }
-        if (!isNum(out.price) || out.price < 0) { out.price = base ? base.price : 0; repaired.push('menu ' + x.id + '.price reset'); }
+        if (!isNum(out.price) || out.price < 0 || out.price > C.limits.maxPrice) { out.price = base ? base.price : 0; repaired.push('menu ' + x.id + '.price reset'); }
         if (out.track !== 'one' && out.track !== 'two') out.track = 'one';
         if (!Array.isArray(out.bom) || out.bom.some((l) => !isObj(l) || !im.has(l.ing) || !isNum(l.qty) || l.qty <= 0)) {
           out.bom = base ? base.bom.map((l) => ({ ing: l.ing, qty: l.qty })) : (Array.isArray(out.bom) ? out.bom.filter((l) => isObj(l) && im.has(l.ing) && isNum(l.qty) && l.qty > 0) : []);
@@ -4083,7 +4098,8 @@
       const x = Object.assign({}, it);
       if (x.track !== 'one' && x.track !== 'two') x.track = 'one';
       if (!Array.isArray(x.mods)) x.mods = [];
-      if (!isNum(x.price)) x.price = 0;
+      if (!isNum(x.price) || x.price < 0 || x.price > C.limits.maxPrice) { if (isNum(x.price)) repaired.push('ticket ' + t.id + ' price reset'); x.price = 0; }
+      if (x.qty > C.limits.maxQty) { x.qty = C.limits.maxQty; repaired.push('ticket ' + t.id + ' quantity lowered'); }
       for (const k of ['firedAt', 'startedAt', 'doneAt', 'cost']) if (x[k] !== undefined && !isNum(x[k])) return null;
       if (x.depleted !== undefined && (!Array.isArray(x.depleted) || x.depleted.some((r) => !isObj(r) || typeof r.ing !== 'string' || !isNum(r.g) || r.g < 0))) return null;
       items.push(x);
@@ -4106,8 +4122,8 @@
     };
     if (o.status === 'paid') {
       const T = o.totals;
-      const money = isObj(T) && ['subtotal', 'discount', 'tax', 'total'].every((k) => isNum(T[k]) && T[k] >= 0);
-      if (!money || !hasOwn(C.payMethodById, o.method) || !isNum(o.paidAt) || !isNum(o.tip) || o.tip < 0) return null;
+      const money = isObj(T) && ['subtotal', 'discount', 'tax', 'total'].every((k) => isNum(T[k]) && T[k] >= 0 && T[k] <= C.limits.maxOrderMoney);
+      if (!money || !hasOwn(C.payMethodById, o.method) || !isNum(o.paidAt) || !isNum(o.tip) || o.tip < 0 || o.tip > C.limits.maxOrderMoney) return null;
       out.paidAt = o.paidAt; out.method = o.method; out.tip = o.tip; out.discount = T.discount;
       out.totals = { subtotal: T.subtotal, discount: T.discount, taxRate: isNum(T.taxRate) && T.taxRate >= 0 ? T.taxRate : 0, tax: T.tax, total: T.total, qty: isInt(T.qty) && T.qty >= 0 ? T.qty : 0, rounds: isInt(T.rounds) && T.rounds >= 0 ? T.rounds : 0 };
       if (out.paidAt < out.createdAt) out.paidAt = out.createdAt;
@@ -4156,7 +4172,7 @@
   // The public door: everything other files may use. _internal is for tests and tools.
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
-    pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
+    pacingPlan, planFor, ticketTiming, ticketProgress, totalsOf, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
     channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),

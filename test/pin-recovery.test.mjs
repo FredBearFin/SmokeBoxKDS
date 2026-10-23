@@ -29,7 +29,7 @@ test('a recovery code needs a PIN, looks like ABCDE-FGHJK, and only its hash is 
     assert.equal(S.hasRecoveryCode(), true);
     S.flush();
     const plain = r.code.replace('-', '');
-    assert.match(S.getState().settings.office.recoveryHash, /^sha256:[0-9a-f]{64}$/);
+    assert.match(S.getState().settings.office.recoveryHash, /^pbkdf2:100000:[0-9a-f]{32}:[0-9a-f]{64}$/);
     for (const text of [b.m.get('smokebox.v1.state'), S.exportAll(), JSON.stringify(E.allEvents(S.getState())), JSON.stringify(S.getState())]) { assert.equal(text.indexOf(plain), -1); assert.equal(text.indexOf(r.code), -1); }
     const r2 = await S.createRecoveryCode();                                   // a new code replaces the old one
     assert.notEqual(r2.code, r.code);
