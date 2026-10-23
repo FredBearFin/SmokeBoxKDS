@@ -12,6 +12,11 @@ await withPage({ w: 1280, h: 900, hash: '' }, async (page, logs) => {
   await page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 20000 });
   await page.evaluate(() => { try { SB.floor.setWelcome(false); } catch (e) { /* no welcome */ } });
   await realKitchen(page, { dishes: 3, orders: 0 });
+  // A kitchen with nothing old must still draw the whole Data page, with the card saying there is nothing to clear
+  await page.evaluate(() => { location.hash = '#/office/data'; });
+  await page.waitForSelector('#od-data', { timeout: 15000 });
+  check('a young kitchen: the card says nothing is old enough and the button is off', /Nothing is old enough to clear yet/.test(await page.locator('[aria-label="Close the month"]').innerText()) && await page.locator('[data-action="close-month"]').isDisabled());
+  await page.evaluate(() => { location.hash = '#/'; }); await page.waitForTimeout(500);
   // Build 50 closed days ending yesterday inside the page with the real engine, then load that kitchen like a restore.
   const built = await page.evaluate(() => {
     const E = SB.engine, MIN = 60e3, today = new Date(); today.setHours(0, 0, 0, 0);
@@ -57,7 +62,7 @@ await withPage({ w: 1280, h: 900, hash: '' }, async (page, logs) => {
   await page.evaluate(() => { window.__cmArgs = null; SB.setup = SB.setup || {}; SB.setup.openCloseMonth = async (o) => { window.__cmArgs = o; }; });
   await card.locator('[data-action="close-month"]').click();
   await page.waitForFunction(() => window.__cmArgs !== null, null, { timeout: 4000 });
-  check('Start opens the guarded flow with the day to count back from', await page.evaluate(() => /^\d{4}-\d\d-\d\d$/.test(window.__cmArgs.before)));
+  check('the button opens the guarded flow with the day to count back from', await page.evaluate(() => /^\d{4}-\d\d-\d\d$/.test(window.__cmArgs.before)));
   // After the history is cleared the pages say so
   await page.evaluate(() => SB.store.importAll(window.__pruned));
   await page.evaluate(() => {

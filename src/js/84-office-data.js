@@ -23,17 +23,21 @@
     const card = flowCard('4', 'Close the month', null, null);
     const keep = (SB.engine && SB.engine.MONTH_KEEP_DAYS) || 35;
     const sum = U.h('p', { class: 'od-p od-cm-sum', role: 'status' }), notes = U.h('p', { class: 'od-hint od-cm-keep' });
-    const start = U.h('button', { type: 'button', class: 'btn btn-sm', 'data-action': 'close-month' }, 'Start');
+    const start = U.h('button', { type: 'button', class: 'btn btn-sm', 'data-action': 'close-month' }, 'Close the month...');
     const hint = U.h('p', { class: 'od-hint od-cm-hint', hidden: true });
-    // The day the preview counts back from: today's service day, so everything older than the keep time is offered.
-    const opts = () => ({ before: U.serviceDate(SB.store.now(), (SB.store.getState().settings.service || {}).dayStartHour) });
+    // The day the preview counts back from: the first of this month (the same default as the guarded flow); the store still keeps the last days.
+    const opts = () => ({ before: U.serviceDate(SB.store.now(), (SB.store.getState().settings.service || {}).dayStartHour).slice(0, 8) + '01' });
     // Asks the store what Close the month would clear now and writes it in plain words (nothing changes).
     function paint() {
+      try { paintNow(); } catch (e) { start.disabled = true; sum.textContent = 'The preview is not available right now. Nothing was changed.'; notes.textContent = ''; }
+    }
+    // Does the work of paint; paint wraps it so this card can never stop the rest of the Data page from drawing.
+    function paintNow() {
       const r = SB.store.closeMonthPreview(opts());
       start.disabled = false; hint.hidden = true;
-      if (!r.ok) {
+      if (!r.ok || !r.preview || !r.preview.days || !r.preview.days.length || !r.preview.from) {
         start.disabled = true;
-        sum.textContent = r.report === 'nothingToDo' ? 'Nothing is old enough to clear yet: the last ' + keep + ' days, today and any open order always stay on this tablet.' : 'The preview is not available right now. Nothing was changed.';
+        sum.textContent = r.report === 'nothingToDo' || r.ok ? 'Nothing is old enough to clear yet: the last ' + keep + ' days, today and any open order always stay on this tablet.' : 'The preview is not available right now. Nothing was changed.';
         notes.textContent = ''; return;
       }
       const p = r.preview;
