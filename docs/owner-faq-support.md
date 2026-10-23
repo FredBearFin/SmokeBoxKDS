@@ -28,7 +28,7 @@ Not decided yet. There is no price to quote. Ask the person who set it up for yo
 
 ## 7. Can I rely on it for my food-safety records?
 
-Treat it as a helper, not as your official record. Smokebox reminds you to take temperatures, warns before a time limit and flags readings outside the limits you set. It cannot see, taste or measure your food. The limits it starts with are examples, not your local rules, so set the limits your local health department gives you. Back office has a printable food safety record. Ask your health department whether they accept it before you stop your paper log. Until then, keep the paper log. Smokebox logs batches only, not cooler or freezer readings, sanitizer strength or thermometer checks, so keep paper logs for those too.
+Treat it as a helper, not as your official record. Smokebox reminds you to take temperatures, warns before a time limit and flags readings outside the limits you set. It cannot see, taste or measure your food. The limits it starts with are examples, not your local rules, so set the limits your local health department gives you. Back office has a printable food safety record. Ask your health department whether they accept it before you stop your paper log. Until then, keep the paper log. Readings (Settings, Readings) lets you write down cooler, freezer, thermometer and sanitizer strip readings, but it only records what you type. Keep a paper log if your health department requires one.
 
 ## 8. Does it charge customers' cards?
 

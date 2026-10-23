@@ -145,6 +145,7 @@ async function cooked(browser) {
   await tap(p, 'Put in hold cabinet'); await p.waitForTimeout(800);
   // The card shows one main button (Log temp here) and a "..." button named More for this batch; the rest are in its menu.
   check('batch card: Log temp', await seen(p, 'Log temp', '.sheet-root:last-of-type'));
+  check('batch card: Pull beside Log temp', await p.evaluate(() => [...document.querySelectorAll('button')].some((e) => e.getClientRects().length && /^Pull \d/.test(e.textContent.trim()))));
   check('batch card: More for this batch', await p.evaluate(() => !!document.querySelector('button[aria-label="More for this batch"]')));
   await p.click('button[aria-label="More for this batch"]'); await p.waitForTimeout(400);
   for (const t of ['Pull', 'Start cooling', 'Discard']) check('batch card menu: ' + t, await p.evaluate((t) => [...document.querySelectorAll('[role=menuitem]')].some((e) => e.getClientRects().length && e.textContent.trim().startsWith(t)), t));
@@ -407,6 +408,28 @@ async function coldItem(browser) {
   await p.close();
 }
 
+// The Readings and Tablet checks walk: the three logs on the Readings sheet and the five checks on Get this tablet ready.
+async function readingsAndChecks(browser) {
+  console.log('Readings and tablet checks');
+  const p = await fresh(browser);
+  await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  await p.evaluate(() => SB.store.dispatchEx('updateSettings', { patch: { modules: { cookAhead: true } } }, { source: 'ui' }));
+  await p.reload(); await p.waitForTimeout(900);
+  await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
+  check('settings: Readings', await tap(p, 'Readings')); await p.waitForTimeout(600);
+  const rs = '.sheet-root:last-of-type';
+  for (const t of ['Fridge, freezer or display case', 'Log reading', 'Food thermometer check', 'Log check', 'Ice water', 'Boiling water', 'Sanitizer strip', 'Log strip reading', 'Recent readings']) check('readings: ' + t, await has(p, t, rs));
+  check('readings: Temperature of the fridge, freezer or case', await p.evaluate(() => !!document.querySelector('.sheet-root:last-of-type input[aria-label="Temperature of the fridge, freezer or case"]')));
+  await p.fill(rs + ' input[aria-label="Temperature of the fridge, freezer or case"]', '38');
+  check('readings: Log reading', await tap(p, 'Log reading')); await p.waitForTimeout(700);
+  check('readings: the entry is listed', await p.evaluate(() => !/No readings yet/.test(document.querySelector('.sheet-root:last-of-type').innerText)), await p.evaluate(() => document.querySelector('.sheet-root:last-of-type').innerText.slice(-300)));
+  await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(300);
+  await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
+  check('settings: Get this tablet ready', await tap(p, 'Get this tablet ready')); await p.waitForTimeout(700);
+  for (const t of ['Screen stays awake', 'Sound is on', 'Volume is loud enough', 'Added to the home screen', 'Full screen', 'Test the sound']) check('tablet checks: ' + t, await has(p, t, rs));
+  await p.close();
+}
+
 // The demo walk: a fresh browser context opened with ?demo has sample dishes and tickets, and a normal tab in the same context stays empty.
 async function demoMode(browser) {
   console.log('Demo mode (?demo)');
@@ -422,7 +445,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'readings') await readingsAndChecks(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await readingsAndChecks(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);

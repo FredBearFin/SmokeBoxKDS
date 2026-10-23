@@ -10,6 +10,7 @@ Print this card and keep it by the tablet. One side for cooks, one for the count
 - [ ] Gray dish: waiting on purpose. Start now goes early
 - [ ] Clock amber, then red: the order is late
 - [ ] Sold out: tap 86 board and mark it
+- [ ] Cooked food leaves the cabinet: tap Pull
 - [ ] Wrong tap: Undo, within 10 seconds
 - [ ] Bumped by mistake: Recall, in the header
 
