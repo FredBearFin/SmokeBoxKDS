@@ -253,7 +253,8 @@
   // Whole calendar days from one service day text to a later one.
   const daysBetween = (a, b) => Math.round((U.dateKeyToMs(b) - U.dateKeyToMs(a)) / 864e5);
   // Forgets the oldest saved day, so the next save starts counting again (after a restore, a reset or Close the month, which remove history on purpose).
-  function histRebase() { hist.oldest = null; }
+  // WATCH OUT: it is written to storage too, or a reload reads back the old day and counts the removed days as dropped.
+  function histRebase() { hist.oldest = null; try { if (storage) storage.set(HIST_KEY, hist); } catch (e) { /* the count is kept in memory */ } }
   // Called after each good save with the copy that was written: if its oldest ticket day moved forward, history was dropped to make room (the size
   // limit of the app or of the browser), and the days are added up so the owner can be told once.
   function histTrack(saved, r) {
@@ -1273,7 +1274,8 @@
     if (now() > realNow()) rebaseClock();
     const rep = dispatch('resetLive', opts || {}, { source: 'user' });
     // Back to real time means the real pace too, not only the real hour.
-    if (rep === 'ok') { if (clk.speed !== 1) setSpeed(1); persistNow(); }
+    // The cleared history was removed on purpose, so the next save must not report it as dropped for lack of space.
+    if (rep === 'ok') { if (clk.speed !== 1) setSpeed(1); histRebase(); persistNow(); }
     return rep;
   }
 
@@ -1546,8 +1548,10 @@
     for (const k of START_OVER_KEYS) { try { storage.remove(k); } catch (e) { /* ignore */ } }
     // Only now that the erase went in: the rolling last-good copy and any set-aside damaged copy still hold the old kitchen's
     // customers and orders, so both are dropped and the last-good copy is retaken from the new empty kitchen.
-    try { storage.remove(LASTGOOD_KEY); storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); } catch (e) { /* ignore */ }
-    st.corrupt = null;
+    // The copy kept from before a repair at load holds the whole old kitchen too, and the dropped-history count belongs to it.
+    try { for (const k of [LASTGOOD_KEY, CORRUPT_KEY, CORRUPT_AT_KEY, DROPPED_KEY, DROPPED_AT_KEY, HIST_KEY, HIST_NOTICE_KEY]) storage.remove(k); } catch (e) { /* ignore */ }
+    st.corrupt = null; st.droppedCount = null;
+    hist = { oldest: null, days: 0, at: 0, droppedBefore: null }; hn = { warnAt: 0, trimAck: 0 };
     // Actions queued for a hub that it never confirmed belong to the erased kitchen: they are dropped (and marked, so another
     // tab's saved copy cannot bring them back), and only the erase itself stays in the queue so the hub is told. Nothing queued
     // is touched when the erase failed, because we returned above.
