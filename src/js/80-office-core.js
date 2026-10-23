@@ -44,6 +44,30 @@
     return { ok: true, range: { id: 'custom', from, to, label, fromKey, toKey } };
   }
 
+  // One service day as a range with id 'day' (not 'custom'), so the clock never rolls it forward. A day
+  // runs from dsh (4 am default) to dsh the next morning, so 1 am Saturday still belongs to Friday.
+  function dayRange(key, dsh) {
+    const r = customRange(key, key, dsh);
+    if (!r.ok) return r;
+    r.range.id = 'day';
+    return r;
+  }
+
+  // The service date one step before or after a date, never later than today. Returns null when the step
+  // would go past today (the Next arrow is then off) or the date is not valid.
+  function stepDayKey(key, delta, todayKey) {
+    if (!validKey(key) || !validKey(todayKey)) return null;
+    const next = U.addDays(key, delta);
+    return next > todayKey ? null : next;
+  }
+
+  // The date the day picker shows for a range: its last day. A range that ends after today (clock moved
+  // back) is pulled to today.
+  function pickerKey(range, todayKey) {
+    const k = range && validKey(range.toKey) ? range.toKey : todayKey;
+    return k > todayKey ? todayKey : k;
+  }
+
   // Split a sentence into number tokens (kept) and plain text so the headline can set the numbers in
   // bold.
   const NUM_RE = /(\$\d[\d,]*(?:\.\d+)?|\d+h \d{2}m|\d+m \d{2}s|\d+(?:\.\d+)?(?:%| kg| g\b| hours?)?|\d[\d,]*)/g;
@@ -124,7 +148,7 @@
     return { dir, better, word, text, deltaPct: dp, delta };
   }
 
-  O.pure = { PAGES, customRange, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
+  O.pure = { PAGES, customRange, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
 
   if (!doc) return; // Node: the pure helpers are all the tests need
 
@@ -891,7 +915,7 @@
     const F = M.filters, f = M.f, sc = M.scope;
     const summary = h('button', { type: 'button', class: 'of-fsum', 'aria-expanded': 'false', 'aria-controls': 'of-fbody' });
     const body = h('div', { class: 'of-fbody', id: 'of-fbody' });
-    const presets = [{ id: 'today', label: 'Today' }, { id: 'yesterday', label: 'Yesterday' }, { id: 'last7', label: 'Last 7 days' }, { id: 'last14', label: 'Last 14 days' }, { id: 'custom', label: 'Custom' }];
+    const presets = [{ id: 'today', label: 'Today' }, { id: 'yesterday', label: 'Yesterday' }, { id: 'last7', label: 'Last 7 days' }, { id: 'last14', label: 'Last 14 days' }, { id: 'day', label: 'One day' }, { id: 'custom', label: 'Custom' }];
 
     // The range buttons: Today, Yesterday, Last 7 days, Last 14 days and Custom.
     const rangeSeg = SB.ui.segmented({ options: presets, value: F.range.id, label: 'Date range', onChange: (id) => setRange(id) });
@@ -899,6 +923,12 @@
     const dFrom = h('input', { type: 'date', class: 'input of-date', 'aria-label': 'From date' });
     const dTo = h('input', { type: 'date', class: 'input of-date', 'aria-label': 'To date (included)' });
     const dErr = h('p', { class: 'of-ferr', role: 'alert', hidden: true });
+    // The day picker: one date with Previous day and Next day arrows beside the presets.
+    const dayPrev = h('button', { type: 'button', class: 'btn of-daybtn', 'aria-label': 'Previous day' }, ico('chevron-left', 20));
+    const dayNext = h('button', { type: 'button', class: 'btn of-daybtn', 'aria-label': 'Next day' }, ico('chevron-right', 20));
+    const dayIn = h('input', { type: 'date', class: 'input of-date of-dayin', 'aria-label': 'Pick one day' });
+    const dayErr = h('p', { class: 'of-ferr', role: 'alert', hidden: true });
+    const dayBox = h('div', { class: 'of-daypick', role: 'group', 'aria-label': 'Single day' }, dayPrev, dayIn, dayNext);
     const custom = h('div', { class: 'of-custom', hidden: F.range.id !== 'custom' }, h('label', { class: 'of-flab' }, h('span', null, 'From'), dFrom), h('label', { class: 'of-flab' }, h('span', null, 'To'), dTo), dErr);
 
     const chanSel = h('select', { class: 'select of-select', id: 'of-channel', 'aria-label': 'Channel' },
@@ -911,24 +941,69 @@
 
     body.append(
       h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Range'), rangeSeg),
+      h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Day'), dayBox, dayErr),
       custom,
       h('div', { class: 'of-fg' }, h('label', { class: 'of-fl', for: 'of-channel' }, 'Channel'), chanSel),
       h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Source'), srcSeg, srcNote));
     const banner = h('p', { class: 'of-banner', role: 'status' }, h('span', { class: 'of-chip', hidden: true }, 'Sample data'), h('span', { class: 'of-banner-t' }));
     f.filters.append(summary, body, banner);
-    Object.assign(M, { rangeSeg, srcSeg, chanSel, dFrom, dTo, dErr, custom, banner, summary, srcNote, fbody: body });
+    Object.assign(M, { dayPrev, dayNext, dayIn, dayErr, rangeSeg, srcSeg, chanSel, dFrom, dTo, dErr, custom, banner, summary, srcNote, fbody: body });
 
     sc.on(summary, 'click', () => { const open = f.filters.dataset.open !== 'true'; f.filters.dataset.open = open ? 'true' : 'false'; summary.setAttribute('aria-expanded', open ? 'true' : 'false'); });
     sc.on(chanSel, 'change', () => { F.channel = chanSel.value; filtersChanged('Channel: ' + (chanSel.selectedOptions[0] ? chanSel.selectedOptions[0].textContent : F.channel)); });
     // Either date box changing re-checks the custom range.
     const onDate = () => applyCustom();
     sc.on(dFrom, 'change', onDate); sc.on(dTo, 'change', onDate);
+    // The arrows step one service day; the box jumps to any date up to today.
+    sc.on(dayPrev, 'click', () => stepDay(-1));
+    sc.on(dayNext, 'click', () => stepDay(1));
+    sc.on(dayIn, 'change', () => pickDay(dayIn.value));
+    paintDayPicker();
     paintFilterSummary();
+  }
+
+  // Keeps the day picker in step with the range: shows its last day, stops the date box going past
+  // today, and turns Next off when today is already showing.
+  function paintDayPicker() {
+    if (!M.dayIn) return;
+    const today = U.serviceDate(nowMs(), svcHour());
+    const key = pickerKey(M.filters.range, today);
+    M.dayIn.max = today; M.dayIn.value = key;
+    M.dayNext.disabled = key >= today;
+    M.dayErr.hidden = true; M.dayIn.removeAttribute('aria-invalid');
+  }
+  // Shows exactly one service day. Stepping onto today gives the live Today preset so it keeps rolling
+  // forward; any other day (or the One day button, fixed = true) is a fixed 'day' range.
+  function showDay(key, fixed) {
+    const dsh = svcHour(), F = M.filters;
+    M.custom.hidden = true; M.dErr.hidden = true;
+    if (!fixed && key === U.serviceDate(nowMs(), dsh)) { F.range = presetRange('today'); M.rangeSeg.setValue('today'); }
+    else { const r = dayRange(key, dsh); if (!r.ok) return; F.range = r.range; M.rangeSeg.setValue('day'); }
+    M.bannerCache = null;
+    filtersChanged(F.range.label);
+  }
+  // An arrow was pressed: one service day earlier or later than the day showing (or than today when a
+  // many-day range is showing).
+  function stepDay(delta) {
+    const today = U.serviceDate(nowMs(), svcHour()), F = M.filters;
+    const base = F.range.fromKey && F.range.fromKey === F.range.toKey ? F.range.toKey : today;
+    const next = stepDayKey(base, delta, today);
+    if (next) showDay(next);
+  }
+  // The date box changed: a valid date up to today is shown, anything else gets a plain message.
+  function pickDay(value) {
+    const today = U.serviceDate(nowMs(), svcHour());
+    if (!validKey(value) || value > today) {
+      M.dayErr.textContent = validKey(value) ? 'That day has not happened yet.' : 'Pick a date.';
+      M.dayErr.hidden = false; M.dayIn.setAttribute('aria-invalid', 'true'); return;
+    }
+    showDay(value);
   }
 
   // A range button was pressed. Custom opens the two date boxes pre-filled; the others apply at once.
   function setRange(id) {
     const F = M.filters;
+    if (id === 'day') { showDay(pickerKey(F.range, U.serviceDate(nowMs(), svcHour())), true); return; }
     if (id === 'custom') {
       const base = F.range.id === 'custom' ? F.range : presetRange('last14');
       M.dFrom.value = base.fromKey || ''; M.dTo.value = base.toKey || '';
@@ -985,6 +1060,7 @@
   // showing.
   function filtersChanged(announce) {
     paintFilterSummary();
+    paintDayPicker();
     paintSourceNote();
     refreshNow(true);
     if (announce && SB.ui && SB.ui.announce) SB.ui.announce('Showing ' + announce);
@@ -1108,7 +1184,7 @@
       M.lastRefresh = Date.now();
       // roll preset ranges forward (a service day ends at 4 am)
       const F = M.filters;
-      if (F.range.id !== 'custom') { const nr = presetRange(F.range.id); if (nr.from !== F.range.from || nr.to !== F.range.to) { F.range = nr; M.bannerCache = null; } else F.range.to = nr.to; }
+      if (F.range.id !== 'custom' && F.range.id !== 'day') { const nr = presetRange(F.range.id); if (nr.from !== F.range.from || nr.to !== F.range.to) { F.range = nr; M.bannerCache = null; } else F.range.to = nr.to; }
       M.gen++; M.prep = null;
       paintSourceNote();
       const rec = M.cur; if (!rec) return;
