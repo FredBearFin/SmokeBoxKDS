@@ -311,7 +311,7 @@
       "t": "ul",
       "x": [
        "**Undo** appears for 10 seconds after an action. After that, fix it by hand.",
-       "To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. Cancelled tickets are still counted in your reports."
+       "To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. A cancelled ticket is left out of your sales and money, and shows only in the count of voided tickets."
       ]
      }
     ]
@@ -458,8 +458,8 @@
       "x": [
        "Open the **Cabinet** tab. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
        "Each batch has a card with two main buttons. **Pull** takes out the usual amount, like Pull 4.50 kg, as food leaves the cabinet. **Log temp** writes down a temperature reading. Take one at every check. A reading in range keeps the batch on the menu.",
-       "The button can change. When a batch is too cool it becomes **Reheat**. Smokebox allows one reheat per batch: its own rule, not a health code rule. When a batch is past its quality limit it becomes **Keep serving**: check the food, then decide.",
-       "The **More for this batch** button (...) opens **Pull**, **Start cooling** and **Discard**, and **Remind me in 10 min** while a warning is showing. Tap **Discard** and pick a reason when a batch is out of time or out of range."
+       "The button can change. A batch too cool for under 2 hours becomes **Reheat**; later, it must be thrown out. One reheat per batch is Smokebox's own rule. When a batch is past its quality limit it becomes **Keep serving**: check the food, then decide.",
+       "The **More for this batch** button (...) opens **Pull**, **Start cooling** and **Discard**, and **Remind me in 10 min** while a warning is showing. Tap **Discard** and pick a reason when a batch is out of time or range."
       ]
      },
      {
@@ -483,7 +483,7 @@
      },
      {
       "t": "p",
-      "x": "Some foods warn earlier, and you can change the times in Settings. A nearly empty batch stays quiet."
+      "x": "Some foods warn earlier. Change the times in Menu and settings, **Batch expiry warnings only**. A nearly empty batch stays quiet."
      },
      {
       "t": "p",
@@ -1144,7 +1144,7 @@
       "t": "ul",
       "x": [
        "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Smokebox writes down the cooler, freezer, thermometer and sanitizer strip readings you type under Readings. It cannot check them, and it may not be the record your health department asks for. Keep a paper log if they require one. Your own food-safety plan, your training and your thermometer checks still apply.",
-       "Your local health code. The limits Smokebox starts with (such as 4 hours, the check interval and one reheat per batch) are starting values, not your local rules. Set the limits your local health department gives you.",
+       "Your local health code. The limits Smokebox starts with (such as each dish's hold time, 4 to 8 hours, and the check interval) are starting values, not your local rules. Set the limits your local health department gives you. The one reheat per batch is Smokebox's own fixed rule; if your local rule is stricter, follow it.",
        "Card processing. Smokebox only writes down how an order was paid. Keep your card reader and your processor.",
        "Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.",
        "Allergy care. A note on a ticket is a reminder. Tell your staff about every allergy, and follow your own allergen rules.",
@@ -1187,7 +1187,7 @@
       "t": "check",
       "x": [
        "Orders: every open order paid or cancelled, then Close the day",
-       "If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)",
+       "If you cook ahead: every batch left in the cabinet decided (keep it, or throw it out)",
        "If you cook ahead: surfaces wiped and Sanitize logged",
        "Food kept over a day: labeled with a date, as your local rule says",
        "Final cooler and freezer readings written down",

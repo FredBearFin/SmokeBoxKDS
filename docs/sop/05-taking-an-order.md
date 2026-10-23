@@ -29,4 +29,4 @@ Tap **New ticket** again and choose **Add to open order**. The new ticket is add
 ## Fixing a mistake
 
 - **Undo** appears for 10 seconds after an action. After that, fix it by hand.
-- To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. Cancelled tickets are still counted in your reports.
+- To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. A cancelled ticket is left out of your sales and money, and shows only in the count of voided tickets.
