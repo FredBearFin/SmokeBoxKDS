@@ -366,3 +366,5 @@ a.of-nav:active { background: var(--press); }
 
 @media (max-width: 1100px) { .of-nav-off { display: none; } }
 .of-page[data-coach="on"] > .of-headline { display: none; }
+.of-wdrow { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.of .of-wd { min-height: 34px; padding: 0 10px; }

@@ -338,6 +338,14 @@
   const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   // Short date label such as "Fri 10/16".
   const dateShort = (ts) => { const d = new Date(ts); return WD[d.getDay()] + ' ' + (d.getMonth() + 1) + '/' + d.getDate(); };
+  // With three or more plain lines the colors alone are not enough for a colour-blind reader, so the third and fourth
+  // line get a dotted and a dashed pattern. Bands, areas, stacked charts and charts with fewer lines stay solid.
+  function autoDash(spec, s, i) {
+    const list = Array.isArray(spec.series) ? spec.series : [];
+    const plain = list.filter((x) => x && x.kind !== 'band' && !x.area).length;
+    if (spec.stacked || s.area || s.kind === 'band' || plain < 3) return null;
+    return [null, null, '2 4', '9 4'][i % 4];
+  }
   // Gram axis label: "850 g" below a thousand, "1.5 kg" from there.
   const fmtGAxis = (v) => (!isNum(v) ? '-' : U.units && U.units.weight === 'lb' && U.weightText ? U.weightText(v) : Math.abs(v) >= 1000 ? trim0((v / 1000).toFixed(1)) + ' kg' : Math.round(v) + ' g');
 
@@ -1011,7 +1019,7 @@
     const s = S('svg', { class: 'ch-sw', width: it.kind === 'line' ? 18 : 12, height: 12, viewBox: it.kind === 'line' ? '0 0 18 12' : '0 0 12 12', 'aria-hidden': 'true', focusable: 'false' });
     const fill = 'fill:' + it.css;
     if (it.kind === 'line') {
-      s.appendChild(S('line', { x1: 1, y1: 6, x2: 17, y2: 6, style: 'stroke:' + it.css + ';stroke-width:2;stroke-linecap:round', 'stroke-dasharray': it.dash ? '4 3' : null }));
+      s.appendChild(S('line', { x1: 1, y1: 6, x2: 17, y2: 6, style: 'stroke:' + it.css + ';stroke-width:2;stroke-linecap:round', 'stroke-dasharray': it.dash || null }));
       if (it.dot) s.appendChild(S('circle', { cx: 9, cy: 6, r: 3, style: fill + ';stroke:var(--ch-surface);stroke-width:1.5' }));
     } else if (it.kind === 'ring') {
       s.appendChild(S('circle', { cx: 6, cy: 6, r: 4, style: 'fill:var(--ch-surface);stroke:' + it.css + ';stroke-width:2' }));
@@ -1238,7 +1246,7 @@
       let sorted = true; for (let k = 1; k < pts.length; k++) if (pts[k].x < pts[k - 1].x) { sorted = false; break; }
       if (!sorted) pts.sort((a, b) => a.x - b.x);
       const id = s.id != null ? String(s.id) : 'series' + i;
-      return { id, name: s.name != null ? String(s.name) : id, key: st.key, css: st.css, area: !!s.area || !!spec.stacked, dash: !!s.dash, band, pts, hidden: chart.hidden.has(id), raw: s };
+      return { id, name: s.name != null ? String(s.name) : id, key: st.key, css: st.css, area: !!s.area || !!spec.stacked, dash: s.dash ? '6 4' : autoDash(spec, s, i), band, pts, hidden: chart.hidden.has(id), raw: s };
     });
     const vis = series.filter((s) => !s.hidden);
     const has = vis.some((s) => s.pts.some((p) => p.y != null));
@@ -1400,7 +1408,7 @@
           for (let i = 0; i < dx.length; i++) { if (dy[i] == null) flush(); else run.push([dx[i], dy[i]]); }
           flush();
         }
-        marks.appendChild(S('path', { d, class: 'ch-ln', style: 'stroke:' + s.css, 'stroke-dasharray': s.dash ? '6 4' : null }));
+        marks.appendChild(S('path', { d, class: 'ch-ln', style: 'stroke:' + s.css, 'stroke-dasharray': s.dash || null }));
         drawn.push({ s, xs, ys });
       });
     }
@@ -2006,7 +2014,7 @@
     }
     // overlay step outlines
     const go = S('g', { class: 'ch-g-ov ch-rv-right' });
-    visOv.forEach((o) => {
+    visOv.forEach((o, oi) => {
       let d = '';
       for (let i = 0; i < b.n; i++) {
         const x0 = r1(X(b.lo + i * b.binSize)), x1 = r1(X(b.lo + (i + 1) * b.binSize)), y = r1(Y(o.c[i]));
@@ -2014,7 +2022,7 @@
       }
       d += 'V' + r1(bot);
       go.appendChild(S('path', { d: d + 'Z', style: 'fill:' + o.s.css + ';fill-opacity:.1;stroke:none' }));
-      go.appendChild(S('path', { d: d.replace(/Z$/, ''), class: 'ch-ln', style: 'stroke:' + o.s.css + ';stroke-linejoin:miter' }));
+      go.appendChild(S('path', { d: d.replace(/Z$/, ''), class: 'ch-ln', style: 'stroke:' + o.s.css + ';stroke-linejoin:miter', 'stroke-dasharray': visOv.length >= 3 ? [null, null, '2 4', '9 4'][oi % 4] : null }));
     });
     svg.appendChild(go);
     drawRefLines(svg, chart, (spec.refLines || []).map((q) => (q.value == null && q.x != null ? Object.assign({}, q, { value: q.x }) : q)), { orient: 'v', scale: X, l, r, t: top, b: bot });
