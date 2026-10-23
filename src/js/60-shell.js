@@ -325,7 +325,9 @@
     if (asked) { role = asked; if (U) U.storage.set(KEY.role, asked); }
     let v = viewFor(g.location.hash);
     const start = startViewFor(role);
-    if (start && (asked || !g.location.hash)) { // a role device opens on its own screen
+    // A role device opens on its own screen. An address that names the office (?role=kitchen#/office) still opens the
+    // office (behind its PIN) instead of silently showing the role screen.
+    if (start && (!g.location.hash || (asked && v.kind !== 'office'))) {
       v = start;
       try { g.history.replaceState({ sbIdx: idx }, '', hashFor(v)); } catch (e) { /* ignore */ }
     } else if (!g.location.hash && lastZone !== 'all') { // a tablet pinned to a station opens on it
@@ -684,7 +686,9 @@
   // focused, not opened twice. An opener that throws is logged and toasted.
   sheets.open = function (name, opts) {
     const fn = reg[name];
-    if (typeof fn !== 'function') { ui.toast('That screen is not part of this build yet.', { tone: 'warn' }); return null; }
+    // When a file failed to load at start-up that is the likely cause, so the message says so and offers the fix.
+    const failedLoad = Array.isArray(g.__sbLoadErrors) && g.__sbLoadErrors.length > 0;
+    if (typeof fn !== 'function') { ui.toast(failedLoad ? 'That screen did not load. Reload the page to try again.' : 'That screen is not part of this build yet.', { tone: 'warn' }); return null; }
     const existing = sheetStack.find((r) => r.name === name && !r.closed);
     if (existing) { try { existing.el.focus({ preventScroll: true }); } catch (e) { /* ignore */ } return existing.api; }
     openingName = name;
@@ -1217,8 +1221,11 @@
       if (S.inOffice()) { e.preventDefault(); S.extinguish(); }
       return;
     }
+    // WATCH OUT: the office key does nothing while a sheet, the PIN keypad or a menu is open. Otherwise it stacked a second
+    // keypad, opened the office under a floor sheet, or closed the office while one of its own sheets was still open.
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'O' || e.key === 'o') && st.mounted) {
       e.preventDefault();
+      if (sheetStack.length || menuState) return;
       if (S.inOffice()) S.extinguish(); else S.ignite();
     }
   });
@@ -1668,7 +1675,17 @@
     st.guideOpen = true;
     if (st.officeOpen) closeOffice();
     layers.floor.hidden = true; layers.order.hidden = true; layers.guide.hidden = false;
-    try { SB.guide.mount(layers.guide, { page }); } catch (e) { console.error('[smokebox] guide failed to open', e); }
+    try { SB.guide.mount(layers.guide, { page }); } catch (e) {
+      console.error('[smokebox] guide failed to open', e);
+      // A failed Guide gets an error card and a way back, never an empty screen with the board hidden behind it.
+      try {
+        U.clear(layers.guide);
+        // Back to the board leaves the Guide address, which takes the failed Guide down.
+        const back = h('button', { type: 'button', class: 'btn btn-primary', onClick: () => R.go(R.home(), { replace: true }) }, ico('chevron-left', 20), h('span', null, 'Back to the board'));
+        layers.guide.append(ui.errorCard(e, { title: 'The Guide could not open', module: '78-guide.js' }), back);
+        back.focus({ preventScroll: true });
+      } catch (e2) { R.go(R.home(), { replace: true }); }
+    }
   }
   // Takes the Guide down and shows the board (or the order page) again; does nothing if it was not open.
   function closeGuidePage() {
@@ -1691,7 +1708,16 @@
         layers.order.hidden = false; layers.floor.hidden = true;
         st.orderCleanup = SB.order.mount(layers.order) || null;
       } else if (sheets.open) sheets.open('order');
-    } catch (e) { console.error('[smokebox] order page failed to open', e); }
+    } catch (e) {
+      console.error('[smokebox] order page failed to open', e);
+      // A failed order page falls back to the New ticket sheet over the board, so orders can still be taken.
+      try {
+        if (layers.order) { U.clear(layers.order); layers.order.hidden = true; }
+        if (layers.floor) layers.floor.hidden = false;
+        ui.toast('The order page did not load, so New ticket opens over the board instead. Reload the page to try again.', { tone: 'warn' });
+        if (sheets.open) sheets.open('order');
+      } catch (e2) { /* the toast above or the board is all that is left */ }
+    }
   }
   // Takes the order page down and shows the board again; does nothing if it was not open.
   function closeOrderPage() {
@@ -1708,7 +1734,7 @@
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, kind: '', sub: null };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, kind: '', text: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -1745,9 +1771,10 @@
     let w = null;
     try { w = bannerWanted(); } catch (e) { w = null; }
     if (!w) { if (bn.el) { bn.el.remove(); bn.el = null; bn.kind = ''; st.shell.removeAttribute('data-banner'); } return; }
-    if (bn.el && bn.kind === w.kind) return;
+    // The same kind with new words (the two save messages differ) is drawn again, so the text always matches its cause.
+    if (bn.el && bn.kind === w.kind && bn.text === w.text) return;
     if (bn.el) bn.el.remove();
-    bn.kind = w.kind;
+    bn.kind = w.kind; bn.text = w.text;
     // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
