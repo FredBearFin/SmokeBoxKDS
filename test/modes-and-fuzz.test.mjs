@@ -32,7 +32,7 @@ function genAction(r, s, t) {
   const pick = (a) => (a.length ? a[Math.floor(r.next() * a.length)] : undefined);
   const dishes = s.menu.filter((m) => !m.archived), any = pick(s.menu), ing = pick(s.ingredients), tk = pick(s.tickets.filter((x) => x.status === 'active')), od = pick(s.orders || []);
   const junk = r.next() < 0.12;
-  const kinds = ['addMenuItem', 'addMenuItem', 'addIngredient', 'setPortions', 'setPortions', 'moveMenuItem', 'recipe', 'restock', 'createTicket', 'createTicket', 'createTicket', 'work', 'work', 'bump', 'pay', 'closeDay', 'resetLive', 'modules', 'toggle86', 'undo', 'import', 'archive', 'price', 'batch'];
+  const kinds = ['addMenuItem', 'addMenuItem', 'addIngredient', 'setPortions', 'setPortions', 'moveMenuItem', 'recipe', 'restock', 'createTicket', 'createTicket', 'createTicket', 'work', 'work', 'bump', 'pay', 'closeDay', 'resetLive', 'modules', 'toggle86', 'undo', 'import', 'archive', 'price', 'batch', 'demoTicket', 'clearDemo'];
   const k = pick(kinds);
   const J = (v) => (junk ? pick([undefined, null, NaN, -1, 'x', {}, [], 1e9, '__proto__']) : v);
   switch (k) {
@@ -56,6 +56,8 @@ function genAction(r, s, t) {
       const out = MI.toActions(MI.parse(text, { existing: s.menu }).rows, s.menu).actions;
       return out.length ? [out[0].type, out[0].payload] : ['addMenuItem', {}];
     }
+    case 'demoTicket': return ['createTicket', { customer: 'demo', channel: 'dine_in', items: dishes.length ? [{ menuId: pick(dishes).id, qty: 1 }] : [], src: pick(['demo', 'sample']) }];
+    case 'clearDemo': return ['clearDemoTickets', {}];
     case 'archive': return ['updateMenuItem', { id: J((any || {}).id), patch: { archived: r.next() < 0.5 } }];
     case 'price': return ['updateMenuItem', { id: J((any || {}).id), patch: { price: pick([0, 5, 12.25, 5000]) } }];
     default: return ['addBatch', { ing: (s.ingredients.find((i) => i.tcs) || {}).id, tempF: 160, cookedG: 2000 }];

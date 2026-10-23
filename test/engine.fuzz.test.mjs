@@ -287,8 +287,9 @@ test('fuzz: 200 random sequences x 60 steps keep I1-I15 after every step', () =>
   const total = Object.values(stats).reduce((a, n) => a + n, 0);
   assert.equal(total, 200 * 60);
   // coverage: every action type succeeded at least once, and a healthy share of steps changed the state
+  // clearDemoTickets needs tickets made by the old in-place demo (test/start-over.test.mjs covers it).
   // keepServing and endKeepServing need a past-quality batch with a fresh reading; the unit tests cover their success paths.
-  for (const type of Object.keys(SB.engine.ACTIONS).filter((x) => x !== 'uiReport' && x !== 'closeDay' && x !== 'keepServing' && x !== 'endKeepServing')) assert.ok(stats[type + ':ok'] > 0, 'never succeeded: ' + type);
+  for (const type of Object.keys(SB.engine.ACTIONS).filter((x) => x !== 'uiReport' && x !== 'closeDay' && x !== 'clearDemoTickets' && x !== 'keepServing' && x !== 'endKeepServing')) assert.ok(stats[type + ':ok'] > 0, 'never succeeded: ' + type);
   assert.ok(ok / total > 0.25, 'ok share ' + ok / total);
   const distinct = new Set(Object.keys(stats).map((k) => k.split(':')[1]));
   assert.ok(distinct.size >= 25, 'reports exercised: ' + distinct.size);
