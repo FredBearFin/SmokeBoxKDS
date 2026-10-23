@@ -19956,7 +19956,11 @@ a.of-nav:active { background: var(--press); }
   S.checkPin = async function (pin) { const want = pinHash(); if (!want) return true; return (await S.hashPin(pin)) === want; };
   // Sets (4 digits) or removes (null or '') the manager PIN. Only the scramble is saved, through the store
   // (settings.office.pinHash); any unlock is forgotten. Resolves {ok, report}; bad input gives 'badPin'.
-  S.setPin = async function (pin) {
+  // Asks for the current PIN right now (the keypad), even inside the 2-minute grace. True at once when no PIN is set; false when cancelled.
+  S.requirePin = () => (S.hasPin() ? promptPin() : Promise.resolve(true));
+  S.setPin = async function (pin, opts) {
+    // With a PIN already set, changing or removing it needs proof that the current PIN was just entered (opts.verified from requirePin).
+    if (S.hasPin() && !(opts && opts.verified === true)) return { ok: false, report: 'pinRequired', message: 'The current PIN is needed to change or remove it.' };
     if (pin != null && pin !== '' && !/^\d{4}$/.test(String(pin))) return { ok: false, report: 'badPin', message: 'Use exactly 4 digits.' };
     const hash = pin == null || pin === '' ? null : await S.hashPin(pin);
     if (!SB.store || typeof SB.store.dispatch !== 'function') return { ok: false, report: 'noStore', message: 'The store is not available.' };
@@ -25935,6 +25939,8 @@ a.of-nav:active { background: var(--press); }
         body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
+      // With a PIN set, clearing live data asks for it.
+      if (SB.shell && SB.shell.requirePin && !(await SB.shell.requirePin())) { toast('The PIN was not entered. Nothing was cleared.', 'warn'); return; }
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
       const rep = SB.store.resetLive({ keepSettings: true, starter: false });
       if (rep === 'ok') toast('Live data cleared. The board is empty.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
@@ -28566,7 +28572,7 @@ a.of-nav:active { background: var(--press); }
       if (rows.some((r) => !r.category)) preview.appendChild(h('div', { class: 'fs-row dp-bulk' }, h('label', null, 'Put all these dishes in: '), bulkCat));
       // Choosing a section sets it on every row that has none of its own.
       bulkCat.addEventListener('change', () => { if (bulkCat.value) rows.forEach((r) => { if (!r.categoryText) r.category = bulkCat.value; }); });
-      const body = h('div', { class: 'dp-ptable', role: 'table', 'aria-label': 'Dishes found' });
+      const body = h('div', { class: 'dp-ptable', role: 'list', 'aria-label': 'Dishes found' });
       const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'import-go' } }, 'Import');
       // Updates the Import button's count and enabled state from the ticked, valid rows.
       const paintGo = () => { const n = rows.filter((r) => r.keep && r.ok).length; go.disabled = n === 0; go.textContent = n ? 'Import ' + n + ' ' + U.plural(n, 'dish', 'dishes') : 'Nothing to import'; };
@@ -28580,7 +28586,7 @@ a.of-nav:active { background: var(--press); }
         const prCell = h('div', { class: 'dp-prcell' }, pr, readAs);
         const zs = h('select', { class: 'select', 'aria-label': 'Station, line ' + r.line }, stations().map((z) => h('option', { value: z.id, selected: (r.station || defaultZone()) === z.id }, z.name)));
         const prob = h('div', { class: 'fs-sub dp-prob' });
-        const rowEl = h('div', { class: 'dp-prow', role: 'row', dataset: { ok: r.ok ? 'true' : 'false' } }, keepWrap, nm, prCell, zs, prob);
+        const rowEl = h('div', { class: 'dp-prow', role: 'listitem', 'aria-label': 'Line ' + r.line, dataset: { ok: r.ok ? 'true' : 'false' } }, keepWrap, nm, prCell, zs, prob);
         // Redraws this row's plain problems and its tick after any edit.
         const redo = () => {
           r.ok = rowOk(r); if (!r.ok) r.keep = false;
@@ -28680,6 +28686,12 @@ a.of-nav:active { background: var(--press); }
   // Opens "Start over with an empty menu": three plain steps (what goes and what stays, save a backup, type the word). This cannot
   // be undone, so the screen says so first and offers a backup before anything is erased.
   function openStartOver() {
+    // With a PIN set, the keypad comes first; the sheet opens only for the right PIN.
+    if (SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.shell.requirePin) { SB.shell.requirePin().then((ok) => { if (ok) buildStartOver(); }); return null; }
+    return buildStartOver();
+  }
+  // Builds the Start over sheet (after the PIN, when one is set).
+  function buildStartOver() {
     const sheet = SB.ui.sheet({ title: 'Start over with an empty menu', side: 'right', width: 'min(640px, 96vw)', name: 'startover' });
     const root = h('div', { class: 'dp so' });
     const keep = h('input', { type: 'checkbox', checked: true, id: 'so-keep' });
@@ -28694,10 +28706,30 @@ a.of-nav:active { background: var(--press); }
     const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: about your backup');
     step1.appendChild(next1);
 
-    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' } }, 'Next: confirm');
+    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' }, disabled: true }, 'Next: confirm');
+    let backupInfo = null; // what the backup file was called and how big, once it was handed to the browser
+    const bkSt = h('p', { class: 'fs-sub dp-msg', role: 'status', dataset: { role: 'so-backup-msg' } });
+    // Saves the backup file now, before anything is erased, and asks the person to confirm they can find it.
+    const saveNow = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'so-save-backup' }, onClick: () => {
+      let text = null; try { text = SB.store.exportAll(); } catch (e) { text = null; }
+      if (!text) { tell(bkSt, 'The backup could not be made, so nothing can be erased. Nothing was changed.', 'bad'); return; }
+      // Pads a number to two digits so the backup file name sorts by time.
+      const d = new Date(), pad2 = (n) => String(n).padStart(2, '0');
+      const filename = 'smokebox-backup-before-start-over-' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '-' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.json';
+      try { const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' })); const a = doc.createElement('a'); a.href = url; a.download = filename; a.style.display = 'none'; doc.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 4000); }
+      catch (e) { tell(bkSt, 'This browser would not save the file. Nothing was erased. Try again, or back up from Back office, Data first.', 'bad'); return; }
+      backupInfo = { filename, chars: text.length };
+      tell(bkSt, 'Asked your browser to save ' + filename + ' (' + Math.max(1, Math.round(text.length / 1024)) + ' KB). Look in your downloads folder to be sure it is there.', 'ok');
+      sawIt.disabled = false; saveNow.textContent = 'Save it again';
+    } }, 'Save my backup file now');
+    const sawIt = h('input', { type: 'checkbox', id: 'so-saw', disabled: true, dataset: { act: 'so-saw' } });
+    // The next step opens only after the person says the file is saved and they can find it.
+    sawIt.addEventListener('change', () => { next2.disabled = !(sawIt.checked && backupInfo); });
     const step2 = h('section', { class: 'fs-section so-step', hidden: true },
       h('h3', { class: 'fs-h' }, '2. Your backup'),
-      h('p', { class: 'fs-sub' }, 'The moment you confirm, Smokebox saves a backup file with everything in your kitchen as it is now, then erases. The file goes to your downloads: keep a copy off this device. If the backup cannot be made, nothing is erased.'),
+      h('p', { class: 'fs-sub' }, 'First save a backup file with everything in your kitchen as it is now. It goes to your downloads: keep a copy off this device. Nothing is erased until you say you saved it.'),
+      saveNow, bkSt,
+      h('label', { class: 'dp-check-row', for: 'so-saw' }, sawIt, h('span', null, 'I saved the backup file and I can find it')),
       h('p', { class: 'fs-sub' }, 'To bring everything back later: Back office, Data, Restore.'), next2);
 
     const word = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': 'Type ' + START_OVER_WORD + ' to confirm', placeholder: START_OVER_WORD });
@@ -28719,13 +28751,14 @@ a.of-nav:active { background: var(--press); }
     go.addEventListener('click', () => {
       const keepIt = keep.checked;
       // The store makes its own backup first, clears the kitchen, my saved setup bits and (when asked) the settings and station names.
-      const res = SB.store.startOver({ confirm: word.value, keepSettings: keepIt });
+      const res = SB.store.startOver({ confirm: word.value, keepSettings: keepIt, backupSaved: backupInfo });
       if (!res.ok) {
         let w = res.report;
         try { w = SB.engine.describe(res.report, res.info, SB.store.getState().settings) || w; } catch (e) { /* keep the code */ }
-        if (res.report === 'confirmWord') w = 'Type ' + START_OVER_WORD + ' exactly, then try again. Nothing was erased.';
+        if (res.report === 'backupRequired') w = 'Save the backup file first (step 2). Nothing was erased.';
+        else if (res.report === 'confirmWord') w = 'Type ' + START_OVER_WORD + ' exactly, then try again. Nothing was erased.';
         else if (res.report === 'notInDemo') w = 'You are in the demo, so there is nothing of yours to erase here. Tap Back to my kitchen first.';
-        tell(goSt, w + (res.report === 'confirmWord' || res.report === 'notInDemo' ? '' : ' Nothing was erased.'), 'bad');
+        tell(goSt, w + (res.report === 'confirmWord' || res.report === 'notInDemo' || res.report === 'backupRequired' ? '' : ' Nothing was erased.'), 'bad');
         return;
       }
       const needsReload = !keepIt;
@@ -28881,9 +28914,11 @@ a.of-nav:active { background: var(--press); }
 
   // Makes a new recovery code and shows it once on a "write this down" screen with Copy and Print. The Done button stays off until the
   // owner selects "I saved it". Needs a PIN; says plainly why when it cannot make one. Used after a PIN is set, and from the PIN section.
-  async function showRecoveryCode() {
+  async function showRecoveryCode(opts) {
     const st = SB.store;
     if (!st || typeof st.createRecoveryCode !== 'function') return false;
+    // A new code replaces the old one, so with a PIN set the current PIN must be entered first (unless it was just entered).
+    if (!(opts && opts.verified) && SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.shell.requirePin && !(await SB.shell.requirePin())) { if (SB.ui.toast) SB.ui.toast('The PIN was not entered, so no recovery code was made.', { tone: 'warn' }); return false; }
     const r = await st.createRecoveryCode();
     if (!r.ok) { let w = r.report; try { w = SB.engine.describe(r.report, r.info, st.getState().settings) || w; } catch (e) { /* keep the code */ } if (SB.ui.toast) SB.ui.toast('The recovery code could not be made. ' + w, { tone: 'warn' }); return false; }
     const sheet = SB.ui.sheet({ title: 'Write down your recovery code', side: 'center', width: 'min(560px, 96vw)', name: 'recoverycode' });
@@ -29329,9 +29364,12 @@ a.of-nav:active { background: var(--press); }
       h('button', { type: 'button', class: 'btn', onClick: async () => {
         const v = pin.value.trim();
         if (!/^\d{4}$/.test(v)) { tell(pinSt, 'Use exactly 4 digits.'); return; }
-        const r = SB.shell && SB.shell.setPin ? await SB.shell.setPin(v) : { ok: false };
+        // With a PIN already set, the current PIN must be entered first, so a cook cannot take over the back office.
+        const hadPin = !!(SB.shell && SB.shell.hasPin && SB.shell.hasPin());
+        if (hadPin && !(await SB.shell.requirePin())) { tell(pinSt, 'The PIN was not changed. The current PIN is needed to change it.', 'bad'); return; }
+        const r = SB.shell && SB.shell.setPin ? await SB.shell.setPin(v, { verified: true }) : { ok: false };
         tell(pinSt, r.ok ? 'PIN set. The back office will ask for it.' : 'The PIN could not be saved.');
-        if (r.ok) { pin.value = ''; await showRecoveryCode(); }
+        if (r.ok) { pin.value = ''; await showRecoveryCode({ verified: true }); }
       } }, 'Set PIN'),
       // For a PIN set before recovery codes existed: makes the code now.
       SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.store.hasRecoveryCode && !SB.store.hasRecoveryCode() ? h('button', { type: 'button', class: 'btn', dataset: { act: 'make-recovery' }, onClick: () => showRecoveryCode() }, 'Make a recovery code') : null);
@@ -35583,7 +35621,7 @@ a.of-nav:active { background: var(--press); }
           pin = n1.input.value;
         }
         let res;
-        try { res = await SB.shell.setPin(pin); } catch (e) { res = { ok: false, report: 'error' }; }
+        try { res = await SB.shell.setPin(pin, { verified: true }); } catch (e) { res = { ok: false, report: 'error' }; }
         if (res && res.ok) {
           closeForm();
           SB.ui.toast(pin ? (m === 'set' ? 'PIN set. The back office will ask for it next time.' : 'PIN changed. The back office will ask for the new one next time.') : 'PIN removed. The back office opens without asking.', { tone: 'ok' });
@@ -36131,6 +36169,8 @@ a.of-nav:active { background: var(--press); }
           'There is no undo. If you might want what is here now, cancel and download a backup first.'],
       });
       if (!ok) return;
+      // With a PIN set, restoring a backup asks for it again, even inside the back office grace period.
+      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was restored.', { tone: 'warn' }); return; }
       const rep = SB.store.importAll(p.text);
       if (rep === 'ok') {
         clearImport(); pasteArea.value = ''; fileIn.value = '';
@@ -36193,7 +36233,9 @@ a.of-nav:active { background: var(--press); }
           k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
           'There is no undo. Back up first if you might want this data.'],
         // Clears the live data after the word was typed.
-        run: () => {
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
           const rep = SB.store.resetLive({ keepSettings: k, starter: false });
           if (rep === 'ok') { resetStatus.ok('Live data erased. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data erased.', { tone: 'ok' }); }
           else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
@@ -36208,7 +36250,9 @@ a.of-nav:active { background: var(--press); }
         lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
           'Your display choices (themes and text size) are kept.', 'There is no undo. Back up first if you might want any of it back.'],
         // Erases everything after the word was typed.
-        run: () => {
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
           const rep = SB.store.reset();
           if (rep === 'ok') { resetStatus.ok('Everything was reset to the starter values.'); SB.ui.toast('Everything was reset.', { tone: 'ok' }); }
           else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
