@@ -29,7 +29,7 @@ function busyKitchen(b) {
   }
   S.dispatch('discardBatch', { batchId: S.getState().batches[0].id, reason: 'manual' });
   const spec = { rename: { zones: { pit: 'Smoker' } }, add: {} }; C.applyCustom(spec); C.saveCustom(spec);
-  b.set('smokebox.v1.setup.draft', { name: 'half' }); b.set('smokebox.v1.setup.examples', ['tea']); b.set('smokebox.v1.setup.hiddenStations', ['fry']);
+  b.set('smokebox.v1.setup.draft', { name: 'half' }); b.set('smokebox.v1.setup.hiddenCategories', ['fried']); b.set('smokebox.v1.setup.lastCategory', 'meat'); b.set('smokebox.v1.setup.examples', ['tea']); b.set('smokebox.v1.setup.hiddenStations', ['fry']);
   b.set('smokebox.v1.welcome', 'done'); b.set('smokebox.v1.dlog', { initials: { b_1: 'JR' } }); b.set('smokebox.v1.theme', 'night'); b.set('smokebox.v1.lastbackup', 12345);
   S.flush();
 }
@@ -68,7 +68,7 @@ test('start over takes a backup first, clears everything, keeps settings, and is
     assert.deepEqual([s.settings.service.taxRatePct, s.settings.office.pinHash], [8, 'sha256:' + 'ab12'.repeat(16)]);   // kept
     assert.equal(E.moduleOn(s, 'cookAhead'), false);
     assert.deepEqual(C.customSpec(), { rename: { zones: { pit: 'Smoker' } }, add: {} });                               // station names kept
-    for (const k of ['setup.draft', 'setup.examples', 'setup.hiddenStations', 'welcome', 'dlog']) assert.equal(b.m.has('smokebox.v1.' + k), false, k);
+    for (const k of ['setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.hiddenCategories', 'setup.lastCategory', 'welcome', 'dlog']) assert.equal(b.m.has('smokebox.v1.' + k), false, k);
     assert.equal(b.get('smokebox.v1.theme', null), 'night'); assert.equal(b.get('smokebox.v1.lastbackup', null), 12345);
     assert.deepEqual(E.checkInvariants(s, S.now()), []);
     // same as a brand-new blank install (ids keep counting so they are never reused)
