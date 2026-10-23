@@ -1,4 +1,4 @@
-// Wall mode numbers: money so far, late count, 86 list, brisket run-out and the order lists for the side panes.
+// Wall mode orders pane: the open and paid order lists. (The glance panel has its own tests in glance.test.mjs.)
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSB } from './_load.mjs';
@@ -7,38 +7,29 @@ const SB = await loadSB(['00-util', '10-config', '20-engine', '25-deadlines']);
 const E = SB.engine, D = SB.deadlines;
 const T0 = Date.UTC(2026, 9, 12, 16, 0, 0), MIN = 60e3;
 
-test('glance: an empty kitchen has no money, no late tickets and brisket "none"', () => {
+test('orders pane: an empty kitchen has no orders', () => {
   const s = E.newState({ now: T0, empty: true });
-  const g = D.wallGlance(s, T0, D.build(s, T0), E.views.counts(s, T0));
-  assert.equal(g.money, 0); assert.equal(g.paidCount, 0); assert.equal(g.late, 0);
-  assert.equal(g.brisket.kind, 'none');
-  assert.deepEqual(g.open, []);
+  assert.deepEqual(D.wallOrders(s, T0), { paidCount: 0, open: [], paid: [] });
 });
 
-test('glance: an open order is listed, a paid one adds its total to money so far and moves to the paid list', () => {
+test('orders pane: an open order is listed with its rounds and total, then moves to the paid list when paid', () => {
   let s = E.newState({ now: T0, stagger: true });
   const mi = SB.config.menu.slice(0, 1).map((m) => ({ menuId: m.id, qty: 1 }));
   let r = E.apply(s, 'createTicket', { customer: 'Table 9', channel: 'dine_in', items: mi }, T0 + MIN);
   assert.equal(r.report, 'ok'); s = r.state;
-  let g = D.wallGlance(s, T0 + 2 * MIN, [], E.views.counts(s, T0 + 2 * MIN));
-  assert.equal(g.open.length, 1); assert.equal(g.open[0].name, 'Table 9'); assert.equal(g.open[0].rounds, 1); assert.equal(g.money, 0);
-  const oid = s.orders[0].id;
-  r = E.apply(s, 'payOrder', { orderId: oid, method: 'cash' }, T0 + 3 * MIN);
+  let g = D.wallOrders(s, T0 + 2 * MIN);
+  assert.equal(g.open.length, 1); assert.equal(g.open[0].name, 'Table 9'); assert.equal(g.open[0].rounds, 1); assert.ok(g.open[0].total > 0);
+  r = E.apply(s, 'payOrder', { orderId: s.orders[0].id, method: 'cash' }, T0 + 3 * MIN);
   assert.equal(r.report, 'ok'); s = r.state;
-  g = D.wallGlance(s, T0 + 4 * MIN, [], E.views.counts(s, T0 + 4 * MIN));
+  g = D.wallOrders(s, T0 + 4 * MIN);
   assert.equal(g.open.length, 0); assert.equal(g.paid.length, 1); assert.equal(g.paidCount, 1);
-  assert.equal(g.money, s.orders[0].totals.total);
+  assert.equal(g.paid[0].total, s.orders[0].totals.total);
 });
 
-test('glance: a forecast brisket run-out in the feed gives its time; brisket in the cabinet with no forecast is "enough"', () => {
-  const s = E.newState({ now: T0, stagger: true });
-  const g1 = D.wallGlance(s, T0, [{ kind: 'shortfall', ing: 'brisket', at: T0 + 90 * MIN }], {});
-  assert.equal(g1.brisket.kind, 'runout'); assert.equal(g1.brisket.at, T0 + 90 * MIN);
-  assert.equal(D.wallGlance(s, T0, [], {}).brisket.kind, 'enough');
-});
-
-test('glance: items that are 86 are named', () => {
-  const s = E.newState({ now: T0, empty: true });
-  const g = D.wallGlance(s, T0, [], {});
-  assert.ok(g.out86.length > 0, 'an empty kitchen has dishes that cannot be made');
+test('orders pane: an order paid on an earlier service day is not listed', () => {
+  let s = E.newState({ now: T0, stagger: true });
+  const mi = SB.config.menu.slice(0, 1).map((m) => ({ menuId: m.id, qty: 1 }));
+  s = E.apply(s, 'createTicket', { customer: 'Old', channel: 'dine_in', items: mi }, T0 + MIN).state;
+  s = E.apply(s, 'payOrder', { orderId: s.orders[0].id, method: 'cash' }, T0 + 2 * MIN).state;
+  assert.equal(D.wallOrders(s, T0 + 48 * 60 * MIN).paidCount, 0);
 });

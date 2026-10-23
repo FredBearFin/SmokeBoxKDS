@@ -570,6 +570,10 @@
     const on = wall && g.innerWidth >= WALL_MIN_PX;
     const v = on ? 'on' : 'off';
     if (m.root.dataset.wall !== v) { m.root.dataset.wall = v; m.fitKey = null; setTimeout(() => { if (m) { paintDensity(); fitHead(); } }, 0); }
+    // The glance panel is made the first time the wall shows and removed with the board.
+    if (on && !m.glance && SB.office && typeof SB.office.glance === 'function') {
+      try { const gh = SB.office.glance(m.wr.body, { size: 'wall' }); m.glance = gh; m.offs.push(() => gh.destroy()); } catch (e) { console.error('[smokebox] glance failed', e); }
+    }
     if (on) updateWall(store().now());
   }
   // Builds a pane: a title and a body, with the parts the updates change handed back.
@@ -587,27 +591,14 @@
     p.body.append(p.openH, p.openL, p.openMore, p.paidH, p.paidL, p.paidMore);
     return p;
   }
-  // The right pane: money so far, late tickets, the 86 list and the brisket run-out time, as four fixed tiles.
-  function buildWallGlance() {
-    const p = wallPane('fl-wall-glance', 'Manager glance', 'Manager glance');
-    // One tile: a small label over a big value, with an optional note line.
-    const tile = (id, label) => { const v = h('div', { class: 'fl-tile-v num' }), n = h('div', { class: 'fl-tile-n' }); const el = h('div', { class: 'fl-tile', dataset: { tile: id } }, h('div', { class: 'fl-tile-l' }, label), v, n); p.body.appendChild(el); return { el, v, n }; };
-    p.money = tile('money', 'Money so far today'); p.late = tile('late', 'Late tickets'); p.out86 = tile('out86', '86 list'); p.brisket = tile('brisket', 'Brisket');
-    return p;
-  }
-  // Rewrites both wall panes from the store: text and attributes only, rows keyed by order id.
+  // The right pane is the manager glance from the back office (SB.office.glance, wall size). It is drawn once, the
+  // first time the wall shows, and refreshes itself every 5 seconds; this only builds its empty pane.
+  function buildWallGlance() { return wallPane('fl-wall-glance', 'Manager glance', 'Manager glance'); }
+  // Rewrites the orders pane from the store: text and attributes only, rows keyed by order id.
   function updateWall(now) {
     if (!m || !m.wl || m.root.dataset.wall !== 'on') return;
     const state = store().getState();
-    const gl = SB.deadlines.wallGlance(state, now, m.feed || [], m.counts || {});
-    const M2 = U.fmtMoney;
-    setTxt(m.wr.money.v, M2(gl.money)); setTxt(m.wr.money.n, gl.paidCount + ' ' + U.plural(gl.paidCount, 'order') + ' paid');
-    setTxt(m.wr.late.v, String(gl.late)); setTxt(m.wr.late.n, gl.late ? 'Past their time. Worst one is first on the board.' : 'Nothing late.'); setTone(m.wr.late.el, gl.late ? 'bad' : 'ok');
-    setTxt(m.wr.out86.v, String(gl.out86.length)); setTxt(m.wr.out86.n, gl.out86.length ? gl.out86.slice(0, 8).join(', ') + (gl.out86.length > 8 ? ' and ' + (gl.out86.length - 8) + ' more' : '') : 'Everything is available.'); setTone(m.wr.out86.el, gl.out86.length ? 'warn' : 'ok');
-    const b = gl.brisket;
-    setTxt(m.wr.brisket.v, b.kind === 'runout' ? U.fmtTime(b.at) : b.kind === 'enough' ? 'Fine' : 'None');
-    setTxt(m.wr.brisket.n, b.kind === 'runout' ? 'Runs out at this pace.' : b.kind === 'enough' ? 'Enough at the current pace.' : 'No brisket in the cabinet.');
-    setTone(m.wr.brisket.el, b.kind === 'runout' ? 'warn' : b.kind === 'none' ? 'bad' : 'ok');
+    const gl = SB.deadlines.wallOrders(state, now), M2 = U.fmtMoney;
     // Orders: keep rows for the first 10 open and 6 paid, patch their text, drop the rest.
     const P = m.wl, want = [];
     gl.open.slice(0, 10).forEach((o) => want.push({ key: 'o' + o.id, list: P.openL, text: o.name, meta: o.rounds + ' ' + U.plural(o.rounds, 'round') + ', ' + M2(o.total) }));
