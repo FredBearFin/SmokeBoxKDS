@@ -1,0 +1,65 @@
+// Back office frame helpers that run without a browser: the single-day range and the day picker steps,
+// including the 4 am service-day boundary.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { loadSB } from './_load.mjs';
+
+const SB = await loadSB(['00-util', '10-config', '40-metrics', '80-office-core']);
+const P = SB.office.pure, U = SB.util;
+const at = (y, m, d, h, mi = 0) => new Date(y, m - 1, d, h, mi, 0, 0).getTime();
+
+test('dayRange covers one service day from 4 am to 4 am', () => {
+  const r = P.dayRange('2026-10-16', 4);
+  assert.ok(r.ok);
+  assert.equal(r.range.id, 'day');
+  assert.equal(r.range.fromKey, '2026-10-16');
+  assert.equal(r.range.toKey, '2026-10-16');
+  assert.equal(r.range.from, at(2026, 10, 16, 4));
+  assert.equal(r.range.to, at(2026, 10, 17, 4));
+});
+
+test('a sale at 1 am Saturday falls inside Friday, not Saturday', () => {
+  const fri = P.dayRange('2026-10-16', 4).range, sat = P.dayRange('2026-10-17', 4).range;
+  const late = at(2026, 10, 17, 1, 30);
+  assert.ok(late >= fri.from && late < fri.to);
+  assert.ok(!(late >= sat.from && late < sat.to));
+  // half open: exactly 4 am belongs to the new day
+  assert.ok(at(2026, 10, 17, 4) >= sat.from && at(2026, 10, 17, 4) < sat.to);
+  assert.ok(!(at(2026, 10, 17, 4) < fri.to));
+});
+
+test('day ranges honor a different start hour', () => {
+  const r = P.dayRange('2026-10-16', 6).range;
+  assert.equal(r.from, at(2026, 10, 16, 6));
+  assert.equal(r.to, at(2026, 10, 17, 6));
+});
+
+test('a range that matches rangePresets Today at 1 am has the same bounds as the day picker', () => {
+  const now = at(2026, 10, 17, 1, 0); // still Friday's service day
+  const today = SB.metrics.rangePresets(now, 4).find((x) => x.id === 'today');
+  assert.equal(today.fromKey, '2026-10-16');
+  const d = P.dayRange(U.serviceDate(now, 4), 4).range;
+  assert.equal(d.from, today.from);
+  assert.equal(d.to, today.to);
+});
+
+test('the day across a daylight saving change is still 23 or 25 hours long, never skipped', () => {
+  const r = P.dayRange('2026-11-01', 4).range; // US clocks fall back on Nov 1 2026
+  const hours = (r.to - r.from) / 36e5;
+  assert.ok(hours === 24 || hours === 25 || hours === 23, String(hours));
+  assert.equal(P.dayRange('2026-11-02', 4).range.from, r.to);
+});
+
+test('stepDayKey steps back freely and never past today', () => {
+  assert.equal(P.stepDayKey('2026-10-16', -1, '2026-10-16'), '2026-10-15');
+  assert.equal(P.stepDayKey('2026-10-16', 1, '2026-10-16'), null);
+  assert.equal(P.stepDayKey('2026-10-15', 1, '2026-10-16'), '2026-10-16');
+  assert.equal(P.stepDayKey('2026-03-01', -1, '2026-10-16'), '2026-02-28');
+  assert.equal(P.stepDayKey('nonsense', -1, '2026-10-16'), null);
+});
+
+test('pickerKey shows the last day of a range and never a future day', () => {
+  assert.equal(P.pickerKey({ toKey: '2026-10-14' }, '2026-10-16'), '2026-10-14');
+  assert.equal(P.pickerKey({ toKey: '2026-10-20' }, '2026-10-16'), '2026-10-16');
+  assert.equal(P.pickerKey(null, '2026-10-16'), '2026-10-16');
+});

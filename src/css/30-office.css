@@ -62,6 +62,10 @@ a.of-nav:active { background: var(--press); }
 .of .of-seg .seg-opt.is-off { opacity: 0.55; }
 .of .of-select, .of .of-date { min-height: 43px; padding-top: 0; padding-bottom: 0; font-size: var(--fs-2); width: auto; min-width: 11em; }
 .of .of-date { min-width: 9.5em; }
+/* The day picker: Previous day arrow, one date box, Next day arrow. */
+.of-daypick { display: flex; align-items: center; gap: var(--sp-1); }
+.of .of-daybtn { min-width: 43px; min-height: 43px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.of .of-daybtn:disabled { opacity: 0.4; }
 .of-custom { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-3); }
 .of-ferr { flex-basis: 100%; margin: 0; font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--crimson); }
 .of-fnote { font-size: var(--fs-1); color: var(--ink3); }
