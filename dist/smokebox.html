@@ -30383,6 +30383,23 @@ a.of-nav:active { background: var(--press); }
     return { dir, better, word, text, deltaPct: dp, delta };
   }
 
+  // How this screen relates to a shared kitchen: 'follower' (read only), 'hub' (writes to a shared kitchen) or 'solo'.
+  O.connection = function () {
+    try {
+      if (SB.store && SB.store.isFollower && SB.store.isFollower()) return 'follower';
+      if (SB.store && SB.store.isHub && SB.store.isHub()) return 'hub';
+    } catch (e) { /* treat an unreadable store as a single device */ }
+    return 'solo';
+  };
+  // The name of the screen an event or ticket came from, trimmed and short, or '' when none was recorded.
+  O.screenName = function (x) {
+    const n = x && typeof x.screen === 'string' ? x.screen.trim() : '';
+    return n.slice(0, 24);
+  };
+  // The plain words for what a follower screen can and cannot do in the back office.
+  O.FOLLOWER_WORDS = 'This screen only shows the shared kitchen. You can read every page, print and download a copy, but changes, closing the day, restoring and erasing are done on the main screen.';
+  // The plain words for a tablet that writes to a shared kitchen.
+  O.HUB_WORDS = 'This tablet is connected to the shared kitchen. A backup here is a copy of the whole shared kitchen. Restoring or erasing here would erase it for every screen, so those are done on the main computer.';
   O.pure = { PAGES, customRange, coachText, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
 
   if (!doc) return; // Node: the pure helpers are all the tests need
@@ -31910,6 +31927,10 @@ a.of-nav:active { background: var(--press); }
       // Draws the panel. If the ticket has left the data it says so instead.
       render(body) {
         const ds = ctx.dataset(), gt = M.ticketGantt(ds, row.ticketId);
+        // A shared kitchen records which screen entered the ticket; a single device records none, so nothing shows.
+        const tk = ((SB.store && SB.store.getState && SB.store.getState().tickets) || []).find((t) => t && t.id === row.ticketId);
+        const scr = O.screenName ? O.screenName(tk) : '';
+        if (scr) body.appendChild(h('p', { class: 'of-look' }, 'Entered by ' + scr + '.'));
         if (!gt || !gt.rows.length) { body.appendChild(K.empty({ title: 'This ticket is no longer in the data', body: 'It may have been cleared since the table was drawn. Close this panel and pick another ticket.' }).el); return null; }
         body.appendChild(h('p', { class: 'of-look' }, h('span', { class: 'of-look-l' }, 'What to look for: '), 'Each row is one item against the ticket clock. The gray bar is the paced hold, then waiting for a cook, then hands-on work. The last row is finished food waiting at expo.'));
         const host = h('div', { class: 'of-chart' }); body.appendChild(host);
@@ -33036,7 +33057,8 @@ a.of-nav:active { background: var(--press); }
       render: (body) => {
         const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
         body.append(h('p', { class: 'ob-text' }, 'Close the day when the last order is paid. You get today\'s totals by cash, card and other, a cash-in-the-drawer line, a backup button and a page to print.', help ? h('span', null, ' ', help) : null),
-          h('button', { type: 'button', class: 'btn btn-primary', 'data-k': 'close-day', onClick: () => { if (O.openCloseDay) O.openCloseDay(); } }, 'Close the day'));
+          h('button', { type: 'button', class: 'btn btn-primary', 'data-k': 'close-day', onClick: () => { if (O.openCloseDay) O.openCloseDay(); } }, 'Close the day'),
+          O.connection && O.connection() === 'follower' ? h('p', { class: 'ob-text' }, 'This screen only shows the shared kitchen. The sheet opens so you can read and print the day, but closing it is done on the main screen.') : null);
         // The address #/office/money?close=1 opens the sheet straight away.
         if (O.maybeOpenCloseDay) O.maybeOpenCloseDay();
         return {};
@@ -34899,6 +34921,33 @@ a.of-nav:active { background: var(--press); }
   }
 
   // Panel 8: what is stored, sample history, export, import and reset.
+  // Which erase buttons the Data page made, so the shared-kitchen lock can find them.
+  const resetBtnsRef = { live: null, all: null };
+
+  // Shuts the controls that would change or erase a shared kitchen. A follower can change nothing (every edit control is
+  // disabled; downloads and copies stay); a hub tablet keeps its edits but loses restore and both erase buttons.
+  function lockShared(content, conn, eraseBtns, P) {
+    // True for the controls that stay usable: downloads, copies, spreadsheet files and section summaries.
+    const keep = (el) => el.closest('[data-shared-ok]') || el.matches('[data-action="backup-download"],[data-action="backup-copy"]') || el.closest('.od-csv') || el.closest('summary');
+    // Disables one control and tells assistive tech why it does nothing.
+    const shut = (el) => { el.disabled = true; el.setAttribute('aria-disabled', 'true'); };
+    if (conn === 'follower') content.querySelectorAll('input,select,textarea,button').forEach((el) => { if (!keep(el)) shut(el); });
+    else content.querySelectorAll('[data-action="import-choose"],[data-action="import-check-paste"],[data-action="import-replace"],.od-paste').forEach(shut);
+    // Locks everything now and again whenever rows are redrawn later, since many controls are built after the first paint.
+    const apply = () => {
+      if (conn === 'follower') content.querySelectorAll('input,select,textarea,button').forEach((el) => { if (!el.disabled && !keep(el)) shut(el); });
+      else content.querySelectorAll('[data-action="import-choose"],[data-action="import-check-paste"],[data-action="import-replace"],.od-paste').forEach((el) => { if (!el.disabled) shut(el); });
+    };
+    if (typeof g.MutationObserver === 'function' && P) {
+      let pending = false;
+      const mo = new g.MutationObserver(() => { if (pending) return; pending = true; setTimeout(() => { pending = false; apply(); }, 0); });
+      mo.observe(content, { childList: true, subtree: true });
+      P.disposers.push(() => mo.disconnect());
+    }
+    for (const b of eraseBtns) if (b) { shut(b); b.title = conn === 'follower' ? 'Done on the main screen.' : 'Done on the main computer, because it erases the shared kitchen.'; }
+    content.querySelectorAll('.od-danger-h').forEach((h3) => { const n = document.createElement('p'); n.className = 'od-p'; n.textContent = conn === 'follower' ? 'Erasing is done on the main screen.' : 'Erasing is done on the main computer, because it would erase the shared kitchen for every screen.'; h3.after(n); });
+  }
+
   function buildData(P) {
     const pn = panel(SECTIONS[7], 'Everything Smokebox knows lives in this browser, on this device. Back it up before you reset, import or clear browser data.');
     // The one-time offer to clear old demo tickets from real reports; nothing is shown when there are none.
@@ -35192,6 +35241,7 @@ a.of-nav:active { background: var(--press); }
     const resetLiveBtn = btn('Erase tickets and records', { icon: 'trash', cls: 'btn-danger' });
     resetLiveBtn.dataset.action = 'reset-live';
     const resetAllBtn = btn('Erase everything', { icon: 'trash', cls: 'btn-danger' });
+    resetBtnsRef.live = resetLiveBtn; resetBtnsRef.all = resetAllBtn;
     resetAllBtn.dataset.action = 'reset-all';
     const dangerBox = h('div', { class: 'od-danger-box', hidden: true, role: 'group', 'aria-label': 'Confirm erasing data' });
     // Shows the confirm box: what will be erased, a field to type the word into, and a button that stays off until it matches.
@@ -35349,6 +35399,12 @@ a.of-nav:active { background: var(--press); }
       if (SECTIONS[i].group !== 'Advanced') { content.appendChild(panels[i].el); return; }
       content.appendChild(h('details', { class: 'od-adv' }, h('summary', null, 'Advanced: ' + SECTIONS[i].label), panels[i].el));
     });
+    // A follower or hub-connected tablet: say so at the top, and shut the controls that would change or erase the shared kitchen.
+    const conn = SB.office && SB.office.connection ? SB.office.connection() : 'solo';
+    if (conn !== 'solo') {
+      headBox.appendChild(h('p', { class: 'od-p od-conn', role: 'note', 'data-conn': conn }, conn === 'follower' ? SB.office.FOLLOWER_WORDS : SB.office.HUB_WORDS));
+      lockShared(content, conn, [resetBtnsRef.live, resetBtnsRef.all], P);
+    }
     root.append(headBox, h('div', { class: 'od-layout' }, toc, content));
 
     // the frame keeps its own sticky bar (the data banner) at the top of the scroll area: sit the contents
@@ -36194,7 +36250,10 @@ a.of-nav:active { background: var(--press); }
       }
       const blocked = blockedLine(m);
       const status = h('p', { class: 'cd-status', role: 'status' }, blocked);
-      const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', disabled: !!m.open.length }, 'Close the day');
+      const conn = O.connection ? O.connection() : 'solo';
+      const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', disabled: !!m.open.length || conn === 'follower' }, 'Close the day');
+      if (conn === 'follower') status.textContent = 'This screen only shows the shared kitchen. Close the day on the main screen. You can still print today\'s summary.';
+      else if (conn === 'hub') status.textContent = 'Closing the day here closes it for every screen on this kitchen.';
       go.addEventListener('click', () => {
         go.disabled = true;
         let rep = 'error';
@@ -36467,6 +36526,9 @@ a.of-nav:active { background: var(--press); }
 
   // ---- 1. Pure rows ----
 
+  // The name of the screen an entry came from (a shared kitchen), or '' when none was recorded.
+  function screenOf(e) { return e && typeof e.screen === 'string' ? e.screen.trim().slice(0, 24) : ''; }
+
   // The plain "late by 12 min" / "on time" words for a reading or round.
   function lateWords(e) {
     if (e.onTime === true || (isNum(e.lateMs) && e.lateMs <= 0)) return 'on time';
@@ -36553,7 +36615,7 @@ a.of-nav:active { background: var(--press); }
     if (!state || !SB.engine || !SB.engine.safetyLog) return [];
     const rows = SB.engine.safetyLog(state).filter((r) => r.event.type !== 'safety_correction' && isNum(r.event.t) && r.event.t >= from && r.event.t < to);
     return rows.map((r) => ({
-      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), facts: factsOf(state, r.event), who: r.event.who || '',
+      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), facts: factsOf(state, r.event), screen: screenOf(r.event), who: r.event.who || '',
       corrections: r.corrections.map((c) => ({ at: c.t, who: c.who || '', note: c.note || '' })),
     }));
   }
@@ -36582,7 +36644,7 @@ a.of-nav:active { background: var(--press); }
   // Builds the printable table for a window as an element (used for both the preview and the print block).
   function recordTable(rows) {
     const body = rows.map((r) => h('tr', null,
-      h('td', null, U.fmtDateShort(U.dateKey(r.at)) + ' ' + U.fmtTime(r.at)), h('td', null, r.kind), h('td', null, r.food), h('td', null, r.detail, (r.facts || []).map((f) => h('div', { class: 'si-fact' }, f))), h('td', null, r.who || 'not recorded'),
+      h('td', null, U.fmtDateShort(U.dateKey(r.at)) + ' ' + U.fmtTime(r.at)), h('td', null, r.kind), h('td', null, r.food), h('td', null, r.detail, (r.facts || []).map((f) => h('div', { class: 'si-fact' }, f))), h('td', null, r.who || 'not recorded', r.screen ? h('div', { class: 'si-fact' }, 'at ' + r.screen) : null),
       h('td', null, r.corrections.map((c) => h('div', { class: 'si-corr' }, 'Correction ' + U.fmtDateShort(U.dateKey(c.at)) + ' ' + U.fmtTime(c.at) + (c.who ? ' by ' + c.who : '') + ': ' + c.note)))));
     return h('table', { class: 'si-table' },
       h('thead', null, h('tr', null, ['When', 'What', 'Food', 'Detail', 'Logged by', 'Corrections added later'].map((t) => h('th', null, t)))),
