@@ -46,7 +46,7 @@
     step('5. Where the tablet sits', 'Put the tablet where the person at the cutting board can tap it without walking. If it is out of reach, batch times will not get logged and the waste numbers will be wrong.');
     // Closes this sheet and opens the Menu and settings page of the back office.
     const openData = () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); };
-    step('6. Your dishes', 'Add your dishes under Dishes and prices, in the Menu. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
+    step('6. Your dishes', 'Add your dishes under Dishes and prices, in Settings. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
       () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu and settings')));
     step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a safety limit. Ask your health department which limit applies to each food you hold, then set it on the Menu and settings page.');
     sheet.body.appendChild(list); keepInView(sheet.body);
@@ -547,24 +547,32 @@
     // Cooked-ahead food: shown only when that module is on and there is a dish. Optional; never needed to order.
     const caBox = h('section', { class: 'fs-card dp-ca', hidden: true });
     // Paints the question (before any item), or the list of cooked-ahead items with Add another.
+    let caNote = '';
     function paintCook() {
       const items = cookItems();
       const on = cookOn();
-      const show = activeDishes().length > 0 && (on ? (items.length > 0 || !U.storage.get(KEY_CASKIP, false)) : (!U.storage.get(KEY_CASKIP, false) && items.length === 0));
+      const show = caNote || (activeDishes().length > 0 && (on ? (items.length > 0 || !U.storage.get(KEY_CASKIP, false)) : (!U.storage.get(KEY_CASKIP, false) && items.length === 0)));
       caBox.hidden = !show;
       if (!show) return;
       U.clear(caBox);
+      // After a No or Not sure: one line on what turning it on adds and where, shown until this sheet is closed.
+      if (caNote && !items.length) { caBox.append(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'ok', role: 'status' }, caNote)); return; }
       // Opens the sheet that adds one cooked-ahead item.
       const add = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => {
         // Saying yes while the cook-ahead part is off turns it on first, then opens the sheet for the first item.
         if (!cookOn()) send('updateSettings', { patch: { modules: { cookAhead: true } } });
         SB.sheets.open('cookahead');
-      } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Add a cooked-ahead item' : 'Yes, I cook ahead'));
+      } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Yes, I cook ahead' : 'Yes, I cook ahead'));
       if (!items.length) {
-        caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook any of this ahead and hold it?'),
-          h('p', { class: 'fs-sub' }, 'Soup in a warmer, salads in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. You can skip this and still take orders.'),
-          // Remembers the owner said no, so the question goes away.
-          h('div', { class: 'fs-row' }, add, h('button', { type: 'button', class: 'btn', dataset: { act: 'skip-cooked' }, onClick: () => { U.storage.set(KEY_CASKIP, true); paintCook(); } }, 'No, skip this')));
+        caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook food ahead?'),
+          h('p', { class: 'fs-sub' }, 'Soup in a warmer, salads in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. Please pick one: it only takes a tap, and you can change it later.'),
+          h('div', { class: 'fs-row' }, add,
+            // No and Not sure both leave cooking ahead off; Not sure says so, and says how to turn it on later.
+            ['No', 'Not sure'].map((lbl) => h('button', { type: 'button', class: 'btn', dataset: { act: lbl === 'No' ? 'no-cooked' : 'notsure-cooked' }, onClick: () => {
+              U.storage.set(KEY_CASKIP, true);
+              caNote = (lbl === 'No' ? 'Cooking ahead stays off. ' : 'Not sure counts as No for now. ') + 'Turning it on adds the Cabinet, batch timers and their warnings. Turn it on any time under Settings, Tax, hours and PIN.';
+              paintCook();
+            } }, lbl))));
       } else {
         caBox.append(h('h3', { class: 'fs-h' }, 'Cooked-ahead food'),
           h('div', { class: 'dp-list' }, items.map((i) => h('div', { class: 'dp-row' }, h('strong', null, i.name), h('span', { class: 'chip' }, (i.hold === 'cold' ? 'Cold' : 'Hot') + ', up to ' + i.maxHoldH + ' h')))), h('div', { class: 'fs-row' }, add));
@@ -573,7 +581,7 @@
     paintCook();
     offs.push(SB.store.subscribe(() => paintCook()));
 
-    // How do you serve? A skippable question under the dishes. Each answer only sets the settings found under Menu, How you serve.
+    // How do you serve? A skippable question under the dishes. Each answer only sets the settings found under Settings, How you serve.
     const svBox = h('section', { class: 'fs-card dp-ca dp-serve', hidden: true });
     // The three answers: what each sets, in the order shown. Table service is the starting state, so it only records the answer.
     const SERVE_CHOICES = [
@@ -588,7 +596,7 @@
       svBox.hidden = !show;
       if (!show) return;
       U.clear(svBox);
-      if (answered) { svBox.append(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'ok', role: 'status' }, 'Saved: ' + (SERVE_CHOICES.find((c) => c.id === answered) || {}).label + '. You can change this any time under Menu, How you serve.')); return; }
+      if (answered) { svBox.append(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'ok', role: 'status' }, 'Saved: ' + (SERVE_CHOICES.find((c) => c.id === answered) || {}).label + '. You can change this any time under Settings, How you serve.')); return; }
       svBox.append(h('h3', { class: 'fs-h' }, 'How do you serve?'),
         h('p', { class: 'fs-sub' }, 'Optional. It only sets the order buttons and counter service for you, and you can change both later.'),
         h('div', { class: 'fs-row' }, SERVE_CHOICES.map((c) =>
@@ -621,7 +629,7 @@
         if (r.ok) { n++; ids.push(r.info.id); }
       });
       U.storage.set(KEY_EXAMPLES, ids);
-      tell(exStatus, n ? 'Added ' + n + ' example dishes with made-up prices. Each one is marked Example: change its name and price, or tap Remove.' : 'Those example dishes are already on your menu.');
+      tell(exStatus, n ? 'Added ' + n + ' example dishes with sample prices. Each one is marked Example: change its name and price, or tap Remove.' : 'Those example dishes are already on your menu.');
     });
     const exRemove = h('button', { type: 'button', class: 'btn', dataset: { act: 'example-remove' } }, ico('x', 20), h('span', null, 'Remove all example dishes'));
     // Archives every dish that came from the example menu, in one tap.
