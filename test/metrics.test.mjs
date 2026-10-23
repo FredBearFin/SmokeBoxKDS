@@ -1295,6 +1295,11 @@ describe('discardWeeks: dollars thrown away, this week against last week', () =>
     assert.deepEqual(w.thisWeek.byReason.map((r) => [r.reason, r.cost]), [['expired', 24], ['quality', 4], ['temp', 12]]);
     assert.deepEqual(w.lastWeek.byReason.map((r) => r.reason), ['cooling']);
   });
+  it('keeps the cold-food limits (fridge date, out of the fridge) as their own reasons, not Other', () => {
+    const d = mk([disc('b1', 'slaw', 1000, 'fridgeDate', 3, D(0)), disc('b2', 'slaw', 500, 'outTime', 2, D(0))]);
+    const w = M.discardWeeks(d, { now: D(0) + 3600e3 }).thisWeek;
+    assert.deepEqual(w.byReason.map((r) => [r.reason, r.label]), [['fridgeDate', 'Past the fridge date'], ['outTime', 'Out of the fridge too long']]);
+  });
   it('folds manual and unknown reasons into Other and never counts a missing cost as zero dollars', () => {
     const d = mk([disc('b1', 'brisket', 1000, 'manual', null, D(0)), disc('b2', 'brisket', 1000, 'expired', 10, D(0))]);
     const w = M.discardWeeks(d, { now: D(0) + 3600e3 }).thisWeek;

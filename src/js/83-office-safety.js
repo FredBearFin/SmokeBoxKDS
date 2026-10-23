@@ -26,9 +26,10 @@
 
   // Legend words, chart color slots, stacking order, and which discard reasons count as safety breaches.
   const TONE_NAMES = { ok: 'In range', check: 'Temperature check due', reheat: 'Reheat or chill now', discard: 'Thrown out' };
-  const REASON_SLOT = { expired: 1, temp: 2, cooling: 3, manual: 4, quality: 5, other: 6 };
-  const REASON_ORDER = ['temp', 'expired', 'cooling', 'manual', 'quality', 'other'];
-  const SAFETY_REASONS = { temp: 1, expired: 1, cooling: 1 };
+  const REASON_SLOT = { expired: 1, temp: 2, cooling: 3, manual: 4, quality: 5, other: 6, fridgeDate: 7, datemark: 7, outTime: 8 };
+  const REASON_ORDER = ['temp', 'expired', 'cooling', 'fridgeDate', 'outTime', 'datemark', 'manual', 'quality', 'other'];
+  // The cold-food limits are time limits too, so they count as safety discards in the verdict.
+  const SAFETY_REASONS = { temp: 1, expired: 1, cooling: 1, fridgeDate: 1, outTime: 1, datemark: 1 };
 
   // Builds the Safety page into the container and returns {update, destroy} for the frame.
   function render(container, ctx) {

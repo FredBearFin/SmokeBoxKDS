@@ -1150,9 +1150,10 @@
   };
 
   // Plain names for the discard reasons, in the order the ledger lists them. "manual" and "other" are
-  // folded into one "Other" line.
-  const DISCARD_WORDS = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', other: 'Other' };
-  const DISCARD_ORDER = ['expired', 'quality', 'temp', 'cooling', 'other'];
+  // folded into one "Other" line. The cold-food limits (fridge date, time out of the fridge, date mark) keep their own
+  // lines, since they are safety limits and not "other".
+  const DISCARD_WORDS = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', fridgeDate: 'Past the fridge date', outTime: 'Out of the fridge too long', datemark: 'Past the date mark', other: 'Other' };
+  const DISCARD_ORDER = ['expired', 'quality', 'temp', 'cooling', 'fridgeDate', 'outTime', 'datemark', 'other'];
   // Adds up one window of discards: total, by product and by reason. Dollars are grams x the batch's
   // recorded cost per cooked kg, so a discard with no recorded cost counts in grams but never as $0.
   function discardWindow(raw, from, to, label) {

@@ -161,7 +161,7 @@
   };
 
   /** Reasons a batch was thrown away, in words an owner would say. */
-  B.REASON = { expired: 'Held too long', temp: 'Out of temperature', cooling: 'Cooled too slowly', manual: 'Thrown out by hand', quality: 'Quality', other: 'Other reason' };
+  B.REASON = { expired: 'Held too long', temp: 'Out of temperature', cooling: 'Cooled too slowly', manual: 'Thrown out by hand', quality: 'Quality', fridgeDate: 'Past the fridge date', outTime: 'Out of the fridge too long', datemark: 'Past the date mark', other: 'Other reason' };
   // Owner wording for a discard reason; an unknown reason is tidied up instead of shown raw.
   B.reasonWord = (r) => B.REASON[r] || (r ? String(r).replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : 'Other reason');
 
