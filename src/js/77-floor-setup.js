@@ -48,7 +48,7 @@
     const openData = () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); };
     step('6. Your dishes', 'Add your dishes under Dishes and prices, in Settings. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
       () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu and settings')));
-    step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a safety limit. Ask your health department which limit applies to each food you hold, then set it on the Menu and settings page.');
+    step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a throw-out time. Ask your health department which applies to each food you hold, then set it in Settings.');
     sheet.body.appendChild(list); keepInView(sheet.body);
     return sheet;
   }

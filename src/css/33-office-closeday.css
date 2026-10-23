@@ -31,3 +31,5 @@
   .cd-ptable th, .cd-ptable td { padding: 6px 4px; text-align: left; border-bottom: 1px solid #999; white-space: pre-wrap; }
   .cd-pnote { margin: 12px 0 0; font-size: 12px; }
 }
+.cd-startl { display: grid; gap: 4px; font-size: var(--fs-2); color: var(--ink2); max-width: 28em; }
+.cd-drawerbox { display: grid; gap: var(--sp-2); }

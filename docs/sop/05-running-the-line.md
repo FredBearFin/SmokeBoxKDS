@@ -24,6 +24,8 @@ Gray dishes are waiting on purpose, so the whole order finishes together. Tap **
 
 ## Send the ticket out
 
+To bump a ticket is kitchen talk for sending it off the board. Smokebox keeps that word.
+
 If a dish is not done, Bump asks first. Bumped by mistake? **Undo** brings it back for 10 seconds. After that, use **Recall**.
 
 ## When something runs out

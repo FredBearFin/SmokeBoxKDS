@@ -23,6 +23,22 @@
   };
   // Picks the singular or plural word for a count; the plural defaults to the singular plus an s.
   B.plural = (n, one, many) => (n === 1 ? one : many || one + 's');
+  // Average sales for each weekday (Monday first) from the by-day rows of M.sales, or null when the range is too short to
+  // compare days: it needs at least two weeks and ten days with paid orders. Each average is over the days of that weekday
+  // that had paid orders, in whole cents. Returns [{wd, name, days, avg}] with avg null for a weekday with no sales day.
+  B.weekdayAverages = (byDay) => {
+    const rows = Array.isArray(byDay) ? byDay : [];
+    if (rows.length < 10) return null;
+    const first = rows[0].date, last = rows[rows.length - 1].date;
+    const span = Math.round((SB.util.dateKeyToMs(last) - SB.util.dateKeyToMs(first)) / 86400e3) + 1;
+    if (span < 14) return null;
+    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return [1, 2, 3, 4, 5, 6, 0].map((wd, i) => {
+      const mine = rows.filter((d) => SB.util.weekday(d.date) === wd);
+      const cents = mine.reduce((a, d) => a + Math.round(d.net * 100), 0);
+      return { wd, name: names[i], days: mine.length, avg: mine.length ? Math.round(cents / mine.length) / 100 : null };
+    });
+  };
   // Middle value of the numbers in a list (the mean of the two middle ones when the count is even), or null.
   B.median = (arr) => {
     const a = (arr || []).filter(isNum).sort((x, y) => x - y);
@@ -309,6 +325,15 @@
     const st = { itemsBy: 'sold', marginBy: 'unit', endpointC: 85, holdH: 2, rawKg: 10 };
     // The gray source line under each card title: the range, the channel and whether sample data is in.
     const scope = () => B.scopeText(ctx);
+    // Every card that was given the range text as its subtitle, so the text follows the range when it changes.
+    const scoped = [];
+    const scope0 = scope();
+    const cardOf = page.card;
+    // Wraps page.card to remember the cards whose subtitle is the range text.
+    page.card = (o) => { const c = cardOf.call(page, o); if (o && o.sub === scope0) scoped.push(c); return c; };
+    const panelOf = page.panel;
+    // Wraps page.panel the same way for panels with a range subtitle.
+    page.panel = (o) => { const c = panelOf.call(page, o); if (o && o.sub === scope0) scoped.push(c); return c; };
 
     /* ---------- derived values, one per prepared handle ---------- */
     // Items sold across all rows, or null when nothing sold, so the tile shows no number instead of 0.
@@ -325,7 +350,7 @@
 
     const salesOf = B.memoP((p) => M.sales(p));
     page.headline();
-    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day turns over at the hour set in Menu and settings (4 am to start). Open and voided orders are not counted. Average order is sales divided by paid orders. Every figure is added up in whole cents from the paid orders themselves.');
+    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu and settings (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Every figure is added up in whole cents from the paid orders themselves.');
 
     page.tiles([
       // The one main money figure: sales after discounts from paid orders (blank until an order is paid).
@@ -399,6 +424,26 @@
           series: [{ id: 'net', name: 'Sales', values: days.map((d) => d.net) }],
           height: 270,
           ariaLabel: 'Bar chart of sales for each day. The best day is ' + best.label + ' with ' + fmt.money(best.net, 0) + '.',
+        };
+      },
+    });
+
+    const weekdayCard = page.card({
+      type: 'bar', span: 5, title: 'Best day of the week', sub: scope(),
+      caption: 'Each bar is the average sales on that weekday, over the days in this range that had paid orders. A day you were closed is not counted. It needs at least two weeks to compare days.',
+      empty: { title: 'Needs at least two weeks to compare days', body: 'Pick Last 14 days or a longer range once you have two weeks of paid orders. With fewer days, one busy night would decide the answer.', icon: 'chart-bar' },
+      // One bar per weekday, Monday first; null until the range holds two weeks.
+      spec: (p) => {
+        const wd = B.weekdayAverages(salesOf(p).byDay);
+        if (!wd) return null;
+        const shown = wd.filter((x) => x.avg !== null);
+        if (!shown.length) return null;
+        const best = shown.reduce((a, d) => (d.avg > a.avg ? d : a), shown[0]);
+        return {
+          orient: 'v', categories: shown.map((x) => x.name), sort: 'none', format: 'money',
+          series: [{ id: 'avg', name: 'Average sales', values: shown.map((x) => x.avg) }],
+          height: 270,
+          ariaLabel: 'Bar chart of average sales for each weekday. The best day is ' + best.name + ' with ' + fmt.money(best.avg, 0) + ' on average.',
         };
       },
     });
@@ -794,7 +839,7 @@
       // Runs on every refresh: keeps the card subtitles and the yield key current.
       update() {
         const s = scope();
-        [topCard, hourCard, chanCard, costCard, marginCard, noCost, yieldCard, costOfWrong].forEach((c) => B.setSub(c, s));
+        scoped.forEach((c) => B.setSub(c, s));
         paintYieldKey(ctx.prepared());
         paintYieldVisible(ctx.prepared());
       },

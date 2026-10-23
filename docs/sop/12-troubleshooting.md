@@ -6,8 +6,8 @@ Plain fixes for sound, sleep, missing dishes and odd numbers. Lost data and the 
 
 1. If the board says "Tap here to turn on warning sounds", tap it. Browsers need one tap first.
 2. Turn the tablet volume up and check its silent switch.
-3. Tap **Menu** and check that Sound is on and the loudness is not low.
-4. Tap **Menu**, then **Set up this tablet**, then **Play a test warning**.
+3. Tap **Settings** and check that Sound is on and the loudness is not low.
+4. Tap **Settings**, then **Set up this tablet**, then **Play a test warning**.
 5. If the bar says "Sound paused", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.
 6. Close any second Smokebox tab. Only the tab on screen makes sound.
 
@@ -17,7 +17,7 @@ Warnings cannot sound while the screen is off. Smokebox asks the browser to keep
 
 ## A dish is missing
 
-- Clear the search box and choose the All category on the New ticket screen.
+- Clear the search box and choose All on the New ticket screen.
 - Open the **86 board**. A dish that is sold out or off the menu is listed there with the reason.
 - Open **Dishes and prices** to see every dish you have added. A dish you removed is under **Removed dishes**: tap **Bring it back**.
 - No **Cabinet** tab or **Sanitize** button? They show only after you say **Yes, I cook ahead** in **Dishes and prices**.

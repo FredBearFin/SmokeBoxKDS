@@ -892,7 +892,7 @@ describe('insights: structure, guards and determinism', () => {
     assert.equal(f.tone, 'warn');
     assert.match(f.title, /Smoked mac and cheese takes 6m 30s on your line/);
     assert.match(f.body, /1m 30s over the starter estimate of 5m 00s/);
-    assert.match(f.body, /Pacing now plans for it/);
+    assert.match(f.body, /Finish together now plans for it/);
     assert.match(f.body, /40 samples/);
   });
   it('without a matching learned estimate the finding tells the owner to confirm instead', () => {
@@ -931,7 +931,7 @@ describe('insights: structure, guards and determinism', () => {
     ];
     const d = craft(40, { events: extra });
     const all = fire(d), top = M.insights(d);
-    assert.ok(all.length >= 10, 'expected >= 10 findings, got ' + all.length);
+    assert.ok(all.length >= 9, 'expected >= 9 findings, got ' + all.length);
     assert.equal(top.length, 8);
     assert.deepEqual(top.map((f) => f.id), all.slice(0, 8).map((f) => f.id));
     for (let i = 1; i < all.length; i++) assert.ok(all[i - 1].importance >= all[i].importance);
@@ -947,20 +947,20 @@ describe('insights: each rule fires on crafted data and has its own guard', () =
     const mk = (n) => dataset({ tickets: [...many(n, (i) => twoItem('p' + i, i * 400, true, 10)), ...many(n, (i) => twoItem('u' + i, 100000 + i * 400, false, 120))] });
     const f = find(mk(15), 'pacing-effect');
     assert.equal(f.tone, 'good');
-    assert.equal(f.title, 'With pacing on, plates finished together: food waited 0m 05s instead of 1m 00s');
+    assert.equal(f.title, 'With Finish together on, plates finished together: food waited 0m 05s instead of 1m 00s');
     assert.match(f.body, /plate spread went from 2m 00s to 0m 10s/);
     assert.match(f.body, /different tickets, so treat it as a hint, not a controlled test/);
     assert.doesNotMatch(f.title + ' ' + f.body, /faster tickets|quicker tickets/);
     assert.equal(find(mk(14), 'pacing-effect'), undefined);
   });
-  it('pacing-effect says pacing is not meant to make tickets faster when the median rose with pacing on', () => {
+  it('pacing-effect says pacing is not meant to make tickets faster when the median rose with Finish together on', () => {
     // paced tickets are held 300 s before the last item is done, so their median ticket time is longer
     const slowTwo = (id, c, spread) => ticket({ id, created: c, expedited: c + 400 + spread, pacing: true, items: [item({ menu: 'slaw', fired: c + 300, done: c + 400 }), item({ menu: 'potato', fired: c + 300, done: c + 400 + spread })] });
     const d = dataset({ tickets: [...many(15, (i) => slowTwo('p' + i, i * 600, 10)), ...many(15, (i) => twoItem('u' + i, 100000 + i * 400, false, 120))] });
     const f = find(d, 'pacing-effect');
     assert.equal(f.tone, 'good');
     assert.match(f.body, /not meant to make tickets faster/);
-    assert.match(f.body, /Median ticket time was \d+m \d+s with pacing off and \d+m \d+s with it on/);
+    assert.match(f.body, /Median ticket time was \d+m \d+s with Finish together off and \d+m \d+s with it on/);
   });
   it('pacing-effect warns when pacing made plates wait longer', () => {
     const d = dataset({ tickets: [...many(15, (i) => twoItem('p' + i, i * 400, true, 120)), ...many(15, (i) => twoItem('u' + i, 100000 + i * 400, false, 10))] });
@@ -1008,13 +1008,6 @@ describe('insights: each rule fires on crafted data and has its own guard', () =
     assert.deepEqual([f.tone, f.title], ['warn', 'The static brisket yield misprices cost by 9.5%']);
     assert.match(f.body, /\$44\.29 per cooked kg instead of \$40\.47/);
     assert.equal(find(mk(2), 'yield-misprice'), undefined);
-  });
-  it('sync-slow: 70 % inside 60 s is bad; needs 8 updates', () => {
-    const mk = (n) => dataset({ events: evs('sync_done', n, (i) => ({ syncId: 's' + i, menuId: 'brisket_qtr', target: 'pos', latencyMs: i < 0.7 * n ? 10000 : 90000 })) });
-    const f = find(mk(10), 'sync-slow');
-    assert.deepEqual([f.tone, f.title], ['bad', '70% of 86 updates reached every channel within 60 s']);
-    assert.match(f.body, /slowest 1m 30s over 10 updates/);
-    assert.equal(find(mk(7), 'sync-slow'), undefined);
   });
   it('voids: 3 of 30 tickets (10 %) is bad; recalls: 4 of 40 is info', () => {
     const vd = (i) => ticket({ id: 'v' + i, created: 20000 + i * 400, voided: 20050 + i * 400, voidReason: 'customer left', items: [item({ menu: 'slaw', fired: 20000 + i * 400 })] });

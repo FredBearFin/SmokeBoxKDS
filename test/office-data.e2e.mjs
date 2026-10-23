@@ -451,7 +451,7 @@ group('5. Pacing', async () => {
     await page.locator('#od-pacing-toggle').click();
     await waitFor(page, (v) => SB.store.getState().settings.pacing.enabled === !v, on0);
     check('the on/off switch saves pacing.enabled', (await pc()).enabled === !on0);
-    check('and says what it does for new tickets', /Pacing is (on|off)\./.test(await text(page, '#od-pacing .od-st')), await text(page, '#od-pacing .od-st'));
+    check('and says what it does for new tickets', /Finish together is (on|off)\./.test(await text(page, '#od-pacing .od-st')), await text(page, '#od-pacing .od-st'));
     await page.locator('#od-pacing-toggle').click();
     await waitFor(page, (v) => SB.store.getState().settings.pacing.enabled === v, on0);
     const specs = [['Shortest prep time', '20', 'floorSec', 20], ['Extra time per extra portion', '30', 'qtyFactor', 0.3], ['Most a big line can grow', '3', 'qtyCap', 3], ['How fast it learns your real times', '8', 'learnK', 8], ['Learned time never below', '0.6', 'minFactor', 0.6], ['Learned time never above', '3', 'maxFactor', 3], ['Ignore a timing longer than', '4', 'outlierFactor', 4]];
@@ -492,7 +492,7 @@ group('6. Food safety limits', async () => {
     check('the safety line is shown word for word', sline === await st(page, () => SB.config.safetyLine), sline);
     check('the panel says the FDA Food Code minimum for hot hold is 135 °F', /refuses a hot-hold limit below 135 °F/.test(await text(page, '#od-safety')));
     const hint = await text(page, '#od-safety .od-nf:has(input[aria-label="Hot hold temperature"]) .od-hint');
-    check('legal limits are printed under the field (min 135 °F)', /FDA Food Code minimum 135 °F/.test(hint) && /Allowed: 135 to 200 °F/.test(hint), hint);
+    check('legal limits are printed under the field (min 135 °F)', /Model Food Code minimum 135 °F/.test(hint) && /Allowed: 135 to 200 °F/.test(hint), hint);
     const f0 = await eventsOf(page, 'ui_report');
     await typeNum(page, 'Hot hold temperature', '120');
     await page.waitForTimeout(150);
@@ -668,7 +668,7 @@ group('9a. Data: counts and sample history', async () => {
     await page.evaluate(() => SB.store.dispatch('createTicket', { customer: 'Demo', channel: SB.config.channels[0].id, items: [{ menuId: SB.config.menu[0].id }], src: 'demo' }));
     await page.waitForTimeout(300);
     check('demo tickets are named as demo, not live', (await text(page, '#od-data .od-stats:not(.od-stats-tight) .od-stat')) .includes('12 live, 1 demo'), await text(page, '#od-data .od-stats:not(.od-stats-tight) .od-stat'));
-    check('without a simulator the page says "Simulator not loaded"', /Simulator not loaded/.test(await text(page, '#od-data .od-sample')) && stats['Sample tickets'] === 'Not loaded', stats['Sample tickets']);
+    check('without a simulator the page says sample history is not available', /Sample history is not available/.test(await text(page, '#od-data .od-sample')) && stats['Sample tickets'] === 'Not loaded', stats['Sample tickets']);
     check('and still explains what sample data is', /not your restaurant/.test(await text(page, '#od-data .od-sample')));
     noErrors('data counts', logs);
   });
@@ -855,7 +855,7 @@ group('9d. Data: reset', async () => {
     await live.scrollIntoViewIfNeeded();
     await live.click();
     let sheet = await typedBox(page, 'cancel');
-    check('reset live data spells out what is cleared, and that settings stay by default', /clears 9 tickets/.test(sheet) && /Your dishes, ingredient edits, limits, pacing and PIN stay/.test(sheet) && /no undo/i.test(sheet), sheet);
+    check('reset live data spells out what is cleared, and that settings stay by default', /clears 9 tickets/.test(sheet) && /Your dishes, ingredient edits, limits, Finish together and PIN stay/.test(sheet) && /no undo/i.test(sheet), sheet);
     check('cancel keeps the tickets', (await st(page, () => SB.store.getState().tickets.length)) === 9);
     await live.click();
     await typedBox(page, 'confirm');
@@ -894,7 +894,7 @@ group('9d. Data: reset', async () => {
 group('10. About and wording', async () => {
   await open({}, async (page, logs) => {
     const about = await text(page, '#od-about');
-    check('About says what is simulated (channel sync)', /simulated/.test(about) && /nothing is sent to a real POS or delivery app/.test(about));
+    check('About says what is simulated (channel sync)', /demo or sample/i.test(about));
     check('About says what is a starter estimate', /starter estimate/.test(about));
     check('About says what has not been tested (real sunlight, other devices)', /real sunlight/.test(about) && /other devices/.test(about));
     check('About says separate devices do not share data and same-browser tablets do', /Separate devices do not share data\. Tablets open in the same browser on the same device do/.test(about));

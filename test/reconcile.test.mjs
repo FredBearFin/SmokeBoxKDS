@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSB } from './_load.mjs';
 
-const SB = await loadSB(['00-util', '10-config', '20-engine', '40-metrics', '45-sim', '87-office-closeday', '88-office-backup', '89-office-inspector']);
+const SB = await loadSB(['00-util', '10-config', '20-engine', '40-metrics', '45-sim', '87-office-closeday', '88-office-backup', '89-office-inspector', '82-office-money']);
 const E = SB.engine, M = SB.metrics, U = SB.util, BP = SB.office.backupPure, CD = SB.office.closeDayPure;
 const H = 3600e3, MIN = 60e3;
 const c100 = (v) => Math.round(v * 100);
@@ -287,4 +287,38 @@ test('safety record ranges start at the wall-clock day-start hour, also on the t
     assert.equal(new Date(w.from).getHours(), 4);
     assert.equal(new Date(w.to).getHours(), 4);
   }
+});
+
+test('sales by hour use the wall clock on the two daylight-saving days (noon is hour 12, 6 pm is hour 18, 12:30 am is hour 24)', () => {
+  const settings = { service: Object.assign({}, SB.config.service) };
+  const mk = (id, at) => ({ id, status: 'paid', paidAt: at, createdAt: at - 60000, channel: 'dine_in', method: 'cash', tip: 0, totals: { subtotal: 10, discount: 0, tax: 0, total: 10, taxRate: 0 } });
+  for (const [label, y, mo, d] of [['spring forward', 2026, 2, 8], ['fall back', 2026, 10, 1], ['ordinary', 2026, 5, 12]]) {
+    const at = (h, m = 0, extraDay = 0) => new Date(y, mo, d + extraDay, h, m, 0).getTime();
+    const orders = [mk('a', at(12)), mk('b', at(18, 30)), mk('c', at(0, 30, 1)), mk('d', at(5))];
+    const ds = { tickets: [], orders, events: [], batches: [], learned: {}, menu: [], ingredients: [], settings };
+    const byHour = M.sales(ds, { from: -Infinity, to: Infinity }).byHour;
+    const get = (h) => (byHour.find((x) => x.hour === h) || { checks: 0 }).checks;
+    assert.equal(get(12), 1, label + ': noon is hour 12');
+    assert.equal(get(18), 1, label + ': 6:30 pm is hour 18');
+    assert.equal(get(24), 1, label + ': 12:30 am the next morning is hour 24');
+    assert.equal(get(5), 1, label + ': 5 am is hour 5');
+  }
+});
+
+test('best day of the week: Monday-first averages in cents, and nothing until there are two weeks', () => {
+  const B = SB.officeB;
+  assert.ok(B && B.weekdayAverages, 'the helper is available');
+  const day = (key, net) => ({ date: key, net });
+  const rows = [];
+  for (let i = 0; i < 21; i++) { const key = U.addDays('2026-10-01', i); rows.push(day(key, U.weekday(key) === 5 ? 300.1 : 100.05)); }
+  const wd = B.weekdayAverages(rows);
+  assert.equal(wd.length, 7);
+  assert.deepEqual(wd.map((x) => x.name), ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+  assert.equal(wd[4].avg, 300.1, 'Friday average');
+  assert.equal(wd[0].avg, 100.05, 'Monday average');
+  assert.equal(wd.reduce((a, x) => a + x.days, 0), 21, 'every day is counted once');
+  assert.equal(B.weekdayAverages(rows.slice(0, 9)), null, 'fewer than ten days: no chart');
+  assert.equal(B.weekdayAverages([]), null);
+  const sparse = [day('2026-10-01', 5), day('2026-10-02', 5), day('2026-10-03', 5), day('2026-10-04', 5), day('2026-10-05', 5), day('2026-10-06', 5), day('2026-10-07', 5), day('2026-10-08', 5), day('2026-10-09', 5), day('2026-10-10', 5)];
+  assert.equal(B.weekdayAverages(sparse), null, 'ten days inside ten calendar days is under two weeks');
 });

@@ -1,6 +1,6 @@
 # Fifteen questions a first-time owner will ask
 
-Plain answers that match what Smokebox does today. Where something is not decided or not built, the answer says so. The in-app Guide (Menu, then Guide) has the steps. See also docs/README-for-owners.md.
+Plain answers that match what Smokebox does today. Where something is not decided or not built, the answer says so. The in-app Guide (Settings, then Guide) has the steps. See also docs/README-for-owners.md.
 
 ## 1. What if the internet goes out?
 
@@ -28,7 +28,7 @@ Not decided yet. There is no price to quote. Ask the person who set it up for yo
 
 ## 7. Can I rely on it for my food-safety records?
 
-Treat it as a helper, not as your official record. Smokebox reminds you to take temperatures, warns before a time limit and flags readings outside the limits you set. It cannot see, taste or measure your food. The starting limits come from the FDA Food Code, and your county may differ, so ask your health department and change the limits to match. Back office has a printable food safety record. Ask your health department whether they accept it before you stop your paper log. Until then, keep the paper log.
+Treat it as a helper, not as your official record. Smokebox reminds you to take temperatures, warns before a time limit and flags readings outside the limits you set. It cannot see, taste or measure your food. The limits it starts with are examples, not your local rules, so set the limits your local health department gives you. Back office has a printable food safety record. Ask your health department whether they accept it before you stop your paper log. Until then, keep the paper log.
 
 ## 8. Does it charge customers' cards?
 
@@ -44,7 +44,7 @@ No. The demo is a barbecue kitchen. A new Smokebox is empty. You add your own di
 
 ## 11. I forgot my PIN. What now?
 
-There is no forgot-PIN button. The PIN keeps cooks out of the back office, and it is not strong security. The only way in is to clear the site's saved data in the browser, which erases everything on that device. Do that only if you have a backup. Use one made before the PIN was set, because a backup brings its PIN back.
+When you set a PIN, Smokebox shows a recovery code once. Keep it away from the tablet. On the PIN pad, Forgot the PIN? asks for the code and a new PIN. The PIN keeps cooks out of the back office and is not strong security. With no code, the only way in is to clear the site's saved data in the browser, which erases everything on that device, so do that only if you have a backup. A backup made after the PIN was set brings the PIN back.
 
 ## 12. Will I hear warnings when the tablet is asleep?
 
@@ -56,7 +56,7 @@ Yes, from a file. In Dishes and prices tap "Have a menu file? Import it". Smokeb
 
 ## 14. How do I handle sales tax?
 
-One flat percentage that you set under Menu, Tax, hours and PIN. Dish prices are before tax. It does not file taxes or handle different rates for different dishes.
+One flat percentage that you set under Settings, Tax, hours and PIN. Dish prices are before tax. It does not file taxes or handle different rates for different dishes.
 
 ## 15. Who do I ask when something goes wrong?
 
