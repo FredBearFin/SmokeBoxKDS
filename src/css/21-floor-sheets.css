@@ -525,3 +525,11 @@
 
 /* Every page grid gets one column that may shrink, so nothing pushes past the edge at 280 px. */
 .hc, .hc-panel, .bd, .rc, .rc-panel, .ox, .ox-panel, .dm, .dm-sim, .hp, .hp-pane, .sp, .mn, .hc-form, .hc-card { grid-template-columns: minmax(0, 1fr); }
+
+/* Touch size: the Warning loudness slider and the 86 board Channel sync row are at least 44 px tall. */
+input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
+.bd-sync > summary { min-height: var(--tap, 44px); display: flex; align-items: center; }
+
+/* An empty menu: the friendly "No dishes yet" block spans the whole tile grid and its button keeps one line. */
+.ord-nodishes { grid-column: 1 / -1; padding: var(--sp-5, 24px) var(--sp-3, 12px); text-align: center; }
+.ord-nodishes .btn { white-space: nowrap; }

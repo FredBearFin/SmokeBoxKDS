@@ -12,6 +12,8 @@
   const U = SB.util;
   const doc = g.document || null;
   const F = (SB.floor = {});
+  // The record of sounds the warning ladder asked for (tests replay it); made once here so it always exists.
+  F._alerts = [];
 
   // Keys the board answers to; the help sheet lists them. Keep in step with onKey.
   F.shortcuts = [
@@ -497,7 +499,7 @@
     if (i.io) i.io.disconnect();
     if (i.ro) i.ro.disconnect();
     cancelAnimationFrame(i.raf);
-    try { doc.documentElement.style.removeProperty('--fl-lift'); } catch (e) { /* ignore */ }
+    try { doc.documentElement.style.removeProperty('--fl-head-bottom'); doc.documentElement.style.removeProperty('--fl-lift'); } catch (e) { /* ignore */ }
     U.clear(i.el);
   };
 
@@ -588,7 +590,7 @@
     const grid = h('div', { class: 'fl-grid' });
     const empty = h('div', { class: 'fl-empty', hidden: true });
     const welcome = buildWelcome();
-    const cabEl = h('section', { class: 'fl-cabinet', hidden: true, 'aria-label': 'Hold cabinet' });
+    const cabEl = h('section', { class: 'fl-cabinet', hidden: true, 'aria-label': 'Hold cabinet' }, h('h2', { class: 'visually-hidden' }, 'Hold cabinet'));
     const main = h('main', { class: 'fl-main', id: 'fl-board', tabindex: -1, 'aria-label': 'Tickets' }, h('h1', { class: 'visually-hidden' }, 'Smokebox kitchen board'), welcome, grid, empty, cabEl);
 
     // ----- dock
@@ -747,8 +749,10 @@
   // In the cabinet view toasts move to the top right, under the header and the attention strip, so they never cover a card's buttons.
   // This tells the stylesheet where the page below the strip starts (--fl-toast-top).
   function measureToastTop() {
-    if (!m || !m.main || !m.cabOn) return;
-    doc.documentElement.style.setProperty('--fl-toast-top', Math.round(m.main.getBoundingClientRect().top + 8) + 'px');
+    if (!m || !m.main) return;
+    // Everyday toasts sit just under the header, over the notice strip, where they hide no ticket button.
+    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(m.head.getBoundingClientRect().bottom + 6) + 'px');
+    if (m.cabOn) doc.documentElement.style.setProperty('--fl-toast-top', Math.round(m.main.getBoundingClientRect().top + 8) + 'px');
   }
   // Tells the stylesheet how tall the all-day strip is (--fl-lift) so toasts sit above it.
   function measureDock() {
@@ -1444,7 +1448,7 @@
   // alert. level: 1 chime, 2 voice, 3 loud tone, 4 expiry or past.
   function logCall(c) {
     const d = c.d;
-    const lg = F._alerts || (F._alerts = []);
+    const lg = F._alerts;
     const b = d.batchId ? (store().getState().batches.find((x) => x.id === d.batchId) || null) : null;
     const rec = { t: store().now(), id: d.id, kind: d.kind, batchId: d.batchId || null, level: c.level, repeat: !!c.repeat, rung: d.rung, msLeft: Math.round(d.msLeft), goes86: !!d.goes86, wasteG: d.wasteG == null ? null : Math.round(d.wasteG),
       remainingG: b ? Math.round(b.remainingG) : null, cookedG: b ? Math.round(b.cookedG) : null, status: b ? b.status : null, allowed: SB.deadlines.soundsAllowed(store().getState(), store().now()), unknown: !!d.unknown, leader: isLeader() };
@@ -1501,14 +1505,18 @@
     const soon = (d) => d.sev === 'bad' || d.kind === 'past' || d.kind === 'expired' || !(d.msLeft > 60 * 60e3);
     if (!m.dis) m.dis = new Set();
     const feed = all.filter((d) => !d.trivial && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
-    const top = feed.slice(0, 2);
+    // A tablet screen is short: one warning row there (the next shows when this one is cleared or done), two on a tall or far screen.
+    const maxRows = far || (g.innerHeight || 0) >= 900 ? 2 : 1;
+    const top = feed.slice(0, maxRows);
+    const moreRows = feed.length - top.length;
     const needSound = sound && !audioReady();
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
     const note = sound ? SB.deadlines.pauseNote(store().getState(), now) : 'Sound is off on this tablet: warnings will not be heard. Tap to turn it on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
-    const showNote = !!note && (!sound || top.length > 0) && !m.dis.has('pause:' + note);
+    // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
+    const showNote = !!note && (!sound || top.length > 0) && !m.dis.has('pause:' + note) && (needSound ? m.dis.has('snd') : true);
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
@@ -1526,7 +1534,7 @@
       if (r.el.dataset.snoozed !== sn) r.el.dataset.snoozed = sn;
       setTxt(r.when, d.kind === 'expired' ? 'OUT' : d.kind === 'past' ? 'PAST' : countdownText(d.msLeft));
       setTxt(r.what, d.label);
-      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action);
+      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action + (i === top.length - 1 && moreRows > 0 ? ' (' + moreRows + ' more warning' + (moreRows > 1 ? 's' : '') + ' after this one.)' : ''));
     });
   }
 
@@ -1729,7 +1737,7 @@
   async function startEmpty() {
     const ok = await SB.ui.confirm({
       title: 'Start with an empty board?', confirmLabel: 'Clear the board', cancelLabel: 'Keep the tickets',
-      body: ['This removes the pretend tickets and anything else logged on this device. Settings stay.'],
+      body: ['This removes the practice tickets and anything else logged on this device. Settings stay.'],
     });
     if (!ok || !m) return;
     try { if (SB.sim && SB.sim.live) SB.sim.live.stop(); } catch (e) { /* the simulator may not be running */ }
@@ -1750,7 +1758,7 @@
     const title = stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
     const text = stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
-      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or run the busy-night demo. Demo orders are pretend.';
+      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or run the busy-night demo. Demo orders are for practice.';
     const sig = title + '|' + text;
     if (e.dataset.sig === sig) return;
     e.dataset.sig = sig;
@@ -1774,7 +1782,7 @@
       try {
         live.start({ rate: 'normal' });
         if (typeof live.crew === 'function') live.crew(true);
-        toast('Busy-night demo started. Orders and the crew are pretend. Open Demo to stop it.', { tone: 'info' });
+        toast('Busy-night demo started. Orders and the crew are for practice. Open Demo to stop it.', { tone: 'info' });
         return;
       } catch (e) { console.error('[smokebox] demo failed to start', e); }
     }
