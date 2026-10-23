@@ -10,7 +10,7 @@ This is the formal companion to SPEC sections 5-10. It follows Wordsworth's styl
 +---------------------------------    tau       = the evaluation time of a state (the `now` of the apply/tick that made it)
 ```
 
-The code is `src/js/20-engine.js` (`SB.engine`); the invariant checker `checkInvariants(state, now)` implements the predicates marked I1-I15. Property tests run every predicate after every step of 12,000+ random steps (`test/engine.fuzz.test.mjs`).
+The code is `src/js/20-engine.js` (`SB.engine`); the invariant checker `checkInvariants(state, now)` implements the predicates marked I1-I18. Property tests run every predicate after every step of 12,000+ random steps (`test/engine.fuzz.test.mjs`).
 
 ---
 
@@ -238,6 +238,16 @@ CreateTicket == CreateTicketOK \/ Refuse(emptyOrder | badPatch | tooManyItems | 
 | SanitizeDone | none | `lastAt = now`, `dueAt = now + sanitizeEveryH`; records on-time or late |
 
 After every action and every tick that touches a batch, stock, `manual86`, the menu or ingredients, `avail` is recomputed (I15). Each change appends `avail_changed`. A change of `ok` creates a simulated sync record whose four channel targets complete `2 + (hash(syncId|target) mod 38001 ms)` later. That is deterministic, never random, and always inside the 60-second target.
+
+### 6.3b Who did it: initials and the safety log
+
+`LogTemp`, `ReheatBatch`, `StartCooling`, `DiscardBatch` and `SanitizeDone` take an optional `who` (1 to 12 characters after trimming; anything else gives `badWho`). It is stored on the event (`temp_logged`, `batch_reheat`, `cooling_started`, `batch_discard`, `sanitize_done`) and on the reading in `batch.temps`. `KeepServing` and `EndKeepServing` already require `who`. Without `who` the event has no `who` field at all, so older screens, older saves and old events stay valid.
+
+| op | precondition (else report) | effect |
+|---|---|---|
+| CorrectSafety `{ eventId, note, who }` | `who` 1..12 (`whoRequired`); `note` non-empty (`reasonRequired`) and within the note limit (`noteTooLong`); `eventId` names an existing safety entry: temperature, reheat, cooling, discard, sanitize or keep-serving (`unknownSafetyEntry`) | appends `safety_correction { of, ofType, batchId?, who, note }`. Nothing else changes. |
+
+The safety log is append-only: the original entry is never edited or removed, and an entry may be corrected more than once. `safetyLog(state)` returns `[{ event, corrections }]`, oldest first. I18: initials on any event are 1 to 12 characters, and a `safety_correction` has `who`, a non-empty `note` and an `of`. `validateBackup` keeps initials on readings only when valid.
 
 ### 6.4 Settings and catalogue
 
