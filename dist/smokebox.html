@@ -3555,7 +3555,6 @@ a.of-nav:active { background: var(--press); }
 /* Inside a chart card the sentences sit above the chart in columns, with no rule of their own. */
 .ob-sentences--card { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: var(--sp-2) var(--sp-6); margin: 0 0 var(--sp-4); padding: var(--sp-3) 0 0; border-top: 0; }
 .ob-sentences--card.ob-keys { margin: var(--sp-4) 0 0; border-top: 1px solid var(--line-soft); }
-.ob-sim-chip { margin: 0 0 var(--sp-3); max-width: 100%; }
 
 /* Tables: sort buttons and the Previous and Next buttons are 48 px, and on a phone a long column title wraps so the table fits. */
 .ob-tbl .of-sortbtn, .ob-tbl .of-tpager .btn { min-height: 48px; }
@@ -3803,7 +3802,6 @@ a.of-nav:active { background: var(--press); }
 .od-fallback { display: grid; gap: var(--sp-2); }
 .od-fbtext, .od-paste { width: 100%; max-width: 100%; font: var(--w-regular) var(--fs-1)/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .od-fbtext { min-height: 140px; }
-.od-import { display: grid; gap: var(--sp-3); }
 .od-paste-det > summary { display: flex; align-items: center; gap: var(--sp-2); min-height: 44px; cursor: pointer; font-size: var(--fs-3); font-weight: var(--w-semi); color: var(--ink); }
 .od-paste-det[open] > summary { margin-bottom: var(--sp-2); }
 .od-paste-det:not([open]) > summary .icon { transform: rotate(-90deg); }
@@ -3862,7 +3860,6 @@ a.of-nav:active { background: var(--press); }
 /* The numbered restore and replace-device steps on the Data page. */
 .od-steps { margin: 0; padding-left: var(--sp-5); display: grid; gap: var(--sp-2); }
 .od-steps li { line-height: 1.45; }
-.od-swap .od-steps { margin: var(--sp-3) 0; }
 
 /* The compact dish row: one line (name, station, price, prep time) that opens the full form on tap. */
 .od-sum { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr) auto auto 24px; align-items: center; gap: var(--sp-3); width: 100%; min-height: 48px; padding: var(--sp-1) var(--sp-2); text-align: left; color: var(--ink); background: transparent; border: 0; border-radius: var(--r-2, 8px); cursor: pointer; font-size: var(--fs-3, 16px); }
@@ -4209,11 +4206,9 @@ a.of-nav:active { background: var(--press); }
 .ch-m { outline: none; }
 .ch-m:focus-visible { outline: 2px solid var(--ch-text); outline-offset: 2px; }
 .ch-hot { filter: brightness(1.16); }
-.ch-dim { opacity: .35; }
 
 /* big numbers use the condensed display face, proportional figures */
-.ch-svg .ch-big, .ch-big-h { font-family: var(--font-display, "Barlow Condensed", "Arial Narrow", system-ui, sans-serif); font-weight: 600; fill: var(--ch-text); font-variant-numeric: proportional-nums; letter-spacing: 0; }
-.ch-big-h { color: var(--ch-text); }
+.ch-svg .ch-big { font-family: var(--font-display, "Barlow Condensed", "Arial Narrow", system-ui, sans-serif); font-weight: 600; fill: var(--ch-text); font-variant-numeric: proportional-nums; letter-spacing: 0; }
 
 /* ---------- tooltip (fixed, one per chart, placed by JS and kept on screen) ---------- */
 .ch-tip {
@@ -4264,15 +4259,7 @@ a.of-nav:active { background: var(--press); }
 .ch-tbl tbody th { font-weight: 500; color: var(--ch-text); }
 .ch-tbl tbody tr:last-child th, .ch-tbl tbody tr:last-child td { border-bottom: 0; }
 
-/* ---------- meter + ring + spark (html parts) ---------- */
-.ch-meter-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 5px; min-width: 0; }
-.ch-meter-l { min-width: 0; color: var(--ch-text); font-weight: 500; overflow-wrap: anywhere; }
-.ch-meter-r { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; color: var(--ch-text); font-weight: 600; text-align: right; }
-.ch-meter-st { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ch-text2); }
-.ch-meter-sub { margin: 4px 0 0; font-size: 12px; color: var(--ch-text2); }
-.ch-ringwrap { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
-.ch-ring-st { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ch-text); }
-.ch-ring-sub { color: var(--ch-text2); font-size: 13px; max-width: 28ch; }
+/* ---------- spark (html part) ---------- */
 .ch--spark { display: inline-block; vertical-align: middle; }
 .ch--spark .ch-plot { width: auto; }
 .ch--spark .ch-svg { width: auto; }
@@ -17391,11 +17378,9 @@ a.of-nav:active { background: var(--press); }
     vis.forEach((s) => m.order.forEach((c) => { if (isNum(val(s, c))) allVals.push(val(s, c)); }));
     const widestVal = Math.max.apply(null, [0].concat(allVals.map((v) => pxText(fmt0.full(v)))), stacked ? Math.max.apply(null, [0].concat(stackL.pos.map((v, ci) => pxText(fmt0.full(percent ? m.total(m.order[ci]) : v))))) : 0);
     const catLabelW = Math.max.apply(null, [0].concat(m.order.map((c) => chart.tw(m.cats[c], 12))));
-    const fontPx = 12;
     let H0, l, r, top, bot, plotW, plotH;
     const g1 = S('g', { class: 'ch-g-bars ' + (orient === 'v' ? 'ch-rv-up' : 'ch-rv-right') });
     const gl = S('g', { class: 'ch-g-vals ch-rv-fade' });
-    const marksOut = [];                                    // { c, s, x,y,w,h ...} for post labelling
     // Thickness of one bar in a slot of width band holding kk bars: up to 24 px, 2 px apart, at least 2 px.
     const thick = (band, kk) => Math.max(Math.min(2, band * 0.85), Math.min(24, (band * (kk > 1 ? 0.84 : 0.7) - (kk - 1) * 2) / kk));
     // The status tone chosen for category c, if any.
@@ -17448,7 +17433,6 @@ a.of-nav:active { background: var(--press); }
       const Y = M.linear(ax.d0, ax.d1, bot, top);
       const y0 = Y(Math.max(ax.d0, Math.min(0, ax.d1)));
       // decide labels before drawing the axis (axis is dropped when every bar is labelled)
-      const groupSlot = catW;
       const bw = thick(catW, stacked ? 1 : k);
       const wantVal = labelsMode === 'all' || (labelsMode === 'auto' && !stacked && k === 1 && widestVal + 4 <= catW);
       const wantTotal = stacked && labelsMode !== 'none' && widestVal + 4 <= catW;
@@ -17712,7 +17696,6 @@ a.of-nav:active { background: var(--press); }
     svg.appendChild(g1);
     const showBase = m.counts && m.counts.length;
     const baseKey = visOv.length ? 'muted' : 'cat1';
-    const binW = (r - l) / b.n;
     const total = b.total;
     // Tooltip for bin i: count and share of the total, each overlay's count, and a note when values above
     // the maximum were piled into the last bin.
@@ -18257,7 +18240,6 @@ a.of-nav:active { background: var(--press); }
     const vW = chart.tw(valT, 13, 700), wW = m.st ? chart.tw(word, 12, 600) + 18 : 0;
     const rightW = vW + (m.st ? wW + 10 : 0);
     const barY = label || m.st || m.v != null ? 24 : 4;
-    const hasText = true;
     svg.appendChild(txt(chart.fit(label, Math.max(30, W - rightW - 14), 13, 500), 0, 13, 'ch-lbl', 'start', { style: 'font-size:13px;font-weight:500' }));
     svg.appendChild(txt(valT, W, 13, 'ch-v', 'end', { style: 'font-size:13px;font-weight:700' }));
     if (m.st) {
@@ -29781,6 +29763,52 @@ a.of-nav:active { background: var(--press); }
     ]
    },
    {
+    "id": "close-the-month",
+    "group": "guide",
+    "title": "Close the month",
+    "summary": "Move old, finished history out of this tablet so it stays quick. You save everything to files first. Nothing is removed until step 3.",
+    "blocks": [
+     {
+      "t": "p",
+      "x": "The screen is called **Close the month**. If a PIN is set, the PIN pad opens first."
+     },
+     {
+      "t": "ol",
+      "x": [
+       "**What this does**. Under **Close everything before**, the date starts on the first of this month. Smokebox shows what moves out (days, orders, tickets and activity records) and what stays: the last 35 days, today, every open order and open ticket, your menu and settings, the end-of-day totals, and all food-safety records. If you pick a date inside the last 35 days, it tells you where it stops instead. Tap **Next: save the files**.",
+       "**Save the month files now**. Tap **Save the month files now**. Your browser downloads five files: a backup of the whole kitchen, three spreadsheets (orders, tickets and days) and a list of what is in them. Look in your downloads folder and check each one is there. If the browser asks to allow several downloads, say yes. Select **I saved the files and I can find them**, then tap **Next: confirm**.",
+       "Type CLOSE. Type the word CLOSE, in any case. Then the red **Close the month** button works."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "After step 3 the history is gone from this tablet, and your files are the only copy of it. For 7 days Smokebox also keeps your kitchen as it was. The last screen says \"Done. The month is closed.\" and has **Undo**, which says \"Undone. Your kitchen is back as it was, with all the history.\" Tap **Done** to leave."
+     },
+     {
+      "t": "p",
+      "x": "To bring everything back later: Back office, Data, Restore, and pick the backup file."
+     },
+     {
+      "t": "h",
+      "x": "When it refuses"
+     },
+     {
+      "t": "p",
+      "x": "Each refusal ends with \"Nothing was removed.\""
+     },
+     {
+      "t": "ul",
+      "x": [
+       "Something changed since you saved the files (a new day started or a record changed): save the files again in step 2, then close. A page reload does the same.",
+       "On a tablet that works through the main computer, it cannot be closed there. Do it on the main computer's own screen or the main tablet.",
+       "In the demo there is no real history. Tap **Back to my kitchen** first.",
+       "If no finished day is older than 35 days before the date, there is nothing to close yet.",
+       "If the browser would not save the change, nothing was removed."
+      ]
+     }
+    ]
+   },
+   {
     "id": "start-over",
     "group": "guide",
     "title": "Start over with an empty menu",
@@ -33075,356 +33103,9 @@ a.of-nav:active { background: var(--press); }
   // ---- 3. Sales and money ----
   if (!O || typeof O.registerPage !== 'function') return;
 
-  // Builds the Sales and money page into the container and returns {update, destroy} for the frame.
-  function render(container, ctx) {
-    const kit = ctx.kit || (SB.office && SB.office.kit);
-    if (!kit || typeof kit.page !== 'function') throw new Error('The back-office kit is not available (80-office-core.js).');
-    const M = ctx.metrics || SB.metrics;
-    const fmt = kit.fmt;
-    const page = kit.page(container, ctx, { id: 'money' });
-    const cleanups = [];
-    // Picker state kept across refreshes. The what-if starts at 85 C, 2 hours and 10 kg (starter values).
-    const st = { itemsBy: 'sold', marginBy: 'unit', endpointC: 85, holdH: 2, rawKg: 10 };
-    // The gray source line under each card title: the range, the channel and whether sample data is in.
-    const scope = () => B.scopeText(ctx);
-    // Every card that was given the range text as its subtitle, so the text follows the range when it changes.
-    const scoped = [];
-    const scope0 = scope();
-    const cardOf = page.card;
-    // Wraps page.card to remember the cards whose subtitle is the range text.
-    page.card = (o) => { const c = cardOf.call(page, o); if (o && o.sub === scope0) scoped.push(c); return c; };
-    const panelOf = page.panel;
-    // Wraps page.panel the same way for panels with a range subtitle.
-    page.panel = (o) => { const c = panelOf.call(page, o); if (o && o.sub === scope0) scoped.push(c); return c; };
-
-    /* ---------- derived values, one per prepared handle ---------- */
-    // Items sold across all rows, or null when nothing sold, so the tile shows no number instead of 0.
-    const soldTotal = (p) => { const rows = M.byItem(p); let n = 0; rows.forEach((r) => { if (isNum(r.sold)) n += r.sold; }); return rows.length ? n : null; };
-    // A second prepared handle for the previous period; only the compare arrows on the tiles use it.
-    const prevHandle = B.memoP((p) => {
-      const c = M.compare(p);
-      if (!c || !c.hasPrevious || !c.prevRange) return null;
-      return M.prepare(ctx.dataset(), { from: c.prevRange.from, to: c.prevRange.to, channel: ctx.filters.channel, now: ctx.now() });
-    });
-    const itemRows = B.memoP((p) => M.byItem(p));
-    // The main (brisket) yield comparison, or null when it cannot be worked out.
-    const yieldPrimary = B.memoP((p) => { const yc = M.yieldComparison(p); return yc && yc.primary ? yc.primary : null; });
-
-    const salesOf = B.memoP((p) => M.sales(p));
-    page.headline();
-    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu and settings (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Every figure is added up in whole cents from the paid orders themselves.');
-
-    page.tiles([
-      // The one main money figure: sales after discounts from paid orders (blank until an order is paid).
-      { id: 'revenue', kpi: 'revenue', label: 'Sales', kind: 'money', good: 'higher', format: (v) => fmt.money(v, 0),
-        // Sales after discounts for the range; blank when no order was paid.
-        value: (p) => { const s = salesOf(p); return s.checks ? { value: s.net, spark: s.byDay.map((d) => d.net) } : null; },
-        // The same figure for the previous period, or null when it had no paid orders.
-        previous: (p) => { const q = prevHandle(p); const s = q ? salesOf(q) : null; return s && s.checks ? s.net : null; } },
-      // Average paid order, before tax and tips, so it agrees with the Sales tile.
-      { id: 'avgTicket', kpi: 'avgTicketValue', label: 'Average order', format: (v) => fmt.money(v, 2),
-        // Sales divided by paid orders; blank when nothing is paid.
-        value: (p) => { const s = salesOf(p); return s.checks ? s.avgCheck : null; } },
-      // Food cost as a share of menu price; blank with a plain note when no item has a recorded cost.
-      { id: 'foodCost', kpi: 'foodCostPct', label: 'Food cost', format: (v) => fmt.pct(v, 1), noValue: 'Cost not recorded',
-        // Cost share of the items that have a recorded cost; null when none do, never a fake zero.
-        value: (p) => { const f = M.foodCostPct(p); return f && f.lines > 0 && isNum(f.costPct) ? f.costPct : null; } },
-      // Items sold has no ready-made kpi, so it is summed here and compared with the previous period's handle.
-      { id: 'items', label: 'Items sold', kind: 'count', good: 'neutral', format: (v) => fmt.num(v, 0),
-        // Sum of all items sold in the range.
-        value: (p) => soldTotal(p),
-        // The same sum for the previous period, or null when there is none.
-        previous: (p) => { const q = prevHandle(p); return q ? soldTotal(q) : null; } },
-    ]);
-
-    /* ---------------------------------------------------------------- takings */
-    page.section('Money collected', 'Sales are the food you sold after discounts. Add tax and tips and you get everything collected. Smokebox only records how an order was paid; it never charges a card.');
-
-    page.panel({
-      span: 5, title: 'Sales, tax and tips', sub: scope(),
-      caption: 'Sales is the food sold less discounts, and it is the number at the top of this page. Tax and tips are on top of it, and all three together are what was collected.',
-      // Builds the figure rows and the notes under them; update repaints them in place.
-      render: (body, p0) => {
-        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the kitchen board and the money shows up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
-        const stats = B.stats(body, { cls: 'ob-stats--3' });
-        const open = h('p', { class: 'ob-note' });
-        body.append(empty, open);
-        // Shows the figures, or the empty note when no order was paid in the range.
-        const paint = (p) => {
-          const s = salesOf(p);
-          empty.hidden = s.checks > 0;
-          if (!s.checks) stats.set([]);
-          else stats.set([
-            { k: 'checks', label: 'Orders paid', value: fmt.num(s.checks, 0), note: isNum(s.avgCheck) ? fmt.money(s.avgCheck, 2) + ' average order' : '' },
-            { k: 'net', label: 'Sales', value: fmt.money(s.net, 2), note: s.discounts > 0 ? fmt.money(s.discounts, 2) + ' given as discounts' : 'before tax and tips' },
-            { k: 'tax', label: 'Tax collected', value: fmt.money(s.tax, 2), note: s.tax > 0 ? '' : 'No tax rate is set' },
-            { k: 'tips', label: 'Tips', value: fmt.money(s.tips, 2), note: isNum(s.tipPct) ? fmt.pct(s.tipPct, 0) + ' of sales' : '' },
-            { k: 'all', label: 'Total collected', value: fmt.money(s.collected, 2), note: 'sales, tax and tips' },
-          ]);
-          const bits = [];
-          if (s.open.orders) bits.push(s.open.orders + ' ' + U.plural(s.open.orders, 'order is', 'orders are') + ' still open, ' + fmt.money(s.open.value, 2) + ' of food not yet paid');
-          if (s.voided) bits.push(s.voided + ' ' + U.plural(s.voided, 'order was', 'orders were') + ' voided');
-          setText(open, bits.length ? bits.join('; ') + '.' : '');
-          open.hidden = !bits.length;
-        };
-        paint(p0 || ctx.prepared());
-        return { update: paint };
-      },
-    });
-
-    page.card({
-      type: 'bar', span: 7, title: 'Money collected by day', sub: scope(),
-      caption: 'Sales for each day, from the orders paid that day. A short bar is a slow day or a day with orders still open.',
-      empty: { title: 'No paid orders to chart yet', body: 'Each day with a paid order gets one bar.', icon: 'chart-bar' },
-      // One bar per day with paid orders.
-      spec: (p) => {
-        const days = salesOf(p).byDay;
-        if (!days.length) return null;
-        const best = days.reduce((a, d) => (d.net > a.net ? d : a), days[0]);
-        return {
-          orient: 'v', categories: days.map((d) => d.label), sort: 'none', format: 'money',
-          series: [{ id: 'net', name: 'Sales', values: days.map((d) => d.net) }],
-          height: 270,
-          ariaLabel: 'Bar chart of sales for each day. The best day is ' + best.label + ' with ' + fmt.money(best.net, 0) + '.',
-        };
-      },
-    });
-
-    const weekdayCard = page.card({
-      type: 'bar', span: 5, title: 'Best day of the week', sub: scope(),
-      caption: 'Each bar is the average sales on that weekday, over the days in this range that had paid orders. A day you were closed is not counted. It needs at least two weeks to compare days.',
-      empty: { title: 'Needs at least two weeks to compare days', body: 'Pick Last 14 days or a longer range once you have two weeks of paid orders. With fewer days, one busy night would decide the answer.', icon: 'chart-bar' },
-      // One bar per weekday, Monday first; null until the range holds two weeks.
-      spec: (p) => {
-        const wd = B.weekdayAverages(salesOf(p).byDay);
-        if (!wd) return null;
-        const shown = wd.filter((x) => x.avg !== null);
-        if (!shown.length) return null;
-        const best = shown.reduce((a, d) => (d.avg > a.avg ? d : a), shown[0]);
-        return {
-          orient: 'v', categories: shown.map((x) => x.name), sort: 'none', format: 'money',
-          series: [{ id: 'avg', name: 'Average sales', values: shown.map((x) => x.avg) }],
-          height: 270,
-          ariaLabel: 'Bar chart of average sales for each weekday. The best day is ' + best.name + ' with ' + fmt.money(best.avg, 0) + ' on average.',
-        };
-      },
-    });
-
-    page.card({
-      type: 'bar', span: 5, title: 'How guests paid', sub: scope(),
-      caption: 'Cash, card and other, counting tax and tips. Cash is what should be in the drawer, apart from the starting float.',
-      empty: { title: 'No payments yet', body: 'Each way of paying gets one bar once an order is paid.', icon: 'dollar' },
-      // One bar per way of paying.
-      spec: (p) => {
-        const rows = salesOf(p).byMethod;
-        if (!rows.length) return null;
-        return {
-          orient: 'h', categories: rows.map((r) => r.name), sort: 'none', labels: 'all', format: 'money',
-          series: [{ id: 'paid', name: 'Collected', values: rows.map((r) => r.collected) }],
-          height: Math.max(150, 46 * rows.length + 40),
-          ariaLabel: 'Bar chart of the money collected by way of paying. ' + rows.slice().sort((a, b) => b.collected - a.collected)[0].name + ' is the largest.',
-        };
-      },
-    });
-
-    /* ---------------------------------------------------------------- what sells */
-    page.section('What sells and what it earns', 'Every figure here comes from finished tickets with priced items in the range above.');
-
-    const topCard = page.card({
-      type: 'bar', span: 6, title: 'Top items', sub: scope(),
-      caption: 'Whether your best sellers are also your best earners. Switch between how many were sold and how much they brought in.',
-      empty: { title: 'No sales in this range yet', body: 'Finished tickets with priced items fill this chart. Take and finish an order on the kitchen board, or pick a longer range.', icon: 'chart-bar' },
-      // Top 10 items by the picked measure; items with no sales are left out.
-      spec: (p) => {
-        const by = st.itemsBy;
-        const rows = itemRows(p).filter((r) => isNum(by === 'sold' ? r.sold : r.revenue) && (by === 'sold' ? r.sold : r.revenue) > 0);
-        if (!rows.length) return null;
-        const top = rows.slice().sort((a, b) => (by === 'sold' ? b.sold - a.sold : b.revenue - a.revenue)).slice(0, 10);
-        const word = by === 'sold' ? 'number sold' : 'sales';
-        return {
-          orient: 'h', categories: top.map((r) => r.name), sort: 'none', labels: 'all', format: by === 'sold' ? 'int' : 'money',
-          series: [{ id: by, name: by === 'sold' ? 'Sold' : 'Sales', values: top.map((r) => (by === 'sold' ? r.sold : r.revenue)) }],
-          height: Math.max(170, 32 * top.length + 40),
-          ariaLabel: 'Bar chart of the ' + top.length + ' top items by ' + word + '. ' + top[0].name + ' leads with ' + (by === 'sold' ? fmt.num(top[0].sold, 0) + ' sold' : fmt.money(top[0].revenue, 0) + ' in sales') + '.',
-        };
-      },
-    });
-    // Sold or Sales switch: only this card redraws.
-    B.addAction(topCard, B.seg({ label: 'Rank items by', value: st.itemsBy, options: [{ id: 'sold', label: 'Sold' }, { id: 'revenue', label: 'Sales' }], onChange: (id) => { st.itemsBy = id; topCard.update(ctx.prepared(), ctx); } }));
-
-    const hourCard = page.card({
-      type: 'bar', span: 6, title: 'Sales by hour of the day', sub: scope(),
-      caption: 'The hours that pay the bills. Staff, prep and the second cook wave should line up with the tallest bars.',
-      empty: { title: 'No hourly sales yet', body: 'Finished tickets with priced items fill this chart, one bar per hour of the day.', icon: 'chart-bar' },
-      // One bar per hour of the day; the card stays empty until some hour has sales.
-      spec: (p) => {
-        const rows = M.revenueByHour(p);
-        if (!rows.length || !rows.some((r) => r.revenue > 0)) return null;
-        const peak = rows.reduce((a, r) => (r.revenue > a.revenue ? r : a), rows[0]);
-        return {
-          orient: 'v', categories: rows.map((r) => r.label), sort: 'none', format: 'money',
-          series: [{ id: 'sales', name: 'Sales', values: rows.map((r) => r.revenue) }],
-          height: 270,
-          ariaLabel: 'Bar chart of sales for each hour of the day. The busiest hour is ' + peak.span + ' with ' + fmt.money(peak.revenue, 0) + '.',
-        };
-      },
-    });
-
-    const chanCard = page.card({
-      type: 'bar', span: 6, title: 'Average ticket value by channel', sub: scope(),
-      caption: 'Which way of ordering brings the biggest tickets. A low bar is a channel where guests add little to the order.',
-      empty: { title: 'No ticket values yet', body: 'Finished tickets with priced items fill this chart, one bar per order channel.', icon: 'chart-bar' },
-      // One bar per order channel, with a line at the all-channel average when there is more than one.
-      spec: (p) => {
-        const v = M.avgTicketValue(p);
-        const rows = (v.byChannel || []).filter((r) => isNum(r.avg));
-        if (!rows.length) return null;
-        const lead = rows.slice().sort((a, b) => b.avg - a.avg)[0];
-        return {
-          orient: 'h', categories: rows.map((r) => r.name), sort: 'none', labels: 'all', format: 'money',
-          series: [{ id: 'avg', name: 'Average ticket', values: rows.map((r) => r.avg) }],
-          refLines: isNum(v.avg) && rows.length > 1 ? [{ value: v.avg, label: 'All channels ' + fmt.money(v.avg, 2), tone: 'muted' }] : [],
-          height: Math.max(150, 46 * rows.length + 40),
-          ariaLabel: 'Bar chart of the average ticket value for each order channel. ' + lead.name + ' is highest at ' + fmt.money(lead.avg, 2) + '.',
-        };
-      },
-    });
-
-    const costCard = page.card({
-      type: 'line', span: 6, title: 'Food cost by day', sub: scope(),
-      caption: 'Whether ingredients are eating a bigger share of the menu price. The shaded band is the 28 to 35% range many restaurants aim for, a rule of thumb and not your target; days above it need a look at portions, waste or prices. A day with very few sales is left out.',
-      empty: { title: 'No food cost to show yet', body: 'Days with sales whose items have a recorded cost fill this line. Items with no cost are left out, never counted as free.', icon: 'chart-line' },
-      spec: (p) => {
-        const fc = M.foodCostPct(p);
-        // A day with only a handful of sales (today so far, or a day the doors were barely open) gives a
-        // misleading percentage, so days under a quarter of the usual day's sales are left out of the line.
-        const days = (fc.byDay || []).filter((d) => isNum(d.costPct) && isNum(d.revenue));
-        const usual = B.median(days.map((d) => d.revenue));
-        const pts = days.filter((d) => !(usual > 0) || d.revenue >= usual * 0.25).map((d) => [U.fmtDateShort(d.date), d.costPct]);
-        if (!pts.length) return null;
-        return {
-          series: [{ id: 'cost', name: 'Food cost', points: pts, slot: 1 }],
-          x: { type: 'cat', label: 'Day' }, y: { format: 'pct', zero: false },
-          bandY: [{ y0: 0.28, y1: 0.35, label: 'Rule of thumb, 28 to 35%' }],
-          markers: pts.length <= 20 ? 'all' : 'auto', height: 270,
-          ariaLabel: 'Line chart of food cost as a share of menu price for each day, from ' + fmt.pct(pts[0][1], 1) + ' to ' + fmt.pct(pts[pts.length - 1][1], 1) + ', with a shaded band for the 28 to 35 percent rule of thumb.',
-        };
-      },
-    });
-
-    /* ---------------------------------------------------------------- margin */
-    page.section('Margin by item', 'What each item leaves after ingredients. Items with no recorded cost are listed on the right, never shown as zero.');
-    // The three ways to read margin: which number to take from each row, how to print it, and the label words.
-    const MARGIN = {
-      // Margin of one portion: menu price minus ingredient cost.
-      unit: { word: 'per portion', value: (r) => r.marginPerUnit, format: 'money', title: 'Margin per portion' },
-      // Margin summed over everything sold in the range.
-      total: { word: 'in total', value: (r) => r.margin, format: 'money', title: 'Total margin' },
-      // Margin as a fraction of the menu price (0 to 1).
-      pct: { word: 'as a share of menu price', value: (r) => r.marginPct, format: 'pct', title: 'Margin as a share of price' },
-    };
-    const marginCard = page.card({
-      type: 'bar', span: 8, title: 'Margin by item', sub: scope(),
-      caption: 'The items that earn the most for every one you sell, and the popular ones that earn little. Per portion is the fairest comparison.',
-      empty: { title: 'No item has a recorded cost yet', body: 'Margin needs an ingredient cost on the menu item. Once a cost is recorded and the item sells, it appears here.', icon: 'dollar' },
-      // Top 12 items by the picked margin; items with no recorded cost are left out, never counted as zero.
-      spec: (p) => {
-        const m = MARGIN[st.marginBy] || MARGIN.unit;
-        const rows = M.marginByItem(p).filter((r) => isNum(m.value(r)));
-        if (!rows.length) return null;
-        const top = rows.slice().sort((a, b) => m.value(b) - m.value(a)).slice(0, 12);
-        // Prints a margin value the way the chosen switch shows it, for the screen-reader text.
-        const fv = (v) => (m.format === 'pct' ? fmt.pct(v, 0) : fmt.money(v, 2));
-        return {
-          orient: 'h', categories: top.map((r) => r.name), sort: 'none', labels: 'all', format: m.format,
-          series: [{ id: 'margin', name: m.title, values: top.map((r) => m.value(r)) }],
-          height: Math.max(170, 32 * top.length + 40),
-          ariaLabel: 'Bar chart of margin ' + m.word + ' for ' + top.length + ' items with a recorded cost. ' + top[0].name + ' is highest at ' + fv(m.value(top[0])) + '.',
-        };
-      },
-    });
-    // Three-way switch (per portion, total, percent of price); only this card redraws.
-    B.addAction(marginCard, B.seg({ label: 'Show margin', value: st.marginBy, options: [{ id: 'unit', label: 'Per portion' }, { id: 'total', label: 'Total' }, { id: 'pct', label: 'Percent of price' }], onChange: (id) => { st.marginBy = id; marginCard.update(ctx.prepared(), ctx); } }));
-
-    const noCost = page.panel({
-      span: 4, title: 'Cost not recorded', sub: scope(),
-      caption: 'Items that sell but have no cost on file. Their margin is unknown, so they stay out of the margin chart and the food cost figure.',
-      // Builds the cost-not-recorded list once; update repaints it only when the list really changed.
-      render: (body, p0) => {
-        const list = h('ul', { class: 'ob-list', 'aria-label': 'Items with no recorded cost' });
-        const none = h('p', { class: 'ob-note', hidden: true });
-        // Opens the Menu and settings page, where a missing cost is entered.
-        const go = kit.button({ label: 'Open Menu and settings', icon: 'sliders', onClick: () => ctx.navigate('data') });
-        const goWrap = h('div', { class: 'ob-actions' }, go);
-        body.append(list, none, goWrap);
-        let last = '';
-        // Lists items that sold with no cost, then items whose cost covers only part of their sales.
-        const paint = (p) => {
-          const rows = itemRows(p).filter((r) => r.sold > 0 && (r.cost === null || r.costCoverage === 0)).sort((a, b) => b.sold - a.sold);
-          const partial = itemRows(p).filter((r) => r.sold > 0 && r.cost !== null && isNum(r.costCoverage) && r.costCoverage < 1);
-          // A signature of what the list shows: if it is unchanged nothing is rebuilt, so there is no flicker.
-          const sig = JSON.stringify([rows.map((r) => [r.menuId, r.sold]), partial.map((r) => [r.menuId, r.costCoverage]), itemRows(p).length]);
-          if (sig === last) return; last = sig;
-          U.clear(list);
-          rows.forEach((r) => list.appendChild(h('li', { class: 'ob-li' },
-            h('span', { class: 'ob-li-n' }, r.name),
-            h('span', { class: 'ob-li-v' }, h('span', { class: 'ob-tag', dataset: { tone: 'warn' } }, 'Cost not recorded'), h('span', { class: 'num ob-li-s' }, fmt.num(r.sold, 0) + ' sold')))));
-          partial.forEach((r) => list.appendChild(h('li', { class: 'ob-li' },
-            h('span', { class: 'ob-li-n' }, r.name),
-            h('span', { class: 'ob-li-v' }, h('span', { class: 'ob-tag', dataset: { tone: 'info' } }, 'Cost on ' + fmt.pct(r.costCoverage, 0) + ' of sales'), h('span', { class: 'num ob-li-s' }, fmt.num(r.sold, 0) + ' sold')))));
-          const total = itemRows(p).length;
-          list.hidden = !rows.length && !partial.length;
-          none.hidden = !!(rows.length || partial.length);
-          setText(none, total ? 'Every item that sold has a recorded cost.' : 'Nothing has sold in this range yet, so there is nothing to check.');
-          goWrap.hidden = !rows.length;
-        };
-        paint(p0);
-        return { update: paint };
-      },
-    });
-
-    noCost.el.style.alignSelf = 'start'; // a short list should not stretch to the height of the margin chart
-
-    /* ---------------------------------------------------------------- dollars thrown away */
-    page.section('Dollars thrown away', 'Food that was discarded, at the cost per cooked kg recorded on each batch. Always the last 7 days against the 7 days before, whatever range is picked above.');
-    const weeksOf = B.memoP((p) => M.discardWeeks(p, { now: ctx.now() }));
-    page.panel({
-      span: 12, title: 'This week against last week',
-      caption: 'Look at the biggest line. If one product or one reason keeps showing up, cook less of it, check temperatures sooner, or cool it faster.',
-      // Builds the sentence and the two lists (by product, by reason) once; update repaints them only when
-      // the figures changed.
-      render: (body, p0) => {
-        const line = h('p', { class: 'ob-note ob-note--accent' });
-        const prodList = h('ul', { class: 'ob-list', 'aria-label': 'Thrown away by product' });
-        const reasonList = h('ul', { class: 'ob-list', 'aria-label': 'Thrown away by reason' });
-        const cols = h('div', { class: 'ob-twocol' }, h('div', null, h('h3', { class: 'ob-h3' }, 'By product'), prodList), h('div', null, h('h3', { class: 'ob-h3' }, 'By reason'), reasonList));
-        const sampleTag = h('span', { class: 'ob-tag', dataset: { tone: 'warn' }, hidden: true }, 'Includes sample data');
-        body.append(line, sampleTag, cols);
-        let last = '';
-        // One list row: the name, this week's dollars (or "cost not recorded") and last week's for comparison.
-        const row = (name, a, b) => h('li', { class: 'ob-li' },
-          h('span', { class: 'ob-li-n' }, name),
-          h('span', { class: 'ob-li-v' }, h('span', { class: 'num' }, a.cost > 0 ? fmt.money(a.cost, 2) : 'cost not recorded'), h('span', { class: 'num ob-li-s' }, fmt.g(a.g) + ' this week, ' + (b ? (b.cost > 0 ? fmt.money(b.cost, 2) : fmt.g(b.g)) : 'none') + ' last week')));
-        // Fills one list from this week's rows, matching each to the same key last week.
-        const fill = (ul, rows, lastRows, key, nameOf, none) => {
-          U.clear(ul);
-          if (!rows.length) { ul.appendChild(h('li', { class: 'ob-li' }, h('span', { class: 'ob-li-n' }, none))); return; }
-          rows.forEach((r) => ul.appendChild(row(nameOf(r), r, lastRows.find((x) => x[key] === r[key]))));
-        };
-        // Redraws the sentence and lists from the discard ledger when it changed.
-        const paint = (p) => {
-          const w = weeksOf(p), sig = JSON.stringify(w);
-          if (sig === last) return; last = sig;
-          setText(line, M.discardSentence(w));
-          fill(prodList, w.thisWeek.byProduct, w.lastWeek.byProduct, 'ing', (r) => r.name, 'Nothing thrown away this week.');
-          fill(reasonList, w.thisWeek.byReason, w.lastWeek.byReason, 'reason', (r) => r.label, 'Nothing thrown away this week.');
-          sampleTag.hidden = !(w.thisWeek.total.sampleCount || w.lastWeek.total.sampleCount);
-        };
-        paint(p0);
-        return { update: paint };
-      },
-    });
-
+  // Builds the Cooked yield section of the Sales and money page (the yield chart, the cost of a wrong yield and the what-if panel) and returns the parts the page result needs.
+  function buildYieldSection(env) {
+    const { page, scope, yieldPrimary, fmt, cleanups, st, M, ctx } = env;
     /* ---------------------------------------------------------------- yield */
     page.section('Cooked yield', 'Cooked meat loses weight while it cooks and while it waits. Pricing it at a fixed yield can quietly under- or over-charge every plate.');
     const yieldSection = page.lastSection;
@@ -33587,6 +33268,380 @@ a.of-nav:active { background: var(--press); }
         return {};
       },
     });
+    return { yieldSection, yieldCard, paintYieldKey, costOfWrong, whatIf };
+  }
+
+  // Builds the Margin by item section of the Sales and money page (the margin chart with its three readings and the list of items with no recorded cost) and returns the two cards the page result keeps.
+  function buildMarginSection(env) {
+    const { page, scope, st, M, fmt, kit, itemRows, ctx } = env;
+    /* ---------------------------------------------------------------- margin */
+    page.section('Margin by item', 'What each item leaves after ingredients. Items with no recorded cost are listed on the right, never shown as zero.');
+    // The three ways to read margin: which number to take from each row, how to print it, and the label words.
+    const MARGIN = {
+      // Margin of one portion: menu price minus ingredient cost.
+      unit: { word: 'per portion', value: (r) => r.marginPerUnit, format: 'money', title: 'Margin per portion' },
+      // Margin summed over everything sold in the range.
+      total: { word: 'in total', value: (r) => r.margin, format: 'money', title: 'Total margin' },
+      // Margin as a fraction of the menu price (0 to 1).
+      pct: { word: 'as a share of menu price', value: (r) => r.marginPct, format: 'pct', title: 'Margin as a share of price' },
+    };
+    const marginCard = page.card({
+      type: 'bar', span: 8, title: 'Margin by item', sub: scope(),
+      caption: 'The items that earn the most for every one you sell, and the popular ones that earn little. Per portion is the fairest comparison.',
+      empty: { title: 'No item has a recorded cost yet', body: 'Margin needs an ingredient cost on the menu item. Once a cost is recorded and the item sells, it appears here.', icon: 'dollar' },
+      // Top 12 items by the picked margin; items with no recorded cost are left out, never counted as zero.
+      spec: (p) => {
+        const m = MARGIN[st.marginBy] || MARGIN.unit;
+        const rows = M.marginByItem(p).filter((r) => isNum(m.value(r)));
+        if (!rows.length) return null;
+        const top = rows.slice().sort((a, b) => m.value(b) - m.value(a)).slice(0, 12);
+        // Prints a margin value the way the chosen switch shows it, for the screen-reader text.
+        const fv = (v) => (m.format === 'pct' ? fmt.pct(v, 0) : fmt.money(v, 2));
+        return {
+          orient: 'h', categories: top.map((r) => r.name), sort: 'none', labels: 'all', format: m.format,
+          series: [{ id: 'margin', name: m.title, values: top.map((r) => m.value(r)) }],
+          height: Math.max(170, 32 * top.length + 40),
+          ariaLabel: 'Bar chart of margin ' + m.word + ' for ' + top.length + ' items with a recorded cost. ' + top[0].name + ' is highest at ' + fv(m.value(top[0])) + '.',
+        };
+      },
+    });
+    // Three-way switch (per portion, total, percent of price); only this card redraws.
+    B.addAction(marginCard, B.seg({ label: 'Show margin', value: st.marginBy, options: [{ id: 'unit', label: 'Per portion' }, { id: 'total', label: 'Total' }, { id: 'pct', label: 'Percent of price' }], onChange: (id) => { st.marginBy = id; marginCard.update(ctx.prepared(), ctx); } }));
+
+    const noCost = page.panel({
+      span: 4, title: 'Cost not recorded', sub: scope(),
+      caption: 'Items that sell but have no cost on file. Their margin is unknown, so they stay out of the margin chart and the food cost figure.',
+      // Builds the cost-not-recorded list once; update repaints it only when the list really changed.
+      render: (body, p0) => {
+        const list = h('ul', { class: 'ob-list', 'aria-label': 'Items with no recorded cost' });
+        const none = h('p', { class: 'ob-note', hidden: true });
+        // Opens the Menu and settings page, where a missing cost is entered.
+        const go = kit.button({ label: 'Open Menu and settings', icon: 'sliders', onClick: () => ctx.navigate('data') });
+        const goWrap = h('div', { class: 'ob-actions' }, go);
+        body.append(list, none, goWrap);
+        let last = '';
+        // Lists items that sold with no cost, then items whose cost covers only part of their sales.
+        const paint = (p) => {
+          const rows = itemRows(p).filter((r) => r.sold > 0 && (r.cost === null || r.costCoverage === 0)).sort((a, b) => b.sold - a.sold);
+          const partial = itemRows(p).filter((r) => r.sold > 0 && r.cost !== null && isNum(r.costCoverage) && r.costCoverage < 1);
+          // A signature of what the list shows: if it is unchanged nothing is rebuilt, so there is no flicker.
+          const sig = JSON.stringify([rows.map((r) => [r.menuId, r.sold]), partial.map((r) => [r.menuId, r.costCoverage]), itemRows(p).length]);
+          if (sig === last) return; last = sig;
+          U.clear(list);
+          rows.forEach((r) => list.appendChild(h('li', { class: 'ob-li' },
+            h('span', { class: 'ob-li-n' }, r.name),
+            h('span', { class: 'ob-li-v' }, h('span', { class: 'ob-tag', dataset: { tone: 'warn' } }, 'Cost not recorded'), h('span', { class: 'num ob-li-s' }, fmt.num(r.sold, 0) + ' sold')))));
+          partial.forEach((r) => list.appendChild(h('li', { class: 'ob-li' },
+            h('span', { class: 'ob-li-n' }, r.name),
+            h('span', { class: 'ob-li-v' }, h('span', { class: 'ob-tag', dataset: { tone: 'info' } }, 'Cost on ' + fmt.pct(r.costCoverage, 0) + ' of sales'), h('span', { class: 'num ob-li-s' }, fmt.num(r.sold, 0) + ' sold')))));
+          const total = itemRows(p).length;
+          list.hidden = !rows.length && !partial.length;
+          none.hidden = !!(rows.length || partial.length);
+          setText(none, total ? 'Every item that sold has a recorded cost.' : 'Nothing has sold in this range yet, so there is nothing to check.');
+          goWrap.hidden = !rows.length;
+        };
+        paint(p0);
+        return { update: paint };
+      },
+    });
+
+    noCost.el.style.alignSelf = 'start'; // a short list should not stretch to the height of the margin chart
+    return { marginCard, noCost };
+  }
+
+  // Builds the What sells and what it earns section of the Sales and money page (top items, sales by hour, by order type and cost of goods) and returns the four cards the page result keeps.
+  function buildSellsSection(env) {
+    const { page, scope, st, itemRows, fmt, M, ctx } = env;
+    /* ---------------------------------------------------------------- what sells */
+    page.section('What sells and what it earns', 'Every figure here comes from finished tickets with priced items in the range above.');
+
+    const topCard = page.card({
+      type: 'bar', span: 6, title: 'Top items', sub: scope(),
+      caption: 'Whether your best sellers are also your best earners. Switch between how many were sold and how much they brought in.',
+      empty: { title: 'No sales in this range yet', body: 'Finished tickets with priced items fill this chart. Take and finish an order on the kitchen board, or pick a longer range.', icon: 'chart-bar' },
+      // Top 10 items by the picked measure; items with no sales are left out.
+      spec: (p) => {
+        const by = st.itemsBy;
+        const rows = itemRows(p).filter((r) => isNum(by === 'sold' ? r.sold : r.revenue) && (by === 'sold' ? r.sold : r.revenue) > 0);
+        if (!rows.length) return null;
+        const top = rows.slice().sort((a, b) => (by === 'sold' ? b.sold - a.sold : b.revenue - a.revenue)).slice(0, 10);
+        const word = by === 'sold' ? 'number sold' : 'sales';
+        return {
+          orient: 'h', categories: top.map((r) => r.name), sort: 'none', labels: 'all', format: by === 'sold' ? 'int' : 'money',
+          series: [{ id: by, name: by === 'sold' ? 'Sold' : 'Sales', values: top.map((r) => (by === 'sold' ? r.sold : r.revenue)) }],
+          height: Math.max(170, 32 * top.length + 40),
+          ariaLabel: 'Bar chart of the ' + top.length + ' top items by ' + word + '. ' + top[0].name + ' leads with ' + (by === 'sold' ? fmt.num(top[0].sold, 0) + ' sold' : fmt.money(top[0].revenue, 0) + ' in sales') + '.',
+        };
+      },
+    });
+    // Sold or Sales switch: only this card redraws.
+    B.addAction(topCard, B.seg({ label: 'Rank items by', value: st.itemsBy, options: [{ id: 'sold', label: 'Sold' }, { id: 'revenue', label: 'Sales' }], onChange: (id) => { st.itemsBy = id; topCard.update(ctx.prepared(), ctx); } }));
+
+    const hourCard = page.card({
+      type: 'bar', span: 6, title: 'Sales by hour of the day', sub: scope(),
+      caption: 'The hours that pay the bills. Staff, prep and the second cook wave should line up with the tallest bars.',
+      empty: { title: 'No hourly sales yet', body: 'Finished tickets with priced items fill this chart, one bar per hour of the day.', icon: 'chart-bar' },
+      // One bar per hour of the day; the card stays empty until some hour has sales.
+      spec: (p) => {
+        const rows = M.revenueByHour(p);
+        if (!rows.length || !rows.some((r) => r.revenue > 0)) return null;
+        const peak = rows.reduce((a, r) => (r.revenue > a.revenue ? r : a), rows[0]);
+        return {
+          orient: 'v', categories: rows.map((r) => r.label), sort: 'none', format: 'money',
+          series: [{ id: 'sales', name: 'Sales', values: rows.map((r) => r.revenue) }],
+          height: 270,
+          ariaLabel: 'Bar chart of sales for each hour of the day. The busiest hour is ' + peak.span + ' with ' + fmt.money(peak.revenue, 0) + '.',
+        };
+      },
+    });
+
+    const chanCard = page.card({
+      type: 'bar', span: 6, title: 'Average ticket value by channel', sub: scope(),
+      caption: 'Which way of ordering brings the biggest tickets. A low bar is a channel where guests add little to the order.',
+      empty: { title: 'No ticket values yet', body: 'Finished tickets with priced items fill this chart, one bar per order channel.', icon: 'chart-bar' },
+      // One bar per order channel, with a line at the all-channel average when there is more than one.
+      spec: (p) => {
+        const v = M.avgTicketValue(p);
+        const rows = (v.byChannel || []).filter((r) => isNum(r.avg));
+        if (!rows.length) return null;
+        const lead = rows.slice().sort((a, b) => b.avg - a.avg)[0];
+        return {
+          orient: 'h', categories: rows.map((r) => r.name), sort: 'none', labels: 'all', format: 'money',
+          series: [{ id: 'avg', name: 'Average ticket', values: rows.map((r) => r.avg) }],
+          refLines: isNum(v.avg) && rows.length > 1 ? [{ value: v.avg, label: 'All channels ' + fmt.money(v.avg, 2), tone: 'muted' }] : [],
+          height: Math.max(150, 46 * rows.length + 40),
+          ariaLabel: 'Bar chart of the average ticket value for each order channel. ' + lead.name + ' is highest at ' + fmt.money(lead.avg, 2) + '.',
+        };
+      },
+    });
+
+    const costCard = page.card({
+      type: 'line', span: 6, title: 'Food cost by day', sub: scope(),
+      caption: 'Whether ingredients are eating a bigger share of the menu price. The shaded band is the 28 to 35% range many restaurants aim for, a rule of thumb and not your target; days above it need a look at portions, waste or prices. A day with very few sales is left out.',
+      empty: { title: 'No food cost to show yet', body: 'Days with sales whose items have a recorded cost fill this line. Items with no cost are left out, never counted as free.', icon: 'chart-line' },
+      spec: (p) => {
+        const fc = M.foodCostPct(p);
+        // A day with only a handful of sales (today so far, or a day the doors were barely open) gives a
+        // misleading percentage, so days under a quarter of the usual day's sales are left out of the line.
+        const days = (fc.byDay || []).filter((d) => isNum(d.costPct) && isNum(d.revenue));
+        const usual = B.median(days.map((d) => d.revenue));
+        const pts = days.filter((d) => !(usual > 0) || d.revenue >= usual * 0.25).map((d) => [U.fmtDateShort(d.date), d.costPct]);
+        if (!pts.length) return null;
+        return {
+          series: [{ id: 'cost', name: 'Food cost', points: pts, slot: 1 }],
+          x: { type: 'cat', label: 'Day' }, y: { format: 'pct', zero: false },
+          bandY: [{ y0: 0.28, y1: 0.35, label: 'Rule of thumb, 28 to 35%' }],
+          markers: pts.length <= 20 ? 'all' : 'auto', height: 270,
+          ariaLabel: 'Line chart of food cost as a share of menu price for each day, from ' + fmt.pct(pts[0][1], 1) + ' to ' + fmt.pct(pts[pts.length - 1][1], 1) + ', with a shaded band for the 28 to 35 percent rule of thumb.',
+        };
+      },
+    });
+    return { topCard, hourCard, chanCard, costCard };
+  }
+
+  // Builds the Money collected section of the Sales and money page (the sales panel, its cards and the daily chart); every part it makes stays on the page.
+  function buildTakingsSection(env) {
+    const { page, scope, kit, salesOf, fmt, ctx } = env;
+    /* ---------------------------------------------------------------- takings */
+    page.section('Money collected', 'Sales are the food you sold after discounts. Add tax and tips and you get everything collected. Smokebox only records how an order was paid; it never charges a card.');
+
+    page.panel({
+      span: 5, title: 'Sales, tax and tips', sub: scope(),
+      caption: 'Sales is the food sold less discounts, and it is the number at the top of this page. Tax and tips are on top of it, and all three together are what was collected.',
+      // Builds the figure rows and the notes under them; update repaints them in place.
+      render: (body, p0) => {
+        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the kitchen board and the money shows up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
+        const stats = B.stats(body, { cls: 'ob-stats--3' });
+        const open = h('p', { class: 'ob-note' });
+        body.append(empty, open);
+        // Shows the figures, or the empty note when no order was paid in the range.
+        const paint = (p) => {
+          const s = salesOf(p);
+          empty.hidden = s.checks > 0;
+          if (!s.checks) stats.set([]);
+          else stats.set([
+            { k: 'checks', label: 'Orders paid', value: fmt.num(s.checks, 0), note: isNum(s.avgCheck) ? fmt.money(s.avgCheck, 2) + ' average order' : '' },
+            { k: 'net', label: 'Sales', value: fmt.money(s.net, 2), note: s.discounts > 0 ? fmt.money(s.discounts, 2) + ' given as discounts' : 'before tax and tips' },
+            { k: 'tax', label: 'Tax collected', value: fmt.money(s.tax, 2), note: s.tax > 0 ? '' : 'No tax rate is set' },
+            { k: 'tips', label: 'Tips', value: fmt.money(s.tips, 2), note: isNum(s.tipPct) ? fmt.pct(s.tipPct, 0) + ' of sales' : '' },
+            { k: 'all', label: 'Total collected', value: fmt.money(s.collected, 2), note: 'sales, tax and tips' },
+          ]);
+          const bits = [];
+          if (s.open.orders) bits.push(s.open.orders + ' ' + U.plural(s.open.orders, 'order is', 'orders are') + ' still open, ' + fmt.money(s.open.value, 2) + ' of food not yet paid');
+          if (s.voided) bits.push(s.voided + ' ' + U.plural(s.voided, 'order was', 'orders were') + ' voided');
+          setText(open, bits.length ? bits.join('; ') + '.' : '');
+          open.hidden = !bits.length;
+        };
+        paint(p0 || ctx.prepared());
+        return { update: paint };
+      },
+    });
+
+    page.card({
+      type: 'bar', span: 7, title: 'Money collected by day', sub: scope(),
+      caption: 'Sales for each day, from the orders paid that day. A short bar is a slow day or a day with orders still open.',
+      empty: { title: 'No paid orders to chart yet', body: 'Each day with a paid order gets one bar.', icon: 'chart-bar' },
+      // One bar per day with paid orders.
+      spec: (p) => {
+        const days = salesOf(p).byDay;
+        if (!days.length) return null;
+        const best = days.reduce((a, d) => (d.net > a.net ? d : a), days[0]);
+        return {
+          orient: 'v', categories: days.map((d) => d.label), sort: 'none', format: 'money',
+          series: [{ id: 'net', name: 'Sales', values: days.map((d) => d.net) }],
+          height: 270,
+          ariaLabel: 'Bar chart of sales for each day. The best day is ' + best.label + ' with ' + fmt.money(best.net, 0) + '.',
+        };
+      },
+    });
+
+    page.card({
+      type: 'bar', span: 5, title: 'Best day of the week', sub: scope(),
+      caption: 'Each bar is the average sales on that weekday, over the days in this range that had paid orders. A day you were closed is not counted. It needs at least two weeks to compare days.',
+      empty: { title: 'Needs at least two weeks to compare days', body: 'Pick Last 14 days or a longer range once you have two weeks of paid orders. With fewer days, one busy night would decide the answer.', icon: 'chart-bar' },
+      // One bar per weekday, Monday first; null until the range holds two weeks.
+      spec: (p) => {
+        const wd = B.weekdayAverages(salesOf(p).byDay);
+        if (!wd) return null;
+        const shown = wd.filter((x) => x.avg !== null);
+        if (!shown.length) return null;
+        const best = shown.reduce((a, d) => (d.avg > a.avg ? d : a), shown[0]);
+        return {
+          orient: 'v', categories: shown.map((x) => x.name), sort: 'none', format: 'money',
+          series: [{ id: 'avg', name: 'Average sales', values: shown.map((x) => x.avg) }],
+          height: 270,
+          ariaLabel: 'Bar chart of average sales for each weekday. The best day is ' + best.name + ' with ' + fmt.money(best.avg, 0) + ' on average.',
+        };
+      },
+    });
+
+    page.card({
+      type: 'bar', span: 5, title: 'How guests paid', sub: scope(),
+      caption: 'Cash, card and other, counting tax and tips. Cash is what should be in the drawer, apart from the starting float.',
+      empty: { title: 'No payments yet', body: 'Each way of paying gets one bar once an order is paid.', icon: 'dollar' },
+      // One bar per way of paying.
+      spec: (p) => {
+        const rows = salesOf(p).byMethod;
+        if (!rows.length) return null;
+        return {
+          orient: 'h', categories: rows.map((r) => r.name), sort: 'none', labels: 'all', format: 'money',
+          series: [{ id: 'paid', name: 'Collected', values: rows.map((r) => r.collected) }],
+          height: Math.max(150, 46 * rows.length + 40),
+          ariaLabel: 'Bar chart of the money collected by way of paying. ' + rows.slice().sort((a, b) => b.collected - a.collected)[0].name + ' is the largest.',
+        };
+      },
+    });
+  }
+
+  // Builds the Sales and money page into the container and returns {update, destroy} for the frame.
+  function render(container, ctx) {
+    const kit = ctx.kit || (SB.office && SB.office.kit);
+    if (!kit || typeof kit.page !== 'function') throw new Error('The back-office kit is not available (80-office-core.js).');
+    const M = ctx.metrics || SB.metrics;
+    const fmt = kit.fmt;
+    const page = kit.page(container, ctx, { id: 'money' });
+    const cleanups = [];
+    // Picker state kept across refreshes. The what-if starts at 85 C, 2 hours and 10 kg (starter values).
+    const st = { itemsBy: 'sold', marginBy: 'unit', endpointC: 85, holdH: 2, rawKg: 10 };
+    // The gray source line under each card title: the range, the channel and whether sample data is in.
+    const scope = () => B.scopeText(ctx);
+    // Every card that was given the range text as its subtitle, so the text follows the range when it changes.
+    const scoped = [];
+    const scope0 = scope();
+    const cardOf = page.card;
+    // Wraps page.card to remember the cards whose subtitle is the range text.
+    page.card = (o) => { const c = cardOf.call(page, o); if (o && o.sub === scope0) scoped.push(c); return c; };
+    const panelOf = page.panel;
+    // Wraps page.panel the same way for panels with a range subtitle.
+    page.panel = (o) => { const c = panelOf.call(page, o); if (o && o.sub === scope0) scoped.push(c); return c; };
+
+    /* ---------- derived values, one per prepared handle ---------- */
+    // Items sold across all rows, or null when nothing sold, so the tile shows no number instead of 0.
+    const soldTotal = (p) => { const rows = M.byItem(p); let n = 0; rows.forEach((r) => { if (isNum(r.sold)) n += r.sold; }); return rows.length ? n : null; };
+    // A second prepared handle for the previous period; only the compare arrows on the tiles use it.
+    const prevHandle = B.memoP((p) => {
+      const c = M.compare(p);
+      if (!c || !c.hasPrevious || !c.prevRange) return null;
+      return M.prepare(ctx.dataset(), { from: c.prevRange.from, to: c.prevRange.to, channel: ctx.filters.channel, now: ctx.now() });
+    });
+    const itemRows = B.memoP((p) => M.byItem(p));
+    // The main (brisket) yield comparison, or null when it cannot be worked out.
+    const yieldPrimary = B.memoP((p) => { const yc = M.yieldComparison(p); return yc && yc.primary ? yc.primary : null; });
+
+    const salesOf = B.memoP((p) => M.sales(p));
+    page.headline();
+    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu and settings (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Every figure is added up in whole cents from the paid orders themselves.');
+
+    page.tiles([
+      // The one main money figure: sales after discounts from paid orders (blank until an order is paid).
+      { id: 'revenue', kpi: 'revenue', label: 'Sales', kind: 'money', good: 'higher', format: (v) => fmt.money(v, 0),
+        // Sales after discounts for the range; blank when no order was paid.
+        value: (p) => { const s = salesOf(p); return s.checks ? { value: s.net, spark: s.byDay.map((d) => d.net) } : null; },
+        // The same figure for the previous period, or null when it had no paid orders.
+        previous: (p) => { const q = prevHandle(p); const s = q ? salesOf(q) : null; return s && s.checks ? s.net : null; } },
+      // Average paid order, before tax and tips, so it agrees with the Sales tile.
+      { id: 'avgTicket', kpi: 'avgTicketValue', label: 'Average order', format: (v) => fmt.money(v, 2),
+        // Sales divided by paid orders; blank when nothing is paid.
+        value: (p) => { const s = salesOf(p); return s.checks ? s.avgCheck : null; } },
+      // Food cost as a share of menu price; blank with a plain note when no item has a recorded cost.
+      { id: 'foodCost', kpi: 'foodCostPct', label: 'Food cost', format: (v) => fmt.pct(v, 1), noValue: 'Cost not recorded',
+        // Cost share of the items that have a recorded cost; null when none do, never a fake zero.
+        value: (p) => { const f = M.foodCostPct(p); return f && f.lines > 0 && isNum(f.costPct) ? f.costPct : null; } },
+      // Items sold has no ready-made kpi, so it is summed here and compared with the previous period's handle.
+      { id: 'items', label: 'Items sold', kind: 'count', good: 'neutral', format: (v) => fmt.num(v, 0),
+        // Sum of all items sold in the range.
+        value: (p) => soldTotal(p),
+        // The same sum for the previous period, or null when there is none.
+        previous: (p) => { const q = prevHandle(p); return q ? soldTotal(q) : null; } },
+    ]);
+
+    buildTakingsSection({ page, scope, kit, salesOf, fmt, ctx });
+
+    const { topCard, hourCard, chanCard, costCard } = buildSellsSection({ page, scope, st, itemRows, fmt, M, ctx });
+
+    const { marginCard, noCost } = buildMarginSection({ page, scope, st, M, fmt, kit, itemRows, ctx });
+
+    /* ---------------------------------------------------------------- dollars thrown away */
+    page.section('Dollars thrown away', 'Food that was discarded, at the cost per cooked kg recorded on each batch. Always the last 7 days against the 7 days before, whatever range is picked above.');
+    const weeksOf = B.memoP((p) => M.discardWeeks(p, { now: ctx.now() }));
+    page.panel({
+      span: 12, title: 'This week against last week',
+      caption: 'Look at the biggest line. If one product or one reason keeps showing up, cook less of it, check temperatures sooner, or cool it faster.',
+      // Builds the sentence and the two lists (by product, by reason) once; update repaints them only when
+      // the figures changed.
+      render: (body, p0) => {
+        const line = h('p', { class: 'ob-note ob-note--accent' });
+        const prodList = h('ul', { class: 'ob-list', 'aria-label': 'Thrown away by product' });
+        const reasonList = h('ul', { class: 'ob-list', 'aria-label': 'Thrown away by reason' });
+        const cols = h('div', { class: 'ob-twocol' }, h('div', null, h('h3', { class: 'ob-h3' }, 'By product'), prodList), h('div', null, h('h3', { class: 'ob-h3' }, 'By reason'), reasonList));
+        const sampleTag = h('span', { class: 'ob-tag', dataset: { tone: 'warn' }, hidden: true }, 'Includes sample data');
+        body.append(line, sampleTag, cols);
+        let last = '';
+        // One list row: the name, this week's dollars (or "cost not recorded") and last week's for comparison.
+        const row = (name, a, b) => h('li', { class: 'ob-li' },
+          h('span', { class: 'ob-li-n' }, name),
+          h('span', { class: 'ob-li-v' }, h('span', { class: 'num' }, a.cost > 0 ? fmt.money(a.cost, 2) : 'cost not recorded'), h('span', { class: 'num ob-li-s' }, fmt.g(a.g) + ' this week, ' + (b ? (b.cost > 0 ? fmt.money(b.cost, 2) : fmt.g(b.g)) : 'none') + ' last week')));
+        // Fills one list from this week's rows, matching each to the same key last week.
+        const fill = (ul, rows, lastRows, key, nameOf, none) => {
+          U.clear(ul);
+          if (!rows.length) { ul.appendChild(h('li', { class: 'ob-li' }, h('span', { class: 'ob-li-n' }, none))); return; }
+          rows.forEach((r) => ul.appendChild(row(nameOf(r), r, lastRows.find((x) => x[key] === r[key]))));
+        };
+        // Redraws the sentence and lists from the discard ledger when it changed.
+        const paint = (p) => {
+          const w = weeksOf(p), sig = JSON.stringify(w);
+          if (sig === last) return; last = sig;
+          setText(line, M.discardSentence(w));
+          fill(prodList, w.thisWeek.byProduct, w.lastWeek.byProduct, 'ing', (r) => r.name, 'Nothing thrown away this week.');
+          fill(reasonList, w.thisWeek.byReason, w.lastWeek.byReason, 'reason', (r) => r.label, 'Nothing thrown away this week.');
+          sampleTag.hidden = !(w.thisWeek.total.sampleCount || w.lastWeek.total.sampleCount);
+        };
+        paint(p0);
+        return { update: paint };
+      },
+    });
+
+    const { yieldSection, yieldCard, paintYieldKey, costOfWrong, whatIf } = buildYieldSection({ page, scope, yieldPrimary, fmt, cleanups, st, M, ctx });
 
     /* ---------------------------------------------------------------- page result */
     const slots = [topCard, hourCard, chanCard, costCard, marginCard, noCost, yieldCard, costOfWrong, whatIf];
@@ -34088,6 +34143,13 @@ a.of-nav:active { background: var(--press); }
     const hint = U.h('p', { class: 'od-hint od-cm-hint', hidden: true });
     // The day the preview counts back from: the first of this month (the same default as the guarded flow); the store still keeps the last days.
     const opts = () => ({ before: U.serviceDate(SB.store.now(), (SB.store.getState().settings.service || {}).dayStartHour).slice(0, 8) + '01' });
+    // Why some old days are not offered: sales after the day's last close (the store lists them in lateSaleDays) or no close at all.
+    function skipped(p) {
+      const late = (p.lateSaleDays || []).length, never = (p.uncoveredDays || []).length - late, out = [];
+      if (late > 0) out.push(late + ' ' + (late === 1 ? 'day was' : 'days were') + ' not cleared: ' + (late === 1 ? 'it has' : 'they have') + ' sales after the last end-of-day close');
+      if (never > 0) out.push(never + ' ' + (never === 1 ? 'day has' : 'days have') + ' no end-of-day close, so ' + (never === 1 ? 'it was' : 'they were') + ' kept');
+      return out.join('. ') + (out.length ? '.' : '');
+    }
     // Asks the store what Close the month would clear now and writes it in plain words (nothing changes).
     function paint() {
       try { paintNow(); } catch (e) { start.disabled = true; sum.textContent = 'The preview is not available right now. Nothing was changed.'; notes.textContent = ''; }
@@ -34105,7 +34167,7 @@ a.of-nav:active { background: var(--press); }
       // A count with its unit word, such as "3 days" or "1 order".
       const n = (k, one, many) => U.fmtNum(k) + ' ' + U.plural(k, one, many || one + 's');
       sum.textContent = 'Ready to save and clear ' + n(p.days.length, 'day') + ' (' + U.fmtDateShort(p.from) + ' to ' + U.fmtDateShort(U.addDays(p.before, -1)) + '): ' + n(p.tickets, 'ticket') + ', ' + n(p.orders, 'order') + ' and ' + n(p.events, 'activity record') + '. Those orders took in ' + U.fmtMoney(p.paidTotal) + '.';
-      notes.textContent = 'Stays on this tablet: ' + n(p.safetyEventsKept, 'safety record') + ', ' + n(p.dayRecordsKept, 'end-of-day total') + (p.openOrdersKept ? ', ' + n(p.openOrdersKept, 'open order') : '') + (p.uncoveredDays && p.uncoveredDays.length ? '. ' + n(p.uncoveredDays.length, 'older day') + ' never closed, so ' + (p.uncoveredDays.length === 1 ? 'it stays' : 'they stay') + '.' : '.');
+      notes.textContent = 'Stays on this tablet: ' + n(p.safetyEventsKept, 'safety record') + ', ' + n(p.dayRecordsKept, 'end-of-day total') + (p.openOrdersKept ? ', ' + n(p.openOrdersKept, 'open order') : '') + (skipped(p) ? '. ' + skipped(p) : '.');
     }
     start.addEventListener('click', async () => {
       if (!SB.setup || typeof SB.setup.openCloseMonth !== 'function') { hint.textContent = 'The step-by-step Close the month is not available in this build. Nothing was changed.'; hint.hidden = false; return; }
@@ -35487,6 +35549,292 @@ a.of-nav:active { background: var(--press); }
     return { ok: true, text, state: v.state, repaired: v.repaired || [], savedAt: env && isNum(env.savedAt) ? env.savedAt : null, mode: env && env.mode === 'demo' ? 'demo' : 'real', bySrc };
   }
 
+  // Builds the Danger zone of the Data page (the two erase buttons and the typed-word box that guards them) into the panel; it makes the pieces the page cleans up and returns the two status lines.
+  function buildDangerZone(env) {
+    const { pn, stateNow } = env;
+    // Danger zone: two reset buttons, each opening a box that asks for a typed word before it will act.
+    pn.body.appendChild(h('h3', { class: 'od-sub od-danger-h', id: undefined }, 'Danger zone: erase data'));
+    const resetStatus = statusLine();
+    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I erase tickets and records', checked: true });
+    const resetLiveBtn = btn('Erase tickets and records', { icon: 'trash', cls: 'btn-danger' });
+    resetLiveBtn.dataset.action = 'reset-live';
+    const resetAllBtn = btn('Erase everything', { icon: 'trash', cls: 'btn-danger' });
+    resetAllBtn.dataset.action = 'reset-all';
+    const dangerBox = h('div', { class: 'od-danger-box', hidden: true, role: 'group', 'aria-label': 'Confirm erasing data' });
+    // Shows the confirm box: what will be erased, a field to type the word into, and a button that stays off until it matches.
+    function askTyped(o) {
+      const BPr = SB.office && SB.office.backupPure;
+      const input = h('input', { class: 'input od-danger-in', type: 'text', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Type ' + o.word + ' to confirm' });
+      const go = btn(o.label, { icon: 'trash', cls: 'btn-danger' });
+      go.disabled = true;
+      // Turns the confirm button on only when the word was typed.
+      const sync = () => { go.disabled = !(BPr ? BPr.resetWordOk(input.value, o.word) : input.value.trim().toLowerCase() === o.word.toLowerCase()); };
+      input.addEventListener('input', sync);
+      // Closes the box without doing anything.
+      const cancel = () => { dangerBox.hidden = true; dangerBox.replaceChildren(); if (o.opener && o.opener.focus) o.opener.focus(); };
+      // Runs the erase once, then closes the box.
+      const run = () => { if (go.disabled) return; cancel(); o.run(); };
+      go.addEventListener('click', run);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); if (e.key === 'Escape') cancel(); });
+      const descId = U.uid('oddesc');
+      input.setAttribute('aria-describedby', descId);
+      dangerBox.replaceChildren(h('p', { class: 'od-danger-t' }, ico('alert', 20), h('strong', null, o.title)), h('div', { id: descId }, ...o.lines.map((t) => h('p', { class: 'od-p' }, t))),
+        h('label', { class: 'od-danger-l' }, 'Type ', h('strong', null, o.word), ' to confirm', input),
+        h('div', { class: 'od-actions' }, go, btn('Keep my data', { onClick: cancel })));
+      dangerBox.hidden = false;
+      input.focus();
+    }
+    // Opens the typed confirm box for clearing live data.
+    resetLiveBtn.addEventListener('click', () => {
+      const s = stateNow(), k = keep.getValue();
+      askTyped({
+        opener: resetLiveBtn, title: 'Erase tickets and records?', word: 'ERASE', label: 'Erase tickets and records',
+        lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any demo orders, and sets the clock back to real time.',
+          k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
+          'There is no undo. Back up first if you might want this data.'],
+        // Clears the live data after the word was typed.
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
+          const rep = SB.store.resetLive({ keepSettings: k, starter: false });
+          if (rep === 'ok') { resetStatus.ok('Live data erased. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data erased.', { tone: 'ok' }); }
+          else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
+        },
+      });
+    });
+    // Opens the typed confirm box for erasing everything.
+    resetAllBtn.addEventListener('click', () => {
+      const s = stateNow();
+      askTyped({
+        opener: resetAllBtn, title: 'Erase everything on this device?', word: 'ERASE', label: 'Erase everything',
+        lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
+          'Your display choices (themes and text size) are kept.', 'There is no undo. Back up first if you might want any of it back.'],
+        // Erases everything after the word was typed.
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
+          const rep = SB.store.reset();
+          if (rep === 'ok') { resetStatus.ok('Everything was reset to the starter values.'); SB.ui.toast('Everything was reset.', { tone: 'ok' }); }
+          else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
+        },
+      });
+    });
+    pn.body.append(
+      para('Erasing tickets and records removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
+      h('div', { class: 'od-toggle-row' }, keep),
+      h('div', { class: 'od-actions' }, resetLiveBtn, resetAllBtn), dangerBox, resetStatus.el);
+    return { resetStatus };
+  }
+
+  // Builds the restore card's working parts on the Data page (choose a file or paste text, check it, show what is inside, replace everything after a confirm and the PIN, and the way back from a restore) and returns what the page needs afterwards.
+  function buildImportCard(env) {
+    const { stateNow, card2, card3, downloadBackup } = env;
+    // Import: a chosen file or pasted text is checked and summarized before anything changes.
+    const impResult = h('div', { class: 'od-impresult', 'aria-live': 'polite' });
+    const fileIn = h('input', { type: 'file', accept: '.json,application/json,text/plain', class: 'visually-hidden', tabindex: -1, 'aria-hidden': 'true', id: U.uid('odfile') });
+    // Opens the system file picker for a backup.
+    const chooseBtn = btn('Choose a backup file', { icon: 'upload', onClick: () => fileIn.click() });
+    chooseBtn.dataset.action = 'import-choose';
+    const undoBox = h('div', { class: 'od-undo-restore', 'data-region': 'undo-restore' });
+    // Shows the way back from a restore: how long the old kitchen is kept and a button to put it back (PIN-guarded like the restore).
+    function paintUndo() {
+      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
+      if (!info) { undoBox.replaceChildren(); undoBox.hidden = true; return; }
+      undoBox.hidden = false;
+      const days = Math.max(1, Math.round((info.expiresAt - info.takenAt) / 86400e3));
+      // The button asks first, then puts the old kitchen back.
+      const b = btn('Undo this restore', { icon: 'history', cls: 'btn-sm', onClick: () => undoRestoreNow() });
+      b.dataset.action = 'undo-restore';
+      undoBox.replaceChildren(
+        h('p', { class: 'od-p od-undo-line' }, 'Your kitchen before this restore is kept for ' + days + ' ' + U.plural(days, 'day') + ' (until ' + U.fmtDateShort(U.dateKey(info.expiresAt)) + ' ' + U.fmtTime(info.expiresAt) + '). It was saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + '.'),
+        h('div', { class: 'od-actions' }, b));
+    }
+    // After a confirm dialog and the PIN, puts the kitchen from before the restore back. Nothing changes if the PIN is not entered.
+    async function undoRestoreNow() {
+      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
+      if (!info) { paintUndo(); return; }
+      const ok = await SB.ui.confirm({ title: 'Undo this restore?', tone: 'danger', confirmLabel: 'Put my old kitchen back', cancelLabel: 'Keep what I have',
+        body: ['This puts back the kitchen you had before the restore (saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + ') and replaces what is here now. What is here now is kept for the same time, so this can be undone once too.'] });
+      if (!ok) return;
+      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
+      const rep = SB.store.undoRestore();
+      if (rep === 'ok') SB.ui.toast('Your kitchen from before the restore is back.', { tone: 'ok' });
+      else SB.ui.toast(rep === 'noCopy' ? 'The copy from before the restore is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings), { tone: 'warn' });
+      paintUndo();
+    }
+    const pasteLabelId = U.uid('odpl');
+    const pasteArea = h('textarea', { class: 'textarea od-paste', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-labelledby': pasteLabelId, placeholder: 'Paste the whole backup text here' });
+    // Checks pasted text the same way as a chosen file.
+    const pasteBtn = btn('Check pasted backup', { icon: 'check', cls: 'btn-sm', onClick: () => check(pasteArea.value, 'pasted text') });
+    pasteBtn.dataset.action = 'import-check-paste';
+    const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
+    card2.body.append(
+      para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
+      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
+    card3.body.append(
+      h('ol', { class: 'od-steps' },
+        h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
+        h('li', null, 'On the new device: copy the same smokebox.html file onto it and open it. Install it as an app (Share, then Add to Home Screen, or Install app).'),
+        h('li', null, 'Run Menu, then Set up this tablet. Sound, screen-on and loudness are per device and are redone here.'),
+        h('li', null, 'Open Back office, then Menu and settings, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.'),
+        h('li', null, 'Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.')),
+      h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
+
+    paintUndo();
+    let pending = null;
+    // Throws away the checked backup and clears the result card.
+    function clearImport() { pending = null; impResult.replaceChildren(); }
+    // Shows why a backup was refused; nothing is changed.
+    function showBad(reason, source) {
+      pending = null;
+      impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'bad', role: 'alert' },
+        h('p', { class: 'od-card-h' }, ico('alert-circle', 20), h('span', null, 'That ' + source + ' cannot be used.')),
+        h('p', { class: 'od-p' }, reason + ' Nothing was changed.')));
+    }
+    // Validates backup text and shows a summary card. The live data is not touched.
+    function check(text, source) {
+      const res = inspectBackup(text);
+      if (!res.ok) { showBad(res.reason, source); return; }
+      pending = res;
+      const s = res.state, n = s.tickets.length;
+      const live = stateNow();
+      const archived = s.menu.filter((m) => m.archived).length;
+      const BPd = SB.office && SB.office.backupPure;
+      const desc = BPd ? BPd.describeBackup(res, SB.store.mode ? SB.store.mode() : null) : { rows: [['Tickets', U.fmtNum(n)]], wrongKitchen: false, refusal: '' };
+      const rows = desc.rows;
+      if (desc.wrongKitchen) { showBad(desc.refusal, source); pending = null; return; }
+      const repairs = res.repaired.length;
+      const card = h('div', { class: 'od-card', 'data-tone': 'ok' },
+        h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'This ' + source + ' is a valid Smokebox backup.')),
+        h('dl', { class: 'od-stats od-stats-tight' }, rows.map(([k, v]) => h('div', { class: 'od-stat' }, h('dt', null, k), h('dd', { class: 'od-stat-v' }, v)))),
+        repairs ? h('p', { class: 'od-hint' }, 'Smokebox repaired ' + repairs + ' small ' + U.plural(repairs, 'problem') + ' while reading it: ' + res.repaired.slice(0, 3).join('; ') + (repairs > 3 ? '; and ' + (repairs - 3) + ' more.' : '.')) : null,
+        h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This replaces everything on this device: ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', your menu edits and your settings. Back up first if you might want what is here.')),
+        h('div', { class: 'od-actions' },
+          btn('Back up what is here first', { icon: 'download', cls: 'btn-sm', onClick: downloadBackup }),
+          // The replace button asks again in a dialog before anything is written.
+          (() => { const b = btn('Replace everything with this backup', { icon: 'upload', cls: 'btn-danger', onClick: () => replaceAll() }); b.dataset.action = 'import-replace'; return b; })(),
+          btn('Cancel', { onClick: clearImport })));
+      impResult.replaceChildren(card);
+    }
+    // After a confirm dialog, replaces everything with the checked backup.
+    async function replaceAll() {
+      if (!pending) return;
+      const p = pending, live = stateNow();
+      const ok = await SB.ui.confirm({
+        title: 'Replace everything on this device?', tone: 'danger', confirmLabel: 'Replace everything', cancelLabel: 'Keep what I have',
+        body: ['This replaces ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', every setting, your menu edits and the PIN with the backup\'s ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.',
+          'There is no undo. If you might want what is here now, cancel and download a backup first.'],
+      });
+      if (!ok) return;
+      // With a PIN set, restoring a backup asks for it again, even inside the back office grace period.
+      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was restored.', { tone: 'warn' }); return; }
+      const rep = SB.store.importAll(p.text);
+      if (rep === 'ok') {
+        clearImport(); pasteArea.value = ''; fileIn.value = '';
+        impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.'))));
+        SB.ui.toast('Backup restored.', { tone: 'ok' });
+        paintUndo();
+      } else {
+        const lr = SB.store.lastResult() || {};
+        showBad(rep === 'invalidBackup' && lr.info && lr.info.error ? backupReason(lr.info.error) : SB.engine.describe(rep, lr.info, (stateNow() || {}).settings), 'backup');
+      }
+    }
+    fileIn.addEventListener('change', async () => {
+      const f = fileIn.files && fileIn.files[0];
+      if (!f) return;
+      if (f.size > MAX_IMPORT_CHARS * 1.2) { showBad(backupReason('too large'), 'file'); fileIn.value = ''; return; }
+      let text;
+      try { text = await readFileText(f); } catch (e) { showBad('The file could not be read from this device.', 'file'); fileIn.value = ''; return; }
+      check(text, 'file');
+      fileIn.value = ''; // so choosing the same file again re-checks it
+    });
+    return { check };
+  }
+
+  // Builds the backup card's working parts on the Data page (pilot report, spreadsheet files, how fresh the last backup is, and the Back up now card with its download, copy and print buttons).
+  function buildExportCard(env) {
+    const { stateNow, exStatus, reportSave, downloadCsv, downloadBackup, copyBackup, card1, fb, pn, P } = env;
+    // Pilot report: the numbers for a real watched service, from the event log and the saved sound log.
+    const cutsIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Cuts the observer counted', style: 'width:7em' });
+    const batchesIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Batches the observer counted', style: 'width:7em' });
+    const whenSel = h('select', { class: 'input', 'aria-label': 'Report window' }, h('option', { value: 'open' }, 'Since opening'), h('option', { value: '4' }, 'Last 4 hours'), h('option', { value: '24' }, 'Last 24 hours'));
+    const repBox = h('pre', { class: 'od-report', hidden: true, role: 'region', 'aria-label': 'Pilot report', tabindex: '0', 'aria-live': 'polite', style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
+    // Builds the report for the chosen window and shows it; with download true it also saves the CSV.
+    async function makeReport(download) {
+      const s = stateNow(), now = SB.store.now();
+      const from = whenSel.value === 'open' ? SB.pilot.defaultFrom(s, now) : now - Number(whenSel.value) * 3600e3;
+      const rep = SB.pilot.build(s, { from, to: now, now, alerts: SB.floor && SB.floor.alertLog ? SB.floor.alertLog() : [], cutsCounted: cutsIn.value === '' ? null : Number(cutsIn.value), demoClock: SB.store.speed() > 1, demo: SB.store.isDemo && SB.store.isDemo(), batchesCounted: batchesIn.value === '' ? null : Number(batchesIn.value) });
+      repBox.textContent = SB.pilot.toText(rep) + (SB.office && SB.office.archivedWords ? (function (w) { return w ? '\n\n' + w : ''; })(SB.office.archivedWords(s.archivedBefore, from, ((s.settings || {}).service || {}).dayStartHour)) : ''); repBox.hidden = false;
+      if (!download) { exStatus.ok('Report made for ' + rep.window.hours + ' hours.'); return; }
+      const fname = (rep.demo ? 'smokebox-demo-pilot-report-' : 'smokebox-pilot-report-') + todayKey() + '.csv';
+      const csv = SB.pilot.toCsv(rep);
+      reportSave(await saveFile(fname, csv, 'text/csv'), fname, csv, 'report');
+    }
+    // The two report buttons: show it on screen, or save the CSV.
+    const showReport = () => makeReport(false), saveReport = () => makeReport(true);
+    // Prints the report text as one page: builds a print-only block, prints it, and removes it again.
+    async function printReport() {
+      await makeReport(false);
+      const root = h('div', { class: 'sb-printroot pr-printroot' }, h('h1', null, 'Pilot report'), h('pre', { style: 'white-space:pre-wrap;font-size:13px' }, repBox.textContent));
+      document.body.appendChild(root);
+      // Removes the print-only block again.
+      const done = () => { try { root.remove(); } catch (e) { /* already gone */ } };
+      window.addEventListener('afterprint', done, { once: true });
+      try { window.print(); } catch (e) { done(); }
+      setTimeout(done, 60000);
+    }
+    const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn), h('label', { class: 'od-inline' }, 'Batches counted ', batchesIn),
+      btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: showReport }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: saveReport }), btn('Print', { cls: 'btn-sm', onClick: printReport }));
+    repRow.dataset.pilot = 'report';
+    // Saves the sales-by-day file for an accountant: one row per day with sales, tax, tips and how it was paid.
+    async function downloadSalesCsv() {
+      const BPs = SB.office && SB.office.backupPure;
+      if (!BPs) { exStatus.bad('Could not make the sales file. Reload and try again.'); return; }
+      const s = stateNow();
+      const text = BPs.salesCsv(s, s.settings.service && s.settings.service.dayStartHour);
+      const fname = 'smokebox-sales-by-day' + (SB.store.mode && SB.store.mode() === 'demo' ? '-demo' : '') + '-' + todayKey() + '.csv';
+      const days = Math.max(0, text.split('\r\n').length - 3);
+      // With no paid orders there is nothing to hand over: say so instead of saving a file that only has column names.
+      if (!days) { exStatus.bad('No order has been paid yet, so there is no sales file to save. Pay an order first.'); return; }
+      const res = await saveFile(fname, text, 'text/csv');
+      if (res.how === 'host' || res.how === 'browser') exStatus.ok((res.how === 'host' ? 'Saved ' : 'Download started: ') + fname + (days ? ' (' + days + ' ' + U.plural(days, 'day') + ' of sales).' : ': it has only the column names because no order has been paid yet.'));
+      else reportSave(res, fname, text, 'sales file');
+    }
+    const csvBtns = [['tickets', 'Tickets'], ['items', 'Items'], ['orders', 'Orders'], ['events', 'Events'], ['batches', 'Batches']].map(([k, l]) => {
+      // Each spreadsheet button downloads its own table.
+      const b = btn(l, { icon: 'download', cls: 'btn-sm', onClick: () => downloadCsv(k, l.toLowerCase()) });
+      b.setAttribute('aria-label', 'Download ' + l.toLowerCase() + ' as CSV');
+      b.dataset.csv = k;
+      return b;
+    });
+    const salesBtn = btn('Sales by day (for your accountant)', { icon: 'download', cls: 'btn-sm', onClick: downloadSalesCsv });
+    salesBtn.dataset.csv = 'sales';
+    csvBtns.unshift(salesBtn);
+    // Says when the last backup was made on this device, so a stale one is easy to spot.
+    const BP = SB.office && SB.office.backupPure;
+    const lastLine = para('', 'od-p od-lastbackup');
+    // Writes how fresh the last backup is, with a colour tone for never or old.
+    const paintLast = () => {
+      const t = SB.shell && SB.shell.lastBackupAt ? SB.shell.lastBackupAt() : null;
+      const f = BP ? BP.backupFreshness(t, Date.now()) : { tone: t ? 'ok' : 'bad', text: t ? 'Last backup: ' + U.fmtDateShort(U.dateKey(t)) + ', ' + U.fmtTime(t) + '.' : 'No backup has been made from this device yet.' };
+      lastLine.textContent = f.text; lastLine.dataset.tone = f.tone;
+    };
+    paintLast(); P.syncs.push(paintLast);
+    const dlBtn = btn('Download backup (JSON)', { icon: 'download', cls: 'btn-primary', onClick: downloadBackup });
+    dlBtn.dataset.action = 'backup-download';
+    const cpBtn = btn('Copy backup', { icon: 'copy', onClick: copyBackup });
+    cpBtn.dataset.action = 'backup-copy';
+    card1.body.append(
+      lastLine,
+      para('A backup is one file with your dishes, orders, settings and records. Back up at the end of every day, and keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
+      para('The starting cash you type on Close the day is remembered on this device only. It is not in a backup.', 'od-hint'),
+      h('div', { class: 'od-actions' }, dlBtn, cpBtn), exStatus.el, fb);
+    // The spreadsheet files and the pilot report are less common, so they sit in a closed group below the flow.
+    pn.body.appendChild(h('details', { class: 'od-paste-det od-more' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Spreadsheet files and the pilot report')),
+      para('Spreadsheet files (CSV) list one kind of record each and cannot be restored from.', 'od-hint'),
+      h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Spreadsheet files'), csvBtns), repRow, repBox));
+  }
+
   // Panel 8: what is stored, sample history, export, import and reset.
   function buildData(P) {
     const pn = panel(SECTIONS[7], 'Everything Smokebox knows lives in this browser, on this device. Back it up before you reset, import or clear browser data.');
@@ -35620,278 +35968,11 @@ a.of-nav:active { background: var(--press); }
         if (res.how === 'host') exStatus.ok('Saved ' + fname + tail); else exStatus.ok('Download started: ' + fname + tail);
       } else reportSave(res, fname, text, 'table');
     }
-    // Pilot report: the numbers for a real watched service, from the event log and the saved sound log.
-    const cutsIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Cuts the observer counted', style: 'width:7em' });
-    const batchesIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Batches the observer counted', style: 'width:7em' });
-    const whenSel = h('select', { class: 'input', 'aria-label': 'Report window' }, h('option', { value: 'open' }, 'Since opening'), h('option', { value: '4' }, 'Last 4 hours'), h('option', { value: '24' }, 'Last 24 hours'));
-    const repBox = h('pre', { class: 'od-report', hidden: true, role: 'region', 'aria-label': 'Pilot report', tabindex: '0', 'aria-live': 'polite', style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
-    // Builds the report for the chosen window and shows it; with download true it also saves the CSV.
-    async function makeReport(download) {
-      const s = stateNow(), now = SB.store.now();
-      const from = whenSel.value === 'open' ? SB.pilot.defaultFrom(s, now) : now - Number(whenSel.value) * 3600e3;
-      const rep = SB.pilot.build(s, { from, to: now, now, alerts: SB.floor && SB.floor.alertLog ? SB.floor.alertLog() : [], cutsCounted: cutsIn.value === '' ? null : Number(cutsIn.value), demoClock: SB.store.speed() > 1, demo: SB.store.isDemo && SB.store.isDemo(), batchesCounted: batchesIn.value === '' ? null : Number(batchesIn.value) });
-      repBox.textContent = SB.pilot.toText(rep) + (SB.office && SB.office.archivedWords ? (function (w) { return w ? '\n\n' + w : ''; })(SB.office.archivedWords(s.archivedBefore, from, ((s.settings || {}).service || {}).dayStartHour)) : ''); repBox.hidden = false;
-      if (!download) { exStatus.ok('Report made for ' + rep.window.hours + ' hours.'); return; }
-      const fname = (rep.demo ? 'smokebox-demo-pilot-report-' : 'smokebox-pilot-report-') + todayKey() + '.csv';
-      const csv = SB.pilot.toCsv(rep);
-      reportSave(await saveFile(fname, csv, 'text/csv'), fname, csv, 'report');
-    }
-    // The two report buttons: show it on screen, or save the CSV.
-    const showReport = () => makeReport(false), saveReport = () => makeReport(true);
-    // Prints the report text as one page: builds a print-only block, prints it, and removes it again.
-    async function printReport() {
-      await makeReport(false);
-      const root = h('div', { class: 'sb-printroot pr-printroot' }, h('h1', null, 'Pilot report'), h('pre', { style: 'white-space:pre-wrap;font-size:13px' }, repBox.textContent));
-      document.body.appendChild(root);
-      // Removes the print-only block again.
-      const done = () => { try { root.remove(); } catch (e) { /* already gone */ } };
-      window.addEventListener('afterprint', done, { once: true });
-      try { window.print(); } catch (e) { done(); }
-      setTimeout(done, 60000);
-    }
-    const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn), h('label', { class: 'od-inline' }, 'Batches counted ', batchesIn),
-      btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: showReport }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: saveReport }), btn('Print', { cls: 'btn-sm', onClick: printReport }));
-    repRow.dataset.pilot = 'report';
-    // Saves the sales-by-day file for an accountant: one row per day with sales, tax, tips and how it was paid.
-    async function downloadSalesCsv() {
-      const BPs = SB.office && SB.office.backupPure;
-      if (!BPs) { exStatus.bad('Could not make the sales file. Reload and try again.'); return; }
-      const s = stateNow();
-      const text = BPs.salesCsv(s, s.settings.service && s.settings.service.dayStartHour);
-      const fname = 'smokebox-sales-by-day' + (SB.store.mode && SB.store.mode() === 'demo' ? '-demo' : '') + '-' + todayKey() + '.csv';
-      const days = Math.max(0, text.split('\r\n').length - 3);
-      // With no paid orders there is nothing to hand over: say so instead of saving a file that only has column names.
-      if (!days) { exStatus.bad('No order has been paid yet, so there is no sales file to save. Pay an order first.'); return; }
-      const res = await saveFile(fname, text, 'text/csv');
-      if (res.how === 'host' || res.how === 'browser') exStatus.ok((res.how === 'host' ? 'Saved ' : 'Download started: ') + fname + (days ? ' (' + days + ' ' + U.plural(days, 'day') + ' of sales).' : ': it has only the column names because no order has been paid yet.'));
-      else reportSave(res, fname, text, 'sales file');
-    }
-    const csvBtns = [['tickets', 'Tickets'], ['items', 'Items'], ['orders', 'Orders'], ['events', 'Events'], ['batches', 'Batches']].map(([k, l]) => {
-      // Each spreadsheet button downloads its own table.
-      const b = btn(l, { icon: 'download', cls: 'btn-sm', onClick: () => downloadCsv(k, l.toLowerCase()) });
-      b.setAttribute('aria-label', 'Download ' + l.toLowerCase() + ' as CSV');
-      b.dataset.csv = k;
-      return b;
-    });
-    const salesBtn = btn('Sales by day (for your accountant)', { icon: 'download', cls: 'btn-sm', onClick: downloadSalesCsv });
-    salesBtn.dataset.csv = 'sales';
-    csvBtns.unshift(salesBtn);
-    // Says when the last backup was made on this device, so a stale one is easy to spot.
-    const BP = SB.office && SB.office.backupPure;
-    const lastLine = para('', 'od-p od-lastbackup');
-    // Writes how fresh the last backup is, with a colour tone for never or old.
-    const paintLast = () => {
-      const t = SB.shell && SB.shell.lastBackupAt ? SB.shell.lastBackupAt() : null;
-      const f = BP ? BP.backupFreshness(t, Date.now()) : { tone: t ? 'ok' : 'bad', text: t ? 'Last backup: ' + U.fmtDateShort(U.dateKey(t)) + ', ' + U.fmtTime(t) + '.' : 'No backup has been made from this device yet.' };
-      lastLine.textContent = f.text; lastLine.dataset.tone = f.tone;
-    };
-    paintLast(); P.syncs.push(paintLast);
-    const dlBtn = btn('Download backup (JSON)', { icon: 'download', cls: 'btn-primary', onClick: downloadBackup });
-    dlBtn.dataset.action = 'backup-download';
-    const cpBtn = btn('Copy backup', { icon: 'copy', onClick: copyBackup });
-    cpBtn.dataset.action = 'backup-copy';
-    card1.body.append(
-      lastLine,
-      para('A backup is one file with your dishes, orders, settings and records. Back up at the end of every day, and keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
-      para('The starting cash you type on Close the day is remembered on this device only. It is not in a backup.', 'od-hint'),
-      h('div', { class: 'od-actions' }, dlBtn, cpBtn), exStatus.el, fb);
-    // The spreadsheet files and the pilot report are less common, so they sit in a closed group below the flow.
-    pn.body.appendChild(h('details', { class: 'od-paste-det od-more' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Spreadsheet files and the pilot report')),
-      para('Spreadsheet files (CSV) list one kind of record each and cannot be restored from.', 'od-hint'),
-      h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Spreadsheet files'), csvBtns), repRow, repBox));
+    buildExportCard({ stateNow, exStatus, reportSave, downloadCsv, downloadBackup, copyBackup, card1, fb, pn, P });
 
-    // Import: a chosen file or pasted text is checked and summarized before anything changes.
-    const impResult = h('div', { class: 'od-impresult', 'aria-live': 'polite' });
-    const fileIn = h('input', { type: 'file', accept: '.json,application/json,text/plain', class: 'visually-hidden', tabindex: -1, 'aria-hidden': 'true', id: U.uid('odfile') });
-    // Opens the system file picker for a backup.
-    const chooseBtn = btn('Choose a backup file', { icon: 'upload', onClick: () => fileIn.click() });
-    chooseBtn.dataset.action = 'import-choose';
-    const undoBox = h('div', { class: 'od-undo-restore', 'data-region': 'undo-restore' });
-    // Shows the way back from a restore: how long the old kitchen is kept and a button to put it back (PIN-guarded like the restore).
-    function paintUndo() {
-      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
-      if (!info) { undoBox.replaceChildren(); undoBox.hidden = true; return; }
-      undoBox.hidden = false;
-      const days = Math.max(1, Math.round((info.expiresAt - info.takenAt) / 86400e3));
-      // The button asks first, then puts the old kitchen back.
-      const b = btn('Undo this restore', { icon: 'history', cls: 'btn-sm', onClick: () => undoRestoreNow() });
-      b.dataset.action = 'undo-restore';
-      undoBox.replaceChildren(
-        h('p', { class: 'od-p od-undo-line' }, 'Your kitchen before this restore is kept for ' + days + ' ' + U.plural(days, 'day') + ' (until ' + U.fmtDateShort(U.dateKey(info.expiresAt)) + ' ' + U.fmtTime(info.expiresAt) + '). It was saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + '.'),
-        h('div', { class: 'od-actions' }, b));
-    }
-    // After a confirm dialog and the PIN, puts the kitchen from before the restore back. Nothing changes if the PIN is not entered.
-    async function undoRestoreNow() {
-      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
-      if (!info) { paintUndo(); return; }
-      const ok = await SB.ui.confirm({ title: 'Undo this restore?', tone: 'danger', confirmLabel: 'Put my old kitchen back', cancelLabel: 'Keep what I have',
-        body: ['This puts back the kitchen you had before the restore (saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + ') and replaces what is here now. What is here now is kept for the same time, so this can be undone once too.'] });
-      if (!ok) return;
-      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
-      const rep = SB.store.undoRestore();
-      if (rep === 'ok') SB.ui.toast('Your kitchen from before the restore is back.', { tone: 'ok' });
-      else SB.ui.toast(rep === 'noCopy' ? 'The copy from before the restore is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings), { tone: 'warn' });
-      paintUndo();
-    }
-    const pasteLabelId = U.uid('odpl');
-    const pasteArea = h('textarea', { class: 'textarea od-paste', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-labelledby': pasteLabelId, placeholder: 'Paste the whole backup text here' });
-    // Checks pasted text the same way as a chosen file.
-    const pasteBtn = btn('Check pasted backup', { icon: 'check', cls: 'btn-sm', onClick: () => check(pasteArea.value, 'pasted text') });
-    pasteBtn.dataset.action = 'import-check-paste';
-    const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
-    card2.body.append(
-      para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
-      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
-    card3.body.append(
-      h('ol', { class: 'od-steps' },
-        h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
-        h('li', null, 'On the new device: copy the same smokebox.html file onto it and open it. Install it as an app (Share, then Add to Home Screen, or Install app).'),
-        h('li', null, 'Run Menu, then Set up this tablet. Sound, screen-on and loudness are per device and are redone here.'),
-        h('li', null, 'Open Back office, then Menu and settings, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.'),
-        h('li', null, 'Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.')),
-      h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
+    const { check } = buildImportCard({ stateNow, card2, card3, downloadBackup });
 
-    paintUndo();
-    let pending = null;
-    // Throws away the checked backup and clears the result card.
-    function clearImport() { pending = null; impResult.replaceChildren(); }
-    // Shows why a backup was refused; nothing is changed.
-    function showBad(reason, source) {
-      pending = null;
-      impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'bad', role: 'alert' },
-        h('p', { class: 'od-card-h' }, ico('alert-circle', 20), h('span', null, 'That ' + source + ' cannot be used.')),
-        h('p', { class: 'od-p' }, reason + ' Nothing was changed.')));
-    }
-    // Validates backup text and shows a summary card. The live data is not touched.
-    function check(text, source) {
-      const res = inspectBackup(text);
-      if (!res.ok) { showBad(res.reason, source); return; }
-      pending = res;
-      const s = res.state, n = s.tickets.length;
-      const live = stateNow();
-      const archived = s.menu.filter((m) => m.archived).length;
-      const evN = SB.engine.allEvents(s).length;
-      const BPd = SB.office && SB.office.backupPure;
-      const desc = BPd ? BPd.describeBackup(res, SB.store.mode ? SB.store.mode() : null) : { rows: [['Tickets', U.fmtNum(n)]], wrongKitchen: false, refusal: '' };
-      const rows = desc.rows;
-      if (desc.wrongKitchen) { showBad(desc.refusal, source); pending = null; return; }
-      const repairs = res.repaired.length;
-      const card = h('div', { class: 'od-card', 'data-tone': 'ok' },
-        h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'This ' + source + ' is a valid Smokebox backup.')),
-        h('dl', { class: 'od-stats od-stats-tight' }, rows.map(([k, v]) => h('div', { class: 'od-stat' }, h('dt', null, k), h('dd', { class: 'od-stat-v' }, v)))),
-        repairs ? h('p', { class: 'od-hint' }, 'Smokebox repaired ' + repairs + ' small ' + U.plural(repairs, 'problem') + ' while reading it: ' + res.repaired.slice(0, 3).join('; ') + (repairs > 3 ? '; and ' + (repairs - 3) + ' more.' : '.')) : null,
-        h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This replaces everything on this device: ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', your menu edits and your settings. Back up first if you might want what is here.')),
-        h('div', { class: 'od-actions' },
-          btn('Back up what is here first', { icon: 'download', cls: 'btn-sm', onClick: downloadBackup }),
-          // The replace button asks again in a dialog before anything is written.
-          (() => { const b = btn('Replace everything with this backup', { icon: 'upload', cls: 'btn-danger', onClick: () => replaceAll() }); b.dataset.action = 'import-replace'; return b; })(),
-          btn('Cancel', { onClick: clearImport })));
-      impResult.replaceChildren(card);
-    }
-    // After a confirm dialog, replaces everything with the checked backup.
-    async function replaceAll() {
-      if (!pending) return;
-      const p = pending, live = stateNow();
-      const ok = await SB.ui.confirm({
-        title: 'Replace everything on this device?', tone: 'danger', confirmLabel: 'Replace everything', cancelLabel: 'Keep what I have',
-        body: ['This replaces ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', every setting, your menu edits and the PIN with the backup\'s ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.',
-          'There is no undo. If you might want what is here now, cancel and download a backup first.'],
-      });
-      if (!ok) return;
-      // With a PIN set, restoring a backup asks for it again, even inside the back office grace period.
-      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was restored.', { tone: 'warn' }); return; }
-      const rep = SB.store.importAll(p.text);
-      if (rep === 'ok') {
-        clearImport(); pasteArea.value = ''; fileIn.value = '';
-        impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.'))));
-        SB.ui.toast('Backup restored.', { tone: 'ok' });
-        paintUndo();
-      } else {
-        const lr = SB.store.lastResult() || {};
-        showBad(rep === 'invalidBackup' && lr.info && lr.info.error ? backupReason(lr.info.error) : SB.engine.describe(rep, lr.info, (stateNow() || {}).settings), 'backup');
-      }
-    }
-    fileIn.addEventListener('change', async () => {
-      const f = fileIn.files && fileIn.files[0];
-      if (!f) return;
-      if (f.size > MAX_IMPORT_CHARS * 1.2) { showBad(backupReason('too large'), 'file'); fileIn.value = ''; return; }
-      let text;
-      try { text = await readFileText(f); } catch (e) { showBad('The file could not be read from this device.', 'file'); fileIn.value = ''; return; }
-      check(text, 'file');
-      fileIn.value = ''; // so choosing the same file again re-checks it
-    });
-
-    // Danger zone: two reset buttons, each opening a box that asks for a typed word before it will act.
-    pn.body.appendChild(h('h3', { class: 'od-sub od-danger-h', id: undefined }, 'Danger zone: erase data'));
-    const resetStatus = statusLine();
-    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I erase tickets and records', checked: true });
-    const resetLiveBtn = btn('Erase tickets and records', { icon: 'trash', cls: 'btn-danger' });
-    resetLiveBtn.dataset.action = 'reset-live';
-    const resetAllBtn = btn('Erase everything', { icon: 'trash', cls: 'btn-danger' });
-    resetAllBtn.dataset.action = 'reset-all';
-    const dangerBox = h('div', { class: 'od-danger-box', hidden: true, role: 'group', 'aria-label': 'Confirm erasing data' });
-    // Shows the confirm box: what will be erased, a field to type the word into, and a button that stays off until it matches.
-    function askTyped(o) {
-      const BPr = SB.office && SB.office.backupPure;
-      const input = h('input', { class: 'input od-danger-in', type: 'text', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Type ' + o.word + ' to confirm' });
-      const go = btn(o.label, { icon: 'trash', cls: 'btn-danger' });
-      go.disabled = true;
-      // Turns the confirm button on only when the word was typed.
-      const sync = () => { go.disabled = !(BPr ? BPr.resetWordOk(input.value, o.word) : input.value.trim().toLowerCase() === o.word.toLowerCase()); };
-      input.addEventListener('input', sync);
-      // Closes the box without doing anything.
-      const cancel = () => { dangerBox.hidden = true; dangerBox.replaceChildren(); if (o.opener && o.opener.focus) o.opener.focus(); };
-      // Runs the erase once, then closes the box.
-      const run = () => { if (go.disabled) return; cancel(); o.run(); };
-      go.addEventListener('click', run);
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); if (e.key === 'Escape') cancel(); });
-      const descId = U.uid('oddesc');
-      input.setAttribute('aria-describedby', descId);
-      dangerBox.replaceChildren(h('p', { class: 'od-danger-t' }, ico('alert', 20), h('strong', null, o.title)), h('div', { id: descId }, ...o.lines.map((t) => h('p', { class: 'od-p' }, t))),
-        h('label', { class: 'od-danger-l' }, 'Type ', h('strong', null, o.word), ' to confirm', input),
-        h('div', { class: 'od-actions' }, go, btn('Keep my data', { onClick: cancel })));
-      dangerBox.hidden = false;
-      input.focus();
-    }
-    // Opens the typed confirm box for clearing live data.
-    resetLiveBtn.addEventListener('click', () => {
-      const s = stateNow(), k = keep.getValue();
-      askTyped({
-        opener: resetLiveBtn, title: 'Erase tickets and records?', word: 'ERASE', label: 'Erase tickets and records',
-        lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any demo orders, and sets the clock back to real time.',
-          k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
-          'There is no undo. Back up first if you might want this data.'],
-        // Clears the live data after the word was typed.
-        run: async () => {
-          // With a PIN set, erasing asks for it again, even inside the back office grace period.
-          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
-          const rep = SB.store.resetLive({ keepSettings: k, starter: false });
-          if (rep === 'ok') { resetStatus.ok('Live data erased. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data erased.', { tone: 'ok' }); }
-          else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
-        },
-      });
-    });
-    // Opens the typed confirm box for erasing everything.
-    resetAllBtn.addEventListener('click', () => {
-      const s = stateNow();
-      askTyped({
-        opener: resetAllBtn, title: 'Erase everything on this device?', word: 'ERASE', label: 'Erase everything',
-        lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
-          'Your display choices (themes and text size) are kept.', 'There is no undo. Back up first if you might want any of it back.'],
-        // Erases everything after the word was typed.
-        run: async () => {
-          // With a PIN set, erasing asks for it again, even inside the back office grace period.
-          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
-          const rep = SB.store.reset();
-          if (rep === 'ok') { resetStatus.ok('Everything was reset to the starter values.'); SB.ui.toast('Everything was reset.', { tone: 'ok' }); }
-          else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
-        },
-      });
-    });
-    pn.body.append(
-      para('Erasing tickets and records removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
-      h('div', { class: 'od-toggle-row' }, keep),
-      h('div', { class: 'od-actions' }, resetLiveBtn, resetAllBtn), dangerBox, resetStatus.el);
+    const { resetStatus } = buildDangerZone({ pn, stateNow });
 
     P.syncs.push((s) => { paintCounts(s); if (sampleToggle && simOn()) sampleToggle.setValue(!!simOn().sampleEnabled()); });
     P.disposers.push(() => exStatus.destroy(), () => resetStatus.destroy());
@@ -36106,6 +36187,172 @@ a.of-nav:active { background: var(--press); }
   // Shared on SB.officeB so the share maths can be checked from the browser console.
   B.stockPure = { cumulativeShare };
 
+  // Builds the What 86 cost section of the Stock page (how often and for how long food was taken off the menu) and returns the parts the page result needs.
+  function buildCostSection(env) {
+    const { page, base, M, scope, fmt, dayLabel, paintClockWords, ctx } = env;
+    // ---------- what 86 cost ----------
+    page.section('What 86 cost', 'Every time food was taken off the menu, and for how long it stayed off while the restaurant was open.');
+    // Times (ms) of orders refused because an item was unavailable. The event does not say which item.
+    const refusedTimes = B.memoP((p) => {
+      const from = ctx.filters.range.from, to = ctx.filters.range.to;
+      return (ctx.dataset().events || []).filter((e) => e && !e.reverted && e.type === 'ui_report' && e.report === 'itemUnavailable' && isNum(e.t) && e.t >= from && e.t < to).map((e) => e.t);
+    });
+    // The 86 spells grouped into events, with the open-hours part of each and the refused order lines that can
+    // be pinned on it. A refusal counts for a spell only when exactly one food was off at that moment; the rest
+    // are reported as not pinned down.
+    const spellsOf = B.memoP((p) => {
+      const b = base(p);
+      const cl = B.clusterSpells(M.eightySixes(p), { S: b.S, nowMs: ctx.now() });
+      const ev = refusedTimes(p);
+      const recorded = ev.length > 0;
+      let loose = 0;
+      cl.forEach((c) => { c.refused = recorded ? 0 : null; });
+      ev.forEach((t) => {
+        const live = cl.filter((c) => c.startT <= t && (c.endT === null || t <= c.endT));
+        const foods = new Set(live.map((c) => c.ing || c.items[0]));
+        if (foods.size === 1) live[0].refused++; else loose++;
+      });
+      return { cl, recorded, loose, total: ev.length };
+    });
+    const spellTable = page.table({
+      span: 12, title: 'Times food went off the menu', sub: scope,
+      caption: 'Long spells at busy hours are the expensive ones. Only time inside opening hours counts. The last column counts order lines staff tried to add while the item was off, where the app recorded them.',
+      empty: { title: 'Nothing was taken off the menu in opening hours', body: 'Each time food runs out, is turned off by hand or is locked out for safety, it is listed here with how long it stayed off while you were open.', icon: 'package' },
+      columns: [
+        { key: 'label', label: 'Day', sort: true, sortKey: 'date', nowrap: true },
+        // Name, plus (on phones only) the reason and refused count, since those columns are hidden there.
+        { key: 'what', label: 'What went off', sort: true, firstDir: 'asc', format: (v, r) => h('span', null, v, h('span', { class: 'ob-why-n' }, ', ' + r.why.toLowerCase() + (r.refused > 0 ? ', ' + fmt.num(r.refused, 0) + ' order ' + B.plural(r.refused, 'line', 'lines') + ' refused' : ''))) },
+        { key: 'why', label: 'Why', sort: true, firstDir: 'asc', wideOnly: true },
+        // Start time of the spell, shown as a clock time.
+        { key: 'startT', label: 'From', align: 'right', sort: true, wideOnly: true, format: (v) => fmt.clock(v) },
+        // Time off during opening hours; under a minute is said in words.
+        { key: 'openMs', label: 'Off during opening hours', align: 'right', sort: true, format: (v) => (v < 60000 ? 'Under a minute' : fmt.ms(v)) },
+        // Refused order lines; reads Not recorded when the app logged none in this range.
+        { key: 'refused', label: 'Order lines refused', align: 'right', sort: true, wideOnly: true, format: (v) => (v === null ? 'Not recorded' : fmt.num(v, 0)) },
+      ],
+      defaultSort: 'openMs', defaultDir: 'desc', pageSize: 8,
+      // Rows are the spells with some time inside opening hours, one per event.
+      rows: (p) => spellsOf(p).cl.filter((c) => c.openMs > 0).map((c) => ({
+        date: c.date, label: dayLabel(c.date), startT: c.startT, openMs: c.openMs, refused: c.refused,
+        what: c.ing ? B.ingName(base(p).ds, c.ing) + (c.items.length > 1 ? ' (' + c.items.length + ' menu items)' : '') : c.names[0],
+        why: WHY[c.reason] || 'Other',
+      })),
+    });
+    spellTable.el.classList.add('ob-tbl');
+    const spellNote = h('p', { class: 'ob-note', 'data-k': 'spell-note' });
+    spellTable.el.querySelector('.of-card-body').appendChild(spellNote);
+
+    paintClockWords(ctx.prepared());
+    return { spellsOf, spellTable, spellNote };
+  }
+
+  // Builds the Stock through the day section of the Stock page (the stock curve for one food on one day with its day picker) and returns the parts the page result needs.
+  function buildBurnSection(env) {
+    const { page, scope, syncPick, st, burn, base, dayLabel, M, fmt, ingSlot, ingSel, daySel, ctx } = env;
+    // ---------- stock through the day ----------
+    page.section('Stock through the day', 'How the level in the cabinet moved for one food on one day.');
+    const burnCard = page.card({
+      type: 'line', span: 12, title: 'Stock level', sub: scope,
+      caption: 'The line falls as plates go out and jumps when a batch lands. When it touches the red line the menu items made from it go 86. The gray line is your par.',
+      empty: { title: 'No stock movements to show', body: 'Pick a day and a food that was cooked and sold. The chart fills as batches land in the cabinet and tickets use them.', icon: 'chart-line' },
+      // Stock level of the picked food on the picked day, with the 86 line, par line, sold-out bands, labels.
+      spec: (p) => {
+        syncPick(p);
+        if (!st.day || !st.ing) return null;
+        const sb = burn(p, st.day, st.ing);
+        const b = base(p);
+        const name = B.ingName(b.ds, st.ing), lbl = dayLabel(st.day);
+        if (!sb || !(sb.points && sb.points.length)) return { series: [], empty: 'No stock movements for ' + name + ' on ' + lbl + '. Nothing was cooked into the cabinet or used from it that day.', ariaLabel: 'Stock level of ' + name + ' on ' + lbl + ': no movements.' };
+        const pts = sb.points.map((pt) => [pt.t, pt.g]);
+        const lastT = pts[pts.length - 1][0];
+        // Run to closing time, or to the last movement if that came after closing; today only runs to now.
+        let endT = Math.max(isNum(sb.closeMs) ? sb.closeMs : lastT, lastT);
+        if (st.day >= b.today) endT = Math.min(endT, Math.max(ctx.now(), lastT));
+        if (endT > lastT) pts.push([endT, pts[pts.length - 1][1]]);
+        const cl = B.clusterSpells(M.eightySixes(p).filter((s) => s.ing === st.ing && s.date === st.day && s.reason !== 'safety'));
+        const bands = cl.map((c) => ({ x0: c.startT, x1: c.endT === null ? endT : Math.min(c.endT, endT), label: 'Sold out' })).filter((x) => x.x1 - x.x0 >= 5 * MIN);
+        const refs = [];
+        if (isNum(sb.thresholdG) && sb.thresholdG > 0) refs.push({ y: sb.thresholdG, label: 'Goes 86 at ' + fmt.g(sb.thresholdG), tone: 'bad' });
+        if (isNum(sb.parG) && sb.parG > 0) refs.push({ y: sb.parG, label: 'Par ' + fmt.g(sb.parG), tone: 'muted' });
+        // Label the sell-outs, and the batches that landed, except where a batch label would sit on top of a
+        // sell-out label or on the par label, which is drawn at the right-hand end of its line. A phone is too
+        // narrow for any of these labels; the story above the chart gives the time.
+        const sold = cl.slice(0, 3), narrow = (g.innerWidth || 1280) < 520;
+        const x0 = Math.min(pts[0][0], isNum(sb.openMs) ? sb.openMs : pts[0][0]);
+        // True for a batch label that would sit on top of the par label at the right-hand end of the line.
+        const nearPar = (pt) => isNum(sb.parG) && Math.abs(pt.g - sb.parG) < 0.12 * sb.parG && pt.t > endT - 0.2 * (endT - x0);
+        const notes = narrow ? [] : sb.points.filter((pt) => (pt.kind === 'intake' || pt.kind === 'restock') && !nearPar(pt) && !sold.some((c) => Math.abs(c.startT - pt.t) < 40 * MIN)).slice(0, 6).map((pt) => ({ x: pt.t, y: pt.g, label: '+' + fmt.g(pt.d) }));
+        if (!narrow) sold.forEach((c) => notes.push({ x: c.startT, y: isNum(sb.thresholdG) ? sb.thresholdG : 0, label: 'Went 86, ' + fmt.clock(c.startT), tone: 'bad' }));
+        return {
+          series: [{ id: 'level', name: name + ' in the cabinet', points: pts, slot: ingSlot(b, st.ing) }],
+          x: { type: 'time', min: x0, max: endT }, y: { format: 'g', min: 0 },
+          refLines: refs, bands, annotations: notes, markers: 'none', height: 320,
+          ariaLabel: 'Line chart of the ' + name + ' stock level on ' + lbl + ', from ' + fmt.g(pts[0][1]) + ' to ' + fmt.g(pts[pts.length - 1][1]) + ', with a line where the menu items go 86 at ' + fmt.g(sb.thresholdG) + '.',
+        };
+      },
+    });
+    B.addAction(burnCard, ingSel.el);
+    B.addAction(burnCard, daySel.el);
+    return { burnCard };
+  }
+
+  // Builds the Sell-out clock section of the Stock page (one dot for the first sell-out of each protein on each day) and returns the parts the page result needs.
+  function buildClockSection(env) {
+    const { page, scope, st, refreshPicks, base, ingSlot, dayLabel, fmt } = env;
+    // ---------- the sell-out clock ----------
+    page.section('Sell-out clock', 'Each dot is the moment a protein went 86 on one day. The dashed line is closing time.');
+    const clock = page.card({
+      type: 'scatter', span: 12, title: 'When each protein went 86', sub: scope,
+      caption: 'Dots near the closing line are fine. Dots in the early afternoon mean guests were turned away at the busiest part of the day; a day with no dot means everything lasted.',
+      empty: { title: 'Nothing sold out', body: 'A dot appears here each time a protein goes 86 because it ran out or was turned off by hand. No dots in a busy range means the cook count is right.', icon: 'package' },
+      // Clicking a dot picks that day and food, then redraws the story and the stock chart.
+      onSelect: (sel) => {
+        if (!sel || !isNum(sel.x)) return;
+        st.ing = sel.series; st.day = U.dateKey(sel.x); st.picked = true;
+        refreshPicks();
+      },
+      // One dot per sell-out, by day (across) and time of day (up), one series per protein.
+      spec: (p) => {
+        const b = base(p), so = b.so;
+        if (!so.rows.length) return null;
+        const names = {};
+        so.proteins.forEach((x) => { names[x.ing] = x.name; });
+        const series = so.proteins.filter((x) => x.days > 0).map((x) => ({
+          id: x.ing, name: x.name, slot: ingSlot(b, x.ing),
+          points: so.rows.filter((r) => r.ing === x.ing).map((r) => [B.dayMs(r.date), r.hour, dayLabel(r.date) + ', ' + names[r.ing] + ' (' + r.menuName + ')']),
+        }));
+        const first = so.days[0], last = so.days[so.days.length - 1];
+        const early = so.rows.slice().sort((x, y) => y.hoursBeforeClose - x.hoursBeforeClose)[0];
+        // The time axis is padded by dayWindow so a short range does not print the same date twice.
+        return {
+          series, x: Object.assign({ type: 'time', format: 'date' }, B.dayWindow(B.dayMs(first.date), B.dayMs(last.date))),
+          y: { format: 'hour', min: b.S.openHour, max: b.S.closeHour + 1, label: 'Time of day' },
+          refLines: [{ y: so.closeHour, label: 'Closing time, ' + U.fmtHour(so.closeHour), tone: 'muted' }], height: 320,
+          ariaLabel: 'Scatter plot with one dot for each time a protein went 86, by day and time of day, against closing time at ' + U.fmtHour(so.closeHour) + '. ' + so.rows.length + ' sell-outs in ' + so.dayCount + ' days. The earliest was ' + early.name + ' at ' + fmt.clock(early.t) + '.',
+        };
+      },
+    });
+    // One sentence per protein above the dots, so the numbers are readable without the chart.
+    const clockWords = h('ul', { class: 'ob-sentences ob-sentences--card', 'aria-label': 'Sell-outs by protein', 'data-k': 'clock-words' });
+    const clockBody = clock.el.querySelector('.of-card-body');
+    clockBody.insertBefore(clockWords, clockBody.firstChild);
+    let lastWords = '';
+    // Writes one sentence per protein that sold out and one for those that never did; skipped if unchanged.
+    function paintClockWords(p) {
+      const b = base(p);
+      const sentences = b.so.proteins.filter((x) => x.days > 0).sort((a, c) => c.days - a.days).map((x) => {
+        const e = b.so.rows.filter((r) => r.ing === x.ing).sort((a, c) => c.hoursBeforeClose - a.hoursBeforeClose)[0];
+        return x.name + ' sold out on ' + x.days + ' of ' + b.so.dayCount + ' ' + B.plural(b.so.dayCount, 'day') + ', the earliest at ' + fmt.clock(e.t) + ', ' + B.hoursWords(e.hoursBeforeClose) + ' before close.';
+      });
+      const none = b.so.proteins.filter((x) => x.days === 0).map((x) => x.name);
+      if (none.length && b.so.dayCount) sentences.push(B.list(none) + ' never sold out.');
+      const sig = sentences.join('|');
+      if (sig !== lastWords) { lastWords = sig; U.clear(clockWords); sentences.forEach((s) => clockWords.appendChild(h('li', null, s))); }
+      clockWords.hidden = !sentences.length;
+    }
+    return { paintClockWords };
+  }
+
   // Builds the Stock and 86 page into the container and returns {update, destroy} for the frame.
   function render(container, ctx) {
     const kit = ctx.kit || (SB.office && SB.office.kit);
@@ -36298,11 +36545,13 @@ a.of-nav:active { background: var(--press); }
       if (!st.picked) { const dp = defaultPick(p); st.day = dp ? dp.day : days[days.length - 1].date; st.ing = dp ? dp.ing : order[0]; }
       daySel.set(st.day); ingSel.set(st.ing);
     }
+    // The stock curve card, made by buildBurnSection below; the pickers redraw it through refreshPicks.
+    let burnCard = null;
     // After the owner picks a day or food (or clicks a dot in the sell-out clock), redraw the chart and story.
     function refreshPicks() {
       const p = ctx.prepared();
       syncPick(p);
-      burnCard.update(p, ctx);
+      if (burnCard) burnCard.update(p, ctx);
       story.update(p, ctx);
     }
 
@@ -36356,156 +36605,11 @@ a.of-nav:active { background: var(--press); }
       },
     });
 
-    // ---------- the sell-out clock ----------
-    page.section('Sell-out clock', 'Each dot is the moment a protein went 86 on one day. The dashed line is closing time.');
-    const clock = page.card({
-      type: 'scatter', span: 12, title: 'When each protein went 86', sub: scope,
-      caption: 'Dots near the closing line are fine. Dots in the early afternoon mean guests were turned away at the busiest part of the day; a day with no dot means everything lasted.',
-      empty: { title: 'Nothing sold out', body: 'A dot appears here each time a protein goes 86 because it ran out or was turned off by hand. No dots in a busy range means the cook count is right.', icon: 'package' },
-      // Clicking a dot picks that day and food, then redraws the story and the stock chart.
-      onSelect: (sel) => {
-        if (!sel || !isNum(sel.x)) return;
-        st.ing = sel.series; st.day = U.dateKey(sel.x); st.picked = true;
-        refreshPicks();
-      },
-      // One dot per sell-out, by day (across) and time of day (up), one series per protein.
-      spec: (p) => {
-        const b = base(p), so = b.so;
-        if (!so.rows.length) return null;
-        const names = {};
-        so.proteins.forEach((x) => { names[x.ing] = x.name; });
-        const series = so.proteins.filter((x) => x.days > 0).map((x) => ({
-          id: x.ing, name: x.name, slot: ingSlot(b, x.ing),
-          points: so.rows.filter((r) => r.ing === x.ing).map((r) => [B.dayMs(r.date), r.hour, dayLabel(r.date) + ', ' + names[r.ing] + ' (' + r.menuName + ')']),
-        }));
-        const first = so.days[0], last = so.days[so.days.length - 1];
-        const early = so.rows.slice().sort((x, y) => y.hoursBeforeClose - x.hoursBeforeClose)[0];
-        // The time axis is padded by dayWindow so a short range does not print the same date twice.
-        return {
-          series, x: Object.assign({ type: 'time', format: 'date' }, B.dayWindow(B.dayMs(first.date), B.dayMs(last.date))),
-          y: { format: 'hour', min: b.S.openHour, max: b.S.closeHour + 1, label: 'Time of day' },
-          refLines: [{ y: so.closeHour, label: 'Closing time, ' + U.fmtHour(so.closeHour), tone: 'muted' }], height: 320,
-          ariaLabel: 'Scatter plot with one dot for each time a protein went 86, by day and time of day, against closing time at ' + U.fmtHour(so.closeHour) + '. ' + so.rows.length + ' sell-outs in ' + so.dayCount + ' days. The earliest was ' + early.name + ' at ' + fmt.clock(early.t) + '.',
-        };
-      },
-    });
-    // One sentence per protein above the dots, so the numbers are readable without the chart.
-    const clockWords = h('ul', { class: 'ob-sentences ob-sentences--card', 'aria-label': 'Sell-outs by protein', 'data-k': 'clock-words' });
-    const clockBody = clock.el.querySelector('.of-card-body');
-    clockBody.insertBefore(clockWords, clockBody.firstChild);
-    let lastWords = '';
-    // Writes one sentence per protein that sold out and one for those that never did; skipped if unchanged.
-    function paintClockWords(p) {
-      const b = base(p);
-      const sentences = b.so.proteins.filter((x) => x.days > 0).sort((a, c) => c.days - a.days).map((x) => {
-        const e = b.so.rows.filter((r) => r.ing === x.ing).sort((a, c) => c.hoursBeforeClose - a.hoursBeforeClose)[0];
-        return x.name + ' sold out on ' + x.days + ' of ' + b.so.dayCount + ' ' + B.plural(b.so.dayCount, 'day') + ', the earliest at ' + fmt.clock(e.t) + ', ' + B.hoursWords(e.hoursBeforeClose) + ' before close.';
-      });
-      const none = b.so.proteins.filter((x) => x.days === 0).map((x) => x.name);
-      if (none.length && b.so.dayCount) sentences.push(B.list(none) + ' never sold out.');
-      const sig = sentences.join('|');
-      if (sig !== lastWords) { lastWords = sig; U.clear(clockWords); sentences.forEach((s) => clockWords.appendChild(h('li', null, s))); }
-      clockWords.hidden = !sentences.length;
-    }
+    const { paintClockWords } = buildClockSection({ page, scope, st, refreshPicks, base, ingSlot, dayLabel, fmt });
 
-    // ---------- stock through the day ----------
-    page.section('Stock through the day', 'How the level in the cabinet moved for one food on one day.');
-    const burnCard = page.card({
-      type: 'line', span: 12, title: 'Stock level', sub: scope,
-      caption: 'The line falls as plates go out and jumps when a batch lands. When it touches the red line the menu items made from it go 86. The gray line is your par.',
-      empty: { title: 'No stock movements to show', body: 'Pick a day and a food that was cooked and sold. The chart fills as batches land in the cabinet and tickets use them.', icon: 'chart-line' },
-      // Stock level of the picked food on the picked day, with the 86 line, par line, sold-out bands, labels.
-      spec: (p) => {
-        syncPick(p);
-        if (!st.day || !st.ing) return null;
-        const sb = burn(p, st.day, st.ing);
-        const b = base(p);
-        const name = B.ingName(b.ds, st.ing), lbl = dayLabel(st.day);
-        if (!sb || !(sb.points && sb.points.length)) return { series: [], empty: 'No stock movements for ' + name + ' on ' + lbl + '. Nothing was cooked into the cabinet or used from it that day.', ariaLabel: 'Stock level of ' + name + ' on ' + lbl + ': no movements.' };
-        const pts = sb.points.map((pt) => [pt.t, pt.g]);
-        const lastT = pts[pts.length - 1][0];
-        // Run to closing time, or to the last movement if that came after closing; today only runs to now.
-        let endT = Math.max(isNum(sb.closeMs) ? sb.closeMs : lastT, lastT);
-        if (st.day >= b.today) endT = Math.min(endT, Math.max(ctx.now(), lastT));
-        if (endT > lastT) pts.push([endT, pts[pts.length - 1][1]]);
-        const cl = B.clusterSpells(M.eightySixes(p).filter((s) => s.ing === st.ing && s.date === st.day && s.reason !== 'safety'));
-        const bands = cl.map((c) => ({ x0: c.startT, x1: c.endT === null ? endT : Math.min(c.endT, endT), label: 'Sold out' })).filter((x) => x.x1 - x.x0 >= 5 * MIN);
-        const refs = [];
-        if (isNum(sb.thresholdG) && sb.thresholdG > 0) refs.push({ y: sb.thresholdG, label: 'Goes 86 at ' + fmt.g(sb.thresholdG), tone: 'bad' });
-        if (isNum(sb.parG) && sb.parG > 0) refs.push({ y: sb.parG, label: 'Par ' + fmt.g(sb.parG), tone: 'muted' });
-        // Label the sell-outs, and the batches that landed, except where a batch label would sit on top of a
-        // sell-out label or on the par label, which is drawn at the right-hand end of its line. A phone is too
-        // narrow for any of these labels; the story above the chart gives the time.
-        const sold = cl.slice(0, 3), narrow = (g.innerWidth || 1280) < 520;
-        const x0 = Math.min(pts[0][0], isNum(sb.openMs) ? sb.openMs : pts[0][0]);
-        // True for a batch label that would sit on top of the par label at the right-hand end of the line.
-        const nearPar = (pt) => isNum(sb.parG) && Math.abs(pt.g - sb.parG) < 0.12 * sb.parG && pt.t > endT - 0.2 * (endT - x0);
-        const notes = narrow ? [] : sb.points.filter((pt) => (pt.kind === 'intake' || pt.kind === 'restock') && !nearPar(pt) && !sold.some((c) => Math.abs(c.startT - pt.t) < 40 * MIN)).slice(0, 6).map((pt) => ({ x: pt.t, y: pt.g, label: '+' + fmt.g(pt.d) }));
-        if (!narrow) sold.forEach((c) => notes.push({ x: c.startT, y: isNum(sb.thresholdG) ? sb.thresholdG : 0, label: 'Went 86, ' + fmt.clock(c.startT), tone: 'bad' }));
-        return {
-          series: [{ id: 'level', name: name + ' in the cabinet', points: pts, slot: ingSlot(b, st.ing) }],
-          x: { type: 'time', min: x0, max: endT }, y: { format: 'g', min: 0 },
-          refLines: refs, bands, annotations: notes, markers: 'none', height: 320,
-          ariaLabel: 'Line chart of the ' + name + ' stock level on ' + lbl + ', from ' + fmt.g(pts[0][1]) + ' to ' + fmt.g(pts[pts.length - 1][1]) + ', with a line where the menu items go 86 at ' + fmt.g(sb.thresholdG) + '.',
-        };
-      },
-    });
-    B.addAction(burnCard, ingSel.el);
-    B.addAction(burnCard, daySel.el);
+    burnCard = buildBurnSection({ page, scope, syncPick, st, burn, base, dayLabel, M, fmt, ingSlot, ingSel, daySel, ctx }).burnCard;
 
-    // ---------- what 86 cost ----------
-    page.section('What 86 cost', 'Every time food was taken off the menu, and for how long it stayed off while the restaurant was open.');
-    // Times (ms) of orders refused because an item was unavailable. The event does not say which item.
-    const refusedTimes = B.memoP((p) => {
-      const from = ctx.filters.range.from, to = ctx.filters.range.to;
-      return (ctx.dataset().events || []).filter((e) => e && !e.reverted && e.type === 'ui_report' && e.report === 'itemUnavailable' && isNum(e.t) && e.t >= from && e.t < to).map((e) => e.t);
-    });
-    // The 86 spells grouped into events, with the open-hours part of each and the refused order lines that can
-    // be pinned on it. A refusal counts for a spell only when exactly one food was off at that moment; the rest
-    // are reported as not pinned down.
-    const spellsOf = B.memoP((p) => {
-      const b = base(p);
-      const cl = B.clusterSpells(M.eightySixes(p), { S: b.S, nowMs: ctx.now() });
-      const ev = refusedTimes(p);
-      const recorded = ev.length > 0;
-      let loose = 0;
-      cl.forEach((c) => { c.refused = recorded ? 0 : null; });
-      ev.forEach((t) => {
-        const live = cl.filter((c) => c.startT <= t && (c.endT === null || t <= c.endT));
-        const foods = new Set(live.map((c) => c.ing || c.items[0]));
-        if (foods.size === 1) live[0].refused++; else loose++;
-      });
-      return { cl, recorded, loose, total: ev.length };
-    });
-    const spellTable = page.table({
-      span: 12, title: 'Times food went off the menu', sub: scope,
-      caption: 'Long spells at busy hours are the expensive ones. Only time inside opening hours counts. The last column counts order lines staff tried to add while the item was off, where the app recorded them.',
-      empty: { title: 'Nothing was taken off the menu in opening hours', body: 'Each time food runs out, is turned off by hand or is locked out for safety, it is listed here with how long it stayed off while you were open.', icon: 'package' },
-      columns: [
-        { key: 'label', label: 'Day', sort: true, sortKey: 'date', nowrap: true },
-        // Name, plus (on phones only) the reason and refused count, since those columns are hidden there.
-        { key: 'what', label: 'What went off', sort: true, firstDir: 'asc', format: (v, r) => h('span', null, v, h('span', { class: 'ob-why-n' }, ', ' + r.why.toLowerCase() + (r.refused > 0 ? ', ' + fmt.num(r.refused, 0) + ' order ' + B.plural(r.refused, 'line', 'lines') + ' refused' : ''))) },
-        { key: 'why', label: 'Why', sort: true, firstDir: 'asc', wideOnly: true },
-        // Start time of the spell, shown as a clock time.
-        { key: 'startT', label: 'From', align: 'right', sort: true, wideOnly: true, format: (v) => fmt.clock(v) },
-        // Time off during opening hours; under a minute is said in words.
-        { key: 'openMs', label: 'Off during opening hours', align: 'right', sort: true, format: (v) => (v < 60000 ? 'Under a minute' : fmt.ms(v)) },
-        // Refused order lines; reads Not recorded when the app logged none in this range.
-        { key: 'refused', label: 'Order lines refused', align: 'right', sort: true, wideOnly: true, format: (v) => (v === null ? 'Not recorded' : fmt.num(v, 0)) },
-      ],
-      defaultSort: 'openMs', defaultDir: 'desc', pageSize: 8,
-      // Rows are the spells with some time inside opening hours, one per event.
-      rows: (p) => spellsOf(p).cl.filter((c) => c.openMs > 0).map((c) => ({
-        date: c.date, label: dayLabel(c.date), startT: c.startT, openMs: c.openMs, refused: c.refused,
-        what: c.ing ? B.ingName(base(p).ds, c.ing) + (c.items.length > 1 ? ' (' + c.items.length + ' menu items)' : '') : c.names[0],
-        why: WHY[c.reason] || 'Other',
-      })),
-    });
-    spellTable.el.classList.add('ob-tbl');
-    const spellNote = h('p', { class: 'ob-note', 'data-k': 'spell-note' });
-    spellTable.el.querySelector('.of-card-body').appendChild(spellNote);
-
-    paintClockWords(ctx.prepared());
+    const { spellsOf, spellTable, spellNote } = buildCostSection({ page, base, M, scope, fmt, dayLabel, paintClockWords, ctx });
 
     return {
       // The frame calls this on every refresh: repaint only the words that depend on the data.
