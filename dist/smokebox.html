@@ -11754,9 +11754,16 @@ a.of-nav:active { background: var(--press); }
     const sampleBatches = new Set((state.batches || []).filter((b) => b.src === 'sample' || b.src === 'starter').map((b) => b.id));
     const out = {
       window: { from, to, hours: r1(hours) },
+      demo: !!opts.demo,
       excluded: { reverted: all.length - ev.length, demoTickets: demoTickets.size, sampleOrStarterBatches: sampleBatches.size, demoClock: !!opts.demoClock },
       pulls: { n: 0, g: 0, byIng: {}, cutsCounted: U.isNum(opts.cutsCounted) && opts.cutsCounted > 0 ? Math.round(opts.cutsCounted) : null, tapRate: null },
       sounds: { total: 0, firstSounds: 0, repeats: 0, byLevel: { 1: 0, 2: 0, 3: 0, 4: 0 }, acknowledged: 0, notLeader: 0, lapses: 0, warnings: 0, warningsAcked: 0, ackRate: null },
+      batches: { n: 0, observerCount: U.isNum(opts.batchesCounted) && opts.batchesCounted > 0 ? Math.round(opts.batchesCounted) : null, rate: null, cookAheadOn: true },
+      costs: { ingredientsWithoutCost: [], ingredientsTotal: 0 },
+      gate: { pullTap: null, batches: null },
+      kitchen: { counterService: !!(state.settings && state.settings.service && state.settings.service.counter), coldItems: 0 },
+      firstTicket: { minutes: null, from: null },
+      undo: { undone: 0, undoTaps: 0, errors: 0 },
       undos: 0, refused: 0,
       keeps: { kept: 0, corrected: 0, snoozed: 0 },
       discards: { n: 0, g: 0, cost: null, costKnownN: 0, costUnknownN: 0, byIng: {}, byReason: {}, perDayCost: null, perWeekCost: null, days: r1(Math.max(hours / 24, 0)) },
@@ -11848,10 +11855,33 @@ a.of-nav:active { background: var(--press); }
     for (const t of state.tickets || []) {
       if (demoTickets.has(t.id) || !inWin(t.createdAt)) continue;
       out.tickets.n++;
-      if (U.isNum(t.expeditedAt)) secs.push((t.expeditedAt - t.createdAt) / 1000);
+      if (U.isNum(t.expeditedAt) && !t.auto) secs.push((t.expeditedAt - t.createdAt) / 1000);
     }
     out.tickets.used = out.tickets.n > 0;
     out.tickets.medianSec = secs.length ? Math.round(median(secs)) : null;
+    // Batches logged by cooking (not sample or starter), against the observer's own count.
+    out.batches.n = ev.filter((e) => e.type === 'batch_in' && e.src === 'cook' && !sampleBatches.has(e.batchId)).length;
+    if (out.batches.observerCount) out.batches.rate = Math.round(1000 * out.batches.n / out.batches.observerCount) / 10;
+    try { out.batches.cookAheadOn = !E().moduleOn || E().moduleOn(state, 'cookAhead') !== false; } catch (e) { out.batches.cookAheadOn = true; }
+    out.kitchen.coldItems = (state.batches || []).filter((b) => b && b.kind === 'cold' && b.src !== 'sample' && b.src !== 'starter').length;
+    // Ingredient costs: which protein or cooked-ahead ingredients have no cost per kg, so discard cost reads as zero.
+    const tcs = (state.ingredients || []).filter((i) => i && i.tcs);
+    out.costs.ingredientsTotal = tcs.length;
+    out.costs.ingredientsWithoutCost = tcs.filter((i) => !(U.isNum(i.costPerKg) && i.costPerKg > 0)).map((i) => i.name || i.id);
+    // Undo and error counts: undone events, undo taps, and refusals the screens reported.
+    out.undo.undone = out.excluded.reverted;
+    out.undo.undoTaps = ev.filter((e) => e.type === 'undo').length;
+    out.undo.errors = ev.filter((e) => e.type === 'ui_report').length;
+    // Time to the first ticket: from the first record in the log (the app keeps no setup clock) to the first real ticket.
+    const realTickets = (state.tickets || []).filter((t) => t && !demoTickets.has(t.id) && U.isNum(t.createdAt));
+    const allT = E().allEvents(state).filter((e) => U.isNum(e.t)).map((e) => e.t);
+    if (realTickets.length && allT.length) {
+      const first = Math.min.apply(null, realTickets.map((t) => t.createdAt)), t0 = Math.min.apply(null, allT);
+      if (first >= t0) { out.firstTicket.minutes = Math.round((first - t0) / MIN); out.firstTicket.from = t0; }
+    }
+    // The gate numbers in one place. Only the two the app can count are given a verdict; the rest are for the observer.
+    out.gate.pullTap = out.pulls.tapRate == null || !out.batches.cookAheadOn ? null : { rate: out.pulls.tapRate, pass: out.pulls.tapRate >= 50 };
+    out.gate.batches = out.batches.rate == null ? null : { rate: out.batches.rate };
     return out;
   }
 
@@ -11863,8 +11893,20 @@ a.of-nav:active { background: var(--press); }
     const L = [];
     // Writes a time in the reader's own date format.
     const when = (t) => new Date(t).toLocaleString();
+    if (r.demo) L.push('DEMO KITCHEN: these numbers come from demo data and are NOT pilot data. Do not use them for the gate.');
     L.push('Pilot report: ' + when(r.window.from) + ' to ' + when(r.window.to) + ' (' + r.window.hours + ' hours).');
     if (r.excluded.demoClock) L.push('WARNING: the demo clock or demo orders were on; demo pulls cannot be told apart, so do not trust these numbers.');
+    L.push('');
+    L.push('THE GATES, IN PLAIN WORDS');
+    L.push('1. Pull taps: ' + (!r.batches.cookAheadOn ? 'cook-ahead is turned off in this kitchen, so there are no pulls to count and this gate does not apply.' : r.gate.pullTap ? r.gate.pullTap.rate + ' percent of the observer\'s cuts got a tap. ' + (r.gate.pullTap.pass ? 'That is at or above the 50 percent gate.' : 'That is below the 50 percent gate.') : 'enter the number of cuts the observer counted to get the rate (the gate needs at least 50 percent).'));
+    L.push('2. Batches: ' + (r.batches.cookAheadOn ? r.batches.n + ' batches logged' + (r.batches.observerCount ? ' of ' + r.batches.observerCount + ' the observer counted (' + r.batches.rate + ' percent).' : '. Enter the observer\'s batch count to compare.') : 'cook-ahead is turned off in this kitchen, so there are no batches or pulls to count.'));
+    if (r.costs.ingredientsTotal && r.costs.ingredientsWithoutCost.length) L.push('3. Discard cost: ' + usd(r.discards.cost) + ', but ' + r.costs.ingredientsWithoutCost.length + ' of ' + r.costs.ingredientsTotal + ' cooked-ahead ingredients have no cost per kg (' + r.costs.ingredientsWithoutCost.slice(0, 6).join(', ') + '), so the cost is too low. To fix it, open Settings, Dishes and prices, and type the cost per kg for each one; it takes about a minute each.');
+    else L.push('3. Discard cost: ' + usd(r.discards.cost) + ' from ' + r.discards.n + ' discards' + (r.discards.costUnknownN ? ' (' + r.discards.costUnknownN + ' had no cost on record)' : '') + '. Ask the owner to say their own weekly figure and compare it with the price.');
+    L.push('4. Warnings: ' + r.sounds.firstSounds + ' shown (sounded), ' + r.sounds.acknowledged + ' tapped. The app cannot know a warning was heard; the observer writes that down.');
+    L.push('Time to the first ticket: ' + (r.firstTicket.minutes == null ? 'not available (no real ticket yet, or Smokebox tickets were not used).' : r.firstTicket.minutes + ' minutes after the first record in the log. Smokebox keeps no setup clock, so treat it as approximate and time setup with a watch.'));
+    L.push('Undo and errors: ' + r.undo.undoTaps + ' undo taps, ' + r.undo.undone + ' events undone, ' + r.undo.errors + ' refusals shown on screen.');
+    if (r.kitchen.counterService) L.push('Counter service is on: tickets are finished when paid, so ticket times are not measured.');
+    L.push('');
     L.push('Left out: ' + r.excluded.reverted + ' undone events, ' + r.excluded.demoTickets + ' demo tickets, ' + r.excluded.sampleOrStarterBatches + ' sample or starter batches.');
     L.push('Pulls: ' + r.pulls.n + ' taps, ' + U.fmtG(r.pulls.g) + '.' + (r.pulls.cutsCounted ? ' Observer counted ' + r.pulls.cutsCounted + ' cuts: ' + r.pulls.tapRate + ' percent got a pull tap (the gate needs at least 50).' : ' No observer count entered yet.'));
     for (const id of Object.keys(r.pulls.byIng)) { const p = r.pulls.byIng[id]; L.push('  ' + id + ': ' + p.n + ' pulls, ' + U.fmtG(p.g) + '; last 2 h pulled ' + p.realizedGPerMin + ' g/min, board estimates ' + (p.estGPerMin == null ? 'unknown' : p.estGPerMin + ' g/min') + '.'); }
@@ -11876,6 +11918,8 @@ a.of-nav:active { background: var(--press); }
     L.push('Taps per hour: ' + Object.keys(r.taps.jobs).map((k) => k + ' ' + r.taps.jobs[k].n + (r.taps.jobs[k].perHour == null ? '' : ' (' + r.taps.jobs[k].perHour + '/h)')).join(', ') + '.');
     L.push(r.tickets.used ? 'Tickets: ' + r.tickets.n + ', median ' + (r.tickets.medianSec == null ? 'unknown' : r.tickets.medianSec + ' s') + ' to bump.' : 'Tickets: Smokebox tickets were not used.');
     L.push('Settings in force: hot hold ' + r.settings.hotHoldF + ' F, temperature check every ' + r.settings.tempCheckEveryMin + ' min, hard cap ' + r.settings.hardCapH + ' h, warning times ' + (typeof r.settings.ladder === 'string' ? r.settings.ladder : JSON.stringify(r.settings.ladder)) + '.');
+    L.push('');
+    L.push('WHAT THE APP CANNOT MEASURE BY ITSELF: whether a warning was heard from the pit, cuts nobody tapped (the observer counts them), batches cooked but never logged, whether the owner can name their discard cost, whether the owner would pay, and how long setup really took.');
     return L.join('\n');
   }
   // CSV text of the report in a long layout (section, name, value, unit): easy to open in a spreadsheet and to paste into notes.
@@ -11884,7 +11928,14 @@ a.of-nav:active { background: var(--press); }
     // Adds one fact as a line of the table.
     const add = (s, n, v, u) => rows.push([s, n, v == null ? '' : v, u || '']);
     add('window', 'from', new Date(r.window.from).toISOString()); add('window', 'to', new Date(r.window.to).toISOString()); add('window', 'hours', r.window.hours, 'h');
+    add('window', 'demo kitchen', r.demo ? 'yes' : 'no');
     for (const k of Object.keys(r.excluded)) add('excluded', k, r.excluded[k]);
+    add('batches', 'logged', r.batches.n); add('batches', 'observer count', r.batches.observerCount); add('batches', 'logged vs observer', r.batches.rate, '%');
+    add('gate', 'pull-tap at least 50%', r.gate.pullTap ? (r.gate.pullTap.pass ? 'yes' : 'no') : '');
+    add('costs', 'discards with no cost', r.discards.costUnknownN); add('costs', 'ingredients with no cost per kg', r.costs.ingredientsWithoutCost.length); add('costs', 'cooked-ahead ingredients', r.costs.ingredientsTotal);
+    add('warnings', 'shown', r.sounds.firstSounds); add('warnings', 'tapped', r.sounds.acknowledged); add('warnings', 'heard', '', 'observer writes this down');
+    add('first ticket', 'minutes after first record', r.firstTicket.minutes, 'min');
+    add('undo', 'undo taps', r.undo.undoTaps); add('undo', 'events undone', r.undo.undone); add('undo', 'refusals shown', r.undo.errors);
     add('pulls', 'taps', r.pulls.n); add('pulls', 'grams', r.pulls.g, 'g'); add('pulls', 'cuts counted by observer', r.pulls.cutsCounted); add('pulls', 'pull-tap rate', r.pulls.tapRate, '%');
     for (const id of Object.keys(r.pulls.byIng)) { const p = r.pulls.byIng[id]; add('pulls ' + id, 'taps', p.n); add('pulls ' + id, 'grams', p.g, 'g'); add('pulls ' + id, 'realized last 2h', p.realizedGPerMin, 'g/min'); add('pulls ' + id, 'board estimate', p.estGPerMin, 'g/min'); }
     for (const k of Object.keys(r.sounds)) if (k !== 'byLevel') add('sounds', k, r.sounds[k]);
@@ -34209,23 +34260,35 @@ a.of-nav:active { background: var(--press); }
     }
     // Pilot report: the numbers for a real watched service, from the event log and the saved sound log.
     const cutsIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Cuts the observer counted', style: 'width:7em' });
+    const batchesIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Batches the observer counted', style: 'width:7em' });
     const whenSel = h('select', { class: 'input', 'aria-label': 'Report window' }, h('option', { value: 'open' }, 'Since opening'), h('option', { value: '4' }, 'Last 4 hours'), h('option', { value: '24' }, 'Last 24 hours'));
     const repBox = h('pre', { class: 'od-report', hidden: true, style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
     // Builds the report for the chosen window and shows it; with download true it also saves the CSV.
     async function makeReport(download) {
       const s = stateNow(), now = SB.store.now();
       const from = whenSel.value === 'open' ? SB.pilot.defaultFrom(s, now) : now - Number(whenSel.value) * 3600e3;
-      const rep = SB.pilot.build(s, { from, to: now, now, alerts: SB.floor && SB.floor.alertLog ? SB.floor.alertLog() : [], cutsCounted: cutsIn.value === '' ? null : Number(cutsIn.value), demoClock: SB.store.speed() > 1 });
+      const rep = SB.pilot.build(s, { from, to: now, now, alerts: SB.floor && SB.floor.alertLog ? SB.floor.alertLog() : [], cutsCounted: cutsIn.value === '' ? null : Number(cutsIn.value), demoClock: SB.store.speed() > 1, demo: SB.store.isDemo && SB.store.isDemo(), batchesCounted: batchesIn.value === '' ? null : Number(batchesIn.value) });
       repBox.textContent = SB.pilot.toText(rep); repBox.hidden = false;
       if (!download) { exStatus.ok('Report made for ' + rep.window.hours + ' hours.'); return; }
-      const fname = 'smokebox-pilot-report-' + todayKey() + '.csv';
+      const fname = (rep.demo ? 'smokebox-demo-pilot-report-' : 'smokebox-pilot-report-') + todayKey() + '.csv';
       const csv = SB.pilot.toCsv(rep);
       reportSave(await saveFile(fname, csv, 'text/csv'), fname, csv, 'report');
     }
     // The two report buttons: show it on screen, or save the CSV.
     const showReport = () => makeReport(false), saveReport = () => makeReport(true);
-    const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn),
-      btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: showReport }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: saveReport }));
+    // Prints the report text as one page: builds a print-only block, prints it, and removes it again.
+    async function printReport() {
+      await makeReport(false);
+      const root = h('div', { class: 'sb-printroot' }, h('h1', null, 'Pilot report'), h('pre', { style: 'white-space:pre-wrap;font-size:13px' }, repBox.textContent));
+      document.body.appendChild(root);
+      // Removes the print-only block again.
+      const done = () => { try { root.remove(); } catch (e) { /* already gone */ } };
+      window.addEventListener('afterprint', done, { once: true });
+      try { window.print(); } catch (e) { done(); }
+      setTimeout(done, 60000);
+    }
+    const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn), h('label', { class: 'od-inline' }, 'Batches counted ', batchesIn),
+      btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: showReport }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: saveReport }), btn('Print', { cls: 'btn-sm', onClick: printReport }));
     repRow.dataset.pilot = 'report';
     // Saves the sales-by-day file for an accountant: one row per day with sales, tax, tips and how it was paid.
     async function downloadSalesCsv() {
