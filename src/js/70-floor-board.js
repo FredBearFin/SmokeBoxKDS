@@ -113,7 +113,7 @@
   const WALL_MIN_PX = 1700;
   // The ticket picked with the bump-bar keys (by id); null until a key picks one.
   let selId = null, selIdx = 0;
-  let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0;
+  let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0, checkLater = 0;
   let volume = (() => { const v = U.storage.get(KEY_VOLUME, 1); return U.isNum(v) ? Math.min(1, Math.max(VOL_MIN, v)) : 1; })();
 
   // Small helpers used by every part below.
@@ -205,22 +205,25 @@
     o.connect(gn); gn.connect(a.destination);
     o.start(t); o.stop(t + dur + 0.03);
   }
-  // Plays the two-note chime for a new ticket when sound is on.
-  // WATCH OUT: calls within 600 ms of the last are dropped, so a burst of tickets makes one ding.
-  function chime() {
+  // Plays the two-note chime for a new ticket when sound is on. warn is true for a warning-ladder call.
+  // WATCH OUT: new-ticket calls within 600 ms of the last are dropped, so a burst of tickets makes one ding. A warning
+  // call always plays (playCalls already makes one sound per moment), so a new ticket never swallows a heads-up.
+  function chime(warn) {
     if (!audible()) return;
     const nowMs = performance.now();
-    if (nowMs - lastChime < 600) return; // a burst of tickets is one ding, not twelve
+    if (!warn && nowMs - lastChime < 600) return; // a burst of tickets is one ding, not twelve
     lastChime = nowMs;
     const a = resumeAudio();
     if (!a) return;
     try { const t0 = a.currentTime + 0.01; tone(a, 784, t0, 0.2, 0.16); tone(a, 1175, t0 + 0.15, 0.42, 0.16); } catch (e) { /* audio is optional */ }
   }
   // Plays three short high beeps when a dish's time is up (when sound is on). Several dishes at once make one set.
+  // WATCH OUT: a call within 1.5 s of the last set is not dropped: one more set plays when the 1.5 s are up, so a
+  // second dish that reaches "Check it" just after the first still gets its beeps.
   function checkChime() {
     if (!audible()) return;
-    const nowMs = performance.now();
-    if (nowMs - lastCheck < 1500) return;
+    const nowMs = performance.now(), wait = 1500 - (nowMs - lastCheck);
+    if (wait > 0) { if (!checkLater) checkLater = setTimeout(() => { checkLater = 0; if (m) checkChime(); }, wait); return; }
     lastCheck = nowMs;
     const a = resumeAudio();
     if (!a) return;
@@ -232,6 +235,7 @@
   F.setSound = function (on) {
     sound = !!on;
     U.storage.set(KEY_SOUND, sound);
+    if (!sound) hush();
     if (sound) { hookAudioUnlock(); resumeAudio(); lastChime = 0; playHere(chime); }
     syncLeadership();
     return sound;
@@ -292,12 +296,18 @@
   F.setSpeech = function (on) {
     speech = !!on;
     U.storage.set(KEY_SPEECH, speech);
+    if (!speech) hush();
     if (speech && sound) playHere(() => speak('Spoken warnings are on.'));
     return speech;
   };
+  // Stops any phrase being spoken now (sound or speech switched off, or another tab took over the sound).
+  function hush() {
+    try { if (g.speechSynthesis) g.speechSynthesis.cancel(); } catch (e) { /* speech is optional */ }
+    lastUtter = null; voiceFreeAt = 0;
+  }
   // When the tablet's voice is expected to be free again (browser clock, ms). A call-out waits for it, so it never talks
   // over a warning or over the call before it.
-  let voiceFreeAt = 0;
+  let voiceFreeAt = 0, lastUtter = null;
   // Says one short phrase with the tablet's voice when sound and speech are both on. A warning replaces whatever is
   // being said; a call-out (queued) waits its turn instead and never cuts anything off.
   function speak(text, queued, kind) {
@@ -307,6 +317,8 @@
       if (!ss || !U2) return false;
       if (!queued) ss.cancel();
       const u = new U2(text);
+      // Kept here until the next phrase: some tablets drop a phrase whose object nothing holds on to.
+      lastUtter = u;
       // The chef voice: fast and sharp, on the best-sounding English voice this device has.
       const cv = SB.deadlines && SB.deadlines.CHEF_VOICE ? SB.deadlines.CHEF_VOICE : { rate: 1.1, pitch: 1 };
       // Calm for a heads-up, brisk for a new ticket, fast and loud for "fire now": the style of the line sets rate, pitch and volume.
@@ -352,6 +364,8 @@
   }
   // True once the browser has let this page make sound (it needs one tap first).
   const audioReady = () => !!audio && audio.state === 'running';
+  // True when this browser has no Web Audio at all: no tap can ever turn tones on, but spoken warnings may still work.
+  const noWebAudio = () => !(g.AudioContext || g.webkitAudioContext);
 
   // Sound leader. With several tabs of this app open on one device, only one makes sound; the others still draw the
   // strip. The tab that holds a Web Lock named smokebox-sound is the leader (a tab that cannot make sound, because
@@ -369,8 +383,9 @@
   const audible = () => sound && isLeader();
   // Runs fn so that the sounds it makes play here whatever the leader is: a tap on "turn sound on" is a local test.
   function playHere(fn) { lead.forced = true; try { fn(); } finally { lead.forced = false; } }
-  // A tab can lead when the board is showing, sound is on and the browser lets it play.
-  const canLead = () => !!m && sound && audioReady();
+  // A tab can lead when the board is showing, sound is on and the browser lets it play. A browser with no Web Audio
+  // can still lead, so its spoken warnings are not held back forever waiting for tones it can never play.
+  const canLead = () => !!m && sound && (audioReady() || noWebAudio());
   // Says to the other tabs whether this tab is visible, can lead, and leads.
   function sayHello() {
     if (SB.store && SB.store.broadcast) SB.store.broadcast({ type: 'alert-hello', visible: doc.visibilityState !== 'hidden', eligible: canLead(), lead: lead.isLeader });
@@ -379,6 +394,7 @@
   function setLeader(on) {
     if (on === lead.isLeader) return;
     lead.isLeader = on;
+    if (!on) hush(); // the new leader speaks from now on; this tab stops mid-phrase so two voices do not overlap
     if (on) lead.needDrain = true;
     if (g.console && console.debug) console.debug('[smokebox] sound leader:', on ? 'this tab' : 'another tab');
     sayHello();
@@ -444,9 +460,13 @@
     try {
       if (!g.navigator || !g.navigator.wakeLock) { wakeState = 'unsupported'; return; }
       g.navigator.wakeLock.request('screen').then((sn) => {
+        // The board was closed while the request was out: let the lock go at once instead of holding it with no owner.
+        if (!m) { try { sn.release(); } catch (e) { /* ignore */ } return; }
+        if (wakeSentinel && wakeSentinel !== sn) { try { wakeSentinel.release(); } catch (e) { /* ignore */ } }
         wakeSentinel = sn; wakeState = 'on';
         // The system may take the lock back (low battery, another app); when the board is still showing it asks again.
-        sn.addEventListener('release', () => { wakeState = 'released'; wakeSentinel = null; if (m && doc.visibilityState === 'visible') setTimeout(requestWake, 800); });
+        // Only the lock in use clears the slot, so an older lock released late does not forget a newer one.
+        sn.addEventListener('release', () => { if (wakeSentinel !== sn) return; wakeState = 'released'; wakeSentinel = null; if (m && doc.visibilityState === 'visible') setTimeout(requestWake, 800); });
       }, () => { wakeState = 'refused'; });
     } catch (e) { wakeState = 'refused'; }
   }
@@ -1648,7 +1668,7 @@
     if (!isLeader()) { calls.forEach((c) => pending.add(c)); return; }
     if (lead.coordinated && SB.store.broadcast) SB.store.broadcast({ type: 'alert-played', keys: calls.map((c) => c.d.id + ':' + c.level + ':' + (c.d.epoch || 0)) });
     const top = calls.reduce((a, c) => (c.level > a.level ? c : a), calls[0]);
-    if (top.level === 4) expiryTone(); else if (top.level === 3) alarmTone(); else chime();
+    if (top.level === 4) expiryTone(); else if (top.level === 3) alarmTone(); else chime(true);
     if (top.level < 2 || top.repeat) return;
     const same = calls.filter((c) => c.level === top.level);
     const first = same.slice().sort((x, y) => x.d.msLeft - y.d.msLeft)[0].d;
@@ -1688,7 +1708,7 @@
     const text = d.kind === 'coldOut'
       ? d.label + (d.msLeft > 0 ? ': ' + mins + (mins === 1 ? ' minute' : ' minutes') + ' left of your out-of-fridge limit.' : ' is past your out-of-fridge limit.')
       : d.label + ': the last day of your fridge limit ends at midnight.';
-    chime(); speak(SB.deadlines.spoken ? SB.deadlines.spoken(text) : text, false, 'expire');
+    chime(true); speak(SB.deadlines.spoken ? SB.deadlines.spoken(text) : text, false, 'expire');
     if (m.strip && m.strip.announce) m.strip.announce.textContent = text;
   }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
@@ -1727,7 +1747,9 @@
     const maxRows = !F.wallActive() && (far ? (g.innerHeight || 0) >= 1300 : (g.innerHeight || 0) >= 900) ? 2 : 1;
     const top = feed.slice(0, maxRows);
     const moreRows = feed.length - top.length;
-    const needSound = sound && !audioReady();
+    // Another tab on this device already leads and plays the sounds: this tab needs no tap, so it shows no bar.
+    const otherLeads = lead.coordinated && !lead.isLeader && Array.from(lead.peers.values()).some((p) => p.lead && Date.now() - p.t < 3 * HELLO_MS);
+    const needSound = sound && !audioReady() && !otherLeads;
     // Clearing the sound bar lasts only while the sound stays blocked: once it plays again, the next block shows the bar again.
     if (!needSound) m.dis.delete('snd');
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
@@ -1755,7 +1777,7 @@
     const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
-    if (moreEl) { const t = 'Tap here to turn on warning sounds. This browser needs one tap first.' + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
+    if (moreEl) { const t = (noWebAudio() ? 'This browser cannot play warning tones. Open Smokebox in another browser for sound.' : 'Tap here to turn on warning sounds. This browser needs one tap first.') + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote && !clockShown);
@@ -2140,7 +2162,8 @@
     if (rec) say('Ticket #' + rec.num + ' selected.');
   }
   // Does one bump-bar action on the picked ticket: start, done or bump. With nothing picked the first ticket is picked
-  // first. WATCH OUT: the same 450 ms guard as a tap applies, so a bar that bounces cannot start and finish a dish.
+  // first. WATCH OUT: the same 450 ms guard as a tap applies, so a bar that bounces cannot start and finish a dish
+  // (bump has its own guard inside bump()).
   function barAct(what) {
     if (!liveSlips().length) return;
     if (!selId || !m.slips.has(selId)) selectTicket(1);
@@ -2188,7 +2211,12 @@
   function notDoneItems(ticket) { return ticket.items.filter((it) => it.status !== 'done'); }
   // Sends a ticket off the line. With items not done it asks first ("N items not done. Bump anyway?"),
   // then bumps with force, which the office numbers count as a forced bump.
+  // WATCH OUT: a second bump within 450 ms (a double tap, or a bar that bounces) is ignored. The first bump moves the
+  // pick to the next ticket, so without this guard the bounce would bump that one too.
   function bump(rec) {
+    const nowMs = performance.now();
+    if (nowMs - (m.lastBump || 0) < 450) return;
+    m.lastBump = nowMs;
     const t = E().findTicket(store().getState(), rec.id);
     if (!t) { toast(E().REPORTS.unknownTicket, { tone: 'warn' }); return; }
     const left = notDoneItems(t);
