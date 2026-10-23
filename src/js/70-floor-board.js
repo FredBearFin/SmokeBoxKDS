@@ -36,7 +36,7 @@
     return set ? set.indexOf(String(key).toLowerCase()) >= 0 && String(key).length === 1 : true;
   };
   // With no page (loaded under plain Node) every call does nothing, so loading never throws.
-  if (!doc) { F.mount = F.unmount = F.setZone = F.highlight = F.setSound = F.setCallouts = () => {}; F.sound = F.callouts = () => false; return; }
+  if (!doc) { F.mount = F.unmount = F.setZone = F.highlight = F.setSound = F.setCallouts = F.setWall = () => {}; F.sound = F.callouts = F.wall = () => false; return; }
 
   const h = U.h;
   const C = SB.config;
@@ -46,6 +46,7 @@
   const KEY_SOUND = 'smokebox.v1.sound';
   // Whether warnings are also spoken aloud (the tablet's own voice), on by default.
   const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume', KEY_FAR = 'smokebox.v1.far', KEY_CALLOUTS = 'smokebox.v1.callouts';
+  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume', KEY_FAR = 'smokebox.v1.far', KEY_WALL = 'smokebox.v1.wall';
   // Loudness of this tablet's warnings: 0.2 to 1. It never reaches 0 (the sound toggle is the way to silence); the last warning and the expiry tone never go below half.
   const VOL_MIN = 0.2;
   const KEY_DOCK = 'smokebox.v1.dock';
@@ -69,6 +70,9 @@
   let far = U.storage.get(KEY_FAR, false) === true;
   // Voice call-outs (new ticket, start this dish now) are off until a tablet opts in; they follow the station tab showing.
   let callouts = U.storage.get(KEY_CALLOUTS, false) === true;
+  // Wall mode (three panes on a wide screen) is off until a tablet or screen opts in; it only shows at 1700 px and wider.
+  let wall = U.storage.get(KEY_WALL, false) === true;
+  const WALL_MIN_PX = 1700;
   let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0;
   let volume = (() => { const v = U.storage.get(KEY_VOLUME, 1); return U.isNum(v) ? Math.min(1, Math.max(VOL_MIN, v)) : 1; })();
 
@@ -221,6 +225,17 @@
     if (callouts && sound && speech) playHere(() => speak('Call-outs are on.'));
     return callouts;
   };
+  // Tells whether wall mode is switched on for this screen (it still needs a window 1700 px wide).
+  F.wall = () => wall;
+  // Switches wall mode on or off, remembers it, and repaints the open board at once.
+  F.setWall = function (on) {
+    wall = !!on;
+    U.storage.set(KEY_WALL, wall);
+    if (m) paintWall();
+    return wall;
+  };
+  // True while the three panes are showing (the setting is on and the window is wide enough).
+  F.wallActive = () => !!m && m.root.dataset.wall === 'on';
   // Tells whether warnings are spoken aloud right now.
   F.speech = () => speech;
   // Switches spoken warnings on or off and remembers it. Speech only plays while sound is on.
@@ -556,7 +571,10 @@
 
     // The attention strip sits under the header and lists the most urgent deadlines; it is hidden when nothing is due.
     const strip = buildStrip();
-    root.append(head, strip.el, main, dock);
+    // Wall mode panes: orders and payments on the left, the manager glance on the right. Built once here and only
+    // patched later; the stylesheet shows them when data-wall is on.
+    const wl = buildWallOrders(), wr = buildWallGlance();
+    root.append(head, strip.el, wl.el, main, dock, wr.el);
     const hlStyle = h('style', { class: 'fl-hl-style' });
     root.appendChild(hlStyle);
     m.el.appendChild(root);
@@ -564,7 +582,7 @@
     m.tabParts = {};
     TABS.forEach((id) => { const b = seg.querySelector('[data-id="' + id + '"]'); if (b) m.tabParts[id] = { count: b.querySelector('.seg-count'), n: -1 }; });
     m.sanText = sanChip.querySelector('.fl-chip-t');
-    Object.assign(m, { head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
+    Object.assign(m, { wl, wr, head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
 
     grid.addEventListener('click', onGridClick);
     dockList.addEventListener('click', (e) => {
@@ -578,6 +596,11 @@
     }
     if (typeof ResizeObserver === 'function') { m.ro = new ResizeObserver(() => { measureDock(); paintDensity(); fitHead(); }); m.ro.observe(dock); m.ro.observe(main); }
     paintDockToggle();
+    paintWall();
+    // The window width decides whether wall mode can show; check it again when the window is resized.
+    const onWin = () => paintWall();
+    g.addEventListener('resize', onWin);
+    m.offs.push(() => g.removeEventListener('resize', onWin));
     layoutHead(true);
     fitHead();
     try {
@@ -586,6 +609,58 @@
       const fn = () => { layoutHead(false); fitHead(); };
       if (q.addEventListener) { q.addEventListener('change', fn); m.offs.push(() => q.removeEventListener('change', fn)); }
     } catch (e) { /* ignore */ }
+  }
+
+  // Shows the wall panes when the setting is on and the window is wide enough; otherwise the board is as before.
+  function paintWall() {
+    if (!m || !m.root) return;
+    const on = wall && g.innerWidth >= WALL_MIN_PX;
+    const v = on ? 'on' : 'off';
+    if (m.root.dataset.wall !== v) { m.root.dataset.wall = v; m.fitKey = null; setTimeout(() => { if (m) { paintDensity(); fitHead(); } }, 0); }
+    // The glance panel is made the first time the wall shows and removed with the board.
+    if (on && !m.glance && SB.office && typeof SB.office.glance === 'function') {
+      try { const gh = SB.office.glance(m.wr.body, { size: 'wall' }); m.glance = gh; m.offs.push(() => gh.destroy()); } catch (e) { console.error('[smokebox] glance failed', e); }
+    }
+    if (on) updateWall(store().now());
+  }
+  // Builds a pane: a title and a body, with the parts the updates change handed back.
+  function wallPane(cls, title, label) {
+    const body = h('div', { class: 'fl-wall-body' });
+    const el = h('aside', { class: 'fl-wall ' + cls, 'aria-label': label }, h('h2', { class: 'fl-wall-h' }, title), body);
+    return { el, body };
+  }
+  // The left pane: open orders (oldest first) and what was paid today. Rows are added once per order and then patched.
+  function buildWallOrders() {
+    const p = wallPane('fl-wall-orders', 'Open orders and payments', 'Open orders and payments');
+    p.openH = h('h3', { class: 'fl-wall-sub' }, 'Open'); p.openL = h('ul', { class: 'fl-wall-list' }); p.openMore = h('p', { class: 'fl-wall-more', hidden: true });
+    p.paidH = h('h3', { class: 'fl-wall-sub' }, 'Paid today'); p.paidL = h('ul', { class: 'fl-wall-list' }); p.paidMore = h('p', { class: 'fl-wall-more', hidden: true });
+    p.rows = new Map();
+    p.body.append(p.openH, p.openL, p.openMore, p.paidH, p.paidL, p.paidMore);
+    return p;
+  }
+  // The right pane is the manager glance from the back office (SB.office.glance, wall size). It is drawn once, the
+  // first time the wall shows, and refreshes itself every 5 seconds; this only builds its empty pane.
+  function buildWallGlance() { return wallPane('fl-wall-glance', 'Manager glance', 'Manager glance'); }
+  // Rewrites the orders pane from the store: text and attributes only, rows keyed by order id.
+  function updateWall(now) {
+    if (!m || !m.wl || m.root.dataset.wall !== 'on') return;
+    const state = store().getState();
+    const gl = SB.deadlines.wallOrders(state, now), M2 = U.fmtMoney;
+    // Orders: keep rows for the first 10 open and 6 paid, patch their text, drop the rest.
+    const P = m.wl, want = [];
+    gl.open.slice(0, 10).forEach((o) => want.push({ key: 'o' + o.id, list: P.openL, text: o.name, meta: o.rounds + ' ' + U.plural(o.rounds, 'round') + ', ' + M2(o.total) }));
+    gl.paid.slice(0, 6).forEach((o) => want.push({ key: 'p' + o.id, list: P.paidL, text: o.name, meta: M2(o.total) + ', ' + (C.payMethodById && C.payMethodById[o.method] ? C.payMethodById[o.method].name.toLowerCase() : o.method) + ', ' + U.fmtTime(o.at) }));
+    const keep = new Set();
+    for (const w of want) {
+      keep.add(w.key);
+      let r = P.rows.get(w.key);
+      if (!r) { r = { li: h('li', { class: 'fl-wall-row' }, h('span', { class: 'fl-wall-name' }), h('span', { class: 'fl-wall-meta num' })), a: null, b: null }; r.a = r.li.firstChild; r.b = r.li.lastChild; P.rows.set(w.key, r); w.list.appendChild(r.li); }
+      setTxt(r.a, w.text); setTxt(r.b, w.meta);
+    }
+    for (const [k, r] of Array.from(P.rows)) if (!keep.has(k)) { r.li.remove(); P.rows.delete(k); }
+    setTxt(P.openH, 'Open (' + gl.open.length + ')'); setTxt(P.paidH, 'Paid today (' + gl.paidCount + ')');
+    setHidden(P.openMore, gl.open.length <= 10); if (gl.open.length > 10) setTxt(P.openMore, 'and ' + (gl.open.length - 10) + ' more');
+    setHidden(P.paidMore, gl.paid.length <= 6); if (gl.paid.length > 6) setTxt(P.paidMore, 'and ' + (gl.paid.length - 6) + ' more paid');
   }
 
   // Tests a CSS media query; false where matchMedia is missing.
@@ -1366,6 +1441,7 @@
   function updateStrip(now) {
     if (!m || !m.strip || !SB.deadlines) return;
     const all = SB.deadlines.build(store().getState(), now);
+    m.feed = all;
     // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
     syncLeadership();
     if (SB.deadlines.soundsAllowed(store().getState(), now)) {
@@ -1413,6 +1489,7 @@
     paintRole();
     updateStrip(now);
     driveCallouts(now);
+    if (m.root.dataset.wall === 'on') updateWall(now);
     // station tabs
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
     const tabCount = (id, n, alert) => {

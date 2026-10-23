@@ -585,6 +585,22 @@
       dropped: () => dropped,
     };
   }
+  // Wall mode, orders pane: the open orders (oldest first, with rounds and total) and the orders paid on this service
+  // day (newest first), plus how many were paid. Reads the state and changes nothing.
+  function wallOrders(state, now) {
+    const out = { paidCount: 0, open: [], paid: [] };
+    if (!state || !U.isNum(now)) return out;
+    const day = U.serviceDate(now, state.settings && state.settings.service ? state.settings.service.dayStartHour : undefined);
+    const totals = E().openOrderTotals(state);
+    for (const o of Array.isArray(state.orders) ? state.orders : []) {
+      const t = totals.get(o.id);
+      if (o.status === 'open') out.open.push({ id: o.id, name: o.customer, rounds: t ? t.rounds : 0, total: t ? t.total : 0, at: o.createdAt });
+      else if (o.status === 'paid' && o.serviceDate === day && o.totals) { out.paidCount++; out.paid.push({ id: o.id, name: o.customer, total: o.totals.total, method: o.method, at: o.paidAt }); }
+    }
+    out.open.sort((a, b) => a.at - b.at);
+    out.paid.sort((a, b) => b.at - a.at);
+    return out;
+  }
   // Builds the feed: every deadline worth showing right now, worst first. Each row has id, kind, label, at,
   // msLeft, rung, sev (bad, warn, info), consequence and action. Batch rows also carry projected waste.
   function build(state, now) {
@@ -603,4 +619,5 @@
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
   SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts };
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, wallOrders };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -570,6 +570,37 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl[data-role="kitchen"] [data-tool="demo"], .fl[data-role="kitchen"] .fl-demo-chip,
 .fl[data-role="kitchen"] .fl-empty .btn-primary, .fl[data-role="kitchen"] .fl-start-demo,
 .fl[data-role="front"] .fl-seg [data-id="cabinet"] { display: none; }
+/* Wall mode (a setting, and only at 1700 px and wider): the board turns into three panes in one window. The kitchen
+   board is the wide centre; open orders and payments sit on the left, the manager glance on the right. No node moves,
+   the same elements are placed on a grid. Below 1700 px the panes stay hidden and the board is unchanged. */
+.fl-wall { display: none; }
+@media (min-width: 1700px) {
+  .fl[data-wall="on"] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.6fr) minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .fl[data-wall="on"] > .fl-head, .fl[data-wall="on"] > .fl-strip { grid-column: 1 / -1; }
+  .fl[data-wall="on"] > .fl-main { grid-column: 2; grid-row: 3; }
+  .fl[data-wall="on"] > .fl-dock { grid-column: 2; grid-row: 4; }
+  .fl[data-wall="on"] > .fl-wall-orders { grid-column: 1; grid-row: 3 / 5; }
+  .fl[data-wall="on"] > .fl-wall-glance { grid-column: 3; grid-row: 3 / 5; }
+  .fl[data-wall="on"] > .fl-wall { display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: calc(16px * var(--fl-k)); gap: calc(10px * var(--fl-k)); background: var(--sub); border-inline: 2px solid var(--line); }
+}
+.fl-wall-h { margin: 0; font-size: calc(22px * var(--fl-k)); font-weight: 800; }
+.fl-wall-body { display: flex; flex-direction: column; gap: calc(10px * var(--fl-k)); min-height: 0; overflow: hidden; }
+.fl-wall-sub { margin: calc(6px * var(--fl-k)) 0 0; font-size: calc(15px * var(--fl-k)); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink2, var(--ink)); }
+.fl-wall-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(6px * var(--fl-k)); }
+.fl-wall-row { display: flex; justify-content: space-between; gap: calc(12px * var(--fl-k)); align-items: baseline; padding: calc(8px * var(--fl-k)) calc(12px * var(--fl-k)); background: var(--paper); border: 1px solid var(--line); border-radius: calc(8px * var(--fl-k)); font-size: calc(18px * var(--fl-k)); }
+.fl-wall-name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-wall-meta { flex: none; font-variant-numeric: tabular-nums; }
+.fl-wall-more { margin: 0; font-size: calc(16px * var(--fl-k)); }
+
+/* The manager glance panel (from the back office) sized for a side pane: one column, type scaled with the board. */
+.fl-wall-glance .sb-glance { margin: 0; min-height: 0; }
+.fl-wall-glance .sb-glance-grid { grid-template-columns: minmax(0, 1fr); gap: calc(8px * var(--fl-k)); }
+.fl-wall-glance .sb-glance[data-size="wall"] .sb-g-l { font-size: calc(16px * var(--fl-k)); }
+.fl-wall-glance .sb-glance[data-size="wall"] .sb-g-v { font-size: calc(28px * var(--fl-k)); }
+.fl-wall-glance .sb-g-card { padding: calc(6px * var(--fl-k)) calc(12px * var(--fl-k)); gap: 0; }
+.fl-wall-glance .fl-wall-body { overflow-y: auto; }
+.fl-wall-glance .sb-glance[data-size="wall"] .sb-g-s { font-size: calc(15px * var(--fl-k)); }
+.fl-wall-glance .sb-glance-note { display: none; }
 
 /* In the cabinet view the cards have buttons along the bottom-left, where toasts normally sit: toasts go to the top right, under the strip. */
 html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto; top: var(--fl-toast-top, 130px); left: auto; right: var(--gutter); transform: none; width: min(400px, 34vw); }

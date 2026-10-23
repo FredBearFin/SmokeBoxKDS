@@ -2024,6 +2024,8 @@
 
     // Voice call-outs: opt-in per tablet; they follow the station tab showing and need sound and speech on.
     const coTog = SB.ui.toggle({ label: 'Voice call-outs for new tickets and "start now"', checked: floorOk && SB.floor.callouts ? SB.floor.callouts() : false, disabled: !(floorOk && SB.floor.setCallouts), onChange: (on) => { if (floorOk && SB.floor.setCallouts) SB.floor.setCallouts(on); } });
+    // Wall mode: three panes on a screen 1700 px wide or more. Per screen; needs the board module.
+    const wallTog = SB.ui.toggle({ label: 'Wall mode (three panes on a wide screen)', checked: floorOk && SB.floor.wall ? SB.floor.wall() : false, disabled: !(floorOk && SB.floor.setWall), onChange: (on) => { if (floorOk && SB.floor.setWall) SB.floor.setWall(on); } });
 
     // Station: the board opens on this station and reopens on it after a reload.
     const stations = [{ id: 'all', label: 'All', icon: 'grid' }].concat(C.zones.map((z) => ({ id: z.id, label: z.name, icon: z.icon })));
@@ -2055,6 +2057,7 @@
       settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
       settingBlock('Voice call-outs', 'Off by default. The tablet says one short line at a time, such as "New ticket 12" or "Start brisket sandwich now". At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Speech has not been tried on a real tablet yet.', coTog),
+      settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       clockBlock,
       settingBlock('More', '', links)));
