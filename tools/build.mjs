@@ -9,6 +9,7 @@
 //    dist file.
 import fs from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,6 +37,9 @@ for (const f of jsFiles) {
   const body = fs.readFileSync(path.join(root, 'src/js', f), 'utf8');
   // A closing script tag inside the code would end the inline script early, so the build refuses.
   if (/<\/script/i.test(body)) { console.error(`ERROR: ${f} contains "</script" which would end the inline script. Write "<\\/script" instead.`); process.exit(1); }
+  // A syntax error in one file would stop the whole inline script before any try/catch runs, so the build refuses it here, by name.
+  // vm.Script only compiles the code; nothing runs.
+  try { new vm.Script(body, { filename: 'src/js/' + f }); } catch (e) { console.error(`ERROR: src/js/${f} does not parse: ${e.message}`); process.exit(1); }
   // each file is wrapped in its own try/catch boundary so one broken module is reported by name instead of killing the rest silently
   js += `\n/* ===== ${f} ===== */\n;try{\n${body}\n}catch(e){console.error('[smokebox] module ${f} failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'${f}',message:String(e&&e.message||e)});}\n`;
 }

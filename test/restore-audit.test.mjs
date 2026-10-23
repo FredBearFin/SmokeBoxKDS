@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
-import { execFileSync } from 'node:child_process';
 import { loadSB, ROOT } from './_load.mjs';
 
 const SB = await loadSB(['00-util', '10-config', '20-engine', '30-store']);
@@ -163,19 +162,16 @@ test('two tabs: one upgrades the save from plain to compact while the other is o
   } finally { A.destroy(); B.destroy(); }
 });
 
-// The previous build's four files, read from git, as a store in its own context (what a downgrade runs). Null when git or the ref is not there.
+// The previous build's four files (test/fixtures/prev-build, copied from commit 7ffe92f) as a store in its own context: what a downgrade runs.
 function previousBuild() {
-  try {
-    const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval };
-    ctx.globalThis = ctx; vm.createContext(ctx);
-    for (const f of ['00-util.js', '10-config.js', '20-engine.js', '30-store.js']) vm.runInContext(execFileSync('git', ['show', 'kds/night/a5-history:src/js/' + f], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1e8, stdio: ['ignore', 'pipe', 'ignore'] }), ctx, { filename: 'old-' + f });
-    return ctx.SB.store;
-  } catch (e) { return null; }
+  const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval };
+  ctx.globalThis = ctx; vm.createContext(ctx);
+  for (const f of ['00-util.js', '10-config.js', '20-engine.js', '30-store.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, 'test/fixtures/prev-build', f), 'utf8'), ctx, { filename: 'old-' + f });
+  return ctx.SB.store;
 }
 
-test('downgrade: the previous build sets a compact save aside and uses the last-good copy; the newer build can bring the parked copy back', (t) => {
+test('downgrade: the previous build sets a compact save aside and uses the last-good copy; the newer build can bring the parked copy back', () => {
   const Old = previousBuild();
-  if (!Old) return t.skip('the previous build is not available from git here');
   const b = mem(); const clock = boot(K, b);
   clock.t += 1000; S.dispatch('closeDay', {}); S.flush();
   const compactText = b.m.get('smokebox.v1.state');
