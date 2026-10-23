@@ -47,6 +47,23 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.click('[data-act=import-check]'); await page.waitForTimeout(400);
   check('the preview names an ignored column', /Ignored column: Calories/.test(await page.locator('[data-act=ignored-columns]').textContent().catch(() => '')), await page.locator('.dp-preview').innerText());
   check('the preview says notes and descriptions are not kept', await page.locator('[data-act=notes-ignored]').count() === 1);
+  // A5's fixtures: header aliases, Lightspeed, cents, typed lines with titles, and the per-row "Read as" text.
+  await page.setInputFiles('input[type=file]', FX('sheet-item-price.csv')); await page.waitForTimeout(500);
+  check('a file with Item and Item Price headers is read, and each row says how its price was read', (await page.locator('.dp-prow').count()) >= 2 && /Read as \$14\.00/.test(await page.locator('.dp-readas').first().textContent()), await page.locator('.dp-fmt').textContent());
+  await page.setInputFiles('input[type=file]', FX('lightspeed-items.csv')); await page.waitForTimeout(500);
+  check('a Lightspeed export is named in plain words and sub-items are left out', /Lightspeed/.test(await page.locator('.dp-fmt').textContent()) && !(await page.locator('.dp-prow input.input').evaluateAll((els) => els.some((e) => e.value === 'Burger bun'))), await page.locator('.dp-fmt').textContent());
+  await page.setInputFiles('input[type=file]', FX('clover-cents.csv')); await page.waitForTimeout(500);
+  check('a Price (cents) header is read as cents and says so', /Read as \$12\.00/.test(await page.locator('.dp-readas').first().textContent()) && await page.locator('[data-act=prices-dollars]').isVisible());
+  await page.fill('textarea', 'Item,Price\nWhole pie,1400\nSlice,350\nSoda,200\nLarge combo,2500');
+  await page.click('[data-act=import-check]'); await page.waitForTimeout(400);
+  check('whole-number prices are dollars by default (1400 is flagged as very large)', /Read as \$1400\.00|Read as \$1,400\.00/.test(await page.locator('.dp-readas').first().textContent()));
+  check('when prices look like cents the screen offers a plain choice', await page.locator('[data-act=prices-cents]').isVisible());
+  await page.click('[data-act=prices-cents]'); await page.waitForTimeout(400);
+  check('choosing cents re-reads every row ($14.00 and $3.50)', /Read as \$14\.00/.test(await page.locator('.dp-readas').nth(0).textContent()) && /Read as \$3\.50/.test(await page.locator('.dp-readas').nth(1).textContent()));
+  await page.click('[data-act=prices-dollars]'); await page.waitForTimeout(300);
+  await page.setInputFiles('input[type=file]', FX('lines-with-titles.txt')); await page.waitForTimeout(500);
+  check('a typed list that starts with column titles skips the titles', (await page.locator('.dp-prow').count()) === 2 && /titles|skipped|column/i.test(await page.locator('.dp-preview').innerText()), await page.locator('.dp-preview').innerText());
+  await page.screenshot({ path: SHOT + '/import-r13.png' });
   // A messy pasted list with a row to fix.
   await page.fill('textarea', 'Pulled pork plate 12.50\nBad one\nLemonade 3');
   await page.click('[data-act=import-check]'); await page.waitForTimeout(400);
