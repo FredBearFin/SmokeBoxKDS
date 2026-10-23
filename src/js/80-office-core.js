@@ -1199,6 +1199,8 @@
         rec.inst = null;
       }
     }
+    // The Safety page gets a small bar to print the food safety record (only when cooked-ahead food is tracked).
+    if (id === 'safety' && !pageIsOff(id) && typeof O.safetyLogBar === 'function' && rec.container.firstChild) { try { rec.container.insertBefore(O.safetyLogBar(), rec.container.firstChild); } catch (e) { warnOnce('safety log bar', e); } }
     paintBanner(ctx);
     if (o.focus) { try { f.title.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   }
