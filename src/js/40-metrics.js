@@ -831,7 +831,7 @@
   M.queueLoad = (ds, opts) => {
     const ctx = makeCtx(ds, opts); const bmin = bucketMinOf(ctx), bm = bmin * MIN, fold = !!ctx.o.opts.fold, now = ctx.nowMs();
     const res = { bucketMin: bmin, fold, days: 0, zones: [], names: {}, peak: null, points: [], series: [] };
-    const iv = []; let t0 = Infinity;
+    const iv = [];
     // Step 1: turn each open item into an interval from when it fired to when it ended.
     for (const { it, v } of ctx.lines(true)) {
       if (!num(it.firedAt) || !it.zone) continue;
@@ -844,13 +844,15 @@
       else end = now;
       if (!num(end) || end <= it.firedAt) continue;
       // A line open over 12 hours is cut off at 12, so one forgotten ticket cannot paint days of load.
-      iv.push([it.firedAt, Math.min(end, it.firedAt + 12 * H), it.zone]); if (it.firedAt < t0) t0 = it.firedAt;
+      iv.push([it.firedAt, Math.min(end, it.firedAt + 12 * H), it.zone]);
     }
     if (!iv.length) return res;
-    // Step 2: per station and bucket, add up the milliseconds of open-line time inside the bucket.
-    const off = tzOff(t0), acc = {}; let kmin = Infinity, kmax = -Infinity;
+    // Step 2: per station and bucket, add up the milliseconds of open-line time inside the bucket. Buckets are
+    // counted on the wall clock like throughput: each line uses the clock offset at its own start, so a range
+    // that crosses a clock change keeps every day's buckets on the hour the kitchen's clock showed.
+    const acc = {}; let kmin = Infinity, kmax = -Infinity;
     for (const [s, e, z] of iv) {
-      const m = acc[z] || (acc[z] = {});
+      const off = tzOff(s), m = acc[z] || (acc[z] = {});
       const a = Math.floor((s + off) / bm), b = Math.floor((e + off - 1e-6) / bm);
       for (let k = a; k <= b; k++) { const bs = k * bm - off; const ov = Math.min(e, bs + bm) - Math.max(s, bs); if (ov > 0) m[k] = (m[k] || 0) + ov; }
       if (a < kmin) kmin = a; if (b > kmax) kmax = b;
@@ -859,7 +861,10 @@
     const zones = C.workZones.filter((z) => acc[z]).concat(Object.keys(acc).filter((z) => C.workZones.indexOf(z) < 0).sort());
     let pts = [];
     for (let k = kmin; k <= kmax; k++) {
-      const st = stamp(ctx, k * bm - off); const bs = st.t;
+      // The real moment the wall-clock bucket starts; a wall time the clock skipped (spring forward) has no bucket.
+      const wall = k * bm, t = wall - tzOff(wall - tzOff(wall));
+      if (t + tzOff(t) !== wall) continue;
+      const st = stamp(ctx, t); const bs = st.t;
       // The bucket holding an explicit opts.now is divided by the time elapsed so far, not its full width
       // (F-M8).
       const div = ctx.o.now !== null && now > bs && now < bs + bm ? now - bs : bm; const v = {}; let tot = 0;
@@ -970,14 +975,16 @@
    * day's batches are tracked on their own (opening 0, depletions matched by batchId; if no depletion carries a batchId all of the day's depletions are
    * used). Non-TCS: opening = opts.openingG or the ingredient's par (openingAssumed = true) plus restock events.
    * @param {object} opts {day:'YYYY-MM-DD' (default: newest day with data), ing:'brisket', openingG?}
-   * @returns {{day,ing,name,unit,tcs,thresholdG,parG,openingG,openingAssumed,openMs,closeMs,intakeG,usedG,wasteG,endG,minG,minAt,
+   * The level never shows below zero: grams used beyond what was counted in are added up in overdrawnG instead (with an
+   * assumed opening that means the real opening was above par).
+   * @returns {{day,ing,name,unit,tcs,thresholdG,parG,openingG,openingAssumed,openMs,closeMs,intakeG,usedG,wasteG,endG,minG,minAt,overdrawnG,
    *   points:Array<{t,hour,g,d,kind:'intake'|'use'|'waste'|'restock'}>,batches:Array<{id,label,enteredAt,cookedG}>}}
    */
   M.stockBurn = (ds, opts) => {
     ds = unwrap(ds); ds = ds && typeof ds === 'object' ? ds : {}; opts = opts && typeof opts === 'object' ? opts : {};
     const ctx = makeCtx(ds, { from: -Infinity, to: Infinity }); const im = ctx.ingMap(); const ing = opts.ing; const meta = im[ing];
     const empty = { day: null, ing: ing || null, name: meta ? meta.name : ing || null, unit: meta ? meta.unit : null, tcs: !!(meta && meta.tcs), thresholdG: meta && num(meta.thresholdG) ? meta.thresholdG : null, parG: meta && num(meta.parG) ? meta.parG : null,
-      openingG: null, openingAssumed: false, openMs: null, closeMs: null, intakeG: 0, usedG: 0, wasteG: 0, endG: null, minG: null, minAt: null, points: [], batches: [] };
+      openingG: null, openingAssumed: false, openMs: null, closeMs: null, intakeG: 0, usedG: 0, wasteG: 0, endG: null, minG: null, minAt: null, overdrawnG: 0, points: [], batches: [] };
     if (!ing) return empty;
     let day = typeof opts.day === 'string' ? opts.day : null;
     if (!day) { const ds2 = []; for (const v of ctx.all) ds2.push(v.date); for (const b of arr(ds.batches)) if (b && num(b.enteredAt)) ds2.push(ctx.dateOf(b.enteredAt)); ds2.sort(); day = ds2.length ? ds2[ds2.length - 1] : null; }
@@ -1013,7 +1020,10 @@
     deltas.sort((a, b) => a.t - b.t || rank[a.kind] - rank[b.kind]);
     let lvl = res.openingG; res.endG = lvl;
     for (const d of deltas) {
-      lvl += d.d; res.points.push({ t: d.t, hour: wallHourOn(d.t, day), g: lvl, d: d.d, kind: d.kind });
+      lvl += d.d;
+      // A level below zero is not stock: the count in was too low (often an assumed par), so it is noted, not shown.
+      if (lvl < 0) { res.overdrawnG += -lvl; lvl = 0; }
+      res.points.push({ t: d.t, hour: wallHourOn(d.t, day), g: lvl, d: d.d, kind: d.kind });
       if (d.kind === 'intake' || d.kind === 'restock') res.intakeG += d.d; else if (d.kind === 'use') res.usedG += -d.d; else res.wasteG += -d.d;
       if (res.minG === null || lvl < res.minG) { res.minG = lvl; res.minAt = d.t; }
     }
@@ -1067,6 +1077,14 @@
   };
 
   /* ================= safety ================= */
+  // Dollar words for a set of discards ({count, cost, noCostCount}): "cost not recorded" when none has a cost, and the
+  // known part named as such when only some do, so an unknown cost never reads as $0.
+  M.discardCostWords = (d, fmtMoney) => {
+    const f = typeof fmtMoney === 'function' ? fmtMoney : (v) => U.fmtMoney(v, 0), n = d && num(d.noCostCount) ? d.noCostCount : 0;
+    if (!d || !d.count) return f(0);
+    if (n >= d.count) return 'cost not recorded';
+    return f(d.cost) + (n ? ' for the ' + (d.count - n) + ' with a recorded cost' : '');
+  };
   // Every discard in the range: batch_discard events, plus discarded batches that have no event. Nothing
   // missed, nothing counted twice.
   function discardList(ctx) {
@@ -1100,7 +1118,7 @@
    * Food-safety compliance from events (and batches for discards). onTimePct are fractions of events that say whether they were on time.
    * score = average of the available temperature-check and sanitise on-time shares (null when neither is known).
    * @returns {{tempChecks:{count,onTime,late,onTimePct,avgLateMs,maxLateMs},sanitize:{count,onTime,late,onTimePct,avgLateMs,maxLateMs},
-   *   discards:{count,g,cost,byReason:Array<{reason,count,g,cost}>},lockouts:{batchCount:number,spellCount:number,totalMs:number,spells:Array},
+   *   discards:{count,g,cost,noCostCount,byReason:Array<{reason,count,g,cost}>},lockouts:{batchCount:number,spellCount:number,totalMs:number,spells:Array},
    *   reheats:number,batchesIn:number,intakeG:number,wastePct:number|null,score:number|null}}
    */
   M.compliance = (ds, opts) => {
@@ -1114,9 +1132,11 @@
     };
     const tc = chk(ctx.ev('temp_logged')), sn = chk(ctx.ev('sanitize_done')), dl = discardList(ctx), il = intakeList(ctx);
     const spells = eightySixList(ctx).filter((s) => s.reason === 'safety');
-    const bl = ctx.ev('batch_status').filter((e) => e.action === 'DISCARD_LOCKOUT' || e.to === 'discard').length;
+    // Batches, not events: a lockout and the discard that follows it are two events for one batch.
+    const bl = new Set(ctx.ev('batch_status').filter((e) => e.action === 'DISCARD_LOCKOUT' || e.to === 'discard').map((e, i) => (e.batchId != null ? e.batchId : '#' + i))).size;
     const dg = sumOf(dl.map((d) => d.g)), ig = sumOf(il.map((d) => d.g)); const parts = [tc.onTimePct, sn.onTimePct].filter(num);
-    return { tempChecks: tc, sanitize: sn, discards: { count: dl.length, g: dg, cost: sumOf(dl.map((d) => d.cost)), byReason: reasonAgg(dl) },
+    // WATCH OUT: cost adds only the discards with a known cost; noCostCount says how many had none, so 0 is not "free".
+    return { tempChecks: tc, sanitize: sn, discards: { count: dl.length, g: dg, cost: sumOf(dl.map((d) => d.cost)), noCostCount: dl.filter((d) => d.cost === null).length, byReason: reasonAgg(dl) },
       lockouts: { batchCount: bl, spellCount: spells.length, totalMs: sumOf(spells.map((s) => s.durationMs)), spells },
       reheats: ctx.ev('batch_reheat').length, batchesIn: il.length, intakeG: ig, wastePct: ig > 0 ? dg / ig : null, score: parts.length ? mean(parts) : null };
   };
@@ -1136,9 +1156,10 @@
   };
 
   // Plain names for the discard reasons, in the order the ledger lists them. "manual" and "other" are
-  // folded into one "Other" line.
-  const DISCARD_WORDS = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', other: 'Other' };
-  const DISCARD_ORDER = ['expired', 'quality', 'temp', 'cooling', 'other'];
+  // folded into one "Other" line. The cold-food limits (fridge date, time out of the fridge, date mark) keep their own
+  // lines, since they are safety limits and not "other".
+  const DISCARD_WORDS = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', fridgeDate: 'Past the fridge date', outTime: 'Out of the fridge too long', datemark: 'Past the date mark', other: 'Other' };
+  const DISCARD_ORDER = ['expired', 'quality', 'temp', 'cooling', 'fridgeDate', 'outTime', 'datemark', 'other'];
   // Adds up one window of discards: total, by product and by reason. Dollars are grams x the batch's
   // recorded cost per cooked kg, so a discard with no recorded cost counts in grams but never as $0.
   function discardWindow(raw, from, to, label) {
@@ -1773,11 +1794,12 @@
         // Sales from paid orders lead the sentence once any exist.
         if (sl.checks) return 'You sold ' + money0(sl.net) + ' of food in ' + U.fmtNum(sl.checks) + ' paid ' + U.plural(sl.checks, 'order') + ' (' + money(sl.avgCheck) + ' average). With tax and tips, ' + money0(sl.collected) + ' was collected' + (sl.tips > 0 ? ', ' + money0(sl.tips) + ' of it tips.' : '.');
         if (t.revenue === null) return 'No sales in this range yet.';
-        return 'Sales of ' + money0(t.revenue) + (v.count ? ' over ' + U.fmtNum(v.count) + ' finished tickets, ' + money(v.avg) + ' per ticket' : '') + (t.costPct !== null ? '; ingredients cost ' + pctTxt(t.costPct) + ' of menu price.' : '.');
+        // WATCH OUT: with no paid order this is finished food at menu price, a different base from Sales, so it says so.
+        return 'No paid orders yet. Finished food worth ' + money0(t.revenue) + ' at menu price' + (v.count ? ' over ' + U.fmtNum(v.count) + ' finished tickets, ' + money(v.avg) + ' per ticket' : '') + (t.costPct !== null ? '; ingredients cost ' + pctTxt(t.costPct) + ' of menu price.' : '.');
       }
       case 'safety': {
         const k = M.compliance(c); if (!k.tempChecks.count && !k.sanitize.count && !k.discards.count) return 'No food-safety records in this range yet.';
-        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + money(k.discards.cost) + ').' : 'nothing was discarded.');
+        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + M.discardCostWords(k.discards, money) + ').' : 'nothing was discarded.');
       }
       case 'stock': {
         const so = M.sellOutClock(c), n = so.rows.length; if (!so.dayCount) return 'No sell-outs in this range yet.';

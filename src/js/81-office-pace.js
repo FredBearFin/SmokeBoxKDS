@@ -502,12 +502,14 @@
         spec(p) {
           const f = M.frictionSummary(p);
           if (!f.tickets) return null;
-          // Rounds to one decimal. Unknown counts as zero events.
-          const per = (x) => (isNum(x) ? Math.round(x * 10) / 10 : 0);
+          // Rounds to one decimal. Unknown stays unknown (no bar, '-' in the tooltip), never a fake zero.
+          const per = (x) => (isNum(x) ? Math.round(x * 10) / 10 : null);
+          // A share (0 to 1) as events per 100, or null when it is unknown.
+          const pc = (x) => (isNum(x) ? x * 100 : null);
           return {
             orient: 'h', format: 'num', labels: 'all',
             categories: ['Undone actions', 'Taps the app could not accept', 'Sent out before all dishes were done', 'Fired early by hand', 'Recalled tickets', 'Voided tickets'],
-            series: [{ id: 'per100', name: 'Per 100 tickets', values: [per(f.undo.per100Tickets), per(f.reports.per100Tickets), per(f.forced.pct * 100), per(f.overrides.pct * 100), per(f.recalls.pct * 100), per(f.voids.pct * 100)] }],
+            series: [{ id: 'per100', name: 'Per 100 tickets', values: [per(f.undo.per100Tickets), per(f.reports.per100Tickets), per(pc(f.forced.pct)), per(pc(f.overrides.pct)), per(pc(f.recalls.pct)), per(pc(f.voids.pct))] }],
             ariaLabel: 'Slip-ups per 100 tickets: undone actions, refused taps, forced bumps, early fires, recalls and voids',
           };
         },

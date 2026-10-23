@@ -552,6 +552,9 @@ describe('stock burn', () => {
     assert.deepEqual([s.openingG, s.openingAssumed, s.endG, s.usedG, s.intakeG], [6000, true, 6330, 170, 500]);
     const s2 = M.stockBurn(d, { ing: 'pickles', day: DAY, openingG: 1000 });
     assert.deepEqual([s2.openingAssumed, s2.endG], [false, 1330]);
+    // Using more than was counted in never shows a negative stock: the extra is reported apart.
+    const s3 = M.stockBurn(dataset({ tickets: [t] }), { ing: 'pickles', day: DAY, openingG: 100 });
+    assert.deepEqual([s3.endG, s3.minG, s3.overdrawnG, s3.usedG], [0, 0, 70, 170]);
   });
   it('no ingredient or unknown day gives an empty, well-formed result', () => {
     assert.deepEqual(M.stockBurn(sd(), {}).points, []);
@@ -639,6 +642,10 @@ describe('safety: compliance, waste, batch timeline', () => {
     const l = M.compliance(cd()).lockouts;
     assert.deepEqual([l.batchCount, l.spellCount, l.totalMs], [2, 1, 600000]);
     assert.equal(l.spells[0].menuId, 'brisket_qtr');
+  });
+  it('compliance: a lockout and the discard that follows it on one batch count as one batch', () => {
+    const evs = [event({ t: at(0), type: 'batch_status', batchId: 'z1', from: 'servable', to: 'check', action: 'DISCARD_LOCKOUT' }), event({ t: at(60), type: 'batch_status', batchId: 'z1', from: 'check', to: 'discard', action: 'DISCARD_LOCKOUT' })];
+    assert.equal(M.compliance(dataset({ events: evs }), { from: at(0) - 3600e3, to: at(0) + 3600e3 }).lockouts.batchCount, 1);
   });
   it('compliance on events without onTime flags counts nothing (unknown is not on time)', () => {
     const k = M.compliance(dataset({ events: [event({ type: 'temp_logged', at: 1, batchId: 'b', f: 150 })] }));
@@ -1065,7 +1072,7 @@ describe('headline sentences', () => {
     const d = craft(40, { events: evs('temp_logged', 10, (i) => ({ batchId: 'b', f: 150, onTime: i < 4, lateMs: 60000 })) });
     assert.match(M.headline('tickets', d), /Most of a ticket's 7m 20s average goes to cooking and plating \(89%\)/);
     assert.match(M.headline('stations', d), /Hot sides finished last on 100% of tickets; 1 item runs outside 0\.8 to 1\.25 times the starter prep time/);
-    assert.match(M.headline('money', d), /Sales of \$780 over 40 finished tickets, \$19\.50 per ticket/);
+    assert.match(M.headline('money', d), /No paid orders yet\. Finished food worth \$780 at menu price over 40 finished tickets, \$19\.50 per ticket/);
     assert.match(M.headline('safety', d), /40% of 10 temperature checks were on time/);
     assert.match(M.headline('stock', d), /1 protein sell-out in 1 day, the earliest brisket at 1:42 pm \(7\.3 hours before close\)/);
     assert.match(M.headline('data', d), /40 tickets in this range \(0 sample, 40 live\)/);
@@ -1295,6 +1302,11 @@ describe('discardWeeks: dollars thrown away, this week against last week', () =>
     assert.deepEqual(w.thisWeek.byReason.map((r) => [r.reason, r.cost]), [['expired', 24], ['quality', 4], ['temp', 12]]);
     assert.deepEqual(w.lastWeek.byReason.map((r) => r.reason), ['cooling']);
   });
+  it('keeps the cold-food limits (fridge date, out of the fridge) as their own reasons, not Other', () => {
+    const d = mk([disc('b1', 'slaw', 1000, 'fridgeDate', 3, D(0)), disc('b2', 'slaw', 500, 'outTime', 2, D(0))]);
+    const w = M.discardWeeks(d, { now: D(0) + 3600e3 }).thisWeek;
+    assert.deepEqual(w.byReason.map((r) => [r.reason, r.label]), [['fridgeDate', 'Past the fridge date'], ['outTime', 'Out of the fridge too long']]);
+  });
   it('folds manual and unknown reasons into Other and never counts a missing cost as zero dollars', () => {
     const d = mk([disc('b1', 'brisket', 1000, 'manual', null, D(0)), disc('b2', 'brisket', 1000, 'expired', 10, D(0))]);
     const w = M.discardWeeks(d, { now: D(0) + 3600e3 }).thisWeek;
@@ -1347,5 +1359,19 @@ describe('discardSentence: the plain line above the weekly ledger', () => {
   it('flags sample data and says when nothing was thrown away', () => {
     assert.match(M.discardSentence({ thisWeek: win(5, 500, 1, { total: { sampleCount: 1 } }), lastWeek: win(0, 0, 0) }), /sample data, not your kitchen/);
     assert.equal(M.discardSentence({ thisWeek: win(0, 0, 0), lastWeek: win(0, 0, 0) }), 'Nothing was thrown away this week or last week.');
+  });
+});
+
+describe('discard cost words: an unknown cost never reads as $0', () => {
+  const disc = (id, g, cost) => event({ t: at(0), type: 'batch_discard', batchId: id, ing: 'brisket', g, reason: 'expired', cost });
+  const R = { from: at(0) - 3600e3, to: at(0) + 3600e3 };
+  it('compliance counts the discards with no cost, and the words name them', () => {
+    const none = M.compliance(dataset({ events: [disc('b1', 1000, null), disc('b2', 500, null)] }), R).discards;
+    assert.equal(none.noCostCount, 2);
+    assert.equal(M.discardCostWords(none), 'cost not recorded');
+    const part = M.compliance(dataset({ events: [disc('b1', 1000, null), disc('b2', 500, 6)] }), R).discards;
+    assert.equal(part.noCostCount, 1);
+    assert.match(M.discardCostWords(part), /^\$6 for the 1 with a recorded cost$/);
+    assert.equal(M.discardCostWords({ count: 2, cost: 12, noCostCount: 0 }), '$12');
   });
 });

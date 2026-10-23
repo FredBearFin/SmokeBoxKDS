@@ -26,9 +26,10 @@
 
   // Legend words, chart color slots, stacking order, and which discard reasons count as safety breaches.
   const TONE_NAMES = { ok: 'In range', check: 'Temperature check due', reheat: 'Reheat or chill now', discard: 'Thrown out' };
-  const REASON_SLOT = { expired: 1, temp: 2, cooling: 3, manual: 4, quality: 5, other: 6 };
-  const REASON_ORDER = ['temp', 'expired', 'cooling', 'manual', 'quality', 'other'];
-  const SAFETY_REASONS = { temp: 1, expired: 1, cooling: 1 };
+  const REASON_SLOT = { expired: 1, temp: 2, cooling: 3, manual: 4, quality: 5, other: 6, fridgeDate: 7, datemark: 7, outTime: 8 };
+  const REASON_ORDER = ['temp', 'expired', 'cooling', 'fridgeDate', 'outTime', 'datemark', 'manual', 'quality', 'other'];
+  // The cold-food limits are time limits too, so they count as safety discards in the verdict.
+  const SAFETY_REASONS = { temp: 1, expired: 1, cooling: 1, fridgeDate: 1, outTime: 1, datemark: 1 };
 
   // Builds the Safety page into the container and returns {update, destroy} for the frame.
   function render(container, ctx) {
@@ -156,7 +157,7 @@
       if (k.tempChecks.count) parts.push('Temperature checks were on time ' + fmt.pct(k.tempChecks.onTimePct, 0) + ' of the time (' + k.tempChecks.onTime + ' of ' + k.tempChecks.count + ')');
       if (k.sanitize.count) parts.push('sanitize rounds ' + fmt.pct(k.sanitize.onTimePct, 0) + ' (' + k.sanitize.onTime + ' of ' + k.sanitize.count + ')');
       let body = parts.length ? parts[0] + (parts[1] ? ', ' + parts[1] : '') + '.' : 'No temperature checks or sanitize rounds were logged.';
-      if (k.discards.count) body += ' ' + k.discards.count + ' ' + B.plural(k.discards.count, 'batch was', 'batches were') + ' thrown out (' + kgWords(k.discards.g) + ', ' + fmt.money(k.discards.cost, 0) + '), ' + safetyDis.length + ' for time or temperature rules.';
+      if (k.discards.count) body += ' ' + k.discards.count + ' ' + B.plural(k.discards.count, 'batch was', 'batches were') + ' thrown out (' + kgWords(k.discards.g) + ', ' + SB.metrics.discardCostWords(k.discards, (v) => fmt.money(v, 0)) + '), ' + safetyDis.length + ' for time or temperature rules.';
       else body += ' Nothing was thrown out.';
       if (brief.length) body += brief.length === 1 ? ' A time or temperature limit also took an item off the menu once, for ' + fmt.ms(brief[0].openMs) + '.' : ' Time or temperature limits also took items off the menu ' + brief.length + ' times for a few minutes each, the longest ' + fmt.ms(Math.max.apply(null, brief.map((c) => c.openMs))) + '.';
       // A red verdict is worded by cause: lost selling time, or checks that fell behind.
@@ -199,7 +200,7 @@
     const WORDS = { ok: 'On track', warn: 'Slipping', bad: 'Needs attention' };
 
     const ringCard = page.card({
-      type: 'ring', span: 4, title: 'Checks kept on time', sub: 'Average of the two measures beside it',
+      type: 'ring', span: 4, title: 'Checks kept on time', sub: 'Average of the measures beside it that have readings',
       caption: 'One number for the whole night. Green is 90% or better; below 75% a check or two were being skipped.',
       empty: { title: 'No score yet', body: 'The score needs temperature checks or sanitize rounds to be logged in this range.', icon: 'shield-check' },
       // Compliance ring: the average of the two on-time rates, empty until a check is logged.
@@ -208,7 +209,7 @@
         if (!isNum(k.score)) return null;
         // Thresholds in percent: below 90 warns, below 75 breaches; inverted because a higher score is better.
         return { value: k.score * 100, max: 100, label: 'Checks kept', sub: 'Temperature checks and sanitize rounds on time', format: 'pct100', warn: 90, breach: 75, invert: true, words: WORDS, size: 188,
-          ariaLabel: 'Checks kept on time ' + fmt.pct(k.score, 0) + ', the average of temperature checks and sanitize rounds logged on time.' };
+          ariaLabel: 'Checks kept on time ' + fmt.pct(k.score, 0) + (k.tempChecks.count && k.sanitize.count ? ', the average of temperature checks and sanitize rounds logged on time.' : k.tempChecks.count ? ', from temperature checks alone; no sanitize rounds were logged.' : ', from sanitize rounds alone; no temperature checks were logged.') };
       },
     });
     const tempCard = page.card({
@@ -403,8 +404,8 @@
           const set = (k, t, d) => { B.setText(nodes[k].t, t); B.setText(nodes[k].d, d); };
           set('hot', 'Hot food stays at ' + T(S.hotHoldF) + ' or above', 'A pan reading below ' + T(S.hotHoldF) + ' must be reheated or thrown out. FDA Food Code 3-501.16; your local code applies.');
           set('cold', 'Cold food stays at ' + T(S.coldHoldF) + ' or below', 'A pan reading above ' + T(S.coldHoldF) + ' must be chilled again or thrown out.');
-          set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'The model Food Code (3-403.11) sets the 165 °F target. Reheating a batch only once is our own rule: if it drops below the limit again it is thrown out.');
-          set('hold', 'Each product has its own hold limit, never more than ' + (S.hardCapH) + ' hours', 'The throw-out time throws the batch out when it is reached. A quality limit is a house rule for food held at temperature: at the limit the batch is taken off the menu but stays on the board until someone tastes it, and it can be kept serving for 30 minutes or 1 hour at a time while a reading of ' + S.hotHoldF + ' F or higher (cold food ' + S.coldHoldF + ' F or lower) is logged within the check interval. Every extension is logged with who and when. The hard cap of ' + (S.hardCapH) + ' hours throws out any batch (products whose limit is at or above it have no quality stage). Slaw, potato salad and banana pudding start with a quality limit for the owner to confirm: if you hold them outside temperature control, make theirs a safety limit. Your local health department\'s rules apply to quality extensions. Brisket and pulled pork starter limits are placeholders for the owner to confirm.');
+          set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'The model Food Code (3-403.11) sets ' + T(165) + ' as the target' + (S.reheatF !== 165 ? '; yours is set to ' + T(S.reheatF) : '') + '. Reheating a batch only once is our own rule: if it drops below the limit again it is thrown out.');
+          set('hold', 'Each product has its own hold limit, never more than ' + (S.hardCapH) + ' hours', 'The throw-out time throws the batch out when it is reached. A quality limit is a house rule for food held at temperature: at the limit the batch is taken off the menu but stays on the board until someone tastes it, and it can be kept serving for 30 minutes or 1 hour at a time while a reading of ' + T(S.hotHoldF) + ' or higher (cold food ' + T(S.coldHoldF) + ' or lower) is logged within the check interval. Every extension is logged with who and when. The hard cap of ' + (S.hardCapH) + ' hours throws out any batch (products whose limit is at or above it have no quality stage). Slaw, potato salad and banana pudding start with a quality limit for the owner to confirm: if you hold them outside temperature control, make theirs a safety limit. Your local health department\'s rules apply to quality extensions. Brisket and pulled pork starter limits are placeholders for the owner to confirm.');
           set('grace', 'Grace of ' + S.belowHotGraceH + ' hours below ' + T(S.hotHoldF) + ' (cold food: ' + S.aboveColdGraceH + ' hours above ' + T(S.coldHoldF) + ')', 'The clock starts at the first reading outside the limit. After the grace time the batch is thrown out.');
           set('checks', 'A temperature reading every ' + U.minutesText(S.tempCheckEveryMin), 'A late reading is flagged and counted here. It does not stop service by itself.');
           set('sanitize', 'Sanitize food-contact surfaces every ' + S.sanitizeEveryH + ' hours', 'A late round is a warning on the line and counts against the checks-kept score. Four hours is our starting value; set the limit your health department gives you.');
