@@ -61,6 +61,9 @@
   // time never goes backwards. subs and tickSubs are the screens waiting to be told. The flags remember that
   // a redraw, a save or a broadcast to other tabs is pending.
   let state = null;
+  // The follower: null in every normal kitchen and in the demo. Only initFollower sets it (see the follower section below).
+  let fol = null;
+  const followSubs = new Set();
   let storage = null;
   // The real clock. Tests replace it with a fake one through init({ now }).
   let realNow = () => Date.now();
@@ -96,7 +99,8 @@
   // than it returned before (rule I9).
   function now() {
     const r = realNow();
-    let v = Math.floor(clk.base + (r - clk.realBase) * clk.speed);
+    // A follower screen keeps the hub's time: this device's clock plus the offset learned from the hub, so elapsed times agree.
+    let v = fol ? Math.floor(r + fol.offset) : Math.floor(clk.base + (r - clk.realBase) * clk.speed);
     // Never go backwards (rule I9): if the real clock steps back or gives garbage, the last time is
     // repeated.
     if (!isNum(v)) v = lastNow;
@@ -167,6 +171,7 @@
   // Marks the state as unsaved and arranges a save SAVE_MS later. broadcast true means tell other tabs after
   // saving.
   function schedulePersist(broadcast) {
+    if (fol) return;                                  // a follower never saves anything
     dirty = true;
     if (broadcast) pendingBroadcast = true;
     if (saveTimer || !storage) return;
@@ -182,6 +187,7 @@
   // it retries with less history (oldest finished tickets and events first), halving up to 12 times. After a
   // good save it announces the new revision to other tabs.
   function persistNow() {
+    if (fol) return true;                             // a follower never saves anything
     if (!storage || !state) return false;
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     // If another tab saved since this tab last loaded or saved, build on its copy first so nothing is lost.
@@ -481,6 +487,7 @@
   // Stops the timers, closes the tab channel, removes the listeners and forgets all subscribers. init calls
   // it first; tests call it to clean up.
   function destroy() {
+    folStop();
     if (interval) clearInterval(interval);
     if (saveTimer) clearTimeout(saveTimer);
     interval = null; saveTimer = null;
@@ -607,6 +614,11 @@
   // refused uiReport (that would loop). If init was never called, it starts the store itself.
   function dispatchEx(type, payload, opts) {
     if (!state) init({ noTimers: true, noSync: true });
+    // A follower screen only shows the hub's kitchen: nothing is applied, queued, logged or sent.
+    if (fol) {
+      last = { type: typeof type === 'string' ? type : String(type), report: 'followerReadOnly', info: {}, events: [], opId: null };
+      return { report: 'followerReadOnly', info: {}, events: [], opId: null };
+    }
     const source = opts && opts.source === 'sim' ? 'sim' : 'user';
     const n = now();
     const opId = tabId + ':' + (++opN);
@@ -677,6 +689,7 @@
   // Replaces the whole state from backup text. Returns "ok", "invalidBackup" or "exportTooLarge". A refused
   // import changes nothing. Repairs it made are listed in lastResult().info.repaired.
   function importAll(text) {
+    if (fol) { last = { type: 'import', report: 'followerReadOnly', info: {}, events: [] }; return 'followerReadOnly'; }
     if (typeof text !== 'string') { last = { type: 'import', report: 'invalidBackup', info: { error: 'not text' }, events: [] }; return 'invalidBackup'; }
     if (text.length > MAX_TEXT) { last = { type: 'import', report: 'exportTooLarge', info: { chars: text.length, max: MAX_TEXT }, events: [] }; return 'exportTooLarge'; }
     // A backup made in the demo cannot be loaded into the real kitchen, nor the reverse. A backup with no mode (made before
@@ -790,6 +803,7 @@
   // Throws everything away and starts a fresh state. Ticket and event counters carry on so ids are never
   // reused. Saves at once. Returns "ok".
   function reset() {
+    if (fol) return 'followerReadOnly';
     rebaseClock();
     const old = state;
     const ns = E().newState({ now: now(), starter: false, seq: old ? old.seq : undefined, blank: !!(old && old.catalog === 'own') });
@@ -809,6 +823,210 @@
     const rep = dispatch('resetLive', opts || {}, { source: 'user' });
     if (rep === 'ok') persistNow();
     return rep;
+  }
+
+
+  /* ---------- follower: a read-only screen that shows a hub's kitchen ---------- */
+  /*
+   * initFollower({ url, code?, staleMs?, now?, fetch?, TextDecoder?, AbortController?, noTimers? }) -> Promise<{ ok, error?, status }>
+   * Turns this store into a read-only follower of a hub (server/server.mjs, GET /follow). Memory only: it never reads or writes the
+   * device's own saved kitchen (storage, outbox, names, drafts), never opens the tab channel, and dispatch is refused with the report
+   * 'followerReadOnly'. It adopts the hub's snapshot, then applies the hub's ordered actions (and ticks) through the same engine, so
+   * its state equals the hub's. A gap, a refused replay or a long silence is repaired by reconnecting; it resumes from its last change
+   * number when the hub still has the history, else takes a fresh snapshot. The clock follows the hub: now() is this device's time plus
+   * the offset learned from the hub. followStatus() says what it is doing; subscribeFollow(fn) fires when that changes.
+   * Fatal errors (no retry): badCode, notFound, wrongVersion, tooMany. unreachable and other failures keep retrying.
+   */
+  const FOLLOW_FATAL = { badCode: 1, notFound: 1, wrongVersion: 1, tooMany: 1 };
+  const FOLLOW_REASON = {
+    badCode: 'The access code is wrong or missing.', notFound: 'That address is not a Smokebox hub.', wrongVersion: 'This screen and the hub do not speak the same version. Reload the page from the hub.',
+    tooMany: 'The hub has too many screens connected.', unreachable: 'Cannot reach the hub.', closed: 'The connection to the hub ended.', error: 'Something went wrong talking to the hub.',
+  };
+  // Memory-only storage with the same methods as the browser's, so the follower never touches the device's saved kitchen.
+  function memoryBackend() {
+    const m = new Map();
+    return {
+      persistent: false,
+      // Reads a kept value, or the fallback when it is missing or unreadable.
+      get: (k, f) => { try { return m.has(k) ? JSON.parse(m.get(k)) : f; } catch (e) { return f; } },
+      // The kept text exactly as stored, or null when nothing is kept.
+      raw: (k) => (m.has(k) ? m.get(k) : null),
+      // Keeps a value as text in memory only; false when it cannot be turned into text.
+      set: (k, v) => { try { m.set(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+      // Forgets one kept value by its name.
+      remove: (k) => { m.delete(k); },
+      // The kept names that start with a prefix.
+      keys: (p) => Array.from(m.keys()).filter((k) => k.indexOf(p || '') === 0),
+    };
+  }
+  // Is this store a read-only follower right now?
+  const isFollower = () => !!fol;
+  // The words and numbers a screen needs about the follower: state, address, last message, how stale, change number, clock offset, error.
+  function followStatus() {
+    if (!fol) return { mode: 'off', state: 'off', url: '', lastUpdate: null, since: null, staleSince: null, seq: null, hubId: null, offsetMs: 0, error: null, connected: false, retryInMs: 0, reason: '' };
+    return { mode: 'follower', state: folState(), url: fol.url, lastUpdate: fol.lastMsgAt, since: fol.goodSince, staleSince: folStale() ? fol.lastMsgAt : null, seq: fol.seq, hubId: fol.hubId,
+      offsetMs: Math.round(fol.offset), error: fol.error, connected: folState() === 'following', retryInMs: fol.retryInMs, reason: fol.error ? (FOLLOW_REASON[fol.error] || FOLLOW_REASON.error) : '' };
+  }
+  // True when nothing has arrived from the hub for longer than the stale limit.
+  const folStale = () => !!fol && isNum(fol.lastMsgAt) && realNow() - fol.lastMsgAt > fol.staleMs;
+  // The status word: error, stale, following, or connecting / reconnecting.
+  function folState() {
+    if (fol.error && FOLLOW_FATAL[fol.error]) return 'error';
+    if (fol.connected && !folStale()) return 'following';
+    if (folStale()) return 'stale';
+    return fol.everConnected ? 'reconnecting' : 'connecting';
+  }
+  // Calls the follow subscribers when the status word or the error changed.
+  function folNotify(force) {
+    if (!fol) return;
+    const key = folState() + '|' + fol.error;
+    if (!force && key === fol.lastKey) return;
+    fol.lastKey = key;
+    const s = followStatus();
+    followSubs.forEach((fn) => { try { fn(s); } catch (e) { if (g.console) console.error('[smokebox] follow subscriber failed', e); } });
+  }
+  // Registers fn for status changes; returns a remover.
+  function subscribeFollow(fn) { if (typeof fn !== 'function') return () => {}; followSubs.add(fn); return () => followSubs.delete(fn); }
+  // Ends the first-attempt promise once.
+  function folSettle(res) { if (fol && fol.resolve) { const r = fol.resolve; fol.resolve = null; r(Object.assign({ status: followStatus() }, res)); } }
+  // Stops following: closes the stream and timers. The store keeps its last state until init is called again.
+  function folStop() {
+    if (!fol) return;
+    const f = fol;
+    f.closed = true;
+    if (f.ctrl) { try { f.ctrl.abort(); } catch (e) { /* ignore */ } }
+    if (f.retryTimer) clearTimeout(f.retryTimer);
+    if (f.timer) clearInterval(f.timer);
+    fol = null;
+    followSubs.clear();
+  }
+  // Starts following a hub. Resolves after the first snapshot (ok: true), a fatal error, or the first failed attempt to reach it.
+  function initFollower(opts) {
+    opts = opts || {};
+    if (typeof opts.url !== 'string') return Promise.resolve({ ok: false, error: 'notFound', status: followStatus() });
+    const keepSubs = Array.from(followSubs);
+    init({ now: opts.now, storage: memoryBackend(), mode: 'real', noSync: true, noTimers: true, blank: true });
+    keepSubs.forEach((fn) => followSubs.add(fn));
+    const url = opts.url.replace(/\/+$/, '');
+    const f = fol = { url, code: typeof opts.code === 'string' ? opts.code : '', staleMs: isNum(opts.staleMs) && opts.staleMs > 0 ? opts.staleMs : 45000, offset: 0, seq: null, hubId: null, connected: false, everConnected: false,
+      error: null, lastMsgAt: null, goodSince: null, retryInMs: 0, retryStep: 0, closed: false, gen: 0, ctrl: null, retryTimer: null, timer: null, lastKey: '', resolve: null, resyncs: 0,
+      fetchFn: opts.fetch || g.fetch, Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
+    f.timer = opts.noTimers ? null : setInterval(folTick, 1000);
+    const p = new Promise((resolve) => { f.resolve = resolve; });
+    folConnect();
+    return p;
+  }
+  // Every second: tells the screens a second passed (for timers), notices a silent stream and reconnects.
+  function folTick() {
+    if (!fol) return;
+    const n = now();
+    if (fol.connected && folStale() && fol.ctrl) { fol.connected = false; try { fol.ctrl.abort(); } catch (e) { /* ignore */ } }
+    folNotify(false);
+    tickSubs.forEach((fn) => { try { fn(n); } catch (e) { if (g.console) console.error('[smokebox] tick subscriber failed', e); } });
+  }
+  // Schedules the next connection attempt after a failure: 1, 2, 4, 8, then every 15 seconds.
+  function folRetry(error, immediate) {
+    const f = fol;
+    if (!f || f.closed) return;
+    f.connected = false;
+    if (error && error !== 'closed') f.error = error;           // a stream that simply ended is not an error to show
+    if (FOLLOW_FATAL[f.error]) { folSettle({ ok: false, error: f.error }); folNotify(true); return; }
+    const delay = immediate ? 50 : Math.min(15000, 1000 * Math.pow(2, f.retryStep++));
+    f.retryInMs = delay;
+    folSettle({ ok: false, error: f.error || 'unreachable' });
+    folNotify(true);
+    f.retryTimer = setTimeout(() => { f.retryTimer = null; f.retryInMs = 0; folConnect(); }, delay);
+  }
+  // Opens the stream (resuming from the last change number when there is one) and reads it until it ends.
+  async function folConnect() {
+    const f = fol;
+    if (!f || f.closed) return;
+    const gen = ++f.gen;
+    if (!f.fetchFn || !f.Abort || !f.Dec) { f.error = 'error'; folRetry('error'); return; }
+    f.ctrl = new f.Abort();
+    let q = '?code=' + encodeURIComponent(f.code);
+    if (f.hubId != null && isNum(f.seq)) q += '&since=' + f.seq + '&hub=' + encodeURIComponent(f.hubId);
+    let res;
+    try { res = await f.fetchFn(f.url + '/follow' + q, { signal: f.ctrl.signal, cache: 'no-store', headers: { accept: 'text/event-stream' } }); } catch (e) { if (f.closed || gen !== f.gen) return; folRetry('unreachable'); return; }
+    if (f.closed || gen !== f.gen) return;
+    if (!res.ok) {
+      const st = res.status;
+      f.error = st === 403 || st === 429 ? 'badCode' : st === 404 ? 'notFound' : st === 503 ? 'tooMany' : 'error';
+      folRetry(f.error);
+      return;
+    }
+    // A reply that is not an event stream is not a hub (a web page, a login screen).
+    const ctype = String((res.headers && res.headers.get && res.headers.get('content-type')) || '');
+    if (ctype.indexOf('text/event-stream') < 0) { f.error = 'notFound'; folRetry('notFound'); return; }
+    f.error = null;
+    try {
+      const reader = res.body.getReader(), dec = new f.Dec();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (f.closed || gen !== f.gen) return;
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const block = buf.slice(0, i); buf = buf.slice(i + 2);
+          const ev = /^event: (.*)$/m.exec(block), da = /^data: (.*)$/m.exec(block);
+          if (!ev || !da) continue;
+          let data = null;
+          try { data = JSON.parse(da[1]); } catch (e) { data = null; }
+          if (data && typeof data === 'object') { folEvent(ev[1], data); if (f.closed || gen !== f.gen) return; }
+        }
+      }
+    } catch (e) { if (f.closed || gen !== f.gen) return; }
+    if (f.closed || gen !== f.gen) return;
+    folRetry('closed');
+  }
+  // Takes the hub's time from a message: the offset is what the hub's clock reads minus this device's.
+  function folClock(d) { if (isNum(d.serverNow)) fol.offset = d.serverNow - realNow(); fol.lastMsgAt = realNow(); }
+  // Marks the connection good after a snapshot or a resume.
+  function folGood() {
+    const f = fol;
+    if (!f.connected) f.goodSince = realNow();
+    f.connected = true; f.everConnected = true; f.error = null; f.retryStep = 0; f.retryInMs = 0; f.resyncs = 0;
+    folSettle({ ok: true });
+    folNotify(true);
+    scheduleNotify();
+  }
+  // Drops the saved change number so the next connection takes a fresh snapshot, and reconnects at once.
+  function folResync() {
+    const f = fol;
+    f.seq = null; f.hubId = null;
+    if (++f.resyncs > 3) { f.error = 'error'; folRetry('error'); return; }
+    try { f.ctrl.abort(); } catch (e) { /* ignore */ }
+    f.gen++;
+    folRetry(null, true);
+  }
+  // Handles one message from the hub: hello (version), snapshot, op (the next action or tick), resumed, hb.
+  function folEvent(name, d) {
+    const f = fol;
+    folClock(d);
+    if (name === 'hello') {
+      if (d.proto !== 1) { f.error = 'wrongVersion'; try { f.ctrl.abort(); } catch (e) { /* ignore */ } folRetry('wrongVersion'); return; }
+      f.pendingHub = d.hubId;
+    } else if (name === 'snapshot') {
+      const v = E().validateBackup(d.state);
+      if (!v.ok || !isNum(d.seq)) { folResync(); return; }
+      state = v.state; f.seq = d.seq; f.hubId = d.hubId || f.pendingHub; atLeast(lastStamp(state));
+      syncUnits();
+      folGood();
+    } else if (name === 'op') {
+      if (!isNum(d.seq) || f.seq === null) return;
+      if (d.seq <= f.seq) return;                                   // already applied
+      if (d.seq !== f.seq + 1 || typeof d.type !== 'string') { folResync(); return; }
+      const r = d.type === 'tick' ? { report: 'ok', state: E().tick(state, d.now).state } : E().apply(state, d.type, d.payload, d.now);
+      if (r.report !== 'ok') { folResync(); return; }
+      state = r.state; f.seq = d.seq;
+      if (!f.connected) folGood(); else folNotify(false);
+      scheduleNotify();
+    } else if (name === 'resumed') {
+      f.hubId = d.hubId || f.pendingHub;
+      folGood();
+    }
   }
 
   /* ---------- selectors (memoised per state reference) ---------- */
@@ -918,6 +1136,7 @@
   // The real data is not touched again while the tab is in the demo. Returns false when already in the demo or the
   // browser cannot remember the choice.
   function enterDemo() {
+    if (fol) return false;
     if (mode === 'demo' || !state) return false;
     flush();
     try { g.sessionStorage.setItem(U.MODE_KEY, 'demo'); } catch (e) { return false; }
@@ -927,6 +1146,7 @@
   // Leaves the demo: throws away everything the demo saved, forgets the choice, stops this tab saving, and reloads into
   // the real kitchen. Returns false when not in the demo.
   function leaveDemo() {
+    if (fol) return false;
     if (mode !== 'demo') return false;
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     dirty = false; storage = null; // nothing more may be saved from this tab
@@ -1132,6 +1352,6 @@
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
-    channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
+    initFollower, followStatus, subscribeFollow, isFollower, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
