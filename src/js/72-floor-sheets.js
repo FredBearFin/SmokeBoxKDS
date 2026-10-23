@@ -303,11 +303,11 @@
     tabs = tabsWithPanels('Hold cabinet', [
       { id: 'batches', label: 'In the cabinet', icon: 'thermometer', count: 0, panel: batchesPanel },
       { id: 'new', label: 'New batch', icon: 'plus', panel: newPanel },
-    ], opts.tab === 'new' ? 'new' : 'batches', (id) => { setHidden(sheet.footer, id !== 'new'); if (id === 'new') form.shown(); });
+    ], opts.tab === 'new' ? 'new' : 'batches', (id) => { setHidden(sheet.footer, id !== 'new' || !st().ingredients.some((i) => i.tcs && !i.archived)); if (id === 'new') form.shown(); });
 
     sheet.body.append(h('div', { class: 'hc' }, safetyNote(), tabs.seg, batchesPanel, newPanel));
     sheet.footer.append(form.footer);
-    setHidden(sheet.footer, tabs.seg.getValue() !== 'new');
+    setHidden(sheet.footer, tabs.seg.getValue() !== 'new' || !st().ingredients.some((i) => i.tcs && !i.archived));
 
     // Builds one batch card once (ring, meter, facts, message, cooling steps, buttons).
     // updateCard fills it in and keeps it current.
@@ -953,10 +953,15 @@
     const addBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg hc-add', onClick: () => add() }, ico('plus', 22), h('span', null, 'Put in hold cabinet'));
     const footer = h('div', { class: 'hc-foot' }, err, addBtn);
 
-    const el = h('div', { class: 'hc-panel hc-form' },
+    // With no cooked-ahead item yet the Product list is empty, so say so and offer the way to add one.
+    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cooked-ahead items yet. Add the food you cook ahead, like brisket, and then log a batch of it here.'),
+      // Opens the Cooked-ahead food sheet where the first item is added.
+      h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add a cooked-ahead item'))));
+    // With nothing to log yet, only the explanation and the Add button show; the weight steppers wait for a product.
+    const el = h('div', { class: 'hc-panel hc-form' + (list().length ? '' : ' hc-noprod') },
       h('h3', { class: 'fs-h' }, 'New batch'),
       h('p', { class: 'fs-sub' }, 'Log a pan when it goes into the cabinet. The first temperature starts its clock, so enter what your thermometer says.'),
-      vis('Product', prodSeg), rawFld, thermalBox, weighedBox, tempFld, labelField, calcBox);
+      noProd, vis('Product', prodSeg), rawFld, thermalBox, weighedBox, tempFld, labelField, calcBox);
 
     // A starting weight of about half the par level, so the box opens near a typical pan.
     function defaultKg(ing) { return Math.max(0.5, Math.round((ing.parG || 4000) / 2 / 100) / 10); }

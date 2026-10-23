@@ -563,3 +563,7 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dp-undo, .dp-back { align-items: center; gap: var(--sp-2); }
 .dp-back[hidden], .dp-undo[hidden] { display: none; }
 .dp-strow .btn { flex: none; white-space: nowrap; min-height: 44px; }
+.hc-noprod > :not(h3):not(p):not(.fs-note) { display: none; }
+.dp-por { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.dp-left { font: var(--w-bold) var(--fs-4) / 1.1 var(--font-display); margin-right: var(--sp-2); }
+.dp-ca { margin-top: var(--sp-2); }

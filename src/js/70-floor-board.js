@@ -623,6 +623,7 @@
 
     m.tabParts = {};
     TABS.forEach((id) => { const b = seg.querySelector('[data-id="' + id + '"]'); if (b) m.tabParts[id] = { count: b.querySelector('.seg-count'), n: -1 }; });
+    m.seg = seg; F.applyHiddenTabs();
     m.sanText = sanChip.querySelector('.fl-chip-t');
     Object.assign(m, { wl, wr, head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
 
@@ -1585,6 +1586,7 @@
       if (z.id === 'expo') tabCount('expo', c.expo, c.overdue > 0);
       else tabCount(z.id, c.zones[z.id] || 0, (c.overdueByZone[z.id] || 0) > 0);
     });
+    F.applyHiddenTabs();
     // tools with counts
     const recentN = recentCount(S, now);
     toolCount(m.tool.recall, recentN, '', recentN ? recentN + ' recently bumped' : '');
@@ -1754,6 +1756,20 @@
   };
   // True while the welcome card has not been dismissed.
   F.welcome = () => !welcomeDone();
+  // Hides the tab of every station the owner marked "Not used" in Dishes and prices. A station with open tickets or
+  // the one being looked at always keeps its tab, so no ticket is ever out of sight.
+  F.applyHiddenTabs = function () {
+    const sg = m && (m.seg || null);
+    if (!sg) return;
+    const hid = SB.setup && SB.setup.hiddenStations ? SB.setup.hiddenStations() : [];
+    const c = store().select.counts();
+    TABS.forEach((id) => {
+      const b = sg.querySelector('[data-id="' + id + '"]');
+      if (!b || id === 'all' || id === 'expo') return;
+      const keep = hid.indexOf(id) < 0 || id === m.zone || (c.zones[id] || 0) > 0;
+      b.style.display = keep ? '' : 'none';
+    });
+  };
   // Starts the guided walkthrough when it is part of this build; otherwise opens the Help sheet instead.
   function startTour() {
     if (SB.tour && typeof SB.tour.start === 'function') SB.tour.start();

@@ -202,18 +202,75 @@ async function runC() {
   });
 }
 
+// Run E: the cook-ahead path. One cooked-ahead dish (Brisket plate): add it, say "Yes, I cook ahead", add Brisket, link it,
+// log a first batch in the cabinet, then take a paid order for it.
+async function runE() {
+  return withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
+    await page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 8000 });
+    await page.waitForTimeout(600);
+    const R = recorder(page, 'E');
+    R.begin('Add the dish', 'Brisket plate at the pit.');
+    await R.tap('.fl-first-dish', 'Add your first dish');
+    await page.waitForSelector('.dp-form');
+    await page.keyboard.type('Brisket plate'); R.typed('Brisket plate', 'Dish name');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('14.00'); R.typed('14.00', 'Price');
+    await R.tap('.dp-tile[data-zone="pit"]', 'Where it is made: Pit');
+    await R.tap('[data-act="save-again"]', 'Save and add another');
+    await page.waitForTimeout(400);
+    await R.end('dish-added');
+    R.begin('Say yes to cooking ahead', 'The question appears under the form after the first dish.');
+    const q = await page.evaluate(() => { const c = document.querySelector('.dp-ca'); return c && !c.hidden ? c.innerText.replace(/\s+/g, ' ').slice(0, 120) : '(not shown)'; });
+    R.note(q === '(not shown)' ? 'deadend' : 'info', 'Question card: ' + q);
+    await R.tap('.dp-ca [data-act="add-cooked"]', 'Yes, I cook ahead');
+    await page.waitForSelector('.sheet:has-text("Cooked-ahead food") .dp-name');
+    await R.end('cooked-ahead-sheet');
+    R.begin('Add Brisket and link it', 'Name, tick the dish, save.');
+    await page.keyboard.type('Brisket'); R.typed('Brisket', 'Cooked-ahead name');
+    await R.tap('.sheet:has-text("Cooked-ahead food") input[type=checkbox]', 'Brisket plate uses it');
+    await R.tap('[data-act="save-cooked"]', 'Save cooked-ahead item');
+    await page.waitForTimeout(400);
+    await R.end('brisket-added');
+    R.begin('Log a first batch', 'Straight to the cabinet with Brisket chosen.');
+    await R.tap('[data-act="log-first-batch"]', 'Log a first batch');
+    await page.waitForSelector('.hc-add');
+    R.note('info', 'Starting values are pre-filled from the product (raw weight, cook endpoint, first reading 150 F); this run accepts them as a cook would after checking the probe.');
+    await page.screenshot({ path: path.join(OUT, 'E-batch-form.png') });
+    await R.tap('.hc-add', 'Put in hold cabinet');
+    await page.waitForTimeout(500);
+    const batches = await page.evaluate(() => SB.store.getState().batches.length);
+    R.rec.batchesLogged = batches;
+    await R.end('batch-logged');
+    R.begin('Take an order for it', 'Close the sheets, New ticket, the dish, cash, send.');
+    for (let k = 0; k < 3; k++) { if (await page.locator('.sheet-close').count()) { await R.tap('.sheet-close >> nth=-1', 'Close a sheet'); await page.waitForTimeout(350); } }
+    await R.tap('.fl-new', 'New ticket');
+    await page.waitForSelector('.ord-tile');
+    const avail = await page.$$('.ord-tile:not(.is-86)');
+    R.note(avail.length ? 'info' : 'deadend', avail.length + ' dish tile(s) orderable after logging the batch.');
+    if (avail.length) { await avail[0].click(); R.rec.taps++; }
+    await R.tap('.ord-pay [data-id="cash"]', 'Cash');
+    await R.tap('.ord-send', 'Send to kitchen');
+    await page.waitForTimeout(500);
+    R.rec.firstPaidTicket = await page.evaluate(() => Object.values(SB.store.getState().orders || {}).some((x) => x && (x.paid || x.status === 'paid' || x.paidAt)));
+    await R.end('cook-ahead-paid');
+    R.rec.errors = logs.errors.length + logs.pageErrors.length;
+    return R.rec;
+  });
+}
+
 // Turns a run into modeled seconds.
 function modeled(rec) { return Math.round(rec.taps * TAP_S + rec.typed * TYPE_S + rec.chars * CHAR_S + rec.picks * PICK_S + rec.reads * READ_S); }
 
-const A = await runA(); const B = await runB(); const C = await runC(); const D = await runA(true);
-for (const r of [A, B, C, D]) r.modeledSeconds = modeled(r);
-const out = { generated: 'modeled, headless Chromium 1280x800, empty storage; not a real person or tablet', model: { TAP_S, TYPE_S, CHAR_S, PICK_S, READ_S }, A, B, C, D };
+const A = await runA(); const B = await runB(); const C = await runC(); const D = await runA(true); const E = await runE();
+for (const r of [A, B, C, D, E]) r.modeledSeconds = modeled(r);
+const out = { generated: 'modeled, headless Chromium 1280x800, empty storage; not a real person or tablet', model: { TAP_S, TYPE_S, CHAR_S, PICK_S, READ_S }, A, B, C, D, E };
 fs.writeFileSync(path.join(OUT, 'journey.json'), JSON.stringify(out, null, 1));
 const line = (r) => 'taps ' + r.taps + ', typed fields ' + r.typed + ' (' + r.chars + ' chars), list choices ' + r.picks + ', screens read ' + r.reads + ', dead ends ' + r.deadEnds + ', confusing ' + r.confusing + ', modeled ' + (r.modeledSeconds / 60).toFixed(1) + ' min';
 console.log('A guided path :', line(A), ' | paid:', A.firstPaidTicket, ' | errors:', A.errors);
 console.log('B naive path  :', line(B));
 console.log('C find menu   :', line(C));
 console.log('D one station :', line(D), ' | paid:', D.firstPaidTicket);
+console.log('E cook-ahead :', line(E), ' | batches:', E.batchesLogged, '| paid:', E.firstPaidTicket, '| errors:', E.errors);
 console.log('first open    :', JSON.stringify(A.firstOpenInventory));
-for (const r of [A, B, C, D]) for (const s of r.steps) { console.log('\n[' + r.run + s.n + '] ' + s.name + ' -> ' + s.screen + ' (' + s.shot + ') taps ' + s.taps + ' typed ' + s.typed); for (const n of s.notes) if (n.kind !== 'tap' && n.kind !== 'type' && n.kind !== 'pick') console.log('   ' + n.kind + ': ' + n.text); }
+for (const r of [A, B, C, D, E]) for (const s of r.steps) { console.log('\n[' + r.run + s.n + '] ' + s.name + ' -> ' + s.screen + ' (' + s.shot + ') taps ' + s.taps + ' typed ' + s.typed); for (const n of s.notes) if (n.kind !== 'tap' && n.kind !== 'type' && n.kind !== 'pick') console.log('   ' + n.kind + ': ' + n.text); }
 void fileURLToPath;

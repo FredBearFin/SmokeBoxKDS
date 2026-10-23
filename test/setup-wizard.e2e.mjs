@@ -62,6 +62,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   check('a renamed station is saved in the shared names and shown on its tile', (await page.evaluate(() => JSON.stringify(SB.config.customSpec()))).includes('Smoker') && await page.locator('.dp-tile:has-text("Smoker")').count() === 1);
   await page.screenshot({ path: SHOT + '/stations-three.png' });
   for (const nm of ['Hot sides', 'Fry']) { await page.locator('.dp-strow:has([aria-label="Name of station ' + nm + '"]) button').click(); await page.waitForTimeout(150); }
+  check('a station marked Not used loses its board tab while it has no tickets', await page.evaluate(() => { const b = document.querySelector('.fl-tabs [data-id=sides], [data-id=sides]'); return !b || b.style.display === 'none'; }));
   check('hiding stations leaves tiles for the rest', await page.locator('.dp-tile').count() === 2);
   await page.locator('.dp-strow:has([aria-label="Name of station Cold and drinks"]) button').click(); await page.waitForTimeout(150);
   check('with one station showing the question is skipped', await page.locator('.dp-tile').count() === 1 && !(await page.locator('.dp-tiles').isVisible()));
@@ -90,6 +91,31 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.screenshot({ path: SHOT + '/shop.png' });
   await page.locator('.sheet .seg-opt', { hasText: 'Yes' }).click(); await page.waitForTimeout(250);
   check('the cook-ahead question writes the real setting', await page.evaluate(() => SB.store.getState().settings.modules.cookAhead === true));
+  // Cooked-ahead food (module on): the question, add Brisket, link it to a dish, then a first batch can be logged.
+  await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(400);
+  await page.evaluate(() => SB.sheets.open('dishes')); await page.waitForTimeout(500);
+  check('with the module on, the cooked-ahead question shows after a dish', await page.locator('.dp-ca [data-act=add-cooked]').isVisible());
+  await page.screenshot({ path: SHOT + '/ca-question.png' });
+  await page.click('.dp-ca [data-act=add-cooked]'); await page.waitForTimeout(400);
+  await page.fill('.sheet:has-text("Cooked-ahead food") .dp-name', 'Brisket');
+  await page.locator('.sheet:has-text("Cooked-ahead food") .dp-row', { hasText: 'Pulled pork plate' }).locator('input[type=checkbox]').check();
+  await page.click('[data-act=save-cooked]'); await page.waitForTimeout(400);
+  const ca = await page.evaluate(() => { const s = SB.store.getState(); const i = s.ingredients.find((x) => x.name === 'Brisket'); const d = s.menu.find((m) => m.name === 'Pulled pork plate'); return { ing: i && [i.tcs, i.hold, i.maxHoldH], bom: d && d.bom }; });
+  check('Brisket is added as cooked-ahead (hot, 4 h) and linked to the dish', ca.ing && ca.ing[0] === true && ca.ing[1] === 'hot' && ca.ing[2] === 4 && ca.bom.length === 1 && ca.bom[0].qty === 150, ca);
+  await page.screenshot({ path: SHOT + '/ca-added.png' });
+  await page.click('[data-act=log-first-batch]'); await page.waitForTimeout(600);
+  check('Log a first batch opens the cabinet on the new batch form with Brisket', await page.locator('.hc-form .hc-prod').isVisible() && await page.locator('.hc-form .hc-prod:has-text("Brisket")').count() === 1);
+  await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(400);
+  // Portions on hand for a dish that lists no ingredients.
+  await page.evaluate(() => SB.sheets.open('dishes')); await page.waitForTimeout(500);
+  const macRow = page.locator('.dp-row:has(input[aria-label="Name of Coleslaw"])').first();
+  await macRow.locator('.dp-por summary').click(); await macRow.locator('.dp-por input').fill('20'); await macRow.getByRole('button', { name: 'Start counting' }).click(); await page.waitForTimeout(400);
+  check('portions on hand: the dish row shows 20 left', await page.locator('.dp-row:has(input[aria-label="Name of Coleslaw"])').first().locator('.dp-left').textContent().then((x) => /20 left/.test(x)));
+  await page.locator('.dp-row:has(input[aria-label="Name of Coleslaw"])').first().getByRole('button', { name: '+10' }).click(); await page.waitForTimeout(400);
+  check('+10 restocks to 30 left', await page.locator('.dp-row:has(input[aria-label="Name of Coleslaw"])').first().locator('.dp-left').textContent().then((x) => /30 left/.test(x)));
+  check('the hidden "Portions of" ingredient is not shown anywhere in the sheet', !(await page.locator('.sheet').first().innerText()).includes('Portions of Coleslaw'));
+  await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(300);
+  await page.evaluate(() => SB.sheets.open('shop')); await page.waitForTimeout(400);
   await page.locator('.sheet .seg-opt', { hasText: 'No' }).click(); await page.waitForTimeout(250);
   check('cook-ahead can be turned back off', await page.evaluate(() => SB.store.getState().settings.modules.cookAhead === false));
   await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(9500);
@@ -97,7 +123,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   check('the main menu has a Dishes and prices entry', await (async () => { await page.evaluate(() => SB.sheets.open('menu')); await page.waitForTimeout(300); return page.getByRole('button', { name: /Dishes and prices/ }).isVisible(); })());
   // The first-steps card goes for good once a ticket exists, even if the board is cleared again.
   await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(200);
-  await page.evaluate(() => { const id = SB.store.getState().menu.find((m) => !m.archived).id; SB.store.dispatchEx('createTicket', { customer: 'T', items: [{ menuId: id, qty: 1 }] }, { source: 'ui' }); });
+  await page.evaluate(() => { const id = SB.store.getState().menu.find((m) => m.name === 'Coleslaw').id; SB.store.dispatchEx('createTicket', { customer: 'T', items: [{ menuId: id, qty: 1 }] }, { source: 'ui' }); });
   await page.waitForTimeout(300);
   check('the first-steps card is gone once a ticket exists', !(await page.locator('.fl-welcome').isVisible()));
   await page.evaluate(() => SB.store.resetLive({ keepSettings: true, starter: false })); await page.waitForTimeout(400);
