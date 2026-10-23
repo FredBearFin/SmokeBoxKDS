@@ -48,7 +48,7 @@
     const d = g.document;
     if (!d || !d.head || d.querySelector('link[rel="manifest"]')) return;
     const l = d.createElement('link');
-    l.rel = 'manifest'; l.href = '/manifest.webmanifest'; l.crossOrigin = 'use-credentials';
+    l.rel = 'manifest'; l.href = 'manifest.webmanifest'; l.crossOrigin = 'use-credentials';
     d.head.appendChild(l);
   }
 
@@ -71,7 +71,7 @@
     });
     try {
       set({ state: 'installing' });
-      reg = await c.register('/sw.js', { scope: '/', updateViaCache: 'none' });
+      reg = await c.register('sw.js', { scope: './', updateViaCache: 'none' });
       reg.addEventListener('updatefound', () => {
         const w = reg.installing;
         if (!w) return;

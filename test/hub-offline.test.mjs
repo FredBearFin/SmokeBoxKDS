@@ -37,7 +37,8 @@ test('the worker text keeps its promises: only the page is handled, the API path
   const port = await hub.listen(0);
   try {
     const { text } = await get(port, '/sw.js');
-    for (const p of ['/action', '/follow', '/events', '/probe', '/seed']) assert.ok(text.includes("'" + p + "'"), p);
+    for (const p of ['action', 'follow', 'events', 'probe', 'seed', 'health']) assert.ok(text.includes("'" + p + "'"), p);
+    assert.match(text, /BASE = new URL\('\.\/', self\.location\.href\)/, 'the worker works out its own folder');
     assert.match(text, /req\.method !== 'GET'/); assert.match(text, /req\.mode !== 'navigate'/); assert.match(text, /has\('nosw'\)/);
     assert.match(text, /res\.redirected/); assert.match(text, /text\\\/html/); assert.match(text, /MIN_BYTES/);
     assert.match(text, /\.catch\(\(\) => fetch\(req\)/, 'any failure falls back to the network');
@@ -53,8 +54,8 @@ test('manifest and icons: valid JSON with same-origin start and scope, an svg, a
     const m = await get(port, '/manifest.webmanifest');
     const j = JSON.parse(m.text);
     assert.equal(m.r.status, 200); assert.match(m.r.headers.get('content-type'), /manifest\+json/);
-    assert.deepEqual([j.start_url, j.scope, j.display], ['/', '/', 'standalone']);
-    assert.ok(j.icons.length >= 2 && j.icons.every((i) => i.src.startsWith('/')));
+    assert.deepEqual([j.start_url, j.scope, j.display], ['./', './', 'standalone']);
+    assert.ok(j.icons.length >= 2 && j.icons.every((i) => !i.src.startsWith('/')));
     const svg = await get(port, '/icon.svg'); assert.equal(svg.r.status, 200); assert.match(svg.r.headers.get('content-type'), /svg/);
     for (const n of [192, 512]) {
       const r = await fetch('http://127.0.0.1:' + port + '/icon-' + n + '.png');

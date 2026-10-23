@@ -105,7 +105,7 @@
     // Decodes one part of the address, empty when it is damaged.
     const dec = (v) => { try { return decodeURIComponent(v || ''); } catch (e) { return ''; } };
     const c = /[?&]code=([^&]*)/.exec(q);
-    return { on: true, url: dec(hit[1]).replace(/\/+$/, ''), code: c ? dec(c[1]) : '' };
+    return { on: true, url: (dec(hit[1]) || U.pageFolder(g)).replace(/\/+$/, ''), code: c ? dec(c[1]) : '' };
   }
   const FOLLOW = readFollow();
   // Says whether this page is a read-only follower screen, and which hub it follows.
@@ -119,7 +119,7 @@
     // Decodes one part of the address, empty when it is damaged.
     const dec = (v) => { try { return decodeURIComponent(v || ''); } catch (e) { return ''; } };
     const c = /[?&]code=([^&]*)/.exec(q);
-    return { on: true, url: dec(hit[1]).replace(/\/+$/, ''), code: c ? dec(c[1]) : '' };
+    return { on: true, url: (dec(hit[1]) || U.pageFolder(g)).replace(/\/+$/, ''), code: c ? dec(c[1]) : '' };
   }
   const HUB = readHub();
   // Says whether this tablet writes through a hub (its taps go to the hub, which answers each one).
