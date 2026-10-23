@@ -41,7 +41,7 @@ Taken after a whole (untrimmed) live save in a real kitchen only (never in the d
 
 What is trimmed: the oldest finished tickets and the oldest events. The books stay balanced (used and wasted grams of trimmed tickets move into the ledger).
 
-What is never trimmed (tested in `test/scale-quota.test.mjs`): settings including the PIN hash, the whole menu, the whole ingredient list, stock, open tickets and open orders, batches, the `catalog` marker, and the safety records (temperature readings, discards, cooling, sanitize, keep-serving), which move to the `safetyKeep` bucket and are only dropped after 190 days. The test loads a kitchen with 5,000 tickets into storage that holds a quarter of it and checks all of these after a reload.
+What is never trimmed (tested in `test/scale-quota.test.mjs`): settings including the PIN hash, the whole menu, the whole ingredient list, stock, open tickets and open orders, batches, the `catalog` marker, and the safety records (temperature readings, discards, cooling, sanitize, keep-serving), which move to the `safetyKeep` bucket and are only dropped after 400 days. The test loads a kitchen with 5,000 tickets into storage that holds a quarter of it and checks all of these after a reload.
 
 Risks to know:
 - A paid-up history of 5,000 two-line tickets is 12.6 MB, well over a 5 MB browser limit, so a busy kitchen will see trimming after a few weeks of full history. The backup export allows up to 20 million characters. Recommendation: nudge for a backup, and offer "close the month" that exports and prunes.
