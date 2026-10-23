@@ -376,8 +376,9 @@
     function chipRow(label, defs, key, base) {
       const row = h('div', { class: 'ox-chips', role: 'group', 'aria-label': label });
       defs.forEach((d) => {
-        // The dollars this chip stands for right now (a share of the base figure, or a fixed amount).
-        const amount = () => (d.roundUp ? roundUpTip(orderTotal()) : d.pct ? r2(base() * d.pct) : d.fixed || 0);
+        // The dollars this chip stands for right now (a share of the base figure, or a fixed amount). A share uses the
+        // same half-cent rule as the New ticket screen (orderMath.pctOfDollars), so 15% shows the same cents on both.
+        const amount = () => (d.roundUp ? roundUpTip(orderTotal()) : d.pct ? SB.orderMath.pctOfDollars(base(), Math.round(d.pct * 100)) : d.fixed || 0);
         const b = SB.ui.chip({
           label: d.label, pressed: false,
           // Writes this chip's amount into the box (or clears it) and repaints the totals.
@@ -477,11 +478,15 @@
     tipInput.addEventListener('input', () => { P.tip = tipInput.value; paint(); });
     cashInput.addEventListener('input', () => { P.cash = cashInput.value; paint(); });
     // Mark paid sends the payment to the engine; a refusal is shown in words and nothing is lost.
+    // WATCH OUT: once paid, a second tap (a double tap while the box closes) does nothing, so it shows no "not open" error.
+    let paidDone = false;
     payBtn.addEventListener('click', () => {
+      if (paidDone) return;
       const r = read();
       if (r.err) { setHidden(err, false); text(err, r.err); r.box.focus(); return; }
       const res = run('payOrder', { orderId, method: P.method, tip: r.t, discount: r.d });
       if (res.report === 'ok') {
+        paidDone = true;
         setMethod(P.method);
         sheet.close('paid');
         const info = res.info || {}, pm = C.payMethodById[P.method];
