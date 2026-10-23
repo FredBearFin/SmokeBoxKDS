@@ -40,14 +40,14 @@ await withPage({ w: 1024, h: 768 }, async (page, logs) => {
   ok(await page.locator('[data-choice="seed"]').isEnabled(), 'empty hub: send-this-tablet option is on');
   ok(await page.locator('[data-role="stop"]').count() === 0, 'empty hub: no stop message');
   const txt = await page.locator('[data-role="choice"]').innerText();
-  ok(/Show the hub's kitchen on this tablet/.test(txt) && /stays untouched on this tablet and comes back/.test(txt) && /Send this tablet's kitchen to the hub/.test(txt), 'both options use the agreed plain words');
+  ok(/Show the shared kitchen on this tablet/.test(txt) && /stays untouched on this tablet and comes back/.test(txt) && /Send this tablet's kitchen to the main computer/.test(txt), 'both options use the agreed plain words');
   await page.check('[data-choice="seed"]');
   await page.click('[data-act="hub-join"]');
   await page.waitForSelector('[data-role="hub-joined"]:not([hidden])');
   const calls = await page.evaluate(() => __calls);
   ok(calls[0][0] === 'probe' && calls[0][1].url === 'https://kitchen.example.com' && calls[0][1].code === 'ABC123', 'probe got a clean address and code');
   ok(calls[1][0] === 'join' && calls[1][1].seed === true && calls[1][1].adopt === undefined && calls[1][1].name === 'Pass', 'join sent seed and the screen name only');
-  ok(/Using the hub/.test(await page.locator('[data-role="hub-status"]').innerText()), 'joined: status in plain words');
+  ok(/Using the main computer/.test(await page.locator('[data-role="hub-status"]').innerText()), 'joined: status in plain words');
   ok(/stays on this tablet, untouched, and comes back/.test(await page.locator('[data-role="hub-joined"]').innerText()), 'joined: says what stays where');
   await page.evaluate(() => { __hub.state = 'offline'; __hub.queued = 2; });
   await page.waitForFunction(() => /out of date/.test(document.querySelector('[data-role="hub-status"]').textContent), null, { timeout: 5000 });
@@ -80,7 +80,7 @@ await withPage({ w: 1024, h: 768 }, async (page, logs) => {
   ok((await page.evaluate(() => __calls.at(-1)[1].adopt)) === 'hub', 'adopt joins with adopt hub');
   await page.click('[data-act="hub-leave"]');
   // errors
-  for (const [code, re] of [['badCode', /access code was not accepted/], ['notFound', /is a Smokebox hub/], ['unreachable', /Could not reach/], ['wrongVersion', /different versions/], ['tooMany', /as many screens/]]) {
+  for (const [code, re] of [['badCode', /access code was not accepted/], ['notFound', /is a Smokebox main computer/], ['unreachable', /Could not reach/], ['wrongVersion', /different versions/], ['tooMany', /as many screens/]]) {
     await page.evaluate((c) => { __hub.error = c; }, code);
     await page.click('[data-act="hub-check"]');
     await page.waitForFunction((s) => new RegExp(s).test(document.querySelector('[data-role="hub-msg"]').textContent), re.source, { timeout: 3000 }).catch(() => {});
@@ -102,7 +102,7 @@ await withPage({ w: 1024, h: 768 }, async (page) => {
   await page.fill('[data-field="hub-url"]', 'kitchen.example.com'); await page.fill('[data-field="hub-name"]', 'Pass');
   await page.click('[data-act="hub-check"]');
   await page.waitForSelector('[data-role="pair-box"]:not([hidden])');
-  ok(/Ask the person who runs the hub for a pairing code. It works once and for 10 minutes./.test(await page.locator('[data-role="pair-box"]').innerText()), 'pairing box uses the agreed words');
+  ok(/Ask the person who runs the main computer for a pairing code. It works once and for 10 minutes./.test(await page.locator('[data-role="pair-box"]').innerText()), 'pairing box uses the agreed words');
   ok(!(await page.locator('[data-role="access-box"]').isVisible()), 'hub needs tokens: old access code field is hidden');
   await page.click('[data-act="hub-pair"]');
   ok(/6-character/.test(await page.locator('[data-role="hub-msg"]').innerText()), 'empty pairing code: plain message');
@@ -118,7 +118,7 @@ await withPage({ w: 1024, h: 768 }, async (page) => {
   await page.check('[data-choice="adopt"]'); await page.click('[data-act="hub-join"]');
   await page.waitForSelector('[data-role="hub-joined"]:not([hidden])');
   await page.evaluate(() => { SB.store.hubStatus = () => ({ state: 'error', error: 'revoked' }); });
-  await page.waitForFunction(() => /removed from the hub/.test(document.querySelector('[data-role="hub-status"]').textContent), null, { timeout: 5000 });
+  await page.waitForFunction(() => /removed from the kitchen/.test(document.querySelector('[data-role="hub-status"]').textContent), null, { timeout: 5000 });
   ok(true, 'removed tablet: plain state');
   await page.click('[data-act="hub-forget"]');
   await page.waitForSelector('[data-role="hub-form"]:not([hidden])');

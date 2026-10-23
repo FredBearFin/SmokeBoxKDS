@@ -29,7 +29,7 @@ try {
   const mineBefore = await a.page.evaluate(() => JSON.stringify(Object.keys(localStorage).filter((k) => /smokebox\.v1\.(state|kitchen)/.test(k)).map((k) => [k, localStorage.getItem(k)])));
   await a.page.check('[data-choice="seed"]'); await a.page.click('[data-act="hub-join"]');
   await a.page.waitForSelector('[data-role="hub-joined"]:not([hidden])', { timeout: 8000 });
-  ok(/Using the hub/.test(await a.page.locator('[data-role="hub-status"]').innerText()), 'first tablet joined by sending its kitchen');
+  ok(/Using the main computer/.test(await a.page.locator('[data-role="hub-status"]').innerText()), 'first tablet joined by sending its kitchen');
   const b = await openJoin('Front counter');
   ok(await b.page.locator('[data-role="stop"]').count() === 1 && await b.page.locator('[data-choice="seed"]').isDisabled(), 'second tablet sees a stop: the hub is not empty');
   await b.page.check('[data-choice="adopt"]'); await b.page.click('[data-act="hub-join"]');
