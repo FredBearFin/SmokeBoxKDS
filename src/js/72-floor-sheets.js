@@ -2154,6 +2154,8 @@
     const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
+      // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
+      SB.setup && SB.setup.leftoversCard ? SB.setup.leftoversCard() : null,
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
       settingBlock('Text size', 'Large makes everything 20 percent bigger.', textSeg),
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),

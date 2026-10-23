@@ -757,10 +757,35 @@
     return sheet;
   }
 
+  /* ---------- old demo tickets in real reports ---------- */
+
+  // A small card for the Menu sheet and the Data page: shown only when the real reports still hold old demo or sample tickets.
+  // It says how many in plain words and offers Clear them or Keep them; the store remembers a Keep. Returns an element, or null.
+  function leftoversCard() {
+    const st = SB.store;
+    if (!st || typeof st.demoLeftovers !== 'function') return null;
+    const d = st.demoLeftovers();
+    if (!d || !d.offer) return null;
+    const msg = h('p', { class: 'fs-sub', role: 'status' });
+    const n = d.tickets, o = d.orders;
+    const words = 'Your reports still hold ' + n + ' ' + U.plural(n, 'ticket') + (o ? ' and ' + o + ' ' + U.plural(o, 'order') : '') + ' from the demo or sample data. They are not your sales, and they are mixed into your numbers.' + (d.mixedOrders ? ' ' + d.mixedOrders + ' ' + U.plural(d.mixedOrders, 'order that also holds a real ticket is', 'orders that also hold a real ticket are') + ' left alone.' : '');
+    const card = h('section', { class: 'fs-card so-left', dataset: { act: 'demo-leftovers' } }, h('h3', { class: 'fs-h' }, 'Old demo tickets in your reports'), h('p', { class: 'fs-sub' }, words),
+      // Clears only the demo and sample tickets, their orders and events; real tickets are never touched.
+      h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'leftovers-clear' }, onClick: () => {
+        const r = st.clearDemoLeftovers();
+        if (r.ok) { U.clear(card); card.append(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'ok', role: 'status' }, 'Cleared ' + r.info.tickets + ' ' + U.plural(r.info.tickets, 'ticket') + '. Your reports now show only your own sales.')); return; }
+        let w = r.report; try { w = SB.engine.describe(r.report, r.info, st.getState().settings) || w; } catch (e) { /* keep the code */ }
+        tell(msg, (r.report === 'nothingToDo' ? 'There is nothing left to clear.' : w + ' Nothing was cleared.'), 'bad');
+      } }, 'Clear them'),
+      // Keeps them and remembers the choice, so the card does not come back.
+      h('button', { type: 'button', class: 'btn', dataset: { act: 'leftovers-keep' }, onClick: () => { st.keepDemoLeftovers(); card.remove(); } }, 'Keep them')), msg);
+    return card;
+  }
+
   /* ---------- Start over with an empty menu ---------- */
 
-  // The word the owner types to confirm. Upper case, so it is easy to read and hard to type by accident.
-  const START_OVER_WORD = 'START OVER';
+  // The word the owner types to confirm: the store's own word (ERASE), so the screen and the store always agree.
+  const START_OVER_WORD = (SB.store && SB.store.START_OVER_WORD) || 'ERASE';
   // Opens "Start over with an empty menu": three plain steps (what goes and what stays, save a backup, type the word). This cannot
   // be undone, so the screen says so first and offers a backup before anything is erased.
   function openStartOver() {
@@ -778,30 +803,11 @@
     const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: save a backup');
     step1.appendChild(next1);
 
-    const backupSt = h('p', { class: 'fs-sub', role: 'status' });
-    let backedUp = false;
-    // Saves the backup file with the browser's download and shows plainly that it happened (or that it did not).
-    const backupBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-backup' } }, ico('download', 22), h('span', null, 'Save a backup now'));
-    backupBtn.addEventListener('click', () => {
-      const text = SB.store.exportAll();
-      if (text == null) { tell(backupSt, 'The backup could not be made, so nothing was saved. Try again, or use Back office, Data, Back up.', 'bad'); return; }
-      const fname = 'smokebox-backup-' + new Date().toISOString().slice(0, 10) + '.json';
-      try {
-        const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' }));
-        const a = doc.createElement('a'); a.href = url; a.download = fname; a.style.display = 'none'; doc.body.appendChild(a); a.click();
-        setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 1000);
-        backedUp = true; if (SB.shell && SB.shell.noteBackup) SB.shell.noteBackup();
-        tell(backupSt, 'Saved ' + fname + ' (' + Math.max(1, Math.round(text.length / 1024)) + ' KB). Find it in your downloads and keep a copy off this device.', 'ok');
-        next2.disabled = false;
-      } catch (e) { tell(backupSt, 'Your browser blocked the download, so nothing was saved. Allow downloads for this page and try again.', 'bad'); }
-    });
-    const next2 = h('button', { type: 'button', class: 'btn btn-lg', dataset: { act: 'so-next2' }, disabled: true }, 'Next: confirm');
-    // For an owner who has a backup already: continue without making another, after one more plain warning.
-    const skip = h('button', { type: 'button', class: 'btn btn-link', dataset: { act: 'so-skip-backup' } }, 'I already have a backup, continue');
+    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' } }, 'Next: confirm');
     const step2 = h('section', { class: 'fs-section so-step', hidden: true },
-      h('h3', { class: 'fs-h' }, '2. Save a backup first'),
-      h('p', { class: 'fs-sub' }, 'A backup is a file with everything in your kitchen right now. If you change your mind, Back office, Data, Restore brings it all back.'),
-      h('div', { class: 'fs-row' }, backupBtn, next2), backupSt, skip);
+      h('h3', { class: 'fs-h' }, '2. Your backup'),
+      h('p', { class: 'fs-sub' }, 'The moment you confirm, Smokebox saves a backup file with everything in your kitchen as it is now, then erases. The file goes to your downloads: keep a copy off this device. If the backup cannot be made, nothing is erased.'),
+      h('p', { class: 'fs-sub' }, 'To bring everything back later: Back office, Data, Restore.'), next2);
 
     const word = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': 'Type ' + START_OVER_WORD + ' to confirm', placeholder: START_OVER_WORD });
     const goSt = h('p', { class: 'fs-sub', role: 'status' });
@@ -818,25 +824,31 @@
     const show = (which) => { [step1, step2, step3, done].forEach((s, i) => { s.hidden = i !== which; }); };
     next1.addEventListener('click', () => show(1));
     next2.addEventListener('click', () => show(2));
-    // Skipping the backup needs the owner to say so on purpose; the next screen repeats that there is no undo.
-    skip.addEventListener('click', () => { if (!backedUp) tell(backupSt, 'Continuing without a backup from this screen. If you saved one earlier, you can restore it later.', 'ok'); show(2); });
     // Erases the kitchen: empty menu, optionally the settings too, then shows the done screen. Any refusal is shown in the same one-line style.
     go.addEventListener('click', () => {
       const keepIt = keep.checked;
-      const r = send('resetLive', { catalog: 'blank', keepSettings: keepIt });
-      if (!r.ok) { tell(goSt, r.words || 'Smokebox could not start over, so nothing was erased. Nothing has changed.', 'bad'); return; }
-      if (SB.store.persistNow) { try { SB.store.persistNow(); } catch (e) { /* saved on the next change */ } }
-      // My own saved bits: the half-typed dish, last station, example list and the questions already answered.
-      [KEY_DRAFT, KEY_LAST, KEY_EXAMPLES, KEY_CASKIP].forEach((k) => U.storage.remove(k));
-      let needsReload = false;
-      if (!keepIt) {
-        U.storage.remove(KEY_HIDDEN);
-        try { SB.config.saveCustom({ rename: {}, add: {} }); needsReload = true; } catch (e) { /* names stay */ }
+      // The store makes its own backup first, clears the kitchen, my saved setup bits and (when asked) the settings and station names.
+      const res = SB.store.startOver({ confirm: word.value, keepSettings: keepIt });
+      if (!res.ok) {
+        let w = res.report;
+        try { w = SB.engine.describe(res.report, res.info, SB.store.getState().settings) || w; } catch (e) { /* keep the code */ }
+        if (res.report === 'confirmWord') w = 'Type ' + START_OVER_WORD + ' exactly, then try again. Nothing was erased.';
+        else if (res.report === 'notInDemo') w = 'You are in the demo, so there is nothing of yours to erase here. Tap Back to my kitchen first.';
+        tell(goSt, w + (res.report === 'confirmWord' || res.report === 'notInDemo' ? '' : ' Nothing was erased.'), 'bad');
+        return;
       }
+      const needsReload = !keepIt;
+      const auto = res.backup;
+      // The backup comes from the same call that erased: download it now, and keep a button for another copy.
+      const saveAuto = () => { try { const url = g.URL.createObjectURL(new g.Blob([auto.text], { type: auto.mime })); const a = doc.createElement('a'); a.href = url; a.download = auto.filename; a.style.display = 'none'; doc.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 1000); return true; } catch (e) { return false; } };
+      const savedOk = auto ? saveAuto() : false;
       if (SB.floor && SB.floor.setWelcome) SB.floor.setWelcome(true);
       U.clear(done);
       done.append(h('h3', { class: 'fs-h' }, 'Done. Your kitchen is empty.'),
         h('p', { class: 'fs-sub' }, 'The menu, tickets and history are gone' + (keepIt ? '. Your tax, hours, PIN and station names stayed.' : ', and tax, hours, PIN and station names are back to how Smokebox starts.')),
+        // The backup made by the same call that erased: says whether it was saved, and offers another copy.
+        auto ? h('p', { class: 'fs-sub dp-msg', 'data-tone': savedOk ? 'ok' : 'bad', role: 'status' }, (savedOk ? 'Saved ' + auto.filename + ' (' + Math.max(1, Math.round(auto.chars / 1024)) + ' KB) to your downloads, from just before the erase. ' : 'Your browser blocked the backup download. ')) : null,
+        auto ? h('button', { type: 'button', class: 'btn', dataset: { act: 'so-auto-backup' }, onClick: () => saveAuto() }, 'Save the backup again') : null,
         // Goes to the first screen: closes the sheets (and reloads when station names were reset so every screen shows them).
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-finish' }, onClick: () => { if (needsReload) g.location.reload(); else SB.sheets.closeAll(); } }, 'Go to the first screen'));
       show(3);
@@ -924,5 +936,5 @@
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -1391,6 +1391,8 @@
   // Panel 8: what is stored, sample history, export, import and reset.
   function buildData(P) {
     const pn = panel(SECTIONS[7], 'Everything Smokebox knows lives in this browser, on this device. Back it up before you reset, import or clear browser data.');
+    // The one-time offer to clear old demo tickets from real reports; nothing is shown when there are none.
+    { const lc = SB.setup && SB.setup.leftoversCard ? SB.setup.leftoversCard() : null; if (lc) pn.body.appendChild(lc); }
 
     // What is stored: counts read from the live state, refreshed on every sync.
     // One label and value pair for the counts list.

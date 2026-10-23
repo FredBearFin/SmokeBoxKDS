@@ -38,6 +38,24 @@ for (const f of fs.readdirSync(DIR).filter((x) => x.endsWith('.json')).sort()) {
   });
 }
 
+// Start over with an empty menu, on an old kitchen in the real browser: refused without the word, then the empty first-run kitchen.
+await withPage({ w: 1280, h: 800, clearStorage: false, init: seed(JSON.parse(fs.readFileSync(path.join(DIR, 'b8e569e.json'), 'utf8')).storage) }, async (page, logs) => {
+  try {
+    await page.waitForSelector('.fl-new', { timeout: 8000 });
+    const r = await page.evaluate(() => {
+      const no = SB.store.startOver({ confirm: 'nope' });
+      const yes = SB.store.startOver({ confirm: 'erase' });
+      const s = SB.store.getState();
+      return { no: no.report, yes: yes.ok, backupChars: yes.backup && yes.backup.text.length, blank: SB.store.isBlank(), menu: s.menu.length, tickets: s.tickets.length, demoKeys: Object.keys(localStorage).filter((k) => k.indexOf('smokebox.demo.') === 0).length };
+    });
+    check('Start over needs the typed word', r.no === 'confirmWord', JSON.stringify(r));
+    check('Start over gives a backup and leaves an empty first-run kitchen', r.yes === true && r.backupChars > 1000 && r.blank && r.menu === 0 && r.tickets === 0, JSON.stringify(r));
+    await page.waitForTimeout(900); await page.reload(); await page.waitForSelector('.fl-new', { timeout: 8000 });
+    check('The empty kitchen survives a reload', await page.evaluate(() => SB.store.isBlank() && SB.store.getState().menu.length === 0));
+    check('No page errors after starting over', logs.pageErrors.length === 0, logs.pageErrors[0] || '');
+  } catch (e) { check('start over (step crashed)', false, e.message.split('\n')[0]); }
+});
+
 // The safety net, in a kitchen the app itself wrote: add a dish, wait for the first save and the last good copy, damage the live key, reload.
 await withPage({ w: 1280, h: 800 }, async (page, logs) => {
   try {
@@ -81,10 +99,10 @@ await withPage({ w: 1280, h: 800, init: `(() => { const real = Storage.prototype
     check('History was trimmed, the dishes were kept', res.status.trimmed === true && res.savedLen > 0 && res.savedLen <= 80000, 'lastSaveOk ' + res.status.lastSaveOk + ', trimmed ' + res.status.trimmed + ', length ' + res.savedLen);
     // Far too many open tickets to trim: the save fails, the app still runs and says so on screen.
     const bad = await page.evaluate(() => { for (let i = 0; i < 300; i++) SB.store.dispatch('createTicket', { customer: 'Open ' + i, channel: 'dine_in', items: [{ menuId: 'dish_number_' + (i % 40), qty: 1 }] }); SB.store.flush(); SB.store.tick(); return { ok: SB.store.status().lastSaveOk, tickets: SB.store.getState().tickets.length }; });
-    // The strip is repainted every few seconds; give it up to 10.
-    let banner = '';
-    for (let i = 0; i < 20 && !banner; i++) { await page.waitForTimeout(500); banner = await page.evaluate(() => (document.body.innerText.match(/save failed[^.]*\./i) || [''])[0]); }
-    check('When nothing fits, the app keeps running and the screen says the save failed', bad.ok === false && bad.tickets > 300 && /save failed/i.test(banner), JSON.stringify(bad) + ' ' + banner);
+    // The store announces a failed save, so the strip should show within a second or two.
+    let banner = '', waited = 0;
+    for (let i = 0; i < 6 && !banner; i++) { await page.waitForTimeout(500); waited += 500; banner = await page.evaluate(() => (document.body.innerText.match(/save failed[^.]*\./i) || [''])[0]); }
+    check('When nothing fits, the app keeps running and the screen says the save failed', bad.ok === false && bad.tickets > 300 && /save failed/i.test(banner), JSON.stringify(bad) + ' after ' + waited + ' ms: ' + banner);
     check('No page errors under quota pressure', logs.pageErrors.length === 0, logs.pageErrors[0] || '');
   } catch (e) { check('quota (step crashed)', false, e.message.split('\n')[0]); }
 });

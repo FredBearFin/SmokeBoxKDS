@@ -10,6 +10,8 @@ Draft written on `night/a5-r9`. Everything below was tested in a simulated brows
 - **Your own ingredients.** Add ingredients with a cost per kilogram (or each), set what a dish uses, and stock and sold-out follow.
 - **Cook-ahead is optional.** The hold cabinet, temperature checks, hold timers, warnings and the sanitize timer are one switch ("Yes, I cook ahead"). New kitchens start with it off. Kitchens that already used the cabinet keep it on. Turning it off never hides food that is still in the cabinet.
 - **Menu import (optional).** Paste lines such as `Brisket plate, 14.00` or load a spreadsheet file. Square, Toast and Clover style item lists are recognised by their headings. Every problem is explained in plain words and nothing is added until you confirm. A price is never guessed: a missing price, a range, or "market price" stops that row.
+- **Start over with an empty menu.** In the back office you can erase the dishes, ingredients, orders and history and begin again. You must type a confirmation word, a full backup file is made and handed to you first, and you choose whether to keep your tax, hours, PIN and station names. The demo is never touched.
+- **Old demo tickets.** A kitchen that tried the old built-in demo is offered a one-time clean-up of the demo tickets in its real reports. Real orders are never removed.
 - **Reorder dishes.** Move a dish up or down the menu; undo works for a few seconds.
 - **Costs are honest.** A dish with no ingredients, or an ingredient without a cost, shows cost as "not recorded", never $0.00 and never a 100 percent margin.
 - **A separate demo.** "Try the demo" opens a pretend barbecue kitchen with its own saved data. It cannot touch your real kitchen, and "Back to my kitchen" throws the demo away. A demo tab and a real tab can be open at once without mixing.
@@ -19,7 +21,7 @@ Draft written on `night/a5-r9`. Everything below was tested in a simulated brows
 
 - **Your data stays on this device.** There is no server and no online account.
 - **A last good copy.** On the first save, after every end-of-day close, and every 6 hours, Smokebox keeps one small copy of the important parts of your kitchen (dishes, ingredients, settings, PIN, safety records, today's orders). If the main save is found damaged when the page opens, that copy is loaded and you are told the time of the copy and that later orders are missing. The damaged text is kept aside for 30 days.
-- **When the browser is full.** Smokebox drops the last good copy first, then the oldest finished orders and history. It never drops your dishes, ingredients, settings, PIN, open orders, food in the cabinet, or the safety log (kept 190 days). If nothing fits, the app keeps running and shows a red strip saying the last save failed. That strip can take a few seconds to appear.
+- **When the browser is full.** Smokebox drops the last good copy first, then the oldest finished orders and history. It never drops your dishes, ingredients, settings, PIN, open orders, food in the cabinet, or the safety log (kept 190 days). If nothing fits, the app keeps running and shows a red strip saying the last save failed. The strip shows within a second or two.
 - **Back up anyway.** The copy lives in the same browser as the main save, so it does not help if the browser's data is cleared or the device is lost. Use Back up (in the Data page) and keep a copy off the device.
 
 ## Known limits
@@ -34,7 +36,7 @@ Draft written on `night/a5-r9`. Everything below was tested in a simulated brows
 ## Upgrading
 
 1. **Before you upgrade, back up.** Open the back office, go to the Data page, choose Back up now, and save the file somewhere that is not this device (email it to yourself or use a USB drive). It is a plain text file.
-2. Open the new file (or page) on the same device and browser. Your saved kitchen loads as it was: dishes, prices, ingredients, settings, PIN, open orders and history. Older kitchens keep the barbecue sample dishes they already had and keep the cook-ahead switch on. Three safety settings from very early builds (check interval, longest hold) are moved to the current defaults once, and a notice says "repaired 3 saved details".
+2. Open the new file (or page) on the same device and browser. Your saved kitchen loads as it was: dishes, prices, ingredients, settings, PIN, open orders and history. Older kitchens keep the barbecue sample dishes they already had and keep the cook-ahead switch on. Three safety settings from very early builds (check interval, longest hold) are moved to the current defaults once, and a notice says "Smokebox updated a few saved settings while opening. Nothing else changed."
 3. Tested with saves written by five earlier builds of this app, including their backup files; all loaded with nothing lost.
 4. An older kitchen keeps its sample dishes. Remove the ones you do not sell (they are archived, not erased, and can be brought back from the removed-dishes list).
 
