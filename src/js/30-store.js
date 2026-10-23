@@ -1051,7 +1051,9 @@
   }
   // The stored form of a recovery code: a salted SHA-256 (only this is ever saved, never the code).
   async function hashCode(plain) {
-    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);
+    const salted = await U.secretHash('smokebox-recovery-v1:', plain);
+    if (salted !== null) return salted;
+    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);     // a browser without PBKDF2 keeps the old plain form
     return hex === null ? null : 'sha256:' + hex;
   }
   // True when a back office PIN is set.
@@ -1088,10 +1090,10 @@
     if (rec.until > t) return { ok: false, report: 'recoveryLocked', info: { waitMs: rec.until - t } };
     if (rec.until && rec.until <= t) rec = { fails: 0, until: 0 };
     const plain = normalizeCode(code);
-    const hash = plain ? await hashCode(plain) : null;
-    if (plain && hash === null) return { ok: false, report: 'noCrypto', info: {} };
     const stored = state.settings.office.recoveryHash;
-    if (!plain || hash !== stored) {
+    const chk = plain ? await U.secretCheck('smokebox-recovery-v1:', plain, stored) : { ok: false };
+    if (plain && !chk.ok && !(g.crypto && g.crypto.subtle)) return { ok: false, report: 'noCrypto', info: {} };
+    if (!plain || !chk.ok) {
       rec.fails++;
       const locked = rec.fails >= RECOVERY_TRIES;
       if (locked) rec = { fails: 0, until: t + RECOVERY_LOCK_MS };

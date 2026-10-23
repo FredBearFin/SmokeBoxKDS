@@ -313,7 +313,7 @@ test('recovery code: the stored value is a hash only, the code is never saved an
   S.flush();
   const plain = code.replace('-', '');
   for (const [k, v] of storage.m) assert.ok(!v.includes(plain) && !v.includes(code), 'the code appears in ' + k);
-  assert.match(S.getState().settings.office.recoveryHash, /^sha256:[0-9a-f]{64}$/);
+  assert.match(S.getState().settings.office.recoveryHash, /^pbkdf2:100000:[0-9a-f]{32}:[0-9a-f]{64}$/);
   S.destroy();
 });
 
