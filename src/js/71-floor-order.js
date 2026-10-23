@@ -415,6 +415,18 @@
     tipInput.addEventListener('input', () => { D.tip = tipInput.value; hideError(); paintCheck(); });
     const tipField = SB.ui.field({ label: 'Tip in dollars (optional)', control: tipInput });
     tipField.classList.add('ord-tip');
+    // Tip buttons for pay-now orders: No tip and 15, 18, 20, 25 percent of the food, with the dollar amount shown.
+    const tipChips = h('div', { class: 'ord-chips ord-tip-chips', role: 'group', 'aria-label': 'Quick tips' });
+    const tipBtns = [{ pct: 0, label: 'No tip' }, { pct: 15 }, { pct: 18 }, { pct: 20 }, { pct: 25 }].map((d) => {
+      const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, d.label || ''));
+      // Writes this tip into the draft (or clears it) so closing the screen never loses it.
+      b.addEventListener('click', () => { const a = tipAmount(d.pct); D.tip = a > 0 ? a.toFixed(2) : ''; tipInput.value = D.tip; paintCheck(); });
+      tipChips.appendChild(b);
+      return { b, d };
+    });
+    tipField.appendChild(tipChips);
+    // The tip in dollars for a percent of the food on this bill (before tax), in whole cents.
+    const tipAmount = (pct) => (pct ? Math.round(pendingTotal().sub * pct) / 100 : 0);
     const payNote = h('p', { class: 'ord-pay-note t-muted', role: 'status' });
     const payBox = h('div', { class: 'ord-block ord-paybox' }, h('div', { class: 'ord-label' }, 'Payment'), paySeg, tipField, payNote);
 
@@ -787,6 +799,11 @@
       setHidden(tipField, !D.pay);
       if (tipInput.value !== D.tip) tipInput.value = D.tip;
       const tip = dollars(D.tip);
+      tipBtns.forEach((t) => {
+        const a = tipAmount(t.d.pct);
+        if (t.d.pct) text(t.b.lastChild, t.d.pct + '% ' + U.fmtMoney(a));
+        t.b.setAttribute('aria-pressed', !Number.isNaN(tip) && (t.d.pct ? Math.abs(tip - a) < 0.005 && tip > 0 : D.tip === '') ? 'true' : 'false');
+      });
       tipField.setError(D.pay && Number.isNaN(tip) ? 'Type dollars and cents, like 2.50.' : null);
       if (!D.pay) { text(payNote, 'The order stays open. Take payment later from Orders.'); return; }
       const pt = pendingTotal(), pm = C.payMethodById[D.pay];
