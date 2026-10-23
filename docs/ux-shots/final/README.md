@@ -12,3 +12,7 @@ Simulated in headless Chromium, built from `night/a1-r15`. Nothing here was capt
 | `06-far-display` | 1920 | Far display: bigger strip and ticket text, one strip row, fewer tickets on purpose. |
 
 Known: the sound bar ("Tap here to turn on warning sounds") shows in most shots because headless Chromium has had no tap yet. The cold card is a little taller than a hot card because of its extra line.
+
+## Connected states
+
+See `README-connected.md` for the follower (TV and phone), hub chip states and offline card shots (files 10 to 15).
