@@ -38,7 +38,7 @@ await withPage({ w: 1024, h: 768 }, async (page, logs) => {
   ok(await page.locator('[data-choice="seed"]').isEnabled(), 'empty hub: send-this-tablet option is on');
   ok(await page.locator('[data-role="stop"]').count() === 0, 'empty hub: no stop message');
   const txt = await page.locator('[data-role="choice"]').innerText();
-  ok(/Show the hub's kitchen on this tablet/.test(txt) && /stays safe on this tablet and comes back/.test(txt) && /Send this tablet's kitchen to the hub/.test(txt), 'both options use the agreed plain words');
+  ok(/Show the hub's kitchen on this tablet/.test(txt) && /stays untouched on this tablet and comes back/.test(txt) && /Send this tablet's kitchen to the hub/.test(txt), 'both options use the agreed plain words');
   await page.check('[data-choice="seed"]');
   await page.click('[data-act="hub-join"]');
   await page.waitForSelector('[data-role="hub-joined"]:not([hidden])');

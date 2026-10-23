@@ -1413,7 +1413,7 @@
     const mainCard = h('section', { class: 'fs-card fw-main', dataset: { part: 'main' } },
       h('h3', { class: 'fs-h' }, 'On this tablet'),
       h('p', null, 'Several screens can share one kitchen through a hub. Pick one way below: Show only (a TV or phone that cannot take orders), or Use this hub for orders (a tablet that takes orders too). Both are test features.'),
-      h('p', null, h('strong', null, 'What it needs: '), 'a small program called the hub that keeps the kitchen in one place and sends it to every screen. The hub is not set up in this version. Smokebox does not start one for you. It works only if someone runs the hub for your kitchen, on a laptop or on a server.'),
+      h('p', null, h('strong', null, 'What it needs: '), 'a small program, running on one computer (the hub computer), that keeps the kitchen in one place and sends it to every screen. The hub is not set up in this version. Smokebox does not start one for you. It works only if someone runs the hub for your kitchen, on a laptop or on a server.'),
       web ? h('p', null, 'If your hub serves this page, type this address on the other screen: ', h('code', { class: 'fw-addr', dataset: { role: 'own-address' } }, here)) : h('p', { class: 'fs-sub', dataset: { role: 'file-note' } }, 'This copy of Smokebox is a file on this tablet, so another screen cannot reach it. Use the address of your hub instead.'),
       h('p', { class: 'fs-sub' }, 'If the hub has an access code, type that code on the other screen too. Your kitchen is not sent anywhere by this page.'));
     const url = h('input', { type: 'text', class: 'input', id: 'fw-url', inputmode: 'url', autocomplete: 'off', autocapitalize: 'off', placeholder: 'https://kitchen.example.com', 'aria-label': 'Address of the kitchen', dataset: { field: 'url' } });
@@ -1462,7 +1462,7 @@
       const opt = (val, title, line, disabled) => { const r = h('input', { type: 'radio', name: 'hu-choice', value: val, disabled: !!disabled, dataset: { choice: val } }); r.addEventListener('change', () => { picked = val; join.disabled = false; }); return h('label', { class: 'dp-check-row fw-opt', dataset: { opt: val } }, r, h('span', null, h('strong', null, title), h('br'), line)); };
       choiceBox.append(
         h('p', null, empty ? 'This hub is empty. Choose what happens. Nothing is combined.' : 'This hub already has a kitchen. Choose what happens. Nothing is combined.'),
-        opt('adopt', 'Show the hub\'s kitchen on this tablet', 'Your own saved kitchen stays safe on this tablet and comes back when you leave the hub.', false),
+        opt('adopt', 'Show the hub\'s kitchen on this tablet', 'Your own saved kitchen stays untouched on this tablet and comes back when you leave the hub.', false),
         opt('seed', 'Send this tablet\'s kitchen to the hub', empty ? 'The hub is empty, so this works. The hub then holds your kitchen and every tablet shows it.' : 'Only works if the hub is empty.', !empty),
         empty ? null : h('p', { class: 'fw-stop', dataset: { role: 'stop' }, role: 'alert' }, 'Stop: the hub already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Smokebox will not mix two kitchens. Show the hub\'s kitchen here, or leave this screen.'));
     }
@@ -1509,7 +1509,7 @@
       h('div', { class: 'fs-row' }, leave, leaveAnyway));
     const hubCard = h('section', { class: 'fs-card fw-hub', dataset: { part: 'hub' } },
       h('h3', { class: 'fs-h' }, 'Use this hub for orders on this tablet'),
-      h('p', { class: 'fs-sub' }, 'This tablet takes orders and the hub shares them with every other tablet on it. This is a test feature. It needs the hub running somewhere (this version does not start one), and it has not been tried in a real kitchen.'),
+      h('p', { class: 'fs-sub' }, 'This tablet takes orders and the hub shares them with every other tablet on it. This is a test feature. It needs the hub computer running somewhere (this version does not start one), and it has not been tried in a real kitchen.'),
       hubApi ? null : h('p', { class: 'fw-stop', dataset: { role: 'no-hub-api' } }, 'This build cannot join a hub yet.'), hubApi ? hubForm : null, hubApi ? hubJoined : null, hMsg);
     // Shows either the join form or the joined state, depending on whether this tablet is using a hub.
     function paintHub() {
