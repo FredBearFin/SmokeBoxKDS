@@ -237,8 +237,18 @@
     const base = B.memoP((p) => {
       const ds = ctx.dataset(), S = B.settings(ds);
       const so = M.sellOutClock(p);
-      return { ds, S, so, protein: so.proteins.map((x) => x.ing), today: U.serviceDate(ctx.now(), S.dayStartHour) };
+      const today = U.serviceDate(ctx.now(), S.dayStartHour);
+      return { ds, S, so, protein: so.proteins.map((x) => x.ing), today, pastSig: pastSig(ds, B.dayMs(today) + S.dayStartHour * HOUR) };
     });
+    // A cheap fingerprint of everything dated before today: counts and grams that change when a past day is edited
+    // (a backdated batch or reading, a voided ticket, a discard), but not when today's service moves on.
+    function pastSig(ds, todayMs) {
+      let nt = 0, nv = 0, nb = 0, gb = 0, ne = 0;
+      for (const t of ds.tickets || []) if (t && t.createdAt < todayMs) { nt++; if (t.status === 'voided') nv++; }
+      for (const x of ds.batches || []) if (x && x.enteredAt < todayMs) { nb++; gb += (isNum(x.remainingG) ? x.remainingG : 0) + (x.status === 'discard' ? 1e9 : 0); }
+      for (const e of ds.events || []) if (e && e.t < todayMs) ne += e.reverted ? 1e6 : 1;
+      return [nt, nv, nb, Math.round(gb), ne].join(':');
+    }
     // Chart color slot of a protein: its place in the protein list, or 6 for any other food.
     const ingSlot = (b, ing) => { const i = b.protein.indexOf(ing); return i >= 0 ? i + 1 : 6; };
 
@@ -246,7 +256,8 @@
     // are remembered.
     function burn(p, day, ing) {
       const b = base(p);
-      const stamp = (b.ds.counts ? b.ds.counts.sample : 0) + ':' + (b.ds.range ? b.ds.range.from : 0);
+      // WATCH OUT: the stamp must change when a past day is edited, or the story shows stale numbers.
+      const stamp = (b.ds.counts ? b.ds.counts.sample : 0) + ':' + (b.ds.range ? b.ds.range.from : 0) + ':' + b.pastSig;
       const key = day + '|' + ing;
       const past = day < b.today;
       if (past) { const c = usageCache.get(key); if (c && c.stamp === stamp) return c.v; }
@@ -320,10 +331,11 @@
         const left = isNum(sb.endG) ? ' ' + fmt.g(sb.endG) + (open ? ' is in the cabinet now.' : ' was left at close.') : '';
         return { tone: 'good', word: open ? 'Not out yet' : 'Lasted', title: open ? name + ' has not run out so far today.' : name + ' lasted all day on ' + dayLabel(st.day) + '.', body: parts.join(' ') + left, extra: '' };
       }
-      // The most likely reason, in order: less cooked than a normal day uses, a lot thrown away, or simply
-      // more orders than usual.
+      // The most likely reason, in order: less cooked than a normal day cooks, a lot thrown away, or simply
+      // more orders than usual. WATCH OUT: compare cooked with cooked; a normal day's served grams leave out its
+      // waste, so comparing with them would flag a normal cook as short.
       let why = '';
-      if (typ.n >= MIN_DAYS && sb.intakeG < typ.medianUsed * 0.95) why = 'You cooked ' + fmt.g(typ.medianUsed - sb.intakeG) + ' less than a normal day uses, so it ran out early.';
+      if (typ.n >= MIN_DAYS && sb.intakeG < typ.medianIntake * 0.95) why = 'You cooked ' + fmt.g(typ.medianIntake - sb.intakeG) + ' less than a normal day, so it ran out early.';
       else if (sb.wasteG > 0 && sb.wasteG >= 0.1 * sb.intakeG) why = fmt.g(sb.wasteG) + ' of what was cooked was thrown away before it could be served, which cut the day short.';
       else if (typ.n >= MIN_DAYS) why = 'You cooked about the usual amount, so guests simply ordered more than usual that day.';
       const early = row.hoursBeforeClose >= 3;
