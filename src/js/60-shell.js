@@ -1216,6 +1216,16 @@
 
   // True while the back office is open.
   S.inOffice = () => st.officeOpen;
+  // True while pretend data is in play: demo tickets on the board, demo orders running, or a clock faster
+  // than real time. The developer-only tools (clock speeds, contrast checker) show only then.
+  S.demoLoaded = function () {
+    try {
+      const sp = SB.store && SB.store.speed ? SB.store.speed() : 1;
+      const live = SB.sim && SB.sim.live && SB.sim.live.status ? SB.sim.live.status() || {} : {};
+      const s = SB.store && SB.store.getState ? SB.store.getState() : null;
+      return sp > 1 || !!live.running || !!(s && s.tickets.some((t) => t.src === 'demo'));
+    } catch (e) { return false; }
+  };
   // True once mount has built the frame.
   S.isMounted = () => st.mounted;
   S.sha256 = sha256hex;

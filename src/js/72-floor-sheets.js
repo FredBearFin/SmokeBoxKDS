@@ -1545,9 +1545,13 @@
       setHidden(warn, sp === 1);
       text(warn.querySelector('.dm-warn-t'), 'The clock is running x' + (Math.round(sp * 100) / 100) + '.');
     }
+    // wrap (set by the caller) is hidden unless the demo is loaded: faster clocks are developer-only.
+    const api = { el, paint: () => { paint(); if (api.wrap) setHidden(api.wrap, !demoOn()); }, seg, wrap: null };
     paint();
-    return { el, paint, seg };
+    return api;
   }
+  // True while the demo is loaded, so developer-only tools should show (clock speeds, contrast checker).
+  const demoOn = () => !!(SB.shell && SB.shell.demoLoaded && SB.shell.demoLoaded());
 
   // Builds the Demo and clock sheet. Without the simulator it says so plainly and keeps the clock and Reset.
   function openDemo() {
@@ -1588,7 +1592,8 @@
 
     // clock
     const clockCtl = clockControl('Clock speed');
-    const clockBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Clock speed'), h('p', { class: 'fs-sub' }, 'Speeds up the whole kitchen so you can watch a busy night in a minute.'), clockCtl.el);
+    const clockBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Clock speed (demo only)'), h('p', { class: 'fs-sub' }, 'Speeds up the whole kitchen so you can watch a busy night in a minute. It shows only while the demo is loaded. Never use it in real service.'), clockCtl.el);
+    clockCtl.wrap = clockBox; setHidden(clockBox, !demoOn());
 
     // sample history
     const sampleBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Data counts'));
@@ -1607,16 +1612,16 @@
 
     // Reset live data asks first (see doReset).
     const resetBtn = h('button', { type: 'button', class: 'btn btn-danger btn-lg', onClick: () => doReset() }, ico('trash', 22), h('span', null, 'Reset live data'));
-    const resetBox = h('section', { class: 'fs-section dm-reset' }, h('h3', { class: 'fs-h' }, 'Start fresh'), h('p', { class: 'fs-sub' }, 'Clears every ticket, batch and event on this device and puts starter stock back. Settings stay. Sample history is not touched.'), resetBtn);
+    const resetBox = h('section', { class: 'fs-section dm-reset' }, h('h3', { class: 'fs-h' }, 'Back to real service'), h('p', { class: 'fs-sub' }, 'Reset live data erases every ticket, batch and event on this device, including all demo orders, and puts the clock back to real time. The board and the pit start empty. Your settings and menu stay. This cannot be undone.'), resetBtn);
 
     // Restart demo: start over with fresh tickets, the way the app looks on its first day.
     const restartBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg dm-restart', onClick: () => doRestart() }, ico('refresh', 22), h('span', null, 'Restart demo'));
     const tourBtn = h('button', { type: 'button', class: 'btn btn-lg', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', null, 'Show me how it works'));
-    const startBox = h('section', { class: 'fs-section dm-start' }, h('h3', { class: 'fs-h' }, 'Start over'),
-      h('p', { class: 'fs-sub' }, 'Puts three fresh pretend tickets on the board, as on the first day. Nothing runs by itself: you tap START and DONE, and the timers show when each dish should begin.'),
+    const startBox = h('section', { class: 'fs-section dm-start' }, h('h3', { class: 'fs-h' }, 'Load the demo'),
+      h('p', { class: 'fs-sub' }, 'For practice only. Loads pretend food in the cabinet and three pretend tickets, and erases what is on this device now. Nothing runs by itself: you tap START and DONE, and the timers show when each dish should begin.'),
       h('div', { class: 'fs-row' }, restartBtn, tourBtn));
 
-    sheet.body.append(h('div', { class: 'dm' }, statusBox, startBox, simBox, clockBox, sampleBox, resetBox));
+    sheet.body.append(h('div', { class: 'dm' }, h('div', { class: 'fs-note', 'data-tone': 'warn' }, ico('alert', 20), h('div', null, h('strong', null, 'Everything here is pretend.'), h('p', null, 'Demo orders, the auto crew and the 14-day sample history are made up by the app. They are not your sales and not your food. Use Reset live data below to go back to real service.'))), statusBox, startBox, simBox, clockBox, sampleBox, resetBox));
 
     // Clears the board after a confirm and puts the fresh demo tickets back. Settings stay.
     async function doRestart() {
@@ -1639,12 +1644,12 @@
       const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length;
       const ok = await SB.ui.confirm({
         title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep everything',
-        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and puts the starter stock back.', 'Settings and sample history stay. This cannot be undone.'],
+        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
       const rep = SB.store.resetLive({ keepSettings: true, starter: false });
-      if (rep === 'ok') toast('Live data cleared. Starter stock is back.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
+      if (rep === 'ok') toast('Live data cleared. The board is empty.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
       paint();
     }
 
@@ -1837,7 +1842,7 @@
         // All three buttons close Help first, so only one sheet is ever open.
         h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, runTour) }, ico('play', 20), h('span', null, 'Replay the walkthrough')),
         // The specs open after Help closes.
-        h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, () => SB.sheets.open('specs')) }, ico('book', 20), h('span', null, 'See the specs')),
+        demoOn() ? h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, () => SB.sheets.open('specs')) }, ico('book', 20), h('span', null, 'See the specs')) : null,
         // The demo sheet opens after Help closes.
         h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, () => SB.sheets.open('demo')) }, ico('play', 20), h('span', null, 'Demo and clock'))),
       h('p', { class: 'fs-sub hp-tiny' }, 'Smokebox version ' + C.version + '. Managers: tap Back office at the top of the board, or press Ctrl+Shift+O. To add a dish or change a price, open Back office, then Menu and settings.'));
@@ -2027,6 +2032,8 @@
 
     // Clock speed shortcut: the same control as the Demo sheet, so both always agree.
     const clockCtl = clockControl('Clock speed');
+    const clockBlock = settingBlock('Clock speed', 'Only for demos and training. Real service runs at x1.', clockCtl.el);
+    clockCtl.wrap = clockBlock; setHidden(clockBlock, !demoOn());
 
     // Links to the other support sheets. Each closes this one first.
     const link = (icon, label, name) => h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, () => SB.sheets.open(name)) }, ico(icon, 22), h('span', { class: 'grow' }, label), ico('chevron-right', 20));
@@ -2035,7 +2042,7 @@
     const officeLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'office' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({}); }) }, ico('gauge', 22), h('span', { class: 'grow' }, 'Back office'), ico('chevron-right', 20));
     // Opens Menu and settings in the back office, where dishes, prices and prep times are edited.
     const menuLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'menu-edit' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }) }, ico('sliders', 22), h('span', { class: 'grow' }, 'Edit the menu'), ico('chevron-right', 20));
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('check-circle', 'Set up this tablet', 'setup'), link('book', 'Specs', 'specs'), link('play', 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), link('receipt', 'Discard log', 'discards'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
@@ -2045,7 +2052,7 @@
       settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
-      settingBlock('Clock speed', 'Only for demos and training. Real service runs at x1.', clockCtl.el),
+      clockBlock,
       settingBlock('More', '', links)));
 
     // Keep every control in step when something else changes the look, the station or the clock.
