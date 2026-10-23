@@ -618,7 +618,7 @@
     st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: SAVE_MS };
     last = null; writeBlocked = false; heldText = null; susp = null;
     baseSid = null; pending = []; skipRebase = false;
-    outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
+    outbox = []; seenOps = new Set(); acked.clear();      // opN is never reset: an action id must not repeat in one page, or a hub that still remembers it drops the new tap as a duplicate
     const r = realNow();
     let payload = null;
     try { payload = storage.get(KEY, null); } catch (e) { payload = null; }
@@ -971,7 +971,7 @@
    * its state equals the hub's. A gap, a refused replay or a long silence is repaired by reconnecting; it resumes from its last change
    * number when the hub still has the history, else takes a fresh snapshot. The clock follows the hub: now() is this device's time plus
    * the offset learned from the hub. followStatus() says what it is doing; subscribeFollow(fn) fires when that changes.
-   * Fatal errors (no retry): badCode, notFound, wrongVersion, tooMany. unreachable and other failures keep retrying.
+   * Fatal errors (no retry): badCode, notFound, wrongVersion (tooMany is retried, ten seconds apart, and says the kitchen is busy). unreachable and other failures keep retrying.
    */
   const CODE_SKEY = 'smokebox.session.hubcode';
   // The address without a trailing slash, as the hub address is compared and remembered.
@@ -997,14 +997,14 @@
     }
     return rememberedCode(opts.url);
   }
-  const FOLLOW_FATAL = { badCode: 1, notFound: 1, wrongVersion: 1, tooMany: 1, unpaired: 1, revoked: 1 };
+  const FOLLOW_FATAL = { badCode: 1, notFound: 1, wrongVersion: 1, unpaired: 1, revoked: 1 };
   const CLIENT_PROTO = 1;                              // the hub protocol this build speaks; sent to the hub, which may require a newer one
   const FOLLOW_REASON = {
     badCode: 'The access code is wrong or missing.', notFound: 'That address is not a Smokebox main computer.', wrongVersion: 'This screen and the main computer run different versions. Reload the page from the main computer.',
     unpaired: 'This screen is not paired with the main computer. Ask the owner for a pairing code.', revoked: 'This screen was removed from the kitchen. Ask the owner to pair it again.',
     badPairCode: 'That pairing code is wrong or has expired. Ask the owner for a new one.', tooManyTries: 'Too many wrong tries. Wait a few minutes, or ask the owner for a new code.',
     badName: 'The screen name may use letters, digits, spaces and . , \' & ( ) # _ - and up to 20 characters.', notOwner: 'Only an owner screen can do that.',
-    tooMany: 'The main computer has too many screens connected.', unreachable: 'Cannot reach the main computer.', closed: 'The connection to the main computer ended.', error: 'Something went wrong talking to the main computer.',
+    tooMany: 'The kitchen is busy, trying again.', unreachable: 'Cannot reach the main computer.', closed: 'The connection to the main computer ended.', error: 'Something went wrong talking to the main computer.',
   };
   // Memory-only storage with the same methods as the browser's, so the follower never touches the device's saved kitchen.
   function memoryBackend() {
@@ -1079,7 +1079,7 @@
     const url = opts.url.replace(/\/+$/, '');
     const f = fol = { url, code: codeFor(opts), staleMs: isNum(opts.staleMs) && opts.staleMs > 0 ? opts.staleMs : 45000, offset: 0, seq: null, hubId: null, connected: false, everConnected: false,
       error: null, lastMsgAt: null, goodSince: null, retryInMs: 0, retryStep: 0, closed: false, gen: 0, ctrl: null, retryTimer: null, timer: null, lastKey: '', resolve: null, resyncs: 0,
-      base: null, hub: false, trim: Number.isInteger(opts.trim) && opts.trim >= 1 && opts.trim <= 365 ? opts.trim : 0, trimmed: null, offsetKnown: false, pend: [], owners: new Map(), baseKey: null, topOwner: null, lastActKey: null, fromCache: false, cachedAt: null, cacheAt: 0, cacheDirty: false, name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
+      base: null, hub: false, trim: Number.isInteger(opts.trim) && opts.trim >= 1 && opts.trim <= 365 ? opts.trim : 0, trimmed: null, offsetKnown: false, pend: [], tooManyMs: Number.isFinite(opts.tooManyRetryMs) && opts.tooManyRetryMs >= 0 ? opts.tooManyRetryMs : 10000, owners: new Map(), baseKey: null, topOwner: null, lastActKey: null, fromCache: false, cachedAt: null, cacheAt: 0, cacheDirty: false, name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
       fetchFn: opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null), Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
     f.hub = !!hub;
     const bound = hub ? tokenFor(url) : null;
@@ -1113,7 +1113,9 @@
     f.connected = false;
     if (error && error !== 'closed') f.error = error;           // a stream that simply ended is not an error to show
     if (FOLLOW_FATAL[f.error]) { folSettle({ ok: false, error: f.error }); folNotify(true); return; }
-    const delay = immediate ? 50 : Math.min(15000, 1000 * Math.pow(2, f.retryStep++));
+    // A full hub asks to be tried again in about ten seconds (its retry-after), so it is not hammered.
+    let delay = immediate ? 50 : Math.min(15000, 1000 * Math.pow(2, f.retryStep++));
+    if (f.error === 'tooMany' && !immediate) delay = Math.max(delay, f.tooManyMs);
     f.retryInMs = delay;
     folSettle({ ok: false, error: f.error || 'unreachable' });
     folNotify(true);
@@ -1202,8 +1204,9 @@
     if (name === 'hello') {
       if (d.proto !== 1 || (isNum(d.minClient) && d.minClient > CLIENT_PROTO)) { f.error = 'wrongVersion'; try { f.ctrl.abort(); } catch (e) { /* ignore */ } folRetry('wrongVersion'); return; }
       f.pendingHub = d.hubId;
-      if (f.hub && f.fromCache && f.hubId && d.hubId !== f.hubId) {
-        // The hub was reset or replaced while this screen was away: the taps queued from the saved copy belong to a kitchen that is gone.
+      if (f.hub && f.hubId && d.hubId !== f.hubId) {
+        // The hub was reset or replaced while this screen was away (a page opened from the saved copy, or a session that kept running): the taps
+        // queued for the old kitchen belong to a kitchen that is gone, and are never sent to this one.
         for (const p of f.pend) hubRefused(p, 'hubChanged', {}, null);
         f.pend = []; f.queueChecked = true;
         try { U.rawStorage.remove(QUEUE_KEY); U.rawStorage.remove(CACHE_KEY); } catch (e) { /* ignore */ }
@@ -1589,7 +1592,7 @@
     if (q > 0 && !(opts && opts.force === true)) return { ok: false, error: 'pending', pending: q };
     try { U.rawStorage.remove(QUEUE_KEY); U.rawStorage.remove(CACHE_KEY); } catch (e) { /* ignore */ }
     init(lastInit || {});
-    return { ok: true };
+    return { ok: true, dropped: q };
   }
 
   /* ---------- selectors (memoised per state reference) ---------- */
