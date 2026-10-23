@@ -22,7 +22,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.fill(sheet + ' [aria-label="Days it may stay in the fridge"]', '2.5'); await page.click('[data-act=save-cooked]'); await page.waitForTimeout(250);
   check('days that are not a whole number are refused in plain words', /whole number of days/.test(await page.locator(sheet).innerText()));
   await page.fill(sheet + ' [aria-label="Days it may stay in the fridge"]', '3'); await page.fill(sheet + ' [aria-label="Hours it may be out of the fridge"]', 'abc'); await page.click('[data-act=save-cooked]'); await page.waitForTimeout(250);
-  check('hours that are not a number are refused in plain words', /hours above 0/.test(await page.locator(sheet).innerText()));
+  check('hours that are not a number are refused in plain words', /hours from 0.25 to 24/.test(await page.locator(sheet).innerText()));
   await page.fill(sheet + ' [aria-label="Hours it may be out of the fridge"]', '2');
   await page.locator(sheet + ' .dp-row', { hasText: 'Potato salad plate' }).locator('input[type=checkbox]').check();
   await page.click('[data-act=save-cooked]'); await page.waitForTimeout(500);
