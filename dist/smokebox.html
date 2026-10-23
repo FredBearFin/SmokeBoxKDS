@@ -2715,6 +2715,11 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .rd-fix[hidden] { display: none; }
 [data-tone="bad"].fs-sub { color: var(--crimson); }
 
+/* Show this kitchen on another screen (fw-): two cards and a status line. */
+.fw { gap: var(--sp-3); }
+.fw-addr { font-family: var(--font-mono, monospace); word-break: break-all; }
+.fw .input { width: 100%; min-height: 48px; }
+
 /* ===== 22-floor-tour.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the "Show me how it works" walkthrough: the pulsing ring and the caption card.
@@ -5726,7 +5731,7 @@ a.of-nav:active { background: var(--press); }
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'followerReadOnly', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -5757,6 +5762,7 @@ a.of-nav:active { background: var(--press); }
     reasonRequired: 'Pick a reason first (for example: wrong order, customer left, dropped).',
     badTemp: 'Enter a temperature between 32 and 300 °F.',
     tempTooLow: 'A reheat needs a reading of at least ' + C.safety.reheatF + ' °F. Keep heating and log it again.' + SAFETY,
+    followerReadOnly: 'This screen only shows the kitchen. Make changes on the main screen.',
     notFridgeBatch: 'This batch is not tracked by place. Only cold items kept in a fridge can be taken out and put back.',
     notReheatable: 'This batch cannot be reheated: Smokebox allows one reheat per batch, and only within ' + C.safety.belowHotGraceH + ' hours of going below ' + C.safety.hotHoldF + ' °F. Discard it.' + SAFETY,
     notEnoughData: 'Not enough data yet. Run a few more tickets first.',
@@ -10620,6 +10626,9 @@ a.of-nav:active { background: var(--press); }
   // time never goes backwards. subs and tickSubs are the screens waiting to be told. The flags remember that
   // a redraw, a save or a broadcast to other tabs is pending.
   let state = null;
+  // The follower: null in every normal kitchen and in the demo. Only initFollower sets it (see the follower section below).
+  let fol = null;
+  const followSubs = new Set();
   let storage = null;
   // The real clock. Tests replace it with a fake one through init({ now }).
   let realNow = () => Date.now();
@@ -10655,7 +10664,8 @@ a.of-nav:active { background: var(--press); }
   // than it returned before (rule I9).
   function now() {
     const r = realNow();
-    let v = Math.floor(clk.base + (r - clk.realBase) * clk.speed);
+    // A follower screen keeps the hub's time: this device's clock plus the offset learned from the hub, so elapsed times agree.
+    let v = fol ? Math.floor(r + fol.offset) : Math.floor(clk.base + (r - clk.realBase) * clk.speed);
     // Never go backwards (rule I9): if the real clock steps back or gives garbage, the last time is
     // repeated.
     if (!isNum(v)) v = lastNow;
@@ -10726,6 +10736,7 @@ a.of-nav:active { background: var(--press); }
   // Marks the state as unsaved and arranges a save SAVE_MS later. broadcast true means tell other tabs after
   // saving.
   function schedulePersist(broadcast) {
+    if (fol) return;                                  // a follower never saves anything
     dirty = true;
     if (broadcast) pendingBroadcast = true;
     if (saveTimer || !storage) return;
@@ -10741,6 +10752,7 @@ a.of-nav:active { background: var(--press); }
   // it retries with less history (oldest finished tickets and events first), halving up to 12 times. After a
   // good save it announces the new revision to other tabs.
   function persistNow() {
+    if (fol) return true;                             // a follower never saves anything
     if (!storage || !state) return false;
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     // If another tab saved since this tab last loaded or saved, build on its copy first so nothing is lost.
@@ -11040,6 +11052,7 @@ a.of-nav:active { background: var(--press); }
   // Stops the timers, closes the tab channel, removes the listeners and forgets all subscribers. init calls
   // it first; tests call it to clean up.
   function destroy() {
+    folStop();
     if (interval) clearInterval(interval);
     if (saveTimer) clearTimeout(saveTimer);
     interval = null; saveTimer = null;
@@ -11166,6 +11179,11 @@ a.of-nav:active { background: var(--press); }
   // refused uiReport (that would loop). If init was never called, it starts the store itself.
   function dispatchEx(type, payload, opts) {
     if (!state) init({ noTimers: true, noSync: true });
+    // A follower screen only shows the hub's kitchen: nothing is applied, queued, logged or sent.
+    if (fol) {
+      last = { type: typeof type === 'string' ? type : String(type), report: 'followerReadOnly', info: {}, events: [], opId: null };
+      return { report: 'followerReadOnly', info: {}, events: [], opId: null };
+    }
     const source = opts && opts.source === 'sim' ? 'sim' : 'user';
     const n = now();
     const opId = tabId + ':' + (++opN);
@@ -11236,6 +11254,7 @@ a.of-nav:active { background: var(--press); }
   // Replaces the whole state from backup text. Returns "ok", "invalidBackup" or "exportTooLarge". A refused
   // import changes nothing. Repairs it made are listed in lastResult().info.repaired.
   function importAll(text) {
+    if (fol) { last = { type: 'import', report: 'followerReadOnly', info: {}, events: [] }; return 'followerReadOnly'; }
     if (typeof text !== 'string') { last = { type: 'import', report: 'invalidBackup', info: { error: 'not text' }, events: [] }; return 'invalidBackup'; }
     if (text.length > MAX_TEXT) { last = { type: 'import', report: 'exportTooLarge', info: { chars: text.length, max: MAX_TEXT }, events: [] }; return 'exportTooLarge'; }
     // A backup made in the demo cannot be loaded into the real kitchen, nor the reverse. A backup with no mode (made before
@@ -11349,6 +11368,7 @@ a.of-nav:active { background: var(--press); }
   // Throws everything away and starts a fresh state. Ticket and event counters carry on so ids are never
   // reused. Saves at once. Returns "ok".
   function reset() {
+    if (fol) return 'followerReadOnly';
     rebaseClock();
     const old = state;
     const ns = E().newState({ now: now(), starter: false, seq: old ? old.seq : undefined, blank: !!(old && old.catalog === 'own') });
@@ -11368,6 +11388,210 @@ a.of-nav:active { background: var(--press); }
     const rep = dispatch('resetLive', opts || {}, { source: 'user' });
     if (rep === 'ok') persistNow();
     return rep;
+  }
+
+
+  /* ---------- follower: a read-only screen that shows a hub's kitchen ---------- */
+  /*
+   * initFollower({ url, code?, staleMs?, now?, fetch?, TextDecoder?, AbortController?, noTimers? }) -> Promise<{ ok, error?, status }>
+   * Turns this store into a read-only follower of a hub (server/server.mjs, GET /follow). Memory only: it never reads or writes the
+   * device's own saved kitchen (storage, outbox, names, drafts), never opens the tab channel, and dispatch is refused with the report
+   * 'followerReadOnly'. It adopts the hub's snapshot, then applies the hub's ordered actions (and ticks) through the same engine, so
+   * its state equals the hub's. A gap, a refused replay or a long silence is repaired by reconnecting; it resumes from its last change
+   * number when the hub still has the history, else takes a fresh snapshot. The clock follows the hub: now() is this device's time plus
+   * the offset learned from the hub. followStatus() says what it is doing; subscribeFollow(fn) fires when that changes.
+   * Fatal errors (no retry): badCode, notFound, wrongVersion, tooMany. unreachable and other failures keep retrying.
+   */
+  const FOLLOW_FATAL = { badCode: 1, notFound: 1, wrongVersion: 1, tooMany: 1 };
+  const FOLLOW_REASON = {
+    badCode: 'The access code is wrong or missing.', notFound: 'That address is not a Smokebox hub.', wrongVersion: 'This screen and the hub do not speak the same version. Reload the page from the hub.',
+    tooMany: 'The hub has too many screens connected.', unreachable: 'Cannot reach the hub.', closed: 'The connection to the hub ended.', error: 'Something went wrong talking to the hub.',
+  };
+  // Memory-only storage with the same methods as the browser's, so the follower never touches the device's saved kitchen.
+  function memoryBackend() {
+    const m = new Map();
+    return {
+      persistent: false,
+      // Reads a kept value, or the fallback when it is missing or unreadable.
+      get: (k, f) => { try { return m.has(k) ? JSON.parse(m.get(k)) : f; } catch (e) { return f; } },
+      // The kept text exactly as stored, or null when nothing is kept.
+      raw: (k) => (m.has(k) ? m.get(k) : null),
+      // Keeps a value as text in memory only; false when it cannot be turned into text.
+      set: (k, v) => { try { m.set(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+      // Forgets one kept value by its name.
+      remove: (k) => { m.delete(k); },
+      // The kept names that start with a prefix.
+      keys: (p) => Array.from(m.keys()).filter((k) => k.indexOf(p || '') === 0),
+    };
+  }
+  // Is this store a read-only follower right now?
+  const isFollower = () => !!fol;
+  // The words and numbers a screen needs about the follower: state, address, last message, how stale, change number, clock offset, error.
+  function followStatus() {
+    if (!fol) return { mode: 'off', state: 'off', url: '', lastUpdate: null, since: null, staleSince: null, seq: null, hubId: null, offsetMs: 0, error: null, connected: false, retryInMs: 0, reason: '' };
+    return { mode: 'follower', state: folState(), url: fol.url, lastUpdate: fol.lastMsgAt, since: fol.goodSince, staleSince: folStale() ? fol.lastMsgAt : null, seq: fol.seq, hubId: fol.hubId,
+      offsetMs: Math.round(fol.offset), error: fol.error, connected: folState() === 'following', retryInMs: fol.retryInMs, reason: fol.error ? (FOLLOW_REASON[fol.error] || FOLLOW_REASON.error) : '' };
+  }
+  // True when nothing has arrived from the hub for longer than the stale limit.
+  const folStale = () => !!fol && isNum(fol.lastMsgAt) && realNow() - fol.lastMsgAt > fol.staleMs;
+  // The status word: error, stale, following, or connecting / reconnecting.
+  function folState() {
+    if (fol.error && FOLLOW_FATAL[fol.error]) return 'error';
+    if (fol.connected && !folStale()) return 'following';
+    if (folStale()) return 'stale';
+    return fol.everConnected ? 'reconnecting' : 'connecting';
+  }
+  // Calls the follow subscribers when the status word or the error changed.
+  function folNotify(force) {
+    if (!fol) return;
+    const key = folState() + '|' + fol.error;
+    if (!force && key === fol.lastKey) return;
+    fol.lastKey = key;
+    const s = followStatus();
+    followSubs.forEach((fn) => { try { fn(s); } catch (e) { if (g.console) console.error('[smokebox] follow subscriber failed', e); } });
+  }
+  // Registers fn for status changes; returns a remover.
+  function subscribeFollow(fn) { if (typeof fn !== 'function') return () => {}; followSubs.add(fn); return () => followSubs.delete(fn); }
+  // Ends the first-attempt promise once.
+  function folSettle(res) { if (fol && fol.resolve) { const r = fol.resolve; fol.resolve = null; r(Object.assign({ status: followStatus() }, res)); } }
+  // Stops following: closes the stream and timers. The store keeps its last state until init is called again.
+  function folStop() {
+    if (!fol) return;
+    const f = fol;
+    f.closed = true;
+    if (f.ctrl) { try { f.ctrl.abort(); } catch (e) { /* ignore */ } }
+    if (f.retryTimer) clearTimeout(f.retryTimer);
+    if (f.timer) clearInterval(f.timer);
+    fol = null;
+    followSubs.clear();
+  }
+  // Starts following a hub. Resolves after the first snapshot (ok: true), a fatal error, or the first failed attempt to reach it.
+  function initFollower(opts) {
+    opts = opts || {};
+    if (typeof opts.url !== 'string') return Promise.resolve({ ok: false, error: 'notFound', status: followStatus() });
+    const keepSubs = Array.from(followSubs);
+    init({ now: opts.now, storage: memoryBackend(), mode: 'real', noSync: true, noTimers: true, blank: true });
+    keepSubs.forEach((fn) => followSubs.add(fn));
+    const url = opts.url.replace(/\/+$/, '');
+    const f = fol = { url, code: typeof opts.code === 'string' ? opts.code : '', staleMs: isNum(opts.staleMs) && opts.staleMs > 0 ? opts.staleMs : 45000, offset: 0, seq: null, hubId: null, connected: false, everConnected: false,
+      error: null, lastMsgAt: null, goodSince: null, retryInMs: 0, retryStep: 0, closed: false, gen: 0, ctrl: null, retryTimer: null, timer: null, lastKey: '', resolve: null, resyncs: 0,
+      fetchFn: opts.fetch || g.fetch, Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
+    f.timer = opts.noTimers ? null : setInterval(folTick, 1000);
+    const p = new Promise((resolve) => { f.resolve = resolve; });
+    folConnect();
+    return p;
+  }
+  // Every second: tells the screens a second passed (for timers), notices a silent stream and reconnects.
+  function folTick() {
+    if (!fol) return;
+    const n = now();
+    if (fol.connected && folStale() && fol.ctrl) { fol.connected = false; try { fol.ctrl.abort(); } catch (e) { /* ignore */ } }
+    folNotify(false);
+    tickSubs.forEach((fn) => { try { fn(n); } catch (e) { if (g.console) console.error('[smokebox] tick subscriber failed', e); } });
+  }
+  // Schedules the next connection attempt after a failure: 1, 2, 4, 8, then every 15 seconds.
+  function folRetry(error, immediate) {
+    const f = fol;
+    if (!f || f.closed) return;
+    f.connected = false;
+    if (error && error !== 'closed') f.error = error;           // a stream that simply ended is not an error to show
+    if (FOLLOW_FATAL[f.error]) { folSettle({ ok: false, error: f.error }); folNotify(true); return; }
+    const delay = immediate ? 50 : Math.min(15000, 1000 * Math.pow(2, f.retryStep++));
+    f.retryInMs = delay;
+    folSettle({ ok: false, error: f.error || 'unreachable' });
+    folNotify(true);
+    f.retryTimer = setTimeout(() => { f.retryTimer = null; f.retryInMs = 0; folConnect(); }, delay);
+  }
+  // Opens the stream (resuming from the last change number when there is one) and reads it until it ends.
+  async function folConnect() {
+    const f = fol;
+    if (!f || f.closed) return;
+    const gen = ++f.gen;
+    if (!f.fetchFn || !f.Abort || !f.Dec) { f.error = 'error'; folRetry('error'); return; }
+    f.ctrl = new f.Abort();
+    let q = '?code=' + encodeURIComponent(f.code);
+    if (f.hubId != null && isNum(f.seq)) q += '&since=' + f.seq + '&hub=' + encodeURIComponent(f.hubId);
+    let res;
+    try { res = await f.fetchFn(f.url + '/follow' + q, { signal: f.ctrl.signal, cache: 'no-store', headers: { accept: 'text/event-stream' } }); } catch (e) { if (f.closed || gen !== f.gen) return; folRetry('unreachable'); return; }
+    if (f.closed || gen !== f.gen) return;
+    if (!res.ok) {
+      const st = res.status;
+      f.error = st === 403 || st === 429 ? 'badCode' : st === 404 ? 'notFound' : st === 503 ? 'tooMany' : 'error';
+      folRetry(f.error);
+      return;
+    }
+    // A reply that is not an event stream is not a hub (a web page, a login screen).
+    const ctype = String((res.headers && res.headers.get && res.headers.get('content-type')) || '');
+    if (ctype.indexOf('text/event-stream') < 0) { f.error = 'notFound'; folRetry('notFound'); return; }
+    f.error = null;
+    try {
+      const reader = res.body.getReader(), dec = new f.Dec();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (f.closed || gen !== f.gen) return;
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const block = buf.slice(0, i); buf = buf.slice(i + 2);
+          const ev = /^event: (.*)$/m.exec(block), da = /^data: (.*)$/m.exec(block);
+          if (!ev || !da) continue;
+          let data = null;
+          try { data = JSON.parse(da[1]); } catch (e) { data = null; }
+          if (data && typeof data === 'object') { folEvent(ev[1], data); if (f.closed || gen !== f.gen) return; }
+        }
+      }
+    } catch (e) { if (f.closed || gen !== f.gen) return; }
+    if (f.closed || gen !== f.gen) return;
+    folRetry('closed');
+  }
+  // Takes the hub's time from a message: the offset is what the hub's clock reads minus this device's.
+  function folClock(d) { if (isNum(d.serverNow)) fol.offset = d.serverNow - realNow(); fol.lastMsgAt = realNow(); }
+  // Marks the connection good after a snapshot or a resume.
+  function folGood() {
+    const f = fol;
+    if (!f.connected) f.goodSince = realNow();
+    f.connected = true; f.everConnected = true; f.error = null; f.retryStep = 0; f.retryInMs = 0; f.resyncs = 0;
+    folSettle({ ok: true });
+    folNotify(true);
+    scheduleNotify();
+  }
+  // Drops the saved change number so the next connection takes a fresh snapshot, and reconnects at once.
+  function folResync() {
+    const f = fol;
+    f.seq = null; f.hubId = null;
+    if (++f.resyncs > 3) { f.error = 'error'; folRetry('error'); return; }
+    try { f.ctrl.abort(); } catch (e) { /* ignore */ }
+    f.gen++;
+    folRetry(null, true);
+  }
+  // Handles one message from the hub: hello (version), snapshot, op (the next action or tick), resumed, hb.
+  function folEvent(name, d) {
+    const f = fol;
+    folClock(d);
+    if (name === 'hello') {
+      if (d.proto !== 1) { f.error = 'wrongVersion'; try { f.ctrl.abort(); } catch (e) { /* ignore */ } folRetry('wrongVersion'); return; }
+      f.pendingHub = d.hubId;
+    } else if (name === 'snapshot') {
+      const v = E().validateBackup(d.state);
+      if (!v.ok || !isNum(d.seq)) { folResync(); return; }
+      state = v.state; f.seq = d.seq; f.hubId = d.hubId || f.pendingHub; atLeast(lastStamp(state));
+      syncUnits();
+      folGood();
+    } else if (name === 'op') {
+      if (!isNum(d.seq) || f.seq === null) return;
+      if (d.seq <= f.seq) return;                                   // already applied
+      if (d.seq !== f.seq + 1 || typeof d.type !== 'string') { folResync(); return; }
+      const r = d.type === 'tick' ? { report: 'ok', state: E().tick(state, d.now).state } : E().apply(state, d.type, d.payload, d.now);
+      if (r.report !== 'ok') { folResync(); return; }
+      state = r.state; f.seq = d.seq;
+      if (!f.connected) folGood(); else folNotify(false);
+      scheduleNotify();
+    } else if (name === 'resumed') {
+      f.hubId = d.hubId || f.pendingHub;
+      folGood();
+    }
   }
 
   /* ---------- selectors (memoised per state reference) ---------- */
@@ -11477,6 +11701,7 @@ a.of-nav:active { background: var(--press); }
   // The real data is not touched again while the tab is in the demo. Returns false when already in the demo or the
   // browser cannot remember the choice.
   function enterDemo() {
+    if (fol) return false;
     if (mode === 'demo' || !state) return false;
     flush();
     try { g.sessionStorage.setItem(U.MODE_KEY, 'demo'); } catch (e) { return false; }
@@ -11486,6 +11711,7 @@ a.of-nav:active { background: var(--press); }
   // Leaves the demo: throws away everything the demo saved, forgets the choice, stops this tab saving, and reloads into
   // the real kitchen. Returns false when not in the demo.
   function leaveDemo() {
+    if (fol) return false;
     if (mode !== 'demo') return false;
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     dirty = false; storage = null; // nothing more may be saved from this tab
@@ -11691,7 +11917,7 @@ a.of-nav:active { background: var(--press); }
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
-    channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
+    initFollower, followStatus, subscribeFollow, isFollower, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
@@ -25089,7 +25315,7 @@ a.of-nav:active { background: var(--press); }
     // The Guide opens only when the guide page is part of this copy of Smokebox.
     const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Get this tablet ready', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Get this tablet ready', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), demoOn() || (SB.store.isDemo && SB.store.isDemo()) ? null : link('eye', 'Show this kitchen on another screen', 'follow'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
@@ -27700,6 +27926,95 @@ a.of-nav:active { background: var(--press); }
     return sheet;
   }
 
+  /* ---------- Show this kitchen on another screen ---------- */
+
+  // Checks a hub address typed by the owner; returns {ok, url} with a clean address, or {ok:false, why} in plain words.
+  function checkHubAddress(raw) {
+    let s = String(raw || '').trim();
+    if (!s) return { ok: false, why: 'Type the address of the kitchen you want to show.' };
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) s = (/^(localhost|\d{1,3}(\.\d{1,3}){3})(:|\/|$)/i.test(s) ? 'http://' : 'https://') + s;
+    let u;
+    try { u = new URL(s); } catch (e) { return { ok: false, why: 'That does not look like an address. It should look like https://kitchen.example.com' }; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, why: 'The address must start with http:// or https://' };
+    if (!u.hostname || (u.hostname.indexOf('.') < 0 && u.hostname !== 'localhost')) return { ok: false, why: 'That address is missing its ending, like .com. Check it and try again.' };
+    return { ok: true, url: u.origin + (u.pathname.replace(/\/+$/, '')) };
+  }
+  // Checks the pairing code; empty is allowed (not every hub asks). Returns {ok, code} or {ok:false, why}.
+  function checkHubCode(raw) {
+    const c = String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (!c) return { ok: true, code: '' };
+    if (!/^[A-Z0-9]{4,12}$/.test(c)) return { ok: false, why: 'The access code is letters and numbers only. Check it with whoever runs the hub.' };
+    return { ok: true, code: c };
+  }
+  // The address of this page without any follow settings, so a button can come back to the own kitchen.
+  function ownPageUrl() { const l = g.location; return l.origin && l.origin !== 'null' ? l.origin + l.pathname : l.protocol + '//' + l.pathname; }
+  // True when this page was opened to follow another kitchen.
+  function isFollowing() { try { if (SB.store.isFollower) return !!SB.store.isFollower(); if (SB.followMode) return !!SB.followMode(); return /[?&]follow(=|&|$)/.test(g.location.search); } catch (e) { return false; } }
+  // Leaves the follower view and reopens this device's own saved kitchen (a plain reload without the follow setting).
+  function leaveFollow() { try { g.location.assign(ownPageUrl()); } catch (e) { /* the page stays as it is */ } }
+  // Plain words for a follower status from the store, or a generic line when the store has none.
+  function followWords(st) {
+    if (!st) return { tone: undefined, text: 'Not connected to another kitchen.' };
+    const when = st.lastUpdate ? ' Last update ' + new Date(st.lastUpdate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' : '';
+    if (st.state === 'following') return { tone: 'ok', text: 'Showing the other kitchen live.' + when };
+    if (st.state === 'connecting') return { tone: undefined, text: 'Connecting...' };
+    if (st.state === 'reconnecting' || st.state === 'stale') return { tone: 'bad', text: 'Lost the connection. This screen may be out of date. Trying again.' + when };
+    if (st.state === 'error') {
+      const why = { badCode: 'The access code was not accepted. Check it with whoever runs the hub.', notFound: 'Nothing at that address is a Smokebox hub. Check the address.', unreachable: 'Could not reach that address yet. Check the Wi-Fi and the address. It keeps trying.', wrongVersion: 'This page and the hub are different versions. Reload this page, or ask whoever runs the hub to update it.', tooMany: 'The hub already has as many screens as it allows.' }[st.error];
+      return { tone: 'bad', text: why || 'Could not connect.' };
+    }
+    return { tone: undefined, text: 'Not connected to another kitchen.' };
+  }
+  // Opens "Show this kitchen on another screen": what it is, what is not set up, and the form for the other screen.
+  function openFollow() {
+    const sheet = SB.ui.sheet({ title: 'Show this kitchen on another screen', side: 'right', width: 'min(720px, 96vw)', name: 'follow' });
+    const root = h('div', { class: 'dp fw' });
+    if (SB.store.isDemo && SB.store.isDemo()) {
+      root.append(h('p', { class: 'fs-sub' }, 'This is not available in the demo. Go back to your own kitchen first.'));
+      sheet.body.appendChild(root); return sheet;
+    }
+    const status = h('p', { class: 'fs-sub fw-status', role: 'status' });
+    // Reads the store's follow status (if this build has one) and writes it in plain words.
+    function paintStatus() {
+      const raw = SB.store.followStatus ? SB.store.followStatus() : null;
+      const w = isFollowing() ? followWords(raw || { state: 'connecting' }) : { tone: undefined, text: 'Not connected to another kitchen.' };
+      tell(status, w.text, w.tone);
+    }
+    const here = ownPageUrl();
+    const web = /^https?:/.test(here);
+    const mainCard = h('section', { class: 'fs-card fw-main', dataset: { part: 'main' } },
+      h('h3', { class: 'fs-h' }, 'On this tablet'),
+      h('p', null, 'A second screen, like a TV above the pass or a phone, can show what this kitchen board shows. It only shows. It cannot take or change orders.'),
+      h('p', null, h('strong', null, 'What it needs: '), 'a small program called the hub that keeps the kitchen in one place and sends it to every screen. The hub is not set up in this version. Smokebox does not start one for you. It works only if someone runs the hub for your kitchen, on a laptop or on a server.'),
+      web ? h('p', null, 'If your hub serves this page, type this address on the other screen: ', h('code', { class: 'fw-addr', dataset: { role: 'own-address' } }, here)) : h('p', { class: 'fs-sub', dataset: { role: 'file-note' } }, 'This copy of Smokebox is a file on this tablet, so another screen cannot reach it. Use the address of your hub instead.'),
+      h('p', { class: 'fs-sub' }, 'If the hub has an access code, type that code on the other screen too. Your kitchen is not sent anywhere by this page.'));
+    const url = h('input', { type: 'text', class: 'input', id: 'fw-url', inputmode: 'url', autocomplete: 'off', autocapitalize: 'off', placeholder: 'https://kitchen.example.com', 'aria-label': 'Address of the kitchen', dataset: { field: 'url' } });
+    const code = h('input', { type: 'text', class: 'input', id: 'fw-code', autocomplete: 'off', autocapitalize: 'characters', maxlength: 12, placeholder: 'ABC123 (if asked)', 'aria-label': 'Access code, if the hub asks for one', dataset: { field: 'code' } });
+    const msg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'msg' } });
+    // Checks both fields; if they are fine, reopens this page set to follow that kitchen (this device's own saved kitchen is not touched).
+    const connect = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'follow-connect' }, onClick: () => {
+      const a = checkHubAddress(url.value); if (!a.ok) { tell(msg, a.why, 'bad'); url.focus(); return; }
+      const c = checkHubCode(code.value); if (!c.ok) { tell(msg, c.why, 'bad'); code.focus(); return; }
+      const target = here + '?follow=' + encodeURIComponent(a.url) + (c.code ? '&code=' + encodeURIComponent(c.code) : '');
+      tell(msg, 'Connecting to ' + a.url + '...');
+      if (g.__followNoNav) { g.__followTarget = target; return; }
+      try { g.location.assign(target); } catch (e) { tell(msg, 'This browser would not open it.', 'bad'); }
+    } }, 'Connect');
+    const disconnect = h('button', { type: 'button', class: 'btn', dataset: { act: 'follow-disconnect' }, onClick: leaveFollow }, 'Disconnect');
+    const back = h('button', { type: 'button', class: 'btn', dataset: { act: 'follow-back' }, onClick: leaveFollow }, 'Back to my own kitchen');
+    const otherCard = h('section', { class: 'fs-card fw-other', dataset: { part: 'other' } },
+      h('h3', { class: 'fs-h' }, 'On the other screen: Show another kitchen here'),
+      h('p', { class: 'fs-sub' }, 'Open Smokebox on the other screen, then Settings, then this page. Type the address, tap Connect. The screen then follows that kitchen and has no controls. Your own saved kitchen on that screen is not touched.'),
+      h('label', { class: 'fs-label', for: 'fw-url' }, 'Address of the kitchen'), url,
+      h('label', { class: 'fs-label', for: 'fw-code' }, 'Access code (only if the hub asks)'), code,
+      h('div', { class: 'fs-row' }, connect, isFollowing() ? disconnect : null, isFollowing() ? back : null), msg);
+    root.append(mainCard, otherCard, h('section', { class: 'fs-card', dataset: { part: 'status' } }, h('h3', { class: 'fs-h' }, 'Status'), status));
+    paintStatus();
+    const timer = setInterval(() => { if (!doc.body.contains(root)) clearInterval(timer); else paintStatus(); }, 2000);
+    sheet.body.appendChild(root); keepInView(root);
+    return sheet;
+  }
+
   /* ---------- Pilot visit checklist ---------- */
 
   // The visit steps, in order: what to do, where in the app, and minutes allowed. Kept as plain data so the printed card and the doc match.
@@ -27814,6 +28129,7 @@ a.of-nav:active { background: var(--press); }
   SB.sheets.register('dishes', openDishes);
   SB.sheets.register('shop', openShop);
   SB.sheets.register('ready', openReady);
+  SB.sheets.register('follow', openFollow);
   SB.sheets.register('pilot', openPilot);
   SB.sheets.register('serve', openServe);
   SB.sheets.register('startover', openStartOver);
@@ -27821,7 +28137,7 @@ a.of-nav:active { background: var(--press); }
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { showRecoveryCode, leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { leaveFollow, checkHubAddress, checkHubCode, showRecoveryCode, leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 77-floor-setup.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'77-floor-setup.js',message:String(e&&e.message||e)});}
