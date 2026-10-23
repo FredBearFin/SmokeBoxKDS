@@ -53,7 +53,7 @@
     return list[0] || null;
   };
   // With no page (loaded under plain Node) every call does nothing, so loading never throws.
-  if (!doc) { F.mount = F.unmount = F.setZone = F.highlight = F.setSound = F.setCallouts = F.setWall = () => {}; F.sound = F.callouts = F.wall = () => false; return; }
+  if (!doc) { F.mount = F.unmount = F.setZone = F.highlight = F.setSound = F.setCallouts = F.setWall = F.setVoiceLevel = () => {}; F.sound = F.callouts = F.wall = () => false; return; }
 
   const h = U.h;
   const C = SB.config;
@@ -62,7 +62,7 @@
   // Browser-storage keys: the sound switch, and whether the all-day strip is folded.
   const KEY_SOUND = 'smokebox.v1.sound';
   // Whether warnings are also spoken aloud (the tablet's own voice), on by default.
-  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume', KEY_FAR = 'smokebox.v1.far', KEY_CALLOUTS = 'smokebox.v1.callouts', KEY_WALL = 'smokebox.v1.wall';
+  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume', KEY_FAR = 'smokebox.v1.far', KEY_CALLOUTS = 'smokebox.v1.callouts', KEY_WALL = 'smokebox.v1.wall', KEY_VLEVEL = 'smokebox.v1.voicelevel';
   // Loudness of this tablet's warnings: 0.2 to 1. It never reaches 0 (the sound toggle is the way to silence); the last warning and the expiry tone never go below half.
   const VOL_MIN = 0.2;
   const KEY_DOCK = 'smokebox.v1.dock';
@@ -84,8 +84,10 @@
   let speech = U.storage.get(KEY_SPEECH, true) !== false;
   // Far display is off by default and belongs to this tablet (it describes how far away the screen is read).
   let far = U.storage.get(KEY_FAR, false) === true;
-  // Voice call-outs (new ticket, start this dish now) are off until a tablet opts in; they follow the station tab showing.
-  let callouts = U.storage.get(KEY_CALLOUTS, false) === true;
+  // How much the voice talks: light (start and ring-out calls), normal (adds new tickets and one reminder) or full (reminders until you act).
+  let voiceLevel = (() => { const v = U.storage.get(KEY_VLEVEL, 'normal'); return v === 'light' || v === 'full' ? v : 'normal'; })();
+  // Voice call-outs (new ticket, start this dish now) are part of the program and on unless a tablet turns them off; they follow the station tab showing.
+  let callouts = U.storage.get(KEY_CALLOUTS, true) !== false;
   // Wall mode (three panes on a wide screen) is off until a tablet or screen opts in; it only shows at 1700 px and wider.
   let wall = U.storage.get(KEY_WALL, false) === true;
   const WALL_MIN_PX = 1700;
@@ -254,6 +256,16 @@
   };
   // True while the three panes are showing (the setting is on and the window is wide enough).
   F.wallActive = () => !!m && m.root.dataset.wall === 'on';
+  // How much the voice talks: light, normal or full.
+  F.voiceLevel = () => voiceLevel;
+  // Saves how much the voice talks and says a sample call; calls already true stay quiet (they are marked heard).
+  F.setVoiceLevel = function (level) {
+    voiceLevel = level === 'light' || level === 'full' ? level : 'normal';
+    U.storage.set(KEY_VLEVEL, voiceLevel);
+    if (m) m.coPrimed = false;
+    if (sound && speech) playHere(() => speak(SB.deadlines.phrase('start', { name: '2 brisket sandwich', num: 12 })));
+    return voiceLevel;
+  };
   // Tells whether warnings are spoken aloud right now.
   F.speech = () => speech;
   // Switches spoken warnings on or off and remembers it. Speech only plays while sound is on.
@@ -275,7 +287,11 @@
       if (!ss || !U2) return false;
       if (!queued) ss.cancel();
       const u = new U2(text);
-      u.rate = 0.95; u.volume = 1;
+      // The chef voice: fast and sharp, on the best-sounding English voice this device has.
+      const cv = SB.deadlines && SB.deadlines.CHEF_VOICE ? SB.deadlines.CHEF_VOICE : { rate: 1.1, pitch: 1 };
+      u.rate = cv.rate; u.pitch = cv.pitch; u.volume = 1;
+      const pv = SB.deadlines && SB.deadlines.pickVoice && ss.getVoices ? SB.deadlines.pickVoice(ss.getVoices()) : null;
+      if (pv) { u.voice = pv; if (pv.lang) u.lang = pv.lang; }
       ss.speak(u);
       // About 70 ms a letter plus a short gap; speech end events are not reliable on every tablet.
       voiceFreeAt = performance.now() + 600 + text.length * 70;
@@ -291,7 +307,7 @@
     if (!D || !D.makeCallouts) return;
     if (!m.co) m.co = D.makeCallouts();
     if (!callouts) { m.coPrimed = false; return; }
-    const wants = D.calloutWants(store().getState(), now, m.zone);
+    const wants = D.calloutWants(store().getState(), now, m.zone, voiceLevel);
     if (!m.coPrimed || !audible() || !speech) { m.co.prime(wants); m.coPrimed = audible() && speech; return; }
     m.co.sync(wants, now);
     if (performance.now() < voiceFreeAt) return;
@@ -1449,10 +1465,11 @@
     const who = first.label + (same.length > 1 ? ' and ' + (same.length - 1) + ' more' : '');
     // Says the phrase aloud and puts it in the hidden live region for screen readers.
     const tell = (t) => { speak(t); if (m && m.strip && m.strip.announce) m.strip.announce.textContent = t; };
-    if (top.level === 4 && first.kind === 'past') { tell(who + (same.length > 1 ? ' are past their quality limit.' : ' is past its quality limit.')); return; }
-    if (top.level === 4) { tell(who + (same.length > 1 ? ' expired and were thrown out.' : ' expired and was thrown out.')); return; }
+    const PH = SB.deadlines.phrase, many = same.length > 1;
+    if (top.level === 4 && first.kind === 'past') { tell(PH('past', { who, many })); return; }
+    if (top.level === 4) { tell(PH('expired', { who, many })); return; }
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
-    tell(who + (first.goes86 && same.length === 1 ? ' goes 86' : same.length > 1 ? ' expire' : ' expires') + ' in ' + (top.level === 2 ? 'about ' : '') + mins + ' ' + U.plural(mins, 'minute') + '.');
+    tell(PH('expire', { who, many, mins, goes86: first.goes86, approx: top.level === 2 }));
   }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
   function acknowledge(key) { saveAlertRecord({ t: store().now(), id: key, ack: true }); ladder.acknowledge(key); pending.forget(key); if (lead.coordinated && SB.store.broadcast) SB.store.broadcast({ type: 'alert-ack', id: key }); }

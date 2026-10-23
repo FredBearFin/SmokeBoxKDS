@@ -2015,6 +2015,9 @@
     // Loudness of this tablet's warnings (20 to 100 percent); the sound switch above is the way to silence.
     const volIn = h('input', { type: 'range', min: '20', max: '100', step: '10', value: String(Math.round((floorOk && SB.floor.volume ? SB.floor.volume() : 1) * 100)), 'aria-label': 'Warning loudness on this tablet', disabled: !floorOk });
     volIn.addEventListener('change', () => { if (floorOk && SB.floor.setVolume) SB.floor.setVolume(Number(volIn.value) / 100); });
+    // How much the voice talks: light, normal or full. The voice itself is always the loud chef.
+    const levelOk = floorOk && typeof SB.floor.setVoiceLevel === 'function';
+    const levelSeg = SB.ui.segmented({ label: 'How much the voice talks', class: 'mn-vlevel', value: levelOk ? SB.floor.voiceLevel() : 'normal', options: [{ id: 'light', label: 'Light' }, { id: 'normal', label: 'Normal' }, { id: 'full', label: 'Full' }], onChange: (id) => { if (levelOk) SB.floor.setVoiceLevel(id); } });
     const speechOk = floorOk && typeof SB.floor.setSpeech === 'function';
     const speechTog = SB.ui.toggle({ label: 'Speak batch warnings aloud', checked: speechOk ? !!SB.floor.speech() : false, disabled: !speechOk, onChange: (on) => { if (speechOk) SB.floor.setSpeech(on); } });
     const soundHelp = floorOk ? 'On by default, because a missed warning can cost a whole batch. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
@@ -2022,7 +2025,7 @@
     // Far display: for a screen read from across the kitchen. Per tablet; needs the board module.
     const farTog = SB.ui.toggle({ label: 'Far display (big type, quiet board)', checked: floorOk && SB.floor.farDisplay ? SB.floor.farDisplay() : false, disabled: !(floorOk && SB.floor.setFarDisplay), onChange: (on) => { if (floorOk && SB.floor.setFarDisplay) SB.floor.setFarDisplay(on); } });
 
-    // Voice call-outs: opt-in per tablet; they follow the station tab showing and need sound and speech on.
+    // Voice call-outs: on by default, with a switch per tablet; they follow the station tab showing and need sound and speech on.
     const coTog = SB.ui.toggle({ label: 'Voice call-outs for new tickets and "start now"', checked: floorOk && SB.floor.callouts ? SB.floor.callouts() : false, disabled: !(floorOk && SB.floor.setCallouts), onChange: (on) => { if (floorOk && SB.floor.setCallouts) SB.floor.setCallouts(on); } });
     // Wall mode: three panes on a screen 1700 px wide or more. Per screen; needs the board module.
     const wallTog = SB.ui.toggle({ label: 'Wall mode (three panes on a wide screen)', checked: floorOk && SB.floor.wall ? SB.floor.wall() : false, disabled: !(floorOk && SB.floor.setWall), onChange: (on) => { if (floorOk && SB.floor.setWall) SB.floor.setWall(on); } });
@@ -2056,7 +2059,7 @@
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap START on Hush puppies.', hintsTog),
       settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
-      settingBlock('Voice call-outs', 'Off by default. The tablet says one short line at a time, such as "New ticket 12" or "Start brisket sandwich now". At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Speech has not been tried on a real tablet yet.', coTog),
+      settingBlock('Voice call-outs', 'A chef calls the line out loud. Light: "Fire brisket now! Ticket 12!" and "Ticket 12 is up! Ring it out!". Normal: adds "Order up!" for new tickets and one reminder if a dish is not started or a ticket not rung out. Full: keeps reminding until you start the dish or ring out the ticket. At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Not tried on a real tablet yet.', coTog, levelSeg),
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       clockBlock,

@@ -526,25 +526,87 @@
     const bits = items.slice(0, 3).map((it) => (it.qty > 1 ? it.qty + ' ' : '') + spokenName(it));
     return bits.join(', ') + (items.length > 3 ? ' and ' + (items.length - 3) + ' more' : '');
   }
+  // The kitchen's voice is one fixed style: a fast, sharp chef calling the line. Rate and pitch for the speech engine.
+  const CHEF_VOICE = { rate: 1.15, pitch: 1.1 };
+  // One spoken line in the chef's voice. kind is new_all, new_zone, start, expire, past or expired; d holds the numbers
+  // and names. Short, loud and to the point, the way a chef calls the pass.
+  function phrase(kind, d) {
+    if (kind === 'new_all') return 'Order up! Ticket ' + d.num + '! ' + d.count + ' ' + U.plural(d.count, 'item') + '!';
+    if (kind === 'new_zone') return 'Order up, ticket ' + d.num + '! ' + d.names + '!';
+    if (kind === 'start') return 'Fire ' + d.name + ' now! Ticket ' + d.num + '!';
+    if (kind === 'start_again') return 'Still waiting on ' + d.name + '! Fire it now! Ticket ' + d.num + '!';
+    if (kind === 'ready') return 'Ticket ' + d.num + ' is up! Ring it out!';
+    if (kind === 'ready_again') return 'Ticket ' + d.num + ' is waiting! Ring it out now!';
+    if (kind === 'past') return d.who + (d.many ? ' are past quality!' : ' is past quality!') + ' Check it now!';
+    if (kind === 'expired') return d.who + ' expired! Pull it and log it now!';
+    return 'Heads up! ' + d.who + (d.goes86 && !d.many ? ' goes 86' : d.many ? ' expire' : ' expires') + ' in ' + (d.approx ? 'about ' : '') + d.mins + ' ' + U.plural(d.mins, 'minute') + '! Act now!';
+  }
+  // Picks the best-sounding English voice the device has: the natural, neural or online ones first, then premium, Google
+  // and well-known named voices; null when there is none, so the device default is used.
+  function pickVoice(voices) {
+    const en = (voices || []).filter((v) => v && /^en/i.test(String(v.lang || '')));
+    // How good a voice sounds for a kitchen call: higher is better.
+    const score = (v) => (/natural|neural|online/i.test(v.name) ? 40 : 0) + (/premium|enhanced/i.test(v.name) ? 30 : 0) + (/google/i.test(v.name) ? 20 : 0)
+      + (/samantha|aria|jenny|guy|ava|allison|karen|daniel|zira|david/i.test(v.name) ? 10 : 0) + (/^en[-_]US/i.test(v.lang) ? 5 : 0);
+    let best = null, bs = -1;
+    for (const v of en) { const sc = score(v); if (sc > bs) { best = v; bs = sc; } }
+    return best;
+  }
+  // How much the voice talks, per level. repeatStartSec is the gap between "still waiting" reminders for a dish that is
+  // due and not started, up to startRepeats of them; readyRepeats is how many "ring it out" reminders follow a finished
+  // ticket (every readyRepeatSec); newTicket says whether a new ticket gets its own call.
+  const VOICE_LEVELS = {
+    light: { newTicket: false, startRepeats: 0, repeatStartSec: 0, readyRepeats: 0, readyRepeatSec: 0 },
+    normal: { newTicket: true, startRepeats: 1, repeatStartSec: 25, readyRepeats: 1, readyRepeatSec: 30 },
+    full: { newTicket: true, startRepeats: 4, repeatStartSec: 20, readyRepeats: 2, readyRepeatSec: 30 },
+  };
+  // The settings for a level name; an unknown name gets normal.
+  function voiceLevel(level) { return VOICE_LEVELS[level] || VOICE_LEVELS.normal; }
   // Every call that is true right now for one station tab: { id, kind, at, text, ticketNum }. kind is "new" (a ticket
-  // arrived) or "start" (a dish's start time has come). zone is "all", a station id, or "expo" (new tickets only).
+  // arrived), "start" (dishes whose start time has come, said again as a reminder while they wait), or "ready" (every dish
+  // on a ticket is done: ring it out, said again while it waits). zone is "all", a station id, or "expo" (tickets only, no
+  // start calls). level is light, normal or full (how much the voice talks).
   // WATCH OUT: a station only gets calls for its own dishes; a ticket with nothing for it makes no call.
-  function calloutWants(state, now, zone) {
+  function calloutWants(state, now, zone, level) {
     const out = [];
     if (!state || !Array.isArray(state.tickets) || !U.isNum(now)) return out;
-    const z = zone || 'all';
+    const z = zone || 'all', cfg = voiceLevel(level);
     for (const t of state.tickets) {
-      if (t.status !== 'active' || !Array.isArray(t.items)) continue;
+      if (t.status !== 'active' || !Array.isArray(t.items) || !t.items.length) continue;
+      // Everything done: the counter and expo hear "ring it out".
+      if (t.items.every((it) => it.status === 'done')) {
+        if (z !== 'all' && z !== 'expo') continue;
+        const readyAt = t.items.reduce((m, it) => Math.max(m, U.isNum(it.doneAt) ? it.doneAt : 0), 0) || t.createdAt;
+        out.push({ id: 'r:' + t.id, kind: 'ready', at: readyAt, text: phrase('ready', { num: t.num }), ticketNum: t.num });
+        for (let k = 1; k <= cfg.readyRepeats; k++) {
+          const at = readyAt + k * cfg.readyRepeatSec * 1000;
+          if (now >= at) out.push({ id: 'r:' + t.id + ':' + k, kind: 'ready', at, text: phrase('ready_again', { num: t.num }), ticketNum: t.num });
+        }
+        continue;
+      }
       const mine = t.items.filter((it) => (z === 'all' || z === 'expo' || it.zone === z) && it.status !== 'done');
       if (!mine.length) continue;
-      const text = z === 'all' || z === 'expo' ? 'New ticket ' + t.num + ', ' + t.items.length + ' ' + U.plural(t.items.length, 'item') + '.' : 'New ticket ' + t.num + ': ' + nameList(mine) + '.';
-      out.push({ id: 'n:' + t.id, kind: 'new', at: t.createdAt, text, ticketNum: t.num });
+      if (cfg.newTicket) {
+        const text = z === 'all' || z === 'expo' ? phrase('new_all', { num: t.num, count: t.items.length }) : phrase('new_zone', { num: t.num, names: nameList(mine) });
+        out.push({ id: 'n:' + t.id, kind: 'new', at: t.createdAt, text, ticketNum: t.num });
+      }
       if (z === 'expo') continue;
+      // Dishes that are due and not started, grouped by the second they became due so one ticket makes one call.
+      const groups = new Map();
       for (const it of mine) {
-        // A dish whose start time came later than the ticket (paced) and is now due and not yet started.
         const due = it.status === 'displayed' || (it.status === 'queued' && it.fireAt <= now);
-        if (!due || !(it.fireAt - t.createdAt > 1000)) continue;
-        out.push({ id: 's:' + it.id, kind: 'start', at: it.fireAt, text: 'Start ' + (it.qty > 1 ? it.qty + ' ' : '') + spokenName(it) + ' now. Ticket ' + t.num + '.', ticketNum: t.num });
+        if (!due || !U.isNum(it.fireAt)) continue;
+        const key = Math.floor(it.fireAt / 1000);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(it);
+      }
+      for (const [key, its] of groups) {
+        const at = key * 1000, name = nameList(its);
+        out.push({ id: 's:' + t.id + ':' + key, kind: 'start', at, text: phrase('start', { name, num: t.num }), ticketNum: t.num });
+        for (let k = 1; k <= cfg.startRepeats; k++) {
+          const rat = at + k * cfg.repeatStartSec * 1000;
+          if (now >= rat) out.push({ id: 's:' + t.id + ':' + key + ':' + k, kind: 'start', at: rat, text: phrase('start_again', { name, num: t.num }), ticketNum: t.num });
+        }
       }
     }
     return out;
@@ -618,5 +680,5 @@
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders };
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

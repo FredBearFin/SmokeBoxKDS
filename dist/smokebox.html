@@ -8587,25 +8587,87 @@ a.of-nav:active { background: var(--press); }
     const bits = items.slice(0, 3).map((it) => (it.qty > 1 ? it.qty + ' ' : '') + spokenName(it));
     return bits.join(', ') + (items.length > 3 ? ' and ' + (items.length - 3) + ' more' : '');
   }
+  // The kitchen's voice is one fixed style: a fast, sharp chef calling the line. Rate and pitch for the speech engine.
+  const CHEF_VOICE = { rate: 1.15, pitch: 1.1 };
+  // One spoken line in the chef's voice. kind is new_all, new_zone, start, expire, past or expired; d holds the numbers
+  // and names. Short, loud and to the point, the way a chef calls the pass.
+  function phrase(kind, d) {
+    if (kind === 'new_all') return 'Order up! Ticket ' + d.num + '! ' + d.count + ' ' + U.plural(d.count, 'item') + '!';
+    if (kind === 'new_zone') return 'Order up, ticket ' + d.num + '! ' + d.names + '!';
+    if (kind === 'start') return 'Fire ' + d.name + ' now! Ticket ' + d.num + '!';
+    if (kind === 'start_again') return 'Still waiting on ' + d.name + '! Fire it now! Ticket ' + d.num + '!';
+    if (kind === 'ready') return 'Ticket ' + d.num + ' is up! Ring it out!';
+    if (kind === 'ready_again') return 'Ticket ' + d.num + ' is waiting! Ring it out now!';
+    if (kind === 'past') return d.who + (d.many ? ' are past quality!' : ' is past quality!') + ' Check it now!';
+    if (kind === 'expired') return d.who + ' expired! Pull it and log it now!';
+    return 'Heads up! ' + d.who + (d.goes86 && !d.many ? ' goes 86' : d.many ? ' expire' : ' expires') + ' in ' + (d.approx ? 'about ' : '') + d.mins + ' ' + U.plural(d.mins, 'minute') + '! Act now!';
+  }
+  // Picks the best-sounding English voice the device has: the natural, neural or online ones first, then premium, Google
+  // and well-known named voices; null when there is none, so the device default is used.
+  function pickVoice(voices) {
+    const en = (voices || []).filter((v) => v && /^en/i.test(String(v.lang || '')));
+    // How good a voice sounds for a kitchen call: higher is better.
+    const score = (v) => (/natural|neural|online/i.test(v.name) ? 40 : 0) + (/premium|enhanced/i.test(v.name) ? 30 : 0) + (/google/i.test(v.name) ? 20 : 0)
+      + (/samantha|aria|jenny|guy|ava|allison|karen|daniel|zira|david/i.test(v.name) ? 10 : 0) + (/^en[-_]US/i.test(v.lang) ? 5 : 0);
+    let best = null, bs = -1;
+    for (const v of en) { const sc = score(v); if (sc > bs) { best = v; bs = sc; } }
+    return best;
+  }
+  // How much the voice talks, per level. repeatStartSec is the gap between "still waiting" reminders for a dish that is
+  // due and not started, up to startRepeats of them; readyRepeats is how many "ring it out" reminders follow a finished
+  // ticket (every readyRepeatSec); newTicket says whether a new ticket gets its own call.
+  const VOICE_LEVELS = {
+    light: { newTicket: false, startRepeats: 0, repeatStartSec: 0, readyRepeats: 0, readyRepeatSec: 0 },
+    normal: { newTicket: true, startRepeats: 1, repeatStartSec: 25, readyRepeats: 1, readyRepeatSec: 30 },
+    full: { newTicket: true, startRepeats: 4, repeatStartSec: 20, readyRepeats: 2, readyRepeatSec: 30 },
+  };
+  // The settings for a level name; an unknown name gets normal.
+  function voiceLevel(level) { return VOICE_LEVELS[level] || VOICE_LEVELS.normal; }
   // Every call that is true right now for one station tab: { id, kind, at, text, ticketNum }. kind is "new" (a ticket
-  // arrived) or "start" (a dish's start time has come). zone is "all", a station id, or "expo" (new tickets only).
+  // arrived), "start" (dishes whose start time has come, said again as a reminder while they wait), or "ready" (every dish
+  // on a ticket is done: ring it out, said again while it waits). zone is "all", a station id, or "expo" (tickets only, no
+  // start calls). level is light, normal or full (how much the voice talks).
   // WATCH OUT: a station only gets calls for its own dishes; a ticket with nothing for it makes no call.
-  function calloutWants(state, now, zone) {
+  function calloutWants(state, now, zone, level) {
     const out = [];
     if (!state || !Array.isArray(state.tickets) || !U.isNum(now)) return out;
-    const z = zone || 'all';
+    const z = zone || 'all', cfg = voiceLevel(level);
     for (const t of state.tickets) {
-      if (t.status !== 'active' || !Array.isArray(t.items)) continue;
+      if (t.status !== 'active' || !Array.isArray(t.items) || !t.items.length) continue;
+      // Everything done: the counter and expo hear "ring it out".
+      if (t.items.every((it) => it.status === 'done')) {
+        if (z !== 'all' && z !== 'expo') continue;
+        const readyAt = t.items.reduce((m, it) => Math.max(m, U.isNum(it.doneAt) ? it.doneAt : 0), 0) || t.createdAt;
+        out.push({ id: 'r:' + t.id, kind: 'ready', at: readyAt, text: phrase('ready', { num: t.num }), ticketNum: t.num });
+        for (let k = 1; k <= cfg.readyRepeats; k++) {
+          const at = readyAt + k * cfg.readyRepeatSec * 1000;
+          if (now >= at) out.push({ id: 'r:' + t.id + ':' + k, kind: 'ready', at, text: phrase('ready_again', { num: t.num }), ticketNum: t.num });
+        }
+        continue;
+      }
       const mine = t.items.filter((it) => (z === 'all' || z === 'expo' || it.zone === z) && it.status !== 'done');
       if (!mine.length) continue;
-      const text = z === 'all' || z === 'expo' ? 'New ticket ' + t.num + ', ' + t.items.length + ' ' + U.plural(t.items.length, 'item') + '.' : 'New ticket ' + t.num + ': ' + nameList(mine) + '.';
-      out.push({ id: 'n:' + t.id, kind: 'new', at: t.createdAt, text, ticketNum: t.num });
+      if (cfg.newTicket) {
+        const text = z === 'all' || z === 'expo' ? phrase('new_all', { num: t.num, count: t.items.length }) : phrase('new_zone', { num: t.num, names: nameList(mine) });
+        out.push({ id: 'n:' + t.id, kind: 'new', at: t.createdAt, text, ticketNum: t.num });
+      }
       if (z === 'expo') continue;
+      // Dishes that are due and not started, grouped by the second they became due so one ticket makes one call.
+      const groups = new Map();
       for (const it of mine) {
-        // A dish whose start time came later than the ticket (paced) and is now due and not yet started.
         const due = it.status === 'displayed' || (it.status === 'queued' && it.fireAt <= now);
-        if (!due || !(it.fireAt - t.createdAt > 1000)) continue;
-        out.push({ id: 's:' + it.id, kind: 'start', at: it.fireAt, text: 'Start ' + (it.qty > 1 ? it.qty + ' ' : '') + spokenName(it) + ' now. Ticket ' + t.num + '.', ticketNum: t.num });
+        if (!due || !U.isNum(it.fireAt)) continue;
+        const key = Math.floor(it.fireAt / 1000);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(it);
+      }
+      for (const [key, its] of groups) {
+        const at = key * 1000, name = nameList(its);
+        out.push({ id: 's:' + t.id + ':' + key, kind: 'start', at, text: phrase('start', { name, num: t.num }), ticketNum: t.num });
+        for (let k = 1; k <= cfg.startRepeats; k++) {
+          const rat = at + k * cfg.repeatStartSec * 1000;
+          if (now >= rat) out.push({ id: 's:' + t.id + ':' + key + ':' + k, kind: 'start', at: rat, text: phrase('start_again', { name, num: t.num }), ticketNum: t.num });
+        }
       }
     }
     return out;
@@ -8679,7 +8741,7 @@ a.of-nav:active { background: var(--press); }
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders };
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 25-deadlines.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'25-deadlines.js',message:String(e&&e.message||e)});}
@@ -17239,7 +17301,7 @@ a.of-nav:active { background: var(--press); }
     return list[0] || null;
   };
   // With no page (loaded under plain Node) every call does nothing, so loading never throws.
-  if (!doc) { F.mount = F.unmount = F.setZone = F.highlight = F.setSound = F.setCallouts = F.setWall = () => {}; F.sound = F.callouts = F.wall = () => false; return; }
+  if (!doc) { F.mount = F.unmount = F.setZone = F.highlight = F.setSound = F.setCallouts = F.setWall = F.setVoiceLevel = () => {}; F.sound = F.callouts = F.wall = () => false; return; }
 
   const h = U.h;
   const C = SB.config;
@@ -17248,7 +17310,7 @@ a.of-nav:active { background: var(--press); }
   // Browser-storage keys: the sound switch, and whether the all-day strip is folded.
   const KEY_SOUND = 'smokebox.v1.sound';
   // Whether warnings are also spoken aloud (the tablet's own voice), on by default.
-  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume', KEY_FAR = 'smokebox.v1.far', KEY_CALLOUTS = 'smokebox.v1.callouts', KEY_WALL = 'smokebox.v1.wall';
+  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume', KEY_FAR = 'smokebox.v1.far', KEY_CALLOUTS = 'smokebox.v1.callouts', KEY_WALL = 'smokebox.v1.wall', KEY_VLEVEL = 'smokebox.v1.voicelevel';
   // Loudness of this tablet's warnings: 0.2 to 1. It never reaches 0 (the sound toggle is the way to silence); the last warning and the expiry tone never go below half.
   const VOL_MIN = 0.2;
   const KEY_DOCK = 'smokebox.v1.dock';
@@ -17270,8 +17332,10 @@ a.of-nav:active { background: var(--press); }
   let speech = U.storage.get(KEY_SPEECH, true) !== false;
   // Far display is off by default and belongs to this tablet (it describes how far away the screen is read).
   let far = U.storage.get(KEY_FAR, false) === true;
-  // Voice call-outs (new ticket, start this dish now) are off until a tablet opts in; they follow the station tab showing.
-  let callouts = U.storage.get(KEY_CALLOUTS, false) === true;
+  // How much the voice talks: light (start and ring-out calls), normal (adds new tickets and one reminder) or full (reminders until you act).
+  let voiceLevel = (() => { const v = U.storage.get(KEY_VLEVEL, 'normal'); return v === 'light' || v === 'full' ? v : 'normal'; })();
+  // Voice call-outs (new ticket, start this dish now) are part of the program and on unless a tablet turns them off; they follow the station tab showing.
+  let callouts = U.storage.get(KEY_CALLOUTS, true) !== false;
   // Wall mode (three panes on a wide screen) is off until a tablet or screen opts in; it only shows at 1700 px and wider.
   let wall = U.storage.get(KEY_WALL, false) === true;
   const WALL_MIN_PX = 1700;
@@ -17440,6 +17504,16 @@ a.of-nav:active { background: var(--press); }
   };
   // True while the three panes are showing (the setting is on and the window is wide enough).
   F.wallActive = () => !!m && m.root.dataset.wall === 'on';
+  // How much the voice talks: light, normal or full.
+  F.voiceLevel = () => voiceLevel;
+  // Saves how much the voice talks and says a sample call; calls already true stay quiet (they are marked heard).
+  F.setVoiceLevel = function (level) {
+    voiceLevel = level === 'light' || level === 'full' ? level : 'normal';
+    U.storage.set(KEY_VLEVEL, voiceLevel);
+    if (m) m.coPrimed = false;
+    if (sound && speech) playHere(() => speak(SB.deadlines.phrase('start', { name: '2 brisket sandwich', num: 12 })));
+    return voiceLevel;
+  };
   // Tells whether warnings are spoken aloud right now.
   F.speech = () => speech;
   // Switches spoken warnings on or off and remembers it. Speech only plays while sound is on.
@@ -17461,7 +17535,11 @@ a.of-nav:active { background: var(--press); }
       if (!ss || !U2) return false;
       if (!queued) ss.cancel();
       const u = new U2(text);
-      u.rate = 0.95; u.volume = 1;
+      // The chef voice: fast and sharp, on the best-sounding English voice this device has.
+      const cv = SB.deadlines && SB.deadlines.CHEF_VOICE ? SB.deadlines.CHEF_VOICE : { rate: 1.1, pitch: 1 };
+      u.rate = cv.rate; u.pitch = cv.pitch; u.volume = 1;
+      const pv = SB.deadlines && SB.deadlines.pickVoice && ss.getVoices ? SB.deadlines.pickVoice(ss.getVoices()) : null;
+      if (pv) { u.voice = pv; if (pv.lang) u.lang = pv.lang; }
       ss.speak(u);
       // About 70 ms a letter plus a short gap; speech end events are not reliable on every tablet.
       voiceFreeAt = performance.now() + 600 + text.length * 70;
@@ -17477,7 +17555,7 @@ a.of-nav:active { background: var(--press); }
     if (!D || !D.makeCallouts) return;
     if (!m.co) m.co = D.makeCallouts();
     if (!callouts) { m.coPrimed = false; return; }
-    const wants = D.calloutWants(store().getState(), now, m.zone);
+    const wants = D.calloutWants(store().getState(), now, m.zone, voiceLevel);
     if (!m.coPrimed || !audible() || !speech) { m.co.prime(wants); m.coPrimed = audible() && speech; return; }
     m.co.sync(wants, now);
     if (performance.now() < voiceFreeAt) return;
@@ -18635,10 +18713,11 @@ a.of-nav:active { background: var(--press); }
     const who = first.label + (same.length > 1 ? ' and ' + (same.length - 1) + ' more' : '');
     // Says the phrase aloud and puts it in the hidden live region for screen readers.
     const tell = (t) => { speak(t); if (m && m.strip && m.strip.announce) m.strip.announce.textContent = t; };
-    if (top.level === 4 && first.kind === 'past') { tell(who + (same.length > 1 ? ' are past their quality limit.' : ' is past its quality limit.')); return; }
-    if (top.level === 4) { tell(who + (same.length > 1 ? ' expired and were thrown out.' : ' expired and was thrown out.')); return; }
+    const PH = SB.deadlines.phrase, many = same.length > 1;
+    if (top.level === 4 && first.kind === 'past') { tell(PH('past', { who, many })); return; }
+    if (top.level === 4) { tell(PH('expired', { who, many })); return; }
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
-    tell(who + (first.goes86 && same.length === 1 ? ' goes 86' : same.length > 1 ? ' expire' : ' expires') + ' in ' + (top.level === 2 ? 'about ' : '') + mins + ' ' + U.plural(mins, 'minute') + '.');
+    tell(PH('expire', { who, many, mins, goes86: first.goes86, approx: top.level === 2 }));
   }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
   function acknowledge(key) { saveAlertRecord({ t: store().now(), id: key, ack: true }); ladder.acknowledge(key); pending.forget(key); if (lead.coordinated && SB.store.broadcast) SB.store.broadcast({ type: 'alert-ack', id: key }); }
@@ -22317,6 +22396,9 @@ a.of-nav:active { background: var(--press); }
     // Loudness of this tablet's warnings (20 to 100 percent); the sound switch above is the way to silence.
     const volIn = h('input', { type: 'range', min: '20', max: '100', step: '10', value: String(Math.round((floorOk && SB.floor.volume ? SB.floor.volume() : 1) * 100)), 'aria-label': 'Warning loudness on this tablet', disabled: !floorOk });
     volIn.addEventListener('change', () => { if (floorOk && SB.floor.setVolume) SB.floor.setVolume(Number(volIn.value) / 100); });
+    // How much the voice talks: light, normal or full. The voice itself is always the loud chef.
+    const levelOk = floorOk && typeof SB.floor.setVoiceLevel === 'function';
+    const levelSeg = SB.ui.segmented({ label: 'How much the voice talks', class: 'mn-vlevel', value: levelOk ? SB.floor.voiceLevel() : 'normal', options: [{ id: 'light', label: 'Light' }, { id: 'normal', label: 'Normal' }, { id: 'full', label: 'Full' }], onChange: (id) => { if (levelOk) SB.floor.setVoiceLevel(id); } });
     const speechOk = floorOk && typeof SB.floor.setSpeech === 'function';
     const speechTog = SB.ui.toggle({ label: 'Speak batch warnings aloud', checked: speechOk ? !!SB.floor.speech() : false, disabled: !speechOk, onChange: (on) => { if (speechOk) SB.floor.setSpeech(on); } });
     const soundHelp = floorOk ? 'On by default, because a missed warning can cost a whole batch. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
@@ -22324,7 +22406,7 @@ a.of-nav:active { background: var(--press); }
     // Far display: for a screen read from across the kitchen. Per tablet; needs the board module.
     const farTog = SB.ui.toggle({ label: 'Far display (big type, quiet board)', checked: floorOk && SB.floor.farDisplay ? SB.floor.farDisplay() : false, disabled: !(floorOk && SB.floor.setFarDisplay), onChange: (on) => { if (floorOk && SB.floor.setFarDisplay) SB.floor.setFarDisplay(on); } });
 
-    // Voice call-outs: opt-in per tablet; they follow the station tab showing and need sound and speech on.
+    // Voice call-outs: on by default, with a switch per tablet; they follow the station tab showing and need sound and speech on.
     const coTog = SB.ui.toggle({ label: 'Voice call-outs for new tickets and "start now"', checked: floorOk && SB.floor.callouts ? SB.floor.callouts() : false, disabled: !(floorOk && SB.floor.setCallouts), onChange: (on) => { if (floorOk && SB.floor.setCallouts) SB.floor.setCallouts(on); } });
     // Wall mode: three panes on a screen 1700 px wide or more. Per screen; needs the board module.
     const wallTog = SB.ui.toggle({ label: 'Wall mode (three panes on a wide screen)', checked: floorOk && SB.floor.wall ? SB.floor.wall() : false, disabled: !(floorOk && SB.floor.setWall), onChange: (on) => { if (floorOk && SB.floor.setWall) SB.floor.setWall(on); } });
@@ -22358,7 +22440,7 @@ a.of-nav:active { background: var(--press); }
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap START on Hush puppies.', hintsTog),
       settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
-      settingBlock('Voice call-outs', 'Off by default. The tablet says one short line at a time, such as "New ticket 12" or "Start brisket sandwich now". At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Speech has not been tried on a real tablet yet.', coTog),
+      settingBlock('Voice call-outs', 'A chef calls the line out loud. Light: "Fire brisket now! Ticket 12!" and "Ticket 12 is up! Ring it out!". Normal: adds "Order up!" for new tickets and one reminder if a dish is not started or a ticket not rung out. Full: keeps reminding until you start the dish or ring out the ticket. At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Not tried on a real tablet yet.', coTog, levelSeg),
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       clockBlock,
