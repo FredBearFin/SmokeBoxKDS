@@ -28,7 +28,7 @@ Not decided yet. There is no price to quote. Ask the person who set it up for yo
 
 ## 7. Can I rely on it for my food-safety records?
 
-Treat it as a helper, not as your official record. Smokebox reminds you to take temperatures, warns before a time limit and flags readings outside the limits you set. It cannot see, taste or measure your food. The starting limits come from the FDA Food Code, and your county may differ, so ask your health department and change the limits to match. Back office has a printable food safety record. Ask your health department whether they accept it before you stop your paper log. Until then, keep the paper log.
+Treat it as a helper, not as your official record. Smokebox reminds you to take temperatures, warns before a time limit and flags readings outside the limits you set. It cannot see, taste or measure your food. The limits it starts with are examples, not your local rules, so set the limits your local health department gives you. Back office has a printable food safety record. Ask your health department whether they accept it before you stop your paper log. Until then, keep the paper log.
 
 ## 8. Does it charge customers' cards?
 

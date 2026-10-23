@@ -19,7 +19,7 @@ Use this for food kept in a warmer or cooler, like chili or potato salad, so Smo
 
 1. In **Dishes and prices**, find "Do you cook any of this ahead and hold it?" and tap **Yes, I cook ahead**. Then tap **Add a cooked-ahead item**.
 2. Type what you cook ahead and choose Hot or Cold.
-3. Set how long it may stay. 4 hours is a careful starting point. Ask your health department and change it to match.
+3. Set how long it may stay. Set the limit your local health department gives you.
 4. Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.
 5. Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**.
 
