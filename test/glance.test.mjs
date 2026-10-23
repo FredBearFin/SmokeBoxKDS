@@ -65,3 +65,11 @@ test('a long 86 list shows four names and the count of the rest', () => {
   assert.equal(card(m, 'out86').value, '6');
   assert.equal(card(m, 'out86').sub, 'A, B, C, D and 2 more');
 });
+
+test('a fresh kitchen shows no 86 list and no red brisket warning', () => {
+  const m = glanceModel({ now, fresh: true, out86: ['Brisket', 'Slaw'], brisket: { onHandG: 0 } });
+  const by = (id) => m.cards.find((c) => c.id === id);
+  assert.equal(by('out86').value, '0');
+  assert.match(by('out86').sub, /Nothing cooked yet/);
+  assert.equal(by('brisket').tone, 'info');
+});

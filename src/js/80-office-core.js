@@ -993,15 +993,17 @@
     srcSeg.classList.add('of-seg');
     const srcNote = h('span', { class: 'of-fnote', hidden: true });
 
+    // The Day group only shows for Yesterday or One day, so the other filters fit on one row.
+    const dayGroup = h('div', { class: 'of-fg', hidden: true }, h('span', { class: 'of-fl' }, 'Day'), dayBox, dayErr);
     body.append(
       h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Range'), rangeSeg),
-      h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Day'), dayBox, dayErr),
+      dayGroup,
       custom,
       h('div', { class: 'of-fg' }, h('label', { class: 'of-fl', for: 'of-channel' }, 'Channel'), chanSel),
       h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Source'), srcSeg, srcNote));
     const banner = h('p', { class: 'of-banner', role: 'status' }, h('span', { class: 'of-chip', hidden: true }, 'Sample data'), h('span', { class: 'of-banner-t' }));
     f.filters.append(summary, body, banner);
-    Object.assign(M, { dayPrev, dayNext, dayIn, dayErr, rangeSeg, srcSeg, chanSel, dFrom, dTo, dErr, custom, banner, summary, srcNote, fbody: body });
+    Object.assign(M, { dayGroup, dayPrev, dayNext, dayIn, dayErr, rangeSeg, srcSeg, chanSel, dFrom, dTo, dErr, custom, banner, summary, srcNote, fbody: body });
 
     sc.on(summary, 'click', () => { const open = f.filters.dataset.open !== 'true'; f.filters.dataset.open = open ? 'true' : 'false'; summary.setAttribute('aria-expanded', open ? 'true' : 'false'); });
     sc.on(chanSel, 'change', () => { F.channel = chanSel.value; filtersChanged('Channel: ' + (chanSel.selectedOptions[0] ? chanSel.selectedOptions[0].textContent : F.channel)); });
@@ -1025,6 +1027,7 @@
     M.dayIn.max = today; M.dayIn.value = key;
     M.dayNext.disabled = key >= today;
     M.dayErr.hidden = true; M.dayIn.removeAttribute('aria-invalid');
+    M.dayGroup.hidden = !(M.filters.range.id === 'day' || M.filters.range.id === 'yesterday');
   }
   // Shows exactly one service day. Stepping onto today gives the live Today preset so it keeps rolling
   // forward; any other day (or the One day button, fixed = true) is a fixed 'day' range.
