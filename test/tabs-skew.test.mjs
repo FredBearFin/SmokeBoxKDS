@@ -147,3 +147,27 @@ for (const [name, tabs, lag, offsets] of [['3 tabs, reads 2 writes late', 3, 2, 
     assert.deepEqual(bad, []);
   });
 }
+
+// Found by the endurance run: a store started again in the same page (as after a restore or in tests) must not reuse action ids, or the other
+// tab's journal says the new action is already in its copy and drops it.
+test('a tab restarted in the same page and a second tab saving in turn lose no ticket', { skip }, async () => {
+  const clock = { t: T0 }, storage = memStorage();
+  const A = tab(clock, 0, null), B = tab(clock, 0, null);
+  const initA = () => A.S.init({ now: () => clock.t, storage, noTimers: true, mode: 'real', blank: true, starter: false });
+  initA();
+  A.S.dispatch('addMenuItem', { name: 'Dish', zone: 'pit', cat: 'meat', price: 5, prepSec: 60, track: 'one', prepGuess: false });
+  const dish = A.S.lastResult().info.id;
+  for (let i = 0; i < 5; i++) { clock.t += 1000; A.S.dispatch('createTicket', { customer: 'old' + i, items: [{ menuId: dish }] }); }
+  A.S.flush(); await sleep(40);
+  A.S.destroy(); initA();                           // the same page starts the store again
+  B.S.init({ now: () => clock.t, storage, noTimers: true, mode: 'real', blank: true, starter: false });
+  try {
+    for (let i = 0; i < 4; i++) {
+      clock.t += 1000; B.S.dispatch('createTicket', { customer: 'b' + i, items: [{ menuId: dish }] }); B.S.flush(); await sleep(25);
+      clock.t += 1000; A.S.dispatch('createTicket', { customer: 'a' + i, items: [{ menuId: dish }] }); A.S.flush(); await sleep(25);
+    }
+    await sleep(80); A.S.flush(); B.S.flush(); await sleep(80);
+    for (const t of [A, B]) assert.equal(t.S.getState().tickets.length, 13);
+    assert.equal(storage.get('smokebox.v1.state').state.tickets.length, 13);
+  } finally { A.S.destroy(); B.S.destroy(); }
+});

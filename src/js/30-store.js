@@ -660,7 +660,7 @@
     st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: SAVE_MS };
     last = null; writeBlocked = false; heldText = null; susp = null;
     baseSid = null; pending = []; recent = []; journal = []; skipRebase = false; noTimersOpt = !!opts.noTimers; if (reconcileTimer) { clearTimeout(reconcileTimer); reconcileTimer = null; }
-    outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
+    outbox = []; seenOps = new Set(); acked.clear();      // opN is never reset: an action id must not repeat in one page, or a hub or another tab that remembers it takes the new action for a repeat
     const r = realNow();
     let payload = null;
     try { payload = storage.get(KEY, null); } catch (e) { payload = null; }
