@@ -46,3 +46,25 @@ instead of the root; that is a change for the hub's owner, not needed here.
 - The codes sit in the address of the tablets (needed to open the page). Do not share screenshots of the address bar.
 - A second Node process uses memory on the same small server; the beta's data is separate and is not backed up by anything.
 - The connected build is experimental: do not run the real kitchen on it. The nightly beta update follows the branch `connected` as it is that night.
+
+## Optional hardening: slow down password guessing (`harden.sh`)
+**Not run on a real server.** Tested only against stand-ins (`test/harden-scripts.test.mjs`): the file edits, the validate-then-reload order, the roll-back, the undo and the log pattern are checked; fail2ban itself, a real Caddy log and real bans are not.
+
+**Why.** The sign-in page (Caddy `basic_auth`) has no limit on wrong passwords, and every wrong password costs the small server a bcrypt check. Someone who finds the address can keep the server busy.
+
+**What `bash harden.sh` does (as root, safe to run twice):** turns on Caddy's JSON access log (`/var/log/caddy/access.log`, 10 MB, 3 kept) through a snippet imported into each site block (the main site and the beta); installs fail2ban with a jail `caddy-401` that blocks an address for 1 hour after 8 wrong passwords in 10 minutes (ports 80 and 443; the server itself, 127.0.0.1, is never banned); and turns on automatic SECURITY upgrades without automatic reboot. It runs `caddy validate` before reloading and puts everything back if Caddy refuses. It does NOT add a firewall rate limit (`ufw limit` is made for ssh and would also cut off a kitchen of many tablets behind one Wi-Fi address). `bash harden-remove.sh` undoes it (the packages stay installed).
+
+**Three commands to check it after running it:**
+1. `fail2ban-client status caddy-401` (the jail is listed; "Currently banned" starts at 0)
+2. `caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`
+3. `journalctl -u fail2ban -u caddy -n 40 --no-pager` (no errors about the filter or the log file)
+Then test it: from another computer type 8 wrong passwords at the sign-in page; that computer should be blocked for an hour. Unblock with `fail2ban-client set caddy-401 unbanip ADDRESS`.
+
+**Caution:** a kitchen where all tablets share one public address (one router) shares one limit: eight wrong passwords from any of them block them all for an hour. Type the password carefully or raise `maxretry` in `/etc/fail2ban/jail.d/caddy-401.local`.
+
+## The tunnel (`tunnel.sh`) and its risks
+`tunnel.sh` adds a second address, `https://<random-words>.trycloudflare.com`, that reaches the same server through Cloudflare, for networks that block the server's own address. Plainly:
+- The address is public. Anyone who learns it (a screenshot, a message, a log) reaches the sign-in page. It changes when the tunnel restarts, and anybody can guess nothing about it, but it is not a secret to rely on.
+- The password prompt is the only gate, and the password you type travels through Cloudflare in a form Cloudflare can read.
+- Traffic through the tunnel reaches Caddy from 127.0.0.1, so the fail2ban jail above cannot ban the real caller (it sees only the local connector). Guessing through the tunnel is therefore not slowed down. Use a long password (a phrase), and switch the tunnel off when you do not need it: `systemctl disable --now smokebox-tunnel`.
+- The connector (`cloudflared`) is installed from Cloudflare's "latest" release page with only a size check; it is not pinned or signed here.
