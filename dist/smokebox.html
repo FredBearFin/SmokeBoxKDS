@@ -2668,6 +2668,10 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dp input[type="file"]::file-selector-button { min-height: 44px; padding: 0 var(--sp-4); margin-right: var(--sp-3); border-radius: var(--r-btn); font: inherit; cursor: pointer; }
 .dp-cat { flex: 0 1 14ch; min-width: 0; }
 .dp-check-row { display: flex; align-items: center; gap: var(--sp-3); min-height: 44px; cursor: pointer; } .dp-check-row input { width: 26px; height: 26px; flex: none; } .so-step { gap: var(--sp-3); }
+.dp-sv { margin-top: var(--sp-2); }
+.rc-code { font: var(--w-bold) 34px / 1.2 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.12em; text-align: center; padding: var(--sp-4); background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-panel); user-select: all; overflow-wrap: anywhere; }
+.pin-recover { display: grid; gap: var(--sp-2); }
+.pin-recover label { display: grid; gap: 4px; }
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -4497,7 +4501,7 @@ a.of-nav:active { background: var(--press); }
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.serveSkipped', 'setup.serveAnswer', 'setup.lastCategory', 'setup.cookAheadSkipped', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -10234,7 +10238,7 @@ a.of-nav:active { background: var(--press); }
   const RECOVERY_KEY = 'smokebox.v1.pinrecovery', RECOVERY_TRIES = 5, RECOVERY_LOCK_MS = 15 * 60e3;
   // Letters and digits for a recovery code, leaving out I, O, 0 and 1 so a handwritten card is not misread. 32 characters, 10 in a code: 50 bits.
   const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const START_OVER_KEYS = ['smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
+  const START_OVER_KEYS = ['smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.serveSkipped', 'smokebox.v1.setup.serveAnswer', 'smokebox.v1.setup.lastCategory',
     'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
@@ -18577,12 +18581,31 @@ a.of-nav:active { background: var(--press); }
       const mkKey = (label, aria, fn, aux) => { const b = h('button', { type: 'button', class: 'btn key' + (aux ? ' is-aux' : ''), 'aria-label': aria || label, onClick: fn }, label); keys.push(b); return b; };
       for (let n = 1; n <= 9; n++) pad.appendChild(mkKey(String(n), 'Digit ' + n, () => push(String(n))));
       pad.append(mkKey('Clear', 'Clear all digits', () => { entry = ''; paint(); }, true), mkKey('0', 'Digit 0', () => push('0')), mkKey(ico('backspace', 26), 'Delete last digit', () => { entry = entry.slice(0, -1); paint(); }, true));
+      // The recovery code form inside Forgot the PIN?: the code, a new PIN (or none to remove it), and one button. Refusals show plain words.
+      function recoveryBox() {
+        if (!SB.store || typeof SB.store.recoverPin !== 'function' || !SB.store.hasRecoveryCode || !SB.store.hasRecoveryCode()) return h('p', { class: 'fs-sub' }, 'No recovery code was saved on this device.');
+        const code = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', placeholder: 'ABCDE-FGHJK', 'aria-label': 'Recovery code' });
+        const np = h('input', { class: 'input', type: 'password', inputmode: 'numeric', maxlength: 4, autocomplete: 'off', 'aria-label': 'New 4-digit PIN, or leave empty to remove the PIN' });
+        const out = h('p', { class: 'pin-msg', role: 'status' });
+        // Checks the code and sets the new PIN (or removes it), then lets the owner in.
+        const go = h('button', { type: 'button', class: 'btn', dataset: { act: 'pin-recover' }, onClick: async () => {
+          const v = np.value.trim();
+          if (v && !/^\d{4}$/.test(v)) { out.textContent = 'The new PIN must be exactly 4 digits, or leave it empty to remove the PIN.'; out.setAttribute('data-tone', 'bad'); return; }
+          const hash = v ? await S.hashPin(v) : null;
+          const r = await SB.store.recoverPin(code.value, hash);
+          if (r.ok) { say(r.info && r.info.pinRemoved ? 'PIN removed. Set a new one under Settings, Tax, hours and PIN.' : 'New PIN saved.', null); finish(true); return; }
+          let w = r.report; try { w = SB.engine.describe(r.report, r.info, SB.store.getState().settings) || w; } catch (e) { /* keep the code */ }
+          out.textContent = w; out.setAttribute('data-tone', 'bad');
+        } }, 'Reset the PIN with my code');
+        return h('div', { class: 'pin-recover' }, h('label', null, 'Recovery code', code), h('label', null, 'New PIN (4 digits, or empty to remove)', np), go, out);
+      }
       const note = h('p', { class: 'pin-note' }, 'This PIN keeps line cooks out of the back office. It is not real security: it is stored on this device, and anyone who can use the device can get around it.');
       // What to do when the PIN is forgotten: said plainly, because there is no reset button and nothing here may pretend otherwise.
       const forgot = h('details', { class: 'pin-forgot' },
         h('summary', null, 'Forgot the PIN?'),
         h('p', null, 'The PIN only locks the back office: sales, menu and settings. The kitchen board and New ticket stay open.'),
-        h('p', null, 'Smokebox cannot reset or recover a PIN. It is saved only on this device. First ask whoever set it.'),
+        h('p', null, 'If you saved a recovery code when you set the PIN, use it below. Otherwise ask whoever set the PIN: it is saved only on this device.'),
+        recoveryBox(),
         h('p', null, 'If nobody knows it, the only way back in is to clear this site\'s saved data in your browser settings. That erases everything on this device: tickets, dishes and settings. Then open Smokebox and restore your latest backup (Back office, Data, Import). A backup brings back the PIN it was saved with, so use one made before the PIN was set or changed.'),
         SB.guide && SB.guide.link ? SB.guide.link('empty-lost-or-locked', 'forgot the PIN') : null);
       sh.body.append(dots, msg, status, pad, note, forgot);
@@ -20894,7 +20917,7 @@ a.of-nav:active { background: var(--press); }
     // The empty board leaves out its own walkthrough button while the card (which has one) is up, so there is only one.
     if (wasShown !== show && m.empty && m.empty.dataset.sig) paintEmpty(store().select.counts());
     if (!show) return;
-    put(m.wText, 'Your menu has ' + n + ' ' + U.plural(n, 'dish', 'dishes') + '. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices.');
+    put(m.wText, 'Your menu has ' + n + ' ' + U.plural(n, 'dish', 'dishes') + '. Tap New ticket to take a first order. Tax, hours and PIN are under Settings, Dishes and prices.');
   }
   // Hides the card for good, or shows it again (a restarted demo starts with it).
   F.setWelcome = function (on) {
@@ -24529,7 +24552,7 @@ a.of-nav:active { background: var(--press); }
     // The Guide opens only when the guide page is part of this copy of Smokebox.
     const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
@@ -25718,7 +25741,7 @@ a.of-nav:active { background: var(--press); }
     step('5. Where the tablet sits', 'Put the tablet where the person at the cutting board can tap it without walking. If it is out of reach, batch times will not get logged and the waste numbers will be wrong.');
     // Closes this sheet and opens the Menu and settings page of the back office.
     const openData = () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); };
-    step('6. Your dishes', 'Add your dishes under Dishes and prices, in the Menu. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
+    step('6. Your dishes', 'Add your dishes under Dishes and prices, in Settings. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
       () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu and settings')));
     step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a safety limit. Ask your health department which limit applies to each food you hold, then set it on the Menu and settings page.');
     sheet.body.appendChild(list); keepInView(sheet.body);
@@ -25751,6 +25774,8 @@ a.of-nav:active { background: var(--press); }
   const KEY_DRAFT = 'smokebox.v1.setup.draft'; // the half-typed dish {name, price, zone}, kept so a closed tab loses nothing
   const KEY_LAST = 'smokebox.v1.setup.lastZone'; // the station chosen for the last saved dish
   const KEY_CASKIP = 'smokebox.v1.setup.cookAheadSkipped'; // true once the owner said no to the cooked-ahead question
+  const KEY_SERVESKIP = 'smokebox.v1.setup.serveSkipped'; // true once the owner skipped the How do you serve? question
+  const KEY_SERVEANS = 'smokebox.v1.setup.serveAnswer'; // 'table', 'counter' or 'truck' once the How do you serve? question is answered
   const KEY_HIDDENCAT = 'smokebox.v1.setup.hiddenCategories'; // category ids the owner marked Not used
   const KEY_LASTCAT = 'smokebox.v1.setup.lastCategory'; // the category the owner last chose by hand (not a guess)
   const KEY_HIDDEN = 'smokebox.v1.setup.hiddenStations'; // station ids the owner hid from the Where is it made? tiles
@@ -25903,7 +25928,7 @@ a.of-nav:active { background: var(--press); }
     const store = SB.store;
     if (!store.enterDemo || store.isDemo()) return false;
     const ok = skipAsk || !SB.ui.confirm ? true : await SB.ui.confirm({ title: 'Try the demo?', confirmLabel: 'Try the demo', cancelLabel: 'Not now',
-      body: ['The demo is a demo kitchen with a sample menu and sample tickets. Nothing in it is your kitchen.', 'Your own dishes and orders are not touched. A bar at the top of every screen has a Back to my kitchen button.'] });
+      body: ['The demo has a sample menu and sample tickets. Nothing in it is your kitchen.', 'Your own dishes and orders are not touched. A bar at the top of every screen has a Back to my kitchen button.'] });
     if (!ok) return false;
     if (!store.enterDemo() && SB.ui.toast) SB.ui.toast('This browser would not open the demo. Try again, or add ?demo to the address.', { tone: 'warn' });
     return true;
@@ -26204,7 +26229,7 @@ a.of-nav:active { background: var(--press); }
           // Moves this dish one place up in the menu order.
           h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + m.name + ' down', disabled: idx === mine.length - 1, onClick: () => moveDish(m, 1) }, ico('arrow-down', 20)));
         // Move to: the category this dish sits in on the order screen, changed with one pick.
-        const catSelRow = h('select', { class: 'select dp-cat', 'aria-label': 'Category of ' + m.name }, SB.config.categories.map((c) => h('option', { value: c.id, selected: c.id === m.cat }, c.name)));
+        const catSelRow = h('select', { class: 'select dp-cat', 'aria-label': 'Section of ' + m.name }, SB.config.categories.map((c) => h('option', { value: c.id, selected: c.id === m.cat }, c.name)));
         // Saves the new category for this dish and says so.
         catSelRow.addEventListener('change', () => { const r = send('updateMenuItem', { id: m.id, patch: { cat: catSelRow.value } }); tell(msg, r.ok ? 'Moved to ' + (SB.config.categoryById[catSelRow.value] || {}).name + '.' : r.words); });
         const z = SB.config.zoneById[m.zone];
@@ -26217,24 +26242,32 @@ a.of-nav:active { background: var(--press); }
     // Cooked-ahead food: shown only when that module is on and there is a dish. Optional; never needed to order.
     const caBox = h('section', { class: 'fs-card dp-ca', hidden: true });
     // Paints the question (before any item), or the list of cooked-ahead items with Add another.
+    let caNote = '';
     function paintCook() {
       const items = cookItems();
       const on = cookOn();
-      const show = activeDishes().length > 0 && (on ? (items.length > 0 || !U.storage.get(KEY_CASKIP, false)) : (!U.storage.get(KEY_CASKIP, false) && items.length === 0));
+      const show = caNote || (activeDishes().length > 0 && (on ? (items.length > 0 || !U.storage.get(KEY_CASKIP, false)) : (!U.storage.get(KEY_CASKIP, false) && items.length === 0)));
       caBox.hidden = !show;
       if (!show) return;
       U.clear(caBox);
+      // After a No or Not sure: one line on what turning it on adds and where, shown until this sheet is closed.
+      if (caNote && !items.length) { caBox.append(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'ok', role: 'status' }, caNote)); return; }
       // Opens the sheet that adds one cooked-ahead item.
       const add = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => {
         // Saying yes while the cook-ahead part is off turns it on first, then opens the sheet for the first item.
         if (!cookOn()) send('updateSettings', { patch: { modules: { cookAhead: true } } });
         SB.sheets.open('cookahead');
-      } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Add a cooked-ahead item' : 'Yes, I cook ahead'));
+      } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Yes, I cook ahead' : 'Yes, I cook ahead'));
       if (!items.length) {
-        caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook any of this ahead and hold it?'),
-          h('p', { class: 'fs-sub' }, 'Soup in a warmer, salads in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. You can skip this and still take orders.'),
-          // Remembers the owner said no, so the question goes away.
-          h('div', { class: 'fs-row' }, add, h('button', { type: 'button', class: 'btn', dataset: { act: 'skip-cooked' }, onClick: () => { U.storage.set(KEY_CASKIP, true); paintCook(); } }, 'No, skip this')));
+        caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook food ahead?'),
+          h('p', { class: 'fs-sub' }, 'Soup in a warmer, salads in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. Please pick one: it only takes a tap, and you can change it later.'),
+          h('div', { class: 'fs-row' }, add,
+            // No and Not sure both leave cooking ahead off; Not sure says so, and says how to turn it on later.
+            ['No', 'Not sure'].map((lbl) => h('button', { type: 'button', class: 'btn', dataset: { act: lbl === 'No' ? 'no-cooked' : 'notsure-cooked' }, onClick: () => {
+              U.storage.set(KEY_CASKIP, true);
+              caNote = (lbl === 'No' ? 'Cooking ahead stays off. ' : 'Not sure counts as No for now. ') + 'Turning it on adds the Cabinet, batch timers and their warnings. Turn it on any time under Settings, Tax, hours and PIN.';
+              paintCook();
+            } }, lbl))));
       } else {
         caBox.append(h('h3', { class: 'fs-h' }, 'Cooked-ahead food'),
           h('div', { class: 'dp-list' }, items.map((i) => h('div', { class: 'dp-row' }, h('strong', null, i.name), h('span', { class: 'chip' }, (i.hold === 'cold' ? 'Cold' : 'Hot') + ', up to ' + i.maxHoldH + ' h')))), h('div', { class: 'fs-row' }, add));
@@ -26242,6 +26275,40 @@ a.of-nav:active { background: var(--press); }
     }
     paintCook();
     offs.push(SB.store.subscribe(() => paintCook()));
+
+    // How do you serve? A skippable question under the dishes. Each answer only sets the settings found under Settings, How you serve.
+    const svBox = h('section', { class: 'fs-card dp-sv dp-serve', hidden: true });
+    // The three answers: what each sets, in the order shown. Table service is the starting state, so it only records the answer.
+    const SERVE_CHOICES = [
+      { id: 'table', label: 'Table and kitchen tickets', sets: { counter: false, chips: null } },
+      { id: 'counter', label: 'Counter service', sets: { counter: true, chips: ['Walk-up', 'Pickup', 'Phone', 'Delivery'] } },
+      { id: 'truck', label: 'Food truck / one person', sets: { counter: false, chips: ['Walk-up', 'Pickup'] } },
+    ];
+    // Paints the question until it is answered or skipped; after an answer it says what was set and where to change it.
+    function paintServe(answer) {
+      const answered = answer || U.storage.get(KEY_SERVEANS, '');
+      const show = activeDishes().length > 0 && !U.storage.get(KEY_SERVESKIP, false);
+      svBox.hidden = !show;
+      if (!show) return;
+      U.clear(svBox);
+      if (answered) { svBox.append(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'ok', role: 'status' }, 'Saved: ' + (SERVE_CHOICES.find((c) => c.id === answered) || {}).label + '. You can change this any time under Settings, How you serve.')); return; }
+      svBox.append(h('h3', { class: 'fs-h' }, 'How do you serve?'),
+        h('p', { class: 'fs-sub' }, 'Optional. It only sets the order buttons and counter service for you, and you can change both later.'),
+        h('div', { class: 'fs-row' }, SERVE_CHOICES.map((c) =>
+          // Saves this answer's settings in one step.
+          h('button', { type: 'button', class: c.id === 'table' ? 'btn btn-primary' : 'btn', dataset: { act: 'serve-' + c.id }, onClick: () => answerServe(c) }, c.label)),
+          // Remembers the owner skipped, so the question goes away.
+          h('button', { type: 'button', class: 'btn btn-link', dataset: { act: 'serve-skip' }, onClick: () => { U.storage.set(KEY_SERVESKIP, true); paintServe(); } }, 'Skip')));
+    }
+    // Saves one answer: counter service on or off, and the order buttons (the starting list when none are given).
+    function answerServe(c) {
+      const r1 = send('updateSettings', { patch: { service: { counter: c.sets.counter } } });
+      const r = r1.ok || r1.report === 'nothingToDo' ? send('setChips', { chips: c.sets.chips }) : r1;
+      if (!r.ok && r.report !== 'nothingToDo') { svBox.appendChild(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'bad', role: 'alert' }, r.words)); return; }
+      U.storage.set(KEY_SERVEANS, c.id); paintServe(c.id);
+    }
+    paintServe();
+    offs.push(SB.store.subscribe(() => { if (!svBox.contains(doc.activeElement)) paintServe(); }));
 
     // More ways to add dishes: for now only an example menu, clearly marked as an example.
     const exStatus = h('p', { class: 'fs-sub', role: 'status' });
@@ -26256,7 +26323,7 @@ a.of-nav:active { background: var(--press); }
         if (r.ok) { n++; ids.push(r.info.id); }
       });
       U.storage.set(KEY_EXAMPLES, ids);
-      tell(exStatus, n ? 'Added ' + n + ' example dishes with made-up prices. Each one is marked Example: change its name and price, or tap Remove.' : 'Those example dishes are already on your menu.');
+      tell(exStatus, n ? 'Added ' + n + ' example dishes with sample prices. Each one is marked Example: change its name and price, or tap Remove.' : 'Those example dishes are already on your menu.');
     });
     const exRemove = h('button', { type: 'button', class: 'btn', dataset: { act: 'example-remove' } }, ico('x', 20), h('span', null, 'Remove all example dishes'));
     // Archives every dish that came from the example menu, in one tap.
@@ -26274,7 +26341,7 @@ a.of-nav:active { background: var(--press); }
     // Links to the other small settings and to the full menu editor in the back office.
     const shopBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('shop'), 60); } }, ico('sliders', 20), h('span', null, 'Tax, hours and PIN'));
     const fullBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); } }, ico('gauge', 20), h('span', null, 'Full menu editor (ingredients, prep times)'));
-    root.append(lead, form, dishesHead, undoBar, listBox, goneFold, caBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
+    root.append(lead, form, dishesHead, undoBar, listBox, goneFold, caBox, svBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
     sheet.body.appendChild(root); keepInView(root);
 
     // Restore a draft left by a closed tab, then the last station used.
@@ -26377,7 +26444,7 @@ a.of-nav:active { background: var(--press); }
       rows.forEach((r) => {
         // The importer's own warnings about extra columns or a digits-only category also leave the row unticked.
         if ((r.problems || []).some((p) => p.code === 'extraColumns' || p.code === 'numericCategory')) { r.keep = false; return; }
-        if (/^\d+$/.test(String(r.categoryText || '').trim())) { r.problems = (r.problems || []).concat([{ code: 'priceSplit', level: 'warn', message: 'The category here is "' + r.categoryText + '", which looks like the end of a price split at a comma (4,50).', fix: 'Check the price, tick the row when it is right. In your file, put prices with commas inside quotes.' }]); r.keep = false; }
+        if (/^\d+$/.test(String(r.categoryText || '').trim())) { r.problems = (r.problems || []).concat([{ code: 'priceSplit', level: 'warn', message: 'The section here is "' + r.categoryText + '", which looks like the end of a price split at a comma (4,50).', fix: 'Check the price, select the row when it is right. In your file, put prices with commas inside quotes.' }]); r.keep = false; }
       });
       if (res.summary && res.summary.unmatched) res.summary.unmatched.categories = res.summary.unmatched.categories.filter((c) => !/^\d+$/.test(String(c).trim()));
       paintPreview(from);
@@ -26400,6 +26467,11 @@ a.of-nav:active { background: var(--press); }
       const sm = parsed.summary;
       preview.append(h('p', { class: 'fs-sub dp-fmt' }, 'Read ' + (from || 'the text') + ' as: ' + parsed.label + '. ' + sm.message));
       (sm.notes || []).forEach((n) => preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, n)));
+      // Columns the importer did not use (like Notes), named once so nothing is dropped without a word.
+      const ign = Array.isArray(sm.ignoredColumns) ? sm.ignoredColumns : [];
+      // Notes or descriptions are read but not stored with a dish, so say that too.
+      if (rows.some((r) => r.description)) preview.appendChild(h('p', { class: 'fs-sub dp-ignored', dataset: { act: 'notes-ignored' } }, 'Notes and descriptions in your file are not kept: Smokebox stores only the name, price, station and section.'));
+      if (ign.length) preview.appendChild(h('p', { class: 'fs-sub dp-ignored', dataset: { act: 'ignored-columns' } }, (ign.length === 1 ? 'Ignored column: ' : 'Ignored columns: ') + ign.join(', ') + '. Smokebox does not keep ' + (ign.length === 1 ? 'it' : 'them') + '.'));
       // Words in the file that match none of the owner's categories or stations: say it once, and offer to add the categories.
       const um = sm.unmatched || { stations: [], categories: [] };
       if (um.categories.length) {
@@ -26408,11 +26480,11 @@ a.of-nav:active { background: var(--press); }
           const C = SB.config, spec = JSON.parse(JSON.stringify(C.customSpec()));
           spec.add = spec.add || {}; spec.add.categories = (spec.add.categories || []).concat(um.categories.map((nm) => ({ name: nm })));
           const before = C.customSpec(), res = C.applyCustom(spec);
-          if (res.rejected.length) { C.applyCustom(before); tell(status, 'Some of those category names could not be added (too long, a repeat, or the list is full). Change the category words in the file, or add them one by one in the Back office.', 'bad'); return; }
+          if (res.rejected.length) { C.applyCustom(before); tell(status, 'Some of those section names could not be added (too long, a repeat, or the list is full). Change the category words in the file, or add them one by one in the Back office.', 'bad'); return; }
           C.saveCustom(spec); check(area.value, 'the file');
-          tell(status, 'Added ' + um.categories.length + ' ' + U.plural(um.categories.length, 'category', 'categories') + '. Each dish now sits in its own.', 'ok');
-        } }, 'Add these categories');
-        preview.appendChild(h('div', { class: 'fs-note', 'data-tone': 'warn' }, h('div', null, h('p', null, 'Your file has categories that are not set up here: ' + um.categories.join(', ') + '. Until you add them, those dishes go in "' + ((SB.config.categories[0] || {}).name || 'the first category') + '".'), addCats)));
+          tell(status, 'Added ' + um.categories.length + ' ' + U.plural(um.categories.length, 'section', 'sections') + '. Each dish now sits in its own.', 'ok');
+        } }, 'Add these sections');
+        preview.appendChild(h('div', { class: 'fs-note', 'data-tone': 'warn' }, h('div', null, h('p', null, 'Your file has sections that are not set up here: ' + um.categories.join(', ') + '. Until you add them, those dishes go in "' + ((SB.config.categories[0] || {}).name || 'the first category') + '".'), addCats)));
       }
       if (um.stations.length) preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'Your file names stations that are not set up here: ' + um.stations.join(', ') + '. Pick each dish\'s station below.'));
       // One station for every dish that came with none, so a cafe does not pick it 22 times.
@@ -26543,10 +26615,10 @@ a.of-nav:active { background: var(--press); }
       h('h3', { class: 'fs-h' }, '1. What happens'),
       h('p', { class: 'fs-sub' }, 'This empties your kitchen so you can begin again with a blank menu.'),
       h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device.'),
-      h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and categories. Clear the box and those go back to how Smokebox starts.'),
+      h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and sections. Clear the box and those go back to how Smokebox starts.'),
       keepLabel,
       h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'There is no undo. We are sorry to be blunt: once you confirm, the old menu and history cannot be brought back, except from a backup file you saved first.'));
-    const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: save a backup');
+    const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: about your backup');
     step1.appendChild(next1);
 
     const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' } }, 'Next: confirm');
@@ -26604,6 +26676,168 @@ a.of-nav:active { background: var(--press); }
     return sheet;
   }
 
+  /* ---------- How you serve ---------- */
+
+  // The starting order buttons, as the engine knows them (the built-in list used when none is saved).
+  const chipDefaults = () => (SB.engine && SB.engine.chipsOf ? SB.engine.chipsOf({}) : ['Walk-up', 'Pickup', 'Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6']);
+  const CHIP_MAX = (SB.engine && SB.engine.CHIP_MAX) || 12; // the most order buttons the order screen holds
+  const CHIP_LEN = (SB.engine && SB.engine.CHIP_LEN) || 24; // letters in one order button name
+  // The order buttons now in use, as plain names: the owner's list, or the starting list when none is saved.
+  function currentChips() { return SB.engine && SB.engine.chipsOf ? SB.engine.chipsOf(SB.store.getState().settings) : chipDefaults(); }
+  // The currency symbol now shown with prices, as plain text ($ when none is saved).
+  function currentSymbol() {
+    const ui = (SB.store.getState().settings || {}).ui || {};
+    return typeof ui.currency === 'string' && ui.currency ? ui.currency : '$';
+  }
+  // Opens "How you serve": counter service on or off, the order buttons, and the currency symbol. Every change saves at once and
+  // offers Undo; nothing here is required.
+  function openServe() {
+    const sheet = SB.ui.sheet({ title: 'How you serve', side: 'right', width: 'min(640px, 96vw)', name: 'serve', onClose: () => offs.splice(0).forEach((f) => f()) });
+    const offs = [];
+    const root = h('div', { class: 'dp so-serve' });
+    const undoBar = h('div', { class: 'fs-note dp-undo', hidden: true, role: 'status' });
+    // Shows a message with an Undo button that runs the given undo step.
+    function offerUndo(message, undo) {
+      U.clear(undoBar);
+      // Runs the undo step and puts the bar away.
+      undoBar.append(h('span', null, message + ' '), h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'serve-undo' }, onClick: () => { undo(); undoBar.hidden = true; } }, 'Undo'));
+      undoBar.hidden = false;
+    }
+
+    // 1. Counter service.
+    const cSt = h('p', { class: 'fs-sub', role: 'status' });
+    // Says whether counter service is on now.
+    const counterOn = () => !!(((SB.store.getState().settings || {}).service || {}).counter);
+    const counterTog = SB.ui.toggle({ label: 'Counter service', checked: counterOn(),
+      // Saves the choice, says what it means, and offers Undo.
+      onChange: (on) => {
+        const before = !on;
+        const r = send('updateSettings', { patch: { service: { counter: on } } });
+        if (!r.ok && r.report !== 'nothingToDo') { counterTog.setValue(before); tell(cSt, r.words, 'bad'); return; }
+        tell(cSt, on ? 'On. You hand food over at the counter, so orders do not wait on kitchen tickets.' : 'Off. Orders go to the kitchen as tickets.', 'ok');
+        offerUndo('Counter service is ' + (on ? 'on' : 'off') + '.', () => { send('updateSettings', { patch: { service: { counter: before } } }); counterTog.setValue(before); });
+      } });
+    const sec1 = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Counter service'),
+      h('p', { class: 'fs-sub' }, 'You hand food over at the counter and do not need kitchen tickets. Leave it off if cooks work from tickets.'), counterTog, cSt);
+
+    // 2. Order buttons.
+    const bSt = h('p', { class: 'fs-sub', role: 'status' });
+    const list = h('div', { class: 'dp-stlist' });
+    // Saves a whole new list of order buttons, with Undo back to the old list.
+    function saveChips(next, message) {
+      const before = currentChips();
+      if (next.length > CHIP_MAX) { tell(bSt, 'You can have up to ' + CHIP_MAX + ' order buttons. Remove one first.', 'bad'); return false; }
+      const r = send('setChips', { chips: next });
+      if (!r.ok && r.report !== 'nothingToDo') { tell(bSt, r.words, 'bad'); return false; }
+      tell(bSt, message, 'ok');
+      offerUndo(message, () => { send('setChips', { chips: before }); paintChips(); });
+      paintChips();
+      return true;
+    }
+    // Rebuilds the rows: a name box, up, down and Remove for each button, then an add box.
+    function paintChips() {
+      U.clear(list);
+      const cur = currentChips();
+      cur.forEach((label, i) => {
+        const inp = h('input', { class: 'input', type: 'text', maxlength: CHIP_LEN, value: label, 'aria-label': 'Order button ' + (i + 1) });
+        // Saves a renamed button when the box is left; an empty name is refused.
+        inp.addEventListener('change', () => {
+          const v = inp.value.replace(/\s+/g, ' ').trim();
+          if (!v) { inp.value = label; tell(bSt, 'A button needs a name. Type one, or tap Remove.', 'bad'); return; }
+          if (cur.some((x, j) => j !== i && x.toLowerCase() === v.toLowerCase())) { inp.value = label; tell(bSt, 'There is already a button called ' + v + '. Pick another name.', 'bad'); return; }
+          if (v !== label) saveChips(cur.map((x, j) => (j === i ? v : x)), 'Renamed ' + label + ' to ' + v + '.');
+        });
+        // Moves this button one place up or down.
+        const move = (d) => () => { const n = cur.slice(); const k = i + d; if (k < 0 || k >= n.length) return; [n[i], n[k]] = [n[k], n[i]]; saveChips(n, 'Moved ' + label + (d < 0 ? ' up.' : ' down.')); };
+        list.appendChild(h('div', { class: 'dp-strow' }, inp,
+          h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + label + ' up', disabled: i === 0, onClick: move(-1) }, ico('arrow-up', 20)),
+          h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + label + ' down', disabled: i === cur.length - 1, onClick: move(1) }, ico('arrow-down', 20)),
+          // Removes this button (it can be added again, or brought back with Undo).
+          h('button', { type: 'button', class: 'btn btn-sm', 'aria-label': 'Remove ' + label, onClick: () => { if (cur.length <= 1) { tell(bSt, 'Keep at least one order button, or reset to the starting list.', 'bad'); return; } saveChips(cur.filter((x, j) => j !== i), 'Removed ' + label + '.'); } }, ico('x', 18), h('span', null, 'Remove'))));
+      });
+      const addIn = h('input', { class: 'input', type: 'text', maxlength: CHIP_LEN, placeholder: 'New button, like Phone', 'aria-label': 'New order button name' });
+      // Adds a button with the typed name at the end of the list.
+      const add = () => {
+        const v = addIn.value.replace(/\s+/g, ' ').trim();
+        if (!v) return;
+        if (cur.some((x) => x.toLowerCase() === v.toLowerCase())) { tell(bSt, 'There is already a button called ' + v + '. Pick another name.', 'bad'); return; }
+        if (saveChips(cur.concat([v]), 'Added ' + v + '.')) addIn.value = '';
+      };
+      addIn.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); add(); } });
+      list.appendChild(h('div', { class: 'dp-strow' }, addIn, h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'chip-add' }, onClick: add }, ico('plus', 18), h('span', null, 'Add button'))));
+    }
+    paintChips();
+    const reset = h('button', { type: 'button', class: 'btn', dataset: { act: 'chips-reset' },
+      // Goes back to the starting list of order buttons (with Undo).
+      onClick: () => saveChips(chipDefaults(), 'Order buttons are back to the starting list.') }, 'Reset to the starting list');
+    const sec2 = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Order buttons'),
+      h('p', { class: 'fs-sub' }, 'The quick buttons on the order screen for who the order is for: Walk-up, Pickup, tables, Phone, Delivery. Up to ' + CHIP_MAX + '.'), list, reset, bSt);
+
+    // 3. Currency symbol.
+    const curSt = h('p', { class: 'fs-sub', role: 'status' });
+    const custom = h('input', { class: 'input dp-num', type: 'text', maxlength: 3, autocomplete: 'off', 'aria-label': 'Your own currency symbol', placeholder: 'kr' });
+    const symbols = ['$', '\u20ac', '\u00a3'];
+    const now = currentSymbol();
+    const seg = SB.ui.segmented({ label: 'Currency symbol', value: symbols.indexOf(now) >= 0 ? now : 'other',
+      options: symbols.map((s) => ({ id: s, label: s })).concat([{ id: 'other', label: 'Your own' }]),
+      // Picks a standard symbol (saved at once) or shows the box for your own.
+      onChange: (id) => { custom.hidden = id !== 'other'; if (id !== 'other') saveSymbol(id); } });
+    custom.hidden = symbols.indexOf(now) >= 0;
+    if (symbols.indexOf(now) < 0) custom.value = now;
+    // Saves a symbol and offers Undo back to the old one.
+    function saveSymbol(sym) {
+      const before = currentSymbol();
+      if (sym === before) return;
+      const r = send('updateSettings', { patch: { ui: { currency: sym } } });
+      if (!r.ok && r.report !== 'nothingToDo') { tell(curSt, r.words, 'bad'); return; }
+      tell(curSt, 'Prices now show ' + sym + '. Screens already open update when you close this sheet.', 'ok');
+      offerUndo('Currency symbol is ' + sym + '.', () => { send('updateSettings', { patch: { ui: { currency: before } } }); });
+    }
+    // Saves your own symbol when the box is left; one to three characters.
+    custom.addEventListener('change', () => { const v = custom.value.trim(); if (!v || !(SB.util.validCurrency ? SB.util.validCurrency(v) : v.length <= 3)) { tell(curSt, 'Type one to three letters or signs, like kr or Rs. No digits.', 'bad'); return; } saveSymbol(v); });
+    const sec3 = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Currency symbol'),
+      h('p', { class: 'fs-sub' }, 'Shown with every price. It does not convert anything.'), seg, custom, curSt);
+
+    offs.push(SB.store.subscribe(() => { if (!list.contains(doc.activeElement)) paintChips(); }));
+    root.append(undoBar, sec1, sec2, sec3);
+    sheet.body.appendChild(root); keepInView(root);
+    return sheet;
+  }
+
+  /* ---------- PIN recovery code ---------- */
+
+  // Makes a new recovery code and shows it once on a "write this down" screen with Copy and Print. The Done button stays off until the
+  // owner selects "I saved it". Needs a PIN; says plainly why when it cannot make one. Used after a PIN is set, and from the PIN section.
+  async function showRecoveryCode() {
+    const st = SB.store;
+    if (!st || typeof st.createRecoveryCode !== 'function') return false;
+    const r = await st.createRecoveryCode();
+    if (!r.ok) { let w = r.report; try { w = SB.engine.describe(r.report, r.info, st.getState().settings) || w; } catch (e) { /* keep the code */ } if (SB.ui.toast) SB.ui.toast('The recovery code could not be made. ' + w, { tone: 'warn' }); return false; }
+    const sheet = SB.ui.sheet({ title: 'Write down your recovery code', side: 'center', width: 'min(560px, 96vw)', name: 'recoverycode' });
+    const codeEl = h('div', { class: 'rc-code', 'aria-label': 'Your recovery code', role: 'textbox' }, r.code);
+    const msg = h('p', { class: 'fs-sub', role: 'status' });
+    // Copies the code to the clipboard and says whether that worked.
+    const copy = h('button', { type: 'button', class: 'btn', dataset: { act: 'rc-copy' }, onClick: () => { Promise.resolve(SB.ui.copyText ? SB.ui.copyText(r.code) : false).then((ok) => tell(msg, ok ? 'Copied. Paste it somewhere safe, away from this tablet.' : 'Could not copy. Write the code down by hand.', ok ? 'ok' : 'bad')); } }, ico('copy', 20), h('span', null, 'Copy'));
+    // Prints a page with only the code and a short note, through a hidden frame.
+    const print = h('button', { type: 'button', class: 'btn', dataset: { act: 'rc-print' }, onClick: () => {
+      try {
+        const f = doc.createElement('iframe'); f.style.cssText = 'position:fixed;width:0;height:0;border:0'; doc.body.appendChild(f);
+        f.contentDocument.open(); f.contentDocument.write('<!doctype html><title>Smokebox recovery code</title><body style="font-family:sans-serif;padding:24px"><h1>Smokebox recovery code</h1><p style="font:700 32px monospace;letter-spacing:4px">' + r.code + '</p><p>Keep this page somewhere safe, away from the tablet. It is the only way back in if the manager PIN is forgotten.</p></body>'); f.contentDocument.close();
+        f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 2000);
+      } catch (e) { tell(msg, 'This browser could not print. Write the code down by hand.', 'bad'); }
+    } }, ico('receipt', 20), h('span', null, 'Print'));
+    const saved = h('input', { type: 'checkbox', id: 'rc-saved' });
+    // Copies the recovery code to the clipboard and says whether it worked.
+    const done = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'rc-done' }, disabled: true, onClick: () => sheet.close('done') }, 'Done');
+    // The Done button wakes up only when the owner says the code is saved.
+    saved.addEventListener('change', () => { done.disabled = !saved.checked; });
+    sheet.body.append(h('div', { class: 'dp' },
+      h('p', null, h('strong', null, 'Write this down now. '), 'If you forget the manager PIN, this code is the only way to set a new one. It will not be shown again, and Smokebox does not keep a readable copy.'),
+      codeEl, h('div', { class: 'fs-row' }, copy, print), msg,
+      h('label', { class: 'dp-check-row', for: 'rc-saved' }, saved, h('span', null, 'I saved it')), done));
+    return true;
+  }
+
   /* ---------- the Tax, hours and PIN sheet ---------- */
 
   // Opens "Tax, hours and PIN": the shop settings that used to be steps of a wizard. Each saves on its own button.
@@ -26646,8 +26880,10 @@ a.of-nav:active { background: var(--press); }
         if (!/^\d{4}$/.test(v)) { tell(pinSt, 'Use exactly 4 digits.'); return; }
         const r = SB.shell && SB.shell.setPin ? await SB.shell.setPin(v) : { ok: false };
         tell(pinSt, r.ok ? 'PIN set. The back office will ask for it.' : 'The PIN could not be saved.');
-        if (r.ok) pin.value = '';
-      } }, 'Set PIN'));
+        if (r.ok) { pin.value = ''; await showRecoveryCode(); }
+      } }, 'Set PIN'),
+      // For a PIN set before recovery codes existed: makes the code now.
+      SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.store.hasRecoveryCode && !SB.store.hasRecoveryCode() ? h('button', { type: 'button', class: 'btn', dataset: { act: 'make-recovery' }, onClick: () => showRecoveryCode() }, 'Make a recovery code') : null);
     // Cook-ahead: one yes or no, kept in the real setting (settings.modules.cookAhead). A saved kitchen from before this
     // setting existed counts as Yes, so nothing disappears from it.
     const on0 = SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : false;
@@ -26677,12 +26913,13 @@ a.of-nav:active { background: var(--press); }
   SB.sheets.register('setup', openSetup);
   SB.sheets.register('dishes', openDishes);
   SB.sheets.register('shop', openShop);
+  SB.sheets.register('serve', openServe);
   SB.sheets.register('startover', openStartOver);
   SB.sheets.register('menuimport', openImport);
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { showRecoveryCode, leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 77-floor-setup.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'77-floor-setup.js',message:String(e&&e.message||e)});}
