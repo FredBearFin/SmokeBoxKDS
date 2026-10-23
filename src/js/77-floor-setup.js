@@ -46,9 +46,9 @@
     step('5. Where the tablet sits', 'Put the tablet where the person at the cutting board can tap it without walking. If it is out of reach, batch times will not get logged and the waste numbers will be wrong.');
     // Closes this sheet and opens the Menu and settings page of the back office.
     const openData = () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); };
-    step('6. Your dishes', 'Add your dishes under Dishes and prices, in the Menu. Then open Menu and settings to enter your real cost per kg, the 86 point, the pull size (one whole brisket, one rack, one pan), the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
+    step('6. Your dishes', 'Add your dishes under Dishes and prices, in the Menu. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
       () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu and settings')));
-    step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a safety limit. Slaw, potato salad and banana pudding start as quality limits. Ask your health department which limit applies to each food you hold, then set it on the Menu and settings page.');
+    step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a safety limit. Ask your health department which limit applies to each food you hold, then set it on the Menu and settings page.');
     sheet.body.appendChild(list);
     return sheet;
   }
@@ -68,7 +68,7 @@
     fry: { cat: 'fried', sec: 240, track: 'two' }, cold: { cat: 'cold', sec: 60, track: 'one' },
   };
   // A short plain line under each station name on its tile.
-  const ZONE_HINT = { pit: 'Smoker and slicing', sides: 'Stove and sides', fry: 'Fryer', cold: 'No cooking: drinks, cold sides' };
+  const ZONE_HINT = { pit: 'Smoker, grill or oven', sides: 'Stove and sides', fry: 'Fryer', cold: 'No cooking: drinks, cold sides' };
   // The example menu. Columns: name, price in dollars, station id, category id. Made-up prices, owner to replace.
   // audit:data-start
   const EXAMPLES = [
@@ -150,7 +150,7 @@
     // Says what went wrong in plain words, such as a dish that already lists ingredients.
     const say = (r) => { msg.textContent = r.ok ? '' : (r.report === 'portionsConflict' ? 'This dish already uses ingredients, so it cannot be counted by portions too.' : r.words); };
     if (left < 0) {
-      const cnt = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', placeholder: 'How many', 'aria-label': 'How many ' + m.name + ' you made' });
+      const cnt = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', placeholder: 'How many?', 'aria-label': 'How many ' + m.name + ' you made' });
       // Starts counting portions for this dish at the typed number.
       const go = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => {
         const n = cnt.value.trim() === '' ? 0 : Number(cnt.value);
@@ -433,7 +433,7 @@
       } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Add a cooked-ahead item' : 'Yes, I cook ahead'));
       if (!items.length) {
         caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook any of this ahead and hold it?'),
-          h('p', { class: 'fs-sub' }, 'Brisket in the morning, slaw in the cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. You can skip this and still take orders.'),
+          h('p', { class: 'fs-sub' }, 'Chili in a warmer, potato salad in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. You can skip this and still take orders.'),
           // Remembers the owner said no, so the question goes away.
           h('div', { class: 'fs-row' }, add, h('button', { type: 'button', class: 'btn', dataset: { act: 'skip-cooked' }, onClick: () => { U.storage.set(KEY_CASKIP, true); paintCook(); } }, 'No, skip this')));
       } else {
@@ -468,7 +468,7 @@
       exStatus.textContent = 'Example dishes removed.';
     });
     const ways = h('details', { class: 'dp-fold dp-ways' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'More ways to add dishes')),
-      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'An example barbecue menu with made-up prices, so you can see how Smokebox looks with food on it. You can edit or remove every dish.'), h('div', { class: 'fs-row' }, exBtn, exRemove), exStatus,
+      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'An example menu with sample prices, so you can see how Smokebox looks with food on it. You can edit or remove every dish.'), h('div', { class: 'fs-row' }, exBtn, exRemove), exStatus,
         // A quiet link to the optional menu import screen.
         h('p', { class: 'fs-sub' }, h('button', { type: 'button', class: 'btn btn-link', dataset: { act: 'open-import' }, onClick: () => SB.sheets.open('menuimport') }, 'Have a menu file? Import it'))));
 
@@ -506,7 +506,7 @@
       const gIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', value: '150', 'aria-label': 'Grams of it in one ' + m.name });
       return { m, cb, gIn, el: h('div', { class: 'dp-row' }, h('label', { class: 'grow' }, cb, ' ' + m.name + (portionLeft(m) >= 0 ? ' (counted by portions)' : '')), h('span', { class: 'fs-sub' }, 'grams in one:'), gIn) };
     });
-    const dishBox = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Which dishes use it?'), h('p', { class: 'fs-sub' }, 'Tick each dish and the grams of it in one serving (150 is a starting guess). Smokebox takes that much off the batch when the dish is made.'), h('div', { class: 'dp-list' }, dishRows.map((r) => r.el)));
+    const dishBox = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Which dishes use it?'), h('p', { class: 'fs-sub' }, 'Select each dish and enter the grams of it in one serving (150 is a starting guess). Smokebox takes that much off the batch when the dish is made.'), h('div', { class: 'dp-list' }, dishRows.map((r) => r.el)));
     const status = h('p', { class: 'fs-sub', role: 'status' });
     const after = h('div', { class: 'fs-row', hidden: true });
     // Saves the item and links the ticked dishes; says plainly what happened and what to do next.
@@ -603,7 +603,7 @@
           else prob.textContent = (!String(r.name || '').trim() ? 'Type a name. ' : '') + (typeof r.price !== 'number' ? 'Type a price like 12.50. ' : '') + ({ removed: 'A removed dish has this name. Bring it back in Dishes and prices, or use another name.', menu: 'That name is already on the menu.', list: 'That name is in this list twice.' }[takenBy(r)] || '');
           paintGo();
         };
-        // Ticking a row in or out changes only whether it is imported.
+        // Selecting a row in or out changes only whether it is imported.
         keep.addEventListener('change', () => { r.keep = keep.checked && (r.ok = rowOk(r)); keep.checked = r.keep; paintGo(); });
         // Typing a new name or price re-checks the row and ticks it in when it has become valid.
         const edit = () => { r.name = nm.value.replace(/\s+/g, ' ').trim(); const p = SB.menuImport.readPrice(pr.value); r.price = p && typeof p.value === 'number' ? p.value : null; r.station = zs.value; r.ok = rowOk(r); r.keep = r.ok; redo(); };
@@ -714,7 +714,7 @@
         if (!r.ok && r.report !== 'nothingToDo') { cook.setValue(v === 'yes' ? 'no' : 'yes'); cookSt.textContent = r.words; return; }
         cookSt.textContent = v === 'yes' ? 'On. The Cabinet, cooked-batch times and their warnings are available. Change this any time here.' : 'Off. Batch tracking stays out of the way. Change this any time here.';
       } });
-    const cookSt = section('Cooking ahead', 'Some places cook brisket or pork in the morning and slice it to order, or keep cold sides in a cooler. If you do, Smokebox can track those batches and warn you before they run out of time. Most new places start with No.', cook);
+    const cookSt = section('Cooking ahead', 'Some places cook a big batch in the morning and serve from it all day, or keep cold sides in a cooler. If you do, Smokebox can track those batches and warn you before they run out of time. Most new places start with No.', cook);
     sheet.body.appendChild(list);
     return sheet;
   }
