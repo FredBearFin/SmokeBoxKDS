@@ -1052,7 +1052,7 @@
   // ingredients, stock, batches, tickets, orders and history (resetLive, catalog 'blank') and the setup-progress choices, so the
   // kitchen is exactly like a brand-new install. opts.keepSettings (default true) keeps tax, hours, PIN, units and station names;
   // false resets those too. Returns { ok, report, info, backup? } with backup { text, filename, mime, savedAt, chars } for the
-  // screen to download; the last good copy is also refreshed first, so a damaged save can still come back.
+  // screen to download; the old last good copy and any set-aside damaged copy are dropped after the erase and the last good copy is retaken from the empty kitchen, so a damaged save can never bring the erased kitchen back.
   // WATCH OUT: the demo's keys are never read or written here.
   function startOver(opts) {
     opts = opts || {};
@@ -1066,10 +1066,14 @@
     const text = exportAll();
     if (text == null) { const lr = last || {}; return fail(lr.report || 'invalidBackup', lr.info); }
     const savedAt = realNow();
-    snapWanted = 'startOver'; maybeSnapshot(savedAt);
     const rep = resetLive({ keepSettings: keep, catalog: 'blank', replaceOwn: true, starter: false });
     if (rep !== 'ok') return fail(rep);
     for (const k of START_OVER_KEYS) { try { storage.remove(k); } catch (e) { /* ignore */ } }
+    // Only now that the erase went in: the rolling last-good copy and any set-aside damaged copy still hold the old kitchen's
+    // customers and orders, so both are dropped and the last-good copy is retaken from the new empty kitchen.
+    try { storage.remove(LASTGOOD_KEY); storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); } catch (e) { /* ignore */ }
+    st.corrupt = null;
+    snapWanted = 'startOver'; persistNow(); maybeSnapshot(savedAt);
     if (!keep && SB.config && typeof SB.config.applyCustom === 'function') {
       try { SB.config.applyCustom({}); SB.config.saveCustom({ rename: {}, add: {} }); } catch (e) { /* the names stay as they were */ }
     }
