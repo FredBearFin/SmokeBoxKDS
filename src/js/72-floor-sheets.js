@@ -2183,6 +2183,18 @@
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
     const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Tablet checks: screen, sound, home screen', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet: first steps', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
+    // The saved-history line: how full this tablet's saved history is, and a way to Close the month once it is getting full.
+    // Nothing shows in the demo or when the store cannot say.
+    const historyBlock = (() => {
+      let fill = null; try { fill = SB.store.historyFill && !(SB.store.isDemo && SB.store.isDemo()) ? SB.store.historyFill() : null; } catch (e) { fill = null; }
+      if (!fill || typeof fill.pct !== 'number') return null;
+      const parts = [];
+      // Closes Settings, then opens the Close the month flow (which asks for the PIN first).
+      const openFlow = () => closeThen(sheet, () => SB.setup && SB.setup.openCloseMonth && SB.setup.openCloseMonth());
+      if (fill.nearFull) parts.push(h('button', { type: 'button', class: 'btn', dataset: { act: 'history-close-month' }, onClick: openFlow }, 'Close the month...'));
+      const words = 'Saved history: ' + Math.round(fill.pct) + '% full.' + (fill.nearFull ? ' Close the month to save older days to files.' : '') + (fill.persisted === false ? ' Your browser may clear this data if the tablet is unused. Installing the app (Tablet checks, step 4) usually helps. Save a backup every day.' : '');
+      return settingBlock('Saved history', words, ...parts);
+    })();
     sheet.body.append(h('div', { class: 'mn' },
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
       SB.setup && SB.setup.leftoversCard ? SB.setup.leftoversCard() : null,
@@ -2196,6 +2208,7 @@
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       clockBlock,
+      historyBlock,
       settingBlock('More', '', links),
       // Start over sits alone at the very bottom, away from the everyday buttons. In the demo it is replaced by the way back.
       SB.store.isDemo && SB.store.isDemo()

@@ -26391,6 +26391,18 @@ a.of-nav:active { background: var(--press); }
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
     const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Tablet checks: screen, sound, home screen', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet: first steps', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
+    // The saved-history line: how full this tablet's saved history is, and a way to Close the month once it is getting full.
+    // Nothing shows in the demo or when the store cannot say.
+    const historyBlock = (() => {
+      let fill = null; try { fill = SB.store.historyFill && !(SB.store.isDemo && SB.store.isDemo()) ? SB.store.historyFill() : null; } catch (e) { fill = null; }
+      if (!fill || typeof fill.pct !== 'number') return null;
+      const parts = [];
+      // Closes Settings, then opens the Close the month flow (which asks for the PIN first).
+      const openFlow = () => closeThen(sheet, () => SB.setup && SB.setup.openCloseMonth && SB.setup.openCloseMonth());
+      if (fill.nearFull) parts.push(h('button', { type: 'button', class: 'btn', dataset: { act: 'history-close-month' }, onClick: openFlow }, 'Close the month...'));
+      const words = 'Saved history: ' + Math.round(fill.pct) + '% full.' + (fill.nearFull ? ' Close the month to save older days to files.' : '') + (fill.persisted === false ? ' Your browser may clear this data if the tablet is unused. Installing the app (Tablet checks, step 4) usually helps. Save a backup every day.' : '');
+      return settingBlock('Saved history', words, ...parts);
+    })();
     sheet.body.append(h('div', { class: 'mn' },
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
       SB.setup && SB.setup.leftoversCard ? SB.setup.leftoversCard() : null,
@@ -26404,6 +26416,7 @@ a.of-nav:active { background: var(--press); }
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       clockBlock,
+      historyBlock,
       settingBlock('More', '', links),
       // Start over sits alone at the very bottom, away from the everyday buttons. In the demo it is replaced by the way back.
       SB.store.isDemo && SB.store.isDemo()
@@ -30098,6 +30111,14 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "p",
       "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first."
+     },
+     {
+      "t": "h",
+      "x": "How full the saved history is"
+     },
+     {
+      "t": "p",
+      "x": "Settings and the Data page show **Saved history**, how full this tablet is. When it is nearly full, **Close the month...** is offered there."
      }
     ]
    },
@@ -30370,6 +30391,22 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "p",
       "x": "If a message says some saved records could not be read and were left out, the data as it was is kept. Do not clear the browser data. Ask whoever set up Smokebox. If a full-screen message says the saved data could not be read, tap **Download the old data** or **Show the data so I can copy it**. Only then can you continue."
+     },
+     {
+      "t": "h",
+      "x": "A copy that was set aside"
+     },
+     {
+      "t": "p",
+      "x": "When Smokebox could not read your saved data at start-up, it kept the unreadable copy aside for 30 days and began with its last good copy. If that set-aside copy can be read now (for example after going back to a newer version), the Data page shows a card: **A copy of your kitchen was set aside**. It says when it was set aside and how many tickets and orders it holds."
+     },
+     {
+      "t": "p",
+      "x": "To bring it back, open Back office, Menu and settings, then Data. In the card, tap **Save a backup of what is here now first** and check that the file arrived. Then type **RESTORE** and tap **Bring the set-aside copy back**. If a PIN is set, Smokebox asks for it first. Everything on this device is replaced by the set-aside copy. What was here before is kept for 7 days: tap **Undo this restore** to put it back."
+     },
+     {
+      "t": "p",
+      "x": "To forget the set-aside copy, tap **Throw the set-aside copy away**. Your kitchen as it is now is not touched, and the copy cannot be brought back."
      }
     ]
    },
@@ -36045,6 +36082,55 @@ a.of-nav:active { background: var(--press); }
       else SB.ui.toast(rep === 'noCopy' ? 'The copy from before the restore is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings), { tone: 'warn' });
       paintUndo();
     }
+    // A copy that was set aside as unreadable (or by a newer build) can still be read: say what it holds and offer to bring it back or throw it away.
+    const parkedBox = h('div', { class: 'od-parked', 'data-region': 'parked-copy' });
+    const PARK_WORD = 'RESTORE';
+    // Draws the set-aside copy card again, or nothing when no readable copy is set aside.
+    function paintParked() {
+      const pc = SB.store.parkedCopy ? SB.store.parkedCopy() : null;
+      if (!pc || (SB.store.isHubClient && SB.store.isHubClient()) || (SB.store.isFollower && SB.store.isFollower())) { parkedBox.replaceChildren(); parkedBox.hidden = true; return; }
+      parkedBox.hidden = false;
+      let savedFirst = false;
+      const status = h('p', { class: 'od-p', role: 'status' });
+      const word = h('input', { class: 'input od-danger-in', type: 'text', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Type ' + PARK_WORD + ' to confirm' });
+      const go = btn('Bring the set-aside copy back', { icon: 'upload', cls: 'btn-danger' }); go.dataset.action = 'parked-restore'; go.disabled = true;
+      // The red button wakes only when the backup of what is here now was saved and the word was typed.
+      const sync = () => { go.disabled = !(savedFirst && word.value.trim().toUpperCase() === PARK_WORD); };
+      word.addEventListener('input', sync);
+      // Saves a backup file of what is on this device now, so bringing the other copy back can never lose it.
+      const saveFirst = btn('Save a backup of what is here now first', { icon: 'download', cls: 'btn-sm', onClick: () => {
+        let text = null; try { text = SB.store.exportAll(); } catch (e) { text = null; }
+        if (!text) { status.textContent = 'The backup could not be made, so nothing can be replaced. Nothing was changed.'; return; }
+        // Pads a number to two digits so the file name sorts by time.
+        const z = (n) => String(n).padStart(2, '0');
+        try { const d = new Date(); const fname = 'smokebox-backup-before-set-aside-restore-' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + '.json'; const url = URL.createObjectURL(new Blob([text], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = fname; a.style.display = 'none'; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000); savedFirst = true; status.textContent = 'Asked your browser to save ' + fname + '. Look in your downloads folder to be sure it is there, then type ' + PARK_WORD + '.'; sync(); }
+        catch (e) { status.textContent = 'This browser would not save the file. Nothing was changed.'; }
+      } }); saveFirst.dataset.action = 'parked-backup';
+      // After the PIN, brings the set-aside copy back; the kitchen it replaces is kept for 7 days (Undo this restore below).
+      go.addEventListener('click', async () => {
+        if (go.disabled) return;
+        if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
+        const rep = SB.store.restoreParked();
+        if (rep === 'ok') SB.ui.toast('The set-aside copy is back. What was here before is kept for 7 days: Undo this restore.', { tone: 'ok' });
+        else SB.ui.toast(rep === 'noCopy' ? 'The set-aside copy is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings) + ' Nothing was changed.', { tone: 'warn' });
+        paintParked(); paintUndo();
+      });
+      // Throws the set-aside copy away after asking; the current kitchen is not touched.
+      const drop = btn('Throw the set-aside copy away', { icon: 'trash', cls: 'btn-sm', onClick: async () => {
+        const ok = await SB.ui.confirm({ title: 'Throw the set-aside copy away?', tone: 'danger', confirmLabel: 'Throw it away', cancelLabel: 'Keep it', body: ['This removes the copy that was set aside. Your kitchen as it is now is not touched. It cannot be brought back.'] });
+        if (!ok) return;
+        if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
+        try { const k = SB.store.CORRUPT_KEY; SB.util.storage.remove(k); SB.util.storage.remove(k + 'at'); } catch (e) { /* the check below tells the truth */ }
+        SB.ui.toast(SB.store.parkedCopy && SB.store.parkedCopy() ? 'The copy could not be removed.' : 'The set-aside copy was thrown away.', { tone: 'ok' });
+        paintParked();
+      } }); drop.dataset.action = 'parked-drop';
+      const when = pc.at ? U.fmtDateShort(U.dateKey(pc.at)) + ' ' + U.fmtTime(pc.at) : 'earlier';
+      parkedBox.replaceChildren(
+        h('h3', { class: 'od-sub' }, 'A copy of your kitchen was set aside'),
+        h('p', { class: 'od-p' }, 'Smokebox set this copy aside on ' + when + ' because it could not read it then, or it came from a newer version. It can be read now and holds ' + U.fmtNum(pc.tickets) + ' ' + U.plural(pc.tickets, 'ticket') + ' and ' + U.fmtNum(pc.orders) + ' ' + U.plural(pc.orders, 'order') + '.'),
+        h('p', { class: 'od-p' }, 'Bringing it back replaces everything on this device. What is here now is kept for 7 days, and you can undo it. First save a backup file of what is here now, then type ' + PARK_WORD + '.'),
+        h('div', { class: 'od-actions' }, saveFirst), SB.ui.field({ label: 'Type ' + PARK_WORD, control: word }), h('div', { class: 'od-actions' }, go, drop), status);
+    }
     const pasteLabelId = U.uid('odpl');
     const pasteArea = h('textarea', { class: 'textarea od-paste', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-labelledby': pasteLabelId, placeholder: 'Paste the whole backup text here' });
     // Checks pasted text the same way as a chosen file.
@@ -36053,7 +36139,8 @@ a.of-nav:active { background: var(--press); }
     const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
     card2.body.append(
       para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
-      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
+      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox, parkedBox);
+    paintParked();
     card3.body.append(
       h('ol', { class: 'od-steps' },
         h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
