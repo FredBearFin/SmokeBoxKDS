@@ -321,8 +321,10 @@ What was slow and what changed (my files, no change of behavior):
 - A station switch built the first 36 tickets and then all the rest in one task. It now builds 18, then 30 at a time.
 
 Still slow, and not mine:
-- The saved copy is written whole and synchronously: `SB.store.flush()` took 41 ms at 1x and 135 to 463 ms at 6x with 1,470 tickets of history (JSON.stringify of 3.4 MB plus the storage write). A Done tap that finishes a ticket costs 165 to 246 ms of script at 6x, which looks like this save. Idea: keep history in a separate saved key that is written only when it changes, or save from an idle callback.
+- The saved copy is written whole and synchronously: `SB.store.flush()` took 41 ms at 1x and 135 to 463 ms at 6x with 1,470 tickets of history (JSON.stringify of 3.4 MB plus the storage write). (An earlier reading that a Done tap cost 165 to 246 ms of script was the test's own button search forcing a layout, not the save; the test no longer does that.) Idea: keep history in a separate saved key that is written only when it changes, or save from an idle callback.
 - Boot at 6x: JSON.parse of the saved state (`get` 128 to 177 ms), `validateBackup` (86 to 170 ms), `repairTicket` (30 to 68 ms), `checkInvariants` (26 ms at 4x). `importAll` of a 11.9 MB backup took 982 ms unthrottled. Profile hint: CDP `Profiler` with a 500 microsecond interval while booting, as the test does.
 - The browser keeps only about 1,470 of 5,000 tickets of history; the rest is trimmed at save time.
 
 Not checked: a real tablet, memory pressure, thermal throttling, a 5,000-ticket history held whole.
+
+Re-measured on main with the compact saved form (night/a5-compact, history fill and notice): `flush()` 27 ms at 1x and 132 to 197 ms at 6x (was 41 and 135 to 463); the saved copy is 1.89 MB for the same history (was 3.4 MB); boot to first painted board 0.9 s at 1x and 2.7 to 3.5 s at 6x (was 1.1 s and 3.2 s). Boot still costs most in `validateBackup` (about 120 ms at 6x), `dec` (the unpack, 56 ms), `get` (JSON.parse, 65 ms) and `checkInvariants` (48 ms). Done at 200 open tickets: 89 ms (1x) and 101 ms (6x).

@@ -89,8 +89,8 @@ for (const rate of RATES) {
       rows[name] = { paint: med(pa), sync: med(sy), long: worst };
     }
     const closeSheets = () => p.evaluate(() => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
-    await run('Start', () => { const b = [...document.querySelectorAll('.fl-slip button[data-act="item"]')].find((x) => x.offsetParent && !x.disabled); if (b) b.click(); });
-    await run('Done', () => { const b = [...document.querySelectorAll('.fl-slip button[data-act="item"]')].find((x) => x.offsetParent && !x.disabled && x.dataset.state && x.dataset.state !== 'displayed'); if (b) b.click(); });
+    await run('Start', () => { const b = [...document.querySelectorAll('.fl-slip button[data-act="item"]')].find((x) => !x.disabled); if (b) b.click(); });
+    await run('Done', () => { const b = [...document.querySelectorAll('.fl-slip button[data-act="item"]')].find((x) => !x.disabled && x.dataset.state && x.dataset.state !== 'displayed'); if (b) b.click(); });
     await run('Bump', (i) => { const t = SB.store.getState().tickets.filter((x) => x.status === 'active')[i]; if (!t) return; t.items.forEach((it) => SB.store.dispatchEx('completeItem', { ticketId: t.id, itemId: it.id }, { source: 'ui' })); const b = document.querySelector('.fl-slip[data-ticket="' + t.id + '"] [data-act="bump"]'); if (b) b.click(); });
     await run('Station tab', (i) => { SB.floor.setZone(['pit', 'all', 'fry', 'all', 'cold', 'all'][i % 6]); });
     await run('Order sheet open', () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', bubbles: true })); }, 3, closeSheets);
