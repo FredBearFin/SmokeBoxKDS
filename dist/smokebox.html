@@ -7232,7 +7232,8 @@ a.of-nav:active { background: var(--press); }
     for (const it of items) if (zones.indexOf(it.zone) < 0) zones.push(it.zone);
     tx.info = { ticketId: id, num, zones, lines: items.length, dmaxSec: dmax, orderId: order.id, round: order.rounds };
     // Paid at the counter: take payment on the same tap that sends the food.
-    if (pay) { const r = payInto(tx, oi, pay); if (r !== 'ok') return r; tx.info.paid = true; tx.info.total = tx.get('orders')[oi].totals.total; }
+    // Trimming the old orders above moves positions in the list, so the order is found again before it is paid.
+    if (pay) { oi = findOrderIdx(tx.get('orders'), order.id); const r = payInto(tx, oi, pay); if (r !== 'ok') return r; tx.info.paid = true; tx.info.total = tx.get('orders')[oi].totals.total; }
     return 'ok';
   };
 
@@ -11306,7 +11307,8 @@ a.of-nav:active { background: var(--press); }
   function snapshotBeforeRestore(why) {
     if (!strict || mode !== 'real' || !storage || !state || isBlank()) return null;
     const r = realNow();
-    for (const keep of [null, SNAP_KEEP]) {
+    // Full history first, then the small rolling size, then only what a kitchen cannot do without (menu, settings, PIN, safety records).
+    for (const keep of [null, SNAP_KEEP, { maxTickets: 0, maxEvents: 0 }]) {
       try {
         const small = keep ? E().prune(state, keep) : state;
         const env = { v: 1, takenAt: r, reason: why || BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
