@@ -585,6 +585,8 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* The rarely needed facts stay on the card only when they matter (late readings keep their red). */
 .hc-dl dt:nth-of-type(n+3), .hc-dl dd:nth-of-type(n+3) { display: none; }
 .hc-dl dt:nth-of-type(4), .hc-dl dd:nth-of-type(4) { display: block; }
+/* "Resting until" (5th) and "Kept serving" (6th) show only while they apply: the script unhides them then, and the card must not hide them again. */
+.hc-dl dt:nth-of-type(n+5):not([hidden]), .hc-dl dd:nth-of-type(n+5):not([hidden]) { display: block; }
 .hc-actions { flex-wrap: nowrap; gap: var(--sp-2); align-items: stretch; }
 .hc-actions .btn { flex: 1 1 auto; min-height: var(--tap); }
 .hc-actions .hc-sec { display: none; }
