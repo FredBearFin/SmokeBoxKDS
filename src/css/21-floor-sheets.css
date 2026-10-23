@@ -667,3 +667,4 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .rd .stepper { display: flex; width: 100%; }
 .rd .stepper .stepper-field { flex: 1 1 auto; min-width: 0; }
 .rd .stepper .stepper-input { flex: 1 1 auto; min-width: 0; width: auto; text-align: center; }
+.rd-state { white-space: nowrap; }
