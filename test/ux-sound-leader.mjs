@@ -3,13 +3,12 @@
 // Both tabs share one browser context (so one BroadcastChannel and one Web Locks scope), use a fake clock, and count the notes
 // and spoken phrases a stub audio engine would play. NOT TESTED here: a crash or force-kill of the leader (the page is closed
 // normally), Safari and iPad, and real audio.
-import { createRequire } from 'node:module';
+import { toolRequire } from '../tools/_deps.mjs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const require = createRequire('/opt/npm-tools/node_modules/');
-const { chromium } = require('playwright');
+const { chromium } = toolRequire('playwright');
 const DIST = path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), 'dist/smokebox.html');
 const MIN = 60e3, H = 3600e3;
 const T0 = new Date(2026, 9, 19, 11, 0, 0).getTime();

@@ -3,15 +3,14 @@
  *    {...}) opens the built app in headless Chromium (Playwright), runs your steps, then closes the browser.
  *    logs collects errors, warnings, page errors and failed requests; a clean run has no errors and no page
  *    errors.
- * PARTS: font-noise filter, storage reset, withPage. USES: Playwright from /opt/npm-tools,
+ * PARTS: font-noise filter, storage reset, withPage. USES: Playwright (found by tools/_deps.mjs),
  *    dist/smokebox.html. USED BY: shot.mjs, charts-gallery.mjs and the browser tests.
  */
-import { createRequire } from 'node:module';
+import { toolRequire } from './_deps.mjs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const require = createRequire('/opt/npm-tools/node_modules/');
-const { chromium } = require('playwright');
+const { chromium } = toolRequire('playwright');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DIST = path.join(root, 'dist/smokebox.html');
 export const ROOT = root;

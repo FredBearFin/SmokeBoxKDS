@@ -21,12 +21,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
+import { toolRequire } from './_deps.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const req = createRequire(import.meta.url);
-const acorn = req('/opt/npm-tools/node_modules/acorn');
+const acorn = toolRequire('acorn');
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC_JS = path.join(ROOT, 'src/js');

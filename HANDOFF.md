@@ -109,7 +109,7 @@ Why it should exist (my analysis): BBQ's real problem is meat, not tickets. Cook
 
 ## 5. How to build and check (all quick)
 
-Requires Node 22. Browser scripts need Playwright; `tools/pw.mjs` loads it from `/opt/npm-tools/node_modules/` (this path is specific to the environment the project was built in; change the `createRequire` path in `tools/pw.mjs`, `tools/qa.mjs`, `tools/contract-check.mjs`, `tools/code-fingerprint.mjs`, `tools/qa-contact.mjs` and `test/artifact.e2e.mjs` if Playwright or acorn live elsewhere).
+Requires Node 22. Browser scripts need Playwright and the audit tools need acorn. `tools/_deps.mjs` finds them: first the folder in the `SMOKEBOX_TOOLS` environment variable, then `./node_modules` (run `npm ci` for acorn and acorn-walk), then the old `/opt/npm-tools/node_modules` path, then Node's normal lookup (global install).
 
 ```
 node tools/build.mjs --quiet                  # writes dist/smokebox.html
