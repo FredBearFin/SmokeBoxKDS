@@ -154,8 +154,8 @@ export async function createHub(opts = {}) {
     if (!swOn) return false;
     if (url === '/manifest.webmanifest') {
       res.writeHead(200, Object.assign({ 'content-type': 'application/manifest+json; charset=utf-8', 'cache-control': 'no-cache' }, base));
-      res.end(JSON.stringify({ name: 'Smokebox', short_name: 'Smokebox', start_url: '/', scope: '/', display: 'standalone', background_color: '#1b1511', theme_color: '#b4452a',
-        icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' }, { src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }));
+      res.end(JSON.stringify({ name: 'Smokebox', short_name: 'Smokebox', start_url: './', scope: './', display: 'standalone', background_color: '#1b1511', theme_color: '#b4452a',
+        icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' }, { src: 'icon-192.png', sizes: '192x192', type: 'image/png' }, { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }] }));
       return true;
     }
     if (url === '/icon.svg') { res.writeHead(200, Object.assign({ 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' }, base)); res.end(ICON_SVG); return true; }
@@ -368,6 +368,8 @@ export async function createHub(opts = {}) {
   // Behind a reverse proxy every screen reaches the hub from 127.0.0.1. With SMOKEBOX_TRUST_PROXY=1 the real address is read from X-Forwarded-For, but only
   // when the connection itself comes from this computer (loopback): from anywhere else the header is ignored, so a screen cannot pick its own address. The
   // last entry is used (the one the proxy added), never the first (which the client can write), and it must be a real IP address.
+  const gzipOn = opts.gzip !== undefined ? opts.gzip !== false : process.env.SMOKEBOX_NO_GZIP !== '1';
+  const startedAt = Date.now();
   const trustProxy = opts.trustProxy !== undefined ? !!opts.trustProxy : process.env.SMOKEBOX_TRUST_PROXY === '1';
   // The address used for the per-address limits.
   function addrOf(req) {
@@ -405,6 +407,18 @@ export async function createHub(opts = {}) {
     req.resume();
     return false;
   }
+  // True when the caller said it accepts gzip and compression is not switched off.
+  const wantsGzip = (req) => gzipOn && /\bgzip\b/i.test(String(req.headers['accept-encoding'] || ''));
+  // Turns a streaming answer into a gzip stream that is flushed after every write, so each event still arrives at once.
+  function gzipStream(req, res) {
+    const gz = zlib.createGzip({ level: 6 }), rawWrite = res.write.bind(res), rawEnd = res.end.bind(res);
+    gz.on('data', (c) => rawWrite(c));
+    gz.on('end', () => rawEnd());
+    // Compresses what is written and flushes it at once, so an event is never held back.
+    res.write = (c) => { if (!gz.destroyed && !gz.writableEnded) { gz.write(c); gz.flush(zlib.constants.Z_SYNC_FLUSH); } return true; };
+    res.end = () => { if (!gz.destroyed && !gz.writableEnded) gz.end(); else rawEnd(); return res; };
+    res.on('close', () => gz.destroy());
+  }
   // Writes a JSON answer with a status.
   function sendJson(res, code, body, extra) { res.writeHead(code, Object.assign({ 'content-type': 'application/json' }, extra || {})); res.end(JSON.stringify(body)); }
   // Writes a refusal with a stable code and plain words.
@@ -441,7 +455,9 @@ export async function createHub(opts = {}) {
       failures.delete(who);
     }
     if (clients.size + followers.size >= MAX_CLIENTS) return fail(503, 'tooMany', { 'retry-after': '10' });
-    res.writeHead(200, Object.assign({ 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', connection: 'keep-alive' }, cors));
+    const gzip = wantsGzip(req);
+    res.writeHead(200, Object.assign({ 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', connection: 'keep-alive' }, gzip ? { 'content-encoding': 'gzip', vary: 'Accept-Encoding' } : {}, cors));
+    if (gzip) gzipStream(req, res);
     followers.add(res);
     if (au.screen) streamScreen.set(res, au.screen.id);
     req.on('close', () => followers.delete(res));
@@ -463,7 +479,11 @@ export async function createHub(opts = {}) {
     const cors = followCode || writeCode || requireTokens ? { 'access-control-allow-origin': '*' } : {};
     const who = addrOf(req);
     // Writes one JSON answer with the given status.
-    const answer = (code, body) => { res.writeHead(code, Object.assign({ 'content-type': 'application/json' }, cors)); res.end(JSON.stringify(body)); };
+    const answer = (code, body) => {
+      const text = JSON.stringify(body);
+      if (wantsGzip(req) && text.length > 1024) { res.writeHead(code, Object.assign({ 'content-type': 'application/json', 'content-encoding': 'gzip', vary: 'Accept-Encoding' }, cors)); res.end(zlib.gzipSync(text)); return; }
+      res.writeHead(code, Object.assign({ 'content-type': 'application/json' }, cors)); res.end(text);
+    };
     const vf = versionFail(req);
     if (vf) return answer(vf.status, { error: vf.report, report: vf.report, words: WORDS[vf.report], tokensRequired: requireTokens, minClient });
     const au = authReq(req);
@@ -562,6 +582,12 @@ export async function createHub(opts = {}) {
   // Answers one HTTP request: the page, the event stream, or an action.
   function handle(req, res) {
     const url = (req.url || '/').split('?')[0];
+    // Health for an owner's monitor and the updater: no secrets, no codes, only counts.
+    if ((req.method === 'GET' || req.method === 'HEAD') && url === '/health') {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+      res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ ok: true, hubId, seq, screens: clients.size + followers.size, uptime: Math.floor((Date.now() - startedAt) / 1000) }));
+      return;
+    }
     if (req.method === 'GET' && url === '/events') {
       const ea = authReq(req);
       if (ea.fail) return refuse(res, ea.fail.status, ea.fail.report);
@@ -685,7 +711,9 @@ export async function createHub(opts = {}) {
   }
   // Returns the current state, hub clock and change counter (used by tests).
   function snapshot() { return view(); }
-  return { server, listen, close, crash, flush, snapshot, hubId, replayed, adminKey, screens };
+  // Which protections are on, with no secret in it (only whether a code exists).
+  const protections = { trustProxy, tokensRequired: requireTokens, writeCode: !!writeCode, followCode: !!followCode, serviceWorker: swOn, gzip: gzipOn };
+  return { server, listen, close, crash, flush, snapshot, hubId, replayed, adminKey, screens, protections };
 }
 
 // The owner's commands for a running hub: node server/server.mjs admin pair [--owner] | list | revoke ID  (options --port N, --data FILE).
@@ -735,6 +763,10 @@ async function main() {
   const hub = await createHub();
   const port = await hub.listen(Number(process.env.PORT || 8787), process.env.HOST || '127.0.0.1');
   console.log('[hub] Smokebox prototype hub on http://' + (process.env.HOST || '127.0.0.1') + ':' + port + ' (time zone ' + (process.env.TZ || 'system') + ')');
+  // Says on or off for one protection.
+  const pr = hub.protections, on = (b) => (b ? 'on' : 'off');
+  console.log('[hub] Protections: pairing tokens required ' + on(pr.tokensRequired) + ', write code ' + on(pr.writeCode) + ', follow code ' + on(pr.followCode) + ', trust proxy ' + on(pr.trustProxy) + ', service worker ' + on(pr.serviceWorker) + ', gzip ' + on(pr.gzip));
+  if (!pr.writeCode && !pr.tokensRequired && (process.env.HOST || '127.0.0.1') !== '127.0.0.1') console.log('[hub] Warning: anyone who can reach this address can write to the kitchen. Set SMOKEBOX_WRITE_CODE or SMOKEBOX_REQUIRE_TOKENS=1.');
   if (process.env.SMOKEBOX_REQUIRE_TOKENS === '1' || process.env.SMOKEBOX_REQUIRE_TOKEN === '1') console.log('[hub] Screens need a pairing code: node server/server.mjs admin pair --port ' + port + (process.env.SMOKEBOX_DATA ? ' --data ' + process.env.SMOKEBOX_DATA : ''));
   // Closes the hub cleanly (saving the file) and exits the process.
   const stop = () => hub.close().then(() => process.exit(0));

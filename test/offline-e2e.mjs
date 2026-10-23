@@ -39,7 +39,7 @@ try {
     const s = await st(p);
     check('status is ready with a version', s.state === 'ready' && /^[0-9a-f]{12}$/.test(s.cachedVersion || '') && s.cachedVersion === s.pageVersion && s.updateReady === false, s);
     check('check() says it can open with no network', (await p.evaluate(() => SB.offline.check())).ok === true);
-    check('the manifest link was added with credentials', await p.evaluate(() => { const l = document.querySelector('link[rel="manifest"]'); return !!l && l.getAttribute('href') === '/manifest.webmanifest' && l.crossOrigin === 'use-credentials'; }));
+    check('the manifest link was added with credentials', await p.evaluate(() => { const l = document.querySelector('link[rel="manifest"]'); return !!l && l.getAttribute('href') === 'manifest.webmanifest' && l.crossOrigin === 'use-credentials'; }));
     await p.evaluate(() => { SB.store.dispatch('addMenuItem', { name: 'Offline pie', zone: 'cold', cat: 'cold', price: 4, prepSec: 60, track: 'one' }); SB.store.flush(); });
     await p.waitForFunction(() => navigator.serviceWorker.controller !== null, null, { timeout: 8000 }).catch(() => {});
     await hub.stop();

@@ -7,7 +7,7 @@ set -euo pipefail
 PREFIX="${SMOKEBOX_PREFIX:-/opt/smokebox}"
 URL="${SMOKEBOX_UPDATE_URL:-https://github.com/FredBearFin/SmokeBoxKDS/archive/refs/heads/deploy.tar.gz}"
 SYSTEMCTL="${SMOKEBOX_SYSTEMCTL:-systemctl}"
-HEALTH_URL="${SMOKEBOX_HEALTH_URL:-http://127.0.0.1:8787/}"
+HEALTH_URL="${SMOKEBOX_HEALTH_URL:-http://127.0.0.1:8787/health}"
 SELF_DEST="${SMOKEBOX_SELF_DEST:-/usr/local/bin/smokebox-update}"
 LOCK="${SMOKEBOX_LOCK:-/run/lock/smokebox-update.lock}"
 MIN_BYTES="${SMOKEBOX_MIN_BYTES:-100000}"     # the built page alone is over a megabyte; anything tiny is an error page
@@ -60,7 +60,11 @@ rollback() {
 "$SYSTEMCTL" restart smokebox || rollback "the service would not restart"
 healthy=0
 for _ in $(seq 1 "$HEALTH_TRIES"); do
-  if curl -fsS --max-time 3 "$HEALTH_URL" -o /dev/null 2>/dev/null; then healthy=1; break; fi
+  # The new build must say {"ok":true}; a build too old to have /health (404) is accepted if the page itself answers.
+  body=$(curl -sS --max-time 3 -w '\n%{http_code}' "$HEALTH_URL" 2>/dev/null) || body=""
+  code=${body##*$'\n'}
+  if [ "$code" = "200" ] && printf '%s' "$body" | grep -q '"ok":true'; then healthy=1; break; fi
+  if [ "$code" = "404" ] && curl -fsS --max-time 3 "${HEALTH_URL%/health}/" -o /dev/null 2>/dev/null; then healthy=1; break; fi
   sleep 1
 done
 [ "$healthy" -eq 1 ] || rollback "the new build did not answer at $HEALTH_URL"

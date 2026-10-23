@@ -13,14 +13,15 @@
 const VERSION = '__VERSION__';
 const CACHE = 'smokebox-shell-' + VERSION;      // one store per version; older stores are deleted when this one is active
 const SHELL = '/__smokebox_shell__';            // the fixed key the page is kept under
-const PAGE_PATHS = ['/', '/smokebox.html'];
-const NEVER = ['/action', '/follow', '/events', '/probe', '/seed'];   // listed for the reader; these are never intercepted
+const BASE = new URL('./', self.location.href).pathname;   // the folder the worker was served from ('/' normally, '/beta/' behind a path prefix)
+const PAGE_PATHS = [BASE, BASE + 'smokebox.html'];
+const NEVER = ['action', 'follow', 'events', 'probe', 'seed', 'health'].map((n) => BASE + n);   // listed for the reader; these are never intercepted
 const MARKER = '<title>Smokebox KDS</title>';
 const MIN_BYTES = 50000;
 
 // Fetches the page from the network and checks that it really is the app. Throws if it is not.
 async function fetchShell() {
-  const res = await fetch('/', { cache: 'reload', credentials: 'same-origin' });
+  const res = await fetch(BASE, { cache: 'reload', credentials: 'same-origin' });
   if (!res.ok || res.redirected || res.status !== 200) throw new Error('not a plain answer');
   if (!/text\/html/i.test(res.headers.get('content-type') || '')) throw new Error('not html');
   const text = await res.clone().text();
