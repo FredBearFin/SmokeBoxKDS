@@ -640,6 +640,10 @@ describe('safety: compliance, waste, batch timeline', () => {
     assert.deepEqual([l.batchCount, l.spellCount, l.totalMs], [2, 1, 600000]);
     assert.equal(l.spells[0].menuId, 'brisket_qtr');
   });
+  it('compliance: a lockout and the discard that follows it on one batch count as one batch', () => {
+    const evs = [event({ t: at(0), type: 'batch_status', batchId: 'z1', from: 'servable', to: 'check', action: 'DISCARD_LOCKOUT' }), event({ t: at(60), type: 'batch_status', batchId: 'z1', from: 'check', to: 'discard', action: 'DISCARD_LOCKOUT' })];
+    assert.equal(M.compliance(dataset({ events: evs }), { from: at(0) - 3600e3, to: at(0) + 3600e3 }).lockouts.batchCount, 1);
+  });
   it('compliance on events without onTime flags counts nothing (unknown is not on time)', () => {
     const k = M.compliance(dataset({ events: [event({ type: 'temp_logged', at: 1, batchId: 'b', f: 150 })] }));
     assert.equal(k.tempChecks.count, 0); assert.equal(k.tempChecks.onTimePct, null); assert.equal(k.score, null);

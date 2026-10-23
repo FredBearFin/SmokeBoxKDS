@@ -1127,7 +1127,8 @@
     };
     const tc = chk(ctx.ev('temp_logged')), sn = chk(ctx.ev('sanitize_done')), dl = discardList(ctx), il = intakeList(ctx);
     const spells = eightySixList(ctx).filter((s) => s.reason === 'safety');
-    const bl = ctx.ev('batch_status').filter((e) => e.action === 'DISCARD_LOCKOUT' || e.to === 'discard').length;
+    // Batches, not events: a lockout and the discard that follows it are two events for one batch.
+    const bl = new Set(ctx.ev('batch_status').filter((e) => e.action === 'DISCARD_LOCKOUT' || e.to === 'discard').map((e, i) => (e.batchId != null ? e.batchId : '#' + i))).size;
     const dg = sumOf(dl.map((d) => d.g)), ig = sumOf(il.map((d) => d.g)); const parts = [tc.onTimePct, sn.onTimePct].filter(num);
     // WATCH OUT: cost adds only the discards with a known cost; noCostCount says how many had none, so 0 is not "free".
     return { tempChecks: tc, sanitize: sn, discards: { count: dl.length, g: dg, cost: sumOf(dl.map((d) => d.cost)), noCostCount: dl.filter((d) => d.cost === null).length, byReason: reasonAgg(dl) },
