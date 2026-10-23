@@ -10,6 +10,55 @@
   'use strict';
   const SB = (g.SB = g.SB || {});
   const doc = g.document;
+
+  // The customer names to offer as one-tap "Recent" buttons: newest orders first, no blanks, no repeats (ignoring
+  // capital letters), and never a name that is already a quick name. state is the app state; quick is the quick names.
+  function recentNames(state, quick, limit) {
+    const skip = new Set((quick || []).map((n) => String(n).trim().toLowerCase()));
+    const orders = ((state && state.orders) || []).slice().sort((a, b) => b.createdAt - a.createdAt);
+    const out = [];
+    for (let i = 0; i < orders.length && out.length < (limit || 4); i++) {
+      const nm = String(orders[i].customer || '').trim(), key = nm.toLowerCase();
+      if (!nm || skip.has(key)) continue;
+      skip.add(key); out.push(nm);
+    }
+    return out;
+  }
+  // Short text for the last order: up to three dishes then "and N more", used under the Repeat button.
+  function summarize(items, nameOf) {
+    const parts = items.map((it) => nameOf(it.menuId) + (it.qty > 1 ? ' x' + it.qty : ''));
+    return parts.length <= 3 ? parts.join(', ') : parts.slice(0, 3).join(', ') + ' and ' + (parts.length - 3) + ' more';
+  }
+
+  // Splits a note into its allergy list and the rest. A note that starts "ALLERGY: peanut, dairy. Sauce on side"
+  // gives { list: ['peanut', 'dairy'], rest: 'Sauce on side' }. A note without that start has an empty list.
+  function parseAllergy(note) {
+    const m = /^\s*allergy:\s*([^.]*)\.\s*/i.exec(String(note || ''));
+    if (!m) return { list: [], rest: String(note || '').trim() };
+    const list = m[1].split(',').map((x) => x.trim()).filter(Boolean);
+    return { list, rest: String(note).slice(m[0].length).trim() };
+  }
+  // Puts a note back together with the allergy first, so cooks read it before anything else.
+  function buildNote(list, rest) {
+    const r = String(rest || '').trim();
+    return list.length ? 'ALLERGY: ' + list.join(', ') + '.' + (r ? ' ' + r : '') : r;
+  }
+  // Adds one allergen to the list or takes it off again (ignoring capital letters). Returns the new note.
+  function toggleAllergen(note, name) {
+    const p = parseAllergy(note), at = p.list.findIndex((x) => x.toLowerCase() === name.toLowerCase());
+    if (at >= 0) p.list.splice(at, 1); else p.list.push(name);
+    return buildNote(p.list, p.rest);
+  }
+  // Adds a ready-made phrase (like "Sauce on the side") at the end of the note. Returns { note, ok }; ok is false and the
+  // note unchanged when the phrase is already there or would pass the length limit.
+  function addPhrase(note, phrase, max) {
+    const cur = String(note || '').trim();
+    if (cur.toLowerCase().indexOf(phrase.toLowerCase()) >= 0) return { note: cur, ok: false, why: 'there' };
+    const next = cur ? cur.replace(/[.\s]+$/, '') + '. ' + phrase : phrase;
+    return next.length > max ? { note: cur, ok: false, why: 'long' } : { note: next, ok: true };
+  }
+  SB.orderLogic = { recentNames, summarize, parseAllergy, buildNote, toggleAllergen, addPhrase };
+
   if (!doc) return; // Node: the sheet is DOM only
 
   const U = SB.util, C = SB.config, h = U.h;
@@ -52,7 +101,10 @@
   // It is cleared on send, Clear order or Discard.
   // orderId is the open order this round is added to (null starts a new one); pay is how it is paid when sent
   // ('' leaves it open); tip is the tip text as typed.
-  const D = { lines: [], customer: '', channel: 'dine_in', note: '', rush: false, orderId: null, pay: '', tip: '' };
+  const D = { lines: [], customer: '', channel: 'dine_in', note: '', rush: false, orderId: null, pay: '', tip: '', allergy: '' };
+  // How the last order was paid when it was sent ('' = left open). A counter that takes cash all day starts the next
+  // order on cash, one tap fewer; Pay later is still one tap away.
+  let payDefault = '';
   let seq = 0;
   let lastSent = null; // { num, channel, items } of the last order sent from this sheet
   let live = null;     // the open view, or null
@@ -64,8 +116,8 @@
   const subtotal = () => D.lines.reduce((s, l) => { const mi = menuById(l.menuId); return s + (mi ? mi.price * l.qty : 0); }, 0);
   // A separate copy of the order, kept so Undo can put it back.
   const copyDraft = () => JSON.parse(JSON.stringify(D));
-  function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; }
-  function resetDraft() { D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = ''; D.tip = ''; }
+  function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; D.allergy = snap.allergy || ''; }
+  function resetDraft() { D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = payDefault; D.tip = ''; D.allergy = ''; }
   // The orders still open, oldest first, for the Add to open order list.
   function openOrdersList() { return (st().orders || []).filter((o) => o.status === 'open').sort((a, b) => a.createdAt - b.createdAt); }
   // A short name for an order in a list: who it is for and where, like "Table 4 (Dine-in)".
@@ -144,27 +196,67 @@
     return parts.join(', ') + '. All ready together in about ' + mmss(plan.readySec) + '.';
   }
 
-  // Builds and opens the New ticket sheet and returns it. The draft
-  // lives outside, so closing never loses an order.
+  // Builds and opens the New ticket sheet and returns it. The draft lives outside, so closing never loses an order.
+  // The sheet only supplies the frame; buildOrder fills it, so the same screen can also be a full page.
   function openOrder(opts) {
+    let built = null;
+    // Esc is handled by the order screen, not by the shell, because an order with items must ask before it closes.
+    const sheet = SB.ui.sheet({
+      title: 'New ticket', side: 'right', width: 'min(1180px, 96vw)', name: 'order', closeOnEsc: false,
+      // Only focus the search box with a mouse or keyboard, so a touch tablet keeps its on-screen keyboard down.
+      initialFocus: () => (built ? built.startFocus() : null),
+      // Whatever closes the sheet, drop the listeners and timers this screen added.
+      onClose: () => { if (built) built.teardown(); },
+    });
+    built = buildOrder({ body: sheet.body, footer: sheet.footer, el: sheet.el, close: sheet.close, isPage: false }, opts);
+    return sheet;
+  }
+
+  // Shows New ticket as a full page inside `host` (any empty element) and returns { el, close, leave, destroy }.
+  // opts.onExit(reason) runs when the page closes (sent, discarded, back); the default goes back to the board.
+  // WATCH OUT: the draft D is shared with the sheet version, so an unsent order survives either way of opening.
+  function mountPage(host, opts) {
+    opts = opts || {};
+    let built = null, closed = false;
+    const page = h('div', { class: 'ord-page', dataset: { name: 'order' } });
+    // The page's own back button asks first when the order has items, like Esc does.
+    const backBtn = h('button', { type: 'button', class: 'btn btn-ghost ord-page-back', 'aria-label': 'Back to the board' }, ico('chevron-left', 22), h('span', null, 'Board'));
+    const bar = h('header', { class: 'ord-page-bar' }, backBtn, h('h1', { class: 'ord-page-title' }, 'New ticket'));
+    const body = h('div', { class: 'sheet-body ord-host' }), footer = h('footer', { class: 'sheet-foot' });
+    page.append(bar, body, footer);
+    host.appendChild(page);
+    // Closes the page once: stops listeners, takes the page off the screen, then tells the caller why.
+    // Closes the page once and reports why.
+    const close = (why) => {
+      if (closed) return;
+      closed = true;
+      if (built) built.teardown();
+      page.remove();
+      if (typeof opts.onExit === 'function') opts.onExit(why || 'api');
+      else if (why !== 'destroy' && SB.router && SB.router.go) SB.router.go({ kind: 'floor', zone: SB.router.lastZone() });
+    };
+    built = buildOrder({ body, footer, el: page, close, isPage: true }, opts);
+    // Asks before leaving when the order has items; closes straight away when it is empty.
+    const leave = () => built.leave();
+    // Closes the page without asking, for the router when it moves to another screen.
+    const destroy = () => close('destroy');
+    backBtn.addEventListener('click', leave);
+    const f = built.startFocus(); if (f) f.focus({ preventScroll: true });
+    return { el: page, close, leave, destroy };
+  }
+
+  // Fills a frame (a sheet or a page) with the whole New ticket screen. host = { body, footer, el, close(why),
+  // isPage }. Returns { teardown, startFocus, leave } so the frame can focus it, close it and ask before leaving.
+  function buildOrder(host, opts) {
     // Opened from the Orders screen to add another round: pick that order when it is still open.
     if (opts && opts.orderId) { const o0 = SB.engine.findOrder(st(), opts.orderId); if (o0 && o0.status === 'open') D.orderId = o0.id; }
     const fine = (() => { try { return g.matchMedia('(pointer: fine)').matches; } catch (e) { return false; } })();
     let searchInput = null;
-    // Esc is handled here, not by the shell, because an order with items must ask before it closes.
-    const sheet = SB.ui.sheet({
-      title: 'New ticket', side: 'right', width: 'min(1180px, 96vw)', name: 'order', closeOnEsc: false,
-      // Only focus the search box with a mouse or keyboard, so a
-      // touch tablet keeps its on-screen keyboard down.
-      initialFocus: () => (fine && searchInput ? searchInput : null),
-      // Whatever closes the sheet, drop the listeners and timers this screen added.
-      onClose: () => teardown(),
-    });
-    sheet.body.classList.add('ord-host');
+    host.body.classList.add('ord-host');
 
-    const view = { cat: 'all', search: '', pane: 'menu', editing: null, tiles: [], heads: [], lineViews: new Map(), chipBtns: new Map(), offs: [] };
+    const view = { cat: 'all', search: '', pane: 'menu', editing: null, tiles: [], heads: [], lineViews: new Map(), chipBtns: new Map(), recentBtns: new Map(), offs: [] };
     const root = h('div', { class: 'ord', dataset: { pane: 'menu' } });
-    sheet.body.appendChild(root);
+    host.body.appendChild(root);
 
     // On a phone the menu and the order are two panes, with a
     // switch on top (hidden on wide screens by the CSS).
@@ -175,7 +267,7 @@
       onChange: (id) => setPane(id),
     });
     // Shows one pane (menu or order) and keeps the switch and the footer buttons in step.
-    function setPane(id) { view.pane = id; root.dataset.pane = id; sheet.footer.dataset.pane = id; paneSeg.setValue(id); }
+    function setPane(id) { view.pane = id; root.dataset.pane = id; host.footer.dataset.pane = id; paneSeg.setValue(id); }
 
     // LEFT: menu pane.
     const menuPane = h('section', { class: 'ord-menu', 'aria-label': 'Menu' });
@@ -259,7 +351,25 @@
       b.addEventListener('click', () => { D.customer = D.customer === nm ? '' : nm; custInput.value = D.customer; paintCustomer(); touched(); });
       chipsEl.appendChild(b); view.chipBtns.set(nm, b);
     });
+    // Names of recent orders that are not quick names, as one-tap buttons; rebuilt only when the list changes.
+    const recentEl = h('div', { class: 'ord-chips ord-recent', role: 'group', 'aria-label': 'Recent customers', hidden: true });
+    // Rebuilds the Recent buttons when the newest orders bring a different set of names.
+    function paintRecent() {
+      const names = recentNames(st(), C.quickNames, 4);
+      const sig = names.join('\u0001');
+      if (recentEl.dataset.sig !== sig) {
+        recentEl.dataset.sig = sig; U.clear(recentEl); view.recentBtns.clear();
+        names.forEach((nm) => {
+          const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, nm));
+          b.addEventListener('click', () => { D.customer = D.customer === nm ? '' : nm; custInput.value = D.customer; paintCustomer(); touched(); });
+          recentEl.appendChild(b); view.recentBtns.set(nm, b);
+        });
+        setHidden(recentEl, !names.length);
+      }
+      view.recentBtns.forEach((b, nm) => b.setAttribute('aria-pressed', D.customer === nm ? 'true' : 'false'));
+    }
     custField.querySelector('.field-label').after(chipsEl);
+    chipsEl.after(recentEl);
     custField.classList.add('ord-cust');
     custField.appendChild(custCount);
 
@@ -305,6 +415,18 @@
     tipInput.addEventListener('input', () => { D.tip = tipInput.value; hideError(); paintCheck(); });
     const tipField = SB.ui.field({ label: 'Tip in dollars (optional)', control: tipInput });
     tipField.classList.add('ord-tip');
+    // Tip buttons for pay-now orders: No tip and 15, 18, 20, 25 percent of the food, with the dollar amount shown.
+    const tipChips = h('div', { class: 'ord-chips ord-tip-chips', role: 'group', 'aria-label': 'Quick tips' });
+    const tipBtns = [{ pct: 0, label: 'No tip' }, { pct: 15 }, { pct: 18 }, { pct: 20 }, { pct: 25 }].map((d) => {
+      const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, d.label || ''));
+      // Writes this tip into the draft (or clears it) so closing the screen never loses it.
+      b.addEventListener('click', () => { const a = tipAmount(d.pct); D.tip = a > 0 ? a.toFixed(2) : ''; tipInput.value = D.tip; paintCheck(); });
+      tipChips.appendChild(b);
+      return { b, d };
+    });
+    tipField.appendChild(tipChips);
+    // The tip in dollars for a percent of the food on this bill (before tax), in whole cents.
+    const tipAmount = (pct) => (pct ? Math.round(pendingTotal().sub * pct) / 100 : 0);
     const payNote = h('p', { class: 'ord-pay-note t-muted', role: 'status' });
     const payBox = h('div', { class: 'ord-block ord-paybox' }, h('div', { class: 'ord-label' }, 'Payment'), paySeg, tipField, payNote);
 
@@ -314,6 +436,7 @@
       ico('receipt', 30),
       h('p', { class: 'ord-empty-title' }, 'No items yet'),
       h('p', { class: 't-muted' }, 'Tap an item on the menu to add it.'),
+      h('p', { class: 't-muted ord-empty-last', hidden: true }),
       h('button', { type: 'button', class: 'btn btn-sm ord-empty-repeat' }, ico('history', 18), h('span', null, 'Repeat last order')));
     const toMenu = h('button', { type: 'button', class: 'btn btn-sm ord-to-menu' }, ico('plus', 18), h('span', null, 'Add items'));
     emptyEl.appendChild(toMenu);
@@ -331,14 +454,75 @@
     const noteField = SB.ui.field({ label: 'Note for the line', control: noteInput, hint: 'Put allergies first. Cooks read the first line.' });
     noteField.classList.add('ord-note');
     noteField.appendChild(noteCount);
-    const allergyHint = h('div', { class: 'ord-allergy', hidden: true, role: 'status' }, ico('alert', 18), h('span', null, 'A line says allergy, see note. Write the allergy in the note.'));
+    const allergyHint = h('div', { class: 'ord-allergy', hidden: true, role: 'status' }, ico('alert', 18), h('span', null, 'A line says allergy, see note. Tap Allergy above and pick it, or write it in the note.'));
     noteField.appendChild(allergyHint);
     // Rush skips pacing: every item starts now and the ticket goes to the front.
-    const rushToggle = SB.ui.toggle({ label: 'Rush', checked: D.rush, onChange: (on) => { D.rush = on; touched(); } });
-    const rushBox = h('div', { class: 'ord-rush' }, rushToggle, h('p', { class: 'ord-rush-copy t-muted' }, 'Rush skips pacing: every item starts now and the ticket goes to the front.'));
+    const rushToggle = SB.ui.toggle({ label: 'Rush ticket', checked: D.rush, onChange: (on) => { D.rush = on; touched(); } });
+    const rushCopy = h('p', { class: 'ord-rush-copy t-muted' }, '');
+    const rushBox = h('div', { class: 'ord-rush' }, rushToggle, rushCopy);
+    // Says in words what the Rush switch does right now, so a cook never has to guess whether it is on.
+    function paintRush() {
+      text(rushCopy, D.rush ? 'RUSH is on: every item starts now and this ticket goes to the front of the board.' : 'Rush is off: items start on the kitchen plan above. Switch it on only when the guest is waiting.');
+      rushBox.classList.toggle('is-on', D.rush);
+    }
+
+    /* allergy first: asked before anything else, written as the first words of the note */
+    const ALLERGENS = ['Peanut', 'Tree nut', 'Dairy', 'Egg', 'Gluten', 'Soy', 'Fish', 'Shellfish', 'Sesame'];
+    const allergyNo = h('button', { type: 'button', class: 'chip ord-allergy-no', 'aria-pressed': 'false' }, h('span', null, 'No allergy'));
+    const allergyYes = h('button', { type: 'button', class: 'chip ord-allergy-yes', 'aria-pressed': 'false' }, ico('alert', 16), h('span', null, 'Allergy'));
+    const allergyChips = h('div', { class: 'ord-chips ord-allergens', role: 'group', 'aria-label': 'Allergens', hidden: true });
+    const allergenBtns = new Map();
+    const allergyWarn = h('p', { class: 'ord-allergy-pick', role: 'status', hidden: true }, 'Tap what the guest is allergic to.');
+    const allergyBox = h('div', { class: 'ord-block ord-allergybox' },
+      h('div', { class: 'ord-label' }, 'Any food allergy?'), h('div', { class: 'ord-chips' }, allergyNo, allergyYes), allergyChips, allergyWarn);
+    // Sets the note text from code and redraws everything that shows it.
+    function setNote(v) { D.note = v; noteInput.value = v; hideError(); paintNote(); }
+    allergyNo.addEventListener('click', () => {
+      // Saying "No allergy" removes any allergy words from the note.
+      const p = SB.orderLogic.parseAllergy(D.note);
+      D.allergy = D.allergy === 'no' ? '' : 'no';
+      setNote(p.rest); touched();
+    });
+    allergyYes.addEventListener('click', () => { D.allergy = D.allergy === 'yes' ? '' : 'yes'; if (D.allergy === '') setNote(SB.orderLogic.parseAllergy(D.note).rest); touched(); });
+    // Makes one button per allergen, plus any other allergy already typed into the note.
+    function paintAllergy() {
+      const parsed = SB.orderLogic.parseAllergy(D.note);
+      if (parsed.list.length && D.allergy !== 'yes') D.allergy = 'yes';
+      const yes = D.allergy === 'yes';
+      allergyNo.setAttribute('aria-pressed', D.allergy === 'no' ? 'true' : 'false');
+      allergyYes.setAttribute('aria-pressed', yes ? 'true' : 'false');
+      setHidden(allergyChips, !yes);
+      setHidden(allergyWarn, !(yes && !parsed.list.length));
+      const all = ALLERGENS.concat(parsed.list.filter((x) => !ALLERGENS.some((a) => a.toLowerCase() === x.toLowerCase())));
+      all.forEach((nm) => {
+        let b = allergenBtns.get(nm);
+        if (!b) {
+          b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, nm));
+          // Each tap adds the allergen to the front of the note, or takes it off again.
+          b.addEventListener('click', () => { setNote(SB.orderLogic.toggleAllergen(D.note, nm)); touched(); });
+          allergenBtns.set(nm, b); allergyChips.appendChild(b);
+        }
+        b.setAttribute('aria-pressed', parsed.list.some((x) => x.toLowerCase() === nm.toLowerCase()) ? 'true' : 'false');
+      });
+      allergenBtns.forEach((b, nm) => { if (all.indexOf(nm) < 0) { b.remove(); allergenBtns.delete(nm); } });
+    }
+
+    /* note templates: one tap adds a common phrase after the allergy words */
+    const TEMPLATES = ['Sauce on the side', 'No sauce', 'Cut in half', 'Extra napkins', 'Birthday', 'Pack to go'];
+    const tplRow = h('div', { class: 'ord-chips ord-templates', role: 'group', 'aria-label': 'Note phrases' });
+    TEMPLATES.forEach((t) => {
+      const b = h('button', { type: 'button', class: 'chip' }, h('span', null, t));
+      // Adds the phrase unless it is already there or the note would pass its length limit.
+      b.addEventListener('click', () => {
+        const r = SB.orderLogic.addPhrase(D.note, t, L.maxNoteLen);
+        if (r.ok) { setNote(r.note); touched(); } else if (r.why === 'long') showNotice('That phrase does not fit: the note holds ' + L.maxNoteLen + ' characters. Keep the allergy and cut the rest.');
+      });
+      tplRow.appendChild(b);
+    });
+    noteField.querySelector('.field-label').after(tplRow);
 
     const details = h('div', { class: 'ord-details', dataset: { add: 'false' } }, orderBox, custField, channelBox, payBox);
-    orderPane.append(head, notice, linesBox, details, plan, noteField, rushBox);
+    orderPane.append(head, notice, allergyBox, linesBox, details, plan, noteField, rushBox);
     root.append(paneSeg, menuPane, orderPane);
 
     // Footer: total, inline error, Send.
@@ -350,8 +534,8 @@
     const total = h('div', { class: 'ord-total' }, totalN, totalSum);
     const reviewBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg ord-review' }, ico('receipt', 22), h('span', null, 'View order'));
     const sendBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg ord-send' }, ico('ticket', 22), h('span', null, 'Send to kitchen'));
-    sheet.footer.classList.add('ord-foot'); sheet.footer.dataset.pane = 'menu';
-    sheet.footer.append(errEl, total, reviewBtn, sendBtn);
+    host.footer.classList.add('ord-foot'); host.footer.dataset.pane = 'menu';
+    host.footer.append(errEl, total, reviewBtn, sendBtn);
 
     // painting: every function updates nodes in place
     // Updates every menu tile in place: price, 86 state, and how many are on the order.
@@ -410,6 +594,7 @@
     // Updates the quick-name buttons and the length counter, and shows an error when the name is too long.
     function paintCustomer() {
       view.chipBtns.forEach((b, nm) => b.setAttribute('aria-pressed', D.customer === nm ? 'true' : 'false'));
+      paintRecent();
       const len = D.customer.trim().length;
       const over = len > L.maxCustomerLen;
       setHidden(custCount, len < 28 && !over);
@@ -427,6 +612,7 @@
       noteField.setError(over ? 'The note is ' + len + ' characters. The limit is ' + L.maxNoteLen + '. Keep the allergy and cut the rest.' : null);
       const needs = D.lines.some((l) => l.mods.some((m) => /allergy/i.test(m))) && len === 0;
       setHidden(allergyHint, !needs);
+      paintAllergy();
     }
     // Refreshes everything that depends on the size of the order:
     // counts, total, button words and the empty state.
@@ -445,9 +631,12 @@
       text(repeatBtn.lastChild, lbl);
       const er = emptyEl.querySelector('.ord-empty-repeat');
       setHidden(er, !last); text(er.lastChild, lbl);
+      const lastEl = emptyEl.querySelector('.ord-empty-last');
+      setHidden(lastEl, !last); if (last) text(lastEl, 'Last order: ' + summarize(last.items, (id) => { const mi = menuById(id); return mi ? mi.short || mi.name : id; }) + '.');
       setHidden(emptyEl, !draftEmpty());
       setHidden(linesEl, draftEmpty());
       rushStamp.hidden = !D.rush;
+      paintRush();
     }
 
     /* the plan: rebuilt as a whole on purpose (it has nothing to press), cheap even at 30 lines */
@@ -610,6 +799,11 @@
       setHidden(tipField, !D.pay);
       if (tipInput.value !== D.tip) tipInput.value = D.tip;
       const tip = dollars(D.tip);
+      tipBtns.forEach((t) => {
+        const a = tipAmount(t.d.pct);
+        if (t.d.pct) text(t.b.lastChild, t.d.pct + '% ' + U.fmtMoney(a));
+        t.b.setAttribute('aria-pressed', !Number.isNaN(tip) && (t.d.pct ? Math.abs(tip - a) < 0.005 && tip > 0 : D.tip === '') ? 'true' : 'false');
+      });
       tipField.setError(D.pay && Number.isNaN(tip) ? 'Type dollars and cents, like 2.50.' : null);
       if (!D.pay) { text(payNote, 'The order stays open. Take payment later from Orders.'); return; }
       const pt = pendingTotal(), pm = C.payMethodById[D.pay];
@@ -686,7 +880,7 @@
           if (!r.ok) { const mi = menuById(it.menuId); skipped.push(mi ? mi.short || mi.name : it.menuId); }
         });
         D.channel = last.channel || 'dine_in'; channelSeg.setValue(D.channel);
-        D.customer = ''; custInput.value = ''; D.note = ''; noteInput.value = ''; D.rush = false; rushToggle.setValue(false);
+        D.customer = ''; custInput.value = ''; D.note = ''; noteInput.value = ''; D.allergy = ''; D.rush = false; rushToggle.setValue(false);
         touched();
         if (skipped.length) showNotice('Order #' + last.num + ' copied. Left out because they are 86 right now: ' + skipped.join(', ') + '.');
         else showNotice('Order #' + last.num + ' copied. Add the customer and send.');
@@ -735,8 +929,9 @@
         const info = res.info || {};
         const zones = Array.isArray(info.zones) ? info.zones.length : 0;
         lastSent = { num: info.num, channel: D.channel, items: items.map((it) => ({ menuId: it.menuId, qty: it.qty, mods: (it.mods || []).slice() })) };
+        payDefault = D.pay;
         resetDraft();
-        sheet.close('sent');
+        host.close('sent');
         const where = addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent to ' : ' sent to ';
         SB.ui.toast('Ticket #' + info.num + where + zones + ' ' + U.plural(zones, 'station') + '.' + (info.paid ? ' Paid ' + U.fmtMoney(info.total) + ' by ' + payWord + '.' : ''), { tone: 'ok' });
         return;
@@ -779,19 +974,20 @@
     function onEscape(e) {
       e.preventDefault();
       if (view.editing) { const k = view.editing; view.editing = null; syncLines(); const v = view.lineViews.get(k); if (v) v.el.querySelector('.ord-mods-btn').focus({ preventScroll: true }); return; }
-      if (draftEmpty()) sheet.close('esc'); else askLeave(sheet, () => { if (fine) searchInput.focus({ preventScroll: true }); });
+      if (draftEmpty()) host.close('esc'); else askLeave(host, () => { if (fine) searchInput.focus({ preventScroll: true }); });
     }
     // When the button that had focus disappears (Repeat last order, a removed
     // line), focus falls to the page and Esc would do nothing
     // because the sheet is built with closeOnEsc off. This catches that
     // case, but only while this sheet is the top one.
     function onDocKey(e) {
-      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || sheet.el.contains(document.activeElement)) return;
+      if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || host.el.contains(document.activeElement)) return;
       const roots = document.querySelectorAll('.sheet-root:not(.is-closing)');
-      if (roots.length && roots[roots.length - 1].contains(sheet.el)) onEscape(e);
+      // A page has no sheet of its own: it acts only when no sheet is open on top of it.
+      if (host.isPage ? !roots.length : roots.length && roots[roots.length - 1].contains(host.el)) onEscape(e);
     }
     document.addEventListener('keydown', onDocKey);
-    sheet.el.addEventListener('keydown', (e) => {
+    host.el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); send(); return; }
       if (e.key === 'Escape' && !e.isComposing) { onEscape(e); return; }
       // typing in this sheet must never trigger the board's single-key shortcuts
@@ -819,11 +1015,15 @@
     live = view;
     paintAll();
     if (!draftEmpty()) { showNotice('Your unsent order is back. Clear it to start fresh.'); setPane('order'); }
-    return sheet;
+    // The search box when a mouse or keyboard is in use, so a touch tablet keeps its on-screen keyboard down.
+    const startFocus = () => (fine && searchInput ? searchInput : null);
+    // Leaving the screen the way Esc does: close an empty order, ask first when there are items.
+    const leave = () => onEscape({ preventDefault() {} });
+    return { teardown, startFocus, leave };
   }
 
   /** Esc on an order that has items: close and keep the draft, keep editing, or discard it. */
-  function askLeave(sheet, back) {
+  function askLeave(host, back) {
     const n = qtyTotal();
     const dlg = SB.ui.sheet({ title: 'Leave this order?', side: 'center', width: 480, role: 'alertdialog', name: 'order-leave' });
     dlg.body.appendChild(h('div', { class: 'sheet-copy' },
@@ -832,13 +1032,17 @@
     // Keep editing: closes this question and goes back to the order.
     const keep = h('button', { type: 'button', class: 'btn', onClick: () => { dlg.close('keep-editing'); if (back) back(); } }, 'Keep editing');
     // Discard order: forgets the draft and closes both sheets.
-    const discard = h('button', { type: 'button', class: 'btn btn-danger', onClick: () => { resetDraft(); dlg.close('discard'); sheet.close('discard'); SB.ui.toast('Order discarded.', { tone: 'info' }); } }, ico('trash', 20), h('span', null, 'Discard order'));
+    const discard = h('button', { type: 'button', class: 'btn btn-danger', onClick: () => { resetDraft(); dlg.close('discard'); host.close('discard'); SB.ui.toast('Order discarded.', { tone: 'info' }); } }, ico('trash', 20), h('span', null, 'Discard order'));
     // Close, keep draft: closes the order sheet but remembers the items for next time.
-    const close = h('button', { type: 'button', class: 'btn btn-primary', 'data-autofocus': '', onClick: () => { dlg.close('close'); sheet.close('esc'); } }, ico('check', 20), h('span', null, 'Close, keep draft'));
+    const close = h('button', { type: 'button', class: 'btn btn-primary', 'data-autofocus': '', onClick: () => { dlg.close('close'); host.close('esc'); } }, ico('check', 20), h('span', null, 'Close, keep draft'));
     dlg.footer.append(keep, discard, close);
     dlg.focus(close);
     return dlg;
   }
 
   SB.sheets.register('order', openOrder);
+  // The page version is for the router: SB.order.mountPage(hostElement, { onExit }) shows New ticket as a full page.
+  // The router layer calls SB.order.mount(el) and keeps the cleanup function it gets back.
+  const mountForRouter = (el, opts) => mountPage(el, opts).destroy;
+  SB.order = { mount: mountForRouter, mountPage, open: openOrder };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

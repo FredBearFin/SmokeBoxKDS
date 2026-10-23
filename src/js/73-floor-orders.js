@@ -11,6 +11,29 @@
   'use strict';
   const SB = (g.SB = g.SB || {});
   const doc = g.document;
+
+  // Rounds a dollar amount to whole cents.
+  const cents = (v) => Math.round(v * 100) / 100;
+  // Tip choices worked out from a base amount (the food after any discount): 15, 18, 20 and 25 percent in dollars.
+  function tipPresets(base) {
+    return [15, 18, 20, 25].map((pct) => ({ pct, label: pct + '%', amount: cents((Math.max(0, base) * pct) / 100) }));
+  }
+  // The tip that brings the amount to collect up to a whole dollar (a total of 23.40 gives 0.60); 0 if already whole.
+  function roundUpTip(total) { return cents(Math.ceil(cents(total) - 1e-9) - cents(total)); }
+  // Cash amounts a guest is likely to hand over for a bill: the exact amount, then the next 5, 10, 20, 50 and 100 above it.
+  // Each is listed once and never below the bill. Returns [{ label, amount }].
+  function cashChoices(due) {
+    const out = [{ label: 'Exact', amount: cents(due) }], seen = new Set([cents(due)]);
+    [5, 10, 20, 50, 100].forEach((step) => {
+      const amt = Math.ceil(cents(due) / step - 1e-9) * step;
+      if (amt > 0 && !seen.has(amt) && out.length < 5) { seen.add(amt); out.push({ label: '$' + amt, amount: amt }); }
+    });
+    return out;
+  }
+  // Change owed back: what was handed over less what is due, or a negative number when it is short.
+  const changeFor = (given, due) => cents(given - due);
+  g.SB.payLogic = { tipPresets, roundUpTip, cashChoices, changeFor };
+
   if (!doc) return; // Node: these screens are DOM only
 
   const U = SB.util, C = SB.config, h = U.h;
@@ -266,13 +289,13 @@
       const row = h('div', { class: 'ox-chips', role: 'group', 'aria-label': label });
       defs.forEach((d) => {
         // The dollars this chip stands for right now (a share of the base figure, or a fixed amount).
-        const amount = () => (d.pct ? r2(base() * d.pct) : d.fixed || 0);
+        const amount = () => (d.roundUp ? roundUpTip(orderTotal()) : d.pct ? r2(base() * d.pct) : d.fixed || 0);
         const b = SB.ui.chip({
           label: d.label, pressed: false,
           // Writes this chip's amount into the box (or clears it) and repaints the totals.
           onClick: () => { P[key] = amount() > 0 ? amount().toFixed(2) : ''; (key === 'disc' ? discInput : tipInput).value = P[key]; paint(); },
         });
-        quick.push({ el: b, key, amount });
+        quick.push({ el: b, key, amount, def: d });
         row.appendChild(b);
       });
       return row;
@@ -282,9 +305,28 @@
     // The food total less the typed discount, which tips are worked out from.
     const net = () => Math.max(0, food() - (Number.isNaN(U.parseDollars(P.disc)) ? 0 : U.parseDollars(P.disc)));
     const discChips = chipRow('Quick discounts', [{ label: 'None' }, { label: '10%', pct: 0.1 }, { label: '20%', pct: 0.2 }], 'disc', food);
+    // The order total (food less discount, plus tax) before any tip; the Round up tip is worked from it.
+    const orderTotal = () => { const o = E().findOrder(st(), orderId), d = U.parseDollars(P.disc); return o && o.status === 'open' ? E().orderTotals(st(), o, { discount: Number.isNaN(d) ? 0 : d }).total : 0; };
     const tipChips = chipRow('Quick tips', [
-      { label: 'No tip' }, { label: '$1', fixed: 1 }, { label: '$2', fixed: 2 }, { label: '$5', fixed: 5 }, { label: '15%', pct: 0.15 }, { label: '20%', pct: 0.2 },
+      { label: 'No tip' }, { label: '15%', pct: 0.15, show: true }, { label: '18%', pct: 0.18, show: true }, { label: '20%', pct: 0.2, show: true },
+      { label: '25%', pct: 0.25, show: true }, { label: 'Round up', roundUp: true, show: true },
     ], 'tip', net);
+    // Cash the guest may hand over: a row of buttons that fill the cash box, rebuilt as the amount due changes.
+    const cashChips = h('div', { class: 'ox-chips ox-cash-chips', role: 'group', 'aria-label': 'Cash handed over' });
+    let cashSig = '';
+    // Shows the likely bills for the amount due; tapping one writes it into the cash box.
+    function paintCashChips(owe) {
+      const opts = cashChoices(owe), sig = opts.map((c) => c.amount).join('|');
+      if (sig !== cashSig) {
+        cashSig = sig; U.clear(cashChips);
+        opts.forEach((c) => {
+          // Writes this amount into the cash box and works out the change.
+          const pick = () => { P.cash = c.amount.toFixed(2); cashInput.value = P.cash; paint(); };
+          cashChips.appendChild(SB.ui.chip({ label: c.label + (c.label === 'Exact' ? ' ' + money(c.amount) : ''), onClick: pick }));
+        });
+      }
+      Array.from(cashChips.children).forEach((b, i) => b.setAttribute('aria-pressed', !Number.isNaN(U.parseDollars(P.cash)) && Math.abs(U.parseDollars(P.cash) - opts[i].amount) < 0.005 ? 'true' : 'false'));
+    }
     methodSeg = SB.ui.segmented({
       label: 'How it was paid', class: 'ox-method', value: P.method,
       options: C.payMethods.map((pm) => ({ id: pm.id, label: pm.name })),
@@ -297,7 +339,7 @@
     sheet.body.append(h('div', { class: 'ox-pay' },
       head, itemsP, calc,
       h('div', { class: 'ox-pay-block' }, h('div', { class: 'ord-label' }, 'How it was paid'), methodSeg),
-      cashField, change,
+      cashField, cashChips, change,
       h('div', { class: 'ox-pay-block' }, tipField, tipChips),
       h('div', { class: 'ox-pay-block' }, discField, discChips),
       err));
@@ -328,11 +370,16 @@
       if (tip > 0) rows.push(['Tip', money(tip)], ['To collect', money(tot.total + tip)]);
       U.clear(calc);
       rows.forEach((row, i) => calc.append(h('dt', { class: i === rows.length - 1 ? 'is-last' : '' }, row[0]), h('dd', { class: 'num' + (i === rows.length - 1 ? ' is-last' : '') }, row[1])));
-      quick.forEach((q) => { const typed = U.parseDollars(P[q.key]); q.el.setAttribute('aria-pressed', !Number.isNaN(typed) && Math.abs(typed - q.amount()) < 0.005 ? 'true' : 'false'); });
+      quick.forEach((q) => {
+        // Tip buttons show their dollar amount; Round up hides when the total is already a whole dollar.
+        if (q.def.show) { const amt = q.amount(); text(q.el.lastChild, q.def.roundUp ? 'Round up ' + money(amt) : q.def.label + ' ' + money(amt)); setHidden(q.el, q.def.roundUp && amt <= 0); }
+        const typed = U.parseDollars(P[q.key]); q.el.setAttribute('aria-pressed', !Number.isNaN(typed) && Math.abs(typed - q.amount()) < 0.005 ? 'true' : 'false'); });
       setHidden(cashField, P.method !== 'cash');
       const owe = r2(tot.total + tip), given = r.err ? 0 : r.c;
-      setHidden(change, P.method !== 'cash' || !(given > 0));
-      text(change, given >= owe ? 'Change due: ' + money(r2(given - owe)) : 'Short by ' + money(r2(owe - given)) + '.');
+      setHidden(cashChips, P.method !== 'cash');
+      if (P.method === 'cash') paintCashChips(owe);
+      setHidden(change, P.method !== 'cash');
+      text(change, !(given > 0) ? 'Tap what the guest handed over to see the change.' : given >= owe ? 'Change due: ' + money(changeFor(given, owe)) : 'Short by ' + money(changeFor(owe, given)) + '.');
       change.dataset.short = given >= owe ? 'false' : 'true';
       text(payBtn.lastChild, 'Mark paid, ' + money(owe));
       payBtn.disabled = tot.subtotal <= 0;
