@@ -128,8 +128,10 @@ async function verify(label, final) {
   console.log(`\n# ${label}`);
   const r = await settle(label);
   check(label + ': every screen equals the hub state', r.ok, r.ok ? null : { last: r.last, hub: (r.hv || '').slice(0, 120), screens: (r.vs || []).map((v) => String(v).slice(0, 120)) });
-  const st = r.ok ? r.st : await snap();
-  const inv = E.checkInvariants(st, st.events && st.events.length ? Date.now() : Date.now());
+  let st = r.ok ? r.st : await snap();
+  // The hub moves time on once a second, so a thing that became due in the last second can look late: look again after the next ticks and fail only if it stays.
+  let inv = E.checkInvariants(st, Date.now());
+  if (inv.length) { await sleep(3000); st = await snap(); inv = E.checkInvariants(st, Date.now() - 2000); }
   check(label + ': engine invariants hold on the hub state', inv.length === 0, inv.slice(0, 5));
   const nums = st.tickets.map((t) => t.num); check(label + ': ticket numbers unique (' + nums.length + ' tickets)', new Set(nums).size === nums.length, nums.length);
   const ids = st.tickets.map((t) => t.id); check(label + ': ticket ids unique', new Set(ids).size === ids.length);
