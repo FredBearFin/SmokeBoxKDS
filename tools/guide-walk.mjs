@@ -26,6 +26,11 @@ async function fresh(browser, w, h) {
   return page;
 }
 // True when an element with this visible text (or aria-label) can be seen inside the selector scope.
+// Like seen(), but the text may be anywhere inside the element (for headings that start with a number).
+const has = (page, text, scope) => page.evaluate(([t, sc]) => {
+  const root = sc ? document.querySelector(sc) : document;
+  return !!root && [...root.querySelectorAll('h2, h3, summary, button, a, label, p, div, span')].some((e) => e.getClientRects().length && e.textContent.replace(/\s+/g, ' ').indexOf(t) >= 0);
+}, [text, scope || '']);
 const seen = (page, text, scope) => page.evaluate(([t, sc]) => {
   const root = sc ? document.querySelector(sc) : document;
   if (!root) return false;
@@ -75,7 +80,8 @@ async function blank(browser) {
   await p.click('button:has-text("Back office")'); await p.waitForTimeout(2200);
   for (const t of ['Sales and money', 'Safety', 'Menu and settings']) check('back office nav: ' + t, await seen(p, t, '#sb-office'));
   await p.click('#sb-office nav >> text=Menu and settings'); await p.waitForTimeout(1400);
-  for (const t of ['Data, backup and reset', 'Download backup (JSON)', 'Copy backup', 'Choose a backup file', 'Check pasted backup']) check('data page: ' + t, await seen(p, t, '#sb-office'));
+  for (const t of ['Data, backup and reset', 'Back up now', 'Restore from a backup', 'Replacing this device', 'Danger zone: erase data']) check('data page: ' + t, await has(p, t, '#sb-office'));
+  for (const t of ['Download backup (JSON)', 'Copy backup', 'Choose a backup file', 'Check pasted backup', 'Reset live data', 'Reset everything']) check('data page: ' + t, await seen(p, t, '#sb-office'));
   await p.close();
 }
 
@@ -92,17 +98,6 @@ async function cookAhead(browser) {
   check('Sanitize button appears when Cooking ahead is Yes', await seen(p, 'Sanitize', '.fl-head'));
   await p.click('text=Cabinet'); await p.waitForTimeout(500);
   for (const t of ['New batch', 'Hold cabinet']) check('cabinet: ' + t, await seen(p, t, '.fl-cabinet'));
-  await p.close();
-}
-
-// The demo walk: the practice kitchen fills the board and can be stopped.
-async function demo(browser) {
-  console.log('Demo kitchen');
-  const p = await fresh(browser);
-  const btn = await p.evaluate(() => [...document.querySelectorAll('button')].map((b) => b.textContent.trim()).find((t) => /busy-night demo/i.test(t)) || '');
-  check('welcome offers the busy-night demo', !!btn, btn);
-  if (btn) { await p.click('button:has-text("busy-night demo")'); await p.waitForTimeout(1500); check('demo: tickets appear on the board', (await p.evaluate(() => document.querySelectorAll('.fl-slip').length)) > 0); }
-  check('header: Demo button', await seen(p, 'Demo', '.fl-head'));
   await p.close();
 }
 
@@ -143,16 +138,24 @@ async function cooked(browser) {
   await tap(p, 'Log a first batch'); await p.waitForTimeout(700);
   for (const t of ['New batch', 'Product', 'Put in hold cabinet']) check('cabinet new batch: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
   await tap(p, 'Put in hold cabinet'); await p.waitForTimeout(800);
-  for (const t of ['Pull', 'Log temp', 'Start cooling', 'Discard']) check('batch card: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
+  // The card shows one main button (Log temp here) and a "..." button named More for this batch; the rest are in its menu.
+  check('batch card: Log temp', await seen(p, 'Log temp', '.sheet-root:last-of-type'));
+  check('batch card: More for this batch', await p.evaluate(() => !!document.querySelector('button[aria-label="More for this batch"]')));
+  await p.click('button[aria-label="More for this batch"]'); await p.waitForTimeout(400);
+  for (const t of ['Pull', 'Start cooling', 'Discard']) check('batch card menu: ' + t, await p.evaluate((t) => [...document.querySelectorAll('[role=menuitem]')].some((e) => e.getClientRects().length && e.textContent.trim().startsWith(t)), t));
   await tap(p, 'Discard'); await p.waitForTimeout(500);
   await tap(p, 'Quality'); await tap(p, 'Discard batch'); await p.waitForTimeout(600);
   for (const t of ['Who is this?', 'Skip']) check('initials: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
-  await p.fill('input[aria-label="Your initials"]', 'JM'); await tap(p, 'Discard batch'); await p.waitForTimeout(800);
+  await p.fill('input[aria-label="Your initials"]', 'JM'); await tap(p, 'Discard batch'); await p.waitForTimeout(900);
+  await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+  await tap(p, 'Cabinet'); await p.waitForTimeout(500);
+  check('cabinet: Entries are saved as JM, and Switch person', (await has(p, 'Entries are saved as JM')) && (await seen(p, 'Switch person')));
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(400);
   await p.click('button:has-text("Menu")'); await p.waitForTimeout(400);
   check('menu: Thrown-out log', await tap(p, 'Thrown-out log')); await p.waitForTimeout(600);
-  for (const t of ['Save as spreadsheet', 'Print or save as PDF', 'Fix']) check('thrown-out log: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
-  await tap(p, 'Fix'); await p.waitForTimeout(500);
+  for (const t of ['Save as spreadsheet', 'Print or save as PDF']) check('thrown-out log: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
+  check('thrown-out log: Fix this entry button', await p.evaluate(() => !!document.querySelector('.sheet-root:last-of-type button[data-act="fix-entry"]')));
+  await p.click('.sheet-root:last-of-type button[data-act="fix-entry"]'); await p.waitForTimeout(500);
   for (const t of ['Fix this entry', 'What was wrong?', 'Save the fix']) check('fix: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
   await p.close();
 }
@@ -196,6 +199,24 @@ async function settings(browser) {
   await q.close();
 }
 
+// The Try the demo walk: the welcome button asks first, the demo has a bar with Back to my kitchen, and your own kitchen stays empty.
+async function tryDemo(browser) {
+  console.log('Try the demo');
+  const p = await fresh(browser);
+  check('welcome: Try the demo', await seen(p, 'Try the demo'));
+  await tap(p, 'Try the demo'); await p.waitForTimeout(700);
+  for (const t of ['Try the demo?', 'Not now']) check('demo dialog: ' + t, await seen(p, t, '.sheet-host'));
+  await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-host button')].find((x) => x.textContent.trim() === 'Try the demo'); if (b) b.click(); });
+  await p.waitForTimeout(2200);
+  check('demo bar: You are trying the demo', await has(p, 'You are trying the demo.'));
+  check('demo bar: Back to my kitchen', await seen(p, 'Back to my kitchen'));
+  check('demo: sample tickets on the board', (await p.evaluate(() => document.querySelectorAll('.fl-slip').length)) > 0);
+  await tap(p, 'Back to my kitchen'); await p.waitForTimeout(2200);
+  check('back in your own kitchen: empty menu', (await p.evaluate(() => SB.store.getState().menu.length)) === 0);
+  check('your own kitchen shows Add your first dish again', await seen(p, 'Add your first dish'));
+  await p.close();
+}
+
 // The demo walk: a fresh browser context opened with ?demo has sample dishes and tickets, and a normal tab in the same context stays empty.
 async function demoMode(browser) {
   console.log('Demo mode (?demo)');
@@ -211,7 +232,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await demoMode(browser); await demo(browser); } finally { await browser.close(); }
+try { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await tryDemo(browser); await demoMode(browser); } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);

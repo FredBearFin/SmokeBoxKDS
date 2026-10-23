@@ -65,3 +65,46 @@ Nothing was tried on a real tablet. Line numbers are where the string starts in 
 ## Counts
 
 30 rows in the table (A2 9, A3 9, A1 8, A5 4; two are "good as it stands" notes), 3 bugs, 5 good examples. Terms to apply once decided: Demo vs Practice (decision 6), station names (8), the cold-dish default (9).
+
+## Status after the round 5 merge (kds/deploy cf8912b, checked in round 6)
+
+Re-ran `tools/extract-strings.mjs`: 4,564 strings (4,368 before). 223 are new or changed since the round 5 file; I read them all (leaving out my own Guide files). Line numbers in the table above are from the round 5 build; some have moved by a few lines.
+
+**Resolved (checked in the merged strings)**
+- A2 (77): "How many?", "Select each dish and enter the grams...", the neutral cooked-ahead examples, "Smoker, grill or oven", "An example menu with sample prices", the Set up this tablet steps 6 and 7 (jargon and the dish names are gone).
+- A5 (20): both engine messages (cook-ahead switch path, portions conflict).
+- A1: "Try the demo" on the welcome screen; "Demo batch" reported done by A1; the Initials cell fix (A1, with a test).
+- Mine: 74-floor-tour.js, 76-floor-discards.js and 83-office-safety.js still match the plain-words rows from rounds 2 and 5. 83:102 ("discards fill this page") is still open (see below).
+
+**Still open (not yet in the merged code)**
+| file:line (merged build) | current | proposed | owner |
+|---|---|---|---|
+| 72-floor-sheets.js:1275 and 1882 | `locked for safety`, `The only batch is locked for safety: too old, too cold or too warm.` | `held back`; `The only batch is held back: too old, too cold or too warm.` | A1 |
+| 72-floor-sheets.js:1934 | `kitchen display for a BBQ line` (the Help text was reworded by A1 in round 5 per A1; the About sheet at 1934 still has it) | `for restaurants that cook food ahead` | A1 |
+| 72-floor-sheets.js:1731 | `This erases YOUR dishes` | `This erases your dishes` | A1 |
+| 72-floor-sheets.js:1039 | `like brisket` | `like pulled pork or chili` | A1 |
+| 72-floor-sheets.js:1922 | `That is a deliberate difference from the research report this app started from.` (internal text, back in Help) | delete the sentence | A1 |
+| 72-floor-sheets.js:308 to 321 | `reaches stage 1`, `stage 2` | `reaches step 1 of 2`, `step 2 of 2` | A1 |
+| 72-floor-sheets.js:659 | `... now, or discard it.` | `... now, or throw it out.` | A1 |
+| 77-floor-setup.js:187 | `a practice kitchen with a sample barbecue menu and pretend tickets` and `Your own dishes and orders are kept safe.` | `a demo kitchen with a sample menu and sample tickets` and `Your own dishes and orders are not touched.` | A2 |
+| 77-floor-setup.js:657 | `fix or untick any` | `fix or clear any` ("untick" is non-US) | A2 |
+| 80-office-core.js:1227 to 1240 | `Turn it on in Settings`, `Open Menu and settings and try there` | `Turn it on under Dishes and prices: Yes, I cook ahead` | A3 |
+| 80-office-core.js:81, 88 and 82-office-money.js:374, 442 | `on the line screen` | `on the kitchen board` | A3 |
+| 82-office-money.js:635 to 757 | `Smoked meat loses weight in the smoker`, `your main smoked meat` | neutral wording or show only when a cooked-ahead meat exists | A3 |
+| 83-office-safety.js:102 and 292 | `discards fill this page`, `on the line screen` | `thrown-out batches fill this page`, `on the kitchen board` (my file; A3 may edit one line there, so I left both to them to avoid a clash) | A3 |
+| 84-office-data.js:474 | `done when it is plated, like tea or slaw ... like brisket or fries` | neutral examples | A3 |
+| 84-office-data.js:1191 | `stored in Fahrenheit` | `always entered in F` | A3 |
+| 84-office-data.js:1692 to 1708 | the Danger zone buttons say Reset live data and Reset everything, but their boxes say Clear live data and Erase everything | one verb for each action (recommend Erase) | A3 |
+| 84-office-data.js:1710 | `Ember or Paper` | `Day or Night` (decision 5) | A3 |
+| 88-office-backupstatus (88:39 to 50) | `Practice kitchen (the demo)` | `Demo kitchen` (decision 6) | A3 |
+| 89-office-inspector (89:18) | `Kept past best-by`, `Best-by note corrected` | the cabinet cards still say quality limit and Taste it, keep serving. Use one pair of words on both (decision 7), until then say `kept serving past its quality limit` | A3 |
+| 85-office-stock.js:449 | `Smokebox pretends to tell each ordering channel` | remove (decision 14) | A3 |
+| 86-office-glance.js:52 | `nothing is 86` | `nothing is sold out` | A3 |
+
+**New things I checked and found good**
+- Menu import (13-menu-import.js, 77:551 to 657): every problem message says what is wrong and what to do ("This row has no price. Enter the price in dollars... A price is never guessed."). Only "untick" is off.
+- The food safety record page (89:114, 89:129): "It is not an inspection result. Entries are never edited; if something was wrong, a correction is added under it." This is the right claim level.
+- Backup status line (88:20 to 26): plain, no alarm words.
+- Demo bar (60:1685): "You are trying the demo. Nothing here is your kitchen."
+
+**Bug carried over:** A3's print rules (`body > *:not(.sb-printroot) { display: none !important; }` in 33-office-closeday.css and 34-office-inspector.css) hide the whole app on every print. The Guide has its own override; A3 was told to scope theirs.

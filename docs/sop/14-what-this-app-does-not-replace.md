@@ -8,4 +8,4 @@ Smokebox is a helper. You and your local rules stay in charge.
 - Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.
 - Allergy care. A note on a ticket is a reminder. Tell your staff about every allergy, and follow your own allergen rules.
 - Your backups. If you do not save backups, clearing the browser data erases everything.
-- Real numbers. Practice tickets and sample history are made up. Starter estimates for prep times, yields and costs are guesses until you confirm them.
+- Real numbers. Demo tickets and sample history are made up. Starter estimates for prep times, yields and costs are guesses until you confirm them.

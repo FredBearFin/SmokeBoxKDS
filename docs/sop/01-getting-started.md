@@ -8,17 +8,19 @@ Add your dishes, send a test order, take payment and save your first backup. Abo
 2. Type what the dish is called and its price. Tap where it is made: Pit, Hot sides, Fry or Cold and drinks.
 3. Tap **Save and add another** until your menu is in. Then tap **Save and finish**.
 
-Change dishes and prices later: tap **Menu**, then **Dishes and prices**. A dish you remove goes to **Removed dishes**, and **Bring it back** puts it back with its price.
+Change dishes and prices later: tap **Menu**, then **Dishes and prices**. A dish you remove goes to **Removed dishes**. Tap **Bring it back** to put it back.
+
+Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**.
 
 Want to see how a ticket works first? Tap **Show me how it works** for a one-minute walkthrough.
 
 ## 2. Set your tax and hours
 
-Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN** at the bottom. Enter your sales tax (0 if you add none) and your opening hours. A PIN is optional. It keeps line cooks out of the back office.
+Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN** at the bottom. Enter your sales tax (0 if you charge none) and your opening hours. A PIN is optional. It keeps your cooks out of the back office.
 
-If you cook food ahead and hold it hot or cold, say so in **Dishes and prices** (see Cooked-ahead food and portions). If you cook everything to order, skip it.
+Do you cook food ahead and keep it hot or cold? Say so in **Dishes and prices** (see Cooked-ahead food and portions). If you cook everything to order, skip it.
 
-Temperatures and weights show in °F and kilograms. To change them, open **Back office**, then **Menu and settings**, and look for Temperatures and Weights.
+Temperatures show in °F and weights in kilograms. You can change both in the **Back office**, under **Menu and settings**.
 
 ## 3. Send a test order
 
@@ -26,7 +28,7 @@ Temperatures and weights show in °F and kilograms. To change them, open **Back 
 2. Tap a dish, then tap **Send to kitchen**.
 3. The ticket appears on the board. Tap **Start**, then **Done** on the dish, then **Bump** the ticket.
 
-A test order is a real order in your reports. To remove it, void it (see Taking an order).
+A test order counts in your reports. To remove it, cancel it (see Taking an order).
 
 ## 4. Take payment
 

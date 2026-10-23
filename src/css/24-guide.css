@@ -8,6 +8,11 @@
 .layer-guide { z-index: calc(var(--zi-base) + 1); }
 .gd { display: flex; flex-direction: column; min-height: 100%; }
 
+/* ---------- skip link ---------- */
+/* Hidden until it gets keyboard focus; jumps past the page list to the text. */
+.gd-skip { position: absolute; left: var(--sp-3); top: -100px; z-index: 5; padding: var(--sp-2) var(--sp-4); background: var(--ink); color: var(--bg); border-radius: var(--r-btn); font: var(--w-semi) var(--fs-2)/1.2 var(--font-body); text-decoration: none; }
+.gd-skip:focus { top: var(--sp-2); outline: var(--bw-focus) solid var(--focus); outline-offset: 2px; }
+
 /* ---------- top bar: back button and the word Guide ---------- */
 /* Sticks to the top so the way back is always one tap away. */
 .gd-top {
@@ -79,7 +84,7 @@ ul.gd-list { list-style: disc; }
 .ga-dot { fill: var(--amber); }
 .ga-badge { fill: var(--amber-ink); } .ga-badge-warn { fill: var(--amber-ink); } .ga-badge-bad { fill: var(--crimson); }
 .ga-spine { stroke: var(--line); stroke-width: 4; }
-.ga-step-1 { fill: var(--sage-ink); } .ga-step-2 { fill: var(--amber-ink); } .ga-step-3 { fill: var(--primary); } .ga-step-4 { fill: var(--crimson); }
+.ga-step-1 { fill: var(--sage-ink); } .ga-step-2 { fill: var(--amber-ink); } .ga-step-3 { fill: var(--ink2); } .ga-step-4 { fill: var(--crimson); }
 .ga-card { fill: var(--paper); stroke: var(--line); stroke-width: 2; }
 .ga-card-bad { stroke: var(--crimson); }
 .ga-note { fill: var(--tint-warn); stroke: var(--amber); stroke-width: 2.5; }
@@ -137,6 +142,8 @@ ul.gd-list { list-style: disc; }
 /* Print shows only the open Guide page, in black on white, with no buttons or lists. Meant for the three quick cards. */
 @media print {
   html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+  /* Other print rules (Close the day, the inspector page) hide everything in the body but their own sheet; while the Guide is open it must stay. */
+  body:has(.layer-guide:not([hidden])) > #app { display: block !important; }
   .sb-shell { position: static !important; overflow: visible !important; background: #fff !important; }
   .sb-shell > :not(.layer-guide), .skip-link { display: none !important; }
   .layer-guide { position: static !important; display: block !important; overflow: visible !important; background: #fff !important; }
@@ -150,4 +157,12 @@ ul.gd-list { list-style: disc; }
   .gd-check li::before { border-color: #000; background: #fff; }
   .gd-ui { border-color: #000; background: #fff; }
   .gd-fig, .gd-list li { break-inside: avoid; }
+  /* Pictures print in black, white and gray, so they stay readable on a black-and-white printer. */
+  .ga-bg { fill: #fff; stroke: #000; stroke-width: 2; }
+  .ga-badge, .ga-badge-warn, .ga-badge-bad, .ga-step-1, .ga-step-2, .ga-step-3, .ga-step-4 { fill: #000; }
+  .ga-badge-t, .ga-on { fill: #fff; }
+  .ga-btn-primary, .ga-btn-ok { fill: #333; }
+  .ga-ink, .ga-ink2, .ga-warn-t, .ga-bad-t, .ga-slip-ink, .ga-slip-ink3, .ga-slip-amber { fill: #000; }
+  .ga-card, .ga-slip, .ga-note { fill: #fff; stroke: #000; }
+  .ga-leader, .ga-dot { stroke: #000; fill: none; } .ga-dot { fill: #000; }
 }

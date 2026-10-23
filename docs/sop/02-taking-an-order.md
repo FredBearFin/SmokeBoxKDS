@@ -4,7 +4,7 @@ Start an order, add dishes and notes, send it to the kitchen, and add to it late
 
 ## Start the order
 
-Tap **New ticket**. Tap a dish to add it. Tap it again to add one more. A dish marked 86 is sold out or off the menu and cannot be added.
+Tap **New ticket**. Tap a dish to add it. Tap it again to add one more. A dish marked 86 (sold out) cannot be added.
 
 ## Customer and order type
 
@@ -24,9 +24,9 @@ Tap **Send to kitchen**. Each station sees only its own dishes. Pay now, or leav
 
 ## Add to an order that is still open
 
-Tap **New ticket** again and choose **Add to open order**. The new ticket joins the same bill as another round.
+Tap **New ticket** again and choose **Add to open order**. The new ticket is added to the same order.
 
 ## Fixing a mistake
 
 - **Undo** appears for 10 seconds after an action. After that, fix it by hand.
-- To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. Voided tickets are counted in your reports.
+- To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. Cancelled tickets are still counted in your reports.
