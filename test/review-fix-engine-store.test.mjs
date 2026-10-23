@@ -62,6 +62,21 @@ test('Ada 4: the ticket cap never drops a finished round of an order that is sti
   } finally { SB.config.limits.maxTickets = old; SB.config.limits.maxOrders = oldO; }
 });
 
+test('Ada 4: when every order stays open (payment taken elsewhere), the ticket cap still holds', () => {
+  const old = SB.config.limits.maxTickets, oldO = SB.config.limits.maxOrders;
+  SB.config.limits.maxTickets = 20; SB.config.limits.maxOrders = 200;
+  try {
+    const k = kitchen();
+    const dish = k.go('addMenuItem', { name: 'Plain', zone: 'pit', cat: 'meat', price: 5, prepSec: 60, track: 'one', prepGuess: false }).info.id;
+    for (let i = 0; i < 60; i++) {
+      const t = k.go('createTicket', { customer: 'C' + i, items: [{ menuId: dish }] });
+      assert.equal(t.report, 'ok');
+      assert.equal(k.go('bumpTicket', { ticketId: t.info.ticketId, force: true }).report, 'ok');
+    }
+    assert.ok(k.s.tickets.length <= 20, 'got ' + k.s.tickets.length);
+  } finally { SB.config.limits.maxTickets = old; SB.config.limits.maxOrders = oldO; }
+});
+
 test('Ada 5: finishing a line whose dish is missing from the menu records no cost, not $0', () => {
   const k = kitchen();
   const dish = k.go('addMenuItem', { name: 'Plain', zone: 'pit', cat: 'meat', price: 5, prepSec: 60, track: 'one', prepGuess: false }).info.id;

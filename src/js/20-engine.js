@@ -3249,7 +3249,8 @@
    * ==================================================================================================== */
   // When there are more tickets than max, drops the oldest finished ones (never active) to about 2 percent
   // under max. Their used grams move into the ledger so the books still balance (I2).
-  // WATCH OUT: a finished ticket on an order that is still open stays, because the check adds up its food.
+  // WATCH OUT: finished tickets on an order that is still open go last, because the check adds up their food. They go only when
+  // nothing else is left to drop (a kitchen that takes payment elsewhere leaves every order open, and the cap must still hold).
   function pruneTicketsInto(tx, max) {
     const arr = tx.get('tickets');
     if (!(arr.length > max)) return;
@@ -3257,16 +3258,19 @@
     let drop = arr.length - target;
     const open = new Set();
     for (const o of tx.get('orders') || []) if (o && o.status === 'open') open.add(o.id);
+    const onOpen = (t) => !!(t.orderId && open.has(t.orderId));
+    // First pass: the oldest finished tickets not on an open check; second pass, only if still too many: the rest.
+    const gone = new Set();
+    for (const late of [false, true]) for (const t of arr) {
+      if (drop > 0 && t.status !== 'active' && onOpen(t) === late && !gone.has(t)) { gone.add(t); drop--; }
+    }
+    if (!gone.size) return;
     const keep = [];
     for (const t of arr) {
-      if (drop > 0 && t.status !== 'active' && !(t.orderId && open.has(t.orderId))) {
-        drop--;
-        for (const it of t.items) for (const r of it.depleted || []) if (r.g > 0) { const L = tx.ledger(r.ing); L.prunedUsed = (L.prunedUsed || 0) + r.g; }
-        continue;
-      }
+      if (gone.has(t)) { for (const it of t.items) for (const r of it.depleted || []) if (r.g > 0) { const L = tx.ledger(r.ing); L.prunedUsed = (L.prunedUsed || 0) + r.g; } continue; }
       keep.push(t);
     }
-    if (keep.length !== arr.length) { tx.own.add(keep); tx.ch.tickets = keep; tx.pruned = true; }
+    tx.own.add(keep); tx.ch.tickets = keep; tx.pruned = true;
   }
   /** prune(state, { maxTickets?, maxEvents?, now? }) -> state. Used by the store to fit storage quotas. Keeps I2 (ledger) whole.
    *  now, when given, caps the time the 400-day safety cut is measured from. */
