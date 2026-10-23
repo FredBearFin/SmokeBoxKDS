@@ -1,0 +1,80 @@
+// Second review round, engine and store: unknown costs stay unknown (never $0), finished tickets on an open check survive the
+// ticket cap, and the other engine and store fixes from the same round. Each test names the finding it covers.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { loadSB } from './_load.mjs';
+
+const SB = await loadSB(['00-util', '10-config', '20-engine']);
+const E = SB.engine;
+const T0 = new Date(2026, 9, 20, 12, 0, 0).getTime(), H = 3600e3, MIN = 60e3;
+
+// A blank kitchen plus a helper that applies one action a second later and keeps the new state when it works.
+function kitchen(opts) {
+  const k = { now: T0, s: E.newState(Object.assign({ now: T0, blank: true }, opts || {})) };
+  k.go = (type, p, at) => { k.now = at != null ? at : k.now + 1000; const r = E.apply(k.s, type, p, k.now, {}); if (r.report === 'ok') k.s = r.state; return r; };
+  return k;
+}
+
+test('Ada 3: a batch logged by raw weight for an ingredient with no price keeps no cost, and its discard records no cost', () => {
+  const k = kitchen();
+  assert.equal(k.go('updateSettings', { patch: { modules: { cookAhead: true } } }).report, 'ok');
+  const r = k.go('addIngredient', { name: 'Mystery pork', tcs: true, hold: 'hot' });
+  assert.equal(r.report, 'ok', JSON.stringify(r.info));
+  const ing = k.s.ingredients.find((i) => i.name === 'Mystery pork');
+  assert.equal(ing.costPerKg, undefined);
+  const b = k.go('addBatch', { ing: ing.id, rawG: 4000, cookedG: 2400, tempF: 165 });
+  assert.equal(b.report, 'ok', JSON.stringify(b.info));
+  const batch = k.s.batches.find((x) => x.id === b.info.batchId);
+  assert.equal(batch.costPerCookedKg, undefined, 'unknown, not $0');
+  const d = k.go('discardBatch', { batchId: batch.id, reason: 'manual' });
+  assert.equal(d.report, 'ok', JSON.stringify(d.info));
+  const ev = E.allEvents(k.s).filter((e) => e.type === 'batch_discard').pop();
+  assert.ok(ev, 'a discard event is logged');
+  assert.equal(ev.cost, undefined, 'the thrown-out food has no made-up $0 cost');
+});
+
+test('Ada 3: with a price per kg, the raw-weight cost is still worked out', () => {
+  const k = kitchen();
+  k.go('updateSettings', { patch: { modules: { cookAhead: true } } });
+  k.go('addIngredient', { name: 'Priced pork', tcs: true, hold: 'hot', costPerKg: 10 });
+  const ing = k.s.ingredients.find((i) => i.name === 'Priced pork');
+  const b = k.go('addBatch', { ing: ing.id, rawG: 4000, cookedG: 2000, tempF: 165 });
+  assert.equal(b.report, 'ok');
+  assert.equal(k.s.batches.find((x) => x.id === b.info.batchId).costPerCookedKg, 20);
+});
+
+test('Ada 4: the ticket cap never drops a finished round of an order that is still open', () => {
+  const old = SB.config.limits.maxTickets, oldO = SB.config.limits.maxOrders;
+  SB.config.limits.maxTickets = 20; SB.config.limits.maxOrders = 200;
+  try {
+    const k = kitchen();
+    k.go('updateSettings', { patch: { service: { counter: true } } });
+    const dish = k.go('addMenuItem', { name: 'Plain', zone: 'pit', cat: 'meat', price: 5, prepSec: 60, track: 'one', prepGuess: false }).info.id;
+    const first = k.go('createTicket', { customer: 'Tab', items: [{ menuId: dish }] });
+    assert.equal(first.report, 'ok');
+    assert.equal(k.go('bumpTicket', { ticketId: first.info.ticketId, force: true }).report, 'ok');
+    const orderId = first.info.orderId;
+    const before = E.orderTotals(k.s, k.s.orders.find((o) => o.id === orderId)).total;
+    for (let i = 0; i < 40; i++) assert.equal(k.go('createTicket', { customer: 'C' + i, items: [{ menuId: dish }], pay: { method: 'cash' } }).report, 'ok');
+    assert.ok(k.s.tickets.length <= 21, 'the cap still trims paid tickets');
+    assert.ok(k.s.tickets.some((t) => t.id === first.info.ticketId), 'the open check keeps its finished round');
+    assert.equal(E.orderTotals(k.s, k.s.orders.find((o) => o.id === orderId)).total, before);
+  } finally { SB.config.limits.maxTickets = old; SB.config.limits.maxOrders = oldO; }
+});
+
+test('Ada 5: finishing a line whose dish is missing from the menu records no cost, not $0', () => {
+  const k = kitchen();
+  const dish = k.go('addMenuItem', { name: 'Plain', zone: 'pit', cat: 'meat', price: 5, prepSec: 60, track: 'one', prepGuess: false }).info.id;
+  const t = k.go('createTicket', { customer: 'A', items: [{ menuId: dish }] });
+  assert.equal(t.report, 'ok');
+  // A save where the dish has gone (for example a hand-edited backup): the ticket still points at it.
+  const s = JSON.parse(JSON.stringify(k.s));
+  s.menu = s.menu.filter((m) => m.id !== dish);
+  k.s = s;
+  const tk = k.s.tickets.find((x) => x.id === t.info.ticketId);
+  const r = k.go('completeItem', { ticketId: tk.id, itemId: tk.items[0].id });
+  assert.equal(r.report, 'ok', JSON.stringify(r.info));
+  const it = k.s.tickets.find((x) => x.id === tk.id).items[0];
+  assert.equal(it.status, 'done');
+  assert.equal(it.cost, undefined);
+});

@@ -1261,7 +1261,7 @@
       // A dish with no recipe, or an ingredient with no cost, records no cost at all (never 0).
       if (d.cost === null) delete w.cost; else w.cost = d.cost;
       if (!(opts && opts.noLearn)) learnInto(tx, w, mi, learnedBefore);
-    } else { w.depleted = []; w.cost = 0; }
+    } else { w.depleted = []; delete w.cost; }
     const ev = { ticketId: t.id, itemId: it.id, zone: it.zone, menuId: it.menuId, workMs: w.doneAt - (w.startedAt != null ? w.startedAt : w.firedAt), qty: it.qty };
     if (w.cost !== undefined) ev.cost = w.cost;
     if (shortG > 0) ev.shortG = shortG;
@@ -2005,7 +2005,8 @@
       cookedG = Math.round(rawG * y); yieldPct = round(y * 100, 2);
     }
     if (!(cookedG > 0)) return 'badWeight';
-    if (rawG !== undefined) costPerCookedKg = round((rawG / 1000) * rawCost / (cookedG / 1000), 4);
+    // WATCH OUT: an ingredient with no price per kg stays unpriced (undefined), never a cost of 0.
+    if (rawG !== undefined && isNum(ing.costPerKg)) costPerCookedKg = round((rawG / 1000) * rawCost / (cookedG / 1000), 4);
     else costPerCookedKg = hasUnitCost(ing) ? round(nominalUnitCost(ing) * 1000, 4) : undefined;
     const b = intakeInto(tx, ing, { cookedG, rawG, yieldPct, costPerCookedKg, src, tempF: p.tempF, label,
       endpointC: ty && p.endpointC != null ? ty.endpointC : undefined, holdH: ty && p.holdH != null ? ty.holdH : undefined });
@@ -3232,14 +3233,17 @@
    * ==================================================================================================== */
   // When there are more tickets than max, drops the oldest finished ones (never active) to about 2 percent
   // under max. Their used grams move into the ledger so the books still balance (I2).
+  // WATCH OUT: a finished ticket on an order that is still open stays, because the check adds up its food.
   function pruneTicketsInto(tx, max) {
     const arr = tx.get('tickets');
     if (!(arr.length > max)) return;
     const target = Math.max(0, max - Math.max(1, Math.floor(max * 0.02)));
     let drop = arr.length - target;
+    const open = new Set();
+    for (const o of tx.get('orders') || []) if (o && o.status === 'open') open.add(o.id);
     const keep = [];
     for (const t of arr) {
-      if (drop > 0 && t.status !== 'active') {
+      if (drop > 0 && t.status !== 'active' && !(t.orderId && open.has(t.orderId))) {
         drop--;
         for (const it of t.items) for (const r of it.depleted || []) if (r.g > 0) { const L = tx.ledger(r.ing); L.prunedUsed = (L.prunedUsed || 0) + r.g; }
         continue;
