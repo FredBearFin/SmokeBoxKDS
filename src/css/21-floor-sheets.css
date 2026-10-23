@@ -618,3 +618,18 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .hc-cold[data-tone="bad"] { color: var(--crimson); }
 /* A cold item keeps its "In the fridge since" row visible on the compact card. */
 .hc-card[data-cold="on"] .hc-dl dt:nth-of-type(3), .hc-card[data-cold="on"] .hc-dl dd:nth-of-type(3) { display: block; }
+
+/* Get this tablet ready (rd-): one card per check with a tick or a do-this line. */
+.rd { gap: var(--sp-3); }
+.rd-card { display: grid; gap: var(--sp-2); }
+.rd-head { display: flex; align-items: center; gap: var(--sp-3); }
+.rd-head .fs-h { flex: 1 1 auto; margin: 0; }
+.rd-state { font: var(--w-bold) var(--fs-2) / 1.2 var(--font-body); }
+.rd-card[data-ok="true"] { border-color: var(--sage); }
+.rd-card[data-ok="true"] .icon, .rd-card[data-ok="true"] .rd-state { color: var(--sage-ink); }
+.rd-card[data-ok="false"] { border-color: var(--amber); }
+.rd-card[data-ok="false"] .icon, .rd-card[data-ok="false"] .rd-state { color: var(--amber-ink); }
+
+/* Pilot visit checklist (pv-): numbered steps with a tick box each. */
+.pv-list { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.pv-step { display: grid; gap: var(--sp-1); }
