@@ -16,6 +16,10 @@ function suites() {
   }
   // The journeys in test/e2e/ have no main of their own; tools/qa.mjs runs them all. --no-report keeps docs/qa-report.md untouched.
   out.qa = 'tools/qa.mjs --no-report';
+  // Optional scripts that are not part of the normal run: they write screenshots and a log, and exit 0 unless the app breaks.
+  out['ux-other-kitchens'] = 'ux-scripts/other-kitchens.mjs';
+  out['ux-hidden-restore'] = 'test/ux-hidden-restore.mjs';
+  out['ux-sound-leader'] = 'test/ux-sound-leader.mjs';
   return out;
 }
 
@@ -37,7 +41,7 @@ if (!want || (want !== 'all' && !all[want])) {
   console.log('Usage: node tools/run-slow.mjs <suite|all> [--log-dir=/tmp/slow] [--timeout=600]\nSuites: ' + Object.keys(all).join(', '));
   process.exit(want ? 2 : 0);
 }
-const names = want === 'all' ? Object.keys(all) : [want];
+const names = want === 'all' ? Object.keys(all).filter((n) => !n.startsWith('ux-')) : [want]; // the optional ux-* scripts run only when named
 let bad = 0;
 for (const n of names) {
   const r = runOne(n, all[n], opt('log-dir', '/tmp/slow'), Number(opt('timeout', 600)));

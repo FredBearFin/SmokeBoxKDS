@@ -1,5 +1,5 @@
 {
- "runStart": "2026-10-23T11:31:01.088Z",
+ "runStart": "2026-10-23T12:06:20.440Z",
  "results": [
   {
    "id": "01-first-run",
@@ -8,7 +8,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 6533,
+   "ms": 7313,
    "checks": 24,
    "failed": [],
    "skips": [],
@@ -16,7 +16,7 @@
    "shots": [
     "test/.out/qa/first-run-1280.png"
    ],
-   "at": "2026-10-23T11:08:00.788Z"
+   "at": "2026-10-23T12:04:59.911Z"
   },
   {
    "id": "02a-send-ticket",
@@ -25,7 +25,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 3830,
+   "ms": 4058,
    "checks": 16,
    "failed": [],
    "skips": [],
@@ -33,7 +33,7 @@
    "shots": [
     "test/.out/qa/cook-order-filled.png"
    ],
-   "at": "2026-10-23T11:08:04.618Z"
+   "at": "2026-10-23T11:49:41.242Z"
   },
   {
    "id": "02b-advance-bump-undo",
@@ -42,21 +42,21 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 19909,
+   "ms": 20533,
    "checks": 21,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "undo toast lifetime",
-     "value": 9.803,
+     "value": 9.78,
      "unit": "s"
     }
    ],
    "shots": [
     "test/.out/qa/cook-after-undo.png"
    ],
-   "at": "2026-10-23T11:08:24.527Z"
+   "at": "2026-10-23T11:50:01.775Z"
   },
   {
    "id": "02c-bump-anyway-void-recall",
@@ -65,7 +65,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 8933,
+   "ms": 7581,
    "checks": 16,
    "failed": [],
    "skips": [],
@@ -73,7 +73,7 @@
    "shots": [
     "test/.out/qa/cook-void-sheet.png"
    ],
-   "at": "2026-10-23T11:08:33.460Z"
+   "at": "2026-10-23T11:50:09.356Z"
   },
   {
    "id": "02d-fire-rush",
@@ -82,13 +82,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 3984,
+   "ms": 4041,
    "checks": 10,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:08:37.444Z"
+   "at": "2026-10-23T11:50:13.398Z"
   },
   {
    "id": "03a-station-views",
@@ -97,7 +97,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 5482,
+   "ms": 5924,
    "checks": 32,
    "failed": [],
    "skips": [],
@@ -105,7 +105,7 @@
    "shots": [
     "test/.out/qa/stations-fry.png"
    ],
-   "at": "2026-10-23T11:08:42.927Z"
+   "at": "2026-10-23T11:50:19.322Z"
   },
   {
    "id": "03b-keyboard",
@@ -114,13 +114,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 14917,
+   "ms": 14673,
    "checks": 30,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:08:57.844Z"
+   "at": "2026-10-23T11:50:33.996Z"
   },
   {
    "id": "04a-hold-cabinet",
@@ -129,7 +129,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 9431,
+   "ms": 9274,
    "checks": 33,
    "failed": [],
    "skips": [],
@@ -138,7 +138,7 @@
     "test/.out/qa/hold-new-batch.png",
     "test/.out/qa/hold-below-135.png"
    ],
-   "at": "2026-10-23T11:09:07.275Z"
+   "at": "2026-10-23T11:50:43.270Z"
   },
   {
    "id": "04b-lockout-86",
@@ -147,7 +147,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 13454,
+   "ms": 13546,
    "checks": 9,
    "failed": [],
    "skips": [],
@@ -157,7 +157,7 @@
     "test/.out/qa/hold-lockout.png",
     "test/.out/qa/order-86-after-lockout.png"
    ],
-   "at": "2026-10-23T11:09:20.729Z"
+   "at": "2026-10-23T11:50:56.816Z"
   },
   {
    "id": "04c-board-86",
@@ -166,7 +166,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 10688,
+   "ms": 9783,
    "checks": 17,
    "failed": [],
    "skips": [],
@@ -174,7 +174,7 @@
    "shots": [
     "test/.out/qa/board86-manual.png"
    ],
-   "at": "2026-10-23T11:09:31.418Z"
+   "at": "2026-10-23T11:51:06.600Z"
   },
   {
    "id": "05-demo-flow",
@@ -183,24 +183,24 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 31361,
+   "ms": 34250,
    "checks": 36,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "demo x15: real seconds until 3 tickets sent and 1 finished",
-     "value": 16,
+     "value": 20,
      "unit": "s"
     },
     {
      "key": "demo x15: tickets sent while watching",
-     "value": 8,
+     "value": 13,
      "unit": "tickets"
     },
     {
      "key": "demo x15: tickets finished by the crew while watching",
-     "value": 3,
+     "value": 1,
      "unit": "tickets"
     },
     {
@@ -214,7 +214,7 @@
     "test/.out/qa/demo-rush-sheet.png",
     "test/.out/qa/demo-restarted.png"
    ],
-   "at": "2026-10-23T11:10:02.779Z"
+   "at": "2026-10-23T11:51:40.850Z"
   },
   {
    "id": "06a-gesture-and-exits",
@@ -223,7 +223,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 30500,
+   "ms": 28367,
    "checks": 25,
    "failed": [],
    "skips": [],
@@ -231,7 +231,7 @@
    "shots": [
     "test/.out/qa/door-open.png"
    ],
-   "at": "2026-10-23T11:10:33.279Z"
+   "at": "2026-10-23T11:52:09.217Z"
   },
   {
    "id": "06b-reduced-motion",
@@ -240,26 +240,26 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 6222,
+   "ms": 4812,
    "checks": 6,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "reduced-motion open time",
-     "value": 18,
+     "value": 31,
      "unit": "ms"
     },
     {
      "key": "normal motion: the ember ring stays in the page for",
-     "value": 888,
+     "value": 945,
      "unit": "ms (the ignition is meant to run about 720 ms)"
     }
    ],
    "shots": [
     "test/.out/qa/door-reduced.png"
    ],
-   "at": "2026-10-23T11:10:39.502Z"
+   "at": "2026-10-23T11:52:14.029Z"
   },
   {
    "id": "06c-pin",
@@ -268,7 +268,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 30320,
+   "ms": 26729,
    "checks": 28,
    "failed": [],
    "skips": [],
@@ -282,7 +282,7 @@
    "shots": [
     "test/.out/qa/pin-keypad.png"
    ],
-   "at": "2026-10-23T11:11:09.822Z"
+   "at": "2026-10-23T11:52:40.758Z"
   },
   {
    "id": "06d-office-button",
@@ -291,13 +291,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 23740,
+   "ms": 21319,
    "checks": 23,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:11:33.562Z"
+   "at": "2026-10-23T11:53:02.078Z"
   },
   {
    "id": "07a-pages-sample",
@@ -306,13 +306,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 15008,
+   "ms": 18361,
    "checks": 101,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:11:48.570Z"
+   "at": "2026-10-23T11:53:20.439Z"
   },
   {
    "id": "07b-pages-live-only",
@@ -321,7 +321,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 10317,
+   "ms": 11378,
    "checks": 52,
    "failed": [],
    "skips": [],
@@ -329,7 +329,7 @@
    "shots": [
     "test/.out/qa/office-live-only-empty.png"
    ],
-   "at": "2026-10-23T11:11:58.888Z"
+   "at": "2026-10-23T11:53:31.818Z"
   },
   {
    "id": "07c-filters",
@@ -338,13 +338,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 13610,
+   "ms": 16716,
    "checks": 15,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:12:12.499Z"
+   "at": "2026-10-23T11:53:48.534Z"
   },
   {
    "id": "07d-gantt-themes-keys",
@@ -353,7 +353,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 26114,
+   "ms": 32139,
    "checks": 20,
    "failed": [],
    "skips": [],
@@ -362,7 +362,7 @@
     "test/.out/qa/office-gantt.png",
     "test/.out/qa/office-paper-tickets.png"
    ],
-   "at": "2026-10-23T11:12:38.614Z"
+   "at": "2026-10-23T11:54:20.673Z"
   },
   {
    "id": "07e-data-page",
@@ -371,7 +371,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 25279,
+   "ms": 26489,
    "checks": 50,
    "failed": [],
    "skips": [],
@@ -385,7 +385,7 @@
    "shots": [
     "test/.out/qa/data-import-refused.png"
    ],
-   "at": "2026-10-23T11:13:03.893Z"
+   "at": "2026-10-23T11:54:47.162Z"
   },
   {
    "id": "08a-reload-keeps",
@@ -394,13 +394,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 9584,
+   "ms": 8978,
    "checks": 11,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:13:13.477Z"
+   "at": "2026-10-23T11:54:56.140Z"
   },
   {
    "id": "08b-two-pages-sync",
@@ -409,13 +409,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 12185,
+   "ms": 9982,
    "checks": 15,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:13:25.662Z"
+   "at": "2026-10-23T12:04:51.887Z"
   },
   {
    "id": "08c-corrupt-storage",
@@ -424,21 +424,15 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 16664,
-   "checks": 50,
+   "ms": 14100,
+   "checks": 45,
    "failed": [],
    "skips": [],
-   "notes": [
-    {
-     "key": "browser dropped all storage on reload, case repeated: wrong shape",
-     "value": 1,
-     "unit": "x"
-    }
-   ],
+   "notes": [],
    "shots": [
     "test/.out/qa/corrupt-storage-board.png"
    ],
-   "at": "2026-10-23T11:13:42.326Z"
+   "at": "2026-10-23T11:55:29.805Z"
   },
   {
    "id": "08d-storage-blocked",
@@ -447,55 +441,24 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 1296,
+   "ms": 1777,
    "checks": 7,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:13:43.622Z"
+   "at": "2026-10-23T11:55:31.582Z"
   },
   {
    "id": "09a-floor-viewports",
    "title": "Viewports: the board at 2560, 1280, 1024, 390 and 280 wide in Day, Night and large text",
    "owner": "board",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 31249,
+   "ms": 34960,
    "checks": 45,
-   "failed": [
-    {
-     "name": "every control is at least 44 px tall on a touch screen (board 280)",
-     "detail": "day/normal: 2 under 44 px: a.gd-help \"Help: no sound\" 28px; button.btn.btn-sm \"Back to my kitchen\" 34px | night/normal: 2 under 44 px: a.gd-help \"Help: no sound\" 28px; button.btn.btn-sm \"Back to my kitchen\" 34px | day/large: 1 under 44 px: button.btn.btn-sm \"Back to my kitchen\" 34px | night/large: 1 under 44 px: button.btn.btn-sm \"Back to my kitchen\" 34px",
-     "owner": "board"
-    },
-    {
-     "name": "every control is at least 44 px tall on a touch screen (board 390)",
-     "detail": "day/normal: 2 under 44 px: a.gd-help \"Help: no sound\" 28px; button.btn.btn-sm \"Back to my kitchen\" 34px | night/normal: 1 under 44 px: button.btn.btn-sm \"Back to my kitchen\" 34px | day/large: 1 under 44 px: button.btn.btn-sm \"Back to my kitchen\" 34px | night/large: 1 under 44 px: button.btn.btn-sm \"Back to my kitchen\" 34px",
-     "owner": "board"
-    },
-    {
-     "name": "no text is clipped or spills out of its control (board 390)",
-     "detail": "day/large: button.seg-opt \"Cabinet0needs attention\" text \"Cabinet\" sticks out by 3px | night/large: button.seg-opt \"Cabinet0needs attention\" text \"Cabinet\" sticks out by 3px",
-     "owner": "board"
-    },
-    {
-     "name": "no control is under 32 px tall (board 1024)",
-     "detail": "day/normal: 1 under 32 px: a.gd-help \"Help: no sound\" 28px",
-     "owner": "board"
-    },
-    {
-     "name": "no control is under 32 px tall (board 1280)",
-     "detail": "day/normal: 1 under 32 px: a.gd-help \"Help: no sound\" 28px",
-     "owner": "board"
-    },
-    {
-     "name": "no control is under 32 px tall (board 2560)",
-     "detail": "day/normal: 1 under 32 px: a.gd-help \"Help: no sound\" 28px",
-     "owner": "board"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [
     {
@@ -525,7 +488,7 @@
     },
     {
      "key": "at 280 wide the slips are this wide / in this many columns",
-     "value": "256, 256, 256, 264, 264, 264, 264 px / 2",
+     "value": "264, 264, 264, 264 px / 1",
      "unit": ""
     }
    ],
@@ -536,38 +499,20 @@
     "test/.out/qa/vp-floor-390-night-large.png",
     "test/.out/qa/vp-floor-1024-day.png",
     "test/.out/qa/vp-floor-1280-day.png",
-    "test/.out/qa/vp-floor-2560-day.png",
-    "test/.out/qa/fail-09a-floor-viewports.png",
-    "test/.out/qa/fail-09a-floor-viewports-1.png"
+    "test/.out/qa/vp-floor-2560-day.png"
    ],
-   "at": "2026-10-23T11:14:14.874Z"
+   "at": "2026-10-23T11:56:06.546Z"
   },
   {
    "id": "09b-sheets-wide",
    "title": "Viewports: every sheet at 2560, 1280 and 1024 wide",
    "owner": "sheets",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 78489,
+   "ms": 68496,
    "checks": 21,
-   "failed": [
-    {
-     "name": "no control is under 32 px tall (sheets 2560)",
-     "detail": "New ticket day/normal: 1 under 32 px: a.gd-help \"Help: taking an order\" 28px | Hold cabinet day/normal: 1 under 32 px: a.gd-help \"Help: the hold cabinet\" 28px | New ticket night/large: 1 under 32 px: a.gd-help \"Help: taking an order\" 28px | Hold cabinet night/large: 1 under 32 px: a.gd-help \"Help: the hold cabinet\" 28px",
-     "owner": "sheets"
-    },
-    {
-     "name": "no control is under 32 px tall (sheets 1280)",
-     "detail": "New ticket day/normal: 1 under 32 px: a.gd-help \"Help: taking an order\" 28px | Hold cabinet day/normal: 1 under 32 px: a.gd-help \"Help: the hold cabinet\" 28px | New ticket night/large: 1 under 32 px: a.gd-help \"Help: taking an order\" 28px | Hold cabinet night/large: 1 under 32 px: a.gd-help \"Help: the hold cabinet\" 28px",
-     "owner": "sheets"
-    },
-    {
-     "name": "no control is under 32 px tall (sheets 1024)",
-     "detail": "New ticket day/normal: 1 under 32 px: a.gd-help \"Help: taking an order\" 28px | Hold cabinet day/normal: 1 under 32 px: a.gd-help \"Help: the hold cabinet\" 28px | New ticket night/large: 1 under 32 px: a.gd-help \"Help: taking an order\" 28px | Hold cabinet night/large: 1 under 32 px: a.gd-help \"Help: the hold cabinet\" 28px",
-     "owner": "sheets"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
@@ -575,29 +520,18 @@
     "test/.out/qa/vp-sheet-hold-1280.png",
     "test/.out/qa/vp-sheet-board86-1280.png"
    ],
-   "at": "2026-10-23T11:15:33.363Z"
+   "at": "2026-10-23T12:06:13.084Z"
   },
   {
    "id": "09c-sheets-narrow",
    "title": "Viewports: every sheet at 390 (touch) and 280 wide",
    "owner": "sheets",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 47520,
+   "ms": 49589,
    "checks": 14,
-   "failed": [
-    {
-     "name": "every control is at least 44 px tall on a touch screen (sheets 390)",
-     "detail": "New ticket day/normal: 1 under 44 px: a.gd-help \"Help: taking an order\" 28px | Hold cabinet day/normal: 1 under 44 px: a.gd-help \"Help: the hold cabinet\" 28px | New ticket night/large: 1 under 44 px: a.gd-help \"Help: taking an order\" 28px | Hold cabinet night/large: 1 under 44 px: a.gd-help \"Help: the hold cabinet\" 28px",
-     "owner": "sheets"
-    },
-    {
-     "name": "every control is at least 44 px tall on a touch screen (sheets 280)",
-     "detail": "New ticket day/normal: 1 under 44 px: a.gd-help \"Help: taking an order\" 28px | Hold cabinet day/normal: 1 under 44 px: a.gd-help \"Help: the hold cabinet\" 28px | New ticket night/large: 1 under 44 px: a.gd-help \"Help: taking an order\" 28px | Hold cabinet night/large: 1 under 44 px: a.gd-help \"Help: the hold cabinet\" 28px",
-     "owner": "sheets"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [
     {
@@ -614,7 +548,7 @@
     "test/.out/qa/vp-sheet-hold-280.png",
     "test/.out/qa/vp-sheet-board86-280.png"
    ],
-   "at": "2026-10-23T11:16:20.884Z"
+   "at": "2026-10-23T11:58:13.365Z"
   },
   {
    "id": "09d-office-wide",
@@ -623,7 +557,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 53593,
+   "ms": 45464,
    "checks": 40,
    "failed": [],
    "skips": [],
@@ -640,39 +574,18 @@
     "test/.out/qa/vp-office-1280-paper-pace.png",
     "test/.out/qa/vp-office-1024-ember-pace.png"
    ],
-   "at": "2026-10-23T11:17:14.477Z"
+   "at": "2026-10-23T11:58:58.830Z"
   },
   {
    "id": "09e-office-narrow",
    "title": "Viewports: the 7 office pages at 390 (touch) and 280 wide (Ember, Paper, large text)",
    "owner": "officeA",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 53468,
+   "ms": 45968,
    "checks": 40,
-   "failed": [
-    {
-     "name": "every control is at least 44 px tall on a touch screen (office 390 ember)",
-     "detail": "Menu and settings: 3 under 44 px: a.gd-help \"Help: backing up\" 28px; a.gd-help \"Help: restoring a backup\" 28px; a.gd-help \"Help: replacing a device\" 28px",
-     "owner": "officeC"
-    },
-    {
-     "name": "every control is at least 44 px tall on a touch screen (office 390 paper)",
-     "detail": "Menu and settings: 3 under 44 px: a.gd-help \"Help: backing up\" 28px; a.gd-help \"Help: restoring a backup\" 28px; a.gd-help \"Help: replacing a device\" 28px",
-     "owner": "officeC"
-    },
-    {
-     "name": "every control is at least 44 px tall on a touch screen (office 390 ember large text)",
-     "detail": "Menu and settings: 3 under 44 px: a.gd-help \"Help: backing up\" 28px; a.gd-help \"Help: restoring a backup\" 28px; a.gd-help \"Help: replacing a device\" 28px",
-     "owner": "officeC"
-    },
-    {
-     "name": "every control is at least 44 px tall on a touch screen (office 280 ember)",
-     "detail": "Menu and settings: 3 under 44 px: a.gd-help \"Help: backing up\" 28px; a.gd-help \"Help: restoring a backup\" 28px; a.gd-help \"Help: replacing a device\" 28px",
-     "owner": "officeC"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [
     {
@@ -703,7 +616,7 @@
     "test/.out/qa/vp-office-280-ember-pace.png",
     "test/.out/qa/vp-office-280-ember-money.png"
    ],
-   "at": "2026-10-23T11:18:07.945Z"
+   "at": "2026-10-23T11:59:44.798Z"
   },
   {
    "id": "10a-no-network",
@@ -712,14 +625,14 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 28369,
+   "ms": 31399,
    "checks": 11,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "built file size",
-     "value": 2243,
+     "value": 2264,
      "unit": "KB"
     },
     {
@@ -731,7 +644,7 @@
    "shots": [
     "test/.out/qa/offline-board.png"
    ],
-   "at": "2026-10-23T11:18:36.315Z"
+   "at": "2026-10-23T12:00:16.197Z"
   },
   {
    "id": "10b-artifact-host",
@@ -740,7 +653,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 5412,
+   "ms": 6996,
    "checks": 1,
    "failed": [],
    "skips": [],
@@ -752,48 +665,54 @@
     }
    ],
    "shots": [],
-   "at": "2026-10-23T11:18:41.727Z"
+   "at": "2026-10-23T12:00:23.194Z"
   },
   {
    "id": "11a-startup-and-sample",
    "title": "Performance: time to first paint, boot, SB.sim.sample() cold and memoised",
    "owner": "lead",
-   "status": "PASS",
+   "status": "FAIL",
    "reason": "",
    "error": null,
-   "ms": 6057,
+   "ms": 6243,
    "checks": 8,
-   "failed": [],
+   "failed": [
+    {
+     "name": "SB.sim.sample() cold finishes in under 2000 ms",
+     "detail": "{\"coldMs\":2043.3999999994412,\"generatedMs\":2042,\"tickets\":2475,\"events\":33227,\"days\":14,\"memoMs\":0,\"json\":3336543}",
+     "owner": "sim"
+    }
+   ],
    "skips": [],
    "notes": [
     {
      "key": "machine load average (1 min, 2 cores shared) before the probes",
-     "value": 3.8,
+     "value": 4.1,
      "unit": ""
     },
     {
      "key": "first paint (median of 3 cold loads)",
-     "value": 220,
+     "value": 212,
      "unit": "ms"
     },
     {
      "key": "first contentful paint (median of 3)",
-     "value": 396,
+     "value": 356,
      "unit": "ms"
     },
     {
      "key": "DOMContentLoaded (parse + run all scripts, median of 3)",
-     "value": 358.6,
+     "value": 326.9,
      "unit": "ms"
     },
     {
      "key": "SB.booted true (median of 3)",
-     "value": 379,
+     "value": 332.9,
      "unit": "ms"
     },
     {
      "key": "board has slips or the empty state painted (median of 3)",
-     "value": 379.1,
+     "value": 333,
      "unit": "ms"
     },
     {
@@ -803,12 +722,12 @@
     },
     {
      "key": "SB.sim.sample() cold (14 days)",
-     "value": 1576.9,
+     "value": 2043.4,
      "unit": "ms"
     },
     {
      "key": "SB.sim.sample() generatedMs reported by the simulator",
-     "value": 1576,
+     "value": 2042,
      "unit": "ms"
     },
     {
@@ -822,92 +741,82 @@
      "unit": ""
     }
    ],
-   "shots": [],
-   "at": "2026-10-23T11:31:07.224Z"
+   "shots": [
+    "test/.out/qa/fail-11a-startup-and-sample.png",
+    "test/.out/qa/fail-11a-startup-and-sample-1.png"
+   ],
+   "at": "2026-10-23T12:06:26.782Z"
   },
   {
    "id": "11b-office-render",
    "title": "Performance: render time of each office page (with 14 days of sample history)",
    "owner": "officeA",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 30483,
+   "ms": 26456,
    "checks": 6,
-   "failed": [
-    {
-     "name": "every office page paints within 1500 ms of the navigation (worst: data 3991 ms)",
-     "detail": "data 3991, stock 19, safety 17, money 29, stations 18, tickets 25, pace 27, pace 21",
-     "owner": "officeC"
-    },
-    {
-     "name": "no single long task over 400 ms while paging through the office (worst page: data, 3970 ms)",
-     "detail": "data: 3970+171",
-     "owner": "officeC"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "deep link #/office/pace to first chart in the DOM (includes the 0.7 s ignition)",
-     "value": 15007,
+     "value": 15005,
      "unit": "ms"
     },
     {
      "key": "office page \"data\" navigate to painted",
-     "value": 3990.8,
+     "value": 83.1,
      "unit": "ms"
     },
     {
      "key": "office page \"stock\" navigate to painted",
-     "value": 19.4,
+     "value": 22,
      "unit": "ms"
     },
     {
      "key": "office page \"safety\" navigate to painted",
-     "value": 16.7,
+     "value": 16.6,
      "unit": "ms"
     },
     {
      "key": "office page \"money\" navigate to painted",
-     "value": 28.5,
+     "value": 22,
      "unit": "ms"
     },
     {
      "key": "office page \"stations\" navigate to painted",
-     "value": 18,
+     "value": 16.9,
      "unit": "ms"
     },
     {
      "key": "office page \"tickets\" navigate to painted",
-     "value": 25.3,
+     "value": 14,
      "unit": "ms"
     },
     {
      "key": "office page \"pace\" navigate to painted",
-     "value": 26.8,
+     "value": 16.1,
      "unit": "ms"
     },
     {
      "key": "office page \"pace\" navigate to painted",
-     "value": 21,
+     "value": 13.2,
      "unit": "ms"
     },
     {
      "key": "long tasks (over 50 ms) while paging through the office",
-     "value": "3970, 171",
+     "value": "70",
      "unit": "ms"
     },
     {
      "key": "Pace: change the date range to 7 days, until painted",
-     "value": 16.5,
+     "value": 5.9,
      "unit": "ms"
     }
    ],
-   "shots": [
-    "test/.out/qa/fail-11b-office-render.png"
-   ],
-   "at": "2026-10-23T11:19:26.472Z"
+   "shots": [],
+   "at": "2026-10-23T12:00:58.071Z"
   },
   {
    "id": "11c-sixty-tickets",
@@ -916,7 +825,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 8764,
+   "ms": 8790,
    "checks": 10,
    "failed": [],
    "skips": [],
@@ -928,56 +837,50 @@
     },
     {
      "key": "board full render with that many slips (lastRenderMs)",
-     "value": 73.7,
+     "value": 67.7,
      "unit": "ms"
     },
     {
      "key": "1 Hz tick with 60 slips: median cost",
-     "value": 12.5,
+     "value": 13.5,
      "unit": "ms"
     },
     {
      "key": "1 Hz tick: worst cost seen (maxTickMs)",
-     "value": 53,
+     "value": 116.6,
      "unit": "ms"
     },
     {
      "key": "frames in 6 s / frames slower than 50 ms / worst frame",
-     "value": "350 / 1 / 62 ms",
+     "value": "356 / 0 / 37 ms",
      "unit": ""
     },
     {
      "key": "long tasks over 50 ms during the 6 s",
-     "value": "54",
+     "value": "none",
      "unit": "ms"
     },
     {
      "key": "one \"All done here\" on a board of 60: dispatch to painted",
-     "value": 25.5,
+     "value": 32,
      "unit": "ms"
     }
    ],
    "shots": [
     "test/.out/qa/perf-60-tickets.png"
    ],
-   "at": "2026-10-23T11:30:45.546Z"
+   "at": "2026-10-23T12:01:06.862Z"
   },
   {
    "id": "12a-structure",
    "title": "Accessibility: landmarks, names on every control, label-in-name, ids, roles, headings (floor, sheets, office)",
    "owner": "lead",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 30482,
+   "ms": 25905,
    "checks": 41,
-   "failed": [
-    {
-     "name": "office: label in name holds on all 7 pages",
-     "detail": "[\"Menu and settings: button.od-sum shows \\\"brisket 1/4 lb pit · meats · s\\\" but is named \\\"brisket 1/4 lb $7 50 prep 1 30 tap to edit\\\"\",\"Menu and settings: button.od-sum shows \\\"brisket 1/2 lb pit · meats · s\\\" but is named \\\"brisket 1/2 lb $14 00 prep 2 00 tap to edit\\\"\",\"Menu and settings: button.od-sum shows \\\"burnt ends 1/2 lb pit · meats \\\" but is named \\\"burnt ends 1/2 lb $15 00 prep 2 30 t...",
-     "owner": "officeC"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [
     {
@@ -991,10 +894,8 @@
      "unit": "controls"
     }
    ],
-   "shots": [
-    "test/.out/qa/fail-12a-structure.png"
-   ],
-   "at": "2026-10-23T11:20:06.895Z"
+   "shots": [],
+   "at": "2026-10-23T12:01:32.769Z"
   },
   {
    "id": "12b-keyboard",
@@ -1003,7 +904,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 11124,
+   "ms": 8381,
    "checks": 12,
    "failed": [],
    "skips": [],
@@ -1015,7 +916,7 @@
     }
    ],
    "shots": [],
-   "at": "2026-10-23T11:20:18.019Z"
+   "at": "2026-10-23T12:01:41.151Z"
   },
   {
    "id": "12c-live-regions",
@@ -1024,29 +925,29 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 32976,
+   "ms": 32599,
    "checks": 7,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "screen reader announcements during 30 s of the demo at x15 (distinct)",
-     "value": 2,
+     "value": 4,
      "unit": "announcements"
     },
     {
      "key": "announcements per real minute at x15",
-     "value": 4,
+     "value": 8,
      "unit": "/min"
     },
     {
      "key": "sample of what was announced",
-     "value": "\"Ticket #108 added for Lane 1 car 25.\" | \"Ticket #109 added for Lane 1 car 24.\"",
+     "value": "\"Ticket #104 added for Table 3.\" | \"Check Burnt ends on ticket #101. Time is up. Check Pork 1/2 on ticket \" | \"Ticket #109 added for Ola.\" | \"Ticket #111 added for Uber Eats 7005.\"",
      "unit": ""
     }
    ],
    "shots": [],
-   "at": "2026-10-23T11:20:50.995Z"
+   "at": "2026-10-23T12:02:13.751Z"
   },
   {
    "id": "12d-contrast-floor",
@@ -1055,7 +956,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 26209,
+   "ms": 23779,
    "checks": 10,
    "failed": [],
    "skips": [],
@@ -1072,29 +973,18 @@
     }
    ],
    "shots": [],
-   "at": "2026-10-23T11:21:17.205Z"
+   "at": "2026-10-23T12:02:37.530Z"
   },
   {
    "id": "12e-contrast-office",
    "title": "Accessibility: contrast of all visible text on the 7 office pages in Ember and Paper",
    "owner": "officeA",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 23495,
+   "ms": 18995,
    "checks": 5,
-   "failed": [
-    {
-     "name": "every piece of text on all 7 office pages reaches 4.5:1 (3:1 for large text) in ember",
-     "detail": "14 below, e.g. Pace: span.of-nav-off \"Not tracking\" 4.39 #857b72 on #181513 | Pace: span.of-nav-off \"Not tracking\" 4.39 #857b72 on #181513 | Tickets: span.of-nav-off \"Not tracking\" 4.39 #857b72 on #181513 | Tickets: span.of-nav-off \"Not tracking\" 4.39 #857b72 on #181513 | Stations: span.of-nav-off \"Not tracking\" 4.39 #857b72 on #181513",
-     "owner": "officeA"
-    },
-    {
-     "name": "every piece of text on all 7 office pages reaches 4.5:1 (3:1 for large text) in paper",
-     "detail": "14 below, e.g. Pace: span.of-nav-off \"Not tracking\" 3.51 #777e80 on #f0ece3 | Pace: span.of-nav-off \"Not tracking\" 3.51 #777e80 on #f0ece3 | Tickets: span.of-nav-off \"Not tracking\" 3.51 #777e80 on #f0ece3 | Tickets: span.of-nav-off \"Not tracking\" 3.51 #777e80 on #f0ece3 | Stations: span.of-nav-off \"Not tracking\" 3.51 #777e80 on #f0ece3",
-     "owner": "officeA"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [
     {
@@ -1108,10 +998,8 @@
      "unit": "elements"
     }
    ],
-   "shots": [
-    "test/.out/qa/fail-12e-contrast-office.png"
-   ],
-   "at": "2026-10-23T11:21:40.720Z"
+   "shots": [],
+   "at": "2026-10-23T12:02:56.527Z"
   },
   {
    "id": "13a-tour-full-loop",
@@ -1120,7 +1008,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 14814,
+   "ms": 13008,
    "checks": 48,
    "failed": [],
    "skips": [],
@@ -1133,7 +1021,7 @@
     "test/.out/qa/tour-8-1280.png",
     "test/.out/qa/tour-9-1280.png"
    ],
-   "at": "2026-10-23T11:21:55.534Z"
+   "at": "2026-10-23T12:03:09.535Z"
   },
   {
    "id": "13b-tour-skip-escape",
@@ -1142,13 +1030,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 4631,
+   "ms": 4089,
    "checks": 13,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:22:00.165Z"
+   "at": "2026-10-23T12:03:13.624Z"
   },
   {
    "id": "13c-tour-out-of-order",
@@ -1157,13 +1045,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 5463,
+   "ms": 4335,
    "checks": 12,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:22:05.628Z"
+   "at": "2026-10-23T12:03:17.960Z"
   },
   {
    "id": "13d-tour-pauses",
@@ -1172,71 +1060,51 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 8321,
+   "ms": 8908,
    "checks": 11,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:22:13.949Z"
+   "at": "2026-10-23T12:03:26.869Z"
   },
   {
    "id": "13e-tour-layouts",
    "title": "Walkthrough: the card stays on screen and off the ring on a phone and in Large text",
    "owner": "board",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 23004,
+   "ms": 23806,
    "checks": 57,
-   "failed": [
-    {
-     "name": "phone 390: step 9 every ringed element can be seen",
-     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[195,844],\"inside\":true,\"top\":546,\"bottom\":832,\"w\":366,\"targets\":[]}",
-     "owner": "board"
-    },
-    {
-     "name": "large text 1280: step 9 every ringed element can be seen",
-     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[123,800],\"inside\":true,\"top\":492,\"bottom\":788,\"w\":560,\"targets\":[]}",
-     "owner": "board"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
     "test/.out/qa/tour-8-phone-390.png",
     "test/.out/qa/tour-9-phone-390.png",
     "test/.out/qa/tour-8-large-text-1280.png",
-    "test/.out/qa/tour-9-large-text-1280.png",
-    "test/.out/qa/fail-13e-tour-layouts.png",
-    "test/.out/qa/fail-13e-tour-layouts-1.png"
+    "test/.out/qa/tour-9-large-text-1280.png"
    ],
-   "at": "2026-10-23T11:22:36.955Z"
+   "at": "2026-10-23T12:03:50.677Z"
   },
   {
    "id": "13f-tour-busy-board",
    "title": "Walkthrough: with other tickets on the board the new ticket is found and the card sits beside it",
    "owner": "board",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 14301,
+   "ms": 12717,
    "checks": 34,
-   "failed": [
-    {
-     "name": "busy board 1280: step 9 every ringed element can be seen",
-     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[123,725],\"inside\":true,\"top\":473,\"bottom\":713,\"w\":560,\"targets\":[]}",
-     "owner": "board"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
     "test/.out/qa/tour-8-busy-board-1280.png",
-    "test/.out/qa/tour-9-busy-board-1280.png",
-    "test/.out/qa/fail-13f-tour-busy-board.png"
+    "test/.out/qa/tour-9-busy-board-1280.png"
    ],
-   "at": "2026-10-23T11:22:51.257Z"
+   "at": "2026-10-23T12:04:03.397Z"
   }
  ]
 }

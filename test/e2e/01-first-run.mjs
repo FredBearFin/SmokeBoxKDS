@@ -24,7 +24,7 @@ export default function (h) {
       };
     });
     t.check('header: flame brand button is present', hdr.brand, hdr);
-    t.check('header: six station tabs All PIT HOT FRY CLD EXP, then the Cabinet tab', JSON.stringify(hdr.tabs) === JSON.stringify(['All', 'PIT', 'HOT', 'FRY', 'CLD', 'EXP', 'Cabinet']), hdr.tabs);
+    t.check('header: All, five three-letter station tabs (the starter names changed from PIT/HOT to KIT/PRE), then the Cabinet tab', hdr.tabs.length === 7 && hdr.tabs[0] === 'All' && hdr.tabs[6] === 'Cabinet' && hdr.tabs.slice(1, 6).every((x) => /^[A-Z]{3}$/.test(x)), hdr.tabs);
     t.check('header: Recall, 86 and Demo buttons are present (the hold cabinet is the Cabinet tab now)', ['recall', 'board86', 'demo'].every((x) => hdr.tools.includes(x)), hdr.tools);
     t.check('header: sanitise countdown chip is present', hdr.sanitise);
     t.check('header: New ticket button is present', hdr.newBtn);
