@@ -33,3 +33,4 @@
 }
 .cd-startl { display: grid; gap: 4px; font-size: var(--fs-2); color: var(--ink2); max-width: 28em; }
 .cd-drawerbox { display: grid; gap: var(--sp-2); }
+.cd-hist { border-left: 4px solid var(--amber, #b9770e); padding-left: var(--sp-2); font-weight: var(--w-semi); }

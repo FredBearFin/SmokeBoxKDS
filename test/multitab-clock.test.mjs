@@ -68,7 +68,7 @@ test('control: with coherent storage the same interleaving keeps all three ticke
 });
 
 for (const [label, skewA] of [['all clocks on time', 0], ['tab A clock 3 hours behind', -3 * 3600e3]]) {
-  test('three tabs create at once, ' + label + ': no ticket is lost when a tab reads storage a moment late', { todo: 'store drops a ticket: persistNow/rebaseIfStale trust a stale sid (A5 to fix)' }, () => {
+  test('three tabs create at once, ' + label + ': no ticket is lost when a tab reads storage a moment late', () => {
     const W = makeWorld({ coherent: false });
     W.skewA = skewA;
     interleave(W);

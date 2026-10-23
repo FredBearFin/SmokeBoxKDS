@@ -56,7 +56,7 @@ Run on this machine today, on the main track, headless Chromium, simulated data:
 | Unit suite (`node tools/test.mjs`) | 880 of 880 pass on this run. An earlier run the same day, with other agents loading the machine, had 3 timing failures (`metrics.test.mjs` performance limits and `hub-sync` "offline client"). |
 | Smoke (`node tools/smoke.mjs`) | 11 of 11 |
 | Guide test (`node --test test/guide.test.mjs`) | 15 of 15 |
-| Guide walk (`tools/guide-walk.mjs`) | 286 of 286 |
+| Guide walk (`tools/guide-walk.mjs`) | 324 of 324 |
 | Guide accessibility (`tools/guide-a11y.mjs`) | 34 of 34 |
 | Browser journeys (`node tools/qa.mjs`, `test/e2e/`) | 44 of 45 journeys pass (1085 checks). The one failure is `11c-sixty-tickets`, a timing journey: the 1 Hz tick median (25 ms limit) failed in the full run and the worst single tick (120 ms limit) failed when run alone. The same journey passed in the earlier run today. Machine-dependent. About 17 minutes. |
 | Other browser suites | 47 `test/*.e2e.mjs` files exist; I did not run them today (individual agents ran the ones for their own changes). `docs/audit/e2e-triage.md` is from round 1 and is out of date. |
@@ -116,7 +116,7 @@ Not covered by the review: real browsers, the connected branch, `tools/`, perfor
 | `docs/audit/e2e-triage.md` is round 1 and out of date | A6 |
 | Demo kitchen and the first starter names are barbecue; new kitchens start with neutral names | A2 |
 
-Done since the first version of this page: the thrown-out log and safety record read the keep time from the engine (about 400 days, no number repeated in the Guide) and the log says how far back it goes; **Undo this restore** on the Data page (kept for N days, confirm, then the PIN if one is set); the safety record has "Changed the cold limit from X to Y" lines and cold readings say "above the cold limit" with the minutes already used. The Guide describes each and the walk checks each label.
+Done since the first version of this page: the thrown-out log and safety record read the keep time from the engine (about 400 days, no number repeated in the Guide) and the log says how far back it goes; **Undo this restore** on the Data page (kept for N days, confirm, then the PIN if one is set); the safety record has "Changed the cold limit from X to Y" lines and cold readings say "above the cold limit" with the minutes already used. The Guide describes each and the walk checks each label. **Close the month** (three steps, five downloaded files, typed word CLOSE, Undo for 7 days, refusals for out-of-date files, hub tablets, the demo and nothing to close) is in the build, has a Guide page, and the walk runs all of it. Its limits: the last 35 days and all safety records always stay, the files are the only copy afterward, and there is no Data page button for it in the build yet.
 
 ## 6. Change log by day part
 

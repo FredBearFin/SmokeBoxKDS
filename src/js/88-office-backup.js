@@ -105,5 +105,47 @@
     return String(typed == null ? '' : typed).trim().toLowerCase() === String(word || 'reset').toLowerCase();
   }
 
-  O.backupPure = { backupFreshness, describeBackup, resetWordOk, salesCsv };
+  // How full the saved history is and what to tell the owner, from the store's historyFill() numbers and the kitchen's state. The fill is the
+  // largest of tickets, events and bytes against their limits; the pace (tickets and events per day over the last 14 days, at least 3 days of
+  // them) gives the days left. Returns { pct, level: 'ok' | 'near' (70 percent) | 'urgent' (85) | 'full', meter, alert, daysLeft, safari }.
+  function historyView(fill, state, now) {
+    const out = { pct: null, level: 'ok', meter: '', alert: '', daysLeft: null, safari: '' };
+    if (!fill || typeof fill !== 'object') return out;
+    const parts = [];
+    if (isNum(fill.tickets) && isNum(fill.ticketsCap) && fill.ticketsCap > 0) parts.push(fill.tickets / fill.ticketsCap);
+    if (isNum(fill.events) && isNum(fill.eventsCap) && fill.eventsCap > 0) parts.push(fill.events / fill.eventsCap);
+    if (isNum(fill.bytes) && isNum(fill.quotaBytes) && fill.quotaBytes > 0) parts.push(fill.bytes / fill.quotaBytes);
+    if (parts.length) out.pct = Math.min(100, Math.floor(Math.max.apply(null, parts) * 100));
+    if (fill.persisted === false) out.safari = 'This browser may delete saved data if the tablet is unused for a while. Add Smokebox to the home screen to keep it.';
+    if (out.pct === null) return out;
+    out.level = out.pct >= 100 ? 'full' : out.pct >= 85 ? 'urgent' : out.pct >= 70 ? 'near' : 'ok';
+    // The pace over the last 14 days, from the tickets and the event log.
+    const DAY = 864e5, from = (isNum(now) ? now : Date.now()) - 14 * DAY;
+    let nT = 0, firstT = Infinity;
+    for (const t of (state && state.tickets) || []) if (t && isNum(t.createdAt) && t.createdAt > from && t.createdAt <= now) { nT++; if (t.createdAt < firstT) firstT = t.createdAt; }
+    let nE = 0;
+    if (SB.engine && SB.engine.allEvents && state) for (const e of SB.engine.allEvents(state)) if (e && isNum(e.t) && e.t > from && e.t <= now) nE++;
+    const span = nT ? Math.min(14, Math.max(1, Math.ceil((now - firstT) / DAY))) : 0;
+    if (out.level !== 'full' && Object.prototype.hasOwnProperty.call(fill, 'daysLeft')) {
+      // The store knows all three limits (including the browser's space), so its own estimate wins; null means under three days of history.
+      out.daysLeft = isNum(fill.daysLeft) ? Math.floor(fill.daysLeft) : null;
+    } else if (out.level !== 'full' && span >= 3) {
+      const room = [];
+      if (nT && isNum(fill.ticketsCap)) room.push(Math.max(0, fill.ticketsCap - fill.tickets) / (nT / span));
+      if (nE && isNum(fill.eventsCap)) room.push(Math.max(0, fill.eventsCap - fill.events) / (nE / span));
+      if (room.length) out.daysLeft = Math.floor(Math.min.apply(null, room));
+    }
+    const left = out.daysLeft === null ? '' : out.daysLeft > 365 ? ' (more than a year at today\'s pace)' : ' (about ' + out.daysLeft + ' more ' + (out.daysLeft === 1 ? 'day' : 'days') + ' at today\'s pace)';
+    out.meter = out.level === 'full' ? 'Your saved history is full.' : 'Your saved history: ' + out.pct + '% full' + left;
+    if (out.level === 'full') out.alert = 'Your saved history is full, so older days are being dropped to make room. Close the month to save them to files.';
+    else if (out.level !== 'ok') out.alert = 'Your saved history is ' + out.pct + '% full. Close the month to save it to files before older days are dropped.';
+    return out;
+  }
+  // The sentence for history that was already dropped to make room: the first day still kept is `day` (YYYY-MM-DD).
+  function droppedWords(day) {
+    if (typeof day !== 'string' || !/^\d{4}-\d\d-\d\d$/.test(day)) return '';
+    return 'Older history was dropped to make room (days before ' + U.fmtDateShort(day) + '). Close the month regularly to keep it in files.';
+  }
+
+  O.backupPure = { backupFreshness, describeBackup, resetWordOk, salesCsv, historyView, droppedWords };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

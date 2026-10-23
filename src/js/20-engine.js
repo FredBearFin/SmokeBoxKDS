@@ -1415,7 +1415,8 @@
     for (const it of items) if (zones.indexOf(it.zone) < 0) zones.push(it.zone);
     tx.info = { ticketId: id, num, zones, lines: items.length, dmaxSec: dmax, orderId: order.id, round: order.rounds };
     // Paid at the counter: take payment on the same tap that sends the food.
-    if (pay) { const r = payInto(tx, oi, pay); if (r !== 'ok') return r; tx.info.paid = true; tx.info.total = tx.get('orders')[oi].totals.total; }
+    // Trimming the old orders above moves positions in the list, so the order is found again before it is paid.
+    if (pay) { oi = findOrderIdx(tx.get('orders'), order.id); const r = payInto(tx, oi, pay); if (r !== 'ok') return r; tx.info.paid = true; tx.info.total = tx.get('orders')[oi].totals.total; }
     return 'ok';
   };
 
@@ -3248,6 +3249,19 @@
   /* ---------- close the month: what would leave the live save, and the one step that removes it ---------- */
   // Days of history that Close the month always leaves alone (counted back from today), unless the caller asks for another number.
   const MONTH_KEEP_DAYS = 35;
+  // How many days of history Close the month leaves alone when the caller does not say: at most MONTH_KEEP_DAYS, and no more than 35 percent of the days
+  // the size limits can hold at this kitchen's own pace (tickets and events per day over the days kept, and the saved bytes against the browser
+  // quota when fill = { bytes, quotaBytes } is given), but never fewer than 3. A kitchen with little history gets the full 35.
+  function adaptiveKeepDays(state, now, fill) {
+    if (!isState(state) || !state.tickets.length || !isNum(now)) return MONTH_KEEP_DAYS;
+    const dsh = state.settings.service.dayStartHour, today = U.serviceDate(now, dsh), oldest = state.tickets[0].serviceDate;
+    if (!isDayText(oldest)) return MONTH_KEEP_DAYS;
+    const span = Math.max(1, Math.round((U.dateKeyToMs(today) - U.dateKeyToMs(oldest)) / 864e5) + 1);
+    if (span < 3) return MONTH_KEEP_DAYS;
+    let hold = Math.min(C.limits.maxTickets / (state.tickets.length / span), C.limits.maxEvents / (allEvents(state).length / span));
+    if (fill && isNum(fill.bytes) && isNum(fill.quotaBytes) && fill.bytes > 0 && fill.quotaBytes > 0) hold = Math.min(hold, fill.quotaBytes / (fill.bytes / (isNum(fill.spanDays) && fill.spanDays >= 1 ? fill.spanDays : span)));
+    return Math.max(3, Math.min(MONTH_KEEP_DAYS, Math.round(hold * 0.35)));
+  }
   // True for a real calendar date written YYYY-MM-DD.
   const isDayText = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && U.dateKey(U.dateKeyToMs(d) + 12 * 3600e3) === d;
   // Works out exactly what Close the month would remove at time now, without changing anything. opts: { before: 'YYYY-MM-DD' (service days
@@ -3259,7 +3273,8 @@
     if (!isState(state)) return { ok: false, report: 'invalidBackup' };
     opts = isObj(opts) ? opts : {};
     if (!isDayText(opts.before)) return { ok: false, report: 'badPatch', info: { key: 'before' } };
-    const keepDays = opts.keepDays === undefined ? MONTH_KEEP_DAYS : opts.keepDays;
+    const keepAuto = opts.keepDays === undefined;
+    const keepDays = keepAuto ? adaptiveKeepDays(state, now, opts.fill) : opts.keepDays;
     if (!isInt(keepDays) || keepDays < 1 || keepDays > 3650) return { ok: false, report: 'badPatch', info: { key: 'keepDays' } };
     if (!isNum(now)) return { ok: false, report: 'badPatch', info: { key: 'now' } };
     const dsh = state.settings.service.dayStartHour;
@@ -3269,9 +3284,22 @@
     const flat = allEvents(state);
     const closed = new Set();
     for (const e of flat) if (e.type === 'day_closed' && typeof e.day === 'string') closed.add(e.day);
-    // A day may go: before the boundary and closed.
-    const goes = (day) => typeof day === 'string' && day < bound && closed.has(day);
     const orders = Array.isArray(state.orders) ? state.orders : [];
+    // A day with a sale, an order or a ticket made AFTER its last end-of-day close is not complete in its day_closed record, so it stays whole: the
+    // sale would otherwise exist only in the owner's files and the kitchen's totals would lose it.
+    const lastClose = new Map();
+    for (const e of flat) if (e.type === 'day_closed' && typeof e.day === 'string' && (!lastClose.has(e.day) || e.t > lastClose.get(e.day))) lastClose.set(e.day, e.t);
+    const late = new Set();
+    // Notes the day as late when the time is after that day's last close.
+    const mark = (day, t) => { if (isNum(t) && lastClose.has(day) && t > lastClose.get(day)) late.add(day); };
+    for (const o of orders) {
+      mark(o.serviceDate, o.createdAt);
+      if (isNum(o.paidAt)) { mark(o.serviceDate, o.paidAt); mark(U.serviceDate(o.paidAt, dsh), o.paidAt); }
+      if (isNum(o.voidedAt)) { mark(o.serviceDate, o.voidedAt); mark(U.serviceDate(o.voidedAt, dsh), o.voidedAt); }
+    }
+    for (const t of state.tickets) mark(t.serviceDate, t.createdAt);
+    // A day may go: before the boundary, closed, and nothing after its last close.
+    const goes = (day) => typeof day === 'string' && day < bound && closed.has(day) && !late.has(day);
     const tickCand = new Set(), ordCand = new Set();
     for (const t of state.tickets) if (t.status !== 'active' && goes(t.serviceDate)) tickCand.add(t.id);
     const ticketsOf = new Map();
@@ -3296,17 +3324,19 @@
     for (const e of flat) if (eventIds.has(e.id)) days.add(U.serviceDate(e.t, dsh));
     const dayList = Array.from(days).sort();
     // Days before the boundary that still hold records but have no day_closed: they stay, and the screen can tell the owner to close them first.
-    const uncovered = new Set();
-    for (const t of state.tickets) if (t.status !== 'active' && typeof t.serviceDate === 'string' && t.serviceDate < bound && !closed.has(t.serviceDate)) uncovered.add(t.serviceDate);
-    for (const o of orders) if (o.status !== 'open' && typeof o.serviceDate === 'string' && o.serviceDate < bound && !closed.has(o.serviceDate)) uncovered.add(o.serviceDate);
+    const uncovered = new Set(), lateDays = new Set();
+    // Old days that stay although they hold finished records: never closed, or sold after the last close (lateDays, a subset of uncoveredDays).
+    for (const t of state.tickets) if (t.status !== 'active' && typeof t.serviceDate === 'string' && t.serviceDate < bound && !goes(t.serviceDate)) { uncovered.add(t.serviceDate); if (late.has(t.serviceDate)) lateDays.add(t.serviceDate); }
+    for (const o of orders) if (o.status !== 'open' && typeof o.serviceDate === 'string' && o.serviceDate < bound && !goes(o.serviceDate)) { uncovered.add(o.serviceDate); if (late.has(o.serviceDate)) lateDays.add(o.serviceDate); }
+    for (const d of late) if (d < bound) { uncovered.add(d); lateDays.add(d); }
     let money = 0;
     for (const o of orders) if (ordCand.has(o.id) && o.status === 'paid') money = cents(money + o.totals.total);
     return { ok: true, plan: {
-      requestedBefore: opts.before, before: bound, keepDays, today, from: dayList.length ? dayList[0] : null, days: dayList,
+      requestedBefore: opts.before, before: bound, keepDays, keepDaysAuto: keepAuto, today, from: dayList.length ? dayList[0] : null, days: dayList,
       ticketIds: tickets, orderIds: ordCand, eventIds,
       tickets: tickets.size, orders: ordCand.size, events: eventIds.size, safetyEventsKept: safetyKept, dayRecordsKept,
       openTicketsKept: state.tickets.filter((t) => t.status === 'active').length, openOrdersKept: orders.filter((o) => o.status === 'open').length,
-      uncoveredDays: Array.from(uncovered).sort(), paidTotal: money,
+      uncoveredDays: Array.from(uncovered).sort(), lateSaleDays: Array.from(lateDays).sort(), paidTotal: money,
     } };
   }
   // The day before which history was archived by Close the month (YYYY-MM-DD), or null when it never was. A day earlier than this with no records
@@ -4307,7 +4337,7 @@
   Object.assign(E, {
     SAFETY_KEEP_DAYS, SAFETY_KEEP_MS, apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, totalsOf, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    monthPlan, closeMonth, archivedBefore, isArchivedDay, MONTH_KEEP_DAYS, channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
+    monthPlan, closeMonth, adaptiveKeepDays, archivedBefore, isArchivedDay, MONTH_KEEP_DAYS, channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.
