@@ -46,6 +46,20 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   const nameFirst = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived)[0].name);
   await page.selectOption('[aria-label="Category of ' + nameFirst + '"]', 'cold'); await page.waitForTimeout(300);
   check('Move to: the category of a dish changes from its row', await page.evaluate((n) => SB.store.getState().menu.find((m) => m.name === n).cat === 'cold', nameFirst));
+  // Menu sections: the add form shows a Menu section list; Change menu sections renames one, marks one Not used (undoable) and adds one.
+  check('the add form has a Menu section list', await page.locator('.dp-menusec').isVisible());
+  await page.locator('.dp-catfold summary').click();
+  await page.fill('[aria-label="Name of section Meats"]', 'Plates'); await page.locator('[aria-label="Name of section Meats"]').blur(); await page.waitForTimeout(300);
+  check('a renamed section shows in the list and is saved in the shared names', (await page.locator('.dp-menusec option', { hasText: 'Plates' }).count()) === 1 && JSON.stringify(await page.evaluate(() => SB.config.customSpec())).includes('Plates'));
+  await page.locator('.dp-catrow-x, .dp-strow:has([aria-label="Name of section Fried"]) button').first().click(); await page.waitForTimeout(200);
+  check('Not used takes a section out of the list', (await page.locator('.dp-menusec option', { hasText: 'Fried' }).count()) === 0);
+  await page.locator('.dp-strow:has([aria-label="Name of section Fried"]) button').first().click(); await page.waitForTimeout(200);
+  check('Use again puts it back', (await page.locator('.dp-menusec option', { hasText: 'Fried' }).count()) === 1);
+  await page.locator('.dp-catfold summary').click();
+  // A section picked by hand is remembered for the next dish.
+  await page.selectOption('.dp-menusec', 'cold'); await page.fill('.dp-name', 'Section test'); await page.fill('.dp-price', '2'); await page.click('.dp-tile >> nth=0'); await page.click('[data-act=save-again]'); await page.waitForTimeout(250);
+  check('the hand-picked section is kept for the next dish', (await page.inputValue('.dp-menusec')) === 'cold');
+  await page.evaluate(() => { const m = SB.store.getState().menu.find((x) => x.name === 'Section test'); SB.store.dispatchEx('updateMenuItem', { id: m.id, patch: { archived: true } }, { source: 'ui' }); });
   // Reorder: move the first dish down, check the menu order and the order screen follow, then Undo.
   const names0 = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).map((m) => m.name));
   await page.getByRole('button', { name: 'Move ' + names0[0] + ' down' }).click(); await page.waitForTimeout(300);

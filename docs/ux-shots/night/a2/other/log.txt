@@ -1,0 +1,24 @@
+pizza: starter names on setup screen [first screen]: ["Pit ... ll stations, All tickets Pit and slicing, PIT tickets","PIT ... tickets Pit and slicing, PIT tickets with work here H","Hot sides ... T tickets with work here Hot sides and prep, HOT tickets wi"]
+pizza: starter names on setup screen [dishes sheet]: ["Pit ... ll stations, All tickets Pit and slicing, PIT tickets","PIT ... tickets Pit and slicing, PIT tickets with work here H","Hot sides ... T tickets with work here Hot sides and prep, HOT tickets wi","Pit ... ollars Where is it made? Pit Smoker, grill or oven Ho"]
+pizza: starter names on setup screen [stations fold]: ["Pit ... ll stations, All tickets Pit and slicing, PIT tickets","PIT ... tickets Pit and slicing, PIT tickets with work here E","Meats ... n the board Menu section Meats Sandwiches Hot sides Fri","Hot sides ... section Meats Sandwiches Hot sides Fried Cold and drinks Wh"]
+pizza: dishes added: 12; categories used: ["Pizzas"]
+pizza: starter names on setup screen [dishes list]: ["Hot sides ... ection Pizzas Sandwiches Hot sides Fried Cold and drinks Wh","Hot sides ... dishes Pizzas Sandwiches Hot sides Fried Cold and drinks Ov","Hot sides ... I made Pizzas Sandwiches Hot sides Fried Cold and drinks Ov"]
+pizza: order screen: customer chips ["No allergy","Allergy","Peanut","Tree nut","Dairy","Egg","Gluten","Soy","Fish","Shellfish","Sesame","Walk-up"]; channels ["New order","Add to open order0","Dine-in","Takeout","Drive-thru","Delivery app","Pay later","Cash","Card","Other"]
+pizza: PASS (paid true, page errors 0, barbecue words in live screens 0, starter names on setup screens 14)
+bakery: starter names on setup screen [more ways fold]: ["Pit ... ll stations, All tickets Pit and slicing, PIT tickets","PIT ... tickets Pit and slicing, PIT tickets with work here H","Hot sides ... T tickets with work here Hot sides and prep, HOT tickets wi","Pit ... ollars Where is it made? Pit Smoker, grill or oven Ho"]
+bakery: format: Read the file as: spreadsheet table (CSV, TSV or pasted from Excel or Google Sheets). 30 of 30 dishes are ready to add.
+bakery: file-level notes: []
+bakery: rows 30; unticked 0; stations in preview ["Pit"]
+bakery: starter names on setup screen [import preview]: ["Pit ... ll stations, All tickets Pit and slicing, PIT tickets","PIT ... tickets Pit and slicing, PIT tickets with work here H","Hot sides ... T tickets with work here Hot sides and prep, HOT tickets wi","Pit ... ollars Where is it made? Pit Smoker, grill or oven Ho"]
+bakery: categories after import: {"Cold and drinks":30}
+bakery: ticket on the board: "Smokebox kitchen board Ticket #101 Walk-up Dine-in 0 of 2 done 00:00 Make Drip coffee and Latte, then tap DONE. 1 Drip coffee , ready. Press when done. DONE CLD 1 Latte , ready. Press when done. DONE CLD Bump"
+bakery: PASS (paid true, page errors 0, barbecue words in live screens 0, starter names on setup screens 8)
+taco: 8 dishes in 3071 ms of script time; saves tapped 8; tile question shown: false
+taco: starter names on setup screen [dishes list]: ["Hot sides ... section Tacos Sandwiches Hot sides Fried Cold and drinks Wh","Hot sides ...  dishes Tacos Sandwiches Hot sides Fried Cold and drinks Gr","Hot sides ...  I made Tacos Sandwiches Hot sides Fried Cold and drinks Gr"]
+taco: order screen category headings: ["Tacos"]
+taco: a 3-taco cash order from the board took 6 taps
+taco: PASS (paid true, page errors 0, barbecue words in live screens 0, starter names on setup screens 3)
+bar: tiles shown for station question: true (Cold and drinks still in use, so the owner is asked)
+bar: starter names on setup screen [dishes list]: ["Hot sides ... tion Bar food Sandwiches Hot sides Fried Cold and drinks Wh","Hot sides ... shes Bar food Sandwiches Hot sides Fried Cold and drinks Ki","Hot sides ... made Bar food Sandwiches Hot sides Fried Cold and drinks Ki"]
+bar: board station tabs: ["All stations, All0has overdue tickets tickets","Kitchen, KIT0has overdue tickets tickets with work here","Hot sides and prep, HOT0has overdue tickets tickets with work here","Fry station, FRY0has overdue tickets tickets with work here","Cold prep and drinks, CLD0has overdue tickets tickets with work here","Expo and packing, EXP0has overdue tickets tickets","Cabinet0"]
+bar: PASS (paid true, page errors 0, barbecue words in live screens 0, starter names on setup screens 3)
