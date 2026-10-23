@@ -103,7 +103,7 @@ a.of-nav:active { background: var(--press); }
 .of-tiles[data-n="5"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .of-tile { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--sp-4) var(--sp-4) var(--sp-4) var(--sp-5); margin-top: -1px; border-top: 1px solid var(--line-soft); border-left: 1px solid var(--line-soft); }
 .of-tile-label { display: flex; align-items: flex-end; font-size: var(--fs-2); font-weight: var(--w-medium); color: var(--ink2); line-height: 1.25; min-height: 2.5em; }
-.of-tile-val { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 1px; margin-top: 2px; font: var(--w-semi) clamp(36px, 3.5vw, 54px)/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--ink); letter-spacing: 0; min-height: 1em; }
+.of-tile-val { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 1px; margin-top: 2px; font: var(--w-semi) clamp(36px, 3.5vw, 54px)/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--ink); letter-spacing: 0; min-height: 1em; overflow-wrap: anywhere; }
 .of-u, .of-uw { font-size: 0.46em; font-weight: var(--w-medium); color: var(--ink2); margin-left: 1px; letter-spacing: 0.01em; }
 .of-uw { margin-left: 6px; }
 .of-cur { font-size: 0.62em; font-weight: var(--w-medium); color: var(--ink2); margin-right: 2px; align-self: flex-start; padding-top: 0.12em; }
