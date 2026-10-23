@@ -24,7 +24,7 @@
     { key: '8', keys: ['8'], label: '86 board' },
     { key: 'D', keys: ['D'], label: 'Demo' },
     { key: '1 to 6', keys: ['1', '2', '3', '4', '5', '6'], label: 'Station: All, PIT, HOT, FRY, CLD, EXP' },
-    { key: 'Z', keys: ['Z'], label: 'Undo the last action (10 seconds)' },
+    { key: 'Z', keys: ['Z'], label: 'Undo the last action' }, // the help sheet adds this kitchen's undo seconds
     // Ticket keys for a USB bump bar (it types like a keyboard): pick a ticket, then act on it.
     { key: 'J or Right', keys: ['J', 'Right'], label: 'Bump bar: select the next ticket (the first press selects the first)' },
     { key: 'K or Left', keys: ['K', 'Left'], label: 'Bump bar: select the previous ticket' },
