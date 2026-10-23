@@ -219,3 +219,28 @@ test('the ordered history includes state-changing ticks, so replaying it gives t
     assert.deepEqual(seqs, seqs.map((_, i) => seqs[0] + i), 'no gaps');
   } finally { f.stop(); await hub.close(); }
 });
+
+test('size fallback: when the missed actions together are bigger than the state, a snapshot is sent instead of a long replay', async () => {
+  let t = T0;
+  const hub = await createHub({ dataFile: null, starter: false, tickMs: 600000, now: () => t });
+  const port = await hub.listen(0);
+  try {
+    // Big actions that barely grow the state: the chips list is replaced each time.
+    for (let i = 1; i <= 250; i++) {
+      t += 1000;
+      const chips = Array.from({ length: 12 }, (_, k) => 'chip ' + i + ' ' + k + ' xxxxxxxxxxxx');
+      const r = await post(port, { type: 'updateSettings', payload: { patch: { service: { chips } } }, opId: 'c:' + i });
+      assert.equal(r.report, 'ok', r.report);
+    }
+    const f = follow(port, '?since=1&hub=' + hub.hubId);
+    await until(() => f.of('snapshot').length === 1 || f.of('resumed').length === 1, 'an answer');
+    assert.equal(f.of('snapshot').length, 1, 'a snapshot, not 249 replayed actions');
+    assert.equal(f.of('snapshot')[0].data.seq, 250);
+    f.stop();
+    // a follower only a few actions behind still resumes
+    const g = follow(port, '?since=248&hub=' + hub.hubId);
+    await until(() => g.of('resumed').length === 1, 'resumed when close behind');
+    assert.deepEqual(g.of('op').map((e) => e.data.seq), [249, 250]);
+    g.stop();
+  } finally { await hub.close(); }
+});
