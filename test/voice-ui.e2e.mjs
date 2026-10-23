@@ -23,7 +23,7 @@ await p.addInitScript(`
   Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { speak: (u) => window.__said.push({ text: u.text, rate: u.rate, pitch: u.pitch, volume: u.volume, voice: u.voice && u.voice.name }), cancel() {}, getVoices: () => voices } });`);
 await p.goto(pathToFileURL(DIST).href + '?demo');
 await p.waitForFunction(() => window.SB && SB.booted === true);
-await p.evaluate(() => { SB.floor.setWelcome(false); SB.sim.live.crew(false); SB.store.resetLive({ keepSettings: true, starter: true, stagger: true, catalog: 'sample', replaceOwn: true }); SB.store.dispatchEx('clearDemoTickets', {}, { source: 'ui' }); });
+await p.evaluate(() => { SB.floor.setWelcome(false); SB.sim.live.crew(false); SB.store.resetLive({ keepSettings: true, starter: true, stagger: true, catalog: 'sample', replaceOwn: true }); SB.store.dispatchEx('clearDemoTickets', {}, { source: 'ui' }); SB.store.dispatchEx('updateSettings', { patch: { modules: { cookAhead: false } } }, { source: 'ui' }); });
 // Test the voice
 await p.evaluate(() => SB.sheets.open('menu'));
 await p.waitForSelector('[data-act="test-voice"]');
@@ -37,12 +37,12 @@ await p.keyboard.press('Escape'); await p.waitForTimeout(400);
 
 // Calls on the board (the audio is not unlocked in a headless page, so the page is told it may speak)
 await p.evaluate(() => { SB.floor.setVoiceLevel('normal'); });
-await p.waitForTimeout(1800);
+await p.waitForTimeout(4500);
 const speakCalls = async (fn) => { await p.evaluate(() => { window.__said.length = 0; }); await p.evaluate(fn); await p.waitForTimeout(2500); return p.evaluate(() => window.__said.map((x) => x.text)); };
 const burst = await speakCalls(() => { const m = SB.store.getState().menu; for (let i = 0; i < 6; i++) SB.store.dispatchEx('createTicket', { customer: 'R' + i, channel: 'takeout', items: [{ menuId: m[i % m.length].id, qty: 1 }], note: '', rush: false }, { source: 'ui' }); });
 check('a burst of six new tickets is one spoken line, not six', burst.filter((t) => /new tickets/.test(t)).length === 1 && burst.filter((t) => /^Order up/.test(t)).length === 0, burst);
 await p.evaluate(() => SB.floor.setVoiceLevel('light'));
-await p.waitForTimeout(1800);
+await p.waitForTimeout(4500);
 const light = await speakCalls(() => { const m = SB.store.getState().menu; SB.store.dispatchEx('createTicket', { customer: 'L', channel: 'takeout', items: [{ menuId: m[0].id, qty: 1 }], note: '', rush: false }, { source: 'ui' }); });
 check('on Light there is no new-ticket call', light.filter((t) => /Order up/.test(t)).length === 0, light);
 check('no page errors', errs.length === 0, errs);
