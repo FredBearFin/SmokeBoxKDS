@@ -115,6 +115,9 @@
       let tone = 'good';
       if (worstLoss >= 30 * 60000 || (isNum(score) && score < 0.75)) tone = 'bad';
       else if (costly.length || lowScore || highWaste) tone = 'warn';
+      // Discards or lockouts with no readings at all are never "on track": nothing shows the food stayed in range.
+      const noChecks = !k.tempChecks.count && !k.sanitize.count;
+      if (noChecks && tone === 'good') tone = 'warn';
 
       // The one problem, in order of what it cost: a lockout (a sale was lost), then late checks,
       // then the heaviest day of waste.
@@ -157,7 +160,8 @@
       else body += ' Nothing was thrown out.';
       if (brief.length) body += brief.length === 1 ? ' A time or temperature limit also took an item off the menu once, for ' + fmt.ms(brief[0].openMs) + '.' : ' Time or temperature limits also took items off the menu ' + brief.length + ' times for a few minutes each, the longest ' + fmt.ms(Math.max.apply(null, brief.map((c) => c.openMs))) + '.';
       // A red verdict is worded by cause: lost selling time, or checks that fell behind.
-      const title = tone === 'good' ? 'All checks were kept and no food was thrown out for time or temperature.' : tone === 'warn' ? 'Most checks were kept, with one thing to look at.' : worstLoss >= 30 * 60000 ? 'Some checks were missed and a dish was off the menu.' : 'Temperature or sanitize checks fell behind.';
+      const title = tone === 'good' ? (safetyDis.length ? 'All checks were kept. Food past a time or temperature limit was thrown out, as it should be.' : 'All checks were kept and no food was thrown out for time or temperature.')
+        : tone === 'warn' ? (noChecks ? 'No temperature checks or sanitize rounds were logged, so nothing shows the food stayed in range.' : 'Most checks were kept, with one thing to look at.') : worstLoss >= 30 * 60000 ? 'Some checks were missed and a dish was off the menu.' : 'Temperature or sanitize checks fell behind.';
       return { tone, title, body, problem };
     }
 
