@@ -7,7 +7,7 @@ import { buildBig } from './_big-kitchen.mjs';
 import { loadSB } from './_load.mjs';
 
 const { SB, state } = await buildBig({ tickets: 3000, days: 90 });
-await loadSB(['25-deadlines', '35-pilot', '40-metrics', '88-office-backup']);
+await loadSB(['36-csv', '25-deadlines', '35-pilot', '40-metrics', '88-office-backup']);
 const M = SB.metrics, E = SB.engine, U = SB.util;
 const ds = { tickets: state.tickets, orders: state.orders, events: E.allEvents(state), batches: state.batches, learned: {}, menu: state.menu, ingredients: state.ingredients, settings: state.settings, range: { from: -Infinity, to: Infinity } };
 

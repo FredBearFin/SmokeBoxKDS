@@ -115,3 +115,16 @@ test('a screen name on an entry shows as "at Pass" data; no name means no field'
   s = Object.assign({}, s, { events: s.events.map((e) => (e.type === 'sanitize_done' ? Object.assign({}, e, { screen: '  Pass  ' }) : e)) });
   assert.equal(inspectorRows(s, T0, T0 + 3600e3)[0].screen, 'Pass');
 });
+
+test('a changed safety setting reads as one plain line with the old and new values', () => {
+  const T = new Date(2026, 9, 20, 9, 30).getTime();
+  const state = { settings: {}, batches: [], ingredients: [] };
+  const mk = (e) => { const s = Object.assign({}, E.newState({ now: T }), { events: [Object.assign({ id: 'e1', t: T, who: 'JM' }, e)] }); return s; };
+  // the engine here may not list this event type in its safety log, so the detail words are checked through factsOf-free helper rows
+  const { rowFor } = SB.office.inspectorPure;
+  const row = rowFor(mk({ type: 'settings_changed', key: 'safety.coldHoldF', from: 41, to: 45 }).events[0], state);
+  assert.equal(row.kind, 'Changed a safety limit');
+  assert.equal(row.detail, 'Changed the cold limit from 41 °F to 45 °F');
+  assert.equal(rowFor({ type: 'settings_changed', t: T, key: 'safety.tempCheckEveryMin', old: 120, new: 60 }, state).detail, 'Changed how often temperatures are checked from 120 min to 60 min');
+  assert.equal(rowFor({ type: 'settings_changed', t: T, key: 'safety.hardCapH', from: 12, to: 1 }, state).detail, 'Changed the longest hold time from 12 hours to 1 hour');
+});

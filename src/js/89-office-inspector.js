@@ -15,7 +15,7 @@
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const KIND = {
     temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
-    equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
+    settings_changed: 'Changed a safety limit', equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
   };
   const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit', datemark: 'Past the date mark' };
   const UNIT = { cooler: 'Cooler', freezer: 'Freezer', display: 'Display case', other: 'Equipment' };
@@ -41,12 +41,35 @@
     return b && b.label ? b.label + (name && b.label.indexOf(name) < 0 ? ' (' + name + ')' : '') : name;
   }
 
+  // The plain names of the food-safety settings an owner can change, by the last part of the setting's name.
+  const SETTING_NAME = {
+    hotHoldF: 'the hot-hold limit', coldHoldF: 'the cold limit', reheatF: 'the reheat temperature', tempCheckEveryMin: 'how often temperatures are checked',
+    belowHotGraceH: 'the time allowed below the hot limit', aboveColdGraceH: 'the time allowed above the cold limit', sanitizeEveryH: 'how often surfaces are sanitized',
+    hardCapH: 'the longest hold time', defaultMaxHoldH: 'the default hold time', stage1ToF: 'the first cooling target', stage1H: 'the first cooling time',
+    totalH: 'the total cooling time', finalF: 'the final cooling target',
+  };
+  // A setting's value in plain words, by what its name ends with: degrees, hours or minutes; anything else as it is.
+  function settingValue(key, v) {
+    if (!isNum(v)) return v == null ? 'nothing' : String(v);
+    if (/F$/.test(key)) return U.tempText(v);
+    if (/Min$/.test(key)) return v + ' min';
+    if (/H$/.test(key)) return v + (v === 1 ? ' hour' : ' hours');
+    return String(v);
+  }
+  // The one plain line for a changed setting: "Changed the cold limit from 41 °F to 45 °F". Reads key, from and to (also old/new).
+  function changeLine(e) {
+    const key = String(e.key || e.setting || ''), last = key.split('.').pop();
+    const from = e.from !== undefined ? e.from : e.old, to = e.to !== undefined ? e.to : e.new;
+    return 'Changed ' + (SETTING_NAME[last] || (key || 'a setting')) + ' from ' + settingValue(last, from) + ' to ' + settingValue(last, to);
+  }
+
   // The detail words for one entry: what was read, weighed or thrown out.
   function detailOf(e) {
     switch (e.type) {
       case 'temp_logged': return (isNum(e.f) ? U.tempText(e.f) : '') + (lateWords(e) ? ', ' + lateWords(e) : '');
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
       case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
+      case 'settings_changed': return changeLine(e);
       case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '');
       case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '');
       case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
@@ -129,7 +152,10 @@
     return { from: at(first), to: at(next), label: r.days === 1 ? U.fmtDateShort(today) : U.fmtDateShort(first) + ' to ' + U.fmtDateShort(today) };
   }
 
-  O.inspectorPure = { inspectorRows, factsOf, rangeFor, RANGES };
+  // One row for one safety entry (the same shape inspectorRows gives), for tests and for entries read without the engine's log.
+  function rowFor(e, state) { return { id: e.id, at: e.t, kind: KIND[e.type] || 'Safety entry', food: foodOf(state, e), detail: detailOf(e), facts: factsOf(state, e), screen: screenOf(e), who: e.who || '', corrections: [] }; }
+
+  O.inspectorPure = { inspectorRows, rowFor, factsOf, rangeFor, RANGES };
   if (!g.document) return; // Node: the pure rows are all the tests need
 
   // ---- 2. The sheet and printing ----
@@ -150,7 +176,12 @@
   }
 
   // The honest line about what this record does not hold, so nobody reads it as the whole paperwork.
+  // What this record leaves out and how long it keeps things; the keep time is the engine's own number (37-retention.js).
+  const keepWords = () => (SB.retention ? ' ' + SB.retention.words() : '');
   const NOT_COVERED = 'Cooler, freezer, thermometer-check and sanitizer strip entries appear here only if someone logged them in Smokebox; keep anything else on your own sheet and ask your health department what to keep and for how long.';
+
+  // The words for a screen that holds only the last days of a shared kitchen, or '' on a screen that holds everything.
+  const trimNote = () => (SB.office && SB.office.trimWords ? SB.office.trimWords() : '');
 
   // Opens the sheet: pick a date range, see the record, print it.
   function openInspectorLog() {
@@ -173,7 +204,8 @@
     const doPrint = () => printRecord(rangeId);
     sheet.body.append(
       h('p', { class: 'si-lead' }, 'This is your own record of readings, reheats, cooling, sanitize rounds and thrown-out food. It is not an inspection result. Entries are never edited; if something was wrong, a correction is added under it.'),
-      h('p', { class: 'si-lead si-notcovered' }, NOT_COVERED),
+      h('p', { class: 'si-lead si-notcovered' }, NOT_COVERED + keepWords()),
+      trimNote() ? h('p', { class: 'si-lead si-trim', role: 'note' }, trimNote()) : null,
       h('div', { class: 'si-actions' }, h('label', null, 'Range ', sel), h('button', { type: 'button', class: 'btn btn-primary', onClick: doPrint }, 'Print')), preview);
     paint();
     return sheet;
@@ -191,7 +223,8 @@
       h('p', { class: 'si-note' }, 'The owner\'s own record of what was logged in this kitchen. It is not an inspection result. Entries are never edited; corrections are added under the entry they correct.'),
       demo ? h('p', { class: 'si-note' }, 'This is a demo kitchen, so these entries are demo entries.') : null,
       recordTable(rows),
-      h('p', { class: 'si-note' }, NOT_COVERED),
+      h('p', { class: 'si-note' }, NOT_COVERED + keepWords()),
+      trimNote() ? h('p', { class: 'si-note' }, trimNote()) : null,
       h('p', { class: 'si-note' }, 'Printed ' + U.fmtDateShort(U.dateKey(Date.now())) + ' ' + U.fmtTime(Date.now()) + '. Reviewed by: ______________   Date: ________'));
     document.body.appendChild(root);
     // Removes the print-only block once the print dialog is done (or at once when printing is unavailable).
