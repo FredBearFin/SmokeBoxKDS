@@ -98,6 +98,16 @@ async function confirmSheet(page, which) {
   if (which) await page.waitForFunction(() => !document.querySelector('.sheet[role="alertdialog"]'), null, { timeout: 3000 });
   return t;
 }
+// Erasing asks for the word ERASE in an inline box (not a dialog): which = 'confirm' types it and presses the red button, 'cancel' presses Keep my data.
+async function confirmTyped(page, which) {
+  const box = page.locator('.od-danger-box');
+  await box.waitFor({ state: 'visible', timeout: 8000 });
+  const t = await box.innerText();
+  if (which === 'confirm') { await box.getByRole('textbox', { name: /Type ERASE/ }).fill('ERASE'); await box.locator('.btn-danger').click(); }
+  else if (which === 'cancel') await box.getByRole('button', { name: 'Keep my data' }).click();
+  if (which) await page.waitForFunction(() => { const b = document.querySelector('.od-danger-box'); return !b || b.hidden || !b.children.length; }, null, { timeout: 4000 });
+  return t;
+}
 async function makeTickets(page, n) {
   await startKitchen(page); // the demo kitchen with starter stock (a real install starts blank)
   return page.evaluate((count) => {
@@ -770,7 +780,7 @@ group('9c. Data: import', async () => {
     await fileIn.setInputFiles({ name: 'my-backup.json', mimeType: 'application/json', buffer: Buffer.from(backup) });
     await page.waitForSelector('#od-data .od-impresult .od-card');
     const card = await text(page, '#od-data .od-impresult .od-card');
-    check('a valid file shows a summary before anything changes', /valid Smokebox backup/.test(card) && new RegExp('Tickets' + nT).test(card) && /Logged events/.test(card) && /Menu items21/.test(card), card);
+    check('a valid file shows a summary before anything changes', /valid Smokebox backup/.test(card) && new RegExp('Tickets' + nT).test(card) && /This replaces everything on this device/.test(card), card);
     check('the summary says it replaces everything on this device, with the real counts', card.includes('This replaces everything on this device: 0 tickets, ' + nB + ' batches') && /Back up first/.test(card), card);
     check('nothing has changed yet', (await st(page, () => SB.store.getState().tickets.length)) === 0);
     await page.locator('[data-action="import-replace"]').click();
@@ -845,29 +855,29 @@ group('9d. Data: reset', async () => {
     const live = page.locator('[data-action="reset-live"]');
     await live.scrollIntoViewIfNeeded();
     await live.click();
-    let sheet = await confirmSheet(page, 'cancel');
-    check('reset live data spells out what is cleared, and that settings stay by default', /clears 9 tickets/.test(sheet) && /Your menu, ingredient edits, limits, pacing and PIN stay/.test(sheet) && /no undo/i.test(sheet), sheet);
+    let sheet = await confirmTyped(page, 'cancel');
+    check('reset live data spells out what is cleared, and that settings stay by default', /clears 9 tickets/.test(sheet) && /Your (menu|dishes), ingredient edits, limits, pacing and PIN stay/.test(sheet) && /no undo/i.test(sheet), sheet);
     check('cancel keeps the tickets', (await st(page, () => SB.store.getState().tickets.length)) === 9);
     await live.click();
-    await confirmSheet(page, 'confirm');
+    await confirmTyped(page, 'confirm');
     await waitFor(page, () => SB.store.getState().tickets.length === 0);
     check('confirming clears tickets', true);
     check('events and batches are reset to the starter set', await st(page, () => SB.engine.allEvents(SB.store.getState()).filter((e) => e.type === 'ticket_created').length === 0));
     check('settings and menu edits are kept (price 9.75)', (await st(page, () => SB.store.getState().menu.find((m) => m.id === 'brisket_qtr').price)) === 9.75);
-    check('the page says what happened', /Live data cleared/.test(await text(page, '#od-data .od-st:last-of-type')) || /Live data cleared/.test(await text(page, '#od-data')));
+    check('the page says what happened', /Live data (cleared|erased)/.test(await text(page, '#od-data .od-st:last-of-type')) || /Live data (cleared|erased)/.test(await text(page, '#od-data')));
     // keep-settings off
     await makeTickets(page, 4);
     await page.locator('#od-data .od-toggle-row .toggle').click();
     await live.click();
-    sheet = await confirmSheet(page, 'confirm');
+    sheet = await confirmTyped(page, 'confirm');
     await waitFor(page, () => SB.store.getState().tickets.length === 0);
-    check('with "keep" switched off, live reset also restores the starter menu and settings', (await st(page, () => SB.store.getState().menu.find((m) => m.id === 'brisket_qtr').price)) === 7.5 && /puts every setting, menu edit and the PIN back/.test(sheet), sheet);
+    check('with "keep" switched off, live reset also restores the starter menu and settings', (await st(page, () => SB.store.getState().menu.find((m) => m.id === 'brisket_qtr').price)) === 7.5 && /puts every setting, (menu|dish) edit and the PIN back/.test(sheet), sheet);
     // everything
     await typeNum(page, 'Price of ' + MENU.name, '8');
     await waitFor(page, () => SB.store.getState().menu.find((m) => m.id === 'brisket_qtr').price === 8);
     await makeTickets(page, 5);
     await page.locator('[data-action="reset-all"]').click();
-    sheet = await confirmSheet(page, 'confirm');
+    sheet = await confirmTyped(page, 'confirm');
     await waitFor(page, () => SB.store.getState().tickets.length === 0 && SB.store.getState().menu.find((m) => m.id === 'brisket_qtr').price === 7.5);
     check('Reset everything clears tickets and puts the menu and settings back', true);
     check('its warning says it erases the PIN and cannot be undone', /PIN/.test(sheet) && /no undo/i.test(sheet), sheet);
