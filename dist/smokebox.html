@@ -27888,7 +27888,7 @@ a.of-nav:active { background: var(--press); }
       if (rows.some((r) => !r.category)) preview.appendChild(h('div', { class: 'fs-row dp-bulk' }, h('label', null, 'Put all these dishes in: '), bulkCat));
       // Choosing a section sets it on every row that has none of its own.
       bulkCat.addEventListener('change', () => { if (bulkCat.value) rows.forEach((r) => { if (!r.categoryText) r.category = bulkCat.value; }); });
-      const body = h('div', { class: 'dp-ptable', role: 'table', 'aria-label': 'Dishes found' });
+      const body = h('div', { class: 'dp-ptable', role: 'list', 'aria-label': 'Dishes found' });
       const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'import-go' } }, 'Import');
       // Updates the Import button's count and enabled state from the ticked, valid rows.
       const paintGo = () => { const n = rows.filter((r) => r.keep && r.ok).length; go.disabled = n === 0; go.textContent = n ? 'Import ' + n + ' ' + U.plural(n, 'dish', 'dishes') : 'Nothing to import'; };
@@ -27902,7 +27902,7 @@ a.of-nav:active { background: var(--press); }
         const prCell = h('div', { class: 'dp-prcell' }, pr, readAs);
         const zs = h('select', { class: 'select', 'aria-label': 'Station, line ' + r.line }, stations().map((z) => h('option', { value: z.id, selected: (r.station || defaultZone()) === z.id }, z.name)));
         const prob = h('div', { class: 'fs-sub dp-prob' });
-        const rowEl = h('div', { class: 'dp-prow', role: 'row', dataset: { ok: r.ok ? 'true' : 'false' } }, keepWrap, nm, prCell, zs, prob);
+        const rowEl = h('div', { class: 'dp-prow', role: 'listitem', 'aria-label': 'Line ' + r.line, dataset: { ok: r.ok ? 'true' : 'false' } }, keepWrap, nm, prCell, zs, prob);
         // Redraws this row's plain problems and its tick after any edit.
         const redo = () => {
           r.ok = rowOk(r); if (!r.ok) r.keep = false;
