@@ -396,7 +396,6 @@ export async function createHub(opts = {}) {
   // when the connection itself comes from this computer (loopback): from anywhere else the header is ignored, so a screen cannot pick its own address. The
   // last entry is used (the one the proxy added), never the first (which the client can write), and it must be a real IP address.
   const gzipOn = opts.gzip !== undefined ? opts.gzip !== false : process.env.SMOKEBOX_NO_GZIP !== '1';
-  const startedAt = Date.now();
   const trustProxy = opts.trustProxy !== undefined ? !!opts.trustProxy : process.env.SMOKEBOX_TRUST_PROXY === '1';
   // The address used for the per-address limits.
   function addrOf(req) {
