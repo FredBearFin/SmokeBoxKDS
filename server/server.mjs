@@ -100,6 +100,42 @@ function writeSaved(file, state, seq, hubId, seeded, bakEveryMs) {
   fs.renameSync(tmp, file);
 }
 
+// Who may send which engine action over /action. 'any': every screen (service work). 'owner': a screen paired as an owner (settings, menu, money
+// corrections, closing the day); with no pairing at all (a trusted network) it works as before. 'never': refused on the hub for everybody. No action uses 'never' today; the class stays so one can be closed completely. EVERY action of the engine must be listed here: test/review2-hub.test.mjs fails otherwise.
+export const ACTION_CLASS = {
+  createTicket: 'any', payOrder: 'any', advanceItem: 'any', completeItem: 'any', fireNow: 'any', completeZone: 'any', bumpTicket: 'any', recallTicket: 'any', voidTicket: 'any', setRush: 'any',
+  toggle86: 'any', restock: 'any', addBatch: 'any', logTemp: 'any', reheatBatch: 'any', startCooling: 'any', correctSafety: 'any', pullBatch: 'any', keepServing: 'any', endKeepServing: 'any',
+  planBatch: 'any', cancelPlan: 'any', snoozeAlert: 'any', clearSnooze: 'any', discardBatch: 'any', sanitizeDone: 'any', logEquipmentTemp: 'any', logThermometerCheck: 'any', pullAgain: 'any',
+  coldTakeOut: 'any', coldReturn: 'any', undo: 'any', uiReport: 'any',
+  reopenOrder: 'owner', voidOrder: 'owner', closeDay: 'owner', updateSettings: 'owner', updateMenuItem: 'owner', addMenuItem: 'owner', updateIngredient: 'owner', moveMenuItem: 'owner',
+  setChips: 'owner', addIngredient: 'owner', setPortions: 'owner', clearDemoTickets: 'owner',
+  resetLive: 'owner',
+};
+
+// One hub per data folder: a lock file holds the process id of the hub running there. A second hub on the same folder would both write to the same
+// record and state file. A lock whose process is gone (a crash, a power cut) is taken over.
+const HELD_LOCKS = new Set();
+function acquireLock(file) {
+  if (!file) return null;
+  const lf = file + '.lock';
+  fs.mkdirSync(path.dirname(lf), { recursive: true });
+  for (let i = 0; i < 3; i++) {
+    try { const fd = fs.openSync(lf, 'wx'); fs.writeSync(fd, process.pid + '\n'); fs.closeSync(fd); HELD_LOCKS.add(lf); return lf; }
+    catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      let pid = 0; try { pid = parseInt(fs.readFileSync(lf, 'utf8'), 10); } catch (err) { pid = 0; }
+      let alive = false;
+      if (pid === process.pid) alive = HELD_LOCKS.has(lf);
+      else if (pid > 0) { try { process.kill(pid, 0); alive = true; } catch (err) { alive = err.code === 'EPERM'; } }
+      if (alive) throw new Error('Another hub (process ' + pid + ') is already using ' + file + '. Stop it first, or give this one its own data folder.');
+      try { fs.unlinkSync(lf); } catch (err) { /* someone else took it over; try again */ }
+    }
+  }
+  throw new Error('Could not lock ' + file + ' (another hub is starting there).');
+}
+function releaseLock(lf) { if (!lf) return; HELD_LOCKS.delete(lf); try { fs.unlinkSync(lf); } catch (e) { /* already gone */ } }
+process.on('exit', () => { for (const lf of HELD_LOCKS) { try { fs.unlinkSync(lf); } catch (e) { /* gone */ } } });
+
 /** createHub(opts) -> { server, listen(port), close(), snapshot() }. Options: starter (demo stock; default empty like a real first run), dataFile, htmlFile, tickMs, heartbeatMs, saveMs, now. */
 export async function createHub(opts = {}) {
   const SB = await loadEngine();
@@ -108,7 +144,8 @@ export async function createHub(opts = {}) {
   const tickMs = opts.tickMs ?? 1000, heartbeatMs = opts.heartbeatMs ?? 15000, saveMs = opts.saveMs ?? 500;
   const htmlFile = opts.htmlFile || process.env.SMOKEBOX_HTML || path.join(ROOT, 'dist/smokebox.html');
   const dataFile = opts.dataFile === undefined ? process.env.SMOKEBOX_DATA : opts.dataFile;
-  const loaded = loadSaved(E, dataFile);
+  const lockFile = acquireLock(dataFile);
+  let loaded; try { loaded = loadSaved(E, dataFile); } catch (e) { releaseLock(lockFile); throw e; }
   const saved = loaded.state ? loaded : null;
   const dataProblem = loaded.problem || null;
   const bakEveryMs = opts.bakEveryMs ?? 10 * 60e3;
@@ -397,6 +434,23 @@ export async function createHub(opts = {}) {
   // last entry is used (the one the proxy added), never the first (which the client can write), and it must be a real IP address.
   const gzipOn = opts.gzip !== undefined ? opts.gzip !== false : process.env.SMOKEBOX_NO_GZIP !== '1';
   const trustProxy = opts.trustProxy !== undefined ? !!opts.trustProxy : process.env.SMOKEBOX_TRUST_PROXY === '1';
+  // DNS rebinding: a web page can make its own name point at this hub and then read and write it as "same origin". So the Host the request names must be
+  // one of: a listed name (opts.allowedHosts or SMOKEBOX_ALLOWED_HOSTS, comma separated), localhost, an IP address, a name with no dot (a kitchen LAN name)
+  // or one ending .local, .lan or .home.arpa. Behind a trusted proxy (SMOKEBOX_TRUST_PROXY=1) the proxy serves only its own names, so any Host is accepted
+  // unless names are listed. Not a login: it only closes the rebinding door on a hub that is reachable without one.
+  const allowedHosts = (opts.allowedHosts !== undefined ? opts.allowedHosts : String(process.env.SMOKEBOX_ALLOWED_HOSTS || '').split(',')).map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+  function hostOk(req) {
+    let h = String(req.headers.host || '').trim().toLowerCase();
+    if (!h) return true;                                   // an HTTP/1.0 request without a Host cannot be a browser page
+    let name = h;
+    if (h.startsWith('[')) name = h.slice(1, h.indexOf(']') < 0 ? undefined : h.indexOf(']'));
+    else name = h.replace(/:\d+$/, '');
+    if (allowedHosts.includes(name)) return true;
+    if (allowedHosts.length === 0 && trustProxy) return true;
+    if (net.isIP(name) || name === 'localhost' || name.endsWith('.localhost')) return true;
+    if (name.indexOf('.') < 0) return true;
+    return /\.(local|lan)$/.test(name) || name.endsWith('.home.arpa');
+  }
   // The address used for the per-address limits.
   function addrOf(req) {
     const direct = req.socket.remoteAddress || '?';
@@ -595,9 +649,16 @@ export async function createHub(opts = {}) {
     const isPair = (url === '/screen/pair' || url === '/admin/pair') && req.method === 'POST';
     const isRevoke = (url === '/screen/revoke' || url === '/admin/revoke') && req.method === 'POST';
     if (!isList && !isPair && !isRevoke) { res.writeHead(404, { 'content-type': 'text/plain' }); res.end('not found'); return; }
-    if (url.indexOf('/admin/') === 0 && lockState('admin:' + who)) return refuse(res, 429, 'tooManyTries');
+    // The admin command: a wrong key is counted against the caller (the owner's own command line, which comes straight from this computer with no forwarding
+    // header, has a bucket of its own, so callers coming through a proxy or tunnel cannot lock it); the right key is never refused because of others' failures.
+    const adminBucket = () => { const d = req.socket.remoteAddress || '?'; const local = (d === '127.0.0.1' || d === '::1' || d === '::ffff:127.0.0.1') && !req.headers['x-forwarded-for']; return local ? 'admin:local' : 'admin:' + who; };
+    const isAdmin = url.indexOf('/admin/') === 0;
+    const keyGiven = isAdmin && /^Bearer /.test(String(req.headers.authorization || '')) ? String(req.headers.authorization).slice(7) : '';
+    const keyIsRight = isAdmin && keyGiven !== '' && codeEq(keyGiven, adminKey);
+    if (isAdmin && !keyIsRight && lockState(adminBucket())) return refuse(res, 429, 'tooManyTries');
     const role = who2();
-    if (!role) { if (url.indexOf('/admin/') === 0) noteFailure('admin:' + who); return; }
+    if (!role) { if (isAdmin) noteFailure(adminBucket()); return; }
+    if (isAdmin) failures.delete(adminBucket());
     if (isList) return sendJson(res, 200, { ok: true, screens: screens.list(), tokensRequired: requireTokens });
     if (!postGuard(req, res)) return;
     readJson(req, res, (body) => {
@@ -613,6 +674,7 @@ export async function createHub(opts = {}) {
   // Answers one HTTP request: the page, the event stream, or an action.
   function handle(req, res) {
     const url = (req.url || '/').split('?')[0];
+    if (!hostOk(req)) { res.writeHead(421, { 'content-type': 'text/plain', connection: 'close' }); res.end('This address is not one of this hub\'s names. Set SMOKEBOX_ALLOWED_HOSTS to the name you use.'); return; }
     // Health for an owner's monitor and the updater: no secrets, no codes, only counts. dataProblem appears only when the saved file had to be set aside.
     if ((req.method === 'GET' || req.method === 'HEAD') && url === '/health') {
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
@@ -620,8 +682,17 @@ export async function createHub(opts = {}) {
       return;
     }
     if (req.method === 'GET' && url === '/events') {
+      // The old whole-state stream follows the same rules as /follow: the version check, a token or the access code, and wrong codes are counted.
+      const evf = versionFail(req);
+      if (evf) return refuse(res, evf.status, evf.report);
       const ea = authReq(req);
       if (ea.fail) return refuse(res, ea.fail.status, ea.fail.report);
+      if (!ea.screen && (followCode || writeCode)) {
+        const who = addrOf(req);
+        if (lockState(who)) { res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '60' }); res.end(JSON.stringify({ error: 'tooManyTries' })); return; }
+        if (!readOk(codeFrom(req, new URL(req.url, 'http://x').searchParams))) { noteFailure(who); res.writeHead(403, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'badCode' })); return; }
+        failures.delete(who);
+      }
       if (clients.size + followers.size >= MAX_CLIENTS) { res.writeHead(503, { 'content-type': 'text/plain', 'retry-after': '10' }); res.end('too many screens connected'); return; }
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', connection: 'keep-alive' });
       clients.add(res);
@@ -669,6 +740,11 @@ export async function createHub(opts = {}) {
         if (au.fail) return refuse(res, au.fail.status, au.fail.report);
         // A paired screen is known by its token: its name and identity come from the hub's list, never from the request, so they cannot be spoofed.
         if (au.screen && body && typeof body === 'object') { body.clientId = 's:' + au.screen.id; body.who = au.screen.name; }
+        // Per-action permission (see ACTION_CLASS): a destructive action is refused for everybody; an owner action needs an owner screen when the caller has a token.
+        const cls = body && typeof body === 'object' ? ACTION_CLASS[body.type] : undefined;
+        if (cls === 'never') return refuse(res, 403, 'notOwner', { info: { error: 'this action is not allowed over the hub; do it on the hub computer' } });
+        if (cls === 'owner' && au.screen && !au.screen.owner) return refuse(res, 403, 'notOwner');
+        if (cls === undefined && body && typeof body === 'object' && typeof body.type === 'string' && Object.prototype.hasOwnProperty.call(E.ACTIONS, body.type)) return refuse(res, 403, 'notOwner', { info: { error: 'this action has no permission class' } });
         // Writing needs the write code when the hub has one and the screen has no token; wrong tries are counted like for the stream.
         if (writeCode && !au.screen) {
           if (lockState(who)) { res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '60' }); res.end(JSON.stringify({ ok: false, report: 'badCode', info: { error: 'tooManyTries' }, seq })); return; }
@@ -696,6 +772,14 @@ export async function createHub(opts = {}) {
   // Start-up: put back whatever the record holds beyond the saved state, and write the starting state to disk at once so the record always
   // has a saved base to replay onto.
   // With no usable state file the record has nothing to replay onto (it belongs to a history that was lost), so it is set aside, never applied.
+  // A crash in the middle of writing leaves the record's last line without its end. That unfinished line was never acknowledged, so it is cut off now;
+  // otherwise the next action would be written onto the end of it and both would be unreadable.
+  if (walFile && fs.existsSync(walFile)) {
+    try {
+      const buf = fs.readFileSync(walFile);
+      if (buf.length > 0 && buf[buf.length - 1] !== 10) { const keep = buf.lastIndexOf(10) + 1; fs.truncateSync(walFile, keep); console.warn('[hub] the record ended in the middle of a line; the unfinished line was cut off'); }
+    } catch (e) { console.warn('[hub] could not check the end of the record: ' + e.message); }
+  }
   if (!saved && walFile && fs.existsSync(walFile)) { try { fs.renameSync(walFile, walFile + '.old'); } catch (e) { /* ignore */ } }
   const replayed = saved ? walReplay() : 0;
   if (dataFile && (!saved || replayed)) { dirty = true; flush(); }
@@ -728,6 +812,7 @@ export async function createHub(opts = {}) {
     for (const res of clients) res.end();
     for (const res of followers) res.end();
     clients.clear(); followers.clear();
+    releaseLock(lockFile);
     return new Promise((resolve) => { server.close(() => resolve()); server.closeAllConnections?.(); });
   }
   // Stops the hub the way a power cut would: no final save, no flush of the record's buffers beyond what was already written (used by tests).
@@ -738,6 +823,7 @@ export async function createHub(opts = {}) {
     for (const res of clients) res.destroy();
     for (const res of followers) res.destroy();
     clients.clear(); followers.clear();
+    releaseLock(lockFile);
     return new Promise((resolve) => { server.close(() => resolve()); server.closeAllConnections?.(); });
   }
   // Returns the current state, hub clock and change counter (used by tests).

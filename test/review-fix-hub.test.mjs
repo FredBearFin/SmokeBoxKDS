@@ -52,7 +52,7 @@ test('#3: a good file loads as before, nothing is renamed, and health shows no p
   try {
     assert.equal(b.snapshot().state.tickets.length, 1);
     assert.equal(b.dataProblem, null);
-    assert.deepEqual(fs.readdirSync(path.dirname(file)).filter((f) => f !== 'state.json' && !/\.(bak|wal|tmp|admin|screens)(\.tmp)?$/.test(f)), []);
+    assert.deepEqual(fs.readdirSync(path.dirname(file)).filter((f) => f !== 'state.json' && !/\.(bak|wal|tmp|admin|screens|lock)(\.tmp)?$/.test(f)), []);
     const h = await (await fetch('http://127.0.0.1:' + pb + '/health')).json();
     assert.equal(h.dataProblem, undefined);
   } finally { await b.close(); }
