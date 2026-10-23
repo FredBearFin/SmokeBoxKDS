@@ -1406,8 +1406,8 @@
       mo.observe(content, { childList: true, subtree: true });
       P.disposers.push(() => mo.disconnect());
     }
-    for (const b of eraseBtns) if (b) { shut(b); b.title = conn === 'follower' ? 'Done on the main screen.' : 'Done on the main computer, because it erases the shared kitchen.'; }
-    content.querySelectorAll('.od-danger-h').forEach((h3) => { const n = document.createElement('p'); n.className = 'od-p'; n.textContent = conn === 'follower' ? 'Erasing is done on the main screen.' : 'Erasing is done on the main computer, because it would erase the shared kitchen for every screen.'; h3.after(n); });
+    for (const b of eraseBtns) if (b) { shut(b); b.title = conn === 'follower' ? 'Done on the hub computer.' : 'Done on the hub computer, because it erases the shared kitchen.'; }
+    content.querySelectorAll('.od-danger-h').forEach((h3) => { const n = document.createElement('p'); n.className = 'od-p'; n.textContent = conn === 'follower' ? 'Erasing is done on the hub computer.' : 'Erasing is done on the hub computer, because it would erase the shared kitchen for every screen.'; h3.after(n); });
   }
 
   function buildData(P) {
