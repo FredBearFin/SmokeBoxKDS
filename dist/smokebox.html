@@ -2661,6 +2661,7 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dp .fs-row { flex-wrap: wrap; }
 .dp input[type="file"]::file-selector-button { min-height: 44px; padding: 0 var(--sp-4); margin-right: var(--sp-3); border-radius: var(--r-btn); font: inherit; cursor: pointer; }
 .dp-cat { flex: 0 1 14ch; min-width: 0; }
+.dp-check-row { display: flex; align-items: center; gap: var(--sp-3); min-height: 44px; cursor: pointer; } .dp-check-row input { width: 26px; height: 26px; flex: none; } .so-step { gap: var(--sp-3); }
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -4466,7 +4467,7 @@ a.of-nav:active { background: var(--press); }
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.cookAheadSkipped', 'lastgood', 'corruptat'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.cookAheadSkipped', 'lastgood', 'corruptat', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -5596,7 +5597,7 @@ a.of-nav:active { background: var(--press); }
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'confirmWord', 'notInDemo'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -5656,6 +5657,8 @@ a.of-nav:active { background: var(--press); }
     badWho: 'Initials must be 1 to 12 characters. Shorten them, or leave them blank if the screen allows.',
     unknownSafetyEntry: 'That safety log entry is not here, or it is not a temperature, discard, cooling, reheat, sanitize or keep-serving entry. Pick one from the safety log.',
     wrongBackupMode: 'That backup does not belong to this kitchen (one is from the demo, the other from a real kitchen). Nothing was changed. Choose a backup made from this kitchen.',
+    confirmWord: 'Type the confirmation word exactly as shown to go ahead. Nothing was changed.',
+    notInDemo: 'This only works in your own kitchen, not in the demo. Nothing was changed.',
     moduleOff: 'Cook-ahead tracking (batches, the hold cabinet, temperature checks and sanitizing) is switched off. Turn it on under Dishes and prices: Yes, I cook ahead.',
     nameTaken: 'Another ingredient already has that name. Pick a different name, or use the one that exists.',
     tooManyIngredients: 'The ingredient list is full (' + 80 + ' ingredients). Archive one you no longer use, then add this one.',
@@ -5702,6 +5705,7 @@ a.of-nav:active { background: var(--press); }
     addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two", prepGuess?:boolean }',
     updateIngredient: '{ id, patch }',
     moveMenuItem: '{ id, toIndex }',
+    clearDemoTickets: '{}',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety" }',
     setPortions: '{ menuId, on:boolean, count? }',
     resetLive: '{ keepSettings?=true, starter?, stagger?, catalog?: "sample"|"blank", replaceOwn? }',
@@ -7973,6 +7977,66 @@ a.of-nav:active { background: var(--press); }
     return 'ok';
   };
 
+  // Works out exactly what clearing the old demo and sample tickets would remove, without changing anything: tickets made by the
+  // old in-place demo or the sample history (src demo or sample) whose order holds only such tickets; those orders; and the
+  // events that belong to them. An order that also holds a real ticket is left alone, with all its tickets (mixedOrders).
+  // Returns { ticketIds, orderIds, tickets, orders, paidOrders, openOrders, mixedOrders, events } (events counted in the log).
+  function planDemoLeftovers(state) {
+    const out = { ticketIds: new Set(), orderIds: new Set(), tickets: 0, orders: 0, paidOrders: 0, openOrders: 0, mixedOrders: 0, events: 0 };
+    if (!isState(state)) return out;
+    // True for a ticket or order made by the old in-place demo or the sample history.
+    const fake = (x) => x && (x.src === 'demo' || x.src === 'sample');
+    const byOrder = new Map();
+    for (const t of state.tickets) if (t.orderId !== undefined) { let g = byOrder.get(t.orderId); if (!g) byOrder.set(t.orderId, g = []); g.push(t); }
+    const mixed = new Set();
+    for (const [oid, g] of byOrder) if (g.some(fake) && g.some((t) => !fake(t))) mixed.add(oid);
+    const orders = Array.isArray(state.orders) ? state.orders : [];
+    for (const o of orders) {
+      if (!fake(o)) continue;
+      const g = byOrder.get(o.id) || [];
+      if (g.some((t) => !fake(t))) { out.mixedOrders++; continue; }
+      out.orderIds.add(o.id); out.orders++;
+      if (o.status === 'paid') out.paidOrders++; else if (o.status === 'open') out.openOrders++;
+    }
+    for (const t of state.tickets) {
+      if (!fake(t) || (t.orderId !== undefined && mixed.has(t.orderId))) continue;
+      // A demo ticket whose order is a real one (src live) stays with that order.
+      if (t.orderId !== undefined && orders.some((o) => o.id === t.orderId && !fake(o) && !out.orderIds.has(o.id))) continue;
+      out.ticketIds.add(t.id); out.tickets++;
+    }
+    if (out.ticketIds.size || out.orderIds.size) for (const e of allEvents(state)) if ((e.ticketId && out.ticketIds.has(e.ticketId)) || (e.orderId && out.orderIds.has(e.orderId))) out.events++;
+    return out;
+  }
+  // How many old demo or sample tickets, orders and events sit in this kitchen's real reports. Pure: changes nothing.
+  // { tickets, orders, paidOrders, openOrders, mixedOrders, events }. Real (live) tickets and the orders that hold them are never counted.
+  function demoLeftovers(state) {
+    const p = planDemoLeftovers(state);
+    return { tickets: p.tickets, orders: p.orders, paidOrders: p.paidOrders, openOrders: p.openOrders, mixedOrders: p.mixedOrders, events: p.events };
+  }
+  // Removes the old demo and sample tickets found by demoLeftovers, with their orders and events. Used grams of the removed
+  // tickets move into the books so stock still balances. Real tickets and real paid orders are never touched. nothingToDo when
+  // there is nothing to remove.
+  A.clearDemoTickets = function (tx) {
+    const st = tx.state();
+    const p = planDemoLeftovers(st);
+    if (!p.ticketIds.size && !p.orderIds.size) return 'nothingToDo';
+    const keepT = [];
+    for (const t of tx.get('tickets')) {
+      if (!p.ticketIds.has(t.id)) { keepT.push(t); continue; }
+      for (const it of t.items) for (const r of it.depleted || []) if (r.g > 0) { const L = tx.ledger(r.ing); L.prunedUsed = (L.prunedUsed || 0) + r.g; }
+    }
+    tx.own.add(keepT); tx.set('tickets', keepT);
+    const keepO = (Array.isArray(st.orders) ? st.orders : []).filter((o) => !p.orderIds.has(o.id));
+    tx.own.add(keepO); tx.set('orders', keepO);
+    let flat = allEvents(st).filter((e) => !((e.ticketId && p.ticketIds.has(e.ticketId)) || (e.orderId && p.orderIds.has(e.orderId))));
+    const ar = [];
+    while (flat.length >= 2 * EVENT_CHUNK) { ar.push(flat.slice(0, EVENT_CHUNK)); flat = flat.slice(EVENT_CHUNK); }
+    tx.set('eventArchive', ar); tx.set('events', flat);
+    tx.set('undo', []);
+    tx.event('demo_tickets_cleared', { tickets: p.tickets, orders: p.orders });
+    tx.info = { tickets: p.tickets, orders: p.orders, paidOrders: p.paidOrders, events: p.events };
+    return 'ok';
+  };
   // Moves one dish to a new place in the menu list (0 is first). The order is what the order screen and the lists show
   // inside each category. toIndex must be a whole number from 0 to the last place (outOfBounds otherwise); the same place
   // gives nothingToDo. Undo puts it back while the dish is still where this move left it.
@@ -9298,7 +9362,7 @@ a.of-nav:active { background: var(--press); }
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, defaultSettings, blankSettings, moduleOn, cookAheadActive, describe, safetyLog, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.
@@ -10023,6 +10087,12 @@ a.of-nav:active { background: var(--press); }
   const CORRUPT_AT_KEY = 'smokebox.v1.corruptat';
   // One small rolling copy of the last good state (menu, ingredients, settings, PIN, safety records, recent history).
   const LASTGOOD_KEY = 'smokebox.v1.lastgood';
+  // The owner's answer to the one-time offer to clear old demo tickets: true once they chose to keep them.
+  const KEPT_KEY = 'smokebox.v1.demoLeftoversKept';
+  // The word that must be typed to start over with an empty menu, and the setup-progress keys that start over clears.
+  const START_OVER_WORD = 'ERASE';
+  const START_OVER_KEYS = ['smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone',
+    'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
   // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
@@ -10178,6 +10248,7 @@ a.of-nav:active { background: var(--press); }
     const v = now();
     let ok = false;
     const t0 = perfNow();
+    const prevSaveOk = st.lastSaveOk;
     let snapDropped = false;
     // full copy first; if the quota refuses it, keep halving the history (oldest completed tickets and events go first)
     let lim = null;
@@ -10195,8 +10266,10 @@ a.of-nav:active { background: var(--press); }
       lim = { maxTickets: nt, maxEvents: ne };
       nt = Math.floor(nt / 2); ne = Math.floor(ne / 2);
     }
+    const flipped = st.lastSaveOk !== ok;
     st.lastSaveOk = ok;
     st.lastSaveAt = r;
+    if (flipped && (ok === false || prevSaveOk === false)) scheduleNotify(); // a failed save (or its recovery) shows on screen at once
     st.saveCostMs = Math.round((perfNow() - t0) * 10) / 10; // how long this save took, which sets the next delay
     if (ok) dirty = false;
     let sid = null;
@@ -10920,6 +10993,60 @@ a.of-nav:active { background: var(--press); }
     reloadPage();
     return true;
   }
+  // Starts the real kitchen over with an empty menu. Needs opts.confirm to be the typed word (SB.store.START_OVER_WORD, any case),
+  // refuses in the demo, and takes a full backup first: if the backup cannot be made nothing is cleared. Then it clears dishes,
+  // ingredients, stock, batches, tickets, orders and history (resetLive, catalog 'blank') and the setup-progress choices, so the
+  // kitchen is exactly like a brand-new install. opts.keepSettings (default true) keeps tax, hours, PIN, units and station names;
+  // false resets those too. Returns { ok, report, info, backup? } with backup { text, filename, mime, savedAt, chars } for the
+  // screen to download; the last good copy is also refreshed first, so a damaged save can still come back.
+  // WATCH OUT: the demo's keys are never read or written here.
+  function startOver(opts) {
+    opts = opts || {};
+    // Records and returns a refusal; nothing has been changed when this is used.
+    const fail = (report, info) => { last = { type: 'startOver', report, info: info || {}, events: [] }; return { ok: false, report, info: info || {} }; };
+    if (!state) return fail('invalidBackup');
+    if (mode === 'demo') return fail('notInDemo');
+    if (typeof opts.confirm !== 'string' || opts.confirm.trim().toUpperCase() !== START_OVER_WORD) return fail('confirmWord', { word: START_OVER_WORD });
+    if (opts.keepSettings != null && typeof opts.keepSettings !== 'boolean') return fail('badPatch', { key: 'keepSettings' });
+    const keep = opts.keepSettings !== false;
+    const text = exportAll();
+    if (text == null) { const lr = last || {}; return fail(lr.report || 'invalidBackup', lr.info); }
+    const savedAt = realNow();
+    snapWanted = 'startOver'; maybeSnapshot(savedAt);
+    const rep = resetLive({ keepSettings: keep, catalog: 'blank', replaceOwn: true, starter: false });
+    if (rep !== 'ok') return fail(rep);
+    for (const k of START_OVER_KEYS) { try { storage.remove(k); } catch (e) { /* ignore */ } }
+    if (!keep && SB.config && typeof SB.config.applyCustom === 'function') {
+      try { SB.config.applyCustom({}); SB.config.saveCustom({ rename: {}, add: {} }); } catch (e) { /* the names stay as they were */ }
+    }
+    last = { type: 'startOver', report: 'ok', info: { keepSettings: keep }, events: [] };
+    const d = new Date(savedAt);
+    // Two-digit number for the file name.
+    const pad = (n) => (n < 10 ? '0' : '') + n;
+    return { ok: true, report: 'ok', info: { keepSettings: keep }, backup: { text, filename: 'smokebox-before-start-over-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.json', mime: 'application/json', savedAt, chars: text.length } };
+  }
+  // Counts the old demo and sample tickets in this kitchen's real reports (see the engine's demoLeftovers), and whether the
+  // owner already chose to keep them. In the demo it counts nothing (demo tickets belong there). { tickets, orders, paidOrders,
+  // openOrders, mixedOrders, events, kept, offer } where offer is true when there is something to clear and no "keep" answer yet.
+  function demoLeftovers() {
+    const c = state && mode !== 'demo' ? E().demoLeftovers(state) : { tickets: 0, orders: 0, paidOrders: 0, openOrders: 0, mixedOrders: 0, events: 0 };
+    let kept = false;
+    try { kept = !!(storage && storage.get(KEPT_KEY, false) === true); } catch (e) { kept = false; }
+    return Object.assign(c, { kept, offer: (c.tickets > 0 || c.orders > 0) && !kept });
+  }
+  // Remembers that the owner chose to keep the old demo tickets, so the offer is not made again. Returns true when saved.
+  function keepDemoLeftovers() {
+    try { return !!storage && mode !== 'demo' && storage.set(KEPT_KEY, true) !== false; } catch (e) { return false; }
+  }
+  // Removes the old demo and sample tickets (the engine action clearDemoTickets) and saves. Refuses in the demo. Returns
+  // { ok, report, info } where info has the counts removed.
+  function clearDemoLeftovers() {
+    if (!state) return { ok: false, report: 'invalidBackup', info: {} };
+    if (mode === 'demo') return { ok: false, report: 'notInDemo', info: {} };
+    const r = dispatchEx('clearDemoTickets', {}, { source: 'user' });
+    if (r.report === 'ok') persistNow();
+    return { ok: r.report === 'ok', report: r.report, info: r.info || {} };
+  }
   // True while this kitchen began empty and still has no dish on the menu (archived dishes do not count): the setup
   // screens use it to know a first-time owner is looking at an empty kitchen. False for old saves and the demo.
   function isBlank() {
@@ -10935,7 +11062,7 @@ a.of-nav:active { background: var(--press); }
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
@@ -18524,7 +18651,7 @@ a.of-nav:active { background: var(--press); }
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '' };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -18668,7 +18795,9 @@ a.of-nav:active { background: var(--press); }
     updateThemeColor();
     bn.el = null; bn.kind = '';
     paintBanner();
-    clearInterval(bn.timer); bn.timer = setInterval(paintBanner, 5000); // also reacts when a save starts failing
+    clearInterval(bn.timer); bn.timer = setInterval(paintBanner, 5000); // the daily backup nudge comes due with the clock
+    // A failed save (or its recovery) is announced by the store, so the red strip shows at once instead of on the next 5 s round.
+    if (!bn.sub && SB.store && typeof SB.store.subscribe === 'function') bn.sub = SB.store.subscribe(paintBanner);
     const v = R.view();
     onRoute(v);
     return S;
@@ -24088,6 +24217,8 @@ a.of-nav:active { background: var(--press); }
     const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
+      // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
+      SB.setup && SB.setup.leftoversCard ? SB.setup.leftoversCard() : null,
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
       settingBlock('Text size', 'Large makes everything 20 percent bigger.', textSeg),
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
@@ -24098,7 +24229,11 @@ a.of-nav:active { background: var(--press); }
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       clockBlock,
-      settingBlock('More', '', links)));
+      settingBlock('More', '', links),
+      // Start over sits alone at the very bottom, away from the everyday buttons. In the demo it is replaced by the way back.
+      SB.store.isDemo && SB.store.isDemo()
+        ? settingBlock('The demo', 'You are in the demo, not your kitchen.', h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => SB.store.leaveDemo() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Back to my kitchen')))
+        : settingBlock('Start over', 'Empty the menu and begin again. You will be asked to save a backup first.', link('trash', 'Start over with an empty menu', 'startover'))));
 
     // Keep every control in step when something else changes the look, the station or the clock.
     offs.push(SB.theme.onChange(() => { themeSeg.setValue(SB.theme.get()); textSeg.setValue(SB.theme.textSize()); sizeSeg.setValue(SB.theme.density()); hintsTog.setValue(SB.theme.hints()); }));
@@ -25974,6 +26109,107 @@ a.of-nav:active { background: var(--press); }
     return sheet;
   }
 
+  /* ---------- old demo tickets in real reports ---------- */
+
+  // A small card for the Menu sheet and the Data page: shown only when the real reports still hold old demo or sample tickets.
+  // It says how many in plain words and offers Clear them or Keep them; the store remembers a Keep. Returns an element, or null.
+  function leftoversCard() {
+    const st = SB.store;
+    if (!st || typeof st.demoLeftovers !== 'function') return null;
+    const d = st.demoLeftovers();
+    if (!d || !d.offer) return null;
+    const msg = h('p', { class: 'fs-sub', role: 'status' });
+    const n = d.tickets, o = d.orders;
+    const words = 'Your reports still hold ' + n + ' ' + U.plural(n, 'ticket') + (o ? ' and ' + o + ' ' + U.plural(o, 'order') : '') + ' from the demo or sample data. They are not your sales, and they are mixed into your numbers.' + (d.mixedOrders ? ' ' + d.mixedOrders + ' ' + U.plural(d.mixedOrders, 'order that also holds a real ticket is', 'orders that also hold a real ticket are') + ' left alone.' : '');
+    const card = h('section', { class: 'fs-card so-left', dataset: { act: 'demo-leftovers' } }, h('h3', { class: 'fs-h' }, 'Old demo tickets in your reports'), h('p', { class: 'fs-sub' }, words),
+      // Clears only the demo and sample tickets, their orders and events; real tickets are never touched.
+      h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'leftovers-clear' }, onClick: () => {
+        const r = st.clearDemoLeftovers();
+        if (r.ok) { U.clear(card); card.append(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'ok', role: 'status' }, 'Cleared ' + r.info.tickets + ' ' + U.plural(r.info.tickets, 'ticket') + '. Your reports now show only your own sales.')); return; }
+        let w = r.report; try { w = SB.engine.describe(r.report, r.info, st.getState().settings) || w; } catch (e) { /* keep the code */ }
+        tell(msg, (r.report === 'nothingToDo' ? 'There is nothing left to clear.' : w + ' Nothing was cleared.'), 'bad');
+      } }, 'Clear them'),
+      // Keeps them and remembers the choice, so the card does not come back.
+      h('button', { type: 'button', class: 'btn', dataset: { act: 'leftovers-keep' }, onClick: () => { st.keepDemoLeftovers(); card.remove(); } }, 'Keep them')), msg);
+    return card;
+  }
+
+  /* ---------- Start over with an empty menu ---------- */
+
+  // The word the owner types to confirm: the store's own word (ERASE), so the screen and the store always agree.
+  const START_OVER_WORD = (SB.store && SB.store.START_OVER_WORD) || 'ERASE';
+  // Opens "Start over with an empty menu": three plain steps (what goes and what stays, save a backup, type the word). This cannot
+  // be undone, so the screen says so first and offers a backup before anything is erased.
+  function openStartOver() {
+    const sheet = SB.ui.sheet({ title: 'Start over with an empty menu', side: 'right', width: 'min(640px, 96vw)', name: 'startover' });
+    const root = h('div', { class: 'dp so' });
+    const keep = h('input', { type: 'checkbox', checked: true, id: 'so-keep' });
+    const keepLabel = h('label', { class: 'dp-check-row', for: 'so-keep' }, keep, h('span', null, 'Keep my tax, hours, PIN and station names'));
+    const step1 = h('section', { class: 'fs-section so-step' },
+      h('h3', { class: 'fs-h' }, '1. What happens'),
+      h('p', { class: 'fs-sub' }, 'This empties your kitchen so you can begin again with a blank menu.'),
+      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device.'),
+      h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and categories. Clear the box and those go back to how Smokebox starts.'),
+      keepLabel,
+      h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'There is no undo. We are sorry to be blunt: once you confirm, the old menu and history cannot be brought back, except from a backup file you saved first.'));
+    const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: save a backup');
+    step1.appendChild(next1);
+
+    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' } }, 'Next: confirm');
+    const step2 = h('section', { class: 'fs-section so-step', hidden: true },
+      h('h3', { class: 'fs-h' }, '2. Your backup'),
+      h('p', { class: 'fs-sub' }, 'The moment you confirm, Smokebox saves a backup file with everything in your kitchen as it is now, then erases. The file goes to your downloads: keep a copy off this device. If the backup cannot be made, nothing is erased.'),
+      h('p', { class: 'fs-sub' }, 'To bring everything back later: Back office, Data, Restore.'), next2);
+
+    const word = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': 'Type ' + START_OVER_WORD + ' to confirm', placeholder: START_OVER_WORD });
+    const goSt = h('p', { class: 'fs-sub', role: 'status' });
+    const go = h('button', { type: 'button', class: 'btn btn-danger btn-lg', dataset: { act: 'so-go' }, disabled: true }, ico('trash', 22), h('span', null, 'Erase everything and start over'));
+    // The red button only wakes up when the exact word has been typed.
+    word.addEventListener('input', () => { go.disabled = word.value.trim().toUpperCase() !== START_OVER_WORD; });
+    const step3 = h('section', { class: 'fs-section so-step', hidden: true },
+      h('h3', { class: 'fs-h' }, '3. Type ' + START_OVER_WORD),
+      h('p', { class: 'fs-sub' }, 'To be sure this is what you want, type ' + START_OVER_WORD + ' in the box. Then the red button works.'),
+      SB.ui.field({ label: 'Type ' + START_OVER_WORD, control: word }), go, goSt);
+    const done = h('section', { class: 'fs-section so-step', hidden: true });
+
+    // Shows one step and hides the others.
+    const show = (which) => { [step1, step2, step3, done].forEach((s, i) => { s.hidden = i !== which; }); };
+    next1.addEventListener('click', () => show(1));
+    next2.addEventListener('click', () => show(2));
+    // Erases the kitchen: empty menu, optionally the settings too, then shows the done screen. Any refusal is shown in the same one-line style.
+    go.addEventListener('click', () => {
+      const keepIt = keep.checked;
+      // The store makes its own backup first, clears the kitchen, my saved setup bits and (when asked) the settings and station names.
+      const res = SB.store.startOver({ confirm: word.value, keepSettings: keepIt });
+      if (!res.ok) {
+        let w = res.report;
+        try { w = SB.engine.describe(res.report, res.info, SB.store.getState().settings) || w; } catch (e) { /* keep the code */ }
+        if (res.report === 'confirmWord') w = 'Type ' + START_OVER_WORD + ' exactly, then try again. Nothing was erased.';
+        else if (res.report === 'notInDemo') w = 'You are in the demo, so there is nothing of yours to erase here. Tap Back to my kitchen first.';
+        tell(goSt, w + (res.report === 'confirmWord' || res.report === 'notInDemo' ? '' : ' Nothing was erased.'), 'bad');
+        return;
+      }
+      const needsReload = !keepIt;
+      const auto = res.backup;
+      // The backup comes from the same call that erased: download it now, and keep a button for another copy.
+      const saveAuto = () => { try { const url = g.URL.createObjectURL(new g.Blob([auto.text], { type: auto.mime })); const a = doc.createElement('a'); a.href = url; a.download = auto.filename; a.style.display = 'none'; doc.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 1000); return true; } catch (e) { return false; } };
+      const savedOk = auto ? saveAuto() : false;
+      if (SB.floor && SB.floor.setWelcome) SB.floor.setWelcome(true);
+      U.clear(done);
+      done.append(h('h3', { class: 'fs-h' }, 'Done. Your kitchen is empty.'),
+        h('p', { class: 'fs-sub' }, 'The menu, tickets and history are gone' + (keepIt ? '. Your tax, hours, PIN and station names stayed.' : ', and tax, hours, PIN and station names are back to how Smokebox starts.')),
+        // The backup made by the same call that erased: says whether it was saved, and offers another copy.
+        auto ? h('p', { class: 'fs-sub dp-msg', 'data-tone': savedOk ? 'ok' : 'bad', role: 'status' }, (savedOk ? 'Saved ' + auto.filename + ' (' + Math.max(1, Math.round(auto.chars / 1024)) + ' KB) to your downloads, from just before the erase. ' : 'Your browser blocked the backup download. ')) : null,
+        auto ? h('button', { type: 'button', class: 'btn', dataset: { act: 'so-auto-backup' }, onClick: () => saveAuto() }, 'Save the backup again') : null,
+        // Goes to the first screen: closes the sheets (and reloads when station names were reset so every screen shows them).
+        h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-finish' }, onClick: () => { if (needsReload) g.location.reload(); else SB.sheets.closeAll(); } }, 'Go to the first screen'));
+      show(3);
+    });
+    root.append(step1, step2, step3, done);
+    sheet.body.appendChild(root); keepInView(root);
+    return sheet;
+  }
+
   /* ---------- the Tax, hours and PIN sheet ---------- */
 
   // Opens "Tax, hours and PIN": the shop settings that used to be steps of a wizard. Each saves on its own button.
@@ -26047,11 +26283,12 @@ a.of-nav:active { background: var(--press); }
   SB.sheets.register('setup', openSetup);
   SB.sheets.register('dishes', openDishes);
   SB.sheets.register('shop', openShop);
+  SB.sheets.register('startover', openStartOver);
   SB.sheets.register('menuimport', openImport);
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 77-floor-setup.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'77-floor-setup.js',message:String(e&&e.message||e)});}
@@ -26512,6 +26749,23 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "p",
       "x": "Spreadsheet files, like the sales file, are for reading. You cannot restore from them."
+     },
+     {
+      "t": "h",
+      "x": "Start over with an empty menu"
+     },
+     {
+      "t": "ol",
+      "x": [
+       "Tap **Menu**. At the bottom, tap **Start over with an empty menu**.",
+       "It lists what goes (every dish, ticket, order and record on this device) and what stays (tax, hours, PIN and station names; clear the box to reset those too). Tap **Next: save a backup**.",
+       "Tap **Save a backup now** and keep the file.",
+       "Type START OVER, then tap **Erase everything and start over**."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "There is no undo. To go back, restore the backup you just saved."
      },
      {
       "t": "h",
@@ -31961,6 +32215,8 @@ a.of-nav:active { background: var(--press); }
   // Panel 8: what is stored, sample history, export, import and reset.
   function buildData(P) {
     const pn = panel(SECTIONS[7], 'Everything Smokebox knows lives in this browser, on this device. Back it up before you reset, import or clear browser data.');
+    // The one-time offer to clear old demo tickets from real reports; nothing is shown when there are none.
+    { const lc = SB.setup && SB.setup.leftoversCard ? SB.setup.leftoversCard() : null; if (lc) pn.body.appendChild(lc); }
 
     // What is stored: counts read from the live state, refreshed on every sync.
     // One label and value pair for the counts list.
@@ -33744,7 +34000,7 @@ a.of-nav:active { background: var(--press); }
     if (!s || !SB.ui || typeof SB.ui.toast !== 'function') return;
     if (s.corrupt && s.restoredFromCopy) SB.ui.toast('Your saved board could not be read, so Smokebox restored the last good copy from ' + new Date(s.restoredFromCopy).toLocaleString() + '. Orders and history after that time are missing. A copy of the damaged data was kept in this browser.', { tone: 'warn', ms: 20000 });
     else if (s.corrupt) SB.ui.toast('Your saved board could not be read, so Smokebox started with an empty board. A copy of the old data was kept on this device.', { tone: 'warn', ms: 15000 });
-    else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox repaired ' + s.repaired.length + ' saved ' + (s.repaired.length === 1 ? 'detail' : 'details') + ' while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
+    else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox updated a few saved settings while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
     if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }
 

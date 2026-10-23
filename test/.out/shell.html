@@ -1575,7 +1575,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.cookAheadSkipped', 'lastgood', 'corruptat'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.cookAheadSkipped', 'lastgood', 'corruptat', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -3893,7 +3893,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '' };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -4037,7 +4037,9 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     updateThemeColor();
     bn.el = null; bn.kind = '';
     paintBanner();
-    clearInterval(bn.timer); bn.timer = setInterval(paintBanner, 5000); // also reacts when a save starts failing
+    clearInterval(bn.timer); bn.timer = setInterval(paintBanner, 5000); // the daily backup nudge comes due with the clock
+    // A failed save (or its recovery) is announced by the store, so the red strip shows at once instead of on the next 5 s round.
+    if (!bn.sub && SB.store && typeof SB.store.subscribe === 'function') bn.sub = SB.store.subscribe(paintBanner);
     const v = R.view();
     onRoute(v);
     return S;
@@ -4142,7 +4144,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (!s || !SB.ui || typeof SB.ui.toast !== 'function') return;
     if (s.corrupt && s.restoredFromCopy) SB.ui.toast('Your saved board could not be read, so Smokebox restored the last good copy from ' + new Date(s.restoredFromCopy).toLocaleString() + '. Orders and history after that time are missing. A copy of the damaged data was kept in this browser.', { tone: 'warn', ms: 20000 });
     else if (s.corrupt) SB.ui.toast('Your saved board could not be read, so Smokebox started with an empty board. A copy of the old data was kept on this device.', { tone: 'warn', ms: 15000 });
-    else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox repaired ' + s.repaired.length + ' saved ' + (s.repaired.length === 1 ? 'detail' : 'details') + ' while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
+    else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox updated a few saved settings while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
     if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }
 
