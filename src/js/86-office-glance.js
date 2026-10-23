@@ -35,8 +35,10 @@
     inp = inp || {};
     // Picks the singular or plural word for a count.
     const plural = (n, one, many) => (n === 1 ? one : many);
-    const late = inp.late || 0, near = inp.nearLate || 0, names = Array.isArray(inp.out86) ? inp.out86 : [];
+    const late = inp.late || 0, near = inp.nearLate || 0, names = Array.isArray(inp.out86) && !inp.fresh ? inp.out86 : [];
     const run = runOutLine(inp.brisket, inp.now);
+    // Before anything is cooked or ordered nothing is "out": say so, not "17 items 86'd and no brisket".
+    if (inp.fresh) { run.tone = 'info'; run.text = 'Nothing cooked yet. Log a batch to track brisket.'; }
     return {
       cards: [
         { id: 'money', label: 'Paid so far today', value: U.fmtMoney(inp.collected || 0), tone: 'info',
@@ -46,7 +48,7 @@
         { id: 'late', label: 'Late tickets', value: String(late), tone: late > 0 ? 'bad' : 'good',
           sub: late > 0 ? 'Past their overdue time' : near > 0 ? 'None late, ' + near + ' close to late' : 'Nothing late' },
         { id: 'out86', label: '86 list', value: String(names.length), tone: names.length ? 'warn' : 'good',
-          sub: names.length ? names.slice(0, 4).join(', ') + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '') : 'Everything is on the menu' },
+          sub: inp.fresh ? 'Nothing cooked yet, so nothing is 86' : names.length ? names.slice(0, 4).join(', ') + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '') : 'Everything is on the menu' },
         { id: 'brisket', label: 'Brisket', value: run.tone === 'bad' ? 'None' : run.tone === 'warn' ? U.fmtTime(inp.brisket.shortfallAt) : run.tone === 'good' ? 'Lasts' : '-', tone: run.tone, sub: run.text, wide: true },
       ],
     };
@@ -74,7 +76,7 @@
     } catch (e) { /* no estimate: the card then says there is not enough data */ }
     const onHandG = st.select.batches().filter((b) => b.ing === 'brisket' && b.canServe !== false && b.kind !== 'cooling' && b.remainingG > 0).reduce((a, b) => a + b.remainingG, 0);
     return { now, collected: sales.collected, paidOrders: sales.checks, openOrders: sales.open ? sales.open.orders : 0, openValue: sales.open ? sales.open.value : 0,
-      tickets: counts.all, late: counts.overdue, nearLate: counts.warn, out86: out.map((x) => x.name), brisket: { onHandG, shortfallAt, rateKnown } };
+      fresh: !state.batches.length && !counts.all, tickets: counts.all, late: counts.overdue, nearLate: counts.warn, out86: out.map((x) => x.name), brisket: { onHandG, shortfallAt, rateKnown } };
   }
 
   // ---- 3. The panel ----

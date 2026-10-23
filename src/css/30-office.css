@@ -52,8 +52,9 @@ a.of-nav:active { background: var(--press); }
 .of-filters { position: sticky; top: 0; z-index: 6; background: color-mix(in srgb, var(--bg) 94%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
 .of-filters > * { max-width: 1480px; margin-left: auto; margin-right: auto; }
 .of-fsum { display: none; }
-.of-fbody { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2) var(--sp-5); padding: var(--sp-3) var(--of-gut) var(--sp-2); }
+.of-fbody { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--of-gut) var(--sp-2); }
 .of-fg { display: grid; gap: 4px; min-width: 0; }
+.of-fg[hidden] { display: none; }
 .of-fl, .of-flab > span { font-size: var(--fs-1); font-weight: var(--w-semi); color: var(--ink2); }
 .of-flab { display: grid; gap: 4px; }
 .of-seg { gap: 2px; }
