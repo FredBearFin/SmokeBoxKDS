@@ -407,6 +407,43 @@ async function coldItem(browser) {
   await p.close();
 }
 
+// The several-screens walk: a real hub is started, a second page follows it read-only, and the labels the Guide page names are checked.
+async function severalScreens(browser) {
+  console.log('Several screens (test feature)');
+  const { spawn } = await import('node:child_process');
+  const PORT = '8797', H = 'http://127.0.0.1:' + PORT;
+  const hub = spawn('node', [path.join(ROOT, 'server', 'server.mjs')], { env: Object.assign({}, process.env, { PORT, SMOKEBOX_FOLLOW_CODE: 'ABC123', SMOKEBOX_STARTER: '1' }), cwd: ROOT, stdio: 'ignore' });
+  try {
+    await new Promise((r) => setTimeout(r, 1500));
+    const p = await fresh(browser);
+    await p.goto(H + '/'); await p.waitForTimeout(900);
+    await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
+    check('settings: Show this kitchen on another screen', await tap(p, 'Show this kitchen on another screen')); await p.waitForTimeout(500);
+    const fs = '.sheet-root:last-of-type';
+    for (const t of ['Address of the kitchen', 'Connect', 'It only shows', 'a small program called the hub']) check('follow sheet: ' + t, await has(p, t, fs));
+    await p.fill('#fw-url', H); await p.fill('#fw-code', 'abc123');
+    await tap(p, 'Connect'); await p.waitForTimeout(2500);
+    const body = () => p.evaluate(() => document.body.innerText);
+    check('follower: Connected', /Connected/.test(await body()));
+    check('follower: This screen only shows the kitchen.', /This screen only shows the kitchen\./.test(await body()));
+    check('follower: no New ticket button', !(await seen(p, 'New ticket')));
+    await fetch(H + '/action', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'createTicket', payload: { customer: 'Maria', channel: 'dine_in', items: [{ menuId: 'hushpuppies', qty: 1 }], note: '', rush: false, src: 'live' }, clientId: 'walk', opId: 'w1' }) });
+    await p.waitForTimeout(1500);
+    check('follower: a ticket sent to the hub appears', /Maria/.test(await body()));
+    await p.evaluate(() => { const r = document.querySelector('.fl-slip .fl-row[data-kind="btn"]'); if (r) r.click(); }); await p.waitForTimeout(600);
+    check('follower: tapping a dish changes nothing', /0 of 1 done/.test(await body()));
+    await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
+    check('follower menu: Back to my own kitchen', await p.evaluate(() => [...document.querySelectorAll('[role=menuitem]')].some((e) => e.textContent.trim().indexOf('Back to my own kitchen') === 0)));
+    await p.keyboard.press('Escape');
+    hub.kill();
+    await p.waitForTimeout(5000);
+    check('follower: Reconnecting... when the hub is gone', /Reconnecting/.test(await body()));
+    await p.waitForTimeout(48000);
+    check('follower: Out of date banner', /Out of date since/.test(await body()) && /may not be what is happening in the kitchen/.test(await body()));
+    await p.close();
+  } finally { try { hub.kill(); } catch (e) { /* already stopped */ } }
+}
+
 // The demo walk: a fresh browser context opened with ?demo has sample dishes and tickets, and a normal tab in the same context stays empty.
 async function demoMode(browser) {
   console.log('Demo mode (?demo)');
@@ -422,7 +459,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'screens') await severalScreens(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await severalScreens(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);

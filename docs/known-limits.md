@@ -15,10 +15,10 @@ A single HTML file (`dist/smokebox.html`) that runs in a browser. It is a kitche
 
 ## Devices and data
 
-- **One device.** Each device has its own menu, tickets and settings. There is no sync between tablets. Two tabs of the same browser on the same device stay in step.
+- **One device.** Each device has its own menu, tickets and settings. There is no sync between tablets (a read-only second screen is a test feature, below). Two tabs of the same browser on the same device stay in step.
 - **Data lives in the browser on that device.** Clearing site data, using another browser or a private window, or replacing the device shows an empty Smokebox. A backup file (Data page) is the only copy that can be moved. A PIN recovery code is shown once when a PIN is set; with no code and no backup, getting past a forgotten PIN means clearing the site data, which erases everything on the device.
 - **Sound, loudness, theme and text size are per device** and are not in a backup.
-- **A prototype server exists** (`server/`, with `go.sh` and `tunnel.sh`) for a possible connected mode. The app does not use it. It is not part of the single-file app and has not been run on a live machine.
+- **A second screen exists as a test feature.** A page opened to follow a hub shows that hub's kitchen read-only, with an "Out of date" banner when the hub is unreachable. It is not part of the normal install: someone must run the hub (`server/server.mjs`) by hand, and Smokebox never starts one. Tablets cannot write through the hub yet, so two tablets still do not share a board. Nothing about it has been tried on real devices. How to try it: `docs/connected-howto.md`.
 
 ## Warnings
 

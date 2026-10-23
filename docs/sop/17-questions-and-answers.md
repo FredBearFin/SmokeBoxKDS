@@ -12,7 +12,7 @@ No. Smokebox is one file and works without internet.
 
 ## Can two tablets share one board?
 
-Not yet. Each device has its own board. Two tabs in the same browser on the same device stay in step.
+Not yet. Each device has its own board. A second screen can show a board, as a test feature, but cannot take orders (see Several screens). Two tabs in the same browser on the same device stay in step.
 
 ## Does it charge cards?
 
