@@ -768,3 +768,26 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 /* The last-checked stamp sits at the right end of the all-day strip, quiet and small. */
 .fl-checked { flex: none; margin-left: auto; padding: 0 var(--sp-3); font-size: var(--fs-1); color: var(--ink2); white-space: nowrap; }
 .mn-test { display: grid; gap: var(--sp-2); }
+/* Follower screen (?follow): a read-only second screen. Nothing that changes the kitchen is shown or can be tapped. */
+.fl[data-follow="on"] .fl-new, .fl[data-follow="on"] .fl-tool, .fl[data-follow="on"] .fl-tools, .fl[data-follow="on"] .fl-san,
+.fl[data-follow="on"] .fl-demo-chip, .fl[data-follow="on"] .fl-welcome, .fl[data-follow="on"] .slip-foot, .fl[data-follow="on"] .slip-next,
+.fl[data-follow="on"] [data-act="fire"], .fl[data-follow="on"] [data-act="zone"], .fl[data-follow="on"] .fl-first-dish { display: none !important; }
+.fl[data-follow="on"] .fl-slip button { pointer-events: none; }
+.fl[data-follow="on"] .fl-empty-actions { display: none; }
+html[data-follow="on"] .hc-actions, html[data-follow="on"] .hc-editor-slot, html[data-follow="on"] .hc .seg-opt[data-id="new"], html[data-follow="on"] .hc-who { display: none !important; }
+.fl-follow { flex: none; display: grid; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4); background: var(--paper); border-bottom: var(--bw) solid var(--line-soft); }
+.fl-frow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); min-width: 0; }
+.fl-fchip { display: inline-flex; align-items: center; gap: calc(10px * var(--fl-k)); min-height: calc(48px * var(--fl-k)); padding: 0 calc(16px * var(--fl-k)); border-radius: 999px; border: calc(3px * var(--fl-k)) solid var(--line); background: var(--bg); font: var(--w-heavy) calc(22px * var(--fl-k)) / 1.1 var(--font-display); letter-spacing: 0.02em; }
+.fl-fdot { flex: none; width: calc(16px * var(--fl-k)); height: calc(16px * var(--fl-k)); border-radius: 50%; background: var(--ink3); }
+.fl-fsub { font: var(--w-semi) calc(16px * var(--fl-k)) / 1.1 var(--font-body); color: var(--ink2); letter-spacing: 0; }
+.fl-fchip[data-tone="ok"] { border-color: var(--sage); }
+.fl-fchip[data-tone="ok"] .fl-fdot { background: var(--sage); }
+.fl-fchip[data-tone="wait"] { border-color: var(--amber); }
+.fl-fchip[data-tone="wait"] .fl-fdot { background: var(--amber); }
+.fl-fchip[data-tone="bad"] { border-color: var(--crimson); background: var(--tint-bad); }
+.fl-fchip[data-tone="bad"] .fl-fdot { background: var(--crimson); }
+.fl-fnote { font: var(--w-semi) calc(18px * var(--fl-k)) / 1.2 var(--font-body); color: var(--ink2); }
+.fl-fstale { padding: var(--sp-2) var(--sp-3); border-radius: var(--r-panel); background: var(--tint-bad); color: var(--ink); border-left: calc(8px * var(--fl-k)) solid var(--crimson); font: var(--w-bold) calc(20px * var(--fl-k)) / 1.25 var(--font-body); }
+.fl-fstale[hidden] { display: none; }
+.fl[data-stale="on"] .fl-main { filter: grayscale(0.6); opacity: 0.8; }
+.follow-fail { max-width: 520px; margin: 18vh auto 0; padding: var(--sp-5); display: grid; gap: var(--sp-4); }
