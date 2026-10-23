@@ -166,6 +166,8 @@ Needs Node 22 or later. The browser tools need Playwright and the Guide and audi
 | `node tools/guide-walk.mjs` (`WALK_ONLY=recipes|import|cold|readings|screens|pairing|startover|notices`) | clicks through the built app for every step the Guide describes (273 checks) | about 4 to 5 minutes; the several-screens part waits about a minute |
 | `node tools/guide-a11y.mjs` | 34 accessibility and print checks on the Guide | about 1 minute |
 | `node tools/qa.mjs [--only word] [--no-report]` | the `test/e2e/` journeys | 15 minutes or more |
+| `node tools/run-all.mjs [--fast] [--only=a,b] [--skip=c]` | everything in order: build, unit, comment audit, smoke, Guide checks, Guide walk, every slow suite, the qa journeys; one log per step and a final table (`--fast` stops after the Guide checks) | `--fast` a few minutes; a full run over an hour on a busy machine |
+| `node test/multitab.e2e.mjs [runs]` | three real Chromium tabs make tickets at the same moment, 20 fresh runs (part of the slow list) | about 2 minutes |
 | `node tools/run-slow.mjs <name>\|all` | one slow suite, or all of them, with a time limit and a log | varies |
 | `node test/<name>.e2e.mjs` | single browser suites (for example `board-round16`, `follower`, `hub-client`) | 5 seconds to several minutes |
 | `npm run bootcheck` | old saved kitchens still load | seconds |
