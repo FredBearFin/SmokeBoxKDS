@@ -131,7 +131,7 @@
     // and the most likely reason.
     function storyOf(p) {
       const b = base(p), so = b.so;
-      if (!so.dayCount) return { tone: 'info', word: 'Nothing yet', title: 'No stock or 86 records in this range yet.', body: 'Once tickets use up food from the hold cabinet, this page shows when each protein ran out and why. Pick a longer range, or switch on sample data in the filters.', extra: '' };
+      if (!so.dayCount) return { tone: 'info', word: 'Nothing yet', title: 'No stock or 86 records in this range yet.', body: 'Once tickets use up food from the hold cabinet, this page shows when each protein ran out and why. Log a batch, then take orders, or pick a longer range.', extra: '' };
       if (!st.day || !st.ing) return { tone: 'info', title: 'Pick a day and a food in the stock chart below.', body: '', extra: '' };
       const sb = burn(p, st.day, st.ing);
       const name = B.ingName(b.ds, st.ing);

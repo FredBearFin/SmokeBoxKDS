@@ -347,7 +347,7 @@
       caption: 'Net sales is the food sold less discounts. Tax and tips are on top of it, and all three together are what was collected.',
       // Builds the figure rows and the notes under them; update repaints them in place.
       render: (body, p0) => {
-        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the line screen and its takings show up here. Switch on sample data in the filters to see how this looks with a busy two weeks.', icon: 'dollar' }).el;
+        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the line screen and its takings show up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
         const stats = B.stats(body, { cls: 'ob-stats--3' });
         const open = h('p', { class: 'ob-note' });
         body.append(empty, open);
@@ -415,7 +415,7 @@
     const topCard = page.card({
       type: 'bar', span: 6, title: 'Top items', sub: scope(),
       caption: 'Whether your best sellers are also your best earners. Switch between how many were sold and how much they brought in.',
-      empty: { title: 'No sales in this range yet', body: 'Finished tickets with priced items fill this chart. Pick a longer range, or switch on sample data in the filters.', icon: 'chart-bar' },
+      empty: { title: 'No sales in this range yet', body: 'Finished tickets with priced items fill this chart. Take and finish an order on the line screen, or pick a longer range.', icon: 'chart-bar' },
       // Top 10 items by the picked measure; items with no sales are left out.
       spec: (p) => {
         const by = st.itemsBy;

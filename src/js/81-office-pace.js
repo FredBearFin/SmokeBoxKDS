@@ -134,7 +134,7 @@
       page.card({
         type: 'ring', span: 4, title: 'Pace right now', sub: 'The last 10 tickets from the past 45 minutes. This one ignores the date range above.',
         caption: 'Under 80% of target is comfortable. At 100% the median ticket is as slow as its warning time, so the line is falling behind.',
-        empty: { title: 'No tickets finished in the last 45 minutes', body: 'The ring wakes up when the line is moving. It reads only the live minutes, so old sample days will not light it.', icon: 'gauge' },
+        empty: { title: 'No tickets finished in the last 45 minutes', body: 'The ring wakes up when the line is moving. It reads only the last live minutes. Take an order and bump it to light it up.', icon: 'gauge' },
         // The ring: how close the last 10 tickets are to their warning time. It ignores the date range on
         // purpose.
         spec(p, c) {
@@ -477,7 +477,7 @@
         // items with enough samples.
         type: 'dumbbell', span: 12, title: 'Prep times: starter, learned and observed', sub: (p) => { const n = M.calibration(p).filter((r) => !r.thin).length; return 'The dot you set against the dot the line really did. ' + (n ? 'Showing the ' + Math.min(12, n) + ' items that differ most' + (n > 12 ? ' of ' + n : '') + '. ' : '') + 'Items with fewer than 5 samples are left out.'; },
         caption: 'A row marked slower or quicker is off the starter estimate by more than a quarter. Confirm the new time in Menu and settings and pacing will plan for it.',
-        empty: { title: 'Not enough finished items to judge prep times', body: 'Each item needs at least 5 finished lines in this range. A longer range, or the sample history, gives it more to work with.', icon: 'timer' },
+        empty: { title: 'Not enough finished items to judge prep times', body: 'Each item needs at least 5 finished lines in this range. A longer range gives it more to work with.', icon: 'timer' },
         // The 12 items whose observed time differs most from the starter estimate. A flag marks those off
         // by a quarter or more.
         spec(p) {

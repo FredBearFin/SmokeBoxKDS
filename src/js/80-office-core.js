@@ -68,6 +68,41 @@
     return k > todayKey ? todayKey : k;
   }
 
+  // The plain next-step message for a page with nothing in its range, or null when the page has data (or
+  // is the settings page). f = {anyLive, tickets, batches, records, label}: whether any live ticket
+  // exists at all, and how many tickets, batches and safety records fall in the range.
+  function coachText(pageId, f) {
+    f = f || {};
+    const never = !f.anyLive && !f.batches && !f.records;
+    const where = f.label ? ' on ' + f.label : ' in this range';
+    if (pageId === 'pace' || pageId === 'tickets' || pageId === 'stations') {
+      if (f.tickets > 0) return null;
+      return never || !f.anyLive
+        ? { title: 'Take your first order', body: 'This page is built from your own tickets. Take an order on the line screen and bump it when it is done, and the times show up here.' }
+        : { title: 'No tickets' + where, body: 'Nothing was ordered in this range. Use the arrows or the range buttons to look at a day you were open.' };
+    }
+    if (pageId === 'money') {
+      // the thrown-away ledger on this page needs no sales, so a discard also counts as data here
+      if (f.tickets > 0 || f.discards > 0) return null;
+      return !f.anyLive
+        ? { title: 'Take your first order', body: 'Sales come from your own orders. Take an order on the line screen and pay it from Orders, and the money shows up here.' }
+        : { title: 'No sales' + where, body: 'Nothing was sold in this range. Use the arrows or the range buttons to look at a day you were open.' };
+    }
+    if (pageId === 'safety') {
+      if (f.batches > 0 || f.records > 0) return null;
+      return never
+        ? { title: 'Log your first batch', body: 'Safety is built from your own records. Log a batch into the hold cabinet, take its temperature when the app asks, and log a sanitize round.' }
+        : { title: 'No food-safety records' + where, body: 'No batch, temperature reading or sanitize round was logged in this range. Use the arrows or the range buttons to pick another day.' };
+    }
+    if (pageId === 'stock') {
+      if (f.batches > 0 || f.tickets > 0) return null;
+      return never
+        ? { title: 'Log your first batch', body: 'Stock and 86 come from your own cooking and orders. Log a batch into the hold cabinet, then take orders, and this page shows when each protein runs out.' }
+        : { title: 'No stock activity' + where, body: 'No food was cooked or sold in this range. Use the arrows or the range buttons to pick another day.' };
+    }
+    return null;
+  }
+
   // Split a sentence into number tokens (kept) and plain text so the headline can set the numbers in
   // bold.
   const NUM_RE = /(\$\d[\d,]*(?:\.\d+)?|\d+h \d{2}m|\d+m \d{2}s|\d+(?:\.\d+)?(?:%| kg| g\b| hours?)?|\d[\d,]*)/g;
@@ -148,7 +183,7 @@
     return { dir, better, word, text, deltaPct: dp, delta };
   }
 
-  O.pure = { PAGES, customRange, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
+  O.pure = { PAGES, customRange, coachText, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
 
   if (!doc) return; // Node: the pure helpers are all the tests need
 
@@ -628,7 +663,8 @@
     const headEl = h('p', { class: 'of-headline', hidden: true });
     const tilesHost = h('div', { class: 'of-tiles-wrap', hidden: true });
     const grid = h('div', { class: 'of-grid' });
-    root.append(headEl, tilesHost, grid);
+    const coachEl = h('div', { class: 'of-coach', role: 'status', hidden: true });
+    root.append(headEl, coachEl, tilesHost, grid);
     container.appendChild(root);
     const state = { headline: false, tileSets: [], slots: [], destroyed: false, cmp: null, cmpP: null, lastText: '' };
     const owner = {
@@ -644,7 +680,7 @@
       el: root, grid,
       // headline switches the headline sentence on and draws it. _paintHeadline redraws it from the
       // metrics handle p.
-      headline() { state.headline = true; headEl.hidden = false; this._paintHeadline(ctx.prepared()); return page; },
+      headline() { state.headline = true; headEl.hidden = false; paintCoach(); this._paintHeadline(ctx.prepared()); return page; },
       _paintHeadline(p) {
         if (!state.headline) return;
         const text = guard('headline', () => SB.metrics.headline(id, p)) || 'No data to summarize yet.';
@@ -716,9 +752,27 @@
       const t = thin ? 'Not enough earlier days to compare with, so no arrows. Last 7 days has a full week before it.' : 'Arrows compare with the ' + (days === 1 ? 'day' : days + ' days') + ' before this range.';
       if (set.noteT.textContent !== t) set.noteT.textContent = t;
     }
+    // Counts what falls inside the range (tickets, batches, safety records) for the empty-state coach.
+    function coachFacts() {
+      const ds = ctx.dataset(), r = ctx.filters.range, inR = (t) => isNum(t) && t >= r.from && t < r.to;
+      let tickets = 0, batches = 0, records = 0, discards = 0;
+      for (const t of ds.tickets || []) if (inR(t.createdAt)) tickets++;
+      for (const o of ds.orders || []) if (inR(o.createdAt)) tickets++;
+      for (const b of ds.batches || []) if (b.src !== 'starter' && inR(b.enteredAt)) batches++;
+      for (const e of ds.events || []) if (e && (e.type === 'temp_logged' || e.type === 'sanitize_done' || e.type === 'batch_discard') && inR(e.t)) { records++; if (e.type === 'batch_discard') discards++; }
+      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, batches, records, discards, label: r.label };
+    }
+    // Shows the "what to do next" message in place of blank tiles and charts when the range has no data.
+    function paintCoach() {
+      const c = guard('coach', () => coachText(id, coachFacts()));
+      const on = !!c;
+      root.dataset.coach = on ? 'on' : 'off'; coachEl.hidden = !on;
+      if (on) coachEl.replaceChildren(h('h2', { class: 'of-coach-t' }, c.title), h('p', { class: 'of-coach-b' }, c.body));
+    }
     // Redraws the headline, the tiles and every card from the metrics handle p.
     function refreshAll(p) {
       if (state.destroyed) return;
+      paintCoach();
       page._paintHeadline(p);
       state.tileSets.forEach((s) => { paintNote(s); guard('tiles', () => s.tiles.forEach((t) => t.update(p, ctx))); });
       state.slots.forEach((s) => s.update(p, ctx));

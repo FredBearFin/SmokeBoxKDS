@@ -63,3 +63,34 @@ test('pickerKey shows the last day of a range and never a future day', () => {
   assert.equal(P.pickerKey({ toKey: '2026-10-20' }, '2026-10-16'), '2026-10-16');
   assert.equal(P.pickerKey(null, '2026-10-16'), '2026-10-16');
 });
+
+test('coachText tells a brand-new kitchen what to do first on every data page', () => {
+  const fresh = { anyLive: false, tickets: 0, batches: 0, records: 0, label: 'Today' };
+  assert.match(P.coachText('pace', fresh).title, /first order/i);
+  assert.match(P.coachText('tickets', fresh).body, /Take an order/);
+  assert.match(P.coachText('stations', fresh).title, /first order/i);
+  assert.match(P.coachText('money', fresh).body, /pay it from Orders/);
+  assert.match(P.coachText('safety', fresh).title, /first batch/i);
+  assert.match(P.coachText('stock', fresh).title, /first batch/i);
+});
+
+test('coachText says "pick another day" when the kitchen has data elsewhere but not in this range', () => {
+  const quiet = { anyLive: true, tickets: 0, batches: 0, records: 0, label: 'Wed 10/21' };
+  const c = P.coachText('money', quiet);
+  assert.match(c.title, /No sales on Wed 10\/21/);
+  assert.match(c.body, /arrows/);
+});
+
+test('coachText is silent when the range has data, and never mentions sample', () => {
+  assert.equal(P.coachText('pace', { anyLive: true, tickets: 3 }), null);
+  assert.equal(P.coachText('safety', { anyLive: true, records: 1 }), null);
+  assert.equal(P.coachText('stock', { anyLive: true, batches: 1 }), null);
+  assert.equal(P.coachText('data', { tickets: 0 }), null);
+  for (const id of ['pace', 'money', 'safety', 'stock']) {
+    for (const f of [{}, { anyLive: true }]) assert.doesNotMatch(JSON.stringify(P.coachText(id, f)), /sample/i);
+  }
+});
+
+test('a discard counts as data on Sales and money, so the thrown-away ledger is not hidden', () => {
+  assert.equal(P.coachText('money', { anyLive: true, tickets: 0, discards: 1 }), null);
+});
