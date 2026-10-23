@@ -2116,7 +2116,7 @@
   }
   // Tells the cook, on the screen that tapped, that the hub did not do a tap, and why. The change shown here was already taken back.
   function onHubRefusal(r) {
-    const text = (r && (r.text || r.reason)) || 'The kitchen did not accept that tap.';
+    const text = String((r && (r.text || r.reason)) || 'The kitchen did not accept that tap.').slice(0, 300); // a hub's sentence is shown short
     toast(/^Not done/i.test(text) ? text : 'Not done: ' + text, { tone: 'warn', ms: 12000 });
     const rec = r && r.ticketId ? m && m.slips.get(r.ticketId) : null;
     if (rec) flash(rec.el.querySelector('.slip-head'));
