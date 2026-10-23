@@ -1699,8 +1699,8 @@
   function bannerWanted() {
     const store = SB.store;
     if (!store || !store.status || !store.getState) return null;
-    // A follower screen keeps nothing on this device, so it never nags about saving or backups.
-    if (SB.followMode && SB.followMode().on) return null;
+    // A follower or hub tablet keeps the kitchen on the hub, so it never nags about saving or backups here.
+    if ((SB.followMode && SB.followMode().on) || (SB.hubMode && SB.hubMode().on)) return null;
     const ss = store.status(), s = store.getState();
     // In the demo this strip always shows, above every other message, and always has the Back button.
     if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
