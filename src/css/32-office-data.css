@@ -271,3 +271,21 @@
 .od-toc-group { list-style: none; padding: var(--sp-2) var(--sp-3) 0; font: var(--w-bold) var(--fs-1, 0.75rem) / 1.2 var(--font-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
 .od-adv { border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-panel); padding: 0 var(--sp-3); }
 .od-adv > summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; font-weight: var(--w-bold); }
+
+/* The Data page: a three-card flow (back up, restore, replace a device), and a quiet danger zone. */
+.od-flow { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); margin: var(--sp-3) 0 var(--sp-6); align-items: start; }
+.od-fcard { display: grid; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-3, 12px); background: var(--ch-surface, transparent); min-width: 0; }
+.od-fh { display: flex; align-items: center; gap: var(--sp-2); margin: 0; font: var(--w-semi) var(--fs-4, 18px)/1.2 var(--font-display); color: var(--ink); }
+.od-fnum { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid currentColor; font-size: var(--fs-2); }
+.od-fbody { display: grid; gap: var(--sp-3); min-width: 0; }
+.od-lastbackup[data-tone="bad"] { color: var(--crimson, #c0392b); font-weight: var(--w-semi); }
+.od-lastbackup[data-tone="warn"] { color: var(--amber, #b9770e); font-weight: var(--w-semi); }
+.od-danger-h { margin-top: var(--sp-8, 40px); color: var(--crimson, #c0392b); }
+.od-danger-box { display: grid; gap: var(--sp-2); padding: var(--sp-4); border: 2px solid var(--crimson, #c0392b); border-radius: var(--r-3, 12px); max-width: 40em; }
+.od-danger-t { display: flex; gap: var(--sp-2); align-items: center; margin: 0; color: var(--crimson, #c0392b); }
+.od-danger-l { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; font-weight: var(--w-semi); }
+.od-danger-l input { flex: 1 0 100%; }
+.od-danger-in { max-width: 14em; }
+@media (min-width: 1700px) { .od-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.od-fcard .od-steps { list-style: decimal; padding-left: 1.4em; display: grid; gap: var(--sp-2); }
+.od-fcard .od-steps li { display: list-item; }

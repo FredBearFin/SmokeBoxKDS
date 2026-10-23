@@ -151,7 +151,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   const filt = await page.evaluate(() => ({ range: SB.office.filters().range.id, channel: SB.office.filters().channel, source: SB.office.filters().source }));
   check('defaults with sample history: last14, all channels, live + sample', filt.range === 'last14' && filt.channel === 'all' && filt.source === 'all', filt);
   const body = await page.evaluate(() => ({ tiles: document.querySelectorAll('.of-tile').length, cards: document.querySelectorAll('.of-card').length, headline: document.querySelector('.of-headline').textContent, charts: SB.charts.live(), hn: document.querySelectorAll('.of-headline .of-hn').length, look: document.querySelectorAll('.of-look').length, tbtn: document.querySelectorAll('.of-card-actions .ch-tbtn').length }));
-  check('Pace opens with the headline sentence, six KPI tiles and chart cards', body.tiles === 6 && body.cards >= 5 && body.headline.length > 40 && body.hn >= 2 && body.charts >= 4, body);
+  check('Pace opens with the headline sentence, four KPI tiles and chart cards', body.tiles === 4 && body.cards >= 5 && body.headline.length > 40 && body.hn >= 2 && body.charts >= 4, body);
   check('the Pace findings are about pace (no discards, food cost or sanitising)', await page.evaluate(() => { const t = (document.querySelector('.of-insights') || { textContent: '' }).textContent; return !/Discards|Food cost|sanitis|yield/i.test(t); }));
   check('every chart card has a "What to look for" caption and a View as table button', body.look >= body.cards - 1 && body.tbtn >= 2, body);
   check('no NaN, undefined or [object] anywhere on the page', !BAD_TEXT.test(await text(page, '.of-main')), (await text(page, '.of-main')).match(BAD_TEXT));
@@ -163,7 +163,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
     const ms = Math.round(performance.now() - t0);
     return { ms, tiles: el.querySelectorAll('.of-tile').length, charts: SB.charts.live(), svgs: el.querySelectorAll('.ch svg').length, headline: el.querySelector('.of-headline').textContent.length };
   });
-  check('first paint is synchronous: tiles, headline and charts exist in the same tick as mount()', sync.tiles === 6 && sync.charts >= 4 && sync.svgs >= 4 && sync.headline > 40, sync);
+  check('first paint is synchronous: tiles, headline and charts exist in the same tick as mount()', sync.tiles === 4 && sync.charts >= 4 && sync.svgs >= 4 && sync.headline > 40, sync);
   // 166 ms on a quiet machine; other builds share this sandbox, so the budget is generous
   check('mount() with 13 sample days takes under 1200 ms in this sandbox (measured ' + sync.ms + ' ms)', sync.ms < 1200, sync.ms);
   if (SHOTS) await page.screenshot({ path: path.join(OUT, 'frame-pace-ember-1280x800.png') });

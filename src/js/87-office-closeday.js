@@ -224,7 +224,7 @@
       thrown = k.discards || thrown;
     } catch (e) { /* the summary still prints without the thrown-out line */ }
     const demo = (s.tickets || []).some((t) => t && t.src === 'demo');
-    const root = h('div', { class: 'cd-printroot' },
+    const root = h('div', { class: 'sb-printroot cd-printroot' },
       h('h1', null, 'End of day, ' + U.fmtDateShort(m.day)),
       demo ? h('p', { class: 'cd-pnote' }, 'This kitchen has practice tickets in it, so some of these numbers are practice numbers.') : null,
       h('table', { class: 'cd-ptable' }, h('tbody', null,
