@@ -956,7 +956,9 @@
         resetDraft();
         host.close('sent');
         const where = addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent to ' : ' sent to ';
-        SB.ui.toast('Ticket #' + info.num + where + zones + ' ' + U.plural(zones, 'station') + '.' + (info.paid ? ' Paid ' + U.fmtMoney(info.total) + ' by ' + payWord + '.' : ''), { tone: 'ok' });
+        // A one-station kitchen has no stations to count, so the message just says the ticket went to the kitchen.
+        const oneStation = zones <= 1 && !!(SB.setup && SB.setup.hiddenStations && SB.setup.hiddenStations().length);
+        SB.ui.toast('Ticket #' + info.num + (oneStation ? (addedTo ? ' added to ' + orderName(addedTo) + ' as round ' + info.round + ', sent' : ' sent') : where + zones + ' ' + U.plural(zones, 'station')) + '.' + (info.paid ? ' Paid ' + U.fmtMoney(info.total) + ' by ' + payWord + '.' : ''), { tone: 'ok' });
         return;
       }
       const words = SB.engine.describe(res.report, res.info, st().settings);

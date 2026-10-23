@@ -1808,6 +1808,17 @@
       const keep = hid.indexOf(id) < 0 || id === m.zone || (c.zones[id] || 0) > 0;
       b.style.display = keep ? '' : 'none';
     });
+    // A one-station kitchen (a taco truck) has nothing to switch between: All, its one station and Expo would show the same tickets,
+    // so those tabs go. The Cabinet tab stays when cooking ahead is on; with nothing left to pick the whole tab row hides.
+    const shown = TABS.filter((id) => id !== 'all' && id !== 'expo' && sg.querySelector('[data-id="' + id + '"]') && sg.querySelector('[data-id="' + id + '"]').style.display !== 'none');
+    const single = m.zone === 'all' && shown.length <= 1 && hid.length > 0;
+    const cab = sg.querySelector('[data-id="cabinet"]');
+    const cabOn = !!cab && !cab.hidden;
+    ['expo'].concat(shown).forEach((id) => { const b = sg.querySelector('[data-id="' + id + '"]'); if (b) b.style.display = single ? 'none' : (id === 'expo' ? '' : b.style.display); });
+    const all = sg.querySelector('[data-id="all"]');
+    if (all) all.style.display = single && !cabOn ? 'none' : '';
+    const row = sg.closest('.fl-tabs');
+    if (row) row.hidden = single && !cabOn;
   };
   // Starts the guided walkthrough when it is part of this build; otherwise opens the Help sheet instead.
   function startTour() {

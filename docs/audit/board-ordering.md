@@ -154,3 +154,31 @@ Known, not done:
 - **Tour ringing a hidden element (qa 13e/13f):** the tour ring now skips elements with no box (the hidden "On time" badge). Edit in `74-floor-tour.js`, A4 told.
 - **Duplicate "Show me how it works":** the empty board leaves out its walkthrough button while the setup card is up, and puts it back when the card goes.
 - **"N more tickets below":** a small pill at the bottom right of the board, above the all-day strip. It reads the position of every ticket only on scroll and about once a second, appears only when something is out of sight, scrolls down 85 percent of a screen when tapped, and is hidden in wall mode and the cabinet.
+
+## Round 11: other kitchens and rough use
+
+Screenshots: `docs/ux-shots/night/a1/r11-*.png`. Test: `test/board-round11.e2e.mjs`. Simulated in headless Chromium.
+
+**Note on the earlier follow-up (r10):** its commits were first made on `night/a1-r8` and not pushed under the r10 name (the remote `night/a1-r10` is only the base). They are carried onto this branch as one commit, so this branch has everything.
+
+### One-station kitchen on one phone (390x844, the only screen)
+Checked: a blank kitchen with five dishes all made at one station and the other stations marked "Not used".
+- **Fixed:** the board showed three tabs (All, the one station, Expo) that all list the same tickets, and the header took two rows (155 px). With one station in use those tabs now hide (the Cabinet tab stays when cooking ahead is on), the header is one row (78 px) and the first ticket starts at y=163 instead of 219.
+- **Fixed:** the "Ticket #101 sent to 1 station." message now says "sent." in a one-station kitchen.
+- **Works:** tickets at 390 px (two dishes per ticket, Start and Bump at 44 px or more), New ticket with a Menu/Order switch and a "View order" button, the sound bar, the "more tickets below" pill, no sideways scroll. The only control under 44 px was the "?" help link, fixed in the follow-up round.
+- **No cook-ahead kitchen:** Cabinet, Hold, Sanitize and batch rows are hidden (round 3), so nothing about batches shows.
+- **Left:** "Send to kitchen" is the button name for a person who is the kitchen (a main button, Freddy's call); a phone shows the Order pane in a second view, so a one-person order is: pick dishes, tap View order, tap Send.
+
+### Counter service with no kitchen (a bakery)
+What happens today: add dishes at a "no cooking" station (Cold and drinks) as one-step dishes; New ticket, pick items, choose Cash (Pay now), Send. The order is created and paid in one step; a ticket also appears on the board ("Make Croissant and Coffee, then tap DONE") with a Done button per item and Bump. Nothing blocks work, but the kitchen step feels extra:
+- The ticket stays on the board until someone taps Done on each item and Bump; Bump on an unfinished ticket asks "Bump anyway?".
+- The channel defaults to Dine-in; the strip, timers and "late" colours still run for a ticket nobody will cook.
+- The "next step" line can be turned off in Menu, Next step, and stations that are not used are hidden.
+Larger needs (not done): a setting that finishes one-step dishes and bumps the ticket as soon as it is paid ("counter service"); a Walk-up channel without a kitchen time limit. Both need engine and settings work.
+
+### Rough use ("drunk Friday")
+Scripted in one browser: a double-tapped Send made one ticket and one order; triple-tapping a dish started it once; a double-tapped Bump and 12 presses of Z (undo) lost or duplicated nothing; Escape pressed three times over stacked sheets left none open; rotating 1024x768 to 768x1024 and back mid-order kept the order lines with no sideways scroll; going offline and online kept every ticket (the app is local); a clock moved back three hours left the board working (the app's clock never runs backwards); three tabs open at once ended with the same seven tickets each. No console errors.
+- **Known, not fixed:** an order that is half built is lost when the page is reloaded (the draft lives in memory only). Saving it would be a store/settings change.
+
+### Long text
+A 40-character customer name and 24-character dish names (the menu limit) were put on the slip, strip, wall, Far display, Orders, Recall, payment and the 390 px order sheet: no element runs past the screen or is cut off, except the wall list, which cut names to about 13 letters. **Fixed:** wall list names wrap onto two lines. The strip row with a 40-character batch name wraps cleanly at 390, 1280 and 1920.
