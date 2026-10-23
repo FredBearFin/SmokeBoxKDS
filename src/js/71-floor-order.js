@@ -116,8 +116,40 @@
   const subtotal = () => D.lines.reduce((s, l) => { const mi = menuById(l.menuId); return s + (mi ? mi.price * l.qty : 0); }, 0);
   // A separate copy of the order, kept so Undo can put it back.
   const copyDraft = () => JSON.parse(JSON.stringify(D));
-  function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; D.allergy = snap.allergy || ''; }
-  function resetDraft() { D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = payDefault; D.tip = ''; D.allergy = ''; }
+  function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; D.allergy = snap.allergy || ''; saveDraftNow(); }
+  function resetDraft() { clearStoredDraft(); D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = payDefault; D.tip = ''; D.allergy = ''; }
+  // The half-built order is also kept in the browser, so a reload or a closed tab brings it back. Uses the store's own draft
+  // calls (saveDraft, loadDraft, clearDraft) when this copy has them, and a plain browser-storage key until then.
+  const KEY_DRAFT = 'smokebox.v1.orderdraft';
+  // Saves the draft now (or forgets it when it is empty). Never throws: a full disk must not stop an order.
+  function saveDraftNow() {
+    try {
+      if (draftEmpty()) { clearStoredDraft(); return; }
+      const data = { lines: D.lines.map((l) => ({ menuId: l.menuId, qty: l.qty, mods: l.mods.slice() })), customer: D.customer, channel: D.channel, note: D.note, rush: D.rush, orderId: D.orderId, pay: D.pay, tip: D.tip, allergy: D.allergy, savedAt: Date.now() };
+      if (SB.store && typeof SB.store.saveDraft === 'function') SB.store.saveDraft(data); else U.storage.set(KEY_DRAFT, data);
+    } catch (e) { /* keeping a draft is a convenience, never a reason to fail */ }
+  }
+  // Forgets the saved draft (after a send, Clear order or Discard).
+  function clearStoredDraft() {
+    try { if (SB.store && typeof SB.store.clearDraft === 'function') SB.store.clearDraft(); else U.storage.remove(KEY_DRAFT); } catch (e) { /* ignore */ }
+  }
+  // The saved draft, or null when there is none or it is not usable.
+  function loadStoredDraft() {
+    try {
+      const d = SB.store && typeof SB.store.loadDraft === 'function' ? SB.store.loadDraft() : U.storage.get(KEY_DRAFT, null);
+      return d && typeof d === 'object' && Array.isArray(d.lines) ? d : null;
+    } catch (e) { return null; }
+  }
+  // Puts a saved draft into the working order, keeping only dishes that are still on the menu and an order that is still open.
+  function applyStoredDraft(d) {
+    D.lines = d.lines.filter((l) => l && typeof l.menuId === 'string' && menuById(l.menuId) && !menuById(l.menuId).archived).slice(0, L.maxItemsPerTicket).map((l) => ({ key: 'l' + (++seq), menuId: l.menuId, qty: Math.max(1, Math.min(L.maxQty, Math.floor(+l.qty) || 1)), mods: Array.isArray(l.mods) ? l.mods.filter((m) => typeof m === 'string').slice(0, 8) : [] }));
+    D.customer = typeof d.customer === 'string' ? d.customer.slice(0, 40) : '';
+    D.channel = C.channelById[d.channel] ? d.channel : 'dine_in';
+    D.note = typeof d.note === 'string' ? d.note.slice(0, 200) : '';
+    D.rush = d.rush === true; D.pay = typeof d.pay === 'string' && (d.pay === '' || C.payMethodById[d.pay]) ? d.pay : ''; D.tip = typeof d.tip === 'string' ? d.tip : ''; D.allergy = typeof d.allergy === 'string' ? d.allergy : '';
+    const o = d.orderId ? SB.engine.findOrder(st(), d.orderId) : null;
+    D.orderId = o && o.status === 'open' ? o.id : null;
+  }
   // The orders still open, oldest first, for the Add to open order list.
   function openOrdersList() { return (st().orders || []).filter((o) => o.status === 'open').sort((a, b) => a.createdAt - b.createdAt); }
   // A short name for an order in a list: who it is for and where, like "Table 4 (Dine-in)".
@@ -250,6 +282,9 @@
   // isPage }. Returns { teardown, startFocus, leave } so the frame can focus it, close it and ask before leaving.
   function buildOrder(host, opts) {
     // Opened from the Orders screen to add another round: pick that order when it is still open.
+    // After a reload nothing is in memory, so look for the order saved in the browser before starting empty.
+    let fromStore = false;
+    if (draftEmpty()) { const sv = loadStoredDraft(); if (sv) { applyStoredDraft(sv); fromStore = !draftEmpty(); } }
     if (opts && opts.orderId) { const o0 = SB.engine.findOrder(st(), opts.orderId); if (o0 && o0.status === 'open') D.orderId = o0.id; }
     const fine = (() => { try { return g.matchMedia('(pointer: fine)').matches; } catch (e) { return false; } })();
     let searchInput = null;
@@ -362,8 +397,12 @@
     const custInput = h('input', { class: 'input ord-cust-input', type: 'text', autocomplete: 'off', autocapitalize: 'words', spellcheck: 'false', enterkeyhint: 'done', placeholder: 'Or type a name' });
     const custCount = h('span', { class: 'ord-counter num', hidden: true });
     const custField = SB.ui.field({ label: 'Customer', control: custInput, hint: 'Leave it blank for Walk-up.' });
+    // The quick names come from the owner's list (settings.service.chips) when there is one; no list means the standard names,
+    // and an empty list means no chip row at all.
+    const svc = st().settings && st().settings.service;
+    const chipList = SB.engine && typeof SB.engine.chipsOf === 'function' ? SB.engine.chipsOf(st().settings) : svc && Array.isArray(svc.chips) ? svc.chips.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim().slice(0, 24)).slice(0, 12) : C.quickNames;
     const chipsEl = h('div', { class: 'ord-chips', role: 'group', 'aria-label': 'Quick names' });
-    C.quickNames.forEach((nm) => {
+    chipList.forEach((nm) => {
       const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, nm));
       b.addEventListener('click', () => { D.customer = D.customer === nm ? '' : nm; custInput.value = D.customer; paintCustomer(); touched(); });
       chipsEl.appendChild(b); view.chipBtns.set(nm, b);
@@ -372,7 +411,7 @@
     const recentEl = h('div', { class: 'ord-chips ord-recent', role: 'group', 'aria-label': 'Recent customers', hidden: true });
     // Rebuilds the Recent buttons when the newest orders bring a different set of names.
     function paintRecent() {
-      const names = recentNames(st(), C.quickNames, 4);
+      const names = recentNames(st(), chipList, 4);
       const sig = names.join('\u0001');
       if (recentEl.dataset.sig !== sig) {
         recentEl.dataset.sig = sig; U.clear(recentEl); view.recentBtns.clear();
@@ -387,6 +426,7 @@
     }
     // The name box comes first so it is always in view; the quick names sit under it.
     custInput.after(chipsEl);
+    if (!chipList.length) chipsEl.hidden = true;
     chipsEl.after(recentEl);
     custField.classList.add('ord-cust');
     custField.appendChild(custCount);
@@ -428,10 +468,10 @@
       // A way of paying marks the order to be paid when it is sent; Pay later leaves it open.
       onChange: (id) => { D.pay = id === 'later' ? '' : id; touched(); },
     });
-    const tipInput = h('input', { class: 'input ord-tip-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Tip in dollars' });
+    const tipInput = h('input', { class: 'input ord-tip-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Tip amount' });
     // Typing a tip keeps the text in the draft, so closing the screen never loses it.
     tipInput.addEventListener('input', () => { D.tip = tipInput.value; hideError(); paintCheck(); });
-    const tipField = SB.ui.field({ label: 'Tip in dollars (optional)', control: tipInput });
+    const tipField = SB.ui.field({ label: 'Tip (optional)', control: tipInput });
     tipField.classList.add('ord-tip');
     // Tip buttons for pay-now orders: No tip and 15, 18, 20, 25 percent of the food, with the dollar amount shown.
     const tipChips = h('div', { class: 'ord-chips ord-tip-chips', role: 'group', 'aria-label': 'Quick tips' });
@@ -822,10 +862,10 @@
         if (t.d.pct) text(t.b.lastChild, t.d.pct + '% ' + U.fmtMoney(a));
         t.b.setAttribute('aria-pressed', !Number.isNaN(tip) && (t.d.pct ? Math.abs(tip - a) < 0.005 && tip > 0 : D.tip === '') ? 'true' : 'false');
       });
-      tipField.setError(D.pay && Number.isNaN(tip) ? 'Type dollars and cents, like 2.50.' : null);
+      tipField.setError(D.pay && Number.isNaN(tip) ? 'Type an amount, like 2.50.' : null);
       if (!D.pay) { text(payNote, 'The order stays open. Take payment later from Orders.'); return; }
       const pt = pendingTotal(), pm = C.payMethodById[D.pay];
-      text(payNote, 'Marked paid by ' + (pm ? pm.name.toLowerCase() : D.pay) + ' when sent: ' + U.fmtMoney(pt.total) + (pt.tax > 0 ? ' with ' + U.fmtMoney(pt.tax) + ' tax' : '') + (tip > 0 ? ', plus a ' + U.fmtMoney(tip) + ' tip' : '') + '. Smokebox only records this; it does not charge cards.' + ((st().settings.service.taxRatePct || 0) === 0 ? ' No sales tax is added. Set it under Menu, Tax, hours and PIN.' : ''));
+      text(payNote, 'Marked paid by ' + (pm ? pm.name.toLowerCase() : D.pay) + ' when sent: ' + U.fmtMoney(pt.total) + (pt.tax > 0 ? ' with ' + U.fmtMoney(pt.tax) + ' tax' : '') + (tip > 0 ? ', plus a ' + U.fmtMoney(tip) + ' tip' : '') + '. Smokebox only records this; it does not charge cards.' + ((st().settings.service.taxRatePct || 0) === 0 ? ' No sales tax is added. Set it in Settings.' : ''));
     }
 
     function paintAll() {
@@ -833,6 +873,7 @@
     }
     /** Something about the draft changed (a tap, a stepper, a field): refresh what depends on it. */
     function touched() {
+      saveDraftNow();
       hideError(); hideNotice();
       paintTiles(); syncLines(); paintCounts(); paintCustomer(); paintNote(); paintPlan(); paintCheck();
       applyFilter();
@@ -942,7 +983,7 @@
       if (D.orderId) payload.orderId = D.orderId;
       if (D.pay) {
         const tip = dollars(D.tip);
-        if (Number.isNaN(tip)) { paintCheck(); showError('The tip must be dollars and cents, like 2.50. Clear it for no tip.'); setPane('order'); tipInput.focus(); return; }
+        if (Number.isNaN(tip)) { paintCheck(); showError('The tip must be an amount, like 2.50. Clear it for no tip.'); setPane('order'); tipInput.focus(); return; }
         payload.pay = { method: D.pay, tip };
       }
       const addedTo = D.orderId ? SB.engine.findOrder(st(), D.orderId) : null;
@@ -1039,7 +1080,7 @@
     custInput.value = D.customer; noteInput.value = D.note; channelSeg.setValue(D.channel); rushToggle.setValue(D.rush); tipInput.value = D.tip;
     live = view;
     paintAll();
-    if (!draftEmpty()) { showNotice('Your unsent order is back. Clear it to start fresh.'); setPane('order'); }
+    if (!draftEmpty()) { showNotice(fromStore ? 'Restored your unfinished order. Clear it to start fresh.' : 'Your unsent order is back. Clear it to start fresh.'); setPane('order'); }
     // The search box when a mouse or keyboard is in use, so a touch tablet keeps its on-screen keyboard down.
     const startFocus = () => (fine && searchInput ? searchInput : null);
     // Leaving the screen the way Esc does: close an empty order, ask first when there are items.

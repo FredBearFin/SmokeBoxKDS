@@ -18,7 +18,6 @@
 .fs-note[data-tone="bad"] { background: var(--tint-bad); color: var(--ink); border: var(--bw-thin) solid var(--crimson); }
 .fs-note[data-tone="bad"] .icon { color: var(--crimson); }
 .fs-note > div, .fs-note > span { min-width: 0; }
-.fs-sim { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font: var(--w-bold) var(--fs-2) / 1.2 var(--font-body); color: var(--amber-ink); background: var(--tint-warn); border: var(--bw) solid var(--amber); border-radius: var(--r-chip); }
 .fs-list { display: grid; gap: var(--sp-2); min-width: 0; }
 .fs-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); min-width: 0; }
 .fs-row > .grow { flex: 1 1 14ch; }
@@ -131,6 +130,7 @@
 .ord-label { font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink); margin-bottom: 6px; }
 .ord-cust { gap: 8px; }
 .ord-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ord-chips[hidden] { display: none; }
 .ord-chips .chip { min-height: 44px; }
 .ord-cust-input { min-height: 48px; }
 .ord-counter { font-size: var(--fs-1); color: var(--ink3); text-align: right; }
@@ -366,18 +366,6 @@
 
 /* The whole 86 board page, and the strip of four simulated channels at the top. */
 .bd { display: grid; gap: var(--sp-5); min-width: 0; }
-.bd-sync-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: var(--sp-2); }
-.bd-chip { display: flex; align-items: flex-start; gap: 10px; min-width: 0; padding: 10px var(--sp-3); background: var(--paper); border: var(--bw) solid var(--line); border-left-width: 6px; border-radius: var(--r-panel); }
-.bd-chip[data-tone="ok"] { border-left-color: var(--sage); }
-.bd-chip[data-tone="warn"] { border-left-color: var(--amber); }
-.bd-chip[data-tone="muted"] { border-left-color: var(--line-soft); }
-.bd-chip-i { flex: none; margin-top: 1px; color: var(--ink3); }
-.bd-chip[data-tone="ok"] .bd-chip-i { color: var(--sage-ink); }
-.bd-chip[data-tone="warn"] .bd-chip-i { color: var(--amber-ink); }
-.bd-chip-t { min-width: 0; display: grid; gap: 1px; }
-.bd-chip-n { font-weight: var(--w-bold); }
-.bd-chip-state { font-weight: var(--w-semi); font-size: var(--fs-2); }
-.bd-chip-sub { font-size: var(--fs-1); color: var(--ink3); overflow-wrap: anywhere; }
 
 /* Menu on the left, stock on the right where there is room. Below 900 px they stack. */
 .bd-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--sp-6); align-items: start; }
@@ -552,7 +540,6 @@
 
 /* Touch size: the Warning loudness slider and the 86 board Channel sync row are at least 44 px tall. */
 input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
-.bd-sync > summary { min-height: var(--tap, 44px); display: flex; align-items: center; }
 
 /* An empty menu: the friendly "No dishes yet" block spans the whole tile grid and its button keeps one line. */
 .ord-nodishes { grid-column: 1 / -1; padding: var(--sp-5, 24px) var(--sp-3, 12px); text-align: center; }

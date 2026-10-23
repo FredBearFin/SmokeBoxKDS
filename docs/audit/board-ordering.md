@@ -182,3 +182,19 @@ Scripted in one browser: a double-tapped Send made one ticket and one order; tri
 
 ### Long text
 A 40-character customer name and 24-character dish names (the menu limit) were put on the slip, strip, wall, Far display, Orders, Recall, payment and the 390 px order sheet: no element runs past the screen or is cut off, except the wall list, which cut names to about 13 letters. **Fixed:** wall list names wrap onto two lines. The strip row with a 40-character batch name wraps cleanly at 390, 1280 and 1920.
+
+## Round 12: counter, pizza and truck kitchens
+
+All checks ran in headless Chromium with a simulated clock. Nothing here was tried on a real device or in a real kitchen.
+
+What changed:
+- **Unfinished order comes back.** The order screen saves the half-built order after every change (dishes, quantities, mods, name, channel, note, rush, payment, tip, allergy) and restores it on the next open, with the note "Restored your unfinished order. Clear it to start fresh." It is cleared by Send, Clear and an empty order. Dishes that were removed or archived since are dropped quietly. Uses `SB.store.saveDraft` when the engine side provides it, otherwise browser storage under `smokebox.v1.orderdraft`.
+- **Counter service.** When `settings.service.counter` is true the board shows one list of orders: station and EXP tabs are hidden, the next-step lines, START or DONE wording, late badges, late colors, tier tags and pulsing are off, and the strip leaves out late, start, ready and new-ticket rows. Bump never asks "Bump anyway?": it marks the dishes done first, so the office numbers do not count a forced bump. Slips stay readable (same type sizes as the normal board).
+- **Order chips** follow `settings.service.chips` (trimmed, up to 12, 24 letters each). Absent means the default list. An empty list hides the chip row.
+- **Renamed stations show at once.** `SB.floor.refreshNames()` re-applies the saved names and remounts the board on the same tab. The back office save calls it, and only falls back to the Reload button if it is missing.
+- **Settings.** The board's Menu button is now Settings (label, aria-label and the quick list heading). Bump keeps its name.
+- **Channel sync strip removed** from the 86 board, with its help line, styles and tests. Demo wording replaces "practice" in my files.
+
+Choices made without asking: the counter flag is read defensively (missing means off); a station tab left open when counter turns on is switched to All; the draft is kept per browser, not per user; drafts are not saved in the demo any differently.
+
+Not done or not checked: the shared currency formatter is not in this branch yet, so board, order and payment surfaces still use `U.fmtMoney`; no "Paid, done" screen beyond the existing one-tap pay (counter orders are paid when sent); the engine currently rejects the counter setting from the settings route, so the test switches it on inside the page. `src/js/85-office-stock.js` (A3) still has a "Channel sync (practice only)" section, and `tools/guide-walk.mjs` (A4) clicks a button named "Menu".

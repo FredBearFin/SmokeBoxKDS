@@ -1299,7 +1299,9 @@
       C.applyCustom(before);
       if (res.rejected.length) { status.bad('That name cannot be used: it is empty, longer than ' + C.customLimits.name + ' letters, already taken, or the list is full.'); return false; }
       if (!C.saveCustom(spec)) { status.bad('This browser would not save the change.'); return false; }
-      status.ok('Saved. Reload the page to see it everywhere.'); reload.hidden = false;
+      // The board redraws with the new names at once; only a build without that call asks for a reload.
+      if (SB.floor && typeof SB.floor.refreshNames === 'function' && SB.floor.refreshNames()) status.ok('Saved. The new names show everywhere now.');
+      else { status.ok('Saved. Reload the page to see it everywhere.'); reload.hidden = false; }
       return true;
     }
     const groups = [

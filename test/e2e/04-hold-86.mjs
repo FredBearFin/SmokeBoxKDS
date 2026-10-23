@@ -3,9 +3,7 @@ import { dialog, head, settle, wait, closeSheets, openKey } from './_lib.mjs';
 
 // The hold cabinet is the Cabinet tab on the board now (an in-page region, not a sheet).
 const openHold = async (page) => { await page.locator('.fl-seg').getByRole('tab', { name: /Cabinet/ }).click(); const d = page.locator('.fl-cabinet'); await d.waitFor({ state: 'visible', timeout: 5000 }); await settle(page, 250); return d; };
-const open86 = async (page) => { await head(page).getByRole('button', { name: /86 board/ }).click(); const d = dialog(page, '86 board and stock'); await d.waitFor({ state: 'visible', timeout: 8000 }); await settle(page, 250);
-  // The channel sync block is a collapsed details element now; open it so its chips can be read.
-  await d.evaluate((el) => { const x = el.querySelector('details.bd-sync'); if (x) x.open = true; }); await settle(page, 100); return d; };
+const open86 = async (page) => { await head(page).getByRole('button', { name: /86 board/ }).click(); const d = dialog(page, '86 board and stock'); await d.waitFor({ state: 'visible', timeout: 8000 }); await settle(page, 250); return d; };
 const num = (s) => Number(String(s).replace(/[^0-9.\-]/g, ''));
 
 export default function (h) {
