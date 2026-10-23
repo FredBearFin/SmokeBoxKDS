@@ -765,3 +765,6 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl[data-counter="on"] .fl-slip[data-level="breach"], .fl[data-counter="on"] .fl-slip[data-tier] { outline: none; }
 .fl[data-counter="on"] .slip[data-level] .slip-head, .fl[data-counter="on"] .slip[data-level] .slip-body, .fl[data-counter="on"] .slip[data-level] .slip-tear { animation: none; box-shadow: none; }
 .fl[data-counter="on"] .slip-timer { color: var(--slip-ink); }
+/* The last-checked stamp sits at the right end of the all-day strip, quiet and small. */
+.fl-checked { flex: none; margin-left: auto; padding: 0 var(--sp-3); font-size: var(--fs-1); color: var(--ink2); white-space: nowrap; }
+.mn-test { display: grid; gap: var(--sp-2); }

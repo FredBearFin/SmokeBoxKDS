@@ -428,7 +428,7 @@
           h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
             h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, dtSince, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept))),
         coldLine, costLine, msg, lock, cool, actions, editorSlot);
-      rec.bMore = bMore; rec.bOut = bOut; rec.bBack = bBack; rec.coldLine = coldLine; rec.dtSince = dtSince;
+      rec.bMore = bMore; rec.bPull = bPull; rec.bOut = bOut; rec.bBack = bBack; rec.coldLine = coldLine; rec.dtSince = dtSince;
       rec.acts = [bKeep, bOut, bBack, bReheat, bLog, bUnkeep, bSnooze, bUnsnooze, bPull, bCool, bDiscard];
       Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept, bKeep, bUnkeep, bSnooze, bUnsnooze, unsnoozeT, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
       // The "..." button lists the secondary actions that are available right now; choosing one presses that button.
@@ -626,6 +626,8 @@
       // buttons
       const showPull = isPullSource(b);
       setHidden(rec.bPull, !showPull);
+      // Hot and cold items from the cabinet both keep Pull visible; it is only hidden behind "..." when the batch has nothing to pull.
+      rec.bPull.dataset.keep = 'on';
       if (showPull) { const pg = ingOf(b.ing); text(rec.pullT, 'Pull ' + qtyText(pg, Math.min(b.remainingG, pg && U.isNum(pg.pullG) ? pg.pullG : 1000))); }
       cls(rec.bLog, 'btn-primary', gt.action === 'CHECK_TEMP');
       setHidden(rec.bReheat, gt.action !== 'REHEAT_IMMEDIATE');
@@ -643,7 +645,9 @@
       const main = [rec.bKeep, rec.bReheat, rec.bOut, rec.bBack, rec.bLog].find((a) => !a.hidden) || rec.bLog;
       rec.primary = main;
       let others = 0;
-      rec.acts.forEach((a) => { const sec = a !== main; if (a.classList.contains('hc-sec') !== sec) a.classList.toggle('hc-sec', sec); if (sec && !a.hidden) others++; });
+      // Pull is the action done most often, so it stays one tap away beside the main button when this batch is the pull source.
+      const keepPull = !rec.bPull.hidden && main !== rec.bPull && rec.bPull.dataset.keep === 'on';
+      rec.acts.forEach((a) => { const sec = a !== main && !(keepPull && a === rec.bPull); if (a.classList.contains('hc-sec') !== sec) a.classList.toggle('hc-sec', sec); if (sec && !a.hidden) others++; });
       cls(main, 'btn-primary', main !== rec.bLog || rec.bLog.classList.contains('btn-primary'));
       setHidden(rec.bMore, others === 0);
     }
@@ -1022,13 +1026,17 @@
   // The numbers used for the last batch of one product, or null when there is none yet.
   function lastBatchOf(ingId) { const m = U.storage.get(KEY_LASTBATCH, null); const x = m && typeof m === 'object' ? m[ingId] : null; return x && U.isNum(x.rawKg) && x.rawKg > 0 ? x : null; }
   // Remembers the numbers used for a product's batch so "same as last batch" can start from them.
-  function rememberBatch(ingId, v) { const m = U.storage.get(KEY_LASTBATCH, null); const all = m && typeof m === 'object' ? m : {}; all[ingId] = v; U.storage.set(KEY_LASTBATCH, all); }
+  // The product of the last batch made, so the form opens on it: the same product again is the usual next batch.
+  const KEY_LASTPROD = 'smokebox.v1.lastproduct';
+  function rememberBatch(ingId, v) {
+    U.storage.set(KEY_LASTPROD, ingId); const m = U.storage.get(KEY_LASTBATCH, null); const all = m && typeof m === 'object' ? m : {}; all[ingId] = v; U.storage.set(KEY_LASTBATCH, all); }
   function buildBatchForm(onAdded, opts) {
     const F = { ing: null, rawKg: 8, endC: 85, holdH: 2, weighed: false, cookedKg: 1, tempF: 150, wTouched: false, tTouched: false };
     // Products that can go in the cabinet: the ones that need temperature control.
     const list = () => st().ingredients.filter((i) => i.tcs && !i.archived);
     const first = list()[0];
-    F.ing = opts && opts.ing && ingOf(opts.ing) && ingOf(opts.ing).tcs ? opts.ing : first ? first.id : null;
+    const lastProd = U.storage.get(KEY_LASTPROD, null);
+    F.ing = opts && opts.ing && ingOf(opts.ing) && ingOf(opts.ing).tcs ? opts.ing : lastProd && list().some((i) => i.id === lastProd) ? lastProd : first ? first.id : null;
     // Gives a stepper and its number box the same spoken label.
     const relabel = (stepper, label) => { attr(stepper, 'aria-label', label); attr(stepper.input, 'aria-label', label); };
     // A labelled field; the visible label is hidden from screen
@@ -2089,8 +2097,8 @@
   // Settings (the floor menu, SPEC 14.4).
 
   // One labelled settings block: a heading, a short help line (left out when empty) and the control.
-  function settingBlock(title, help, node, node2, node3) {
-    return h('section', { class: 'fs-section mn-block' }, h('h3', { class: 'fs-h' }, title), help ? h('p', { class: 'fs-sub' }, help) : null, node, node2 || null, node3 || null);
+  function settingBlock(title, help, node, node2, node3, node4) {
+    return h('section', { class: 'fs-section mn-block' }, h('h3', { class: 'fs-h' }, title), help ? h('p', { class: 'fs-sub' }, help) : null, node, node2 || null, node3 || null, node4 || null);
   }
 
   // Builds the Settings sheet (look, text size, sound, station, clock speed, links) and returns it.
@@ -2124,6 +2132,13 @@
     const levelSeg = SB.ui.segmented({ label: 'How much the voice talks', class: 'mn-vlevel', value: levelOk ? SB.floor.voiceLevel() : 'normal', options: [{ id: 'light', label: 'Light' }, { id: 'normal', label: 'Normal' }, { id: 'full', label: 'Full' }], onChange: (id) => { if (levelOk) SB.floor.setVoiceLevel(id); } });
     const speechOk = floorOk && typeof SB.floor.setSpeech === 'function';
     const speechTog = SB.ui.toggle({ label: 'Speak batch warnings aloud', checked: speechOk ? !!SB.floor.speech() : false, disabled: !speechOk, onChange: (on) => { if (speechOk) SB.floor.setSpeech(on); } });
+    // Test the sound: plays a chime and a spoken line, then says in words whether this tablet let it play.
+    const testSay = h('p', { class: 'fs-sub mn-test-say', role: 'status' });
+    const testBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'test-sound' }, disabled: !floorOk, onClick: () => {
+      const r = SB.floor.testSound ? SB.floor.testSound() : 'unsupported';
+      text(testSay, r === 'running' ? 'You should have heard a chime and a voice. If not, turn the tablet volume up.' : r === 'unsupported' ? 'This browser cannot play sound. Warnings will only show on screen.' : 'The browser has not let the board play sound yet. Tap the button once more.');
+    } }, ico('volume', 20), h('span', null, 'Test the sound'));
+    const testRow = h('div', { class: 'mn-test' }, testBtn, testSay);
     const soundHelp = floorOk ? 'On by default, because a missed warning can cost a whole batch. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
 
     // Far display: for a screen read from across the kitchen. Per tablet; needs the board module.
@@ -2157,7 +2172,11 @@
     // The Guide opens only when the guide page is part of this copy of Smokebox.
     const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
+<<<<<<< HEAD
     const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Get this tablet ready', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
+=======
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
+>>>>>>> kds/night/a1-r16
 
     sheet.body.append(h('div', { class: 'mn' },
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
@@ -2166,7 +2185,7 @@
       settingBlock('Text size', 'Large makes everything 20 percent bigger.', textSeg),
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap Start on a dish.', hintsTog),
-      settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
+      settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn), testRow),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
       settingBlock('Voice call-outs', 'A chef calls the line out loud. Light: "Fire the pizza now! Ticket 12!" and "Ticket 12 is up! Ring it out!". Normal: adds "Order up!" for new tickets and one reminder if a dish is not started or a ticket not rung out. Full: keeps reminding until you start the dish or ring out the ticket. At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Not tried on a real tablet yet.', coTog, levelSeg),
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),

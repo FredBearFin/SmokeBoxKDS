@@ -218,3 +218,32 @@ Headless Chromium with a simulated clock only; nothing was tried on a real devic
 - When a Take out or Put back itself ends the batch, the cook sees the engine's words as a warning instead of the plain "taken out" message. This case could not be reproduced in a test.
 - Tests: `test/board-round15.e2e.mjs` (feed row, strip words, spoken once, no overdue wording). All board suites passed on the merged build, including `floor` and `floor-sheets` (floor: 201 passed, 0 failed, 2 known reported).
 - Not done: a cold row has no chime ladder of its own (the engine gives it zero rungs), so the sound is a single chime with the spoken line.
+
+## Round 16: pull logging friction, keep-awake and sound, readings
+
+Headless Chromium with a simulated clock and a stubbed wake lock only. Nothing here was tried on a real tablet, with real greasy hands, or in a real kitchen. The seconds are a model, not a stopwatch on a person: 1.5 s per tap plus 0.6 s per typed character.
+
+### Taps from the board (script: `test/board-round16-taps.e2e.mjs`, same numbers on a 390 px phone and a 1024 px tablet)
+
+| Flow | Before: taps, seconds | After: taps, seconds | What changed |
+|---|---|---|---|
+| Pull (Cabinet tab, then the pull) | 3, 4.5 | 2, 3.0 | Pull sits next to the main button on the card, no longer behind "...". It is 1 tap when the board is already on the Cabinet tab. |
+| Log a temperature | 3, 4.5 | 3, 4.5 | Unchanged (Cabinet, Log temp, Save). |
+| New batch, first product | 3, 4.5 | 3, 4.5 | Unchanged. |
+| New batch, a different product | 4, 6.0 | 4, 6.0 | Unchanged. |
+| New batch, same product as last time | 3, 4.5 | 3, 4.5 | The form now opens on the product used last (before it opened on the first product), with its weights filled in. The first temperature is still typed or confirmed on purpose: a one-tap batch with a made-up temperature would defeat the log. |
+| Cold item: Take out / Put back | 2 and 1 | 2 and 1 | Unchanged (initials are asked once per tablet). |
+
+No flow needs typing. Cabinet card buttons are now at least 52 px tall (was 44). Honest result: only the pull got faster; the others were already as short as the form allows. A "pull again" action exists in the engine (`pullAgain`), but pulls here already use one fixed amount per product, so it was not needed.
+
+### Keep awake and sound
+- The screen wake lock is asked for when the board shows, again at the first tap if the browser had refused, again when the page comes back to the front, and again when the system takes it back. It is let go when the board closes.
+- Calm lines in the strip, dismissible, never blocking work: "Warnings are silent: sound is off on this tablet. Tap to turn on." (tapping turns sound on); "This screen may go to sleep, and warnings stop while it sleeps. Keep the tablet plugged in with its screen set to stay on." (no wake lock or refused); "The board was in the background for N minutes. Warnings are silent while it is hidden." (for 10 minutes after it returns). The existing bar that asks for one tap when the browser has not let the board play sound stays.
+- A quiet "Checked 2:07 pm" stamp at the right end of the All day strip shows the last time the board checked its warnings.
+- "Test the sound" in Settings plays a chime and a voice line and says in words whether the browser allowed it.
+- Not checked: how long real tablets (iPad, Android) really stay awake, or whether Safari grants the wake lock at the first tap. The note that the page was hidden only appears after the page comes back, because a hidden page cannot show anything.
+
+### Readings sheet
+- New sheet "Readings" (Settings links, the sanitize chip menu and the narrow-screen menu), shown only when cook-ahead is on. Three small forms: fridge, freezer or display case (kind, optional name, temperature), food thermometer check (ice water, boiling water or other, starts at 32 or 212), sanitizer strip (ppm, optional product and place, also marks surfaces sanitized). Names used last time come back as one-tap chips. A list of the last six readings with Fix, which adds a note next to the entry (nothing is erased).
+- Undo: the engine does not let the two temperature entries be undone (only the sanitize action can), so a wrong entry is fixed with a note instead. Not done: an Undo button on the sanitizer strip reading.
+- Tests: `test/board-round16.e2e.mjs`.

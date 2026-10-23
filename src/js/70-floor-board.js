@@ -438,11 +438,36 @@
   function requestWake() {
     try {
       if (!g.navigator || !g.navigator.wakeLock) { wakeState = 'unsupported'; return; }
-      g.navigator.wakeLock.request('screen').then((sn) => { wakeSentinel = sn; wakeState = 'on'; sn.addEventListener('release', () => { wakeState = 'released'; }); }, () => { wakeState = 'refused'; });
+      g.navigator.wakeLock.request('screen').then((sn) => {
+        wakeSentinel = sn; wakeState = 'on';
+        // The system may take the lock back (low battery, another app); when the board is still showing it asks again.
+        sn.addEventListener('release', () => { wakeState = 'released'; wakeSentinel = null; if (m && doc.visibilityState === 'visible') setTimeout(requestWake, 800); });
+      }, () => { wakeState = 'refused'; });
     } catch (e) { wakeState = 'refused'; }
   }
   // Reports the screen wake lock state: unknown, on, released, refused or unsupported.
   F.wakeLock = () => wakeState;
+  // A calm sentence when the screen may go to sleep (the browser has no wake lock or refused it); empty when all is well.
+  function awakeNote() {
+    if (wakeState !== 'unsupported' && wakeState !== 'refused') return '';
+    return 'This screen may go to sleep, and warnings stop while it sleeps. Keep the tablet plugged in with its screen set to stay on.';
+  }
+  // A sentence shown for a while after the board comes back from the background, since warnings were silent in between.
+  function awayNote() {
+    const a = m && m.away;
+    if (!a || Date.now() - a.at > 10 * 60e3) return '';
+    return 'The board was in the background for ' + (a.min < 1 ? 'a moment' : a.min + (a.min === 1 ? ' minute' : ' minutes')) + '. Warnings are silent while it is hidden.';
+  }
+  // Plays a test chime and a spoken line so a cook can hear that this tablet makes sound, and says what happened.
+  F.testSound = function () {
+    if (!sound) F.setSound(true);
+    hookAudioUnlock();
+    const a = resumeAudio();
+    playHere(() => { chime(); speak('Sound is on. This is a test.'); });
+    return F.audioState();
+  };
+  // Whether this tablet can make sound right now: running, suspended (needs a tap), unsupported or off.
+  F.audioState = () => (!sound ? 'off' : !(g.AudioContext || g.webkitAudioContext) ? 'unsupported' : audio && audio.state === 'running' ? 'running' : 'needs-tap');
 
   // Mounting: the board is built once into the element the shell provides.
 
@@ -485,9 +510,18 @@
     m.offs.push(() => doc.removeEventListener('keydown', onKey));
     // Keep the screen awake while the board shows, and ask again when the page returns to the front.
     requestWake();
-    const onVis = () => { if (doc.visibilityState === 'visible') requestWake(); };
+    // The first tap or key press asks again if the browser had refused (some only allow it after a gesture).
+    const onGesture = () => { if (wakeState === 'refused' || wakeState === 'released' || wakeState === 'unknown') requestWake(); };
+    doc.addEventListener('pointerdown', onGesture, true);
+    // When the page returns to the front it asks for the wake lock again and remembers how long it was away; hiding notes the time.
+    const onVis = () => {
+      if (doc.visibilityState === 'visible') {
+        requestWake();
+        if (m && m.hiddenAt) { const min = Math.round((Date.now() - m.hiddenAt) / 60e3); if (min >= 1) m.away = { at: Date.now(), min }; m.hiddenAt = null; }
+      } else if (m) m.hiddenAt = Date.now();
+    };
     doc.addEventListener('visibilitychange', onVis);
-    m.offs.push(() => { doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
+    m.offs.push(() => { doc.removeEventListener('pointerdown', onGesture, true); doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
     if (sound) hookAudioUnlock();
     m.offs.push(joinLeadership());
     // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
@@ -622,7 +656,10 @@
     const dockClear = h('button', { type: 'button', class: 'btn fl-dock-clear', hidden: true, onClick: () => F.highlight(null) }, ico('x', 18), h('span', null, 'Clear highlight'));
     const dockList = h('div', { class: 'fl-dock-list', id: 'fl-dock-list', role: 'group', 'aria-label': 'Items still to make, tap one to highlight it on the board' });
     const dockEmpty = h('span', { class: 'fl-dock-empty' }, 'Nothing waiting.');
-    const dock = h('footer', { class: 'fl-dock' }, dockToggle, dockClear, dockList, dockEmpty);
+    // A quiet stamp of the last time the board checked its warnings, so a frozen or sleeping screen shows an old time.
+    const checked = h('span', { class: 'fl-checked num', title: 'The last time this board checked its warnings' });
+    const dock = h('footer', { class: 'fl-dock' }, dockToggle, dockClear, dockList, dockEmpty, checked);
+    m.checked = checked;
     // While a pointer is over the strip its chips stay put, see renderDock.
     dock.addEventListener('pointerenter', () => { m.dockHover = true; });
     dock.addEventListener('pointerleave', () => { m.dockHover = false; });
@@ -1579,6 +1616,7 @@
   // Rewrites the strip from the deadline feed: the top three rows, or hidden when the feed is empty.
   function updateStrip(now) {
     if (!m || !m.strip || !SB.deadlines) return;
+    if (m.checked) { const t = U.fmtTime(Date.now()); if (m.checkedT !== t) { m.checkedT = t; m.checked.textContent = 'Checked ' + t; } }
     const all = SB.deadlines.build(store().getState(), now);
     m.feed = all;
     // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
@@ -1613,10 +1651,11 @@
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
-    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) : 'Sound is off on this tablet: warnings will not be heard. Tap to turn it on.';
+    const health = awayNote() || awakeNote();
+    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
-    const showNote = !!note && (!sound || top.length > 0) && !m.dis.has('pause:' + note) && (needSound ? m.dis.has('snd') : true);
+    const showNote = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note) && (note === health || (needSound ? m.dis.has('snd') : true));
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
@@ -1769,6 +1808,8 @@
     SB.ui.menu(anchor, [
       // Logging a check goes through run(), so it can be undone like any action.
       { label: 'Mark surfaces sanitized', icon: 'check-circle', onClick: () => { const go = (who) => run('sanitizeDone', who ? { who } : {}); if (SB.who && SB.who.ask) SB.who.ask(anchor, 'Mark sanitized', go); else go(''); } },
+      // Readings opens the sheet for fridge, thermometer and sanitizer strip numbers.
+      { label: 'Readings: fridge, thermometer, strip', icon: 'thermometer', onClick: () => openSheet('readings') },
       { label: 'Open the hold cabinet', icon: 'thermometer', onClick: () => showCabinet(true) },
     ].filter((it) => !(roleNow() === 'front' && /cabinet/.test(it.label))), { label: 'Sanitize timer' });
   }
@@ -1792,6 +1833,7 @@
       { label: '86 board' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
       { hide: kit, label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
       // The sanitize entry opens its own small menu on the same anchor.
+      { hide: !cookOn(), label: 'Readings', icon: 'thermometer', onClick: () => openSheet('readings') },
       { hide: !cookOn(), label: 'Sanitize timer' + (m.sanText.textContent ? ': ' + m.sanText.textContent : ''), icon: 'shield-check', onClick: () => sanitiseMenu(anchor) },
       { separator: true },
       // Settings, help and the office sit behind the Menu sheet.

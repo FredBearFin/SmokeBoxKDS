@@ -20,7 +20,7 @@ await withPage({ w: 1280, h: 800, hash: '' }, async (page, logs) => {
 
   await page.click('.fl-seg button:has-text("Cabinet")'); await page.waitForSelector('.hc-card');
   const cards = await page.evaluate(() => [...document.querySelectorAll('.hc-card')].map((c) => ({ h: Math.round(c.getBoundingClientRect().height), main: [...c.querySelectorAll('.hc-actions .btn')].filter((b) => b.offsetParent !== null && !b.classList.contains('hc-more')).length, more: !!c.querySelector('.hc-more:not([hidden])') })));
-  check('every cabinet card shows exactly one main button', cards.every((c) => c.main === 1), cards);
+  check('every cabinet card shows a main button and at most Pull beside it', cards.every((c) => c.main >= 1 && c.main <= 2), cards);
   check('cards in the cabinet all have the same height', new Set(cards.map((c) => c.h)).size <= 2, cards.map((c) => c.h));
   check('no Starter stock chip on each card', (await page.locator('.hc-card .chip:visible').count()) === 0);
   await page.locator('.hc-more').first().click(); await page.waitForTimeout(200);

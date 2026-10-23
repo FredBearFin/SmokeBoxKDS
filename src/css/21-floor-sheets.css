@@ -618,6 +618,7 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .hc-cold[data-tone="bad"] { color: var(--crimson); }
 /* A cold item keeps its "In the fridge since" row visible on the compact card. */
 .hc-card[data-cold="on"] .hc-dl dt:nth-of-type(3), .hc-card[data-cold="on"] .hc-dl dd:nth-of-type(3) { display: block; }
+<<<<<<< HEAD
 
 /* Get this tablet ready (rd-): one card per check with a tick or a do-this line. */
 .rd { gap: var(--sp-3); }
@@ -633,3 +634,19 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* Pilot visit checklist (pv-): numbered steps with a tick box each. */
 .pv-list { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
 .pv-step { display: grid; gap: var(--sp-1); }
+=======
+/* Greasy hands: the buttons on a cabinet card are at least 52 px tall. */
+.hc-actions .btn { min-height: max(var(--tap), 52px); }
+.hc-actions .hc-more { min-width: max(var(--tap), 52px); }
+/* Readings sheet: one block per kind of reading, big buttons, a short list of recent entries. */
+.rd { display: grid; gap: var(--sp-4); }
+.rd-sec { display: grid; gap: var(--sp-3); }
+.rd-sec .btn-lg { min-height: 52px; }
+.rd-row { display: grid; gap: var(--sp-2); padding: var(--sp-2) 0; border-top: var(--bw) solid var(--line-soft); }
+.rd-line { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; }
+.rd-what { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.rd-fix { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.rd-fix .input { flex: 1 1 180px; }
+.rd-fix[hidden] { display: none; }
+[data-tone="bad"].fs-sub { color: var(--crimson); }
+>>>>>>> kds/night/a1-r16
