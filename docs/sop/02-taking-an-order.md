@@ -4,7 +4,7 @@ Start an order, add dishes and notes, send it to the kitchen, and add to it late
 
 ## Start the order
 
-Tap **New ticket**. Tap a dish to add it. Tap it again to add one more. Use the search box to find a dish by name. A dish marked 86 is sold out or off the menu and cannot be added.
+Tap **New ticket**. Tap a dish to add it. Tap it again to add one more. A dish marked 86 is sold out or off the menu and cannot be added.
 
 ## Customer and order type
 

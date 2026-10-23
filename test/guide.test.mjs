@@ -9,9 +9,11 @@ import { readPages, dataBlock, inject } from '../tools/build-guide.mjs';
 
 const SB = await loadSB(['00-util', '10-config', '60-shell', '78-guide']);
 const G = SB.guide;
-const EXPECTED = ['getting-started', 'taking-an-order', 'running-the-line', 'closing-the-day', 'backup-and-restore', 'replacing-a-device', 'what-this-app-does-not-replace'];
-// Every piece of text on a page, in one list, for the word checks.
-const textOf = (p) => [p.title, p.summary].concat(p.blocks.map((b) => (Array.isArray(b.x) ? b.x.join(' ') : b.x)));
+const GUIDE = ['getting-started', 'taking-an-order', 'running-the-line', 'hold-cabinet-and-warnings', 'closing-the-day', 'backup-and-restore', 'replacing-a-device', 'troubleshooting', 'empty-lost-or-locked', 'questions-and-answers', 'what-this-app-does-not-replace'];
+const CARDS = ['card-opening-checklist', 'card-closing-checklist', 'card-when-something-goes-wrong'];
+const FIGURES = ['ticket', 'ladder', 'cabinet'];
+// Every piece of text on a page (picture descriptions included), in one list, for the word checks.
+const textOf = (p) => G.textsOf(p);
 
 test('the data in 78-guide.js is exactly what docs/sop produces (one source of truth)', () => {
   const file = path.join(ROOT, 'src/js/78-guide.js');
@@ -19,18 +21,43 @@ test('the data in 78-guide.js is exactly what docs/sop produces (one source of t
   assert.equal(inject(src, dataBlock(readPages())), src, 'run: node tools/build-guide.mjs');
 });
 
-test('the Guide has the seven agreed pages, in order, each with a title, a summary and real content', () => {
-  assert.deepEqual(G.pages.map((p) => p.id), EXPECTED);
+test('the Guide has its eleven pages and three quick cards, in order, each with a title, a summary and real content', () => {
+  assert.deepEqual(G.pages.filter((p) => p.group === 'guide').map((p) => p.id), GUIDE);
+  assert.deepEqual(G.pages.filter((p) => p.group === 'cards').map((p) => p.id), CARDS);
   G.pages.forEach((p) => {
     assert.ok(p.title && p.title.length >= 5, p.id + ' title');
     assert.ok(p.summary && p.summary.length >= 20, p.id + ' summary');
     assert.ok(p.blocks.length >= 1, p.id + ' has some body');
-    p.blocks.forEach((b) => assert.ok(Array.isArray(b.x) ? b.x.length > 0 && b.x.every((x) => x.length > 3) : b.x.length > 3, p.id + ' block ' + b.t));
+    p.blocks.forEach((b) => assert.ok(b.t === 'fig' ? b.alt.length > 3 : Array.isArray(b.x) ? b.x.length > 0 && b.x.every((x) => x.length > 3) : b.x.length > 3, p.id + ' block ' + b.t));
   });
 });
 
-test('each page is short enough to read on one screen or so (under 330 words)', () => {
-  G.pages.forEach((p) => assert.ok(textOf(p).join(' ').split(/\s+/).length < 330, p.id));
+test('each page is short: under 400 words, and a quick card under 160 so it fits one printed page', () => {
+  G.pages.forEach((p) => assert.ok(textOf(p).join(' ').split(/\s+/).length < (p.group === 'cards' ? 160 : 400), p.id));
+});
+
+test('every picture is one of the three drawn in 79-guide-art.js and has a real description for screen readers', () => {
+  const art = fs.readFileSync(path.join(ROOT, 'src/js/79-guide-art.js'), 'utf8');
+  const figs = G.pages.flatMap((p) => p.blocks.filter((b) => b.t === 'fig'));
+  assert.deepEqual([...new Set(figs.map((f) => f.id))].sort(), FIGURES.slice().sort(), 'all three pictures are placed');
+  figs.forEach((f) => { assert.ok(f.alt.length >= 60, f.id + ' alt text'); assert.ok(new RegExp('function ' + f.id + '\\(').test(art), f.id + ' is drawn'); });
+});
+
+test('the quick cards are checklists, so they print with boxes to tick', () => {
+  CARDS.forEach((id) => { const p = G.byId(id); assert.ok(p.blocks.some((b) => b.t === 'check' && b.x.length >= 6), id); });
+});
+
+test('search finds pages by plain words, ranks a title match first, and says nothing for nonsense', () => {
+  assert.equal(G.search('forgot pin')[0].page.id, 'empty-lost-or-locked');
+  assert.equal(G.search('backup')[0].page.group, 'guide');
+  assert.ok(G.search('sound').some((r) => r.page.id === 'troubleshooting'));
+  assert.deepEqual(G.search('zzzzqq'), []);
+  assert.deepEqual(G.search(''), []);
+  assert.ok(G.search('hold cabinet')[0].snippet.length > 10);
+});
+
+test('the help-link helper exists (it returns nothing in Node, an element in the app)', () => {
+  assert.equal(typeof G.link, 'function');
 });
 
 test('no page claims food or a kitchen is safe, compliant, certified or guaranteed', () => {
