@@ -7,7 +7,7 @@ A small Node process that keeps one shared kitchen state so several screens can 
 node tools/build.mjs --quiet                       # writes dist/smokebox.html
 SMOKEBOX_TZ=America/New_York SMOKEBOX_DATA=./hub-state.json node server/server.mjs
 ```
-Then open `http://127.0.0.1:8787/`. The page served today is the normal single-file app; it does not talk to the hub until the transport lands.
+Then open `http://127.0.0.1:8787/`. The page served is the normal single-file app; the browser does not yet use a hub transport (only the Node test helper `test/_hub-transport.mjs` does).
 
 | Variable | Meaning | Default |
 |---|---|---|
@@ -24,7 +24,13 @@ Then open `http://127.0.0.1:8787/`. The page served today is the normal single-f
 - A 1 s tick runs `engine.tick`; it broadcasts only when something became due.
 - Saving is debounced (0.5 s), written through a temp file and a rename.
 
+## Catching up and action times
+- Every `state` event also carries `op`: `{ seq, opId, actionType, payload, now, by }`, the action that caused it. A device that applies `op` messages from other devices (the store's `{ type: 'action' }` transport message) stays in step.
+- `GET /events?since=N`: a screen that was away gets one `catchup` event `{ ops, serverNow, seq }` with the actions after N (the last 5000 are kept in memory), or a full `snapshot` if the log no longer reaches back that far.
+- `POST /action` accepts an optional `at` (the time the device did the action, for example a queued action replayed after being offline). The hub uses `at` only between the time of its last applied action and its own clock, so time never runs backwards or into the future.
+
 ## Known limits (prototype)
+- Snapshot and `state` events also carry `opIds` (the actions in the recent log). A client that adopts the hub state (store transport message `{ type: 'state', state, opIds }`) treats those as confirmed and replays its own unconfirmed actions on top, so ticket numbers follow the hub's order; `test/hub-sync.test.mjs` checks this after an offline replay. The `opIds` list grows with the log (up to 5000), which is fine for a prototype only.
 - No login, no TLS: use only on a trusted network.
 - Whole state is sent on every change (fine for a small kitchen, not for a big one).
 - The opId memory resets on restart.
