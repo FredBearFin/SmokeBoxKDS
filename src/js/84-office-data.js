@@ -1598,6 +1598,33 @@
     // Opens the system file picker for a backup.
     const chooseBtn = btn('Choose a backup file', { icon: 'upload', onClick: () => fileIn.click() });
     chooseBtn.dataset.action = 'import-choose';
+    const undoBox = h('div', { class: 'od-undo-restore', 'data-region': 'undo-restore' });
+    // Shows the way back from a restore: how long the old kitchen is kept and a button to put it back (PIN-guarded like the restore).
+    function paintUndo() {
+      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
+      if (!info) { undoBox.replaceChildren(); undoBox.hidden = true; return; }
+      undoBox.hidden = false;
+      const days = Math.max(1, Math.round((info.expiresAt - info.takenAt) / 86400e3));
+      // The button asks first, then puts the old kitchen back.
+      const b = btn('Undo this restore', { icon: 'history', cls: 'btn-sm', onClick: () => undoRestoreNow() });
+      b.dataset.action = 'undo-restore';
+      undoBox.replaceChildren(
+        h('p', { class: 'od-p od-undo-line' }, 'Your kitchen before this restore is kept for ' + days + ' ' + U.plural(days, 'day') + ' (until ' + U.fmtDateShort(U.dateKey(info.expiresAt)) + ' ' + U.fmtTime(info.expiresAt) + '). It was saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + '.'),
+        h('div', { class: 'od-actions' }, b));
+    }
+    // After a confirm dialog and the PIN, puts the kitchen from before the restore back. Nothing changes if the PIN is not entered.
+    async function undoRestoreNow() {
+      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
+      if (!info) { paintUndo(); return; }
+      const ok = await SB.ui.confirm({ title: 'Undo this restore?', tone: 'danger', confirmLabel: 'Put my old kitchen back', cancelLabel: 'Keep what I have',
+        body: ['This puts back the kitchen you had before the restore (saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + ') and replaces what is here now. What is here now is kept for the same time, so this can be undone once too.'] });
+      if (!ok) return;
+      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
+      const rep = SB.store.undoRestore();
+      if (rep === 'ok') SB.ui.toast('Your kitchen from before the restore is back.', { tone: 'ok' });
+      else SB.ui.toast(rep === 'noCopy' ? 'The copy from before the restore is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings), { tone: 'warn' });
+      paintUndo();
+    }
     const pasteLabelId = U.uid('odpl');
     const pasteArea = h('textarea', { class: 'textarea od-paste', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-labelledby': pasteLabelId, placeholder: 'Paste the whole backup text here' });
     // Checks pasted text the same way as a chosen file.
@@ -1606,7 +1633,7 @@
     const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
     card2.body.append(
       para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
-      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult);
+      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
     card3.body.append(
       h('ol', { class: 'od-steps' },
         h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
@@ -1616,6 +1643,7 @@
         h('li', null, 'Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.')),
       h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
 
+    paintUndo();
     let pending = null;
     // Throws away the checked backup and clears the result card.
     function clearImport() { pending = null; impResult.replaceChildren(); }
@@ -1669,6 +1697,7 @@
         clearImport(); pasteArea.value = ''; fileIn.value = '';
         impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.'))));
         SB.ui.toast('Backup restored.', { tone: 'ok' });
+        paintUndo();
       } else {
         const lr = SB.store.lastResult() || {};
         showBad(rep === 'invalidBackup' && lr.info && lr.info.error ? backupReason(lr.info.error) : SB.engine.describe(rep, lr.info, (stateNow() || {}).settings), 'backup');
