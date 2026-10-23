@@ -1584,6 +1584,8 @@
   }
   // Keeps the last 400 sound records in storage (the pilot report reads them after a reload). A full or blocked storage is ignored.
   function saveAlertRecord(rec) {
+    // A follower keeps no sound records on this device (they belong to the kitchen's own pilot log).
+    if (following) return;
     try { const cur = U.storage.get(SB.pilot.KEY_ALERTLOG, []); const arr = Array.isArray(cur) ? cur : []; arr.push(rec); U.storage.set(SB.pilot.KEY_ALERTLOG, arr.slice(-SB.pilot.LOG_MAX)); } catch (e) { /* the log is optional */ }
   }
   // The saved sound records, oldest first.
@@ -1896,6 +1898,8 @@
   // ticket exists or someone closes it. With no dishes the empty board's own button does the job instead.
   function paintWelcome() {
     if (!m || !m.welcome) return;
+    // A follower screen has no first-steps card and writes nothing about it on this device.
+    if (following) { setHidden(m.welcome, true); return; }
     const s = store().getState();
     const n = SB.setup ? SB.setup.dishCount() : 0;
     // Once any ticket or order exists the first-steps card is finished for good, even if the board is cleared later.
@@ -1910,6 +1914,7 @@
   }
   // Hides the card for good, or shows it again (a restarted demo starts with it).
   F.setWelcome = function (on) {
+    if (following) return false;
     if (on) U.storage.remove(KEY_WELCOME); else U.storage.set(KEY_WELCOME, 'done');
     if (m) paintWelcome();
     return !!on;
