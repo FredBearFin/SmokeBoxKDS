@@ -39,7 +39,7 @@ All five are pages in the Guide, at the bottom of the list under "Quick cards to
 
 These are written for the app as it is today. If you decide differently, the Guide text changes (edit `docs/sop/`, run `node tools/build-guide.mjs`). A test fails if a button name the Guide quotes disappears from the app.
 
-- **New ticket vs New order** (decision 5). The Guide says "New ticket" everywhere.
+- **Kept: New ticket**, because that is what kitchens call them. The Guide says "New ticket" everywhere (no longer depends on a decision).
 - **Menu vs Settings** (6). The Guide says "Menu, then ...".
 - **Bump vs Send out** (7). The Guide says "Bump".
 - **Quality limit vs Best-by** (8). The cabinet page says "Taste it, keep serving" and does not name the limit kinds.
