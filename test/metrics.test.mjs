@@ -1065,7 +1065,7 @@ describe('headline sentences', () => {
     const d = craft(40, { events: evs('temp_logged', 10, (i) => ({ batchId: 'b', f: 150, onTime: i < 4, lateMs: 60000 })) });
     assert.match(M.headline('tickets', d), /Most of a ticket's 7m 20s average goes to cooking and plating \(89%\)/);
     assert.match(M.headline('stations', d), /Hot sides finished last on 100% of tickets; 1 item runs outside 0\.8 to 1\.25 times the starter prep time/);
-    assert.match(M.headline('money', d), /Sales of \$780 over 40 finished tickets, \$19\.50 per ticket/);
+    assert.match(M.headline('money', d), /No paid orders yet\. Finished food worth \$780 at menu price over 40 finished tickets, \$19\.50 per ticket/);
     assert.match(M.headline('safety', d), /40% of 10 temperature checks were on time/);
     assert.match(M.headline('stock', d), /1 protein sell-out in 1 day, the earliest brisket at 1:42 pm \(7\.3 hours before close\)/);
     assert.match(M.headline('data', d), /40 tickets in this range \(0 sample, 40 live\)/);

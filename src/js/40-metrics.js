@@ -1773,7 +1773,8 @@
         // Sales from paid orders lead the sentence once any exist.
         if (sl.checks) return 'You sold ' + money0(sl.net) + ' of food in ' + U.fmtNum(sl.checks) + ' paid ' + U.plural(sl.checks, 'order') + ' (' + money(sl.avgCheck) + ' average). With tax and tips, ' + money0(sl.collected) + ' was collected' + (sl.tips > 0 ? ', ' + money0(sl.tips) + ' of it tips.' : '.');
         if (t.revenue === null) return 'No sales in this range yet.';
-        return 'Sales of ' + money0(t.revenue) + (v.count ? ' over ' + U.fmtNum(v.count) + ' finished tickets, ' + money(v.avg) + ' per ticket' : '') + (t.costPct !== null ? '; ingredients cost ' + pctTxt(t.costPct) + ' of menu price.' : '.');
+        // WATCH OUT: with no paid order this is finished food at menu price, a different base from Sales, so it says so.
+        return 'No paid orders yet. Finished food worth ' + money0(t.revenue) + ' at menu price' + (v.count ? ' over ' + U.fmtNum(v.count) + ' finished tickets, ' + money(v.avg) + ' per ticket' : '') + (t.costPct !== null ? '; ingredients cost ' + pctTxt(t.costPct) + ' of menu price.' : '.');
       }
       case 'safety': {
         const k = M.compliance(c); if (!k.tempChecks.count && !k.sanitize.count && !k.discards.count) return 'No food-safety records in this range yet.';

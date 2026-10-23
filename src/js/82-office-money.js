@@ -561,13 +561,15 @@
 
   // Builds the What sells and what it earns section of the Sales and money page (top items, sales by hour, by order type and cost of goods) and returns the four cards the page result keeps.
   function buildSellsSection(env) {
-    const { page, scope, st, itemRows, fmt, M, ctx } = env;
+    const { page, scope, st, itemRows, salesOf, fmt, M, ctx } = env;
     /* ---------------------------------------------------------------- what sells */
-    page.section('What sells and what it earns', 'Every figure here comes from finished tickets with priced items in the range above.');
+    // WATCH OUT: two bases live on this page. Sales by hour and by channel come from paid orders, like the Sales
+    // tile. Top items and food cost can only come from finished food at menu price, so they say "menu value".
+    page.section('What sells and what it earns', 'Sales by hour and by channel come from paid orders, like the Sales figure at the top. Top items and food cost use the menu price of finished food, before discounts and whether paid yet or not, so their totals can differ from Sales.');
 
     const topCard = page.card({
       type: 'bar', span: 6, title: 'Top items', sub: scope(),
-      caption: 'Whether your best sellers are also your best earners. Switch between how many were sold and how much they brought in.',
+      caption: 'Whether your best sellers are also your best earners. Switch between how many were sold and their menu value (menu price times number sold, before discounts).',
       empty: { title: 'No sales in this range yet', body: 'Finished tickets with priced items fill this chart. Take and finish an order on the kitchen board, or pick a longer range.', icon: 'chart-bar' },
       // Top 10 items by the picked measure; items with no sales are left out.
       spec: (p) => {
@@ -575,52 +577,52 @@
         const rows = itemRows(p).filter((r) => isNum(by === 'sold' ? r.sold : r.revenue) && (by === 'sold' ? r.sold : r.revenue) > 0);
         if (!rows.length) return null;
         const top = rows.slice().sort((a, b) => (by === 'sold' ? b.sold - a.sold : b.revenue - a.revenue)).slice(0, 10);
-        const word = by === 'sold' ? 'number sold' : 'sales';
+        const word = by === 'sold' ? 'number sold' : 'menu value';
         return {
           orient: 'h', categories: top.map((r) => r.name), sort: 'none', labels: 'all', format: by === 'sold' ? 'int' : 'money',
-          series: [{ id: by, name: by === 'sold' ? 'Sold' : 'Sales', values: top.map((r) => (by === 'sold' ? r.sold : r.revenue)) }],
+          series: [{ id: by, name: by === 'sold' ? 'Sold' : 'Menu value', values: top.map((r) => (by === 'sold' ? r.sold : r.revenue)) }],
           height: Math.max(170, 32 * top.length + 40),
-          ariaLabel: 'Bar chart of the ' + top.length + ' top items by ' + word + '. ' + top[0].name + ' leads with ' + (by === 'sold' ? fmt.num(top[0].sold, 0) + ' sold' : fmt.money(top[0].revenue, 0) + ' in sales') + '.',
+          ariaLabel: 'Bar chart of the ' + top.length + ' top items by ' + word + '. ' + top[0].name + ' leads with ' + (by === 'sold' ? fmt.num(top[0].sold, 0) + ' sold' : fmt.money(top[0].revenue, 0) + ' in menu value') + '.',
         };
       },
     });
-    // Sold or Sales switch: only this card redraws.
-    B.addAction(topCard, B.seg({ label: 'Rank items by', value: st.itemsBy, options: [{ id: 'sold', label: 'Sold' }, { id: 'revenue', label: 'Sales' }], onChange: (id) => { st.itemsBy = id; topCard.update(ctx.prepared(), ctx); } }));
+    // Sold or Menu value switch: only this card redraws.
+    B.addAction(topCard, B.seg({ label: 'Rank items by', value: st.itemsBy, options: [{ id: 'sold', label: 'Sold' }, { id: 'revenue', label: 'Menu value' }], onChange: (id) => { st.itemsBy = id; topCard.update(ctx.prepared(), ctx); } }));
 
     const hourCard = page.card({
       type: 'bar', span: 6, title: 'Sales by hour of the day', sub: scope(),
       caption: 'The hours that pay the bills. Staff, prep and the second cook wave should line up with the tallest bars.',
-      empty: { title: 'No hourly sales yet', body: 'Finished tickets with priced items fill this chart, one bar per hour of the day.', icon: 'chart-bar' },
-      // One bar per hour of the day; the card stays empty until some hour has sales.
+      empty: { title: 'No hourly sales yet', body: 'Paid orders fill this chart, one bar per hour of the day they were paid.', icon: 'chart-bar' },
+      // One bar per hour of the day from paid orders, so the bars add up to the Sales tile; empty until some hour has sales.
       spec: (p) => {
-        const rows = M.revenueByHour(p);
-        if (!rows.length || !rows.some((r) => r.revenue > 0)) return null;
-        const peak = rows.reduce((a, r) => (r.revenue > a.revenue ? r : a), rows[0]);
+        const rows = salesOf(p).byHour;
+        if (!rows.length || !rows.some((r) => r.net > 0)) return null;
+        const peak = rows.reduce((a, r) => (r.net > a.net ? r : a), rows[0]);
         return {
           orient: 'v', categories: rows.map((r) => r.label), sort: 'none', format: 'money',
-          series: [{ id: 'sales', name: 'Sales', values: rows.map((r) => r.revenue) }],
+          series: [{ id: 'sales', name: 'Sales', values: rows.map((r) => r.net) }],
           height: 270,
-          ariaLabel: 'Bar chart of sales for each hour of the day. The busiest hour is ' + peak.span + ' with ' + fmt.money(peak.revenue, 0) + '.',
+          ariaLabel: 'Bar chart of sales for each hour of the day. The busiest hour is ' + peak.span + ' with ' + fmt.money(peak.net, 0) + '.',
         };
       },
     });
 
     const chanCard = page.card({
-      type: 'bar', span: 6, title: 'Average ticket value by channel', sub: scope(),
-      caption: 'Which way of ordering brings the biggest tickets. A low bar is a channel where guests add little to the order.',
-      empty: { title: 'No ticket values yet', body: 'Finished tickets with priced items fill this chart, one bar per order channel.', icon: 'chart-bar' },
-      // One bar per order channel, with a line at the all-channel average when there is more than one.
+      type: 'bar', span: 6, title: 'Average order by channel', sub: scope(),
+      caption: 'Which way of ordering brings the biggest orders: sales on paid orders divided by the number of them, like the Average order tile. A low bar is a channel where guests add little to the order.',
+      empty: { title: 'No paid orders yet', body: 'Paid orders fill this chart, one bar per order channel.', icon: 'chart-bar' },
+      // One bar per order channel from paid orders, with a line at the all-channel average when there is more than one.
       spec: (p) => {
-        const v = M.avgTicketValue(p);
-        const rows = (v.byChannel || []).filter((r) => isNum(r.avg));
+        const s = salesOf(p);
+        const rows = (s.byChannel || []).filter((r) => isNum(r.avg));
         if (!rows.length) return null;
         const lead = rows.slice().sort((a, b) => b.avg - a.avg)[0];
         return {
           orient: 'h', categories: rows.map((r) => r.name), sort: 'none', labels: 'all', format: 'money',
-          series: [{ id: 'avg', name: 'Average ticket', values: rows.map((r) => r.avg) }],
-          refLines: isNum(v.avg) && rows.length > 1 ? [{ value: v.avg, label: 'All channels ' + fmt.money(v.avg, 2), tone: 'muted' }] : [],
+          series: [{ id: 'avg', name: 'Average order', values: rows.map((r) => r.avg) }],
+          refLines: isNum(s.avgCheck) && rows.length > 1 ? [{ value: s.avgCheck, label: 'All channels ' + fmt.money(s.avgCheck, 2), tone: 'muted' }] : [],
           height: Math.max(150, 46 * rows.length + 40),
-          ariaLabel: 'Bar chart of the average ticket value for each order channel. ' + lead.name + ' is highest at ' + fmt.money(lead.avg, 2) + '.',
+          ariaLabel: 'Bar chart of the average paid order for each order channel. ' + lead.name + ' is highest at ' + fmt.money(lead.avg, 2) + '.',
         };
       },
     });
@@ -688,8 +690,8 @@
     });
 
     page.card({
-      type: 'bar', span: 7, title: 'Money collected by day', sub: scope(),
-      caption: 'Sales for each day, from the orders paid that day. A short bar is a slow day or a day with orders still open.',
+      type: 'bar', span: 7, title: 'Sales by day', sub: scope(),
+      caption: 'Sales for each day, from the orders paid that day, before tax and tips (so less than the cash and card taken in). A short bar is a slow day or a day with orders still open.',
       empty: { title: 'No paid orders to chart yet', body: 'Each day with a paid order gets one bar.', icon: 'chart-bar' },
       // One bar per day with paid orders.
       spec: (p) => {
@@ -791,8 +793,12 @@
         previous: (p) => { const q = prevHandle(p); const s = q ? salesOf(q) : null; return s && s.checks ? s.net : null; } },
       // Average paid order, before tax and tips, so it agrees with the Sales tile.
       { id: 'avgTicket', kpi: 'avgTicketValue', label: 'Average order', format: (v) => fmt.money(v, 2),
-        // Sales divided by paid orders; blank when nothing is paid.
-        value: (p) => { const s = salesOf(p); return s.checks ? s.avgCheck : null; } },
+        // Sales divided by paid orders; blank when nothing is paid. The daily line is on the same paid basis.
+        value: (p) => { const s = salesOf(p); return s.checks ? { value: s.avgCheck, spark: s.byDay.map((d) => (d.checks ? d.net / d.checks : null)) } : null; },
+        // WATCH OUT: the ready-made avgTicketValue kpi is finished food at menu price, so the change arrow must come
+        // from paid orders here too or it compares two different things.
+        kind: 'money', good: 'higher',
+        previous: (p) => { const q = prevHandle(p); const s = q ? salesOf(q) : null; return s && s.checks ? s.avgCheck : null; } },
       // Food cost as a share of menu price; blank with a plain note when no item has a recorded cost.
       { id: 'foodCost', kpi: 'foodCostPct', label: 'Food cost', format: (v) => fmt.pct(v, 1), noValue: 'Cost not recorded',
         // Cost share of the items that have a recorded cost; null when none do, never a fake zero.
@@ -807,7 +813,7 @@
 
     buildTakingsSection({ page, scope, kit, salesOf, fmt, ctx });
 
-    const { topCard, hourCard, chanCard, costCard } = buildSellsSection({ page, scope, st, itemRows, fmt, M, ctx });
+    const { topCard, hourCard, chanCard, costCard } = buildSellsSection({ page, scope, st, itemRows, salesOf, fmt, M, ctx });
 
     const { marginCard, noCost } = buildMarginSection({ page, scope, st, M, fmt, kit, itemRows, ctx });
 
