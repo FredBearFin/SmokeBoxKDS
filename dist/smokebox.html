@@ -9086,9 +9086,21 @@ a.of-nav:active { background: var(--press); }
     const flat = allEvents(state);
     const closed = new Set();
     for (const e of flat) if (e.type === 'day_closed' && typeof e.day === 'string') closed.add(e.day);
-    // A day may go: before the boundary and closed.
-    const goes = (day) => typeof day === 'string' && day < bound && closed.has(day);
     const orders = Array.isArray(state.orders) ? state.orders : [];
+    // A day with a sale, an order or a ticket made AFTER its last end-of-day close is not complete in its day_closed record, so it stays whole: the
+    // sale would otherwise exist only in the owner's files and the kitchen's totals would lose it.
+    const lastClose = new Map();
+    for (const e of flat) if (e.type === 'day_closed' && typeof e.day === 'string' && (!lastClose.has(e.day) || e.t > lastClose.get(e.day))) lastClose.set(e.day, e.t);
+    const late = new Set();
+    const mark = (day, t) => { if (isNum(t) && lastClose.has(day) && t > lastClose.get(day)) late.add(day); };
+    for (const o of orders) {
+      mark(o.serviceDate, o.createdAt);
+      if (isNum(o.paidAt)) { mark(o.serviceDate, o.paidAt); mark(U.serviceDate(o.paidAt, dsh), o.paidAt); }
+      if (isNum(o.voidedAt)) { mark(o.serviceDate, o.voidedAt); mark(U.serviceDate(o.voidedAt, dsh), o.voidedAt); }
+    }
+    for (const t of state.tickets) mark(t.serviceDate, t.createdAt);
+    // A day may go: before the boundary, closed, and nothing after its last close.
+    const goes = (day) => typeof day === 'string' && day < bound && closed.has(day) && !late.has(day);
     const tickCand = new Set(), ordCand = new Set();
     for (const t of state.tickets) if (t.status !== 'active' && goes(t.serviceDate)) tickCand.add(t.id);
     const ticketsOf = new Map();
@@ -9113,9 +9125,11 @@ a.of-nav:active { background: var(--press); }
     for (const e of flat) if (eventIds.has(e.id)) days.add(U.serviceDate(e.t, dsh));
     const dayList = Array.from(days).sort();
     // Days before the boundary that still hold records but have no day_closed: they stay, and the screen can tell the owner to close them first.
-    const uncovered = new Set();
-    for (const t of state.tickets) if (t.status !== 'active' && typeof t.serviceDate === 'string' && t.serviceDate < bound && !closed.has(t.serviceDate)) uncovered.add(t.serviceDate);
-    for (const o of orders) if (o.status !== 'open' && typeof o.serviceDate === 'string' && o.serviceDate < bound && !closed.has(o.serviceDate)) uncovered.add(o.serviceDate);
+    const uncovered = new Set(), lateDays = new Set();
+    // Old days that stay although they hold finished records: never closed, or sold after the last close (lateDays, a subset of uncoveredDays).
+    for (const t of state.tickets) if (t.status !== 'active' && typeof t.serviceDate === 'string' && t.serviceDate < bound && !goes(t.serviceDate)) { uncovered.add(t.serviceDate); if (late.has(t.serviceDate)) lateDays.add(t.serviceDate); }
+    for (const o of orders) if (o.status !== 'open' && typeof o.serviceDate === 'string' && o.serviceDate < bound && !goes(o.serviceDate)) { uncovered.add(o.serviceDate); if (late.has(o.serviceDate)) lateDays.add(o.serviceDate); }
+    for (const d of late) if (d < bound) { uncovered.add(d); lateDays.add(d); }
     let money = 0;
     for (const o of orders) if (ordCand.has(o.id) && o.status === 'paid') money = cents(money + o.totals.total);
     return { ok: true, plan: {
@@ -9123,7 +9137,7 @@ a.of-nav:active { background: var(--press); }
       ticketIds: tickets, orderIds: ordCand, eventIds,
       tickets: tickets.size, orders: ordCand.size, events: eventIds.size, safetyEventsKept: safetyKept, dayRecordsKept,
       openTicketsKept: state.tickets.filter((t) => t.status === 'active').length, openOrdersKept: orders.filter((o) => o.status === 'open').length,
-      uncoveredDays: Array.from(uncovered).sort(), paidTotal: money,
+      uncoveredDays: Array.from(uncovered).sort(), lateSaleDays: Array.from(lateDays).sort(), paidTotal: money,
     } };
   }
   // The day before which history was archived by Close the month (YYYY-MM-DD), or null when it never was. A day earlier than this with no records
