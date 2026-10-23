@@ -151,3 +151,20 @@ test('Bram 7: a restore never trusts a servable flag that is not a real true, or
   assert.equal(vc.state.batches[0].canServe, true);
   assert.ok(!vc.repaired.some((x) => /taken off the menu/.test(x)));
 });
+
+test('Bram 11: closing the month never removes the old events of a ticket that stays (recalled after payment and still on the board)', () => {
+  let now = new Date(2026, 7, 1, 11, 0, 0).getTime();
+  let s = E.newState({ now, blank: true });
+  const go = (type, p) => { now += 1000; const r = E.apply(s, type, p, now); assert.equal(r.report, 'ok', type + ' ' + r.report); s = r.state; return r; };
+  const dish = go('addMenuItem', { name: 'Plain', zone: 'pit', cat: 'meat', price: 5, prepSec: 60, track: 'one', prepGuess: false }).info.id;
+  const t = go('createTicket', { customer: 'A', items: [{ menuId: dish }] });
+  go('bumpTicket', { ticketId: t.info.ticketId, force: true });
+  go('payOrder', { orderId: t.info.orderId, method: 'cash' });
+  go('recallTicket', { ticketId: t.info.ticketId });
+  go('closeDay', {});
+  const p = E.monthPlan(s, { before: '2026-12-01', keepDays: 5 }, now + 60 * 24 * H);
+  assert.equal(p.ok, true);
+  assert.ok(!p.plan.ticketIds.has(t.info.ticketId), 'the live ticket stays');
+  const gone = E.allEvents(s).filter((e) => p.plan.eventIds.has(e.id) && e.ticketId === t.info.ticketId);
+  assert.deepEqual(gone.map((e) => e.type), [], 'and so do its events');
+});

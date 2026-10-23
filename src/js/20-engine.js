@@ -3352,9 +3352,14 @@
     const tickets = new Set();
     for (const t of state.tickets) if (tickCand.has(t.id) && (t.orderId === undefined || ordCand.has(t.orderId) || !orders.some((o) => o.id === t.orderId))) tickets.add(t.id);
     const eventIds = new Set(); let safetyKept = 0, dayRecordsKept = 0;
+    // A ticket or order that stays (still live, or on an open check) keeps its whole story, even its events from an old day.
+    const staysT = new Set(), staysO = new Set();
+    for (const t of state.tickets) if (!tickets.has(t.id)) staysT.add(t.id);
+    for (const o of orders) if (!ordCand.has(o.id)) staysO.add(o.id);
     for (const e of flat) {
       if (hasOwn(SAFETY_EVENT, e.type)) { safetyKept++; continue; }
       if (e.type === 'day_closed') { dayRecordsKept++; continue; }
+      if ((e.ticketId !== undefined && staysT.has(e.ticketId)) || (e.orderId !== undefined && staysO.has(e.orderId))) continue;
       if (goes(U.serviceDate(e.t, dsh))) eventIds.add(e.id);
     }
     const days = new Set();
