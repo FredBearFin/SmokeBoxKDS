@@ -64,7 +64,7 @@ Then test it: from another computer type 8 wrong passwords at the sign-in page; 
 
 ## The tunnel (`tunnel.sh`) and its risks
 `tunnel.sh` adds a second address, `https://<random-words>.trycloudflare.com`, that reaches the same server through Cloudflare, for networks that block the server's own address. Plainly:
-- The address is public. Anyone who learns it (a screenshot, a message, a log) reaches the sign-in page. It changes when the tunnel restarts, and anybody can guess nothing about it, but it is not a secret to rely on.
+- The address is public. Anyone who learns it (a screenshot, a message, a log) reaches the sign-in page. It changes when the tunnel restarts, but it is not a secret to rely on.
 - The password prompt is the only gate, and the password you type travels through Cloudflare in a form Cloudflare can read.
 - Traffic through the tunnel reaches Caddy from 127.0.0.1, so the fail2ban jail above cannot ban the real caller (it sees only the local connector). Guessing through the tunnel is therefore not slowed down. Use a long password (a phrase), and switch the tunnel off when you do not need it: `systemctl disable --now smokebox-tunnel`.
 - The connector (`cloudflared`) is installed from Cloudflare's "latest" release page with only a size check; it is not pinned or signed here.
