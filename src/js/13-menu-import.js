@@ -208,6 +208,8 @@
       else if (row.price === 0) P.push(prob('freeItem', 'warn', 'The price is $0.00.', 'Keep it if the dish is free, or enter a price.'));
       if (row.rounded) P.push(prob('priceRounded', 'warn', 'The price had more than two decimals and was rounded to the cent.', 'Check the price shown.'));
     }
+    if (row.extraCells) P.push(prob('extraColumns', 'warn', 'This row has ' + row.extraCells + ' more ' + (row.extraCells === 1 ? 'column' : 'columns') + ' than the header, so a value may have been split at a comma.' + (row.maybePrice ? ' The price may be ' + row.maybePrice + ', not ' + row.price + '.' : ''), 'Put quotes around a price with a comma (for example "4,50"), or use a dot (4.50), then read the file again.'));
+    else if (/^\d+([.,]\d+)?$/.test(row.categoryText || '')) P.push(prob('numericCategory', 'warn', 'The category "' + row.categoryText + '" is a number, which usually means a price was split in two.', 'Check the price and the category in the file.'));
     if (row.stationText && !row.station) P.push(prob('unknownStation', 'warn', 'The station "' + row.stationText + '" is not one of yours, so the default station is used.', 'Pick the station after adding the dish.'));
     if (row.categoryText && !row.category) P.push(prob('unknownCategory', 'warn', 'The category "' + row.categoryText + '" is not one of yours, so the default category is used.', 'Change the category after adding the dish.'));
     if (row.fromCents) P.push(prob('centsConverted', 'warn', 'The price was read in cents (' + row.priceText + ' becomes $' + (row.price != null ? row.price.toFixed(2) : '?') + ').', 'If this is wrong, choose "Prices are in dollars".'));
@@ -294,6 +296,14 @@
       const typ = col.priceType >= 0 ? clean(c(col.priceType)).toUpperCase() : '';
       if (typ === 'VARIABLE' || typ === 'PER_UNIT') { row.priceText = clean(c(col.price)) || typ.toLowerCase(); row.priceError = 'variable'; } else setPrice(row, c(col.price), cents);
       setWhere(row, c(col.station), c(col.category), opts);
+      // More filled cells than the header has columns: a comma inside an unquoted value pushed the rest along.
+      let used = d.cells.length;
+      while (used > 0 && !clean(d.cells[used - 1])) used--;
+      if (used > headers.length) {
+        row.extraCells = used - headers.length;
+        const next = clean(c(col.price + 1));
+        if (col.price >= 0 && /^\d{2}$/.test(next) && /^\d+$/.test(clean(c(col.price)))) row.maybePrice = clean(c(col.price)) + '.' + next;
+      }
       const desc = clean(c(col.description));
       if (desc) row.description = desc;
       if (col.hidden >= 0 && /^(true|yes|y|1|hidden|archived)$/i.test(clean(c(col.hidden)))) row.hidden = true;

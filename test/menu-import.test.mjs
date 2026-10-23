@@ -167,3 +167,16 @@ test('parse never throws on junk', () => {
   }
   for (const v of [undefined, 5, {}, [], () => 1]) assert.ok(M.parse(v).error);
 });
+
+const kc = (row) => codes(row).filter((c) => c !== 'unknownCategory' && c !== 'unknownStation'); // the other warnings are not the point here
+test('a row with more columns than the header is flagged (an unquoted decimal comma)', () => {
+  const r = M.parse('Name,Price,Category\nCappuccino,4,50,Coffee\nLatte,"4,50",Coffee\nTea,3.5,Hot\n');
+  assert.equal(r.rows[0].price, 4);
+  assert.deepEqual(kc(r.rows[0]), ['extraColumns']);
+  assert.match(r.rows[0].problems[0].message, /price may be 4\.50/);
+  assert.match(r.rows[0].problems[0].fix, /quotes/);
+  assert.deepEqual(kc(r.rows[1]), []); assert.equal(r.rows[1].price, 4.5);
+  assert.deepEqual(kc(r.rows[2]), []);
+  assert.deepEqual(kc(M.parse('Name,Price,Category\nTea,3.5,12\n').rows[0]), ['numericCategory']);
+  assert.deepEqual(kc(M.parse('Name,Price,Category\nTea,3.5,Hot,,\n').rows[0]), []); // trailing empty cells are fine
+});
