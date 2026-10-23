@@ -20,6 +20,12 @@
   const CORRUPT_AT_KEY = 'smokebox.v1.corruptat';
   // One small rolling copy of the last good state (menu, ingredients, settings, PIN, safety records, recent history).
   const LASTGOOD_KEY = 'smokebox.v1.lastgood';
+  // The owner's answer to the one-time offer to clear old demo tickets: true once they chose to keep them.
+  const KEPT_KEY = 'smokebox.v1.demoLeftoversKept';
+  // The word that must be typed to start over with an empty menu, and the setup-progress keys that start over clears.
+  const START_OVER_WORD = 'ERASE';
+  const START_OVER_KEYS = ['smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone',
+    'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
   // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
@@ -175,6 +181,7 @@
     const v = now();
     let ok = false;
     const t0 = perfNow();
+    const prevSaveOk = st.lastSaveOk;
     let snapDropped = false;
     // full copy first; if the quota refuses it, keep halving the history (oldest completed tickets and events go first)
     let lim = null;
@@ -192,8 +199,10 @@
       lim = { maxTickets: nt, maxEvents: ne };
       nt = Math.floor(nt / 2); ne = Math.floor(ne / 2);
     }
+    const flipped = st.lastSaveOk !== ok;
     st.lastSaveOk = ok;
     st.lastSaveAt = r;
+    if (flipped && (ok === false || prevSaveOk === false)) scheduleNotify(); // a failed save (or its recovery) shows on screen at once
     st.saveCostMs = Math.round((perfNow() - t0) * 10) / 10; // how long this save took, which sets the next delay
     if (ok) dirty = false;
     let sid = null;
@@ -917,6 +926,60 @@
     reloadPage();
     return true;
   }
+  // Starts the real kitchen over with an empty menu. Needs opts.confirm to be the typed word (SB.store.START_OVER_WORD, any case),
+  // refuses in the demo, and takes a full backup first: if the backup cannot be made nothing is cleared. Then it clears dishes,
+  // ingredients, stock, batches, tickets, orders and history (resetLive, catalog 'blank') and the setup-progress choices, so the
+  // kitchen is exactly like a brand-new install. opts.keepSettings (default true) keeps tax, hours, PIN, units and station names;
+  // false resets those too. Returns { ok, report, info, backup? } with backup { text, filename, mime, savedAt, chars } for the
+  // screen to download; the last good copy is also refreshed first, so a damaged save can still come back.
+  // WATCH OUT: the demo's keys are never read or written here.
+  function startOver(opts) {
+    opts = opts || {};
+    // Records and returns a refusal; nothing has been changed when this is used.
+    const fail = (report, info) => { last = { type: 'startOver', report, info: info || {}, events: [] }; return { ok: false, report, info: info || {} }; };
+    if (!state) return fail('invalidBackup');
+    if (mode === 'demo') return fail('notInDemo');
+    if (typeof opts.confirm !== 'string' || opts.confirm.trim().toUpperCase() !== START_OVER_WORD) return fail('confirmWord', { word: START_OVER_WORD });
+    if (opts.keepSettings != null && typeof opts.keepSettings !== 'boolean') return fail('badPatch', { key: 'keepSettings' });
+    const keep = opts.keepSettings !== false;
+    const text = exportAll();
+    if (text == null) { const lr = last || {}; return fail(lr.report || 'invalidBackup', lr.info); }
+    const savedAt = realNow();
+    snapWanted = 'startOver'; maybeSnapshot(savedAt);
+    const rep = resetLive({ keepSettings: keep, catalog: 'blank', replaceOwn: true, starter: false });
+    if (rep !== 'ok') return fail(rep);
+    for (const k of START_OVER_KEYS) { try { storage.remove(k); } catch (e) { /* ignore */ } }
+    if (!keep && SB.config && typeof SB.config.applyCustom === 'function') {
+      try { SB.config.applyCustom({}); SB.config.saveCustom({ rename: {}, add: {} }); } catch (e) { /* the names stay as they were */ }
+    }
+    last = { type: 'startOver', report: 'ok', info: { keepSettings: keep }, events: [] };
+    const d = new Date(savedAt);
+    // Two-digit number for the file name.
+    const pad = (n) => (n < 10 ? '0' : '') + n;
+    return { ok: true, report: 'ok', info: { keepSettings: keep }, backup: { text, filename: 'smokebox-before-start-over-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.json', mime: 'application/json', savedAt, chars: text.length } };
+  }
+  // Counts the old demo and sample tickets in this kitchen's real reports (see the engine's demoLeftovers), and whether the
+  // owner already chose to keep them. In the demo it counts nothing (demo tickets belong there). { tickets, orders, paidOrders,
+  // openOrders, mixedOrders, events, kept, offer } where offer is true when there is something to clear and no "keep" answer yet.
+  function demoLeftovers() {
+    const c = state && mode !== 'demo' ? E().demoLeftovers(state) : { tickets: 0, orders: 0, paidOrders: 0, openOrders: 0, mixedOrders: 0, events: 0 };
+    let kept = false;
+    try { kept = !!(storage && storage.get(KEPT_KEY, false) === true); } catch (e) { kept = false; }
+    return Object.assign(c, { kept, offer: (c.tickets > 0 || c.orders > 0) && !kept });
+  }
+  // Remembers that the owner chose to keep the old demo tickets, so the offer is not made again. Returns true when saved.
+  function keepDemoLeftovers() {
+    try { return !!storage && mode !== 'demo' && storage.set(KEPT_KEY, true) !== false; } catch (e) { return false; }
+  }
+  // Removes the old demo and sample tickets (the engine action clearDemoTickets) and saves. Refuses in the demo. Returns
+  // { ok, report, info } where info has the counts removed.
+  function clearDemoLeftovers() {
+    if (!state) return { ok: false, report: 'invalidBackup', info: {} };
+    if (mode === 'demo') return { ok: false, report: 'notInDemo', info: {} };
+    const r = dispatchEx('clearDemoTickets', {}, { source: 'user' });
+    if (r.report === 'ok') persistNow();
+    return { ok: r.report === 'ok', report: r.report, info: r.info || {} };
+  }
   // True while this kitchen began empty and still has no dish on the menu (archived dishes do not count): the setup
   // screens use it to know a first-time owner is looking at an empty kitchen. False for old saves and the demo.
   function isBlank() {
@@ -932,7 +995,7 @@
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").

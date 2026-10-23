@@ -1667,7 +1667,7 @@
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '' };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -1811,7 +1811,9 @@
     updateThemeColor();
     bn.el = null; bn.kind = '';
     paintBanner();
-    clearInterval(bn.timer); bn.timer = setInterval(paintBanner, 5000); // also reacts when a save starts failing
+    clearInterval(bn.timer); bn.timer = setInterval(paintBanner, 5000); // the daily backup nudge comes due with the clock
+    // A failed save (or its recovery) is announced by the store, so the red strip shows at once instead of on the next 5 s round.
+    if (!bn.sub && SB.store && typeof SB.store.subscribe === 'function') bn.sub = SB.store.subscribe(paintBanner);
     const v = R.view();
     onRoute(v);
     return S;
