@@ -461,7 +461,10 @@
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
     if (loaded) atLeast(lastStamp(loaded));
-    state = loaded || E().newState({ now: now(), starter: opts.starter === true, stagger: opts.starter === true }); // a real kitchen starts with an empty pit; init({ starter: true }) gives the demo stock
+    // A real kitchen starts with an empty pit; init({ starter: true }) gives the demo stock. init({ blank: true }) (what the
+    // app's start-up passes) makes a brand-new install start with no dishes, ingredients or prices at all. A saved state
+    // always wins: nobody who already has data is changed.
+    state = loaded || E().newState(opts.blank === true && opts.starter !== true ? { now: now(), blank: true } : { now: now(), starter: opts.starter === true, stagger: opts.starter === true });
     // Catch up anything that became due while the page was closed.
     const t = E().tick(state, now());
     state = t.state;
@@ -673,7 +676,7 @@
   function reset() {
     rebaseClock();
     const old = state;
-    const ns = E().newState({ now: now(), starter: false, seq: old ? old.seq : undefined });
+    const ns = E().newState({ now: now(), starter: false, seq: old ? old.seq : undefined, blank: !!(old && old.catalog === 'own') });
     ns.rev = (old ? old.rev : 0) + 1;
     commit(ns, true);
     skipRebase = true; pending = [];
@@ -784,6 +787,14 @@
     return ds;
   }
 
+  // True while this kitchen began empty and still has no dish on the menu (archived dishes do not count): the setup
+  // screens use it to know a first-time owner is looking at an empty kitchen. False for old saves and the demo.
+  function isBlank() {
+    return !!(state && state.catalog === 'own' && !state.menu.some((m) => !m.archived));
+  }
+  // True when this kitchen began empty (the sample dishes were never loaded into it), even after dishes were added.
+  function isOwn() { return !!(state && state.catalog === 'own'); }
+
   // Public API: init, destroy, status, getState, now, tick, dispatch, dispatchEx, lastResult, subscribe,
   // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, exportCsv, reset,
   // resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY.
@@ -791,7 +802,7 @@
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY,
+    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
