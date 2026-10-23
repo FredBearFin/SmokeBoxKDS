@@ -756,3 +756,12 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 /* Wall list: a long customer name wraps onto up to two lines instead of being cut to a few letters. */
 .fl-wall-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .fl-wall-row { align-items: center; }
+/* Counter service (settings.service.counter): no station switching, no START or DONE wording, no next-step line and no late
+   colours. A ticket stays a plain, readable list of what was ordered, ended with Bump. */
+.fl[data-counter="on"] .fl-seg { display: none; }
+.fl[data-counter="on"] .slip-next, .fl[data-counter="on"] .fl-act-word, .fl[data-counter="on"] .fl-deck, .fl[data-counter="on"] .fl-badge, .fl[data-counter="on"] .fl-fire { display: none; }
+.fl[data-counter="on"] .fl-slip::before { display: none; }
+.fl[data-counter="on"] .fl-slip[data-level="warn"] .slip-head, .fl[data-counter="on"] .fl-slip[data-level="breach"] .slip-head { background: var(--slip); }
+.fl[data-counter="on"] .fl-slip[data-level="breach"], .fl[data-counter="on"] .fl-slip[data-tier] { outline: none; }
+.fl[data-counter="on"] .slip[data-level] .slip-head, .fl[data-counter="on"] .slip[data-level] .slip-body, .fl[data-counter="on"] .slip[data-level] .slip-tear { animation: none; box-shadow: none; }
+.fl[data-counter="on"] .slip-timer { color: var(--slip-ink); }

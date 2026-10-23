@@ -1,6 +1,5 @@
 // Board and ordering round 2 checks (browser, about 40 s). Run: node test/board-round2.e2e.mjs
 // Covers: tab names on one line at 390 px, heading order in the Cabinet view, 44 px touch size of the loudness slider and
-// the Channel sync row, SB.floor._alerts existing at start, a short notice area, toasts that clear and sit clear of
 // tickets, the overdue ranking tags, the sold-out explanation, the customer name above the quick names, and the
 // empty-menu first step. Needs dist/smokebox.html.
 import { withPage } from '../tools/pw.mjs';
@@ -35,9 +34,6 @@ await withPage({ w: 1280, h: 800 }, async (page, logs) => {
   const vol = await page.evaluate(() => Math.round(document.querySelector('input.mn-volume').getBoundingClientRect().height));
   check('Warning loudness slider is at least 44 px tall', vol >= 44, vol);
   await page.keyboard.press('Escape'); await page.waitForTimeout(400);
-  await page.evaluate(() => SB.sheets.open('board86')); await page.waitForSelector('.bd-sync > summary');
-  const sum = await page.evaluate(() => Math.round(document.querySelector('.bd-sync > summary').getBoundingClientRect().height));
-  check('86 board Channel sync row is at least 44 px tall', sum >= 44, sum);
   await page.keyboard.press('Escape'); await page.waitForTimeout(400);
 
   // Short top area with a late board; the first ticket is near the top

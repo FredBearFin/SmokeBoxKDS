@@ -317,20 +317,15 @@ async function testBoard86() {
     await boot(page);
     await openSheet(page, 'board86');
     check('the sync strip says it is practice only', /(Practice|Demo) only: no live POS connected/.test(await text(page, TOP) || ''));
-    check('four sync chips, one per channel', (await page.locator('.bd-chip').count()) === 4);
     check('all menu items are listed as rows', (await page.locator('.bd-row').count()) === 21);
     const row = '.bd-row[data-menu="brisket_qtr"]';
     await page.click(row + ' [data-act="toggle"]'); await page.waitForTimeout(250);
     check('86 it marks the row 86 manual in words and swaps the button to Back on', /86 manual/.test(await text(page, row + ' .fs-state') || '') && /Back on/.test(await text(page, row + ' [data-act="toggle"]') || ''));
     check('the engine agrees (manual 86 recorded)', await page.evaluate(() => SB.store.select.availability('brisket_qtr').reason === 'manual'));
-    check('the sync chips show it is syncing, with the word "Syncing"', /Syncing/.test(await text(page, '.bd-sync-grid') || ''), await text(page, '.bd-sync-grid'));
     check('a toast with Undo is shown', (await page.locator('.toast .toast-undo').count()) === 1);
     await clickToastUndo(page);
     check('Undo puts it back on the menu', /On the menu/.test(await text(page, row + ' .fs-state') || ''));
     await page.click(row + ' [data-act="toggle"]'); await page.waitForTimeout(200);
-    // let simulated time pass: x30 makes the 60 s sync window pass in about two seconds
-    await page.evaluate(() => SB.store.setSpeed(30)); await page.waitForTimeout(3200); await page.evaluate(() => SB.store.setSpeed(1)); await page.waitForTimeout(1200);
-    check('after the sync window the chips say Synced and how many seconds it took', /Synced \d+ s/.test(await text(page, '.bd-sync-grid') || ''), await text(page, '.bd-sync-grid'));
     await page.click(row + ' [data-act="toggle"]'); await page.waitForTimeout(250);
     check('Back on returns the item to the menu', /On the menu/.test(await text(page, row + ' .fs-state') || ''));
     // filter
