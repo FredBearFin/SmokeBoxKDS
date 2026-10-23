@@ -544,13 +544,22 @@ await withPage({ w: 1280, h: 800, file: SHELL_OUT }, async (page, logs) => {
 group('PIN gate');
 await withPage({ w: 1280, h: 800, file: SHELL_OUT }, async (page, logs) => {
   await stubs(page);
-  const vec = await page.evaluate(async () => ({ subtle: await SB.shell.hashPin('1234'), pure: 'sha256:' + SB.shell.sha256('smokebox.v1:1234') }));
-  check('crypto.subtle and the pure SHA-256 give the same PIN hash', vec.subtle === vec.pure && /^sha256:[0-9a-f]{64}$/.test(vec.subtle), vec);
+  const vec = await page.evaluate(async () => ({ a: await SB.shell.hashPin('1234'), b: await SB.shell.hashPin('1234') }));
+  check('a PIN hash is salted PBKDF2 (two hashes of one PIN differ)', /^pbkdf2:100000:[0-9a-f]{32}:[0-9a-f]{64}$/.test(vec.a) && vec.a !== vec.b, vec);
+  const upg = await page.evaluate(async () => {
+    const legacy = 'sha256:' + SB.shell.sha256('smokebox.v1:4321');
+    SB.store.dispatch('updateSettings', { patch: { office: { pinHash: legacy } } }, { source: 'user' });
+    const wrong = await SB.shell.checkPin('1111'), still = SB.store.getState().settings.office.pinHash === legacy;
+    const right = await SB.shell.checkPin('4321'), now = SB.store.getState().settings.office.pinHash, again = await SB.shell.checkPin('4321');
+    SB.store.dispatch('updateSettings', { patch: { office: { pinHash: null } } }, { source: 'user' });
+    return { wrong, still, right, upgraded: /^pbkdf2:/.test(now), again };
+  });
+  check('an old unsalted PIN hash still works and is upgraded on the first right PIN, not on a wrong one', upg.wrong === false && upg.still && upg.right && upg.upgraded && upg.again, upg);
   check('no PIN set: the gate is open', await page.evaluate(async () => !SB.shell.hasPin() && (await SB.shell.checkPin('0000')) === true));
   const bad = await page.evaluate(async () => [await SB.shell.setPin('12'), await SB.shell.setPin('abcd'), await SB.shell.setPin('12345')].map((r) => r.ok));
   check('setPin rejects anything but exactly 4 digits', JSON.stringify(bad) === '[false,false,false]', bad);
   const set = await page.evaluate(async () => { const r = await SB.shell.setPin('1234'); return { r, hash: SB.store.getState().settings.office.pinHash, has: SB.shell.hasPin() }; });
-  check('setPin stores the hash at state.settings.office.pinHash through SB.store.dispatch("updateSettings")', set.r.ok && /^sha256:/.test(set.hash) && set.has && !JSON.stringify(set).includes('"1234"'), set);
+  check('setPin stores the hash at state.settings.office.pinHash through SB.store.dispatch("updateSettings")', set.r.ok && /^pbkdf2:/.test(set.hash) && set.has && !JSON.stringify(set).includes('"1234"'), set);
   check('right and wrong PINs check correctly', await page.evaluate(async () => (await SB.shell.checkPin('1234')) === true && (await SB.shell.checkPin('1235')) === false));
 
   // 5 taps -> keypad
