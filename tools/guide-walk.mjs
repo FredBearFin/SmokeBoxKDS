@@ -242,6 +242,58 @@ async function startOver(browser) {
   await p.close();
 }
 
+// The Setup recipes walk: the four recipes on the Setup recipes page, each checked against the real screens.
+async function recipes(browser) {
+  console.log('Setup recipes');
+  const tabTap = (p, label) => p.evaluate((l) => { const e = [...document.querySelectorAll('.fl-seg button')].find((x) => x.getClientRects().length && x.textContent.trim().indexOf(l) === 0); if (e) e.click(); return !!e; }, label);
+  const tabTexts = (p) => p.evaluate(() => [...document.querySelectorAll('.fl-seg [role=tab], .fl-seg button')].filter((e) => e.getClientRects().length).map((e) => (e.getAttribute('aria-label') || e.textContent).trim()));
+  // Counter cafe: rename one station, mark the others Not used, count a batch dish, then Done and Bump.
+  let p = await fresh(browser);
+  await p.click('[data-act="first-dish"]'); await p.waitForTimeout(500);
+  const sh = '.sheet-root';
+  await p.fill(sh + ' input >> nth=0', 'Latte'); await p.fill(sh + ' input >> nth=1', '4.50');
+  check('cafe: Change stations', await tap(p, 'Change stations')); await p.waitForTimeout(300);
+  await p.fill('input[aria-label="Name of station Cold and drinks"]', 'Counter'); await p.keyboard.press('Tab'); await p.waitForTimeout(300);
+  for (let i = 0; i < 3; i++) await p.evaluate((i) => document.querySelectorAll('.dp-strow')[i].querySelector('button').click(), i);
+  check('cafe: Not used', await seen(p, 'Use again', sh));
+  await tap(p, 'Save and add another'); await p.waitForTimeout(500);
+  check('cafe: I count what I made', await has(p, 'I count what I made', sh));
+  check('cafe: No, skip this', await has(p, 'No, skip this', sh));
+  await p.reload(); await p.waitForTimeout(900);
+  const t1 = (await tabTexts(p)).join(' | ');
+  check('cafe: tabs are All stations, Counter, Expo', /All stations/.test(t1) && /Counter/.test(t1) && /Expo/.test(t1) && !/Pit/.test(t1) && !/Fry/.test(t1), t1);
+  await tap(p, 'New ticket'); await p.waitForTimeout(500);
+  await tap(p, 'Latte'); await p.waitForTimeout(200);
+  for (const t of ['Takeout', 'Dine-in', 'Cash', 'Card', 'Send to kitchen']) check('order screen: ' + t, await seen(p, t));
+  await tap(p, 'Cash'); await tap(p, 'Send to kitchen'); await p.waitForTimeout(900);
+  check('cafe: Done on the ticket', await seen(p, 'Done'));
+  await tap(p, 'Done'); await p.waitForTimeout(400);
+  check('cafe: Bump', await seen(p, 'Bump'));
+  await p.close();
+  // Line with an expo: a cook tab shows only its dishes, the Expo tab shows the whole ticket tagged by station and has Bump.
+  p = await fresh(browser);
+  await addDish(p, { name: 'Burger', short: 'Burger', zone: 'fry', price: 12 });
+  await addDish(p, { name: 'Salad', short: 'Salad', zone: 'cold', price: 9, track: 'one' });
+  await tap(p, 'New ticket'); await p.waitForTimeout(500);
+  await tap(p, 'Burger'); await tap(p, 'Salad'); await tap(p, 'Dine-in'); await tap(p, 'Table 3'); await tap(p, 'Card'); await tap(p, 'Send to kitchen'); await p.waitForTimeout(900);
+  check('expo: tab', await tabTap(p, 'Expo')); await p.waitForTimeout(500);
+  const ex = await p.evaluate(() => document.body.innerText);
+  check('expo: sees the whole ticket', /Burger/.test(ex) && /Salad/.test(ex) && /FRY/.test(ex) && /CLD/.test(ex), ex.slice(-400));
+  check('expo: Bump', await seen(p, 'Bump'));
+  await tabTap(p, 'Fry'); await p.waitForTimeout(500);
+  const fr = await p.evaluate(() => document.querySelector('.fl-board, main, body').innerText);
+  check('cook tab: only its own dishes', /Burger/.test(fr) && !/Salad, /.test(fr));
+  await p.close();
+  // Cooks food ahead: saying yes adds the Cabinet tab and New batch.
+  p = await fresh(browser);
+  await addDish(p, { name: 'Chili', short: 'Chili', zone: 'sides', cat: 'side', price: 6 });
+  await p.click('button:has-text("Menu")'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
+  check('ahead: Yes, I cook ahead', await tap(p, 'Yes, I cook ahead')); await p.waitForTimeout(500);
+  await p.evaluate(() => SB.sheets.closeAll && SB.sheets.closeAll()); await p.waitForTimeout(400);
+  check('ahead: Cabinet tab', (await tabTexts(p)).some((t) => /Cabinet/.test(t)));
+  await p.close();
+}
+
 // The demo walk: a fresh browser context opened with ?demo has sample dishes and tickets, and a normal tab in the same context stays empty.
 async function demoMode(browser) {
   console.log('Demo mode (?demo)');
@@ -257,7 +309,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await startOver(browser); await tryDemo(browser); await demoMode(browser); } finally { await browser.close(); }
+try { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);

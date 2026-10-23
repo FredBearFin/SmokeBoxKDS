@@ -1,8 +1,8 @@
-# Hold cabinet and warnings
+# Cabinet and warnings
 
-How cooked food is tracked, and how the board warns you before it runs out of time.
+For kitchens that cook food ahead, like pots of soup or trays of rice. Skip this page if you cook everything to order.
 
-## Food in the hold cabinet
+## Food in the cabinet
 
 ![Steps for a batch in the hold cabinet: it goes in, it is checked, portions are taken out, and it ends by being reheated once or thrown out.](fig:cabinet "A batch in the hold cabinet.")
 

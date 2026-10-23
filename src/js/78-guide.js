@@ -30,7 +30,7 @@
       "t": "ol",
       "x": [
        "A new Smokebox starts empty on purpose. Tap **Add your first dish** on the welcome screen.",
-       "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made: Kitchen, Prep, Fryer or Cold and drinks.",
+       "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made. The starting stations are Kitchen, Prep, Fryer and Cold and drinks. Rename or drop any of them (see Setup recipes).",
        "Tap **Save and add another** until your menu is in. Then tap **Save and finish**."
       ]
      },
@@ -93,6 +93,66 @@
      {
       "t": "p",
       "x": "Tap **Back office**, then **Menu and settings**. Find Data, backup and reset and tap **Download backup (JSON)**. Keep a copy off this device: email it to yourself or put it on a USB drive."
+     }
+    ]
+   },
+   {
+    "id": "setup-recipes",
+    "group": "guide",
+    "title": "Setup recipes",
+    "summary": "Four ways to set up Smokebox. Pick the one closest to your place. Each uses only what the app has: a few stations, one cooking-ahead switch and counted dishes.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Counter cafe or bakery"
+     },
+     {
+      "t": "p",
+      "x": "Smokebox has no setting to skip kitchen tickets. Every order makes one, so here a ticket is a quick receipt you clear with one tap."
+     },
+     {
+      "t": "ul",
+      "x": [
+       "Stations: tap **Menu**, **Dishes and prices**, then **Change stations**. Rename one to \"Counter\" and tap **Not used** on the others.",
+       "Settings: set tax and hours in **Tax, hours and PIN**. Choose **No, skip this** for cooking ahead. For a batch you bake, like 24 croissants, tap **I count what I made**.",
+       "The board: tabs for All stations, Counter and Expo. Tap **Done**, then **Bump**."
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Food truck on one tablet"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "Stations: keep two, like \"Grill\" and \"Window\". Tap **Not used** on the rest.",
+       "Settings: enter your tax. Set a PIN if others use the tablet. Tap **Takeout** on each order. Tap **Cash** or **Card** before **Send to kitchen**.",
+       "The board: one tablet does both jobs. **New ticket** takes the order and the All stations tab shows what to cook. **Orders** lists unpaid orders."
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Restaurant with a line and an expo"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "Stations: rename the four stations to match your line, like \"Grill\" and \"Saute\". Expo is always there.",
+       "Settings: choose **Dine-in** and a table on each order. Set a PIN to keep cooks out of the back office.",
+       "The board: each cook opens their station tab and sees only their dishes. Expo sees whole tickets, each dish tagged with its station, and taps **Bump** when the plate is complete."
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Kitchen that cooks food ahead"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "Stations: as above.",
+       "Settings: in **Dishes and prices**, tap **Yes, I cook ahead**. Add each pot or tray as a cooked-ahead item, Hot or Cold, with the time limit your health department gives you.",
+       "The board: a **Cabinet** tab appears. Tap **New batch** and **Log temp** at every check. See Cabinet and warnings."
+      ]
      }
     ]
    },
@@ -229,7 +289,7 @@
     "id": "cooked-ahead-and-portions",
     "group": "guide",
     "title": "Cooked-ahead food and portions",
-    "summary": "Two ways to keep track of food you make before the order comes in.",
+    "summary": "Two ways to keep track of food you make before the order comes in. Skip this page if you cook everything to order.",
     "blocks": [
      {
       "t": "h",
@@ -279,12 +339,12 @@
    {
     "id": "hold-cabinet-and-warnings",
     "group": "guide",
-    "title": "Hold cabinet and warnings",
-    "summary": "How cooked food is tracked, and how the board warns you before it runs out of time.",
+    "title": "Cabinet and warnings",
+    "summary": "For kitchens that cook food ahead, like pots of soup or trays of rice. Skip this page if you cook everything to order.",
     "blocks": [
      {
       "t": "h",
-      "x": "Food in the hold cabinet"
+      "x": "Food in the cabinet"
      },
      {
       "t": "fig",
@@ -641,7 +701,7 @@
      },
      {
       "t": "p",
-      "x": "Sample numbers are made up. They are never your sales or your food."
+      "x": "The demo kitchen is a barbecue restaurant. Yours can be anything. Sample numbers are made up. They are never your sales or your food."
      }
     ]
    },
@@ -651,6 +711,14 @@
     "title": "Questions and answers",
     "summary": "Short answers to the questions owners ask first.",
     "blocks": [
+     {
+      "t": "h",
+      "x": "Is it only for barbecue?"
+     },
+     {
+      "t": "p",
+      "x": "No. A new Smokebox starts empty. You add your own dishes, rename the stations and choose whether you cook ahead. Only the demo is a barbecue kitchen."
+     },
      {
       "t": "h",
       "x": "Does it need the internet?"
@@ -767,7 +835,7 @@
        "Tap the warning bar once, or use Play a test warning under Set up this tablet",
        "Check the 86 board: what is out today?",
        "Counted dishes: how many did you make today?",
-       "If you cook ahead: log a first temperature on each batch in the Hold cabinet",
+       "If you cook ahead: log a first temperature on each batch in the cabinet",
        "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
        "Yesterday's backup saved and a copy kept off the device"
       ]

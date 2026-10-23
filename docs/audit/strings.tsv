@@ -2682,7 +2682,7 @@ file	line	kind	area	text
 78-guide.js	22	title	78-guide	Getting started
 78-guide.js	23	text	78-guide	Add dishes, send a test order, take payment and save a backup. About ten minutes.
 78-guide.js	27	text	78-guide	1. Add your first dish
-78-guide.js	33	text	78-guide	Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like "Reads as $12.50". Tap where it is made: Pit, Hot sides, Fry or Cold and drinks.
+78-guide.js	33	text	78-guide	Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like "Reads as $12.50". Tap where it is made. The starting stations are Pit, Hot sides, Fry and Cold and drinks. Rename or drop any of them (see Setup recipes).
 78-guide.js	34	text	78-guide	Tap **Save and add another** until your menu is in. Then tap **Save and finish**.
 78-guide.js	39	text	78-guide	Change dishes and prices later: tap **Menu**, then **Dishes and prices**. A dish you remove goes to **Removed dishes**. Tap **Bring it back** to put it back.
 78-guide.js	43	text	78-guide	The arrow buttons beside each dish change the order they appear in. The category list on a dish's row moves it to another category.
@@ -2699,278 +2699,299 @@ file	line	kind	area	text
 78-guide.js	87	text	78-guide	Smokebox only writes down how the order was paid. It never charges a card.
 78-guide.js	91	text	78-guide	5. Save a backup
 78-guide.js	95	text	78-guide	Tap **Back office**, then **Menu and settings**. Find Data, backup and reset and tap **Download backup (JSON)**. Keep a copy off this device: email it to yourself or put it on a USB drive.
-78-guide.js	102	title	78-guide	Taking an order
-78-guide.js	103	text	78-guide	Start an order, add dishes and notes, send it to the kitchen, and add to it later.
-78-guide.js	107	text	78-guide	Start the order
-78-guide.js	111	text	78-guide	Tap **New ticket**. Tap a dish to add it. Tap it again to add one more. A dish marked 86 (sold out) cannot be added.
-78-guide.js	115	text	78-guide	Customer and order type
-78-guide.js	119	text	78-guide	Type a name or tap a quick name. Leave it blank for Walk-up. Choose how the order came in: Dine-in, Takeout, Drive-thru or Delivery app. Each type has its own time limit before a ticket turns amber and then red.
-78-guide.js	123	text	78-guide	Allergies and notes
-78-guide.js	127	text	78-guide	Under Any food allergy?, tap **Allergy**, then tap what the customer is allergic to. Put allergies first in the note. Cooks read the first line first.
-78-guide.js	131	text	78-guide	Rush
-78-guide.js	135	text	78-guide	Switch on **Rush ticket** when a customer is waiting. Every dish starts at once and the ticket goes to the front of the board.
-78-guide.js	139	text	78-guide	Send it
-78-guide.js	143	text	78-guide	Tap **Send to kitchen**. Each station sees only its own dishes. Pay now, or leave it on Pay later and take payment from **Orders** when the customer is ready.
-78-guide.js	147	text	78-guide	Add to an order that is still open
-78-guide.js	151	text	78-guide	Tap **New ticket** again and choose **Add to open order**. The new ticket is added to the same order.
-78-guide.js	155	text	78-guide	Fixing a mistake
-78-guide.js	160	text	78-guide	**Undo** appears for 10 seconds after an action. After that, fix it by hand.
-78-guide.js	161	text	78-guide	To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. Cancelled tickets are still counted in your reports.
-78-guide.js	169	title	78-guide	Running the line
-78-guide.js	170	text	78-guide	What a cook does on the kitchen board.
-78-guide.js	174	text	78-guide	Read a ticket
-78-guide.js	185	text	78-guide	Ticket number and clock. The clock counts up from when the order came in. It turns amber, then red, when the order is taking too long.
-78-guide.js	186	text	78-guide	The customer, the order type and how many dishes are done.
-78-guide.js	187	text	78-guide	The next step. This line says what to do next.
-78-guide.js	189	text	78-guide	**Start** or **Done** for that dish. Quick dishes, like drinks, only need Done.
-78-guide.js	190	text	78-guide	The small menu (the ... button): cancel the ticket or mark it as a rush.
-78-guide.js	191	text	78-guide	**Bump** finishes the ticket and takes it off the board, once every dish is done.
-78-guide.js	196	text	78-guide	Start and finish dishes
-78-guide.js	201	text	78-guide	Tap **Start** when you begin a dish that takes time. A countdown shows the usual cooking time.
-78-guide.js	202	text	78-guide	When the countdown reaches zero the row says Check it. Look at the food. Smokebox never decides that a dish is done.
-78-guide.js	203	text	78-guide	Tap **Done** when the dish is really finished.
-78-guide.js	208	text	78-guide	Gray dishes are waiting on purpose, so the whole order finishes together. Tap **Start now** to start one early.
-78-guide.js	212	text	78-guide	Send the ticket out
-78-guide.js	216	text	78-guide	If a dish is not done, Bump asks first. Bumped by mistake? **Undo** brings it back for 10 seconds. After that, use **Recall**.
-78-guide.js	220	text	78-guide	When something runs out
-78-guide.js	224	text	78-guide	Tap **86 board**, find the dish and mark it sold out. Smokebox also does this by itself when a dish's food runs low.
-78-guide.js	231	title	78-guide	Cooked-ahead food and portions
-78-guide.js	232	text	78-guide	Two ways to keep track of food you make before the order comes in.
-78-guide.js	236	text	78-guide	Count portions
-78-guide.js	240	text	78-guide	Use this for a dish you make a batch of and sell until it is gone, like 20 sandwiches.
-78-guide.js	245	text	78-guide	Tap **Menu**, then **Dishes and prices**. Under the dish, tap **I count what I made**.
-78-guide.js	246	text	78-guide	Type how many you made and tap **Start counting**.
-78-guide.js	247	text	78-guide	The dish shows how many are left, like "20 left". Tap **+10** or **Add** when you make more.
-78-guide.js	248	text	78-guide	At zero the dish shows as sold out. **Stop counting** turns it off.
-78-guide.js	253	text	78-guide	Counting does not track temperature or time.
-78-guide.js	257	text	78-guide	Track food you hold hot or cold
-78-guide.js	261	text	78-guide	Use this for food kept in a warmer or cooler, like chili or potato salad, so Smokebox can warn you before it runs out of time.
-78-guide.js	266	text	78-guide	In **Dishes and prices**, find "Do you cook any of this ahead and hold it?" and tap **Yes, I cook ahead**. Then tap **Add a cooked-ahead item**.
-78-guide.js	267	text	78-guide	Type what you cook ahead and choose Hot or Cold.
-78-guide.js	268	text	78-guide	Set how long it may stay. 4 hours is a careful starting point. Ask your health department and change it to match.
-78-guide.js	269	text	78-guide	Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.
-78-guide.js	270	text	78-guide	Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**.
-78-guide.js	275	text	78-guide	Choose **No, skip this** if you cook everything to order. You can add cooked-ahead items later from the Cabinet.
-78-guide.js	282	title	78-guide	Hold cabinet and warnings
-78-guide.js	283	text	78-guide	How cooked food is tracked, and how the board warns you before it runs out of time.
-78-guide.js	287	text	78-guide	Food in the hold cabinet
-78-guide.js	292	aria-label	78-guide	Steps for a batch in the hold cabinet: it goes in, it is checked, portions are taken out, and it ends by being reheated once or thrown out.
-78-guide.js	297	text	78-guide	No **Cabinet** tab? Say yes to cooking ahead first (see Cooked-ahead food and portions).
-78-guide.js	302	text	78-guide	Open the **Cabinet** tab. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.
-78-guide.js	303	text	78-guide	Each batch has a card with one main button. Usually it is **Log temp**: take a reading at every check. A reading in range keeps the batch on the menu. When a batch is too cool the button becomes **Reheat** (once per batch). When it is past its best, it becomes **Taste it, keep serving**.
-78-guide.js	304	text	78-guide	The **More for this batch** button (...) opens the rest: **Pull** as portions leave the cabinet, **Start cooling**, and **Discard**.
-78-guide.js	310	text	78-guide	Warnings before the time runs out
-78-guide.js	315	aria-label	78-guide	Four warning steps as a batch nears its time limit: a soft chime about an hour before, a voice call at thirty minutes, a loud repeating tone at ten minutes, and a different sound when time is up. A note says warnings only sound while the screen is on and Smokebox is open.
-78-guide.js	316	text	78-guide	The warning steps. Times shown are the usual ones.
-78-guide.js	321	text	78-guide	About an hour left: a soft chime, and a row appears in the strip at the top.
-78-guide.js	322	text	78-guide	30 minutes left: a voice call.
-78-guide.js	323	text	78-guide	10 minutes left: a loud tone and voice. It repeats every 20 seconds until you tap the strip row.
-78-guide.js	324	text	78-guide	Time is up: a different sound, and the batch comes off the menu.
-78-guide.js	329	text	78-guide	Some foods warn earlier. You can change the times in Menu and settings. A batch that is almost empty, or on pace to sell out in time, stays quiet.
-78-guide.js	333	text	78-guide	Warnings only sound while the screen is on and Smokebox is open on the board. They do not sound when the tablet is asleep, the page is closed, the volume is off, or it is outside your opening hours.
-78-guide.js	340	title	78-guide	Closing the day
-78-guide.js	341	text	78-guide	Close the day when the last order is paid. It saves the day's totals and gives you a page to print.
-78-guide.js	345	text	78-guide	Close the day
-78-guide.js	350	text	78-guide	Tap **Orders**, then **Close the day** at the bottom.
-78-guide.js	351	text	78-guide	If an order is still open, it is listed. Every order must be paid or cancelled first. Tap **Open Orders to pay or void**, then come back.
-78-guide.js	352	text	78-guide	If you cook ahead and food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).
-78-guide.js	353	text	78-guide	Read Money today: cash, card and other. The cash line says how much should be in the drawer, on top of the cash you started with.
-78-guide.js	354	text	78-guide	Tap **Close the day**.
-78-guide.js	355	text	78-guide	Tap **Back up today's data now** and **Print today's summary**.
-78-guide.js	360	text	78-guide	Closing does not lock anything. You can still take orders, and closing again later includes them. The app's day turns over at 4 am.
-78-guide.js	364	text	78-guide	Also
-78-guide.js	369	text	78-guide	Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.
-78-guide.js	370	text	78-guide	If your health department asks, save or print the thrown-out log. Open it from the **Menu** button on the board.
-78-guide.js	371	text	78-guide	Keep a copy of the backup off this device (see Backup and restore).
-78-guide.js	372	text	78-guide	For your accountant: in **Menu and settings**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other.
-78-guide.js	380	title	78-guide	Who made this entry
-78-guide.js	381	text	78-guide	Initials go next to temperature readings and thrown-out batches, so the log shows who did what. A wrong entry is corrected, not erased.
-78-guide.js	385	text	78-guide	Initials
-78-guide.js	390	text	78-guide	The first time you log a temperature or throw a batch out on a tablet, Smokebox asks "Who is this?". Type your initials. **Skip** is allowed, and the action still goes ahead.
-78-guide.js	391	text	78-guide	The tablet remembers them while you keep working, and asks again after two idle hours.
-78-guide.js	392	text	78-guide	When someone else takes over, tap **Switch person** in the cabinet.
-78-guide.js	397	text	78-guide	Fix an entry
-78-guide.js	402	text	78-guide	Open the thrown-out log from the board's menu.
-78-guide.js	403	text	78-guide	Tap **Fix this entry** on the row.
-78-guide.js	404	text	78-guide	Say what was wrong, add your initials and tap **Save the fix**.
-78-guide.js	409	text	78-guide	The old entry stays in the log. Your fix is saved as a new entry next to it, with your initials and the time. That keeps the record honest.
-78-guide.js	416	title	78-guide	Backup and restore
-78-guide.js	417	text	78-guide	Everything Smokebox knows is saved in this browser on this device. A backup is a file you keep somewhere else.
-78-guide.js	421	text	78-guide	Make a backup
-78-guide.js	426	text	78-guide	Tap **Back office**, then **Menu and settings**.
-78-guide.js	427	text	78-guide	Find Data, backup and reset. In the first card, **Back up now**, tap **Download backup (JSON)**. Or tap **Copy backup** and paste the text into an email to yourself.
-78-guide.js	428	text	78-guide	Keep a copy off this device.
-78-guide.js	433	text	78-guide	Back up every day at close. If the browser data is cleared or the device is replaced, a copy on the same device goes with it.
-78-guide.js	437	text	78-guide	Restore from a backup
-78-guide.js	442	text	78-guide	In the second card, **Restore from a backup**, tap **Choose a backup file**. Pick the newest one, named smokebox-backup-(date).json. Or paste the text and tap **Check pasted backup**.
-78-guide.js	443	text	78-guide	Read the summary: the saved date, the tickets and the batches should match what you expect. Nothing has changed yet.
-78-guide.js	444	text	78-guide	If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN. There is no undo, so back up what is here first if you might want it.
-78-guide.js	445	text	78-guide	Open the board and check your menu and your food. Sound and loudness are set per device, so test them again.
-78-guide.js	454	text	78-guide	Spreadsheet files, like the sales file, cannot be restored.
-78-guide.js	458	text	78-guide	Start over with an empty menu
-78-guide.js	463	text	78-guide	Tap **Menu**. At the bottom, tap **Start over with an empty menu**.
-78-guide.js	464	text	78-guide	Read what goes and what stays. Clear **Keep my tax, hours, PIN and station names** to reset those too. Tap **Next: save a backup**.
-78-guide.js	465	text	78-guide	This step only explains: the backup is saved at the moment of erasing, and if it fails, nothing is erased. Tap **Next: confirm**.
-78-guide.js	466	text	78-guide	Type ERASE, then tap **Erase everything and start over**.
-78-guide.js	467	text	78-guide	At "Done. Your kitchen is empty." tap **Save the backup again** or **Go to the first screen**.
-78-guide.js	472	text	78-guide	There is no undo. To go back, restore the backup file. Left-over practice tickets get **Clear them** or **Keep them**.
-78-guide.js	476	text	78-guide	Erasing
-78-guide.js	480	text	78-guide	The Danger zone has **Erase live data** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either.
-78-guide.js	487	title	78-guide	Replacing a device
-78-guide.js	488	text	78-guide	Move Smokebox to a new tablet or computer and keep your menu, settings and history. The Data page has a card, **Replacing this device**, with the same steps.
-78-guide.js	493	text	78-guide	On the old device, if it still works, download a backup (see Backup and restore). Copy the file somewhere else: email it to yourself or use a USB drive.
-78-guide.js	494	text	78-guide	On the new device, copy the same smokebox.html file onto it and open it. Install it as an app: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app.
-78-guide.js	495	text	78-guide	Tap **Menu**, then **Set up this tablet**. Sound and keeping the screen on are set on each device, so do them again here.
-78-guide.js	496	text	78-guide	Tap **Back office**, then **Menu and settings**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.
-78-guide.js	497	text	78-guide	Check the board and your menu. Save a fresh backup from the new device, then retire the old one.
-78-guide.js	502	text	78-guide	If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.
-78-guide.js	506	text	78-guide	Separate devices do not share data yet. Two tabs on the same device stay in step.
-78-guide.js	513	title	78-guide	Troubleshooting
-78-guide.js	514	text	78-guide	Plain fixes for sound, sleep, missing dishes and odd numbers. Lost data and the PIN are on the next page.
-78-guide.js	518	text	78-guide	No sound
-78-guide.js	523	text	78-guide	If the board says "Tap here to turn on warning sounds", tap it. Browsers need one tap first.
-78-guide.js	524	text	78-guide	Turn the tablet volume up and check its silent switch.
-78-guide.js	525	text	78-guide	Tap **Menu** and check that Sound is on and the loudness is not low.
-78-guide.js	526	text	78-guide	Tap **Menu**, then **Set up this tablet**, then **Play a test warning**.
-78-guide.js	527	text	78-guide	If the bar says "Sound paused", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.
-78-guide.js	528	text	78-guide	Close any second Smokebox tab. Only the tab on screen makes sound.
-78-guide.js	533	text	78-guide	The screen went to sleep
-78-guide.js	537	text	78-guide	Warnings cannot sound while the screen is off. Smokebox asks the browser to keep the screen on, but some browsers say no. Set the tablet to never sleep (Auto-Lock on an iPad, Screen timeout on Android) and keep it plugged in. When you wake it, check the times on the cards.
-78-guide.js	546	text	78-guide	Clear the search box and choose the All category on the New ticket screen.
-78-guide.js	547	text	78-guide	Open the **86 board**. A dish that is sold out or off the menu is listed there with the reason.
-78-guide.js	548	text	78-guide	Open **Dishes and prices** to see every dish you have added. A dish you removed is under **Removed dishes**: tap **Bring it back**.
-78-guide.js	549	text	78-guide	No **Cabinet** tab or **Sanitize** button? They show only after you say **Yes, I cook ahead** in **Dishes and prices**.
-78-guide.js	559	text	78-guide	Check the date range and the filters at the top of the Back office page.
-78-guide.js	560	text	78-guide	Choose **Live only** to leave out the sample history, which is made up.
-78-guide.js	561	text	78-guide	Unpaid orders are not counted as money collected.
-78-guide.js	562	text	78-guide	Starter estimates (prep times, yields, costs) are guesses until you confirm them.
-78-guide.js	570	title	78-guide	Empty, lost or locked
-78-guide.js	571	text	78-guide	What to do when Smokebox opens empty, your data is gone, or you cannot get past the PIN.
-78-guide.js	575	text	78-guide	I closed the tab
-78-guide.js	579	text	78-guide	Smokebox saves every change on this device as you go. Open it again the same way, in the same browser, and the board comes back. The clocks kept running while it was closed, and no warning sounded.
-78-guide.js	583	text	78-guide	The tablet was replaced or cleared
-78-guide.js	587	text	78-guide	Your data lives only in the browser on one device. Clearing the browser data, using another browser, another file location or a private window shows an empty Smokebox. Restore your last backup (see Backup and restore).
-78-guide.js	591	text	78-guide	I forgot the PIN
-78-guide.js	595	text	78-guide	Smokebox has no forgot-PIN button. The PIN is a door latch kept on this device, not real security. Five wrong tries lock the pad for 30 seconds.
-78-guide.js	599	text	78-guide	The only way back in is to clear this site's saved data in your browser settings. That erases everything Smokebox saved on this device, including today's tickets and your menu. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before the PIN was set.
-78-guide.js	603	text	78-guide	Smokebox opens empty
-78-guide.js	607	text	78-guide	That is by design for a new Smokebox. It starts with no dishes, tickets or food in the cabinet, and it never guesses. Add dishes under **Dishes and prices**. If it was full yesterday, see "The tablet was replaced or cleared" above.
-78-guide.js	611	text	78-guide	What is saved where
-78-guide.js	616	text	78-guide	Tickets, dishes, settings and the PIN: in this browser on this device only.
-78-guide.js	617	text	78-guide	Sound, loudness, Day or Night and text size: on this device only.
-78-guide.js	618	text	78-guide	Other devices do not see your board. A backup file is the only copy you can move.
-78-guide.js	626	title	78-guide	Trying the demo
-78-guide.js	627	text	78-guide	See Smokebox with food on it, without touching your own kitchen.
-78-guide.js	632	text	78-guide	On the welcome screen, or in the **Menu**, tap **Try the demo**. Then tap **Try the demo** again to confirm. Tap **Not now** to stay where you are.
-78-guide.js	633	text	78-guide	The demo opens with sample dishes, three sample tickets and food in the cabinet. A bar at the top says "You are trying the demo". Cook, bump, pay and throw out food as much as you like.
-78-guide.js	634	text	78-guide	Nothing you do there reaches your own kitchen.
-78-guide.js	635	text	78-guide	Tap **Back to my kitchen** on the bar to return. Your own dishes and orders are as you left them.
-78-guide.js	644	text	78-guide	Sample numbers are made up. They are never your sales or your food.
-78-guide.js	651	title	78-guide	Questions and answers
-78-guide.js	652	text	78-guide	Short answers to the questions owners ask first.
-78-guide.js	656	text	78-guide	Does it need the internet?
-78-guide.js	660	text	78-guide	No. Smokebox is one file and works without internet.
-78-guide.js	664	text	78-guide	Can two tablets share one board?
-78-guide.js	668	text	78-guide	Not yet. Each device has its own board. Two tabs in the same browser on the same device stay in step.
-78-guide.js	672	text	78-guide	Does it charge cards?
-78-guide.js	676	text	78-guide	No. It only writes down how an order was paid. Keep your card reader.
-78-guide.js	680	text	78-guide	Where is my data?
-78-guide.js	684	text	78-guide	In this browser on this device. Save a backup every day at close.
-78-guide.js	688	text	78-guide	What does 86 mean?
-78-guide.js	692	text	78-guide	Sold out or off the menu. The **86 board** lists what is out and why.
-78-guide.js	696	text	78-guide	What is a starter estimate?
-78-guide.js	704	text	78-guide	Why is there no Cabinet tab?
-78-guide.js	708	text	78-guide	The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Menu**, then **Dishes and prices**, and tap **Yes, I cook ahead**.
-78-guide.js	712	text	78-guide	Can I try it without risking my data?
-78-guide.js	716	text	78-guide	Yes. See Trying the demo.
-78-guide.js	720	text	78-guide	Can I change a price on an open order?
-78-guide.js	724	text	78-guide	New tickets use the new price. Tickets already on the board keep theirs.
-78-guide.js	728	text	78-guide	Has it been used in a real kitchen?
-78-guide.js	732	text	78-guide	It has been tested in a browser on a computer, not in a working kitchen. Try it on your own tablet before a busy service, and keep your usual system beside it until you trust it.
-78-guide.js	739	title	78-guide	What this app does not replace
-78-guide.js	740	text	78-guide	Smokebox is a helper. You and your local rules stay in charge.
-78-guide.js	745	text	78-guide	Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Your own food-safety plan, your training and your thermometer checks still apply.
-78-guide.js	746	text	78-guide	Your local health code. The starting limits come from the FDA Food Code. Your state or county may require something different. Ask your health department, then change the limits in Menu and settings.
-78-guide.js	747	text	78-guide	Card processing. Smokebox only writes down how an order was paid. Keep your card reader and your processor.
-78-guide.js	748	text	78-guide	Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.
-78-guide.js	749	text	78-guide	Allergy care. A note on a ticket is a reminder. Tell your staff about every allergy, and follow your own allergen rules.
-78-guide.js	750	text	78-guide	Your backups. If you do not save backups, clearing the browser data erases everything.
-78-guide.js	751	text	78-guide	Real numbers. Demo tickets and sample history are made up. Starter estimates for prep times, yields and costs are guesses until you confirm them.
-78-guide.js	759	title	78-guide	Opening checklist
-78-guide.js	760	text	78-guide	Print this card and keep it by the tablet.
-78-guide.js	765	text	78-guide	Tablet plugged in, and set to never sleep
-78-guide.js	766	text	78-guide	Volume up. Smokebox open on the kitchen board
-78-guide.js	767	text	78-guide	Tap the warning bar once, or use Play a test warning under Set up this tablet
-78-guide.js	768	text	78-guide	Check the 86 board: what is out today?
-78-guide.js	769	text	78-guide	Counted dishes: how many did you make today?
-78-guide.js	770	text	78-guide	If you cook ahead: log a first temperature on each batch in the Hold cabinet
-78-guide.js	771	text	78-guide	If you cook ahead: wipe food-contact surfaces and tap Sanitize
-78-guide.js	772	text	78-guide	Yesterday's backup saved and a copy kept off the device
-78-guide.js	780	title	78-guide	Closing checklist
-78-guide.js	781	text	78-guide	Print this card and keep it by the tablet.
-78-guide.js	786	text	78-guide	Orders: every open order paid or cancelled, then Close the day
-78-guide.js	787	text	78-guide	If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)
-78-guide.js	788	text	78-guide	If you cook ahead: surfaces wiped and Sanitize logged
-78-guide.js	789	text	78-guide	Sales and money looks right in the Back office
-78-guide.js	790	text	78-guide	Log of thrown-out batches saved or printed
-78-guide.js	791	text	78-guide	Backup downloaded and a copy kept off the device
-78-guide.js	792	text	78-guide	Tablet on its charger
-78-guide.js	800	title	78-guide	When something goes wrong
-78-guide.js	801	text	78-guide	Print this card and keep it by the tablet.
-78-guide.js	806	text	78-guide	No sound: tap the warning bar, turn the volume up, then Menu, Set up this tablet, Play a test warning
-78-guide.js	807	text	78-guide	Screen asleep: wake it and check the times on the cards. Set it to never sleep
-78-guide.js	808	text	78-guide	Wrong tap: Undo, within 10 seconds
-78-guide.js	809	text	78-guide	Bumped by mistake: Recall it from the board header
-78-guide.js	810	text	78-guide	Wrong ticket: cancel it with Void ticket in its small menu, and give a reason
-78-guide.js	811	text	78-guide	Dish missing: check the 86 board and Dishes and prices
-78-guide.js	812	text	78-guide	Opened empty: restore the last backup (Back office, Menu and settings)
-78-guide.js	813	text	78-guide	Forgot the PIN: see Empty, lost or locked in the Guide. There is no reset button
-78-guide.js	821	title	78-guide	First day checklist
-78-guide.js	822	text	78-guide	Print this card. Check each box off with a pen.
-78-guide.js	826	text	78-guide	Before opening
-78-guide.js	831	text	78-guide	Dishes added, tax and hours set (Menu, Dishes and prices)
-78-guide.js	832	text	78-guide	Tablet plugged in, set to never sleep, volume up
-78-guide.js	833	text	78-guide	One test order sent and cancelled
-78-guide.js	838	text	78-guide	During service
-78-guide.js	843	text	78-guide	On each ticket: Start, Done, then Bump
-78-guide.js	844	text	78-guide	Wrong tap? Undo, within 10 seconds
-78-guide.js	845	text	78-guide	Dish sold out? Mark it on the 86 board
-78-guide.js	850	text	78-guide	Closing
-78-guide.js	855	text	78-guide	Every order paid or cancelled, then Close the day
-78-guide.js	856	text	78-guide	Backup saved, and a copy kept off the tablet
-78-guide.js	861	text	78-guide	If something goes wrong
-78-guide.js	866	text	78-guide	Open the Guide. Troubleshooting covers sound and lost data
-78-guide.js	874	title	78-guide	Tablet setup
-78-guide.js	875	text	78-guide	Print this card and keep it with the tablet.
-78-guide.js	880	text	78-guide	Open Smokebox and add it to the home screen: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app
-78-guide.js	881	text	78-guide	Keep it awake: set Auto-Lock (iPad) or Screen timeout (Android) to Never, and plug it in
-78-guide.js	882	text	78-guide	Turn the volume up. Tap Menu, Set up this tablet, then Play a test warning
-78-guide.js	883	text	78-guide	Wifi: not needed. Smokebox works without internet
-78-guide.js	884	text	78-guide	Backups go where you save them: the Downloads folder, or an email to yourself. Smokebox does not send them anywhere
-78-guide.js	885	text	78-guide	Keep a copy of every backup off this tablet
-78-guide.js	886	text	78-guide	Replacing the tablet? Restore your newest backup (Guide, Replacing a device)
-78-guide.js	980	text	78-guide > paint	Print this card
-78-guide.js	980	text	78-guide > paint	Print this page
-78-guide.js	987	text	78-guide > link	Previous:
-78-guide.js	987	text	78-guide > link	Next:
-78-guide.js	1013	text	78-guide > show	Pages:
-78-guide.js	1014	text	78-guide > show	All pages and search
-78-guide.js	1027	text	78-guide > buildList	Quick cards to print
-78-guide.js	1032	placeholder	78-guide > buildSearch	Search the Guide
-78-guide.js	1034	aria-label	78-guide > buildSearch	Search results
-78-guide.js	1040	text	78-guide > run	page matches
-78-guide.js	1040	text	78-guide > run	pages match
-78-guide.js	1040	text	78-guide > run	No page matches. Try fewer or different words.
-78-guide.js	1049	text	78-guide > buildSearch	Search the Guide
-78-guide.js	1060	text	78-guide > mount	All pages and search
-78-guide.js	1062	aria-label	78-guide > mount	Guide pages
-78-guide.js	1068	text	78-guide > fit	Pages:
-78-guide.js	1068	text	78-guide > fit	All pages and search
-78-guide.js	1074	text	78-guide > mount	Back to the board
-78-guide.js	1075	text	78-guide > mount	Guide
-78-guide.js	1077	text	78-guide > mount	Skip to this page
-78-guide.js	1103	text	78-guide > link	Help:
-78-guide.js	1103	text	78-guide > link	Help
+78-guide.js	102	title	78-guide	Setup recipes
+78-guide.js	103	text	78-guide	Four ways to set up Smokebox. Pick the one closest to your place. Each uses only what the app has: a few stations, one cooking-ahead switch and counted dishes.
+78-guide.js	107	text	78-guide	Counter cafe or bakery
+78-guide.js	111	text	78-guide	Smokebox has no setting to skip kitchen tickets. Every order makes one, so here a ticket is a quick receipt you clear with one tap.
+78-guide.js	116	text	78-guide	Stations: tap **Menu**, **Dishes and prices**, then **Change stations**. Rename one to "Counter" and tap **Not used** on the others.
+78-guide.js	117	text	78-guide	Settings: set tax and hours in **Tax, hours and PIN**. Choose **No, skip this** for cooking ahead. For a batch you bake, like 24 croissants, tap **I count what I made**.
+78-guide.js	118	text	78-guide	The board: tabs for All stations, Counter and Expo. Tap **Done**, then **Bump**.
+78-guide.js	123	text	78-guide	Food truck on one tablet
+78-guide.js	128	text	78-guide	Stations: keep two, like "Grill" and "Window". Tap **Not used** on the rest.
+78-guide.js	129	text	78-guide	Settings: enter your tax. Set a PIN if others use the tablet. Tap **Takeout** on each order. Tap **Cash** or **Card** before **Send to kitchen**.
+78-guide.js	130	text	78-guide	The board: one tablet does both jobs. **New ticket** takes the order and the All stations tab shows what to cook. **Orders** lists unpaid orders.
+78-guide.js	135	text	78-guide	Restaurant with a line and an expo
+78-guide.js	140	text	78-guide	Stations: rename the four stations to match your line, like "Grill" and "Saute". Expo is always there.
+78-guide.js	141	text	78-guide	Settings: choose **Dine-in** and a table on each order. Set a PIN to keep cooks out of the back office.
+78-guide.js	142	text	78-guide	The board: each cook opens their station tab and sees only their dishes. Expo sees whole tickets, each dish tagged with its station, and taps **Bump** when the plate is complete.
+78-guide.js	147	text	78-guide	Kitchen that cooks food ahead
+78-guide.js	152	text	78-guide	Stations: as above.
+78-guide.js	153	text	78-guide	Settings: in **Dishes and prices**, tap **Yes, I cook ahead**. Add each pot or tray as a cooked-ahead item, Hot or Cold, with the time limit your health department gives you.
+78-guide.js	154	text	78-guide	The board: a **Cabinet** tab appears. Tap **New batch** and **Log temp** at every check. See Cabinet and warnings.
+78-guide.js	162	title	78-guide	Taking an order
+78-guide.js	163	text	78-guide	Start an order, add dishes and notes, send it to the kitchen, and add to it later.
+78-guide.js	167	text	78-guide	Start the order
+78-guide.js	171	text	78-guide	Tap **New ticket**. Tap a dish to add it. Tap it again to add one more. A dish marked 86 (sold out) cannot be added.
+78-guide.js	175	text	78-guide	Customer and order type
+78-guide.js	179	text	78-guide	Type a name or tap a quick name. Leave it blank for Walk-up. Choose how the order came in: Dine-in, Takeout, Drive-thru or Delivery app. Each type has its own time limit before a ticket turns amber and then red.
+78-guide.js	183	text	78-guide	Allergies and notes
+78-guide.js	187	text	78-guide	Under Any food allergy?, tap **Allergy**, then tap what the customer is allergic to. Put allergies first in the note. Cooks read the first line first.
+78-guide.js	191	text	78-guide	Rush
+78-guide.js	195	text	78-guide	Switch on **Rush ticket** when a customer is waiting. Every dish starts at once and the ticket goes to the front of the board.
+78-guide.js	199	text	78-guide	Send it
+78-guide.js	203	text	78-guide	Tap **Send to kitchen**. Each station sees only its own dishes. Pay now, or leave it on Pay later and take payment from **Orders** when the customer is ready.
+78-guide.js	207	text	78-guide	Add to an order that is still open
+78-guide.js	211	text	78-guide	Tap **New ticket** again and choose **Add to open order**. The new ticket is added to the same order.
+78-guide.js	215	text	78-guide	Fixing a mistake
+78-guide.js	220	text	78-guide	**Undo** appears for 10 seconds after an action. After that, fix it by hand.
+78-guide.js	221	text	78-guide	To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. Cancelled tickets are still counted in your reports.
+78-guide.js	229	title	78-guide	Running the line
+78-guide.js	230	text	78-guide	What a cook does on the kitchen board.
+78-guide.js	234	text	78-guide	Read a ticket
+78-guide.js	245	text	78-guide	Ticket number and clock. The clock counts up from when the order came in. It turns amber, then red, when the order is taking too long.
+78-guide.js	246	text	78-guide	The customer, the order type and how many dishes are done.
+78-guide.js	247	text	78-guide	The next step. This line says what to do next.
+78-guide.js	249	text	78-guide	**Start** or **Done** for that dish. Quick dishes, like drinks, only need Done.
+78-guide.js	250	text	78-guide	The small menu (the ... button): cancel the ticket or mark it as a rush.
+78-guide.js	251	text	78-guide	**Bump** finishes the ticket and takes it off the board, once every dish is done.
+78-guide.js	256	text	78-guide	Start and finish dishes
+78-guide.js	261	text	78-guide	Tap **Start** when you begin a dish that takes time. A countdown shows the usual cooking time.
+78-guide.js	262	text	78-guide	When the countdown reaches zero the row says Check it. Look at the food. Smokebox never decides that a dish is done.
+78-guide.js	263	text	78-guide	Tap **Done** when the dish is really finished.
+78-guide.js	268	text	78-guide	Gray dishes are waiting on purpose, so the whole order finishes together. Tap **Start now** to start one early.
+78-guide.js	272	text	78-guide	Send the ticket out
+78-guide.js	276	text	78-guide	If a dish is not done, Bump asks first. Bumped by mistake? **Undo** brings it back for 10 seconds. After that, use **Recall**.
+78-guide.js	280	text	78-guide	When something runs out
+78-guide.js	284	text	78-guide	Tap **86 board**, find the dish and mark it sold out. Smokebox also does this by itself when a dish's food runs low.
+78-guide.js	291	title	78-guide	Cooked-ahead food and portions
+78-guide.js	292	text	78-guide	Two ways to keep track of food you make before the order comes in. Skip this page if you cook everything to order.
+78-guide.js	296	text	78-guide	Count portions
+78-guide.js	300	text	78-guide	Use this for a dish you make a batch of and sell until it is gone, like 20 sandwiches.
+78-guide.js	305	text	78-guide	Tap **Menu**, then **Dishes and prices**. Under the dish, tap **I count what I made**.
+78-guide.js	306	text	78-guide	Type how many you made and tap **Start counting**.
+78-guide.js	307	text	78-guide	The dish shows how many are left, like "20 left". Tap **+10** or **Add** when you make more.
+78-guide.js	308	text	78-guide	At zero the dish shows as sold out. **Stop counting** turns it off.
+78-guide.js	313	text	78-guide	Counting does not track temperature or time.
+78-guide.js	317	text	78-guide	Track food you hold hot or cold
+78-guide.js	321	text	78-guide	Use this for food kept in a warmer or cooler, like chili or potato salad, so Smokebox can warn you before it runs out of time.
+78-guide.js	326	text	78-guide	In **Dishes and prices**, find "Do you cook any of this ahead and hold it?" and tap **Yes, I cook ahead**. Then tap **Add a cooked-ahead item**.
+78-guide.js	327	text	78-guide	Type what you cook ahead and choose Hot or Cold.
+78-guide.js	328	text	78-guide	Set how long it may stay. 4 hours is a careful starting point. Ask your health department and change it to match.
+78-guide.js	329	text	78-guide	Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.
+78-guide.js	330	text	78-guide	Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**.
+78-guide.js	335	text	78-guide	Choose **No, skip this** if you cook everything to order. You can add cooked-ahead items later from the Cabinet.
+78-guide.js	342	title	78-guide	Cabinet and warnings
+78-guide.js	343	text	78-guide	For kitchens that cook food ahead, like pots of soup or trays of rice. Skip this page if you cook everything to order.
+78-guide.js	347	text	78-guide	Food in the cabinet
+78-guide.js	352	aria-label	78-guide	Steps for a batch in the hold cabinet: it goes in, it is checked, portions are taken out, and it ends by being reheated once or thrown out.
+78-guide.js	357	text	78-guide	No **Cabinet** tab? Say yes to cooking ahead first (see Cooked-ahead food and portions).
+78-guide.js	362	text	78-guide	Open the **Cabinet** tab. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.
+78-guide.js	363	text	78-guide	Each batch has a card with one main button. Usually it is **Log temp**: take a reading at every check. A reading in range keeps the batch on the menu. When a batch is too cool the button becomes **Reheat** (once per batch). When it is past its best, it becomes **Taste it, keep serving**.
+78-guide.js	364	text	78-guide	The **More for this batch** button (...) opens the rest: **Pull** as portions leave the cabinet, **Start cooling**, and **Discard**.
+78-guide.js	370	text	78-guide	Warnings before the time runs out
+78-guide.js	375	aria-label	78-guide	Four warning steps as a batch nears its time limit: a soft chime about an hour before, a voice call at thirty minutes, a loud repeating tone at ten minutes, and a different sound when time is up. A note says warnings only sound while the screen is on and Smokebox is open.
+78-guide.js	376	text	78-guide	The warning steps. Times shown are the usual ones.
+78-guide.js	381	text	78-guide	About an hour left: a soft chime, and a row appears in the strip at the top.
+78-guide.js	382	text	78-guide	30 minutes left: a voice call.
+78-guide.js	383	text	78-guide	10 minutes left: a loud tone and voice. It repeats every 20 seconds until you tap the strip row.
+78-guide.js	384	text	78-guide	Time is up: a different sound, and the batch comes off the menu.
+78-guide.js	389	text	78-guide	Some foods warn earlier. You can change the times in Menu and settings. A batch that is almost empty, or on pace to sell out in time, stays quiet.
+78-guide.js	393	text	78-guide	Warnings only sound while the screen is on and Smokebox is open on the board. They do not sound when the tablet is asleep, the page is closed, the volume is off, or it is outside your opening hours.
+78-guide.js	400	title	78-guide	Closing the day
+78-guide.js	401	text	78-guide	Close the day when the last order is paid. It saves the day's totals and gives you a page to print.
+78-guide.js	405	text	78-guide	Close the day
+78-guide.js	410	text	78-guide	Tap **Orders**, then **Close the day** at the bottom.
+78-guide.js	411	text	78-guide	If an order is still open, it is listed. Every order must be paid or cancelled first. Tap **Open Orders to pay or void**, then come back.
+78-guide.js	412	text	78-guide	If you cook ahead and food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).
+78-guide.js	413	text	78-guide	Read Money today: cash, card and other. The cash line says how much should be in the drawer, on top of the cash you started with.
+78-guide.js	414	text	78-guide	Tap **Close the day**.
+78-guide.js	415	text	78-guide	Tap **Back up today's data now** and **Print today's summary**.
+78-guide.js	420	text	78-guide	Closing does not lock anything. You can still take orders, and closing again later includes them. The app's day turns over at 4 am.
+78-guide.js	424	text	78-guide	Also
+78-guide.js	429	text	78-guide	Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.
+78-guide.js	430	text	78-guide	If your health department asks, save or print the thrown-out log. Open it from the **Menu** button on the board.
+78-guide.js	431	text	78-guide	Keep a copy of the backup off this device (see Backup and restore).
+78-guide.js	432	text	78-guide	For your accountant: in **Menu and settings**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other.
+78-guide.js	440	title	78-guide	Who made this entry
+78-guide.js	441	text	78-guide	Initials go next to temperature readings and thrown-out batches, so the log shows who did what. A wrong entry is corrected, not erased.
+78-guide.js	445	text	78-guide	Initials
+78-guide.js	450	text	78-guide	The first time you log a temperature or throw a batch out on a tablet, Smokebox asks "Who is this?". Type your initials. **Skip** is allowed, and the action still goes ahead.
+78-guide.js	451	text	78-guide	The tablet remembers them while you keep working, and asks again after two idle hours.
+78-guide.js	452	text	78-guide	When someone else takes over, tap **Switch person** in the cabinet.
+78-guide.js	457	text	78-guide	Fix an entry
+78-guide.js	462	text	78-guide	Open the thrown-out log from the board's menu.
+78-guide.js	463	text	78-guide	Tap **Fix this entry** on the row.
+78-guide.js	464	text	78-guide	Say what was wrong, add your initials and tap **Save the fix**.
+78-guide.js	469	text	78-guide	The old entry stays in the log. Your fix is saved as a new entry next to it, with your initials and the time. That keeps the record honest.
+78-guide.js	476	title	78-guide	Backup and restore
+78-guide.js	477	text	78-guide	Everything Smokebox knows is saved in this browser on this device. A backup is a file you keep somewhere else.
+78-guide.js	481	text	78-guide	Make a backup
+78-guide.js	486	text	78-guide	Tap **Back office**, then **Menu and settings**.
+78-guide.js	487	text	78-guide	Find Data, backup and reset. In the first card, **Back up now**, tap **Download backup (JSON)**. Or tap **Copy backup** and paste the text into an email to yourself.
+78-guide.js	488	text	78-guide	Keep a copy off this device.
+78-guide.js	493	text	78-guide	Back up every day at close. If the browser data is cleared or the device is replaced, a copy on the same device goes with it.
+78-guide.js	497	text	78-guide	Restore from a backup
+78-guide.js	502	text	78-guide	In the second card, **Restore from a backup**, tap **Choose a backup file**. Pick the newest one, named smokebox-backup-(date).json. Or paste the text and tap **Check pasted backup**.
+78-guide.js	503	text	78-guide	Read the summary: the saved date, the tickets and the batches should match what you expect. Nothing has changed yet.
+78-guide.js	504	text	78-guide	If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN. There is no undo, so back up what is here first if you might want it.
+78-guide.js	505	text	78-guide	Open the board and check your menu and your food. Sound and loudness are set per device, so test them again.
+78-guide.js	514	text	78-guide	Spreadsheet files, like the sales file, cannot be restored.
+78-guide.js	518	text	78-guide	Start over with an empty menu
+78-guide.js	523	text	78-guide	Tap **Menu**. At the bottom, tap **Start over with an empty menu**.
+78-guide.js	524	text	78-guide	Read what goes and what stays. Clear **Keep my tax, hours, PIN and station names** to reset those too. Tap **Next: save a backup**.
+78-guide.js	525	text	78-guide	This step only explains: the backup is saved at the moment of erasing, and if it fails, nothing is erased. Tap **Next: confirm**.
+78-guide.js	526	text	78-guide	Type ERASE, then tap **Erase everything and start over**.
+78-guide.js	527	text	78-guide	At "Done. Your kitchen is empty." tap **Save the backup again** or **Go to the first screen**.
+78-guide.js	532	text	78-guide	There is no undo. To go back, restore the backup file. Left-over practice tickets get **Clear them** or **Keep them**.
+78-guide.js	536	text	78-guide	Erasing
+78-guide.js	540	text	78-guide	The Danger zone has **Erase live data** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either.
+78-guide.js	547	title	78-guide	Replacing a device
+78-guide.js	548	text	78-guide	Move Smokebox to a new tablet or computer and keep your menu, settings and history. The Data page has a card, **Replacing this device**, with the same steps.
+78-guide.js	553	text	78-guide	On the old device, if it still works, download a backup (see Backup and restore). Copy the file somewhere else: email it to yourself or use a USB drive.
+78-guide.js	554	text	78-guide	On the new device, copy the same smokebox.html file onto it and open it. Install it as an app: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app.
+78-guide.js	555	text	78-guide	Tap **Menu**, then **Set up this tablet**. Sound and keeping the screen on are set on each device, so do them again here.
+78-guide.js	556	text	78-guide	Tap **Back office**, then **Menu and settings**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.
+78-guide.js	557	text	78-guide	Check the board and your menu. Save a fresh backup from the new device, then retire the old one.
+78-guide.js	562	text	78-guide	If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.
+78-guide.js	566	text	78-guide	Separate devices do not share data yet. Two tabs on the same device stay in step.
+78-guide.js	573	title	78-guide	Troubleshooting
+78-guide.js	574	text	78-guide	Plain fixes for sound, sleep, missing dishes and odd numbers. Lost data and the PIN are on the next page.
+78-guide.js	578	text	78-guide	No sound
+78-guide.js	583	text	78-guide	If the board says "Tap here to turn on warning sounds", tap it. Browsers need one tap first.
+78-guide.js	584	text	78-guide	Turn the tablet volume up and check its silent switch.
+78-guide.js	585	text	78-guide	Tap **Menu** and check that Sound is on and the loudness is not low.
+78-guide.js	586	text	78-guide	Tap **Menu**, then **Set up this tablet**, then **Play a test warning**.
+78-guide.js	587	text	78-guide	If the bar says "Sound paused", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.
+78-guide.js	588	text	78-guide	Close any second Smokebox tab. Only the tab on screen makes sound.
+78-guide.js	593	text	78-guide	The screen went to sleep
+78-guide.js	597	text	78-guide	Warnings cannot sound while the screen is off. Smokebox asks the browser to keep the screen on, but some browsers say no. Set the tablet to never sleep (Auto-Lock on an iPad, Screen timeout on Android) and keep it plugged in. When you wake it, check the times on the cards.
+78-guide.js	606	text	78-guide	Clear the search box and choose the All category on the New ticket screen.
+78-guide.js	607	text	78-guide	Open the **86 board**. A dish that is sold out or off the menu is listed there with the reason.
+78-guide.js	608	text	78-guide	Open **Dishes and prices** to see every dish you have added. A dish you removed is under **Removed dishes**: tap **Bring it back**.
+78-guide.js	609	text	78-guide	No **Cabinet** tab or **Sanitize** button? They show only after you say **Yes, I cook ahead** in **Dishes and prices**.
+78-guide.js	619	text	78-guide	Check the date range and the filters at the top of the Back office page.
+78-guide.js	620	text	78-guide	Choose **Live only** to leave out the sample history, which is made up.
+78-guide.js	621	text	78-guide	Unpaid orders are not counted as money collected.
+78-guide.js	622	text	78-guide	Starter estimates (prep times, yields, costs) are guesses until you confirm them.
+78-guide.js	630	title	78-guide	Empty, lost or locked
+78-guide.js	631	text	78-guide	What to do when Smokebox opens empty, your data is gone, or you cannot get past the PIN.
+78-guide.js	635	text	78-guide	I closed the tab
+78-guide.js	639	text	78-guide	Smokebox saves every change on this device as you go. Open it again the same way, in the same browser, and the board comes back. The clocks kept running while it was closed, and no warning sounded.
+78-guide.js	643	text	78-guide	The tablet was replaced or cleared
+78-guide.js	647	text	78-guide	Your data lives only in the browser on one device. Clearing the browser data, using another browser, another file location or a private window shows an empty Smokebox. Restore your last backup (see Backup and restore).
+78-guide.js	651	text	78-guide	I forgot the PIN
+78-guide.js	655	text	78-guide	Smokebox has no forgot-PIN button. The PIN is a door latch kept on this device, not real security. Five wrong tries lock the pad for 30 seconds.
+78-guide.js	659	text	78-guide	The only way back in is to clear this site's saved data in your browser settings. That erases everything Smokebox saved on this device, including today's tickets and your menu. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before the PIN was set.
+78-guide.js	663	text	78-guide	Smokebox opens empty
+78-guide.js	667	text	78-guide	That is by design for a new Smokebox. It starts with no dishes, tickets or food in the cabinet, and it never guesses. Add dishes under **Dishes and prices**. If it was full yesterday, see "The tablet was replaced or cleared" above.
+78-guide.js	671	text	78-guide	What is saved where
+78-guide.js	676	text	78-guide	Tickets, dishes, settings and the PIN: in this browser on this device only.
+78-guide.js	677	text	78-guide	Sound, loudness, Day or Night and text size: on this device only.
+78-guide.js	678	text	78-guide	Other devices do not see your board. A backup file is the only copy you can move.
+78-guide.js	686	title	78-guide	Trying the demo
+78-guide.js	687	text	78-guide	See Smokebox with food on it, without touching your own kitchen.
+78-guide.js	692	text	78-guide	On the welcome screen, or in the **Menu**, tap **Try the demo**. Then tap **Try the demo** again to confirm. Tap **Not now** to stay where you are.
+78-guide.js	693	text	78-guide	The demo opens with sample dishes, three sample tickets and food in the cabinet. A bar at the top says "You are trying the demo". Cook, bump, pay and throw out food as much as you like.
+78-guide.js	694	text	78-guide	Nothing you do there reaches your own kitchen.
+78-guide.js	695	text	78-guide	Tap **Back to my kitchen** on the bar to return. Your own dishes and orders are as you left them.
+78-guide.js	704	text	78-guide	The demo kitchen is a barbecue restaurant. Yours can be anything. Sample numbers are made up. They are never your sales or your food.
+78-guide.js	711	title	78-guide	Questions and answers
+78-guide.js	712	text	78-guide	Short answers to the questions owners ask first.
+78-guide.js	716	text	78-guide	Is it only for barbecue?
+78-guide.js	720	text	78-guide	No. A new Smokebox starts empty. You add your own dishes, rename the stations and choose whether you cook ahead. Only the demo is a barbecue kitchen.
+78-guide.js	724	text	78-guide	Does it need the internet?
+78-guide.js	728	text	78-guide	No. Smokebox is one file and works without internet.
+78-guide.js	732	text	78-guide	Can two tablets share one board?
+78-guide.js	736	text	78-guide	Not yet. Each device has its own board. Two tabs in the same browser on the same device stay in step.
+78-guide.js	740	text	78-guide	Does it charge cards?
+78-guide.js	744	text	78-guide	No. It only writes down how an order was paid. Keep your card reader.
+78-guide.js	748	text	78-guide	Where is my data?
+78-guide.js	752	text	78-guide	In this browser on this device. Save a backup every day at close.
+78-guide.js	756	text	78-guide	What does 86 mean?
+78-guide.js	760	text	78-guide	Sold out or off the menu. The **86 board** lists what is out and why.
+78-guide.js	764	text	78-guide	What is a starter estimate?
+78-guide.js	772	text	78-guide	Why is there no Cabinet tab?
+78-guide.js	776	text	78-guide	The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Menu**, then **Dishes and prices**, and tap **Yes, I cook ahead**.
+78-guide.js	780	text	78-guide	Can I try it without risking my data?
+78-guide.js	784	text	78-guide	Yes. See Trying the demo.
+78-guide.js	788	text	78-guide	Can I change a price on an open order?
+78-guide.js	792	text	78-guide	New tickets use the new price. Tickets already on the board keep theirs.
+78-guide.js	796	text	78-guide	Has it been used in a real kitchen?
+78-guide.js	800	text	78-guide	It has been tested in a browser on a computer, not in a working kitchen. Try it on your own tablet before a busy service, and keep your usual system beside it until you trust it.
+78-guide.js	807	title	78-guide	What this app does not replace
+78-guide.js	808	text	78-guide	Smokebox is a helper. You and your local rules stay in charge.
+78-guide.js	813	text	78-guide	Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Your own food-safety plan, your training and your thermometer checks still apply.
+78-guide.js	814	text	78-guide	Your local health code. The starting limits come from the FDA Food Code. Your state or county may require something different. Ask your health department, then change the limits in Menu and settings.
+78-guide.js	815	text	78-guide	Card processing. Smokebox only writes down how an order was paid. Keep your card reader and your processor.
+78-guide.js	816	text	78-guide	Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.
+78-guide.js	817	text	78-guide	Allergy care. A note on a ticket is a reminder. Tell your staff about every allergy, and follow your own allergen rules.
+78-guide.js	818	text	78-guide	Your backups. If you do not save backups, clearing the browser data erases everything.
+78-guide.js	819	text	78-guide	Real numbers. Demo tickets and sample history are made up. Starter estimates for prep times, yields and costs are guesses until you confirm them.
+78-guide.js	827	title	78-guide	Opening checklist
+78-guide.js	828	text	78-guide	Print this card and keep it by the tablet.
+78-guide.js	833	text	78-guide	Tablet plugged in, and set to never sleep
+78-guide.js	834	text	78-guide	Volume up. Smokebox open on the kitchen board
+78-guide.js	835	text	78-guide	Tap the warning bar once, or use Play a test warning under Set up this tablet
+78-guide.js	836	text	78-guide	Check the 86 board: what is out today?
+78-guide.js	837	text	78-guide	Counted dishes: how many did you make today?
+78-guide.js	838	text	78-guide	If you cook ahead: log a first temperature on each batch in the cabinet
+78-guide.js	839	text	78-guide	If you cook ahead: wipe food-contact surfaces and tap Sanitize
+78-guide.js	840	text	78-guide	Yesterday's backup saved and a copy kept off the device
+78-guide.js	848	title	78-guide	Closing checklist
+78-guide.js	849	text	78-guide	Print this card and keep it by the tablet.
+78-guide.js	854	text	78-guide	Orders: every open order paid or cancelled, then Close the day
+78-guide.js	855	text	78-guide	If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)
+78-guide.js	856	text	78-guide	If you cook ahead: surfaces wiped and Sanitize logged
+78-guide.js	857	text	78-guide	Sales and money looks right in the Back office
+78-guide.js	858	text	78-guide	Log of thrown-out batches saved or printed
+78-guide.js	859	text	78-guide	Backup downloaded and a copy kept off the device
+78-guide.js	860	text	78-guide	Tablet on its charger
+78-guide.js	868	title	78-guide	When something goes wrong
+78-guide.js	869	text	78-guide	Print this card and keep it by the tablet.
+78-guide.js	874	text	78-guide	No sound: tap the warning bar, turn the volume up, then Menu, Set up this tablet, Play a test warning
+78-guide.js	875	text	78-guide	Screen asleep: wake it and check the times on the cards. Set it to never sleep
+78-guide.js	876	text	78-guide	Wrong tap: Undo, within 10 seconds
+78-guide.js	877	text	78-guide	Bumped by mistake: Recall it from the board header
+78-guide.js	878	text	78-guide	Wrong ticket: cancel it with Void ticket in its small menu, and give a reason
+78-guide.js	879	text	78-guide	Dish missing: check the 86 board and Dishes and prices
+78-guide.js	880	text	78-guide	Opened empty: restore the last backup (Back office, Menu and settings)
+78-guide.js	881	text	78-guide	Forgot the PIN: see Empty, lost or locked in the Guide. There is no reset button
+78-guide.js	889	title	78-guide	First day checklist
+78-guide.js	890	text	78-guide	Print this card. Check each box off with a pen.
+78-guide.js	894	text	78-guide	Before opening
+78-guide.js	899	text	78-guide	Dishes added, tax and hours set (Menu, Dishes and prices)
+78-guide.js	900	text	78-guide	Tablet plugged in, set to never sleep, volume up
+78-guide.js	901	text	78-guide	One test order sent and cancelled
+78-guide.js	906	text	78-guide	During service
+78-guide.js	911	text	78-guide	On each ticket: Start, Done, then Bump
+78-guide.js	912	text	78-guide	Wrong tap? Undo, within 10 seconds
+78-guide.js	913	text	78-guide	Dish sold out? Mark it on the 86 board
+78-guide.js	918	text	78-guide	Closing
+78-guide.js	923	text	78-guide	Every order paid or cancelled, then Close the day
+78-guide.js	924	text	78-guide	Backup saved, and a copy kept off the tablet
+78-guide.js	929	text	78-guide	If something goes wrong
+78-guide.js	934	text	78-guide	Open the Guide. Troubleshooting covers sound and lost data
+78-guide.js	942	title	78-guide	Tablet setup
+78-guide.js	943	text	78-guide	Print this card and keep it with the tablet.
+78-guide.js	948	text	78-guide	Open Smokebox and add it to the home screen: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app
+78-guide.js	949	text	78-guide	Keep it awake: set Auto-Lock (iPad) or Screen timeout (Android) to Never, and plug it in
+78-guide.js	950	text	78-guide	Turn the volume up. Tap Menu, Set up this tablet, then Play a test warning
+78-guide.js	951	text	78-guide	Wifi: not needed. Smokebox works without internet
+78-guide.js	952	text	78-guide	Backups go where you save them: the Downloads folder, or an email to yourself. Smokebox does not send them anywhere
+78-guide.js	953	text	78-guide	Keep a copy of every backup off this tablet
+78-guide.js	954	text	78-guide	Replacing the tablet? Restore your newest backup (Guide, Replacing a device)
+78-guide.js	1048	text	78-guide > paint	Print this card
+78-guide.js	1048	text	78-guide > paint	Print this page
+78-guide.js	1055	text	78-guide > link	Previous:
+78-guide.js	1055	text	78-guide > link	Next:
+78-guide.js	1081	text	78-guide > show	Pages:
+78-guide.js	1082	text	78-guide > show	All pages and search
+78-guide.js	1095	text	78-guide > buildList	Quick cards to print
+78-guide.js	1100	placeholder	78-guide > buildSearch	Search the Guide
+78-guide.js	1102	aria-label	78-guide > buildSearch	Search results
+78-guide.js	1108	text	78-guide > run	page matches
+78-guide.js	1108	text	78-guide > run	pages match
+78-guide.js	1108	text	78-guide > run	No page matches. Try fewer or different words.
+78-guide.js	1117	text	78-guide > buildSearch	Search the Guide
+78-guide.js	1128	text	78-guide > mount	All pages and search
+78-guide.js	1130	aria-label	78-guide > mount	Guide pages
+78-guide.js	1136	text	78-guide > fit	Pages:
+78-guide.js	1136	text	78-guide > fit	All pages and search
+78-guide.js	1142	text	78-guide > mount	Back to the board
+78-guide.js	1143	text	78-guide > mount	Guide
+78-guide.js	1145	text	78-guide > mount	Skip to this page
+78-guide.js	1171	text	78-guide > link	Help:
+78-guide.js	1171	text	78-guide > link	Help
 79-guide-art.js	54	text	79-guide-art > ticket	Maria
 79-guide-art.js	55	text	79-guide-art > ticket	Dine-in 0 of 2 done
 79-guide-art.js	58	text	79-guide-art > ticket	Tap Start on Hush puppies.
@@ -3879,362 +3900,362 @@ file	line	kind	area	text
 84-office-data.js	452	text	back office: Data and Menu > onChange	Saved. Prep time marked as a starter estimate.
 84-office-data.js	472	text	back office: Data and Menu > menuRow	How it is cooked
 84-office-data.js	472	text	back office: Data and Menu > menuRow	One tap: done when it is plated, like a drink or a cold side. Start, then done: the cook taps Start, and Done when it is finished, like a roast or fries.
-84-office-data.js	491	text	back office: Data and Menu > sync	· Archived
-84-office-data.js	491	text	back office: Data and Menu > sync	· Starter prep time
-84-office-data.js	497	text	back office: Data and Menu > sync	Unarchive
-84-office-data.js	497	text	back office: Data and Menu > sync	Archive
-84-office-data.js	502	text	back office: Data and Menu > sync	Learned estimate
-84-office-data.js	502	text	back office: Data and Menu > sync	than the starter
-84-office-data.js	502	text	back office: Data and Menu > sync	, close to the starter
-84-office-data.js	516	placeholder	back office: Data and Menu > addDishForm	Brisket plate
-84-office-data.js	517	label	back office: Data and Menu > addDishForm	Dish name
-84-office-data.js	519	label	back office: Data and Menu > addDishForm	Short name on tickets (optional)
-84-office-data.js	519	help	back office: Data and Menu > addDishForm	Leave it empty to use the first 24 letters of the name.
-84-office-data.js	521	label	back office: Data and Menu > addDishForm	Station that cooks it
-84-office-data.js	523	label	back office: Data and Menu > addDishForm	Category on the order screen
-84-office-data.js	525	label	back office: Data and Menu > addDishForm	Price ($)
-84-office-data.js	526	aria-label	back office: Data and Menu > addDishForm	Prep time, minutes
-84-office-data.js	527	aria-label	back office: Data and Menu > addDishForm	Prep time, seconds
-84-office-data.js	529	text	back office: Data and Menu > addDishForm	Prep time
-84-office-data.js	530	text	back office: Data and Menu > addDishForm	How long the cook needs from start to plated. A guess is fine; the app learns the real time from your tickets.
-84-office-data.js	532	label	back office: Data and Menu > addDishForm	How it is cooked
-84-office-data.js	532	label	back office: Data and Menu > addDishForm	One tap
-84-office-data.js	532	label	back office: Data and Menu > addDishForm	Start, then done
-84-office-data.js	538	text	back office: Data and Menu > paintTrack	The cook taps Start when the dish begins and Done when it is finished. Use it for anything cooked on the line.
-84-office-data.js	538	text	back office: Data and Menu > paintTrack	The cook taps Done when it is plated. Use it for drinks, cold sides and anything with no cooking step.
-84-office-data.js	540	text	back office: Data and Menu > addDishForm	Add dish
-84-office-data.js	542	text	back office: Data and Menu > addDishForm	Close
-84-office-data.js	543	aria-label	back office: Data and Menu > addDishForm	Add a dish
-84-office-data.js	544	text	back office: Data and Menu > addDishForm	Add a dish
-84-office-data.js	546	text	back office: Data and Menu > addDishForm	How it is cooked
-84-office-data.js	555	text	back office: Data and Menu > addDishForm	Type the dish name.
-84-office-data.js	557	text	back office: Data and Menu > addDishForm	Type the price in dollars, like 12.50.
-84-office-data.js	559	text	back office: Data and Menu > addDishForm	Type the prep time with digits only.
-84-office-data.js	561	text	back office: Data and Menu > addDishForm	Prep time has to be between 0:05 and 60:00.
-84-office-data.js	564	text	back office: Data and Menu > addDishForm	Added
-84-office-data.js	571	text	back office: Data and Menu > addDishForm	There is already a dish called
-84-office-data.js	572	text	back office: Data and Menu > addDishForm	The name has to be 1 to 60 characters.
-84-office-data.js	573	text	back office: Data and Menu > addDishForm	The short name has to be 1 to 24 characters.
-84-office-data.js	574	name	back office: Data and Menu > addDishForm	The price
-84-office-data.js	594	text	back office: Data and Menu > buildMenu	Changes save as you make them. New tickets use the new price, prep time and ingredients; tickets already on the board keep theirs. There is no Undo for settings, so check a value before you move on.
-84-office-data.js	603	text	back office: Data and Menu > buildMenu	Add a dish
-84-office-data.js	605	text	back office: Data and Menu > buildMenu	Use only my own dishes
-84-office-data.js	606	aria-label	back office: Data and Menu > buildMenu	Archive the starter dishes
-84-office-data.js	608	text	back office: Data and Menu > buildMenu	Archive the starter dishes
-84-office-data.js	609	text	back office: Data and Menu > buildMenu	Keep them
-84-office-data.js	616	text	back office: Data and Menu > buildMenu	This archives the
-84-office-data.js	616	text	back office: Data and Menu > buildMenu	made-up starter
+84-office-data.js	491	text	back office: Data and Menu > sync	, archived
+84-office-data.js	491	text	back office: Data and Menu > sync	, starter prep time
+84-office-data.js	496	text	back office: Data and Menu > sync	Unarchive
+84-office-data.js	496	text	back office: Data and Menu > sync	Archive
+84-office-data.js	501	text	back office: Data and Menu > sync	Learned estimate
+84-office-data.js	501	text	back office: Data and Menu > sync	than the starter
+84-office-data.js	501	text	back office: Data and Menu > sync	, close to the starter
+84-office-data.js	515	placeholder	back office: Data and Menu > addDishForm	Brisket plate
+84-office-data.js	516	label	back office: Data and Menu > addDishForm	Dish name
+84-office-data.js	518	label	back office: Data and Menu > addDishForm	Short name on tickets (optional)
+84-office-data.js	518	help	back office: Data and Menu > addDishForm	Leave it empty to use the first 24 letters of the name.
+84-office-data.js	520	label	back office: Data and Menu > addDishForm	Station that cooks it
+84-office-data.js	522	label	back office: Data and Menu > addDishForm	Category on the order screen
+84-office-data.js	524	label	back office: Data and Menu > addDishForm	Price ($)
+84-office-data.js	525	aria-label	back office: Data and Menu > addDishForm	Prep time, minutes
+84-office-data.js	526	aria-label	back office: Data and Menu > addDishForm	Prep time, seconds
+84-office-data.js	528	text	back office: Data and Menu > addDishForm	Prep time
+84-office-data.js	529	text	back office: Data and Menu > addDishForm	How long the cook needs from start to plated. A guess is fine; the app learns the real time from your tickets.
+84-office-data.js	531	label	back office: Data and Menu > addDishForm	How it is cooked
+84-office-data.js	531	label	back office: Data and Menu > addDishForm	One tap
+84-office-data.js	531	label	back office: Data and Menu > addDishForm	Start, then done
+84-office-data.js	537	text	back office: Data and Menu > paintTrack	The cook taps Start when the dish begins and Done when it is finished. Use it for anything cooked on the line.
+84-office-data.js	537	text	back office: Data and Menu > paintTrack	The cook taps Done when it is plated. Use it for drinks, cold sides and anything with no cooking step.
+84-office-data.js	539	text	back office: Data and Menu > addDishForm	Add dish
+84-office-data.js	541	text	back office: Data and Menu > addDishForm	Close
+84-office-data.js	542	aria-label	back office: Data and Menu > addDishForm	Add a dish
+84-office-data.js	543	text	back office: Data and Menu > addDishForm	Add a dish
+84-office-data.js	545	text	back office: Data and Menu > addDishForm	How it is cooked
+84-office-data.js	554	text	back office: Data and Menu > addDishForm	Type the dish name.
+84-office-data.js	556	text	back office: Data and Menu > addDishForm	Type the price in dollars, like 12.50.
+84-office-data.js	558	text	back office: Data and Menu > addDishForm	Type the prep time with digits only.
+84-office-data.js	560	text	back office: Data and Menu > addDishForm	Prep time has to be between 0:05 and 60:00.
+84-office-data.js	563	text	back office: Data and Menu > addDishForm	Added
+84-office-data.js	570	text	back office: Data and Menu > addDishForm	There is already a dish called
+84-office-data.js	571	text	back office: Data and Menu > addDishForm	The name has to be 1 to 60 characters.
+84-office-data.js	572	text	back office: Data and Menu > addDishForm	The short name has to be 1 to 24 characters.
+84-office-data.js	573	name	back office: Data and Menu > addDishForm	The price
+84-office-data.js	593	text	back office: Data and Menu > buildMenu	Changes save as you make them. New tickets use the new price, prep time and ingredients; tickets already on the board keep theirs. There is no Undo for settings, so check a value before you move on.
+84-office-data.js	602	text	back office: Data and Menu > buildMenu	Add a dish
+84-office-data.js	604	text	back office: Data and Menu > buildMenu	Use only my own dishes
+84-office-data.js	605	aria-label	back office: Data and Menu > buildMenu	Archive the starter dishes
+84-office-data.js	607	text	back office: Data and Menu > buildMenu	Archive the starter dishes
+84-office-data.js	608	text	back office: Data and Menu > buildMenu	Keep them
+84-office-data.js	615	text	back office: Data and Menu > buildMenu	This archives the
+84-office-data.js	615	text	back office: Data and Menu > buildMenu	made-up starter
+84-office-data.js	623	text	back office: Data and Menu > buildMenu	Archived
+84-office-data.js	623	text	back office: Data and Menu > buildMenu	starter dishes.
+84-office-data.js	623	text	back office: Data and Menu > buildMenu	could not be archived.
 84-office-data.js	624	text	back office: Data and Menu > buildMenu	Archived
-84-office-data.js	624	text	back office: Data and Menu > buildMenu	starter dishes.
-84-office-data.js	624	text	back office: Data and Menu > buildMenu	could not be archived.
-84-office-data.js	625	text	back office: Data and Menu > buildMenu	Archived
-84-office-data.js	632	label	back office: Data and Menu > buildMenu	Show items
-84-office-data.js	633	label	back office: Data and Menu > buildMenu	Active
-84-office-data.js	633	label	back office: Data and Menu > buildMenu	Archived
-84-office-data.js	633	label	back office: Data and Menu > buildMenu	All
-84-office-data.js	637	aria-label	back office: Data and Menu > buildMenu	Show one station
-84-office-data.js	637	text	back office: Data and Menu > buildMenu	All stations
-84-office-data.js	640	label	back office: Data and Menu > buildMenu	Starter estimates only
-84-office-data.js	644	text	back office: Data and Menu > buildMenu	No items match.
-84-office-data.js	644	text	back office: Data and Menu > buildMenu	Change the filter above to see more.
-84-office-data.js	646	text	back office: Data and Menu > buildMenu	Add your first dish
-84-office-data.js	668	text	back office: Data and Menu > applyFilter	No dishes yet.
-84-office-data.js	668	text	back office: Data and Menu > applyFilter	No items match.
-84-office-data.js	669	text	back office: Data and Menu > applyFilter	Add your first dish to start taking orders.
-84-office-data.js	669	text	back office: Data and Menu > applyFilter	Change the filter above to see more.
-84-office-data.js	705	name	back office: Data and Menu > ingRow	Opening amount
-84-office-data.js	706	name	back office: Data and Menu > ingRow	The sold-out amount
-84-office-data.js	708	label	back office: Data and Menu > ingRow	Opening amount (par)
-84-office-data.js	708	text	back office: Data and Menu > ingRow	Opening amount of
-84-office-data.js	711	text	back office: Data and Menu > save	Saved. Par is
-84-office-data.js	714	label	back office: Data and Menu > ingRow	Sold out at
-84-office-data.js	714	text	back office: Data and Menu > ingRow	Sold out at,
-84-office-data.js	715	help	back office: Data and Menu > ingRow	Dishes that use this are marked sold out at or below this amount.
-84-office-data.js	717	text	back office: Data and Menu > save	Saved. Items using
-84-office-data.js	717	text	back office: Data and Menu > save	go 86 at
-84-office-data.js	717	text	back office: Data and Menu > save	or less.
-84-office-data.js	721	name	back office: Data and Menu > ingRow	The cost each
-84-office-data.js	721	name	back office: Data and Menu > ingRow	The cost per kg
-84-office-data.js	723	label	back office: Data and Menu > ingRow	Cost each ($)
-84-office-data.js	723	label	back office: Data and Menu > ingRow	Raw cost per kg ($)
-84-office-data.js	723	text	back office: Data and Menu > ingRow	Cost each of
-84-office-data.js	723	text	back office: Data and Menu > ingRow	Cost per kg of
-84-office-data.js	725	text	back office: Data and Menu > save	Saved. Costs and margins use
-84-office-data.js	725	text	back office: Data and Menu > save	per kg
-84-office-data.js	725	text	back office: Data and Menu > save	from now on.
-84-office-data.js	731	name	back office: Data and Menu > ingRow	The pull size
-84-office-data.js	733	label	back office: Data and Menu > ingRow	Amount per take-out
-84-office-data.js	733	text	back office: Data and Menu > ingRow	Amount per take-out of
-84-office-data.js	736	help	back office: Data and Menu > ingRow	What one tap on Pull takes out of the cabinet: one whole brisket, one rack, one pan.
-84-office-data.js	738	text	back office: Data and Menu > save	Saved. One tap on Pull takes
-84-office-data.js	738	text	back office: Data and Menu > save	out of the cabinet.
-84-office-data.js	742	name	back office: Data and Menu > ingRow	The hold limit
-84-office-data.js	742	name	back office: Data and Menu > ingRow	The rest time
-84-office-data.js	744	label	back office: Data and Menu > ingRow	Hold limit (hours in the cabinet)
-84-office-data.js	744	text	back office: Data and Menu > ingRow	Hold limit of
-84-office-data.js	747	text	back office: Data and Menu > save	Saved. New batches of
-84-office-data.js	747	text	back office: Data and Menu > save	reach their hold limit
-84-office-data.js	747	text	back office: Data and Menu > save	hours after they go in.
-84-office-data.js	750	label	back office: Data and Menu > ingRow	Rest before serving (hours)
-84-office-data.js	750	text	back office: Data and Menu > ingRow	Rest time of
-84-office-data.js	753	text	back office: Data and Menu > save	Saved. New batches of
-84-office-data.js	753	text	back office: Data and Menu > save	hours before they are ready.
-84-office-data.js	755	name	back office: Data and Menu > ingRow	The cook time
-84-office-data.js	757	label	back office: Data and Menu > ingRow	Cook time (hours)
-84-office-data.js	757	text	back office: Data and Menu > ingRow	Cook time of
-84-office-data.js	758	help	back office: Data and Menu > ingRow	From starting a batch to ready (before its rest). Used to say whether a new batch started now is ready before close. Starter value: owner to confirm.
-84-office-data.js	760	text	back office: Data and Menu > save	Saved. A new batch of
-84-office-data.js	760	text	back office: Data and Menu > save	hours to cook.
-84-office-data.js	763	label	back office: Data and Menu > ingRow	Kind of hold limit for
-84-office-data.js	764	label	back office: Data and Menu > ingRow	Quality limit
-84-office-data.js	764	label	back office: Data and Menu > ingRow	Safety limit
-84-office-data.js	768	text	back office: Data and Menu > onChange	Saved. The limit is a
-84-office-data.js	778	name	back office: Data and Menu > ingRow	The yield
-84-office-data.js	780	label	back office: Data and Menu > ingRow	Cooked yield (cooked weight as a percent of raw weight)
-84-office-data.js	780	text	back office: Data and Menu > ingRow	Cooked yield of
-84-office-data.js	784	text	back office: Data and Menu > save	Saved. New batches use
-84-office-data.js	784	text	back office: Data and Menu > save	% cooked yield.
-84-office-data.js	787	label	back office: Data and Menu > ingRow	Yield status for
-84-office-data.js	788	label	back office: Data and Menu > ingRow	Starter estimate
-84-office-data.js	788	label	back office: Data and Menu > ingRow	Confirmed
-84-office-data.js	792	text	back office: Data and Menu > onChange	Saved. Yield marked as confirmed.
-84-office-data.js	792	text	back office: Data and Menu > onChange	Saved. Yield marked as a starter estimate.
-84-office-data.js	799	text	back office: Data and Menu > ingRow	is costed with the thermal model (about
-84-office-data.js	799	text	back office: Data and Menu > ingRow	% at
-84-office-data.js	799	text	back office: Data and Menu > ingRow	h hold). This static number is what the Sales and money page compares it against.
-84-office-data.js	803	text	back office: Data and Menu > ingRow	Cold hold
-84-office-data.js	803	text	back office: Data and Menu > ingRow	Hot hold
-84-office-data.js	803	text	back office: Data and Menu > ingRow	Max hold
-84-office-data.js	804	text	back office: Data and Menu > ingRow	Counted in pieces
-84-office-data.js	804	text	back office: Data and Menu > ingRow	Not temperature controlled
-84-office-data.js	815	text	back office: Data and Menu > ingRow	Starter basis, owner to confirm: if
-84-office-data.js	815	text	back office: Data and Menu > ingRow	is held outside temperature control, choose Safety limit.
-84-office-data.js	836	text	back office: Data and Menu > buildIngredients	The opening amount (par) is the stock you start a day with. When stock falls to the sold-out amount or below, every dish that uses it is marked sold out. Weights are grams and kilograms; counted items such as buns and cornbread are pieces. Cooked yield is cooked weight divided by raw weight, and stays a starter estimate until you confirm it from weighed batches. Costs are starter numbers too: replace them with your supplier invoices. Changes save as you make them and apply from now on.
-84-office-data.js	872	text	back office: Data and Menu > paint	ticket turns amber at
-84-office-data.js	872	text	back office: Data and Menu > paint	and overdue at
-84-office-data.js	875	name	back office: Data and Menu > buildTimes	amber time
-84-office-data.js	875	text	back office: Data and Menu > words	Amber has to come before overdue (
-84-office-data.js	875	text	back office: Data and Menu > words	). Raise the overdue time first, then this one.
-84-office-data.js	877	name	back office: Data and Menu > buildTimes	overdue time
-84-office-data.js	877	text	back office: Data and Menu > words	Overdue has to come after amber (
-84-office-data.js	877	text	back office: Data and Menu > words	). Use
-84-office-data.js	877	text	back office: Data and Menu > words	or later.
-84-office-data.js	882	label	back office: Data and Menu > buildTimes	Turns amber at
-84-office-data.js	882	text	back office: Data and Menu > buildTimes	turns amber at (seconds)
-84-office-data.js	884	text	back office: Data and Menu > save	Saved.
-84-office-data.js	884	text	back office: Data and Menu > save	tickets turn amber at
-84-office-data.js	888	label	back office: Data and Menu > buildTimes	Overdue at
-84-office-data.js	888	text	back office: Data and Menu > buildTimes	overdue at (seconds)
-84-office-data.js	890	text	back office: Data and Menu > save	Saved.
-84-office-data.js	890	text	back office: Data and Menu > save	tickets show overdue at
-84-office-data.js	901	text	back office: Data and Menu > buildTimes	Reset times to starter values
-84-office-data.js	906	text	back office: Data and Menu > buildTimes	Saved. Every channel is back to the starter times.
-84-office-data.js	907	text	back office: Data and Menu > buildTimes	Already at the starter times.
-84-office-data.js	920	name	back office: Data and Menu	Shortest prep time
-84-office-data.js	920	text	back office: Data and Menu	No item is planned for less time than this, even if its prep estimate is shorter.
-84-office-data.js	921	name	back office: Data and Menu	Extra time per extra portion
-84-office-data.js	921	text	back office: Data and Menu	Each extra portion on the same line adds this much to its prep time.
-84-office-data.js	922	name	back office: Data and Menu	Most a big line can grow
-84-office-data.js	923	name	back office: Data and Menu	How fast it learns your real times
-84-office-data.js	923	text	back office: Data and Menu	How many real timings it takes to count as much as your starter estimate. Higher learns more slowly; 0 trusts the line from the first timing.
-84-office-data.js	924	name	back office: Data and Menu	Learned time never below
+84-office-data.js	631	label	back office: Data and Menu > buildMenu	Show items
+84-office-data.js	632	label	back office: Data and Menu > buildMenu	Active
+84-office-data.js	632	label	back office: Data and Menu > buildMenu	Archived
+84-office-data.js	632	label	back office: Data and Menu > buildMenu	All
+84-office-data.js	636	aria-label	back office: Data and Menu > buildMenu	Show one station
+84-office-data.js	636	text	back office: Data and Menu > buildMenu	All stations
+84-office-data.js	639	label	back office: Data and Menu > buildMenu	Starter estimates only
+84-office-data.js	643	text	back office: Data and Menu > buildMenu	No items match.
+84-office-data.js	643	text	back office: Data and Menu > buildMenu	Change the filter above to see more.
+84-office-data.js	645	text	back office: Data and Menu > buildMenu	Add your first dish
+84-office-data.js	667	text	back office: Data and Menu > applyFilter	No dishes yet.
+84-office-data.js	667	text	back office: Data and Menu > applyFilter	No items match.
+84-office-data.js	668	text	back office: Data and Menu > applyFilter	Add your first dish to start taking orders.
+84-office-data.js	668	text	back office: Data and Menu > applyFilter	Change the filter above to see more.
+84-office-data.js	704	name	back office: Data and Menu > ingRow	Opening amount
+84-office-data.js	705	name	back office: Data and Menu > ingRow	The sold-out amount
+84-office-data.js	707	label	back office: Data and Menu > ingRow	Opening amount (par)
+84-office-data.js	707	text	back office: Data and Menu > ingRow	Opening amount of
+84-office-data.js	710	text	back office: Data and Menu > save	Saved. Par is
+84-office-data.js	713	label	back office: Data and Menu > ingRow	Sold out at
+84-office-data.js	713	text	back office: Data and Menu > ingRow	Sold out at,
+84-office-data.js	714	help	back office: Data and Menu > ingRow	Dishes that use this are marked sold out at or below this amount.
+84-office-data.js	716	text	back office: Data and Menu > save	Saved. Items using
+84-office-data.js	716	text	back office: Data and Menu > save	go 86 at
+84-office-data.js	716	text	back office: Data and Menu > save	or less.
+84-office-data.js	720	name	back office: Data and Menu > ingRow	The cost each
+84-office-data.js	720	name	back office: Data and Menu > ingRow	The cost per kg
+84-office-data.js	722	label	back office: Data and Menu > ingRow	Cost each ($)
+84-office-data.js	722	label	back office: Data and Menu > ingRow	Raw cost per kg ($)
+84-office-data.js	722	text	back office: Data and Menu > ingRow	Cost each of
+84-office-data.js	722	text	back office: Data and Menu > ingRow	Cost per kg of
+84-office-data.js	724	text	back office: Data and Menu > save	Saved. Costs and margins use
+84-office-data.js	724	text	back office: Data and Menu > save	per kg
+84-office-data.js	724	text	back office: Data and Menu > save	from now on.
+84-office-data.js	730	name	back office: Data and Menu > ingRow	The pull size
+84-office-data.js	732	label	back office: Data and Menu > ingRow	Amount per take-out
+84-office-data.js	732	text	back office: Data and Menu > ingRow	Amount per take-out of
+84-office-data.js	735	help	back office: Data and Menu > ingRow	What one tap on Pull takes out of the cabinet: one whole brisket, one rack, one pan.
+84-office-data.js	737	text	back office: Data and Menu > save	Saved. One tap on Pull takes
+84-office-data.js	737	text	back office: Data and Menu > save	out of the cabinet.
+84-office-data.js	741	name	back office: Data and Menu > ingRow	The hold limit
+84-office-data.js	741	name	back office: Data and Menu > ingRow	The rest time
+84-office-data.js	743	label	back office: Data and Menu > ingRow	Hold limit (hours in the cabinet)
+84-office-data.js	743	text	back office: Data and Menu > ingRow	Hold limit of
+84-office-data.js	746	text	back office: Data and Menu > save	Saved. New batches of
+84-office-data.js	746	text	back office: Data and Menu > save	reach their hold limit
+84-office-data.js	746	text	back office: Data and Menu > save	hours after they go in.
+84-office-data.js	749	label	back office: Data and Menu > ingRow	Rest before serving (hours)
+84-office-data.js	749	text	back office: Data and Menu > ingRow	Rest time of
+84-office-data.js	752	text	back office: Data and Menu > save	Saved. New batches of
+84-office-data.js	752	text	back office: Data and Menu > save	hours before they are ready.
+84-office-data.js	754	name	back office: Data and Menu > ingRow	The cook time
+84-office-data.js	756	label	back office: Data and Menu > ingRow	Cook time (hours)
+84-office-data.js	756	text	back office: Data and Menu > ingRow	Cook time of
+84-office-data.js	757	help	back office: Data and Menu > ingRow	From starting a batch to ready (before its rest). Used to say whether a new batch started now is ready before close. Starter value: owner to confirm.
+84-office-data.js	759	text	back office: Data and Menu > save	Saved. A new batch of
+84-office-data.js	759	text	back office: Data and Menu > save	hours to cook.
+84-office-data.js	762	label	back office: Data and Menu > ingRow	Kind of hold limit for
+84-office-data.js	763	label	back office: Data and Menu > ingRow	Quality limit
+84-office-data.js	763	label	back office: Data and Menu > ingRow	Safety limit
+84-office-data.js	767	text	back office: Data and Menu > onChange	Saved. The limit is a
+84-office-data.js	777	name	back office: Data and Menu > ingRow	The yield
+84-office-data.js	779	label	back office: Data and Menu > ingRow	Cooked yield (cooked weight as a percent of raw weight)
+84-office-data.js	779	text	back office: Data and Menu > ingRow	Cooked yield of
+84-office-data.js	783	text	back office: Data and Menu > save	Saved. New batches use
+84-office-data.js	783	text	back office: Data and Menu > save	% cooked yield.
+84-office-data.js	786	label	back office: Data and Menu > ingRow	Yield status for
+84-office-data.js	787	label	back office: Data and Menu > ingRow	Starter estimate
+84-office-data.js	787	label	back office: Data and Menu > ingRow	Confirmed
+84-office-data.js	791	text	back office: Data and Menu > onChange	Saved. Yield marked as confirmed.
+84-office-data.js	791	text	back office: Data and Menu > onChange	Saved. Yield marked as a starter estimate.
+84-office-data.js	798	text	back office: Data and Menu > ingRow	is costed with the thermal model (about
+84-office-data.js	798	text	back office: Data and Menu > ingRow	% at
+84-office-data.js	798	text	back office: Data and Menu > ingRow	h hold). This static number is what the Sales and money page compares it against.
+84-office-data.js	802	text	back office: Data and Menu > ingRow	Cold hold
+84-office-data.js	802	text	back office: Data and Menu > ingRow	Hot hold
+84-office-data.js	802	text	back office: Data and Menu > ingRow	Max hold
+84-office-data.js	803	text	back office: Data and Menu > ingRow	Counted in pieces
+84-office-data.js	803	text	back office: Data and Menu > ingRow	Not temperature controlled
+84-office-data.js	814	text	back office: Data and Menu > ingRow	Starter basis, owner to confirm: if
+84-office-data.js	814	text	back office: Data and Menu > ingRow	is held outside temperature control, choose Safety limit.
+84-office-data.js	835	text	back office: Data and Menu > buildIngredients	The opening amount (par) is the stock you start a day with. When stock falls to the sold-out amount or below, every dish that uses it is marked sold out. Weights are grams and kilograms; counted items such as buns and cornbread are pieces. Cooked yield is cooked weight divided by raw weight, and stays a starter estimate until you confirm it from weighed batches. Costs are starter numbers too: replace them with your supplier invoices. Changes save as you make them and apply from now on.
+84-office-data.js	871	text	back office: Data and Menu > paint	ticket turns amber at
+84-office-data.js	871	text	back office: Data and Menu > paint	and overdue at
+84-office-data.js	874	name	back office: Data and Menu > buildTimes	amber time
+84-office-data.js	874	text	back office: Data and Menu > words	Amber has to come before overdue (
+84-office-data.js	874	text	back office: Data and Menu > words	). Raise the overdue time first, then this one.
+84-office-data.js	876	name	back office: Data and Menu > buildTimes	overdue time
+84-office-data.js	876	text	back office: Data and Menu > words	Overdue has to come after amber (
+84-office-data.js	876	text	back office: Data and Menu > words	). Use
+84-office-data.js	876	text	back office: Data and Menu > words	or later.
+84-office-data.js	881	label	back office: Data and Menu > buildTimes	Turns amber at
+84-office-data.js	881	text	back office: Data and Menu > buildTimes	turns amber at (seconds)
+84-office-data.js	883	text	back office: Data and Menu > save	Saved.
+84-office-data.js	883	text	back office: Data and Menu > save	tickets turn amber at
+84-office-data.js	887	label	back office: Data and Menu > buildTimes	Overdue at
+84-office-data.js	887	text	back office: Data and Menu > buildTimes	overdue at (seconds)
+84-office-data.js	889	text	back office: Data and Menu > save	Saved.
+84-office-data.js	889	text	back office: Data and Menu > save	tickets show overdue at
+84-office-data.js	900	text	back office: Data and Menu > buildTimes	Reset times to starter values
+84-office-data.js	905	text	back office: Data and Menu > buildTimes	Saved. Every channel is back to the starter times.
+84-office-data.js	906	text	back office: Data and Menu > buildTimes	Already at the starter times.
+84-office-data.js	919	name	back office: Data and Menu	Shortest prep time
+84-office-data.js	919	text	back office: Data and Menu	No item is planned for less time than this, even if its prep estimate is shorter.
+84-office-data.js	920	name	back office: Data and Menu	Extra time per extra portion
+84-office-data.js	920	text	back office: Data and Menu	Each extra portion on the same line adds this much to its prep time.
+84-office-data.js	921	name	back office: Data and Menu	Most a big line can grow
+84-office-data.js	922	name	back office: Data and Menu	How fast it learns your real times
+84-office-data.js	922	text	back office: Data and Menu	How many real timings it takes to count as much as your starter estimate. Higher learns more slowly; 0 trusts the line from the first timing.
+84-office-data.js	923	name	back office: Data and Menu	Learned time never below
+84-office-data.js	923	unit	back office: Data and Menu	times the starter time
+84-office-data.js	923	text	back office: Data and Menu	The learned prep time cannot fall under this share of your starter estimate.
+84-office-data.js	924	name	back office: Data and Menu	Learned time never above
 84-office-data.js	924	unit	back office: Data and Menu	times the starter time
-84-office-data.js	924	text	back office: Data and Menu	The learned prep time cannot fall under this share of your starter estimate.
-84-office-data.js	925	name	back office: Data and Menu	Learned time never above
+84-office-data.js	924	text	back office: Data and Menu	The learned prep time cannot rise over this many times your starter estimate.
+84-office-data.js	925	name	back office: Data and Menu	Ignore a timing longer than
 84-office-data.js	925	unit	back office: Data and Menu	times the starter time
-84-office-data.js	925	text	back office: Data and Menu	The learned prep time cannot rise over this many times your starter estimate.
-84-office-data.js	926	name	back office: Data and Menu	Ignore a timing longer than
-84-office-data.js	926	unit	back office: Data and Menu	times the starter time
-84-office-data.js	931	text	back office: Data and Menu > buildPacing	Meal pacing times all the items for a plate to finish together: the slowest item starts first, and quicker items are held back until it is time to start them. Rush tickets skip pacing and send every item to its station at once.
-84-office-data.js	935	label	back office: Data and Menu > buildPacing	Pace tickets
-84-office-data.js	939	text	back office: Data and Menu > onChange	Pacing is on. New tickets are paced; tickets already on the board keep the plan they were made with.
-84-office-data.js	939	text	back office: Data and Menu > onChange	Pacing is off. New tickets send every item to its station at once.
-84-office-data.js	940	name	back office: Data and Menu > onChange	Pacing
-84-office-data.js	955	text	back office: Data and Menu > buildPacing	Allowed:
-84-office-data.js	957	text	back office: Data and Menu > save	Saved.
-84-office-data.js	957	text	back office: Data and Menu > save	is now
-84-office-data.js	962	text	back office: Data and Menu > buildPacing	Reset to starter values
-84-office-data.js	967	text	back office: Data and Menu > buildPacing	Saved. The pacing numbers are back to the starter values. The on/off switch is unchanged.
-84-office-data.js	968	text	back office: Data and Menu > buildPacing	Already at the starter values.
-84-office-data.js	981	name	back office: Data and Menu	Hot hold temperature
-84-office-data.js	981	text	back office: Data and Menu	Hot food has to stay at or above this.
-84-office-data.js	982	name	back office: Data and Menu	Cold hold temperature
-84-office-data.js	982	text	back office: Data and Menu	Cold food has to stay at or below this.
-84-office-data.js	983	name	back office: Data and Menu	Reheat to
-84-office-data.js	984	name	back office: Data and Menu	Time allowed below hot hold
-84-office-data.js	984	text	back office: Data and Menu	Food can sit below hot hold this long before it must be thrown out. A reheat is only allowed inside this window.
-84-office-data.js	985	name	back office: Data and Menu	Time allowed above cold hold
-84-office-data.js	985	text	back office: Data and Menu	Cold food can sit above cold hold this long before it must be thrown out.
-84-office-data.js	986	name	back office: Data and Menu	Hold limit for a product with none of its own
-84-office-data.js	986	text	back office: Data and Menu	Every starter product has its own limit; this is only used for one that has not.
-84-office-data.js	987	name	back office: Data and Menu	Longest any batch may stay
-84-office-data.js	987	text	back office: Data and Menu	At this age any batch is thrown out, whatever its limit kind. A product whose own limit is at or above it has no quality stage: it is thrown out at the cap.
-84-office-data.js	988	name	back office: Data and Menu	Temperature check every
-84-office-data.js	989	name	back office: Data and Menu	Sanitize food-contact surfaces every
-84-office-data.js	989	text	back office: Data and Menu	The sanitize timer on the line counts down from this.
-84-office-data.js	994	name	back office: Data and Menu	First cooling stage: cool to
-84-office-data.js	994	text	back office: Data and Menu	Hot food has to fall to this temperature in the first stage.
-84-office-data.js	995	name	back office: Data and Menu	First cooling stage: within
-84-office-data.js	995	text	back office: Data and Menu	How long the first stage may take.
-84-office-data.js	996	name	back office: Data and Menu	Total cooling time
-84-office-data.js	996	text	back office: Data and Menu	Food has to be fully cooled within this time from the start, and longer than the first stage.
-84-office-data.js	997	name	back office: Data and Menu	Cool all the way to
-84-office-data.js	997	text	back office: Data and Menu	The final cooling target.
-84-office-data.js	1001	text	back office: Data and Menu	The FDA Food Code sets 135 °F as the minimum for hot holding. Your local health code applies and may be stricter.
-84-office-data.js	1002	text	back office: Data and Menu	The FDA Food Code sets 165 °F as the minimum reheat target. Your local health code applies.
-84-office-data.js	1003	text	back office: Data and Menu	The FDA Food Code sets 41 °F as the maximum for cold holding. Your local health code applies.
-84-office-data.js	1004	text	back office: Data and Menu	The FDA Food Code allows at most 2 hours. Your local health code applies.
-84-office-data.js	1004	text	back office: Data and Menu	The FDA Food Code allows at most 4 hours. Your local health code applies.
-84-office-data.js	1004	text	back office: Data and Menu	The FDA Food Code allows at most 4 hours between wipe-downs. Your local health code applies.
-84-office-data.js	1012	text	back office: Data and Menu > buildSafety	Smokebox refuses a hot-hold limit below 135 °F (the FDA Food Code minimum; your local health code applies and may be stricter), and it refuses any limit outside the range shown under each field, naming the one that is wrong. These limits drive the hold cabinet, the temperature checks and the sanitize timer. A change applies from the next check on; batches already in the cabinet are re-checked against it.
-84-office-data.js	1022	text	back office: Data and Menu > words	The first stage has to be shorter than the total cooling time (
-84-office-data.js	1022	text	back office: Data and Menu > words	hours). Raise the total first.
-84-office-data.js	1024	text	back office: Data and Menu > words	The total cooling time has to be longer than the first stage (
-84-office-data.js	1024	text	back office: Data and Menu > words	hours):
-84-office-data.js	1024	text	back office: Data and Menu > words	hours or more.
-84-office-data.js	1026	text	back office: Data and Menu > mk	FDA Food Code minimum
-84-office-data.js	1026	text	back office: Data and Menu > mk	FDA Food Code maximum
-84-office-data.js	1029	text	back office: Data and Menu > mk	Allowed:
-84-office-data.js	1031	text	back office: Data and Menu > save	Saved.
-84-office-data.js	1031	text	back office: Data and Menu > save	is now
-84-office-data.js	1045	text	back office: Data and Menu > paintQ	Products with no quality stage at this cap (thrown out when they reach their limit):
-84-office-data.js	1045	text	back office: Data and Menu > paintQ	Every cooked product has a quality stage at this cap.
-84-office-data.js	1046	text	back office: Data and Menu > paintQ	Owner to confirm:
-84-office-data.js	1046	text	back office: Data and Menu > paintQ	start with a quality limit; if you hold them outside temperature control, set their limit kind to safety.
-84-office-data.js	1050	name	back office: Data and Menu > buildSafety	Warning times
-84-office-data.js	1050	text	back office: Data and Menu > words	Each warning time is a whole number of minutes from
-84-office-data.js	1050	text	back office: Data and Menu > words	, counting down, with at most 5 per product.
-84-office-data.js	1050	text	back office: Data and Menu > words	Type minutes before the limit, biggest first, like 60, 30, 10. At most 5 times, each smaller than the one before.
-84-office-data.js	1056	aria-label	back office: Data and Menu > mkLadder	Warning minutes for
-84-office-data.js	1057	help	back office: Data and Menu > mkLadder	Built in:
-84-office-data.js	1057	help	back office: Data and Menu > mkLadder	minutes. Leave empty for the built-in list.
-84-office-data.js	1067	text	back office: Data and Menu > commit	alerts.ladderThresholds
-84-office-data.js	1067	text	back office: Data and Menu > commit	Saved.
-84-office-data.js	1067	text	back office: Data and Menu > commit	minutes before the limit.
-84-office-data.js	1067	text	back office: Data and Menu > commit	at the built-in times.
-84-office-data.js	1079	text	back office: Data and Menu > buildSafety	All other products
-84-office-data.js	1083	text	back office: Data and Menu > buildSafety	Batch expiry warnings only
-84-office-data.js	1083	text	back office: Data and Menu > buildSafety	How many minutes before a batch reaches its limit the board warns, loudest at the last time. This changes the warnings, never the limits or the food-safety rules: the last warning cannot be under 5 minutes.
-84-office-data.js	1083	text	back office: Data and Menu > buildSafety	Cooling stages
-84-office-data.js	1083	text	back office: Data and Menu > buildSafety	Cooked food that is not going into the cabinet has to be cooled in two stages.
-84-office-data.js	1093	text	back office: Data and Menu > buildPin	This keeps line cooks out of the back office. It is not real security: anyone with the file or the device can read the data.
-84-office-data.js	1094	text	back office: Data and Menu > buildPin	After you leave the back office it stays open for 2 minutes without asking, so a quick return does not need the PIN. A backup file contains the PIN lock too, so restoring a backup also restores its PIN.
-84-office-data.js	1107	help	back office: Data and Menu > mkPin	4 digits
-84-office-data.js	1115	text	back office: Data and Menu > openForm	Current PIN
-84-office-data.js	1116	text	back office: Data and Menu > openForm	New PIN
-84-office-data.js	1117	text	back office: Data and Menu > openForm	Type the new PIN again
-84-office-data.js	1121	text	back office: Data and Menu > openForm	Set PIN
-84-office-data.js	1121	text	back office: Data and Menu > openForm	Change PIN
-84-office-data.js	1121	text	back office: Data and Menu > openForm	Remove PIN
-84-office-data.js	1123	text	back office: Data and Menu > openForm	Cancel
-84-office-data.js	1124	aria-label	back office: Data and Menu > openForm	Set a PIN
-84-office-data.js	1124	aria-label	back office: Data and Menu > openForm	Change the PIN
-84-office-data.js	1124	aria-label	back office: Data and Menu > openForm	Remove the PIN
-84-office-data.js	1130	text	back office: Data and Menu > openForm	Enter the current 4-digit PIN.
-84-office-data.js	1133	text	back office: Data and Menu > openForm	That is not the current PIN. Nothing was changed.
-84-office-data.js	1137	text	back office: Data and Menu > openForm	Use exactly 4 digits.
-84-office-data.js	1138	text	back office: Data and Menu > openForm	The two entries do not match. Type the same 4 digits twice.
-84-office-data.js	1145	toast	back office: Data and Menu > openForm	PIN set. The back office will ask for it next time.
-84-office-data.js	1145	toast	back office: Data and Menu > openForm	PIN changed. The back office will ask for the new one next time.
-84-office-data.js	1145	toast	back office: Data and Menu > openForm	PIN removed. The back office opens without asking.
-84-office-data.js	1146	text	back office: Data and Menu > openForm	That is already the PIN. Nothing was changed.
-84-office-data.js	1147	text	back office: Data and Menu > openForm	The PIN could not be saved. Try again.
-84-office-data.js	1156	text	back office: Data and Menu > paint	No PIN is set. Anyone who opens the back office sees everything.
-84-office-data.js	1162	text	back office: Data and Menu > paint	Change PIN
-84-office-data.js	1162	text	back office: Data and Menu > paint	Remove PIN
-84-office-data.js	1163	text	back office: Data and Menu > paint	Set a PIN
-84-office-data.js	1172	text	back office: Data and Menu > buildLook	Display choices are remembered on this device only. The floor and the back office have their own light and dark themes.
-84-office-data.js	1186	text	back office: Data and Menu > buildLook	Back office theme
-84-office-data.js	1186	text	back office: Data and Menu > buildLook	Ember is dark and warm, Paper is light. This page and every chart follow it.
-84-office-data.js	1186	text	back office: Data and Menu > buildLook	Ember
-84-office-data.js	1186	text	back office: Data and Menu > buildLook	Paper
-84-office-data.js	1187	text	back office: Data and Menu > buildLook	Line theme
-84-office-data.js	1187	text	back office: Data and Menu > buildLook	Day is the anti-glare parchment for bright kitchens, Night is for a dim prep corner.
-84-office-data.js	1187	text	back office: Data and Menu > buildLook	Day
-84-office-data.js	1187	text	back office: Data and Menu > buildLook	Night
-84-office-data.js	1188	text	back office: Data and Menu > buildLook	Text size
-84-office-data.js	1188	text	back office: Data and Menu > buildLook	Large makes all text about 20% bigger on the line and in the back office.
-84-office-data.js	1188	text	back office: Data and Menu > buildLook	Normal
-84-office-data.js	1188	text	back office: Data and Menu > buildLook	Large
-84-office-data.js	1189	text	back office: Data and Menu > buildLook	Temperatures
-84-office-data.js	1189	text	back office: Data and Menu > buildLook	Shows temperatures in Fahrenheit or Celsius. The limits on the Food safety page are always entered in °F.
-84-office-data.js	1190	text	back office: Data and Menu > buildLook	Weights
-84-office-data.js	1190	text	back office: Data and Menu > buildLook	Shows food weights in kilograms and grams, or in pounds and ounces. Amounts you type on the Ingredients page are still in grams.
-84-office-data.js	1190	text	back office: Data and Menu > buildLook	kg and g
-84-office-data.js	1190	text	back office: Data and Menu > buildLook	lb and oz
-84-office-data.js	1197	label	back office: Data and Menu > buildLook	Sound on the line
-84-office-data.js	1200	text	back office: Data and Menu > onChange	Sound is on. You should have heard a chime; alert sounds play for new and overdue tickets.
-84-office-data.js	1200	text	back office: Data and Menu > onChange	Sound is off.
-84-office-data.js	1201	text	back office: Data and Menu > onChange	Could not change the sound. Reload and try again.
-84-office-data.js	1207	text	back office: Data and Menu > buildLook	Service hours
-84-office-data.js	1208	text	back office: Data and Menu > buildLook	The charts and the sell-out clock measure against these hours. Use whole hours on the 24-hour clock; a closing time past 24 means after midnight.
-84-office-data.js	1211	name	back office: Data and Menu > buildLook	Service day starts at
-84-office-data.js	1212	name	back office: Data and Menu > buildLook	Opens at
-84-office-data.js	1212	text	back office: Data and Menu > buildLook	The first hour of service.
-84-office-data.js	1213	name	back office: Data and Menu > buildLook	Closes at
-84-office-data.js	1213	text	back office: Data and Menu > buildLook	The last hour of service. 25 means 1 am the next day.
-84-office-data.js	1214	name	back office: Data and Menu > buildLook	Warnings start at
-84-office-data.js	1214	text	back office: Data and Menu > buildLook	Warning sounds start at this hour, or at opening if that is earlier. Set it to when the pit master starts. Before it the strip says sound is paused.
-84-office-data.js	1222	text	back office: Data and Menu > words	Opening has to be before closing (
-84-office-data.js	1222	text	back office: Data and Menu > words	). Move the closing time first.
-84-office-data.js	1223	text	back office: Data and Menu > words	Closing has to be after opening (
-84-office-data.js	1223	text	back office: Data and Menu > words	or later.
-84-office-data.js	1229	text	back office: Data and Menu > save	Saved.
-84-office-data.js	1236	label	back office: Data and Menu > buildLook	Warnings may sound outside open hours
-84-office-data.js	1240	text	back office: Data and Menu > onChange	Warnings may now sound at any hour.
-84-office-data.js	1240	text	back office: Data and Menu > onChange	Warnings sound only from the start hour to closing.
-84-office-data.js	1241	name	back office: Data and Menu > onChange	Sound outside open hours
-84-office-data.js	1245	name	back office: Data and Menu > buildLook	Wait before other apps are told
-84-office-data.js	1248	label	back office: Data and Menu > buildLook	Wait before other apps are told an item is past best-by
-84-office-data.js	1251	text	back office: Data and Menu > save	service.qualitySyncHoldMin
-84-office-data.js	1251	text	back office: Data and Menu > save	Saved. Channels wait
-84-office-data.js	1257	text	back office: Data and Menu > buildLook	Sales tax
-84-office-data.js	1258	text	back office: Data and Menu > buildLook	Added on top of the food when an order is paid, and shown in Money collected. Leave it at 0 if your menu prices already include tax, and ask your tax office for the right rate.
-84-office-data.js	1262	name	back office: Data and Menu > buildLook	Sales tax
-84-office-data.js	1265	label	back office: Data and Menu > buildLook	Sales tax rate
-84-office-data.js	1267	text	back office: Data and Menu > read	added to every order
-84-office-data.js	1267	text	back office: Data and Menu > read	no tax added
-84-office-data.js	1269	text	back office: Data and Menu > save	service.taxRatePct
-84-office-data.js	1269	text	back office: Data and Menu > save	Saved. Orders now add
-84-office-data.js	1269	text	back office: Data and Menu > save	% sales tax.
-84-office-data.js	1269	text	back office: Data and Menu > save	Saved. Orders add no sales tax.
-84-office-data.js	1286	text	back office: Data and Menu > buildNames	Station, category and channel names
-84-office-data.js	1287	text	back office: Data and Menu > buildNames	Rename a station, a menu category or an order channel, or add a new one. Ids and history never change, only what people read. Changes show on every screen after you reload. Backups do not carry these names, so repeat them on a replacement device before restoring.
-84-office-data.js	1290	text	back office: Data and Menu > buildNames	Reload to apply
-84-office-data.js	1301	text	back office: Data and Menu > commit	That name cannot be used: it is empty, longer than
-84-office-data.js	1301	text	back office: Data and Menu > commit	letters, already taken, or the list is full.
-84-office-data.js	1302	text	back office: Data and Menu > commit	This browser would not save the change.
-84-office-data.js	1303	text	back office: Data and Menu > commit	Saved. Reload the page to see it everywhere.
-84-office-data.js	1308	title	back office: Data and Menu > buildNames	Stations
-84-office-data.js	1310	title	back office: Data and Menu > buildNames	Menu categories
-84-office-data.js	1312	title	back office: Data and Menu > buildNames	Order channels
-84-office-data.js	1317	aria-label	back office: Data and Menu > buildNames	Name of
-84-office-data.js	1319	text	back office: Data and Menu > buildNames	Rename
-84-office-data.js	1322	placeholder	back office: Data and Menu > buildNames	New
-84-office-data.js	1324	text	back office: Data and Menu > buildNames	Add
-84-office-data.js	1353	text	back office: Data and Menu	Sample history is generated by a simulator that runs the real engine; it is not your restaurant's data. Days 1 to 5 run without pacing and days 6 to 14 with it so you can see the difference.
-84-office-data.js	1358	text	back office: Data and Menu > backupReason	The text could not be read: it is probably not a Smokebox backup, or it was cut off.
-84-office-data.js	1359	text	back office: Data and Menu > backupReason	It is not a Smokebox backup (the top level is not a record).
-84-office-data.js	1360	text	back office: Data and Menu > backupReason	It does not say which Smokebox version made it, so it is probably not a backup.
-84-office-data.js	1361	text	back office: Data and Menu > backupReason	It was made by a different Smokebox version (
-84-office-data.js	1362	text	back office: Data and Menu > backupReason	It has no
-84-office-data.js	1362	text	back office: Data and Menu > backupReason	list, so it is not a Smokebox backup.
-84-office-data.js	1363	text	back office: Data and Menu > backupReason	It is bigger than Smokebox can load (20 MB).
-84-office-data.js	1364	text	back office: Data and Menu > backupReason	Its records contradict each other (
-84-office-data.js	1364	text	back office: Data and Menu > backupReason	), so loading it could corrupt the board.
-84-office-data.js	1365	text	back office: Data and Menu > backupReason	It could not be read (
-84-office-data.js	1373	text	back office: Data and Menu > onerror	read failed
-84-office-data.js	1380	text	back office: Data and Menu > inspectBackup	There is nothing in it. Choose a backup file or paste the backup text.
-84-office-data.js	1381	text	back office: Data and Menu > inspectBackup	too large
-84-office-data.js	1383	text	back office: Data and Menu > inspectBackup	not JSON
-84-office-data.js	1393	text	back office: Data and Menu > buildData	Everything Smokebox knows lives in this browser, on this device. Back it up before you reset, import or clear browser data.
-84-office-data.js	1400	text	back office: Data and Menu > buildData	Tickets
-84-office-data.js	1400	text	back office: Data and Menu > buildData	Logged events
-84-office-data.js	1400	text	back office: Data and Menu > buildData	Hold-cabinet batches
-84-office-data.js	1400	text	back office: Data and Menu > buildData	Stored on this device
-84-office-data.js	1401	text	back office: Data and Menu > buildData	Sample tickets
-84-office-data.js	1402	text	back office: Data and Menu > buildData	What is stored
-84-office-data.js	1415	text	back office: Data and Menu > paintCounts	live,
+84-office-data.js	930	text	back office: Data and Menu > buildPacing	Meal pacing times all the items for a plate to finish together: the slowest item starts first, and quicker items are held back until it is time to start them. Rush tickets skip pacing and send every item to its station at once.
+84-office-data.js	934	label	back office: Data and Menu > buildPacing	Pace tickets
+84-office-data.js	938	text	back office: Data and Menu > onChange	Pacing is on. New tickets are paced; tickets already on the board keep the plan they were made with.
+84-office-data.js	938	text	back office: Data and Menu > onChange	Pacing is off. New tickets send every item to its station at once.
+84-office-data.js	939	name	back office: Data and Menu > onChange	Pacing
+84-office-data.js	954	text	back office: Data and Menu > buildPacing	Allowed:
+84-office-data.js	956	text	back office: Data and Menu > save	Saved.
+84-office-data.js	956	text	back office: Data and Menu > save	is now
+84-office-data.js	961	text	back office: Data and Menu > buildPacing	Reset to starter values
+84-office-data.js	966	text	back office: Data and Menu > buildPacing	Saved. The pacing numbers are back to the starter values. The on/off switch is unchanged.
+84-office-data.js	967	text	back office: Data and Menu > buildPacing	Already at the starter values.
+84-office-data.js	980	name	back office: Data and Menu	Hot hold temperature
+84-office-data.js	980	text	back office: Data and Menu	Hot food has to stay at or above this.
+84-office-data.js	981	name	back office: Data and Menu	Cold hold temperature
+84-office-data.js	981	text	back office: Data and Menu	Cold food has to stay at or below this.
+84-office-data.js	982	name	back office: Data and Menu	Reheat to
+84-office-data.js	983	name	back office: Data and Menu	Time allowed below hot hold
+84-office-data.js	983	text	back office: Data and Menu	Food can sit below hot hold this long before it must be thrown out. A reheat is only allowed inside this window.
+84-office-data.js	984	name	back office: Data and Menu	Time allowed above cold hold
+84-office-data.js	984	text	back office: Data and Menu	Cold food can sit above cold hold this long before it must be thrown out.
+84-office-data.js	985	name	back office: Data and Menu	Hold limit for a product with none of its own
+84-office-data.js	985	text	back office: Data and Menu	Every starter product has its own limit; this is only used for one that has not.
+84-office-data.js	986	name	back office: Data and Menu	Longest any batch may stay
+84-office-data.js	986	text	back office: Data and Menu	At this age any batch is thrown out, whatever its limit kind. A product whose own limit is at or above it has no quality stage: it is thrown out at the cap.
+84-office-data.js	987	name	back office: Data and Menu	Temperature check every
+84-office-data.js	988	name	back office: Data and Menu	Sanitize food-contact surfaces every
+84-office-data.js	988	text	back office: Data and Menu	The sanitize timer on the line counts down from this.
+84-office-data.js	993	name	back office: Data and Menu	First cooling stage: cool to
+84-office-data.js	993	text	back office: Data and Menu	Hot food has to fall to this temperature in the first stage.
+84-office-data.js	994	name	back office: Data and Menu	First cooling stage: within
+84-office-data.js	994	text	back office: Data and Menu	How long the first stage may take.
+84-office-data.js	995	name	back office: Data and Menu	Total cooling time
+84-office-data.js	995	text	back office: Data and Menu	Food has to be fully cooled within this time from the start, and longer than the first stage.
+84-office-data.js	996	name	back office: Data and Menu	Cool all the way to
+84-office-data.js	996	text	back office: Data and Menu	The final cooling target.
+84-office-data.js	1000	text	back office: Data and Menu	The FDA Food Code sets 135 °F as the minimum for hot holding. Your local health code applies and may be stricter.
+84-office-data.js	1001	text	back office: Data and Menu	The FDA Food Code sets 165 °F as the minimum reheat target. Your local health code applies.
+84-office-data.js	1002	text	back office: Data and Menu	The FDA Food Code sets 41 °F as the maximum for cold holding. Your local health code applies.
+84-office-data.js	1003	text	back office: Data and Menu	The FDA Food Code allows at most 2 hours. Your local health code applies.
+84-office-data.js	1003	text	back office: Data and Menu	The FDA Food Code allows at most 4 hours. Your local health code applies.
+84-office-data.js	1003	text	back office: Data and Menu	The FDA Food Code allows at most 4 hours between wipe-downs. Your local health code applies.
+84-office-data.js	1011	text	back office: Data and Menu > buildSafety	Smokebox refuses a hot-hold limit below 135 °F (the FDA Food Code minimum; your local health code applies and may be stricter), and it refuses any limit outside the range shown under each field, naming the one that is wrong. These limits drive the hold cabinet, the temperature checks and the sanitize timer. A change applies from the next check on; batches already in the cabinet are re-checked against it.
+84-office-data.js	1021	text	back office: Data and Menu > words	The first stage has to be shorter than the total cooling time (
+84-office-data.js	1021	text	back office: Data and Menu > words	hours). Raise the total first.
+84-office-data.js	1023	text	back office: Data and Menu > words	The total cooling time has to be longer than the first stage (
+84-office-data.js	1023	text	back office: Data and Menu > words	hours):
+84-office-data.js	1023	text	back office: Data and Menu > words	hours or more.
+84-office-data.js	1025	text	back office: Data and Menu > mk	FDA Food Code minimum
+84-office-data.js	1025	text	back office: Data and Menu > mk	FDA Food Code maximum
+84-office-data.js	1028	text	back office: Data and Menu > mk	Allowed:
+84-office-data.js	1030	text	back office: Data and Menu > save	Saved.
+84-office-data.js	1030	text	back office: Data and Menu > save	is now
+84-office-data.js	1044	text	back office: Data and Menu > paintQ	Products with no quality stage at this cap (thrown out when they reach their limit):
+84-office-data.js	1044	text	back office: Data and Menu > paintQ	Every cooked product has a quality stage at this cap.
+84-office-data.js	1045	text	back office: Data and Menu > paintQ	Owner to confirm:
+84-office-data.js	1045	text	back office: Data and Menu > paintQ	start with a quality limit; if you hold them outside temperature control, set their limit kind to safety.
+84-office-data.js	1049	name	back office: Data and Menu > buildSafety	Warning times
+84-office-data.js	1049	text	back office: Data and Menu > words	Each warning time is a whole number of minutes from
+84-office-data.js	1049	text	back office: Data and Menu > words	, counting down, with at most 5 per product.
+84-office-data.js	1049	text	back office: Data and Menu > words	Type minutes before the limit, biggest first, like 60, 30, 10. At most 5 times, each smaller than the one before.
+84-office-data.js	1055	aria-label	back office: Data and Menu > mkLadder	Warning minutes for
+84-office-data.js	1056	help	back office: Data and Menu > mkLadder	Built in:
+84-office-data.js	1056	help	back office: Data and Menu > mkLadder	minutes. Leave empty for the built-in list.
+84-office-data.js	1066	text	back office: Data and Menu > commit	alerts.ladderThresholds
+84-office-data.js	1066	text	back office: Data and Menu > commit	Saved.
+84-office-data.js	1066	text	back office: Data and Menu > commit	minutes before the limit.
+84-office-data.js	1066	text	back office: Data and Menu > commit	at the built-in times.
+84-office-data.js	1078	text	back office: Data and Menu > buildSafety	All other products
+84-office-data.js	1082	text	back office: Data and Menu > buildSafety	Batch expiry warnings only
+84-office-data.js	1082	text	back office: Data and Menu > buildSafety	How many minutes before a batch reaches its limit the board warns, loudest at the last time. This changes the warnings, never the limits or the food-safety rules: the last warning cannot be under 5 minutes.
+84-office-data.js	1082	text	back office: Data and Menu > buildSafety	Cooling stages
+84-office-data.js	1082	text	back office: Data and Menu > buildSafety	Cooked food that is not going into the cabinet has to be cooled in two stages.
+84-office-data.js	1092	text	back office: Data and Menu > buildPin	This keeps line cooks out of the back office. It is not real security: anyone with the file or the device can read the data.
+84-office-data.js	1093	text	back office: Data and Menu > buildPin	After you leave the back office it stays open for 2 minutes without asking, so a quick return does not need the PIN. A backup file contains the PIN lock too, so restoring a backup also restores its PIN.
+84-office-data.js	1106	help	back office: Data and Menu > mkPin	4 digits
+84-office-data.js	1114	text	back office: Data and Menu > openForm	Current PIN
+84-office-data.js	1115	text	back office: Data and Menu > openForm	New PIN
+84-office-data.js	1116	text	back office: Data and Menu > openForm	Type the new PIN again
+84-office-data.js	1120	text	back office: Data and Menu > openForm	Set PIN
+84-office-data.js	1120	text	back office: Data and Menu > openForm	Change PIN
+84-office-data.js	1120	text	back office: Data and Menu > openForm	Remove PIN
+84-office-data.js	1122	text	back office: Data and Menu > openForm	Cancel
+84-office-data.js	1123	aria-label	back office: Data and Menu > openForm	Set a PIN
+84-office-data.js	1123	aria-label	back office: Data and Menu > openForm	Change the PIN
+84-office-data.js	1123	aria-label	back office: Data and Menu > openForm	Remove the PIN
+84-office-data.js	1129	text	back office: Data and Menu > openForm	Enter the current 4-digit PIN.
+84-office-data.js	1132	text	back office: Data and Menu > openForm	That is not the current PIN. Nothing was changed.
+84-office-data.js	1136	text	back office: Data and Menu > openForm	Use exactly 4 digits.
+84-office-data.js	1137	text	back office: Data and Menu > openForm	The two entries do not match. Type the same 4 digits twice.
+84-office-data.js	1144	toast	back office: Data and Menu > openForm	PIN set. The back office will ask for it next time.
+84-office-data.js	1144	toast	back office: Data and Menu > openForm	PIN changed. The back office will ask for the new one next time.
+84-office-data.js	1144	toast	back office: Data and Menu > openForm	PIN removed. The back office opens without asking.
+84-office-data.js	1145	text	back office: Data and Menu > openForm	That is already the PIN. Nothing was changed.
+84-office-data.js	1146	text	back office: Data and Menu > openForm	The PIN could not be saved. Try again.
+84-office-data.js	1155	text	back office: Data and Menu > paint	No PIN is set. Anyone who opens the back office sees everything.
+84-office-data.js	1161	text	back office: Data and Menu > paint	Change PIN
+84-office-data.js	1161	text	back office: Data and Menu > paint	Remove PIN
+84-office-data.js	1162	text	back office: Data and Menu > paint	Set a PIN
+84-office-data.js	1171	text	back office: Data and Menu > buildLook	Display choices are remembered on this device only. The floor and the back office have their own light and dark themes.
+84-office-data.js	1185	text	back office: Data and Menu > buildLook	Back office theme
+84-office-data.js	1185	text	back office: Data and Menu > buildLook	Ember is dark and warm, Paper is light. This page and every chart follow it.
+84-office-data.js	1185	text	back office: Data and Menu > buildLook	Ember
+84-office-data.js	1185	text	back office: Data and Menu > buildLook	Paper
+84-office-data.js	1186	text	back office: Data and Menu > buildLook	Line theme
+84-office-data.js	1186	text	back office: Data and Menu > buildLook	Day is the anti-glare parchment for bright kitchens, Night is for a dim prep corner.
+84-office-data.js	1186	text	back office: Data and Menu > buildLook	Day
+84-office-data.js	1186	text	back office: Data and Menu > buildLook	Night
+84-office-data.js	1187	text	back office: Data and Menu > buildLook	Text size
+84-office-data.js	1187	text	back office: Data and Menu > buildLook	Large makes all text about 20% bigger on the line and in the back office.
+84-office-data.js	1187	text	back office: Data and Menu > buildLook	Normal
+84-office-data.js	1187	text	back office: Data and Menu > buildLook	Large
+84-office-data.js	1188	text	back office: Data and Menu > buildLook	Temperatures
+84-office-data.js	1188	text	back office: Data and Menu > buildLook	Shows temperatures in Fahrenheit or Celsius. The limits on the Food safety page are always entered in °F.
+84-office-data.js	1189	text	back office: Data and Menu > buildLook	Weights
+84-office-data.js	1189	text	back office: Data and Menu > buildLook	Shows food weights in kilograms and grams, or in pounds and ounces. Amounts you type on the Ingredients page are still in grams.
+84-office-data.js	1189	text	back office: Data and Menu > buildLook	kg and g
+84-office-data.js	1189	text	back office: Data and Menu > buildLook	lb and oz
+84-office-data.js	1196	label	back office: Data and Menu > buildLook	Sound on the line
+84-office-data.js	1199	text	back office: Data and Menu > onChange	Sound is on. You should have heard a chime; alert sounds play for new and overdue tickets.
+84-office-data.js	1199	text	back office: Data and Menu > onChange	Sound is off.
+84-office-data.js	1200	text	back office: Data and Menu > onChange	Could not change the sound. Reload and try again.
+84-office-data.js	1206	text	back office: Data and Menu > buildLook	Service hours
+84-office-data.js	1207	text	back office: Data and Menu > buildLook	The charts and the sell-out clock measure against these hours. Use whole hours on the 24-hour clock; a closing time past 24 means after midnight.
+84-office-data.js	1210	name	back office: Data and Menu > buildLook	Service day starts at
+84-office-data.js	1211	name	back office: Data and Menu > buildLook	Opens at
+84-office-data.js	1211	text	back office: Data and Menu > buildLook	The first hour of service.
+84-office-data.js	1212	name	back office: Data and Menu > buildLook	Closes at
+84-office-data.js	1212	text	back office: Data and Menu > buildLook	The last hour of service. 25 means 1 am the next day.
+84-office-data.js	1213	name	back office: Data and Menu > buildLook	Warnings start at
+84-office-data.js	1213	text	back office: Data and Menu > buildLook	Warning sounds start at this hour, or at opening if that is earlier. Set it to when the pit master starts. Before it the strip says sound is paused.
+84-office-data.js	1221	text	back office: Data and Menu > words	Opening has to be before closing (
+84-office-data.js	1221	text	back office: Data and Menu > words	). Move the closing time first.
+84-office-data.js	1222	text	back office: Data and Menu > words	Closing has to be after opening (
+84-office-data.js	1222	text	back office: Data and Menu > words	or later.
+84-office-data.js	1228	text	back office: Data and Menu > save	Saved.
+84-office-data.js	1235	label	back office: Data and Menu > buildLook	Warnings may sound outside open hours
+84-office-data.js	1239	text	back office: Data and Menu > onChange	Warnings may now sound at any hour.
+84-office-data.js	1239	text	back office: Data and Menu > onChange	Warnings sound only from the start hour to closing.
+84-office-data.js	1240	name	back office: Data and Menu > onChange	Sound outside open hours
+84-office-data.js	1244	name	back office: Data and Menu > buildLook	Wait before other apps are told
+84-office-data.js	1247	label	back office: Data and Menu > buildLook	Wait before other apps are told an item is past best-by
+84-office-data.js	1250	text	back office: Data and Menu > save	service.qualitySyncHoldMin
+84-office-data.js	1250	text	back office: Data and Menu > save	Saved. Channels wait
+84-office-data.js	1256	text	back office: Data and Menu > buildLook	Sales tax
+84-office-data.js	1257	text	back office: Data and Menu > buildLook	Added on top of the food when an order is paid, and shown in Money collected. Leave it at 0 if your menu prices already include tax, and ask your tax office for the right rate.
+84-office-data.js	1261	name	back office: Data and Menu > buildLook	Sales tax
+84-office-data.js	1264	label	back office: Data and Menu > buildLook	Sales tax rate
+84-office-data.js	1266	text	back office: Data and Menu > read	added to every order
+84-office-data.js	1266	text	back office: Data and Menu > read	no tax added
+84-office-data.js	1268	text	back office: Data and Menu > save	service.taxRatePct
+84-office-data.js	1268	text	back office: Data and Menu > save	Saved. Orders now add
+84-office-data.js	1268	text	back office: Data and Menu > save	% sales tax.
+84-office-data.js	1268	text	back office: Data and Menu > save	Saved. Orders add no sales tax.
+84-office-data.js	1285	text	back office: Data and Menu > buildNames	Station, category and channel names
+84-office-data.js	1286	text	back office: Data and Menu > buildNames	Rename a station, a menu category or an order channel, or add a new one. Ids and history never change, only what people read. Changes show on every screen after you reload. Backups do not carry these names, so repeat them on a replacement device before restoring.
+84-office-data.js	1289	text	back office: Data and Menu > buildNames	Reload to apply
+84-office-data.js	1300	text	back office: Data and Menu > commit	That name cannot be used: it is empty, longer than
+84-office-data.js	1300	text	back office: Data and Menu > commit	letters, already taken, or the list is full.
+84-office-data.js	1301	text	back office: Data and Menu > commit	This browser would not save the change.
+84-office-data.js	1302	text	back office: Data and Menu > commit	Saved. Reload the page to see it everywhere.
+84-office-data.js	1307	title	back office: Data and Menu > buildNames	Stations
+84-office-data.js	1309	title	back office: Data and Menu > buildNames	Menu categories
+84-office-data.js	1311	title	back office: Data and Menu > buildNames	Order channels
+84-office-data.js	1316	aria-label	back office: Data and Menu > buildNames	Name of
+84-office-data.js	1318	text	back office: Data and Menu > buildNames	Rename
+84-office-data.js	1321	placeholder	back office: Data and Menu > buildNames	New
+84-office-data.js	1323	text	back office: Data and Menu > buildNames	Add
+84-office-data.js	1352	text	back office: Data and Menu	Sample history is generated by a simulator that runs the real engine; it is not your restaurant's data. Days 1 to 5 run without pacing and days 6 to 14 with it so you can see the difference.
+84-office-data.js	1357	text	back office: Data and Menu > backupReason	The text could not be read: it is probably not a Smokebox backup, or it was cut off.
+84-office-data.js	1358	text	back office: Data and Menu > backupReason	It is not a Smokebox backup (the top level is not a record).
+84-office-data.js	1359	text	back office: Data and Menu > backupReason	It does not say which Smokebox version made it, so it is probably not a backup.
+84-office-data.js	1360	text	back office: Data and Menu > backupReason	It was made by a different Smokebox version (
+84-office-data.js	1361	text	back office: Data and Menu > backupReason	It has no
+84-office-data.js	1361	text	back office: Data and Menu > backupReason	list, so it is not a Smokebox backup.
+84-office-data.js	1362	text	back office: Data and Menu > backupReason	It is bigger than Smokebox can load (20 MB).
+84-office-data.js	1363	text	back office: Data and Menu > backupReason	Its records contradict each other (
+84-office-data.js	1363	text	back office: Data and Menu > backupReason	), so loading it could corrupt the board.
+84-office-data.js	1364	text	back office: Data and Menu > backupReason	It could not be read (
+84-office-data.js	1372	text	back office: Data and Menu > onerror	read failed
+84-office-data.js	1379	text	back office: Data and Menu > inspectBackup	There is nothing in it. Choose a backup file or paste the backup text.
+84-office-data.js	1380	text	back office: Data and Menu > inspectBackup	too large
+84-office-data.js	1382	text	back office: Data and Menu > inspectBackup	not JSON
+84-office-data.js	1392	text	back office: Data and Menu > buildData	Everything Smokebox knows lives in this browser, on this device. Back it up before you reset, import or clear browser data.
+84-office-data.js	1399	text	back office: Data and Menu > buildData	Tickets
+84-office-data.js	1399	text	back office: Data and Menu > buildData	Logged events
+84-office-data.js	1399	text	back office: Data and Menu > buildData	Hold-cabinet batches
+84-office-data.js	1399	text	back office: Data and Menu > buildData	Stored on this device
+84-office-data.js	1400	text	back office: Data and Menu > buildData	Sample tickets
+84-office-data.js	1401	text	back office: Data and Menu > buildData	What is stored
+84-office-data.js	1414	text	back office: Data and Menu > paintCounts	live,
 84-office-data.js	1427	text	back office: Data and Menu > paintCounts	Not loaded
 84-office-data.js	1427	text	back office: Data and Menu > paintCounts	On
 84-office-data.js	1427	text	back office: Data and Menu > paintCounts	Off
@@ -4243,147 +4264,147 @@ file	line	kind	area	text
 84-office-data.js	1437	toast	back office: Data and Menu > onChange	Sample history is on. The back office charts include it.
 84-office-data.js	1437	toast	back office: Data and Menu > onChange	Sample history is off. The back office charts use live tickets only.
 84-office-data.js	1438	toast	back office: Data and Menu > onChange	Could not change sample history. Reload and try again.
-84-office-data.js	1445	text	back office: Data and Menu > buildData	Simulator not loaded. This build has no sample history, so the back office shows only live tickets.
-84-office-data.js	1458	text	back office: Data and Menu > buildData	Back up now
-84-office-data.js	1458	text	back office: Data and Menu > buildData	backing up
-84-office-data.js	1459	text	back office: Data and Menu > buildData	Restore from a backup
-84-office-data.js	1459	text	back office: Data and Menu > buildData	restoring a backup
-84-office-data.js	1460	text	back office: Data and Menu > buildData	Replacing this device
-84-office-data.js	1460	text	back office: Data and Menu > buildData	replacing a device
-84-office-data.js	1467	text	back office: Data and Menu > buildData	Select all
-84-office-data.js	1468	text	back office: Data and Menu > buildData	Backup text: copy all of it
-84-office-data.js	1476	text	back office: Data and Menu > backupText	Nothing was saved.
-84-office-data.js	1490	text	back office: Data and Menu > reportSave	Saved
-84-office-data.js	1491	text	back office: Data and Menu > reportSave	You chose not to save the file, so nothing was written.
-84-office-data.js	1492	text	back office: Data and Menu > reportSave	Download started:
-84-office-data.js	1492	text	back office: Data and Menu > reportSave	). If nothing arrives, your browser may be blocking downloads: use Copy backup instead.
-84-office-data.js	1493	text	back office: Data and Menu > reportSave	Your browser blocked the download. The
-84-office-data.js	1493	text	back office: Data and Menu > reportSave	is selected below: copy it and paste it into a file named
-84-office-data.js	1499	text	back office: Data and Menu > fail	Your browser blocked copying. The backup is selected below: press Ctrl+C (Cmd+C on a Mac) to copy it.
-84-office-data.js	1502	text	back office: Data and Menu > copyBackup	Copied
-84-office-data.js	1502	text	back office: Data and Menu > copyBackup	to the clipboard.
-84-office-data.js	1508	text	back office: Data and Menu > downloadCsv	Could not make the
-84-office-data.js	1508	text	back office: Data and Menu > downloadCsv	file. Reload and try again.
-84-office-data.js	1514	text	back office: Data and Menu > downloadCsv	: it has only the column names because there is nothing to list yet.
-84-office-data.js	1515	text	back office: Data and Menu > downloadCsv	Saved
-84-office-data.js	1515	text	back office: Data and Menu > downloadCsv	Download started:
-84-office-data.js	1519	aria-label	back office: Data and Menu > buildData	Cuts the observer counted
-84-office-data.js	1520	aria-label	back office: Data and Menu > buildData	Report window
-84-office-data.js	1520	text	back office: Data and Menu > buildData	Since opening
-84-office-data.js	1520	text	back office: Data and Menu > buildData	Last 4 hours
-84-office-data.js	1520	text	back office: Data and Menu > buildData	Last 24 hours
-84-office-data.js	1528	text	back office: Data and Menu > makeReport	Report made for
-84-office-data.js	1535	text	back office: Data and Menu > buildData	Pilot report
-84-office-data.js	1535	text	back office: Data and Menu > buildData	Cuts counted
-84-office-data.js	1536	text	back office: Data and Menu > buildData	Show report
-84-office-data.js	1536	text	back office: Data and Menu > buildData	Download CSV
-84-office-data.js	1541	text	back office: Data and Menu > downloadSalesCsv	Could not make the sales file. Reload and try again.
-84-office-data.js	1547	text	back office: Data and Menu > downloadSalesCsv	No order has been paid yet, so there is no sales file to save. Pay an order first.
-84-office-data.js	1549	text	back office: Data and Menu > downloadSalesCsv	Saved
-84-office-data.js	1549	text	back office: Data and Menu > downloadSalesCsv	Download started:
-84-office-data.js	1549	text	back office: Data and Menu > downloadSalesCsv	of sales).
-84-office-data.js	1549	text	back office: Data and Menu > downloadSalesCsv	: it has only the column names because no order has been paid yet.
-84-office-data.js	1550	text	back office: Data and Menu > downloadSalesCsv	sales file
-84-office-data.js	1552	text	back office: Data and Menu > buildData	Tickets
-84-office-data.js	1552	text	back office: Data and Menu > buildData	Items
-84-office-data.js	1552	text	back office: Data and Menu > buildData	Orders
-84-office-data.js	1552	text	back office: Data and Menu > buildData	Events
-84-office-data.js	1552	text	back office: Data and Menu > buildData	Batches
-84-office-data.js	1559	text	back office: Data and Menu > buildData	Sales by day (for your accountant)
-84-office-data.js	1568	text	back office: Data and Menu > paintLast	Last backup:
-84-office-data.js	1568	text	back office: Data and Menu > paintLast	No backup has been made from this device yet.
-84-office-data.js	1572	text	back office: Data and Menu > buildData	Download backup (JSON)
-84-office-data.js	1574	text	back office: Data and Menu > buildData	Copy backup
-84-office-data.js	1581	text	back office: Data and Menu > buildData	Spreadsheet files and the pilot report
-84-office-data.js	1582	text	back office: Data and Menu > buildData	Spreadsheet files (CSV) list one kind of record each and cannot be restored from.
-84-office-data.js	1583	text	back office: Data and Menu > buildData	Spreadsheet files
-84-office-data.js	1589	text	back office: Data and Menu > buildData	Choose a backup file
-84-office-data.js	1592	placeholder	back office: Data and Menu > buildData	Paste the whole backup text here
-84-office-data.js	1594	text	back office: Data and Menu > buildData	Check pasted backup
-84-office-data.js	1594	text	back office: Data and Menu > onClick	pasted text
-84-office-data.js	1596	text	back office: Data and Menu > buildData	Paste a backup instead
-84-office-data.js	1598	text	back office: Data and Menu > buildData	Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (practice or real).
-84-office-data.js	1602	text	back office: Data and Menu > buildData	On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).
-84-office-data.js	1603	text	back office: Data and Menu > buildData	On the new device: copy the same smokebox.html file onto it and open it. Install it as an app (Share, then Add to Home Screen, or Install app).
-84-office-data.js	1604	text	back office: Data and Menu > buildData	Run Menu, then Set up this tablet. Sound, screen-on and loudness are per device and are redone here.
-84-office-data.js	1605	text	back office: Data and Menu > buildData	Open Back office, then Menu and settings, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.
-84-office-data.js	1606	text	back office: Data and Menu > buildData	Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.
-84-office-data.js	1607	text	back office: Data and Menu > buildData	If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.
-84-office-data.js	1616	text	back office: Data and Menu > showBad	That
-84-office-data.js	1616	text	back office: Data and Menu > showBad	cannot be used.
-84-office-data.js	1617	text	back office: Data and Menu > showBad	Nothing was changed.
-84-office-data.js	1629	text	back office: Data and Menu > check	Tickets
-84-office-data.js	1634	text	back office: Data and Menu > check	This
-84-office-data.js	1634	text	back office: Data and Menu > check	is a valid Smokebox backup.
-84-office-data.js	1636	text	back office: Data and Menu > check	Smokebox repaired
-84-office-data.js	1636	text	back office: Data and Menu > check	while reading it:
-84-office-data.js	1636	text	back office: Data and Menu > check	; and
-84-office-data.js	1637	text	back office: Data and Menu > check	This replaces everything on this device:
-84-office-data.js	1637	text	back office: Data and Menu > check	, your menu edits and your settings. Back up first if you might want what is here.
-84-office-data.js	1639	text	back office: Data and Menu > check	Back up what is here first
-84-office-data.js	1641	text	back office: Data and Menu > check	Replace everything with this backup
-84-office-data.js	1642	text	back office: Data and Menu > check	Cancel
-84-office-data.js	1650	title	back office: Data and Menu > replaceAll	Replace everything on this device?
-84-office-data.js	1650	button	back office: Data and Menu > replaceAll	Replace everything
-84-office-data.js	1650	button	back office: Data and Menu > replaceAll	Keep what I have
-84-office-data.js	1651	text	back office: Data and Menu > replaceAll	This replaces
-84-office-data.js	1651	text	back office: Data and Menu > replaceAll	, every setting, your menu edits and the PIN with the backup's
-84-office-data.js	1652	text	back office: Data and Menu > replaceAll	There is no undo. If you might want what is here now, cancel and download a backup first.
-84-office-data.js	1658	text	back office: Data and Menu > replaceAll	Backup restored:
-84-office-data.js	1659	toast	back office: Data and Menu > replaceAll	Backup restored.
-84-office-data.js	1668	text	back office: Data and Menu > buildData	too large
-84-office-data.js	1670	text	back office: Data and Menu > buildData	The file could not be read from this device.
-84-office-data.js	1676	text	back office: Data and Menu > buildData	Danger zone: erase data
-84-office-data.js	1678	label	back office: Data and Menu > buildData	Keep my dishes, settings and PIN when I erase live data
-84-office-data.js	1679	text	back office: Data and Menu > buildData	Erase live data
-84-office-data.js	1681	text	back office: Data and Menu > buildData	Erase everything
-84-office-data.js	1683	aria-label	back office: Data and Menu > buildData	Confirm erasing data
-84-office-data.js	1687	aria-label	back office: Data and Menu > askTyped	Type
-84-office-data.js	1687	aria-label	back office: Data and Menu > askTyped	to confirm
-84-office-data.js	1702	text	back office: Data and Menu > askTyped	Type
-84-office-data.js	1702	text	back office: Data and Menu > askTyped	to confirm
-84-office-data.js	1703	text	back office: Data and Menu > askTyped	Keep my data
-84-office-data.js	1711	title	back office: Data and Menu > buildData	Erase live data?
-84-office-data.js	1711	label	back office: Data and Menu > buildData	Erase live data
-84-office-data.js	1712	text	back office: Data and Menu > buildData	This clears
-84-office-data.js	1712	text	back office: Data and Menu > buildData	saved records and
-84-office-data.js	1712	text	back office: Data and Menu > buildData	on this device, including any practice orders, and sets the clock back to real time.
-84-office-data.js	1713	text	back office: Data and Menu > buildData	Your dishes, ingredient edits, limits, pacing and PIN stay as they are.
-84-office-data.js	1713	text	back office: Data and Menu > buildData	It also puts every setting, dish edit and the PIN back to the starter values.
-84-office-data.js	1714	text	back office: Data and Menu > buildData	There is no undo. Back up first if you might want this data.
-84-office-data.js	1718	text	back office: Data and Menu > run	Live data erased. The board is empty
-84-office-data.js	1718	text	back office: Data and Menu > run	; your settings were kept.
-84-office-data.js	1718	text	back office: Data and Menu > run	; settings are back to the starter values.
-84-office-data.js	1718	toast	back office: Data and Menu > run	Live data erased.
-84-office-data.js	1727	title	back office: Data and Menu > buildData	Erase everything on this device?
-84-office-data.js	1727	label	back office: Data and Menu > buildData	Erase everything
-84-office-data.js	1728	text	back office: Data and Menu > buildData	This erases everything Smokebox stored on this device:
-84-office-data.js	1728	text	back office: Data and Menu > buildData	, your dishes and ingredient edits, every setting and the PIN. The board starts empty.
-84-office-data.js	1729	text	back office: Data and Menu > buildData	Your display choices (themes and text size) are kept.
-84-office-data.js	1729	text	back office: Data and Menu > buildData	There is no undo. Back up first if you might want any of it back.
-84-office-data.js	1733	text	back office: Data and Menu > run	Everything was reset to the starter values.
-84-office-data.js	1733	toast	back office: Data and Menu > run	Everything was reset.
-84-office-data.js	1739	text	back office: Data and Menu > buildData	Erasing live data removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).
-84-office-data.js	1753	text	back office: Data and Menu > buildAbout	This build
-84-office-data.js	1754	text	back office: Data and Menu > buildAbout	What is simulated
-84-office-data.js	1754	text	back office: Data and Menu > buildAbout	Order-channel sync is simulated. When an item goes 86, the counter POS, online ordering, drive-thru board and delivery-app feeds are updated after a pretend delay of a few seconds; nothing is sent to a real POS or delivery app. Sample history is generated by a simulator too.
-84-office-data.js	1755	text	back office: Data and Menu > buildAbout	What is a starter estimate
-84-office-data.js	1755	text	back office: Data and Menu > buildAbout	Prep times, cooked yields and ingredient costs began as starter numbers. Prep times and yields keep the label "starter estimate" until you confirm them. Costs stay starter numbers until you replace them with your invoices.
-84-office-data.js	1756	text	back office: Data and Menu > buildAbout	What has not been tested
-84-office-data.js	1756	text	back office: Data and Menu > buildAbout	It was tested in Chromium at phone, tablet and desktop sizes. Not tested: real sunlight on a real screen, and other devices and browsers. Try the line on the actual tablet before service.
-84-office-data.js	1757	text	back office: Data and Menu > buildAbout	Several devices
-84-office-data.js	1757	text	back office: Data and Menu > buildAbout	Separate devices do not share data. Tablets open in the same browser on the same device do, and stay in step.
-84-office-data.js	1782	text	back office: Data and Menu > render	Show the starter estimates
-84-office-data.js	1789	text	back office: Data and Menu > paintHeadline	Your settings are saved on this device.
-84-office-data.js	1789	text	back office: Data and Menu > paintHeadline	This browser is not keeping your changes, so they will be lost when you close the page. Allow site data for this page.
-84-office-data.js	1790	text	back office: Data and Menu > paintHeadline	estimate is
-84-office-data.js	1790	text	back office: Data and Menu > paintHeadline	estimates are
-84-office-data.js	1790	text	back office: Data and Menu > paintHeadline	not confirmed yet.
-84-office-data.js	1790	text	back office: Data and Menu > paintHeadline	Every prep time and yield is confirmed.
-84-office-data.js	1798	aria-label	back office: Data and Menu > render	On this page
-84-office-data.js	1829	title	back office: Data and Menu > render	This panel could not load
-84-office-data.js	1837	text	back office: Data and Menu > render	Advanced:
-84-office-data.js	1899	title	back office: Data and Menu	Menu and settings
+84-office-data.js	1447	text	back office: Data and Menu > buildData	Simulator not loaded. This build has no sample history, so the back office shows only live tickets.
+84-office-data.js	1460	text	back office: Data and Menu > buildData	Back up now
+84-office-data.js	1460	text	back office: Data and Menu > buildData	backing up
+84-office-data.js	1461	text	back office: Data and Menu > buildData	Restore from a backup
+84-office-data.js	1461	text	back office: Data and Menu > buildData	restoring a backup
+84-office-data.js	1462	text	back office: Data and Menu > buildData	Replacing this device
+84-office-data.js	1462	text	back office: Data and Menu > buildData	replacing a device
+84-office-data.js	1469	text	back office: Data and Menu > buildData	Select all
+84-office-data.js	1470	text	back office: Data and Menu > buildData	Backup text: copy all of it
+84-office-data.js	1478	text	back office: Data and Menu > backupText	Nothing was saved.
+84-office-data.js	1492	text	back office: Data and Menu > reportSave	Saved
+84-office-data.js	1493	text	back office: Data and Menu > reportSave	You chose not to save the file, so nothing was written.
+84-office-data.js	1494	text	back office: Data and Menu > reportSave	Download started:
+84-office-data.js	1494	text	back office: Data and Menu > reportSave	). If nothing arrives, your browser may be blocking downloads: use Copy backup instead.
+84-office-data.js	1495	text	back office: Data and Menu > reportSave	Your browser blocked the download. The
+84-office-data.js	1495	text	back office: Data and Menu > reportSave	is selected below: copy it and paste it into a file named
+84-office-data.js	1501	text	back office: Data and Menu > fail	Your browser blocked copying. The backup is selected below: press Ctrl+C (Cmd+C on a Mac) to copy it.
+84-office-data.js	1504	text	back office: Data and Menu > copyBackup	Copied
+84-office-data.js	1504	text	back office: Data and Menu > copyBackup	to the clipboard.
+84-office-data.js	1510	text	back office: Data and Menu > downloadCsv	Could not make the
+84-office-data.js	1510	text	back office: Data and Menu > downloadCsv	file. Reload and try again.
+84-office-data.js	1516	text	back office: Data and Menu > downloadCsv	: it has only the column names because there is nothing to list yet.
+84-office-data.js	1517	text	back office: Data and Menu > downloadCsv	Saved
+84-office-data.js	1517	text	back office: Data and Menu > downloadCsv	Download started:
+84-office-data.js	1521	aria-label	back office: Data and Menu > buildData	Cuts the observer counted
+84-office-data.js	1522	aria-label	back office: Data and Menu > buildData	Report window
+84-office-data.js	1522	text	back office: Data and Menu > buildData	Since opening
+84-office-data.js	1522	text	back office: Data and Menu > buildData	Last 4 hours
+84-office-data.js	1522	text	back office: Data and Menu > buildData	Last 24 hours
+84-office-data.js	1530	text	back office: Data and Menu > makeReport	Report made for
+84-office-data.js	1537	text	back office: Data and Menu > buildData	Pilot report
+84-office-data.js	1537	text	back office: Data and Menu > buildData	Cuts counted
+84-office-data.js	1538	text	back office: Data and Menu > buildData	Show report
+84-office-data.js	1538	text	back office: Data and Menu > buildData	Download CSV
+84-office-data.js	1543	text	back office: Data and Menu > downloadSalesCsv	Could not make the sales file. Reload and try again.
+84-office-data.js	1549	text	back office: Data and Menu > downloadSalesCsv	No order has been paid yet, so there is no sales file to save. Pay an order first.
+84-office-data.js	1551	text	back office: Data and Menu > downloadSalesCsv	Saved
+84-office-data.js	1551	text	back office: Data and Menu > downloadSalesCsv	Download started:
+84-office-data.js	1551	text	back office: Data and Menu > downloadSalesCsv	of sales).
+84-office-data.js	1551	text	back office: Data and Menu > downloadSalesCsv	: it has only the column names because no order has been paid yet.
+84-office-data.js	1552	text	back office: Data and Menu > downloadSalesCsv	sales file
+84-office-data.js	1554	text	back office: Data and Menu > buildData	Tickets
+84-office-data.js	1554	text	back office: Data and Menu > buildData	Items
+84-office-data.js	1554	text	back office: Data and Menu > buildData	Orders
+84-office-data.js	1554	text	back office: Data and Menu > buildData	Events
+84-office-data.js	1554	text	back office: Data and Menu > buildData	Batches
+84-office-data.js	1561	text	back office: Data and Menu > buildData	Sales by day (for your accountant)
+84-office-data.js	1570	text	back office: Data and Menu > paintLast	Last backup:
+84-office-data.js	1570	text	back office: Data and Menu > paintLast	No backup has been made from this device yet.
+84-office-data.js	1574	text	back office: Data and Menu > buildData	Download backup (JSON)
+84-office-data.js	1576	text	back office: Data and Menu > buildData	Copy backup
+84-office-data.js	1583	text	back office: Data and Menu > buildData	Spreadsheet files and the pilot report
+84-office-data.js	1584	text	back office: Data and Menu > buildData	Spreadsheet files (CSV) list one kind of record each and cannot be restored from.
+84-office-data.js	1585	text	back office: Data and Menu > buildData	Spreadsheet files
+84-office-data.js	1591	text	back office: Data and Menu > buildData	Choose a backup file
+84-office-data.js	1594	placeholder	back office: Data and Menu > buildData	Paste the whole backup text here
+84-office-data.js	1596	text	back office: Data and Menu > buildData	Check pasted backup
+84-office-data.js	1596	text	back office: Data and Menu > onClick	pasted text
+84-office-data.js	1598	text	back office: Data and Menu > buildData	Paste a backup instead
+84-office-data.js	1600	text	back office: Data and Menu > buildData	Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (practice or real).
+84-office-data.js	1604	text	back office: Data and Menu > buildData	On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).
+84-office-data.js	1605	text	back office: Data and Menu > buildData	On the new device: copy the same smokebox.html file onto it and open it. Install it as an app (Share, then Add to Home Screen, or Install app).
+84-office-data.js	1606	text	back office: Data and Menu > buildData	Run Menu, then Set up this tablet. Sound, screen-on and loudness are per device and are redone here.
+84-office-data.js	1607	text	back office: Data and Menu > buildData	Open Back office, then Menu and settings, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.
+84-office-data.js	1608	text	back office: Data and Menu > buildData	Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.
+84-office-data.js	1609	text	back office: Data and Menu > buildData	If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.
+84-office-data.js	1618	text	back office: Data and Menu > showBad	That
+84-office-data.js	1618	text	back office: Data and Menu > showBad	cannot be used.
+84-office-data.js	1619	text	back office: Data and Menu > showBad	Nothing was changed.
+84-office-data.js	1631	text	back office: Data and Menu > check	Tickets
+84-office-data.js	1636	text	back office: Data and Menu > check	This
+84-office-data.js	1636	text	back office: Data and Menu > check	is a valid Smokebox backup.
+84-office-data.js	1638	text	back office: Data and Menu > check	Smokebox repaired
+84-office-data.js	1638	text	back office: Data and Menu > check	while reading it:
+84-office-data.js	1638	text	back office: Data and Menu > check	; and
+84-office-data.js	1639	text	back office: Data and Menu > check	This replaces everything on this device:
+84-office-data.js	1639	text	back office: Data and Menu > check	, your menu edits and your settings. Back up first if you might want what is here.
+84-office-data.js	1641	text	back office: Data and Menu > check	Back up what is here first
+84-office-data.js	1643	text	back office: Data and Menu > check	Replace everything with this backup
+84-office-data.js	1644	text	back office: Data and Menu > check	Cancel
+84-office-data.js	1652	title	back office: Data and Menu > replaceAll	Replace everything on this device?
+84-office-data.js	1652	button	back office: Data and Menu > replaceAll	Replace everything
+84-office-data.js	1652	button	back office: Data and Menu > replaceAll	Keep what I have
+84-office-data.js	1653	text	back office: Data and Menu > replaceAll	This replaces
+84-office-data.js	1653	text	back office: Data and Menu > replaceAll	, every setting, your menu edits and the PIN with the backup's
+84-office-data.js	1654	text	back office: Data and Menu > replaceAll	There is no undo. If you might want what is here now, cancel and download a backup first.
+84-office-data.js	1660	text	back office: Data and Menu > replaceAll	Backup restored:
+84-office-data.js	1661	toast	back office: Data and Menu > replaceAll	Backup restored.
+84-office-data.js	1670	text	back office: Data and Menu > buildData	too large
+84-office-data.js	1672	text	back office: Data and Menu > buildData	The file could not be read from this device.
+84-office-data.js	1678	text	back office: Data and Menu > buildData	Danger zone: erase data
+84-office-data.js	1680	label	back office: Data and Menu > buildData	Keep my dishes, settings and PIN when I erase live data
+84-office-data.js	1681	text	back office: Data and Menu > buildData	Erase live data
+84-office-data.js	1683	text	back office: Data and Menu > buildData	Erase everything
+84-office-data.js	1685	aria-label	back office: Data and Menu > buildData	Confirm erasing data
+84-office-data.js	1689	aria-label	back office: Data and Menu > askTyped	Type
+84-office-data.js	1689	aria-label	back office: Data and Menu > askTyped	to confirm
+84-office-data.js	1704	text	back office: Data and Menu > askTyped	Type
+84-office-data.js	1704	text	back office: Data and Menu > askTyped	to confirm
+84-office-data.js	1705	text	back office: Data and Menu > askTyped	Keep my data
+84-office-data.js	1713	title	back office: Data and Menu > buildData	Erase live data?
+84-office-data.js	1713	label	back office: Data and Menu > buildData	Erase live data
+84-office-data.js	1714	text	back office: Data and Menu > buildData	This clears
+84-office-data.js	1714	text	back office: Data and Menu > buildData	saved records and
+84-office-data.js	1714	text	back office: Data and Menu > buildData	on this device, including any practice orders, and sets the clock back to real time.
+84-office-data.js	1715	text	back office: Data and Menu > buildData	Your dishes, ingredient edits, limits, pacing and PIN stay as they are.
+84-office-data.js	1715	text	back office: Data and Menu > buildData	It also puts every setting, dish edit and the PIN back to the starter values.
+84-office-data.js	1716	text	back office: Data and Menu > buildData	There is no undo. Back up first if you might want this data.
+84-office-data.js	1720	text	back office: Data and Menu > run	Live data erased. The board is empty
+84-office-data.js	1720	text	back office: Data and Menu > run	; your settings were kept.
+84-office-data.js	1720	text	back office: Data and Menu > run	; settings are back to the starter values.
+84-office-data.js	1720	toast	back office: Data and Menu > run	Live data erased.
+84-office-data.js	1729	title	back office: Data and Menu > buildData	Erase everything on this device?
+84-office-data.js	1729	label	back office: Data and Menu > buildData	Erase everything
+84-office-data.js	1730	text	back office: Data and Menu > buildData	This erases everything Smokebox stored on this device:
+84-office-data.js	1730	text	back office: Data and Menu > buildData	, your dishes and ingredient edits, every setting and the PIN. The board starts empty.
+84-office-data.js	1731	text	back office: Data and Menu > buildData	Your display choices (themes and text size) are kept.
+84-office-data.js	1731	text	back office: Data and Menu > buildData	There is no undo. Back up first if you might want any of it back.
+84-office-data.js	1735	text	back office: Data and Menu > run	Everything was reset to the starter values.
+84-office-data.js	1735	toast	back office: Data and Menu > run	Everything was reset.
+84-office-data.js	1741	text	back office: Data and Menu > buildData	Erasing live data removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).
+84-office-data.js	1755	text	back office: Data and Menu > buildAbout	This build
+84-office-data.js	1756	text	back office: Data and Menu > buildAbout	What is simulated
+84-office-data.js	1756	text	back office: Data and Menu > buildAbout	Order-channel sync is simulated. When an item goes 86, the counter POS, online ordering, drive-thru board and delivery-app feeds are updated after a pretend delay of a few seconds; nothing is sent to a real POS or delivery app. Sample history is generated by a simulator too.
+84-office-data.js	1757	text	back office: Data and Menu > buildAbout	What is a starter estimate
+84-office-data.js	1757	text	back office: Data and Menu > buildAbout	Prep times, cooked yields and ingredient costs began as starter numbers. Prep times and yields keep the label "starter estimate" until you confirm them. Costs stay starter numbers until you replace them with your invoices.
+84-office-data.js	1758	text	back office: Data and Menu > buildAbout	What has not been tested
+84-office-data.js	1758	text	back office: Data and Menu > buildAbout	It was tested in Chromium at phone, tablet and desktop sizes. Not tested: real sunlight on a real screen, and other devices and browsers. Try the line on the actual tablet before service.
+84-office-data.js	1759	text	back office: Data and Menu > buildAbout	Several devices
+84-office-data.js	1759	text	back office: Data and Menu > buildAbout	Separate devices do not share data. Tablets open in the same browser on the same device do, and stay in step.
+84-office-data.js	1784	text	back office: Data and Menu > render	Show the starter estimates
+84-office-data.js	1791	text	back office: Data and Menu > paintHeadline	Your settings are saved on this device.
+84-office-data.js	1791	text	back office: Data and Menu > paintHeadline	This browser is not keeping your changes, so they will be lost when you close the page. Allow site data for this page.
+84-office-data.js	1792	text	back office: Data and Menu > paintHeadline	estimate is
+84-office-data.js	1792	text	back office: Data and Menu > paintHeadline	estimates are
+84-office-data.js	1792	text	back office: Data and Menu > paintHeadline	not confirmed yet.
+84-office-data.js	1792	text	back office: Data and Menu > paintHeadline	Every prep time and yield is confirmed.
+84-office-data.js	1800	aria-label	back office: Data and Menu > render	On this page
+84-office-data.js	1831	title	back office: Data and Menu > render	This panel could not load
+84-office-data.js	1839	text	back office: Data and Menu > render	Advanced:
+84-office-data.js	1901	title	back office: Data and Menu	Menu and settings
 85-office-stock.js	22	title	back office: Stock and 86	Stock and 86
 85-office-stock.js	22	text	back office: Stock and 86 > render	The shared helpers for the Stock page (82-office-money.js) did not load.
 85-office-stock.js	28	text	back office: Stock and 86	Sunday

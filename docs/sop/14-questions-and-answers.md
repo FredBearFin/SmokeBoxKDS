@@ -2,6 +2,10 @@
 
 Short answers to the questions owners ask first.
 
+## Is it only for barbecue?
+
+No. A new Smokebox starts empty. You add your own dishes, rename the stations and choose whether you cook ahead. Only the demo is a barbecue kitchen.
+
 ## Does it need the internet?
 
 No. Smokebox is one file and works without internet.

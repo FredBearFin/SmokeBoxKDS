@@ -1,6 +1,6 @@
 # Cooked-ahead food and portions
 
-Two ways to keep track of food you make before the order comes in.
+Two ways to keep track of food you make before the order comes in. Skip this page if you cook everything to order.
 
 ## Count portions
 
