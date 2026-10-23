@@ -422,9 +422,9 @@
       "x": [
        "In **Dishes and prices**, find \"Do you cook food ahead?\" and tap **Yes, I cook ahead**. The cooked-ahead sheet opens.",
        "Type what you cook ahead and choose Hot or Cold.",
-       "Set how long it may stay. Set the limit your local health department gives you.",
+       "Set how long it may stay. For hot food it is one number of hours. For cold food two optional boxes ask how many days it may stay in the fridge and how many hours it may be out of the fridge. Use the limits your local health department gives you. Leave a box empty if no limit is set: Smokebox then only shows the time.",
        "Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.",
-       "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**."
+       "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**. To change an item later, open it from the list and tap **Save changes**."
       ]
      },
      {

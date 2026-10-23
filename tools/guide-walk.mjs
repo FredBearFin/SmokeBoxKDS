@@ -323,6 +323,9 @@ async function recipes(browser) {
   await addDish(p, { name: 'Chili', short: 'Chili', zone: 'sides', cat: 'side', price: 6 });
   await p.click('button.fl-menu'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
   check('ahead: Yes, I cook ahead', await tap(p, 'Yes, I cook ahead')); await p.waitForTimeout(500);
+  const cs = '.sheet-root:last-of-type';
+  check('ahead: Cold', await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-root:last-of-type button, .sheet-root:last-of-type [role=radio]')].find((e) => e.getClientRects().length && e.textContent.trim().indexOf('Cold') === 0); if (b) b.click(); return !!b; })); await p.waitForTimeout(300);
+  for (const t of ['How many days may it stay in the fridge?', 'How many hours may it be out of the fridge?', 'Use the limits your local health department gives you']) check('ahead (cold): ' + t, await has(p, t, cs));
   await p.evaluate(() => SB.sheets.closeAll && SB.sheets.closeAll()); await p.waitForTimeout(400);
   check('ahead: Cabinet tab', (await tabTexts(p)).some((t) => /Cabinet/.test(t)));
   await p.close();
