@@ -43,6 +43,17 @@ test('Cleo 2: while a before-restore copy is kept, the 6-hour copy still refresh
   S.destroy && S.destroy();
 });
 
+test('Cleo 7: a second damaged save does not wipe the first damaged copy before anyone looked at it', () => {
+  clock = T;
+  const b = backend({ 'smokebox.v1.corrupt': JSON.stringify('first damaged text'), 'smokebox.v1.corruptat': JSON.stringify(T - DAY) });
+  b.m.set('smokebox.v1.state', '{"second damaged');
+  start(b);
+  assert.equal(b.get('smokebox.v1.corrupt', null), '{"second damaged', 'the new damaged text is parked');
+  assert.equal(b.get('smokebox.v1.corrupt.prev', null), 'first damaged text', 'the first one is kept behind it');
+  assert.equal(b.get('smokebox.v1.corruptat.prev', null), T - DAY);
+  S.destroy && S.destroy();
+});
+
 test('Cleo 3: start over also removes the copy kept from before a repair at load (it holds the whole old kitchen)', () => {
   clock = T;
   const b = backend({ 'smokebox.v1.dropped': JSON.stringify('{"old":"kitchen"}'), 'smokebox.v1.droppedat': JSON.stringify(T - DAY) });

@@ -841,9 +841,9 @@
     if (!st.corrupt) {
       try {
         const at = storage.get(CORRUPT_AT_KEY, null);
-        if (isNum(at) && r - at > CORRUPT_KEEP_MS) { storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); st.corruptCleared = true; }
+        if (isNum(at) && r - at > CORRUPT_KEEP_MS) { dropParked(CORRUPT_KEY, CORRUPT_AT_KEY); st.corruptCleared = true; }
         const da = storage.get(DROPPED_AT_KEY, null);
-        if (isNum(da) && r - da > CORRUPT_KEEP_MS && !st.droppedCount) { storage.remove(DROPPED_KEY); storage.remove(DROPPED_AT_KEY); }
+        if (isNum(da) && r - da > CORRUPT_KEEP_MS && !st.droppedCount) dropParked(DROPPED_KEY, DROPPED_AT_KEY);
       } catch (e) { /* ignore */ }
     }
     snapAt = 0;
@@ -884,9 +884,18 @@
     return status();
   }
   // Keeps a copy of damaged or about-to-be-repaired data under its own key. True only when the copy was really written; a full browser store says no.
+  // WATCH OUT: a copy already parked there may not have been looked at yet, so it moves to the '.prev' key first (best effort, one older copy).
   function parkText(key, atKey, value, at) {
-    try { if (storage.set(key, value) === false) return false; storage.set(atKey, at); return true; } catch (e) { return false; }
+    try {
+      const old = typeof storage.raw === 'function' ? storage.raw(key) : null;
+      if (typeof old === 'string' && old !== JSON.stringify(value)) {
+        try { if (storage.set(key + '.prev', JSON.parse(old)) !== false) storage.set(atKey + '.prev', storage.get(atKey, null)); } catch (e) { /* the older copy could not be kept */ }
+      }
+      if (storage.set(key, value) === false) return false; storage.set(atKey, at); return true;
+    } catch (e) { return false; }
   }
+  // Removes a parked copy, its time and the older copy kept behind it.
+  function dropParked(key, atKey) { for (const k of [key, atKey, key + '.prev', atKey + '.prev']) storage.remove(k); }
   // The exact saved text for a payload, so a person can download what could not be kept safe.
   function rawOf(payload) {
     try { const raw = typeof storage.raw === 'function' ? storage.raw(KEY) : null; if (raw != null) return raw; } catch (e) { /* fall back to the parsed copy */ }
@@ -1560,7 +1569,7 @@
     // Only now that the erase went in: the rolling last-good copy and any set-aside damaged copy still hold the old kitchen's
     // customers and orders, so both are dropped and the last-good copy is retaken from the new empty kitchen.
     // The copy kept from before a repair at load holds the whole old kitchen too, and the dropped-history count belongs to it.
-    try { for (const k of [LASTGOOD_KEY, ROLLING_KEY, CORRUPT_KEY, CORRUPT_AT_KEY, DROPPED_KEY, DROPPED_AT_KEY, HIST_KEY, HIST_NOTICE_KEY]) storage.remove(k); } catch (e) { /* ignore */ }
+    try { for (const k of [LASTGOOD_KEY, ROLLING_KEY, HIST_KEY, HIST_NOTICE_KEY]) storage.remove(k); dropParked(CORRUPT_KEY, CORRUPT_AT_KEY); dropParked(DROPPED_KEY, DROPPED_AT_KEY); } catch (e) { /* ignore */ }
     st.corrupt = null; st.droppedCount = null;
     hist = { oldest: null, days: 0, at: 0, droppedBefore: null }; hn = { warnAt: 0, trimAck: 0 };
     // Actions queued for a hub that it never confirmed belong to the erased kitchen: they are dropped (and marked, so another
