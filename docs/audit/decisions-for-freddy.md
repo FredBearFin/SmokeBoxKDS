@@ -1,6 +1,8 @@
-# Decisions for Freddy (A4, updated round 12)
+# Decisions for Freddy (A4, updated round 16)
 
-Decisions Freddy has made come first, then what is still open, then smaller items with my recommendation. Nobody who runs a restaurant has been asked yet, so a recommendation about owners is my guess. Longer detail: docs/audit/wording.md.
+## Business items (yours, not engineering)
+
+Price, which restaurant to pilot with, who answers support, and terms, liability and insurance. The open list is in docs/commercial-decisions.md. Nothing is recommended here.
 
 ## Decided (Freddy, round 12)
 

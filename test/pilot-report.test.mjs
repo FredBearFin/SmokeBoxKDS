@@ -107,7 +107,7 @@ test('pilot report: a 3-day simulated pilot answers the gate questions in plain 
   const DAY = 24 * HR;
   const settings = E.defaultSettings(); settings.service.openHour = 11; settings.service.closeHour = 21;
   let s = E.newState({ now: T0, empty: true, settings });
-  s.ingredients = s.ingredients.map((i) => (i.id === 'ribs' ? Object.assign({}, i, { costPerKg: 0 }) : i));
+  s.ingredients = s.ingredients.map((i) => (i.id === 'ribs' ? Object.assign({}, i, { costPerKg: undefined }) : i));
   const go = (type, p, t) => { const r = E.apply(s, type, p, t); assert.equal(r.report, 'ok', type + ' ' + r.report); s = r.state; return r; };
   for (let d = 0; d < 3; d++) {
     const t = T0 + d * DAY;
@@ -124,7 +124,7 @@ test('pilot report: a 3-day simulated pilot answers the gate questions in plain 
   assert.equal(r.batches.n, 6);
   assert.equal(r.batches.rate, 75);
   assert.equal(r.gate.pullTap.pass, false, '12 pulls of 30 cuts is 40 percent');
-  assert.equal(r.costs.discardsWithoutCost, 3);
+  assert.equal(r.discards.costUnknownN, 3);
   assert.deepEqual(r.costs.ingredientsWithoutCost, ['St. Louis ribs']);
   assert.equal(r.sounds.firstSounds, 1);
   assert.equal(r.sounds.acknowledged, 1);

@@ -16,8 +16,8 @@ Reported, not pass or fail: seconds per ticket (only if Smokebox tickets were us
 ## Before the visit (Freddy)
 
 - Fix the price and write it above and on the observer sheet.
-- On their tablet, run **Menu, Set up this tablet** (the six steps): sound test, screen kept on, protected data, installed as an app, tablet placed where the cutter can tap it without walking (a sketch or photo of where), and their real products entered (cost per kg, pull size, hold limit and kind, rest time). Slaw, potato salad and banana pudding start as quality limits: confirm each.
-- Check the hold limits and the temperature-check interval against their local health department. The app is a helper; the local code governs.
+- On their tablet, run **Settings, Set up this tablet** (seven steps): sound test, screen kept on, protected data, installed as an app, tablet placed where the cutter can tap it without walking (a sketch or photo of where), their dishes, and hold limits. A new kitchen starts empty: add dishes (or import a menu file), answer "Do you cook food ahead?", and enter their real products (cost per kg, pull size, hold limit and kind, rest time). Cold items take days in the fridge and hours out of the fridge typed by the owner; leave a box empty rather than guess.
+- Check the hold limits and the temperature-check interval against their local health department. The limits the app starts with are starting values, not local rules. The app is a helper; the local code governs.
 - Set service hours and "Warnings start at" to when their pit starts. Turn the demo clock and demo orders **off** (the report warns if they were on).
 - Test the loud tone from the pit position. Bring a speaker and a battery pack.
 - Open the Data page and take a **backup** so there is a clean starting point.
@@ -34,7 +34,7 @@ If a warning is wrong in a way that could cause a food-safety mistake, the cook 
 1. **Data page, Pilot report:** window "Since opening", type the number of cuts you counted, **Show report**, then **Download CSV**. Keep the file.
 2. Ask the discard question again ("what did you throw out last week and what did it cost?") and the price question. Write the exact words.
 3. Fill the decision table below.
-4. Take a backup, then **Reset live data** (settings are kept) so their next day starts clean.
+4. Take a backup, then **Erase tickets and records** (settings are kept) so their next day starts clean.
 
 ## Decision table
 

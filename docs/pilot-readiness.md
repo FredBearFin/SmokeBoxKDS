@@ -10,7 +10,7 @@ Device ______ OS/browser version ______ speaker ______ Wi-Fi/none ______
 
 | Test | Pass? | Notes |
 |---|---|---|
-| Menu, Set up this tablet: all six steps done | | |
+| Settings, Set up this tablet: all seven steps done | | |
 | Test warning heard from the **pit position**, without looking, with the kitchen running (fans, fryer, radio) | | |
 | Spoken call is intelligible from the pit | | |
 | Loud tone at the last warning is heard and is not mistaken for another device | | |
@@ -28,9 +28,15 @@ If the sleep or hidden tests lose a warning in a way the kitchen cannot live wit
 
 ## B. Food-safety settings
 - Hold limits and temperature-check interval checked against the **local health department** (name and date of the person or document): ______________
-- Each product marked **quality** or **safety** limit with the owner; cold food held outside temperature control is a safety limit.
+- Each product marked **quality limit** or **throw-out time** with the owner. Cold items use days in the fridge and hours out of the fridge that the owner types; the app pre-fills none.
 - The owner has read this sentence and agrees: "Smokebox is a helper and does not replace required food-safety procedures, logs or inspections."
 - A cook follows their own rules if the app is wrong; the observer says so aloud before service.
+
+## B2. Also test on the tablet (features added since)
+- Start from an empty kitchen, add a dish, import a menu file.
+- Set a PIN, write down the recovery code, then use Forgot the PIN with it.
+- Take a backup and restore it on a second browser profile.
+- Make a cold item with limits and a batch, then Take out and Put back.
 
 ## C. Go / no-go
 Go only if every row in A passes or has a written workaround the owner accepts, and B is complete. Then run `docs/pilot-protocol.md`.
