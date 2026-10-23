@@ -8,7 +8,8 @@
   "scripts": {
     "build": "node tools/build.mjs --quiet",
     "test": "node tools/test.mjs",
-    "audit": "node tools/comment-audit.mjs"
+    "audit": "node tools/comment-audit.mjs",
+    "smoke": "node tools/smoke.mjs"
   },
   "devDependencies": {
     "acorn": "8.14.1",
