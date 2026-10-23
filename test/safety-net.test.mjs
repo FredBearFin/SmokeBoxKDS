@@ -97,7 +97,7 @@ test('a damaged live save is replaced by the last-good copy, and the damaged one
     assert.equal(b.get('smokebox.v1.corrupt', null), '{"v":1,"state":{broken');       // kept
     assert.equal(b.get('smokebox.v1.corruptat', null), T + 3 * H);
     S.flush();                                                                      // the live save is whole again
-    assert.equal(E.validateBackup(b.m.get('smokebox.v1.state')).ok, true);
+    assert.equal(E.validateBackup(S.decodeSaved(b.get('smokebox.v1.state'))).ok, true);
   } finally { S.destroy(); }
   // damaged live save and a damaged copy: a blank kitchen, with both set aside / untouched, no crash
   b.m.set('smokebox.v1.state', 'nope'); b.m.set('smokebox.v1.lastgood', '{"x"');
@@ -123,8 +123,8 @@ test('under quota pressure the copy goes first, history is trimmed only after, a
   for (let i = 0; i < 60; i++) dish('Dish ' + i);
   history(1500);
   S.flush();
-  const liveLen = big.m.get('smokebox.v1.state').length, snapLen = big.m.get('smokebox.v1.lastgood').length;
-  assert.ok(snapLen < liveLen * 0.5, 'copy ' + snapLen + ' live ' + liveLen);
+  const liveLen = big.m.get('smokebox.v1.state').length, decodedLen = JSON.stringify(S.decodeSaved(big.get('smokebox.v1.state'))).length, snapLen = big.m.get('smokebox.v1.lastgood').length;
+  assert.ok(snapLen < decodedLen * 0.5, 'copy ' + snapLen + ' live ' + decodedLen);
   S.destroy();
   // 2. room for the live save only: the copy does not fit, is not kept, and the live save is whole (not trimmed)
   const tight = capStorage(Math.ceil(liveLen * 1.03));
@@ -147,7 +147,7 @@ test('under quota pressure the copy goes first, history is trimmed only after, a
   while (roomy.m.has('smokebox.v1.lastgood') && guard++ < 60) { for (let i = 0; i < 20; i++) dish('More ' + guard + '_' + i); S.flush(); }
   assert.ok(guard < 60, 'the copy was never dropped');
   assert.equal(S.status().lastSaveOk, true); assert.equal(S.status().trimmed, false, 'history must not be trimmed while the copy can be dropped');
-  assert.equal(E.validateBackup(roomy.m.get('smokebox.v1.state')).ok, true);
+  assert.equal(E.validateBackup(S.decodeSaved(roomy.get('smokebox.v1.state'))).ok, true);
   S.destroy();
 });
 

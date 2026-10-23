@@ -145,7 +145,7 @@ export async function runEndurance(opts) {
     for (const [id, t] of seenSafety) if (now - t < E.SAFETY_KEEP_MS && !nowIds.has(id)) { bad(day, 'safety entry ' + id + ' vanished'); seenSafety.delete(id); }
     for (const [id, t] of nowIds) seenSafety.set(id, t);
     if (deep) {
-      const saved = storage.get(KEY, null);
+      const saved = S.decodeSaved(storage.get(KEY, null));
       const v = saved ? E.validateBackup(saved) : { ok: false, error: 'nothing saved' };
       if (!v.ok) bad(day, 'saved copy does not load: ' + v.error);
       else {
@@ -350,7 +350,7 @@ export async function runEndurance(opts) {
       for (const [name, s] of [['A', S], ['B', B.S]]) {
         if (count(s, pre + 'A') !== want.A || count(s, pre + 'B') !== want.B) bad(day, 'tab ' + name + ' has wrong ticket counts: A ' + count(s, pre + 'A') + '/' + want.A + ', B ' + count(s, pre + 'B') + '/' + want.B);
       }
-      const saved = storage.get(KEY, null);
+      const saved = S.decodeSaved(storage.get(KEY, null));
       const sv = saved && saved.state && saved.state.tickets.filter((t) => t.customer.indexOf(pre) === 0).length;
       if (sv !== want.A + want.B) bad(day, 'saved copy has ' + sv + ' of ' + (want.A + want.B) + ' two-tab tickets');
       created += want.A + want.B;
