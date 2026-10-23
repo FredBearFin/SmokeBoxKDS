@@ -118,6 +118,7 @@ async function cooked(browser) {
   await addDish(p, { name: 'Pulled pork sandwich', short: 'Pork sand', zone: 'pit', cat: 'sandwich', price: 11 });
   await p.click('button:has-text("Menu")'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
   const sh = '.sheet-root';
+  check('dishes: up and down arrows beside each dish', await p.evaluate(() => !!document.querySelector('.sheet-root button[aria-label="Move Hush puppies down"]') && !!document.querySelector('.sheet-root button[aria-label="Move Pulled pork sandwich up"]')));
   check('portions: I count what I made', await seen(p, 'I count what I made', sh));
   await tap(p, 'I count what I made'); await p.waitForTimeout(300);
   await p.fill('input[aria-label="How many Hush puppies you made"]', '20');

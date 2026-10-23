@@ -70,7 +70,12 @@ function inject(src, block) {
   return src.slice(0, a) + block + src.slice(b + END.length);
 }
 
-export { parsePage, readPages, dataBlock, inject };
+// docs/faq.md is a copy of the Questions and answers page, so the answers live in one place.
+const FAQ_FROM = path.join(SOP, '13-questions-and-answers.md');
+const FAQ_TO = path.join(ROOT, 'docs', 'faq.md');
+const faqText = () => '<!-- Generated from docs/sop/13-questions-and-answers.md by tools/build-guide.mjs. Edit that file, then run the tool. -->\n\n' + fs.readFileSync(FAQ_FROM, 'utf8');
+
+export { parsePage, readPages, dataBlock, inject, faqText };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const pages = readPages();
@@ -78,9 +83,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const next = inject(src, dataBlock(pages));
   if (process.argv.includes('--check')) {
     if (next !== src) { console.error('Guide data in src/js/78-guide.js differs from docs/sop. Run: node tools/build-guide.mjs'); process.exit(1); }
+    if (!fs.existsSync(FAQ_TO) || fs.readFileSync(FAQ_TO, 'utf8') !== faqText()) { console.error('docs/faq.md differs from docs/sop/13-questions-and-answers.md. Run: node tools/build-guide.mjs'); process.exit(1); }
     console.log('guide data matches docs/sop (' + pages.length + ' pages)');
   } else {
     fs.writeFileSync(TARGET, next);
+    fs.writeFileSync(FAQ_TO, faqText());
     console.log('wrote ' + pages.length + ' pages into src/js/78-guide.js');
   }
 }

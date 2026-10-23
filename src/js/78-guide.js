@@ -20,7 +20,7 @@
     "id": "getting-started",
     "group": "guide",
     "title": "Getting started",
-    "summary": "Add your dishes, send a test order, take payment and save your first backup. About ten minutes.",
+    "summary": "Add dishes, send a test order, take payment and save a backup. About ten minutes.",
     "blocks": [
      {
       "t": "h",
@@ -40,11 +40,15 @@
      },
      {
       "t": "p",
+      "x": "The arrow buttons beside each dish change the order they appear in."
+     },
+     {
+      "t": "p",
       "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**."
      },
      {
       "t": "p",
-      "x": "Want to see how a ticket works first? Tap **Show me how it works** for a one-minute walkthrough."
+      "x": "For a one-minute walkthrough, tap **Show me how it works**."
      },
      {
       "t": "h",
@@ -56,11 +60,11 @@
      },
      {
       "t": "p",
-      "x": "Do you cook food ahead and keep it hot or cold? Say so in **Dishes and prices** (see Cooked-ahead food and portions). If you cook everything to order, skip it."
+      "x": "Cook food ahead and keep it hot or cold? Say so in **Dishes and prices** (see Cooked-ahead food and portions)."
      },
      {
       "t": "p",
-      "x": "Temperatures show in °F and weights in kilograms. You can change both in the **Back office**, under **Menu and settings**."
+      "x": "Temperatures show in °F and weights in kilograms. Change them in the **Back office**, under **Menu and settings**."
      },
      {
       "t": "h",
@@ -792,6 +796,79 @@
        "Dish missing: check the 86 board and Dishes and prices",
        "Opened empty: restore the last backup (Back office, Menu and settings)",
        "Forgot the PIN: see Empty, lost or locked in the Guide. There is no reset button"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "card-first-day-checklist",
+    "group": "cards",
+    "title": "First day checklist",
+    "summary": "Print this card. Check each box off with a pen.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Before opening"
+     },
+     {
+      "t": "check",
+      "x": [
+       "Dishes added, tax and hours set (Menu, Dishes and prices)",
+       "Tablet plugged in, set to never sleep, volume up",
+       "One test order sent and cancelled"
+      ]
+     },
+     {
+      "t": "h",
+      "x": "During service"
+     },
+     {
+      "t": "check",
+      "x": [
+       "On each ticket: Start, Done, then Bump",
+       "Wrong tap? Undo, within 10 seconds",
+       "Dish sold out? Mark it on the 86 board"
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Closing"
+     },
+     {
+      "t": "check",
+      "x": [
+       "Every order paid or cancelled, then Close the day",
+       "Backup saved, and a copy kept off the tablet"
+      ]
+     },
+     {
+      "t": "h",
+      "x": "If something goes wrong"
+     },
+     {
+      "t": "check",
+      "x": [
+       "Open the Guide. Troubleshooting covers sound and lost data"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "card-tablet-setup",
+    "group": "cards",
+    "title": "Tablet setup",
+    "summary": "Print this card and keep it with the tablet.",
+    "blocks": [
+     {
+      "t": "check",
+      "x": [
+       "Open Smokebox and add it to the home screen: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app",
+       "Keep it awake: set Auto-Lock (iPad) or Screen timeout (Android) to Never, and plug it in",
+       "Turn the volume up. Tap Menu, Set up this tablet, then Play a test warning",
+       "Wifi: not needed. Smokebox works without internet",
+       "Backups go where you save them: the Downloads folder, or an email to yourself. Smokebox does not send them anywhere",
+       "Keep a copy of every backup off this tablet",
+       "Replacing the tablet? Restore your newest backup (Guide, Replacing a device)"
       ]
      }
     ]
