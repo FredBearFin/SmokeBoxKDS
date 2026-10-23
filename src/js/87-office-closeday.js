@@ -120,6 +120,12 @@
     function paintReview(m) {
       const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
       body.appendChild(h('p', { class: 'cd-lead' }, 'Today is ' + U.fmtDateShort(m.day) + '. ', whatClosingDoes((stateNow().settings.service || {}).dayStartHour), help ? h('span', null, ' ', help) : null));
+      // From 85 percent full the sheet repeats the saved-history warning, because closing the day is when the owner is already looking at the numbers.
+      try {
+        const BPh = SB.office && SB.office.backupPure, fill = SB.store.historyFill ? SB.store.historyFill() : null;
+        const hv = BPh && fill ? BPh.historyView(fill, stateNow(), SB.store.now()) : null;
+        if (hv && (hv.level === 'urgent' || hv.level === 'full')) body.appendChild(h('p', { class: 'cd-note cd-hist', role: 'status' }, hv.alert));
+      } catch (e) { /* the sheet works without the warning */ }
       if (m.closedAt) body.appendChild(h('p', { class: 'cd-note' }, 'Closed once already today at ' + U.fmtTime(m.closedAt) + '. Closing again covers the whole day, including anything sold since.'));
       // Open orders block
       const sec1 = h('section', { class: 'cd-sec' }, h('h3', null, m.open.length ? 'Orders still open (' + m.open.length + ')' : 'No open orders'));

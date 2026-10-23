@@ -197,6 +197,14 @@
     return 'Days before ' + U.fmtDateShort(before) + ' were saved to your month files and cleared from this tablet. Totals for those days are not shown here.';
   }
   O.archivedWords = archivedWords;
+  // The matching note for days dropped to make room when the saved history filled up (`day` is the first day still kept), or '' when the
+  // range starts on or after it.
+  function droppedRangeWords(day, from, dsh) {
+    if (typeof day !== 'string' || !/^\d{4}-\d\d-\d\d$/.test(day)) return '';
+    if (isNum(from) && from >= dayStartMs(day, isNum(dsh) ? dsh : 4)) return '';
+    return 'Older history was dropped to make room: days before ' + U.fmtDateShort(day) + ' are not here, so totals for those days are missing.';
+  }
+  O.droppedRangeWords = droppedRangeWords;
 
   O.pure = { PAGES, customRange, coachText, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
 
@@ -1216,7 +1224,7 @@
     }
     const b = bannerText(info);
     // Pages that add up history say when the range reaches days that were cleared from this tablet (the safety record keeps its own).
-    if (M.pageId !== 'safety' && M.pageId !== 'data') { const aw = O.archivedWords(ds && ds.archivedBefore, F.range.from, svcHour()); if (aw) b.text += ' ' + aw; }
+    if (M.pageId !== 'safety' && M.pageId !== 'data') { const aw = O.archivedWords(ds && ds.archivedBefore, F.range.from, svcHour()); if (aw) b.text += ' ' + aw; const dw = O.droppedRangeWords(ds && ds.trimmedBefore, F.range.from, svcHour()); if (dw) b.text += ' ' + dw; }
     const t = M.banner.querySelector('.of-banner-t');
     if (t.textContent !== b.text) t.textContent = b.text;
     M.banner.dataset.kind = b.kind;

@@ -298,3 +298,12 @@
   .pr-printroot h1 { font-size: 20px; margin: 0 0 8px; color: #000; }
   .pr-printroot pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; color: #000; margin: 0; }
 }
+
+/* Saved history: a plain meter and, from 70 percent full, a calm amber card. Words carry the meaning; the bar is a picture of the same number. */
+.od-hist { display: grid; gap: var(--sp-2); }
+.od-hist-track { height: 10px; border-radius: 6px; background: var(--line-soft, var(--line)); overflow: hidden; }
+.od-hist-bar { display: block; height: 100%; background: var(--ink2); border-radius: 6px; }
+.od-hist[data-tone="warn"] { border-left: 4px solid var(--amber, #b9770e); background: var(--tint-warn, transparent); }
+.od-hist[data-tone="warn"] .od-hist-bar { background: var(--amber, #b9770e); }
+.od-hist-alert { margin: 0; font-weight: var(--w-semi); }
+.od-hist-meter { margin: 0; }
