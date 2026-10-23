@@ -455,7 +455,26 @@ async function severalScreens(browser) {
     check('join: leaving works', await tap(q, 'Leave the hub')); await q.waitForTimeout(1200);
     check('join: You left the hub.', await has(q, 'You left the hub.', js));
     await q.close();
+    // A writing tablet: undo only while nobody else has acted, the offline card, then the last known kitchen after the hub is gone.
+    const r = await fresh(browser);
+    await r.goto(H + '/?hub&code=ABC123'); await r.waitForTimeout(2500);
+    await tap(r, 'New ticket'); await r.waitForTimeout(500); await tap(r, 'Hush puppies'); await tap(r, 'Send to kitchen'); await r.waitForTimeout(1200);
+    await r.evaluate(() => { const b = document.querySelector('.fl-slip .fl-row button'); if (b) b.click(); }); await r.waitForTimeout(700);
+    check('undo: the bar offers Undo for my own action', await r.evaluate(() => [...document.querySelectorAll('button')].some((e) => e.getClientRects().length && /Undo/.test(e.textContent + (e.getAttribute('aria-label') || '')))));
+    await fetch(H + '/action', { method: 'POST', headers: { 'content-type': 'application/json', 'x-smokebox-code': 'ABC123' }, body: JSON.stringify({ type: 'createTicket', payload: { customer: 'Zed', channel: 'dine_in', items: [{ menuId: 'hushpuppies', qty: 1 }], note: '', rush: false, src: 'live' }, clientId: 'other', opId: 'o1', code: 'ABC123' }) });
+    await r.waitForTimeout(600);
+    await r.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.getClientRects().length && /Undo/.test(e.textContent + (e.getAttribute('aria-label') || ''))); if (b) b.click(); }); await r.waitForTimeout(800);
+    check('undo: Someone else changed the kitchen since', await r.evaluate(() => /Someone else changed the kitchen since, so this cannot be undone from here\. Fix it by hand\./.test(document.body.innerText)));
+    await r.evaluate(() => document.querySelector('button.fl-menu').click()); await r.waitForTimeout(400);
+    check('settings: Tablet checks: screen, sound, home screen', await tap(r, 'Tablet checks: screen, sound, home screen')); await r.waitForTimeout(1500);
+    check('tablet checks: Opens without the internet', await has(r, 'Opens without the internet', '.sheet-root:last-of-type'));
+    await r.evaluate(() => SB.sheets.closeAll()); await r.waitForTimeout(300);
     hub.kill();
+    await r.waitForTimeout(500);
+    await r.reload(); await r.waitForTimeout(3500);
+    check('last known: Last known, from', await r.evaluate(() => /Last known, from/.test(document.body.innerText)));
+    check('last known: Offline: your taps are saved and will be sent', await r.evaluate(() => /Offline: your taps are saved and will be sent/.test(document.body.innerText)));
+    await r.close();
     await p.waitForTimeout(5000);
     check('follower: Reconnecting... when the hub is gone', /Reconnecting/.test(await body()));
     await p.waitForTimeout(48000);

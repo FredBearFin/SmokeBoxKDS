@@ -553,13 +553,14 @@
       // Serve-by time with the kind of limit it is: quality (house limit, held at temperature) or safety (time as a health control).
       const coolingNow = b.kind === 'cooling';
       setHidden(rec.dtServe, coolingNow); setHidden(rec.ddServe, coolingNow);
-      if (!coolingNow) text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b)) + ', ' + (b.holdBasis === 'safety' ? 'throw-out time' : 'quality limit'));
+      // One answer per row: the label says which kind of limit it is and the value is just the time.
+      if (!coolingNow) { text(rec.dtServe, b.holdBasis === 'safety' ? 'Throw out at' : 'Quality limit'); text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b))); }
       // A cold item shows its fridge date instead: the last day in the fridge, or that no days were set.
       if (ci) {
         text(rec.dtServe, 'Fridge date');
         text(rec.ddServe, ci.useBy ? 'Use by ' + U.fmtDateShort(ci.useBy) + ' (your ' + trimNum(ci.fridgeDays) + ' ' + plural(ci.fridgeDays, 'day') + ')' : 'No limit set');
         setHidden(rec.dtServe, false); setHidden(rec.ddServe, false);
-      } else if (rec.dtServe.textContent !== 'Serve by') text(rec.dtServe, 'Serve by');
+      }
       const resting = U.isNum(b.restUntil) && b.restUntil > now && !coolingNow;
       setHidden(rec.dtRest, !resting); setHidden(rec.ddRest, !resting);
       if (resting) text(rec.ddRest, U.fmtTime(b.restUntil));

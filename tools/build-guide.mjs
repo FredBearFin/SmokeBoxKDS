@@ -23,7 +23,7 @@ function parsePage(file, text) {
   const id = path.basename(file, '.md').replace(/^\d+-/, '');
   const lines = text.replace(/\r/g, '').split('\n');
   const num = Number((path.basename(file).match(/^(\d+)-/) || [0, 0])[1]);
-  const page = { id, group: num >= 20 ? 'cards' : 'guide', title: '', summary: '', blocks: [] };
+  const page = { id, group: /^card-/.test(id) ? 'cards' : 'guide', title: '', summary: '', blocks: [] };
   let para = [], list = null;
   // Closes the paragraph or list being collected and files it as the summary or a block.
   const flush = () => {

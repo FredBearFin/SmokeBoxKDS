@@ -663,3 +663,7 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 @media (max-width: 560px) { .fw-modes { grid-template-columns: 1fr; } }
 .fw [hidden] { display: none !important; }
 .fw .fs-row { margin-block: var(--sp-2); }
+/* Readings: the number box fills the row, so there is no empty gap beside the +5 button. */
+.rd .stepper { display: flex; width: 100%; }
+.rd .stepper .stepper-field { flex: 1 1 auto; min-width: 0; }
+.rd .stepper .stepper-input { flex: 1 1 auto; min-width: 0; width: auto; text-align: center; }
