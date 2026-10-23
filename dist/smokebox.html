@@ -11676,7 +11676,7 @@ a.of-nav:active { background: var(--press); }
     const f = fol;
     if (FOLLOW_FATAL[f.error]) return 'error';
     if (!f.everConnected) return 'connecting';
-    if (!f.connected || f.sendFail || folStale()) return 'offline';
+    if (!f.connected || (f.sendFail && hubQueued() > 0) || folStale()) return 'offline';
     return hubQueued() > 0 ? 'sending' : 'connected';
   }
   // What a screen shows about the hub connection: state, address, screen name, last message, unanswered taps, error words, clock offset.
