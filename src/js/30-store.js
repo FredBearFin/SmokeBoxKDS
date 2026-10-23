@@ -17,6 +17,9 @@
   // A saved copy that fails the check is parked here instead of being deleted, so nothing is lost.
   const CORRUPT_KEY = 'smokebox.v1.corrupt';
   const SID_KEY = 'smokebox.v1.sid';
+  // The actions this device has done that no server has confirmed yet (only used when a transport can push).
+  const OUTBOX_KEY = 'smokebox.v1.outbox';
+  const OUTBOX_MAX = 5000; // oldest unconfirmed actions are dropped past this, and st.outboxDropped says so
   // 20 million characters: bigger backups are refused on both export and import (Pitcall finding PO4c).
   const MAX_TEXT = 20e6; // characters; backups above this are refused (Pitcall PO4c)
   // 400 ms: wait this long after the last change before saving, so a burst of taps is one save.
@@ -38,18 +41,22 @@
   let lastNow = -Infinity;
   let subs = new Set(), tickSubs = new Set();
   let notifyPending = false;
-  let interval = null, saveTimer = null, bc = null;
+  let interval = null, saveTimer = null, tr = null;
   let pendingBroadcast = false;
   // Two tabs saving at the same moment must not drop each other's work (F-L9). baseSid names the save this tab last
   // loaded or wrote; pending lists this tab's actions since then, so they can be replayed on top of a newer save.
   let baseSid = null, pending = [], skipRebase = false, sidN = 0;
   let dirty = false; // unsaved changes exist (page-lifecycle flushes only write when dirty)
   let listeners = [];
+  // Server-ready bookkeeping. opN numbers this tab's actions. outbox is the saved list of unconfirmed
+  // actions. seenOps remembers opIds already applied so a repeat delivery does nothing. pushing and
+  // retryAt keep one push in flight with a back-off after a failure.
+  let opN = 0, outbox = [], seenOps = new Set(), pushing = false, retryAt = 0, retryMs = 2000;
   // simRef is the simulator (if attached). last is the result of the most recent action. st is the save
   // status. tabId names this tab in tab-sync messages.
   let simRef = null;
   let last = null;
-  let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [] };
+  let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0 };
   const tabId = 'tab_' + Math.floor(Math.random() * 1e9).toString(36);
 
   /* ---------- clock: now() = base + (real - realBase) * speed, clamped so it never goes backwards ---------- */
@@ -129,7 +136,7 @@
     if (saveTimer || !storage) return;
     // Once a shared save exists and other tabs may be open, each tab waits a little differently, so two tabs rarely write in the
     // same instant. The very first save of a new board is not delayed, so a second tab opened right after sees it.
-    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, bc && baseSid ? SAVE_MS + Math.floor(Math.random() * 300) : SAVE_MS);
+    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, tr && baseSid ? SAVE_MS + Math.floor(Math.random() * 300) : SAVE_MS);
   }
   // Saves the state to the browser right now and returns true if it worked. If the browser says it is full,
   // it retries with less history (oldest finished tickets and events first), halving up to 12 times. After a
@@ -165,7 +172,7 @@
       try { storage.set(SID_KEY, sid); baseSid = sid; } catch (e) { sid = null; }
       pending = [];
     }
-    if (ok && pendingBroadcast && bc) { try { bc.postMessage({ type: 'saved', rev: state.rev, tab: tabId, sid }); } catch (e) { /* ignore */ } }
+    if (ok && pendingBroadcast && tr) { try { tr.post({ type: 'saved', rev: state.rev, tab: tabId, sid }); } catch (e) { /* ignore */ } }
     pendingBroadcast = false;
     return ok;
   }
@@ -207,13 +214,16 @@
   // Listeners for alert messages from other tabs.
   const bcListeners = new Set();
   // Sends a message to the other tabs of this browser. Returns false when there is no channel (then each tab acts alone).
-  function broadcast(msg) { if (!bc) return false; try { bc.postMessage(Object.assign({}, msg, { tab: tabId })); return true; } catch (e) { return false; } }
+  function broadcast(msg) { if (!tr) return false; try { return tr.post(Object.assign({}, msg, { tab: tabId })) !== false; } catch (e) { return false; } }
   // Registers fn for messages from other tabs; returns a function that stops it.
   function onBroadcast(fn) { bcListeners.add(fn); return () => bcListeners.delete(fn); }
   // Another tab announced a save. With nothing unsaved here, adopt its copy and redraw. With unsaved actions
   // here, replay them on top of its copy and save the merged result. Ignores our own messages.
-  function onMessage(ev) {
-    const d = ev && ev.data;
+  function onMessage(d) {
+    // A server (or another device) can hand over a confirmation or an action done elsewhere.
+    if (d && d.tab !== tabId && d.type === 'ack') { ackOps(d.opIds); return; }
+    if (d && d.tab !== tabId && d.type === 'action') { applyRemote(d); return; }
+    if (d && d.tab !== tabId && d.type === 'state') { adoptState(d); return; }
     // Messages about alerts (sound leader, played, acknowledged) go to whoever listens; they are not saves.
     if (d && d.tab !== tabId && typeof d.type === 'string' && d.type.indexOf('alert-') === 0) { bcListeners.forEach((fn) => { try { fn(d); } catch (e) { /* a listener must not stop the others */ } }); return; }
     if (!d || d.tab === tabId || d.type !== 'saved' || !storage) return;
@@ -230,6 +240,164 @@
     scheduleNotify();
   }
 
+  /* ---------- transport: how this store talks to other tabs, other devices and a server ---------- */
+  /*
+   * TRANSPORT INTERFACE (for the hub prototype and any future server link)
+   *
+   * A transport is a plain object. Pass one to SB.store.init({ transport }) either as the object itself or as a
+   * function that returns it. With no transport given, the store uses channelTransport() (same-browser tabs).
+   *
+   *   name                string, for debugging.
+   *   open(deliver)       Start. Call deliver(msg) for every message that arrives from outside. Return false
+   *                       when the transport cannot work here (the store then runs alone, like noSync).
+   *   post(msg)           Best-effort broadcast of a small message to the peers. Return false if it was not
+   *                       handed off. Never throw. The store adds msg.tab (this tab's id).
+   *   push(entries)       OPTIONAL. Makes the store keep a saved outbox (key smokebox.v1.outbox). entries is a
+   *                       copy of the unconfirmed list, oldest first: [{ opId, type, payload, now }]. Return
+   *                       (or resolve to) an array of opIds the server accepted, or { acked: [opIds] }. A
+   *                       rejection, a throw or no answer means "try later": the store retries about every 2 s,
+   *                       backing off to 60 s. The server must treat a repeated opId as already done.
+   *   close()             Stop and release resources. Must be safe to call twice.
+   *
+   * Messages coming in through deliver(msg), all objects with a string type:
+   *   { type: 'ack', opIds: [...] }                 the server confirms these actions; they leave the outbox.
+   *   { type: 'action', opId, actionType, payload, now }   an action done on another device. It is applied
+   *                       once (repeats of an opId are ignored), is not queued again, and a refusal is dropped.
+   *   { type: 'state', state, opIds }               the authoritative state (an object or backup text). The
+   *                       store adopts it, treats opIds as confirmed (they leave the outbox), then replays any
+   *                       actions still in the outbox on top, so a device's own unconfirmed work is kept while
+   *                       its numbering follows the hub. An invalid state is ignored.
+   *   { type: 'saved', ... } and { type: 'alert-*', ... }  same-browser tab messages (see the tab channel).
+   * Messages carrying tab equal to this tab's id are ignored, so a transport may echo.
+   *
+   * Every dispatched action gets an opId (tabId + ':' + a counter, unique per page load) returned by
+   * dispatchEx and kept in lastResult(). Only successful actions from a person are queued (not simulator ones).
+   * The engine itself never sees an opId: it stays pure.
+   *
+   * Helpers: store.outbox() copies the queue, store.syncNow() pushes now, store.ackOps(ids) confirms by hand.
+   */
+  // Builds the default transport: a BroadcastChannel to the other tabs of this browser (name defaults to smokebox).
+  function channelTransport(name) {
+    let ch = null;
+    return {
+      name: 'broadcast-channel',
+      // Opens the channel; false when this browser has none.
+      open(deliver) {
+        if (typeof g.BroadcastChannel !== 'function') return false;
+        // Messages arrive wrapped in an event; hand the store just the data.
+        const unwrap = (ev) => deliver(ev && ev.data);
+        try { ch = new g.BroadcastChannel(name || 'smokebox'); ch.onmessage = unwrap; return true; } catch (e) { ch = null; return false; }
+      },
+      // Sends one message to the other tabs.
+      post(msg) { if (!ch) return false; try { ch.postMessage(msg); return true; } catch (e) { return false; } },
+      // Closes the channel and lets go of it.
+      close() { if (ch) { try { ch.close(); } catch (e) { /* ignore */ } ch = null; } },
+    };
+  }
+  // Starts the chosen transport (a given one, or the tab channel) and keeps it in tr when it opened.
+  function openTransport(given) {
+    let t = given;
+    try { if (typeof t === 'function') t = t(); } catch (e) { t = null; }
+    if (!t) t = channelTransport();
+    if (typeof t.open !== 'function' || typeof t.post !== 'function') return;
+    let ok = false;
+    try { ok = t.open((msg) => { if (tr === t && msg && typeof msg === 'object') onMessage(msg); }) !== false; } catch (e) { ok = false; }
+    if (!ok) { try { if (typeof t.close === 'function') t.close(); } catch (e) { /* ignore */ } return; }
+    tr = t;
+    if (typeof t.push === 'function') loadOutbox();
+  }
+  // Reads the saved outbox into memory (only entries that look right).
+  function loadOutbox() {
+    let raw = null;
+    try { raw = storage.get(OUTBOX_KEY, null); } catch (e) { raw = null; }
+    outbox = Array.isArray(raw) ? raw.filter((x) => x && typeof x.opId === 'string' && typeof x.type === 'string' && isNum(x.now)) : [];
+  }
+  // Saves the outbox so a reload or a dead connection does not lose unconfirmed actions. Merges with what other
+  // tabs wrote (by opId), so two tabs do not overwrite each other.
+  function saveOutbox() {
+    if (!storage) return;
+    try {
+      const other = storage.get(OUTBOX_KEY, null);
+      const have = new Set(outbox.map((x) => x.opId));
+      if (Array.isArray(other)) for (const x of other) if (x && typeof x.opId === 'string' && !have.has(x.opId) && !acked.has(x.opId)) { outbox.push(x); have.add(x.opId); }
+      outbox.sort((a, b) => a.now - b.now);
+      while (outbox.length > OUTBOX_MAX) { outbox.shift(); st.outboxDropped++; }
+      storage.set(OUTBOX_KEY, outbox);
+    } catch (e) { /* a full or blocked store keeps the in-memory queue */ }
+  }
+  // opIds confirmed during this page load, so a merge never brings a confirmed action back.
+  const acked = new Set();
+  // Adds one successful action to the outbox when the transport can push. Does nothing otherwise.
+  function enqueueOp(entry) {
+    if (!tr || typeof tr.push !== 'function') return;
+    outbox.push(entry);
+    saveOutbox();
+    retryAt = 0;
+    if (typeof setTimeout === 'function') setTimeout(pushOutbox, 0);
+  }
+  // Removes confirmed actions from the outbox and saves it. Unknown ids are ignored.
+  function ackOps(ids) {
+    if (!Array.isArray(ids) || !ids.length) return;
+    const set = new Set(ids.filter((x) => typeof x === 'string'));
+    for (const id of set) acked.add(id);
+    outbox = outbox.filter((x) => !set.has(x.opId));
+    saveOutbox();
+    retryMs = 2000;
+  }
+  // Offers the whole outbox to the transport, one push at a time. A failure waits retryMs (2 s, doubling to 60 s).
+  function pushOutbox() {
+    if (!tr || typeof tr.push !== 'function' || pushing || !outbox.length) return;
+    if (realNow() < retryAt) return;
+    pushing = true;
+    const t = tr;
+    // A failed push: wait longer (2 s, doubling up to 60 s) before the next try.
+    const fail = () => { pushing = false; retryAt = realNow() + retryMs; retryMs = Math.min(60000, retryMs * 2); };
+    // The transport answered: confirmed ids leave the outbox, anything else counts as a failure.
+    const done = (res) => {
+      if (tr !== t) { pushing = false; return; }
+      pushing = false;
+      const ids = Array.isArray(res) ? res : res && Array.isArray(res.acked) ? res.acked : null;
+      if (ids) ackOps(ids); else fail();
+    };
+    try {
+      const out = t.push(outbox.map((x) => Object.assign({}, x)));
+      if (out && typeof out.then === 'function') out.then(done, fail); else done(out);
+    } catch (e) { fail(); }
+  }
+  // Takes the authoritative state sent by a hub: confirmed actions leave the outbox, the state replaces ours,
+  // and actions still unconfirmed are replayed on top (a refused one is dropped). Ticket numbers then follow
+  // the hub's order, not the order this device did things in.
+  function adoptState(d) {
+    if (!state || !storage) return;
+    const v = E().validateBackup(d.state);
+    if (!v.ok) return;
+    const ids = Array.isArray(d.opIds) ? d.opIds.filter((x) => typeof x === 'string') : [];
+    for (const id of ids) seenOps.add(id);
+    ackOps(ids);
+    let ns = v.state;
+    atLeast(lastStamp(ns));
+    for (const p of outbox) {
+      const r = E().apply(ns, p.type, p.payload, Math.max(p.now, lastStamp(ns)));
+      if (r.report === 'ok') ns = r.state;
+    }
+    ns = E().tick(ns, now()).state;
+    ns.rev = Math.max(ns.rev, (state.rev || 0) + 1);
+    state = ns;
+    pending = []; skipRebase = true; pendingBroadcast = true;
+    persistNow();
+    scheduleNotify();
+  }
+  // Applies an action that another device did. Each opId is applied once; the action is not queued again.
+  function applyRemote(d) {
+    if (!state || typeof d.opId !== 'string' || seenOps.has(d.opId) || typeof d.actionType !== 'string') return;
+    seenOps.add(d.opId);
+    if (seenOps.size > 5000) seenOps.delete(seenOps.values().next().value);
+    const n = Math.max(now(), isNum(d.now) ? d.now : 0);
+    atLeast(n);
+    const r = E().apply(state, d.actionType, d.payload, n);
+    if (r.report === 'ok') commit(r.state, true);
+  }
+
   /* ---------- lifecycle ---------- */
   // Adds an event listener (a bell on the door) and remembers it so destroy can remove it. Errors are
   // ignored.
@@ -240,7 +408,8 @@
     if (interval) clearInterval(interval);
     if (saveTimer) clearTimeout(saveTimer);
     interval = null; saveTimer = null;
-    if (bc) { try { bc.close(); } catch (e) { /* ignore */ } bc = null; }
+    if (tr) { try { tr.close(); } catch (e) { /* ignore */ } tr = null; }
+    pushing = false; retryAt = 0; retryMs = 2000;
     for (const [t, ty, fn] of listeners) { try { t.removeEventListener(ty, fn); } catch (e) { /* ignore */ } }
     listeners = [];
     subs = new Set(); tickSubs = new Set();
@@ -255,9 +424,10 @@
     destroy();
     realNow = typeof opts.now === 'function' ? opts.now : () => Date.now();
     storage = opts.storage && typeof opts.storage.get === 'function' && typeof opts.storage.set === 'function' ? opts.storage : U.storage;
-    st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [] };
+    st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0 };
     last = null;
     baseSid = null; pending = []; skipRebase = false;
+    outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
     const r = realNow();
     let payload = null;
     try { payload = storage.get(KEY, null); } catch (e) { payload = null; }
@@ -296,9 +466,7 @@
     state = t.state;
     if (!loaded && st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
     if (!opts.noTimers && typeof setInterval === 'function') interval = setInterval(tickNow, 1000);
-    if (!opts.noSync && typeof g.BroadcastChannel === 'function') {
-      try { bc = new g.BroadcastChannel('smokebox'); bc.onmessage = onMessage; } catch (e) { bc = null; }
-    }
+    if (!opts.noSync) openTransport(opts.transport);
     if (!opts.noTimers) {
       if (typeof g.addEventListener === 'function') on(g, 'pagehide', () => flushIfDirty());
       if (g.document && typeof g.document.addEventListener === 'function') on(g.document, 'visibilitychange', () => { if (g.document.visibilityState === 'hidden') flushIfDirty(); });
@@ -324,6 +492,7 @@
     const n = now();
     const r = E().tick(state, n);
     if (r.state !== state) commit(r.state, false);
+    if (outbox.length) pushOutbox();
     tickSubs.forEach((fn) => { try { fn(n); } catch (e) { if (g.console) console.error('[smokebox] tick subscriber failed', e); } });
   }
   // Gives one action to the engine and returns { report, info, events }. The report is the word "ok" or the
@@ -334,15 +503,22 @@
     if (!state) init({ noTimers: true, noSync: true });
     const source = opts && opts.source === 'sim' ? 'sim' : 'user';
     const n = now();
+    const opId = tabId + ':' + (++opN);
     const r = E().apply(state, type, payload, n);
-    last = { type: typeof type === 'string' ? type : String(type), report: r.report, info: r.info, events: r.events };
-    if (r.report === 'ok') { if (r.state !== state) { pending.push({ type, payload, now: n }); if (pending.length > 300) pending.shift(); } commit(r.state, true); }
+    last = { type: typeof type === 'string' ? type : String(type), report: r.report, info: r.info, events: r.events, opId };
+    if (r.report === 'ok') {
+      if (r.state !== state) {
+        pending.push({ type, payload, now: n, opId }); if (pending.length > 300) pending.shift();
+        if (source === 'user') enqueueOp({ opId, type, payload, now: n });
+      }
+      commit(r.state, true);
+    }
     else if (source === 'user' && r.report !== 'nothingToDo' && type !== 'uiReport') {
       // instrumentation (UI guide): a user action that was refused is recorded as a ui_report event
       const r2 = E().apply(state, 'uiReport', { action: String(type).slice(0, 40) || '?', report: r.report }, n);
       if (r2.report === 'ok') commit(r2.state, false);
     }
-    return { report: r.report, info: r.info, events: r.events };
+    return { report: r.report, info: r.info, events: r.events, opId };
   }
   // Same as dispatchEx but returns only the report word.
   const dispatch = (type, payload, opts) => dispatchEx(type, payload, opts).report;
@@ -611,6 +787,8 @@
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
     flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
-    broadcast, onBroadcast, canBroadcast: () => !!bc, tabId,
+    broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
+    // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
+    channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
