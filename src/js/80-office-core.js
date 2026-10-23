@@ -1224,7 +1224,7 @@
     }
     const b = bannerText(info);
     // Pages that add up history say when the range reaches days that were cleared from this tablet (the safety record keeps its own).
-    if (M.pageId !== 'safety' && M.pageId !== 'data') { const aw = O.archivedWords(ds && ds.archivedBefore, F.range.from, svcHour()); if (aw) b.text += ' ' + aw; const dw = O.droppedRangeWords(ds && ds.trimmedBefore, F.range.from, svcHour()); if (dw) b.text += ' ' + dw; }
+    if (M.pageId !== 'safety' && M.pageId !== 'data') { const aw = O.archivedWords(ds && ds.archivedBefore, F.range.from, svcHour()); if (aw) b.text += ' ' + aw; const dw = O.droppedRangeWords(ds && ds.droppedBefore, F.range.from, svcHour()); if (dw) b.text += ' ' + dw; }
     const t = M.banner.querySelector('.of-banner-t');
     if (t.textContent !== b.text) t.textContent = b.text;
     M.banner.dataset.kind = b.kind;

@@ -126,7 +126,10 @@
     let nE = 0;
     if (SB.engine && SB.engine.allEvents && state) for (const e of SB.engine.allEvents(state)) if (e && isNum(e.t) && e.t > from && e.t <= now) nE++;
     const span = nT ? Math.min(14, Math.max(1, Math.ceil((now - firstT) / DAY))) : 0;
-    if (out.level !== 'full' && span >= 3) {
+    if (out.level !== 'full' && Object.prototype.hasOwnProperty.call(fill, 'daysLeft')) {
+      // The store knows all three limits (including the browser's space), so its own estimate wins; null means under three days of history.
+      out.daysLeft = isNum(fill.daysLeft) ? Math.floor(fill.daysLeft) : null;
+    } else if (out.level !== 'full' && span >= 3) {
       const room = [];
       if (nT && isNum(fill.ticketsCap)) room.push(Math.max(0, fill.ticketsCap - fill.tickets) / (nT / span));
       if (nE && isNum(fill.eventsCap)) room.push(Math.max(0, fill.eventsCap - fill.events) / (nE / span));

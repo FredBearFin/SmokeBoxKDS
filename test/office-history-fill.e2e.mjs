@@ -80,7 +80,7 @@ await withPage({ w: 1280, h: 900, hash: '' }, async (page, logs) => {
   t = await cardText();
   check('the card says it is full and what to do', /Your saved history is full, so older days are being dropped to make room\. Close the month to save them to files\./.test(t), t);
 
-  r = await load(100, { persisted: false, trimmedBefore: '2026-09-10' });
+  r = await load(100, { persisted: false, trimmedSince: { days: 3, at: Date.now(), droppedBefore: '2026-09-10' } });
   t = await cardText();
   check('when the browser did not promise to keep the data the card says to add the app to the home screen', /This browser may delete saved data if the tablet is unused for a while\. Add Smokebox to the home screen/.test(t), t);
   check('and after a drop it says days before the date were dropped', /Older history was dropped to make room \(days before .+\)\. Close the month regularly to keep it in files\./.test(t), t);

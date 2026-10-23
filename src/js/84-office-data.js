@@ -40,14 +40,16 @@
       track.setAttribute('data-pct', String(v.pct === null ? '' : v.pct));
       meter.textContent = v.meter || 'Saved history size is not known on this device.';
       alert.textContent = v.alert; alert.hidden = !v.alert; go.hidden = !v.alert;
-      const dday = st.trimmedBefore || (fill && typeof fill.trimmedBefore === 'string' ? fill.trimmedBefore : '');
+      const ts = fill.trimmedSince && typeof fill.trimmedSince === 'object' ? fill.trimmedSince.droppedBefore : '';
+      let ds = null; try { ds = SB.store.dataset({ sample: false }); } catch (e) { ds = null; }
+      const dday = (ds && ds.droppedBefore) || ts || '';
       const dw = BP.droppedWords(dday); dropped.textContent = dw; dropped.hidden = !dw;
       safari.textContent = v.safari; safari.hidden = !v.safari;
     }
     paint();
     // Keeps the card in step with the store, redrawing only when the tickets, events or day changed.
     let seen = '';
-    function sync(st) { const k = st.tickets.length + '|' + (st.events || []).length + '|' + (st.archivedBefore || '') + '|' + (st.trimmedBefore || '') + '|' + U.serviceDate(SB.store.now(), (st.settings.service || {}).dayStartHour); if (k !== seen) { seen = k; try { paint(); } catch (e) { /* the rest of the page still draws */ } } }
+    function sync(st) { const k = st.tickets.length + '|' + (st.events || []).length + '|' + (st.archivedBefore || '') + '|' + (st.droppedBefore || '') + '|' + U.serviceDate(SB.store.now(), (st.settings.service || {}).dayStartHour); if (k !== seen) { seen = k; try { paint(); } catch (e) { /* the rest of the page still draws */ } } }
     return { el, sync };
   }
 

@@ -91,3 +91,10 @@ test('a range that reaches days dropped to make room gets the page note, and a r
   assert.equal(w(day, start - DAY, 4), 'Older history was dropped to make room: days before ' + SB.util.fmtDateShort(day) + ' are not here, so totals for those days are missing.');
   assert.equal(w(day, -Infinity, 4), w(day, start - DAY, 4)); assert.equal(w(undefined, -Infinity, 4), '');
 });
+
+test('the store\'s own days-left number wins when it gives one (it knows the browser space too), and null means no guess', () => {
+  const { s, now } = kitchen(100);
+  assert.match(BP.historyView(fillOf(s, { daysLeft: 7 }), s, now).meter, /\(about 7 more days at today's pace\)$/);
+  assert.match(BP.historyView(fillOf(s, { daysLeft: 1 }), s, now).meter, /\(about 1 more day at today's pace\)$/);
+  assert.equal(BP.historyView(fillOf(s, { daysLeft: null }), s, now).daysLeft, null);
+});
