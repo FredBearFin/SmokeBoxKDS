@@ -2608,7 +2608,9 @@
     }
     const ns = newState({
       now: tx.now, seq: s.seq, starter: p.starter !== false, stagger: p.stagger === true, blank, settings,
-      menu: keep && !fresh ? s.menu : undefined, ingredients: keep && !fresh ? s.ingredients : undefined, learned: keep ? s.learned : undefined,
+      menu: keep && !fresh ? s.menu : undefined, ingredients: keep && !fresh ? s.ingredients : undefined,
+      // Learned prep times belong to the dishes; when the dishes are replaced they go too (invariant I14).
+      learned: keep && !fresh ? s.learned : undefined,
     });
     for (const k of Object.keys(ns)) tx.set(k, ns[k]);
     if (!ns.catalog && hasOwn(s, 'catalog')) tx.set('catalog', undefined);
