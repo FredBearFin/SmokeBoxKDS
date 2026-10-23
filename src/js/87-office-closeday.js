@@ -209,7 +209,7 @@
     const paintLine = () => {
       const d = drawerExpected(drawer.text, m);
       U.clear(line);
-      if (d.bad) { line.append('Type the starting cash as dollars, like 150 or 150.00, or leave it empty. Without it: cash paid today is ', h('strong', { class: 'num' }, money(d.expected)), '.'); return; }
+      if (d.bad) { line.append('Type the starting cash as an amount, like 150 or 150.00, or leave it empty. Without it: cash paid today is ', h('strong', { class: 'num' }, money(d.expected)), '.'); return; }
       line.append('Cash in the drawer should be ', h('strong', { class: 'num' }, money(d.expected)), ': ', d.start ? money(d.start) + ' you started with, plus ' : '', money(d.cashSales) + ' of cash payments' + (d.cashTips > 0 ? ' and ' + money(d.cashTips) + ' of tips paid in cash' : '') + '. This is a helper for counting the drawer, not an audit.');
     };
     // Keeps the typed text and updates the sentence on every keystroke.

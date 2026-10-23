@@ -342,8 +342,8 @@ export default function (h) {
     const box = page.locator('.od-danger-box');
     await box.waitFor({ state: 'visible', timeout: 8000 });
     const boxText = await box.innerText();
-    t.check('Erase live data spells out what goes and that there is no undo', /This clears \d+/.test(boxText) && /no undo/i.test(boxText), boxText, 'officeC');
-    const goBtn = box.getByRole('button', { name: 'Erase live data' });
+    t.check('Erase tickets and records spells out what goes and that there is no undo', /This clears \d+/.test(boxText) && /no undo/i.test(boxText), boxText, 'officeC');
+    const goBtn = box.getByRole('button', { name: 'Erase tickets and records' });
     t.check('the red button is off until the word ERASE is typed', await goBtn.isDisabled(), '', 'officeC');
     await box.getByRole('button', { name: 'Keep my data' }).click();
     await wait(400);
