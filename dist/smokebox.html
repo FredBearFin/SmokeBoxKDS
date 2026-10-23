@@ -1292,6 +1292,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 /* On touch-sized screens the buttons in the reminder and demo bars are full 44 px targets. */
 @media (max-width: 1024px), (pointer: coarse) { .sb-banner .btn { min-height: 44px; } }
 
+/* The clock question may use two lines so a phone can read it all; the page below starts under the whole strip. */
+.sb-banner[data-kind="clock"] { min-height: 40px; align-items: center; }
+.sb-banner[data-kind="clock"] .sb-banner-t { white-space: normal; overflow: visible; line-height: 1.25; }
+
 /* ===== 20-floor.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the floor board: the header with station tabs, the paper ticket slips, item
@@ -2079,13 +2083,19 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
   /* The next-step line is one line with an ellipsis (each dish row already shows its own "Start in" time), and sits closer to the dishes. */
   .fl-main[data-density="compact"] .slip-next { margin-top: 2px; padding-block: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
-}
 /* The device-clock notice on the strip: calm, wraps, two plain buttons that are not the width of the screen. */
 .fl-bar-clock { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-4); background: var(--tint-warn, var(--paper)); border-bottom: var(--bw) solid var(--amber); }
 .fl-bar-clock[hidden] { display: none; }
 .fl-clock-t { flex: 1 1 260px; min-width: 0; font: var(--w-semi) var(--fs-3) / 1.3 var(--font-body); }
 .fl-bar-clock .btn { min-height: var(--tap, 44px); flex: 0 1 auto; }
 .fl-bar-clock > .icon { flex: none; margin-left: var(--sp-4); }
+
+/* On a phone the clock notice puts its words on the full width and the two choices side by side below them. */
+@media (max-width: 640px) {
+  .fl-clock-t { flex: 1 1 calc(100% - 64px); }
+  .fl-bar-clock .btn { flex: 1 1 40%; align-self: stretch; }
+  .fl-bar-clock > .icon { margin-left: 0; }
+}
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -2742,6 +2752,8 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .rd .stepper { display: flex; width: 100%; }
 .rd .stepper .stepper-field { flex: 1 1 auto; min-width: 0; }
 .rd .stepper .stepper-input { flex: 1 1 auto; min-width: 0; width: auto; text-align: center; }
+/* Close the month: the counts block and the list of files to save. */
+.cm-counts { display: grid; gap: var(--sp-2); } .cm-files { margin: 0; padding-left: var(--sp-5); display: grid; gap: var(--sp-1); overflow-wrap: anywhere; } .cm-files:empty { display: none; }
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -2871,6 +2883,9 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .ox-acts .ox-how { min-width: 140px; gap: var(--sp-1); }
 .ox-how-k { color: var(--ink2); font-weight: var(--w-semi); }
 .ox-how-v { font-weight: var(--w-heavy); }
+
+/* A closed-day sale keeps a quiet, dashed Reopen button that explains itself; a tap still gives the full reason. */
+.ox-acts .ox-reopen.is-shut { border-style: dashed; color: var(--muted, inherit); white-space: normal; text-align: center; }
 
 /* ===== 24-guide.css ===== */
 /* WHAT THIS FILE IS: the look of the in-app Guide screen (#/guide): a page list on the left and the text on the right.
@@ -4306,6 +4321,52 @@ a.of-nav:active { background: var(--press); }
   const ZWJ_RE = /(\p{Extended_Pictographic}[\uFE0F\u{1F3FB}-\u{1F3FF}]*\u200D(?=\p{Extended_Pictographic}))|\u200D/gu;
   // Returns the text with those invisible characters removed (emoji joiners stay).
   U.stripInvisible = (s) => String(s).replace(INVISIBLE_RE, '').replace(ZWJ_RE, (m, keep) => (keep ? m : ''));
+  // SHA-256 of a text (its UTF-8 bytes) as 64 lower-case hex digits. Plain code with no browser calls, so it works the same in a page and in Node,
+  // and answers at once (a 20 MB backup takes about a second). Used to prove that the file the owner saved is the file Smokebox made.
+  U.sha256Hex = (text) => {
+    const K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+      0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+      0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+      0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+    // UTF-8 bytes of the text (a lone half of a surrogate pair becomes U+FFFD, as TextEncoder does).
+    const bytes = [];
+    for (let i = 0; i < text.length; i++) {
+      let c = text.charCodeAt(i);
+      if (c >= 0xD800 && c <= 0xDBFF && i + 1 < text.length && text.charCodeAt(i + 1) >= 0xDC00 && text.charCodeAt(i + 1) <= 0xDFFF) { c = 0x10000 + ((c - 0xD800) << 10) + (text.charCodeAt(++i) - 0xDC00); }
+      else if (c >= 0xD800 && c <= 0xDFFF) c = 0xFFFD;
+      if (c < 0x80) bytes.push(c);
+      else if (c < 0x800) bytes.push(0xC0 | (c >> 6), 0x80 | (c & 63));
+      else if (c < 0x10000) bytes.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+      else bytes.push(0xF0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+    const n = bytes.length;
+    const total = ((n + 9 + 63) >> 6) << 6;
+    const buf = new Uint8Array(total);
+    for (let i = 0; i < n; i++) buf[i] = bytes[i];
+    buf[n] = 0x80;
+    const bitsHi = Math.floor((n * 8) / 4294967296), bitsLo = (n * 8) >>> 0;
+    buf[total - 8] = bitsHi >>> 24; buf[total - 7] = bitsHi >>> 16; buf[total - 6] = bitsHi >>> 8; buf[total - 5] = bitsHi;
+    buf[total - 4] = bitsLo >>> 24; buf[total - 3] = bitsLo >>> 16; buf[total - 2] = bitsLo >>> 8; buf[total - 1] = bitsLo;
+    const h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+    const w = new Array(64);
+    // Rotates the 32 bits of x right by k places (a step of the SHA-256 mixing).
+    const rr = (x, k) => (x >>> k) | (x << (32 - k));
+    for (let off = 0; off < total; off += 64) {
+      for (let i = 0; i < 16; i++) w[i] = (buf[off + 4 * i] << 24) | (buf[off + 4 * i + 1] << 16) | (buf[off + 4 * i + 2] << 8) | buf[off + 4 * i + 3];
+      for (let i = 16; i < 64; i++) {
+        const s0 = rr(w[i - 15], 7) ^ rr(w[i - 15], 18) ^ (w[i - 15] >>> 3), s1 = rr(w[i - 2], 17) ^ rr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      let [a, b, c, d, e, f, g2, hh] = h;
+      for (let i = 0; i < 64; i++) {
+        const t1 = (hh + (rr(e, 6) ^ rr(e, 11) ^ rr(e, 25)) + ((e & f) ^ (~e & g2)) + K[i] + w[i]) | 0;
+        const t2 = ((rr(a, 2) ^ rr(a, 13) ^ rr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+        hh = g2; g2 = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      h[0] = (h[0] + a) | 0; h[1] = (h[1] + b) | 0; h[2] = (h[2] + c) | 0; h[3] = (h[3] + d) | 0; h[4] = (h[4] + e) | 0; h[5] = (h[5] + f) | 0; h[6] = (h[6] + g2) | 0; h[7] = (h[7] + hh) | 0;
+    }
+    return h.map((x) => ('00000000' + (x >>> 0).toString(16)).slice(-8)).join('');
+  };
   // Cleans typed text for names and notes: strips the invisible characters, squeezes runs of white space to single spaces and trims both ends.
   U.cleanText = (s) => U.stripInvisible(s).replace(/\s+/g, ' ').trim();
   /* ---------- secret hashing (PIN and recovery code) ---------- */
@@ -5968,7 +6029,7 @@ a.of-nav:active { background: var(--press); }
   // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
   // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
   // safetyKeep bucket instead of being dropped.
-  const SAFETY_EVENT = { safety_setting_changed: 1, temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  const SAFETY_EVENT = { month_closed: 1, safety_setting_changed: 1, temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
   // 400 days: how long the safetyKeep bucket holds a safety entry (a year and a month, so a yearly inspection can look back a full year). This is our own
   // choice; no source gives one minimum for everyone, so ask your health department how long to keep records. Safety entries are small and the bucket is
   // never trimmed by size, only by age.
@@ -9001,6 +9062,113 @@ a.of-nav:active { background: var(--press); }
     return tx.dirty() ? tx.commit() : state;
   }
 
+  /* ---------- close the month: what would leave the live save, and the one step that removes it ---------- */
+  // Days of history that Close the month always leaves alone (counted back from today), unless the caller asks for another number.
+  const MONTH_KEEP_DAYS = 35;
+  // True for a real calendar date written YYYY-MM-DD.
+  const isDayText = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && U.dateKey(U.dateKeyToMs(d) + 12 * 3600e3) === d;
+  // Works out exactly what Close the month would remove at time now, without changing anything. opts: { before: 'YYYY-MM-DD' (service days
+  // before this one may go), keepDays (default 35) }. A day may go only if it is before the boundary, is not within keepDays of today, and has a
+  // day_closed record. A finished ticket goes with its day; a paid or voided order goes only when its service day and its paying day are both
+  // such days and every ticket it still has goes too. Open tickets and orders never go. Of the events only the plain activity of those days
+  // goes: safety entries, day_closed and month_closed entries always stay. Returns { ok, report?, plan } where plan has the id sets and counts.
+  function monthPlan(state, opts, now) {
+    if (!isState(state)) return { ok: false, report: 'invalidBackup' };
+    opts = isObj(opts) ? opts : {};
+    if (!isDayText(opts.before)) return { ok: false, report: 'badPatch', info: { key: 'before' } };
+    const keepDays = opts.keepDays === undefined ? MONTH_KEEP_DAYS : opts.keepDays;
+    if (!isInt(keepDays) || keepDays < 1 || keepDays > 3650) return { ok: false, report: 'badPatch', info: { key: 'keepDays' } };
+    if (!isNum(now)) return { ok: false, report: 'badPatch', info: { key: 'now' } };
+    const dsh = state.settings.service.dayStartHour;
+    const today = U.serviceDate(now, dsh);
+    const cutoff = U.addDays(today, -keepDays);
+    const bound = opts.before < cutoff ? opts.before : cutoff;
+    const flat = allEvents(state);
+    const closed = new Set();
+    for (const e of flat) if (e.type === 'day_closed' && typeof e.day === 'string') closed.add(e.day);
+    // A day may go: before the boundary and closed.
+    const goes = (day) => typeof day === 'string' && day < bound && closed.has(day);
+    const orders = Array.isArray(state.orders) ? state.orders : [];
+    const tickCand = new Set(), ordCand = new Set();
+    for (const t of state.tickets) if (t.status !== 'active' && goes(t.serviceDate)) tickCand.add(t.id);
+    const ticketsOf = new Map();
+    for (const t of state.tickets) if (t.orderId !== undefined) { let l = ticketsOf.get(t.orderId); if (!l) ticketsOf.set(t.orderId, l = []); l.push(t); }
+    for (const o of orders) {
+      if (o.status === 'open') continue;
+      const endAt = o.status === 'paid' ? o.paidAt : o.voidedAt;
+      if (!goes(o.serviceDate) || (isNum(endAt) && !goes(U.serviceDate(endAt, dsh)))) continue;
+      if ((ticketsOf.get(o.id) || []).every((t) => tickCand.has(t.id))) ordCand.add(o.id);
+    }
+    const tickets = new Set();
+    for (const t of state.tickets) if (tickCand.has(t.id) && (t.orderId === undefined || ordCand.has(t.orderId) || !orders.some((o) => o.id === t.orderId))) tickets.add(t.id);
+    const eventIds = new Set(); let safetyKept = 0, dayRecordsKept = 0;
+    for (const e of flat) {
+      if (hasOwn(SAFETY_EVENT, e.type)) { safetyKept++; continue; }
+      if (e.type === 'day_closed') { dayRecordsKept++; continue; }
+      if (goes(U.serviceDate(e.t, dsh))) eventIds.add(e.id);
+    }
+    const days = new Set();
+    for (const t of state.tickets) if (tickets.has(t.id)) days.add(t.serviceDate);
+    for (const o of orders) if (ordCand.has(o.id)) days.add(o.serviceDate);
+    for (const e of flat) if (eventIds.has(e.id)) days.add(U.serviceDate(e.t, dsh));
+    const dayList = Array.from(days).sort();
+    // Days before the boundary that still hold records but have no day_closed: they stay, and the screen can tell the owner to close them first.
+    const uncovered = new Set();
+    for (const t of state.tickets) if (t.status !== 'active' && typeof t.serviceDate === 'string' && t.serviceDate < bound && !closed.has(t.serviceDate)) uncovered.add(t.serviceDate);
+    for (const o of orders) if (o.status !== 'open' && typeof o.serviceDate === 'string' && o.serviceDate < bound && !closed.has(o.serviceDate)) uncovered.add(o.serviceDate);
+    let money = 0;
+    for (const o of orders) if (ordCand.has(o.id) && o.status === 'paid') money = cents(money + o.totals.total);
+    return { ok: true, plan: {
+      requestedBefore: opts.before, before: bound, keepDays, today, from: dayList.length ? dayList[0] : null, days: dayList,
+      ticketIds: tickets, orderIds: ordCand, eventIds,
+      tickets: tickets.size, orders: ordCand.size, events: eventIds.size, safetyEventsKept: safetyKept, dayRecordsKept,
+      openTicketsKept: state.tickets.filter((t) => t.status === 'active').length, openOrdersKept: orders.filter((o) => o.status === 'open').length,
+      uncoveredDays: Array.from(uncovered).sort(), paidTotal: money,
+    } };
+  }
+  // The day before which history was archived by Close the month (YYYY-MM-DD), or null when it never was. A day earlier than this with no records
+  // in the live save is "archived", not missing or an error: its day totals (day_closed) are still here, the details are in the owner's files.
+  function archivedBefore(state) { return isState(state) && isDayText(state.archivedBefore) ? state.archivedBefore : null; }
+  // True when the day (YYYY-MM-DD) is before the archive boundary.
+  function isArchivedDay(state, day) { const b = archivedBefore(state); return b !== null && typeof day === 'string' && day < b; }
+  // Removes what monthPlan chose and logs one month_closed entry with the counts (and the saved-backup proof when given). Not an action and not
+  // undoable: the backup file is the way back. opts as monthPlan plus backup { filename, chars, sha256 }. Returns { state, report, info }.
+  function closeMonth(state, opts, now) {
+    try {
+      const r = monthPlan(state, opts, now);
+      if (!r.ok) return { state, report: r.report, info: r.info || {} };
+      const pl = r.plan;
+      if (!pl.tickets && !pl.orders && !pl.events) return { state, report: 'nothingToDo', info: { before: pl.before } };
+      const base = Array.isArray(state.orders) ? state : Object.assign({}, state, { orders: [] });
+      const t1 = tick(base, now);
+      const tx = new Tx(t1.state, now);
+      const ts = tx.get('tickets');
+      const keepT = [];
+      for (const t of ts) {
+        if (!pl.ticketIds.has(t.id)) { keepT.push(t); continue; }
+        for (const it of t.items) for (const d of it.depleted || []) if (d.g > 0) { const L = tx.ledger(d.ing); L.prunedUsed = (L.prunedUsed || 0) + d.g; }
+      }
+      tx.own.add(keepT); tx.set('tickets', keepT);
+      const keepO = tx.get('orders').filter((o) => !pl.orderIds.has(o.id)); tx.own.add(keepO); tx.set('orders', keepO);
+      let evs = allEvents(t1.state).filter((e) => !pl.eventIds.has(e.id));
+      const ar = [];
+      while (evs.length >= 2 * EVENT_CHUNK) { ar.push(evs.slice(0, EVENT_CHUNK)); evs = evs.slice(EVENT_CHUNK); }
+      tx.set('eventArchive', ar); tx.set('events', evs);
+      tx.set('undo', []);
+      const prev = archivedBefore(t1.state);
+      tx.set('archivedBefore', prev !== null && prev > pl.before ? prev : pl.before);
+      const b = isObj(opts.backup) ? opts.backup : null;
+      tx.event('month_closed', {
+        before: pl.before, from: pl.from, days: pl.days.length, tickets: pl.tickets, orders: pl.orders, events: pl.events, safetyEventsKept: pl.safetyEventsKept, paidTotal: pl.paidTotal,
+        backup: b ? { filename: String(b.filename).slice(0, 120), chars: b.chars, sha256: String(b.sha256 || '').slice(0, 64) } : null,
+      });
+      finalize(tx, true);
+      return { state: tx.commit(), report: 'ok', info: { before: pl.before, from: pl.from, days: pl.days.length, tickets: pl.tickets, orders: pl.orders, events: pl.events, safetyEventsKept: pl.safetyEventsKept } };
+    } catch (err) {
+      return { state, report: 'badPatch', info: { internalError: String((err && err.stack) || err) } };
+    }
+  }
+
   /* ======================================================================================================
    * 13. tick and apply
    * ==================================================================================================== */
@@ -9495,6 +9663,8 @@ a.of-nav:active { background: var(--press); }
     // I9
     let lt = -Infinity;
     for (const e of allEvents(state)) { if (!(e.t >= lt)) { add('I9 event ' + e.id + ' t goes backwards'); break; } lt = e.t; }
+    // I21: archivedBefore, when present, is a real date
+    if (state.archivedBefore !== undefined && !isDayText(state.archivedBefore)) add('I21 archivedBefore is not a date');
     // I17: lastClose, when present, names a real date, a time and a leftovers choice, and no order is open
     // that was closed over (a later open order is fine, so only the shape is checked).
     if (state.lastClose !== undefined) {
@@ -9820,6 +9990,7 @@ a.of-nav:active { background: var(--press); }
       const lcs = st.lastClose;
       if (isObj(lcs) && typeof lcs.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lcs.day) && isNum(lcs.at) && (lcs.leftovers === 'keep' || lcs.leftovers === 'discard')) out.lastClose = { day: lcs.day, at: lcs.at, leftovers: lcs.leftovers };
       else if (lcs !== undefined) repaired.push('lastClose dropped');
+      if (isDayText(st.archivedBefore)) out.archivedBefore = st.archivedBefore; else if (st.archivedBefore !== undefined) repaired.push('archivedBefore dropped');
       for (const x of ledgerCheck(out)) { out.ledger[x.ing].open += x.have - x.expect; repaired.push('ledger ' + x.ing + ' re-opened at current stock'); }
       // availability (derived)
       const prevAvail = isObj(st.avail) ? st.avail : {};
@@ -9953,7 +10124,7 @@ a.of-nav:active { background: var(--press); }
   Object.assign(E, {
     SAFETY_KEEP_DAYS, SAFETY_KEEP_MS, apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, totalsOf, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
+    monthPlan, closeMonth, archivedBefore, isArchivedDay, MONTH_KEEP_DAYS, channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.
@@ -10839,7 +11010,7 @@ a.of-nav:active { background: var(--press); }
   // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
   const SNAP_KEEP = { maxTickets: 300, maxEvents: 2000 };
   // The 'before restore' copy stays in the last-good slot for 7 days, or until a close-day copy replaces it, so a wrong restore can be undone.
-  const BEFORE_RESTORE = 'before restore', BEFORE_RESTORE_KEEP_MS = 7 * 24 * 3600e3;
+  const BEFORE_RESTORE = 'before restore', BEFORE_MONTH_CLOSE = 'before month close', BEFORE_RESTORE_KEEP_MS = 7 * 24 * 3600e3;
   const SID_KEY = 'smokebox.v1.sid';
   // Two tabs of one browser must not overwrite each other's save. Where the browser has Web Locks, a timed save waits for the lock named
   // LOCK_NAME, so only one tab at a time reads the save id, builds the text and writes it. Where it does not, a tab writes its own tag to
@@ -11102,19 +11273,19 @@ a.of-nav:active { background: var(--press); }
   function beforeRestoreCopy(r) {
     try {
       const g = storage.get(LASTGOOD_KEY, null);
-      return g && typeof g === 'object' && g.reason === BEFORE_RESTORE && isNum(g.takenAt) && r - g.takenAt < BEFORE_RESTORE_KEEP_MS && r >= g.takenAt ? g : null;
+      return g && typeof g === 'object' && (g.reason === BEFORE_RESTORE || g.reason === BEFORE_MONTH_CLOSE) && isNum(g.takenAt) && r - g.takenAt < BEFORE_RESTORE_KEEP_MS && r >= g.takenAt ? g : null;
     } catch (e) { return null; }
   }
   // Before a restore replaces the kitchen: keeps a whole copy of the current one in the last-good slot (full history if the
   // browser has room, else the small rolling size). Returns the time it was taken, or null when there was nothing worth
   // keeping (an empty kitchen, the demo, no storage) or the browser had no room. Never throws.
-  function snapshotBeforeRestore() {
+  function snapshotBeforeRestore(why) {
     if (!strict || mode !== 'real' || !storage || !state || isBlank()) return null;
     const r = realNow();
     for (const keep of [null, SNAP_KEEP]) {
       try {
         const small = keep ? E().prune(state, keep) : state;
-        const env = { v: 1, takenAt: r, reason: BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
+        const env = { v: 1, takenAt: r, reason: why || BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
         if (!E().validateBackup(JSON.stringify(env)).ok) continue;
         if (storage.set(LASTGOOD_KEY, env) === false) continue;
         snapAt = r; snapWanted = null; st.lastGoodAt = r; st.beforeRestoreAt = r;
@@ -11127,7 +11298,7 @@ a.of-nav:active { background: var(--press); }
   function beforeRestoreInfo() {
     if (!storage) return null;
     const g = beforeRestoreCopy(realNow());
-    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS } : null;
+    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS, reason: g.reason } : null;
   }
   // Puts the 'before restore' copy back as the kitchen (the way back from a wrong restore). Returns 'ok', or 'noCopy'.
   // The copy it replaces is kept the same way, so this can be undone once too.
@@ -11647,6 +11818,116 @@ a.of-nav:active { background: var(--press); }
     last = { type: 'import', report: 'ok', info: { repaired: v.repaired, beforeRestore: beforeAt != null, beforeRestoreAt: beforeAt, beforeRestoreKeepDays: beforeAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, events: [] };
     return 'ok';
   }
+
+  /* ---------- close the month: preview, export, prune ---------- */
+  // What the last Close the month export held, so the prune can check the owner saved exactly that: { before, planKey, backup: { chars, sha256 } }.
+  let monthExport = null;
+  // A short key for a plan: the boundary plus the sha256 of its sorted ticket, order and event ids. Two plans with the same key remove the same records.
+  function planKey(pl) {
+    return pl.before + ':' + U.sha256Hex([Array.from(pl.ticketIds).sort().join(','), Array.from(pl.orderIds).sort().join(','), Array.from(pl.eventIds).sort().join(',')].join('|'));
+  }
+  // The public part of a plan (no id sets), for the screens.
+  function planView(pl) {
+    const v = {};
+    for (const k of Object.keys(pl)) if (!(pl[k] instanceof Set)) v[k] = pl[k];
+    return v;
+  }
+  // Records a Close-the-month answer and returns it.
+  function monthAnswer(type, ok, report, info, extra) { last = { type, report, info: info || {}, events: [] }; return Object.assign({ ok, report, info: info || {} }, extra || {}); }
+  // Says exactly what Close the month would remove for opts { before: 'YYYY-MM-DD', keepDays? } (days before 'before' that are closed and older
+  // than keepDays, default 35), and what stays. Changes nothing. { ok, report, preview } where preview has tickets, orders, events, days, from,
+  // before (the real boundary), safetyEventsKept, dayRecordsKept, openTicketsKept, openOrdersKept, uncoveredDays, paidTotal.
+  function closeMonthPreview(opts) {
+    if (!state) return monthAnswer('closeMonthPreview', false, 'invalidBackup');
+    const r = E().monthPlan(state, opts, now());
+    if (!r.ok) return monthAnswer('closeMonthPreview', false, r.report, r.info);
+    return monthAnswer('closeMonthPreview', true, 'ok', {}, { preview: planView(r.plan) });
+  }
+  // File name part for a date like 2026-09-01 without dashes.
+  const flatDay = (d) => String(d).replace(/-/g, '');
+  // Builds the files for Close the month, changing nothing: the full backup of the kitchen as it is now (first, so nothing is lost even if the
+  // prune goes wrong), CSV files for the records that would be removed (orders, tickets, day totals), and a manifest with counts and the sha256
+  // and size of each. { ok, report, files: [{ name, kind, mime, text, chars, sha256 }], manifest }. Remembers the backup so closeMonthPrune
+  // can check the owner saved that exact file.
+  function closeMonthExport(opts) {
+    if (!state) return monthAnswer('closeMonthExport', false, 'invalidBackup');
+    if (mode === 'demo') return monthAnswer('closeMonthExport', false, 'notInDemo');
+    const r = E().monthPlan(state, opts, now());
+    if (!r.ok) return monthAnswer('closeMonthExport', false, r.report, r.info);
+    const pl = r.plan;
+    if (!pl.tickets && !pl.orders && !pl.events) return monthAnswer('closeMonthExport', false, 'nothingToDo', { before: pl.before });
+    const backupText = exportAll();
+    if (backupText == null) { const lr = last || {}; return monthAnswer('closeMonthExport', false, lr.report || 'invalidBackup', lr.info); }
+    // Turns rows of values into CSV file text (A3's shared writer when loaded).
+    const toText = (rows) => (SB.csv && typeof SB.csv.text === 'function' ? SB.csv.text(rows) : rows.map(row).join('\r\n') + '\r\n');
+    const range = pl.from + '-to-' + pl.days[pl.days.length - 1];
+    const files = [];
+    // Adds one file to the list with its size and sha256.
+    const add = (name, kind, mime, text) => files.push({ name, kind, mime, text, chars: text.length, sha256: U.sha256Hex(text) });
+    add('smokebox-before-month-close-' + flatDay(U.dateKey(realNow())) + '.json', 'backup', 'application/json', backupText);
+    add('smokebox-orders-' + range + '.csv', 'orders', 'text/csv', toText(csvRows('orders', state, pl)));
+    add('smokebox-tickets-' + range + '.csv', 'tickets', 'text/csv', toText(csvRows('tickets', state, pl)));
+    // Day totals: the last day_closed record of each removed day.
+    const dayRows = [['day', 'orders', 'voidedOrders', 'tickets', 'voidedTickets', 'subtotal', 'discount', 'tax', 'total', 'tip', 'discarded', 'discardedG']];
+    const lastOf = new Map();
+    for (const e of E().allEvents(state)) if (e.type === 'day_closed' && pl.days.indexOf(e.day) >= 0) lastOf.set(e.day, e);
+    for (const d of Array.from(lastOf.keys()).sort()) { const e = lastOf.get(d); dayRows.push([e.day, e.orders, e.voidedOrders, e.tickets, e.voidedTickets, e.subtotal, e.discount, e.tax, e.total, e.tip, e.discarded, e.discardedG]); }
+    add('smokebox-days-' + range + '.csv', 'days', 'text/csv', toText(dayRows));
+    const manifest = {
+      app: 'Smokebox', kind: 'close-the-month', madeAt: realNow(), before: pl.before, requestedBefore: pl.requestedBefore, keepDays: pl.keepDays, from: pl.from, days: pl.days.length,
+      counts: { tickets: pl.tickets, orders: pl.orders, events: pl.events, safetyEventsKept: pl.safetyEventsKept, dayRecordsKept: pl.dayRecordsKept }, paidTotal: pl.paidTotal,
+      files: files.map((f) => ({ name: f.name, kind: f.kind, chars: f.chars, sha256: f.sha256 })),
+    };
+    add('smokebox-month-manifest-' + range + '.json', 'manifest', 'application/json', JSON.stringify(manifest, null, 2) + '\n');
+    monthExport = { before: pl.before, planKey: planKey(pl), backup: { chars: files[0].chars, sha256: files[0].sha256 } };
+    last = { type: 'closeMonthExport', report: 'ok', info: { files: files.length }, events: [] };
+    return { ok: true, report: 'ok', info: { files: files.length }, files, manifest };
+  }
+  // Removes the history closeMonthPreview described, after the owner confirmed the backup file was saved. opts: { before, keepDays?,
+  // confirmBackupSaved: { filename, chars, sha256 } } where chars and sha256 are those closeMonthExport gave for the backup file. Refuses
+  // with backupRequired (no or wrong proof), notInDemo, hubKitchen (a tablet that works through a hub), nothingToDo or exportStale (the records
+  // changed since the export: export again). First keeps a 'before month close' copy of the kitchen for 7 days (the same slot as before restore),
+  // then removes and saves; if the save does not go in, the kitchen is put back exactly as it was and the answer is storageBlocked.
+  // Not undoable; importAll of the backup file brings everything back.
+  function closeMonthPrune(opts) {
+    opts = opts || {};
+    // Records and returns a refusal; nothing has been changed when this is used.
+    const fail = (report, info) => monthAnswer('closeMonthPrune', false, report, info);
+    if (!state) return fail('invalidBackup');
+    if (mode === 'demo') return fail('notInDemo');
+    if (tr && typeof tr.push === 'function') return fail('hubKitchen');
+    const cb = opts.confirmBackupSaved;
+    if (!cb || typeof cb !== 'object' || typeof cb.filename !== 'string' || !cb.filename.trim() || !(Number.isFinite(cb.chars) && cb.chars > 0) || typeof cb.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(cb.sha256)) return fail('backupRequired');
+    const r = E().monthPlan(state, opts, now());
+    if (!r.ok) return fail(r.report, r.info);
+    const pl = r.plan;
+    if (!pl.tickets && !pl.orders && !pl.events) return fail('nothingToDo', { before: pl.before });
+    if (!monthExport || monthExport.backup.sha256 !== cb.sha256 || monthExport.backup.chars !== cb.chars) return fail('backupRequired', { why: 'notTheExport' });
+    if (monthExport.planKey !== planKey(pl)) return fail('exportStale');
+    // Make sure what is in storage is this very kitchen before anything is removed.
+    persistNow();
+    const before = state, savedAt = realNow();
+    const out = E().closeMonth(state, { before: opts.before, keepDays: opts.keepDays, backup: cb }, now());
+    if (out.report !== 'ok') return fail(out.report, out.info);
+    const copyAt = snapshotBeforeRestore(BEFORE_MONTH_CLOSE);
+    const ns = out.state;
+    ns.rev = Math.max(ns.rev, (before.rev || 0) + 1);
+    atLeast(lastStamp(ns));
+    state = ns; syncUnits();
+    pendingBroadcast = true; skipRebase = true; pending = [];
+    const ok = persistNow();
+    if (!ok) {
+      // The save did not go in: the kitchen in memory goes back to what it was, and what is stored is still the full copy.
+      state = before; skipRebase = true; pendingBroadcast = false; syncUnits(); scheduleNotify();
+      if (copyAt != null) { try { storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } }
+      persistNow();
+      return fail('storageBlocked');
+    }
+    monthExport = null;
+    scheduleNotify();
+    last = { type: 'closeMonthPrune', report: 'ok', info: Object.assign({ copyKept: copyAt != null, copyKeepDays: copyAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, out.info), events: [] };
+    return { ok: true, report: 'ok', info: last.info, savedAt };
+  }
   // Time in ms as readable date text for spreadsheets, or empty text when missing.
   const ISO = (t) => (isNum(t) ? new Date(t).toISOString() : '');
   // Prepares one value for a spreadsheet (CSV) cell: empty for missing, quotes where needed. WATCH OUT: text
@@ -11664,47 +11945,60 @@ a.of-nav:active { background: var(--press); }
   // Spreadsheet text for "tickets", "items", "orders", "events" or "batches", one header line then one line per
   // record. Returns empty text for an unknown kind.
   function exportCsv(kind) {
-    if (!state) return '';
+    const rows = state ? csvRows(kind, state, null) : null;
+    return rows ? rows.map(row).join('\n') + '\n' : '';
+  }
+  // The rows (lists of values, header first) of one CSV kind for state st, or null for an unknown kind. only, when given, limits it to the
+  // tickets, orders and events in its three id sets (what Close the month removes).
+  function csvRows(kind, st0, only) {
+    const state = st0;
+    if (!state) return null;
+    // True when the record is inside the chosen sets (or when no sets were given).
+    const inT = (t) => !only || only.ticketIds.has(t.id);
+    // True when the order is inside the chosen sets, or no sets were given.
+    const inO = (o) => !only || only.orderIds.has(o.id);
+    // True when the event is inside the chosen sets, or no sets were given.
+    const inE = (e) => !only || only.eventIds.has(e.id);
     const out = [];
     if (kind === 'tickets') {
-      out.push(row(['id', 'num', 'serviceDate', 'customer', 'channel', 'src', 'status', 'rush', 'pacing', 'dmaxSec', 'createdAt', 'expeditedAt', 'voidedAt', 'totalSec', 'lines', 'qty', 'value', 'forced', 'recalls', 'voidReason', 'note']));
-      for (const t of state.tickets) {
+      out.push((['id', 'num', 'serviceDate', 'customer', 'channel', 'src', 'status', 'rush', 'pacing', 'dmaxSec', 'createdAt', 'expeditedAt', 'voidedAt', 'totalSec', 'lines', 'qty', 'value', 'forced', 'recalls', 'voidReason', 'note']));
+      for (const t of state.tickets.filter(inT)) {
         // Totals for the ticket are worked out from its items, so the sheet needs no extra columns.
         let qty = 0, value = 0;
         for (const it of t.items) { qty += it.qty; value += it.qty * it.price; }
-        out.push(row([t.id, t.num, t.serviceDate, t.customer, t.channel, t.src, t.status, t.rush, t.pacing, t.dmaxSec, ISO(t.createdAt), ISO(t.expeditedAt), ISO(t.voidedAt),
+        out.push(([t.id, t.num, t.serviceDate, t.customer, t.channel, t.src, t.status, t.rush, t.pacing, t.dmaxSec, ISO(t.createdAt), ISO(t.expeditedAt), ISO(t.voidedAt),
           isNum(t.expeditedAt) ? Math.round((t.expeditedAt - t.createdAt) / 1000) : undefined, t.items.length, qty, U.round(value, 2), !!t.forced, t.recalls, t.voidReason, t.note]));
       }
     } else if (kind === 'items') {
-      out.push(row(['ticketId', 'itemId', 'menuId', 'name', 'zone', 'qty', 'mods', 'track', 'status', 'price', 'prepSec', 'offsetSec', 'fireAt', 'firedAt', 'startedAt', 'doneAt', 'override', 'rushed', 'cost', 'shortG']));
-      for (const t of state.tickets) for (const it of t.items) {
+      out.push((['ticketId', 'itemId', 'menuId', 'name', 'zone', 'qty', 'mods', 'track', 'status', 'price', 'prepSec', 'offsetSec', 'fireAt', 'firedAt', 'startedAt', 'doneAt', 'override', 'rushed', 'cost', 'shortG']));
+      for (const t of state.tickets.filter(inT)) for (const it of t.items) {
         // shortG is grams the kitchen cooked that stock could not cover.
         let short = 0;
         for (const r of it.depleted || []) if (r.short > 0) short += r.short;
-        out.push(row([t.id, it.id, it.menuId, it.name, it.zone, it.qty, (it.mods || []).join('; '), it.track, it.status, it.price, it.prepSec, it.offsetSec, ISO(it.fireAt),
+        out.push(([t.id, it.id, it.menuId, it.name, it.zone, it.qty, (it.mods || []).join('; '), it.track, it.status, it.price, it.prepSec, it.offsetSec, ISO(it.fireAt),
           ISO(it.firedAt), ISO(it.startedAt), ISO(it.doneAt), !!it.override, !!it.rushed, it.cost, short || undefined]));
       }
     } else if (kind === 'orders') {
-      out.push(row(['id', 'serviceDate', 'customer', 'channel', 'src', 'status', 'rounds', 'createdAt', 'paidAt', 'method', 'subtotal', 'discount', 'tax', 'tip', 'total', 'voidReason']));
-      for (const o of state.orders || []) {
+      out.push((['id', 'serviceDate', 'customer', 'channel', 'src', 'status', 'rounds', 'createdAt', 'paidAt', 'method', 'subtotal', 'discount', 'tax', 'tip', 'total', 'voidReason']));
+      for (const o of (state.orders || []).filter(inO)) {
         // Paid orders carry the totals frozen when they were paid; open ones are worked out now.
         const tot = o.status === 'voided' ? null : E().orderTotals(state, o) || {};
-        out.push(row([o.id, o.serviceDate, o.customer, o.channel, o.src, o.status, o.rounds, ISO(o.createdAt), ISO(o.paidAt), o.method,
+        out.push(([o.id, o.serviceDate, o.customer, o.channel, o.src, o.status, o.rounds, ISO(o.createdAt), ISO(o.paidAt), o.method,
           tot ? tot.subtotal : undefined, tot ? tot.discount : undefined, tot ? tot.tax : undefined, o.status === 'paid' ? o.tip : undefined, tot ? tot.total : undefined, o.voidReason]));
       }
     } else if (kind === 'events') {
-      out.push(row(['id', 't', 'time', 'type', 'reverted', 'fields']));
-      for (const e of E().allEvents(state)) {
+      out.push((['id', 't', 'time', 'type', 'reverted', 'fields']));
+      for (const e of E().allEvents(state).filter(inE)) {
         // Event details beyond the four basic columns are packed as JSON in the last column.
         const f = {};
         for (const k of Object.keys(e)) if (k !== 'id' && k !== 't' && k !== 'type' && k !== 'reverted') f[k] = e[k];
-        out.push(row([e.id, e.t, ISO(e.t), e.type, !!e.reverted, JSON.stringify(f)]));
+        out.push(([e.id, e.t, ISO(e.t), e.type, !!e.reverted, JSON.stringify(f)]));
       }
     } else if (kind === 'batches') {
-      out.push(row(['id', 'ing', 'label', 'kind', 'src', 'enteredAt', 'rawG', 'cookedG', 'remainingG', 'yieldPct', 'costPerCookedKg', 'status', 'action', 'canServe', 'lastTempF', 'lastTempAt', 'reheats', 'discardedAt', 'discardReason', 'wasteG']));
-      for (const b of state.batches) out.push(row([b.id, b.ing, b.label, b.kind, b.src, ISO(b.enteredAt), b.rawG, b.cookedG, b.remainingG, b.yieldPct, b.costPerCookedKg, b.status, b.action, b.canServe, b.lastTempF, ISO(b.lastTempAt), b.reheats, ISO(b.discardedAt), b.discardReason, b.wasteG]));
-    } else return '';
-    return out.join('\n') + '\n';
+      out.push((['id', 'ing', 'label', 'kind', 'src', 'enteredAt', 'rawG', 'cookedG', 'remainingG', 'yieldPct', 'costPerCookedKg', 'status', 'action', 'canServe', 'lastTempF', 'lastTempAt', 'reheats', 'discardedAt', 'discardReason', 'wasteG']));
+      for (const b of state.batches) out.push(([b.id, b.ing, b.label, b.kind, b.src, ISO(b.enteredAt), b.rawG, b.cookedG, b.remainingG, b.yieldPct, b.costPerCookedKg, b.status, b.action, b.canServe, b.lastTempF, ISO(b.lastTempAt), b.reheats, ISO(b.discardedAt), b.discardReason, b.wasteG]));
+    } else return null;
+    return out;
   }
 
   /* ---------- resets ---------- */
@@ -11827,6 +12121,8 @@ a.of-nav:active { background: var(--press); }
       tickets, orders, events, batches, learned: state.learned, menu: state.menu, ingredients: state.ingredients, settings: state.settings,
       range: { from: isNum(from) ? from : to, to }, counts: { live: state.tickets.length, sample: smp ? smp.tickets.length : 0 }, hasSample: !!smp,
     };
+    // Days before this date were archived by Close the month: their day totals stay (day_closed events), their tickets and orders are in the owner's files.
+    if (typeof state.archivedBefore === 'string') ds.archivedBefore = state.archivedBefore;
     m[key] = { smp, ds };
     return ds;
   }
@@ -12055,13 +12351,13 @@ a.of-nav:active { background: var(--press); }
   function isOwn() { return !!(state && state.catalog === 'own'); }
 
   // Public API: init, destroy, status, getState, now, tick, dispatch, dispatchEx, lastResult, subscribe,
-  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset,
+  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset,
   // resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY.
   SB.store = {
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
@@ -12369,6 +12665,37 @@ a.of-nav:active { background: var(--press); }
 
 }catch(e){console.error('[smokebox] module 36-csv.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'36-csv.js',message:String(e&&e.message||e)});}
 
+/* ===== 37-retention.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: How long the app keeps safety records, in one place, so every screen and printout that talks about
+ *    "how far back" reads the engine's own number instead of repeating one. If the engine does not tell us, no number is
+ *    claimed.
+ * PARTS: days, words.
+ * USES: 20-engine.js (SAFETY_KEEP_DAYS or SAFETY_KEEP_MS, when exported).   USED BY: 76-floor-discards.js, 89-office-inspector.js, tests.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+
+  // The number of days the engine keeps a safety record, or null when the engine does not say.
+  function days() {
+    const E = SB.engine || {};
+    if (typeof E.SAFETY_KEEP_DAYS === 'number' && E.SAFETY_KEEP_DAYS > 0) return Math.round(E.SAFETY_KEEP_DAYS);
+    if (typeof E.SAFETY_KEEP_MS === 'number' && E.SAFETY_KEEP_MS > 0) return Math.round(E.SAFETY_KEEP_MS / 86400e3);
+    return null;
+  }
+  // Plain words for the keep time: "Records are kept for about 400 days." or, when unknown, a line that claims no number.
+  function words() {
+    const d = days();
+    return d ? 'Safety records are kept for about ' + d + ' days; older ones are not kept.' : 'Safety records are not kept forever; older ones may be gone.';
+  }
+
+  SB.retention = { days, words };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 37-retention.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'37-retention.js',message:String(e&&e.message||e)});}
+
 /* ===== 40-metrics.js ===== */
 ;try{
 /*
@@ -12486,6 +12813,9 @@ a.of-nav:active { background: var(--press); }
   function hourMs(key, h) { const p = key.split('-').map(Number); const w = Math.floor(h); return new Date(p[0], p[1] - 1, p[2], w, 0, 0, 0).getTime() + Math.round((h - w) * H); }
   // Local-time offset from UTC at that moment, in ms.
   const tzOff = (ts) => -new Date(ts).getTimezoneOffset() * MIN;
+  // Hours on the wall clock from midnight of a service date to a moment (12:45 am the next morning is 24.75). On a clock-change
+  // day this is the hour the kitchen's clock shows, not the hours that really passed.
+  function wallHourOn(t, date) { const m = dayMs(date); return (t + tzOff(t) - (m + tzOff(m))) / H; }
   // Service-date lookups dominate large datasets, so cache them per 15-minute slot (every real UTC offset is a multiple of 15 minutes and the
   // service-day boundary is a whole number of quarter hours, so a slot never straddles two service dates).
   const slotCache = new Map();
@@ -12626,7 +12956,7 @@ a.of-nav:active { background: var(--press); }
       // sh = hours since midnight of the service date (12:45 am = 24.75); hk numbers each date+hour slot.
       const sh = wallHours(t.createdAt, si);
       all.push({
-        t, items, id: t.id, num: t.num, channel: t.channel, createdAt: t.createdAt, date, sh, hour: Math.floor(sh), hk: Math.round(si.ms / H) + Math.floor(sh), wd: si.wd,
+        t, items, id: t.id, num: t.num, channel: t.channel, createdAt: t.createdAt, date, sh, hour: Math.floor(sh), hk: Math.round(si.ms / 86400e3) * 100 + Math.floor(sh), wd: si.wd,
         voided: t.status === 'voided', forced: t.forced === true, recalls: num(t.recalls) ? t.recalls : 0,
         pacing: typeof t.pacing === 'boolean' ? t.pacing : null, rush: !!t.rush, expeditedAt: null, totalMs: null, level: null,
       });
@@ -13090,7 +13420,7 @@ a.of-nav:active { background: var(--press); }
     return points.filter((p, i) => p.date in first && i >= first[p.date] && i <= last[p.date]);
   }
   // A moment as its service date plus its hour on that date (12:45 am is 24.75 of the previous date).
-  function stamp(ctx, t) { const date = ctx.dateOf(t); return { t, date, hour: (t - dayMs(date)) / H }; }
+  function stamp(ctx, t) { const date = ctx.dateOf(t); return { t, date, hour: wallHourOn(t, date) }; }
   /** Average absolute buckets over service days into time-of-day slots. */
   function foldPoints(ctx, points, bmin, fields) {
     const days = new Set(points.map((p) => p.date)).size; const slots = {};
@@ -13121,18 +13451,24 @@ a.of-nav:active { background: var(--press); }
     const stamps = []; for (const v of ctx.vol) stamps.push(v.createdAt); for (const v of ctx.spd) stamps.push(v.expeditedAt);
     if (!stamps.length) return res;
     let t0 = Infinity, t1 = -Infinity; for (const s of stamps) { if (s < t0) t0 = s; if (s > t1) t1 = s; }
-    // Buckets are cut on local clock time: the UTC offset is added so a bucket starts on :00, :15, :30 or
-    // :45 on the wall clock.
-    const off = tzOff(t0), cm = {}, dm = {};
-    for (const v of ctx.vol) { const k = Math.floor((v.createdAt + off) / bm); cm[k] = (cm[k] || 0) + 1; }
-    for (const v of ctx.spd) { const k = Math.floor((v.expeditedAt + off) / bm); dm[k] = (dm[k] || 0) + 1; }
-    const k0 = Math.floor((t0 + off) / bm), k1 = Math.floor((t1 + off) / bm); let pts = [];
+    // Buckets are cut on the wall clock: each moment gets its own UTC offset, so a bucket starts on :00, :15, :30 or :45 of the kitchen's clock
+    // also after a clock change inside the range. Bucket number k is "wall minutes since 1970 / width"; the repeated hour of a fall-back
+    // night is one bucket, and the hour that does not exist in spring has no bucket.
+    const cm = {}, dm = {};
+    for (const v of ctx.vol) { const k = Math.floor((v.createdAt + tzOff(v.createdAt)) / bm); cm[k] = (cm[k] || 0) + 1; }
+    for (const v of ctx.spd) { const k = Math.floor((v.expeditedAt + tzOff(v.expeditedAt)) / bm); dm[k] = (dm[k] || 0) + 1; }
+    const k0 = Math.floor((t0 + tzOff(t0)) / bm), k1 = Math.floor((t1 + tzOff(t1)) / bm); let pts = [];
     // A huge span (over 30 000 buckets) keeps only buckets that have tickets, to avoid a giant list of
     // zeros.
-    if (k1 - k0 > 30000) { const ks = Object.keys(cm).concat(Object.keys(dm)).map(Number).filter((k, i, a) => a.indexOf(k) === i).sort((a, b) => a - b); for (const k of ks) pts.push(mkT(k)); }
-    else for (let k = k0; k <= k1; k++) pts.push(mkT(k));
-    // Builds the point for bucket number k.
-    function mkT(k) { const st = stamp(ctx, k * bm - off); return Object.assign(st, { x: st.t, completed: dm[k] || 0, created: cm[k] || 0, v: { completed: dm[k] || 0, created: cm[k] || 0 } }); }
+    if (k1 - k0 > 30000) { const ks = Object.keys(cm).concat(Object.keys(dm)).map(Number).filter((k, i, a) => a.indexOf(k) === i).sort((a, b) => a - b); for (const k of ks) { const pt = mkT(k); if (pt) pts.push(pt); } }
+    else for (let k = k0; k <= k1; k++) { const pt = mkT(k); if (pt) pts.push(pt); }
+    // The real moment a wall-clock reading happened, or null when the kitchen's clock never showed it (spring forward).
+    function realOf(wall) {
+      const w = new Date(wall), t = new Date(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate(), w.getUTCHours(), w.getUTCMinutes(), w.getUTCSeconds(), 0).getTime();
+      return t + tzOff(t) === wall ? t : null;
+    }
+    // Builds the point for bucket number k (null for a wall-clock time that does not exist).
+    function mkT(k) { const t = realOf(k * bm); if (t === null) return null; const st = stamp(ctx, t); return Object.assign(st, { x: st.t, completed: dm[k] || 0, created: cm[k] || 0, v: { completed: dm[k] || 0, created: cm[k] || 0 } }); }
     pts = trimDays(pts, (p) => p.completed + p.created > 0);
     if (fold) {
       const f = foldPoints(ctx, pts, bmin, ['completed', 'created']); res.days = f.days;
@@ -13377,7 +13713,7 @@ a.of-nav:active { background: var(--press); }
     deltas.sort((a, b) => a.t - b.t || rank[a.kind] - rank[b.kind]);
     let lvl = res.openingG; res.endG = lvl;
     for (const d of deltas) {
-      lvl += d.d; res.points.push({ t: d.t, hour: (d.t - dayMs(day)) / H, g: lvl, d: d.d, kind: d.kind });
+      lvl += d.d; res.points.push({ t: d.t, hour: wallHourOn(d.t, day), g: lvl, d: d.d, kind: d.kind });
       if (d.kind === 'intake' || d.kind === 'restock') res.intakeG += d.d; else if (d.kind === 'use') res.usedG += -d.d; else res.wasteG += -d.d;
       if (res.minG === null || lvl < res.minG) { res.minG = lvl; res.minAt = d.t; }
     }
@@ -13408,7 +13744,7 @@ a.of-nav:active { background: var(--press); }
     const dates = new Set(ctx.dates()); for (const k in first) dates.add(first[k].date);
     const rows = Object.keys(first).map((k) => {
       const f = first[k], closeMs = hourMs(f.date, close);
-      return { date: f.date, ing: f.ing, name: im[f.ing] ? im[f.ing].name : f.ing, t: f.e.t, hour: (f.e.t - dayMs(f.date)) / H, hoursBeforeClose: (closeMs - f.e.t) / H, reason: f.e.reason, menuId: f.e.menuId, menuName: mm[f.e.menuId] ? mm[f.e.menuId].name : f.e.menuId };
+      return { date: f.date, ing: f.ing, name: im[f.ing] ? im[f.ing].name : f.ing, t: f.e.t, hour: wallHourOn(f.e.t, f.date), hoursBeforeClose: (closeMs - f.e.t) / H, reason: f.e.reason, menuId: f.e.menuId, menuName: mm[f.e.menuId] ? mm[f.e.menuId].name : f.e.menuId };
     }).sort((a, b) => a.t - b.t);
     const days = Array.from(dates).sort().map((d) => ({ date: d, label: U.fmtDateShort(d), weekday: U.weekday(d), closeMs: hourMs(d, close), items: rows.filter((r) => r.date === d).map((r) => ({ ing: r.ing, name: r.name, t: r.t, hour: r.hour, hoursBeforeClose: r.hoursBeforeClose, reason: r.reason, menuId: r.menuId, menuName: r.menuName })) }));
     const pc = {}; for (const r of rows) pc[r.ing] = (pc[r.ing] || 0) + 1;
@@ -19803,7 +20139,7 @@ a.of-nav:active { background: var(--press); }
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '', sub: null };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, kind: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -19812,6 +20148,10 @@ a.of-nav:active { background: var(--press); }
   };
   // When the last backup was made on this device (ms), or null if never.
   S.lastBackupAt = () => { const t = U ? U.storage.get(KEY.lastBackup, null) : null; return typeof t === 'number' ? t : null; };
+  // Accepts the device's new time after the person says it is right, then refreshes the strip.
+  function useNewTime() { SB.store.acceptClockJump(); paintBanner(); }
+  // Keeps the old time and stays quiet about the jump for ten minutes.
+  function keepOldTime() { bn.clockSnooze = Date.now() + 10 * 60000; paintBanner(); }
   // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
   function bannerWanted() {
     const store = SB.store;
@@ -19821,6 +20161,11 @@ a.of-nav:active { background: var(--press); }
     if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
+    // Off the board (a back-office page), a device clock that jumped far ahead is asked about here: a slim strip, not a box over the page.
+    if (ss.clockSuspect && Date.now() >= (bn.clockSnooze || 0) && (R.view().kind === 'office' || !(SB.floor && SB.floor.isMounted && SB.floor.isMounted()))) {
+      const dd = Math.round(ss.clockSuspect.aheadMs / 86400000);
+      return { kind: 'clock', tone: 'warn', text: 'The clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(ss.clockSuspect.aheadMs / 3600000) + ' hours') + '. Still on the old time.', act: 'Use the new time', onAct: useNewTime, later: true, laterLabel: 'Keep the old time', onLater: keepOldTime };
+    }
     if (!s) return null;
     const due = backupDue({ service: s.settings && s.settings.service, lastBackupAt: S.lastBackupAt(), snoozeUntil: bn.snoozeUntil, now: Date.now(), hasData: s.tickets.length + s.batches.length > 0 });
     return due ? { kind: 'nudge', tone: 'warn', text: 'Service is over. Save today\'s backup now and keep a copy off this device (email it or use a USB drive).', act: 'Back up now', later: true } : null;
@@ -19837,7 +20182,7 @@ a.of-nav:active { background: var(--press); }
     // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
-    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: 'Hide for 45 minutes', onClick: () => { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } }, ico('x', 18), h('span', { class: 'visually-hidden' }, 'Later')) : null;
+    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: w.laterLabel || 'Hide for 45 minutes', onClick: () => { if (w.onLater) w.onLater(); else { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } } }, ico('x', 18), h('span', { class: 'visually-hidden' }, w.laterLabel || 'Later')) : null;
     bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
@@ -20643,7 +20988,7 @@ a.of-nav:active { background: var(--press); }
       if (!b) return;
       if (id !== 'all') b.dataset.zone = id;
       b.insertBefore(h('span', { class: 'visually-hidden' }, (id === 'all' ? 'All stations' : zoneById(id).long) + ', '), b.firstChild);
-      b.appendChild(h('span', { class: 'visually-hidden' }, id === 'all' || id === 'expo' ? ' tickets' : ' tickets with work here'));
+      b.appendChild(h('span', { class: 'visually-hidden fl-tab-what', dataset: { here: id === 'all' || id === 'expo' ? 'no' : 'yes' } }, tabWhat(0, id)));
     });
     const tabs = h('div', { class: 'fl-tabs' }, seg);
 
@@ -20848,6 +21193,8 @@ a.of-nav:active { background: var(--press); }
     }
     m.fitKey = headKey();
   }
+  // The hidden words after a tab's count: "ticket" for one, "tickets" for the rest, and "with work here" on a station tab.
+  function tabWhat(n, id) { return ' ' + U.plural(n, 'ticket') + (id === 'all' || id === 'expo' ? '' : ' with work here'); }
   // Runs every second: refits the header only when its width or chip text changed, so most ticks cost nothing.
   function refit() {
     if (m && m.head && headKey() !== m.fitKey) fitHead();
@@ -20860,7 +21207,9 @@ a.of-nav:active { background: var(--press); }
   function measureToastTop() {
     if (!m || !m.main) return;
     // Everyday toasts sit just under the header, over the notice strip, where they hide no ticket button.
-    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(m.head.getBoundingClientRect().bottom + 6) + 'px');
+    // While the clock notice shows, toasts start below it so they never cover its two buttons.
+    const cb = m.strip && m.strip.clockBar && !m.strip.clockBar.hidden ? m.strip.clockBar.getBoundingClientRect().bottom : 0;
+    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(Math.max(m.head.getBoundingClientRect().bottom, cb) + 6) + 'px');
     if (m.cabOn) doc.documentElement.style.setProperty('--fl-toast-top', Math.round(m.main.getBoundingClientRect().top + 8) + 'px');
   }
   // Tells the stylesheet how tall the all-day strip is (--fl-lift) so toasts sit above it.
@@ -21726,7 +22075,9 @@ a.of-nav:active { background: var(--press); }
       if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
     }
     setHidden(m.strip.clockBar, !clockShown);
+    measureToastTop();
     const soundShown = needSound && !m.dis.has('snd') && !clockShown;
+    setHidden(m.strip.soundBar, !soundShown); // the clock notice goes first, so the sound bar waits behind it
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
     const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
@@ -21787,6 +22138,8 @@ a.of-nav:active { background: var(--press); }
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
     const tabCount = (id, n, alert) => {
       m.seg.setCount(id, n, { alert });
+      const what = m.seg.querySelector('[data-id="' + id + '"] .fl-tab-what');
+      if (what) { const t = tabWhat(n, id); if (what.textContent !== t) what.textContent = t; }
       const p = m.tabParts[id];
       if (p && p.n !== n) { p.n = n; p.count.dataset.zero = n === 0 ? 'true' : 'false'; }
     };
@@ -23302,7 +23655,7 @@ a.of-nav:active { background: var(--press); }
       });
       touched();
       if (skipped.length) SB.ui.toast(cb.name + ': left out ' + skipped.join(', ') + ' because ' + (skipped.length === 1 ? 'it is' : 'they are') + ' 86 or at the limit.', { tone: 'warn' });
-      else say(cb.name + ' added, ' + added.length + ' lines');
+      else say(cb.name + ' added, ' + added.length + ' ' + U.plural(added.length, 'line'));
     }
     // Repeat last order: copies the previous order into this one, asking first if this one already has items.
     function doRepeat() {
@@ -25282,7 +25635,7 @@ a.of-nav:active { background: var(--press); }
       text(dLive, String(s.tickets.length - demo)); text(dDemo, String(demo));
       if (!sim || typeof sim.sampleInfo !== 'function') { text(dSample, 'Not loaded'); return; }
       if (sim.sampleEnabled && !sim.sampleEnabled()) { text(dSample, 'Switched off'); return; }
-      if (paintCounts.info) { text(dSample, U.fmtNum(paintCounts.info.tickets) + ' tickets over ' + paintCounts.info.days + ' days'); return; }
+      if (paintCounts.info) { text(dSample, U.fmtNum(paintCounts.info.tickets) + ' ' + plural(paintCounts.info.tickets, 'ticket') + ' over ' + paintCounts.info.days + ' ' + plural(paintCounts.info.days, 'day')); return; }
       text(dSample, 'Counting...');
       if (!paintCounts.asked) {
         paintCounts.asked = true;
@@ -26002,6 +26355,16 @@ a.of-nav:active { background: var(--press); }
       const lines = foodLines(state, o.id), t = o.totals || {}, pm = C.payMethodById[o.method];
       text(rec.items, lines.length ? itemsLine(lines) : 'Items are no longer on the board.');
       text(rec.meta, 'Paid ' + U.fmtTime(o.paidAt) + ' by ' + (pm ? pm.name.toLowerCase() : o.method) + '.' + (o.tip > 0 ? ' Tip ' + money(o.tip) + '.' : '') + (t.discount > 0 ? ' Discount ' + money(t.discount) + '.' : '') + (t.rounds > 1 ? ' ' + t.rounds + ' rounds.' : ''));
+      // A sale from a day that was already closed cannot be opened again, so say so on the button before the tap.
+      const lc = state.lastClose, shut = !!(lc && isFinite(o.paidAt) && U.serviceDate(o.paidAt, state.settings.service.dayStartHour) <= lc.day);
+      if (rec.shut !== shut) {
+        rec.shut = shut;
+        U.clear(rec.reopen);
+        rec.reopen.append(ico('history', 20), h('span', null, shut ? 'Closed day: cannot reopen' : 'Reopen'));
+        rec.reopen.classList.toggle('is-shut', shut);
+        if (shut) rec.reopen.setAttribute('aria-disabled', 'true'); else rec.reopen.removeAttribute('aria-disabled');
+        rec.reopen.title = shut ? 'Tap to see why.' : '';
+      }
       text(rec.total, money(t.total));
       text(rec.sub, t.tax > 0 ? 'incl. ' + money(t.tax) + ' tax' : '');
     }
@@ -26821,7 +27184,7 @@ a.of-nav:active { background: var(--press); }
         eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
     }
-    // Discards whose batch has since been dropped from the cabinet list are still in the safety record (kept about six months):
+    // Discards whose batch has since been dropped from the cabinet list are still in the safety record (kept for the engine's keep time):
     // show them from that entry, with what the entry holds (the amount, the reason, who) and nothing invented.
     const ingName = (id) => { const i = (state.ingredients || []).find((x) => x && x.id === id); return i && i.name ? i.name : id || 'Food'; };
     for (const [batchId, row] of logged) {
@@ -26835,8 +27198,8 @@ a.of-nav:active { background: var(--press); }
     }
     return out.sort((a, b) => b.t - a.t);
   }
-  // How far back the log reaches, in plain words, so nobody reads it as more than it is. The app keeps safety records for
-  // about six months (190 days); a kitchen newer than that has everything from its first record.
+  // How far back the log reaches, in plain words, so nobody reads it as more than it is. The keep time comes from the engine
+  // (SB.retention); a kitchen newer than that has everything from its first record.
   function coverageText(state, list, now) {
     if (!list.length) return '';
     const oldest = list[list.length - 1].t;
@@ -26845,8 +27208,10 @@ a.of-nav:active { background: var(--press); }
     for (const b of state.batches || []) if (b && Number.isFinite(b.enteredAt) && b.enteredAt < first) first = b.enteredAt;
     const since = U.fmtDateShort(U.dateKey(oldest));
     const n = list.length + ' ' + U.plural(list.length, 'batch', 'batches');
-    if (now - first < 175 * 86400e3) return 'Showing every batch thrown out since ' + U.fmtDateShort(U.dateKey(first)) + ' (' + n + '), the first record this app has.';
-    return 'Showing the ' + n + ' thrown out since ' + since + '. Records older than about six months are not kept, so older ones are not here.';
+    const keep = SB.retention ? SB.retention.days() : null;
+    // A kitchen younger than the keep time (less a two-week margin) has everything from its first record.
+    if (keep && now - first < (keep - 14) * 86400e3) return 'Showing every batch thrown out since ' + U.fmtDateShort(U.dateKey(first)) + ' (' + n + '), the first record this app has.';
+    return 'Showing the ' + n + ' thrown out since ' + since + '. ' + (SB.retention ? SB.retention.words() : '') + ' Older ones are not here.';
   }
   // Escapes text for safe use inside HTML.
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -28098,6 +28463,152 @@ a.of-nav:active { background: var(--press); }
     return sheet;
   }
 
+  /* ---------- Close the month ---------- */
+
+  // The word the owner types to confirm closing the month.
+  const CLOSE_MONTH_WORD = 'CLOSE';
+  // Plain words for each way Close the month can be refused. Nothing is removed in any of these cases.
+  const MONTH_WORDS = {
+    backupRequired: 'The files must be saved first. Go back to step 2 and save them again. Nothing was removed.',
+    exportStale: 'Something changed since you saved the files (a new day started or a record changed). Save the files again in step 2, then close. Nothing was removed.',
+    notInDemo: 'You are in the demo, so there is no real history to close here. Tap Back to my kitchen first. Nothing was removed.',
+    hubKitchen: 'This tablet works through the main computer, so the month cannot be closed here. Do this on the main computer\'s own screen or the main tablet. Nothing was removed.',
+    nothingToDo: 'There is nothing to close yet. Only finished days older than 35 days can be moved out, and none are left before that date. Nothing was removed.',
+    storageBlocked: 'This browser would not save the change, so nothing was removed. Your kitchen is exactly as it was. Allow site data or use a normal window, then try again.',
+    badPatch: 'That date is not one Smokebox can use. Pick a date and try again. Nothing was removed.',
+  };
+  // Turns a store answer that was refused into one plain sentence.
+  function monthWords(r) { return MONTH_WORDS[r && r.report] || ((r && r.report) ? 'Smokebox could not do that (' + r.report + '). Nothing was removed.' : 'Smokebox could not do that. Nothing was removed.'); }
+  // Writes a YYYY-MM-DD day as a short date like Mar 3, 2026.
+  function monthDay(ymd) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || '')); if (!m) return String(ymd || ''); return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
+  // The first day of the current month as YYYY-MM-DD, the usual "close everything before" date.
+  function firstOfMonth() { const d = new Date(SB.store.now()); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01'; }
+  // Opens "Close the month": with a PIN set, the keypad comes first. opts.before picks the date (YYYY-MM-DD); the default is the first of this month.
+  function openCloseMonth(opts) {
+    if (SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.shell.requirePin) { SB.shell.requirePin().then((ok) => { if (ok) buildCloseMonth(opts || {}); }); return null; }
+    return buildCloseMonth(opts || {});
+  }
+  // Builds the Close the month sheet: what happens, save the files, type the word, then the done screen with Undo.
+  function buildCloseMonth(opts) {
+    const sheet = SB.ui.sheet({ title: 'Close the month', side: 'right', width: 'min(640px, 96vw)', name: 'closemonth' });
+    const root = h('div', { class: 'dp so cm' });
+    const store = SB.store;
+    let before = /^\d{4}-\d{2}-\d{2}$/.test(String(opts.before || '')) ? opts.before : firstOfMonth();
+    let exported = null; // the files of the last export: { files, backup: { filename, chars, sha256 } }
+
+    // Step 1: what happens, with the real counts.
+    const dateIn = h('input', { class: 'input', type: 'date', value: before, id: 'cm-before', dataset: { field: 'before' } });
+    const counts = h('div', { class: 'cm-counts', role: 'status', dataset: { role: 'cm-counts' } });
+    const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'cm-next1' }, disabled: true }, 'Next: save the files');
+    // Redraws the counts for the chosen date. The store says what would move out and what stays; nothing changes here.
+    function paintPreview() {
+      before = /^\d{4}-\d{2}-\d{2}$/.test(dateIn.value) ? dateIn.value : before; exported = null;
+      U.clear(counts); next1.disabled = true;
+      if (store.isHubClient && store.isHubClient()) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords({ report: 'hubKitchen' }))); return; }
+      if (store.isDemo && store.isDemo()) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords({ report: 'notInDemo' }))); return; }
+      const r = store.closeMonthPreview({ before });
+      if (!r.ok) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords(r))); return; }
+      const p = r.preview;
+      if (!p.tickets && !p.orders && !p.events) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords({ report: 'nothingToDo' }))); return; }
+      // Writes a count with the right singular or plural word.
+      const n = (x, one, many) => Number(x).toLocaleString() + ' ' + U.plural(x, one, many);
+      counts.append(...[
+        h('p', null, h('strong', null, 'This moves out of your kitchen: '), n(Array.isArray(p.days) ? p.days.length : p.days, 'day') + ' of history (' + monthDay(p.from) + ' up to, not including, ' + monthDay(p.before) + '), with ' + n(p.orders, 'order') + ', ' + n(p.tickets, 'ticket') + ' and ' + n(p.events, 'activity record', 'activity records') + '.'),
+        p.before !== before ? h('p', { class: 'fs-sub' }, 'You picked ' + monthDay(before) + ', but the last 35 days always stay, so it stops at ' + monthDay(p.before) + '.') : null,
+        h('p', null, h('strong', null, 'This stays: '), 'the last 35 days, today, every open order and open ticket' + (p.openOrdersKept || p.openTicketsKept ? ' (' + n(p.openOrdersKept || 0, 'open order') + ', ' + n(p.openTicketsKept || 0, 'open ticket') + ' right now)' : '') + ', your menu and settings, the end-of-day totals, and all food-safety records (' + n(p.safetyEventsKept || 0, 'record') + ').'),
+        p.uncoveredDays && p.uncoveredDays.length ? h('p', { class: 'fs-sub' }, n(p.uncoveredDays.length, 'older day') + ' with records but no end-of-day close stay where they are.') : null].filter(Boolean));
+      next1.disabled = false;
+    }
+    dateIn.addEventListener('change', paintPreview);
+    const step1 = h('section', { class: 'fs-section so-step' },
+      h('h3', { class: 'fs-h' }, '1. What this does'),
+      h('p', { class: 'fs-sub' }, 'Close the month moves old, finished history out of this tablet so it stays quick. First you save everything to files. Nothing is removed until step 3.'),
+      SB.ui.field({ label: 'Close everything before', control: dateIn }),
+      counts,
+      h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'After step 3 the history is gone from this tablet. Your files are the only copy of it. For 7 days Smokebox also keeps your kitchen as it was, and you can undo.'),
+      next1);
+
+    // Step 2: save the files.
+    const fileList = h('ul', { class: 'cm-files', dataset: { role: 'cm-files' } });
+    const saveSt = h('p', { class: 'fs-sub dp-msg', role: 'status', dataset: { role: 'cm-save-msg' } });
+    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'cm-next2' }, disabled: true }, 'Next: confirm');
+    const saw = h('input', { type: 'checkbox', id: 'cm-saw', disabled: true, dataset: { act: 'cm-saw' } });
+    saw.addEventListener('change', () => { next2.disabled = !(saw.checked && exported); });
+    // Hands one file to the browser as a download.
+    function download(f) {
+      const url = g.URL.createObjectURL(new g.Blob([f.text], { type: f.mime || 'text/plain' }));
+      const a = doc.createElement('a'); a.href = url; a.download = f.name; a.style.display = 'none'; doc.body.appendChild(a); a.click();
+      setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 4000);
+    }
+    // Makes the files and downloads them one after another (a browser may refuse several at once). The backup file comes first.
+    const saveNow = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'cm-save-files' },
+      // Makes the export, lists the files and starts the downloads, or says in words why it could not.
+      onClick: () => {
+      const r = store.closeMonthExport({ before });
+      if (!r.ok) { tell(saveSt, monthWords(r), 'bad'); return; }
+      exported = { files: r.files, backup: { filename: r.files[0].name, chars: r.files[0].chars, sha256: r.files[0].sha256 } };
+      U.clear(fileList);
+      const kindWord = { backup: 'Backup of the whole kitchen (to bring everything back)', orders: 'Orders being closed (opens in a spreadsheet)', tickets: 'Tickets being closed (opens in a spreadsheet)', days: 'Days being closed (opens in a spreadsheet)', manifest: 'List of what is in these files' };
+      r.files.forEach((f) => fileList.append(h('li', null, h('strong', null, f.name), ' ' + (kindWord[f.kind] || '') + ', ' + Math.max(1, Math.round(f.chars / 1024)) + ' KB')));
+      try { r.files.forEach((f, i) => setTimeout(() => { try { download(f); } catch (e) { /* the message below covers it */ } }, i * 400)); }
+      catch (e) { tell(saveSt, 'This browser would not save the files. Nothing was removed. Try again.', 'bad'); return; }
+      tell(saveSt, 'Asked your browser to save ' + r.files.length + ' files. Look in your downloads folder and check every file listed above is there. If the browser asks to allow several downloads, say yes.', 'ok');
+      saw.disabled = false; saw.checked = false; next2.disabled = true; saveNow.textContent = 'Save the files again';
+    } }, 'Save the month files now');
+    const step2 = h('section', { class: 'fs-section so-step', hidden: true },
+      h('h3', { class: 'fs-h' }, '2. Save the month files now'),
+      h('p', { class: 'fs-sub' }, 'These files hold your whole kitchen and the history being closed. Keep a copy off this device too (a memory stick or your email).'),
+      saveNow, fileList, saveSt,
+      h('label', { class: 'dp-check-row', for: 'cm-saw' }, saw, h('span', null, 'I saved the files and I can find them')),
+      h('p', { class: 'fs-sub' }, 'To bring everything back later: Back office, Data, Restore, and pick the backup file.'), next2);
+
+    // Step 3: the typed word and the red button.
+    const word = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': 'Type ' + CLOSE_MONTH_WORD + ' to confirm', placeholder: CLOSE_MONTH_WORD });
+    const goSt = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'cm-go-msg' } });
+    const go = h('button', { type: 'button', class: 'btn btn-danger btn-lg', dataset: { act: 'cm-go' }, disabled: true }, ico('trash', 22), h('span', null, 'Close the month'));
+    word.addEventListener('input', () => { go.disabled = word.value.trim().toUpperCase() !== CLOSE_MONTH_WORD; });
+    const step3 = h('section', { class: 'fs-section so-step', hidden: true },
+      h('h3', { class: 'fs-h' }, '3. Type ' + CLOSE_MONTH_WORD),
+      h('p', { class: 'fs-sub' }, 'To be sure this is what you want, type ' + CLOSE_MONTH_WORD + ' in the box. Then the red button works.'),
+      SB.ui.field({ label: 'Type ' + CLOSE_MONTH_WORD, control: word }), go, goSt);
+    const done = h('section', { class: 'fs-section so-step', hidden: true, dataset: { role: 'cm-done' } });
+
+    // Shows one step and hides the others.
+    const show = (which) => { [step1, step2, step3, done].forEach((s, i) => { s.hidden = i !== which; }); };
+    next1.addEventListener('click', () => show(1));
+    next2.addEventListener('click', () => show(2));
+    go.addEventListener('click', () => {
+      if (!exported) { tell(goSt, MONTH_WORDS.backupRequired, 'bad'); return; }
+      const res = store.closeMonthPrune({ before, confirmBackupSaved: exported.backup });
+      if (!res.ok) {
+        tell(goSt, monthWords(res), 'bad');
+        if (res.report === 'exportStale' || res.report === 'backupRequired') { exported = null; saw.checked = false; saw.disabled = true; next2.disabled = true; saveNow.textContent = 'Save the month files now'; U.clear(fileList); show(1); tell(saveSt, 'Save the files again, then continue.', 'bad'); }
+        return;
+      }
+      const i = res.info;
+      // Writes a count with the right singular or plural word.
+      const n = (x, one, many) => Number(x).toLocaleString() + ' ' + U.plural(x, one, many);
+      const undoMsg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'cm-undo-msg' } });
+      U.clear(done);
+      done.append(h('h3', { class: 'fs-h' }, 'Done. The month is closed.'),
+        h('p', { class: 'fs-sub' }, 'Moved out: ' + n(i.days, 'day') + ' (' + monthDay(i.from) + ' up to, not including, ' + monthDay(i.before) + '), ' + n(i.orders, 'order') + ', ' + n(i.tickets, 'ticket') + ' and ' + n(i.events, 'activity record', 'activity records') + '. Food-safety records all stayed (' + i.safetyEventsKept + ').'),
+        i.copyKept ? h('p', { class: 'fs-note', 'data-tone': 'ok' }, 'Your kitchen before this is kept for ' + i.copyKeepDays + ' days: ',
+          // Puts the kitchen back exactly as it was before the month was closed.
+          h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'cm-undo' }, onClick: () => {
+            const rep = store.undoRestore();
+            if (rep === 'ok' || (rep && rep.ok)) { tell(undoMsg, 'Undone. Your kitchen is back as it was, with all the history.', 'ok'); } else tell(undoMsg, 'The saved copy could not be put back (' + (rep && rep.report ? rep.report : rep) + '). Use the backup file you saved: Back office, Data, Restore.', 'bad');
+          } }, 'Undo')) : h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'No copy could be kept on this tablet, so the files you saved are the only way back: Back office, Data, Restore.'),
+        undoMsg,
+        // Closes the sheet when the person is finished reading the result.
+        h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'cm-finish' }, onClick: () => SB.sheets.closeAll() }, 'Done'));
+      show(3);
+    });
+    root.append(step1, step2, step3, done);
+    sheet.body.appendChild(root); keepInView(root);
+    paintPreview();
+    return sheet;
+  }
+
   /* ---------- How you serve ---------- */
 
   // The starting order buttons, as the engine knows them (the built-in list used when none is saved).
@@ -28485,11 +28996,12 @@ a.of-nav:active { background: var(--press); }
   SB.sheets.register('pilot', openPilot);
   SB.sheets.register('serve', openServe);
   SB.sheets.register('startover', openStartOver);
+  SB.sheets.register('closemonth', openCloseMonth);
   SB.sheets.register('menuimport', openImport);
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { showRecoveryCode, leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { openCloseMonth, showRecoveryCode, leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 77-floor-setup.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'77-floor-setup.js',message:String(e&&e.message||e)});}
@@ -29074,6 +29586,14 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "p",
       "x": "Open the entry in **Recent readings** and tap **Save fix**. The old entry stays, with your fix next to it."
+     },
+     {
+      "t": "h",
+      "x": "The safety record"
+     },
+     {
+      "t": "p",
+      "x": "In **Back office**, open **Safety** and tap **Print the safety record**. It lists thrown-out batches, your readings and checks, and changes to limits, like \"Changed the cold limit from X to Y\". A cold reading says \"above the cold limit\" and how many minutes above it the batch has already used. The record says how long Smokebox keeps entries; ask your health department how long you must."
      }
     ]
    },
@@ -29143,7 +29663,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "ol",
       "x": [
-       "Open the thrown-out log from the board's menu. It says which period it covers.",
+       "Open the thrown-out log from the board's menu. It starts by saying how far back it goes, like \"Showing every batch thrown out since\" a date.",
        "Tap **Fix this entry** on the row.",
        "Say what was wrong, add your initials and tap **Save the fix**."
       ]
@@ -29188,6 +29708,10 @@ a.of-nav:active { background: var(--press); }
        "If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN. There is no undo, so back up what is here first if you might want it.",
        "Open the board and check your menu and your food. Sound and loudness are set per device, so test them again."
       ]
+     },
+     {
+      "t": "p",
+      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. What was here is kept too, so you can undo once more."
      },
      {
       "t": "p",
@@ -31901,7 +32425,7 @@ a.of-nav:active { background: var(--press); }
     render(container, ctx) {
       const page = K.page(container, ctx, { id: 'tickets' });
       page.headline();
-      page.how('Finished tickets are tickets that were sent out and not voided, counted on the day they were placed. Ticket time runs from when the ticket was entered until it was sent out; the middle ticket is the typical one. Overdue means a ticket took longer than the overdue limit for its order type. Voided tickets were cancelled before they were sent out. The arrows compare with the same number of days just before this range.');
+      page.how('Finished tickets are tickets that were sent out and not voided, counted on the day they were placed. Ticket time runs from when the ticket was entered until it was sent out; the middle ticket is the typical one. Overdue means a ticket reached or passed the overdue limit for its order type. Voided tickets were cancelled before they were sent out. The arrows compare with the same number of days just before this range.');
       page.tiles([
         { id: 'count', kpi: 'count', label: 'Finished tickets' },
         { id: 'median', kpi: 'medianMs', label: 'Median ticket time' },
@@ -35083,6 +35607,33 @@ a.of-nav:active { background: var(--press); }
     // Opens the system file picker for a backup.
     const chooseBtn = btn('Choose a backup file', { icon: 'upload', onClick: () => fileIn.click() });
     chooseBtn.dataset.action = 'import-choose';
+    const undoBox = h('div', { class: 'od-undo-restore', 'data-region': 'undo-restore' });
+    // Shows the way back from a restore: how long the old kitchen is kept and a button to put it back (PIN-guarded like the restore).
+    function paintUndo() {
+      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
+      if (!info) { undoBox.replaceChildren(); undoBox.hidden = true; return; }
+      undoBox.hidden = false;
+      const days = Math.max(1, Math.round((info.expiresAt - info.takenAt) / 86400e3));
+      // The button asks first, then puts the old kitchen back.
+      const b = btn('Undo this restore', { icon: 'history', cls: 'btn-sm', onClick: () => undoRestoreNow() });
+      b.dataset.action = 'undo-restore';
+      undoBox.replaceChildren(
+        h('p', { class: 'od-p od-undo-line' }, 'Your kitchen before this restore is kept for ' + days + ' ' + U.plural(days, 'day') + ' (until ' + U.fmtDateShort(U.dateKey(info.expiresAt)) + ' ' + U.fmtTime(info.expiresAt) + '). It was saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + '.'),
+        h('div', { class: 'od-actions' }, b));
+    }
+    // After a confirm dialog and the PIN, puts the kitchen from before the restore back. Nothing changes if the PIN is not entered.
+    async function undoRestoreNow() {
+      const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
+      if (!info) { paintUndo(); return; }
+      const ok = await SB.ui.confirm({ title: 'Undo this restore?', tone: 'danger', confirmLabel: 'Put my old kitchen back', cancelLabel: 'Keep what I have',
+        body: ['This puts back the kitchen you had before the restore (saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + ') and replaces what is here now. What is here now is kept for the same time, so this can be undone once too.'] });
+      if (!ok) return;
+      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
+      const rep = SB.store.undoRestore();
+      if (rep === 'ok') SB.ui.toast('Your kitchen from before the restore is back.', { tone: 'ok' });
+      else SB.ui.toast(rep === 'noCopy' ? 'The copy from before the restore is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings), { tone: 'warn' });
+      paintUndo();
+    }
     const pasteLabelId = U.uid('odpl');
     const pasteArea = h('textarea', { class: 'textarea od-paste', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-labelledby': pasteLabelId, placeholder: 'Paste the whole backup text here' });
     // Checks pasted text the same way as a chosen file.
@@ -35091,7 +35642,7 @@ a.of-nav:active { background: var(--press); }
     const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
     card2.body.append(
       para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
-      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult);
+      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
     card3.body.append(
       h('ol', { class: 'od-steps' },
         h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
@@ -35101,6 +35652,7 @@ a.of-nav:active { background: var(--press); }
         h('li', null, 'Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.')),
       h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
 
+    paintUndo();
     let pending = null;
     // Throws away the checked backup and clears the result card.
     function clearImport() { pending = null; impResult.replaceChildren(); }
@@ -35154,6 +35706,7 @@ a.of-nav:active { background: var(--press); }
         clearImport(); pasteArea.value = ''; fileIn.value = '';
         impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.'))));
         SB.ui.toast('Backup restored.', { tone: 'ok' });
+        paintUndo();
       } else {
         const lr = SB.store.lastResult() || {};
         showBad(rep === 'invalidBackup' && lr.info && lr.info.error ? backupReason(lr.info.error) : SB.engine.describe(rep, lr.info, (stateNow() || {}).settings), 'backup');
@@ -35313,7 +35866,7 @@ a.of-nav:active { background: var(--press); }
     let lastGroup = '';
     ORDER.forEach((i) => {
       const sec = SECTIONS[i];
-      if (sec.group !== lastGroup) { lastGroup = sec.group; tocList.appendChild(h('li', { class: 'od-toc-group', role: 'presentation' }, sec.group)); }
+      if (sec.group !== lastGroup) { lastGroup = sec.group; tocList.appendChild(h('li', { class: 'od-toc-group' }, sec.group)); }
       const a = h('a', { class: 'od-toc-link', href: '#od-' + sec.id, dataset: { target: sec.id } }, sec.label);
       a.addEventListener('click', (ev) => { ev.preventDefault(); goTo(sec.id); }); // a real hash would be read by the router as "leave the office"
       links.push(a);
@@ -36455,7 +37008,7 @@ a.of-nav:active { background: var(--press); }
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const KIND = {
     temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
-    equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
+    safety_setting_changed: 'Changed a safety limit', month_closed: 'History saved and cleared', equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
   };
   const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit', datemark: 'Past the date mark' };
   const UNIT = { cooler: 'Cooler', freezer: 'Freezer', display: 'Display case', other: 'Equipment' };
@@ -36478,12 +37031,54 @@ a.of-nav:active { background: var(--press); }
     return b && b.label ? b.label + (name && b.label.indexOf(name) < 0 ? ' (' + name + ')' : '') : name;
   }
 
+  // The plain names of the food-safety settings an owner can change, by the last part of the setting's name.
+  const SETTING_NAME = {
+    hotHoldF: 'the hot-hold limit', coldHoldF: 'the cold limit', reheatF: 'the reheat temperature', tempCheckEveryMin: 'how often temperatures are checked',
+    belowHotGraceH: 'the time allowed below the hot limit', aboveColdGraceH: 'the time allowed above the cold limit', sanitizeEveryH: 'how often surfaces are sanitized',
+    hardCapH: 'the longest hold time', defaultMaxHoldH: 'the default hold time', stage1ToF: 'the first cooling target', stage1H: 'the first cooling time',
+    totalH: 'the total cooling time', finalF: 'the final cooling target',
+  };
+  // A setting's value in plain words, by what its name ends with: degrees, hours or minutes; anything else as it is.
+  function settingValue(key, v) {
+    if (!isNum(v)) return v == null ? 'nothing' : String(v);
+    if (/F$/.test(key)) return U.tempText(v);
+    if (/Min$/.test(key)) return v + ' min';
+    if (/H$/.test(key)) return v + (v === 1 ? ' hour' : ' hours');
+    return String(v);
+  }
+  // The one plain line for a changed setting: "Changed the cold limit from 41 °F to 45 °F". Reads key, from and to (also old/new).
+  function changeLine(e) {
+    const key = String(e.key || e.setting || ''), last = key.split('.').pop();
+    const from = e.from !== undefined ? e.from : e.old, to = e.to !== undefined ? e.to : e.new;
+    return 'Changed ' + (SETTING_NAME[last] || (key || 'a setting')) + ' from ' + settingValue(last, from) + ' to ' + settingValue(last, to);
+  }
+
+  // For a cold-food reading: whether it was above the cold limit and how much time above the limit the batch has used up so far.
+  // The engine adds up the time across separate stretches (an in-range reading does not wipe it), so this replays the batch's
+  // readings in order the same way. Returns '' when the batch is not cold food or the limit is unknown.
+  function coldNote(state, e) {
+    const b = (state.batches || []).find((x) => x && x.id === e.batchId);
+    const lim = state.settings && state.settings.safety ? state.settings.safety.coldHoldF : null;
+    if (!b || b.kind !== 'cold' || !isNum(lim) || !isNum(e.f) || !SB.engine || !SB.engine.allEvents) return '';
+    let since = null, used = 0;
+    for (const x of SB.engine.allEvents(state)) {
+      if (x.type !== 'temp_logged' || x.batchId !== e.batchId || x.reverted || !isNum(x.f) || !isNum(x.t) || x.t > e.t) continue;
+      if (x.f > lim) { if (since == null) since = x.t; } else if (since != null) { used += x.t - since; since = null; }
+      if (x === e || x.id === e.id) break;
+    }
+    const mins = Math.round(used / 60000);
+    const above = e.f > lim;
+    if (above) return 'above the cold limit' + (mins > 0 ? '; ' + mins + ' min above it earlier, which still counts' : '');
+    return mins > 0 ? 'back in range; ' + mins + ' min above the cold limit so far, which still counts' : '';
+  }
+
   // The detail words for one entry: what was read, weighed or thrown out.
   function detailOf(e) {
     switch (e.type) {
       case 'temp_logged': return (isNum(e.f) ? U.tempText(e.f) : '') + (lateWords(e) ? ', ' + lateWords(e) : '');
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
       case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
+      case 'safety_setting_changed': return changeLine(e);
       case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '');
       case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '');
       case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
@@ -36549,7 +37144,7 @@ a.of-nav:active { background: var(--press); }
     if (!state || !SB.engine || !SB.engine.safetyLog) return [];
     const rows = SB.engine.safetyLog(state).filter((r) => r.event.type !== 'safety_correction' && isNum(r.event.t) && r.event.t >= from && r.event.t < to);
     return rows.map((r) => ({
-      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), facts: factsOf(state, r.event), who: r.event.who || '',
+      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: [detailOf(r.event), r.event.type === 'temp_logged' ? coldNote(state, r.event) : ''].filter(Boolean).join(', '), facts: factsOf(state, r.event), who: r.event.who || '',
       corrections: r.corrections.map((c) => ({ at: c.t, who: c.who || '', note: c.note || '' })),
     }));
   }
@@ -36566,7 +37161,10 @@ a.of-nav:active { background: var(--press); }
     return { from: at(first), to: at(next), label: r.days === 1 ? U.fmtDateShort(today) : U.fmtDateShort(first) + ' to ' + U.fmtDateShort(today) };
   }
 
-  O.inspectorPure = { inspectorRows, factsOf, rangeFor, RANGES };
+  // One row for one safety entry (the same shape inspectorRows gives), for tests and for entries read without the engine's log.
+  function rowFor(e, state) { return { id: e.id, at: e.t, kind: KIND[e.type] || 'Safety entry', food: foodOf(state, e), detail: [detailOf(e), e.type === 'temp_logged' ? coldNote(state, e) : ''].filter(Boolean).join(', '), facts: factsOf(state, e), who: e.who || '', corrections: [] }; }
+
+  O.inspectorPure = { inspectorRows, rowFor, factsOf, rangeFor, RANGES };
   if (!g.document) return; // Node: the pure rows are all the tests need
 
   // ---- 2. The sheet and printing ----
@@ -36587,6 +37185,8 @@ a.of-nav:active { background: var(--press); }
   }
 
   // The honest line about what this record does not hold, so nobody reads it as the whole paperwork.
+  // What this record leaves out and how long it keeps things; the keep time is the engine's own number (37-retention.js).
+  const keepWords = () => (SB.retention ? ' ' + SB.retention.words() : '');
   const NOT_COVERED = 'Cooler, freezer, thermometer-check and sanitizer strip entries appear here only if someone logged them in Smokebox; keep anything else on your own sheet and ask your health department what to keep and for how long.';
 
   // Opens the sheet: pick a date range, see the record, print it.
@@ -36610,7 +37210,7 @@ a.of-nav:active { background: var(--press); }
     const doPrint = () => printRecord(rangeId);
     sheet.body.append(
       h('p', { class: 'si-lead' }, 'This is your own record of readings, reheats, cooling, sanitize rounds and thrown-out food. It is not an inspection result. Entries are never edited; if something was wrong, a correction is added under it.'),
-      h('p', { class: 'si-lead si-notcovered' }, NOT_COVERED),
+      h('p', { class: 'si-lead si-notcovered' }, NOT_COVERED + keepWords()),
       h('div', { class: 'si-actions' }, h('label', null, 'Range ', sel), h('button', { type: 'button', class: 'btn btn-primary', onClick: doPrint }, 'Print')), preview);
     paint();
     return sheet;
@@ -36628,7 +37228,7 @@ a.of-nav:active { background: var(--press); }
       h('p', { class: 'si-note' }, 'The owner\'s own record of what was logged in this kitchen. It is not an inspection result. Entries are never edited; corrections are added under the entry they correct.'),
       demo ? h('p', { class: 'si-note' }, 'This is a demo kitchen, so these entries are demo entries.') : null,
       recordTable(rows),
-      h('p', { class: 'si-note' }, NOT_COVERED),
+      h('p', { class: 'si-note' }, NOT_COVERED + keepWords()),
       h('p', { class: 'si-note' }, 'Printed ' + U.fmtDateShort(U.dateKey(Date.now())) + ' ' + U.fmtTime(Date.now()) + '. Reviewed by: ______________   Date: ________'));
     document.body.appendChild(root);
     // Removes the print-only block once the print dialog is done (or at once when printing is unavailable).
@@ -36764,18 +37364,12 @@ a.of-nav:active { background: var(--press); }
 
   // Watches for a device clock that jumped far ahead (or saved times far ahead of it) and asks the owner, once per episode, whether the new time is right.
   function watchClock() {
-    let asking = false, toldWrong = false;
+    let toldWrong = false;
     setInterval(() => {
       try {
         const s = SB.store.status();
         if (s.clockWrong && !toldWrong && SB.ui && SB.ui.toast) { toldWrong = true; SB.ui.toast("This device's clock looks wrong: some saved times are far ahead of it. Smokebox kept the device clock. Check the date and time in the device's settings.", { tone: 'warn', ms: 20000 }); }
-        // On the board the calm strip notice asks instead (a box over the screen would block tickets).
-        if (SB.floor && SB.floor.isMounted && SB.floor.isMounted()) return;
-        if (!s.clockSuspect || asking || !SB.ui || !SB.ui.confirm) return;
-        asking = true;
-        const days = Math.round(s.clockSuspect.aheadMs / 86400000);
-        SB.ui.confirm({ title: "This device's clock jumped ahead", body: ["The date or time on this device just moved ahead by about " + (days >= 2 ? days + ' days' : Math.round(s.clockSuspect.aheadMs / 3600000) + ' hours') + '. Smokebox is still counting from the old time so no batch is thrown out by mistake.', 'If the new time is right (the device was off or asleep that long), choose Use the new time. If the clock is wrong, fix it in the device settings and choose Keep the old time.'], confirmLabel: 'Use the new time', cancelLabel: 'Keep the old time', tone: 'danger' })
-          .then((yes) => { if (yes) { SB.store.acceptClockJump(); asking = false; } else setTimeout(() => { asking = false; }, 10 * 60e3); });
+        // The board's strip notice and the slim banner on back-office pages (60-shell.js) ask about a clock jump; no box covers the screen.
       } catch (e) { /* the watcher must never break the board */ }
     }, 5000);
   }

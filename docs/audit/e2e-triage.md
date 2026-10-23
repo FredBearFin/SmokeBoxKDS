@@ -262,3 +262,25 @@ Every slow suite run singly (two at a time), the 45 qa journeys, and the node:te
 | all other 37 slow suites | PASS | artifact, backup-banner, board-*, bumpbar, cold-items, config-names, demo-mode, menu-import-ui, office*, order-*, pay-ui, pin-recovery-ui, production-mode, quiet-board, serve, setup-wizard, shell, start-over, strip-notices, tablet-ready |
 
 New in this round: `beta.sh` / `beta-remove.sh` (docs/connected-howto.md), proved only against stand-ins by `test/beta-scripts.test.mjs` (8 pass) and `test/beta-proxy.e2e.mjs`; not run on a real server.
+
+## Round 19: full regression after the review fixes (integration-main b1672da)
+
+Every slow suite singly (two at a time; the machine was shared with other agents, load average 6 to 16), the 45 qa journeys, and the node:test files twice (806 and 813 cases).
+
+| Suite | Result | Note |
+|---|---|---|
+| node:test files, run 1 and 2 | 804 and 811 pass; the only failures are the two new `#14` cases (below) | no timing failures either time |
+| qa journeys | 44 pass first time (timed out at the 900 s cap once because of load); 06c-pin failed, fixed (see below), passes | |
+| 06c-pin (qa) | stale: each wrong PIN now costs a slow salted hash (review fix 13), so the test typed the next PIN before the keypad had answered; the helper now waits for the keypad to settle | test drift, fixed |
+| shell | stale once: `setPin(null)` now needs proof of the current PIN (review fix 4); the test passes `{ verified: true }`; passes. One run missed the 900 ms ignition by timing under load | test drift, fixed |
+| floor | timing only: "1 Hz tick with 60 tickets" mean 10 to 18 ms against the 8 ms limit, "one tap re-renders in under 40 ms" 54 ms, while load was high. Earlier in the same round it also failed the same way. Not reproduced on a quiet machine, so not called a bug; rerun when the machine is quiet | open (timing) |
+| floor-sheets | passes alone (353 s); fails with a selector timeout when two suites run at once | timing |
+| voice-ui | fails under load ("a burst of six new tickets is one spoken line": nothing spoken, the sound leader is chosen slowly), passes alone twice | timing |
+| beta-proxy | was run on a tree without the pairing hub, so it failed; it now skips with a message on the main track | test drift, fixed |
+| all other slow suites | pass | |
+
+Real bug: review finding 14 (second half). After a hub restart an action sent again is applied a second time, because the hub keeps its answered ids in memory only. Reproduction: `node --test test/review-fix-restart.test.mjs` (two cases fail). Owner A5. The connected track's write-ahead log already fixes it.
+
+Known and not re-run: `tools/guide-walk.mjs` fails the Start over step until A4's night/a4-fix1 lands.
+
+Reviewer findings and the test that fails if the bug returns: 1, 2, 5 `review-fix-store.test.mjs`; 3, 7 `review-fix-hub.test.mjs`; 4 `pin-guard.e2e.mjs` (and the shell test); 6, 11 `csv-and-discards.test.mjs`; 8, 10 `review-fix-money.test.mjs`; 9 `order-money.test.mjs`; 12 `review-fix-import.test.mjs`; 13 `review-fix-pin.test.mjs`; 14 `updater.test.mjs` (the time zone in the timer) and `review-fix-restart.test.mjs`; 15 `updater.test.mjs` (signature, pinning, special files); 16 `start-over.test.mjs`, `start-over.e2e.mjs` and `pin-guard.e2e.mjs`. The only finding that had no test was the second half of 14, which this round adds.
