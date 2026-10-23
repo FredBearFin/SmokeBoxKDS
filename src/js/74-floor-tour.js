@@ -18,14 +18,13 @@
   const C = () => SB.config || {};
 
   const POLL_MS = 250;      // four checks a second: quick enough to feel live, light enough to ignore
-  const LAST = 9;           // the number of steps
+  const LAST = 8;           // the number of steps
   const TOUR_SPEED = 30;    // 30x clock: a 5-minute fry takes 10 real seconds
   const SETTLE_MS = 2000;   // after a step starts the board may still shift (the hint line re-wraps), so the card keeps adjusting
   const MARGIN = 12;        // pixels kept free around the card
   const MIN_SIDE = 340;     // the narrowest the card may be when it sits beside the ticket
   const MAX_W = 560;        // the widest the card gets
-  const DWELL_MS = 5000;    // step 5 stays this long so the gray countdown can be read, even if it already ended
-  // Dishes the starter menu offers for the walkthrough, tried first when they are on the menu and not 86:
+    // Dishes the starter menu offers for the walkthrough, tried first when they are on the menu and not 86:
   // lead (the slowest, cooked in two steps), second (held back by pacing) and quick (finished with one tap).
   const PREFER = { lead: 'hushpuppies', second: 'brisket_sand', quick: 'tea' };
   // Steps that wait for the Next button because there is nothing for the person to tap.
@@ -106,12 +105,11 @@
     for (let guard = 0; guard < 10; guard++) {
       const before = s;
       if (t.status === 'expedited') s = LAST;
-      else if (all && s < 8) s = 8;
-      else if (begun(bs) && s >= 4 && s < 7) s = 7;
+      else if (all && s < 7) s = 7;
+      else if (begun(bs) && s >= 4 && s < 6) s = 6;
       else if (begun(hp) && s < 4) s = 4;
-      else if (!hp && s >= 3 && s < 7) s = 7;            // no two-step dish: there is no Start to show
-      else if (!bs && (s === 5 || s === 6)) s = 7;       // no second two-step dish: nothing is held back, skip the gray-dish steps
-      else if (s === 5 && bs && bs.status !== 'queued' && Date.now() - T.at >= DWELL_MS) s = 6;
+      else if (!hp && s >= 3 && s < 6) s = 6;            // no two-step dish: there is no Start to show
+      else if (!bs && s === 5) s = 6;                    // no second two-step dish: nothing is held back, skip the gray-dish step
       if (s === before) break;
     }
     if (s !== T.step) goTo(s);
@@ -134,11 +132,10 @@
       case 2: return 'The clock counts up from when the order came in. It turns amber, then red, when the order is taking too long.';
       case 3: return 'Each dish belongs to a station' + (zone ? ' (' + zone.name + ' for ' + lead + ')' : '') + '. ' + lead + (second || quick ? ' is the slowest dish on this ticket, so it can start now.' : ' can start now.') + ' Tap Start when you begin cooking it.';
       case 4: return 'The countdown under the dish is the cooking time left, as estimated. At zero the row flashes Check it. Smokebox cannot see your food, so it never marks a dish done by itself.';
-      case 5: return 'The other dishes are gray on purpose. Smokebox holds them back so everything finishes together. Watch the countdown: it says when to start.';
-      case 6: return bs && bs.status === 'queued'
-        ? 'Almost there. When the countdown reaches zero, Start appears on ' + second + '. You can also tap Start now to begin it early.'
+      case 5: return bs && bs.status === 'queued'
+        ? 'The other dishes are gray on purpose. Smokebox holds them back so everything finishes together. When the countdown reaches zero, Start appears on ' + second + '. You can also tap Start now to begin it early.'
         : 'Its time has come. Tap Start on ' + second + '.';
-      case 7: {
+      case 6: {
         const open = [];
         if (hp && !isDone(hp)) open.push(lead);
         if (bs && !isDone(bs)) open.push(second);
@@ -148,7 +145,7 @@
         if (tea && !isDone(tea)) s += teaReady ? (open.length ? ' Then tap Done on ' + quick + '.' : 'Tap Done on ' + quick + '.') : ' ' + quick + ' is still waiting its turn; it joins in a moment.';
         return s;
       }
-      case 8: return slip() && slip().querySelector('.fl-bump')
+      case 7: return slip() && slip().querySelector('.fl-bump')
         ? 'Everything is done, so Bump is green. Tap Bump to send the ticket away. The clock stops.'
         : 'Everything is done. Tap the All tab, then tap Bump to send the ticket away. The clock stops.';
       default: return 'That is the whole loop: a ticket arrives, you start what is ready, tap Done, then Bump. The back office turns these taps into charts: tap Back office at the top of the screen. To add dishes and set prices and prep times, open Menu and settings there.';
@@ -172,13 +169,13 @@
       case 1: return q('.slip-head').concat(hint() ? [hint()] : []);
       case 2: return q('.slip-timer, .fl-bw'); // the wrapper .slip-time has no box of its own, so ring the digits and the badge
       case 3: case 4: return PICK.lead ? row(PICK.lead.id) : [];
-      case 5: case 6: return PICK.second ? row(PICK.second.id) : [];
-      case 7: {
+      case 5: return PICK.second ? row(PICK.second.id) : [];
+      case 6: {
         const out = [];
         t.items.forEach((i) => { if (i.status === 'cooking' || (i.track === 'one' && i.status === 'displayed')) out.push(...row(i.menuId)); });
         return out.length ? out : (PICK.quick ? row(PICK.quick.id) : []);
       }
-      case 8: { const b = q('.fl-bump'); return b.length ? b : Array.from(doc.querySelectorAll('.fl-seg [data-id="all"]')); }
+      case 7: { const b = q('.fl-bump'); return b.length ? b : Array.from(doc.querySelectorAll('.fl-seg [data-id="all"]')); }
       default: return [];
     }
   }
@@ -261,7 +258,7 @@
     put(u.step, 'Step ' + s + ' of ' + LAST);
     put(u.text, words(t));
     u.skip.hidden = s === LAST;
-    u.next.hidden = !MANUAL[s];
+    u.next.hidden = !MANUAL[s] || (s === 5 && !!PICK.second && (() => { const d = dish(t, PICK.second.id); return !!d && d.status !== 'queued'; })());
     u.mine.hidden = u.demo.hidden = u.done.hidden = s !== LAST;
     // Only elements that are on screen get the ring (the On time badge is hidden unless a ticket is late).
     const els = targets(t).filter((e) => e.getClientRects().length > 0);

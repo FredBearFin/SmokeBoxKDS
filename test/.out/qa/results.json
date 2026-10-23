@@ -1,5 +1,5 @@
 {
- "runStart": "2026-10-23T11:31:01.088Z",
+ "runStart": "2026-10-23T11:55:17.819Z",
  "results": [
   {
    "id": "01-first-run",
@@ -1115,13 +1115,13 @@
   },
   {
    "id": "13a-tour-full-loop",
-   "title": "Walkthrough: all nine steps with real clicks, from start to Done",
+   "title": "Walkthrough: all eight steps with real clicks, from start to Done",
    "owner": "board",
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 14814,
-   "checks": 48,
+   "ms": 15199,
+   "checks": 49,
    "failed": [],
    "skips": [],
    "notes": [],
@@ -1129,11 +1129,11 @@
     "test/.out/qa/tour-1-1280.png",
     "test/.out/qa/tour-3-1280.png",
     "test/.out/qa/tour-5-1280.png",
+    "test/.out/qa/tour-6-1280.png",
     "test/.out/qa/tour-7-1280.png",
-    "test/.out/qa/tour-8-1280.png",
-    "test/.out/qa/tour-9-1280.png"
+    "test/.out/qa/tour-8-1280.png"
    ],
-   "at": "2026-10-23T11:21:55.534Z"
+   "at": "2026-10-23T11:55:33.139Z"
   },
   {
    "id": "13b-tour-skip-escape",
@@ -1142,13 +1142,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 4631,
+   "ms": 4745,
    "checks": 13,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:22:00.165Z"
+   "at": "2026-10-23T11:55:37.885Z"
   },
   {
    "id": "13c-tour-out-of-order",
@@ -1157,13 +1157,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 5463,
+   "ms": 4928,
    "checks": 12,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:22:05.628Z"
+   "at": "2026-10-23T11:55:42.814Z"
   },
   {
    "id": "13d-tour-pauses",
@@ -1172,71 +1172,51 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 8321,
+   "ms": 11524,
    "checks": 11,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T11:22:13.949Z"
+   "at": "2026-10-23T11:55:54.339Z"
   },
   {
    "id": "13e-tour-layouts",
    "title": "Walkthrough: the card stays on screen and off the ring on a phone and in Large text",
    "owner": "board",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 23004,
+   "ms": 15996,
    "checks": 57,
-   "failed": [
-    {
-     "name": "phone 390: step 9 every ringed element can be seen",
-     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[195,844],\"inside\":true,\"top\":546,\"bottom\":832,\"w\":366,\"targets\":[]}",
-     "owner": "board"
-    },
-    {
-     "name": "large text 1280: step 9 every ringed element can be seen",
-     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[123,800],\"inside\":true,\"top\":492,\"bottom\":788,\"w\":560,\"targets\":[]}",
-     "owner": "board"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
+    "test/.out/qa/tour-7-phone-390.png",
     "test/.out/qa/tour-8-phone-390.png",
-    "test/.out/qa/tour-9-phone-390.png",
-    "test/.out/qa/tour-8-large-text-1280.png",
-    "test/.out/qa/tour-9-large-text-1280.png",
-    "test/.out/qa/fail-13e-tour-layouts.png",
-    "test/.out/qa/fail-13e-tour-layouts-1.png"
+    "test/.out/qa/tour-7-large-text-1280.png",
+    "test/.out/qa/tour-8-large-text-1280.png"
    ],
-   "at": "2026-10-23T11:22:36.955Z"
+   "at": "2026-10-23T11:56:10.335Z"
   },
   {
    "id": "13f-tour-busy-board",
    "title": "Walkthrough: with other tickets on the board the new ticket is found and the card sits beside it",
    "owner": "board",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 14301,
+   "ms": 10365,
    "checks": 34,
-   "failed": [
-    {
-     "name": "busy board 1280: step 9 every ringed element can be seen",
-     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[123,725],\"inside\":true,\"top\":473,\"bottom\":713,\"w\":560,\"targets\":[]}",
-     "owner": "board"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
-    "test/.out/qa/tour-8-busy-board-1280.png",
-    "test/.out/qa/tour-9-busy-board-1280.png",
-    "test/.out/qa/fail-13f-tour-busy-board.png"
+    "test/.out/qa/tour-7-busy-board-1280.png",
+    "test/.out/qa/tour-8-busy-board-1280.png"
    ],
-   "at": "2026-10-23T11:22:51.257Z"
+   "at": "2026-10-23T11:56:20.700Z"
   }
  ]
 }

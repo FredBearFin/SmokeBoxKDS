@@ -264,11 +264,15 @@ async function recipes(browser) {
   check('cafe: one station in use shows no station tabs', t1.length === 0, t1);
   await tap(p, 'New ticket'); await p.waitForTimeout(500);
   await tap(p, 'Latte'); await p.waitForTimeout(200);
-  for (const t of ['Takeout', 'Dine-in', 'Cash', 'Card', 'Send to kitchen']) check('order screen: ' + t, await seen(p, t));
+  for (const t of ['Takeout', 'Dine-in', 'Cash', 'Card', 'Pay later', 'Allergy', 'Rush ticket', 'Send to kitchen']) check('order screen: ' + t, await seen(p, t));
   await tap(p, 'Cash'); await tap(p, 'Send to kitchen'); await p.waitForTimeout(900);
+  check('card: Recall and 86 board in the header', (await seen(p, 'Recall')) && (await seen(p, '86 board')));
   check('cafe: Done on the ticket', await seen(p, 'Done'));
   await tap(p, 'Done'); await p.waitForTimeout(400);
   check('cafe: Bump', await seen(p, 'Bump'));
+  // The During service card opens from the Guide and names buttons the board has.
+  await p.goto(FILE + '#/guide/card-during-service'); await p.waitForTimeout(700);
+  check('card: During service opens', (await has(p, 'Counter and expo')) && (await has(p, 'Frozen or offline')));
   await p.close();
   // Line with an expo: a cook tab shows only its dishes, the Expo tab shows the whole ticket tagged by station and has Bump.
   p = await fresh(browser);

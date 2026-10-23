@@ -10,9 +10,9 @@ Add dishes, send a test order, take payment and save a backup. About ten minutes
 
 Change dishes and prices later: tap **Menu**, then **Dishes and prices**. A dish you remove goes to **Removed dishes**. Tap **Bring it back** to put it back.
 
-The arrow buttons beside each dish change the order they appear in. The category list on a dish's row moves it to another category.
+The arrow buttons beside each dish change the order they appear in. The menu section list on a dish's row moves it to another menu section.
 
-Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything. New categories in the file? Tap **Add these categories**.
+Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything. New menu sections in the file? Tap **Add these categories**.
 
 ## 2. Set your tax and hours
 

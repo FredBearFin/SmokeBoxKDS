@@ -40,11 +40,11 @@
      },
      {
       "t": "p",
-      "x": "The arrow buttons beside each dish change the order they appear in. The category list on a dish's row moves it to another category."
+      "x": "The arrow buttons beside each dish change the order they appear in. The menu section list on a dish's row moves it to another menu section."
      },
      {
       "t": "p",
-      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything. New categories in the file? Tap **Add these categories**."
+      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything. New menu sections in the file? Tap **Add these categories**."
      },
      {
       "t": "h",
@@ -603,7 +603,7 @@
      {
       "t": "ul",
       "x": [
-       "Clear the search box and choose the All category on the New ticket screen.",
+       "Clear the search box and choose All on the New ticket screen.",
        "Open the **86 board**. A dish that is sold out or off the menu is listed there with the reason.",
        "Open **Dishes and prices** to see every dish you have added. A dish you removed is under **Removed dishes**: tap **Bring it back**.",
        "No **Cabinet** tab or **Sanitize** button? They show only after you say **Yes, I cook ahead** in **Dishes and prices**."
@@ -952,6 +952,47 @@
        "Backups go where you save them: the Downloads folder, or an email to yourself. Smokebox does not send them anywhere",
        "Keep a copy of every backup off this tablet",
        "Replacing the tablet? Restore your newest backup (Guide, Replacing a device)"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "card-during-service",
+    "group": "cards",
+    "title": "During service",
+    "summary": "Print this card and keep it by the tablet. One side for cooks, one for the counter.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Cooks"
+     },
+     {
+      "t": "check",
+      "x": [
+       "A ticket arrives: read your dishes",
+       "Tap Start when a timed dish begins",
+       "Tap Done only when it is really finished",
+       "Gray dish: waiting on purpose. Start now goes early",
+       "Clock amber, then red: the order is late",
+       "Sold out: tap 86 board and mark it",
+       "Wrong tap: Undo, within 10 seconds",
+       "Bumped by mistake: Recall, in the header"
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Counter and expo"
+     },
+     {
+      "t": "check",
+      "x": [
+       "New ticket, tap the dishes, pick Dine-in or Takeout",
+       "Allergy: tap Allergy and say which, first",
+       "Customer waiting: switch on Rush ticket",
+       "Cash or Card, then Send to kitchen. Or Pay later",
+       "Every dish done: Bump",
+       "Wrong ticket: Void ticket, with a reason",
+       "Frozen or offline: reload the page. Orders are kept"
       ]
      }
     ]

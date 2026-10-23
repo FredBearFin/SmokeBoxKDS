@@ -1,9 +1,9 @@
 // Journey 13: the "Show me how it works" walkthrough (SB.tour). A first-time user taps through one real ticket; the caption follows what
-// they actually do. Checks the nine steps with real clicks, Skip and Escape cleanup, doing things out of order, pausing for sheets and the
+// they actually do. Checks the eight steps with real clicks, Skip and Escape cleanup, doing things out of order, pausing for sheets and the
 // office, and the card never covering what it points at (laptop, phone, Large text).
 import { clearBoard as clearBoardBlank, seedStandard, wait, settle, openKey, closeSheets, tapFlame, waitOffice, officeOpen } from './_lib.mjs';
 
-const LAST = 9;
+const LAST = 8;
 const slipOf = (page, id) => page.locator('.fl-slip[data-ticket="' + id + '"]');
 const rowBtn = (page, menu) => page.locator('.fl-row[data-menu="' + menu + '"] button').first();
 const card = (page) => page.locator('.tour-card');
@@ -20,9 +20,9 @@ const newestId = (page) => page.evaluate(() => { const l = SB.store.getState().t
 const stepLabel = (page) => page.evaluate(() => { const c = document.querySelector('.tour-card'); const s = document.querySelector('.tour-step'); return c && !c.hidden && s ? s.textContent : ''; });
 // The caption sentence.
 const sentence = (page) => page.evaluate(() => { const e = document.querySelector('.tour-text'); return e ? e.textContent : ''; });
-// Waits for the label "Step n of 9"; true when it showed up in time.
+// Waits for the label "Step n of 8"; true when it showed up in time.
 async function reach(page, n, ms = 20000) {
-  return page.waitForFunction((n) => { const c = document.querySelector('.tour-card'); const s = document.querySelector('.tour-step'); return !!c && !c.hidden && !!s && s.textContent === 'Step ' + n + ' of 9'; }, n, { timeout: ms }).then(() => true, () => false);
+  return page.waitForFunction((n) => { const c = document.querySelector('.tour-card'); const s = document.querySelector('.tour-step'); return !!c && !c.hidden && !!s && s.textContent === 'Step ' + n + ' of 8'; }, n, { timeout: ms }).then(() => true, () => false);
 }
 // The clock speed, the ring count, whether the card is on the page and what has focus.
 const snap = (page) => page.evaluate(() => ({
@@ -61,7 +61,7 @@ const drive = (page, id, menu, times) => page.evaluate(([id, menu, times]) => {
   return find().status;
 }, [id, menu, times]);
 
-// Visits steps 1 to 9 of a fresh walkthrough by moving the real ticket along (no clock needed) and checks, at every step, that the
+// Visits steps 1 to 8 of a fresh walkthrough by moving the real ticket along (no clock needed) and checks, at every step, that the
 // card is on screen, covers none of the rings, and that every ringed element can be seen. On a wide screen it also checks the card
 // leaves the Bump button alone. busy: start from the four standard tickets instead of an empty board.
 async function walk(t, page, label, busy) {
@@ -77,7 +77,7 @@ async function walk(t, page, label, busy) {
     const g = await geometry(page, id);
     t.check(label + ': step ' + n + ' card is on screen and does not cover what it points at', ok && layoutOk(g), { n, ok, g });
     // The ring is a class on the element itself, so an element with no box (the "On time" badge is hidden on purpose) draws nothing: skip those.
-    if (g) t.check(label + ': step ' + n + ' every ringed element can be seen', g.targets.filter((x) => x.bottom - x.top > 0).every((x) => x.seen) && (n === 9 ? true : g.targets.some((x) => x.bottom - x.top > 0)), g); // step 9 is the closing caption and rings nothing
+    if (g) t.check(label + ': step ' + n + ' every ringed element can be seen', g.targets.filter((x) => x.bottom - x.top > 0).every((x) => x.seen) && (n === 8 ? true : g.targets.some((x) => x.bottom - x.top > 0)), g); // step 8 is the closing caption and rings nothing
     if (g && wide) t.check(label + ': step ' + n + ' the card leaves the Bump button free', !g.bumpCovered, g);
     return g;
   };
@@ -86,25 +86,25 @@ async function walk(t, page, label, busy) {
   await card(page).getByRole('button', { name: 'Next' }).click(); await look(3);
   await drive(page, id, 'hushpuppies', 1); await look(4);
   await card(page).getByRole('button', { name: 'Next' }).click(); await look(5);
-  await drive(page, id, 'brisket_sand', 0); // fired early so step 6 shows the START wording on a real button
-  await look(6);
-  await drive(page, id, 'brisket_sand', 1); await look(7);
+  await drive(page, id, 'brisket_sand', 0); // fired early so step 5 shows the START wording on a real button
+  await look(5);
+  await drive(page, id, 'brisket_sand', 1); await look(6);
   await drive(page, id, 'hushpuppies', 1); await drive(page, id, 'brisket_sand', 1); await drive(page, id, 'tea', 1);
-  await look(8);
+  await look(7);
   const bump = await slipOf(page, id).locator('.fl-bump').boundingBox();
-  t.check(label + ': at step 8 the Bump button is tall enough to tap', !!bump && bump.height >= 44, bump);
-  await t.shot(page, 'tour-8-' + label.replace(/\W+/g, '-'));
+  t.check(label + ': at step 7 the Bump button is tall enough to tap', !!bump && bump.height >= 44, bump);
+  await t.shot(page, 'tour-7-' + label.replace(/\W+/g, '-'));
   await slipOf(page, id).locator('.fl-bump').click();
   await look(LAST);
   const btns = await card(page).locator('button:visible').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
   t.check(label + ': every card button is at least 44 px tall', btns.length >= 3 && btns.every((x) => x >= 44), btns);
-  await t.shot(page, 'tour-9-' + label.replace(/\W+/g, '-'));
+  await t.shot(page, 'tour-8-' + label.replace(/\W+/g, '-'));
   await card(page).getByRole('button', { name: 'Done' }).click();
   await settle(page, 200);
 }
 
 export default function (h) {
-  h.test('13a-tour-full-loop', 'Walkthrough: all nine steps with real clicks, from start to Done', { owner: 'board', timeout: 120000 }, async (t) => {
+  h.test('13a-tour-full-loop', 'Walkthrough: all eight steps with real clicks, from start to Done', { owner: 'board', timeout: 120000 }, async (t) => {
     const page = await t.open({ w: 1280, h: 800, kitchen: true });
     if (!(await page.evaluate(() => !!(window.SB && SB.tour)))) t.skip('SB.tour is not built yet');
     await clearBoard(page);
@@ -115,7 +115,7 @@ export default function (h) {
     const id = await newestId(page);
     t.check('it added exactly one ticket to the board', (await page.locator('.fl-grid > .fl-slip').count()) === 1, await page.locator('.fl-grid > .fl-slip').count());
     t.check('the All tab is showing so the whole ticket is visible', (await page.locator('.fl-seg [data-id="all"]').getAttribute('aria-selected')) === 'true');
-    t.check('step 1 shows "Step 1 of 9"', (await stepLabel(page)) === 'Step 1 of 9', await stepLabel(page));
+    t.check('step 1 shows "Step 1 of 8"', (await stepLabel(page)) === 'Step 1 of 8', await stepLabel(page));
     t.check('step 1 says this is a ticket, one customer\'s order', /one customer's order/.test(await sentence(page)), await sentence(page));
     t.check('step 1 rings the ticket header', (await slipOf(page, id).locator('.slip-head.tour-ring').count()) === 1);
     t.check('step 1 has Skip and Next', (await card(page).getByRole('button', { name: 'Skip' }).isVisible()) && (await card(page).getByRole('button', { name: 'Next' }).isVisible()));
@@ -148,17 +148,18 @@ export default function (h) {
     t.check('step 5: the card does not cover the brisket row', layoutOk(await geometry(page)), await geometry(page));
     await t.shot(page, 'tour-5-1280');
 
-    // wait for the countdown to run out; step 6 arrives by itself once the sandwich is no longer gray
-    t.check('step 6 arrives by itself when the brisket sandwich is ready to start', await reach(page, 6, 20000), await stepLabel(page));
-    t.check('step 6 tells the person to tap START on the brisket sandwich', /Tap Start on Brisket sandwich/.test(await sentence(page)), await sentence(page));
-    t.check('step 6: the sandwich row is a real button now', (await slipOf(page, id).locator('.fl-row[data-menu="brisket_sand"][data-kind="btn"]').count()) === 1);
-    t.check('step 6: the card does not cover the brisket row', layoutOk(await geometry(page)), await geometry(page));
+    // wait for the countdown to run out; step 5 then changes its words by itself once the sandwich is no longer gray
+    t.check('step 5 first explains the gray dish and offers Next', /Start now/.test(await sentence(page)) && (await card(page).getByRole('button', { name: 'Next' }).isVisible()), await sentence(page));
+    t.check('step 5 changes to the START wording when the brisket sandwich is ready', await page.waitForFunction(() => /Tap Start on Brisket sandwich/.test((document.querySelector('.tour-say') || {}).textContent || ''), null, { timeout: 20000 }).then(() => true, () => false), await sentence(page));
+    t.check('step 5 then has no Next button', !(await card(page).getByRole('button', { name: 'Next' }).isVisible()));
+    t.check('step 5: the sandwich row is a real button now', (await slipOf(page, id).locator('.fl-row[data-menu="brisket_sand"][data-kind="btn"]').count()) === 1);
+    t.check('step 5: the card does not cover the brisket row', layoutOk(await geometry(page)), await geometry(page));
     await rowBtn(page, 'brisket_sand').click();
     await settle(page, 300);
-    t.check('tapping START on the sandwich moves to step 7', await reach(page, 7, 4000), await stepLabel(page));
-    t.check('step 7 says the person is the one who says a dish is done', /You are the one who says it is done/.test(await sentence(page)), await sentence(page));
-    t.check('step 7: the card does not cover the cooking rows', layoutOk(await geometry(page)), await geometry(page));
-    await t.shot(page, 'tour-7-1280');
+    t.check('tapping START on the sandwich moves to step 6', await reach(page, 6, 4000), await stepLabel(page));
+    t.check('step 6 says the person is the one who says a dish is done', /You are the one who says it is done/.test(await sentence(page)), await sentence(page));
+    t.check('step 6: the card does not cover the cooking rows', layoutOk(await geometry(page)), await geometry(page));
+    await t.shot(page, 'tour-6-1280');
 
     // finish the hush puppies and the sandwich by tapping their orange timers, then the tea when it is ready
     await rowBtn(page, 'hushpuppies').click();
@@ -168,21 +169,21 @@ export default function (h) {
     t.check('both cooked dishes show Done', (await slipOf(page, id).locator('.fl-row[data-state="done"]').count()) === 2, await slipOf(page, id).locator('.fl-row[data-state="done"]').count());
     const teaReady = await page.waitForFunction((id) => { const r = document.querySelector('.fl-slip[data-ticket="' + id + '"] .fl-row[data-menu="tea"]'); return !!r && r.dataset.kind === 'btn'; }, id, { timeout: 20000 }).then(() => true, () => false);
     t.check('the sweet tea becomes ready to tap by itself', teaReady);
-    t.check('step 7 still waits for the tea', (await stepLabel(page)) === 'Step 7 of 9' && /Sweet tea/.test(await sentence(page)), await sentence(page));
+    t.check('step 6 still waits for the tea', (await stepLabel(page)) === 'Step 6 of 8' && /Sweet tea/.test(await sentence(page)), await sentence(page));
     await rowBtn(page, 'tea').click();
-    t.check('finishing the last dish moves to step 8', await reach(page, 8, 4000), await stepLabel(page));
-    t.check('step 8 rings the Bump button and says the clock stops', (await slipOf(page, id).locator('.fl-bump.tour-ring').count()) === 1 && /clock stops/.test(await sentence(page)), await sentence(page));
-    t.check('step 8: the card does not cover the Bump button', layoutOk(await geometry(page)), await geometry(page));
-    await t.shot(page, 'tour-8-1280');
+    t.check('finishing the last dish moves to step 7', await reach(page, 7, 4000), await stepLabel(page));
+    t.check('step 7 rings the Bump button and says the clock stops', (await slipOf(page, id).locator('.fl-bump.tour-ring').count()) === 1 && /clock stops/.test(await sentence(page)), await sentence(page));
+    t.check('step 7: the card does not cover the Bump button', layoutOk(await geometry(page)), await geometry(page));
+    await t.shot(page, 'tour-7-1280');
     await slipOf(page, id).locator('.fl-bump').click();
-    t.check('tapping Bump moves to step 9', await reach(page, LAST, 5000), await stepLabel(page));
-    t.check('step 9 says that is the whole loop and points at the back office', /whole loop/.test(await sentence(page)) && /tap Back office/.test(await sentence(page)), await sentence(page));
+    t.check('tapping Bump moves to step 8', await reach(page, LAST, 5000), await stepLabel(page));
+    t.check('step 8 says that is the whole loop and points at the back office', /whole loop/.test(await sentence(page)) && /tap Back office/.test(await sentence(page)), await sentence(page));
     const last = await Promise.all(['Add my own ticket', 'Start the demo', 'Done'].map((n) => card(page).getByRole('button', { name: n }).isVisible()));
-    t.check('step 9 offers Add my own ticket, Start the demo and Done', last.every(Boolean), last);
-    t.check('step 9 has no Skip: Done ends it', !(await card(page).getByRole('button', { name: 'Skip' }).isVisible()));
-    t.check('the clock is back to normal speed by step 9', (await snap(page)).speed === 1, (await snap(page)).speed);
-    t.check('step 9 has no ring left on the board', (await snap(page)).rings === 0, (await snap(page)).rings);
-    await t.shot(page, 'tour-9-1280');
+    t.check('step 8 offers Add my own ticket, Start the demo and Done', last.every(Boolean), last);
+    t.check('step 8 has no Skip: Done ends it', !(await card(page).getByRole('button', { name: 'Skip' }).isVisible()));
+    t.check('the clock is back to normal speed by step 8', (await snap(page)).speed === 1, (await snap(page)).speed);
+    t.check('step 8 has no ring left on the board', (await snap(page)).rings === 0, (await snap(page)).rings);
+    await t.shot(page, 'tour-8-1280');
     await card(page).getByRole('button', { name: 'Done' }).click();
     await settle(page, 300);
     const end = await snap(page);
@@ -218,7 +219,7 @@ export default function (h) {
     t.check('starting again adds a second ticket and leaves the first one', (await page.locator('.fl-grid > .fl-slip').count()) === 2, await page.locator('.fl-grid > .fl-slip').count());
     await page.evaluate(() => SB.tour.start());
     await settle(page, 300);
-    t.check('starting while one runs does not stack cards', (await snap(page)).cards === 1 && (await stepLabel(page)) === 'Step 1 of 9', await snap(page));
+    t.check('starting while one runs does not stack cards', (await snap(page)).cards === 1 && (await stepLabel(page)) === 'Step 1 of 8', await snap(page));
 
     // Escape on the board ends it; at step 5 so the clock must come back too
     await page.evaluate(() => { document.querySelector('#fl-board').focus(); });
@@ -247,23 +248,23 @@ export default function (h) {
     await reach(page, 1, 3000);
     const id = await newestId(page);
 
-    // brisket first (Start now on the gray row goes straight to cooking), then the hush puppies: the caption lands on step 7
+    // brisket first (Start now on the gray row goes straight to cooking), then the hush puppies: the caption lands on step 6
     await rowBtn(page, 'brisket_sand').click(); // Start now
     await settle(page, 400);
     const bsState = await slipOf(page, id).locator('.fl-row[data-menu="brisket_sand"]').getAttribute('data-state');
     t.check('Start now on the gray sandwich row starts it cooking', bsState === 'cooking', bsState);
-    t.check('starting the sandwich before the hush puppies does not jump ahead', (await stepLabel(page)) === 'Step 1 of 9', await stepLabel(page));
+    t.check('starting the sandwich before the hush puppies does not jump ahead', (await stepLabel(page)) === 'Step 1 of 8', await stepLabel(page));
     await rowBtn(page, 'hushpuppies').click();
-    t.check('starting the hush puppies afterwards lands on step 7, the "tap done" step', await reach(page, 7, 4000), await stepLabel(page));
-    t.check('step 7 asks for the hush puppies and the sandwich to be finished', /Hush puppies and Brisket sandwich/.test(await sentence(page)), await sentence(page));
+    t.check('starting the hush puppies afterwards lands on step 6, the "tap done" step', await reach(page, 6, 4000), await stepLabel(page));
+    t.check('step 6 asks for the hush puppies and the sandwich to be finished', /Hush puppies and Brisket sandwich/.test(await sentence(page)), await sentence(page));
 
-    // finishing everything without the tour's help goes to step 8 even though the tea is still waiting
+    // finishing everything without the tour's help goes to step 7 even though the tea is still waiting
     await drive(page, id, 'hushpuppies', 1);
     await drive(page, id, 'brisket_sand', 1);
     await drive(page, id, 'tea', 1);
-    t.check('finishing every dish by any route lands on step 8', await reach(page, 8, 5000), await stepLabel(page));
+    t.check('finishing every dish by any route lands on step 7', await reach(page, 7, 5000), await stepLabel(page));
 
-    // an early Bump on a fresh tour ticket: the confirm appears, "Bump anyway" jumps to step 9
+    // an early Bump on a fresh tour ticket: the confirm appears, "Bump anyway" jumps to step 8
     await page.evaluate(() => SB.tour.start());
     await reach(page, 1, 3000);
     const id2 = await newestId(page);
@@ -274,7 +275,7 @@ export default function (h) {
     await settle(page, 500); // the walkthrough looks four times a second
     t.check('while the confirm is open the caption steps aside', (await stepLabel(page)) === '' && (await snap(page)).rings === 0, await snap(page));
     await ad.first().getByRole('button', { name: 'Bump anyway' }).click();
-    t.check('bumping early jumps to step 9', await reach(page, LAST, 5000), await stepLabel(page));
+    t.check('bumping early jumps to step 8', await reach(page, LAST, 5000), await stepLabel(page));
     await card(page).getByRole('button', { name: 'Done' }).click();
     await settle(page, 200);
     t.check('Done ends the tour', !(await snap(page)).active);

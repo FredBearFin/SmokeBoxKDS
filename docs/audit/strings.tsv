@@ -3010,28 +3010,46 @@ file	line	kind	area	text
 78-guide.js	952	text	78-guide	Backups go where you save them: the Downloads folder, or an email to yourself. Smokebox does not send them anywhere
 78-guide.js	953	text	78-guide	Keep a copy of every backup off this tablet
 78-guide.js	954	text	78-guide	Replacing the tablet? Restore your newest backup (Guide, Replacing a device)
-78-guide.js	1048	text	78-guide > paint	Print this card
-78-guide.js	1048	text	78-guide > paint	Print this page
-78-guide.js	1055	text	78-guide > link	Previous:
-78-guide.js	1055	text	78-guide > link	Next:
-78-guide.js	1081	text	78-guide > show	Pages:
-78-guide.js	1082	text	78-guide > show	All pages and search
-78-guide.js	1095	text	78-guide > buildList	Quick cards to print
-78-guide.js	1100	placeholder	78-guide > buildSearch	Search the Guide
-78-guide.js	1102	aria-label	78-guide > buildSearch	Search results
-78-guide.js	1108	text	78-guide > run	page matches
-78-guide.js	1108	text	78-guide > run	pages match
-78-guide.js	1108	text	78-guide > run	No page matches. Try fewer or different words.
-78-guide.js	1117	text	78-guide > buildSearch	Search the Guide
-78-guide.js	1128	text	78-guide > mount	All pages and search
-78-guide.js	1130	aria-label	78-guide > mount	Guide pages
-78-guide.js	1136	text	78-guide > fit	Pages:
-78-guide.js	1136	text	78-guide > fit	All pages and search
-78-guide.js	1142	text	78-guide > mount	Back to the board
-78-guide.js	1143	text	78-guide > mount	Guide
-78-guide.js	1145	text	78-guide > mount	Skip to this page
-78-guide.js	1171	text	78-guide > link	Help:
-78-guide.js	1171	text	78-guide > link	Help
+78-guide.js	962	title	78-guide	During service
+78-guide.js	963	text	78-guide	Print this card and keep it by the tablet. One side for cooks, one for the counter.
+78-guide.js	967	text	78-guide	Cooks
+78-guide.js	973	text	78-guide	Tap Start when a timed dish begins
+78-guide.js	974	text	78-guide	Tap Done only when it is really finished
+78-guide.js	975	text	78-guide	Gray dish: waiting on purpose. Start now goes early
+78-guide.js	976	text	78-guide	Clock amber, then red: the order is late
+78-guide.js	977	text	78-guide	Sold out: tap 86 board and mark it
+78-guide.js	978	text	78-guide	Wrong tap: Undo, within 10 seconds
+78-guide.js	979	text	78-guide	Bumped by mistake: Recall, in the header
+78-guide.js	984	text	78-guide	Counter and expo
+78-guide.js	989	text	78-guide	New ticket, tap the dishes, pick Dine-in or Takeout
+78-guide.js	990	text	78-guide	Allergy: tap Allergy and say which, first
+78-guide.js	991	text	78-guide	Customer waiting: switch on Rush ticket
+78-guide.js	992	text	78-guide	Cash or Card, then Send to kitchen. Or Pay later
+78-guide.js	993	text	78-guide	Every dish done: Bump
+78-guide.js	994	text	78-guide	Wrong ticket: Void ticket, with a reason
+78-guide.js	995	text	78-guide	Frozen or offline: reload the page. Orders are kept
+78-guide.js	1089	text	78-guide > paint	Print this card
+78-guide.js	1089	text	78-guide > paint	Print this page
+78-guide.js	1096	text	78-guide > link	Previous:
+78-guide.js	1096	text	78-guide > link	Next:
+78-guide.js	1122	text	78-guide > show	Pages:
+78-guide.js	1123	text	78-guide > show	All pages and search
+78-guide.js	1136	text	78-guide > buildList	Quick cards to print
+78-guide.js	1141	placeholder	78-guide > buildSearch	Search the Guide
+78-guide.js	1143	aria-label	78-guide > buildSearch	Search results
+78-guide.js	1149	text	78-guide > run	page matches
+78-guide.js	1149	text	78-guide > run	pages match
+78-guide.js	1149	text	78-guide > run	No page matches. Try fewer or different words.
+78-guide.js	1158	text	78-guide > buildSearch	Search the Guide
+78-guide.js	1169	text	78-guide > mount	All pages and search
+78-guide.js	1171	aria-label	78-guide > mount	Guide pages
+78-guide.js	1177	text	78-guide > fit	Pages:
+78-guide.js	1177	text	78-guide > fit	All pages and search
+78-guide.js	1183	text	78-guide > mount	Back to the board
+78-guide.js	1184	text	78-guide > mount	Guide
+78-guide.js	1186	text	78-guide > mount	Skip to this page
+78-guide.js	1212	text	78-guide > link	Help:
+78-guide.js	1212	text	78-guide > link	Help
 79-guide-art.js	54	text	79-guide-art > ticket	Maria
 79-guide-art.js	55	text	79-guide-art > ticket	Dine-in 0 of 2 done
 79-guide-art.js	58	text	79-guide-art > ticket	Tap Start on Hush puppies.
