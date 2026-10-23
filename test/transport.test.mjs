@@ -120,3 +120,24 @@ test('a custom transport receives saved announcements, a failed open runs alone,
   assert.equal(S.dispatch('createTicket', order), 'ok');
   S.destroy();
 });
+
+test('adopting the hub state keeps unconfirmed local actions and takes the hub numbering', () => {
+  const clock = { real: T0 };
+  const t = fakeTransport(() => new Promise(() => {}));
+  S.init({ now: () => clock.real, storage: memStorage(), noTimers: true, transport: t });
+  const a = S.dispatchEx('createTicket', { customer: 'Mine A', items: [{ menuId: 'tea' }] }).opId;
+  clock.real += 1000;
+  S.dispatchEx('createTicket', { customer: 'Mine B', items: [{ menuId: 'tea' }] });
+  // the hub saw another device's ticket first, then our first action; it has not seen our second
+  let hub = E.newState({ now: T0 });
+  hub = E.apply(hub, 'createTicket', { customer: 'Theirs', items: [{ menuId: 'tea' }] }, T0 + 10).state;
+  hub = E.apply(hub, 'createTicket', { customer: 'Mine A', items: [{ menuId: 'tea' }] }, T0 + 20).state;
+  t.deliver({ type: 'state', state: JSON.parse(E.serialize(hub)), opIds: [a] });
+  const nums = S.getState().tickets.map((x) => x.customer + ':' + x.num);
+  assert.deepEqual(nums, ['Theirs:101', 'Mine A:102', 'Mine B:103']);
+  assert.equal(S.outbox().length, 1); // only the second action is still unconfirmed
+  assert.deepEqual(E.checkInvariants(S.getState(), S.now()), []);
+  t.deliver({ type: 'state', state: 'not a state', opIds: [] }); // junk is ignored
+  assert.equal(S.getState().tickets.length, 3);
+  S.destroy();
+});
