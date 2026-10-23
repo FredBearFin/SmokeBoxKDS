@@ -244,7 +244,7 @@
   function batchRows(state, now, S, sales, out) {
     const byIng = Object.create(null);
     for (const b of state.batches) {
-      if (b.status === 'discard' || !(b.remainingG > 0) || b.kind === 'cooling') continue;
+      if (b.status === 'discard' || !(b.remainingG > 0) || b.kind === 'cooling' || b.fridge === true) continue;
       // A batch past its quality limit is off the menu: it cannot sell, so it gets its own row and no projection.
       if (b.status === 'past') { pastRow(state, b, now, out); continue; }
       (byIng[b.ing] = byIng[b.ing] || []).push(b);
@@ -314,7 +314,7 @@
       const gt = E().gate(b, now, S);
       if (gt.action === 'NONE' && !(b.kind === 'cooling')) {
         const due = gt.nextDeadlineAt;
-        if (U.isNum(due) && due !== Infinity && due - now <= 15 * MIN && b.enteredAt + E()._internal.holdLimitMs(b, S) > due) {
+        if (U.isNum(due) && due !== Infinity && due - now <= 15 * MIN && (b.fridge === true || b.enteredAt + E()._internal.holdLimitMs(b, S) > due)) {
           out.push({ id: 'check:' + b.id, kind: 'check', ing: b.ing, batchId: b.id, label: b.label || b.ing, at: due, msLeft: due - now, rung: 0, rungs: 0, sev: 'info',
             consequence: 'A temperature reading is due at ' + U.fmtTime(due) + '.', action: 'Log a temperature.', unknown: false });
         }
@@ -328,16 +328,47 @@
         consequence: text, action: kind === 'check' ? 'Log a temperature.' : kind === 'reheat' ? 'Reheat it and log the reading.' : kind === 'chill' ? 'Chill it now.' : 'Log a reading as it cools.', unknown: false });
     }
   }
+  // Plain words about a cold batch kept in a fridge, for a card line or a call-out: where it is, the date mark and the time left
+  // against the owner's own limits. Never states a rule: it says "your limit". Returns '' for any other batch.
+  function coldLine(b, now) {
+    const c = E().coldInfo(b, now);
+    if (!c) return '';
+    const parts = [c.place === 'line' ? 'Out of the fridge' + (c.outSince != null ? ' since ' + U.fmtTime(c.outSince) : '') : 'In the fridge'];
+    if (c.madeOn) parts.push('made ' + U.fmtDateShort(c.madeOn));
+    if (c.fridgeDays != null) parts.push('your fridge limit ' + c.fridgeDays + (c.fridgeDays === 1 ? ' day' : ' days') + ', last day ' + U.fmtDateShort(c.useBy));
+    if (c.outHours != null) parts.push(c.outMs > 0 || c.place === 'line' ? U.fmtDur(c.outMs) + ' out so far, ' + (c.outLeftMs > 0 ? U.fmtDur(c.outLeftMs) + ' left of' : 'over') + ' your ' + c.outHours + '-hour limit' : 'your out-of-fridge limit ' + c.outHours + ' hours');
+    if (c.noLimit) parts.push('no limit set');
+    else if (c.outHours == null && c.fridgeDays != null) parts.push('no out-of-fridge limit set');
+    else if (c.fridgeDays == null && c.outHours != null) parts.push('no fridge limit set');
+    return parts.join(' - ');
+  }
+  // Rows for cold batches kept in a fridge: the out-of-fridge hours running low, and the last day of the fridge limit. The words
+  // say "your limit"; the app does not know the local rule.
+  function coldRows(state, now, out) {
+    for (const b of state.batches) {
+      if (b.fridge !== true || b.status === 'discard' || !(b.remainingG > 0)) continue;
+      const c = E().coldInfo(b, now);
+      const label = b.label || b.ing;
+      if (c.place === 'line' && c.outLeftMs != null && c.outLeftMs <= 30 * MIN) {
+        out.push({ id: 'coldout:' + b.id, epoch: 0, kind: 'coldOut', ing: b.ing, batchId: b.id, label, at: now + c.outLeftMs, msLeft: c.outLeftMs, rung: 0, rungs: 0, sev: c.outLeftMs <= 10 * MIN ? 'bad' : 'warn',
+          consequence: c.outLeftMs > 0 ? U.fmtDur(c.outLeftMs) + ' left of your ' + c.outHours + '-hour limit out of the fridge.' : 'Past your ' + c.outHours + '-hour limit out of the fridge.', action: 'Put it back in the fridge, or use it. Your food-safety plan comes first.', unknown: false });
+      }
+      if (c.fridgeLeftMs != null && c.fridgeLeftMs <= 6 * H) {
+        out.push({ id: 'colddate:' + b.id, epoch: 0, kind: 'coldDate', ing: b.ing, batchId: b.id, label, at: now + c.fridgeLeftMs, msLeft: c.fridgeLeftMs, rung: 0, rungs: 0, sev: c.fridgeLeftMs <= 2 * H ? 'bad' : 'warn',
+          consequence: 'The last day of your fridge limit (' + U.fmtDateShort(c.useBy) + ') ends at midnight.', action: 'Use it today, or check it against your food-safety plan.', unknown: false });
+      }
+    }
+  }
   // Rows for batches that expired and were thrown out in the last 30 minutes, so the loss is not silent.
   function expiredRows(state, now, out) {
     for (const b of state.batches) {
-      if (b.status !== 'discard' || b.discardReason !== 'expired' || !U.isNum(b.discardedAt) || now - b.discardedAt > 30 * MIN || !(b.wasteG >= TRIVIAL_G)) continue;
+      if (b.status !== 'discard' || !(b.discardReason === 'expired' || b.discardReason === 'fridgeDate' || b.discardReason === 'outTime') || !U.isNum(b.discardedAt) || now - b.discardedAt > 30 * MIN || !(b.wasteG >= TRIVIAL_G)) continue;
       const ing = state.ingredients.find((x) => x.id === b.ing);
       const name = ing ? ing.name : b.ing;
       const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');
       const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' (' + U.currencySymbol() + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
       out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
-        consequence: 'Expired and thrown out: ' + U.weightText(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
+        consequence: (b.discardReason === 'expired' ? 'Expired and thrown out: ' : 'Past your limit and thrown out: ') + U.weightText(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
     }
   }
   // Rows for batches that are being kept serving: shown from 15 minutes before the extension ends, or when the last
@@ -670,6 +701,7 @@
       const sales = salesRate(state, now);
       batchRows(state, now, S, sales, out);
       safetyRows(state, now, S, out);
+      coldRows(state, now, out);
       expiredRows(state, now, out);
       keepRows(state, now, S, out);
     }
@@ -679,5 +711,5 @@
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
+  SB.deadlines = { build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

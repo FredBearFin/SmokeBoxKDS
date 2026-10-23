@@ -216,7 +216,7 @@
     else if (pr === 'bad') P.push(prob('badPrice', 'error', 'The price "' + row.priceText + '" is not a number.', 'Use digits only, for example 9.50.'));
     else if (typeof row.price === 'number') {
       if (row.price < 0) P.push(prob('negativePrice', 'error', 'The price ' + row.price + ' is below zero.', 'Enter the price as a positive amount.'));
-      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above ' + cs() + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "Prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950. If the file is in cents, choose "Prices are in cents".'));
+      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above ' + cs() + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "These prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950. If the file is in cents, choose "These prices are in cents".'));
       else if (row.price === 0) P.push(prob('freeItem', 'warn', 'The price is ' + cs() + '0.00.', 'Keep it if the dish is free, or enter a price.'));
       if (row.rounded) P.push(prob('priceRounded', 'warn', 'The price had more than two decimals and was rounded to the cent.', 'Check the price shown.'));
     }
@@ -224,7 +224,7 @@
     else if (/^\d+([.,]\d+)?$/.test(row.categoryText || '')) P.push(prob('numericCategory', 'warn', 'The menu section (category) "' + row.categoryText + '" is a number, which usually means a price was split in two.', 'Check the price and the menu section (category) in the file.'));
     if (row.stationText && !row.station) P.push(prob('unknownStation', 'warn', 'The station "' + row.stationText + '" is not one of yours, so the default station is used.', 'Pick the station after adding the dish.'));
     if (row.categoryText && !row.category) P.push(prob('unknownCategory', 'warn', 'The menu section (category) "' + row.categoryText + '" is not one of yours, so the default section is used.', 'Change the menu section after adding the dish.'));
-    if (row.fromCents) P.push(prob('centsConverted', 'warn', 'The price was read in cents (' + row.priceText + ' becomes ' + cs() + (row.price != null ? row.price.toFixed(2) : '?') + ').', 'If this is wrong, choose "Prices are in dollars".'));
+    if (row.fromCents) P.push(prob('centsConverted', 'warn', 'The price was read in cents (' + row.priceText + ' becomes ' + cs() + (row.price != null ? row.price.toFixed(2) : '?') + ').', 'If this is wrong, choose "These prices are in dollars".'));
     row.ok = !P.some((p) => p.level === 'error');
   }
 
