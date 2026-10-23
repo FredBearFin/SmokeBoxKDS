@@ -106,7 +106,7 @@ Header strings are the exact text first, then the normalized form the code compa
 | station | `Prep Area`, `Prep Location`, `Line` | `preparea`, `preplocation`, `line` | spreadsheets (guess, no source) |
 | price | `Item Price` | `itemprice` | currently Toast branch only |
 | price | `Price (USD)`, `Price USD`, `Prices`, `Regular Price` | `priceusd`, `prices`, `regularprice` | spreadsheets (guess, no source) |
-| name | `Menu Item Name`, `Food`, `Dish Name`, `Item Description` is NOT a name | `menuitemname`, `food` | `dishname` already exists |
+| name | `Menu Item Name`, `Food` | `menuitemname`, `food` | spreadsheets (guess, no source); `dishname` already exists |
 | hidden | `Square Online Item Visibility` (values `visible`, `hidden`, `unavailable`?) | `squareonlineitemvisibility` | Square; the three values are from one sample file, not documented by me |
 | hidden | `Hidden`, `Archived` | already handled | Clover `Hidden` = `No`/`Yes`; Square `Archived` = `N`/`Y` |
 
