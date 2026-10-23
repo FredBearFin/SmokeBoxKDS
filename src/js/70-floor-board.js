@@ -27,7 +27,7 @@
     { key: 'Esc', keys: ['Esc'], label: 'Close a screen, or clear the all-day highlight' },
   ];
   // With no page (loaded under plain Node) every call does nothing, so loading never throws.
-  if (!doc) { F.mount = F.unmount = F.setZone = F.highlight = F.setSound = () => {}; F.sound = () => false; return; }
+  if (!doc) { F.mount = F.unmount = F.setZone = F.highlight = F.setSound = F.setCallouts = () => {}; F.sound = F.callouts = () => false; return; }
 
   const h = U.h;
   const C = SB.config;
@@ -36,7 +36,7 @@
   // Browser-storage keys: the sound switch, and whether the all-day strip is folded.
   const KEY_SOUND = 'smokebox.v1.sound';
   // Whether warnings are also spoken aloud (the tablet's own voice), on by default.
-  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume', KEY_FAR = 'smokebox.v1.far';
+  const KEY_SPEECH = 'smokebox.v1.speech', KEY_VOLUME = 'smokebox.v1.volume', KEY_FAR = 'smokebox.v1.far', KEY_CALLOUTS = 'smokebox.v1.callouts';
   // Loudness of this tablet's warnings: 0.2 to 1. It never reaches 0 (the sound toggle is the way to silence); the last warning and the expiry tone never go below half.
   const VOL_MIN = 0.2;
   const KEY_DOCK = 'smokebox.v1.dock';
@@ -58,6 +58,8 @@
   let speech = U.storage.get(KEY_SPEECH, true) !== false;
   // Far display is off by default and belongs to this tablet (it describes how far away the screen is read).
   let far = U.storage.get(KEY_FAR, false) === true;
+  // Voice call-outs (new ticket, start this dish now) are off until a tablet opts in; they follow the station tab showing.
+  let callouts = U.storage.get(KEY_CALLOUTS, false) === true;
   let audio = null, audioHooked = false, lastChime = 0, lastCheck = 0;
   let volume = (() => { const v = U.storage.get(KEY_VOLUME, 1); return U.isNum(v) ? Math.min(1, Math.max(VOL_MIN, v)) : 1; })();
 
@@ -197,6 +199,17 @@
     if (m.root) m.root.dataset.far = far ? 'on' : 'off';
     return far;
   };
+  // Tells whether voice call-outs are on for this tablet.
+  F.callouts = () => callouts;
+  // Switches voice call-outs on or off for this tablet and remembers it. Turning on says one test line (when sound
+  // and speech are on) and ignores tickets that are already on the board.
+  F.setCallouts = function (on) {
+    callouts = !!on;
+    U.storage.set(KEY_CALLOUTS, callouts);
+    if (m) { m.coPrimed = false; }
+    if (callouts && sound && speech) playHere(() => speak('Call-outs are on.'));
+    return callouts;
+  };
   // Tells whether warnings are spoken aloud right now.
   F.speech = () => speech;
   // Switches spoken warnings on or off and remembers it. Speech only plays while sound is on.
@@ -206,18 +219,40 @@
     if (speech && sound) playHere(() => speak('Spoken warnings are on.'));
     return speech;
   };
-  // Says one short fixed phrase with the tablet's voice when sound and speech are both on. Never queues up: a new
-  // phrase replaces an old one.
-  function speak(text) {
-    if (!audible() || !speech) return;
+  // When the tablet's voice is expected to be free again (browser clock, ms). A call-out waits for it, so it never talks
+  // over a warning or over the call before it.
+  let voiceFreeAt = 0;
+  // Says one short phrase with the tablet's voice when sound and speech are both on. A warning replaces whatever is
+  // being said; a call-out (queued) waits its turn instead and never cuts anything off.
+  function speak(text, queued) {
+    if (!audible() || !speech) return false;
     try {
       const ss = g.speechSynthesis, U2 = g.SpeechSynthesisUtterance;
-      if (!ss || !U2) return;
-      ss.cancel();
+      if (!ss || !U2) return false;
+      if (!queued) ss.cancel();
       const u = new U2(text);
       u.rate = 0.95; u.volume = 1;
       ss.speak(u);
-    } catch (e) { /* speech is optional */ }
+      // About 70 ms a letter plus a short gap; speech end events are not reliable on every tablet.
+      voiceFreeAt = performance.now() + 600 + text.length * 70;
+      return true;
+    } catch (e) { return false; /* speech is optional */ }
+  }
+  // Speaks the next waiting call-out when the voice is free. Called every second from the header update.
+  // WATCH OUT: with call-outs, sound or speech off, or when this tab is not the sound leader, nothing is queued, so
+  // nothing old is read out when they come back on.
+  function driveCallouts(now) {
+    if (!m) return;
+    const D = SB.deadlines;
+    if (!D || !D.makeCallouts) return;
+    if (!m.co) m.co = D.makeCallouts();
+    if (!callouts) { m.coPrimed = false; return; }
+    const wants = D.calloutWants(store().getState(), now, m.zone);
+    if (!m.coPrimed || !audible() || !speech) { m.co.prime(wants); m.coPrimed = audible() && speech; return; }
+    m.co.sync(wants, now);
+    if (performance.now() < voiceFreeAt) return;
+    const c = m.co.next(now);
+    if (c) speak(c.text, true);
   }
   // Plays the loud warning for the last minutes: three pairs of high and low notes, much louder than the chime.
   function alarmTone() {
@@ -416,7 +451,7 @@
     clearBoard();
     syncZoneUi();
     // Count this redraw as the first, so slips do not print in or chime as if they were new.
-    m.first = true;
+    m.first = true; m.coPrimed = false;
     m.hl = null; paintHighlight();
     render();
     m.first = false;
@@ -1325,6 +1360,7 @@
     const c = S.select.counts();
     m.counts = c;
     updateStrip(now);
+    driveCallouts(now);
     // station tabs
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
     const tabCount = (id, n, alert) => {
