@@ -233,11 +233,11 @@ async function startOver(browser) {
   const sh = '.sheet-root:last-of-type';
   for (const t of ['What happens', 'Keep my tax, hours, PIN and station names', 'Next: save a backup']) check('start over step 1: ' + t, await has(p, t, sh));
   await tap(p, 'Next: save a backup'); await p.waitForTimeout(500);
-  check('start over step 2: Save a backup now', await seen(p, 'Save a backup now', sh));
-  await tap(p, 'Save a backup now'); await p.waitForTimeout(900);
+  check('start over step 2: the backup is made at the moment of erasing', await seen(p, 'The moment you confirm', sh));
   await tap(p, 'Next: confirm'); await p.waitForTimeout(500);
   check('start over step 3: Erase everything and start over', await has(p, 'Erase everything and start over', sh));
-  await p.fill(sh + ' input[type=text]', 'START OVER'); await tap(p, 'Erase everything and start over'); await p.waitForTimeout(1500);
+  await p.fill(sh + ' input[type=text]', 'erase'); await tap(p, 'Erase everything and start over'); await p.waitForTimeout(1500);
+  for (const t of ['Done. Your kitchen is empty.', 'Go to the first screen', 'Save the backup again']) check('start over done: ' + t, await has(p, t, sh));
   check('start over: the kitchen is empty afterwards', (await p.evaluate(() => SB.store.getState().menu.length)) === 0);
   await p.close();
 }
