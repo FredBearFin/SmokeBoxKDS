@@ -757,6 +757,95 @@
     return sheet;
   }
 
+  /* ---------- Start over with an empty menu ---------- */
+
+  // The word the owner types to confirm. Upper case, so it is easy to read and hard to type by accident.
+  const START_OVER_WORD = 'START OVER';
+  // Opens "Start over with an empty menu": three plain steps (what goes and what stays, save a backup, type the word). This cannot
+  // be undone, so the screen says so first and offers a backup before anything is erased.
+  function openStartOver() {
+    const sheet = SB.ui.sheet({ title: 'Start over with an empty menu', side: 'right', width: 'min(640px, 96vw)', name: 'startover' });
+    const root = h('div', { class: 'dp so' });
+    const keep = h('input', { type: 'checkbox', checked: true, id: 'so-keep' });
+    const keepLabel = h('label', { class: 'dp-check-row', for: 'so-keep' }, keep, h('span', null, 'Keep my tax, hours, PIN and station names'));
+    const step1 = h('section', { class: 'fs-section so-step' },
+      h('h3', { class: 'fs-h' }, '1. What happens'),
+      h('p', { class: 'fs-sub' }, 'This empties your kitchen so you can begin again with a blank menu.'),
+      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device.'),
+      h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and categories. Clear the box and those go back to how Smokebox starts.'),
+      keepLabel,
+      h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'There is no undo. We are sorry to be blunt: once you confirm, the old menu and history cannot be brought back, except from a backup file you saved first.'));
+    const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: save a backup');
+    step1.appendChild(next1);
+
+    const backupSt = h('p', { class: 'fs-sub', role: 'status' });
+    let backedUp = false;
+    // Saves the backup file with the browser's download and shows plainly that it happened (or that it did not).
+    const backupBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-backup' } }, ico('download', 22), h('span', null, 'Save a backup now'));
+    backupBtn.addEventListener('click', () => {
+      const text = SB.store.exportAll();
+      if (text == null) { tell(backupSt, 'The backup could not be made, so nothing was saved. Try again, or use Back office, Data, Back up.', 'bad'); return; }
+      const fname = 'smokebox-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      try {
+        const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' }));
+        const a = doc.createElement('a'); a.href = url; a.download = fname; a.style.display = 'none'; doc.body.appendChild(a); a.click();
+        setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 1000);
+        backedUp = true; if (SB.shell && SB.shell.noteBackup) SB.shell.noteBackup();
+        tell(backupSt, 'Saved ' + fname + ' (' + Math.max(1, Math.round(text.length / 1024)) + ' KB). Find it in your downloads and keep a copy off this device.', 'ok');
+        next2.disabled = false;
+      } catch (e) { tell(backupSt, 'Your browser blocked the download, so nothing was saved. Allow downloads for this page and try again.', 'bad'); }
+    });
+    const next2 = h('button', { type: 'button', class: 'btn btn-lg', dataset: { act: 'so-next2' }, disabled: true }, 'Next: confirm');
+    // For an owner who has a backup already: continue without making another, after one more plain warning.
+    const skip = h('button', { type: 'button', class: 'btn btn-link', dataset: { act: 'so-skip-backup' } }, 'I already have a backup, continue');
+    const step2 = h('section', { class: 'fs-section so-step', hidden: true },
+      h('h3', { class: 'fs-h' }, '2. Save a backup first'),
+      h('p', { class: 'fs-sub' }, 'A backup is a file with everything in your kitchen right now. If you change your mind, Back office, Data, Restore brings it all back.'),
+      h('div', { class: 'fs-row' }, backupBtn, next2), backupSt, skip);
+
+    const word = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': 'Type ' + START_OVER_WORD + ' to confirm', placeholder: START_OVER_WORD });
+    const goSt = h('p', { class: 'fs-sub', role: 'status' });
+    const go = h('button', { type: 'button', class: 'btn btn-danger btn-lg', dataset: { act: 'so-go' }, disabled: true }, ico('trash', 22), h('span', null, 'Erase everything and start over'));
+    // The red button only wakes up when the exact word has been typed.
+    word.addEventListener('input', () => { go.disabled = word.value.trim().toUpperCase() !== START_OVER_WORD; });
+    const step3 = h('section', { class: 'fs-section so-step', hidden: true },
+      h('h3', { class: 'fs-h' }, '3. Type ' + START_OVER_WORD),
+      h('p', { class: 'fs-sub' }, 'To be sure this is what you want, type ' + START_OVER_WORD + ' in the box. Then the red button works.'),
+      SB.ui.field({ label: 'Type ' + START_OVER_WORD, control: word }), go, goSt);
+    const done = h('section', { class: 'fs-section so-step', hidden: true });
+
+    // Shows one step and hides the others.
+    const show = (which) => { [step1, step2, step3, done].forEach((s, i) => { s.hidden = i !== which; }); };
+    next1.addEventListener('click', () => show(1));
+    next2.addEventListener('click', () => show(2));
+    // Skipping the backup needs the owner to say so on purpose; the next screen repeats that there is no undo.
+    skip.addEventListener('click', () => { if (!backedUp) tell(backupSt, 'Continuing without a backup from this screen. If you saved one earlier, you can restore it later.', 'ok'); show(2); });
+    // Erases the kitchen: empty menu, optionally the settings too, then shows the done screen. Any refusal is shown in the same one-line style.
+    go.addEventListener('click', () => {
+      const keepIt = keep.checked;
+      const r = send('resetLive', { catalog: 'blank', keepSettings: keepIt });
+      if (!r.ok) { tell(goSt, r.words || 'Smokebox could not start over, so nothing was erased. Nothing has changed.', 'bad'); return; }
+      if (SB.store.persistNow) { try { SB.store.persistNow(); } catch (e) { /* saved on the next change */ } }
+      // My own saved bits: the half-typed dish, last station, example list and the questions already answered.
+      [KEY_DRAFT, KEY_LAST, KEY_EXAMPLES, KEY_CASKIP].forEach((k) => U.storage.remove(k));
+      let needsReload = false;
+      if (!keepIt) {
+        U.storage.remove(KEY_HIDDEN);
+        try { SB.config.saveCustom({ rename: {}, add: {} }); needsReload = true; } catch (e) { /* names stay */ }
+      }
+      if (SB.floor && SB.floor.setWelcome) SB.floor.setWelcome(true);
+      U.clear(done);
+      done.append(h('h3', { class: 'fs-h' }, 'Done. Your kitchen is empty.'),
+        h('p', { class: 'fs-sub' }, 'The menu, tickets and history are gone' + (keepIt ? '. Your tax, hours, PIN and station names stayed.' : ', and tax, hours, PIN and station names are back to how Smokebox starts.')),
+        // Goes to the first screen: closes the sheets (and reloads when station names were reset so every screen shows them).
+        h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-finish' }, onClick: () => { if (needsReload) g.location.reload(); else SB.sheets.closeAll(); } }, 'Go to the first screen'));
+      show(3);
+    });
+    root.append(step1, step2, step3, done);
+    sheet.body.appendChild(root); keepInView(root);
+    return sheet;
+  }
+
   /* ---------- the Tax, hours and PIN sheet ---------- */
 
   // Opens "Tax, hours and PIN": the shop settings that used to be steps of a wizard. Each saves on its own button.
@@ -830,6 +919,7 @@
   SB.sheets.register('setup', openSetup);
   SB.sheets.register('dishes', openDishes);
   SB.sheets.register('shop', openShop);
+  SB.sheets.register('startover', openStartOver);
   SB.sheets.register('menuimport', openImport);
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
