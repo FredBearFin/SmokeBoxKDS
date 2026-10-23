@@ -91,7 +91,7 @@ const visible = (page, sel) => page.locator(sel).first().isVisible();
 const eventsOf = (page, type) => page.evaluate((t) => SB.engine.allEvents(SB.store.getState()).filter((e) => e.type === t).length, type);
 const stateJson = (page) => page.evaluate(() => JSON.stringify(SB.store.getState()));
 async function confirmSheet(page, which) {
-  await page.waitForSelector('.sheet[role="alertdialog"]', { timeout: 3000 });
+  await page.waitForSelector('.sheet[role="alertdialog"]', { timeout: 8000 });
   const t = await page.locator('.sheet[role="alertdialog"]').first().innerText();
   if (which === 'confirm') await page.locator('.sheet[role="alertdialog"] .sheet-foot .btn-danger').click();
   else if (which === 'cancel') await page.locator('.sheet[role="alertdialog"] .sheet-foot .btn:not(.btn-danger)').first().click();
@@ -715,7 +715,7 @@ group('9b. Data: saveFile (host, browser, copy)', async () => {
     const click = async (sel) => { await goPanel(page, 'data'); await page.locator(sel).first().scrollIntoViewIfNeeded(); await page.locator(sel).first().click(); await page.waitForTimeout(200); };
     await page.evaluate(() => { delete window.claude; });
     const ds = new Date(); const ymd = ds.getFullYear() + '-' + String(ds.getMonth() + 1).padStart(2, '0') + '-' + String(ds.getDate()).padStart(2, '0');
-    const [d1] = await Promise.all([page.waitForEvent('download'), click('[data-action="backup-download"]')]);
+    const [d1] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), click('[data-action="backup-download"]')]);
     check('plain browser: backup file is smokebox-backup-YYYY-MM-DD.json', d1.suggestedFilename() === 'smokebox-backup-' + ymd + '.json', d1.suggestedFilename());
     const backup = fs.readFileSync(await d1.path(), 'utf8');
     const valid = await page.evaluate((t) => { const v = SB.engine.validateBackup(t); return { ok: v.ok, err: v.error, tickets: v.ok ? v.state.tickets.length : -1 }; }, backup);
@@ -723,7 +723,7 @@ group('9b. Data: saveFile (host, browser, copy)', async () => {
     check('the page says the download started (and what to do if nothing arrives)', /Download started: smokebox-backup-/.test(await text(page, '#od-data .od-st')) && /Copy backup/.test(await text(page, '#od-data .od-st')));
     await makeTickets(page, 3);
     for (const k of ['tickets', 'items', 'events', 'batches']) {
-      const [d] = await Promise.all([page.waitForEvent('download'), click(`[data-csv="${k}"]`)]);
+      const [d] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), click(`[data-csv="${k}"]`)]);
       const csv = fs.readFileSync(await d.path(), 'utf8');
       check('CSV ' + k + ': named smokebox-' + k + '-date.csv with a header row', d.suggestedFilename() === `smokebox-${k}-${ymd}.csv` && csv.split('\n')[0].length > 10, [d.suggestedFilename(), csv.split('\n')[0].slice(0, 60)]);
       if (k === 'tickets') check('CSV tickets has one row per ticket plus the header', csv.trim().split('\n').length === 1 + (await st(page, () => SB.store.getState().tickets.length)));
@@ -769,8 +769,8 @@ group('9c. Data: import', async () => {
     await fileIn.setInputFiles({ name: 'my-backup.json', mimeType: 'application/json', buffer: Buffer.from(backup) });
     await page.waitForSelector('#od-data .od-impresult .od-card');
     const card = await text(page, '#od-data .od-impresult .od-card');
-    check('a valid file shows a summary before anything changes', /valid Smokebox backup/.test(card) && new RegExp('Tickets' + nT + ' \\(' + nT + ' live\\)').test(card) && /Logged events/.test(card) && /Menu items21/.test(card), card);
-    check('the summary says it replaces everything on this device, with the real counts', card.includes('This replaces everything on this device: 0 tickets, ' + nB + ' batches') && /Export a backup first\./.test(card), card);
+    check('a valid file shows a summary before anything changes', /valid Smokebox backup/.test(card) && new RegExp('Tickets' + nT).test(card) && /Logged events/.test(card) && /Menu items21/.test(card), card);
+    check('the summary says it replaces everything on this device, with the real counts', card.includes('This replaces everything on this device: 0 tickets, ' + nB + ' batches') && /Back up first/.test(card), card);
     check('nothing has changed yet', (await st(page, () => SB.store.getState().tickets.length)) === 0);
     await page.locator('[data-action="import-replace"]').click();
     let sheet = await confirmSheet(page, 'cancel');

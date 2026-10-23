@@ -116,3 +116,47 @@ Real devices, real Safari/iPad, real audio, a real kitchen; Connected/hub flows 
 4. Rewrite the Hold-sheet journeys (04a, 04b, 03b, 09b, 09c, 10a, 12a) around the Cabinet tab.
 5. Put `tools/run-slow.mjs qa` on a per-test timeout (30 s clicks make failing journeys slow) and run the long suites nightly, not on every pull request.
 6. Decide the empty-kitchen ordering question with Freddy.
+
+# Round 2 and final run (build 22fa0c2, branch night/a6-final)
+
+Rule used in every fixed suite: a test that needs the barbecue kitchen opens it on purpose. A normal install is blank, and the demo is its own mode (`?demo`, separate saved keys), so `test/_kitchen.mjs` `startKitchen(page, {sample, starter, welcome, who})` reloads the page into the demo (same file and hash) and then clears live data, puts the 10 starter batches in, sets sample history on or off and remembers hold-cabinet initials ("Who is this?" now appears before a safety action). `tools/pw.mjs` `withPage` has a `query` option, `tools/qa.mjs` `t.open({ kitchen })` does the same for the journeys, and has a 6 s action timeout (a missing element fails in 6 s, not 30). `contract-check` ignores private `_` slots and `page.lastSection`, skips the legacy `wizard` sheet name and boots the page with `?demo`. Suites that throw inside a group now count one failed check and carry on. Real app bugs that are reported but not yet fixed are listed as KNOWN and do not fail a run.
+
+## Suites, one run each on 22fa0c2
+
+| Suite | Round 1 | Final | Notes |
+|---|---|---|---|
+| unit (`tools/test.mjs`) | 499/499 | not re-run by me (coordinator: 564, one timing flake that passes alone) | soak and metrics timing tests hardened: best of three windows with warm-up and 5k floor; median of three, 400 ms |
+| floor | crash | 201 pass, 1 FAIL (flake), 1 KNOWN | the FAIL is "tapping a dock chip highlights matching rows": read while the outline is mid-transition (box-shadow 0.03 px / 3.98 px). Fix: wait for the transition (class C). A KNOWN header-wraps-at-1920 px bug with the demo chip |
+| floor-sheets | crash | last full run 160 pass, 3 FAIL; fixed since (wording tolerant of practice/demo) and not re-run | the three were wording: sync strip, "mode not loaded", About |
+| office | 51 ok then crash | 122 pass, 5 FAIL | pace-ring check and a click timeout (D, unexplained); 768 px grid is no longer one column (4/6/6 cards not full width: deliberate or a layout bug, A3 to say) |
+| office-b | 28 ok then crash | 240 pass, 0 FAIL | Sales tile now reads paid orders (M.sales), End of day is a panel without a caption, card and note names changed |
+| office-data | 157 ok, 29 FAIL | 260 pass, 3 FAIL | CSV export buttons `[data-csv]` not found, backup summary wording, confirm dialog not shown in time (D, A3). Dishes are collapsed rows and rare panels sit in "Advanced": helper `prep()` opens them |
+| shell | 204/1 | crash at boot | REAL BUG B6 below |
+| contract | 3 of 5 | 18/18 pass after the tool fixes and `?demo` (rerun) | |
+| artifact | pass | pass (3 s) | |
+| board-round2, board-round3, board-round4, setup-wizard, strip-notices | n/a | pass | |
+| order-page, order-note, config-names, bumpbar, quiet-board, orders-page, pay-ui | pass | pass after `?demo` (and `startKitchen` for the two that list orders) | all re-run green |
+| production-mode | pass | pass after wording tolerance | |
+| backup-banner | pass | FAIL (stale) | the nudge needs a real kitchen with data; the demo never nudges and a blank real kitchen has no data. Needs a real-kitchen fixture (add a dish by action) |
+| qa journeys (45) | 23 pass / 22 fail | 21 pass / 24 fail | see below |
+
+Fixed in round 2 and green again: 01, 03b, 04a-c, 05, 06a, 07a-c, 08, 09a-b, 11c, 12a (on the previous base); after 22fa0c2 changed wording and flows again these fail afresh (they were not re-fixed in the time left).
+
+## qa journeys on 22fa0c2: 21 pass, 24 fail, by cause (all unowned fixes still to do; none re-fixed this round)
+
+- Wording or flow changed again (class A): 01 (empty board wording), 04a/04c (starter batch count text, "Simulated" sync wording), 04b (toast text), 05 (demo tag and restart text), 06d (Menu list at 1024), 07b (Safety empty wording), 07d/07e (table rows and Brisket price fields: the Data page dishes are collapsed rows now), 12c/13d ("Demo and clock" dialog name), 13a/13b (the tour's x30 clock step).
+- Real kitchen vs demo (class A): 08b, 08c create tickets in a blank real kitchen; they need `startKitchen`.
+- Known small touch targets (B3, A1/A2): 09a, 09b, 09c, 09e (office 390 px). 09e passed in my earlier run, so something under 44 px appeared in the office since (A3).
+- Possibly real (owner A3): 11b the Data page takes 1,587 ms to paint with a 1,574 ms long task (limit 800/400 ms); 12e contrast below 4.5:1 on office pages in Ember and Paper; 12a "label in name" fails on the office pages; 13e/13f tour step 9 ring on a hidden element.
+
+## Real bugs found in round 2 (not fixed; tests only)
+
+- B5 (A1): at 1920 px wide the header wraps to two rows while the demo clock chip reads "Demo clock x15" (floor.e2e KNOWN).
+- B6 (99-boot.js, A5/A2): `SB.store.isDemo` is read without checking `SB.store` exists, so a page built without the store (the shell test bundle) shows "Smokebox could not start" instead of the placeholder. One-line guard fixes it: `if (SB.store && SB.store.isDemo && ...)` in `src/js/99-boot.js` (I confirmed all 205 shell checks pass with that guard in a scratch copy). Shell suite stays red until it lands.
+- B7 (A3): Data page dish rows use middle dots ("Pit · Meats · Starter prep time"), against the "no middots" rule in docs/design-notes.md (office-data KNOWN).
+- B8 (A3, low): Data page is about 22,000 px tall and Playwright/`scrollIntoView` could not reach controls inside collapsed Advanced sections; real users scroll fine, tests need `prep()`.
+- Earlier, still open: B3 touch targets under 44 px (welcome buttons 38 px, Menu sheet "Warning loudness" slider 16 px, Clear/pause notice 33 px), B4 Cabinet heading skip h1 to h3, overdue slips reordered by CSS only so keyboard order differs from visual order (checked as KNOWN in floor.e2e).
+
+## Not done / not checked
+
+qa journeys were not re-fixed after the last merge (see above); backup-banner needs a real-kitchen fixture; office, office-data (3) and floor (flake) leave the failures listed; no real devices.

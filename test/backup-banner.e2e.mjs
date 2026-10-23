@@ -3,7 +3,7 @@
 import { withPage } from '../tools/pw.mjs';
 let bad = 0;
 const check = (n, ok, x) => { console.log((ok ? 'ok   ' : 'FAIL ') + n + (ok ? '' : ' ' + JSON.stringify(x))); if (!ok) bad++; };
-await withPage({ w: 1280, h: 800 }, async (page, logs) => {
+await withPage({ w: 1280, h: 800, query: '?demo' }, async (page, logs) => {
   await page.waitForTimeout(600);
   check('no banner on a fresh kitchen', (await page.locator('.sb-banner').count()) === 0);
   const hr = new Date().getHours();
@@ -24,7 +24,7 @@ await withPage({ w: 1280, h: 800 }, async (page, logs) => {
   check('no page errors', logs.pageErrors.length === 0, logs.pageErrors);
 });
 // A browser that refuses to save: the save-failure banner shows on the board.
-await withPage({ w: 1280, h: 800, init: 'Storage.prototype.setItem = function () { throw new Error("quota"); };' }, async (page, logs) => {
+await withPage({ w: 1280, h: 800, query: '?demo', init: 'Storage.prototype.setItem = function () { throw new Error("quota"); };' }, async (page, logs) => {
   await page.waitForTimeout(6500);
   const t = await page.locator('.sb-banner[data-kind=save]').first().textContent().catch(() => '');
   check('save-failure banner shows when nothing can be saved', /not saving|save failed/.test(t), t);

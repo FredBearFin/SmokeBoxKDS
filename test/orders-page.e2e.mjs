@@ -1,14 +1,16 @@
 // Orders page and one-tap payment check (browser, quick). Run: node test/orders-page.e2e.mjs
 // Covers 73-floor-orders.js: the sheet still opens, SB.orders.mountPage shows the same list as a page, Add items on a
 // page opens New ticket on top, the one-tap Pay button pays with the last way of paying and its Undo reopens the order.
+import { startKitchen } from './_kitchen.mjs';
 import { withPage } from '../tools/pw.mjs';
 
 let pass = 0, fail = 0;
 // Records one check and prints it.
 function check(name, ok, detail) { if (ok) { pass++; console.log('  ok    ' + name); } else { fail++; console.log('  FAIL  ' + name + (detail !== undefined ? ' -> ' + JSON.stringify(detail) : '')); } }
 
-await withPage({ w: 1280, h: 800 }, async (page, logs) => {
+await withPage({ w: 1280, h: 800, query: '?demo' }, async (page, logs) => {
   await page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 8000 });
+  await startKitchen(page); // the demo's own three sample orders would otherwise be first in the list
   await page.evaluate(() => { SB.floor.setWelcome(false); if (SB.sim) SB.sim.live.crew(false); });
   const made = await page.evaluate(() => {
     const m = SB.store.getState().menu.find((x) => !x.archived && SB.store.select.availability(x.id).ok);

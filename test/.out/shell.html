@@ -167,9 +167,11 @@ WORDS YOU WILL SEE IN THE CODE
 
   /* motion */
   /* durations in ms (1000 ms = 1 second) and the speed curves used for movements */
-  --dur-fast: 100ms;
-  --dur: 180ms;
-  --dur-slow: 260ms;
+  /* --sb-motion is the one switch for movement: 1 = normal, 0 = none (reduced motion sets it to 0). Every duration below follows it. */
+  --sb-motion: 1;
+  --dur-fast: calc(100ms * var(--sb-motion));
+  --dur: calc(180ms * var(--sb-motion));
+  --dur-slow: calc(260ms * var(--sb-motion));
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-in-out: cubic-bezier(0.5, 0.05, 0.2, 1);
   --ease-ignite: cubic-bezier(0.55, 0.06, 0.3, 1);
@@ -1285,6 +1287,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .pin-forgot { margin-top: var(--sp-3); font-size: var(--fs-2); color: var(--ink2); }
 .pin-forgot summary { cursor: pointer; font-weight: var(--w-semi); min-height: var(--tap); display: flex; align-items: center; }
 .pin-forgot p { margin: var(--sp-2) 0; }
+/* On a 4K screen the reminder bar grows with the board, so the demo or backup notice is readable from across the room. */
+@media (min-width: 3000px) { .sb-banner { min-height: 64px; font-size: 28px; } .sb-banner .btn { min-height: 52px; font-size: 24px; } }
 
 </style>
 </head>
@@ -1571,7 +1575,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.cookAheadSkipped'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.cookAheadSkipped', 'lastgood', 'corruptat'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -3903,6 +3907,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     const store = SB.store;
     if (!store || !store.status || !store.getState) return null;
     const ss = store.status(), s = store.getState();
+    // In the demo this strip always shows, above every other message, and always has the Back button.
+    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
     if (!s) return null;
@@ -3919,10 +3925,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
     if (bn.el) bn.el.remove();
     bn.kind = w.kind;
     // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
-    const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => S.ignite({ section: 'data' }) }, w.act);
+    const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
     const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: 'Hide for 45 minutes', onClick: () => { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } }, ico('x', 18), h('span', { class: 'visually-hidden' }, 'Later')) : null;
-    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
     st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip
@@ -4134,7 +4140,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   function storageNotices() {
     const s = SB.store && typeof SB.store.status === 'function' ? SB.store.status() : null;
     if (!s || !SB.ui || typeof SB.ui.toast !== 'function') return;
-    if (s.corrupt) SB.ui.toast('Your saved board could not be read, so Smokebox started with an empty board. A copy of the old data was kept on this device.', { tone: 'warn', ms: 15000 });
+    if (s.corrupt && s.restoredFromCopy) SB.ui.toast('Your saved board could not be read, so Smokebox restored the last good copy from ' + new Date(s.restoredFromCopy).toLocaleString() + '. Orders and history after that time are missing. A copy of the damaged data was kept in this browser.', { tone: 'warn', ms: 20000 });
+    else if (s.corrupt) SB.ui.toast('Your saved board could not be read, so Smokebox started with an empty board. A copy of the old data was kept on this device.', { tone: 'warn', ms: 15000 });
     else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox repaired ' + s.repaired.length + ' saved ' + (s.repaired.length === 1 ? 'detail' : 'details') + ' while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
     if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }

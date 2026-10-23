@@ -1,14 +1,16 @@
 // Payment helpers check (browser, quick). Run: node test/pay-ui.e2e.mjs
 // Covers 73-floor-orders.js (Take payment box: tip presets, cash buttons, change) and 71-floor-order.js (tip buttons on a
 // pay-now order). Only the existing payOrder fields are used: method, tip, discount.
+import { startKitchen } from './_kitchen.mjs';
 import { withPage } from '../tools/pw.mjs';
 
 let pass = 0, fail = 0;
 // Records one check and prints it.
 function check(name, ok, detail) { if (ok) { pass++; console.log('  ok    ' + name); } else { fail++; console.log('  FAIL  ' + name + (detail !== undefined ? ' -> ' + JSON.stringify(detail) : '')); } }
 
-await withPage({ w: 1280, h: 800 }, async (page, logs) => {
+await withPage({ w: 1280, h: 800, query: '?demo' }, async (page, logs) => {
   await page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 8000 });
+  await startKitchen(page); // the demo's own three sample orders would otherwise be first in the list
   await page.evaluate(() => { SB.floor.setWelcome(false); if (SB.sim) SB.sim.live.crew(false); });
   const made = await page.evaluate(() => {
     const m = SB.store.getState().menu.find((x) => !x.archived && SB.store.select.availability(x.id).ok);

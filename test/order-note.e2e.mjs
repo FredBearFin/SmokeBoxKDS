@@ -7,7 +7,7 @@ let pass = 0, fail = 0;
 // Records one check and prints it.
 function check(name, ok, detail) { if (ok) { pass++; console.log('  ok    ' + name); } else { fail++; console.log('  FAIL  ' + name + (detail !== undefined ? ' -> ' + JSON.stringify(detail) : '')); } }
 
-await withPage({ w: 1280, h: 800 }, async (page, logs) => {
+await withPage({ w: 1280, h: 800, query: '?demo' }, async (page, logs) => {
   await page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 8000 });
   await page.evaluate(() => { SB.floor.setWelcome(false); if (SB.sim) SB.sim.live.crew(false); SB.sheets.open('order'); });
   await page.waitForSelector('.sheet .ord');

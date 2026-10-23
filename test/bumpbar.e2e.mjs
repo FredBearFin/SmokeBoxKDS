@@ -11,7 +11,7 @@ const { chromium } = req('playwright');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 const errs = []; p.on('pageerror', (e) => errs.push(e.message));
-await p.goto('file://' + path.join(ROOT, 'dist/smokebox.html'));
+await p.goto('file://' + path.join(ROOT, 'dist/smokebox.html') + '?demo');
 await p.waitForTimeout(600);
 await p.evaluate(() => { SB.floor.setWelcome(false); SB.sim.restartDemo(); });
 await p.waitForTimeout(800);

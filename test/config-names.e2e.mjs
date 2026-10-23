@@ -3,7 +3,7 @@
 import { withPage } from '../tools/pw.mjs';
 let bad = 0;
 const check = (n, ok, x) => { console.log((ok ? 'ok   ' : 'FAIL ') + n + (ok ? '' : ' ' + JSON.stringify(x))); if (!ok) bad++; };
-await withPage({ w: 1280, h: 800, clearStorage: true, hash: '#/office/data' }, async (page, logs) => {
+await withPage({ w: 1280, h: 800, query: '?demo', clearStorage: true, hash: '#/office/data' }, async (page, logs) => {
   await page.waitForTimeout(900);
   await page.locator('input[aria-label="Name of station Pit"]').fill('Smoker');
   await page.locator('input[aria-label="Name of station Pit"]').locator('xpath=following-sibling::button').click();

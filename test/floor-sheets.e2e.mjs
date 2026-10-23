@@ -314,7 +314,7 @@ async function testBoard86() {
   await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
     await boot(page);
     await openSheet(page, 'board86');
-    check('the sync strip says it is practice only', /Practice only: no live POS connected/.test(await text(page, TOP) || ''));
+    check('the sync strip says it is practice only', /(Practice|Demo) only: no live POS connected/.test(await text(page, TOP) || ''));
     check('four sync chips, one per channel', (await page.locator('.bd-chip').count()) === 4);
     check('all menu items are listed as rows', (await page.locator('.bd-row').count()) === 21);
     const row = '.bd-row[data-menu="brisket_qtr"]';
@@ -486,7 +486,7 @@ async function testDemo() {
   await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
     await boot(page, { sim: 'none' });
     await openSheet(page, 'demo');
-    check('an honest "Practice mode not loaded" note is shown', /Practice mode not loaded/.test(await text(page, TOP) || ''));
+    check('an honest "Practice mode not loaded" note is shown', /(Practice|Demo) mode not loaded/.test(await text(page, TOP) || ''));
     check('no automatic order controls are offered', (await page.locator('.dm-rates').count()) === 0 && (await page.locator('.dm-burst').count()) === 0);
     check('the clock speed and reset controls still work', (await page.locator('.dm-speed').count()) === 1 && (await page.locator('.dm-reset .btn').count()) === 1);
     check('sample history says it is not loaded', /Not loaded/.test(await text(page, '.dm-counts') || ''));
@@ -501,7 +501,7 @@ async function testDemo() {
       const has = await page.evaluate(() => !!(window.SB.sim && SB.sim.live));
       await openSheet(page, 'demo');
       if (!has) {
-        check('real SB.sim has no live part yet: the sheet still says "Practice mode not loaded" and stays usable', /Practice mode not loaded/.test(await text(page, TOP) || '') && (await page.locator('.dm-speed').count()) === 1);
+        check('real SB.sim has no live part yet: the sheet still says "Practice mode not loaded" and stays usable', /(Practice|Demo) mode not loaded/.test(await text(page, TOP) || '') && (await page.locator('.dm-speed').count()) === 1);
       } else {
         check('real simulator: automatic order controls exist', (await page.locator('.dm-rates').count()) === 1 && (await page.locator('.dm-burst').count()) === 1);
         await tapSeg(page, '.dm-rates', 'rush'); await page.waitForTimeout(300);
@@ -539,7 +539,7 @@ async function testHelp() {
     check('Food safety carries the guidance line', /health-code/i.test(fs1));
     await tapSeg(page, TOP, 'about'); await page.waitForTimeout(100);
     const ab = await text(page, '.hp [role="tabpanel"]:not([hidden])');
-    check('About says what it is and that nothing is connected to a real POS', /Smokebox/.test(ab) && /practice/i.test(ab) && /POS/.test(ab), ab.slice(0, 300));
+    check('About says what it is and that nothing is connected to a real POS', /Smokebox/.test(ab) && /practice|demo|simulated/i.test(ab) && /POS/.test(ab), ab.slice(0, 300));
     check('the manager hint is small and plain', /Managers: tap Back office/i.test(await text(page, TOP) || ''));
     noErrors('help', logs);
   });

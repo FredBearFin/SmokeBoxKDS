@@ -21,7 +21,7 @@ await withPage({ w: 1280, h: 800 }, async (page, logs) => {
   check('demoLoaded in a demo tab', await demo.evaluate(() => SB.shell.demoLoaded()));
   await demo.evaluate(() => SB.sheets.open('demo')); await demo.waitForTimeout(300);
   check('demo sheet (demo tab): clock speed shows', (await demo.locator('.dm-speed:visible').count()) === 1);
-  check('demo sheet (demo tab): says it is for practice', (await demo.locator('.dm:has-text("for practice")').count()) >= 1);
+  check('demo sheet (demo tab): says it is for practice', (await demo.locator('.dm').filter({ hasText: /for practice|for the demo/ }).count()) >= 1);
   check('no page errors in the demo tab', demoErrors.length === 0, demoErrors);
   await demo.close();
   check('no page errors', logs.pageErrors.length === 0, logs.pageErrors);

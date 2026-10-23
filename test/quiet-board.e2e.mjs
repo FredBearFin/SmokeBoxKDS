@@ -11,7 +11,7 @@ const { chromium } = req('playwright');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 const errs = []; p.on('pageerror', (e) => errs.push(e.message));
-await p.goto('file://' + path.join(ROOT, 'dist/smokebox.html'));
+await p.goto('file://' + path.join(ROOT, 'dist/smokebox.html') + '?demo');
 await p.waitForTimeout(600);
 await p.evaluate(() => { SB.floor.setWelcome(false); SB.sim.restartDemo(); window.mk = (n, tag) => { const mi = SB.config.menu.slice(0, 2).map((m) => ({ menuId: m.id, qty: 1 })); for (let i = 0; i < n; i++) SB.store.dispatchEx('createTicket', { customer: tag + i, channel: 'dine_in', items: mi }, { source: 'ui' }); }; window.mk(2, 'A'); });
 const go = async (ms) => { await p.evaluate(() => SB.store.setSpeed(200)); await p.waitForTimeout(ms); await p.evaluate(() => SB.store.setSpeed(1)); };
