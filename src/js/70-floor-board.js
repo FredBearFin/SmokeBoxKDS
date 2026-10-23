@@ -1567,7 +1567,7 @@
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
     const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: (e) => { if (following) followMenu(e.currentTarget); else if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
-    const pauseWrap = h('div', { class: 'fl-strip-bar fl-bar-pause', hidden: true }, pauseBar, clearBtn('Clear this notice', () => 'pause:' + (pauseBar.textContent || '')));
+    const pauseWrap = h('div', { class: 'fl-strip-bar fl-bar-pause', hidden: true }, pauseBar, clearBtn('Clear this notice', () => (m && m.noteKey) || 'pause:'));
     el.appendChild(pauseWrap);
     for (let i = 0; i < 3; i++) {
       const when = h('span', { class: 'fl-strip-when num' }), what = h('span', { class: 'fl-strip-what' }), why = h('span', { class: 'fl-strip-why' });
@@ -1695,7 +1695,13 @@
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
     const health = updateNote() || awayNote() || awakeNote();
-    const note = following ? health : sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
+    // Safety first: "sound is off" outranks a waiting new version. But the update is not hidden for good: the silent line says one more notice
+    // waits, the Settings button carries a dot while an update waits, and once the silent line is cleared the update line shows.
+    const silentText = 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
+    const healthLive = !!health && !m.dis.has('pause:' + health);
+    let note = following ? health : sound ? SB.deadlines.pauseNote(store().getState(), now) || health : silentText;
+    if (!sound && !following && m.dis.has('pause:' + silentText) && health) note = health;
+    const behindSilent = note === silentText && healthLive ? 1 : 0;
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
     // Only one notice shows at a time (the "tap for sound" bar first, then the note); the bar says how many more wait behind it, and
@@ -1705,9 +1711,10 @@
     const showNote = noteWanted && !soundShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
-    if (moreEl) { const t = 'Tap here to turn on warning sounds. This browser needs one tap first.' + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
+    const more = (noteWanted ? 1 : 0) + behindSilent;
+    if (moreEl) { const t = 'Tap here to turn on warning sounds. This browser needs one tap first.' + (soundShown && more ? ' (' + more + ' more notice' + (more > 1 ? 's' : '') + ')' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
-    if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
+    if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note + (behindSilent ? ' (1 more notice)' : ''));
     // The note's icon says what it is about: a new version waiting shows a refresh arrow, everything else the muted speaker.
     if (showNote) {
       const want = updateNote() && note === updateNote() ? 'refresh' : 'volume-off';
@@ -1821,9 +1828,9 @@
       setTone(m.demoChip, 'warn');
     }
     // the menu button carries a dot when something on the quick list needs a look
-    const needs = c.hold > 0 || c.sanitizeOverdue || demoOn;
+    const needs = c.hold > 0 || c.sanitizeOverdue || demoOn || !!updateNote();
     setHidden(m.menuBtn.querySelector('.fl-menu-dot'), !needs);
-    const menuName = needs ? 'Settings, something needs a look' : 'Settings';
+    const menuName = updateNote() ? 'Settings, a new version is ready' : needs ? 'Settings, something needs a look' : 'Settings';
     if (m.menuBtn.getAttribute('aria-label') !== menuName) m.menuBtn.setAttribute('aria-label', menuName);
     toolCount(m.tool.demo, demoOn ? 1 : 0, 'warn', demoOn ? (speed > 1 ? 'clock running at x' + (Math.round(speed * 10) / 10) : 'demo orders running') : '', demoOn ? (speed > 1 ? 'x' + (Math.round(speed * 10) / 10) : 'on') : '');
     refit();
