@@ -182,7 +182,7 @@
   /* ---------- food safety. Owner-editable inside safetyBounds (hotHoldF can never go below 135, same rule as Pitcall). ---------- */
   // Food-safety limits, in hours, degrees Fahrenheit and minutes. The owner can change them only inside
   // C.safetyBounds, and hot hold can never go below 135 F. The 135, 41 and 165 F limits, the cooling stages
-  // and the 4-hour sanitise interval are FDA Food Code rules (sections shown on each line). The grace
+  // and the 4-hour sanitise interval follow the FDA model Food Code (sections shown on each line); local codes can differ. The grace
   // periods run from the first out-of-range READING, not from when the food left the heat (finding F-E1, a
   // deliberate change from the research report). belowHotGraceH 2 is the research report's limit;
   // aboveColdGraceH 4 mirrors it for cold food (starter estimate). defaultMaxHoldH and tempCheckEveryMin are
@@ -196,7 +196,7 @@
     cooling: { stage1ToF: 70, stage1H: 2, totalH: 6, finalF: 41 }, // 135->70 in 2h, then 70->41 inside 4 more (6h total) (3-501.14)
     defaultMaxHoldH: 12,    // the hold limit for a product that has none of its own (every starter product has one)
     hardCapH: 12,           // the longest any batch of any kind may stay in the cabinet: at this age it is thrown out
-    tempCheckEveryMin: 120, // a temperature reading is due this often (2 h; the FDA minimum is 4 h)
+    tempCheckEveryMin: 120, // a temperature reading is due this often (2 h is our default; check what your health department asks)
     sanitizeEveryH: 4,      // food-contact surfaces (4-602.11)
     holdWindowV2: true,     // marks settings made after the hold limit moved from a flat 4 hours to per-product limits
     tempIntervalV2: true,   // marks settings made after the check interval default moved from 30 to 120 minutes

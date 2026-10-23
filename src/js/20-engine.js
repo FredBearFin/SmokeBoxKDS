@@ -85,7 +85,7 @@
     reasonRequired: 'Pick a reason first (for example: wrong order, customer left, dropped).',
     badTemp: 'Enter a temperature between 32 and 300 °F.',
     tempTooLow: 'A reheat needs a reading of at least ' + C.safety.reheatF + ' °F. Keep heating and log it again.' + SAFETY,
-    notReheatable: 'This batch cannot be reheated: only one reheat is allowed, and only within ' + C.safety.belowHotGraceH + ' hours of going below ' + C.safety.hotHoldF + ' °F. Discard it.' + SAFETY,
+    notReheatable: 'This batch cannot be reheated: Smokebox allows one reheat per batch, and only within ' + C.safety.belowHotGraceH + ' hours of going below ' + C.safety.hotHoldF + ' °F. Discard it.' + SAFETY,
     notEnoughData: 'Not enough data yet. Run a few more tickets first.',
     batchNotServable: 'That batch is locked or already discarded, so it cannot be used.' + SAFETY,
     badWeight: 'Enter a weight above 0 g (up to 1,000 kg).',
@@ -206,7 +206,7 @@
   // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
   // safetyKeep bucket instead of being dropped.
   const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, cooling_started: 1, sanitize_done: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
-  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months, the minimum to keep).
+  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months). This is our own choice; no source gives a minimum, so ask your health department how long to keep records.
   const SAFETY_KEEP_MS = 190 * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
@@ -560,10 +560,10 @@
     const hot = batch.kind !== 'cold';
     if (batch.outSince != null) {
       if (hot) {
-        if (batch.reheats >= 1) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Below ' + f0(S.hotHoldF) + ' again after its one reheat. Discard.' + SAFETY);
+        if (batch.reheats >= 1) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Below ' + f0(S.hotHoldF) + ' again after its one reheat (Smokebox allows one per batch). Discard.' + SAFETY);
         const lim = batch.outSince + S.belowHotGraceH * H;
         if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Below ' + f0(S.hotHoldF) + ' for more than ' + S.belowHotGraceH + ' hours. Discard.' + SAFETY);
-        return gateOut('REHEAT_IMMEDIATE', false, 'belowHot', 'bad', 'Below ' + f0(S.hotHoldF) + '. Reheat to ' + f0(S.reheatF) + ' now (one reheat only) or discard.' + SAFETY, Math.min(lim, exp));
+        return gateOut('REHEAT_IMMEDIATE', false, 'belowHot', 'bad', 'Below ' + f0(S.hotHoldF) + '. Reheat to ' + f0(S.reheatF) + ' now (Smokebox allows one reheat per batch) or discard.' + SAFETY, Math.min(lim, exp));
       }
       const lim = batch.outSince + S.aboveColdGraceH * H;
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
@@ -3890,7 +3890,7 @@
     const i = isObj(info) ? info : {};
     switch (report) {
       case 'tempTooLow': return 'A reheat needs a reading of at least ' + S.reheatF + ' °F. Keep heating and log it again. ' + C.safetyLine;
-      case 'notReheatable': return 'This batch cannot be reheated: only one reheat is allowed, and only within ' + S.belowHotGraceH + ' hours of going below ' + S.hotHoldF + ' °F. Discard it. ' + C.safetyLine;
+      case 'notReheatable': return 'This batch cannot be reheated: Smokebox allows one reheat per batch, and only within ' + S.belowHotGraceH + ' hours of going below ' + S.hotHoldF + ' °F. Discard it. ' + C.safetyLine;
       case 'notAllDone': return isInt(i.remaining) ? i.remaining + ' ' + U.plural(i.remaining, 'item') + ' not done yet. Finish them, or use Bump anyway to send the ticket out.' : REPORTS.notAllDone;
       case 'itemUnavailable': {
         const why = i.reason === 'manual' ? 'marked 86 by hand' : i.reason === 'safety' ? 'on a safety hold' : i.reason === 'quality' ? 'past its quality limit' : i.reason === 'stock' ? 'sold out' : '86';

@@ -1,0 +1,6 @@
+Name,Type,Accounting group,Price,Screen,SKU
+Burger,Item,Food,12.00,Mains,B1
+Burger bun,Sub-item,Food,0.00,,B1a
+Lunch combo,Combo,Food,15.00,Mains,C1
+Sides group,Group,Food,0.00,Sides,G1
+Fries,Item,Food,4.00,Sides,F1
