@@ -1,0 +1,118 @@
+# Slow browser suites: run and triage (round 1)
+
+Build under test: `kds/deploy` at b8e569e ("Fix banner covering sheets; add first UX audit"), built with `node tools/build.mjs --quiet`. All runs headless Chromium on a 4-core sandbox, simulated data only. Nothing here was checked on a real device or in a real kitchen. No source or test files were changed; this file and `tools/run-slow.mjs` are the only additions.
+
+How to rerun any suite: `SMOKEBOX_TOOLS=$(npm root -g) node tools/run-slow.mjs <name> --log-dir=/tmp/slow` (names: `node tools/run-slow.mjs` with no argument; `qa` runs the whole `test/e2e/` journey set through `tools/qa.mjs --no-report`). Logs: `/tmp/slow/<name>.log`.
+
+## 1. Results
+
+| Suite | Command | Time | Result |
+|---|---|---|---|
+| Unit suite | `node tools/test.mjs` | 13 s | 499/499 pass |
+| Smoke | `node tools/smoke.mjs` | 4 s | 9/9 pass |
+| floor | `node test/floor.e2e.mjs` | crashes at 1.5 s | 0 checks ran (infra, see F1) |
+| floor-sheets | `node test/floor-sheets.e2e.mjs` | crashes at 32 s | 2 ok, then a 30 s click timeout (see F2) |
+| office | `node test/office.e2e.mjs` | 71 s | 51 ok, 7 FAIL, then crash (30 s click timeout) |
+| office-b | `node test/office-b.e2e.mjs` | 43 s | 28 ok, 13 FAIL, then crash |
+| office-data | `node test/office-data.e2e.mjs` | 206 s | 157 ok, 29 FAIL (incl. 5 groups that threw) |
+| shell | `node test/shell.e2e.mjs` | 83 s | 204 ok, 1 FAIL |
+| contract | `node test/contract.e2e.mjs` | 98 s | 3 of 5 behaviour tests ok; static scan 1 FAIL, behaviour 2 FAIL |
+| artifact | `node test/artifact.e2e.mjs` | 4 s | pass |
+| qa (test/e2e journeys, 45 tests) | `node tools/qa.mjs --no-report` | 901 s (hit my 900 s limit during 11-13); 11b-13f rerun singly | 20 PASS, 25 FAIL (see 3.8) |
+| backup-banner, bumpbar, config-names, order-note, order-page, orders-page, pay-ui, production-mode, quiet-board, setup-wizard (`*.e2e.mjs`, not named in the brief) | `node test/<name>.e2e.mjs` | 2.6 to 14.8 s each | all pass |
+| ux-hidden-restore | `node test/ux-hidden-restore.mjs` | 122 s | pass |
+| ux-sound-leader | `node test/ux-sound-leader.mjs` | 73 s in the loaded run | FAIL once under load, pass 2 of 2 alone (flake, F6) |
+
+`test/e2e/*.mjs` have no main of their own; running them with plain `node` "passes" in 0 s having run nothing. Use `tools/qa.mjs`.
+
+To see past the first crash in the crashing suites I ran patched COPIES in a scratch folder (never in the worktree): withPage made non-fatal, the missing bundle file added, sample history switched on, or starter stock added. Those "scratch" numbers are marked below. Remaining after the infra/stale fixes: floor 139 ok / 18 FAIL, floor-sheets 124 ok / mostly the same stale causes, office 136 ok / 4 FAIL, office-b 236 ok / 4 FAIL, office-data 223 ok / 10 FAIL.
+
+## 2. Real bugs (class B), each reproduced in isolation on `dist/smokebox.html`
+
+| # | What is wrong | Where | Impact | Suggested fix | Owner |
+|---|---|---|---|---|---|
+| B1 | The "Tap here to turn on warning sounds" button is created with `hidden: true` and nothing ever un-hides it. The wrapper bar shows (sound is on by default, audio not unlocked) so the first run shows an empty dark bar with only a tiny X. Reproduced: wrapper hidden=false, button hidden=true, bar 20 px tall. Introduced by 818e82a. The `quiet-board` suite passes anyway. | `src/js/70-floor-board.js:1411` (`soundBar`); toggled only at line ~1506 (wrapper) | The one visible cue that sounds are not unlocked never shows; the cook gets an empty bar. Also the cause of the 20 px "Clear this notice" touch-target failures in 09a. | Drop `hidden: true` from the button (the wrapper already hides it); add an assertion to quiet-board. | A1 |
+| B2 | "Cabinet" station tab label wraps to "Cabine / t" at 390 px wide (screenshot seen). | `70-floor-board.js:538` tab; `src/css/20-floor.css` | Cosmetic but on the first thing a phone user sees. | `white-space: nowrap` or a short label on narrow widths. | A1 |
+| B3 | Touch targets under the project's 44 px rule: welcome card buttons "Set up your kitchen" and "Show me how it works" are 38 px (css line 644 deliberately slimmed them); the Menu sheet "Warning loudness" slider is 16 px tall; the 86 board "Channel sync (simulated)" summary is 28 px; "Clear this notice" X is 20 px (B1). | `src/css/20-floor.css:644`; `72-floor-sheets.js:2016`; `72-floor-sheets.js:1113` | Misses on a tablet with gloves or wet hands; flagged by 09a, 09b, 09c, floor-sheets sweep. The 38 px is a deliberate trade-off against the slimmer banner, so this one needs a decision, not just a fix. | Restore 44 px min height (padding, not font) or revise the rule and the tests together. | A1 (welcome buttons: A2) |
+| B4 | In-page Cabinet view has headings h1 then h3 ("Brisket batch 1") with no h2. | cabinet section in `70-floor-board.js` | Screen-reader heading skip (12a). | Make the batch titles h2 or add a visually hidden h2 "Hold cabinet". | A1 |
+
+Design question, not a code bug (D): an empty kitchen means every menu item is 86 until a batch is logged. `createTicket` returns `itemUnavailable` for everything, the Order sheet shows every tile "86 sold out", and Orders cannot be rung. The welcome card says "Set up your kitchen" and the 86 board says "Nothing is cooked yet", so the path exists, but a bar owner who just wants to ring a first order hits a wall. Worth a deliberate decision by Freddy (e.g. a "no cooked-ahead stock, always available" setting). Owner: A2 with A5 for the engine side.
+
+Tooling note (C, harmless): `contract` static scan flags `SB.floor._alerts` (`70-floor-board.js:1451-1452`) as "does not exist at run time", because `F._alerts` is created lazily (`F._alerts || (F._alerts = [])`). Either initialize `F._alerts = []` once (A1, one line) or let `tools/contract-check.mjs` skip names that start with `_`. Not an app bug. One unexplained variance (D, minor): after "Back to the line" the office unmounted in about 150 ms in one probe and about 550 ms in another (`dist/integ.html`), so the contract test's fixed 500 ms wait fails every time; see F5.
+
+## 3. Failures by suite and class
+
+Class A = stale test (names the deliberate change), C = flake or environment, D = unknown.
+
+### 3.1 floor.e2e.mjs
+- F1 (A, infrastructure): the private bundle list lacks `25-deadlines.js`; `70-floor-board.js` calls `SB.deadlines.makePending()` at load and fails (`module 70-floor-board.js failed to load`), so no `.fl-main` exists and the first `page.evaluate` throws. Fix: add `'25-deadlines.js'` after `'20-engine.js'` in `test/floor.e2e.mjs:24`.
+- After that (scratch run, 139 ok / 18 FAIL), all stale: (a) seeds fail with `itemUnavailable` because a first run has no stock: call `SB.store.resetLive({ keepSettings: true, starter: true })` before seeding (in `seedTickets`) (empty kitchen); (b) a seventh tab "Cabinet" exists: tab lists, counts and the keyboard order check must expect it (new Cabinet tab; test "Cabinet tab shows the hold cabinet in the page, not in a sheet" times out clicking a sheet); (c) "On time" badge hidden: the time-state check expects the word, now `ok|On time|ok|false` for non-late; (d) compact is the default size: the "roomy" and "17 tickets switch to compact" checks (`d: compact` always); (e) welcome card now "Set up your kitchen / Show me how it works / Hide this welcome", no "Start with an empty board", no "pretend" wording; (f) "Sound off" check never turns sound off but call-outs and sound are on by default (osc 3): add `SB.floor.setSound(false)`; (g) 48 px button check: bump and More buttons are 44 px (see B3); (h) 60-ticket test: only 2 slips because creation fails on stock (starter batches hold only part of 60).
+
+### 3.2 floor-sheets.e2e.mjs
+- F2 (A): Order sheet tiles are "is-86" (disabled) because nothing is cooked; the test clicks `brisket_half`. Fix: `resetLive({ starter: true })` at the start of `boot()`. Also the bundle lacks `25-deadlines.js` (`sheet "hold" failed to open ... reading 'build'`). Scratch run 124 ok; remaining failures are the hold-sheet batch cards (the cabinet is now a tab, the Hold sheet is opened via `openHoldFor`), "sample history count is shown" (sample history is off: test must call `SB.sim.setSampleEnabled(true)`), and the small-target sweep (B3: Warning loudness 129x16).
+
+### 3.3 office.e2e.mjs
+- (A) First run has sample history off, so the Pace page is empty and the source toggle "Live + sample" is disabled (`aria-disabled`, title "Sample history is switched off in Menu and settings"). Fix: in `boot()` call `SB.sim.setSampleEnabled(true)` before `attachSim`. This cleared 7 of 11 failures in the scratch run.
+- Still failing after that (4): "start date after end date" reads the first `.of-ferr`, but there are now two (the first is hidden, the real message "The end date is before the start date. Pick dates in order." is in the second): use `.of-ferr:not([hidden])` (A, verified by probe). "Pace ring" and two "Today at 6:15 pm" checks: the injected today dataset is reported as "Sample history is on but none of it falls in this range" with a fake clock; probably stale since sample data no longer shows for today, not proven (D, likely A).
+
+### 3.4 office-b.e2e.mjs
+- (A) Same sample-history-off cause (money/safety/stock all "no data"). With it fixed, 4 remain: three "empty cards say what would fill them" (A: an empty page now shows one page-level card "Take your first order" / "Log your first batch", the per-chart empty cards are not shown; verified by screenshot, update the check to look for `.of-empty` page card), and "thin stock ... Not enough sales recorded" (D, likely A: the thin set has 2 days and `MIN_DAYS` is 3, so the page says "Not enough cooking days yet" (`85-office-stock.js:174`) instead of the line-177 sales message; accept either wording or use 3 thin days).
+
+### 3.5 office-data.e2e.mjs
+- F3 (A, infrastructure): the bundle list (line 26) lacks `25-deadlines.js`; "Food safety limits failed ... rungsFor" fires in every group. Scratch 223 ok / 10 FAIL.
+- Remaining (A): max hold chip expects "Max hold 4 h", config says 8 h for brisket (earlier config change 9e1e870, not this round); `#od-look .toggle` count is now 2 (call-outs toggle exists) so the "no sound switch" check and the click are ambiguous (use a label locator); `makeTickets` creates 0 tickets on an empty kitchen so counts, "12 live, 1 demo", import summary ("replaces ... 12 tickets") and reset text ("clears 9 tickets") all fail: add `resetLive({ starter: true })` first.
+- Note: the app tolerates the missing `SB.deadlines` with a "Food safety limits failed" card instead of crashing; fine.
+
+### 3.6 shell.e2e.mjs
+- 204 ok, 1 FAIL (A): "SB.sim.seedFirstRun runs on a first run when it exists". `99-boot.js` no longer calls it (8d0f2e2, a first run is an empty kitchen). Invert: expect `n === 0`.
+
+### 3.7 contract.e2e.mjs
+- Static scan (C/tooling, see section 2): `F._alerts`.
+- "[ and ] ... Back to the line" (C): `page.waitForTimeout(500)` after `!inOffice()` is shorter than the office unmount; replace with `waitForFunction(() => !SB.office.isMounted())`. Fails 2 of 2 in isolation, so not random.
+- "no rebuild on a timer" (A): needs "the five starter demo tickets" on the board; first run has none. Load the demo first (`SB.sim.restartDemo()`) or seed with starter stock.
+
+### 3.8 tools/qa.mjs journeys (test/e2e), 45 tests
+PASS: 02a, 02b, 02c, 02d, 03a, 06b, 06c, 06d, 08a, 08b, 09d, 09e, 10b, 11a, 11b, 12b, 12c, 12d, 12e, 13a, 13b, 13c, 13d. FAIL, all class A unless noted:
+
+| Test | Cause |
+|---|---|
+| 01-first-run | six tabs (now 7 with Cabinet); expects 3 seeded demo tickets and an "On time" chip (empty kitchen, badge hidden) |
+| 03b-keyboard | `H` now switches to the Cabinet tab instead of opening the Hold sheet (checks that read the sheet fail) |
+| 04a, 04b | click the header "Hold cabinet" button; the cabinet is a tab now. Re-script via the Cabinet tab |
+| 04c-board-86 | 86 board has "Add a batch" and disabled "86 it" for uncooked items; channel chips sit in a collapsed `<details>` (Channel sync) |
+| 05-demo-flow | clock speeds hidden until the demo is loaded; sample history off ("Switched off"); "starter stock is back after the reset" no longer true (empty kitchen) |
+| 06a | unknown station link shows the board with 7 tabs, expects 6 |
+| 07a, 07b, 07c, 07d | sample history off (no charts, no table rows, counts 0); "Not enough data" wording replaced by the page-level first-run cards. 07c also throws on `input[type=date]` nth(1) |
+| 07e | all 41 checks pass, then a strict-mode violation: `.od-paste-det summary` matches two elements (new "Replacing this device" details). Narrow the locator |
+| 08c, 08d | the ticket made after the reset is rejected `itemUnavailable` (verified: createTicket on an empty kitchen returns it) |
+| 09a | brand flame hidden at 520 px and below on purpose (`20-floor.css:229`, phone header); touch-size failures are B1 and B3 |
+| 09b, 09c | "Hold cabinet: did not open" (tab not sheet); small-target findings are B3 |
+| 10a | "sheet Hold cabinet opens" times out (tab not sheet); the offline findings themselves pass |
+| 11c | creates 5 of 60 tickets (stock) |
+| 12a | Hold cabinet is no longer a modal dialog; heading skip is B4 |
+| 13e, 13f | tour step 2 rings `.slip-timer, .fl-bw` (`74-floor-tour.js:139`); `.fl-bw` has no box while the "On time" badge is hidden, so "every ringed element can be seen" fails for a zero-size target. Test should ignore zero-size targets (the ring still surrounds the timer) |
+
+Runtime caveat: with these tests waiting out 30 s timeouts the full run is about 15+ minutes; fixing the stale clicks will bring it down a lot.
+
+### 3.9 Passing but worth noting
+`bumpbar`, `quiet-board`, `config-names`, `backup-banner` and the order/payment suites pass. `quiet-board` should have caught B1 (it checks counts, not the empty bar).
+
+## 4. Counts
+
+Real bugs: 4 (B1 to B4) plus 1 design question and 1 tooling false positive. Stale or infrastructure causes (A): about 35 distinct failing checks and 5 broken bundles or boots fall into about 12 root causes: no stock on first run (the biggest), sample history off, Cabinet tab / hold sheet gone, welcome card wording, compact default, hidden On time badge, clock speeds hidden, call-outs/sound on, `25-deadlines.js` missing from three bundles, `seedFirstRun` removed, second `.of-ferr`, max hold 8 h. Flakes (C): 2 timing tests (below) plus ux-sound-leader lossy under load and the contract 500 ms wait. Unknown (D): office Today/pace-ring checks (probably A), thin-stock wording.
+
+## 5. Known flaky timing tests and how to harden them
+
+- Engine soak throughput (`test/engine.soak.test.mjs:221`, `perSec > 10000`): single measurement of 2000 cycles. Quiet run here: 16 671 apply/s, so the margin is only 1.7x and it dips when other suites run. Make it robust: measure three windows of 1000 cycles and assert on the best (the way `metrics.test.mjs` does), warm up first, and lower the floor to 5000 apply/s, or skip the rate check when `process.env.CI` and keep only the invariant checks.
+- Metrics "under 250 ms" (`test/metrics.test.mjs:1170-1176`): already best of up to 5 tries, but the first reading here was 239.7 ms (4 percent under the limit), and insights alone take 149 ms. Make it robust: warm up the full four-call path (not only a 100-ticket slice), assert on the median of 3 and raise the budget to 400 ms, or compare against a calibration loop measured on the same machine (ratio, not absolute ms).
+
+## 6. Not checked
+Real devices, real Safari/iPad, real audio, a real kitchen; Connected/hub flows beyond what the unit suite covers; screenshots were read only where cited; the scratch-patched runs were not completed for `qa` journeys (only classified from their messages), so some A items may hide further failures behind them; the tour `.fl-bw` busy-board screenshot also shows a "Service is over. Save today's backup" banner plus two toasts stacked over the tickets, which I did not investigate; `tools/contract-check.mjs` and `tools/qa-contact.mjs` were not run on their own.
+
+## 7. Recommendation for round 2
+1. Fix B1 to B4 first (A1), then add checks that would have caught them.
+2. Add one shared test helper (`test/_fixtures.mjs`): `startKitchen(page)` = `resetLive({ keepSettings: true, starter: true })` plus `setSampleEnabled(true)` on demand. That removes the biggest stale cause across floor, floor-sheets, office-data, contract and qa journeys.
+3. Add `25-deadlines.js` to the three private bundles (or build them from one list shared with `tools/build.mjs`).
+4. Rewrite the Hold-sheet journeys (04a, 04b, 03b, 09b, 09c, 10a, 12a) around the Cabinet tab.
+5. Put `tools/run-slow.mjs qa` on a per-test timeout (30 s clicks make failing journeys slow) and run the long suites nightly, not on every pull request.
+6. Decide the empty-kitchen ordering question with Freddy.
