@@ -11,8 +11,8 @@ What a cook does on the kitchen board.
 3. The next step. This line says what to do next.
 4. A dish. It shows its station, and a countdown once it is cooking.
 5. **Start** or **Done** for that dish. Quick dishes, like drinks, only need Done.
-6. The small menu: void the ticket or mark it as a rush.
-7. **Bump** sends the ticket out when every dish is done.
+6. The small menu (the ... button): cancel the ticket or mark it as a rush.
+7. **Bump** finishes the ticket and takes it off the board, once every dish is done.
 
 ## Start and finish dishes
 
@@ -24,8 +24,8 @@ Gray dishes are waiting on purpose, so the whole order finishes together. Tap **
 
 ## Send the ticket out
 
-If something is not done, Bump asks first. A ticket you bump by mistake comes back with **Undo** for 10 seconds, or later with **Recall**.
+If a dish is not done, Bump asks first. Bumped by mistake? **Undo** brings it back for 10 seconds. After that, use **Recall**.
 
 ## When something runs out
 
-Tap **86 board**, find the item and mark it sold out. Smokebox also takes a dish off the menu by itself when its ingredient runs low.
+Tap **86 board**, find the dish and mark it sold out. Smokebox also does this by itself when a dish's food runs low.

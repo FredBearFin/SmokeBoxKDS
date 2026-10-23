@@ -36,7 +36,11 @@
      },
      {
       "t": "p",
-      "x": "Change dishes and prices later: tap **Menu**, then **Dishes and prices**. A dish you remove goes to **Removed dishes**, and **Bring it back** puts it back with its price."
+      "x": "Change dishes and prices later: tap **Menu**, then **Dishes and prices**. A dish you remove goes to **Removed dishes**. Tap **Bring it back** to put it back."
+     },
+     {
+      "t": "p",
+      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**."
      },
      {
       "t": "p",
@@ -48,15 +52,15 @@
      },
      {
       "t": "p",
-      "x": "Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN** at the bottom. Enter your sales tax (0 if you add none) and your opening hours. A PIN is optional. It keeps line cooks out of the back office."
+      "x": "Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN** at the bottom. Enter your sales tax (0 if you charge none) and your opening hours. A PIN is optional. It keeps your cooks out of the back office."
      },
      {
       "t": "p",
-      "x": "If you cook food ahead and hold it hot or cold, say so in **Dishes and prices** (see Cooked-ahead food and portions). If you cook everything to order, skip it."
+      "x": "Do you cook food ahead and keep it hot or cold? Say so in **Dishes and prices** (see Cooked-ahead food and portions). If you cook everything to order, skip it."
      },
      {
       "t": "p",
-      "x": "Temperatures and weights show in °F and kilograms. To change them, open **Back office**, then **Menu and settings**, and look for Temperatures and Weights."
+      "x": "Temperatures show in °F and weights in kilograms. You can change both in the **Back office**, under **Menu and settings**."
      },
      {
       "t": "h",
@@ -72,7 +76,7 @@
      },
      {
       "t": "p",
-      "x": "A test order is a real order in your reports. To remove it, void it (see Taking an order)."
+      "x": "A test order counts in your reports. To remove it, cancel it (see Taking an order)."
      },
      {
       "t": "h",
@@ -108,7 +112,7 @@
      },
      {
       "t": "p",
-      "x": "Tap **New ticket**. Tap a dish to add it. Tap it again to add one more. A dish marked 86 is sold out or off the menu and cannot be added."
+      "x": "Tap **New ticket**. Tap a dish to add it. Tap it again to add one more. A dish marked 86 (sold out) cannot be added."
      },
      {
       "t": "h",
@@ -148,7 +152,7 @@
      },
      {
       "t": "p",
-      "x": "Tap **New ticket** again and choose **Add to open order**. The new ticket joins the same bill as another round."
+      "x": "Tap **New ticket** again and choose **Add to open order**. The new ticket is added to the same order."
      },
      {
       "t": "h",
@@ -158,7 +162,7 @@
       "t": "ul",
       "x": [
        "**Undo** appears for 10 seconds after an action. After that, fix it by hand.",
-       "To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. Voided tickets are counted in your reports."
+       "To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. Cancelled tickets are still counted in your reports."
       ]
      }
     ]
@@ -187,8 +191,8 @@
        "The next step. This line says what to do next.",
        "A dish. It shows its station, and a countdown once it is cooking.",
        "**Start** or **Done** for that dish. Quick dishes, like drinks, only need Done.",
-       "The small menu: void the ticket or mark it as a rush.",
-       "**Bump** sends the ticket out when every dish is done."
+       "The small menu (the ... button): cancel the ticket or mark it as a rush.",
+       "**Bump** finishes the ticket and takes it off the board, once every dish is done."
       ]
      },
      {
@@ -213,7 +217,7 @@
      },
      {
       "t": "p",
-      "x": "If something is not done, Bump asks first. A ticket you bump by mistake comes back with **Undo** for 10 seconds, or later with **Recall**."
+      "x": "If a dish is not done, Bump asks first. Bumped by mistake? **Undo** brings it back for 10 seconds. After that, use **Recall**."
      },
      {
       "t": "h",
@@ -221,7 +225,7 @@
      },
      {
       "t": "p",
-      "x": "Tap **86 board**, find the item and mark it sold out. Smokebox also takes a dish off the menu by itself when its ingredient runs low."
+      "x": "Tap **86 board**, find the dish and mark it sold out. Smokebox also does this by itself when a dish's food runs low."
      }
     ]
    },
@@ -289,7 +293,7 @@
      {
       "t": "fig",
       "id": "cabinet",
-      "alt": "Five steps for a batch in the hold cabinet: it goes in, it is checked, portions are taken out, and it ends by being reheated once or thrown out.",
+      "alt": "Steps for a batch in the hold cabinet: it goes in, it is checked, portions are taken out, and it ends by being reheated once or thrown out.",
       "cap": "A batch in the hold cabinet."
      },
      {
@@ -299,10 +303,9 @@
      {
       "t": "ol",
       "x": [
-       "Open the **Cabinet** tab or the **Hold cabinet**. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
-       "Take a reading at every check with **Log temp**. A reading in range keeps the batch on the menu.",
-       "Tap **Pull** as portions leave the cabinet. The amount left goes down.",
-       "A batch that is too cool can be reheated once with **Reheat**.",
+       "Open the **Cabinet** tab. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
+       "Each batch has a card with one main button. Usually it is **Log temp**: take a reading at every check. A reading in range keeps the batch on the menu. When a batch is too cool the button becomes **Reheat** (once per batch). When it is past its best, it becomes **Taste it, keep serving**.",
+       "The **More for this batch** button (...) opens the rest: **Pull** as portions leave the cabinet, **Start cooling**, and **Discard**.",
        "A batch out of time or out of range is thrown out: tap **Discard** and pick a reason."
       ]
      },
@@ -349,9 +352,9 @@
       "t": "ol",
       "x": [
        "Tap **Orders**, then **Close the day** at the bottom.",
-       "If an order is still open, it is listed. Every order must be paid or voided first. Tap **Open Orders to pay or void**, then come back.",
+       "If an order is still open, it is listed. Every order must be paid or cancelled first. Tap **Open Orders to pay or void**, then come back.",
        "If you cook ahead and food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).",
-       "Read Money today: cash, card and other. The cash line says what should be in the drawer, plus the cash you started with.",
+       "Read Money today: cash, card and other. The cash line says how much should be in the drawer, on top of the cash you started with.",
        "Tap **Close the day**.",
        "Tap **Back up today's data now** and **Print today's summary**."
       ]
@@ -368,7 +371,7 @@
       "t": "ul",
       "x": [
        "Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.",
-       "Open the thrown-out log from the board's menu and save or print it if your health department asks.",
+       "If your health department asks, save or print the thrown-out log. Open it from the **Menu** button on the board.",
        "Keep a copy of the backup off this device (see Backup and restore)."
       ]
      }
@@ -378,7 +381,7 @@
     "id": "who-made-this-entry",
     "group": "guide",
     "title": "Who made this entry",
-    "summary": "Initials go next to temperature readings and thrown-out batches, so the log shows who did what. A wrong entry is fixed, not erased.",
+    "summary": "Initials go next to temperature readings and thrown-out batches, so the log shows who did what. A wrong entry is corrected, not erased.",
     "blocks": [
      {
       "t": "h",
@@ -400,7 +403,7 @@
       "t": "ol",
       "x": [
        "Open the thrown-out log from the board's menu.",
-       "Tap **Fix** on the row.",
+       "Tap **Fix this entry** on the row.",
        "Say what was wrong, add your initials and tap **Save the fix**."
       ]
      },
@@ -424,7 +427,7 @@
       "t": "ol",
       "x": [
        "Tap **Back office**, then **Menu and settings**.",
-       "Find Data, backup and reset. Tap **Download backup (JSON)**. Or tap **Copy backup** and paste the text into an email to yourself.",
+       "Find Data, backup and reset. In the first card, **Back up now**, tap **Download backup (JSON)**. Or tap **Copy backup** and paste the text into an email to yourself.",
        "Keep a copy off this device."
       ]
      },
@@ -439,15 +442,23 @@
      {
       "t": "ol",
       "x": [
-       "Open Data, backup and reset. Under Import, tap **Choose a backup file**. Pick the newest one, named smokebox-backup-(date).json. Or paste the text and tap **Check pasted backup**.",
+       "In the second card, **Restore from a backup**, tap **Choose a backup file**. Pick the newest one, named smokebox-backup-(date).json. Or paste the text and tap **Check pasted backup**.",
        "Read the summary: the saved date, the tickets and the batches should match what you expect. Nothing has changed yet.",
        "If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN. There is no undo, so back up what is here first if you might want it.",
-       "Open the board and check the batches, the 86 board and your menu. Sound and loudness are set per device, so test them again."
+       "Open the board and check your menu and your food. Sound and loudness are set per device, so test them again."
       ]
      },
      {
       "t": "p",
-      "x": "A file that is not a valid backup is refused, and nothing is changed. So is a backup from the demo (or a demo given a real one)."
+      "x": "A file that is not a valid backup is refused, and nothing is changed. A backup from the demo is refused too."
+     },
+     {
+      "t": "h",
+      "x": "Erasing"
+     },
+     {
+      "t": "p",
+      "x": "The Danger zone has **Reset live data** and **Reset everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either."
      }
     ]
    },
@@ -455,16 +466,16 @@
     "id": "replacing-a-device",
     "group": "guide",
     "title": "Replacing a device",
-    "summary": "Move Smokebox to a new tablet or computer without losing your menu, settings and history.",
+    "summary": "Move Smokebox to a new tablet or computer and keep your menu, settings and history. The Data page has a card, **Replacing this device**, with the same steps.",
     "blocks": [
      {
       "t": "ol",
       "x": [
        "On the old device, if it still works, download a backup (see Backup and restore). Copy the file somewhere else: email it to yourself or use a USB drive.",
        "On the new device, copy the same smokebox.html file onto it and open it. Install it as an app: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app.",
-       "Tap **Menu**, then **Set up this tablet**. Sound, keeping the screen on and loudness are set per device, so do them again here.",
-       "Tap **Back office**, then **Menu and settings**. Under Import, choose the backup file, check the summary and tap **Replace everything with this backup**.",
-       "Check the board: batches, the 86 board and the menu. Save a fresh backup from the new device, then retire the old one."
+       "Tap **Menu**, then **Set up this tablet**. Sound and keeping the screen on are set on each device, so do them again here.",
+       "Tap **Back office**, then **Menu and settings**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
+       "Check the board and your menu. Save a fresh backup from the new device, then retire the old one."
       ]
      },
      {
@@ -599,15 +610,15 @@
      {
       "t": "ol",
       "x": [
-       "Open Smokebox with ?demo on the end of its address, like smokebox.html?demo.",
-       "It opens with sample dishes, three sample tickets and food in the cabinet. Cook, bump, pay and throw out food as much as you like.",
-       "Nothing you do in the demo reaches your own kitchen. The demo keeps its own saved data.",
-       "To go back, open Smokebox again without ?demo."
+       "On the welcome screen, or in the **Menu**, tap **Try the demo**. Then tap **Try the demo** again to confirm. Tap **Not now** to stay where you are.",
+       "The demo opens with sample dishes, three sample tickets and food in the cabinet. A bar at the top says \"You are trying the demo\". Cook, bump, pay and throw out food as much as you like.",
+       "Nothing you do there reaches your own kitchen.",
+       "Tap **Back to my kitchen** on the bar to return. Your own dishes and orders are as you left them."
       ]
      },
      {
       "t": "p",
-      "x": "A backup made in the demo cannot be loaded into your own kitchen, and the other way round. Smokebox refuses it and changes nothing."
+      "x": "A backup made in the demo cannot be loaded into your own kitchen, and a real backup cannot be loaded into the demo. Smokebox refuses it and changes nothing."
      },
      {
       "t": "p",
@@ -718,7 +729,7 @@
        "Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.",
        "Allergy care. A note on a ticket is a reminder. Tell your staff about every allergy, and follow your own allergen rules.",
        "Your backups. If you do not save backups, clearing the browser data erases everything.",
-       "Real numbers. Practice tickets and sample history are made up. Starter estimates for prep times, yields and costs are guesses until you confirm them."
+       "Real numbers. Demo tickets and sample history are made up. Starter estimates for prep times, yields and costs are guesses until you confirm them."
       ]
      }
     ]
@@ -753,7 +764,7 @@
      {
       "t": "check",
       "x": [
-       "Orders: every open order paid or voided, then Close the day",
+       "Orders: every open order paid or cancelled, then Close the day",
        "If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)",
        "If you cook ahead: surfaces wiped and Sanitize logged",
        "Sales and money looks right in the Back office",
@@ -776,8 +787,8 @@
        "No sound: tap the warning bar, turn the volume up, then Menu, Set up this tablet, Play a test warning",
        "Screen asleep: wake it and check the times on the cards. Set it to never sleep",
        "Wrong tap: Undo, within 10 seconds",
-       "Ticket sent out by mistake: Recall it from the board header",
-       "Wrong ticket: Void ticket in its small menu, and give a reason",
+       "Bumped by mistake: Recall it from the board header",
+       "Wrong ticket: cancel it with Void ticket in its small menu, and give a reason",
        "Dish missing: check the 86 board and Dishes and prices",
        "Opened empty: restore the last backup (Back office, Menu and settings)",
        "Forgot the PIN: see Empty, lost or locked in the Guide. There is no reset button"
@@ -928,7 +939,7 @@
   function buildSearch(listBox) {
     const input = h('input', { type: 'search', class: 'input gd-search-in', id: 'gd-search', placeholder: 'Search the Guide', 'aria-label': 'Search the Guide', autocomplete: 'off' });
     const status = h('p', { class: 'gd-search-n', role: 'status', 'aria-live': 'polite' });
-    const results = h('ul', { class: 'gd-results', hidden: true });
+    const results = h('ul', { class: 'gd-results', hidden: true, 'aria-label': 'Search results' });
     // Redraws the results (or brings the page list back when the box is empty).
     function run() {
       const q = input.value.trim(), found = search(q);
@@ -943,7 +954,7 @@
       else if (e.key === 'Escape' && input.value) { e.preventDefault(); e.stopPropagation(); input.value = ''; run(); }
       else if (e.key === 'ArrowDown') { const first = results.querySelector('a'); if (first) { e.preventDefault(); first.focus(); } }
     });
-    return h('div', { class: 'gd-search' }, h('label', { class: 'visually-hidden', for: 'gd-search' }, 'Search the Guide'), input, status, results);
+    return h('div', { class: 'gd-search', role: 'search' }, h('label', { class: 'visually-hidden', for: 'gd-search' }, 'Search the Guide'), input, status, results);
   }
 
   // Closes the Guide on Escape, unless a pop-up sheet is open (then Escape belongs to the sheet).
@@ -970,7 +981,9 @@
     const main = h('main', { class: 'gd-main', id: 'gd-main' }, article);
     const topBack = h('button', { type: 'button', class: 'btn gd-back', onClick: back }, ico('chevron-left', 20), h('span', null, 'Back to the board'));
     const top = h('header', { class: 'gd-top' }, topBack, h('h1', { class: 'gd-title' }, ico('info', 24), h('span', null, 'Guide')));
-    const root = h('div', { class: 'gd' }, top, h('div', { class: 'gd-body' }, nav, main));
+    // Keyboard users can jump past the page list straight to the page text.
+    const skip = h('a', { class: 'gd-skip', href: '#gd-main', onClick: (e) => { e.preventDefault(); const t = article.querySelector('.gd-page-title'); if (t) t.focus(); } }, 'Skip to this page');
+    const root = h('div', { class: 'gd' }, skip, top, h('div', { class: 'gd-body' }, nav, main));
     U.clear(el);
     el.appendChild(root);
     el.addEventListener('keydown', onKey);

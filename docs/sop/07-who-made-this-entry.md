@@ -1,6 +1,6 @@
 # Who made this entry
 
-Initials go next to temperature readings and thrown-out batches, so the log shows who did what. A wrong entry is fixed, not erased.
+Initials go next to temperature readings and thrown-out batches, so the log shows who did what. A wrong entry is corrected, not erased.
 
 ## Initials
 
@@ -11,7 +11,7 @@ Initials go next to temperature readings and thrown-out batches, so the log show
 ## Fix an entry
 
 1. Open the thrown-out log from the board's menu.
-2. Tap **Fix** on the row.
+2. Tap **Fix this entry** on the row.
 3. Say what was wrong, add your initials and tap **Save the fix**.
 
 The old entry stays in the log. Your fix is saved as a new entry next to it, with your initials and the time. That keeps the record honest.
