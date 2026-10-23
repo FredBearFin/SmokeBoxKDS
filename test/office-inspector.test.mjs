@@ -78,3 +78,24 @@ test('the sales CSV has plain headers, one row per day, a Total row, and plain m
   assert.doesNotMatch(csv, /\$/);
   assert.equal(BP.salesCsv(E.newState({ now: T0 }), 4).trim().split('\r\n').length, 1, 'no paid orders: only the header');
 });
+
+test('facts under an entry: made date, days in the fridge, and cooling readings against the owner\'s limits', () => {
+  const { factsOf } = SB.office.inspectorPure;
+  const state = { settings: { safety: { cooling: { stage1ToF: 70, stage1H: 2, finalF: 41, totalH: 6 } } }, batches: [
+    { id: 'c1', kind: 'cold', enteredAt: T0, maxHoldH: 48 },
+    { id: 'k1', kind: 'cooling', enteredAt: T0, coolStartAt: T0, temps: [{ t: T0 + 30 * MIN, f: 120 }, { t: T0 + 100 * MIN, f: 80 }] },
+  ] };
+  const cold = factsOf(state, { type: 'batch_discard', batchId: 'c1', t: T0 + 3 * 86400e3 + 3600e3 });
+  assert.ok(cold.some((f) => /^Made /.test(f)) && cold.includes('3 days in the fridge') && cold.includes('Your limit: 48 hours'), cold.join('|'));
+  const cool = factsOf(state, { type: 'cooling_started', batchId: 'k1', t: T0 });
+  assert.ok(cool.some((f) => /^Your limit: 70 °F within 2 h, 41 °F within 6 h/.test(f)), cool.join('|'));
+  assert.ok(cool.some((f) => /^Readings: .*120 °F \(30 min\).*80 °F \(100 min\)/.test(f)), cool.join('|'));
+  assert.deepEqual(factsOf(state, { type: 'batch_discard', batchId: 'gone', t: T0 }), []);
+});
+
+test('a fridge-kept cold item shows its made day, its own fridge and out-of-fridge limits, and out time', () => {
+  const { factsOf } = SB.office.inspectorPure;
+  const state = { settings: {}, batches: [{ id: 'f1', kind: 'cold', fridge: true, madeOn: '2026-10-17', fridgeDays: 3, outHours: 4, enteredAt: T0, lineMs: 90 * MIN }] };
+  const f = factsOf(state, { type: 'batch_back', batchId: 'f1', t: T0 + 86400e3, outMs: 90 * MIN });
+  assert.deepEqual(f, ['Made Sat 10/17', 'Your fridge limit: 3 days, last day Mon 10/19', 'Out of the fridge so far: 90 min (your limit 4 h)']);
+});

@@ -83,7 +83,7 @@ async function blank(browser) {
   for (const t of ['Sales and money', 'Safety', 'Menu and settings']) check('back office nav: ' + t, await seen(p, t, '#sb-office'));
   await p.click('#sb-office nav >> text=Menu and settings'); await p.waitForTimeout(1400);
   for (const t of ['Data, backup and reset', 'Back up now', 'Restore from a backup', 'Replacing this device', 'Danger zone: erase data']) check('data page: ' + t, await has(p, t, '#sb-office'));
-  for (const t of ['Sales by day (for your accountant)', 'Download backup (JSON)', 'Copy backup', 'Choose a backup file', 'Check pasted backup', 'Erase live data', 'Erase everything']) check('data page: ' + t, await seen(p, t, '#sb-office'));
+  for (const t of ['Sales by day (for your accountant)', 'Download backup (JSON)', 'Copy backup', 'Choose a backup file', 'Check pasted backup', 'Erase tickets and records', 'Erase everything']) check('data page: ' + t, await seen(p, t, '#sb-office'));
   await p.close();
 }
 

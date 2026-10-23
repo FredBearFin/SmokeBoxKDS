@@ -709,7 +709,7 @@
       label: 'Opening amount (par)', aria: 'Opening amount of ' + nm, value: ing0.parG, min: 0, max: 1e7, step: pieces ? 1 : 100, big: pieces ? 10 : 1000, unit: pieces ? 'pieces' : 'g', meta: parMeta,
       read: pieces ? null : (u) => U.weightText(u),
       // Par saves through the engine; the line under the row confirms it.
-      save: (v) => mkPatch({ parG: v }, 'Saved. Par is ' + amountText(ing0, v) + '. After you reset live data and keep settings, opening stock starts at this amount.', parMeta), onSaved: (t) => status.ok(t),
+      save: (v) => mkPatch({ parG: v }, 'Saved. Par is ' + amountText(ing0, v) + '. After you erase tickets and records and keep settings, opening stock starts at this amount.', parMeta), onSaved: (t) => status.ok(t),
     });
     const thr = numField({
       label: 'Sold out at', aria: 'Sold out at, ' + nm, value: ing0.thresholdG, min: 0, max: 1e7, step: pieces ? 1 : 50, big: pieces ? 10 : 500, unit: pieces ? 'pieces' : 'g', meta: thrMeta,
@@ -1002,7 +1002,7 @@
     hotHoldF: 'The model Food Code sets 135\u00a0°F as the minimum for hot holding. Your local health code applies and may be stricter (some states use 140).',
     reheatF: 'The FDA Food Code sets 165 °F as the minimum reheat target. Your local health code applies.',
     coldHoldF: 'The FDA Food Code sets 41 °F as the maximum for cold holding. Your local health code applies.',
-    belowHotGraceH: 'Our starting value is 2 hours; the model Food Code sets no fixed limit here. Set the limit your local health department gives you.', aboveColdGraceH: 'Our starting value is 4 hours; the model Food Code sets no fixed limit here. Set the limit your local health department gives you.', sanitizeEveryH: 'The model Food Code (4-602.11) says at most 4 hours between wipe-downs. Check your local code.',
+    belowHotGraceH: 'Our starting value is 2 hours; the model Food Code sets no fixed limit here. Set the limit your local health department gives you.', aboveColdGraceH: 'Our starting value is 4 hours; the model Food Code sets no fixed limit here. Set the limit your local health department gives you.', sanitizeEveryH: 'Our starting value is 4 hours. Set the limit your local health department gives you.',
   };
 
   // Panel 5: food-safety limits, always inside the legal bounds, with the legal note shown.
@@ -1243,16 +1243,6 @@
         else { outTog.setValue(!v); sst.bad(refusal(r, { name: 'Sound outside open hours' })); }
       },
     });
-    // Minutes a dish off the menu for a quality limit waits before the channels hear it, in case it is kept serving.
-    const qMeta = { name: 'Wait before other apps are told', fmt: (v) => v + ' min' };
-    META['service.qualitySyncHoldMin'] = qMeta;
-    const qHold = numField({
-      label: 'Wait before other apps are told an item is past its quality limit', value: (cur() || {}).settings.service.qualitySyncHoldMin, min: 0, max: 30, step: 1, unit: 'min', meta: qMeta,
-      hint: 'A dish past its quality limit may be tasted and kept. The delivery apps are told it is off only after this wait. A safety lock tells them at once.',
-      // Saves the wait as a service setting and confirms it in words.
-      save: (v) => saveSetting('service.qualitySyncHoldMin', v, 'Saved. Channels wait ' + v + ' min.', qMeta), onSaved: (t) => sst.ok(t),
-    });
-    hgrid.appendChild(qHold.el);
     pn.body.append(hgrid, h('div', { class: 'od-toggle-row' }, outTog), sst.el);
 
     // Sales tax: one rate that is added to every order when it is paid.
@@ -1682,8 +1672,8 @@
     // Danger zone: two reset buttons, each opening a box that asks for a typed word before it will act.
     pn.body.appendChild(h('h3', { class: 'od-sub od-danger-h', id: undefined }, 'Danger zone: erase data'));
     const resetStatus = statusLine();
-    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I erase live data', checked: true });
-    const resetLiveBtn = btn('Erase live data', { icon: 'trash', cls: 'btn-danger' });
+    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I erase tickets and records', checked: true });
+    const resetLiveBtn = btn('Erase tickets and records', { icon: 'trash', cls: 'btn-danger' });
     resetLiveBtn.dataset.action = 'reset-live';
     const resetAllBtn = btn('Erase everything', { icon: 'trash', cls: 'btn-danger' });
     resetAllBtn.dataset.action = 'reset-all';
@@ -1715,7 +1705,7 @@
     resetLiveBtn.addEventListener('click', () => {
       const s = stateNow(), k = keep.getValue();
       askTyped({
-        opener: resetLiveBtn, title: 'Erase live data?', word: 'ERASE', label: 'Erase live data',
+        opener: resetLiveBtn, title: 'Erase tickets and records?', word: 'ERASE', label: 'Erase tickets and records',
         lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any demo orders, and sets the clock back to real time.',
           k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
           'There is no undo. Back up first if you might want this data.'],
@@ -1743,7 +1733,7 @@
       });
     });
     pn.body.append(
-      para('Erasing live data removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
+      para('Erasing tickets and records removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
       h('div', { class: 'od-toggle-row' }, keep),
       h('div', { class: 'od-actions' }, resetLiveBtn, resetAllBtn), dangerBox, resetStatus.el);
 

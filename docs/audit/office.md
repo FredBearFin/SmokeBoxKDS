@@ -222,3 +222,43 @@ Method: `test/reconcile.test.mjs` builds random own kitchens with the real engin
 - **Wording (Freddy's decisions):** Pace page is "Speed" (hash stays `#/office/pace`); the pacing setting is "Finish together"; "best-by" is "quality limit"; safety limit is "Throw-out time"; "Demo" and "Sample history" replace practice/made-up; office text says "Settings" for the main board button; food-safety notes say "model Food Code" and "our starting value" where the code sets no fixed limit; reheat-once is described as our own rule. "Erase live data" was left as is because the Guide quotes the button name.
 - **Phone (390 wide), seven pages plus Data, Day and Night:** no horizontal overflow; screenshots in `docs/ux-shots/night/a3/r12-*`. Not checked on a real phone.
 - **Least-risky defaults chosen:** device-local start cash; counter gating off when the setting is absent; hash and ids unchanged.
+
+## Round 14: safety record and inspector log from the research
+
+Sources: `docs/research/restaurant-ops-checklists.md` and `food-holding-rules.md` (web-search leads, not law; nothing here is shown as a rule).
+
+**Now shown under each entry** (`factsOf` in `89-office-inspector.js`, from fields the batch already has; empty when an old batch was trimmed):
+- Made date and time (`enteredAt`); for cold batches, whole days in the fridge at the time of the entry; on a discard or a keep-serving entry, "Your limit: N hours" (the batch's own `maxHoldH`).
+- Cooling: when cooling began, minutes into cooling for each reading, "Your limit: 70 F within 2 h, 41 F within 6 h" read from the owner's settings (not quoted as code), and on the "Cooling started" row the readings so far with their minutes.
+- The sheet and the printout both say plainly that the record covers batches only (no cooler, freezer, strip or thermometer entries) and that the log is not an inspection result (header unchanged).
+
+**What the log can show with data the app already has, and what it cannot** (research gap numbers in brackets):
+
+| Gap | Data today | Status |
+|---|---|---|
+| Made date on every entry [5, 6] | `enteredAt` | Added |
+| Cooling readings with elapsed time [1] | `temps` on the cooling batch, `coolStartAt` | Added as words under the entries; each reading is also its own row already |
+| Cooling checkpoint named (2 h mark, 6 h mark) [1] | none | Request 4 (A5 now stores `stage1F/At` and `finalF/At`; the record still names no checkpoint) |
+| Cooler, freezer, display temperatures [2] | none | Request 1; the record now says it does not cover them |
+| Sanitizer strip reading [3] | `sanitize_done` has lateness only | Request 2 |
+| Thermometer check [4] | none | Request 3 |
+| Discard reason "past date mark", note for Other [5] | reasons expired/quality/temp/cooling/other | Request 5 |
+| Hours out of the fridge, accumulated; fridge limit and last day | A5's cold-item fields on `night/a5-r14` (`fridge`, `madeOn`, `fridgeDays`, `outHours`, `lineMs`, `coldInfo`) | Added in words; new rows "Taken out of the fridge" / "Put back in the fridge" and discard reasons "Past your fridge limit" / "Past your out-of-fridge limit". Tested with a hand-built state; not yet run against A5's engine branch |
+| Retention wording [9], "FDA minimum" in `10-config.js` comments [10] | A5's files | Reported in round 12 |
+| Hand sink and employee-health lines on the cards [7, 8] | print cards are A4's | For A4 |
+| Verified-by line [11] | none | Request 6; the printout keeps a blank "Reviewed by" line |
+
+**Exact requests to A5 (engine, none done by me):**
+1. Event `equip_temp` `{unit: 'cooler'|'freezer'|'display', f, who}` and action `logEquipmentTemp`.
+2. Optional `{ppm, product, where}` on `sanitize_done`.
+3. Event `thermometer_checked` `{f, who}`.
+4. A named checkpoint on cooling readings (`mark: '2h'|'6h'`) so each is its own entry.
+5. Discard reason `datemark` and an optional note on `other`.
+6. Optional `verifiedBy` on the day's record.
+Each new type goes in `SAFETY_EVENT` so the record picks it up unchanged; I will add the plain-words row for it.
+
+**Erase live data, renamed** to "Erase tickets and records" (button, sheet title, confirm button, the keep-settings toggle and the Data page sentence). "Erase everything" is unchanged. The Guide line (`78-guide.js:592`), `docs/sop/10-backup-and-restore.md:35`, `tools/guide-walk.mjs:86` and `test/e2e/07-office.mjs` change in the same commit, so the guide test sees one name.
+
+**Not checked:** the 390-wide look of the extra fact lines in the sheet and the printout on a real printer or phone.
+
+**Also this round:** the "Wait before other apps are told" field (it belonged to the removed channel sync) is hidden; the sanitize interval says "our starting value" instead of a code section; the drawer text says "an amount" not "dollars".
