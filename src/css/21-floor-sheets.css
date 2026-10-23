@@ -573,6 +573,9 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .hc-title { flex: 1 1 auto; }
 .hc-name { font-size: var(--fs-3); font-weight: var(--w-bold); }
 .hc-status { font-size: var(--fs-2); white-space: nowrap; }
+/* On a very narrow screen with Large text the name and the status may sit on two lines instead of pushing past the edge. */
+.hc-title { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 360px) { .hc-head { flex-wrap: wrap; } .hc-status { white-space: normal; } }
 .hc-body { gap: var(--sp-3); }
 .hc-ring { width: 76px; height: 76px; flex: none; }
 .hc-ring::before { inset: 7px; }
