@@ -17,4 +17,4 @@ Back up every day at close. If the browser data is cleared or the device is repl
 3. If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN. There is no undo, so back up what is here first if you might want it.
 4. Open the board and check the batches, the 86 board and your menu. Sound and loudness are set per device, so test them again.
 
-A file that is not a valid backup is refused, and nothing is changed.
+A file that is not a valid backup is refused, and nothing is changed. So is a backup from the demo (or a demo given a real one).

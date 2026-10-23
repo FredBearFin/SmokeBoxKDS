@@ -16,7 +16,9 @@ Want to see how a ticket works first? Tap **Show me how it works** for a one-min
 
 Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN** at the bottom. Enter your sales tax (0 if you add none) and your opening hours. A PIN is optional. It keeps line cooks out of the back office.
 
-The same page asks if you cook food ahead. Leave it on No if you cook to order. Yes adds the **Cabinet** for batches you cook ahead.
+If you cook food ahead and hold it hot or cold, say so in **Dishes and prices** (see Cooked-ahead food and portions). If you cook everything to order, skip it.
+
+Temperatures and weights show in °F and kilograms. To change them, open **Back office**, then **Menu and settings**, and look for Temperatures and Weights.
 
 ## 3. Send a test order
 

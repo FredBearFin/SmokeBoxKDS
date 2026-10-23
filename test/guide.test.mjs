@@ -9,7 +9,7 @@ import { readPages, dataBlock, inject } from '../tools/build-guide.mjs';
 
 const SB = await loadSB(['00-util', '10-config', '60-shell', '78-guide']);
 const G = SB.guide;
-const GUIDE = ['getting-started', 'taking-an-order', 'running-the-line', 'hold-cabinet-and-warnings', 'closing-the-day', 'backup-and-restore', 'replacing-a-device', 'troubleshooting', 'empty-lost-or-locked', 'questions-and-answers', 'what-this-app-does-not-replace'];
+const GUIDE = ['getting-started', 'taking-an-order', 'running-the-line', 'cooked-ahead-and-portions', 'hold-cabinet-and-warnings', 'closing-the-day', 'who-made-this-entry', 'backup-and-restore', 'replacing-a-device', 'troubleshooting', 'empty-lost-or-locked', 'trying-the-demo', 'questions-and-answers', 'what-this-app-does-not-replace'];
 const CARDS = ['card-opening-checklist', 'card-closing-checklist', 'card-when-something-goes-wrong'];
 const FIGURES = ['ticket', 'ladder', 'cabinet'];
 // Every piece of text on a page (picture descriptions included), in one list, for the word checks.
@@ -21,7 +21,7 @@ test('the data in 78-guide.js is exactly what docs/sop produces (one source of t
   assert.equal(inject(src, dataBlock(readPages())), src, 'run: node tools/build-guide.mjs');
 });
 
-test('the Guide has its eleven pages and three quick cards, in order, each with a title, a summary and real content', () => {
+test('the Guide has its fourteen pages and three quick cards, in order, each with a title, a summary and real content', () => {
   assert.deepEqual(G.pages.filter((p) => p.group === 'guide').map((p) => p.id), GUIDE);
   assert.deepEqual(G.pages.filter((p) => p.group === 'cards').map((p) => p.id), CARDS);
   G.pages.forEach((p) => {
@@ -79,7 +79,7 @@ test('words follow the house rules: US spelling, grams and kilograms, no develop
 
 test('every button or screen name shown in bold exists as text in the app source', () => {
   const src = fs.readdirSync(path.join(ROOT, 'src/js')).filter((f) => f.endsWith('.js') && f !== '78-guide.js')
-    .map((f) => fs.readFileSync(path.join(ROOT, 'src/js', f), 'utf8')).join('\n');
+    .map((f) => fs.readFileSync(path.join(ROOT, 'src/js', f), 'utf8')).join('\n').replace(/\\'/g, "'");
   const missing = G.labels().filter((l) => !src.includes(l));
   assert.deepEqual(missing, [], 'rename these in docs/sop (then run tools/build-guide.mjs), or restore the label');
 });
@@ -98,4 +98,16 @@ test('the router understands #/guide and #/guide/page, and cleans junk', () => {
   assert.equal(R.hashFor({ kind: 'guide', page: 'closing-the-day' }), '#/guide/closing-the-day');
   assert.equal(R.hashFor({ kind: 'guide' }), '#/guide');
   assert.deepEqual(R.viewFor(R.hashFor({ kind: 'guide', page: 'a-b' })), { kind: 'guide', page: 'a-b' });
+});
+
+test('every "?" link and open() call in the app points at a Guide page that exists', () => {
+  const dir = path.join(ROOT, 'src/js');
+  const ids = new Set(G.pages.map((p) => p.id));
+  const bad = [];
+  fs.readdirSync(dir).filter((f) => f.endsWith('.js') && f !== '78-guide.js').forEach((f) => {
+    const src = fs.readFileSync(path.join(dir, f), 'utf8');
+    for (const m of src.matchAll(/guide\.(?:link|open)\(\s*'([a-z0-9-]+)'/g)) if (!ids.has(m[1])) bad.push(f + ': ' + m[1]);
+    for (const m of src.matchAll(/(?:helpLink|guideLink)\(\s*'([a-z0-9-]+)'/g)) if (!ids.has(m[1])) bad.push(f + ': ' + m[1]);
+  });
+  assert.deepEqual(bad, []);
 });
