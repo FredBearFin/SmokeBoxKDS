@@ -259,3 +259,24 @@ Headless Chromium against the real hub (`server/server.mjs`) in this process, wi
 - **Its own menu** (the menu button): Wall mode, Far display, Night colors, Warning sounds on this screen, Back to my own kitchen. Wall mode (1700 px and wider) and far display work as on the main screen.
 - **Tests:** `test/follower.e2e.mjs` (chip words and size, ticket and action convergence, no write controls, forced taps and keys do nothing, hub state unchanged, no kitchen data in local storage, silent, wall and far display, hub away then Out of date, hub back then Connected with what it missed, phone at 390).
 - **Not checked:** a real TV or phone browser, a hub on another origin with an access code, a hub restart that changes its id, the follower in Night colors at 1920, and the cabinet on a follower with cook-ahead on.
+
+## Round 19 (main track): speed with 60 and 200 tickets, and four notices at once
+
+Headless Chromium on a shared machine, not a tablet. Script: `test/board-perf.e2e.mjs`. A demo kitchen with cook-ahead items, a cold fridge item and 60 or 200 open tickets. Each cell is the median of 7 taps (3 for the sheet), in milliseconds, from the tap to the next painted frame (two animation frames); the script time inside the tap is in brackets. A frame is about 16 ms, so 25 ms is "painted on the next frame".
+
+| Screen, tickets | Start a dish | Bump | New ticket arrives | Switch station | Open Cabinet tab | Open Readings |
+|---|---|---|---|---|---|---|
+| 1280x800, 60 | 26 (1.5) | 39 (4.1) | 26 (0.3) | 140 (39) | 84 (12) | 26 (2.2) |
+| 1280x800, 200 | 32 (4.7) | 56 (7.6) | 25 (0.4) | 204 (142) | 101 (24) | 31 (1.9) |
+| 390x844, 60 | 24 (1.7) | 30 (2.8) | 23 (0.3) | 76 (59) | 90 (17) | 31 (2.8) |
+| 390x844, 200 | 26 (3.9) | 36 (4.7) | 29 (0.3) | 176 (156) | 61 (18) | 35 (2.4) |
+
+- The cooking taps (Start, Done, Bump) and a new ticket stay at one or two frames even with 200 tickets open (max 56 ms).
+- The slowest thing is switching to a station tab that has many tickets: the board is rebuilt from scratch, about 0.7 ms per slip. Going to a tab with 200 slips takes 140 to 270 ms in the script (the worst single switch measured was 268 ms). It is not a cooking tap and 200 open tickets is far above a real rush, so I left it. A fix would keep the slips of the last tab in a pool, or draw only the first screens of slips and the rest when idle; both touch ticket order and focus, so not done tonight.
+- No jank or overlap found in the new features (readings, counter service, cold items, tablet checks, pull beside the main button) in the existing layout suites; all board suites, `floor-sheets` (177) and `floor` (202) pass on this branch.
+
+### Notices on the strip
+- Warning rows (batches, tickets) always show, one or two by screen height.
+- Everything else is one notice line at a time, in this order: the "tap for sound" bar, then the note (sound off, screen may sleep, the board was in the background, kitchen closed). The bar adds "(1 more notice)" when another waits, and its X is now "Clear all notices". After it is cleared the next notice does not come back until its words change.
+- Checked at 1024 (Day, and Night with Large text) and 1920 (Night, Large text): `test/board-notices.e2e.mjs`. The strip stays under 30 percent of the screen height with a demo banner, the sound bar and two warning rows. At Night the notice line is a light bar on a dark board by design (inverted strip); it reads well but is the brightest thing on screen.
+- Not checked: the update line (it lives on the offline track, not on main), a backup banner together with all of the above, and a real tablet.

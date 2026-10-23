@@ -2770,6 +2770,7 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 @media (max-width: 560px) { .fw-modes { grid-template-columns: 1fr; } }
 .fw [hidden] { display: none !important; }
 .fw .fs-row { margin-block: var(--sp-2); }
+.rd-state { white-space: nowrap; }
 /* Readings: the number box fills the row, so there is no empty gap beside the +5 button. */
 .rd .stepper { display: flex; width: 100%; }
 .rd .stepper .stepper-field { flex: 1 1 auto; min-width: 0; }
@@ -3672,6 +3673,7 @@ a.of-nav:active { background: var(--press); }
   border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
   overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin;
 }
+.od-toc { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }   /* a soft right edge says the strip scrolls */
 .od-toc-list { display: flex; gap: var(--sp-2); width: max-content; min-width: 100%; }
 .od-toc-link {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-4); white-space: nowrap;
@@ -3686,10 +3688,10 @@ a.of-nav:active { background: var(--press); }
   .od-layout { grid-template-columns: 184px minmax(0, 1fr); gap: var(--sp-8); align-items: start; }
   .od-toc {
     top: calc(var(--od-sticky-top) + var(--sp-4)); margin: 0; padding: 0; overflow: visible;
-    background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0;
+    background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; -webkit-mask-image: none; mask-image: none;
   }
   .od-toc-list { display: grid; gap: 2px; width: auto; min-width: 0; }
-  .od-toc-link { min-height: 40px; padding: 0 var(--sp-3); border: 0; border-left: 2px solid var(--line-soft); border-radius: 0 var(--r-btn) var(--r-btn) 0; }
+  .od-toc-link { min-height: 44px; padding: 0 var(--sp-3); border: 0; border-left: 2px solid var(--line-soft); border-radius: 0 var(--r-btn) var(--r-btn) 0; }
   .od-toc-link[aria-current="location"] { border-left-color: var(--amber); }
 }
 
@@ -3715,7 +3717,7 @@ a.of-nav:active { background: var(--press); }
 .od-read:empty { display: none; }
 .od-ferr { display: flex; align-items: flex-start; gap: 6px; font-size: var(--fs-2); font-weight: var(--w-semi); line-height: 1.35; color: var(--crimson); }
 .od-ferr .icon { margin-top: 2px; }
-.od .stepper-input { font-size: var(--fs-4); flex: none; }
+.od .stepper-input { font-size: var(--fs-4); flex: none; min-width: 4.8ch; }   /* a 3-digit value must stay readable even when the stepper sized itself for two */
 .od .stepper-btn.is-big { width: auto; min-width: var(--tap-step); padding: 0 var(--sp-2); white-space: nowrap; }   /* "-1000" must stay on one line */
 .od .stepper-field { flex: none; }   /* a stepper may spill sideways before it may hide a digit */
 .od .stepper-unit { max-width: 7em; overflow: hidden; text-overflow: ellipsis; }
@@ -21960,7 +21962,7 @@ a.of-nav:active { background: var(--press); }
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
-    const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear this notice', 'snd'));
+    const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear all notices', () => { if (m && m.noteKey) m.dis.add(m.noteKey); return 'snd'; }));
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
     const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: (e) => { if (following) followMenu(e.currentTarget); else if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
@@ -22095,7 +22097,14 @@ a.of-nav:active { background: var(--press); }
     const note = following ? health : sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
-    const showNote = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note) && (note === health || (needSound ? m.dis.has('snd') : true));
+    // Only one notice shows at a time (the "tap for sound" bar first, then the note); the bar says how many more wait behind it, and
+    // its X clears them all. Warning rows above are separate and always show.
+    const soundShown = needSound && !m.dis.has('snd');
+    const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
+    const showNote = noteWanted && !soundShown;
+    m.noteKey = noteWanted ? 'pause:' + note : '';
+    const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
+    if (moreEl) { const t = 'Tap here to turn on warning sounds. This browser needs one tap first.' + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
     // The note's icon says what it is about: a new version waiting shows a refresh arrow, everything else the muted speaker.
@@ -28724,7 +28733,7 @@ a.of-nav:active { background: var(--press); }
     return true;
   }
 
-  /* ---------- Get this tablet ready ---------- */
+  /* ---------- Tablet checks ---------- */
 
   // Plays one short, clear beep through the browser's own audio, at this tablet's saved loudness. Returns true when a beep was started.
   // A tap is needed first on most tablets: it is only called from a button.
@@ -28747,7 +28756,7 @@ a.of-nav:active { background: var(--press); }
   function isInstalled() {
     try { return !!(g.navigator && g.navigator.standalone) || !!(g.matchMedia && (g.matchMedia('(display-mode: standalone)').matches || g.matchMedia('(display-mode: fullscreen)').matches)); } catch (e) { return false; }
   }
-  // Opens "Get this tablet ready": five checks in plain words, each with a green tick or a plain "do this" line. It only reports what the
+  // Opens "Tablet checks": five checks in plain words, each with a green tick or a plain "do this" line. It only reports what the
   // browser can really tell (screen awake, installed, full screen); sound and volume are confirmed by the person who hears the beep.
   function openReady() {
     const sheet = SB.ui.sheet({ title: 'Tablet checks', side: 'right', width: 'min(720px, 96vw)', name: 'ready', onClose: () => { releaseWake(); } });
@@ -28760,7 +28769,7 @@ a.of-nav:active { background: var(--press); }
     const cAwake = card('awake', 'Screen stays awake'), cSound = card('sound', 'Sound is on'), cVol = card('volume', 'Volume is loud enough'), cOff = card('offline', 'Opens without the internet'), cInst = card('installed', 'Added to the home screen'), cFull = card('full', 'Full screen');
     const summary = h('p', { class: 'fs-sub rd-summary', role: 'status' });
     // Counts the ticks and says how many checks are done.
-    function paintSummary() { const n = [cAwake, cSound, cVol, cInst, cFull, cOff].filter((c) => c.el.dataset.ok === 'true').length; tell(summary, n + ' of 6 ready. A check mark means the tablet or you confirmed it; it is not a promise it stays that way all day.', n === 5 ? 'ok' : undefined); }
+    function paintSummary() { const n = [cAwake, cSound, cVol, cInst, cFull, cOff].filter((c) => c.el.dataset.ok === 'true').length; tell(summary, n + ' of 6 ready. A check mark means the tablet or you confirmed it; it is not a promise it stays that way all day.', n === 6 ? 'ok' : undefined); }
 
     // 1. Screen awake: ask the browser to hold the screen on now (a tap lets it), or say how to set the tablet itself.
     // Asks for the screen hold and shows the result; the tablet's own timeout is still the first thing to set.
@@ -29068,7 +29077,7 @@ a.of-nav:active { background: var(--press); }
 
   // The visit steps, in order: what to do, where in the app, and minutes allowed. Kept as plain data so the printed card and the doc match.
   const PILOT_STEPS = [
-    { min: 3, what: 'Get this tablet ready', how: 'Settings, Get this tablet ready. Screen never sleeps, plugged in, sound test heard, added to the home screen, full screen.' },
+    { min: 3, what: 'Tablet checks', how: 'Settings, Tablet checks. Screen never sleeps, plugged in, sound test heard, added to the home screen, full screen.' },
     { min: 3, what: 'Put the menu in', how: 'Import their spreadsheet (Settings, Dishes and prices, More ways to add dishes) or add the first dishes by hand. Check the preview before saving.' },
     { min: 2, what: 'Tax, hours and PIN', how: 'Settings, Tax, hours and PIN. Set the manager PIN and write down the recovery code with the owner.' },
     { min: 2, what: 'Name stations and menu sections', how: 'Use their words. Hide stations they do not have (Change stations).' },
@@ -29287,7 +29296,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Tap **Back office**, then **Menu and settings**. Find Data, backup and reset and tap **Download backup (JSON)**. Keep a copy off this device: email it to yourself or put it on a USB drive."
+      "x": "Tap **Back office**, then **Menu and settings**. Find Data, backup and reset and tap **Download backup (JSON)**. This saves a file. Keep a copy off this device: email it to yourself or put it on a USB drive."
      }
     ]
    },
@@ -29295,7 +29304,7 @@ a.of-nav:active { background: var(--press); }
     "id": "setup-recipes",
     "group": "guide",
     "title": "Setup recipes",
-    "summary": "Four ways to set up Smokebox. Pick the one closest to your place. Each uses only what the app has: a few stations, one cooking-ahead switch and counted dishes.",
+    "summary": "Four ways to set up Smokebox. Pick the one closest to your place. Each uses only what the app can do today. A station is a place in your kitchen, like the grill or the cold counter.",
     "blocks": [
      {
       "t": "h",
@@ -29334,7 +29343,7 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "Stations: rename the starting stations (Kitchen, Prep, Fryer, Cold and drinks) to match your line. Expo stays.",
        "Settings: choose **Dine-in** and a table on each order. Set a PIN to keep cooks out of the back office.",
-       "The board: a station gets a tab once a dish is made there. Each cook opens their tab and sees only their dishes. Expo sees whole tickets, each dish tagged with its station, and taps **Bump** when the plate is complete."
+       "The board: a station gets a tab once a dish is made there. Each cook opens their tab and sees only their dishes. Expo is the person who checks and packs whole orders. Expo sees whole tickets, each dish tagged with its station, and taps **Bump** when the plate is complete."
       ]
      },
      {
@@ -29617,7 +29626,7 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "In **Dishes and prices**, find \"Do you cook food ahead?\" and tap **Yes, I cook ahead**. The cooked-ahead sheet opens.",
        "Type what you cook ahead and choose Hot or Cold.",
-       "Set how long it may stay. For hot food it is one number of hours. For cold food two optional boxes ask how many days it may stay in the fridge and how many hours it may be out of the fridge. Use the limits your local health department gives you. Leave a box empty if no limit is set: Smokebox then only shows the time. Batches of cold food are described in Cold items in the fridge.",
+       "Set how long it may stay. Hot food takes one number of hours. Cold food has two optional boxes: days in the fridge, and hours out of the fridge. Use the limits your local health department gives you. Leave a box empty if none is set, and Smokebox will only show the time. See Cold items in the fridge.",
        "Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.",
        "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**. To change an item later, open it from the list and tap **Save changes**."
       ]
@@ -29641,7 +29650,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "fig",
       "id": "cabinet",
-      "alt": "Steps for a batch in the hold cabinet: it goes in, it is checked, portions are taken out, and it ends by being reheated or thrown out.",
+      "alt": "Steps for a batch in the hold cabinet: it goes in, it is checked, portions are pulled out, and it ends by being reheated or thrown out.",
       "cap": "A batch in the hold cabinet."
      },
      {
@@ -29652,9 +29661,9 @@ a.of-nav:active { background: var(--press); }
       "t": "ol",
       "x": [
        "Open the **Cabinet** tab. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
-       "Each batch has a card with one main button. Usually it is **Log temp**: take a reading at every check. A reading in range keeps the batch on the menu. When a batch is too cool the button becomes **Reheat**. Smokebox allows one reheat per batch. That is its own rule, not a health code rule. When it is past its best, it becomes **Keep serving**.",
-       "The **More for this batch** button (...) opens the rest: **Pull** as portions leave the cabinet, **Start cooling**, and **Discard**.",
-       "A batch out of time or out of range is thrown out: tap **Discard** and pick a reason."
+       "Each batch has a card with two main buttons. **Pull** takes out the usual amount, like Pull 4.50 kg, as food leaves the cabinet. **Log temp** writes down a temperature reading. Take one at every check. A reading in range keeps the batch on the menu.",
+       "The button can change. When a batch is too cool it becomes **Reheat**. Smokebox allows one reheat per batch: its own rule, not a health code rule. When a batch is past its quality limit it becomes **Keep serving**: check the food, then decide.",
+       "The **More for this batch** button (...) opens **Pull**, **Start cooling** and **Discard**, and **Remind me in 10 min** while a warning is showing. Tap **Discard** and pick a reason when a batch is out of time or out of range."
       ]
      },
      {
@@ -29678,11 +29687,11 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Some foods warn earlier. You can change the times in Settings. A batch that is almost empty, or on pace to sell out in time, stays quiet."
+      "x": "Some foods warn earlier, and you can change the times in Settings. A nearly empty batch stays quiet."
      },
      {
       "t": "p",
-      "x": "Warnings only sound while the screen is on and Smokebox is open on the board. They do not sound when the tablet is asleep, the page is closed, the volume is off, or it is outside your opening hours."
+      "x": "Warnings sound only while the screen is on and Smokebox is open on the board, with the volume up, inside your opening hours."
      }
     ]
    },
@@ -29723,6 +29732,54 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "p",
       "x": "The days and hours are the numbers you typed. Smokebox does not know your local rules and does not say what they are. It only counts the time against your limits."
+     }
+    ]
+   },
+   {
+    "id": "readings",
+    "group": "guide",
+    "title": "Readings",
+    "summary": "Write down fridge, thermometer and sanitizer strip readings in one place. You see Readings only if you cook food ahead.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Open it"
+     },
+     {
+      "t": "p",
+      "x": "Tap **Settings**, then **Readings**."
+     },
+     {
+      "t": "h",
+      "x": "Three things you can write down"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "**Fridge, freezer or display case**: pick which one, add a name if you like (like Walk-in), type the temperature, and tap **Log reading**.",
+       "**Food thermometer check**: type what the thermometer says, say how you checked it (Ice water, Boiling water or Other), and tap **Log check**.",
+       "**Sanitizer strip**: type the strip reading in parts per million. Add the sanitizer and where if you like. Tap **Log strip reading**. This also marks surfaces as sanitized."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "Each entry goes in the safety record with your initials. Type the number the thermometer or strip really shows before you tap the log button."
+     },
+     {
+      "t": "h",
+      "x": "What it does not do"
+     },
+     {
+      "t": "p",
+      "x": "Smokebox writes down what you type. It does not know what a good reading is and cannot see the food. Use the numbers your health department and the sanitizer's label give you."
+     },
+     {
+      "t": "h",
+      "x": "Fix a wrong entry"
+     },
+     {
+      "t": "p",
+      "x": "Open the entry in **Recent readings** and tap **Save fix**. The old entry stays, with your fix next to it."
      }
     ]
    },
@@ -29885,7 +29942,7 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "On the old device, if it still works, download a backup (see Backup and restore). Copy the file somewhere else: email it to yourself or use a USB drive.",
        "On the new device, copy the same smokebox.html file onto it and open it. Install it as an app: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app.",
-       "Tap **Settings**, then **Set up this tablet: first steps**. Sound and keeping the screen on are set on each device, so do them again here.",
+       "Tap **Settings**, then **Tablet checks: screen, sound, home screen**. Sound and keeping the screen on are set on each device, so do them again here.",
        "Tap **Back office**, then **Menu and settings**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
        "Check the board and your menu. Save a fresh backup from the new device, then retire the old one."
       ]
@@ -29897,6 +29954,46 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "p",
       "x": "Separate devices do not share data yet. Two tabs on the same device stay in step."
+     }
+    ]
+   },
+   {
+    "id": "get-the-tablet-ready",
+    "group": "guide",
+    "title": "Get the tablet ready",
+    "summary": "Five quick checks so the board keeps working during service.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Open it"
+     },
+     {
+      "t": "p",
+      "x": "Tap **Settings**, then **Tablet checks: screen, sound, home screen**. Each check shows a check mark, or a plain line saying what to do. A check mark means you or the tablet confirmed it. It is not a promise it stays that way all day. For the longer first-time list, open **Set up this tablet: first steps**."
+     },
+     {
+      "t": "h",
+      "x": "The five checks"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "**Screen stays awake**: warnings cannot sound while the screen is off. Smokebox asks the browser to keep it on, but also set the tablet to never sleep and keep it plugged in. Tap **Check again** after you change it.",
+       "**Sound is on** and **Volume is loud enough**: tap **Test the sound**. Tap **Yes, I heard it**, or turn the volume up and try again. A tablet speaker is easy to miss in a loud kitchen. A small Bluetooth speaker near the cutting board helps.",
+       "**Added to the home screen**: open Smokebox from its icon, not from the browser.",
+       "**Full screen**: tap **Go full screen**, or install the app so it opens without the browser bars."
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Two lines you may see on the board"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "\"This screen may go to sleep, and warnings stop while it sleeps.\" Keep the tablet plugged in with its screen set to stay on.",
+       "\"Warnings are silent: sound is off on this tablet. Tap to turn on.\" Tap it once."
+      ]
      }
     ]
    },
@@ -29916,7 +30013,7 @@ a.of-nav:active { background: var(--press); }
        "If the board says \"Tap here to turn on warning sounds\", tap it. Browsers need one tap first.",
        "Turn the tablet volume up and check its silent switch.",
        "Tap **Settings** and check that Sound is on and the loudness is not low.",
-       "Tap **Settings**, then **Set up this tablet: first steps**, then **Play a test warning**.",
+       "Tap **Settings**, then **Tablet checks: screen, sound, home screen**, then **Test the sound**.",
        "If the bar says \"Sound paused\", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.",
        "Close any second Smokebox tab. Only the tab on screen makes sound."
       ]
@@ -29927,7 +30024,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Warnings cannot sound while the screen is off. Smokebox asks the browser to keep the screen on, but some browsers say no. Set the tablet to never sleep (Auto-Lock on an iPad, Screen timeout on Android) and keep it plugged in. When you wake it, check the times on the cards."
+      "x": "Warnings cannot sound while the screen is off. Smokebox asks the browser to keep the screen on, but some browsers say no. Set the tablet to never sleep (Auto-Lock on an iPad, Screen timeout on Android) and keep it plugged in. **Tablet checks: screen, sound, home screen** checks this. When you wake it, check the times on the cards."
      },
      {
       "t": "h",
@@ -30155,7 +30252,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "ul",
       "x": [
-       "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Smokebox does not log cooler or freezer temperatures, sanitizer strength or thermometer checks: keep a paper log for those. Your own food-safety plan, your training and your thermometer checks still apply.",
+       "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Smokebox writes down the cooler, freezer, thermometer and sanitizer strip readings you type under Readings. It cannot check them, and it may not be the record your health department asks for. Keep a paper log if they require one. Your own food-safety plan, your training and your thermometer checks still apply.",
        "Your local health code. The limits Smokebox starts with (such as 4 hours, the check interval and one reheat per batch) are starting values, not your local rules. Set the limits your local health department gives you.",
        "Card processing. Smokebox only writes down how an order was paid. Keep your card reader and your processor.",
        "Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.",
@@ -30178,7 +30275,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "A hub: a small program that keeps the kitchen in one place. Someone runs it by hand on a laptop or server. Smokebox never starts one. You need its address and its access code, if it has one. Then tap **Settings**, then **Use one kitchen on several tablets**."
+      "x": "The main computer (also called the hub) is a small program that keeps the kitchen in one place. Someone runs it by hand on a laptop or server. Smokebox never starts one. You need its address and, if it needs one, a pairing code or an access code. Then tap **Settings**, then **Use one kitchen on several tablets**."
      },
      {
       "t": "h",
@@ -30190,22 +30287,22 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "h",
-      "x": "Use this hub for orders"
+      "x": "Use the main computer for orders"
      },
      {
       "t": "p",
-      "x": "For a tablet that takes orders too. Tap **Use this hub for orders on this tablet**. Type the address, the code and a name for this screen, like Pass. Tap **Check the hub**, then choose one:"
+      "x": "For a tablet that takes orders too. Tap **Use the main computer for orders on this tablet**. Type the address and a name for this screen, like Pass. Tap **Check the main computer**. If it asks for a pairing code, ask the person who runs the main computer for one (it works once and for 10 minutes), type it in the **Pairing code** box and tap **Pair this tablet**. Then choose one:"
      },
      {
       "t": "ul",
       "x": [
-       "Show the hub's kitchen on this tablet. Your own saved kitchen stays untouched.",
-       "Send this tablet's kitchen to the hub. This works only if the hub is empty. Smokebox never mixes two kitchens."
+       "Show the shared kitchen on this tablet. Your own saved kitchen stays untouched.",
+       "Send this tablet's kitchen to the main computer. This works only if the main computer is empty. Smokebox never mixes two kitchens."
       ]
      },
      {
       "t": "p",
-      "x": "Then tap **Join the hub**. Tap **Leave the hub** to go back."
+      "x": "Then tap **Join this kitchen**. Tap **Leave the shared kitchen** to go back. If the main computer removed this tablet, the sheet says so; tap **Leave and pair again**."
      },
      {
       "t": "h",
@@ -30232,29 +30329,6 @@ a.of-nav:active { background: var(--press); }
     ]
    },
    {
-    "id": "card-opening-checklist",
-    "group": "cards",
-    "title": "Opening checklist",
-    "summary": "Print this card and keep it by the tablet.",
-    "blocks": [
-     {
-      "t": "check",
-      "x": [
-       "Tablet plugged in, and set to never sleep",
-       "Volume up. Smokebox open on the kitchen board",
-       "Tap the warning bar once, or use Play a test warning under Set up this tablet: first steps",
-       "Check the 86 board: what is out today?",
-       "Counted dishes: how many did you make today?",
-       "Hand sink works and is stocked. Anyone unwell? Tell the manager",
-       "Thermometer checked in ice water. Cooler and freezer readings on your paper log",
-       "If you cook ahead: log a first temperature on each batch in the cabinet",
-       "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
-       "Yesterday's backup saved and a copy kept off the device"
-      ]
-     }
-    ]
-   },
-   {
     "id": "opening-without-the-internet",
     "group": "guide",
     "title": "Opening without the internet (test feature)",
@@ -30275,6 +30349,29 @@ a.of-nav:active { background: var(--press); }
     ]
    },
    {
+    "id": "card-opening-checklist",
+    "group": "cards",
+    "title": "Opening checklist",
+    "summary": "Print this card and keep it by the tablet.",
+    "blocks": [
+     {
+      "t": "check",
+      "x": [
+       "Tablet plugged in, and set to never sleep",
+       "Volume up. Smokebox open on the kitchen board",
+       "Tap the warning bar once, or use Test the sound under Tablet checks: screen, sound, home screen",
+       "Check the 86 board: what is out today?",
+       "Counted dishes: how many did you make today?",
+       "Hand sink works and is stocked. Anyone unwell? Tell the manager",
+       "Thermometer checked in ice water. Cooler and freezer readings written down (Settings, Readings, or your paper log)",
+       "If you cook ahead: log a first temperature on each batch in the cabinet",
+       "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
+       "Yesterday's backup saved and a copy kept off the device"
+      ]
+     }
+    ]
+   },
+   {
     "id": "card-closing-checklist",
     "group": "cards",
     "title": "Closing checklist",
@@ -30287,7 +30384,7 @@ a.of-nav:active { background: var(--press); }
        "If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)",
        "If you cook ahead: surfaces wiped and Sanitize logged",
        "Food kept over a day: labeled with a date, as your local rule says",
-       "Final cooler and freezer readings on your paper log",
+       "Final cooler and freezer readings written down",
        "Sales and money looks right in the Back office",
        "Log of thrown-out batches saved or printed",
        "Backup downloaded and a copy kept off the device",
@@ -30305,7 +30402,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "check",
       "x": [
-       "No sound: tap the warning bar, turn the volume up, then Settings, Set up this tablet: first steps, Play a test warning",
+       "No sound: tap the warning bar, turn the volume up, then Settings, Tablet checks: screen, sound, home screen, Test the sound",
        "Screen asleep: wake it and check the times on the cards. Set it to never sleep",
        "Wrong tap: Undo, within 10 seconds",
        "Bumped by mistake: Recall it from the board header",
@@ -30381,7 +30478,7 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "Open Smokebox and add it to the home screen: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app",
        "Keep it awake: set Auto-Lock (iPad) or Screen timeout (Android) to Never, and plug it in",
-       "Turn the volume up. Tap Settings, Set up this tablet: first steps, then Play a test warning",
+       "Turn the volume up. Tap Settings, Tablet checks: screen, sound, home screen, then Test the sound",
        "Wifi: not needed. Smokebox works without internet",
        "Backups go where you save them: the Downloads folder, or an email to yourself. Smokebox does not send them anywhere",
        "Keep a copy of every backup off this tablet",
@@ -30409,6 +30506,7 @@ a.of-nav:active { background: var(--press); }
        "Gray dish: waiting on purpose. Start now goes early",
        "Clock amber, then red: the order is late",
        "Sold out: tap 86 board and mark it",
+       "Cooked food leaves the cabinet: tap Pull",
        "Wrong tap: Undo, within 10 seconds",
        "Bumped by mistake: Recall, in the header"
       ]
@@ -35710,7 +35808,7 @@ a.of-nav:active { background: var(--press); }
     const cutsIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Cuts the observer counted', style: 'width:7em' });
     const batchesIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Batches the observer counted', style: 'width:7em' });
     const whenSel = h('select', { class: 'input', 'aria-label': 'Report window' }, h('option', { value: 'open' }, 'Since opening'), h('option', { value: '4' }, 'Last 4 hours'), h('option', { value: '24' }, 'Last 24 hours'));
-    const repBox = h('pre', { class: 'od-report', hidden: true, style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
+    const repBox = h('pre', { class: 'od-report', hidden: true, role: 'region', 'aria-label': 'Pilot report', tabindex: '0', 'aria-live': 'polite', style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
     // Builds the report for the chosen window and shows it; with download true it also saves the CSV.
     async function makeReport(download) {
       const s = stateNow(), now = SB.store.now();
@@ -35779,6 +35877,7 @@ a.of-nav:active { background: var(--press); }
     card1.body.append(
       lastLine,
       para('A backup is one file with your dishes, orders, settings and records. Back up at the end of every day, and keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
+      para('The starting cash you type on Close the day is remembered on this device only. It is not in a backup.', 'od-hint'),
       h('div', { class: 'od-actions' }, dlBtn, cpBtn), exStatus.el, fb);
     // The spreadsheet files and the pilot report are less common, so they sit in a closed group below the flow.
     pn.body.appendChild(h('details', { class: 'od-paste-det od-more' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Spreadsheet files and the pilot report')),
@@ -36938,9 +37037,20 @@ a.of-nav:active { background: var(--press); }
   // classified as kitchen data in 00-util.js (an unclassified key is kept apart in the demo, which is the safe side).
   const START_KEY = 'smokebox.v1.' + 'office.startCash';
   // The starting cash remembered from the last close, as text ('' when none).
-  function rememberedStart() { try { const v = U.storage.get(START_KEY, ''); return typeof v === 'string' ? v : ''; } catch (e) { return ''; } }
+  // The starting cash remembered from the last close, as text, or '' when none or when it belongs to an older kitchen: it is
+  // saved with the time it was saved, and ignored unless this kitchen has an order from before that time (Start over
+  // empties the orders, so every later order is newer and the old value is dropped).
+  function rememberedStart() {
+    try {
+      const v = U.storage.get(START_KEY, null);
+      if (!v || typeof v !== 'object' || typeof v.t !== 'string' || !isNum(v.at)) return '';
+      const s = stateNow();
+      const orders = s && Array.isArray(s.orders) ? s.orders : [];
+      return orders.some((o) => o && isNum(o.createdAt) && o.createdAt <= v.at) ? v.t : '';
+    } catch (e) { return ''; }
+  }
   // Remembers the starting cash text for tomorrow when it is a valid amount.
-  function rememberStart(text) { try { if (isNum(U.parseDollars(text))) U.storage.set(START_KEY, String(text).trim()); } catch (e) { /* the helper still works without it */ } }
+  function rememberStart(text) { try { if (!String(text == null ? '' : text).trim()) U.storage.remove(START_KEY); else if (isNum(U.parseDollars(text))) U.storage.set(START_KEY, { t: String(text).trim(), at: SB.store.now() }); } catch (e) { /* the helper still works without it */ } }
 
   // The cash-in-the-drawer block: an optional starting cash box and the line that adds it to today's cash payments.
   function drawerBlock(m, drawer) {
@@ -37288,7 +37398,8 @@ a.of-nav:active { background: var(--press); }
       h('td', null, U.fmtDateShort(U.dateKey(r.at)) + ' ' + U.fmtTime(r.at)), h('td', null, r.kind), h('td', null, r.food), h('td', null, r.detail, (r.facts || []).map((f) => h('div', { class: 'si-fact' }, f))), h('td', null, r.who || 'not recorded', r.screen ? h('div', { class: 'si-fact' }, 'at ' + r.screen) : null),
       h('td', null, r.corrections.map((c) => h('div', { class: 'si-corr' }, 'Correction ' + U.fmtDateShort(U.dateKey(c.at)) + ' ' + U.fmtTime(c.at) + (c.who ? ' by ' + c.who : '') + ': ' + c.note)))));
     return h('table', { class: 'si-table' },
-      h('thead', null, h('tr', null, ['When', 'What', 'Food', 'Detail', 'Logged by', 'Corrections added later'].map((t) => h('th', null, t)))),
+      h('caption', { class: 'visually-hidden' }, 'Food safety entries, oldest first'),
+      h('thead', null, h('tr', null, ['When', 'What', 'Food', 'Detail', 'Logged by', 'Corrections added later'].map((t) => h('th', { scope: 'col' }, t)))),
       h('tbody', null, body.length ? body : h('tr', null, h('td', { colspan: 6 }, 'No safety entries in this range.'))));
   }
 

@@ -248,3 +248,17 @@ Deploy download: 164 MB before, 1.4 MB after the root `.gitattributes` (see `doc
 | qa journeys (45) | 45 pass after two drift fixes (re-run alone) | 02d: the overdue slip now leads, then rush slips; 07a: page title "Speed" |
 
 After a3-r14 landed and was merged: office, office-b, office-data, contract, shell, floor, board-round14, cold-items, board-contrast and all 45 qa journeys pass (45/45, 1,085 checks).
+
+## Round 18: full regression on main (abf003e)
+
+Every slow suite run singly (two at a time), the 45 qa journeys, and the node:test files. 41 slow runs: 37 pass, 4 fail; 741 node:test cases (a first run had 3 timing failures under load, a second run was clean).
+
+| Suite | Result | Note |
+|---|---|---|
+| floor | FAIL (repeats alone) | 390 px: 17 compact tickets take 12.5 screens (limit 12); a burst of 12 new tickets renders twice, not once (A1, new since round 14) |
+| contract | FAIL | at 280 px `.fl-checked` in the dock overflows the floor by 9 px (document itself does not scroll). A1 |
+| floor-sheets | FAIL once, PASS alone | a wait for a selector timed out while two suites ran; 356 s alone, 172 pass |
+| qa (45 journeys) | 44 pass, 1 fail | 11a: `SB.sim.sample()` cold over 3,000 ms on this shared machine (known, A5/sim, timing) |
+| all other 37 slow suites | PASS | artifact, backup-banner, board-*, bumpbar, cold-items, config-names, demo-mode, menu-import-ui, office*, order-*, pay-ui, pin-recovery-ui, production-mode, quiet-board, serve, setup-wizard, shell, start-over, strip-notices, tablet-ready |
+
+New in this round: `beta.sh` / `beta-remove.sh` (docs/connected-howto.md), proved only against stand-ins by `test/beta-scripts.test.mjs` (8 pass) and `test/beta-proxy.e2e.mjs`; not run on a real server.

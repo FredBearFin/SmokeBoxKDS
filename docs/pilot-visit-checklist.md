@@ -8,7 +8,7 @@ Bring: the tablet and its charger, a Wi-Fi password is not needed, a pen, the ow
 
 | # | Step | Minutes | Where | Done |
 |---|------|---------|-------|------|
-| 1 | Get this tablet ready: screen never sleeps, plugged in, sound test heard, added to the home screen, full screen | 3 | Settings, Get this tablet ready | |
+| 1 | Tablet checks: screen never sleeps, plugged in, sound test heard, added to the home screen, full screen | 3 | Settings, Tablet checks | |
 | 2 | Put the menu in: import their spreadsheet, or add the first dishes by hand. Check the preview before saving | 3 | Settings, Dishes and prices | |
 | 3 | Tax, hours and PIN: set the manager PIN and write down the recovery code with the owner | 2 | Settings, Tax, hours and PIN | |
 | 4 | Name stations and menu sections in their words; hide stations they do not have | 2 | Dishes and prices, Change stations | |

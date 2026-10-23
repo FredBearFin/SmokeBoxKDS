@@ -13,3 +13,8 @@ Re-ran `tools/extract-strings.mjs`; 96 new strings outside the Guide. Mostly cle
 
 ## Checked and fine
 Best day of the week (82-office-money.js:432 to 446), "Cash you started the day with" (87-office-closeday.js:218), the Speed page and its counter-service note (80-office-core.js:1279), the reheat limit text ("Smokebox allows one reheat per batch"), and the model Food Code lines at 84-office-data.js:1002 and 1013, which name it as the model code and tell the owner to use the local rule.
+
+## Round 18 (main abf003e) leftover rows
+- `src/js/77-floor-setup.js:1260` "A tick means" and `:1351` "Tick each step as you go": UK use, say "check mark" and "Check each step" (A2).
+- `src/js/77-floor-setup.js:25, 1250` and `72-floor-sheets.js:2175`: Settings still has two similar entries, "Set up this tablet" and "Get this tablet ready" (A2; already renamed on the connected branch).
+- `src/js/75-floor-readings.js:36-39, 74-77, 88-92`: the temperature box starts at 38, 0, 32 or 212 depending on the kind picked. A cook can log a reading without measuring and it is recorded as a real reading. Start the box empty and require a number (A1).
