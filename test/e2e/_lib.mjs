@@ -2,6 +2,7 @@
 // Everything here drives the app the way a person would (roles, visible words); the few page.evaluate calls only READ state
 // or set up a scene (tickets, clock speed) that a journey needs, never to make a check pass.
 
+export { startKitchen } from '../_kitchen.mjs';
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Words that must never appear in rendered text. */
@@ -26,9 +27,9 @@ export async function settle(page, ms = 150) {
   await wait(ms);
 }
 
-/** The first screen a brand-new user sees already holds five demo tickets (SB.sim.seedFirstRun). Journeys that need a known board start by clearing them, like a kitchen that has been running a day. */
+/** A brand-new kitchen is empty (no tickets, no stock). Journeys that need a known board call this: it clears live data and puts the starter hold batches in, so every dish can be sold. */
 export async function clearBoard(page) {
-  await page.evaluate(() => { SB.store.resetLive({ keepSettings: true }); SB.store.tick(); });
+  await page.evaluate(() => { SB.store.resetLive({ keepSettings: true, starter: true }); SB.store.tick(); });
   await settle(page, 250);
 }
 
@@ -36,7 +37,7 @@ export async function clearBoard(page) {
 export async function seedStandard(page, { clearFirst = true } = {}) {
   const bad = await page.evaluate((clearFirst) => {
     const S = SB.store, bad = [];
-    if (clearFirst && S.resetLive) S.resetLive({ keepSettings: true });
+    if (clearFirst && S.resetLive) S.resetLive({ keepSettings: true, starter: true });
     const now = S.now();
     const mk = (customer, channel, items, o = {}) => { const r = S.dispatchEx('createTicket', Object.assign({ customer, channel, items, src: 'demo', allowPast: true }, o), { source: 'sim' }); if (r.report !== 'ok') bad.push(customer + ': ' + r.report); };
     mk('Table 4', 'dine_in', [{ menuId: 'brisket_half', qty: 2 }, { menuId: 'mac' }, { menuId: 'slaw' }, { menuId: 'cornbread', qty: 2 }], { createdAt: now - 14 * 60e3 });
@@ -194,9 +195,10 @@ export async function closeSheets(page, max = 4) {
 }
 
 /** Open a sheet with its keyboard key and wait until it is the open dialog. */
-export async function openKey(page, key, name) {
+export async function openKey(page, key, name, viaApi = null) {
   await closeSheets(page);
-  await page.keyboard.press(key);
+  // viaApi: a sheet that has no key any more (H now shows the Cabinet tab) is opened by its name instead.
+  if (viaApi) await page.evaluate((n) => SB.sheets.open(n), viaApi); else await page.keyboard.press(key);
   const d = page.getByRole('dialog', { name });
   await d.waitFor({ state: 'visible', timeout: 10000 });
   await wait(300);

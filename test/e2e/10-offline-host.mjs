@@ -36,7 +36,7 @@ export default function (h) {
     const page = await t.open({ w: 1280, h: 800, init: monitor });
     await seedStandard(page);
     // walk the whole app: every floor sheet, then every office page, then export from the Data page
-    for (const [k, n] of [['n', 'New ticket'], ['h', 'Hold cabinet'], ['8', '86 board'], ['r', 'Recall'], ['d', 'Demo and clock']]) { try { await openKey(page, k, n); } catch (e) { t.check('sheet ' + n + ' opens', false, String(e).slice(0, 100), 'sheets'); } }
+    for (const [k, n, api] of [['n', 'New ticket'], ['h', 'Hold cabinet', 'hold'], ['8', '86 board'], ['r', 'Recall'], ['d', 'Demo and clock']]) { try { await openKey(page, k, n, api); } catch (e) { t.check('sheet ' + n + ' opens', false, String(e).slice(0, 100), 'sheets'); } }
     await closeSheets(page);
     for (const s of ['help', 'specs', 'menu']) { await page.evaluate((s) => SB.sheets.open(s), s); await wait(500); await closeSheets(page); }
     await page.evaluate(() => { location.hash = '#/office/pace'; });

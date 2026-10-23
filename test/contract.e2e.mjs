@@ -11,6 +11,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { scanStatic, analyze, runBrowser, ROOT, DIST_FILE } from '../tools/contract-check.mjs';
 import { spawnSync } from 'node:child_process';
+import { startKitchen } from './_kitchen.mjs';
 
 const { withPage } = await import(pathToFileURL(path.join(ROOT, 'tools/pw.mjs')).href);
 const PAGES = ['pace', 'tickets', 'stations', 'money', 'safety', 'stock', 'data'];
@@ -147,7 +148,8 @@ describe('behaviour across files', () => {
       }
       await page.evaluate(() => document.querySelector('[data-back-to-line]').click());
       await page.waitForFunction(() => !SB.shell.inOffice(), null, { timeout: 8000 });
-      await page.waitForTimeout(500);
+      // The office is emptied when its closing fade ends (about 150 to 550 ms), so wait for that instead of a fixed time.
+      await page.waitForFunction(() => !SB.office.isMounted(), null, { timeout: 4000 }).catch(() => {});
       assert.equal(await page.evaluate(() => SB.office.isMounted()), false, 'the office is still mounted after Back to the line');
       assert.equal(await page.evaluate(() => !!document.querySelector('#sb-floor') && !document.querySelector('#sb-floor').inert), true, 'the floor is still inert after leaving the office');
       assert.deepEqual(logs.pageErrors, []);
@@ -187,11 +189,14 @@ describe('behaviour across files', () => {
   test('no rebuild on a timer: ticket slips and office cards keep the same DOM nodes across ticks and refreshes', async () => {
     await withPage({ file: path.join(ROOT, DIST_FILE), w: 1280, h: 800, hash: '#/', reducedMotion: 'reduce' }, async (page) => {
       await page.waitForFunction(() => window.SB && window.SB.booted, null, { timeout: 25000 });
+      await startKitchen(page, { sample: true }); // known state, then three demo tickets (a first run is an empty kitchen)
+      await page.evaluate(() => SB.sim.restartDemo());
+      await page.evaluate(() => { SB.sim.live.stop(); SB.sim.live.crew(false); });
       await page.waitForTimeout(500);
       const tag = (sel, key) => page.evaluate(([q, k]) => { const els = [...document.querySelectorAll(q)]; els.forEach((e, i) => { e[k] = i + 1; }); return els.length; }, [sel, key]);
       const check = (sel, key) => page.evaluate(([q, k]) => { const els = [...document.querySelectorAll(q)]; return { now: els.length, kept: els.filter((e) => e[k]).length }; }, [sel, key]);
       const n = await tag('#sb-floor [data-ticket]', '__keepSlip');
-      assert.ok(n >= 3, 'expected the five starter demo tickets on the board, saw ' + n);
+      assert.ok(n >= 3, 'expected the three demo tickets on the board, saw ' + n);
       await page.waitForTimeout(3300); // three 1 Hz ticks and one store refresh
       const r = await check('#sb-floor [data-ticket]', '__keepSlip');
       assert.equal(r.kept, n, 'ticket slips were replaced by a timer (' + r.kept + ' of ' + n + ' nodes survived)');

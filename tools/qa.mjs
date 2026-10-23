@@ -31,6 +31,7 @@ import crypto from 'node:crypto';
 import { toolRequire } from './_deps.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { startKitchen } from '../test/_kitchen.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { chromium } = toolRequire('playwright');
@@ -85,8 +86,9 @@ function makeContext(test) {
     note(key, value, unit) { this.notes.push({ key, value, unit: unit || '' }); },
     /** Open a fresh page from empty storage. Options: w h hash touch reducedMotion colorScheme scale init(fn) preset(storage object) wait(false to skip SB.booted) file. */
     async open(o = {}) {
-      const { w = 1280, h = 800, hash = '', touch = false, reducedMotion = 'no-preference', colorScheme = 'light', scale = 1, init, preset, wait = true, file = BUILD, clear = true } = o;
+      const { w = 1280, h = 800, hash = '', touch = false, kitchen = null, reducedMotion = 'no-preference', colorScheme = 'light', scale = 1, init, preset, wait = true, file = BUILD, clear = true } = o;
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: scale, hasTouch: touch, isMobile: false, colorScheme, reducedMotion });
+      ctx.setDefaultTimeout(o.actionTimeout || 6000); // a missing element fails in a few seconds, not Playwright's 30
       live.push(ctx);
       // every browser context starts with empty storage; an init script that clears it is NOT used because (Chromium + Playwright) it ran again after page.reload() on a URL with a #hash and wiped the saved data under test
       // planted once per tab: window.name survives reloads (and a #hash), so a reload never plants the data a second time
@@ -94,8 +96,10 @@ function makeContext(test) {
       if (init) await ctx.addInitScript(init);
       const page = await ctx.newPage();
       this.attach(page);
-      await page.goto(pathToFileURL(file).href + hash, { waitUntil: 'load' });
+      await page.goto(pathToFileURL(file).href + (kitchen ? '' : hash), { waitUntil: 'load' }); // with a kitchen, the hash is applied after the kitchen is set
       if (wait) await page.waitForFunction(() => window.SB && window.SB.booted === true, null, { timeout: 10000 }).catch(() => { /* reported by clean() */ });
+      // kitchen: true or { sample } puts the kitchen into a known state (starter batches, sample history on or off) instead of relying on first-run content.
+      if (kitchen) { await startKitchen(page, kitchen === true ? {} : kitchen).catch(() => { /* reported by the checks that follow */ }); if (hash) await page.evaluate((x) => { location.hash = x; }, hash); }
       return page;
     },
     /** A second page in the same browser context (same storage), for the two-tab test. */

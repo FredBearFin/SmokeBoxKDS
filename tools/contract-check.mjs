@@ -838,6 +838,8 @@ export function analyze(S, R, CSS, extras) {
     const grouped = new Map();
     for (const r of S.refs) {
       if (exists(r.path)) continue;
+      // A name that starts with an underscore (SB.floor._alerts) is a private slot made on first use, not part of the contract.
+      if (r.path.split('.').some((seg, i) => i > 1 && seg.startsWith('_'))) continue;
       const k = r.file + '|' + r.path;
       if (!grouped.has(k)) grouped.set(k, { file: r.file, path: r.path, sites: [] });
       grouped.get(k).sites.push(r);

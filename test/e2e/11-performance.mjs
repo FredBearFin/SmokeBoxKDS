@@ -111,9 +111,11 @@ export default function (h) {
   });
 
   h.test('11c-sixty-tickets', 'Performance: 60 active tickets on the board, 1 Hz update cost and frame health', { owner: 'board', timeout: 90000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800 });
+    const page = await t.open({ w: 1280, h: 800, kitchen: true });
     const made = await page.evaluate(() => {
       const S = SB.store, now = S.now(); let ok = 0, bad = [];
+      // The starter stock would run out before 60 tickets, so stock every ingredient generously (cooked batches, restocked dry goods).
+      for (const ing of S.getState().ingredients) S.dispatchEx(ing.tcs ? 'addBatch' : 'restock', ing.tcs ? { ing: ing.id, cookedG: 1e6, tempF: ing.hold === 'cold' ? 38 : 160 } : { ing: ing.id, g: 1e6 }, { source: 'sim' });
       const menus = ['brisket_half', 'ribs_full', 'sausage', 'mac', 'slaw', 'cornbread', 'hushpuppies', 'fried_pickles', 'tea', 'pudding', 'brisket_sand'];
       for (let i = 0; i < 60; i++) {
         const items = [{ menuId: menus[i % menus.length] }, { menuId: menus[(i * 5 + 3) % menus.length] }, { menuId: menus[(i * 7 + 1) % menus.length], qty: 1 + (i % 2) }];

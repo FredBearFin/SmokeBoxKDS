@@ -1,5 +1,5 @@
 // Journey 8: persistence and sync. Reload keeps tickets, settings and theme; two pages in one browser stay in sync; corrupt storage starts fresh with a notice.
-import { seedStandard, boardSummary, storeTickets, settle, wait, dialog, openKey, closeSheets, head } from './_lib.mjs';
+import { startKitchen, seedStandard, boardSummary, storeTickets, settle, wait, dialog, openKey, closeSheets, head } from './_lib.mjs';
 
 const ageText = (page, who) => page.evaluate((who) => { const s = Array.from(document.querySelectorAll('.fl-slip')).find((x) => x.querySelector('.slip-who') && x.querySelector('.slip-who').textContent.includes(who)); return s ? s.querySelector('.slip-timer').textContent : null; }, who);
 const secs = (mmss) => { const m = /^(\d+):(\d\d)$/.exec(mmss || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
@@ -127,6 +127,7 @@ export default function (h) {
       if (noticed) shownNotice++;
       t.check(name + ': the user is told that the saved data could not be read and the board started fresh', noticed, visible.replace(/\s+/g, ' ').slice(0, 160), 'lead');
       // new work after the reset must persist (the bad payload was replaced): first it must reach storage, then it must survive a reload
+      await startKitchen(page); // the fresh start is an empty kitchen with no stock, so put the starter stock in before selling
       await page.evaluate(() => SB.store.dispatchEx('createTicket', { customer: 'After', channel: 'takeout', items: [{ menuId: 'mac' }], src: 'live' }, { source: 'ui' }));
       let saved = false;
       for (let i = 0; i < 12 && !saved; i++) { await wait(400); saved = await page.evaluate(() => /"customer":"After"/.test(localStorage.getItem('smokebox.v1.state') || '')); }
@@ -150,6 +151,7 @@ export default function (h) {
     const page = await t.open({ w: 1280, h: 800, init: block, clear: false });
     const booted = await page.evaluate(() => ({ b: !!SB.booted, err: !!document.getElementById('boot-error') }));
     t.check('with localStorage throwing the app still boots', booted.b && !booted.err, booted, 'lead');
+    await startKitchen(page);
     await page.evaluate(() => SB.store.dispatchEx('createTicket', { customer: 'NoSave', channel: 'takeout', items: [{ menuId: 'mac' }], src: 'live' }, { source: 'ui' }));
     await settle(page, 400);
     t.check('a ticket can still be made and is drawn', (await boardSummary(page)).slips.some((s) => /NoSave/.test(s.customer)), (await boardSummary(page)).slips.length, 'board');

@@ -1,13 +1,16 @@
 // Journey 4: hold cabinet (temperature logs, thermal batch, below-135 wording, safety line) and the 86 board.
 import { dialog, head, settle, wait, closeSheets, openKey } from './_lib.mjs';
 
-const openHold = async (page) => { await head(page).getByRole('button', { name: /Hold cabinet/ }).click(); const d = dialog(page, 'Hold cabinet'); await d.waitFor({ state: 'visible', timeout: 8000 }); await settle(page, 250); return d; };
-const open86 = async (page) => { await head(page).getByRole('button', { name: /86 board/ }).click(); const d = dialog(page, '86 board and stock'); await d.waitFor({ state: 'visible', timeout: 8000 }); await settle(page, 250); return d; };
+// The hold cabinet is the Cabinet tab on the board now (an in-page region, not a sheet).
+const openHold = async (page) => { await page.locator('.fl-seg').getByRole('tab', { name: /Cabinet/ }).click(); const d = page.locator('.fl-cabinet'); await d.waitFor({ state: 'visible', timeout: 5000 }); await settle(page, 250); return d; };
+const open86 = async (page) => { await head(page).getByRole('button', { name: /86 board/ }).click(); const d = dialog(page, '86 board and stock'); await d.waitFor({ state: 'visible', timeout: 8000 }); await settle(page, 250);
+  // The channel sync block is a collapsed details element now; open it so its chips can be read.
+  await d.evaluate((el) => { const x = el.querySelector('details.bd-sync'); if (x) x.open = true; }); await settle(page, 100); return d; };
 const num = (s) => Number(String(s).replace(/[^0-9.\-]/g, ''));
 
 export default function (h) {
   h.test('04a-hold-cabinet', 'Hold cabinet: log a temperature, thermal brisket batch yield, below 135 wording, safety line', { owner: 'sheets', timeout: 60000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800 });
+    const page = await t.open({ w: 1280, h: 800, kitchen: true });
     const safety = await page.evaluate(() => SB.config.safetyLine);
     let d = await openHold(page);
     const body0 = await d.innerText();
@@ -84,8 +87,8 @@ export default function (h) {
     t.check('the card says Reheat now with the 165 °F instruction', /Reheat now/.test(low) && /Reheat to 165 °F/.test(low), low.slice(0, 400));
     t.check('the card says it is not being served and the menu items are 86', /Not being served/.test(low) && /86/.test(low), low.slice(-300));
     t.check('the card offers Reheat and Discard', await card2.getByRole('button', { name: 'Reheat' }).count() === 1 && await card2.getByRole('button', { name: 'Discard' }).count() === 1);
-    const chipText = await page.evaluate(() => { const b = document.querySelector('.fl-head [data-tool="hold"]'); return b ? b.innerText.replace(/\s+/g, ' ') + ' | ' + b.getAttribute('aria-label') : ''; });
-    t.check('the Hold button in the header shows how many batches need attention', /\b1\b|\b2\b/.test(chipText), chipText);
+    const chipText = await page.evaluate(() => { const b = document.querySelector('.fl-seg [data-id="cabinet"]'); return b ? b.innerText.replace(/\s+/g, ' ') + ' | ' + (b.querySelector('.seg-dot') ? b.querySelector('.seg-dot').textContent : '') : ''; });
+    t.check('the Cabinet tab shows how many batches need attention', /\b1\b|\b2\b/.test(chipText), chipText);
     await t.shot(page, 'hold-below-135');
 
     await card2.getByRole('button', { name: 'Reheat' }).click();
@@ -128,7 +131,7 @@ export default function (h) {
   });
 
   h.test('04b-lockout-86', 'A batch under 135 F for 2 hours is discarded and its menu items go 86 (safety hold)', { owner: 'sheets', timeout: 60000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800 });
+    const page = await t.open({ w: 1280, h: 800, kitchen: true });
     // The only brisket pan drops to 120 F. Then the clock runs ahead (a bench shortcut: x1000 for 8 s is about 2 h 13 min of kitchen time).
     let d = await openHold(page);
     const card = d.getByRole('article', { name: /Brisket batch 1/ });
@@ -180,7 +183,7 @@ export default function (h) {
   });
 
   h.test('04c-board-86', '86 board: manual 86 hides the item from the order screen, Back on restores, sync strip is labelled Simulated', { owner: 'sheets', timeout: 60000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800 });
+    const page = await t.open({ w: 1280, h: 800, kitchen: true });
     let d = await open86(page);
     const txt = await d.innerText();
     t.check('the sync strip says "Simulated: no live POS connected"', /Simulated: no live POS connected/.test(txt), txt.slice(0, 160));

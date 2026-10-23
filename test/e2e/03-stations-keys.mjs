@@ -54,7 +54,13 @@ export default function (h) {
     const page = await t.open({ w: 1280, h: 800 });
     await seedStandard(page);
     const top = () => page.evaluate(() => SB.sheets.top && SB.sheets.top() ? (SB.sheets.top().name || SB.sheets.top().el.getAttribute('aria-label')) : null);
-    const sheets = [['n', 'order'], ['r', 'recall'], ['h', 'hold'], ['8', 'board86'], ['d', 'demo'], ['?', 'help']];
+    const sheets = [['n', 'order'], ['r', 'recall'], ['8', 'board86'], ['d', 'demo'], ['?', 'help']];
+    // H does not open a sheet any more: it switches the board to the Cabinet tab and a second press switches back.
+    const cabinetOn = () => page.evaluate(() => { const c = document.querySelector('.fl-seg [data-id="cabinet"]'); return !!c && c.getAttribute('aria-selected') === 'true' && !document.querySelector('.fl-cabinet').hidden; });
+    await page.keyboard.press('h'); await settle(page, 450);
+    t.check('key H shows the Cabinet tab in the page (no sheet)', (await cabinetOn()) && !(await page.evaluate(() => SB.sheets.isOpen('hold'))));
+    await page.keyboard.press('h'); await settle(page, 450);
+    t.check('a second H returns to the tickets', !(await cabinetOn()));
     for (const [key, name] of sheets) {
       await page.keyboard.press(key);
       await settle(page, 450);
@@ -109,14 +115,14 @@ export default function (h) {
     t.check('a second Esc closes the order sheet', !(await page.evaluate(() => SB.sheets.isOpen('order'))));
 
     // shortcut keys must be inert behind an open sheet (the board is inert)
-    await page.keyboard.press('h');
+    await page.keyboard.press('8');
     await settle(page, 400);
     await page.keyboard.press('3');
     await page.keyboard.press('n');
     await settle(page, 300);
-    const stillHold = await page.evaluate(() => SB.sheets.isOpen('hold') && !SB.sheets.isOpen('order'));
+    const stillHold = await page.evaluate(() => SB.sheets.isOpen('board86') && !SB.sheets.isOpen('order'));
     const sel2 = (await boardSummary(page)).tabs.find((x) => x.selected).id;
-    t.check('with the hold sheet open, keys N and 3 do nothing', stillHold && sel2 === 'all', { stillHold, sel2 });
+    t.check('with the 86 board open, keys N and 3 do nothing', stillHold && sel2 === 'all', { stillHold, sel2 });
     await page.keyboard.press('Escape');
     await settle(page, 300);
 
@@ -135,7 +141,7 @@ export default function (h) {
     // modifier keys must not trigger shortcuts (Ctrl+R reload etc. stay with the browser)
     await page.keyboard.press('Control+h');
     await settle(page, 250);
-    t.check('Ctrl+H does not open the hold sheet', !(await page.evaluate(() => SB.sheets.isOpen('hold'))));
+    t.check('Ctrl+H does not switch to the Cabinet tab', !(await cabinetOn()));
     await t.clean(page, 'keyboard');
   });
 }

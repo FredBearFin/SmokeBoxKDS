@@ -8,7 +8,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { withPage } from '../tools/pw.mjs';
+import { withPage as pwWithPage } from '../tools/pw.mjs';
+import { startKitchen } from './_kitchen.mjs';
+// A group that throws counts as one failed check and the next group still runs.
+const withPage = (...a) => pwWithPage(...a).catch((e) => { fail++; failures.push('group threw'); console.log('  FAIL  group threw: ' + String(e.message).split('\n')[0].slice(0, 300)); });
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(root, 'test/.out/officeC');
@@ -23,7 +26,7 @@ const NO_SHOTS = args.includes('--no-shots');
 /* ---------- private bundle ---------- */
 function buildBundle() {
   const CSS = ['00-tokens.css', '10-base.css', '30-office.css', '32-office-data.css', '40-charts.css'];
-  const JS = ['00-util.js', '05-icons.js', '10-config.js', '20-engine.js', '30-store.js', '40-metrics.js', '50-charts.js', '60-shell.js', '80-office-core.js', '84-office-data.js', '99-boot.js'];
+  const JS = ['00-util.js', '05-icons.js', '10-config.js', '20-engine.js', '25-deadlines.js', '30-store.js', '40-metrics.js', '50-charts.js', '60-shell.js', '80-office-core.js', '84-office-data.js', '99-boot.js'];
   let c = '';
   for (const f of CSS) c += `\n/* ===== ${f} ===== */\n` + fs.readFileSync(path.join(root, 'src/css', f), 'utf8');
   let j = '';
@@ -85,6 +88,7 @@ async function confirmSheet(page, which) {
   return t;
 }
 async function makeTickets(page, n) {
+  await startKitchen(page); // starter stock, so the dishes can be sold on a first-run (empty) kitchen
   return page.evaluate((count) => {
     const ids = SB.config.menu.map((m) => m.id);
     let ok = 0;
@@ -223,7 +227,7 @@ group('2. Menu and bills of materials', async () => {
     await typeNum(page, 'Prep time of ' + MENU.name, '125');
     await waitFor(page, (id) => SB.store.getState().menu.find((m) => m.id === id).prepSec === 125, MENU.id);
     check('prep time saved and shown as minutes and seconds beside the field', (await text(page, item(MENU.id) + ' .od-read:not(:empty)')) === '2:05');
-    const seg = page.locator(item(MENU.id) + ' .seg').first();
+    const seg = page.locator(item(MENU.id) + ' .seg:has([data-id="confirmed"])').first(); // the item also has Station, Category and How it is cooked segments
     check('prep time starts as a starter estimate', (await st(page, (id) => SB.store.getState().menu.find((m) => m.id === id).prepConfirmed, MENU.id)) === false);
     const headBefore = await text(page, '.od-headline');
     await seg.locator('[data-id="confirmed"]').click();
@@ -362,8 +366,9 @@ group('3. Ingredients', async () => {
     await waitFor(page, () => SB.store.getState().ingredients.find((i) => i.id === 'buns').costEach === 0.5);
     check('counted items take a cost each and are labelled pieces', /pieces/.test(await text(page, '#od-ingredients .od-ing[data-id="buns"]')));
     const read = await st(page, () => Array.from(document.querySelectorAll('#od-ingredients .od-ing[data-id="brisket"] .chip')).map((c) => c.textContent));
-    check('hold type and max hold hours are shown read-only as chips', read.includes('Hot hold') && read.some((t) => /Max hold 4 h/.test(t)), read);
-    check('no editable field for hold type or max hold hours', (await page.locator('#od-ingredients .od-ing[data-id="brisket"] input').count()) <= 5);
+    check('hold type and max hold hours are shown read-only as chips', read.includes('Hot hold') && read.some((t) => /Max hold 8 h/.test(t)), read);
+    // The per-product Hold limit, Rest time and Cook time are editable now; the hold TYPE is still read-only.
+    check('no editable field for hold type (hot or cold)', (await page.locator('#od-ingredients .od-ing[data-id="brisket"] input[aria-label^="Hold type"]').count()) === 0);
     check('weights are grams or kilograms only (no lb, oz or pounds in the ingredient copy)', !/\b(lbs?|oz|ounces?|pounds?)\b/i.test(await text(page, '#od-ingredients')));
     noErrors('ingredients panel', logs);
   });
@@ -495,7 +500,7 @@ group('6. Food safety limits', async () => {
     await page.waitForTimeout(150);
     const ec = await text(page, '#od-safety .od-nf:has(input[aria-label="Total cooling time"]) .od-ferr:not([hidden])');
     check('total cooling shorter than the first stage is refused with words', /longer than the first stage \(2 hours\)/.test(ec), ec);
-    await typeNum(page, 'Longest time in the hold cabinet', '6');
+    await typeNum(page, 'Hold limit for a product with none of its own', '6');
     await waitFor(page, () => SB.store.getState().settings.safety.defaultMaxHoldH === 6);
     await typeNum(page, 'Temperature check every', '45');
     await waitFor(page, () => SB.store.getState().settings.safety.tempCheckEveryMin === 45);
@@ -574,7 +579,8 @@ group('7. Manager PIN', async () => {
 group('8. Appearance and service hours', async () => {
   await open({}, async (page, logs) => {
     const look = page.locator('#od-look');
-    check('no sound switch when this build has no SB.floor.setSound', (await look.locator('.toggle').count()) === 0);
+    // The page also has a "Warnings may sound outside open hours" switch, so look for the sound switch by its label.
+    check('no sound switch when this build has no SB.floor.setSound', (await look.locator('.toggle', { hasText: 'Sound on the line' }).count()) === 0);
     await look.locator('[aria-label="Back office theme"] [data-id="paper"]').click();
     await page.waitForTimeout(150);
     check('Paper makes the office light', (await st(page, () => ({ t: SB.theme.office(), a: document.querySelector('.office').getAttribute('data-otheme') }))).a === 'paper');
@@ -617,7 +623,7 @@ group('8. Appearance and service hours', async () => {
     await page.waitForTimeout(150);
     await page.evaluate(() => SB.office.navigate('data'));
     await page.waitForSelector('#od-look');
-    await page.locator('#od-look .toggle').click();
+    await page.locator('#od-look .toggle', { hasText: 'Sound on the line' }).click();
     check('sound switch calls SB.floor.setSound(true) and says so', (await page.evaluate(() => SB.floor.__calls.join(','))) === 'true' && /Sound is on/.test(await text(page, '#od-look .od-st')));
     noErrors('appearance panel', logs);
   });
@@ -788,7 +794,7 @@ group('9c. Data: import', async () => {
     check('after all those refusals the state is byte-for-byte unchanged', (await stateJson(page)) === before);
 
     // paste instead
-    await page.locator('#od-data .od-paste-det summary').click();
+    await page.locator('#od-data .od-paste-det summary', { hasText: 'Paste a backup instead' }).click(); // a second details (Replacing this device) also has this class
     await page.locator('#od-data .od-paste').fill(backup);
     await page.locator('[data-action="import-check-paste"]').click();
     await page.waitForSelector('#od-data .od-impresult [data-action="import-replace"]');
@@ -1101,7 +1107,7 @@ group('15. UI ranges match the engine (min, max, just outside)', async () => {
         'Shortest prep time': (v) => ({ pacing: { floorSec: v } }), 'Extra time per extra portion': (v) => ({ pacing: { qtyFactor: v / 100 } }), 'Most a big line can grow': (v) => ({ pacing: { qtyCap: v } }),
         'Learning strength': (v) => ({ pacing: { learnK: v } }), 'Learned time never below': (v) => ({ pacing: { minFactor: v } }), 'Learned time never above': (v) => ({ pacing: { maxFactor: v } }), 'Trim a very long timing at': (v) => ({ pacing: { outlierFactor: v } }),
         'Hot hold temperature': (v) => ({ safety: { hotHoldF: v } }), 'Cold hold temperature': (v) => ({ safety: { coldHoldF: v } }), 'Reheat to': (v) => ({ safety: { reheatF: v } }),
-        'Time allowed below hot hold': (v) => ({ safety: { belowHotGraceH: v } }), 'Time allowed above cold hold': (v) => ({ safety: { aboveColdGraceH: v } }), 'Longest time in the hold cabinet': (v) => ({ safety: { defaultMaxHoldH: v } }),
+        'Time allowed below hot hold': (v) => ({ safety: { belowHotGraceH: v } }), 'Time allowed above cold hold': (v) => ({ safety: { aboveColdGraceH: v } }), 'Hold limit for a product with none of its own': (v) => ({ safety: { defaultMaxHoldH: v } }),
         'Temperature check every': (v) => ({ safety: { tempCheckEveryMin: v } }), 'Sanitize food-contact surfaces every': (v) => ({ safety: { sanitizeEveryH: v } }),
         'First cooling stage: cool to': (v) => ({ safety: { cooling: { stage1ToF: v } } }), 'First cooling stage: within': (v) => ({ safety: { cooling: { stage1H: v } } }), 'Cool all the way to': (v) => ({ safety: { cooling: { finalF: v } } }),
         'Service day starts at': (v) => ({ service: { dayStartHour: v } }), 'Opens at': (v) => ({ service: { openHour: v, closeHour: 30 } }), 'Closes at': (v) => ({ service: { openHour: 0, closeHour: v } }), // each also moves its partner so only its own range is tested

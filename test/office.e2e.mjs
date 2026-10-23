@@ -7,7 +7,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { withPage } from '../tools/pw.mjs';
+import { withPage as pwWithPage } from '../tools/pw.mjs';
+import { startKitchen } from './_kitchen.mjs';
+// A group that throws counts as one failed check and the next group still runs.
+const withPage = (...a) => pwWithPage(...a).catch((e) => { fail++; failures.push('group threw'); console.log('  FAIL  group threw: ' + String(e.message).split('\n')[0].slice(0, 300)); });
 import { sampleDs, thinDs, emptyDs, todayDs, todayAt, fakeClock } from './_office-data.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -32,6 +35,7 @@ const VIEWPORTS = [[1280, 800], [1024, 768], [768, 1024], [390, 844], [280, 640]
 
 /** inject the sample (or SB.sim) and open the office; resolves when the first page is on screen */
 async function boot(page, ds, { section = '', theme = null } = {}) {
+  await startKitchen(page, { sample: true }); // known state; the back office tests need sample history switched on
   if (ds) await page.evaluate((d) => { SB.store.attachSim({ sample: () => d }); }, ds);
   if (theme) await page.evaluate((t) => SB.theme.setOffice(t), theme);
   await page.evaluate((s) => { location.hash = '#/office' + (s ? '/' + s : ''); }, section);
@@ -243,7 +247,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   const keys = await page.evaluate(() => { const k = SB.office.filters().range; return { fromKey: k.fromKey, toKey: k.toKey }; });
   await page.fill('.of-custom input[aria-label="From date"]', keys.toKey); await page.fill('.of-custom input[aria-label="To date (included)"]', keys.fromKey);
   await page.locator('.of-custom input[aria-label="To date (included)"]').dispatchEvent('change'); await wait(100);
-  const bad = await page.evaluate(() => ({ err: document.querySelector('.of-ferr') && !document.querySelector('.of-ferr').hidden ? document.querySelector('.of-ferr').textContent : '', invalid: document.querySelector('.of-custom input[aria-invalid="true"]') !== null, to: SB.office.filters().range.toKey }));
+  const bad = await page.evaluate(() => ({ err: (document.querySelector('.of-ferr:not([hidden])') || {}).textContent || '', invalid: document.querySelector('.of-custom input[aria-invalid="true"]') !== null, to: SB.office.filters().range.toKey }));
   check('a start date after the end date is refused with words and the range is not changed', /before the start/.test(bad.err) && bad.invalid && bad.to === keys.toKey, bad);
   await page.fill('.of-custom input[aria-label="From date"]', keys.fromKey); await page.fill('.of-custom input[aria-label="To date (included)"]', keys.fromKey);
   await page.locator('.of-custom input[aria-label="To date (included)"]').dispatchEvent('change'); await wait(150);

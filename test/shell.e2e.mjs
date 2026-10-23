@@ -650,7 +650,8 @@ await withPage({ w: 1280, h: 800, file: SHELL_OUT }, async (page, logs) => {
   check('SB.dev appears only with a store', await page.evaluate(() => typeof SB.dev === 'undefined'));
   await page.evaluate(() => { SB.shell.unmount(); document.getElementById('app').innerHTML = ''; window.__sbLoadErrors = []; SB.store = { init() { return { firstRun: true }; }, getState() { return { settings: {} }; }, dispatch() { return 'ok'; }, subscribe() { return () => {}; } }; SB.boot.run(); });
   check('SB.dev.state() reads the store when a store exists', await page.evaluate(() => typeof SB.dev === 'object' && typeof SB.dev.state === 'function' && !!SB.dev.state().settings));
-  check('SB.sim.seedFirstRun runs on a first run when it exists', await page.evaluate(() => { let n = 0; SB.sim = { seedFirstRun() { n++; } }; SB.shell.unmount(); document.getElementById('app').innerHTML = ''; SB.boot.run(); return n === 1; }));
+  // A first run is an empty kitchen on purpose: boot no longer puts demo tickets on the board.
+  check('boot does not seed demo tickets on a first run (an empty kitchen), even when SB.sim.seedFirstRun exists', await page.evaluate(() => { let n = 0; SB.sim = { seedFirstRun() { n++; } }; SB.shell.unmount(); document.getElementById('app').innerHTML = ''; SB.boot.run(); return n === 0; }));
   const errs = logs.errors.filter((e) => !/storage is full|boot failed/.test(e));
   check('boot failure: only the expected error was logged', errs.length === 0 && logs.pageErrors.length === 0, { errs, pe: logs.pageErrors });
 });

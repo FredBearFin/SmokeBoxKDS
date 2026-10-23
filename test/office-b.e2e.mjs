@@ -8,7 +8,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { withPage } from '../tools/pw.mjs';
+import { withPage as pwWithPage } from '../tools/pw.mjs';
+import { startKitchen } from './_kitchen.mjs';
+// A group that throws counts as one failed check and the next group still runs.
+const withPage = (...a) => pwWithPage(...a).catch((e) => { fail++; failures.push('group threw'); console.log('  FAIL  group threw: ' + String(e.message).split('\n')[0].slice(0, 300)); });
 import { loadSB } from './_load.mjs';
 import { emptyDs } from './_office-data.mjs';
 
@@ -61,6 +64,7 @@ const empty = emptyDs();
 // ---------- page helpers ----------
 // Opens the built bundle on a back-office page, optionally with a test dataset and a theme.
 async function boot(page, section, { ds = null, theme = null } = {}) {
+  await startKitchen(page, { sample: true }); // known state; the back office tests need sample history switched on
   // The store serves this dataset instead of the simulator's own sample.
   if (ds) await page.evaluate((d) => { SB.store.attachSim({ sample: () => d }); }, ds);
   if (theme) await page.evaluate((t) => SB.theme.setOffice(t), theme);
@@ -514,13 +518,14 @@ for (const [name, ds] of variants) {
       await boot(page, id, { ds });
       const f = await page.evaluate(() => {
         const cards = [...document.querySelectorAll('.of-card')];
-        return { cards: cards.length, looks: cards.filter((c) => c.querySelector('.of-look')).length, errors: document.querySelectorAll('.of-error').length, empties: [...document.querySelectorAll('.of-empty .of-empty-b, .ch-empty')].filter((e) => e.offsetParent).map((e) => e.textContent.trim()), headline: document.querySelector('.of-headline').textContent };
+        return { cards: cards.length, looks: cards.filter((c) => c.querySelector('.of-look')).length, errors: document.querySelectorAll('.of-error').length, empties: [...document.querySelectorAll('.of-empty .of-empty-b, .ch-empty')].filter((e) => e.offsetParent).map((e) => e.textContent.trim()), headline: document.querySelector('.of-headline').textContent, coach: (() => { const c = document.querySelector('.of-coach'); return c && c.offsetParent ? c.textContent.trim() : ''; })() };
       });
       check(name + ' ' + id + ': draws, with captions and no error cards', f.cards >= 5 && f.looks === f.cards && f.errors === 0, f);
       check(name + ' ' + id + ': no NaN, undefined or null in the text', !BAD_TEXT.test(await mainText(page)), (await mainText(page)).match(BAD_TEXT));
       if (name === 'empty') {
         // The first-run demo tickets are live data the dataset swap cannot remove, so Money still has a few sales on it.
-        check(name + ' ' + id + ': empty cards say what would fill them', f.empties.length >= (id === 'money' ? 1 : 3) && f.empties.every((e) => e.length > 30), f.empties);
+        // An empty page now shows one page-level next-step card (.of-coach) instead of an empty-state in every chart.
+        check(name + ' ' + id + ': the page says what would fill it (one next-step card)', f.coach.length > 30 || (f.empties.length >= 3 && f.empties.every((e) => e.length > 30)), { coach: f.coach, empties: f.empties });
         check(name + ' ' + id + ': the headline says there is no data instead of showing numbers', !/NaN/.test(f.headline) && f.headline.length > 20, f.headline);
       }
       // A date label must never print twice on one axis (the kit's date axis does that on a short range).
@@ -528,7 +533,7 @@ for (const [name, ds] of variants) {
       check(name + ' ' + id + ': no date label is printed twice on an axis', dup.length === 0, dup);
       if ((name === 'empty' || name === 'ticketsonly') && id === 'safety') check(name + ' safety: with nothing logged the verdict never says the kitchen was safe', !/The kitchen stayed safe/.test(await mainText(page)), (await mainText(page)).slice(0, 300));
       if (name === 'ticketsonly' && id !== 'money') check(name + ' ' + id + ': the page says nothing was recorded rather than inventing numbers', /No (food-safety|stock)|No batches|nothing|None|not recorded|No stock/i.test(await mainText(page)), (await mainText(page)).slice(0, 300));
-      if (name === 'thin' && id === 'stock') check('thin stock: a protein whose sales are far below what was cooked gets no invented number', !/about 0 g|Cook about 0 g/.test(await mainText(page)) && /Not enough sales recorded/.test(await mainText(page)), (await mainText(page)).match(/.{40}about 0 g.{20}/));
+      if (name === 'thin' && id === 'stock') check('thin stock: a protein whose sales are far below what was cooked gets no invented number', !/about 0 g|Cook about 0 g/.test(await mainText(page)) && /Not enough (sales recorded|cooking days)/.test(await mainText(page)), (await mainText(page)).match(/.{40}about 0 g.{20}/)); // the thin set has 2 days, fewer than the 3 the page needs, so the wording names the days
       if (name === 'thin' && id === 'stock') check('thin stock: refused order lines are "Not recorded" when no report exists, never invented', /Not recorded|No (items|food)|Nothing was taken off/.test(await mainText(page)) && !/Order lines refused while an item was off are not recorded/.test('') , (await mainText(page)).slice(-300));
       if (SHOTS) await fullShot(page, id + '-' + name + '-ember-1280x800.png', 1280);
     }

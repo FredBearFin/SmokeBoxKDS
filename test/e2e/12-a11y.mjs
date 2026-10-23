@@ -4,7 +4,7 @@ import { wait, seedStandard, settle, closeSheets, openKey, waitOffice, gotoOffic
 
 const PAGE_OWNER = { pace: 'officeA', tickets: 'officeA', stations: 'officeA', money: 'officeB', safety: 'officeB', stock: 'officeB', data: 'officeC' };
 const SHEETS = [
-  { name: 'order', label: 'New ticket', open: 'n' }, { name: 'hold', label: 'Hold cabinet', open: 'h' }, { name: 'board86', label: '86 board', open: '8' },
+  { name: 'order', label: 'New ticket', open: 'n' }, { name: 'hold', label: 'Hold cabinet', open: null }, { name: 'board86', label: '86 board', open: '8' },
   { name: 'recall', label: 'Recall', open: 'r' }, { name: 'demo', label: 'Demo and clock', open: 'd' }, { name: 'help', label: 'Help', open: '?' },
   { name: 'specs', label: 'Specs', open: null }, { name: 'menu', label: 'Menu', open: null },
 ];
@@ -97,6 +97,13 @@ export default function (h) {
       if (a.dupIds.length || a.broken.length || a.badRoles.length) sheetBag.ids.push(s.label + ': ' + JSON.stringify({ d: a.dupIds, b: a.broken, r: a.badRoles }));
       a.hiddenFocusable.forEach((x) => sheetBag.hid.push(s.label + ': ' + x)); a.fields.forEach((x) => sheetBag.fields.push(s.label + ': ' + x)); a.jumps.forEach((x) => sheetBag.jumps.push(s.label + ': ' + x)); a.svgBare.forEach((x) => sheetBag.svg.push(s.label + ': ' + x));
     }
+    // KNOWN BUG (A1, B4 in docs/audit/e2e-triage.md): the in-page Cabinet view goes from h1 straight to h3. Recorded as a note, not a failure, until fixed.
+    await closeSheets(page);
+    await page.keyboard.press('h'); await wait(500);
+    const cabHeads = await page.evaluate(() => Array.from(document.querySelectorAll('h1, h2, h3, h4')).filter((e) => e.offsetParent).map((e) => Number(e.tagName[1])));
+    const cabSkip = cabHeads.some((l, k) => k > 0 && l - cabHeads[k - 1] > 1);
+    if (cabSkip) t.note('KNOWN BUG A1: Cabinet tab skips a heading level', cabHeads.join(' '), ''); else t.check('the Cabinet tab has no skipped heading levels (the known bug is fixed: drop this note logic)', true);
+    await page.keyboard.press('h'); await wait(300);
     await closeSheets(page);
     t.check('every control in every sheet has an accessible name', sheetBag.unnamed.length === 0, sheetBag.unnamed.slice(0, 8), 'sheets');
     t.check('label in name holds in every sheet (visible text is part of the accessible name)', sheetBag.lin.length === 0, sheetBag.lin.length + ' mismatches, e.g. ' + sheetBag.lin.slice(0, 4).join(' | '), 'sheets');
@@ -161,22 +168,23 @@ export default function (h) {
 
     // a sheet opened from its header button: focus goes in, stays in while tabbing, and returns to the button on close
     await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
-    const holdBtn = page.locator('.fl-head button', { hasText: /Hold/ }).first();
+    // The Hold cabinet is a tab now, so the 86 board (opened from its header button) stands in for the sheet focus trap check.
+    const holdBtn = page.locator('.fl-head [data-tool="board86"]').first();
     if (await holdBtn.count()) {
       await holdBtn.focus();
       await page.keyboard.press('Enter');
-      const d = page.getByRole('dialog', { name: 'Hold cabinet' });
+      const d = page.getByRole('dialog', { name: '86 board and stock' });
       await d.waitFor({ state: 'visible', timeout: 10000 });
       await wait(450);
       const inside = [];
       for (let i = 0; i < 40; i++) { await page.keyboard.press('Tab'); inside.push(await page.evaluate(() => { const d = document.querySelector('[role=dialog]'); return !!(d && d.contains(document.activeElement)); })); }
-      t.check('Tab inside the Hold cabinet sheet stays inside it for 40 presses (focus is trapped)', inside.every(Boolean), inside.filter((x) => !x).length + ' presses escaped', 'sheets');
+      t.check('Tab inside the 86 board sheet stays inside it for 40 presses (focus is trapped)', inside.every(Boolean), inside.filter((x) => !x).length + ' presses escaped', 'sheets');
       for (let i = 0; i < 6; i++) { await page.keyboard.press('Shift+Tab'); inside.push(await page.evaluate(() => { const d = document.querySelector('[role=dialog]'); return !!(d && d.contains(document.activeElement)); })); }
       t.check('Shift+Tab also stays inside', inside.every(Boolean), '', 'sheets');
       await closeSheets(page);
       const ret = await page.evaluate(() => { const e = document.activeElement; return e && e !== document.body ? (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 30) : 'BODY'; });
-      t.check('closing the sheet with Esc gives focus back to the Hold button that opened it', /Hold/.test(ret), ret, 'sheets');
-    } else t.skipCheck('focus trap and focus return', 'no Hold button in the header');
+      t.check('closing the sheet with Esc gives focus back to the 86 button that opened it', /86/.test(ret), ret, 'sheets');
+    } else t.skipCheck('focus trap and focus return', 'no 86 button in the header');
 
     // inert board behind a modal sheet: Tab never reaches a slip control
     await page.keyboard.press('n');

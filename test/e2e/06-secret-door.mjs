@@ -102,7 +102,7 @@ export default function (h) {
     await p3.evaluate(() => { location.hash = '#/s/nonsense'; });
     await wait(900);
     const floorBad = await p3.evaluate(() => ({ office: SB.shell.inOffice(), tabs: document.querySelectorAll('.fl-seg [role=tab]').length }));
-    t.check('an unknown station link shows the board', !floorBad.office && floorBad.tabs === 6, floorBad);
+    t.check('an unknown station link shows the board', !floorBad.office && floorBad.tabs === 7, floorBad);
   });
 
   h.test('06b-reduced-motion', 'Secret door with reduced motion: short cross-fade, no ember ring or smoke', { owner: 'lead', timeout: 40000 }, async (t) => {
