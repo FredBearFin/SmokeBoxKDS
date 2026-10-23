@@ -37,6 +37,8 @@ for (const [w, h] of SIZES) for (const [theme, text] of LOOKS) {
     await page.waitForFunction(() => window.SB && SB.booted === true);
     await page.evaluate(([t, x]) => { SB.theme.set(t); SB.theme.setTextSize(x); }, [theme, text]);
     const tag = w + 'x' + h + '-' + theme + '-' + text;
+    // Opens Start over; when the earlier snaps set a PIN, types it on the keypad first.
+    const openStartOver = async () => { await page.evaluate(() => SB.sheets.open('startover')); await page.waitForTimeout(400); if (await page.locator('.keypad').count()) { for (const d of ['1', '2', '3', '4']) await page.locator('.keypad button', { hasText: new RegExp('^' + d + '$') }).first().click(); await page.waitForTimeout(500); } };
     const snap = async (name, prep) => {
       await page.evaluate(() => SB.sheets.closeAll()); await page.waitForTimeout(250);
       await prep(); await page.waitForTimeout(450);
@@ -68,9 +70,9 @@ for (const [w, h] of SIZES) for (const [theme, text] of LOOKS) {
     await snap('cold-edit', async () => { await page.evaluate(() => { const r = SB.store.dispatchEx('addIngredient', { name: 'Coleslaw', unit: 'g', tcs: true, hold: 'cold', maxHoldH: 4, holdBasis: 'safety' }, { source: 'ui' }); SB.sheets.open('cookahead', { id: r.info.id }); }); });
     await snap('recovery-code', async () => { await page.evaluate(() => SB.sheets.open('shop')); await page.waitForTimeout(300); await page.fill('[aria-label="Manager PIN, 4 digits"]', '1234'); await page.getByRole('button', { name: 'Set PIN' }).click(); await page.waitForTimeout(700); });
     await snap('serve', async () => { await page.evaluate(() => SB.sheets.open('serve')); });
-    await snap('startover-1', async () => { await page.evaluate(() => SB.sheets.open('startover')); });
-    await snap('startover-2', async () => { await page.evaluate(() => SB.sheets.open('startover')); await page.waitForTimeout(300); await page.click('[data-act=so-next1]'); });
-    await snap('startover-3', async () => { await page.evaluate(() => SB.sheets.open('startover')); await page.waitForTimeout(300); await page.click('[data-act=so-next1]'); await page.click('[data-act=so-next2]'); });
+    await snap('startover-1', async () => { await openStartOver(); });
+    await snap('startover-2', async () => { await openStartOver(); await page.waitForTimeout(300); await page.click('[data-act=so-next1]'); });
+    await snap('startover-3', async () => { await openStartOver(); await page.waitForTimeout(300); await page.click('[data-act=so-next1]'); await page.click('[data-act=so-save-backup]'); await page.check('#so-saw'); await page.click('[data-act=so-next2]'); });
     await snap('demo-intro', async () => { await page.evaluate(() => SB.sheets.open('demo')); });
     // Round 18: screens added since the last sweep. The cold ingredient and cook-ahead are set up by the earlier snaps on this page.
     await snap('settings-menu', async () => { await page.evaluate(() => SB.sheets.open('menu')); });

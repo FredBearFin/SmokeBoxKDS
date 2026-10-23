@@ -12316,15 +12316,52 @@ a.of-nav:active { background: var(--press); }
     for (const k of Object.keys(r.taps.jobs)) { add('taps', k, r.taps.jobs[k].n); add('taps', k + ' per hour', r.taps.jobs[k].perHour, '/h'); }
     add('tickets', 'count', r.tickets.n); add('tickets', 'median seconds to bump', r.tickets.medianSec, 's');
     add('settings', 'hot hold', r.settings.hotHoldF, 'F'); add('settings', 'temperature check', r.settings.tempCheckEveryMin, 'min'); add('settings', 'hard cap', r.settings.hardCapH, 'h');
-    // Quote a cell when it holds a comma, quote or line break; text cells never start with a formula sign.
-    const cell = (v) => { let s = String(v); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-    return rows.map((x) => x.map(cell).join(',')).join('\n') + '\n';
+    // Every cell goes through the shared guard (36-csv.js): text that could run as a formula gets a leading apostrophe.
+    return rows.map((x) => SB.csv.line(x)).join('\n') + '\n';
   }
 
   SB.pilot = { build, toText, toCsv, defaultFrom, KEY_ALERTLOG: 'smokebox.v1.alertlog', LOG_MAX: 400 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 35-pilot.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'35-pilot.js',message:String(e&&e.message||e)});}
+
+/* ===== 36-csv.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The one place that turns values into spreadsheet (CSV) cells safely. A text cell that starts with
+ *    = + - @ or a tab or carriage return could be run as a formula by a spreadsheet (a note typed as =HYPERLINK(...) in a
+ *    file handed to an inspector or an accountant), so such text gets a leading apostrophe. Real numbers and plain
+ *    number text stay numbers.
+ * PARTS: the cell, the line, the whole file.
+ * USES: nothing. USED BY: 35-pilot.js (pilot report), 76-floor-discards.js (thrown-out log), 88-office-backup.js (sales by day),
+ *    tests. The store has its own copy of the same rule for its five data files (30-store.js).
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  // Text that is only a number (an optional minus, digits, an optional decimal part): safe to leave as it is.
+  const PLAIN_NUMBER = /^-?\d+(?:\.\d+)?$/;
+  // Text that a spreadsheet may read as a formula or a command.
+  const DANGEROUS = /^[=+\-@\t\r]/;
+
+  // One CSV cell: numbers as digits, text with a leading apostrophe when it could be a formula, and quotes when it holds a comma, quote or line break.
+  function cell(v) {
+    if (v === undefined || v === null) return '';
+    if (typeof v === 'number') return isFinite(v) ? String(v) : '';
+    if (typeof v === 'boolean') return v ? 'true' : 'false';
+    let s = typeof v === 'string' ? v : String(v);
+    if (DANGEROUS.test(s) && !PLAIN_NUMBER.test(s)) s = "'" + s;
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  // One CSV line from a list of values (no line break at the end).
+  const line = (a) => a.map(cell).join(',');
+  // A whole CSV text from a list of lists, with a carriage return and line feed after each line.
+  const text = (rows) => rows.map(line).join('\r\n') + '\r\n';
+
+  SB.csv = { cell, line, text };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 36-csv.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'36-csv.js',message:String(e&&e.message||e)});}
 
 /* ===== 40-metrics.js ===== */
 ;try{
@@ -19368,7 +19405,11 @@ a.of-nav:active { background: var(--press); }
   };
   // Sets (4 digits) or removes (null or '') the manager PIN. Only the scramble is saved, through the store
   // (settings.office.pinHash); any unlock is forgotten. Resolves {ok, report}; bad input gives 'badPin'.
-  S.setPin = async function (pin) {
+  // Asks for the current PIN right now (the keypad), even inside the 2-minute grace. True at once when no PIN is set; false when cancelled.
+  S.requirePin = () => (S.hasPin() ? promptPin() : Promise.resolve(true));
+  S.setPin = async function (pin, opts) {
+    // With a PIN already set, changing or removing it needs proof that the current PIN was just entered (opts.verified from requirePin).
+    if (S.hasPin() && !(opts && opts.verified === true)) return { ok: false, report: 'pinRequired', message: 'The current PIN is needed to change or remove it.' };
     if (pin != null && pin !== '' && !/^\d{4}$/.test(String(pin))) return { ok: false, report: 'badPin', message: 'Use exactly 4 digits.' };
     const hash = pin == null || pin === '' ? null : await S.hashPin(pin);
     if (!SB.store || typeof SB.store.dispatch !== 'function') return { ok: false, report: 'noStore', message: 'The store is not available.' };
@@ -19929,6 +19970,39 @@ a.of-nav:active { background: var(--press); }
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 60-shell.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'60-shell.js',message:String(e&&e.message||e)});}
+
+/* ===== 66-order-math.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The money shown before an order is sent. It asks the engine's own order totals (whole cents, half-up tax) what a
+ *    draft would come to, so the preview on the order screen and the charge are always the same numbers. Nothing here does its own
+ *    rounding of tax. It also splits a tip percentage in whole cents.
+ * PARTS: previewTotals, pctOfDollars.
+ * USES: 20-engine.js (orderTotals). USED BY: 71-floor-order.js (the order screen), 73-floor-orders.js (tip choices), and tests.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  // What the order would come to if the draft lines were sent now: the food already on the order (if any) plus the draft lines at menu
+  // price, less nothing, plus tax, worked out by the engine's own orderTotals on a copy of the state that holds the draft as one more
+  // ticket. lines is [{ price, qty }]. order is the open order the round goes to, or null for a new order. Returns { sub, tax, total }.
+  function previewTotals(state, order, lines) {
+    const E = SB.engine;
+    const oid = order ? order.id : '_draft';
+    const items = (lines || []).map((l) => ({ price: l.price, qty: l.qty }));
+    const probe = Object.assign({}, state, { tickets: state.tickets.concat([{ id: '_draft', orderId: oid, status: 'active', items }]) });
+    const t = E.orderTotals(probe, order && order.status === 'open' ? order : { id: oid, status: 'open' });
+    return { sub: t.subtotal, tax: t.tax, total: t.total };
+  }
+  // A percentage of a dollar amount in whole cents, half a cent rounding up (15 percent of 23.50 is 3.53, not 3.52), for tip choices.
+  function pctOfDollars(amount, pct) {
+    const c = Math.round(Math.max(0, Number(amount) || 0) * 100 + 1e-7);
+    return Math.floor((c * pct + 50) / 100) / 100;
+  }
+  SB.orderMath = { previewTotals, pctOfDollars };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 66-order-math.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'66-order-math.js',message:String(e&&e.message||e)});}
 
 /* ===== 70-floor-board.js ===== */
 ;try{
@@ -22433,11 +22507,8 @@ a.of-nav:active { background: var(--press); }
   // What the bill comes to if this round is sent now: the food already on the open order plus this draft, with tax.
   function pendingTotal() {
     const s0 = st(), o = D.orderId ? SB.engine.findOrder(s0, D.orderId) : null;
-    let c = Math.round(subtotal() * 100);
-    if (o) c += Math.round(SB.engine.orderTotals(s0, o).subtotal * 100);
-    const sub = c / 100, rate = s0.settings && s0.settings.service && s0.settings.service.taxRatePct > 0 ? s0.settings.service.taxRatePct : 0;
-    const tax = Math.round(sub * rate) / 100;
-    return { sub, tax, total: Math.round((sub + tax) * 100) / 100 };
+    // The engine's own order totals do the sum and the tax, so what is shown is exactly what will be charged.
+    return SB.orderMath.previewTotals(s0, o, D.lines.map((l) => { const mi = menuById(l.menuId); return { price: mi ? mi.price : 0, qty: l.qty }; }));
   }
 
   /** Add one menu item (or qty) to the draft. Same item with no modifiers merges into the existing line. */
@@ -22758,7 +22829,7 @@ a.of-nav:active { background: var(--press); }
     });
     tipField.appendChild(tipChips);
     // The tip in dollars for a percent of the food on this bill (before tax), in whole cents.
-    const tipAmount = (pct) => (pct ? Math.round(pendingTotal().sub * pct) / 100 : 0);
+    const tipAmount = (pct) => (pct ? SB.orderMath.pctOfDollars(pendingTotal().sub, pct) : 0);
     const payNote = h('p', { class: 'ord-pay-note t-muted', role: 'status' });
     const payBox = h('div', { class: 'ord-block ord-paybox' }, h('div', { class: 'ord-label' }, 'Payment'), paySeg, tipField, payNote);
 
@@ -25154,6 +25225,8 @@ a.of-nav:active { background: var(--press); }
         body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
+      // With a PIN set, clearing live data asks for it.
+      if (SB.shell && SB.shell.requirePin && !(await SB.shell.requirePin())) { toast('The PIN was not entered. Nothing was cleared.', 'warn'); return; }
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
       const rep = SB.store.resetLive({ keepSettings: true, starter: false });
       if (rep === 'ok') toast('Live data cleared. The board is empty.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
@@ -25632,7 +25705,7 @@ a.of-nav:active { background: var(--press); }
   const cents = (v) => Math.round(v * 100) / 100;
   // Tip choices worked out from a base amount (the food after any discount): 15, 18, 20 and 25 percent in dollars.
   function tipPresets(base) {
-    return [15, 18, 20, 25].map((pct) => ({ pct, label: pct + '%', amount: cents((Math.max(0, base) * pct) / 100) }));
+    return [15, 18, 20, 25].map((pct) => ({ pct, label: pct + '%', amount: SB.orderMath ? SB.orderMath.pctOfDollars(base, pct) : cents((Math.max(0, base) * pct) / 100) }));
   }
   // The tip that brings the amount to collect up to a whole dollar (a total of 23.40 gives 0.60); 0 if already whole.
   function roundUpTip(total) { return cents(Math.ceil(cents(total) - 1e-9) - cents(total)); }
@@ -26060,7 +26133,7 @@ a.of-nav:active { background: var(--press); }
       if (tot.taxRate > 0) rows.push(['Tax (' + tot.taxRate + '%)', money(tot.tax)]);
       rows.push(['Order total', money(tot.total)]);
       const tip = r.err || Number.isNaN(r.t) ? 0 : r.t;
-      if (tip > 0) rows.push(['Tip', money(tip)], ['To collect', money(tot.total + tip)]);
+      if (tip > 0) rows.push(['Tip', money(tip)], ['To collect', money(Math.round(tot.total * 100 + tip * 100 + 1e-7) / 100)]);
       U.clear(calc);
       rows.forEach((row, i) => calc.append(h('dt', { class: i === rows.length - 1 ? 'is-last' : '' }, row[0]), h('dd', { class: 'num' + (i === rows.length - 1 ? ' is-last' : '') }, row[1])));
       quick.forEach((q) => {
@@ -26678,7 +26751,6 @@ a.of-nav:active { background: var(--press); }
   const SB = (g.SB = g.SB || {});
   const U = SB.util;
   const doc = g.document;
-  if (!doc || !SB.sheets) return;
   const h = U.h;
   // Builds an icon element, or an empty span when icons are missing.
   const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 20 }); } catch (e) { return doc.createElement('span'); } };
@@ -26709,8 +26781,10 @@ a.of-nav:active { background: var(--press); }
     // The engine's own discard entries by batch: who threw it out, the entry id for a fix, and fixes already made.
     const logged = new Map();
     for (const row of SB.engine.safetyLog(state)) if (row.event.type === 'batch_discard' && row.event.batchId) logged.set(row.event.batchId, row);
+    const seen = new Set();
     for (const b of state.batches) {
       if (b.status !== 'discard' || !Number.isFinite(b.discardedAt)) continue;
+      seen.add(b.id);
       out.push({
         id: b.id, t: b.discardedAt, date: U.fmtDateShort(U.dateKey(b.discardedAt)), food: b.label || b.ing,
         amount: U.weightText(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
@@ -26718,37 +26792,65 @@ a.of-nav:active { background: var(--press); }
         eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
     }
+    // Discards whose batch has since been dropped from the cabinet list are still in the safety record (kept about six months):
+    // show them from that entry, with what the entry holds (the amount, the reason, who) and nothing invented.
+    const ingName = (id) => { const i = (state.ingredients || []).find((x) => x && x.id === id); return i && i.name ? i.name : id || 'Food'; };
+    for (const [batchId, row] of logged) {
+      const e = row.event;
+      if (seen.has(batchId) || !Number.isFinite(e.t)) continue;
+      out.push({
+        id: batchId, t: e.t, date: U.fmtDateShort(U.dateKey(e.t)), food: ingName(e.ing), amount: Number.isFinite(e.g) ? U.weightText(e.g) : '',
+        since: '', out: U.fmtTime(e.t), reason: REASON[e.reason] || 'Other',
+        initials: rec.initials[batchId] || e.who || '', extra: rec.extra[batchId] || e.note || '', eventId: e.id || '', fixes: row.corrections || [],
+      });
+    }
     return out.sort((a, b) => b.t - a.t);
+  }
+  // How far back the log reaches, in plain words, so nobody reads it as more than it is. The app keeps safety records for
+  // about six months (190 days); a kitchen newer than that has everything from its first record.
+  function coverageText(state, list, now) {
+    if (!list.length) return '';
+    const oldest = list[list.length - 1].t;
+    let first = oldest;
+    for (const row of SB.engine.safetyLog(state)) if (Number.isFinite(row.event.t) && row.event.t < first) first = row.event.t;
+    for (const b of state.batches || []) if (b && Number.isFinite(b.enteredAt) && b.enteredAt < first) first = b.enteredAt;
+    const since = U.fmtDateShort(U.dateKey(oldest));
+    const n = list.length + ' ' + U.plural(list.length, 'batch', 'batches');
+    if (now - first < 175 * 86400e3) return 'Showing every batch thrown out since ' + U.fmtDateShort(U.dateKey(first)) + ' (' + n + '), the first record this app has.';
+    return 'Showing the ' + n + ' thrown out since ' + since + '. Records older than about six months are not kept, so older ones are not here.';
   }
   // Escapes text for safe use inside HTML.
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // Builds the log as plain HTML for printing: a heading and one table with the columns that are switched on.
-  function printHtml(list, rec) {
+  function printHtml(list, rec, note) {
     const cols = rec.cols.filter((c) => c.on);
     const head = '<tr>' + cols.map((c) => '<th>' + esc(c.label) + '</th>').join('') + '</tr>';
     const body = list.map((r) => '<tr>' + cols.map((c) => '<td>' + esc(r[c.key]) + '</td>').join('') + '</tr>').join('');
-    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p><table>' + head + body + '</table>';
+    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p>' + (note ? '<p>' + esc(note) + '</p>' : '') + '<table>' + head + body + '</table>';
   }
   // Builds the log as CSV text with the columns that are switched on.
-  function csv(list, rec) {
+  function csv(list, rec, note) {
     const cols = rec.cols.filter((c) => c.on);
-    // Wraps one value in quotes, doubling any quotes inside it, as CSV requires.
-    const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
-    return [cols.map((c) => q(c.label)).join(',')].concat(list.map((r) => cols.map((c) => q(r[c.key])).join(','))).join('\r\n') + '\r\n';
+    // Each cell goes through the shared guard (36-csv.js): quotes where needed and an apostrophe before anything a spreadsheet could run as a formula.
+    const rowsOut = [cols.map((c) => c.label)].concat(list.map((r) => cols.map((c) => r[c.key])));
+    if (note) rowsOut.push([note]);
+    return SB.csv.text(rowsOut);
   }
+  SB.discardsPure = { rows, coverageText, csv, printHtml };
+  if (!doc || !SB.sheets) return;
   // Prints the log through a hidden frame so the board behind the sheet is not printed with it.
-  function printLog(list, rec) {
+  function printLog(list, rec, note) {
     const f = doc.createElement('iframe');
     f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
     doc.body.appendChild(f);
-    f.srcdoc = printHtml(list, rec);
+    f.srcdoc = printHtml(list, rec, note);
     // Prints once the hidden frame has loaded its page, then removes it.
     f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { /* printing is optional */ } setTimeout(() => f.remove(), 2000); };
   }
   // Saves the log as a CSV file with the browser's normal download, and notes the save time.
-  function saveCsv(list, rec) {
+  function saveCsv(list, rec, note) {
     try {
-      const url = URL.createObjectURL(new Blob([csv(list, rec)], { type: 'text/csv' }));
+      const url = URL.createObjectURL(new Blob([csv(list, rec, note)], { type: 'text/csv' }));
       const a = doc.createElement('a');
       a.href = url; a.download = 'smokebox-thrown-out-log-' + new Date().toISOString().slice(0, 10) + '.csv'; a.style.display = 'none';
       doc.body.appendChild(a); a.click();
@@ -26765,8 +26867,11 @@ a.of-nav:active { background: var(--press); }
     // Stops listening to the store when the sheet closes.
     const onClose = () => offs.splice(0).forEach((f) => f());
     const sheet = SB.ui.sheet({ title: 'Thrown-out log', side: 'right', width: 'min(1040px, 96vw)', name: 'discards', onClose });
-    const note = h('p', { class: 'fs-sub' }, 'Every batch thrown out, newest first. Add initials on each row. Copy these to your health department\'s own form if it asks for a different layout. Save a copy every day: this log lives on this device only.');
+    const note = h('p', { class: 'fs-sub' }, 'Batches thrown out, newest first. Add initials on each row. Copy these to your health department\'s own form if it asks for a different layout. Save a copy every day: this log lives on this device only.');
     const status = h('p', { class: 'fs-sub', role: 'status' });
+    const cover = h('p', { class: 'fs-sub dlog-cover' });
+    // The plain words for how far back the log reaches, for the sheet, print and file.
+    const noteFor = (list) => coverageText(SB.store.getState(), list, SB.store.now());
     const wrap = h('div', { class: 'dlog-wrap', style: 'overflow:auto' });
     const colsBox = h('div', { class: 'dlog-cols', hidden: true });
 
@@ -26794,6 +26899,7 @@ a.of-nav:active { background: var(--press); }
     function draw() {
       U.clear(wrap);
       const list = rows(SB.store.getState(), rec);
+      cover.textContent = noteFor(list);
       const cols = rec.cols.filter((c) => c.on);
       if (!list.length) { wrap.appendChild(h('div', { class: 'empty' }, ico('trash', 40), h('h3', null, 'Nothing thrown out yet'), h('p', null, 'Batches you throw out show up here with their time and reason.'))); return; }
       const table = h('table', { class: 'dlog-table', style: 'border-collapse:collapse;width:100%' });
@@ -26832,15 +26938,15 @@ a.of-nav:active { background: var(--press); }
       });
     }
     // Prints the log as it stands.
-    const doPrint = () => printLog(rows(SB.store.getState(), rec), rec);
+    const doPrint = () => { const l = rows(SB.store.getState(), rec); printLog(l, rec, noteFor(l)); };
     // Saves a spreadsheet copy and says whether it worked.
-    const doCsv = () => { status.textContent = saveCsv(rows(SB.store.getState(), rec), rec) ? 'Saved a copy to your downloads.' : 'The browser blocked the download. Use Print instead.'; };
+    const doCsv = () => { const l = rows(SB.store.getState(), rec); status.textContent = saveCsv(l, rec, noteFor(l)) ? 'Saved a copy to your downloads.' : 'The browser blocked the download. Use Print instead.'; };
     // Shows or hides the column editor.
     const doCols = () => { colsBox.hidden = !colsBox.hidden; if (!colsBox.hidden) drawCols(); };
     const bPrint = h('button', { type: 'button', class: 'btn', onClick: doPrint }, ico('receipt', 20), h('span', null, 'Print or save as PDF'));
     const bCsv = h('button', { type: 'button', class: 'btn btn-primary', onClick: doCsv }, ico('package', 20), h('span', null, 'Save as spreadsheet'));
     const bCols = h('button', { type: 'button', class: 'btn', onClick: doCols }, ico('sliders', 20), h('span', null, 'Edit columns'));
-    sheet.body.append(note, h('div', { class: 'row', style: 'display:flex;gap:12px;flex-wrap:wrap;margin:12px 0' }, bCsv, bPrint, bCols), status, colsBox, wrap);
+    sheet.body.append(note, cover, h('div', { class: 'row', style: 'display:flex;gap:12px;flex-wrap:wrap;margin:12px 0' }, bCsv, bPrint, bCols), status, colsBox, wrap);
     draw();
     offs.push(SB.store.subscribe(() => draw()));
     return sheet;
@@ -26867,7 +26973,7 @@ a.of-nav:active { background: var(--press); }
   // Rows for the state, with the saved initials and notes filled in.
   const rowsFor = (state) => rows(state, load());
   // The whole log for the state as CSV text.
-  const csvFor = (state) => csv(rows(state, load()), load());
+  const csvFor = (state) => { const l = rows(state, load()); return csv(l, load(), coverageText(state, l, SB.store.now())); };
   SB.discards = { rows: rowsFor, csv: csvFor, remind, persist };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
@@ -27867,6 +27973,12 @@ a.of-nav:active { background: var(--press); }
   // Opens "Start over with an empty menu": three plain steps (what goes and what stays, save a backup, type the word). This cannot
   // be undone, so the screen says so first and offers a backup before anything is erased.
   function openStartOver() {
+    // With a PIN set, the keypad comes first; the sheet opens only for the right PIN.
+    if (SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.shell.requirePin) { SB.shell.requirePin().then((ok) => { if (ok) buildStartOver(); }); return null; }
+    return buildStartOver();
+  }
+  // Builds the Start over sheet (after the PIN, when one is set).
+  function buildStartOver() {
     const sheet = SB.ui.sheet({ title: 'Start over with an empty menu', side: 'right', width: 'min(640px, 96vw)', name: 'startover' });
     const root = h('div', { class: 'dp so' });
     const keep = h('input', { type: 'checkbox', checked: true, id: 'so-keep' });
@@ -27881,10 +27993,30 @@ a.of-nav:active { background: var(--press); }
     const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: about your backup');
     step1.appendChild(next1);
 
-    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' } }, 'Next: confirm');
+    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' }, disabled: true }, 'Next: confirm');
+    let backupInfo = null; // what the backup file was called and how big, once it was handed to the browser
+    const bkSt = h('p', { class: 'fs-sub dp-msg', role: 'status', dataset: { role: 'so-backup-msg' } });
+    // Saves the backup file now, before anything is erased, and asks the person to confirm they can find it.
+    const saveNow = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'so-save-backup' }, onClick: () => {
+      let text = null; try { text = SB.store.exportAll(); } catch (e) { text = null; }
+      if (!text) { tell(bkSt, 'The backup could not be made, so nothing can be erased. Nothing was changed.', 'bad'); return; }
+      // Pads a number to two digits so the backup file name sorts by time.
+      const d = new Date(), pad2 = (n) => String(n).padStart(2, '0');
+      const filename = 'smokebox-backup-before-start-over-' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '-' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.json';
+      try { const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' })); const a = doc.createElement('a'); a.href = url; a.download = filename; a.style.display = 'none'; doc.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 4000); }
+      catch (e) { tell(bkSt, 'This browser would not save the file. Nothing was erased. Try again, or back up from Back office, Data first.', 'bad'); return; }
+      backupInfo = { filename, chars: text.length };
+      tell(bkSt, 'Asked your browser to save ' + filename + ' (' + Math.max(1, Math.round(text.length / 1024)) + ' KB). Look in your downloads folder to be sure it is there.', 'ok');
+      sawIt.disabled = false; saveNow.textContent = 'Save it again';
+    } }, 'Save my backup file now');
+    const sawIt = h('input', { type: 'checkbox', id: 'so-saw', disabled: true, dataset: { act: 'so-saw' } });
+    // The next step opens only after the person says the file is saved and they can find it.
+    sawIt.addEventListener('change', () => { next2.disabled = !(sawIt.checked && backupInfo); });
     const step2 = h('section', { class: 'fs-section so-step', hidden: true },
       h('h3', { class: 'fs-h' }, '2. Your backup'),
-      h('p', { class: 'fs-sub' }, 'The moment you confirm, Smokebox saves a backup file with everything in your kitchen as it is now, then erases. The file goes to your downloads: keep a copy off this device. If the backup cannot be made, nothing is erased.'),
+      h('p', { class: 'fs-sub' }, 'First save a backup file with everything in your kitchen as it is now. It goes to your downloads: keep a copy off this device. Nothing is erased until you say you saved it.'),
+      saveNow, bkSt,
+      h('label', { class: 'dp-check-row', for: 'so-saw' }, sawIt, h('span', null, 'I saved the backup file and I can find it')),
       h('p', { class: 'fs-sub' }, 'To bring everything back later: Back office, Data, Restore.'), next2);
 
     const word = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': 'Type ' + START_OVER_WORD + ' to confirm', placeholder: START_OVER_WORD });
@@ -27906,13 +28038,14 @@ a.of-nav:active { background: var(--press); }
     go.addEventListener('click', () => {
       const keepIt = keep.checked;
       // The store makes its own backup first, clears the kitchen, my saved setup bits and (when asked) the settings and station names.
-      const res = SB.store.startOver({ confirm: word.value, keepSettings: keepIt });
+      const res = SB.store.startOver({ confirm: word.value, keepSettings: keepIt, backupSaved: backupInfo });
       if (!res.ok) {
         let w = res.report;
         try { w = SB.engine.describe(res.report, res.info, SB.store.getState().settings) || w; } catch (e) { /* keep the code */ }
-        if (res.report === 'confirmWord') w = 'Type ' + START_OVER_WORD + ' exactly, then try again. Nothing was erased.';
+        if (res.report === 'backupRequired') w = 'Save the backup file first (step 2). Nothing was erased.';
+        else if (res.report === 'confirmWord') w = 'Type ' + START_OVER_WORD + ' exactly, then try again. Nothing was erased.';
         else if (res.report === 'notInDemo') w = 'You are in the demo, so there is nothing of yours to erase here. Tap Back to my kitchen first.';
-        tell(goSt, w + (res.report === 'confirmWord' || res.report === 'notInDemo' ? '' : ' Nothing was erased.'), 'bad');
+        tell(goSt, w + (res.report === 'confirmWord' || res.report === 'notInDemo' || res.report === 'backupRequired' ? '' : ' Nothing was erased.'), 'bad');
         return;
       }
       const needsReload = !keepIt;
@@ -28068,9 +28201,11 @@ a.of-nav:active { background: var(--press); }
 
   // Makes a new recovery code and shows it once on a "write this down" screen with Copy and Print. The Done button stays off until the
   // owner selects "I saved it". Needs a PIN; says plainly why when it cannot make one. Used after a PIN is set, and from the PIN section.
-  async function showRecoveryCode() {
+  async function showRecoveryCode(opts) {
     const st = SB.store;
     if (!st || typeof st.createRecoveryCode !== 'function') return false;
+    // A new code replaces the old one, so with a PIN set the current PIN must be entered first (unless it was just entered).
+    if (!(opts && opts.verified) && SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.shell.requirePin && !(await SB.shell.requirePin())) { if (SB.ui.toast) SB.ui.toast('The PIN was not entered, so no recovery code was made.', { tone: 'warn' }); return false; }
     const r = await st.createRecoveryCode();
     if (!r.ok) { let w = r.report; try { w = SB.engine.describe(r.report, r.info, st.getState().settings) || w; } catch (e) { /* keep the code */ } if (SB.ui.toast) SB.ui.toast('The recovery code could not be made. ' + w, { tone: 'warn' }); return false; }
     const sheet = SB.ui.sheet({ title: 'Write down your recovery code', side: 'center', width: 'min(560px, 96vw)', name: 'recoverycode' });
@@ -28279,9 +28414,12 @@ a.of-nav:active { background: var(--press); }
       h('button', { type: 'button', class: 'btn', onClick: async () => {
         const v = pin.value.trim();
         if (!/^\d{4}$/.test(v)) { tell(pinSt, 'Use exactly 4 digits.'); return; }
-        const r = SB.shell && SB.shell.setPin ? await SB.shell.setPin(v) : { ok: false };
+        // With a PIN already set, the current PIN must be entered first, so a cook cannot take over the back office.
+        const hadPin = !!(SB.shell && SB.shell.hasPin && SB.shell.hasPin());
+        if (hadPin && !(await SB.shell.requirePin())) { tell(pinSt, 'The PIN was not changed. The current PIN is needed to change it.', 'bad'); return; }
+        const r = SB.shell && SB.shell.setPin ? await SB.shell.setPin(v, { verified: true }) : { ok: false };
         tell(pinSt, r.ok ? 'PIN set. The back office will ask for it.' : 'The PIN could not be saved.');
-        if (r.ok) { pin.value = ''; await showRecoveryCode(); }
+        if (r.ok) { pin.value = ''; await showRecoveryCode({ verified: true }); }
       } }, 'Set PIN'),
       // For a PIN set before recovery codes existed: makes the code now.
       SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.store.hasRecoveryCode && !SB.store.hasRecoveryCode() ? h('button', { type: 'button', class: 'btn', dataset: { act: 'make-recovery' }, onClick: () => showRecoveryCode() }, 'Make a recovery code') : null);
@@ -34426,7 +34564,7 @@ a.of-nav:active { background: var(--press); }
           pin = n1.input.value;
         }
         let res;
-        try { res = await SB.shell.setPin(pin); } catch (e) { res = { ok: false, report: 'error' }; }
+        try { res = await SB.shell.setPin(pin, { verified: true }); } catch (e) { res = { ok: false, report: 'error' }; }
         if (res && res.ok) {
           closeForm();
           SB.ui.toast(pin ? (m === 'set' ? 'PIN set. The back office will ask for it next time.' : 'PIN changed. The back office will ask for the new one next time.') : 'PIN removed. The back office opens without asking.', { tone: 'ok' });
@@ -34947,6 +35085,8 @@ a.of-nav:active { background: var(--press); }
           'There is no undo. If you might want what is here now, cancel and download a backup first.'],
       });
       if (!ok) return;
+      // With a PIN set, restoring a backup asks for it again, even inside the back office grace period.
+      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was restored.', { tone: 'warn' }); return; }
       const rep = SB.store.importAll(p.text);
       if (rep === 'ok') {
         clearImport(); pasteArea.value = ''; fileIn.value = '';
@@ -35008,7 +35148,9 @@ a.of-nav:active { background: var(--press); }
           k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
           'There is no undo. Back up first if you might want this data.'],
         // Clears the live data after the word was typed.
-        run: () => {
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
           const rep = SB.store.resetLive({ keepSettings: k, starter: false });
           if (rep === 'ok') { resetStatus.ok('Live data erased. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data erased.', { tone: 'ok' }); }
           else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
@@ -35023,7 +35165,9 @@ a.of-nav:active { background: var(--press); }
         lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
           'Your display choices (themes and text size) are kept.', 'There is no undo. Back up first if you might want any of it back.'],
         // Erases everything after the word was typed.
-        run: () => {
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
           const rep = SB.store.reset();
           if (rep === 'ok') { resetStatus.ok('Everything was reset to the starter values.'); SB.ui.toast('Everything was reset.', { tone: 'ok' }); }
           else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
@@ -36190,10 +36334,7 @@ a.of-nav:active { background: var(--press); }
 
 
   // Quotes one value for a CSV cell: wraps it in quotes when it holds a comma, quote or line break.
-  function csvCell(v) {
-    const t = v == null ? '' : String(v);
-    return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
-  }
+  function csvCell(v) { return SB.csv.cell(v); }
   // Whole cents as plain digits with two decimals (1240 gives "12.40"), with no dollar sign or thousands commas, so a spreadsheet adds them up.
   const plainMoney = (v) => (isNum(v) ? (Math.round(v) / 100).toFixed(2) : '0.00');
 

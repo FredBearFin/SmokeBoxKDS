@@ -1316,7 +1316,11 @@
   };
   // Sets (4 digits) or removes (null or '') the manager PIN. Only the scramble is saved, through the store
   // (settings.office.pinHash); any unlock is forgotten. Resolves {ok, report}; bad input gives 'badPin'.
-  S.setPin = async function (pin) {
+  // Asks for the current PIN right now (the keypad), even inside the 2-minute grace. True at once when no PIN is set; false when cancelled.
+  S.requirePin = () => (S.hasPin() ? promptPin() : Promise.resolve(true));
+  S.setPin = async function (pin, opts) {
+    // With a PIN already set, changing or removing it needs proof that the current PIN was just entered (opts.verified from requirePin).
+    if (S.hasPin() && !(opts && opts.verified === true)) return { ok: false, report: 'pinRequired', message: 'The current PIN is needed to change or remove it.' };
     if (pin != null && pin !== '' && !/^\d{4}$/.test(String(pin))) return { ok: false, report: 'badPin', message: 'Use exactly 4 digits.' };
     const hash = pin == null || pin === '' ? null : await S.hashPin(pin);
     if (!SB.store || typeof SB.store.dispatch !== 'function') return { ok: false, report: 'noStore', message: 'The store is not available.' };

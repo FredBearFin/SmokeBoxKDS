@@ -21,6 +21,12 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.click('[data-act=so-next1]');
   check('step 2 explains the automatic backup and nothing is erased yet', /backup/i.test(await page.locator('.so').innerText()) && (await page.evaluate(() => SB.store.getState().menu.length)) === 2);
   await page.screenshot({ path: SHOT + '/startover-2.png' });
+  check('step 2: Next is off and the tick box is off until the backup is saved', await page.locator('[data-act=so-next2]').isDisabled() && await page.locator('#so-saw').isDisabled());
+  const dl0 = page.waitForEvent('download', { timeout: 5000 });
+  await page.click('[data-act=so-save-backup]'); const dwn0 = await dl0;
+  check('Save my backup file now downloads a before-start-over file, with nothing erased yet', /before-start-over.*\.json$/.test(dwn0.suggestedFilename()) && (await page.evaluate(() => SB.store.getState().menu.length)) === 2);
+  check('after saving, Next is still off until the person says they can find the file', await page.locator('[data-act=so-next2]').isDisabled() && await page.locator('#so-saw').isEnabled());
+  await page.check('#so-saw'); check('ticking "I saved the backup file" turns Next on', await page.locator('[data-act=so-next2]').isEnabled());
   await page.click('[data-act=so-next2]');
   const WORD = await page.evaluate(() => SB.store.START_OVER_WORD);
   check('the screen asks for the store\'s own confirm word (' + WORD + ')', (await page.locator('.so').innerText()).includes(WORD));
@@ -41,7 +47,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.evaluate(() => { SB.store.dispatchEx('updateSettings', { patch: { service: { taxRatePct: 8 } } }, { source: 'ui' }); SB.store.dispatchEx('addMenuItem', { name: 'Tea', zone: 'cold', cat: 'cold', price: 3, prepSec: 60, track: 'one' }, { source: 'ui' }); });
   await page.waitForTimeout(400);
   await page.evaluate(() => SB.sheets.open('startover')); await page.waitForTimeout(400);
-  await page.locator('#so-keep').uncheck(); await page.click('[data-act=so-next1]'); await page.click('[data-act=so-next2]');
+  await page.locator('#so-keep').uncheck(); await page.click('[data-act=so-next1]'); await page.click('[data-act=so-save-backup]'); await page.check('#so-saw'); await page.click('[data-act=so-next2]');
   await page.fill('.so input.input', WORD); await page.click('[data-act=so-go]'); await page.waitForTimeout(600);
   check('with the box unticked the tax goes back to its start', await page.evaluate(() => SB.store.getState().settings.service.taxRatePct === 0));
   // Old demo tickets in real reports: a small card with a plain count, Clear them and Keep them.
