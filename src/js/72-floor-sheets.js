@@ -1527,7 +1527,7 @@
       text(rec.num, '#' + t.num); text(rec.who, t.customer || 'No name');
       const ch = channelOf(t.channel);
       if (rec.chKey !== t.channel) { rec.chKey = t.channel; U.clear(rec.ch); rec.ch.append(ico(ch.icon, 16), h('span', null, ch.name)); }
-      setHidden(rec.demo, t.src !== 'demo');
+      setHidden(rec.demo, t.src !== 'demo' || !!(SB.store.isDemo && SB.store.isDemo()));
       text(rec.items, itemsSummary(t));
       const tm = levelOf(t, now);
       if (voided) {

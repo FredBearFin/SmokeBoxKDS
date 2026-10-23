@@ -240,7 +240,7 @@
       const ch = channelOf(o.channel);
       if (rec.chKey !== o.channel) { rec.chKey = o.channel; U.clear(rec.ch); rec.ch.append(ico(ch.icon, 16), h('span', null, ch.name)); }
       setHidden(rec.round, tot.rounds < 2); text(rec.round, tot.rounds + ' rounds');
-      setHidden(rec.demo, o.src !== 'demo');
+      setHidden(rec.demo, o.src !== 'demo' || !!(SB.store.isDemo && SB.store.isDemo()));
       text(rec.items, lines.length ? itemsLine(lines) : 'Nothing on this order any more.');
       const live = state.tickets.filter((t) => t.orderId === o.id && t.status !== 'voided');
       const out = live.filter((t) => t.status === 'expedited').length;
