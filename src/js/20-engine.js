@@ -2577,6 +2577,7 @@
     }
     // Place and limits belong only to a cold cooked-ahead product marked as kept in a fridge; a hot or plain one cannot carry them.
     if (listKey === 'ingredients') {
+      if (out.fridge !== true && ['fridgeDays', 'outHours'].some((k) => hasOwn(p.patch, k) && p.patch[k] !== null)) { tx.info.key = prefix + '.' + cur.id + '.' + (hasOwn(p.patch, 'fridgeDays') ? 'fridgeDays' : 'outHours'); return 'badPatch'; }
       if (out.fridge !== true && (out.fridgeDays !== undefined || out.outHours !== undefined)) { delete out.fridgeDays; delete out.outHours; if (!keys.length) keys.push(prefix + '.' + cur.id + '.fridgeDays'); }
       if (out.fridge === true && !(out.tcs === true && out.hold === 'cold')) { tx.info.key = prefix + '.' + cur.id + '.fridge'; return 'badPatch'; }
       if (out.fridge === false && cur.fridge === undefined) delete out.fridge;
