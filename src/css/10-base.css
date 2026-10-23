@@ -703,3 +703,6 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   .slip[data-level="breach"] .slip-head, .slip[data-level="breach"] .slip-body, .slip[data-level="breach"] .slip-tear { animation: none !important; }
   .stamp, .is-printing { animation: none !important; }
 }
+
+/* A station, category or channel added by the owner has no hue of its own, so it gets a neutral one. */
+[data-zone]:not([data-zone="pit"], [data-zone="sides"], [data-zone="fry"], [data-zone="cold"], [data-zone="expo"]) { --zc: var(--ink3); }

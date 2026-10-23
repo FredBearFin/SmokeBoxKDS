@@ -265,4 +265,82 @@
   C.payMethodById = byId(C.payMethods);
   C.comboById = byId(C.combos);
   C.syncTargetById = byId(C.syncTargets);
+
+  /* ---------- owner names and extra entries for stations, categories and channels ---------- */
+  // The owner can rename stations, menu categories and order channels, and add one or more of each. The
+  // choices are kept in this browser (not in the saved kitchen state) under CUSTOM_KEY and applied right
+  // here, while this file loads, so the engine, the board and the office all see the same lists. Ids never
+  // change: a rename only changes what people read. A change made in the app takes effect after a reload.
+  // WATCH OUT: a backup file does not carry these names. Restoring on a device without them would drop
+  // tickets that sit on an added station, so copy the names too (Data page) when moving devices.
+  const CUSTOM_KEY = 'smokebox.v1.names';
+  // Size limits so a typing slip cannot grow the screen without end: names up to 24 letters.
+  const CUSTOM_MAX = { zones: 8, categories: 12, channels: 8, name: 24 };
+  // Turns a name into a short id: lower-case letters and digits joined by underscores, with a prefix.
+  const slug = (prefix, name) => prefix + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 16);
+  // The first three letters of a name, upper case, for the small tag on tickets and tabs.
+  const codeOf = (name) => String(name).replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || '???';
+  // Cleans one typed name: trims spaces, squeezes runs of spaces; returns '' when it is not usable.
+  const cleanName = (x) => (typeof x === 'string' ? x.replace(/\s+/g, ' ').trim() : '');
+  // Checks a typed name against the others in a list (ignoring one id): true if another entry has it.
+  const nameTaken = (list, name, exceptId) => list.some((e) => e.id !== exceptId && e.name.toLowerCase() === name.toLowerCase());
+  // Rebuilds the lookup tables in place, so code that already holds them still sees the new entries.
+  const reindex = () => {
+    for (const [tbl, list] of [['zoneById', C.zones], ['channelById', C.channels], ['categoryById', C.categories]]) {
+      C[tbl] = C[tbl] || {};
+      for (const k of Object.keys(C[tbl])) delete C[tbl][k];
+      for (const e of list) C[tbl][e.id] = e;
+    }
+  };
+  // The built-in lists as they were before any custom change, so a spec is always applied to the starters.
+  const BASE = { zones: C.zones.map((x) => Object.assign({}, x)), categories: C.categories.map((x) => Object.assign({}, x)), channels: C.channels.map((x) => Object.assign({}, x)) };
+  // Applies a custom spec {rename:{zones,categories,channels}, add:{zones,categories,channels}} to the
+  // lists. Bad entries are skipped and named in the returned rejected list. Safe to call again with a new spec.
+  C.applyCustom = function (spec) {
+    const rejected = [];
+    const sp = spec && typeof spec === 'object' ? spec : {};
+    const ren = sp.rename && typeof sp.rename === 'object' ? sp.rename : {}, add = sp.add && typeof sp.add === 'object' ? sp.add : {};
+    const kinds = [['zones', C.zones, 'z_'], ['categories', C.categories, 'c_'], ['channels', C.channels, 'ch_']];
+    // Start from the starter entries, then restore the work-station list to the same array object.
+    for (const [k, list] of kinds) { list.length = 0; BASE[k].forEach((x) => list.push(Object.assign({}, x))); }
+    C.workZones.length = 0; C.zones.forEach((z) => { if (z.id !== 'expo') C.workZones.push(z.id); });
+    for (const [k, list] of kinds) {
+      const r = ren[k] && typeof ren[k] === 'object' ? ren[k] : {};
+      for (const id of Object.keys(r)) {
+        const e = list.find((x) => x.id === id), nm = cleanName(r[id]);
+        if (!e || !nm || nm.length > CUSTOM_MAX.name || nameTaken(list, nm, id)) { rejected.push(k + '.' + id); continue; }
+        e.name = nm;
+        if (k === 'zones') { e.long = nm; e.code = codeOf(nm); }
+        if (k === 'channels') e.short = nm.slice(0, 5);
+      }
+      const extra = Array.isArray(add[k]) ? add[k] : [];
+      for (const x of extra) {
+        const nm = cleanName(x && x.name);
+        const id = x && typeof x.id === 'string' && /^[a-z0-9_]{2,24}$/.test(x.id) ? x.id : slug(k === 'zones' ? 'z_' : k === 'categories' ? 'c_' : 'ch_', nm);
+        if (!nm || nm.length > CUSTOM_MAX.name || list.length >= BASE[k].length + CUSTOM_MAX[k] || list.some((e) => e.id === id) || nameTaken(list, nm)) { rejected.push(k + '+' + nm); continue; }
+        if (k === 'zones') { list.splice(list.length - 1, 0, { id, name: nm, long: nm, code: codeOf(nm), icon: 'pot' }); C.workZones.push(id); } // expo stays last
+        else if (k === 'categories') list.push({ id, name: nm });
+        else list.push({ id, name: nm, short: nm.slice(0, 5), icon: 'plate', warnSec: 480, breachSec: 720 });
+      }
+    }
+    reindex();
+    return { rejected };
+  };
+  // The spec saved in this browser, or an empty one.
+  C.customSpec = function () {
+    const U = SB.util;
+    let v = null;
+    try { v = U && U.storage ? U.storage.get(CUSTOM_KEY, null) : null; } catch (e) { v = null; }
+    return v && typeof v === 'object' ? v : { rename: {}, add: {} };
+  };
+  // Saves a spec for the next start. Returns false if it holds nothing usable or storage refused it.
+  // The change shows on the screens after a reload.
+  C.saveCustom = function (spec) {
+    const U = SB.util;
+    if (!U || !U.storage) return false;
+    return U.storage.set(CUSTOM_KEY, spec) !== false;
+  };
+  C.customLimits = CUSTOM_MAX;
+  reindex();
+  C.applyCustom(C.customSpec());
 })(typeof globalThis !== 'undefined' ? globalThis : window);

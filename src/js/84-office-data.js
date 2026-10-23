@@ -1243,7 +1243,57 @@
     const off = SB.theme && SB.theme.onChange ? SB.theme.onChange(themeSync) : null;
     P.syncs.push((s) => { themeSync(); if (sound) sound.setValue(soundNow()); hf.forEach(({ f, p }) => f.sync(s.settings.service[p.key])); taxF.sync(s.settings.service.taxRatePct || 0); });
     P.disposers.push(() => { if (off) off(); }, () => hf.forEach(({ f }) => f.destroy()), () => taxF.destroy(), () => status.destroy(), () => sst.destroy(), () => tst.destroy());
+    pn.body.appendChild(buildNames());
     return pn;
+  }
+
+  // Builds the "Names" section: rename stations, menu categories and order channels, or add one of each.
+  // Choices are saved in this browser by SB.config.saveCustom and show on every screen after a reload.
+  function buildNames() {
+    const wrap = h('div', { class: 'od-names' });
+    wrap.appendChild(sub('Station, category and channel names'));
+    wrap.appendChild(para('Rename a station, a menu category or an order channel, or add a new one. Ids and history never change, only what people read. Changes show on every screen after you reload. Backups do not carry these names, so repeat them on a replacement device before restoring.', 'od-hint'));
+    const status = statusLine();
+    // Reloads the page so every screen picks up the saved names.
+    const reload = btn('Reload to apply', { icon: 'refresh', cls: 'btn-sm', onClick: () => g.location.reload() });
+    reload.hidden = true;
+    // Writes a changed spec to storage, checks it against the rules first, and says what happened.
+    function commit(mutate) {
+      const spec = JSON.parse(JSON.stringify(C.customSpec()));
+      spec.rename = spec.rename || {}; spec.add = spec.add || {};
+      mutate(spec);
+      // Dry run on a copy of the lists: any rejected entry means nothing is saved.
+      const before = C.customSpec();
+      const res = C.applyCustom(spec);
+      C.applyCustom(before);
+      if (res.rejected.length) { status.bad('That name cannot be used: it is empty, longer than ' + C.customLimits.name + ' letters, already taken, or the list is full.'); return false; }
+      if (!C.saveCustom(spec)) { status.bad('This browser would not save the change.'); return false; }
+      status.ok('Saved. Reload the page to see it everywhere.'); reload.hidden = false;
+      return true;
+    }
+    const groups = [
+      // The stations that receive items (expo only sees whole tickets, so it keeps its name).
+      { k: 'zones', title: 'Stations', noun: 'station', list: () => C.zones.filter((z) => z.id !== 'expo') },
+      // Every menu category, which can be renamed or added to.
+      { k: 'categories', title: 'Menu categories', noun: 'category', list: () => C.categories },
+      // Every order channel, which can be renamed or added to.
+      { k: 'channels', title: 'Order channels', noun: 'channel', list: () => C.channels },
+    ];
+    for (const grp of groups) {
+      const rows = h('div', { class: 'od-fgrid' });
+      for (const e of grp.list()) {
+        const input = h('input', { class: 'input', type: 'text', maxlength: C.customLimits.name, value: e.name, 'aria-label': 'Name of ' + grp.noun + ' ' + e.name });
+        // Saves the new name for this entry when the button is pressed.
+        const save = btn('Rename', { cls: 'btn-sm', onClick: () => commit((sp) => { sp.rename[grp.k] = Object.assign({}, sp.rename[grp.k], { [e.id]: input.value }); }) });
+        rows.appendChild(h('div', { class: 'od-field' }, input, save));
+      }
+      const addIn = h('input', { class: 'input', type: 'text', maxlength: C.customLimits.name, placeholder: 'New ' + grp.noun + ' name', 'aria-label': 'New ' + grp.noun + ' name' });
+      // Adds one new entry of this kind, named as typed.
+      const addBtn = btn('Add ' + grp.noun, { icon: 'plus', cls: 'btn-sm', onClick: () => { if (commit((sp) => { sp.add[grp.k] = (sp.add[grp.k] || []).concat([{ name: addIn.value }]); })) addIn.value = ''; } });
+      wrap.append(h('h4', { class: 'od-sub' }, grp.title), rows, h('div', { class: 'od-field' }, addIn, addBtn));
+    }
+    wrap.append(status.el, reload);
+    return wrap;
   }
 
   // Saves a file: the host's download capability first (Claude artifact viewer), then a plain browser
