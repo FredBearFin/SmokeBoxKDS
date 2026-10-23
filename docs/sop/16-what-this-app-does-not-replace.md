@@ -3,7 +3,7 @@
 Smokebox is a helper. You and your local rules stay in charge.
 
 - Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Your own food-safety plan, your training and your thermometer checks still apply.
-- Your local health code. The limits Smokebox starts with are examples, not your local rules. Set the limits your local health department gives you.
+- Your local health code. The limits Smokebox starts with (such as 4 hours, the check interval and one reheat per batch) are its own starting values or house rules, not code. Set the limits your local health department gives you.
 - Card processing. Smokebox only writes down how an order was paid. Keep your card reader and your processor.
 - Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.
 - Allergy care. A note on a ticket is a reminder. Tell your staff about every allergy, and follow your own allergen rules.

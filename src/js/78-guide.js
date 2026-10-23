@@ -401,7 +401,7 @@
      {
       "t": "fig",
       "id": "cabinet",
-      "alt": "Steps for a batch in the hold cabinet: it goes in, it is checked, portions are taken out, and it ends by being reheated once or thrown out.",
+      "alt": "Steps for a batch in the hold cabinet: it goes in, it is checked, portions are taken out, and it ends by being reheated or thrown out.",
       "cap": "A batch in the hold cabinet."
      },
      {
@@ -412,7 +412,7 @@
       "t": "ol",
       "x": [
        "Open the **Cabinet** tab. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
-       "Each batch has a card with one main button. Usually it is **Log temp**: take a reading at every check. A reading in range keeps the batch on the menu. When a batch is too cool the button becomes **Reheat** (once per batch). When it is past its best, it becomes **Taste it, keep serving**.",
+       "Each batch has a card with one main button. Usually it is **Log temp**: take a reading at every check. A reading in range keeps the batch on the menu. When a batch is too cool the button becomes **Reheat**. Smokebox allows one reheat per batch. That is its own rule, not a health code rule. When it is past its best, it becomes **Keep serving**.",
        "The **More for this batch** button (...) opens the rest: **Pull** as portions leave the cabinet, **Start cooling**, and **Discard**.",
        "A batch out of time or out of range is thrown out: tap **Discard** and pick a reason."
       ]
@@ -867,7 +867,7 @@
       "t": "ul",
       "x": [
        "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Your own food-safety plan, your training and your thermometer checks still apply.",
-       "Your local health code. The limits Smokebox starts with are examples, not your local rules. Set the limits your local health department gives you.",
+       "Your local health code. The limits Smokebox starts with (such as 4 hours, the check interval and one reheat per batch) are its own starting values or house rules, not code. Set the limits your local health department gives you.",
        "Card processing. Smokebox only writes down how an order was paid. Keep your card reader and your processor.",
        "Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.",
        "Allergy care. A note on a ticket is a reminder. Tell your staff about every allergy, and follow your own allergen rules.",

@@ -197,7 +197,7 @@ async function settings(browser) {
   for (const t of ['Manager PIN', 'Forgot the PIN?']) check('pin pad: ' + t, await seen(p, t));
   await p.evaluate(() => { const d = [...document.querySelectorAll('details')].find((x) => /Forgot the PIN/.test(x.textContent)); if (d) d.open = true; });
   await p.waitForTimeout(300);
-  for (const t of ['Recovery code', 'Reset the PIN with my code']) check('pin pad: ' + t, await has(p, t) || await p.evaluate((t) => [...document.querySelectorAll('input, button')].some((e) => e.getClientRects().length && ((e.getAttribute('aria-label') || '') + (e.placeholder || '') + e.textContent).indexOf(t) >= 0), t));
+  check('pin pad: no code saved says so', await has(p, 'No recovery code was saved on this device.'));
   await p.evaluate(() => SB.shell.setPin(''));
   await p.close();
   const q = await fresh(browser);
@@ -337,6 +337,11 @@ async function pinCode(browser) {
   check('recovery code: Done stays off until I saved it is selected', off);
   await p.evaluate(() => document.querySelector('#rc-saved').click()); await p.waitForTimeout(200);
   check('recovery code: Done works after the box is selected', await tap(p, 'Done')); await p.waitForTimeout(400);
+  await p.evaluate(() => SB.sheets.closeAll && SB.sheets.closeAll()); await tap(p, 'Back office'); await p.waitForTimeout(1000);
+  await p.evaluate(() => { const d = [...document.querySelectorAll('details')].find((x) => /Forgot the PIN/.test(x.textContent)); if (d) d.open = true; });
+  await p.waitForTimeout(300);
+  const pad = await p.evaluate(() => [...document.querySelectorAll('input, button, label')].filter((e) => e.getClientRects().length).map((e) => (e.getAttribute('aria-label') || '') + ' ' + e.textContent).join(' | '));
+  for (const t of ['Recovery code', 'Reset the PIN with my code']) check('pin pad with a code: ' + t, pad.indexOf(t) >= 0, pad.slice(0, 200));
   await p.close();
 }
 
