@@ -2014,6 +2014,9 @@
     // Far display: for a screen read from across the kitchen. Per tablet; needs the board module.
     const farTog = SB.ui.toggle({ label: 'Far display (big type, quiet board)', checked: floorOk && SB.floor.farDisplay ? SB.floor.farDisplay() : false, disabled: !(floorOk && SB.floor.setFarDisplay), onChange: (on) => { if (floorOk && SB.floor.setFarDisplay) SB.floor.setFarDisplay(on); } });
 
+    // Voice call-outs: opt-in per tablet; they follow the station tab showing and need sound and speech on.
+    const coTog = SB.ui.toggle({ label: 'Voice call-outs for new tickets and "start now"', checked: floorOk && SB.floor.callouts ? SB.floor.callouts() : false, disabled: !(floorOk && SB.floor.setCallouts), onChange: (on) => { if (floorOk && SB.floor.setCallouts) SB.floor.setCallouts(on); } });
+
     // Station: the board opens on this station and reopens on it after a reload.
     const stations = [{ id: 'all', label: 'All', icon: 'grid' }].concat(C.zones.map((z) => ({ id: z.id, label: z.name, icon: z.icon })));
     const view0 = SB.router.view();
@@ -2041,6 +2044,7 @@
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap START on Hush puppies.', hintsTog),
       settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn)),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
+      settingBlock('Voice call-outs', 'Off by default. The tablet says one short line at a time, such as "New ticket 12" or "Start brisket sandwich now". At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Speech has not been tried on a real tablet yet.', coTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       settingBlock('Clock speed', 'Only for demos and training. Real service runs at x1.', clockCtl.el),
       settingBlock('More', '', links)));

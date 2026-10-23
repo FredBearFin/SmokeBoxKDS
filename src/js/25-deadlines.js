@@ -514,6 +514,77 @@
       size: () => q.size,
     };
   }
+  // Voice call-outs: a short spoken line for a new ticket and for "start this dish now" when a dish's planned start
+  // (fireAt) arrives. Nothing here speaks; it only works out what is worth saying and in what order.
+
+  // A call older than this (45 s) is stale and dropped instead of read out late; at most this many calls wait (6).
+  const CALL_STALE_MS = 45e3, CALL_MAX_WAIT = 6;
+  // A dish name made speakable: the short name, with the abbreviation dot spelled out.
+  const spokenName = (it) => String(it.short || it.name || 'item').replace(/ sand\.$/, ' sandwich');
+  // Joins up to three dishes ("2 brisket, ribs and 1 more") for a spoken line.
+  function nameList(items) {
+    const bits = items.slice(0, 3).map((it) => (it.qty > 1 ? it.qty + ' ' : '') + spokenName(it));
+    return bits.join(', ') + (items.length > 3 ? ' and ' + (items.length - 3) + ' more' : '');
+  }
+  // Every call that is true right now for one station tab: { id, kind, at, text, ticketNum }. kind is "new" (a ticket
+  // arrived) or "start" (a dish's start time has come). zone is "all", a station id, or "expo" (new tickets only).
+  // WATCH OUT: a station only gets calls for its own dishes; a ticket with nothing for it makes no call.
+  function calloutWants(state, now, zone) {
+    const out = [];
+    if (!state || !Array.isArray(state.tickets) || !U.isNum(now)) return out;
+    const z = zone || 'all';
+    for (const t of state.tickets) {
+      if (t.status !== 'active' || !Array.isArray(t.items)) continue;
+      const mine = t.items.filter((it) => (z === 'all' || z === 'expo' || it.zone === z) && it.status !== 'done');
+      if (!mine.length) continue;
+      const text = z === 'all' || z === 'expo' ? 'New ticket ' + t.num + ', ' + t.items.length + ' ' + U.plural(t.items.length, 'item') + '.' : 'New ticket ' + t.num + ': ' + nameList(mine) + '.';
+      out.push({ id: 'n:' + t.id, kind: 'new', at: t.createdAt, text, ticketNum: t.num });
+      if (z === 'expo') continue;
+      for (const it of mine) {
+        // A dish whose start time came later than the ticket (paced) and is now due and not yet started.
+        const due = it.status === 'displayed' || (it.status === 'queued' && it.fireAt <= now);
+        if (!due || !(it.fireAt - t.createdAt > 1000)) continue;
+        out.push({ id: 's:' + it.id, kind: 'start', at: it.fireAt, text: 'Start ' + (it.qty > 1 ? it.qty + ' ' : '') + spokenName(it) + ' now. Ticket ' + t.num + '.', ticketNum: t.num });
+      }
+    }
+    return out;
+  }
+  // The waiting line of calls. sync(wants, now) takes the calls that are true now: new ones join, ones no longer true
+  // (bumped, started) and ones older than the stale limit leave, and only the newest few are kept. next(now) hands out
+  // the oldest call still fresh, or null. prime(wants) marks what is already true as heard, for a fresh start.
+  function makeCallouts(o) {
+    const staleMs = o && U.isNum(o.staleMs) ? o.staleMs : CALL_STALE_MS, maxWait = o && U.isNum(o.maxWait) ? o.maxWait : CALL_MAX_WAIT;
+    const seen = new Set(), q = [];
+    let dropped = 0;
+    // Remembers a call id as handled; the memory is trimmed to the latest 600.
+    const mark = (id) => { seen.add(id); if (seen.size > 600) seen.delete(seen.values().next().value); };
+    return {
+      // Marks the calls true right now as already heard and empties the waiting line.
+      prime(wants) { q.length = 0; (wants || []).forEach((w) => mark(w.id)); },
+      // Brings the waiting line in step with what is true now; drops gone, stale and surplus calls.
+      sync(wants, now) {
+        const live = new Set(wants.map((w) => w.id));
+        for (let i = q.length - 1; i >= 0; i--) if (!live.has(q[i].id) || now - q[i].at > staleMs) { q.splice(i, 1); dropped++; }
+        for (const w of wants) {
+          if (seen.has(w.id)) continue;
+          mark(w.id);
+          if (now - w.at > staleMs) { dropped++; continue; }
+          q.push(w);
+        }
+        q.sort((a, b) => (a.at - b.at) || (a.id < b.id ? -1 : 1));
+        while (q.length > maxWait) { q.shift(); dropped++; }
+      },
+      // Hands out the oldest call that is still fresh, or null when none is left.
+      next(now) {
+        while (q.length) { const c = q.shift(); if (now - c.at <= staleMs) return c; dropped++; }
+        return null;
+      },
+      // How many calls are waiting to be spoken right now.
+      size: () => q.length,
+      // How many calls were thrown away unspoken, for tests and the pilot notes.
+      dropped: () => dropped,
+    };
+  }
   // Builds the feed: every deadline worth showing right now, worst first. Each row has id, kind, label, at,
   // msLeft, rung, sev (bad, warn, info), consequence and action. Batch rows also carry projected waste.
   function build(state, now) {
@@ -531,5 +602,5 @@
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending };
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
