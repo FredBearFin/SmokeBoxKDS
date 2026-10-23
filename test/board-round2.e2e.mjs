@@ -52,8 +52,8 @@ await withPage({ w: 1280, h: 800 }, async (page, logs) => {
   // Ranking tags
   const tiers = await page.evaluate(() => { const t = (n) => document.querySelectorAll('.fl-slip[data-tier="' + n + '"]').length; const b = getComputedStyle(document.querySelector('.fl-slip[data-tier="1"]'), '::before').content; return { t1: t(1), t2: t(2), t3: t(3), tag: b }; });
   check('one ticket tagged Do this first, two tagged Next, the rest calm', tiers.t1 === 1 && tiers.t2 === 2 && tiers.t3 > 0 && /Do this first/.test(tiers.tag), tiers);
-  const calm = await page.evaluate(() => { const e = document.querySelector('.fl-slip[data-tier="3"] .slip-head'); return e ? getComputedStyle(e).backgroundColor : null; });
-  check('late tickets after the first three are not filled pink', calm === 'rgba(0, 0, 0, 0)', calm);
+  const calm = await page.evaluate(() => { const e = document.querySelector('.fl-slip[data-tier="3"] .slip-head'); const b = document.querySelector('.fl-slip[data-tier="3"] .slip-body'); return e && b ? [getComputedStyle(e).backgroundColor, getComputedStyle(b).backgroundColor] : null; });
+  check('late tickets after the first three are not filled pink (head matches the paper)', !!calm && calm[0] === calm[1], calm);
 
   // Toasts: info clears by itself, error stays, and the host sits under the header
   await page.evaluate(() => { SB.ui.toast('Info note', { tone: 'info' }); SB.ui.toast('Error note', { tone: 'bad' }); });

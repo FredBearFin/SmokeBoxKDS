@@ -1528,7 +1528,8 @@
     const batchy = (d) => !ck && (d.batchId || d.kind === 'sanitize' || d.kind === 'check' || d.kind === 'shortfall' || d.kind === 'leftover' || d.kind === 'keepcheck' || d.kind === 'expiry' || d.kind === 'expired' || d.kind === 'past');
     const feed = all.filter((d) => !d.trivial && !batchy(d) && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
     // A tablet screen is short: one warning row there (the next shows when this one is cleared or done), two on a tall or far screen.
-    const maxRows = !F.wallActive() && (far || (g.innerHeight || 0) >= 900) ? 2 : 1;
+    // A far display below 1300 px tall keeps one big row, so the tickets keep most of the screen; a taller one has room for two.
+    const maxRows = !F.wallActive() && (far ? (g.innerHeight || 0) >= 1300 : (g.innerHeight || 0) >= 900) ? 2 : 1;
     const top = feed.slice(0, maxRows);
     const moreRows = feed.length - top.length;
     const needSound = sound && !audioReady();
@@ -1791,7 +1792,7 @@
   async function startEmpty() {
     const ok = await SB.ui.confirm({
       title: 'Start with an empty board?', confirmLabel: 'Clear the board', cancelLabel: 'Keep the tickets',
-      body: ['This removes the practice tickets and anything else logged on this device. Settings stay.'],
+      body: ['This removes the demo tickets and anything else logged on this device. Settings stay.'],
     });
     if (!ok || !m) return;
     try { if (SB.sim && SB.sim.live) SB.sim.live.stop(); } catch (e) { /* the simulator may not be running */ }
@@ -1813,7 +1814,7 @@
     const title = firstRun ? 'Welcome. Let\'s build your menu.' : stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
     const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
-      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or run the busy-night demo. Demo orders are for practice.';
+      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
     const sig = title + '|' + text;
     if (e.dataset.sig === sig) return;
     e.dataset.sig = sig;
@@ -1838,7 +1839,7 @@
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.
   function startDemo() {
-    // In a real kitchen the button opens the practice kitchen in its own space; only inside the demo does it start the crew.
+    // In a real kitchen the button opens the demo kitchen in its own space; only inside the demo does it start the crew.
     if (SB.setup && SB.setup.tryDemo && store().isDemo && !store().isDemo()) { SB.setup.tryDemo(); return; }
     // A real kitchen never turns into the demo: the demo is a separate mode (own saved data), entered with a reload.
     if (store().isolated && store().isolated() && !store().isDemo()) { store().enterDemo(); return; }
@@ -1849,7 +1850,7 @@
       try {
         live.start({ rate: 'normal' });
         if (typeof live.crew === 'function') live.crew(true);
-        toast('Busy-night demo started. Orders and the crew are for practice. Open Demo to stop it.', { tone: 'info' });
+        toast('Demo started. The orders and the crew are not real. Open Demo to stop it.', { tone: 'info' });
         return;
       } catch (e) { console.error('[smokebox] demo failed to start', e); }
     }
