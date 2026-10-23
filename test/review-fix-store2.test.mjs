@@ -67,6 +67,18 @@ test('Cleo 5: after the device clock steps back an hour, the kitchen clock keeps
   S.destroy && S.destroy();
 });
 
+test('Cleo 8: a copy another tab saved that this tab cannot read is set aside before this tab saves over it', () => {
+  clock = T;
+  const b = backend();
+  start(b); sale();
+  const newer = { v: 1, fmt: 9, p: 'a format from a newer build', savedAt: T };
+  b.set('smokebox.v1.state', newer); b.set('smokebox.v1.sid', 'tab_other:7');   // another tab, another build
+  clock += MIN; sale();
+  assert.deepEqual(b.get('smokebox.v1.corrupt', null), newer, 'the other copy is kept');
+  assert.ok(b.get('smokebox.v1.state', null).state, 'and this tab still saves its kitchen');
+  S.destroy && S.destroy();
+});
+
 test('Cleo 3: start over also removes the copy kept from before a repair at load (it holds the whole old kitchen)', () => {
   clock = T;
   const b = backend({ 'smokebox.v1.dropped': JSON.stringify('{"old":"kitchen"}'), 'smokebox.v1.droppedat': JSON.stringify(T - DAY) });

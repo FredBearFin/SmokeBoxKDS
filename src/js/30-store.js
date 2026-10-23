@@ -358,6 +358,8 @@
     if (skipRebase) skipRebase = false; else rebaseIfStale();
     // With several tabs and no lock, claim the write and rebuild on the newest copy if another tab got in first (up to 3 times, then write anyway).
     if (tr && !inLock && !lockManager()) for (let i = 0; i < 3 && !claimWrite(); i++) { if (forced) break; rebaseIfStale(); }
+    // Reading the other tab's copy may have found one that could not be set aside: then it is not written over either.
+    if (writeBlocked) { st.lastSaveOk = false; return false; }
     const r = realNow();
     const v = now();
     let ok = false;
@@ -567,7 +569,14 @@
     if (sid == null || sid === baseSid) return;
     const full = loadStoredFull();
     baseSid = sid;
-    if (!full) return;
+    // Another tab wrote a copy this tab cannot read (a newer build, or damage). The next save would write over it, so it is set
+    // aside first like a damaged save at start-up; if even that fails, nothing is written over it.
+    if (!full) {
+      let stored = null;
+      try { stored = storage.get(KEY, null); if (stored == null && typeof storage.raw === 'function') stored = storage.raw(KEY); } catch (e) { stored = null; }
+      if (stored != null && !parkText(CORRUPT_KEY, CORRUPT_AT_KEY, stored, realNow())) { writeBlocked = true; heldText = rawOf(stored); st.heldInMemory = true; }
+      return;
+    }
     atLeast(lastStamp(full.state));
     const m = mergeForeign(full.state, full.ops, full.era);
     if (m.keep) return;
