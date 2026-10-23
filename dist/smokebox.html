@@ -167,9 +167,11 @@ WORDS YOU WILL SEE IN THE CODE
 
   /* motion */
   /* durations in ms (1000 ms = 1 second) and the speed curves used for movements */
-  --dur-fast: 100ms;
-  --dur: 180ms;
-  --dur-slow: 260ms;
+  /* --sb-motion is the one switch for movement: 1 = normal, 0 = none (reduced motion sets it to 0). Every duration below follows it. */
+  --sb-motion: 1;
+  --dur-fast: calc(100ms * var(--sb-motion));
+  --dur: calc(180ms * var(--sb-motion));
+  --dur-slow: calc(260ms * var(--sb-motion));
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-in-out: cubic-bezier(0.5, 0.05, 0.2, 1);
   --ease-ignite: cubic-bezier(0.55, 0.06, 0.3, 1);
@@ -1918,7 +1920,7 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-cabinet { flex: 1 1 auto; min-width: 0; }
 .fl-cabinet[hidden] { display: none; }
 .fl-cabinet .hc { max-width: none; }
-.fl-cabinet .hc-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(420px * var(--fl-k))), 1fr)); }
+.fl-cabinet .hc-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(330px * var(--fl-k))), 1fr)); }
 .fl-cabinet .hc-name { font-size: calc(var(--fs-4) * var(--fl-k)); }
 .fl-cabinet .hc-status { font-size: calc(var(--fs-4) * var(--fl-k)); }
 .fl-cabinet .hc-stock-t, .fl-cabinet .hc-dl, .fl-cabinet .hc-msg { font-size: calc(var(--fs-3) * var(--fl-k)); }
@@ -1977,6 +1979,43 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-dock-list { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
 /* Wall mode keeps one notice row and no sound-pause note: the TV is for glancing, and the three panes need the height. */
 .fl[data-wall="on"] .fl-bar-pause { display: none; }
+
+/* ===== Round 5: slip density and hierarchy, motion system ===== */
+/* Motion: --sb-motion (set in 00-tokens.css) is the one switch. Reduced motion turns it to 0; set it to 0 anywhere to stop all movement. */
+@media (prefers-reduced-motion: reduce) { :root { --sb-motion: 0; } }
+/* Print-in, a little quicker; bump-out slides sideways and fades; time colours ease instead of jumping. */
+.fl-slip.is-printing { animation-duration: calc(240ms * var(--sb-motion)); }
+.fl-slip.fl-leaving { animation: fl-leave calc(260ms * var(--sb-motion)) var(--ease-in-out) both; }
+@keyframes fl-leave { 0% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(calc(36px * var(--fl-k))) scale(0.97); } }
+.fl-slip .slip-head, .fl-slip .slip-timer, .fl-badge, .fl-row > .slip-item, .slip-next { transition: background-color var(--dur-slow) var(--ease-out), color var(--dur-slow) var(--ease-out), border-color var(--dur-slow) var(--ease-out), box-shadow var(--dur-slow) var(--ease-out); }
+/* One soft highlight when a ticket changes time state or a dish changes state. It plays once and leaves nothing behind. */
+.fl-flash { animation: fl-flash calc(800ms * var(--sb-motion)) var(--ease-out) 1; }
+@keyframes fl-flash { 0% { box-shadow: inset 0 0 0 999px rgba(255, 190, 40, 0.38); } 100% { box-shadow: inset 0 0 0 999px rgba(255, 190, 40, 0); } }
+/* Warnings get the eye for a few seconds, then hold still: no loop runs for ever on a busy board. */
+.slip[data-level="breach"] .slip-head, .slip[data-level="breach"] .slip-body, .slip[data-level="breach"] .slip-tear { animation-iteration-count: 3; }
+.fl-row[data-cook="check"] > .slip-item, .fl-row[data-cook="check"] .fl-act[data-act="cook"] { animation-iteration-count: 6; }
+
+/* Density: tickets in one grid row stretch to the same height so a row looks even; Bump stays right under the dishes so it is never pushed out of reach. */
+.fl-grid { align-items: stretch; gap: var(--sp-5) var(--sp-4); }
+.fl-slip { display: flex; flex-direction: column; }
+.fl-slip .slip-body { flex: 1 1 auto; display: flex; flex-direction: column; }
+/* Hierarchy: number and timer first, dish names large, helper lines (start times, the next-step line) quiet. */
+.fl-row .slip-item { min-height: calc(52px * var(--fl-k)); padding: calc(5px * var(--fl-k)) var(--sp-3); gap: 0 var(--sp-3); }
+.fl-row .slip-name { font-size: calc(var(--fs-item) * 1.15); }
+.fl-row[data-state="queued"] .slip-name { font-weight: var(--w-bold); color: var(--ink2); }
+.fl-sub { padding-left: calc(var(--qty-w) + var(--sp-3)); gap: 0 var(--sp-2); }
+.fl-sub .chip { min-height: calc(22px * var(--fl-k)); padding-block: 0; font-size: var(--fs-1); }
+.fl-deck, .fl-cook { font-size: var(--fs-1); }
+.fl-deck { color: var(--ink3); }
+.slip-next { margin: var(--sp-1) var(--sp-3) 0; padding: calc(4px * var(--fl-k)) var(--sp-2); font-size: var(--fs-2); font-weight: var(--w-semi); }
+.fl-slip .slip-head { padding-bottom: var(--sp-3); }
+.fl-slip .slip-meta { margin-top: var(--sp-1); }
+.fl-slip .slip-progress { margin-top: var(--sp-1); }
+/* Far display keeps the roomier, bigger helper lines so they read from across the kitchen. */
+.fl[data-far="on"] .fl-deck, .fl[data-far="on"] .fl-cook { font-size: var(--fs-3); }
+.fl[data-far="on"] .fl-sub .chip { min-height: calc(28px * var(--fl-k)); font-size: var(--fs-2); }
+.fl[data-far="on"] .slip-next { font-size: var(--fs-3); }
+.fl-fire { min-height: calc(44px * var(--fl-k)); }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -2550,6 +2589,39 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dp-ca { margin-top: var(--sp-2); }
 
 .hc-who { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0; color: var(--ink2); font-size: var(--fs-2); }
+.dp-ptable { display: grid; gap: var(--sp-2); }
+.dp-prow { display: grid; grid-template-columns: 32px minmax(0, 2fr) 9ch minmax(0, 1.2fr); gap: var(--sp-2); align-items: center; padding-bottom: var(--sp-2); border-bottom: var(--bw-thin) solid var(--line-soft); }
+.dp-prow[data-ok="false"] { background: var(--tint-warn); }
+.dp-prow .dp-prob { grid-column: 2 / -1; margin: 0; }
+.dp-prob:empty { display: none; }
+@media (max-width: 640px) { .dp-prow { grid-template-columns: 32px minmax(0, 1fr) 8ch; } .dp-prow select { grid-column: 2 / -1; } }
+.btn-link { background: none; border: 0; text-decoration: underline; min-height: 44px; padding-inline: 0; }
+
+
+/* ===== Round 5: one compact cabinet card =====
+   Every card has the same parts: a name line, a ring and three facts, one main button and a "..." for the rest. */
+.hc-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: var(--sp-3); }
+.hc-card { gap: var(--sp-2); padding: var(--sp-3); border-left-width: 6px; }
+.hc-head { align-items: center; flex-wrap: nowrap; }
+.hc-title { flex: 1 1 auto; }
+.hc-name { font-size: var(--fs-3); font-weight: var(--w-bold); }
+.hc-status { font-size: var(--fs-2); white-space: nowrap; }
+.hc-body { gap: var(--sp-3); }
+.hc-ring { width: 76px; height: 76px; flex: none; }
+.hc-ring::before { inset: 7px; }
+.hc-ring-t { font-size: var(--fs-3); }
+.hc-facts { gap: var(--sp-1); }
+.hc-dl { grid-template-columns: auto 1fr; font-size: var(--fs-2); }
+/* The rarely needed facts stay on the card only when they matter (late readings keep their red). */
+.hc-dl dt:nth-of-type(n+3), .hc-dl dd:nth-of-type(n+3) { display: none; }
+.hc-dl dt:nth-of-type(4), .hc-dl dd:nth-of-type(4) { display: block; }
+.hc-actions { flex-wrap: nowrap; gap: var(--sp-2); align-items: stretch; }
+.hc-actions .btn { flex: 1 1 auto; min-height: var(--tap); }
+.hc-actions .hc-sec { display: none; }
+.hc-actions .hc-more { flex: none; min-width: var(--tap); padding: 0; }
+.hc-actions .hc-more[hidden] { display: none; }
+.hc-discard { color: inherit; border-color: var(--line); }
+.hc-cost { display: none; } /* yield and cost notes belong in the back office, not on every card */
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -3188,6 +3260,22 @@ a.of-nav:active { background: var(--press); }
 .of[data-gated="true"] .of-filters { display: none; }
 .of-section[hidden], .of-card[hidden] { display: none; }
 
+/* Folded extras: pages show their lead chart, then a quiet button reveals the rest. */
+.of-grid[data-more-open="false"] > [data-more] { display: none; }
+.of-more { grid-column: 1 / -1; display: flex; justify-content: center; padding: var(--sp-2) 0; }
+.of-more-btn { min-width: 14em; }
+/* Charts and tiles ease in once when a page opens. No loop, no number animation; off for reduced motion or --motion-on: 0. */
+:root { --motion-on: 1; }
+@keyframes of-ease-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  .of-tile, .of-card, .of-section { animation: of-ease-in calc(var(--motion-on, 1) * 320ms) ease-out both; }
+  .of-tile:nth-child(2), .of-card:nth-of-type(2) { animation-delay: 40ms; }
+  .of-tile:nth-child(3), .of-card:nth-of-type(3) { animation-delay: 80ms; }
+  .of-tile:nth-child(4), .of-card:nth-of-type(4) { animation-delay: 120ms; }
+}
+
+@media (max-width: 720px) { .of-nav-off { display: none; } }
+
 /* ===== 31-office-money.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the three Office B pages (Sales and money, Safety, Stock and 86): running text,
@@ -3630,6 +3718,24 @@ a.of-nav:active { background: var(--press); }
 .od-adv { border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-panel); padding: 0 var(--sp-3); }
 .od-adv > summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; font-weight: var(--w-bold); }
 
+/* The Data page: a three-card flow (back up, restore, replace a device), and a quiet danger zone. */
+.od-flow { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); margin: var(--sp-3) 0 var(--sp-6); align-items: start; }
+.od-fcard { display: grid; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-3, 12px); background: var(--ch-surface, transparent); min-width: 0; }
+.od-fh { display: flex; align-items: center; gap: var(--sp-2); margin: 0; font: var(--w-semi) var(--fs-4, 18px)/1.2 var(--font-display); color: var(--ink); }
+.od-fnum { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid currentColor; font-size: var(--fs-2); }
+.od-fbody { display: grid; gap: var(--sp-3); min-width: 0; }
+.od-lastbackup[data-tone="bad"] { color: var(--crimson, #c0392b); font-weight: var(--w-semi); }
+.od-lastbackup[data-tone="warn"] { color: var(--amber, #b9770e); font-weight: var(--w-semi); }
+.od-danger-h { margin-top: var(--sp-8, 40px); color: var(--crimson, #c0392b); }
+.od-danger-box { display: grid; gap: var(--sp-2); padding: var(--sp-4); border: 2px solid var(--crimson, #c0392b); border-radius: var(--r-3, 12px); max-width: 40em; }
+.od-danger-t { display: flex; gap: var(--sp-2); align-items: center; margin: 0; color: var(--crimson, #c0392b); }
+.od-danger-l { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; font-weight: var(--w-semi); }
+.od-danger-l input { flex: 1 0 100%; }
+.od-danger-in { max-width: 14em; }
+@media (min-width: 1700px) { .od-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.od-fcard .od-steps { list-style: decimal; padding-left: 1.4em; display: grid; gap: var(--sp-2); }
+.od-fcard .od-steps li { display: list-item; }
+
 /* ===== 33-office-closeday.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the Close the day sheet and its print-only end-of-day summary.
@@ -3655,15 +3761,41 @@ a.of-nav:active { background: var(--press); }
 .cd-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .cd-status { margin: 0; min-height: 1.2em; font-size: var(--fs-2); color: var(--ink2); }
 .cd-done h3 { margin: 0 0 var(--sp-2); font: var(--w-semi) var(--fs-5, 22px)/1.2 var(--font-display); }
-.cd-printroot { display: none; }
+.cd-printroot, .si-printroot { display: none; }
 @media print {
-  body > *:not(.cd-printroot) { display: none !important; }
+  body > *:not(.sb-printroot) { display: none !important; }
   .cd-printroot { display: block !important; position: static; padding: 24px; color: #000; background: #fff; font: 14px/1.4 system-ui, sans-serif; }
   .cd-printroot h1 { font-size: 22px; margin: 0 0 12px; }
   .cd-ptable { width: 100%; border-collapse: collapse; }
   .cd-ptable th, .cd-ptable td { padding: 6px 4px; text-align: left; border-bottom: 1px solid #999; white-space: pre-wrap; }
   .cd-pnote { margin: 12px 0 0; font-size: 12px; }
 }
+
+/* ===== 34-office-inspector.css ===== */
+/*
+ * WHAT THIS FILE IS: Styles for the printable food safety record: the bar on the Safety page, the preview sheet, and the print page.
+ */
+.si-bar { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin: 0 0 var(--sp-4); padding: var(--sp-2) 0; }
+.si-bar-t { font-weight: var(--w-semi); color: var(--ink2); }
+.si-lead { margin: 0 0 var(--sp-3); color: var(--ink2); line-height: 1.5; }
+.si-actions { display: flex; gap: var(--sp-3); align-items: end; flex-wrap: wrap; margin-bottom: var(--sp-3); }
+.si-count { margin: 0 0 var(--sp-2); color: var(--ink3); font-size: var(--fs-2); }
+.si-table { width: 100%; border-collapse: collapse; font-size: var(--fs-2); }
+.si-table th, .si-table td { padding: 6px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft, var(--line)); }
+.si-corr { font-style: italic; }
+.si-preview { overflow-x: auto; }
+@media print {
+  body > *:not(.sb-printroot) { display: none !important; }
+  .si-printroot { display: block !important; position: static; color: #000; background: #fff; font: 12px/1.4 system-ui, sans-serif; }
+  .si-printroot h1 { font-size: 20px; margin: 0 0 8px; }
+  .si-note { margin: 6px 0; font-size: 11px; }
+  .si-table th, .si-table td { border-bottom: 1px solid #999; color: #000; }
+  .si-table thead { display: table-header-group; }
+  .si-table tr { break-inside: avoid; }
+}
+/* Page margins and page numbers; kept last so an older browser that skips the margin box loses nothing above. */
+@page { margin: 16mm; }
+@page { @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 11px sans-serif; } }
 
 /* ===== 40-charts.css ===== */
 /*
@@ -4924,6 +5056,421 @@ a.of-nav:active { background: var(--press); }
 
 }catch(e){console.error('[smokebox] module 10-config.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'10-config.js',message:String(e&&e.message||e)});}
 
+/* ===== 13-menu-import.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: Reads a menu an owner pastes or loads (typed lines, a spreadsheet CSV, or an item export from
+ *    Square, Toast or Clover) and turns it into checked dish rows, then into engine actions. It never touches the page.
+ * PARTS: limits and words, price reading, text tables (CSV), the line reader, column and format detection, row
+ *    checks, parse, toActions, exportMenu.
+ * USES: 10-config.js (station and category names, read when called). USED BY: the menu import screen.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const M = (SB.menuImport = {});
+
+  // The engine's own bounds for a dish, copied here because this file loads before the engine. A test checks the engine
+  // refuses exactly what these refuse. 150 dishes, names up to 60 characters, price 0 to 1000 dollars.
+  const LIMITS = { maxDishes: 150, nameMax: 60, priceMax: 1000, textMax: 1000000, rowsRead: 2000 };
+  M.limits = LIMITS;
+  // The dish form fields the importer uses when the file does not say: one tap to finish, a 5 minute guess.
+  const DEFAULTS = { prepSec: 300, track: 'one' };
+
+  // Collapses runs of white space and trims, as the engine does to a dish name.
+  const clean = (s) => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
+  // The name compared for duplicates: lower case, single spaces.
+  const key = (s) => clean(s).toLowerCase();
+
+  /* ---------- reading a price ---------- */
+
+  // Reads a typed price: "$9", "9.50", "USD 12", "1,250.00", "9,50" (a comma for the cents). Returns
+  // { value, rounded } with value in dollars, or { error: 'missing'|'bad'|'range' } when it is not one price.
+  function readPrice(raw) {
+    let t = clean(raw);
+    if (!t) return { error: 'missing' };
+    if (/^(mp|m\/p|market( price)?|varies|variable|ask|tbd|\?+)$/i.test(t)) return { error: 'variable' };
+    if (/\d\s*(-|to|–|—)\s*\$?\s*\d/i.test(t.replace(/^\$/, ''))) return { error: 'range' };
+    t = t.replace(/usd|us\$|[$€£]/gi, '').replace(/\s+/g, '');
+    if (!/^[+-]?[\d.,]+$/.test(t)) return { error: 'bad' };
+    let neg = false;
+    if (t[0] === '-') { neg = true; t = t.slice(1); } else if (t[0] === '+') t = t.slice(1);
+    // One comma and two digits after it, and no dot: a comma for the cents. Otherwise commas are thousands marks.
+    if (/^\d+,\d{2}$/.test(t)) t = t.replace(',', '.');
+    else t = t.replace(/,/g, '');
+    if (!/^\d*\.?\d+$|^\d+\.$/.test(t)) return { error: 'bad' };
+    let v = Number(t);
+    if (!isFinite(v)) return { error: 'bad' };
+    if (neg) v = -v;
+    const r = Math.round(v * 100) / 100;
+    return { value: r, rounded: Math.abs(r - v) > 1e-9 };
+  }
+  M.readPrice = readPrice;
+
+  /* ---------- text tables ---------- */
+
+  // Splits text into rows of cells following the CSV rules: quotes, doubled quotes, delimiters and line breaks inside
+  // quotes. delim is one character. Blank lines come back as rows with one empty cell; the caller drops them.
+  function splitTable(text, delim) {
+    const rows = [];
+    let row = [], cell = '', q = false, i = 0;
+    const n = text.length;
+    while (i < n) {
+      const c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i += 2; continue; } q = false; i++; continue; }
+        cell += c; i++; continue;
+      }
+      if (c === '"' && cell === '') { q = true; i++; continue; }
+      if (c === delim) { row.push(cell); cell = ''; i++; continue; }
+      if (c === '\r' || c === '\n') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(cell); rows.push(row); row = []; cell = ''; i++; continue;
+      }
+      cell += c; i++;
+    }
+    row.push(cell);
+    if (row.length > 1 || row[0] !== '' || rows.length === 0) rows.push(row);
+    return rows;
+  }
+  // Picks the column separator from the first line: tab, semicolon or comma, whichever appears most outside quotes.
+  function pickDelimiter(text) {
+    const first = text.split(/\r\n|\r|\n/)[0] || '';
+    const count = { '\t': 0, ';': 0, ',': 0 };
+    let q = false;
+    for (const c of first) { if (c === '"') q = !q; else if (!q && c in count) count[c]++; }
+    let best = ',', n = 0;
+    for (const d of ['\t', ';', ',']) if (count[d] > n) { best = d; n = count[d]; }
+    return best;
+  }
+  // Takes off a leading byte-order mark and the apostrophe a spreadsheet guard puts before = + - @.
+  const stripBom = (t) => String(t == null ? '' : t).replace(/^﻿/, '');
+  const unguard = (s) => (/^'[=+\-@]/.test(s) ? s.slice(1) : s);
+
+  /* ---------- column and format detection ---------- */
+
+  // Header words for each field, compared after lower-casing and removing spaces and punctuation.
+  const WORDS = {
+    name: ['name', 'item', 'itemname', 'dish', 'product', 'title', 'menuitem', 'itemtitle', 'dishname', 'productname'],
+    price: ['price', 'amount', 'baseprice', 'sellprice', 'unitprice', 'saleprice', 'menuprice', 'cost'],
+    station: ['station', 'zone', 'prepstation', 'kitchen', 'kitchenstation', 'madein', 'wheremade'],
+    category: ['category', 'group', 'menugroup', 'section', 'type', 'menucategory', 'reportingcategory'],
+    description: ['description', 'desc', 'details', 'notes'],
+  };
+  // A header made comparable: lower case, letters and digits only.
+  const norm = (h) => String(h == null ? '' : h).toLowerCase().replace(/[^a-z0-9]/g, '');
+  // The column number whose header is one of the words, or -1. "cost" only counts as a price when no better word exists.
+  function findCol(headers, words, skip) {
+    for (const w of words) { const i = headers.findIndex((h, ix) => h === w && !(skip && skip.indexOf(ix) >= 0)); if (i >= 0) return i; }
+    return -1;
+  }
+  // Which export a header row comes from, by the column names each point-of-sale system writes. Returns
+  // 'square', 'toast', 'clover', 'csv' (any other table with a name and a price) or null.
+  function detectFormat(headers) {
+    const h = headers.map(norm);
+    // True when the header row has a column with this normalised name.
+    const has = (x) => h.indexOf(x) >= 0;
+    if (has('itemname') && (has('variationname') || has('token') || has('sku')) && has('price')) return 'square';
+    if (has('cloverid') || (has('name') && has('pricetype') && (has('alternatename') || has('producecode') || has('productcode')))) return 'clover';
+    if ((has('menugroup') || has('menu') || has('menuitem') || has('menuitemname')) && (has('price') || has('baseprice') || has('basepricedollars') || has('itemprice'))) return 'toast';
+    const nameOk = WORDS.name.some((w) => has(w)), priceOk = WORDS.price.some((w) => has(w));
+    return nameOk && priceOk ? 'csv' : null;
+  }
+  const FORMAT_LABEL = {
+    square: 'Square item library export', toast: 'Toast menu export', clover: 'Clover items export',
+    csv: 'spreadsheet table (CSV, TSV or pasted from Excel or Google Sheets)', lines: 'typed or pasted lines',
+  };
+
+  /* ---------- station and category words from the live config ---------- */
+
+  // Looks up a station written in the file by id, name, long name or three-letter code. Returns its id or undefined.
+  function zoneFrom(text, opts) {
+    const t = key(text);
+    if (!t) return undefined;
+    const list = (opts && opts.zones) || (SB.config && SB.config.zones) || [];
+    for (const z of list) {
+      if (z.id === 'expo') continue;
+      if ([z.id, z.name, z.long, z.code].some((x) => x && key(x) === t)) return z.id;
+    }
+    return undefined;
+  }
+  // Same for a menu category (id or name).
+  function catFrom(text, opts) {
+    const t = key(text);
+    if (!t) return undefined;
+    const list = (opts && opts.categories) || (SB.config && SB.config.categories) || [];
+    for (const c of list) if ([c.id, c.name].some((x) => x && key(x) === t)) return c.id;
+    return undefined;
+  }
+
+  /* ---------- the line reader ---------- */
+
+  const PRICE_TOKEN = /^(?:usd\s*|us\$\s*)?[$€£]?\s*\d[\d.,]*\s*(?:usd|[$€£])?$/i;
+  // Reads one typed line such as "Brisket plate, 14.00, pit", "Burger 9.50", "Name - $9" or a tab or semicolon line.
+  // Returns { name, priceText, extras:[] } or null when the line has no usable shape (it still becomes a row with problems).
+  function readLine(line) {
+    const delims = ['\t', ';'];
+    let parts = null;
+    // "Pickles 3,50": a single comma that only marks the cents is not a column separator.
+    if ((line.match(/,/g) || []).length === 1 && line.indexOf('\t') < 0 && line.indexOf(';') < 0 && /^.*\S\s+[$€£]?\d+,\d{2}$/.test(line)) {
+      const m = line.match(/^(.*\S)\s+([$€£]?\d+,\d{2})$/);
+      return { name: clean(m[1]), priceText: m[2], extras: [] };
+    }
+    for (const d of delims) if (line.indexOf(d) >= 0) { parts = splitTable(line, d)[0].map(clean); break; }
+    if (!parts && /\s[-–—]\s/.test(line)) {
+      const m = line.match(/^(.*\S)\s+[-–—]\s+([^-–—]*)$/);
+      if (m) parts = [clean(m[1]), clean(m[2])];
+    }
+    if (!parts && line.indexOf(',') >= 0) parts = splitTable(line, ',')[0].map(clean);
+    if (parts) {
+      parts = parts.filter((p, i) => p !== '' || i === 0);
+      // The price is the first cell after the first that looks like one; a name may itself contain commas.
+      let pi = -1;
+      for (let i = 1; i < parts.length; i++) if (PRICE_TOKEN.test(parts[i])) { pi = i; break; }
+      if (pi < 0) {
+        // No cell looks like a price: the second cell is offered as the price so the row can say what is wrong.
+        return { name: parts[0] || '', priceText: parts.length > 1 ? parts[1] : '', extras: parts.slice(2) };
+      }
+      return { name: parts.slice(0, pi).join(', '), priceText: parts[pi], extras: parts.slice(pi + 1) };
+    }
+    // No separator: the price is the last word ("Burger 9.50", "Burger $9", "Burger 9,50").
+    const m = line.match(/^(.*\S)\s+((?:usd\s*)?[$€£]?\s*\d[\d.,]*)$/i);
+    if (m) return { name: clean(m[1]), priceText: m[2], extras: [] };
+    return { name: clean(line), priceText: '', extras: [] };
+  }
+
+  /* ---------- row checks ---------- */
+
+  // Builds one problem: code (for tests and screens), level 'error' (the row cannot be added) or 'warn', the plain words,
+  // and what to do about it.
+  const prob = (code, level, message, fix) => ({ code, level, message, fix });
+
+  // Checks one dish row and fills its problems. seen holds the names already used in the file (name key -> first line).
+  function checkRow(row, seen, existing, state) {
+    const P = row.problems;
+    const name = row.name;
+    if (!name) P.push(prob('noName', 'error', 'This row has no dish name.', 'Type a name in the first column, or delete the row.'));
+    else {
+      if (name.length > LIMITS.nameMax) P.push(prob('nameTooLong', 'error', 'The name is ' + name.length + ' characters long. A dish name holds up to ' + LIMITS.nameMax + '.', 'Shorten the name to ' + LIMITS.nameMax + ' characters or fewer.'));
+      const k = key(name);
+      if (existing.has(k)) P.push(prob('duplicateExisting', 'error', '"' + name + '" is already on your menu.', 'Skip this row, or rename it (for example add "large").'));
+      else if (seen.has(k)) P.push(prob('duplicateInFile', 'error', '"' + name + '" appears again; line ' + seen.get(k) + ' already has it.', 'Keep one of the two rows, or rename this one.'));
+      else seen.set(k, row.line);
+    }
+    const pr = row.priceError;
+    if (pr === 'missing') P.push(prob('noPrice', 'error', 'This row has no price.', 'Enter the price in dollars, for example 9.50. A price is never guessed.'));
+    else if (pr === 'variable') P.push(prob('variablePrice', 'error', 'The price says "' + row.priceText + '", not an amount.', 'Enter a fixed price in dollars. You can change it later.'));
+    else if (pr === 'range') P.push(prob('priceRange', 'error', 'The price "' + row.priceText + '" is a range.', 'Pick one price in dollars.'));
+    else if (pr === 'bad') P.push(prob('badPrice', 'error', 'The price "' + row.priceText + '" is not a number.', 'Use digits only, for example 9.50.'));
+    else if (typeof row.price === 'number') {
+      if (row.price < 0) P.push(prob('negativePrice', 'error', 'The price ' + row.price + ' is below zero.', 'Enter the price as a positive amount.'));
+      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above $' + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "Prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950.'));
+      else if (row.price === 0) P.push(prob('freeItem', 'warn', 'The price is $0.00.', 'Keep it if the dish is free, or enter a price.'));
+      if (row.rounded) P.push(prob('priceRounded', 'warn', 'The price had more than two decimals and was rounded to the cent.', 'Check the price shown.'));
+    }
+    if (row.stationText && !row.station) P.push(prob('unknownStation', 'warn', 'The station "' + row.stationText + '" is not one of yours, so the default station is used.', 'Pick the station after adding the dish.'));
+    if (row.categoryText && !row.category) P.push(prob('unknownCategory', 'warn', 'The category "' + row.categoryText + '" is not one of yours, so the default category is used.', 'Change the category after adding the dish.'));
+    if (row.fromCents) P.push(prob('centsConverted', 'warn', 'The price was read in cents (' + row.priceText + ' becomes $' + (row.price != null ? row.price.toFixed(2) : '?') + ').', 'If this is wrong, choose "Prices are in dollars".'));
+    row.ok = !P.some((p) => p.level === 'error');
+  }
+
+  /* ---------- parse ---------- */
+
+  // Builds a fresh, empty dish row for one line of the file.
+  function newRow(line) {
+    return { name: '', price: null, station: undefined, category: undefined, description: undefined, line, problems: [], ok: false, priceText: '', priceError: null, stationText: '', categoryText: '', fromCents: false, rounded: false };
+  }
+  // Gives a row its price from text. cents: true reads a whole-number price as cents (Clover).
+  function setPrice(row, text, cents) {
+    row.priceText = clean(text);
+    const r = readPrice(text);
+    if (r.error) { row.priceError = r.error; return; }
+    let v = r.value;
+    if (cents && /^[+-]?\d+$/.test(row.priceText.replace(/[$€£\s]/g, ''))) { v = Math.round(v) / 100; row.fromCents = true; }
+    row.price = v; row.rounded = !!r.rounded && !row.fromCents;
+  }
+  // Fills the station and category of a row from the config words.
+  function setWhere(row, stationText, categoryText, opts) {
+    row.stationText = clean(stationText); row.categoryText = clean(categoryText);
+    row.station = zoneFrom(row.stationText, opts); row.category = catFrom(row.categoryText, opts);
+  }
+
+  // Rows from the typed-lines format.
+  function parseLines(text, opts) {
+    const out = [];
+    const lines = text.split(/\r\n|\r|\n/);
+    for (let i = 0; i < lines.length && out.length < LIMITS.rowsRead; i++) {
+      const raw = lines[i];
+      if (!clean(raw)) continue;
+      if (/^\s*(#|\/\/)/.test(raw)) continue;
+      const f = readLine(raw.trim());
+      const row = newRow(i + 1);
+      row.name = clean(unguard(f.name));
+      setPrice(row, f.priceText, opts.priceUnit === 'cents');
+      // Extra cells after the price: a station, a category, or a note.
+      let stationText = '', categoryText = '';
+      for (const x of f.extras) { if (zoneFrom(x, opts)) stationText = x; else if (catFrom(x, opts)) categoryText = x; else if (!stationText && !categoryText) stationText = x; }
+      setWhere(row, stationText, categoryText, opts);
+      out.push(row);
+    }
+    return out;
+  }
+
+  // Rows from a table with a header row. cols tells where each field is; square joins the variation name when an item has several.
+  function parseTable(table, format, opts) {
+    const headers = table[0].map(norm);
+    const col = {
+      name: findCol(headers, format === 'toast' ? ['itemname', 'menuitem', 'menuitemname', 'name'] : WORDS.name),
+      price: findCol(headers, format === 'toast' ? ['price', 'baseprice', 'basepricedollars', 'itemprice'] : WORDS.price.filter((w) => w !== 'cost')),
+      station: findCol(headers, WORDS.station),
+      category: findCol(headers, format === 'toast' ? ['menugroup', 'category', 'menucategory'] : WORDS.category),
+      description: findCol(headers, WORDS.description),
+      variation: format === 'square' ? headers.indexOf('variationname') : -1,
+      priceType: format === 'clover' ? headers.indexOf('pricetype') : -1,
+      hidden: Math.max(headers.indexOf('hidden'), headers.indexOf('archived'), headers.indexOf('visibility')),
+    };
+    if (col.price < 0) col.price = findCol(headers, ['cost']);
+    const cents = opts.priceUnit === 'cents' || (opts.priceUnit !== 'dollars' && format === 'clover');
+    const data = [];
+    for (let i = 1; i < table.length && data.length < LIMITS.rowsRead; i++) {
+      const r = table[i];
+      if (r.every((c) => !clean(c))) continue;
+      data.push({ cells: r, line: i + 1 });
+    }
+    // Square lists one row per variation; the variation name is added to the dish name when an item has more than one.
+    const count = {};
+    if (col.variation >= 0) for (const d of data) { const k = key(d.cells[col.name]); count[k] = (count[k] || 0) + 1; }
+    const out = [];
+    for (const d of data) {
+      // The text in column ix of this row, or empty when the column is missing.
+      const c = (ix) => (ix >= 0 && ix < d.cells.length ? d.cells[ix] : '');
+      const row = newRow(d.line);
+      let name = clean(unguard(c(col.name)));
+      if (col.variation >= 0) {
+        const v = clean(c(col.variation));
+        if (v && count[key(name)] > 1 && !/^(regular|default|standard)$/i.test(v)) name = clean(name + ' (' + v + ')');
+      }
+      row.name = name;
+      const typ = col.priceType >= 0 ? clean(c(col.priceType)).toUpperCase() : '';
+      if (typ === 'VARIABLE' || typ === 'PER_UNIT') { row.priceText = clean(c(col.price)) || typ.toLowerCase(); row.priceError = 'variable'; } else setPrice(row, c(col.price), cents);
+      setWhere(row, c(col.station), c(col.category), opts);
+      const desc = clean(c(col.description));
+      if (desc) row.description = desc;
+      if (col.hidden >= 0 && /^(true|yes|y|1|hidden|archived)$/i.test(clean(c(col.hidden)))) row.hidden = true;
+      out.push(row);
+    }
+    return out;
+  }
+
+  // Reads menu text and says what it found. opts: format (force 'lines', 'csv', 'square', 'toast' or 'clover'),
+  // existing (the dishes already on the menu), priceUnit ('dollars' or 'cents'; Clover is read as cents unless told),
+  // zones and categories (override the config lists). Returns { format, label, rows, summary, error? }; never throws.
+  M.parse = function parse(text, opts) {
+    opts = opts || {};
+    const res = { format: null, label: '', rows: [], summary: { total: 0, ok: 0, errors: 0, warnings: 0, notes: [] } };
+    try {
+      if (typeof text !== 'string') { res.error = 'No text to read.'; return res; }
+      text = stripBom(text);
+      if (text.length > LIMITS.textMax) { res.error = 'That is too much text (more than ' + (LIMITS.textMax / 1000) + ' KB). A menu file is far smaller; check that it is the right file.'; return res; }
+      if (!clean(text)) { res.error = 'The text is empty.'; return res; }
+      const delim = pickDelimiter(text);
+      let table = null, format = opts.format || null;
+      // A table is tried first unless the caller asked for lines.
+      if (format !== 'lines') {
+        table = splitTable(text, delim).filter((r) => r.some((c) => clean(c)));
+        const found = table.length ? detectFormat(table[0]) : null;
+        if (format && format !== 'csv' && found === null && table.length) format = null;
+        if (!format) format = found || 'lines';
+        else if (format === 'csv' && found === null) format = 'lines';
+      }
+      res.format = format; res.label = FORMAT_LABEL[format] || format;
+      if (format === 'lines') res.rows = parseLines(text, opts);
+      else {
+        if (table.length < 2) { res.summary.notes.push('The file has a header row but no dishes under it.'); res.rows = []; } else res.rows = parseTable(table, format, opts);
+        if (format === 'clover' && opts.priceUnit !== 'dollars') res.summary.notes.push('Clover prices are read as cents (1400 is $14.00). If the first rows look wrong, read the file again with prices in dollars.');
+      }
+      if (res.rows.length >= LIMITS.rowsRead) res.summary.notes.push('Only the first ' + LIMITS.rowsRead + ' rows were read.');
+      const existing = new Set(((opts.existing) || []).map((m) => key(m && m.name)));
+      const seen = new Map();
+      const room = Math.max(0, LIMITS.maxDishes - ((opts.existing) || []).length);
+      let okCount = 0;
+      for (const row of res.rows) {
+        checkRow(row, seen, existing, null);
+        // A row that passes every other check still needs room on the menu.
+        if (row.ok) {
+          if (okCount >= room) { row.problems.push(prob('menuFull', 'error', 'The menu holds up to ' + LIMITS.maxDishes + ' dishes and this one does not fit.', 'Archive dishes you no longer sell, or import fewer rows.')); row.ok = false; } else okCount++;
+        }
+        if (row.hidden) row.problems.push(prob('hiddenItem', 'warn', 'The file marks this item as hidden.', 'Skip it if you do not sell it.'));
+      }
+      const S = res.summary;
+      S.total = res.rows.length;
+      for (const r of res.rows) { if (r.ok) S.ok++; if (r.problems.some((p) => p.level === 'error')) S.errors++; if (r.problems.some((p) => p.level === 'warn')) S.warnings++; }
+      // Station and category words the file used that match none of the kitchen's, so a screen can offer to add them.
+      S.unmatched = { stations: [], categories: [] };
+      for (const r of res.rows) {
+        if (r.stationText && !r.station && S.unmatched.stations.indexOf(r.stationText) < 0) S.unmatched.stations.push(r.stationText);
+        if (r.categoryText && !r.category && S.unmatched.categories.indexOf(r.categoryText) < 0) S.unmatched.categories.push(r.categoryText);
+      }
+      S.duplicates = res.rows.filter((r) => r.problems.some((p) => p.code === 'duplicateInFile' || p.code === 'duplicateExisting')).length;
+      S.message = S.total === 0 ? 'No dishes were found.' : S.ok + ' of ' + S.total + ' dishes are ready to add' + (S.errors ? '; ' + S.errors + ' need a fix or will be skipped.' : '.');
+    } catch (e) {
+      res.error = 'That text could not be read. Check that it is a menu list or a table with a name and a price.';
+    }
+    return res;
+  };
+
+  /* ---------- engine actions ---------- */
+
+  // Turns checked rows into the engine's addMenuItem actions, with safe defaults: the first work station and category (or
+  // opts.zone / opts.cat), a 5 minute prep time marked as a guess, one tap to finish. Rows with an error are skipped and
+  // listed. The dishes already on the menu and the 150 dish limit are checked again here. Returns { actions, skipped }.
+  M.toActions = function toActions(rows, existingMenu, opts) {
+    opts = opts || {};
+    const zones = (opts.zones || (SB.config && SB.config.workZones) || ['pit']);
+    const cats = (opts.categories || (SB.config && SB.config.categories) || [{ id: 'meat' }]);
+    const zoneDef = opts.zone || zones[0];
+    const catDef = opts.cat || (cats[0] && cats[0].id);
+    const have = new Set((existingMenu || []).map((m) => key(m && m.name)));
+    let room = LIMITS.maxDishes - (existingMenu || []).length;
+    const actions = [], skipped = [];
+    for (const r of Array.isArray(rows) ? rows : []) {
+      const reason = !r || !r.ok ? 'This row has a problem to fix first.' : have.has(key(r.name)) ? 'That dish is already on the menu.' : room <= 0 ? 'The menu is full.' : null;
+      if (reason) { skipped.push({ line: r && r.line, name: r && r.name, reason }); continue; }
+      have.add(key(r.name)); room--;
+      actions.push({ type: 'addMenuItem', line: r.line, payload: { name: r.name, zone: r.station || zoneDef, cat: r.category || catDef, price: r.price, prepSec: opts.prepSec || DEFAULTS.prepSec, track: opts.track || DEFAULTS.track, prepGuess: true } });
+    }
+    return { actions, skipped };
+  };
+
+  /* ---------- export ---------- */
+
+  // One spreadsheet cell: quoted when it has a comma, quote or line break; text starting with = + - @ gets an apostrophe so a
+  // spreadsheet cannot run it as a formula (the importer takes the apostrophe off again).
+  function cell(v) {
+    let s = v == null ? '' : String(v);
+    if (/^[=+\-@\t]/.test(s)) s = "'" + s;
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  // Writes the menu as CSV the importer can read back: Name, Price, Station, Category. Archived dishes are left out.
+  // Station and category are written by their names. Lines end with CRLF so Excel opens it cleanly.
+  M.exportMenu = function exportMenu(menu, opts) {
+    const zones = (opts && opts.zones) || (SB.config && SB.config.zones) || [];
+    const cats = (opts && opts.categories) || (SB.config && SB.config.categories) || [];
+    // The station name for an id (the id itself when unknown).
+    const zn = (id) => { const z = zones.find((x) => x.id === id); return z ? z.name : id; };
+    // The category name for an id (the id itself when unknown).
+    const cn = (id) => { const c = cats.find((x) => x.id === id); return c ? c.name : id; };
+    const lines = [['Name', 'Price', 'Station', 'Category'].join(',')];
+    for (const m of Array.isArray(menu) ? menu : []) {
+      if (!m || m.archived) continue;
+      lines.push([cell(m.name), cell(typeof m.price === 'number' ? m.price.toFixed(2) : ''), cell(zn(m.zone)), cell(cn(m.cat))].join(','));
+    }
+    return lines.join('\r\n') + '\r\n';
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 13-menu-import.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'13-menu-import.js',message:String(e&&e.message||e)});}
+
 /* ===== 20-engine.js ===== */
 ;try{
 /*
@@ -5042,10 +5589,10 @@ a.of-nav:active { background: var(--press); }
     badWho: 'Initials must be 1 to 12 characters. Shorten them, or leave them blank if the screen allows.',
     unknownSafetyEntry: 'That safety log entry is not here, or it is not a temperature, discard, cooling, reheat, sanitize or keep-serving entry. Pick one from the safety log.',
     wrongBackupMode: 'That backup does not belong to this kitchen (one is from the demo, the other from a real kitchen). Nothing was changed. Choose a backup made from this kitchen.',
-    moduleOff: 'Cook-ahead tracking (batches, the hold cabinet, temperature checks and sanitizing) is switched off. Turn it on in Menu and settings first.',
+    moduleOff: 'Cook-ahead tracking (batches, the hold cabinet, temperature checks and sanitizing) is switched off. Turn it on under Dishes and prices: Yes, I cook ahead.',
     nameTaken: 'Another ingredient already has that name. Pick a different name, or use the one that exists.',
     tooManyIngredients: 'The ingredient list is full (' + 80 + ' ingredients). Archive one you no longer use, then add this one.',
-    portionsConflict: 'This dish already lists ingredients, so it cannot also count portions. Remove its ingredients first, or keep tracking it by ingredients.',
+    portionsConflict: 'This dish already uses ingredients, so it cannot also be counted by portions. Remove its ingredients first, or keep it as it is.',
     badSnooze: 'A reminder can be put off for 1 to 30 minutes, only for a batch still on the menu, and never past 5 minutes before its last warning. The last warning, a past-quality batch and a thrown-out batch cannot be put off.',
   };
 
@@ -5085,8 +5632,9 @@ a.of-nav:active { background: var(--press); }
     sanitizeDone: '{ who? }',
     updateSettings: '{ patch }',
     updateMenuItem: '{ id, patch }',
-    addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two" }',
+    addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two", prepGuess?:boolean }',
     updateIngredient: '{ id, patch }',
+    moveMenuItem: '{ id, toIndex }',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety" }',
     setPortions: '{ menuId, on:boolean, count? }',
     resetLive: '{ keepSettings?=true, starter?, stagger?, catalog?: "sample"|"blank", replaceOwn? }',
@@ -5095,7 +5643,7 @@ a.of-nav:active { background: var(--press); }
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient', 'moveMenuItem'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -6178,7 +6726,7 @@ a.of-nav:active { background: var(--press); }
         }
       }
       /*@I7*/ const a = hasOwn(avail, mi.id) ? avail[mi.id] : availability(tx.state(), mi.id);
-      if (!a || a.ok !== true) { tx.info.menuId = mi.id; tx.info.reason = a ? a.reason : null; tx.info.ing = a ? a.ing : null; return 'itemUnavailable'; }
+      if (!a || a.ok !== true) { tx.info.menuId = mi.id; tx.info.name = mi.name; tx.info.reason = a ? a.reason : null; tx.info.ing = a ? a.ing : null; return 'itemUnavailable'; }
       parsed.push({ mi, qty, mods });
     }
     delete tx.info.line;
@@ -7328,7 +7876,8 @@ a.of-nav:active { background: var(--press); }
   A.updateIngredient = (tx, p) => patchEntity(tx, p, 'ingredients', ING_PATCH, 'ingredients');
   // Adds a new dish. It needs a name, station, category, price, prep time and whether one tap or
   // start-then-finish makes it. The id is made from the name and never reuses an old one. The new dish has no
-  // recipe yet, so stock is not tracked for it, and its prep time counts as confirmed because the owner typed it.
+  // recipe yet, so stock is not tracked for it, and its prep time counts as confirmed because the owner typed it
+  // (unless prepGuess is true, as for an imported menu: then the app keeps learning the real time).
   A.addMenuItem = function (tx, p) {
     const list = tx.get('menu');
     if (list.length >= MENU_MAX) { tx.info = { key: 'menu', min: 0, max: MENU_MAX }; return 'outOfBounds'; }
@@ -7351,12 +7900,38 @@ a.of-nav:active { background: var(--press); }
     let id = base, n = 2;
     while (taken.has(id) || hasOwn(C.menuById, id) || !safeKey(id)) id = base + '_' + n++;
     const w = tx.mut('menu');
-    w.push({ id, name, short, zone: p.zone, cat: p.cat, price: p.price, prepSec: Math.round(p.prepSec), track: p.track, bom: [], prepConfirmed: true, archived: false });
+    w.push({ id, name, short, zone: p.zone, cat: p.cat, price: p.price, prepSec: Math.round(p.prepSec), track: p.track, bom: [], prepConfirmed: p.prepGuess !== true, archived: false });
     tx.event('settings_changed', { keys: ['menu.' + id + '.added'] });
     tx.info = { id, keys: ['menu.' + id + '.added'] };
     return 'ok';
   };
 
+  // Moves one dish to a new place in the menu list (0 is first). The order is what the order screen and the lists show
+  // inside each category. toIndex must be a whole number from 0 to the last place (outOfBounds otherwise); the same place
+  // gives nothingToDo. Undo puts it back while the dish is still where this move left it.
+  A.moveMenuItem = function (tx, p) {
+    const list = tx.get('menu');
+    const from = typeof p.id === 'string' ? list.findIndex((m) => m.id === p.id) : -1;
+    if (from < 0) return 'unknownMenu';
+    if (!isInt(p.toIndex) || p.toIndex < 0 || p.toIndex >= list.length) { tx.info = { key: 'toIndex', min: 0, max: list.length - 1 }; return 'outOfBounds'; }
+    if (p.toIndex === from) return 'nothingToDo';
+    const w = tx.mut('menu');
+    const [mi] = w.splice(from, 1);
+    w.splice(p.toIndex, 0, mi);
+    tx.event('settings_changed', { keys: ['menu.' + mi.id + '.moved'] });
+    pushUndo(tx, 'moveMenu', (mi.short || mi.name) + ' moved', { id: mi.id, from, to: p.toIndex });
+    tx.info = { id: mi.id, from, to: p.toIndex, keys: ['menu.' + mi.id + '.moved'] };
+    return 'ok';
+  };
+  // Undo of a move: the dish goes back to its old place, but only if it is still where the move put it.
+  UNDO.moveMenu = function (tx, d) {
+    const list = tx.get('menu');
+    if (!list[d.to] || list[d.to].id !== d.id || d.from >= list.length) return 'undoConflict';
+    const w = tx.mut('menu');
+    const [mi] = w.splice(d.to, 1);
+    w.splice(d.from, 0, mi);
+    return 'ok';
+  };
   // The most ingredients a kitchen may hold, so a typing slip cannot fill the saved data.
   const ING_MAX = 80;
   // Makes an id from a name that no ingredient and no config ingredient already uses ("Hamburger Buns" becomes
@@ -8249,6 +8824,8 @@ a.of-nav:active { background: var(--press); }
     {
       const ids = new Set(state.ingredients.map((i) => i.id));
       for (const mi of state.menu) for (const ln of Array.isArray(mi.bom) ? mi.bom : []) if (!ids.has(ln.ing)) add('B1 ' + mi.id + ' recipe names missing ingredient ' + ln.ing);
+      const seenIds = new Set();
+      for (const mi of state.menu) { if (seenIds.has(mi.id)) add('B2 menu id ' + mi.id + ' appears twice'); seenIds.add(mi.id); }
       for (const i of state.ingredients) if (i.forMenu !== undefined && !state.menu.some((m) => m.id === i.forMenu)) add('B1 ingredient ' + i.id + ' counts portions of missing dish ' + i.forMenu);
     }
     // I14
@@ -8633,7 +9210,8 @@ a.of-nav:active { background: var(--press); }
       case 'notAllDone': return isInt(i.remaining) ? i.remaining + ' ' + U.plural(i.remaining, 'item') + ' not done yet. Finish them, or use Bump anyway to send the ticket out.' : REPORTS.notAllDone;
       case 'itemUnavailable': {
         const why = i.reason === 'manual' ? 'marked 86 by hand' : i.reason === 'safety' ? 'on a safety hold' : i.reason === 'quality' ? 'past its quality limit' : i.reason === 'stock' ? 'sold out' : '86';
-        const mi = typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
+        // The dish's own name (the live menu put it in info); the sample menu is only a fallback for older callers.
+        const mi = typeof i.name === 'string' && i.name ? i.name : typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
         return mi + ' is ' + why + '. Take it off the order or pick something else.';
       }
       case 'wrongBackupMode': return i.backup === 'demo' ? 'That backup comes from the demo, not from your kitchen. Nothing was changed. Choose a backup made from your own kitchen.' : 'That backup comes from a real kitchen, so it cannot be loaded into the demo. Nothing was changed. Leave the demo first, then load it into your own kitchen.';
@@ -8797,7 +9375,7 @@ a.of-nav:active { background: var(--press); }
     const ing = state.ingredients.find((x) => x.id === b.ing);
     const name = ing ? ing.name : b.ing;
     const left = state.batches.some((x) => x !== b && x.ing === b.ing && x.status !== 'discard' && x.canServe === true && x.remainingG > 0);
-    const amount = U.fmtG(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
+    const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
     out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
       consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or discard it.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
   }
@@ -8880,7 +9458,7 @@ a.of-nav:active { background: var(--press); }
     if (!ing || !U.isNum(ing.cookH) || !(ing.cookH > 0)) return null;
     const latest = runOutAt - (ing.cookH + (U.isNum(ing.restH) ? ing.restH : 0)) * H;
     if (latest > now) return { ahead: true, latestStart: latest, text: 'Start the next batch by ' + U.fmtTime(latest) + ', not counting anything still on the smoker.' };
-    return { ahead: false, latestStart: latest, text: 'Too late for a new batch to cover it: about ' + U.fmtG(unmetG) + ' of demand with nothing to sell. Shorten portions, stop preorders, run a special.' };
+    return { ahead: false, latestStart: latest, text: 'Too late for a new batch to cover it: about ' + U.weightText(unmetG) + ' of demand with nothing to sell. Shorten portions, stop preorders, run a special.' };
   }
   // Rows for one ingredient from its close sweep: grams left over at close (waste, silent) and demand with nothing to
   // sell (a silent caution with what to do). Either can raise a row. A shortfall that a quality limit causes has no row
@@ -8890,17 +9468,17 @@ a.of-nav:active { background: var(--press); }
     const { closeAt, stock, r } = info;
     if (r.leftoverG >= Math.max(NOTABLE_G, NOTABLE_SHARE * stock)) {
       out.push({ id: 'leftover:' + ing.id, kind: 'leftover', ing: ing.id, label: name, at: closeAt, msLeft: closeAt - now, rung: 0, rungs: 0, sev: 'info', leftoverG: r.leftoverG,
-        consequence: 'At the current pace about ' + U.fmtG(r.leftoverG) + ' of ' + name + ' will be left at close, not counting what is already on the block.', action: 'Sell it: run a special, tell the front.', unknown: false });
+        consequence: 'At the current pace about ' + U.weightText(r.leftoverG) + ' of ' + name + ' will be left at close, not counting what is already on the block.', action: 'Sell it: run a special, tell the front.', unknown: false });
     }
     if ((r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG) < NOTABLE_G || r.runOutAt == null || (r.runOutCause === 'limit' && r.limitQuality)) return;
     let consequence, action, sb = null;
     if (r.runOutCause === 'rest-gap') {
-      consequence = 'At the current pace ' + name + ' runs out at ' + U.fmtTime(r.runOutAt) + ', next batch ready at ' + U.fmtTime(r.gapEndAt) + ', about ' + U.fmtG(r.gapUnmetG) + ' of demand with nothing to sell in between.';
+      consequence = 'At the current pace ' + name + ' runs out at ' + U.fmtTime(r.runOutAt) + ', next batch ready at ' + U.fmtTime(r.gapEndAt) + ', about ' + U.weightText(r.gapUnmetG) + ' of demand with nothing to sell in between.';
       action = 'Shorten portions, stop preorders, run a special until then.';
     } else {
       sb = startBy(ing, now, r.runOutAt, r.unmetG);
       const verb = r.runOutCause === 'limit' ? ' is thrown out at ' : ' runs out at ';
-      consequence = 'At the current pace ' + name + verb + U.fmtTime(r.runOutAt) + '.' + (sb && !sb.ahead ? ' ' + sb.text.split(' Shorten')[0] : sb ? '' : ' About ' + U.fmtG(r.unmetG) + ' of demand will have nothing to sell.');
+      consequence = 'At the current pace ' + name + verb + U.fmtTime(r.runOutAt) + '.' + (sb && !sb.ahead ? ' ' + sb.text.split(' Shorten')[0] : sb ? '' : ' About ' + U.weightText(r.unmetG) + ' of demand will have nothing to sell.');
       action = sb && sb.ahead ? sb.text : 'Shorten portions, stop preorders, run a special.';
     }
     out.push({ id: 'shortfall:' + ing.id, kind: 'shortfall', ing: ing.id, label: name, at: r.runOutAt, msLeft: r.runOutAt - now, rung: 0, rungs: 0, sev: 'warn', leftoverG: r.leftoverG, shortG: r.unmetG, unmetG: r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG,
@@ -8957,17 +9535,17 @@ a.of-nav:active { background: var(--press); }
         const trivial = b.remainingG < TRIVIAL_G || (waste != null && waste < NOTABLE_G && waste < NOTABLE_SHARE * b.remainingG);
         const usd = waste != null && U.isNum(b.costPerCookedKg) ? waste / 1000 * b.costPerCookedKg : null;
         let consequence, action;
-        const amount = U.fmtG(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
+        const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
         const goes86 = lastOne ? ' and ' + name + ' goes 86' : '';
         const fate = q ? 'pass its quality limit' : 'be thrown out';
         if (msLeft <= 0) { consequence = 'Expired: ' + amount + ' must be thrown out' + goes86 + '.'; action = 'Discard and log it.'; }
         else if (waste == null) { consequence = 'Pace unknown (nothing pulled yet): up to ' + amount + ' may ' + (q ? 'pass its quality limit' : 'be thrown out') + goes86 + '.'; action = 'Use it first, and log pulls so the pace can be worked out.'; }
-        else if (waste > 50) { consequence = 'About ' + U.fmtG(waste) + ' of ' + U.fmtG(b.remainingG) + ' will ' + fate + (usd != null ? ' ($' + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
-        else { consequence = 'On pace to sell all ' + U.fmtG(b.remainingG) + ' in time.'; action = 'Nothing to do.'; }
+        else if (waste > 50) { consequence = 'About ' + U.weightText(waste) + ' of ' + U.weightText(b.remainingG) + ' will ' + fate + (usd != null ? ' ($' + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
+        else { consequence = 'On pace to sell all ' + U.weightText(b.remainingG) + ' in time.'; action = 'Nothing to do.'; }
         // A batch gets a row once a rung is crossed, or earlier when the pace says food will be thrown out within 2 hours.
         const isLim = !!lim && lim.limitBatchId === b.id;
         if (isLim) {
-          consequence = name + ' passes its quality limit at ' + U.fmtTime(exp) + ', with about ' + U.fmtG(lim.unmetG) + ' of demand after it' + (waste != null && waste > 50 ? ' and about ' + U.fmtG(waste) + ' of this batch unsold' : '') + '.';
+          consequence = name + ' passes its quality limit at ' + U.fmtTime(exp) + ', with about ' + U.weightText(lim.unmetG) + ' of demand after it' + (waste != null && waste > 50 ? ' and about ' + U.weightText(waste) + ' of this batch unsold' : '') + '.';
           action = limSb ? limSb.text : 'Shorten portions, stop preorders, run a special.';
         }
         if (rung >= 1 || (waste != null && waste > 50 && msLeft <= 2 * H) || isLim) {
@@ -9010,7 +9588,7 @@ a.of-nav:active { background: var(--press); }
       const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');
       const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' ($' + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
       out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
-        consequence: 'Expired and thrown out: ' + U.fmtG(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
+        consequence: 'Expired and thrown out: ' + U.weightText(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
     }
   }
   // Rows for batches that are being kept serving: shown from 15 minutes before the extension ends, or when the last
@@ -9021,7 +9599,7 @@ a.of-nav:active { background: var(--press); }
       const stale = !U.isNum(b.lastTempAt) || now - b.lastTempAt > S.tempCheckEveryMin * MIN;
       if (b.keepUntil - now > 15 * MIN && !stale) continue;
       const cold = b.kind === 'cold';
-      const need = cold ? S.coldHoldF + ' °F or lower' : S.hotHoldF + ' °F or higher';
+      const need = cold ? U.tempText(S.coldHoldF) + ' or lower' : U.tempText(S.hotHoldF) + ' or higher';
       out.push({ id: 'keepcheck:' + b.id + ':' + b.keepUntil, epoch: b.keepUntil, kind: 'keepcheck', ing: b.ing, batchId: b.id, label: b.label || b.ing, at: b.keepUntil, msLeft: b.keepUntil - now, rung: 0, rungs: 0, sev: 'info',
         consequence: 'Kept serving until ' + U.fmtTime(b.keepUntil) + '. Log a temperature of ' + need + ' before then to keep it longer.', action: 'Log a temperature.', unknown: false });
     }
@@ -17828,6 +18406,8 @@ a.of-nav:active { background: var(--press); }
     const store = SB.store;
     if (!store || !store.status || !store.getState) return null;
     const ss = store.status(), s = store.getState();
+    // In the demo this strip always shows, above every other message, and always has the Back button.
+    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
     if (!s) return null;
@@ -17844,10 +18424,10 @@ a.of-nav:active { background: var(--press); }
     if (bn.el) bn.el.remove();
     bn.kind = w.kind;
     // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
-    const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => S.ignite({ section: 'data' }) }, w.act);
+    const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
     const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: 'Hide for 45 minutes', onClick: () => { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } }, ico('x', 18), h('span', { class: 'visually-hidden' }, 'Later')) : null;
-    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
     st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip
@@ -19013,6 +19593,14 @@ a.of-nav:active { background: var(--press); }
     setTimeout(done, 900 + Math.min(i, 9) * 55);
   }
 
+  // Gives an element one soft highlight so a changed ticket or dish catches the eye, then removes the hook.
+  // WATCH OUT: no forced layout here, because 200 tickets can change state in the same second.
+  function flash(el) {
+    if (!el || reduced() || el.classList.contains('fl-flash')) return;
+    el.classList.add('fl-flash');
+    setTimeout(() => el.classList.remove('fl-flash'), 900);
+  }
+
   // Takes a finished slip off the board: it slides out (inert, so no tap lands on it), or goes at once
   // with reduced motion.
   function removeSlip(rec) {
@@ -19285,6 +19873,7 @@ a.of-nav:active { background: var(--press); }
     // Waiting and read-only rows change only with the status; tappable rows also refresh the timer.
     if (row.status === st && row.kind !== 'btn') { return; }
     const changed = row.status !== st;
+    if (changed && row.status != null) flash(row.li); // a dish that changes state gets one soft highlight
     row.status = st;
     row.li.dataset.state = st;
     if (row.kind === 'btn') {
@@ -19344,6 +19933,7 @@ a.of-nav:active { background: var(--press); }
       rec.refs.timer.dataset.level = lvl;
       rec.refs.badge.dataset.level = lvl;
       if (lvl !== 'breach') put(rec.refs.bw, WORDS[lvl]);
+      if (prev) flash(rec.el.querySelector('.slip-head')); // the head glows once when the ticket moves to a new time state
       if (announceBreach && lvl === 'breach' && prev && prev !== 'breach') say('Ticket #' + rec.num + ' is overdue.');
     }
   }
@@ -19801,7 +20391,7 @@ a.of-nav:active { background: var(--press); }
     if (firstRun) {
       actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'Add your first dish')),
         h('button', { type: 'button', class: 'btn fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
-        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Try the busy-night demo (practice)')));
+        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Try the demo')));
       e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
       return;
     }
@@ -19810,12 +20400,14 @@ a.of-nav:active { background: var(--press); }
     actions.appendChild(h('button', { type: 'button', class: 'btn btn-primary', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket')));
     if (!stationBusy) actions.append(
       h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
-      h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Busy-night demo')));
+      h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, store().isDemo && store().isDemo() ? 'Busy-night crew' : 'Try the demo')));
     e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
   }
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.
   function startDemo() {
+    // In a real kitchen the button opens the practice kitchen in its own space; only inside the demo does it start the crew.
+    if (SB.setup && SB.setup.tryDemo && store().isDemo && !store().isDemo()) { SB.setup.tryDemo(); return; }
     // A real kitchen never turns into the demo: the demo is a separate mode (own saved data), entered with a reload.
     if (store().isolated && store().isolated() && !store().isDemo()) { store().enterDemo(); return; }
     // The pit starts empty now, so the demo first loads its own stocked kitchen (settings stay).
@@ -21267,7 +21859,11 @@ a.of-nav:active { background: var(--press); }
   const uid = (p) => U.uid(p || 'fs');
 
   // A temperature in words, like 155 degrees F, or 'no reading'.
-  const fmtF = (f) => (U.isNum(f) ? Math.round(f) + ' °F' : 'no reading');
+  // The weight word for the chosen unit, "kg" or "lb", used in cost-per-weight lines.
+  const unitW = () => (U.units.weight === 'lb' ? 'lb' : 'kg');
+  // A price stored per kilogram, as the price per shown unit (per pound when pounds are chosen).
+  const perUnit = (perKg) => (U.units.weight === 'lb' && U.isNum(perKg) ? perKg * 0.45359237 : perKg);
+  const fmtF = (f) => (U.isNum(f) ? U.tempText(f) : 'no reading');
   // 7500 s -> "2 h 05 min"; 90 s -> "2 min"; 20 s -> "20 s" (always rounded up to
   // the minute from a minute on, so a countdown never reads 0 early).
   function hmLong(ms) {
@@ -21295,7 +21891,7 @@ a.of-nav:active { background: var(--press); }
   // Finds a menu item by id in the current state, or null.
   const menuOf = (id) => { const a = st().menu; for (let i = 0; i < a.length; i++) if (a[i].id === id) return a[i]; return null; };
   // An amount in words: pieces for counted items (cornbread), otherwise grams or kilograms.
-  const qtyText = (ing, gm) => (ing && ing.unit === 'ea' ? Math.round(gm) + ' ' + plural(Math.round(gm), 'piece') : U.fmtG(gm));
+  const qtyText = (ing, gm) => (ing && ing.unit === 'ea' ? Math.round(gm) + ' ' + plural(Math.round(gm), 'piece') : U.weightText(gm));
   // Station details for an id, with a safe fallback so an unknown station still shows.
   const zoneOf = (id) => C.zoneById[id] || { name: id, code: String(id || '').slice(0, 3).toUpperCase(), icon: 'flame' };
   // Order channel details for an id, with a safe fallback.
@@ -21520,20 +22116,20 @@ a.of-nav:active { background: var(--press); }
     const S = safety();
     if (mode === 'reheat') {
       return f >= S.reheatF
-        ? { tone: 'ok', text: f + ' °F counts as a reheat. The batch can be served again.' }
-        : { tone: 'warn', text: 'A reheat needs at least ' + S.reheatF + ' °F. Keep heating, then log it.' };
+        ? { tone: 'ok', text: U.tempText(f) + ' counts as a reheat. The batch can be served again.' }
+        : { tone: 'warn', text: 'A reheat needs at least ' + U.tempText(S.reheatF) + '. Keep heating, then log it.' };
     }
     if (b.kind === 'cooling') {
       const c = S.cooling || C.safety.cooling;
-      if (b.stage1At == null) return f <= c.stage1ToF ? { tone: 'ok', text: f + ' °F reaches stage 1 (' + c.stage1ToF + ' °F or below).' } : { tone: 'warn', text: 'Stage 1 needs ' + c.stage1ToF + ' °F or below. Keep chilling.' };
-      return f <= c.finalF ? { tone: 'ok', text: f + ' °F finishes the cooling (' + c.finalF + ' °F or below).' } : { tone: 'warn', text: 'Stage 2 needs ' + c.finalF + ' °F or below. Keep chilling.' };
+      if (b.stage1At == null) return f <= c.stage1ToF ? { tone: 'ok', text: U.tempText(f) + ' reaches stage 1 (' + U.tempText(c.stage1ToF) + ' or below).' } : { tone: 'warn', text: 'Stage 1 needs ' + U.tempText(c.stage1ToF) + ' or below. Keep chilling.' };
+      return f <= c.finalF ? { tone: 'ok', text: U.tempText(f) + ' finishes the cooling (' + U.tempText(c.finalF) + ' or below).' } : { tone: 'warn', text: 'Stage 2 needs ' + U.tempText(c.finalF) + ' or below. Keep chilling.' };
     }
     if (b.kind === 'cold') {
-      return f > S.coldHoldF ? { tone: 'bad', text: 'Above ' + S.coldHoldF + ' °F. The batch goes on Chill now and stops being served.' } : { tone: 'ok', text: 'In range (' + S.coldHoldF + ' °F or below).' };
+      return f > S.coldHoldF ? { tone: 'bad', text: 'Above ' + U.tempText(S.coldHoldF) + '. The batch goes on Chill now and stops being served.' } : { tone: 'ok', text: 'In range (' + U.tempText(S.coldHoldF) + ' or below).' };
     }
-    if (f < S.hotHoldF) return { tone: 'bad', text: 'Below ' + S.hotHoldF + ' °F. The batch goes on Reheat now and stops being served.' };
-    if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1)) return { tone: 'ok', text: f + ' °F counts as the reheat (one reheat only).' };
-    return { tone: 'ok', text: 'In range (' + S.hotHoldF + ' °F or above).' };
+    if (f < S.hotHoldF) return { tone: 'bad', text: 'Below ' + U.tempText(S.hotHoldF) + '. The batch goes on Reheat now and stops being served.' };
+    if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1)) return { tone: 'ok', text: U.tempText(f) + ' counts as the reheat (one reheat only).' };
+    return { tone: 'ok', text: 'In range (' + U.tempText(S.hotHoldF) + ' or above).' };
   }
   // The temperature the editor starts at: the last reading, or a typical value for that kind of batch.
   const defaultTemp = (b) => (U.isNum(b.lastTempF) ? b.lastTempF : b.kind === 'cold' ? 38 : b.kind === 'cooling' ? 70 : 150);
@@ -21630,7 +22226,9 @@ a.of-nav:active { background: var(--press); }
       const bSnooze = h('button', { type: 'button', class: 'btn', dataset: { act: 'snooze' }, hidden: true }, ico('clock', 20), snoozeT);
       const unsnoozeT = h('span', null, 'Cancel reminder');
       const bUnsnooze = h('button', { type: 'button', class: 'btn', dataset: { act: 'unsnooze' }, hidden: true }, ico('x', 20), unsnoozeT);
-      const actions = h('div', { class: 'hc-actions' }, bKeep, bUnkeep, bSnooze, bUnsnooze, bPull, bLog, bReheat, bCool, bDiscard);
+      // One main action per card; every other action sits behind the "..." button so all cards look the same.
+      const bMore = h('button', { type: 'button', class: 'btn btn-icon hc-more', 'aria-label': 'More for this batch', title: 'More', hidden: true }, ico('more', 22));
+      const actions = h('div', { class: 'hc-actions' }, bKeep, bUnkeep, bSnooze, bUnsnooze, bPull, bLog, bReheat, bCool, bDiscard, bMore);
       const editorSlot = h('div', { class: 'hc-editor-slot' });
       // Card layout: heading, ring and facts, message and lock note, cooling steps, then the buttons.
       const el = h('article', { class: 'hc-card', dataset: { batch: b.id, tone: 'ok' }, 'aria-label': 'Batch' },
@@ -21639,7 +22237,13 @@ a.of-nav:active { background: var(--press); }
           h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
             h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept))),
         costLine, msg, lock, cool, actions, editorSlot);
+      rec.bMore = bMore; rec.acts = [bKeep, bReheat, bLog, bUnkeep, bSnooze, bUnsnooze, bPull, bCool, bDiscard];
       Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept, bKeep, bUnkeep, bSnooze, bUnsnooze, unsnoozeT, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
+      // The "..." button lists the secondary actions that are available right now; choosing one presses that button.
+      bMore.addEventListener('click', () => {
+        const items = rec.acts.filter((a) => !a.hidden && a !== rec.primary).map((a) => ({ label: a.textContent.trim(), icon: a.dataset.act === 'discard' ? 'trash' : 'chevron-right', onClick: () => a.click() }));
+        if (items.length) SB.ui.menu(bMore, items, { label: 'More for this batch' });
+      });
       bLog.addEventListener('click', () => toggleEditor(rec, 'log'));
       bReheat.addEventListener('click', () => toggleEditor(rec, 'reheat'));
       bCool.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openCooling(bb, bCool); });
@@ -21689,7 +22293,7 @@ a.of-nav:active { background: var(--press); }
       text(rec.name, b.label || 'Batch');
       attr(rec.el, 'aria-label', (b.label || 'Batch') + ': ' + sv.word);
       if (rec.kindKey !== b.kind) { rec.kindKey = b.kind; U.clear(rec.kindEl); rec.kindEl.append(ico(KIND_ICON[b.kind] || 'flame', 18), h('span', null, KIND_WORD[b.kind] || 'Hold')); }
-      const srcWord = b.src === 'sample' ? 'Practice batch' : b.src === 'starter' ? 'Starter stock' : '';
+      const srcWord = b.src === 'sample' ? 'Practice batch' : ''; // starter stock is named once in the summary line, not on every card
       setHidden(rec.srcChip, !srcWord); if (srcWord) { text(rec.srcChip, srcWord); attr(rec.srcChip, 'data-tone', 'info'); }
       setState(rec.status, sv.tone, sv.icon, sv.word);
       attr(rec.el, 'data-tone', sv.tone); attr(rec.el, 'data-status', gt.status);
@@ -21708,7 +22312,7 @@ a.of-nav:active { background: var(--press); }
       const left = b.cookedG > 0 ? Math.max(0, Math.min(1, b.remainingG / b.cookedG)) : 0;
       const lv = (left * 100).toFixed(1);
       if (rec.meter._v !== lv) { rec.meter._v = lv; rec.meter.style.setProperty('--v', lv); attr(rec.meter, 'aria-valuenow', left.toFixed(3)); attr(rec.meter, 'aria-valuemax', 1); }
-      text(rec.stockT, U.fmtG(b.remainingG) + ' left of ' + U.fmtG(b.cookedG));
+      text(rec.stockT, U.weightText(b.remainingG) + ' left of ' + U.weightText(b.cookedG));
 
       // facts
       text(rec.ddLast, U.isNum(b.lastTempF) ? fmtF(b.lastTempF) + ', ' + agoText(now - b.lastTempAt) + (lastCheckBy(b.id) ? ', checked by ' + lastCheckBy(b.id) : '') : 'No reading yet');
@@ -21748,7 +22352,7 @@ a.of-nav:active { background: var(--press); }
       const ing = ingOf(b.ing);
       const bits = [];
       if (U.isNum(b.yieldPct)) bits.push('Yield ' + pctText(b.yieldPct, 1));
-      if (U.isNum(b.costPerCookedKg)) bits.push('cost ' + U.fmtMoney(b.costPerCookedKg) + ' per cooked kg');
+      if (U.isNum(b.costPerCookedKg)) bits.push('cost ' + U.fmtMoney(perUnit(b.costPerCookedKg)) + ' per cooked ' + unitW());
       const costWord = bits.length ? bits.join(', ') + '.' + (ing && ing.yieldConfirmed ? '' : ' Starter estimate.') : '';
       setHidden(rec.costLine, !costWord); text(rec.costLine, costWord);
 
@@ -21770,13 +22374,13 @@ a.of-nav:active { background: var(--press); }
         const c = S.cooling || C.safety.cooling;
         const s1 = since + c.stage1H * H1, fin = since + c.totalH * H1;
         stepLine(rec.step1, b.stage1At != null, b.stage1At == null && now > s1,
-          'Stage 1 done: ' + c.stage1ToF + ' °F reached at ' + U.fmtTime(b.stage1At || 0),
-          'Stage 1: reach ' + c.stage1ToF + ' °F within ' + trimNum(c.stage1H) + ' h (' + hmLong(s1 - now) + ' left)',
-          'Stage 1 missed: ' + c.stage1ToF + ' °F was not reached within ' + trimNum(c.stage1H) + ' h');
+          'Stage 1 done: ' + U.tempText(c.stage1ToF) + ' reached at ' + U.fmtTime(b.stage1At || 0),
+          'Stage 1: reach ' + U.tempText(c.stage1ToF) + ' within ' + trimNum(c.stage1H) + ' h (' + hmLong(s1 - now) + ' left)',
+          'Stage 1 missed: ' + U.tempText(c.stage1ToF) + ' was not reached within ' + trimNum(c.stage1H) + ' h');
         stepLine(rec.step2, b.finalAt != null, b.finalAt == null && now > fin,
-          'Stage 2 done: ' + c.finalF + ' °F reached at ' + U.fmtTime(b.finalAt || 0),
-          'Stage 2: reach ' + c.finalF + ' °F by ' + trimNum(c.totalH) + ' h in all (' + hmLong(fin - now) + ' left)',
-          'Stage 2 missed: ' + c.finalF + ' °F was not reached within ' + trimNum(c.totalH) + ' h');
+          'Stage 2 done: ' + U.tempText(c.finalF) + ' reached at ' + U.fmtTime(b.finalAt || 0),
+          'Stage 2: reach ' + U.tempText(c.finalF) + ' by ' + trimNum(c.totalH) + ' h in all (' + hmLong(fin - now) + ' left)',
+          'Stage 2 missed: ' + U.tempText(c.finalF) + ' was not reached within ' + trimNum(c.totalH) + ' h');
       }
 
       // buttons
@@ -21786,17 +22390,27 @@ a.of-nav:active { background: var(--press); }
       cls(rec.bLog, 'btn-primary', gt.action === 'CHECK_TEMP');
       setHidden(rec.bReheat, gt.action !== 'REHEAT_IMMEDIATE');
       setHidden(rec.bCool, !(b.kind === 'hot' && b.remainingG > 0 && gt.action !== 'DISCARD_LOCKOUT'));
+      layoutActions(rec);
       if (rec.ed && rec.mode) refreshHint(rec, b);
       return gt;
     }
 
+    // Picks the one main button of a card (taste and keep, then reheat, then log temp) and moves the others behind "...".
+    function layoutActions(rec) {
+      const main = [rec.bKeep, rec.bReheat, rec.bLog].find((a) => !a.hidden) || rec.bLog;
+      rec.primary = main;
+      let others = 0;
+      rec.acts.forEach((a) => { const sec = a !== main; if (a.classList.contains('hc-sec') !== sec) a.classList.toggle('hc-sec', sec); if (sec && !a.hidden) others++; });
+      cls(main, 'btn-primary', main !== rec.bLog || rec.bLog.classList.contains('btn-primary'));
+      setHidden(rec.bMore, others === 0);
+    }
     // Builds the inline temperature box once per card. Log temp and Reheat both use it.
     function buildEditor(rec) {
       const ed = { err: h('div', { class: 'fs-note', 'data-tone': 'bad', role: 'alert', hidden: true }), hint: h('p', { class: 'hc-hint', role: 'status' }) };
       ed.title = h('div', { class: 'hc-ed-t' });
       // Wide range on purpose: a reading of 40 or 250 degrees must be
       // typeable so it can be recorded and flagged.
-      ed.stepper = SB.ui.stepper({ value: 150, min: 32, max: 300, step: 1, bigStep: 5, unit: '°F', label: 'Temperature in degrees Fahrenheit', onChange: () => { const b = batchOf(rec.id); if (b) refreshHint(rec, b); setHidden(ed.err, true); } });
+      ed.stepper = SB.ui.stepper({ value: U.tempShown(150), min: U.tempShown(32), max: U.tempShown(300), step: 1, bigStep: 5, unit: U.unitLabel('temp'), label: U.units.temp === 'C' ? 'Temperature in degrees Celsius' : 'Temperature in degrees Fahrenheit', onChange: () => { const b = batchOf(rec.id); if (b) refreshHint(rec, b); setHidden(ed.err, true); } });
       // Saves the reading through the engine.
       ed.save = h('button', { type: 'button', class: 'btn btn-primary btn-lg', onClick: () => saveReading(rec) }, ico('check', 22), h('span', null, 'Save reading'));
       // Closes the box without saving anything.
@@ -21818,7 +22432,7 @@ a.of-nav:active { background: var(--press); }
       const S = safety();
       text(rec.ed.title, mode === 'reheat' ? 'Reheated to' : b.kind === 'cooling' ? 'Cooling reading' : 'Temperature now');
       text(rec.ed.save.querySelector('span'), mode === 'reheat' ? 'Log reheat' : 'Save reading');
-      rec.ed.stepper.setValue(mode === 'reheat' ? S.reheatF : defaultTemp(b), { silent: true });
+      rec.ed.stepper.setValue(U.tempShown(mode === 'reheat' ? S.reheatF : defaultTemp(b)), { silent: true });
       setHidden(rec.ed.err, true); setHidden(rec.ed.el, false);
       refreshHint(rec, b);
       rec.bLog.setAttribute('aria-expanded', mode === 'log' ? 'true' : 'false'); rec.bReheat.setAttribute('aria-expanded', mode === 'reheat' ? 'true' : 'false');
@@ -21834,13 +22448,13 @@ a.of-nav:active { background: var(--press); }
     }
     // Updates the one-line verdict under the stepper to match the number in it.
     function refreshHint(rec, b) {
-      const hnt = tempHint(b, rec.mode, rec.ed.stepper.getValue());
+      const hnt = tempHint(b, rec.mode, U.tempStored(rec.ed.stepper.getValue()));
       text(rec.ed.hint, hnt.text); attr(rec.ed.hint, 'data-tone', hnt.tone);
     }
     // Saves the reading (or the reheat) through the engine. A refusal is shown inside the box in plain words.
     function saveReading(rec) {
       const b = batchOf(rec.id); if (!b) { closeEditor(rec, false); return; }
-      const f = rec.ed.stepper.getValue(), mode = rec.mode;
+      const f = U.tempStored(rec.ed.stepper.getValue()), mode = rec.mode;
       // Initials are asked once on this tablet; the reading is then saved with them.
       askWho(null, 'Save reading', (who) => saveReadingAs(rec, b, f, mode, who));
     }
@@ -21852,10 +22466,10 @@ a.of-nav:active { background: var(--press); }
         return;
       }
       const label = b.label || 'Batch', info = res.info || {};
-      if (mode === 'reheat' || info.reheated) toast(label + ' reheated to ' + f + ' °F. It is being served again.', 'ok');
-      else if (info.status === 'reheat') toast(label + ' is below ' + safety().hotHoldF + ' °F. Reheat it to ' + safety().reheatF + ' °F now, or discard it.', 'warn');
-      else if (info.status === 'chill') toast(label + ' is above ' + safety().coldHoldF + ' °F. Chill it now.', 'warn');
-      else toast(label + ' logged at ' + f + ' °F.' + (info.onTime === false ? ' That check was ' + hmLong(info.lateMs) + ' late.' : ''), info.onTime === false ? 'warn' : 'ok');
+      if (mode === 'reheat' || info.reheated) toast(label + ' reheated to ' + U.tempText(f) + '. It is being served again.', 'ok');
+      else if (info.status === 'reheat') toast(label + ' is below ' + U.tempText(safety().hotHoldF) + '. Reheat it to ' + U.tempText(safety().reheatF) + ' now, or discard it.', 'warn');
+      else if (info.status === 'chill') toast(label + ' is above ' + U.tempText(safety().coldHoldF) + '. Chill it now.', 'warn');
+      else toast(label + ' logged at ' + U.tempText(f) + '.' + (info.onTime === false ? ' That check was ' + hmLong(info.lateMs) + ' late.' : ''), info.onTime === false ? 'warn' : 'ok');
       closeEditor(rec, true);
       update(nowMs());
       flash(rec.el);
@@ -21893,7 +22507,7 @@ a.of-nav:active { background: var(--press); }
           // Initials are asked once on this tablet; the discard is then logged with them.
           setTimeout(() => askWho(opener, 'Discard batch', (who) => {
             const res = run('discardBatch', who ? { batchId: b.id, reason, who } : { batchId: b.id, reason });
-            if (res.report === 'ok') { undoToast(label + ' discarded. ' + U.fmtG(res.info && res.info.g) + ' counted as waste.', 'ok'); update(nowMs()); }
+            if (res.report === 'ok') { undoToast(label + ' discarded. ' + U.weightText(res.info && res.info.g) + ' counted as waste.', 'ok'); update(nowMs()); }
             else toast(say(res), 'warn');
           }), 60);
         },
@@ -21944,7 +22558,7 @@ a.of-nav:active { background: var(--press); }
         picks.set(x.id, cb);
         const reading = U.isNum(x.lastTempF) ? 'Last reading ' + fmtF(x.lastTempF) + ', ' + agoText(nowMs() - x.lastTempAt) : 'No reading yet';
         list.appendChild(h('label', { class: 'fs-card fs-card-soft', style: 'display:flex;gap:12px;align-items:center;padding:12px' }, cb,
-          h('span', { class: 'grow' }, h('strong', null, x.label || 'Batch'), h('br'), h('span', { class: 'fs-sub' }, ok ? reading : reading + '. Log a temperature of ' + (x.kind === 'cold' ? S.coldHoldF + ' °F or lower' : S.hotHoldF + ' °F or higher') + ' first.'))));
+          h('span', { class: 'grow' }, h('strong', null, x.label || 'Batch'), h('br'), h('span', { class: 'fs-sub' }, ok ? reading : reading + '. Log a temperature of ' + (x.kind === 'cold' ? U.tempText(S.coldHoldF) + ' or lower' : U.tempText(S.hotHoldF) + ' or higher') + ' first.'))));
       });
       const dur = SB.ui.segmented({ label: 'How long', value: '30', options: [{ id: '30', label: '30 minutes' }, { id: '60', label: '1 hour' }, { id: 'until', label: 'Until a time' }] });
       const untilIn = h('input', { class: 'input', type: 'time', 'aria-label': 'Keep serving until', hidden: true });
@@ -22009,7 +22623,7 @@ a.of-nav:active { background: var(--press); }
         title: 'Start cooling ' + label + '?', name: 'cooling', opener, confirmLabel: 'Start cooling', icon: 'snow',
         body: [
           h('p', null, 'All ' + qtyText(ing, b.remainingG) + ' moves to cooling and stops being served.'),
-          h('p', null, 'Get it from ' + S.hotHoldF + ' °F to ' + c.stage1ToF + ' °F within ' + trimNum(c.stage1H) + ' hours, then to ' + c.finalF + ' °F within ' + trimNum(c.totalH - c.stage1H) + ' more hours (' + trimNum(c.totalH) + ' hours in all). Log a reading as it cools.'),
+          h('p', null, 'Get it from ' + U.tempText(S.hotHoldF) + ' to ' + U.tempText(c.stage1ToF) + ' within ' + trimNum(c.stage1H) + ' hours, then to ' + U.tempText(c.finalF) + ' within ' + trimNum(c.totalH - c.stage1H) + ' more hours (' + trimNum(c.totalH) + ' hours in all). Log a reading as it cools.'),
           fx && fx.off.length ? h('div', { class: 'fs-note', 'data-tone': 'warn' }, ico('alert', 20), h('div', null, 'These menu items go 86: ' + endDot(listWords(fx.off)))) : null,
           h('p', { class: 'fs-sub' }, C.safetyLine),
         ],
@@ -22031,7 +22645,7 @@ a.of-nav:active { background: var(--press); }
     }
     // Refreshes one recently discarded line: what, why, how much and when.
     function updateRecent(rec, b, now) {
-      text(rec.t, (b.label || 'Batch') + ': ' + (REASON_WORDS[b.discardReason] || 'Discarded').toLowerCase() + ', ' + U.fmtG(b.wasteG || 0) + ' wasted');
+      text(rec.t, (b.label || 'Batch') + ': ' + (REASON_WORDS[b.discardReason] || 'Discarded').toLowerCase() + ', ' + U.weightText(b.wasteG || 0) + ' wasted');
       text(rec.when, agoText(now - (b.discardedAt || now)));
     }
 
@@ -22093,7 +22707,7 @@ a.of-nav:active { background: var(--press); }
       for (const e of plans) {
         const ing = ingOf(e.ing);
         planList.appendChild(h('div', { class: 'fs-card fs-card-soft hc-plan', dataset: { plan: e.id }, style: 'display:flex;gap:12px;align-items:center;padding:12px' }, ico('flame', 18),
-          h('span', { class: 'grow' }, h('strong', null, (ing ? ing.name : e.ing) + ', ' + U.fmtG(e.grams)), h('br'), h('span', { class: 'fs-sub' }, 'Ready at ' + U.fmtTime(e.offAt) + (e.readyAt > e.offAt ? ', ready to serve about ' + U.fmtTime(e.readyAt) : '') + '.')),
+          h('span', { class: 'grow' }, h('strong', null, (ing ? ing.name : e.ing) + ', ' + U.weightText(e.grams)), h('br'), h('span', { class: 'fs-sub' }, 'Ready at ' + U.fmtTime(e.offAt) + (e.readyAt > e.offAt ? ', ready to serve about ' + U.fmtTime(e.readyAt) : '') + '.')),
           h('button', { type: 'button', class: 'btn', dataset: { act: 'cancel-plan' }, onClick: () => { const res = run('cancelPlan', { planId: e.id }); if (res.report !== 'ok') toast(say(res), 'warn'); else { toast('Plan cancelled.', 'ok'); update(nowMs()); } } }, ico('x', 20), h('span', null, 'Cancel'))));
       }
     }
@@ -22116,7 +22730,7 @@ a.of-nav:active { background: var(--press); }
         const bits = [];
         if (act) bits.push(act + ' ' + plural(act, 'needs', 'need') + ' action now');
         if (check) bits.push(check + ' ' + plural(check, 'needs', 'need') + ' a temperature reading');
-        text(summary, live.length + ' ' + plural(live.length, 'batch', 'batches') + ' in the cabinet. ' + (bits.length ? bits.join('. ') + '.' : 'All are in range.'));
+        text(summary, live.length + ' ' + plural(live.length, 'batch', 'batches') + ' in the cabinet. ' + (bits.length ? bits.join('. ') + '.' : 'All are in range.') + (live.some((x) => x.src === 'starter') ? ' ' + live.filter((x) => x.src === 'starter').length + ' are starter stock (starting amounts, not weighed).' : ''));
         cls(summary, 'is-alert', act > 0);
       }
       tabs.seg.setCount('batches', live.length, { alert: act + check > 0 });
@@ -22199,7 +22813,7 @@ a.of-nav:active { background: var(--press); }
     // The cook endpoint is in Celsius (the research model uses it), so the same number is shown in Fahrenheit beside it.
     const endF = h('p', { class: 'fs-sub hc-sub' });
     // Writes the endpoint in Fahrenheit under its stepper.
-    const paintEndF = () => text(endF, '= ' + Math.round(F.endC * 9 / 5 + 32) + ' °F');
+    const paintEndF = () => text(endF, '= ' + U.tempTextC(F.endC));
     const thermalBox = h('div', { class: 'hc-two' }, vis('Cook endpoint', endStep, endF), vis('Rested before slicing', holdStep));
 
     // Cooked weight typed by the cook; it replaces the model when 'I weighed it' is on.
@@ -22210,7 +22824,7 @@ a.of-nav:active { background: var(--press); }
     const weighedBox = h('div', { class: 'hc-weighed' }, weighedTog, cookedFld);
 
     // The first temperature reading; it starts the batch's clock.
-    const tempStep = SB.ui.stepper({ value: F.tempF, min: 32, max: 300, step: 1, bigStep: 5, unit: '°F', label: 'First temperature reading in degrees Fahrenheit', onChange: (v) => { F.tempF = v; F.tTouched = true; tempHintPaint(); } });
+    const tempStep = SB.ui.stepper({ value: U.tempShown(F.tempF), min: U.tempShown(32), max: U.tempShown(300), step: 1, bigStep: 5, unit: U.unitLabel('temp'), label: U.units.temp === 'C' ? 'First temperature reading in degrees Celsius' : 'First temperature reading in degrees Fahrenheit', onChange: (v) => { F.tempF = U.tempStored(v); F.tTouched = true; tempHintPaint(); } });
     const tempHintEl = h('p', { class: 'hc-hint', role: 'status' });
     const tempFld = h('div', { class: 'hc-fld' }, h('div', { class: 'field-label', 'aria-hidden': 'true' }, 'First temperature reading'), tempStep, tempHintEl);
 
@@ -22263,7 +22877,7 @@ a.of-nav:active { background: var(--press); }
       setHidden(thermalBox, !ing.thermal);
       setHidden(weighedBox, !meat);
       if (!meat && F.weighed) { F.weighed = false; weighedTog.setValue(false); setHidden(cookedFld, true); }
-      if (!F.tTouched) { F.tempF = ing.hold === 'cold' ? 38 : 150; tempStep.setValue(F.tempF, { silent: true }); }
+      if (!F.tTouched) { F.tempF = ing.hold === 'cold' ? 38 : 150; tempStep.setValue(U.tempShown(F.tempF), { silent: true }); }
       if (F.weighed) { F.cookedTouched = false; syncCooked(); }
       tempHintPaint(); calc();
     }
@@ -22297,21 +22911,21 @@ a.of-nav:active { background: var(--press); }
       const meat = m.ing.thermal || (U.isNum(m.ing.yield) && m.ing.yield < 1);
       text(dtYield, m.kind === 'weighed' ? 'Yield from your weights' : meat ? 'Expected yield' : 'Yield');
       text(dYield, pctText(m.yieldPct, 1) + (m.kind === 'model' ? ' (cook-loss model)' : m.kind === 'static' && meat ? ' (starter estimate)' : ''));
-      text(dCooked, U.fmtG(m.cookedG));
-      text(dtCost, 'Cost per cooked kg');
+      text(dCooked, U.weightText(m.cookedG));
+      text(dtCost, 'Cost per cooked ' + unitW());
       text(dCost, U.fmtMoney(m.costPerKg) + ' (starter cost)');
       if (m.cmp) {
         const c = m.cmp;
         const wTxt = Math.abs(Math.round(c.weightErrorPct)) + '% too ' + (c.weightErrorPct < 0 ? 'little' : 'much');
         const cTxt = Math.abs(Math.round(c.costErrorPct)) + '% too ' + (c.costErrorPct > 0 ? 'high' : 'low');
-        text(cmpLine, 'The flat ' + c.staticPct + '% rule would plan ' + U.fmtG(c.staticCookedG) + ' of cooked meat (' + wTxt + ') and price it at ' + U.fmtMoney(c.staticCostPerKg) + ' per kg (' + cTxt + '). This model says ' + U.fmtG(c.modelCookedG) + ' at ' + U.fmtMoney(c.modelCostPerKg) + ' per kg.');
+        text(cmpLine, 'The flat ' + c.staticPct + '% rule would plan ' + U.weightText(c.staticCookedG) + ' of cooked meat (' + wTxt + ') and price it at ' + U.fmtMoney(perUnit(c.staticCostPerKg)) + ' per ' + unitW() + ' (' + cTxt + '). This model says ' + U.weightText(c.modelCookedG) + ' at ' + U.fmtMoney(perUnit(c.modelCostPerKg)) + ' per ' + unitW() + '.');
         setHidden(cmpLine, false);
       } else if (m.ing.thermal && m.kind === 'weighed') {
         const staticCost = m.rawCost / 0.5;
-        text(cmpLine, 'The flat 50% rule would have priced this at ' + U.fmtMoney(staticCost) + ' per kg and planned ' + U.fmtG(m.rawG * 0.5) + '. Your weights say ' + U.fmtG(m.cookedG) + ' at ' + U.fmtMoney(m.costPerKg) + ' per kg.');
+        text(cmpLine, 'The flat 50% rule would have priced this at ' + U.fmtMoney(perUnit(staticCost)) + ' per ' + unitW() + ' and planned ' + U.weightText(m.rawG * 0.5) + '. Your weights say ' + U.weightText(m.cookedG) + ' at ' + U.fmtMoney(perUnit(m.costPerKg)) + ' per ' + unitW() + '.');
         setHidden(cmpLine, false);
       } else setHidden(cmpLine, true);
-      text(honest, (m.ing.thermal ? 'Brisket yield comes from the Texas A&M cook-loss model. ' : 'Yield is a starter estimate until you weigh a batch. ') + 'Raw cost of ' + U.fmtMoney(m.rawCost) + ' per kg is a starter estimate.');
+      text(honest, (m.ing.thermal ? 'Brisket yield comes from the Texas A&M cook-loss model. ' : 'Yield is a starter estimate until you weigh a batch. ') + 'Raw cost of ' + U.fmtMoney(perUnit(m.rawCost)) + ' per ' + unitW() + ' is a starter estimate.');
     }
 
     // Shows or clears the error above the Put in hold cabinet button.
@@ -22329,8 +22943,8 @@ a.of-nav:active { background: var(--press); }
       showErr(null);
       rememberBatch(m.ing.id, { rawKg: F.rawKg, endC: F.endC, holdH: F.holdH });
       const info = res.info || {}, b = st().batches.find((x) => x.id === info.batchId), label = b ? b.label : m.ing.name + ' batch';
-      if (info.status === 'ok') toast(label + ' is in the cabinet: ' + U.fmtG(info.cookedG) + ' cooked, first reading ' + F.tempF + ' °F.', 'ok');
-      else toast(label + ' is in the cabinet but not being served: ' + (m.ing.hold === 'cold' ? 'above ' + safety().coldHoldF + ' °F, chill it now.' : 'below ' + safety().hotHoldF + ' °F, reheat it to ' + safety().reheatF + ' °F.'), 'warn');
+      if (info.status === 'ok') toast(label + ' is in the cabinet: ' + U.weightText(info.cookedG) + ' cooked, first reading ' + U.tempText(F.tempF) + '.', 'ok');
+      else toast(label + ' is in the cabinet but not being served: ' + (m.ing.hold === 'cold' ? 'above ' + U.tempText(safety().coldHoldF) + ', chill it now.' : 'below ' + U.tempText(safety().hotHoldF) + ', reheat it to ' + U.tempText(safety().reheatF) + '.'), 'warn');
       labelInput.value = ''; F.tTouched = false; setIng(F.ing);
       onAdded(info.batchId);
     }
@@ -22849,7 +23463,10 @@ a.of-nav:active { background: var(--press); }
   function openDemo() {
     const offs = [];
     // Listeners are removed when the sheet closes, so nothing keeps updating a screen that is gone.
-    const sheet = SB.ui.sheet({ title: 'Demo and clock', side: 'right', width: 'min(640px, 96vw)', name: 'demo', onClose: () => offs.splice(0).forEach((f) => f()) });
+    // In a real kitchen (not the demo tab) this sheet only explains the demo and opens it; the crew and clock live in the demo.
+    const realKitchen = !!(SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() && SB.setup && SB.setup.demoIntro);
+    const sheet = SB.ui.sheet({ title: realKitchen ? 'Try the demo' : 'Demo and clock', side: 'right', width: 'min(640px, 96vw)', name: 'demo', onClose: () => offs.splice(0).forEach((f) => f()) });
+    if (realKitchen) { sheet.body.appendChild(SB.setup.demoIntro()); return sheet; }
     const live = simLive();
 
     // status line
@@ -23109,13 +23726,13 @@ a.of-nav:active { background: var(--press); }
       safetyNote(),
       h('p', { class: 'fs-sub' }, 'These are the limits Smokebox is using right now. They start from the FDA Food Code (3-501.14, 3-501.16, 3-403.11 and 4-602.11) and are starter values until the owner confirms them.'),
       helpList([
-        rule('flame', 'Keep hot food hot', 'Hot food stays at ' + S.hotHoldF + ' °F or above.'),
-        rule('snow', 'Keep cold food cold', 'Cold food stays at ' + S.coldHoldF + ' °F or below.'),
+        rule('flame', 'Keep hot food hot', 'Hot food stays at ' + U.tempText(S.hotHoldF) + ' or above.'),
+        rule('snow', 'Keep cold food cold', 'Cold food stays at ' + U.tempText(S.coldHoldF) + ' or below.'),
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
-        rule('refresh', 'Reheat once', 'Below ' + S.hotHoldF + ' °F, reheat to ' + S.reheatF + ' °F within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
-        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + S.hotHoldF + ' °F, not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
+        rule('refresh', 'Reheat once', 'Below ' + U.tempText(S.hotHoldF) + ', reheat to ' + U.tempText(S.reheatF) + ' within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
+        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
         rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit means the batch must be thrown out when time is up. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
-        rule('snow', 'Cooling', 'From ' + S.hotHoldF + ' °F to ' + c.stage1ToF + ' °F within ' + c.stage1H + ' hours, then to ' + c.finalF + ' °F within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
+        rule('snow', 'Cooling', 'From ' + U.tempText(S.hotHoldF) + ' to ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' hours, then to ' + U.tempText(c.finalF) + ' within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
         rule('lock', 'Locked batches', 'A batch that is out of range is locked. Nothing is taken from it, and menu items that need it show 86 safety hold.'),
       ]));
@@ -23347,7 +23964,7 @@ a.of-nav:active { background: var(--press); }
     // The Guide opens only when the guide page is part of this copy of Smokebox.
     const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
@@ -24315,7 +24932,7 @@ a.of-nav:active { background: var(--press); }
       if (b.status !== 'discard' || !Number.isFinite(b.discardedAt)) continue;
       out.push({
         id: b.id, t: b.discardedAt, date: U.fmtDateShort(U.dateKey(b.discardedAt)), food: b.label || b.ing,
-        amount: U.fmtG(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
+        amount: U.weightText(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
         initials: rec.initials[b.id] || (logged.get(b.id) && logged.get(b.id).event.who) || '', extra: rec.extra[b.id] || '',
         eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
@@ -24399,7 +25016,7 @@ a.of-nav:active { background: var(--press); }
       const cols = rec.cols.filter((c) => c.on);
       if (!list.length) { wrap.appendChild(h('div', { class: 'empty' }, ico('trash', 40), h('h3', null, 'Nothing thrown out yet'), h('p', null, 'Batches you throw out show up here with their time and reason.'))); return; }
       const table = h('table', { class: 'dlog-table', style: 'border-collapse:collapse;width:100%' });
-      table.appendChild(h('thead', null, h('tr', null, ...cols.map((c) => h('th', { style: 'text-align:left;padding:8px;border-bottom:2px solid var(--line)' }, c.label)), h('th', { style: 'padding:8px;border-bottom:2px solid var(--line)' }, h('span', { class: 'visually-hidden' }, 'Fix')))));
+      table.appendChild(h('thead', null, h('tr', null, ...cols.map((c) => h('th', { style: 'text-align:left;padding:8px;border-bottom:2px solid var(--line);' + (c.label.length <= 12 ? 'white-space:nowrap' : '') }, c.label)), h('th', { style: 'padding:8px;border-bottom:2px solid var(--line)' }, h('span', { class: 'visually-hidden' }, 'Fix')))));
       const tb = h('tbody');
       list.forEach((r) => {
         // Opens the fix box for this row.
@@ -24500,6 +25117,9 @@ a.of-nav:active { background: var(--press); }
   function openSetup() {
     const sheet = SB.ui.sheet({ title: 'Set up this tablet', side: 'right', width: 'min(720px, 96vw)', name: 'setup' });
     const list = h('div', { class: 'setup-list' });
+    // A small "?" help line at the top: the guide pages about setting up and about sound trouble, when the guide is in this build.
+    const gl = SB.guide && typeof SB.guide.link === 'function' ? [SB.guide.link('getting-started', 'setting up'), SB.guide.link('troubleshooting', 'no sound')].filter(Boolean) : [];
+    if (gl.length) list.appendChild(h('p', { class: 'fs-sub' }, 'Help: ', ...gl.flatMap((a, i) => (i ? [' · ', a] : [a]))));
     // Adds one checklist step: a title, plain words, an optional button and a status line.
     function step(title, words, action) {
       const status = h('p', { class: 'fs-sub', role: 'status' });
@@ -24516,15 +25136,15 @@ a.of-nav:active { background: var(--press); }
       btn('Play a test warning', 'volume', () => { if (SB.floor && SB.floor.setSound) { SB.floor.setSound(true); if (SB.floor.setSpeech) SB.floor.setSpeech(true); return 'You should have heard a chime and a voice. If not, turn the tablet volume up and tap again.'; } return 'The kitchen board is not loaded.'; }));
     const wake = SB.floor && SB.floor.wakeLock ? SB.floor.wakeLock() : 'unknown';
     step('2. Keep the screen on', 'The board asks the browser to keep the screen awake' + (wake === 'on' ? ' (it is on now).' : wake === 'unsupported' ? ', but this browser does not support that.' : ', but this browser has not allowed it.') + ' Also set the tablet itself: Settings, Display, Auto-Lock (iPad) or Screen timeout (Android), to Never. Plug the tablet into power.');
-    const prot = step('3. Protect your data', 'Everything is saved in this browser only. Ask the browser to keep it safe, and save a copy of the discard log every day.',
-      btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Your browser agreed to keep this data. Still save a backup every day.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save the discard log every day.'; }));
+    const prot = step('3. Protect your data', 'Everything is saved in this browser only. Ask the browser to keep it safe, and save a backup every day (Menu and settings, then Data). If you cook ahead, save the thrown-out log too.',
+      btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Your browser agreed to keep this data. Still save a backup every day.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save a backup every day.'; }));
     step('4. Install as an app', 'On an iPad: Share, then Add to Home Screen. In Chrome on Android or a computer: the menu, then Install app or Add to Home screen. An installed app opens full screen and the browser is less likely to clear its data.');
     step('5. Where the tablet sits', 'Put the tablet where the person at the cutting board can tap it without walking. If it is out of reach, batch times will not get logged and the waste numbers will be wrong.');
     // Closes this sheet and opens the Menu and settings page of the back office.
     const openData = () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); };
-    step('6. Your dishes', 'Add your dishes under Dishes and prices, in the Menu. Then open Menu and settings to enter your real cost per kg, the 86 point, the pull size (one whole brisket, one rack, one pan), the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
+    step('6. Your dishes', 'Add your dishes under Dishes and prices, in the Menu. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
       () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu and settings')));
-    step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a safety limit. Slaw, potato salad and banana pudding start as quality limits. Ask your health department which limit applies to each food you hold, then set it on the Menu and settings page.');
+    step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a safety limit. Ask your health department which limit applies to each food you hold, then set it on the Menu and settings page.');
     sheet.body.appendChild(list);
     return sheet;
   }
@@ -24544,7 +25164,7 @@ a.of-nav:active { background: var(--press); }
     fry: { cat: 'fried', sec: 240, track: 'two' }, cold: { cat: 'cold', sec: 60, track: 'one' },
   };
   // A short plain line under each station name on its tile.
-  const ZONE_HINT = { pit: 'Smoker and slicing', sides: 'Stove and sides', fry: 'Fryer', cold: 'No cooking: drinks, cold sides' };
+  const ZONE_HINT = { pit: 'Smoker, grill or oven', sides: 'Stove and sides', fry: 'Fryer', cold: 'No cooking: drinks, cold sides' };
   // The example menu. Columns: name, price in dollars, station id, category id. Made-up prices, owner to replace.
   // audit:data-start
   const EXAMPLES = [
@@ -24626,7 +25246,7 @@ a.of-nav:active { background: var(--press); }
     // Says what went wrong in plain words, such as a dish that already lists ingredients.
     const say = (r) => { msg.textContent = r.ok ? '' : (r.report === 'portionsConflict' ? 'This dish already uses ingredients, so it cannot be counted by portions too.' : r.words); };
     if (left < 0) {
-      const cnt = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', placeholder: 'How many', 'aria-label': 'How many ' + m.name + ' you made' });
+      const cnt = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', placeholder: 'How many?', 'aria-label': 'How many ' + m.name + ' you made' });
       // Starts counting portions for this dish at the typed number.
       const go = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => {
         const n = cnt.value.trim() === '' ? 0 : Number(cnt.value);
@@ -24651,6 +25271,28 @@ a.of-nav:active { background: var(--press); }
   function cookOn() { return SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : true; }
   // The cooked-ahead items the owner has made: cook-ahead food that is not archived.
   function cookItems() { return SB.store.getState().ingredients.filter((i) => i.tcs && !i.archived); }
+
+  /* ---------- Try the demo ---------- */
+
+  // Asks once, in plain words, then opens the demo: a practice kitchen in this tab. The owner's own kitchen is saved first
+  // and comes back with the Back to my kitchen button.
+  async function tryDemo(skipAsk) {
+    const store = SB.store;
+    if (!store.enterDemo || store.isDemo()) return false;
+    const ok = skipAsk || !SB.ui.confirm ? true : await SB.ui.confirm({ title: 'Try the demo?', confirmLabel: 'Try the demo', cancelLabel: 'Not now',
+      body: ['The demo is a practice kitchen with a sample barbecue menu and pretend tickets. Nothing in it is your kitchen.', 'Your own dishes and orders are kept safe. A bar at the top of every screen has a Back to my kitchen button.'] });
+    if (!ok) return false;
+    if (!store.enterDemo() && SB.ui.toast) SB.ui.toast('This browser would not open the demo. Try again, or add ?demo to the address.', { tone: 'warn' });
+    return true;
+  }
+  // The body of the Demo sheet in a real kitchen: what the demo is, and one button that opens it.
+  function demoIntro() {
+    return h('div', { class: 'dm' }, h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Try the demo'),
+      h('p', { class: 'fs-sub' }, 'A practice kitchen with a sample barbecue menu, pretend tickets and a crew that sends orders, so you can see Smokebox busy. Nothing in it is your kitchen, and nothing you do there reaches your real dishes, orders or numbers.'),
+      h('p', { class: 'fs-sub' }, 'A bar at the top of every demo screen says so and has a Back to my kitchen button. Leaving erases the demo.'),
+      // Opens the demo after the plain-words question.
+      h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'try-demo' }, onClick: () => tryDemo(true) }, ico('play', 22), h('span', null, 'Try the demo'))));
+  }
 
   /* ---------- the Dishes and prices sheet ---------- */
 
@@ -24887,7 +25529,7 @@ a.of-nav:active { background: var(--press); }
       } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Add a cooked-ahead item' : 'Yes, I cook ahead'));
       if (!items.length) {
         caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook any of this ahead and hold it?'),
-          h('p', { class: 'fs-sub' }, 'Brisket in the morning, slaw in the cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. You can skip this and still take orders.'),
+          h('p', { class: 'fs-sub' }, 'Chili in a warmer, potato salad in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. You can skip this and still take orders.'),
           // Remembers the owner said no, so the question goes away.
           h('div', { class: 'fs-row' }, add, h('button', { type: 'button', class: 'btn', dataset: { act: 'skip-cooked' }, onClick: () => { U.storage.set(KEY_CASKIP, true); paintCook(); } }, 'No, skip this')));
       } else {
@@ -24922,7 +25564,9 @@ a.of-nav:active { background: var(--press); }
       exStatus.textContent = 'Example dishes removed.';
     });
     const ways = h('details', { class: 'dp-fold dp-ways' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'More ways to add dishes')),
-      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'An example barbecue menu with made-up prices, so you can see how Smokebox looks with food on it. You can edit or remove every dish.'), h('div', { class: 'fs-row' }, exBtn, exRemove), exStatus));
+      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'An example menu with sample prices, so you can see how Smokebox looks with food on it. You can edit or remove every dish.'), h('div', { class: 'fs-row' }, exBtn, exRemove), exStatus,
+        // A quiet link to the optional menu import screen.
+        h('p', { class: 'fs-sub' }, h('button', { type: 'button', class: 'btn btn-link', dataset: { act: 'open-import' }, onClick: () => SB.sheets.open('menuimport') }, 'Have a menu file? Import it'))));
 
     // Links to the other small settings and to the full menu editor in the back office.
     const shopBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('shop'), 60); } }, ico('sliders', 20), h('span', null, 'Tax, hours and PIN'));
@@ -24958,7 +25602,7 @@ a.of-nav:active { background: var(--press); }
       const gIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', value: '150', 'aria-label': 'Grams of it in one ' + m.name });
       return { m, cb, gIn, el: h('div', { class: 'dp-row' }, h('label', { class: 'grow' }, cb, ' ' + m.name + (portionLeft(m) >= 0 ? ' (counted by portions)' : '')), h('span', { class: 'fs-sub' }, 'grams in one:'), gIn) };
     });
-    const dishBox = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Which dishes use it?'), h('p', { class: 'fs-sub' }, 'Tick each dish and the grams of it in one serving (150 is a starting guess). Smokebox takes that much off the batch when the dish is made.'), h('div', { class: 'dp-list' }, dishRows.map((r) => r.el)));
+    const dishBox = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Which dishes use it?'), h('p', { class: 'fs-sub' }, 'Select each dish and enter the grams of it in one serving (150 is a starting guess). Smokebox takes that much off the batch when the dish is made.'), h('div', { class: 'dp-list' }, dishRows.map((r) => r.el)));
     const status = h('p', { class: 'fs-sub', role: 'status' });
     const after = h('div', { class: 'fs-row', hidden: true });
     // Saves the item and links the ticked dishes; says plainly what happened and what to do next.
@@ -24991,6 +25635,124 @@ a.of-nav:active { background: var(--press); }
     sheet.body.appendChild(h('div', { class: 'dp' }, h('p', { class: 'fs-sub' }, 'Optional. Skip this and you can still take every order. Later you can add more from the Cabinet.'),
       h('div', { class: 'dp-form' }, nameField, h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Hot or cold'), kind), hoursField, kgField, dishBox, h('div', { class: 'fs-row' }, save), status, after)));
     setTimeout(() => nameIn.focus(), 50);
+    return sheet;
+  }
+
+  /* ---------- the Import a menu sheet ---------- */
+
+  // Opens "Import a menu": choose a file or paste text, check it, fix the rows in a preview, then import the ticked ones.
+  // Also has "Export my menu". Optional; the form is still the easy way to add dishes.
+  function openImport() {
+    const M = SB.menuImport;
+    const sheet = SB.ui.sheet({ title: 'Import a menu', side: 'right', width: 'min(900px, 96vw)', name: 'menuimport' });
+    const root = h('div', { class: 'dp' });
+    if (!M) { sheet.body.appendChild(h('p', { class: 'fs-sub' }, 'Menu import is not part of this copy of Smokebox.')); return sheet; }
+    const area = h('textarea', { class: 'textarea', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Paste your menu here', placeholder: 'Paste your menu here, one dish per line like "Pulled pork plate 12.50", or the text of a spreadsheet.' });
+    const fileIn = h('input', { type: 'file', accept: '.csv,.tsv,.txt,text/csv,text/plain', 'aria-label': 'Choose a menu file' });
+    const status = h('p', { class: 'fs-sub', role: 'status' });
+    const preview = h('div', { class: 'dp-preview' });
+    let parsed = null, rows = [];
+    // The station used for a row that names none: the first station still in use.
+    const defaultZone = () => visibleStations()[0].id;
+    // Runs the importer on the text and draws the preview, or says plainly what is wrong with the text.
+    function check(text, from) {
+      U.clear(preview); status.textContent = '';
+      const res = M.parse(text, { existing: SB.store.getState().menu });
+      if (res.error) { status.textContent = res.error; parsed = null; return; }
+      parsed = res; rows = res.rows.map((r) => Object.assign({ keep: r.ok && !r.hidden }, r));
+      paintPreview(from);
+    }
+    // Says why a typed name cannot be used: 'removed' (a removed dish has it), 'menu' (a dish on the menu), 'list' (another row here), or ''.
+    function takenBy(r) {
+      const nm = String(r.name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      const hit = SB.store.getState().menu.find((m) => m.name.toLowerCase() === nm);
+      if (hit) return hit.archived ? 'removed' : 'menu';
+      return rows.some((o) => o !== r && o.keep && String(o.name || '').trim().toLowerCase() === nm) ? 'list' : '';
+    }
+    // True when an edited row can be imported: a name, a price from 0 to 1000 and a name that is not taken.
+    function rowOk(r) {
+      const nm = String(r.name || '').replace(/\s+/g, ' ').trim();
+      return !!nm && nm.length <= 60 && typeof r.price === 'number' && r.price >= 0 && r.price <= 1000 && !takenBy(r);
+    }
+    // Draws the format line, any file notes, the table of rows (tick, name, price, station, problems) and the Import button.
+    function paintPreview(from) {
+      U.clear(preview);
+      const sm = parsed.summary;
+      preview.append(h('p', { class: 'fs-sub dp-fmt' }, 'Read ' + (from || 'the text') + ' as: ' + parsed.label + '. ' + sm.message));
+      (sm.notes || []).forEach((n) => preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, n)));
+      const body = h('div', { class: 'dp-ptable', role: 'table', 'aria-label': 'Dishes found' });
+      const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'import-go' } }, 'Import');
+      // Updates the Import button's count and enabled state from the ticked, valid rows.
+      const paintGo = () => { const n = rows.filter((r) => r.keep && r.ok).length; go.disabled = n === 0; go.textContent = n ? 'Import ' + n + ' ' + U.plural(n, 'dish', 'dishes') : 'Nothing to import'; };
+      rows.forEach((r) => {
+        const keep = h('input', { type: 'checkbox', checked: r.keep, 'aria-label': 'Import ' + r.name });
+        const nm = h('input', { class: 'input', type: 'text', maxlength: 60, value: r.name || '', 'aria-label': 'Name, line ' + r.line });
+        const pr = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: typeof r.price === 'number' ? r.price.toFixed(2) : '', 'aria-label': 'Price, line ' + r.line });
+        const zs = h('select', { class: 'select', 'aria-label': 'Station, line ' + r.line }, stations().map((z) => h('option', { value: z.id, selected: (r.station || defaultZone()) === z.id }, z.name)));
+        const prob = h('div', { class: 'fs-sub dp-prob' });
+        const rowEl = h('div', { class: 'dp-prow', role: 'row', dataset: { ok: r.ok ? 'true' : 'false' } }, keep, nm, pr, zs, prob);
+        // Redraws this row's plain problems and its tick after any edit.
+        const redo = () => {
+          r.ok = rowOk(r); if (!r.ok) r.keep = false;
+          keep.checked = r.keep; rowEl.dataset.ok = r.ok ? 'true' : 'false';
+          if (r.ok) prob.textContent = '';
+          else prob.textContent = (!String(r.name || '').trim() ? 'Type a name. ' : '') + (typeof r.price !== 'number' ? 'Type a price like 12.50. ' : '') + ({ removed: 'A removed dish has this name. Bring it back in Dishes and prices, or use another name.', menu: 'That name is already on the menu.', list: 'That name is in this list twice.' }[takenBy(r)] || '');
+          paintGo();
+        };
+        // Selecting a row in or out changes only whether it is imported.
+        keep.addEventListener('change', () => { r.keep = keep.checked && (r.ok = rowOk(r)); keep.checked = r.keep; paintGo(); });
+        // Typing a new name or price re-checks the row and ticks it in when it has become valid.
+        const edit = () => { r.name = nm.value.replace(/\s+/g, ' ').trim(); const p = SB.menuImport.readPrice(pr.value); r.price = p && typeof p.value === 'number' ? p.value : null; r.station = zs.value; r.ok = rowOk(r); r.keep = r.ok; redo(); };
+        nm.addEventListener('change', edit); pr.addEventListener('change', edit); zs.addEventListener('change', () => { r.station = zs.value; });
+        prob.textContent = (r.problems || []).map((p) => p.message + (p.fix ? ' ' + p.fix : '')).join(' ');
+        body.appendChild(rowEl);
+      });
+      // Imports the ticked rows through the importer's actions, then offers one-tap undo of that batch.
+      go.addEventListener('click', () => {
+        const picked = rows.filter((r) => r.keep && r.ok).map((r) => Object.assign({}, r, { station: r.station || defaultZone() }));
+        const out = M.toActions(picked, SB.store.getState().menu, { zone: defaultZone() });
+        const ids = [];
+        out.actions.forEach((a) => { const res = send(a.type, a.payload); if (res.ok && res.info && res.info.id) ids.push(res.info.id); });
+        const bad = out.actions.length - ids.length + out.skipped.length;
+        status.textContent = 'Imported ' + ids.length + ' ' + U.plural(ids.length, 'dish', 'dishes') + (bad ? '. ' + bad + ' could not be imported' + (out.skipped.length ? ': ' + out.skipped.map((s) => s.name + ' (' + s.reason + ')').join('; ') : '.') : '.');
+        U.clear(preview);
+        if (ids.length) {
+          // Takes the imported dishes off the menu again in one step (they are removed, not deleted).
+          preview.appendChild(h('button', { type: 'button', class: 'btn', dataset: { act: 'import-undo' }, onClick: () => { ids.forEach((id) => send('updateMenuItem', { id, patch: { archived: true } })); status.textContent = 'Removed the ' + ids.length + ' imported ' + U.plural(ids.length, 'dish', 'dishes') + '.'; U.clear(preview); } }, 'Remove these ' + ids.length));
+        }
+      });
+      preview.append(body, h('div', { class: 'fs-row' }, go));
+      paintGo();
+    }
+    // Reads the chosen file as text and checks it like pasted text.
+    fileIn.addEventListener('change', () => {
+      const f = fileIn.files && fileIn.files[0];
+      if (!f) return;
+      if (f.size > M.limits.textMax) { status.textContent = 'That file is too big to read. Use a file under 1 MB.'; return; }
+      const rd = new g.FileReader();
+      // When the file is read, check its text; a failed read says so.
+      rd.onload = () => { area.value = String(rd.result || ''); check(area.value, 'the file'); };
+      rd.onerror = () => { status.textContent = 'That file could not be read.'; };
+      rd.readAsText(f);
+    });
+    const checkBtn = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'import-check' } }, ico('check', 20), h('span', null, 'Check it'));
+    // Checks the pasted text.
+    checkBtn.addEventListener('click', () => check(area.value, 'the pasted text'));
+    // Export: the menu as a spreadsheet file, so it can be edited elsewhere or kept as a copy.
+    const exp = h('button', { type: 'button', class: 'btn', dataset: { act: 'export-menu' } }, ico('download', 20), h('span', null, 'Export my menu'));
+    // Builds the menu CSV and starts a download; says so if the browser blocks it.
+    exp.addEventListener('click', () => {
+      const text = M.exportMenu(SB.store.getState().menu);
+      try {
+        const url = g.URL.createObjectURL(new g.Blob([text], { type: 'text/csv' }));
+        const a = doc.createElement('a'); a.href = url; a.download = 'smokebox-menu.csv'; a.style.display = 'none'; doc.body.appendChild(a); a.click();
+        setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 1000);
+        status.textContent = 'Saved smokebox-menu.csv. Open it in a spreadsheet, or import it again later.';
+      } catch (e) { area.value = text; status.textContent = 'Your browser blocked the download. The menu is in the box above: copy it into a file named smokebox-menu.csv.'; }
+    });
+    root.append(h('p', { class: 'fs-sub' }, 'Optional. Choose a spreadsheet (CSV) or an item export from Square, Toast or Clover, or paste a list. You will see every dish and can fix or untick any before anything is added. Adding dishes by hand in Dishes and prices is just as good.'),
+      h('div', { class: 'fs-row' }, fileIn), area, h('div', { class: 'fs-row' }, checkBtn, exp), status, preview);
+    sheet.body.appendChild(root);
     return sheet;
   }
 
@@ -25048,7 +25810,7 @@ a.of-nav:active { background: var(--press); }
         if (!r.ok && r.report !== 'nothingToDo') { cook.setValue(v === 'yes' ? 'no' : 'yes'); cookSt.textContent = r.words; return; }
         cookSt.textContent = v === 'yes' ? 'On. The Cabinet, cooked-batch times and their warnings are available. Change this any time here.' : 'Off. Batch tracking stays out of the way. Change this any time here.';
       } });
-    const cookSt = section('Cooking ahead', 'Some places cook brisket or pork in the morning and slice it to order, or keep cold sides in a cooler. If you do, Smokebox can track those batches and warn you before they run out of time. Most new places start with No.', cook);
+    const cookSt = section('Cooking ahead', 'Some places cook a big batch in the morning and serve from it all day, or keep cold sides in a cooler. If you do, Smokebox can track those batches and warn you before they run out of time. Most new places start with No.', cook);
     sheet.body.appendChild(list);
     return sheet;
   }
@@ -25067,10 +25829,11 @@ a.of-nav:active { background: var(--press); }
   SB.sheets.register('setup', openSetup);
   SB.sheets.register('dishes', openDishes);
   SB.sheets.register('shop', openShop);
+  SB.sheets.register('menuimport', openImport);
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 77-floor-setup.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'77-floor-setup.js',message:String(e&&e.message||e)});}
@@ -25131,7 +25894,11 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "The same page asks if you cook food ahead. Leave it on No if you cook to order. Yes adds the **Cabinet** for batches you cook ahead."
+      "x": "If you cook food ahead and hold it hot or cold, say so in **Dishes and prices** (see Cooked-ahead food and portions). If you cook everything to order, skip it."
+     },
+     {
+      "t": "p",
+      "x": "Temperatures and weights show in °F and kilograms. To change them, open **Back office**, then **Menu and settings**, and look for Temperatures and Weights."
      },
      {
       "t": "h",
@@ -25301,6 +26068,57 @@ a.of-nav:active { background: var(--press); }
     ]
    },
    {
+    "id": "cooked-ahead-and-portions",
+    "group": "guide",
+    "title": "Cooked-ahead food and portions",
+    "summary": "Two ways to keep track of food you make before the order comes in.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Count portions"
+     },
+     {
+      "t": "p",
+      "x": "Use this for a dish you make a batch of and sell until it is gone, like 20 sandwiches."
+     },
+     {
+      "t": "ol",
+      "x": [
+       "Tap **Menu**, then **Dishes and prices**. Under the dish, tap **I count what I made**.",
+       "Type how many you made and tap **Start counting**.",
+       "The dish shows how many are left, like \"20 left\". Tap **+10** or **Add** when you make more.",
+       "At zero the dish shows as sold out. **Stop counting** turns it off."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "Counting does not track temperature or time."
+     },
+     {
+      "t": "h",
+      "x": "Track food you hold hot or cold"
+     },
+     {
+      "t": "p",
+      "x": "Use this for food kept in a warmer or cooler, like chili or potato salad, so Smokebox can warn you before it runs out of time."
+     },
+     {
+      "t": "ol",
+      "x": [
+       "In **Dishes and prices**, find \"Do you cook any of this ahead and hold it?\" and tap **Yes, I cook ahead**. Then tap **Add a cooked-ahead item**.",
+       "Type what you cook ahead and choose Hot or Cold.",
+       "Set how long it may stay. 4 hours is a careful starting point. Ask your health department and change it to match.",
+       "Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.",
+       "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "Choose **No, skip this** if you cook everything to order. You can add cooked-ahead items later from the Cabinet."
+     }
+    ]
+   },
+   {
     "id": "hold-cabinet-and-warnings",
     "group": "guide",
     "title": "Hold cabinet and warnings",
@@ -25318,21 +26136,17 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "No **Cabinet** tab? Set Cooking ahead to Yes under **Tax, hours and PIN** (Menu, then Dishes and prices)."
+      "x": "No **Cabinet** tab? Say yes to cooking ahead first (see Cooked-ahead food and portions)."
      },
      {
       "t": "ol",
       "x": [
-       "Open the **Cabinet** tab or the **Hold cabinet**. Tap **New batch** and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
+       "Open the **Cabinet** tab or the **Hold cabinet**. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
        "Take a reading at every check with **Log temp**. A reading in range keeps the batch on the menu.",
        "Tap **Pull** as portions leave the cabinet. The amount left goes down.",
        "A batch that is too cool can be reheated once with **Reheat**.",
        "A batch out of time or out of range is thrown out: tap **Discard** and pick a reason."
       ]
-     },
-     {
-      "t": "p",
-      "x": "The cabinet tracks food by ingredient. If the Product list in New batch is empty, Smokebox has no ingredient to track yet."
      },
      {
       "t": "h",
@@ -25367,31 +26181,74 @@ a.of-nav:active { background: var(--press); }
     "id": "closing-the-day",
     "group": "guide",
     "title": "Closing the day",
-    "summary": "A short routine for the end of service.",
+    "summary": "Close the day when the last order is paid. It saves the day's totals and gives you a page to print.",
     "blocks": [
      {
       "t": "h",
-      "x": "Before you close"
+      "x": "Close the day"
      },
      {
       "t": "ol",
       "x": [
-       "Finish the open orders. Tap **Orders**. For each open order tap Pay, or void it if the customer left.",
-       "If you cook ahead, look in the **Hold cabinet**. Decide what to do with each batch that is left, using your own rules. To throw a batch out, tap **Discard** and pick a reason.",
-       "If you cook ahead, wipe down food-contact surfaces and tap the **Sanitize** button on the board to log it."
+       "Tap **Orders**, then **Close the day** at the bottom.",
+       "If an order is still open, it is listed. Every order must be paid or voided first. Tap **Open Orders to pay or void**, then come back.",
+       "If you cook ahead and food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).",
+       "Read Money today: cash, card and other. The cash line says what should be in the drawer, plus the cash you started with.",
+       "Tap **Close the day**.",
+       "Tap **Back up today's data now** and **Print today's summary**."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "Closing does not lock anything. You can still take orders, and closing again later includes them. The app's day turns over at 4 am."
+     },
+     {
+      "t": "h",
+      "x": "Also"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.",
+       "Open the thrown-out log from the board's menu and save or print it if your health department asks.",
+       "Keep a copy of the backup off this device (see Backup and restore)."
+      ]
+     }
+    ]
+   },
+   {
+    "id": "who-made-this-entry",
+    "group": "guide",
+    "title": "Who made this entry",
+    "summary": "Initials go next to temperature readings and thrown-out batches, so the log shows who did what. A wrong entry is fixed, not erased.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Initials"
+     },
+     {
+      "t": "ol",
+      "x": [
+       "The first time you log a temperature or throw a batch out on a tablet, Smokebox asks \"Who is this?\". Type your initials. **Skip** is allowed, and the action still goes ahead.",
+       "The tablet remembers them while you keep working, and asks again after two idle hours.",
+       "When someone else takes over, tap **Switch person** in the cabinet."
       ]
      },
      {
       "t": "h",
-      "x": "After you close"
+      "x": "Fix an entry"
      },
      {
       "t": "ol",
       "x": [
-       "Look at the day. In **Back office**, open **Sales and money** for what you collected and **Safety** for the checks you logged and the food you threw out.",
-       "Save the log of thrown-out batches. Open it from the board's menu, then tap **Save as spreadsheet** or **Print or save as PDF**. Your health department may ask to see it.",
-       "Save a backup (see Backup and restore). After closing time Smokebox shows a bar with **Back up now**. It is a reminder, not a block."
+       "Open the thrown-out log from the board's menu.",
+       "Tap **Fix** on the row.",
+       "Say what was wrong, add your initials and tap **Save the fix**."
       ]
+     },
+     {
+      "t": "p",
+      "x": "The old entry stays in the log. Your fix is saved as a new entry next to it, with your initials and the time. That keeps the record honest."
      }
     ]
    },
@@ -25432,7 +26289,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "A file that is not a valid backup is refused, and nothing is changed."
+      "x": "A file that is not a valid backup is refused, and nothing is changed. So is a backup from the demo (or a demo given a real one)."
      }
     ]
    },
@@ -25501,7 +26358,7 @@ a.of-nav:active { background: var(--press); }
        "Clear the search box and choose the All category on the New ticket screen.",
        "Open the **86 board**. A dish that is sold out or off the menu is listed there with the reason.",
        "Open **Dishes and prices** to see every dish you have added. A dish you removed is under **Removed dishes**: tap **Bring it back**.",
-       "No **Cabinet** tab or **Sanitize** button? Those show only when Cooking ahead is Yes (Menu, Dishes and prices, Tax, hours and PIN)."
+       "No **Cabinet** tab or **Sanitize** button? They show only after you say **Yes, I cook ahead** in **Dishes and prices**."
       ]
      },
      {
@@ -25576,6 +26433,31 @@ a.of-nav:active { background: var(--press); }
     ]
    },
    {
+    "id": "trying-the-demo",
+    "group": "guide",
+    "title": "Trying the demo",
+    "summary": "See Smokebox with food on it, without touching your own kitchen.",
+    "blocks": [
+     {
+      "t": "ol",
+      "x": [
+       "Open Smokebox with ?demo on the end of its address, like smokebox.html?demo.",
+       "It opens with sample dishes, three sample tickets and food in the cabinet. Cook, bump, pay and throw out food as much as you like.",
+       "Nothing you do in the demo reaches your own kitchen. The demo keeps its own saved data.",
+       "To go back, open Smokebox again without ?demo."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "A backup made in the demo cannot be loaded into your own kitchen, and the other way round. Smokebox refuses it and changes nothing."
+     },
+     {
+      "t": "p",
+      "x": "Sample numbers are made up. They are never your sales or your food."
+     }
+    ]
+   },
+   {
     "id": "questions-and-answers",
     "group": "guide",
     "title": "Questions and answers",
@@ -25635,7 +26517,15 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN**, and choose Yes under Cooking ahead."
+      "x": "The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Menu**, then **Dishes and prices**, and tap **Yes, I cook ahead**."
+     },
+     {
+      "t": "h",
+      "x": "Can I try it without risking my data?"
+     },
+     {
+      "t": "p",
+      "x": "Yes. See Trying the demo."
      },
      {
       "t": "h",
@@ -25688,6 +26578,7 @@ a.of-nav:active { background: var(--press); }
        "Volume up. Smokebox open on the kitchen board",
        "Tap the warning bar once, or use Play a test warning under Set up this tablet",
        "Check the 86 board: what is out today?",
+       "Counted dishes: how many did you make today?",
        "If you cook ahead: log a first temperature on each batch in the Hold cabinet",
        "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
        "Yesterday's backup saved and a copy kept off the device"
@@ -25704,7 +26595,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "check",
       "x": [
-       "Every open order paid or voided (Orders)",
+       "Orders: every open order paid or voided, then Close the day",
        "If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)",
        "If you cook ahead: surfaces wiped and Sanitize logged",
        "Sales and money looks right in the Back office",
@@ -26833,6 +27724,23 @@ a.of-nav:active { background: var(--press); }
       section(title, sub) {
         const sec = h('div', { class: 'of-section' }, h('h2', { class: 'of-section-t' }, title), sub ? h('p', { class: 'of-section-s' }, sub) : null);
         grid.appendChild(sec); page.lastSection = sec;
+        if (state.moreOn) sec.dataset.more = '1';
+        return page;
+      },
+      // more adds a quiet button row; everything added after it stays folded away until the button is pressed.
+      more(label) {
+        state.moreOn = true;
+        const btn = h('button', { type: 'button', class: 'btn of-more-btn', 'aria-expanded': 'false' }, label || 'Show more');
+        // Opens or folds the extra cards, then nudges charts to measure themselves again.
+        const toggle = () => {
+          const open = grid.dataset.moreOpen !== 'true';
+          grid.dataset.moreOpen = open ? 'true' : 'false'; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          btn.textContent = open ? 'Show less' : (label || 'Show more');
+          if (open) { try { g.dispatchEvent(new Event('resize')); } catch (e) { /* charts catch up on the next refresh */ } }
+        };
+        btn.addEventListener('click', toggle);
+        grid.dataset.moreOpen = 'false';
+        grid.appendChild(h('div', { class: 'of-more' }, btn));
         return page;
       },
       // card adds a chart card and panel adds a free-form box. Both go in the grid in the order they are
@@ -26866,6 +27774,7 @@ a.of-nav:active { background: var(--press); }
     // Adds a built card to the grid, remembers it for refresh and clean-up, and draws it once.
     function addSlot(slot) {
       state.slots.push(slot); grid.appendChild(slot.el);
+      if (state.moreOn) slot.el.dataset.more = '1';
       cardsLive.add(slot);
       // Wraps the card's destroy so it also leaves the live-card list that the leak counters read.
       const orig = slot.destroy; slot.destroy = () => { cardsLive.delete(slot); orig(); };
@@ -27325,6 +28234,8 @@ a.of-nav:active { background: var(--press); }
         rec.inst = null;
       }
     }
+    // The Safety page gets a small bar to print the food safety record (only when cooked-ahead food is tracked).
+    if (id === 'safety' && !pageIsOff(id) && typeof O.safetyLogBar === 'function' && rec.container.firstChild) { try { rec.container.insertBefore(O.safetyLogBar(), rec.container.firstChild); } catch (e) { warnOnce('safety log bar', e); } }
     paintBanner(ctx);
     if (o.focus) { try { f.title.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   }
@@ -27601,19 +28512,13 @@ a.of-nav:active { background: var(--press); }
     });
   }
 
-  // The six KPI tiles of the Pace page. Items 86'd is worked out here; the other five come from the
-  // metrics comparison.
+  // The four KPI tiles of the Pace page, all from the metrics comparison.
   function paceTiles() {
     return [
       { id: 'median', kpi: 'medianMs', label: 'Median ticket time' },
       { id: 'p90', kpi: 'p90Ms', label: 'Slowest 1 in 10' },
       { id: 'ontime', kpi: 'onTimePct', label: 'Tickets on time' },
       { id: 'rate', kpi: 'perHour', label: 'Tickets per hour' },
-      { id: 'spread', kpi: 'avgSpreadMs', label: 'First to last item' },
-      // The 86 tile counts items taken off the menu, compares with the earlier period and draws one dot
-      // per day.
-      { id: 'e86', label: 'Items sold out', kind: 'count', good: 'lower', format: 'num', value: (p) => M.eightySixes(p).length, previous: (p, c) => M.eightySixes(c.previous()).length,
-        spark: (p) => { const by = {}; M.eightySixes(p).forEach((e) => { by[e.date] = (by[e.date] || 0) + 1; }); return M.byDay(p).map((d) => by[d.date] || 0); } },
     ];
   }
 
@@ -27631,7 +28536,7 @@ a.of-nav:active { background: var(--press); }
       page.tiles(paceTiles());
 
       page.card({
-        type: 'line', span: 8, height: 300, title: 'Ticket time by hour of service',
+        type: 'line', span: 12, height: 300, title: 'Ticket time by hour of service',
         // The hero card's subtitle and its 'what to look for' line change with the range and with whether
         // a baseline exists.
         sub: (p, c) => { const m = heroModel(p, c); return (m.base ? c.filters.range.label + ' against the middle 80% of the 14 days before it' : 'Median ticket time in each hour, ' + lc(c.filters.range.label)) + (m.dropped ? '. ' + m.dropped + ' ' + plural(m.dropped, 'hour') + ' with fewer than ' + MIN_N + ' tickets left out' : ''); },
@@ -27661,6 +28566,7 @@ a.of-nav:active { background: var(--press); }
         },
       });
 
+      page.more('Show more charts and findings');
       page.card({
         type: 'ring', span: 4, title: 'Pace right now', sub: 'The last 10 tickets from the past 45 minutes. This one ignores the date range above.',
         caption: 'Under 80% of target is comfortable. At 100% the median ticket is as slow as its warning time, so the line is falling behind.',
@@ -27804,7 +28710,6 @@ a.of-nav:active { background: var(--press); }
         { id: 'count', kpi: 'count', label: 'Finished tickets' },
         { id: 'median', kpi: 'medianMs', label: 'Median ticket time' },
         { id: 'overdue', kpi: 'overdue', label: 'Overdue tickets' },
-        { id: 'lamp', kpi: 'avgLampMs', label: 'Finished food waiting' },
         { id: 'voids', kpi: 'voids', label: 'Voided tickets' },
       ]);
 
@@ -27835,6 +28740,7 @@ a.of-nav:active { background: var(--press); }
         },
       });
 
+      page.more('Show more charts and findings');
       page.section('Where the time goes', 'Every ticket splits into four waits that add up to its total.');
       page.card({
         type: 'stack', span: 6, title: 'By channel', sub: 'Average per ticket',
@@ -27945,7 +28851,6 @@ a.of-nav:active { background: var(--press); }
         // Items finished per hour has no ready-made KPI, so it reads the summary for this and the earlier
         // period.
         { id: 'items', label: 'Items finished per hour', kind: 'count', good: 'neutral', format: 'num', value: (p) => { const s = M.summary(p); return s.count ? s.itemsPerHour : null; }, previous: (p, c) => { const s = M.summary(c.previous()); return s.count ? s.itemsPerHour : null; } },
-        { id: 'voids', kpi: 'voids', label: 'Voided tickets' },
       ]);
 
       page.card({
@@ -27967,6 +28872,7 @@ a.of-nav:active { background: var(--press); }
         },
       });
 
+      page.more('Show more charts and findings');
       page.card({
         type: 'bar', span: 6, title: 'Response and work time by station', sub: 'Median, from the moment an item fires',
         caption: 'Response is how long an item waits before a cook touches it; work is the hands-on time. Items with no start tap show zero response and count work from firing, so those times are estimated. A long response means the station is short of hands, a long work time means the dish itself is slow.',
@@ -30723,7 +31629,7 @@ a.of-nav:active { background: var(--press); }
     if (!v.ok) return { ok: false, reason: backupReason(v.error) };
     const bySrc = { live: 0, demo: 0, sample: 0 };
     for (const t of v.state.tickets) bySrc[t.src] = (bySrc[t.src] || 0) + 1;
-    return { ok: true, text, state: v.state, repaired: v.repaired || [], savedAt: env && isNum(env.savedAt) ? env.savedAt : null, bySrc };
+    return { ok: true, text, state: v.state, repaired: v.repaired || [], savedAt: env && isNum(env.savedAt) ? env.savedAt : null, mode: env && env.mode === 'demo' ? 'demo' : 'real', bySrc };
   }
 
   // Panel 8: what is stored, sample history, export, import and reset.
@@ -30781,7 +31687,21 @@ a.of-nav:active { background: var(--press); }
     else sampleBox.append(h('p', { class: 'od-p od-warnline' }, ico('alert', 18), h('span', null, 'Simulator not loaded. This build has no sample history, so the back office shows only live tickets.')), para(SAMPLE_NOTE, 'od-hint'));
 
     // Export: JSON backup and CSV tables go through saveFile, with copy as the fallback.
-    pn.body.appendChild(subHelp('Export', 'backup-and-restore', 'backing up'));
+    // The three-card flow at the top of the page: back up, restore, replace a device.
+    const flow = h('div', { class: 'od-flow' });
+    // Builds one numbered card of the flow: a heading (with an optional Guide "?") and a body to fill.
+    const flowCard = (num, title, guidePage, guideLabel) => {
+      const body = h('div', { class: 'od-fbody' });
+      const head = h('h3', { class: 'od-fh' }, h('span', { class: 'od-fnum', 'aria-hidden': 'true' }, num), h('span', null, title));
+      const hl = guidePage ? helpLink(guidePage, guideLabel) : null;
+      if (hl) { head.appendChild(doc.createTextNode(' ')); head.appendChild(hl); }
+      return { el: h('section', { class: 'od-fcard', 'aria-label': title }, head, body), body };
+    };
+    const card1 = flowCard('1', 'Back up now', 'backup-and-restore', 'backing up');
+    const card2 = flowCard('2', 'Restore from a backup', 'backup-and-restore', 'restoring a backup');
+    const card3 = flowCard('3', 'Replacing this device', 'replacing-a-device', 'replacing a device');
+    flow.append(card1.el, card2.el, card3.el);
+    pn.body.prepend(flow);
     const exStatus = statusLine();
     const fbLabelId = U.uid('odfb');
     const fbText = h('textarea', { class: 'textarea od-fbtext', readonly: true, rows: 6, 'aria-labelledby': fbLabelId, spellcheck: 'false' });
@@ -30865,25 +31785,29 @@ a.of-nav:active { background: var(--press); }
       return b;
     });
     // Says when the last backup was made on this device, so a stale one is easy to spot.
+    const BP = SB.office && SB.office.backupPure;
     const lastLine = para('', 'od-p od-lastbackup');
-    const paintLast = () => { const t = SB.shell && SB.shell.lastBackupAt ? SB.shell.lastBackupAt() : null; lastLine.textContent = t ? 'Last backup from this device: ' + U.fmtDateShort(U.dateKey(t)) + ', ' + U.fmtTime(t) + '.' : 'No backup has been made from this device yet.'; };
+    // Writes how fresh the last backup is, with a colour tone for never or old.
+    const paintLast = () => {
+      const t = SB.shell && SB.shell.lastBackupAt ? SB.shell.lastBackupAt() : null;
+      const f = BP ? BP.backupFreshness(t, Date.now()) : { tone: t ? 'ok' : 'bad', text: t ? 'Last backup: ' + U.fmtDateShort(U.dateKey(t)) + ', ' + U.fmtTime(t) + '.' : 'No backup has been made from this device yet.' };
+      lastLine.textContent = f.text; lastLine.dataset.tone = f.tone;
+    };
     paintLast(); P.syncs.push(paintLast);
     const dlBtn = btn('Download backup (JSON)', { icon: 'download', cls: 'btn-primary', onClick: downloadBackup });
     dlBtn.dataset.action = 'backup-download';
     const cpBtn = btn('Copy backup', { icon: 'copy', onClick: copyBackup });
     cpBtn.dataset.action = 'backup-copy';
-    pn.body.append(
-      para('A backup is every ticket, event, batch, menu edit and setting in one JSON file. Keep one before you reset or import. Spreadsheet files (CSV) list one kind of record each and cannot be imported back.', 'od-p'),
+    card1.body.append(
       lastLine,
-      para('Back up at least once a day, at close. Keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
-      h('div', { class: 'od-actions' }, dlBtn, cpBtn),
-      h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Spreadsheet files'), csvBtns),
-      repRow, repBox,
-      exStatus.el, fb);
+      para('A backup is one file with your dishes, orders, settings and records. Back up at the end of every day, and keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
+      h('div', { class: 'od-actions' }, dlBtn, cpBtn), exStatus.el, fb);
+    // The spreadsheet files and the pilot report are less common, so they sit in a closed group below the flow.
+    pn.body.appendChild(h('details', { class: 'od-paste-det od-more' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Spreadsheet files and the pilot report')),
+      para('Spreadsheet files (CSV) list one kind of record each and cannot be restored from.', 'od-hint'),
+      h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Spreadsheet files'), csvBtns), repRow, repBox));
 
     // Import: a chosen file or pasted text is checked and summarized before anything changes.
-    pn.body.appendChild(subHelp('Import', 'replacing-a-device', 'replacing a device'));
-    const impHost = h('div', { class: 'od-import' });
     const impResult = h('div', { class: 'od-impresult', 'aria-live': 'polite' });
     const fileIn = h('input', { type: 'file', accept: '.json,application/json,text/plain', class: 'visually-hidden', tabindex: -1, 'aria-hidden': 'true', id: U.uid('odfile') });
     // Opens the system file picker for a backup.
@@ -30895,27 +31819,17 @@ a.of-nav:active { background: var(--press); }
     const pasteBtn = btn('Check pasted backup', { icon: 'check', cls: 'btn-sm', onClick: () => check(pasteArea.value, 'pasted text') });
     pasteBtn.dataset.action = 'import-check-paste';
     const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
-    // The restore wizard: four plain steps. Step 1 is this button, the file check shows step 2, and the
-    // replace button is step 3 (it asks once more). Step 4 is looking at the board.
-    const wizard = h('ol', { class: 'od-steps' },
-      h('li', null, 'Choose the backup file (below). Pick the newest one, named smokebox-backup-<date>.json.'),
-      h('li', null, 'Read the summary that appears: the saved date, tickets and batches should match what you expect. Nothing has changed yet.'),
-      h('li', null, 'If it is right, press Replace everything. It replaces all data on this device, so back up what is here first if you might want it.'),
-      h('li', null, 'Open the kitchen board and check the batches, the 86 board and your menu. Sound and loudness are set per device, so test them again.'));
-    // The guide for moving to a new device, following the recovery steps in docs/solo-offer.md.
-    const swap = h('details', { class: 'od-paste-det od-swap' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Replacing this device: step by step')),
+    card2.body.append(
+      para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (practice or real).', 'od-p'),
+      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult);
+    card3.body.append(
       h('ol', { class: 'od-steps' },
-        h('li', null, 'On the old device, if it still works: download a backup (above) and copy the file somewhere else (email it to yourself or use a USB drive).'),
+        h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
         h('li', null, 'On the new device: copy the same smokebox.html file onto it and open it. Install it as an app (Share, then Add to Home Screen, or Install app).'),
         h('li', null, 'Run Menu, then Set up this tablet. Sound, screen-on and loudness are per device and are redone here.'),
-        h('li', null, 'Open Back office, then Menu and settings (this page), choose the backup file, check the summary and press Replace everything.'),
-        h('li', null, 'Check the board: batches, the 86 board and the menu. Take a fresh backup from the new device, then retire the old one.')),
+        h('li', null, 'Open Back office, then Menu and settings, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.'),
+        h('li', null, 'Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.')),
       h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
-    impHost.append(
-      h('p', { class: 'od-card-h' }, 'Restore from a backup, step by step'), wizard, swap,
-      para('Importing checks the backup first and shows what is inside before anything changes. A file that is not a valid backup is refused and nothing is touched.', 'od-p'),
-      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult);
-    pn.body.appendChild(impHost);
 
     let pending = null;
     // Throws away the checked backup and clears the result card.
@@ -30936,19 +31850,16 @@ a.of-nav:active { background: var(--press); }
       const live = stateNow();
       const archived = s.menu.filter((m) => m.archived).length;
       const evN = SB.engine.allEvents(s).length;
-      const rows = [
-        ['Tickets', U.fmtNum(n) + (n ? ' (' + [res.bySrc.live ? res.bySrc.live + ' live' : '', res.bySrc.demo ? res.bySrc.demo + ' demo' : '', res.bySrc.sample ? res.bySrc.sample + ' sample' : ''].filter(Boolean).join(', ') + ')' : '')],
-        ['Logged events', U.fmtNum(evN)], ['Batches', U.fmtNum(s.batches.length)],
-        ['Menu items', s.menu.length + (archived ? ' (' + archived + ' archived)' : '')],
-        ['Pacing', s.settings.pacing.enabled ? 'On' : 'Off'], ['PIN', s.settings.office && s.settings.office.pinHash ? 'Set' : 'Not set'],
-      ];
-      if (res.savedAt) rows.unshift(['Saved', U.fmtDateShort(U.dateKey(res.savedAt)) + ', ' + U.fmtTime(res.savedAt)]);
+      const BPd = SB.office && SB.office.backupPure;
+      const desc = BPd ? BPd.describeBackup(res, SB.store.mode ? SB.store.mode() : null) : { rows: [['Tickets', U.fmtNum(n)]], wrongKitchen: false, refusal: '' };
+      const rows = desc.rows;
+      if (desc.wrongKitchen) { showBad(desc.refusal, source); pending = null; return; }
       const repairs = res.repaired.length;
       const card = h('div', { class: 'od-card', 'data-tone': 'ok' },
         h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'This ' + source + ' is a valid Smokebox backup.')),
         h('dl', { class: 'od-stats od-stats-tight' }, rows.map(([k, v]) => h('div', { class: 'od-stat' }, h('dt', null, k), h('dd', { class: 'od-stat-v' }, v)))),
         repairs ? h('p', { class: 'od-hint' }, 'Smokebox repaired ' + repairs + ' small ' + U.plural(repairs, 'problem') + ' while reading it: ' + res.repaired.slice(0, 3).join('; ') + (repairs > 3 ? '; and ' + (repairs - 3) + ' more.' : '.')) : null,
-        h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This replaces everything on this device: ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', your menu edits and your settings. Export a backup first.')),
+        h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This replaces everything on this device: ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', your menu edits and your settings. Back up first if you might want what is here.')),
         h('div', { class: 'od-actions' },
           btn('Back up what is here first', { icon: 'download', cls: 'btn-sm', onClick: downloadBackup }),
           // The replace button asks again in a dialog before anything is written.
@@ -30986,45 +31897,71 @@ a.of-nav:active { background: var(--press); }
       fileIn.value = ''; // so choosing the same file again re-checks it
     });
 
-    // Reset: two buttons, each behind a confirm dialog.
-    pn.body.appendChild(sub('Reset'));
+    // Danger zone: two reset buttons, each opening a box that asks for a typed word before it will act.
+    pn.body.appendChild(h('h3', { class: 'od-sub od-danger-h', id: undefined }, 'Danger zone: erase data'));
     const resetStatus = statusLine();
-    const keep = SB.ui.toggle({ label: 'Keep my menu, settings and PIN when I reset live data', checked: true });
+    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I clear live data', checked: true });
     const resetLiveBtn = btn('Reset live data', { icon: 'trash', cls: 'btn-danger' });
     resetLiveBtn.dataset.action = 'reset-live';
     const resetAllBtn = btn('Reset everything', { icon: 'trash', cls: 'btn-danger' });
     resetAllBtn.dataset.action = 'reset-all';
-    // Both reset buttons say what will be cleared, ask in a dialog first, and do nothing without a yes.
-    resetLiveBtn.addEventListener('click', async () => {
+    const dangerBox = h('div', { class: 'od-danger-box', hidden: true, role: 'group', 'aria-label': 'Confirm erasing data' });
+    // Shows the confirm box: what will be erased, a field to type the word into, and a button that stays off until it matches.
+    function askTyped(o) {
+      const BPr = SB.office && SB.office.backupPure;
+      const input = h('input', { class: 'input od-danger-in', type: 'text', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Type ' + o.word + ' to confirm' });
+      const go = btn(o.label, { icon: 'trash', cls: 'btn-danger' });
+      go.disabled = true;
+      // Turns the confirm button on only when the word was typed.
+      const sync = () => { go.disabled = !(BPr ? BPr.resetWordOk(input.value, o.word) : input.value.trim().toLowerCase() === o.word.toLowerCase()); };
+      input.addEventListener('input', sync);
+      // Closes the box without doing anything.
+      const cancel = () => { dangerBox.hidden = true; dangerBox.replaceChildren(); };
+      // Runs the erase once, then closes the box.
+      const run = () => { if (go.disabled) return; cancel(); o.run(); };
+      go.addEventListener('click', run);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); if (e.key === 'Escape') cancel(); });
+      dangerBox.replaceChildren(h('p', { class: 'od-danger-t' }, ico('alert', 20), h('strong', null, o.title)), ...o.lines.map((t) => h('p', { class: 'od-p' }, t)),
+        h('label', { class: 'od-danger-l' }, 'Type ', h('strong', null, o.word), ' to confirm', input),
+        h('div', { class: 'od-actions' }, go, btn('Keep my data', { onClick: cancel })));
+      dangerBox.hidden = false;
+      input.focus();
+    }
+    // Opens the typed confirm box for clearing live data.
+    resetLiveBtn.addEventListener('click', () => {
       const s = stateNow(), k = keep.getValue();
-      const ok = await SB.ui.confirm({
-        title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep my data',
-        body: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' logged events and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any demo orders, and sets the clock back to real time.',
-          k ? 'Your menu, ingredient edits, limits, pacing and PIN stay as they are.' : 'It also puts every setting, menu edit and the PIN back to the starter values.',
-          'Sample history is not touched. There is no undo: download a backup first if you might want this data.'],
+      askTyped({
+        title: 'Clear live data?', word: 'RESET', label: 'Clear live data',
+        lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any practice orders, and sets the clock back to real time.',
+          k ? 'Your dishes, ingredient edits, limits, pacing and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
+          'There is no undo. Back up first if you might want this data.'],
+        // Clears the live data after the word was typed.
+        run: () => {
+          const rep = SB.store.resetLive({ keepSettings: k, starter: false });
+          if (rep === 'ok') { resetStatus.ok('Live data cleared. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data cleared.', { tone: 'ok' }); }
+          else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
+        },
       });
-      if (!ok) return;
-      const rep = SB.store.resetLive({ keepSettings: k, starter: false });
-      if (rep === 'ok') { resetStatus.ok('Live data cleared. The board and the pit are empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data cleared.', { tone: 'ok' }); }
-      else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
     });
-    resetAllBtn.addEventListener('click', async () => {
+    // Opens the typed confirm box for erasing everything.
+    resetAllBtn.addEventListener('click', () => {
       const s = stateNow();
-      const ok = await SB.ui.confirm({
-        title: 'Reset everything?', tone: 'danger', confirmLabel: 'Reset everything', cancelLabel: 'Keep my data',
-        body: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your menu and ingredient edits, every setting and the PIN. The board starts empty.',
-          'Your Day or Night, Ember or Paper and text-size choices, and the sample history switch, are kept. There is no undo: download a backup first if you might want any of it back.'],
+      askTyped({
+        title: 'Erase everything on this device?', word: 'ERASE', label: 'Erase everything',
+        lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
+          'Your Day or Night, Ember or Paper and text-size choices are kept.', 'There is no undo. Back up first if you might want any of it back.'],
+        // Erases everything after the word was typed.
+        run: () => {
+          const rep = SB.store.reset();
+          if (rep === 'ok') { resetStatus.ok('Everything was reset to the starter values.'); SB.ui.toast('Everything was reset.', { tone: 'ok' }); }
+          else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
+        },
       });
-      if (!ok) return;
-      // Display choices live outside the stored state, so they survive this reset.
-      const rep = SB.store.reset();
-      if (rep === 'ok') { resetStatus.ok('Everything was reset to the starter values.'); SB.ui.toast('Everything was reset.', { tone: 'ok' }); }
-      else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
     });
     pn.body.append(
-      para('Reset live data clears tickets, events and batches. Reset everything also puts the menu, ingredients and every setting back to the starter values. Both ask first and cannot be undone.', 'od-p'),
+      para('Clearing live data removes tickets, records and batches. Resetting everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
       h('div', { class: 'od-toggle-row' }, keep),
-      h('div', { class: 'od-actions' }, resetLiveBtn, resetAllBtn), resetStatus.el);
+      h('div', { class: 'od-actions' }, resetLiveBtn, resetAllBtn), dangerBox, resetStatus.el);
 
     P.syncs.push((s) => { paintCounts(s); if (sampleToggle && simOn()) sampleToggle.setValue(!!simOn().sampleEnabled()); });
     P.disposers.push(() => exStatus.destroy(), () => resetStatus.destroy());
@@ -32094,7 +33031,7 @@ a.of-nav:active { background: var(--press); }
       thrown = k.discards || thrown;
     } catch (e) { /* the summary still prints without the thrown-out line */ }
     const demo = (s.tickets || []).some((t) => t && t.src === 'demo');
-    const root = h('div', { class: 'cd-printroot' },
+    const root = h('div', { class: 'sb-printroot cd-printroot' },
       h('h1', null, 'End of day, ' + U.fmtDateShort(m.day)),
       demo ? h('p', { class: 'cd-pnote' }, 'This kitchen has practice tickets in it, so some of these numbers are practice numbers.') : null,
       h('table', { class: 'cd-ptable' }, h('tbody', null,
@@ -32125,6 +33062,227 @@ a.of-nav:active { background: var(--press); }
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 87-office-closeday.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'87-office-closeday.js',message:String(e&&e.message||e)});}
+
+/* ===== 88-office-backup.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: Plain-words helpers for the Data page's backup, restore and reset flow: how fresh the last
+ * backup is, what a chosen backup file contains (and whether it belongs to this kitchen), and the typed word that
+ * guards a reset. Pure functions, so they run in Node tests.
+ * PARTS: freshness, backup summary, reset word.   USES: SB.util.   USED BY: 84-office-data.js (the Data page).
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util;
+  const O = (SB.office = SB.office || {});
+  // True only for a real, finite number.
+  const isNum = (n) => typeof n === 'number' && isFinite(n);
+  // 3 600 000 ms in an hour.
+  const HOUR = 3600e3;
+
+  // How fresh the last backup is: {tone: 'ok'|'warn'|'bad', text}. Never backed up is bad; over 3 days is bad;
+  // over about a day is a warning; anything newer is fine. at is the time of the last backup or null.
+  function backupFreshness(at, now) {
+    if (!isNum(at)) return { tone: 'bad', text: 'You have never backed up this kitchen from this device. Back up now.' };
+    const hrs = Math.max(0, (now - at) / HOUR);
+    const when = U.fmtDateShort(U.dateKey(at)) + ', ' + U.fmtTime(at);
+    const ago = hrs < 1 ? 'less than an hour ago' : hrs < 36 ? Math.round(hrs) + ' ' + U.plural(Math.round(hrs), 'hour') + ' ago' : Math.round(hrs / 24) + ' days ago';
+    if (hrs <= 26) return { tone: 'ok', text: 'Last backup: ' + when + ' (' + ago + ').' };
+    if (hrs <= 72) return { tone: 'warn', text: 'Last backup: ' + when + ' (' + ago + '). Back up again today.' };
+    return { tone: 'bad', text: 'Last backup: ' + when + ' (' + ago + '). That is old. Back up now.' };
+  }
+
+  // What a checked backup file holds, as plain rows, plus whether it belongs to this kitchen.
+  // res = {state, savedAt, mode ('real' or 'demo'), bySrc}; storeMode is this device's mode ('real' or 'demo').
+  // Returns {rows:[[label,value]], wrongKitchen:boolean, kindText, refusal}. Counts only real data, never guesses.
+  function describeBackup(res, storeMode) {
+    const s = res.state || {};
+    const menu = Array.isArray(s.menu) ? s.menu : [];
+    const archived = menu.filter((m) => m && m.archived).length;
+    const orders = Array.isArray(s.orders) ? s.orders.length : 0;
+    const tickets = Array.isArray(s.tickets) ? s.tickets.length : 0;
+    const mode = res.mode === 'demo' ? 'demo' : 'real';
+    const kindText = mode === 'demo' ? 'Practice kitchen (the demo)' : 'Your own kitchen';
+    const pin = s.settings && s.settings.office && s.settings.office.pinHash ? 'Set (this device will ask for it)' : 'Not set';
+    const rows = [];
+    if (isNum(res.savedAt)) rows.push(['Saved', U.fmtDateShort(U.dateKey(res.savedAt)) + ', ' + U.fmtTime(res.savedAt)]);
+    rows.push(['Kind', kindText]);
+    rows.push(['Dishes', menu.length + (archived ? ' (' + archived + ' hidden)' : '')]);
+    rows.push(['Orders', U.fmtNum(orders)]);
+    rows.push(['Tickets', U.fmtNum(tickets)]);
+    rows.push(['Manager PIN', pin]);
+    const wrongKitchen = !!storeMode && mode !== storeMode;
+    const refusal = wrongKitchen
+      ? (mode === 'demo' ? 'This backup comes from the practice kitchen (the demo), not from your own kitchen, so it cannot be restored here.' : 'This backup comes from a real kitchen, so it cannot be restored into the practice kitchen.')
+      : '';
+    return { rows, wrongKitchen, kindText, refusal };
+  }
+
+  // True when the typed text is the confirming word (any capitals, spaces around it ignored).
+  function resetWordOk(typed, word) {
+    return String(typed == null ? '' : typed).trim().toLowerCase() === String(word || 'reset').toLowerCase();
+  }
+
+  O.backupPure = { backupFreshness, describeBackup, resetWordOk };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 88-office-backup.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'88-office-backup.js',message:String(e&&e.message||e)});}
+
+/* ===== 89-office-inspector.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: A printable food-safety record for the owner: temperature readings, reheats, cooling, sanitize
+ * rounds and thrown-out food, each with who logged it, and any corrections added later. It opens from the Safety page.
+ * PARTS: 1 pure rows (runs in Node tests), 2 the sheet and printing, 3 the Safety page bar.
+ * USES: SB.engine.safetyLog (read only), SB.store, SB.ui.sheet, SB.util.   USED BY: 80-office-core.js (Safety page bar).
+ * HONEST: this is the owner's own record, not an inspection result or a certificate. Entries are never edited; a
+ * correction is a new line under the entry it corrects.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util;
+  const O = (SB.office = SB.office || {});
+  // True only for a real, finite number.
+  const isNum = (n) => typeof n === 'number' && isFinite(n);
+  const KIND = {
+    temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
+    sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept past best-by', quality_extend_corrected: 'Best-by note corrected',
+  };
+  const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other' };
+
+  // ---- 1. Pure rows ----
+
+  // The plain "late by 12 min" / "on time" words for a reading or round.
+  function lateWords(e) {
+    if (e.onTime === true || (isNum(e.lateMs) && e.lateMs <= 0)) return 'on time';
+    return isNum(e.lateMs) && e.lateMs > 0 ? 'late by ' + Math.max(1, Math.round(e.lateMs / 60000)) + ' min' : '';
+  }
+
+  // The food a safety entry is about: the batch's label, else the ingredient name, else nothing.
+  function foodOf(state, e) {
+    const b = (state.batches || []).find((x) => x && x.id === e.batchId);
+    const ingId = e.ing || (b && b.ing);
+    const ing = (state.ingredients || []).find((i) => i && i.id === ingId);
+    const name = ing ? ing.name : ingId || '';
+    return b && b.label ? b.label + (name && b.label.indexOf(name) < 0 ? ' (' + name + ')' : '') : name;
+  }
+
+  // The detail words for one entry: what was read, weighed or thrown out.
+  function detailOf(e) {
+    switch (e.type) {
+      case 'temp_logged': return (isNum(e.f) ? U.tempText(e.f) : '') + (lateWords(e) ? ', ' + lateWords(e) : '');
+      case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
+      case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '');
+      case 'cooling_started': return isNum(e.g) ? U.weightText(e.g) : '';
+      case 'sanitize_done': return lateWords(e);
+      case 'quality_extend': return isNum(e.until) ? 'Until ' + U.fmtTime(e.until) : '';
+      default: return e.note || '';
+    }
+  }
+
+  // Safety log rows from `from` up to (not including) `to`, oldest first:
+  // [{id, at, kind, food, detail, who, corrections:[{at, who, note}]}]. Read only; never changes the state.
+  function inspectorRows(state, from, to) {
+    if (!state || !SB.engine || !SB.engine.safetyLog) return [];
+    const rows = SB.engine.safetyLog(state).filter((r) => r.event.type !== 'safety_correction' && isNum(r.event.t) && r.event.t >= from && r.event.t < to);
+    return rows.map((r) => ({
+      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), who: r.event.who || '',
+      corrections: r.corrections.map((c) => ({ at: c.t, who: c.who || '', note: c.note || '' })),
+    }));
+  }
+
+  // The preset date ranges for the printed record: [{id, label, days}].
+  const RANGES = [{ id: 'today', label: 'Today', days: 1 }, { id: '7', label: 'Last 7 days', days: 7 }, { id: '30', label: 'Last 30 days', days: 30 }, { id: '90', label: 'Last 90 days', days: 90 }];
+  // The service-day window for a preset, ending after today: {from, to, label}.
+  function rangeFor(id, now, dayStartHour) {
+    const r = RANGES.find((x) => x.id === id) || RANGES[1];
+    const today = U.serviceDate(now, dayStartHour);
+    const first = U.addDays(today, -(r.days - 1)), next = U.addDays(today, 1);
+    // The moment a service day starts: local midnight plus the day-start hour.
+    const at = (key) => U.dateKeyToMs(key) + dayStartHour * 3600e3;
+    return { from: at(first), to: at(next), label: r.days === 1 ? U.fmtDateShort(today) : U.fmtDateShort(first) + ' to ' + U.fmtDateShort(today) };
+  }
+
+  O.inspectorPure = { inspectorRows, rangeFor, RANGES };
+  if (!g.document) return; // Node: the pure rows are all the tests need
+
+  // ---- 2. The sheet and printing ----
+  const h = U.h;
+
+  // Reads the saved state, or null when the store is not ready.
+  function stateNow() { try { return SB.store.getState(); } catch (e) { return null; } }
+
+  // Builds the printable table for a window as an element (used for both the preview and the print block).
+  function recordTable(rows) {
+    const body = rows.map((r) => h('tr', null,
+      h('td', null, U.fmtDateShort(U.dateKey(r.at)) + ' ' + U.fmtTime(r.at)), h('td', null, r.kind), h('td', null, r.food), h('td', null, r.detail), h('td', null, r.who || 'not recorded'),
+      h('td', null, r.corrections.map((c) => h('div', { class: 'si-corr' }, 'Correction ' + U.fmtDateShort(U.dateKey(c.at)) + ' ' + U.fmtTime(c.at) + (c.who ? ' by ' + c.who : '') + ': ' + c.note)))));
+    return h('table', { class: 'si-table' },
+      h('thead', null, h('tr', null, ['When', 'What', 'Food', 'Detail', 'Logged by', 'Corrections added later'].map((t) => h('th', null, t)))),
+      h('tbody', null, body.length ? body : h('tr', null, h('td', { colspan: 6 }, 'No safety entries in this range.'))));
+  }
+
+  // Opens the sheet: pick a date range, see the record, print it.
+  function openInspectorLog() {
+    if (!SB.ui || !SB.ui.sheet || !stateNow()) return null;
+    const sheet = SB.ui.sheet({ title: 'Print the food safety record', side: 'right', width: 'min(860px, 96vw)', name: 'inspectorlog' });
+    const dsh = (stateNow().settings.service || {}).dayStartHour;
+    let rangeId = '7';
+    const preview = h('div', { class: 'si-preview' });
+    const sel = h('select', { class: 'select', 'aria-label': 'Date range' }, RANGES.map((r) => h('option', { value: r.id, selected: r.id === rangeId }, r.label)));
+    // Redraws the preview table for the chosen range.
+    function paint() {
+      const w = rangeFor(rangeId, SB.store.now(), dsh);
+      const rows = inspectorRows(stateNow(), w.from, w.to);
+      U.clear(preview);
+      preview.append(h('p', { class: 'si-count' }, rows.length + ' ' + U.plural(rows.length, 'entry', 'entries') + ', ' + w.label + '.'), recordTable(rows));
+    }
+    // Picks a new range from the select and redraws.
+    sel.addEventListener('change', () => { rangeId = sel.value; paint(); });
+    // Prints the record for the chosen range.
+    const doPrint = () => printRecord(rangeId);
+    sheet.body.append(
+      h('p', { class: 'si-lead' }, 'This is your own record of readings, reheats, cooling, sanitize rounds and thrown-out food. It is not an inspection result. Entries are never edited; if something was wrong, a correction is added under it.'),
+      h('div', { class: 'si-actions' }, h('label', null, 'Range ', sel), h('button', { type: 'button', class: 'btn btn-primary', onClick: doPrint }, 'Print')), preview);
+    paint();
+    return sheet;
+  }
+
+  // Builds the print-only record, prints it, and removes it again.
+  function printRecord(id) {
+    const s = stateNow(); if (!s) return;
+    const dsh = (s.settings.service || {}).dayStartHour;
+    const w = rangeFor(id, SB.store.now(), dsh);
+    const rows = inspectorRows(s, w.from, w.to);
+    const demo = (s.tickets || []).some((t) => t && t.src === 'demo');
+    const root = h('div', { class: 'sb-printroot si-printroot' },
+      h('h1', null, 'Food safety record, ' + w.label),
+      h('p', { class: 'si-note' }, 'The owner\'s own record of what was logged in this kitchen. It is not an inspection result. Entries are never edited; corrections are added under the entry they correct.'),
+      demo ? h('p', { class: 'si-note' }, 'This kitchen has practice data in it, so some entries are practice entries.') : null,
+      recordTable(rows),
+      h('p', { class: 'si-note' }, 'Printed ' + U.fmtDateShort(U.dateKey(Date.now())) + ' ' + U.fmtTime(Date.now()) + '. Reviewed by: ______________   Date: ________'));
+    document.body.appendChild(root);
+    // Removes the print-only block once the print dialog is done (or at once when printing is unavailable).
+    const done = () => { try { root.remove(); } catch (e) { /* already gone */ } };
+    g.addEventListener('afterprint', done, { once: true });
+    try { g.print(); } catch (e) { done(); }
+    setTimeout(done, 60000);
+  }
+
+  // ---- 3. The Safety page bar ----
+
+  // A small bar for the top of the Safety page: the print button and the Guide "?" link.
+  O.safetyLogBar = function () {
+    const help = SB.guide && SB.guide.link ? SB.guide.link('hold-cabinet-and-warnings', 'the safety page') : null;
+    return h('div', { class: 'si-bar' }, h('span', { class: 'si-bar-t' }, 'Your safety record'),
+      h('button', { type: 'button', class: 'btn btn-sm', 'data-k': 'print-safety-log', onClick: openInspectorLog }, 'Print the safety record'), help);
+  };
+  O.openInspectorLog = openInspectorLog;
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 89-office-inspector.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'89-office-inspector.js',message:String(e&&e.message||e)});}
 
 /* ===== 99-boot.js ===== */
 ;try{
