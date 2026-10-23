@@ -19,7 +19,8 @@ Warnings cannot sound while the screen is off. Smokebox asks the browser to keep
 
 - Clear the search box and choose the All category on the New ticket screen.
 - Open the **86 board**. A dish that is sold out or off the menu is listed there with the reason.
-- Open **Dishes and prices** to see every dish you have added.
+- Open **Dishes and prices** to see every dish you have added. A dish you removed is under **Removed dishes**: tap **Bring it back**.
+- No **Cabinet** tab or **Sanitize** button? Those show only when Cooking ahead is Yes (Menu, Dishes and prices, Tax, hours and PIN).
 
 ## A number looks wrong
 

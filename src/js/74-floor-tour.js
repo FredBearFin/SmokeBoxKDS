@@ -37,17 +37,18 @@
   let PICK = { lead: null, second: null, quick: null };
   // The dish name as the walkthrough says it: no portion note after a comma or in brackets.
   const nameOf = (m) => (m ? String(m.name).replace(/\s*\(.*$/, '').replace(/,.*$/, '').trim() : '');
-  // Picks the lead, second and quick dishes from the current menu. Needs at least one dish that is not archived,
-  // not 86 and cooked in two steps (Start, then Done); second and quick are optional. Returns null when there is none.
+  // Picks the lead, second and quick dishes from the current menu. Needs at least one dish that is not archived and
+  // not 86. The lead is a two-step dish (Start, then Done) when there is one; with only one-tap dishes the lead is
+  // missing and the walkthrough skips the Start steps. Returns null when no dish can be ordered.
   function pickDishes() {
     const menu = (SB.store.getState().menu || []).filter((m) => !m.archived && ((SB.store.select.availability(m.id) || {}).ok));
     // The usable menu item with this id, or null.
     const find = (id) => menu.find((m) => m.id === id) || null;
     const twos = menu.filter((m) => m.track === 'two').sort((a, b) => b.prepSec - a.prepSec);
+    if (!menu.length) return null;
     const lead = find(PREFER.lead) && find(PREFER.lead).track === 'two' ? find(PREFER.lead) : twos[0] || null;
-    if (!lead) return null;
-    const shorter = twos.filter((m) => m.id !== lead.id && m.prepSec < lead.prepSec);
-    const second = find(PREFER.second) && find(PREFER.second).track === 'two' && find(PREFER.second).prepSec < lead.prepSec ? find(PREFER.second) : shorter[0] || null;
+    const shorter = lead ? twos.filter((m) => m.id !== lead.id && m.prepSec < lead.prepSec) : [];
+    const second = lead && find(PREFER.second) && find(PREFER.second).track === 'two' && find(PREFER.second).prepSec < lead.prepSec ? find(PREFER.second) : shorter[0] || null;
     const ones = menu.filter((m) => m.track === 'one').sort((a, b) => a.prepSec - b.prepSec);
     const quick = find(PREFER.quick) && find(PREFER.quick).track === 'one' ? find(PREFER.quick) : ones[0] || null;
     return { lead, second, quick };
@@ -99,7 +100,7 @@
   // Moves the step forward when the real ticket has moved on. Steps only go forward, and a step the person
   // already did by themselves is skipped, so doing things in a different order never leaves the caption behind.
   function advance(t) {
-    const hp = dish(t, PICK.lead.id), bs = PICK.second ? dish(t, PICK.second.id) : null;
+    const hp = PICK.lead ? dish(t, PICK.lead.id) : null, bs = PICK.second ? dish(t, PICK.second.id) : null;
     const all = t.items.every((i) => i.status === 'done');
     let s = T.step;
     for (let guard = 0; guard < 10; guard++) {
@@ -108,6 +109,7 @@
       else if (all && s < 8) s = 8;
       else if (begun(bs) && s >= 4 && s < 7) s = 7;
       else if (begun(hp) && s < 4) s = 4;
+      else if (!hp && s >= 3 && s < 7) s = 7;            // no two-step dish: there is no Start to show
       else if (!bs && (s === 5 || s === 6)) s = 7;       // no second two-step dish: nothing is held back, skip the gray-dish steps
       else if (s === 5 && bs && bs.status !== 'queued' && Date.now() - T.at >= DWELL_MS) s = 6;
       if (s === before) break;
@@ -124,13 +126,13 @@
   // The words for the current step. They are chosen from the real ticket so they never ask for a button
   // that is not there yet.
   function words(t) {
-    const hp = dish(t, PICK.lead.id), bs = PICK.second ? dish(t, PICK.second.id) : null, tea = PICK.quick ? dish(t, PICK.quick.id) : null;
+    const hp = PICK.lead ? dish(t, PICK.lead.id) : null, bs = PICK.second ? dish(t, PICK.second.id) : null, tea = PICK.quick ? dish(t, PICK.quick.id) : null;
     const lead = nameOf(PICK.lead), second = nameOf(PICK.second), quick = nameOf(PICK.quick);
-    const zone = (C().zoneById && C().zoneById[PICK.lead.zone]) || null;
+    const zone = PICK.lead && C().zoneById ? C().zoneById[PICK.lead.zone] || null : null;
     switch (T.step) {
       case 1: return "This is a ticket: one customer's order." + (hint() ? ' The line under the name says what to do next.' : '');
       case 2: return 'The clock counts up from when the order came in. It turns amber, then red, when the order is taking too long.';
-      case 3: return 'Each dish belongs to a station' + (zone ? ' (' + zone.name + ' for ' + lead + ')' : '') + '. ' + lead + ' is the slowest dish on this ticket, so it can start now. Tap Start when you begin cooking it.';
+      case 3: return 'Each dish belongs to a station' + (zone ? ' (' + zone.name + ' for ' + lead + ')' : '') + '. ' + lead + (second || quick ? ' is the slowest dish on this ticket, so it can start now.' : ' can start now.') + ' Tap Start when you begin cooking it.';
       case 4: return 'The countdown under the dish is the cooking time left, as estimated. At zero the row flashes Check it. Smokebox cannot see your food, so it never marks a dish done by itself.';
       case 5: return 'The other dishes are gray on purpose. Smokebox holds them back so everything finishes together. Watch the countdown: it says when to start.';
       case 6: return bs && bs.status === 'queued'
@@ -164,7 +166,7 @@
     switch (T.step) {
       case 1: return q('.slip-head').concat(hint() ? [hint()] : []);
       case 2: return q('.slip-timer, .fl-bw'); // the wrapper .slip-time has no box of its own, so ring the digits and the badge
-      case 3: case 4: return row(PICK.lead.id);
+      case 3: case 4: return PICK.lead ? row(PICK.lead.id) : [];
       case 5: case 6: return PICK.second ? row(PICK.second.id) : [];
       case 7: {
         const out = [];
@@ -256,7 +258,8 @@
     u.skip.hidden = s === LAST;
     u.next.hidden = !MANUAL[s];
     u.mine.hidden = u.demo.hidden = u.done.hidden = s !== LAST;
-    const els = targets(t);
+    // Only elements that are on screen get the ring (the On time badge is hidden unless a ticket is late).
+    const els = targets(t).filter((e) => e.getClientRects().length > 0);
     ring(els);
     const fresh = T.shown !== s && els.length > 0;
     if (fresh) { bring(els[0]); T.shown = s; }
@@ -318,6 +321,16 @@
     if (b && b.getAttribute('aria-selected') !== 'true') b.click();
   }
 
+  // Says why the walkthrough cannot start when there is no dish to use: with an empty menu it offers a button that opens
+  // Dishes and prices; when every dish is sold out or archived it says so.
+  function noDishNote() {
+    const menu = (SB.store.getState().menu || []).filter((m) => !m.archived);
+    if (menu.length) { toast('Every dish is sold out right now, so the walkthrough has nothing to order. Open the 86 board to see why, then try again.', { tone: 'warn' }); return; }
+    // Opens the Dishes and prices sheet, where the first dish is added.
+    const open = h('button', { type: 'button', class: 'btn', onClick: () => { try { SB.sheets.open('dishes'); } catch (e) { /* the sheet is optional */ } } }, 'Add your first dish');
+    toast(h('span', null, 'The walkthrough needs a dish to show. Add one first (a name and a price is enough), then try again. ', open), { tone: 'warn', ms: 12000 });
+  }
+
   // Adds the walkthrough ticket and starts the guide. Starting again while one is running begins again at
   // step 1 with a fresh ticket. Returns true when it started.
   function start(opts) {
@@ -326,10 +339,7 @@
     if (T) stop(true);
     // Choose the dishes from the owner's menu. With no usable dish the walkthrough says why instead of failing quietly.
     const pick = pickDishes();
-    if (!pick) {
-      toast('The walkthrough needs a dish that is cooked in two steps (Start, then Done) and is not sold out. Add one in Back office, Menu and settings, then try again.', { tone: 'warn' });
-      return false;
-    }
+    if (!pick) { noDishNote(); return false; }
     PICK = pick;
     const items = [pick.lead, pick.second, pick.quick].filter(Boolean).map((m) => ({ menuId: m.id, qty: 1 }));
     const r = S.dispatchEx('createTicket', { customer: 'Walk-up', channel: 'dine_in', items, note: '', rush: false, src: 'demo' }, { source: 'sim' });

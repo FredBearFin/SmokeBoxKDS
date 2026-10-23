@@ -1,13 +1,19 @@
 // Journey 13: the "Show me how it works" walkthrough (SB.tour). A first-time user taps through one real ticket; the caption follows what
 // they actually do. Checks the nine steps with real clicks, Skip and Escape cleanup, doing things out of order, pausing for sheets and the
 // office, and the card never covering what it points at (laptop, phone, Large text).
-import { clearBoard, seedStandard, wait, settle, openKey, closeSheets, tapFlame, waitOffice, officeOpen } from './_lib.mjs';
+import { clearBoard as clearBoardBlank, seedStandard, wait, settle, openKey, closeSheets, tapFlame, waitOffice, officeOpen } from './_lib.mjs';
 
 const LAST = 9;
 const slipOf = (page, id) => page.locator('.fl-slip[data-ticket="' + id + '"]');
 const rowBtn = (page, menu) => page.locator('.fl-row[data-menu="' + menu + '"] button').first();
 const card = (page) => page.locator('.tour-card');
 
+// Empties the board but loads the sample kitchen (dishes and food in the cabinet), because the app now starts with no dishes and
+// the walkthrough needs dishes to show.
+async function clearBoard(page) {
+  await page.evaluate(() => { SB.store.resetLive({ keepSettings: true, catalog: 'sample' }); SB.store.tick(); });
+  await wait(250);
+}
 // The newest ticket on the board: the one the walkthrough just added.
 const newestId = (page) => page.evaluate(() => { const l = SB.store.getState().tickets.slice().sort((a, b) => b.createdAt - a.createdAt); return l.length ? l[0].id : null; });
 // The caption's step label, or '' when the card is not showing.
@@ -59,7 +65,7 @@ const drive = (page, id, menu, times) => page.evaluate(([id, menu, times]) => {
 // card is on screen, covers none of the rings, and that every ringed element can be seen. On a wide screen it also checks the card
 // leaves the Bump button alone. busy: start from the four standard tickets instead of an empty board.
 async function walk(t, page, label, busy) {
-  if (busy) await seedStandard(page); else await clearBoard(page);
+  if (busy) { await clearBoard(page); await seedStandard(page, { clearFirst: false }); } else await clearBoard(page);
   await page.evaluate(() => SB.tour.start());
   await reach(page, 1, 3000);
   const id = await newestId(page);
@@ -117,7 +123,7 @@ export default function (h) {
 
     await card(page).getByRole('button', { name: 'Next' }).click();
     t.check('Next goes to step 2, the clock', (await reach(page, 2, 3000)) && /counts up/.test(await sentence(page)), await sentence(page));
-    t.check('step 2 rings the ticket clock and its on-time badge', (await slipOf(page, id).locator('.slip-timer.tour-ring').count()) === 1 && (await slipOf(page, id).locator('.fl-bw.tour-ring').count()) === 1);
+    t.check('step 2 rings the ticket clock (the On time badge is hidden until a ticket is late, so it is not ringed)', (await slipOf(page, id).locator('.slip-timer.tour-ring').count()) === 1 && (await slipOf(page, id).locator('.fl-bw.tour-ring').count()) === 0);
     t.check('step 2: the card does not cover the clock', layoutOk(await geometry(page)), await geometry(page));
 
     await card(page).getByRole('button', { name: 'Next' }).click();

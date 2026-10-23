@@ -12,7 +12,7 @@ Type a name or tap a quick name. Leave it blank for Walk-up. Choose how the orde
 
 ## Allergies and notes
 
-Tap **Any food allergy?** and tap what the customer is allergic to. Put allergies first in the note. Cooks read the first line first.
+Under Any food allergy?, tap **Allergy**, then tap what the customer is allergic to. Put allergies first in the note. Cooks read the first line first.
 
 ## Rush
 
