@@ -710,6 +710,7 @@
       for (let i = 0; i < rec.timed.length; i++) tickRow(rec.timed[i], now);
       if (rec.timed.length) paintNext(rec, now);
     }
+    rankOverdue();
     updateHeader(now);
     const dt = performance.now() - t0;
     const s = m.stats;
@@ -1207,6 +1208,10 @@
     const el = now - rec.createdAt;
     const th = thresholds(rec.channel);
     const lvl = el >= th.breachMs ? 'breach' : el >= th.warnMs ? 'warn' : 'ok';
+    // How long past its overdue time the slip is; 0 while it is not overdue. The ranking below uses it.
+    rec.overMs = lvl === 'breach' ? el - th.breachMs : 0;
+    // An overdue slip says how late it is, in whole minutes, so the worst one is easy to pick out.
+    if (lvl === 'breach') put(rec.refs.bw, WORDS.breach + ' +' + Math.floor(rec.overMs / 60e3) + ' min');
     const txt = U.fmtClock(el);
     if (txt !== rec.timerText) { rec.timerText = txt; put(rec.refs.timer, txt); }
     if (lvl !== rec.level) {
@@ -1215,9 +1220,32 @@
       rec.el.dataset.level = lvl;
       rec.refs.timer.dataset.level = lvl;
       rec.refs.badge.dataset.level = lvl;
-      put(rec.refs.bw, WORDS[lvl]);
+      if (lvl !== 'breach') put(rec.refs.bw, WORDS[lvl]);
       if (announceBreach && lvl === 'breach' && prev && prev !== 'breach') say('Ticket #' + rec.num + ' is overdue.');
     }
+  }
+
+  // Ranks the overdue slips, most overdue first, and tells the stylesheet: data-tier 1 for the worst slip, 2 for the
+  // next two, 3 for the rest, and a CSS order so the worst sit first on the board without moving any node.
+  // WATCH OUT: it only edits attributes and styles, and only when a rank changed.
+  function rankOverdue() {
+    const late = [];
+    for (const rec of m.slips.values()) if (rec.overMs > 0) late.push(rec);
+    late.sort((a, b) => (b.overMs - a.overMs) || (a.num - b.num));
+    const ranked = new Set();
+    late.forEach((rec, i) => {
+      ranked.add(rec);
+      const tier = i === 0 ? '1' : i < 3 ? '2' : '3';
+      if (rec.tier !== tier) { rec.tier = tier; rec.el.dataset.tier = tier; }
+      const ord = String(i - 1000);
+      if (rec.ord !== ord) { rec.ord = ord; rec.el.style.order = ord; }
+    });
+    for (const rec of m.slips.values()) {
+      if (ranked.has(rec) || !rec.tier) continue;
+      rec.tier = ''; rec.ord = ''; delete rec.el.dataset.tier; rec.el.style.removeProperty('order');
+    }
+    // Late slips on screen right now, for the header and for tests.
+    m.lateCount = late.length;
   }
 
   // Header: counters, chips and buttons, updated in place.
