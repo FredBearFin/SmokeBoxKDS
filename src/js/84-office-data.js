@@ -17,6 +17,42 @@
   const SAVE_DELAY = 600;           // ms after the last change before a field is written (longer than the stepper's 500 ms hold-repeat gap)
   const MAX_IMPORT_CHARS = 20e6;    // same ceiling as SB.store.importAll
 
+  // Builds the always-visible "Saved history" card of the Data page: a plain meter of how full the saved history is, a calm amber note with a
+  // button into Close the month from 70 percent, the sentence about history already dropped, and the browser-may-delete line. Reads the store's
+  // historyFill(); a store without it draws nothing.
+  function historyCard() {
+    const BP = SB.office && SB.office.backupPure;
+    const el = U.h('section', { class: 'od-fcard od-hist', 'aria-label': 'Saved history' });
+    const bar = U.h('span', { class: 'od-hist-bar' }), track = U.h('div', { class: 'od-hist-track', 'aria-hidden': 'true' }, bar);
+    const meter = U.h('p', { class: 'od-p od-hist-meter', role: 'status' }), alert = U.h('p', { class: 'od-p od-hist-alert', hidden: true });
+    const dropped = U.h('p', { class: 'od-hint od-hist-dropped', hidden: true }), safari = U.h('p', { class: 'od-hint od-hist-safari', hidden: true });
+    const go = U.h('button', { type: 'button', class: 'btn btn-sm', 'data-action': 'history-close-month', hidden: true }, 'Close the month...');
+    go.addEventListener('click', () => { try { if (SB.setup && typeof SB.setup.openCloseMonth === 'function') SB.setup.openCloseMonth(); } catch (e) { /* the flow shows its own refusals */ } });
+    el.append(U.h('h3', { class: 'od-fh' }, U.h('span', null, 'Saved history')), track, meter, alert, U.h('div', { class: 'od-actions' }, go), dropped, safari);
+    // Redraws the card from the store.
+    function paint() {
+      const st = SB.store.getState(), fill = SB.store.historyFill ? SB.store.historyFill() : null;
+      const v = BP.historyView(fill, st, SB.store.now());
+      el.hidden = !fill;
+      if (!fill) return;
+      el.dataset.tone = v.level === 'ok' ? '' : 'warn'; el.dataset.level = v.level;
+      bar.style.width = (v.pct === null ? 0 : v.pct) + '%';
+      track.setAttribute('data-pct', String(v.pct === null ? '' : v.pct));
+      meter.textContent = v.meter || 'Saved history size is not known on this device.';
+      alert.textContent = v.alert; alert.hidden = !v.alert; go.hidden = !v.alert;
+      const ts = fill.trimmedSince && typeof fill.trimmedSince === 'object' ? fill.trimmedSince.droppedBefore : '';
+      let ds = null; try { ds = SB.store.dataset({ sample: false }); } catch (e) { ds = null; }
+      const dday = (ds && ds.droppedBefore) || ts || '';
+      const dw = BP.droppedWords(dday); dropped.textContent = dw; dropped.hidden = !dw;
+      safari.textContent = v.safari; safari.hidden = !v.safari;
+    }
+    paint();
+    // Keeps the card in step with the store, redrawing only when the tickets, events or day changed.
+    let seen = '';
+    function sync(st) { const k = st.tickets.length + '|' + (st.events || []).length + '|' + (st.archivedBefore || '') + '|' + (st.droppedBefore || '') + '|' + U.serviceDate(SB.store.now(), (st.settings.service || {}).dayStartHour); if (k !== seen) { seen = k; try { paint(); } catch (e) { /* the rest of the page still draws */ } } }
+    return { el, sync };
+  }
+
   // Builds the "Close the month" card for the Data page: one plain paragraph on what it does, the numbers from the store's own preview,
   // and a Start button that opens the guarded confirm flow (SB.setup.openCloseMonth). Nothing here changes any data.
   function closeMonthCard(flowCard) {
@@ -1797,6 +1833,7 @@
     const hubTablet = (() => { try { return !!(SB.store.hubKitchen && SB.store.hubKitchen()); } catch (e) { return false; } })();
     if (!(SB.store.isDemo && SB.store.isDemo()) && !hubTablet && SB.store.closeMonthPreview) { const cm = closeMonthCard(flowCard); flow.append(cm.el); P.syncs.push(cm.sync); }
     pn.body.prepend(flow);
+    if (SB.store.historyFill && !(SB.store.isDemo && SB.store.isDemo())) { const hc = historyCard(); pn.body.prepend(hc.el); P.syncs.push(hc.sync); }
     const exStatus = statusLine();
     const fbLabelId = U.uid('odfb');
     const fbText = h('textarea', { class: 'textarea od-fbtext', readonly: true, rows: 6, 'aria-labelledby': fbLabelId, spellcheck: 'false' });
