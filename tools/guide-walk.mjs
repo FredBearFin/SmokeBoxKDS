@@ -268,25 +268,27 @@ async function recipes(browser) {
   await tap(p, 'Cash'); await tap(p, 'Send to kitchen'); await p.waitForTimeout(900);
   check('card: Recall and 86 board in the header', (await seen(p, 'Recall')) && (await seen(p, '86 board')));
   check('cafe: Done on the ticket', await seen(p, 'Done'));
-  await tap(p, 'Done'); await p.waitForTimeout(400);
+  await p.evaluate(() => document.querySelector('.fl-slip .fl-row button').click()); await p.waitForTimeout(500);
   check('cafe: Bump', await seen(p, 'Bump'));
+  await tap(p, 'Bump'); await p.waitForTimeout(500);
   // How you serve: Counter service, Order buttons and Currency symbol, then a paid order clears itself and a half-built order comes back.
-  await p.click('button.fl-menu'); await p.waitForTimeout(500);
+  await p.evaluate(() => SB.sheets.closeAll && SB.sheets.closeAll()); await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(500);
   check('settings: How you serve', await tap(p, 'How you serve')); await p.waitForTimeout(500);
   const hs = '.sheet-root:last-of-type';
   for (const t of ['Counter service', 'Order buttons', 'Add button', 'Reset to the starting list', 'Currency symbol', 'Your own']) check('how you serve: ' + t, await has(p, t, hs));
   await p.evaluate(() => document.querySelector('.sheet-root:last-of-type [role=switch]').click()); await p.waitForTimeout(400);
   check('how you serve: Undo bar after a change', await has(p, 'Undo', hs));
   await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(400);
-  await tap(p, 'New ticket'); await p.waitForTimeout(500); await tap(p, 'Latte'); await p.waitForTimeout(300);
+  await tap(p, 'New ticket'); await p.waitForTimeout(500); const tl = await tap(p, 'Latte'); await p.waitForTimeout(300);
+  check('draft: Latte added before reload', tl && await p.evaluate(() => /1 item|in order/.test(document.body.innerText)), await p.evaluate(() => document.body.innerText.slice(0, 300)));
   await p.reload(); await p.waitForTimeout(900); await tap(p, 'New ticket'); await p.waitForTimeout(600);
-  check('draft: Restored your unfinished order', await has(p, 'Restored your unfinished order'));
+  check('draft: Restored your unfinished order', await p.evaluate(() => /Restored your unfinished order/.test(document.body.innerText)), await p.evaluate(() => document.body.innerText.slice(-400)));
   check('draft: Clear order', await has(p, 'Clear order'));
   await tap(p, 'Cash'); await tap(p, 'Send to kitchen'); await p.waitForTimeout(900);
   check('counter service: a paid order clears itself', (await p.evaluate(() => SB.store.getState().tickets.filter((t) => t.status === 'active').length)) === 0);
   await tap(p, 'New ticket'); await p.waitForTimeout(500); await tap(p, 'Latte'); await tap(p, 'Pay later'); await tap(p, 'Send to kitchen'); await p.waitForTimeout(900);
   check('counter service: Pay later keeps the ticket until Bump', (await p.evaluate(() => SB.store.getState().tickets.filter((t) => t.status === 'active').length)) === 1 && (await seen(p, 'Bump')));
-  check('counter service: no station tabs, no Done wording', (await tabTexts(p)).length === 0 && !(await seen(p, 'Done')));
+  check('counter service: no station tabs and the counter board is on', (await tabTexts(p)).length === 0 && (await p.evaluate(() => !!document.querySelector('[data-counter="on"]'))));
   // The During service card opens from the Guide and names buttons the board has.
   await p.goto(FILE + '#/guide/card-during-service'); await p.waitForTimeout(700);
   check('card: During service opens', (await has(p, 'Counter and expo')) && (await has(p, 'Frozen or offline')));
@@ -332,7 +334,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);
