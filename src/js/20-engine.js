@@ -1415,7 +1415,8 @@
     for (const it of items) if (zones.indexOf(it.zone) < 0) zones.push(it.zone);
     tx.info = { ticketId: id, num, zones, lines: items.length, dmaxSec: dmax, orderId: order.id, round: order.rounds };
     // Paid at the counter: take payment on the same tap that sends the food.
-    if (pay) { const r = payInto(tx, oi, pay); if (r !== 'ok') return r; tx.info.paid = true; tx.info.total = tx.get('orders')[oi].totals.total; }
+    // Trimming the old orders above moves positions in the list, so the order is found again before it is paid.
+    if (pay) { oi = findOrderIdx(tx.get('orders'), order.id); const r = payInto(tx, oi, pay); if (r !== 'ok') return r; tx.info.paid = true; tx.info.total = tx.get('orders')[oi].totals.total; }
     return 'ok';
   };
 

@@ -314,7 +314,8 @@
   function snapshotBeforeRestore(why) {
     if (!strict || mode !== 'real' || !storage || !state || isBlank()) return null;
     const r = realNow();
-    for (const keep of [null, SNAP_KEEP]) {
+    // Full history first, then the small rolling size, then only what a kitchen cannot do without (menu, settings, PIN, safety records).
+    for (const keep of [null, SNAP_KEEP, { maxTickets: 0, maxEvents: 0 }]) {
       try {
         const small = keep ? E().prune(state, keep) : state;
         const env = { v: 1, takenAt: r, reason: why || BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
