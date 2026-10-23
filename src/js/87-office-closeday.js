@@ -195,7 +195,7 @@
   // Counts of paid, voided and tickets, in one quiet line.
   function countsBlock(m) {
     const bits = [m.tickets + ' ' + U.plural(m.tickets, 'ticket') + ' sent to the kitchen', m.voidedOrders + ' ' + U.plural(m.voidedOrders, 'order') + ' voided', m.voidedTickets + ' ' + U.plural(m.voidedTickets, 'ticket') + ' voided'];
-    return h('p', { class: 'cd-counts' }, bits.join(' · ') + '.');
+    return h('p', { class: 'cd-counts' }, bits.join(', ') + '.');
   }
 
   // Saves the whole backup file and says what happened; also tells the app a backup was made.

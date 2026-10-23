@@ -170,3 +170,12 @@ Left: charts in black and white print (only the two print pages are print-styled
 - `test/office-b.e2e.mjs` is stale against the blank-start and demo-isolation merges (it expects sample data and every page populated): 20 ok, 4 FAIL, then crashes at an empty headline. `test/office-data.e2e.mjs` was not re-run this round. `test/office.e2e.mjs` was not re-run either. These suites need updating by whoever owns the e2e refresh.
 
 **Not done:** starting-cash setting; weekday sales chart; legend samples for dashed lines on histograms; a printed-chart view.
+
+---
+
+## Follow-up round (branch night/a3-r10): known bugs closed
+
+- **Data page painted in 1.6 to 4.7 s** (qa 11b budget 800 ms). Cause: opening the page built the 14-day sample history (the engine runs the whole fortnight) only to count sample tickets and write the sample note, even with the sample switched off. Now the sample is counted only when it is on, and the note with real dates appears when the switch is turned on (with it off the page shows the general sample note). The page now paints in about 130 ms; qa 11b passes.
+- **Middle dots** in the dish rows ("Pit · Meats · Starter prep time") and the Close the day counts line replaced with commas ("Pit, Meats, starter prep time"), per the "no middots" rule in docs/design-notes.md. The dish-row buttons no longer carry a separate aria-label, so the accessible name now contains the visible text (qa 12a label-in-name passes).
+- **qa 12e (office contrast):** the "Not tracking" rail words were too faint (4.36:1 in Paper); they now use the main ink color. Passes.
+- **e2e suites brought up to the current UI** (all deliberate UI changes, no UI regressions): the CSV buttons sit in a closed "Spreadsheet files and the pilot report" group (the test opens it); the restore summary now lists Kind, Dishes, Orders, Tickets and Manager PIN; the two erase buttons open a typed-word box instead of a confirm dialog (the test types ERASE); the Data page bundle in the test now includes `88-office-backup.js`; the dish-summary middle-dot exemption was removed. In `test/office.e2e.mjs` the pace ring, the slowest-tickets table and the one-column check at 768 px now account for the "Show more charts and findings" fold: those cards are folded away on purpose, so the tests open the fold or skip hidden cards (deliberate, not a layout bug).

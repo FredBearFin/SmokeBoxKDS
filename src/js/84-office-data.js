@@ -488,9 +488,8 @@
         trackSeg.setValue(mi.track === 'two' ? 'two' : 'one');
         root.dataset.zone = mi.zone;
         sumName.textContent = mi.name;
-        { const zn = C.zoneById[mi.zone] ? C.zoneById[mi.zone].name : '', cn = catName(mi.cat); sumMeta.textContent = (zn.toLowerCase() === cn.toLowerCase() ? zn : zn + ' · ' + cn) + (mi.archived ? ' · Archived' : mi.prepConfirmed ? '' : ' · Starter prep time'); }
+        { const zn = C.zoneById[mi.zone] ? C.zoneById[mi.zone].name : '', cn = catName(mi.cat); sumMeta.textContent = (zn.toLowerCase() === cn.toLowerCase() ? zn : zn + ', ' + cn) + (mi.archived ? ', archived' : mi.prepConfirmed ? '' : ', starter prep time'); }
         sumPrice.textContent = money(mi.price); sumPrep.textContent = mmss(mi.prepSec);
-        sumBtn.setAttribute('aria-label', mi.name + ', ' + money(mi.price) + ', prep ' + mmss(mi.prepSec) + '. Tap to edit.');
         price.sync(mi.price); prep.sync(mi.prepSec);
         confSeg.setValue(mi.prepConfirmed ? 'confirmed' : 'starter');
         archChip.hidden = !mi.archived;
@@ -1423,7 +1422,8 @@
         sSize.dd.textContent = n == null ? 'unknown' : kbText(n);
       }
       let smp = null;
-      if (simOn()) { try { const ds = SB.store.dataset({ sample: true }); smp = ds.hasSample ? ds.counts.sample : 0; } catch (e) { smp = null; } }
+      // Building the sample history takes seconds, so it is only counted when the sample is switched on.
+      if (simOn() && simOn().sampleEnabled()) { try { const ds = SB.store.dataset({ sample: true }); smp = ds.hasSample ? ds.counts.sample : 0; } catch (e) { smp = null; } }
       sSample.dd.textContent = !simOn() ? 'Not loaded' : simOn().sampleEnabled() ? (smp != null ? U.fmtNum(smp) : 'On') : 'Off';
     }
 
@@ -1436,12 +1436,14 @@
       onChange: (v) => {
         try { simOn().setSampleEnabled(v); SB.ui.toast(v ? 'Sample history is on. The back office charts include it.' : 'Sample history is off. The back office charts use live tickets only.', { tone: 'ok' }); }
         catch (e) { sampleToggle.setValue(!v); SB.ui.toast('Could not change sample history. Reload and try again.', { tone: 'bad' }); }
-        try { paintCounts(cur()); } catch (e) { /* counts repaint on the next sync */ }
+        try { noteP.textContent = noteText(); paintCounts(cur()); } catch (e) { /* counts repaint on the next sync */ }
       },
     }) : null;
     // The sample-history note from the simulator, or the built-in one.
-    const noteText = () => { try { const i = SB.sim && SB.sim.sampleInfo && SB.sim.sampleInfo(); if (i && typeof i.note === 'string' && i.note) return i.note; } catch (e) { /* default below */ } return SAMPLE_NOTE; };
-    if (sampleToggle) sampleBox.append(sampleToggle, para(noteText(), 'od-p'));
+    // The sample note with real dates needs the sample built, which takes seconds: with the sample off the page shows the general note.
+    const noteText = () => { try { const i = SB.sim && SB.sim.sampleEnabled && SB.sim.sampleEnabled() && SB.sim.sampleInfo && SB.sim.sampleInfo(); if (i && typeof i.note === 'string' && i.note) return i.note; } catch (e) { /* default below */ } return SAMPLE_NOTE; };
+    const noteP = para(noteText(), 'od-p');
+    if (sampleToggle) sampleBox.append(sampleToggle, noteP);
     else sampleBox.append(h('p', { class: 'od-p od-warnline' }, ico('alert', 18), h('span', null, 'Simulator not loaded. This build has no sample history, so the back office shows only live tickets.')), para(SAMPLE_NOTE, 'od-hint'));
 
     // Export: JSON backup and CSV tables go through saveFile, with copy as the fallback.
