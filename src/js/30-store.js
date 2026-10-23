@@ -437,7 +437,8 @@
   // Before a restore replaces the kitchen: keeps a whole copy of the current one in the last-good slot (full history if the
   // browser has room, else the small rolling size). Returns the time it was taken, or null when there was nothing worth
   // keeping (an empty kitchen, the demo, no storage) or the browser had no room. Never throws.
-  function snapshotBeforeRestore(why) {
+  // carried is the names and setup lists to keep with it, read before a restore began changing them (read now when not given).
+  function snapshotBeforeRestore(why, carried) {
     if (!strict || mode !== 'real' || !storage || !state || isBlank()) return null;
     const r = realNow();
     // Full history first, then the small rolling size, then only what a kitchen cannot do without (menu, settings, PIN, safety records).
@@ -445,6 +446,9 @@
       try {
         const small = keep ? E().prune(state, keep) : state;
         const env = { v: 1, takenAt: r, reason: why || BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
+        // The names and setup lists a restore overwrites go in too, even when empty, so undoing puts them back exactly as they were.
+        Object.assign(env, carried || carriedSetup(true));
+        if (keep) env.trimmed = true; // the screens say the copy holds only recent history
         if (!E().validateBackup(JSON.stringify(env)).ok) continue;
         // A big kitchen's copy is saved compact too, so it fits where the plain text would not (the full history is what makes it worth keeping).
         if (wantCompact(small)) { delete env.state; env.fmt = 2; env.p = packer.pack(small); }
@@ -455,11 +459,12 @@
     }
     return null;
   }
-  // Tells the screens about the 'before restore' copy: { takenAt, expiresAt } or null when there is none now.
+  // Tells the screens about the 'before restore' copy: { takenAt, expiresAt, reason, trimmed } or null when there is none now.
+  // trimmed is true when the browser was short on space and the copy keeps only recent tickets (menu, settings, PIN and safety records stay).
   function beforeRestoreInfo() {
     if (!storage) return null;
     const g = beforeRestoreCopy(realNow());
-    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS, reason: g.reason } : null;
+    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS, reason: g.reason, trimmed: g.trimmed === true } : null;
   }
   // Puts the 'before restore' copy back as the kitchen (the way back from a wrong restore). Returns 'ok', or 'noCopy'.
   // The copy it replaces is kept the same way, so this can be undone once too.
@@ -995,13 +1000,18 @@
     const r = realNow();
     const env = { v: 1, savedAt: r, rev: state.rev, clock: { virtual: now(), real: r, speed: clk.speed }, state };
     if (strict) env.mode = mode;
-    // Owner choices from the setup screens that live outside the board state travel with the backup too.
-    const setup = {};
-    for (const k of SETUP_LISTS) { let v = null; try { v = storage ? storage.get(SETUP_KEYS[k], null) : null; } catch (e) { v = null; } if (Array.isArray(v)) setup[k] = v.filter((x) => typeof x === 'string').slice(0, 200); }
-    if (Object.keys(setup).length) env.setup = setup;
+    return Object.assign(env, carriedSetup(false));
+  }
+  // Owner choices from the setup screens that live outside the board state: { setup, names }, each left out when there is
+  // nothing in it. With always true both are filled even when empty (the 'before restore' copy, so undo clears what a restore added).
+  function carriedSetup(always) {
+    const out = {}, setup = {};
+    for (const k of SETUP_LISTS) { let v = null; try { v = storage ? storage.get(SETUP_KEYS[k], null) : null; } catch (e) { v = null; } if (Array.isArray(v)) setup[k] = v.filter((x) => typeof x === 'string').slice(0, 200); else if (always) setup[k] = []; }
+    if (Object.keys(setup).length) out.setup = setup;
     const nm = ownerNames();
-    if (nm) env.names = nm;
-    return env;
+    if (nm) out.names = nm;
+    else if (always && SB.config && typeof SB.config.customSpec === 'function') out.names = { rename: {}, add: {} };
+    return out;
   }
   // The setup-screen lists a backup carries: stations the owner hid from the tiles, and dishes that came from the examples.
   const SETUP_KEYS = { hiddenStations: 'smokebox.v1.setup.hiddenStations', examples: 'smokebox.v1.setup.examples' };
@@ -1054,6 +1064,8 @@
     // not dropped. A backup without names (an older one) leaves the current names alone. A refused import
     // puts the old names back.
     const C = SB.config;
+    // WATCH OUT: read the names and setup lists for the 'before restore' copy now, before this restore starts overwriting them.
+    const carriedBefore = carriedSetup(true);
     let namesBefore = null, namesGiven = null;
     if (C && typeof C.applyCustom === 'function' && typeof C.customSpec === 'function') {
       try {
@@ -1070,7 +1082,7 @@
     if (namesGiven && typeof C.saveCustom === 'function') { try { C.saveCustom(namesGiven); } catch (e) { /* the names stay applied for this session */ } }
     if (parsed && isObjLike(parsed.setup)) for (const k of SETUP_LISTS) if (Array.isArray(parsed.setup[k])) { try { storage.set(SETUP_KEYS[k], parsed.setup[k].filter((x) => typeof x === 'string').slice(0, 200)); } catch (e) { /* the list is a convenience */ } }
     // Keep the kitchen being replaced, so a wrong restore can be undone: a visible copy in the last-good slot.
-    const beforeAt = snapshotBeforeRestore();
+    const beforeAt = snapshotBeforeRestore(BEFORE_RESTORE, carriedBefore);
     const ns = v.state;
     // The revision must go up so other tabs treat the imported copy as newer; the clock must not be behind
     // its times.

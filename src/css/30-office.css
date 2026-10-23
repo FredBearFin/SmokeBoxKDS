@@ -103,7 +103,7 @@ a.of-nav:active { background: var(--press); }
 .of-tiles[data-n="5"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .of-tile { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--sp-4) var(--sp-4) var(--sp-4) var(--sp-5); margin-top: -1px; border-top: 1px solid var(--line-soft); border-left: 1px solid var(--line-soft); }
 .of-tile-label { display: flex; align-items: flex-end; font-size: var(--fs-2); font-weight: var(--w-medium); color: var(--ink2); line-height: 1.25; min-height: 2.5em; }
-.of-tile-val { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 1px; margin-top: 2px; font: var(--w-semi) clamp(36px, 3.5vw, 54px)/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--ink); letter-spacing: 0; min-height: 1em; }
+.of-tile-val { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 1px; margin-top: 2px; font: var(--w-semi) clamp(36px, 3.5vw, 54px)/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--ink); letter-spacing: 0; min-height: 1em; overflow-wrap: anywhere; }
 .of-u, .of-uw { font-size: 0.46em; font-weight: var(--w-medium); color: var(--ink2); margin-left: 1px; letter-spacing: 0.01em; }
 .of-uw { margin-left: 6px; }
 .of-cur { font-size: 0.62em; font-weight: var(--w-medium); color: var(--ink2); margin-right: 2px; align-self: flex-start; padding-top: 0.12em; }
@@ -374,3 +374,18 @@ a.of-nav:active { background: var(--press); }
 .of-how summary { cursor: pointer; display: inline-block; padding: 6px 0; min-height: 32px; color: var(--ink2); text-decoration: underline; text-underline-offset: 3px; }
 .of-how p { margin: var(--sp-1) 0 0; line-height: 1.5; }
 .of-page[data-coach="on"] > .of-how { display: none; }
+
+/* Browser print (Ctrl+P) of an office page: the whole page column on white paper, without the rail, and no card split across two
+   pages. The script switches to the Paper look while printing, so text stays dark. The dedicated print pages (safety record, close
+   day, pilot report) hide all of this with their own rule. */
+@media print {
+  body:has(.layer-office:not([hidden])):not(:has(.layer-guide:not([hidden]))) .sb-shell { position: static !important; overflow: visible !important; background: #fff !important; }
+  body:has(.layer-office:not([hidden])):not(:has(.layer-guide:not([hidden]))) .sb-shell > :not(.layer-office) { display: none !important; }
+  .layer-office { position: static !important; display: block !important; overflow: visible !important; background: #fff !important; }
+  .layer-office[hidden] { display: none !important; }
+  .of { display: block; background: #fff; color: #000; }
+  .of-rail { display: none; }
+  .of-col { overflow: visible; height: auto; }
+  .of-main { max-width: none; padding: 0; }
+  .of-card, .ch { break-inside: avoid; }
+}

@@ -784,7 +784,7 @@ group('9c. Data: import', async () => {
     check('nothing has changed yet', (await st(page, () => SB.store.getState().tickets.length)) === 0);
     await page.locator('[data-action="import-replace"]').click();
     let sheet = await confirmSheet(page, 'cancel');
-    check('the confirm step spells out the consequence and is a danger dialog', /There is no undo/.test(sheet) && /Replace everything/.test(sheet) && /12 tickets/.test(sheet), sheet);
+    check('the confirm step spells out the consequence and is a danger dialog', /can be undone/.test(sheet) && /Replace everything/.test(sheet) && /12 tickets/.test(sheet), sheet);
     check('cancel leaves everything as it was', (await st(page, () => SB.store.getState().tickets.length)) === 0);
     await page.locator('[data-action="import-replace"]').click();
     await confirmSheet(page, 'confirm');
