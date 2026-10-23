@@ -4,7 +4,7 @@ More than one screen on one kitchen. This is a test feature, not part of the nor
 
 ## What you need
 
-A hub: a small program that keeps the kitchen in one place. Someone runs it by hand on a laptop or server. Smokebox never starts one. You need its address and its access code, if it has one. Then tap **Settings**, then **Use one kitchen on several tablets**.
+A main computer (the hub): a small program on one computer that keeps the shared kitchen and sends it to every screen. Someone runs it by hand. Smokebox never starts one. You need its address and its access code, if it has one. Then tap **Settings**, then **Use one kitchen on several tablets**.
 
 ## Show only
 
@@ -15,17 +15,17 @@ For a TV or a phone. Tap **Show only**, type the **Address of the kitchen** and 
 For a tablet that takes orders too. Tap **Use this hub for orders on this tablet**. Type the address, the code and a name for this screen, like Pass. Tap **Check the hub**, then choose one:
 
 - Show the hub's kitchen on this tablet. Your own saved kitchen stays untouched.
-- Send this tablet's kitchen to the hub. This works only if the hub is empty. Smokebox never mixes two kitchens.
+- Send this tablet's kitchen to the hub. This works only if the main computer has no kitchen yet. Smokebox never mixes two kitchens.
 
 Then tap **Join the hub**. Tap **Leave the hub** to go back.
 
 ## What the board tells you
 
-- "Connected": your taps are reaching the hub.
+- "Connected": your taps are reaching the main computer.
 - "Offline: your taps are saved and will be sent": the link is down. Taps wait on this tablet.
-- "Last known, from" a time: the page reloaded while the hub was down, so it shows the last kitchen it had.
-- "Not confirmed yet" on a ticket: the hub has not answered that change.
-- "Not done:" and a reason: the hub refused a tap, for example because another tablet got there first.
+- "Last known, from" a time: the page reloaded while the main computer was down, so it shows the last kitchen it had.
+- "Not confirmed yet" on a ticket: the main computer has not answered that change.
+- "Not done:" and a reason: the main computer refused a tap, for example because another tablet got there first.
 
 ## Undo
 

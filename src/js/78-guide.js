@@ -983,7 +983,7 @@
      },
      {
       "t": "p",
-      "x": "A hub: a small program that keeps the kitchen in one place. Someone runs it by hand on a laptop or server. Smokebox never starts one. You need its address and its access code, if it has one. Then tap **Settings**, then **Use one kitchen on several tablets**."
+      "x": "A main computer (the hub): a small program on one computer that keeps the shared kitchen and sends it to every screen. Someone runs it by hand. Smokebox never starts one. You need its address and its access code, if it has one. Then tap **Settings**, then **Use one kitchen on several tablets**."
      },
      {
       "t": "h",
@@ -1005,7 +1005,7 @@
       "t": "ul",
       "x": [
        "Show the hub's kitchen on this tablet. Your own saved kitchen stays untouched.",
-       "Send this tablet's kitchen to the hub. This works only if the hub is empty. Smokebox never mixes two kitchens."
+       "Send this tablet's kitchen to the hub. This works only if the main computer has no kitchen yet. Smokebox never mixes two kitchens."
       ]
      },
      {
@@ -1019,11 +1019,11 @@
      {
       "t": "ul",
       "x": [
-       "\"Connected\": your taps are reaching the hub.",
+       "\"Connected\": your taps are reaching the main computer.",
        "\"Offline: your taps are saved and will be sent\": the link is down. Taps wait on this tablet.",
-       "\"Last known, from\" a time: the page reloaded while the hub was down, so it shows the last kitchen it had.",
-       "\"Not confirmed yet\" on a ticket: the hub has not answered that change.",
-       "\"Not done:\" and a reason: the hub refused a tap, for example because another tablet got there first."
+       "\"Last known, from\" a time: the page reloaded while the main computer was down, so it shows the last kitchen it had.",
+       "\"Not confirmed yet\" on a ticket: the main computer has not answered that change.",
+       "\"Not done:\" and a reason: the main computer refused a tap, for example because another tablet got there first."
       ]
      },
      {
@@ -1071,7 +1071,7 @@
      },
      {
       "t": "p",
-      "x": "The card **Opens without the internet** in **Tablet checks: screen, sound, home screen** says whether this tablet keeps a copy of Smokebox. It works after you have opened Smokebox once with the kitchen connected. It needs a secure (https) address, or the hub computer itself. A plain http address on your network cannot do it. iPad Safari may clear stored data after about a week unless Smokebox is added to the home screen."
+      "x": "The card **Opens without the internet** in **Tablet checks: screen, sound, home screen** says whether this tablet keeps a copy of Smokebox. It works after you have opened Smokebox once with the kitchen connected. It needs a secure (https) address, or the main computer itself. A plain http address on your network cannot do it. iPad Safari may clear stored data after about a week unless Smokebox is added to the home screen."
      },
      {
       "t": "p",

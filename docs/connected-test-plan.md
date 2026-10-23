@@ -6,10 +6,10 @@ For Freddy. Plain steps to try the connected build on two real tablets. **Nothin
 
 - Two tablets (try one Android and one iPad if you can), charged, with Chrome (Android) and Safari (iPad).
 - A third screen if you have one (a TV or phone), for Show only.
-- One computer on the same Wi-Fi to run the hub. Or a server: use the beta instance below.
+- One computer on the same Wi-Fi to run the main computer. Or a server: use the beta instance below.
 - A pen, and a phone to take photos of anything odd.
 
-## Part 1: the hub on your own computer (same Wi-Fi)
+## Part 1: the main computer (the hub) on your own computer, same Wi-Fi
 
 1. On the computer: `node tools/build.mjs --quiet`, then `PORT=8787 SMOKEBOX_FOLLOW_CODE=ABC123 SMOKEBOX_STARTER=1 node server/server.mjs`. Find the computer's address on the Wi-Fi (like 192.168.1.20).
 2. Open `http://<that address>:8787/?hub&code=ABC123` on tablet 1.
@@ -32,8 +32,8 @@ Do each and write down yes or no.
 | Turn Wi-Fi off on tablet 2. Take an order there | The bar says "Offline: your taps are saved and will be sent". The ticket shows "Not confirmed yet" |
 | Turn Wi-Fi back on | The bar says "Connected", the marker goes away, both tablets agree |
 | Open `http://<address>:8787/?follow&code=ABC123` on the third screen | "Connected" and "This screen only shows the kitchen." Taps on it do nothing |
-| Stop the hub (Ctrl+C on the computer) and wait a minute | The Show only screen says "Reconnecting..." and then "Out of date since" with a red banner |
-| Start the hub again | Everything says "Connected" |
+| Stop the main computer (Ctrl+C on the computer) and wait a minute | The Show only screen says "Reconnecting..." and then "Out of date since" with a red banner |
+| Start the main computer again | Everything says "Connected" |
 
 If a step goes wrong, write down: which tablet, what you tapped, the exact words on the screen, the time, and take a photo.
 
@@ -41,7 +41,7 @@ If a step goes wrong, write down: which tablet, what you tapped, the exact words
 
 This needs a secure address, so use the beta instance (below) or another https address.
 
-1. On each tablet open the hub address once with the hub reachable. Then Settings, **Tablet checks: screen, sound, home screen**.
+1. On each tablet open the main computer address once with the main computer reachable. Then Settings, **Tablet checks: screen, sound, home screen**.
    - Should happen: the card **Opens without the internet** says "Yes: this tablet can open Smokebox without the internet."
 2. Turn Wi-Fi off, close the page fully, and open Smokebox again from the home screen icon.
    - Should happen: the page opens and the bar says "Last known, from" a time, and "Offline: your taps are saved and will be sent".
@@ -60,9 +60,41 @@ This needs a secure address, so use the beta instance (below) or another https a
 5. To remove: `bash beta-remove.sh` (or `--keep-data`).
    - If the script stops with a message, write it down. It says it undoes its own Caddy change if Caddy refuses.
 
+## Part 5: pairing (only after the pairing field is in the join form)
+
+The pairing field is being built (A2, `night/a2-c7`). Until it is in the build you cannot type a code on a screen; skip this part and write that down.
+
+1. Start the main computer with `SMOKEBOX_REQUIRE_TOKENS=1 SMOKEBOX_DATA=/path/hub.json`. Open it on a tablet: it should say it is not paired and ask for a pairing code.
+2. On the main computer: `node server/server.mjs admin pair --data /path/hub.json`. It prints six letters and digits and says it works once, for 10 minutes.
+3. Type the code and a name on the tablet. It should join. Use the same code on a second tablet: it should be refused (a code works once).
+4. `node server/server.mjs admin list --data /path/hub.json` shows both screens. Remove one with `admin revoke ID`: that tablet should stop at once and say it was removed. Pair it again with a new code and any taps it was holding should be sent.
+5. Type a wrong code five times: that address is locked for ten minutes, even for the right code.
+
 ## What to write down
 
-For every "no": the tablet and browser, the step, what you tapped, the exact words on the screen, the time, and a photo. Also note anything slow, anything that flickered, and any time a tap seemed to vanish. Do not share photos of the address bar: it contains the access code.
+Copy this table onto paper. One row for every step that did not do what the plan says.
+
+| When (time) | Part and step | Which screen (tablet 1, 2, third) and its browser | What you tapped | What should have happened | What happened, in the screen's exact words | Photo taken (yes/no) |
+|---|---|---|---|---|---|---|
+| | | | | | | |
+| | | | | | | |
+| | | | | | | |
+
+Also write down, even when everything worked: the main computer's address, which tablets and browsers, the Wi-Fi name, how long each part took, anything slow, anything that flickered, and any time a tap seemed to vanish. Do not share photos of the address bar: it contains the access code or pairing details.
+
+## If it goes wrong (one page)
+
+1. **Stop and write.** Note the time, the screen, what you tapped and the exact words. Take a photo. Do not fix anything yet.
+2. **The tablet shows an error instead of the board.** Read the words. "Not paired" means you need a pairing code. "Removed" means pair it again. "Different versions" means reload the page from the main computer. "Cannot reach the main computer" means check Wi-Fi and the address.
+3. **A tap did not do what you expected.** Look for "Not done:" and read the reason. Look for "Not confirmed yet": the main computer has not answered. Wait for "Connected" before you try again.
+4. **Undo says "Someone else changed the kitchen since".** That is expected when another tablet acted. Fix it by hand.
+5. **The tablet says "Offline".** Check Wi-Fi. Taps are saved and will be sent. Do not reload the page until it says "Connected" (what happens to waiting taps after a reload is not checked).
+6. **A screen shows "Out of date since".** Do not trust it. Check the main computer is running and the network is up.
+7. **The page will not open without the internet.** Check Tablet checks: screen, sound, home screen, the card "Opens without the internet". It needs https. Try **Reset the offline copy** in Help and about.
+8. **A tablet looks wrong or stuck.** Go back to your own kitchen: menu button, then **Back to my own kitchen** (Show only), or **Leave the hub**. Your own saved kitchen is untouched.
+9. **The main computer misbehaves.** Stop it with Ctrl+C, start it again with the same `SMOKEBOX_DATA` file. The kitchen is kept. Write down what the terminal said.
+10. **The beta server install stops.** Read its message. It undoes its own Caddy change if Caddy refuses. Run `bash beta-remove.sh` if you want it gone. The real Smokebox must still open; check it first.
+11. **You are not sure.** Stop. Nothing here is a real kitchen. Write it down and move on.
 
 ## What this plan does not cover
 
