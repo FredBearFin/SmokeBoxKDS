@@ -866,9 +866,13 @@
     }
     return rememberedCode(opts.url);
   }
-  const FOLLOW_FATAL = { badCode: 1, notFound: 1, wrongVersion: 1, tooMany: 1 };
+  const FOLLOW_FATAL = { badCode: 1, notFound: 1, wrongVersion: 1, tooMany: 1, unpaired: 1, revoked: 1 };
+  const CLIENT_PROTO = 1;                              // the hub protocol this build speaks; sent to the hub, which may require a newer one
   const FOLLOW_REASON = {
     badCode: 'The access code is wrong or missing.', notFound: 'That address is not a Smokebox hub.', wrongVersion: 'This screen and the hub do not speak the same version. Reload the page from the hub.',
+    unpaired: 'This screen is not paired with the hub. Ask the owner for a pairing code.', revoked: 'This screen was removed from the hub. Ask the owner to pair it again.',
+    badPairCode: 'That pairing code is wrong or has expired. Ask the owner for a new one.', tooManyTries: 'Too many wrong tries. Wait a few minutes, or ask the owner for a new code.',
+    badName: 'The screen name may use letters, digits, spaces and . , \' & ( ) # _ - and up to 20 characters.', notOwner: 'Only an owner screen can do that.',
     tooMany: 'The hub has too many screens connected.', unreachable: 'Cannot reach the hub.', closed: 'The connection to the hub ended.', error: 'Something went wrong talking to the hub.',
   };
   // Memory-only storage with the same methods as the browser's, so the follower never touches the device's saved kitchen.
@@ -947,7 +951,8 @@
       base: null, hub: false, offsetKnown: false, pend: [], owners: new Map(), baseKey: null, topOwner: null, lastActKey: null, fromCache: false, cachedAt: null, cacheAt: 0, cacheDirty: false, name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
       fetchFn: opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null), Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
     f.hub = !!hub;
-    f.name = typeof opts.name === 'string' ? opts.name.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20) : '';
+    const bound = hub ? tokenFor(url) : null;
+    f.name = bound && bound.name ? bound.name : typeof opts.name === 'string' ? opts.name.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20) : '';
     f.timer = opts.noTimers ? null : setInterval(folTick, 1000);
     const p = new Promise((resolve) => { f.resolve = resolve; });
     if (hub && cache) {
@@ -992,14 +997,13 @@
     f.ctrl = new f.Abort();
     let q = '';
     if (f.hubId != null && isNum(f.seq)) q = '?since=' + f.seq + '&hub=' + encodeURIComponent(f.hubId);
-    const hdr = { accept: 'text/event-stream' };
-    if (f.code) hdr['x-smokebox-code'] = f.code;                // the code travels in a header, never in the address
+    const hdr = hubHeaders(f.url, f.code, { accept: 'text/event-stream' });       // the token or code travels in a header, never in the address
     let res;
     try { res = await f.fetchFn(f.url + '/follow' + q, { signal: f.ctrl.signal, cache: 'no-store', headers: hdr }); } catch (e) { if (f.closed || gen !== f.gen) return; folRetry('unreachable'); return; }
     if (f.closed || gen !== f.gen) return;
     if (!res.ok) {
-      const st = res.status;
-      f.error = st === 403 || st === 429 ? 'badCode' : st === 404 ? 'notFound' : st === 503 ? 'tooMany' : 'error';
+      let rb = null; try { rb = await res.json(); } catch (e) { rb = null; }
+      f.error = refusalWord(res.status, rb);
       folRetry(f.error);
       return;
     }
@@ -1063,7 +1067,7 @@
     const f = fol;
     folClock(d);
     if (name === 'hello') {
-      if (d.proto !== 1) { f.error = 'wrongVersion'; try { f.ctrl.abort(); } catch (e) { /* ignore */ } folRetry('wrongVersion'); return; }
+      if (d.proto !== 1 || (isNum(d.minClient) && d.minClient > CLIENT_PROTO)) { f.error = 'wrongVersion'; try { f.ctrl.abort(); } catch (e) { /* ignore */ } folRetry('wrongVersion'); return; }
       f.pendingHub = d.hubId;
       if (f.hub && f.fromCache && f.hubId && d.hubId !== f.hubId) {
         // The hub was reset or replaced while this screen was away: the taps queued from the saved copy belong to a kitchen that is gone.
@@ -1118,6 +1122,69 @@
    * device's own saved kitchen is never written or replaced, and leaveHub() restores it. Exactly one of adopt:'hub' (show the hub's kitchen)
    * or seed:true (send this device's kitchen to an EMPTY hub first; refused with notEmpty otherwise) must be given.
    */
+  const TOKEN_KEY = 'smokebox.v1.hubtoken';
+  // The pairing records kept on this device, one per hub address: { [address]: { token, id, name, owner } }.
+  function tokenBook() { try { const b = U.rawStorage.get(TOKEN_KEY, null); return b && b.v === 1 && isObjLike(b.hubs) ? b.hubs : {}; } catch (e) { return {}; } }
+  // The pairing record for a hub address, or null.
+  const tokenFor = (url) => tokenBook()[normUrl(url)] || null;
+  // The headers every call to a hub carries: this build's protocol, and the screen's token or else the shared access code.
+  function hubHeaders(url, code, extra) {
+    const h = Object.assign({ 'x-smokebox-client': String(CLIENT_PROTO) }, extra || {}), t = tokenFor(url);
+    if (t && t.token) h['x-smokebox-token'] = t.token; else if (code) h['x-smokebox-code'] = code;
+    return h;
+  }
+  // The fetch function for hub calls from the options or the page.
+  const hubFetch = (opts) => (opts && opts.fetch) || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null);
+  // Turns a refusal from the hub (its status and JSON) into one of our error words.
+  function refusalWord(status, body) {
+    const r = body && typeof body === 'object' ? body.report || body.error : '';
+    if (['unpaired', 'revoked', 'wrongVersion', 'badPairCode', 'tooManyTries', 'badName', 'notOwner', 'tooMany', 'badCode'].indexOf(r) >= 0) return r;
+    return status === 403 || status === 429 ? 'badCode' : status === 404 ? 'notFound' : status === 426 ? 'wrongVersion' : status === 503 ? 'tooMany' : 'error';
+  }
+  // Pairs this device with a hub: exchanges the one-time pairing code (and a screen name) for a token kept on this device. Resolves { ok, error?, name, owner, id }.
+  async function pairHub(opts) {
+    opts = opts || {};
+    const fetchFn = hubFetch(opts);
+    if (typeof opts.url !== 'string' || !fetchFn) return { ok: false, error: 'notFound' };
+    const url = normUrl(opts.url);
+    let res, b = null;
+    try {
+      res = await fetchFn(url + '/pair', { method: 'POST', headers: { 'content-type': 'application/json', 'x-smokebox-client': String(CLIENT_PROTO) }, cache: 'no-store', body: JSON.stringify({ code: String(opts.code || ''), name: typeof opts.name === 'string' ? opts.name : '' }) });
+      try { b = await res.json(); } catch (e) { b = null; }
+    } catch (e) { return { ok: false, error: 'unreachable' }; }
+    if (!res.ok || !b || b.ok !== true || typeof b.token !== 'string') return { ok: false, error: refusalWord(res.status, b), reason: FOLLOW_REASON[refusalWord(res.status, b)] || '' };
+    try {
+      const hubs = Object.assign({}, tokenBook());
+      hubs[url] = { token: b.token, id: b.screen.id, name: b.screen.name || '', owner: !!b.screen.owner };
+      U.rawStorage.set(TOKEN_KEY, { v: 1, hubs });
+    } catch (e) { return { ok: false, error: 'error' }; }
+    return { ok: true, name: b.screen.name || '', owner: !!b.screen.owner, id: b.screen.id };
+  }
+  // Whether this device is paired with a hub address, and as what (never the token itself).
+  function pairedFor(url) { const t = tokenFor(url); return t ? { paired: true, name: t.name, owner: t.owner, id: t.id } : { paired: false, name: '', owner: false, id: null }; }
+  // Forgets the pairing for a hub address on this device only (the hub's list is not changed; an owner removes screens there).
+  function unpair(url) {
+    try { const hubs = Object.assign({}, tokenBook()); const had = !!hubs[normUrl(url)]; delete hubs[normUrl(url)]; if (Object.keys(hubs).length) U.rawStorage.set(TOKEN_KEY, { v: 1, hubs }); else U.rawStorage.remove(TOKEN_KEY); return had; } catch (e) { return false; }
+  }
+  // A call to the owner's routes on the hub with this device's token. Resolves { ok, ... } or { ok:false, error }.
+  async function ownerCall(opts, method, p, body) {
+    opts = opts || {};
+    const fetchFn = hubFetch(opts);
+    if (typeof opts.url !== 'string' || !fetchFn) return { ok: false, error: 'notFound' };
+    if (!tokenFor(opts.url)) return { ok: false, error: 'unpaired' };
+    try {
+      const res = await fetchFn(normUrl(opts.url) + p, { method, headers: hubHeaders(opts.url, '', body ? { 'content-type': 'application/json' } : {}), cache: 'no-store', body: body ? JSON.stringify(body) : undefined });
+      let b = null; try { b = await res.json(); } catch (e) { b = null; }
+      if (!res.ok || !b || b.ok !== true) return { ok: false, error: refusalWord(res.status, b) };
+      return b;
+    } catch (e) { return { ok: false, error: 'unreachable' }; }
+  }
+  // The paired screens of a hub (owner screens only).
+  const hubScreens = (opts) => ownerCall(opts, 'GET', '/screen/list');
+  // A new one-time pairing code for another screen (owner screens only): { ok, code, minutes }.
+  const hubNewPairingCode = (opts) => ownerCall(opts, 'POST', '/screen/pair', {});
+  // Removes a screen from the hub (owner screens only); it is cut off at once.
+  const hubRemoveScreen = (opts) => ownerCall(opts, 'POST', '/screen/revoke', { id: opts && opts.id });
   const QUEUE_KEY = 'smokebox.v1.hubqueue';
   const CACHE_KEY = 'smokebox.v1.hubcache', CACHE_MAX = 1500000;      // the last hub snapshot kept on the device, and the most characters it may use
   // Keeps the hub's latest state on the device (not the shown state) so a reload while the hub is unreachable can show the last known kitchen.
@@ -1159,7 +1226,7 @@
     if (!fol || !fol.hub) return { mode: 'off', state: 'off', url: '', name: '', lastUpdate: null, lastOk: null, queued: 0, unsent: 0, error: null, reason: '', seq: null, hubId: null, offsetMs: 0, connected: false };
     const q = hubQueued(), st = hubState();
     return { mode: 'hub', state: st, url: fol.url, name: fol.name, lastUpdate: fol.lastMsgAt, lastOk: fol.lastMsgAt, queued: q, unsent: q, error: fol.error, reason: fol.error ? (FOLLOW_REASON[fol.error] || FOLLOW_REASON.error) : '',
-      seq: fol.seq, hubId: fol.hubId, offsetMs: Math.round(fol.offset), connected: st === 'connected' || st === 'sending', lastKnown: !!fol.fromCache, lastKnownAt: fol.fromCache ? fol.cachedAt : null };
+      seq: fol.seq, hubId: fol.hubId, offsetMs: Math.round(fol.offset), connected: st === 'connected' || st === 'sending', lastKnown: !!fol.fromCache, lastKnownAt: fol.fromCache ? fol.cachedAt : null, paired: !!tokenFor(fol.url), owner: !!(tokenFor(fol.url) && tokenFor(fol.url).owner) };
   }
   // True when this store is a screen that writes through a hub.
   const isHubClient = () => !!fol && fol.hub;
@@ -1305,13 +1372,13 @@
     f.sending = true;
     let res = null, body = null;
     try {
-      res = await f.fetchFn(f.url + '/action', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store',
+      res = await f.fetchFn(f.url + '/action', { method: 'POST', headers: hubHeaders(f.url, '', { 'content-type': 'application/json' }), cache: 'no-store',
         body: JSON.stringify({ type: next.type, payload: next.payload, opId: next.opId, clientId: tabId, who: f.name, at: next.now, code: f.code }) });
       try { body = await res.json(); } catch (e) { body = null; }
     } catch (e) { res = null; }
     f.sending = false;
     if (fol !== f || f.closed) return;
-    if (res && (res.status === 403 || res.status === 429)) { f.error = 'badCode'; folNotify(true); return; }
+    if (res && (res.status === 403 || res.status === 429 || res.status === 426)) { f.error = refusalWord(res.status, body); folNotify(true); return; }
     if (!res || res.status >= 500 || !body || typeof body !== 'object') {
       f.sendFail = true; f.sendRetryAt = realNow() + Math.min(15000, 1000 * Math.pow(2, f.sendStep++));
       folNotify(false);
@@ -1335,15 +1402,16 @@
     if (typeof opts.url !== 'string' || !fetchFn) return { ok: false, error: 'notFound' };
     const code = codeFor(opts);
     let res;
-    try { res = await fetchFn(opts.url.replace(/\/+$/, '') + '/probe', { cache: 'no-store', headers: code ? { 'x-smokebox-code': code } : {} }); } catch (e) { return { ok: false, error: 'unreachable' }; }
-    if (res.status === 403 || res.status === 429) return { ok: false, error: 'badCode' };
+    try { res = await fetchFn(opts.url.replace(/\/+$/, '') + '/probe', { cache: 'no-store', headers: hubHeaders(opts.url, code) }); } catch (e) { return { ok: false, error: 'unreachable' }; }
+    if (res.status === 403 || res.status === 429 || res.status === 426) { let pb = null; try { pb = await res.json(); } catch (e) { pb = null; } return { ok: false, error: refusalWord(res.status, pb), tokensRequired: !!(pb && pb.tokensRequired) }; }
     if (res.status === 404) return { ok: false, error: 'notFound' };
     if (res.status === 503) return { ok: false, error: 'tooMany' };
     let b = null;
     try { b = await res.json(); } catch (e) { b = null; }
     if (!res.ok || !b || typeof b !== 'object' || !('proto' in b)) return { ok: false, error: res.ok ? 'notFound' : 'error' };
     if (b.proto !== 1) return { ok: false, error: 'wrongVersion' };
-    return { ok: true, empty: b.empty === true, hubId: b.hubId };
+    if (isNum(b.minClient) && b.minClient > CLIENT_PROTO) return { ok: false, error: 'wrongVersion' };
+    return { ok: true, empty: b.empty === true, hubId: b.hubId, tokensRequired: b.tokensRequired === true };
   }
   // Joins a hub as a screen that writes through it. See the section comment above for the two choices and what is never touched.
   async function initHubClient(opts) {
@@ -1368,10 +1436,10 @@
       const fetchFn = opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null);
       let res, b = null;
       try {
-        res = await fetchFn(opts.url.replace(/\/+$/, '') + '/seed', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ state, code: codeFor(opts) }) });
+        res = await fetchFn(opts.url.replace(/\/+$/, '') + '/seed', { method: 'POST', headers: hubHeaders(opts.url, '', { 'content-type': 'application/json' }), cache: 'no-store', body: JSON.stringify({ state, code: codeFor(opts) }) });
         try { b = await res.json(); } catch (e) { b = null; }
       } catch (e) { return fail('unreachable'); }
-      if (res.status === 403 || res.status === 429) return fail('badCode');
+      if (res.status === 403 || res.status === 429 || res.status === 426) return fail(refusalWord(res.status, b));
       if (res.status === 409) return fail('notEmpty');
       if (!res.ok || !b || b.ok !== true) return fail('error');
       try { U.rawStorage.remove(CACHE_KEY); U.rawStorage.remove(QUEUE_KEY); } catch (e) { /* ignore */ }
@@ -1712,6 +1780,6 @@
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
-    initFollower, followStatus, subscribeFollow, isFollower, initHubClient, probeHub, rememberedCode, hubStatus, subscribeHub: subscribeFollow, subscribeRefusals, pendingFor, isHubClient, isHub: isHubClient, leaveHub, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
+    initFollower, followStatus, subscribeFollow, isFollower, initHubClient, probeHub, rememberedCode, pairHub, pairedFor, unpair, hubScreens, hubNewPairingCode, hubRemoveScreen, hubStatus, subscribeHub: subscribeFollow, subscribeRefusals, pendingFor, isHubClient, isHub: isHubClient, leaveHub, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

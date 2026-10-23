@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
+import { createScreens, WORDS } from './screens.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -61,6 +62,8 @@ function iconPng(size) {
 
 // The follower stream version: a follower that expects another number is told 'wrongVersion' and stops.
 const PROTO = 1;
+// The oldest client protocol the hub still accepts when a client says its own (x-smokebox-client). 0 accepts any client, including ones that say nothing.
+const DEFAULT_MIN_CLIENT = 0;
 
 // Reads the saved JSON file and checks it with the engine's validateBackup; returns { state, seq, hubId } or null.
 function loadSaved(E, file) {
@@ -99,6 +102,22 @@ export async function createHub(opts = {}) {
   // The code a screen needs to change anything (write actions, send its kitchen). Empty means writing needs no code (a trusted network).
   const writeCode = opts.writeCode !== undefined ? opts.writeCode : (process.env.SMOKEBOX_WRITE_CODE || '');
   const walFile = opts.walFile !== undefined ? opts.walFile : (dataFile ? dataFile + '.wal' : null);
+  // Per-screen tokens: with requireTokens every read and write needs a valid token; without it a token is optional but, when given, must be valid.
+  const requireTokens = opts.requireTokens !== undefined ? !!opts.requireTokens : (process.env.SMOKEBOX_REQUIRE_TOKENS === '1' || process.env.SMOKEBOX_REQUIRE_TOKEN === '1');
+  const minClient = opts.minClient !== undefined ? opts.minClient : (Number(process.env.SMOKEBOX_MIN_CLIENT) || DEFAULT_MIN_CLIENT);
+  const screensFile = opts.screensFile !== undefined ? opts.screensFile : (dataFile ? dataFile + '.screens' : null);
+  // Removing a screen cuts its open streams at once (cutScreen is defined below).
+  const cutOnRevoke = (id) => cutScreen(id);
+  const screens = createScreens({ file: screensFile, now, pairMs: opts.pairMs, onRevoke: cutOnRevoke });
+  // The owner's key for the hub's admin calls (pair, list, remove). Kept in a file next to the data (owner-only) or given; never sent to a screen.
+  const adminFile = dataFile ? dataFile + '.admin' : null;
+  const adminKey = opts.adminKey || process.env.SMOKEBOX_ADMIN_KEY || (() => {
+    if (adminFile && fs.existsSync(adminFile)) { try { const k = fs.readFileSync(adminFile, 'utf8').trim(); if (k.length >= 32) return k; } catch (e) { /* make a new one */ } }
+    const k = crypto.randomBytes(24).toString('hex');
+    if (adminFile) { try { fs.writeFileSync(adminFile, k + '\n', { mode: 0o600 }); } catch (e) { console.warn('[hub] could not save the admin key: ' + e.message); } }
+    return k;
+  })();
+  const streamScreen = new WeakMap();   // an open stream -> the id of the screen that opened it, so removing a screen cuts it off at once
   const clients = new Set();
   const followers = new Set();
   // Offline page load can be switched off (option serviceWorker:false or SMOKEBOX_NO_SW=1): then /sw.js is a worker that removes itself.
@@ -345,6 +364,37 @@ export async function createHub(opts = {}) {
   const readOk = (given) => (!followCode && !writeCode) || (!!followCode && codeEq(given, followCode)) || (!!writeCode && codeEq(given, writeCode));
   // True when a writing screen's code is right (no write code set means open).
   const writeOk = (given) => !writeCode || codeEq(given, writeCode);
+  // Reads the token header and checks it. Returns { screen } (a valid token), { none: true } (no token and none needed), or { fail: { status, report } }.
+  function authReq(req) {
+    const raw = req.headers['x-smokebox-token'];
+    if (raw === undefined || raw === '') return requireTokens ? { fail: { status: 403, report: 'unpaired' } } : { none: true };
+    const a = screens.authenticate(raw);
+    if (a.screen) { screens.touch(a.screen); return { screen: a.screen }; }
+    return { fail: { status: 403, report: a.report } };
+  }
+  // The version check: a client that says its protocol is older than the hub's minimum is refused with plain words.
+  function versionFail(req) {
+    if (!(minClient > 0)) return null;
+    const n = Number(req.headers['x-smokebox-client']);
+    return n >= minClient ? null : { status: 426, report: 'wrongVersion' };
+  }
+  // Cuts every open stream of a screen (used when the screen is removed).
+  function cutScreen(id) { for (const set of [clients, followers]) for (const r of Array.from(set)) if (streamScreen.get(r) === id) { set.delete(r); r.destroy(); } }
+  // The same-origin and content-type check for posted JSON; returns true when the request may go on.
+  function postGuard(req, res) {
+    const ct = String(req.headers['content-type'] || '').toLowerCase(), origin = req.headers.origin;
+    let same = true;
+    if (origin) { try { same = new URL(origin).host === req.headers.host; } catch (e) { same = false; } }
+    if (ct.startsWith('application/json') && same) return true;
+    res.writeHead(!same ? 403 : 415, { 'content-type': 'application/json', connection: 'close' });
+    res.end(JSON.stringify({ ok: false, report: 'badPatch', info: { error: !same ? 'cross-site request refused' : 'content-type must be application/json' } }));
+    req.resume();
+    return false;
+  }
+  // Writes a JSON answer with a status.
+  function sendJson(res, code, body, extra) { res.writeHead(code, Object.assign({ 'content-type': 'application/json' }, extra || {})); res.end(JSON.stringify(body)); }
+  // Writes a refusal with a stable code and plain words.
+  function refuse(res, status, report, extra) { sendJson(res, status, Object.assign({ ok: false, error: report, report, words: WORDS[report] || report, info: {}, seq }, extra || {})); }
   // The access code a read request carries: the x-smokebox-code header (kept out of addresses and logs), or the code in the address.
   const codeFrom = (req, q) => String(req.headers['x-smokebox-code'] || q.get('code') || '');
   // Counts a wrong code against the caller's address and returns the status to answer (403, or 429 while locked); null when fine to try.
@@ -363,11 +413,15 @@ export async function createHub(opts = {}) {
   // log still reaches back and is smaller than a snapshot), then every new action as it is applied. It can never write.
   function handleFollow(req, res) {
     const q = new URL(req.url, 'http://x').searchParams;
-    const cors = followCode || writeCode ? { 'access-control-allow-origin': '*' } : {};
+    const cors = followCode || writeCode || requireTokens ? { 'access-control-allow-origin': '*' } : {};
     // Answers a refused follower with a status and a short reason in JSON, then closes the connection.
     const fail = (code, error, extra) => { res.writeHead(code, Object.assign({ 'content-type': 'application/json', connection: 'close' }, cors, extra || {})); res.end(JSON.stringify({ error })); };
     const who = req.socket.remoteAddress || '?';
-    if (followCode || writeCode) {
+    const vf = versionFail(req);
+    if (vf) return refuse(res, vf.status, vf.report, cors);
+    const au = authReq(req);
+    if (au.fail) return refuse(res, au.fail.status, au.fail.report, cors);
+    if (!au.screen && (followCode || writeCode)) {
       if (lockState(who)) return fail(429, 'tooManyTries', { 'retry-after': '60' });
       if (!readOk(codeFrom(req, q))) { noteFailure(who); return fail(403, 'badCode'); }
       failures.delete(who);
@@ -375,8 +429,9 @@ export async function createHub(opts = {}) {
     if (clients.size + followers.size >= MAX_CLIENTS) return fail(503, 'tooMany', { 'retry-after': '10' });
     res.writeHead(200, Object.assign({ 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', connection: 'keep-alive' }, cors));
     followers.add(res);
+    if (au.screen) streamScreen.set(res, au.screen.id);
     req.on('close', () => followers.delete(res));
-    send(res, 'hello', { proto: PROTO, hubId, seq, serverNow: now() });
+    send(res, 'hello', { proto: PROTO, minClient, hubId, seq, serverNow: now() });
     const sinceText = q.get('since'), since = sinceText === null || sinceText === '' ? NaN : Number(sinceText);
     const sameHub = q.get('hub') === hubId;
     const missed = Number.isInteger(since) && since >= 0 && since <= seq && sameHub && (since === seq || (ops.length && ops[0].seq <= since + 1)) ? ops.filter((o) => o.seq > since) : null;
@@ -391,16 +446,20 @@ export async function createHub(opts = {}) {
   // no kitchen sent to it), so a device can decide whether it may send its own kitchen here.
   function handleProbe(req, res) {
     const q = new URL(req.url, 'http://x').searchParams;
-    const cors = followCode || writeCode ? { 'access-control-allow-origin': '*' } : {};
+    const cors = followCode || writeCode || requireTokens ? { 'access-control-allow-origin': '*' } : {};
     const who = req.socket.remoteAddress || '?';
     // Writes one JSON answer with the given status.
     const answer = (code, body) => { res.writeHead(code, Object.assign({ 'content-type': 'application/json' }, cors)); res.end(JSON.stringify(body)); };
-    if (followCode || writeCode) {
+    const vf = versionFail(req);
+    if (vf) return answer(vf.status, { error: vf.report, report: vf.report, words: WORDS[vf.report], tokensRequired: requireTokens, minClient });
+    const au = authReq(req);
+    if (au.fail) return answer(au.fail.status, { error: au.fail.report, report: au.fail.report, words: WORDS[au.fail.report], tokensRequired: requireTokens, minClient });
+    if (!au.screen && (followCode || writeCode)) {
       if (lockState(who)) return answer(429, { error: 'tooManyTries' });
       if (!readOk(codeFrom(req, q))) { noteFailure(who); return answer(403, { error: 'badCode' }); }
       failures.delete(who);
     }
-    answer(200, { proto: PROTO, hubId, seq, empty: seq === 0 && !seeded, serverNow: now() });
+    answer(200, { proto: PROTO, minClient, tokensRequired: requireTokens, hubId, seq, empty: seq === 0 && !seeded, serverNow: now() });
   }
   // A device sends its whole kitchen to an empty hub (change number 0, nothing seeded before). Needs the write code; refuses with 409
   // notEmpty otherwise. The hub starts a new history from it: new history name, every connected stream is ended so screens take a fresh
@@ -414,7 +473,12 @@ export async function createHub(opts = {}) {
     if (!ct.startsWith('application/json') || !sameOrigin) { req.resume(); return reply(!sameOrigin ? 403 : 415, { ok: false, report: 'badPatch', info: { error: 'refused' } }); }
     readJson(req, res, (body) => {
       const who = req.socket.remoteAddress || '?';
-      if (writeCode) {
+      const vf = versionFail(req);
+      if (vf) return refuse(res, vf.status, vf.report);
+      const au = authReq(req);
+      if (au.fail) return refuse(res, au.fail.status, au.fail.report);
+      if (au.screen && !au.screen.owner) return refuse(res, 403, 'notOwner');
+      if (writeCode && !au.screen) {
         if (lockState(who)) return reply(429, { ok: false, report: 'badCode' });
         if (!(body && typeof body === 'object' && writeOk(body.code))) { noteFailure(who); return reply(403, { ok: false, report: 'badCode' }); }
         failures.delete(who);
@@ -435,13 +499,62 @@ export async function createHub(opts = {}) {
       reply(200, { ok: true, report: 'ok', hubId, seq });
     }, 8 * 1024 * 1024);
   }
+  // The pairing routes. /pair exchanges a one-time code for a token. /screen/* is for an owner screen (its token). /admin/* is for the person who runs
+  // the hub (the admin key in a bearer header, from the command line). Screens cannot reach /admin/*.
+  function handleScreens(req, res, url) {
+    const who = req.socket.remoteAddress || '?';
+    if (url === '/pair' && req.method === 'POST') {
+      if (!postGuard(req, res)) return;
+      return readJson(req, res, (body) => {
+        const vf = versionFail(req);
+        if (vf) return refuse(res, vf.status, vf.report);
+        if (!body || typeof body !== 'object') return refuse(res, 400, 'badPairCode');
+        const r = screens.exchange(body.code, body.name, who);
+        if (!r.ok) return refuse(res, r.report === 'tooManyTries' ? 429 : 403, r.report, r.report === 'tooManyTries' ? { 'retry-after': '300' } : {});
+        sendJson(res, 200, { ok: true, token: r.token, screen: r.screen, proto: PROTO, minClient, hubId });
+      }, 4096);
+    }
+    // Is this an owner screen (by token) or the admin (by key)? Returns 'owner', 'admin' or null after writing the refusal.
+    const who2 = () => {
+      const h = req.headers.authorization;
+      if (url.indexOf('/admin/') === 0) {
+        if (!h || !/^Bearer /.test(h) || !codeEq(h.slice(7), adminKey)) { refuse(res, 403, 'unpaired'); return null; }
+        return 'admin';
+      }
+      const au = authReq(req);
+      if (au.fail || !au.screen) { refuse(res, 403, au.fail ? au.fail.report : 'unpaired'); return null; }
+      if (!au.screen.owner) { refuse(res, 403, 'notOwner'); return null; }
+      return 'owner';
+    };
+    const isList = (url === '/screen/list' || url === '/admin/screens') && req.method === 'GET';
+    const isPair = (url === '/screen/pair' || url === '/admin/pair') && req.method === 'POST';
+    const isRevoke = (url === '/screen/revoke' || url === '/admin/revoke') && req.method === 'POST';
+    if (!isList && !isPair && !isRevoke) { res.writeHead(404, { 'content-type': 'text/plain' }); res.end('not found'); return; }
+    if (url.indexOf('/admin/') === 0 && lockState('admin:' + who)) return refuse(res, 429, 'tooManyTries');
+    const role = who2();
+    if (!role) { if (url.indexOf('/admin/') === 0) noteFailure('admin:' + who); return; }
+    if (isList) return sendJson(res, 200, { ok: true, screens: screens.list(), tokensRequired: requireTokens });
+    if (!postGuard(req, res)) return;
+    readJson(req, res, (body) => {
+      if (isPair) {
+        const c = screens.issueCode({ owner: role === 'admin' && !!(body && body.owner) });
+        return sendJson(res, 200, { ok: true, code: c.code, expiresAt: c.expiresAt, owner: c.owner, minutes: Math.round((c.expiresAt - now()) / 60000) });
+      }
+      const s = body && typeof body.id === 'string' ? screens.revoke(body.id) : null;
+      if (!s) return refuse(res, 404, 'unpaired', { info: { error: 'no such screen' } });
+      sendJson(res, 200, { ok: true, screen: screens.pub(s) });
+    }, 4096);
+  }
   // Answers one HTTP request: the page, the event stream, or an action.
   function handle(req, res) {
     const url = (req.url || '/').split('?')[0];
     if (req.method === 'GET' && url === '/events') {
+      const ea = authReq(req);
+      if (ea.fail) return refuse(res, ea.fail.status, ea.fail.report);
       if (clients.size + followers.size >= MAX_CLIENTS) { res.writeHead(503, { 'content-type': 'text/plain', 'retry-after': '10' }); res.end('too many screens connected'); return; }
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', connection: 'keep-alive' });
       clients.add(res);
+      if (ea.screen) streamScreen.set(res, ea.screen.id);
       req.on('close', () => clients.delete(res));
       // ?since=N: a screen that was away asks for the actions after N. If the log still reaches back that far it gets
       // them as one catchup message; otherwise it gets a full snapshot.
@@ -453,8 +566,8 @@ export async function createHub(opts = {}) {
       return;
     }
     if (req.method === 'OPTIONS' && (url === '/follow' || url === '/probe')) {
-      const open = followCode || writeCode;
-      res.writeHead(204, open ? { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'x-smokebox-code, accept', 'access-control-allow-methods': 'GET', 'access-control-max-age': '600' } : {});
+      const open = followCode || writeCode || requireTokens;
+      res.writeHead(204, open ? { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'x-smokebox-code, x-smokebox-token, x-smokebox-client, accept', 'access-control-allow-methods': 'GET', 'access-control-max-age': '600' } : {});
       res.end();
       return;
     }
@@ -462,6 +575,7 @@ export async function createHub(opts = {}) {
     if (req.method === 'GET' && url === '/follow') return handleFollow(req, res);
     if (req.method === 'GET' && url === '/probe') return handleProbe(req, res);
     if (req.method === 'POST' && url === '/seed') return handleSeed(req, res);
+    if (url === '/pair' || url.indexOf('/screen/') === 0 || url.indexOf('/admin/') === 0) return handleScreens(req, res, url);
     if (req.method === 'POST' && url === '/action') {
       // Cross-site request forgery: a web page the signed-in person visits could send a "simple" POST here and the browser would attach the
       // cached login. Two cheap guards: the body must say it is application/json (a cross-site page cannot send that without a permission
@@ -477,9 +591,15 @@ export async function createHub(opts = {}) {
         return;
       }
       readJson(req, res, (body) => {
-        // Writing needs the write code when the hub has one; wrong tries are counted like for the stream.
         const who = req.socket.remoteAddress || '?';
-        if (writeCode) {
+        const vf = versionFail(req);
+        if (vf) return refuse(res, vf.status, vf.report);
+        const au = authReq(req);
+        if (au.fail) return refuse(res, au.fail.status, au.fail.report);
+        // A paired screen is known by its token: its name and identity come from the hub's list, never from the request, so they cannot be spoofed.
+        if (au.screen && body && typeof body === 'object') { body.clientId = 's:' + au.screen.id; body.who = au.screen.name; }
+        // Writing needs the write code when the hub has one and the screen has no token; wrong tries are counted like for the stream.
+        if (writeCode && !au.screen) {
           if (lockState(who)) { res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '60' }); res.end(JSON.stringify({ ok: false, report: 'badCode', info: { error: 'tooManyTries' }, seq })); return; }
           if (!(body && typeof body === 'object' && writeOk(body.code))) { noteFailure(who); res.writeHead(403, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: false, report: 'badCode', info: { error: 'badCode' }, seq })); return; }
           failures.delete(who);
@@ -551,14 +671,57 @@ export async function createHub(opts = {}) {
   }
   // Returns the current state, hub clock and change counter (used by tests).
   function snapshot() { return view(); }
-  return { server, listen, close, crash, flush, snapshot, hubId, replayed };
+  return { server, listen, close, crash, flush, snapshot, hubId, replayed, adminKey, screens };
+}
+
+// The owner's commands for a running hub: node server/server.mjs admin pair [--owner] | list | revoke ID  (options --port N, --data FILE).
+// They talk to the hub on this computer with the admin key kept next to the data file (or SMOKEBOX_ADMIN_KEY).
+async function adminCli(args) {
+  const opt = (name, dflt) => { const i = args.indexOf(name); return i >= 0 && args[i + 1] ? args[i + 1] : dflt; };
+  const port = Number(opt('--port', process.env.PORT || 8787)), dataFile = opt('--data', process.env.SMOKEBOX_DATA || '');
+  let key = process.env.SMOKEBOX_ADMIN_KEY || '';
+  if (!key && dataFile) { try { key = fs.readFileSync(dataFile + '.admin', 'utf8').trim(); } catch (e) { key = ''; } }
+  if (!key) { console.error('No admin key found. Give --data FILE (the hub\'s data file) or set SMOKEBOX_ADMIN_KEY.'); return 2; }
+  const cmd = args[0];
+  // Runs one admin command against the hub on this computer and resolves its status and JSON answer.
+  const call = (method, p, body) => new Promise((resolve) => {
+    const data = body ? JSON.stringify(body) : null;
+    const r = http.request({ host: '127.0.0.1', port, path: p, method, headers: Object.assign({ authorization: 'Bearer ' + key }, data ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } : {}) }, (res) => {
+      let t = ''; res.on('data', (c) => (t += c)); res.on('end', () => { let j = null; try { j = JSON.parse(t); } catch (e) { /* not JSON */ } resolve({ status: res.statusCode, body: j }); });
+    });
+    r.on('error', (e) => resolve({ status: 0, error: e.message })); if (data) r.write(data); r.end();
+  });
+  if (cmd === 'pair') {
+    const r = await call('POST', '/admin/pair', { owner: args.includes('--owner') });
+    if (!r.body || !r.body.ok) { console.error(r.error ? 'Cannot reach the hub on port ' + port + ': ' + r.error : 'Refused: ' + ((r.body && r.body.words) || r.status)); return 1; }
+    console.log('Pairing code: ' + r.body.code + (r.body.owner ? '  (owner screen)' : '') + '\nEnter it on the new screen within ' + r.body.minutes + ' minutes. It works once.');
+    return 0;
+  }
+  if (cmd === 'list') {
+    const r = await call('GET', '/admin/screens');
+    if (!r.body || !r.body.ok) { console.error(r.error ? 'Cannot reach the hub on port ' + port + ': ' + r.error : 'Refused: ' + ((r.body && r.body.words) || r.status)); return 1; }
+    if (!r.body.screens.length) console.log('No screens are paired.');
+    for (const sc of r.body.screens) console.log(sc.id + '  ' + (sc.name || '(no name)').padEnd(22) + (sc.owner ? ' owner ' : '       ') + (sc.revokedAt ? 'REMOVED ' + new Date(sc.revokedAt).toISOString() : 'last seen ' + new Date(sc.lastSeen).toISOString()));
+    console.log('Tokens ' + (r.body.tokensRequired ? 'are required' : 'are optional (the access code still works)') + '.');
+    return 0;
+  }
+  if (cmd === 'revoke' && args[1]) {
+    const r = await call('POST', '/admin/revoke', { id: args[1] });
+    if (!r.body || !r.body.ok) { console.error(r.error ? 'Cannot reach the hub on port ' + port + ': ' + r.error : 'Refused: ' + ((r.body && (r.body.info && r.body.info.error || r.body.words)) || r.status)); return 1; }
+    console.log('Removed ' + r.body.screen.id + ' (' + (r.body.screen.name || 'no name') + '). It is cut off now.');
+    return 0;
+  }
+  console.error('Usage: node server/server.mjs admin pair [--owner] | list | revoke ID   [--port N] [--data FILE]');
+  return 2;
 }
 
 // Command line start: reads PORT and HOST, prints the address, and saves on Ctrl-C.
 async function main() {
+  if (process.argv[2] === 'admin') { process.exit(await adminCli(process.argv.slice(3))); }
   const hub = await createHub();
   const port = await hub.listen(Number(process.env.PORT || 8787), process.env.HOST || '127.0.0.1');
   console.log('[hub] Smokebox prototype hub on http://' + (process.env.HOST || '127.0.0.1') + ':' + port + ' (time zone ' + (process.env.TZ || 'system') + ')');
+  if (process.env.SMOKEBOX_REQUIRE_TOKENS === '1' || process.env.SMOKEBOX_REQUIRE_TOKEN === '1') console.log('[hub] Screens need a pairing code: node server/server.mjs admin pair --port ' + port + (process.env.SMOKEBOX_DATA ? ' --data ' + process.env.SMOKEBOX_DATA : ''));
   // Closes the hub cleanly (saving the file) and exits the process.
   const stop = () => hub.close().then(() => process.exit(0));
   process.on('SIGINT', stop); process.on('SIGTERM', stop);

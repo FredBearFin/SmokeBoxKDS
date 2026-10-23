@@ -109,7 +109,7 @@ test('the data file is written only at its own path and an unreadable or hostile
   await post(port, { type: 'createTicket', payload: { items: [{ menuId: 'brisket_half' }] } });
   hub.flush();
   const files = fs.readdirSync(dir);
-  assert.ok(files.every((f) => f === 'state.json' || f === 'state.json.tmp'), 'only the data file and its temp: ' + files);
+  assert.ok(files.every((f) => f === 'state.json' || /^state\.json\.(tmp|wal|wal\.tmp|screens|screens\.tmp|admin)$/.test(f)), 'only the data file and its own companions: ' + files);
   JSON.parse(fs.readFileSync(file, 'utf8'));
 });
 
