@@ -308,8 +308,8 @@
     }
     if (b.kind === 'cooling') {
       const c = S.cooling || C.safety.cooling;
-      if (b.stage1At == null) return f <= c.stage1ToF ? { tone: 'ok', text: U.tempText(f) + ' reaches stage 1 (' + U.tempText(c.stage1ToF) + ' or below).' } : { tone: 'warn', text: 'Stage 1 needs ' + U.tempText(c.stage1ToF) + ' or below. Keep chilling.' };
-      return f <= c.finalF ? { tone: 'ok', text: U.tempText(f) + ' finishes the cooling (' + U.tempText(c.finalF) + ' or below).' } : { tone: 'warn', text: 'Stage 2 needs ' + U.tempText(c.finalF) + ' or below. Keep chilling.' };
+      if (b.stage1At == null) return f <= c.stage1ToF ? { tone: 'ok', text: U.tempText(f) + ' reaches step 1 of 2 (' + U.tempText(c.stage1ToF) + ' or below).' } : { tone: 'warn', text: 'Stage 1 needs ' + U.tempText(c.stage1ToF) + ' or below. Keep chilling.' };
+      return f <= c.finalF ? { tone: 'ok', text: U.tempText(f) + ' finishes step 2 of 2 (' + U.tempText(c.finalF) + ' or below).' } : { tone: 'warn', text: 'Stage 2 needs ' + U.tempText(c.finalF) + ' or below. Keep chilling.' };
     }
     if (b.kind === 'cold') {
       return f > S.coldHoldF ? { tone: 'bad', text: 'Above ' + U.tempText(S.coldHoldF) + '. The batch goes on Chill now and stops being served.' } : { tone: 'ok', text: 'In range (' + U.tempText(S.coldHoldF) + ' or below).' };
@@ -654,7 +654,7 @@
       }
       const label = b.label || 'Batch', info = res.info || {};
       if (mode === 'reheat' || info.reheated) toast(label + ' reheated to ' + U.tempText(f) + '. It is being served again.', 'ok');
-      else if (info.status === 'reheat') toast(label + ' is below ' + U.tempText(safety().hotHoldF) + '. Reheat it to ' + U.tempText(safety().reheatF) + ' now, or discard it.', 'warn');
+      else if (info.status === 'reheat') toast(label + ' is below ' + U.tempText(safety().hotHoldF) + '. Reheat it to ' + U.tempText(safety().reheatF) + ' now, or throw it out.', 'warn');
       else if (info.status === 'chill') toast(label + ' is above ' + U.tempText(safety().coldHoldF) + '. Chill it now.', 'warn');
       else toast(label + ' logged at ' + U.tempText(f) + '.' + (info.onTime === false ? ' That check was ' + hmLong(info.lateMs) + ' late.' : ''), info.onTime === false ? 'warn' : 'ok');
       closeEditor(rec, true);
@@ -1043,8 +1043,8 @@
       h('p', { class: 'fs-sub' }, 'Log a pan when it goes into the cabinet. The first temperature starts its clock, so enter what your thermometer says.'),
       noProd, vis('Product', prodSeg), rawFld, thermalBox, weighedBox, tempFld, labelField, calcBox);
 
-    // A starting weight of about half the par level, so the box opens near a typical pan.
-    function defaultKg(ing) { return Math.max(0.5, Math.round((ing.parG || 4000) / 2 / 100) / 10); }
+    // A starting weight equal to the usual batch size (the par the owner typed), so the box opens at what they said they cook.
+    function defaultKg(ing) { return Math.max(0.5, Math.round((ing.parG || 4000) / 100) / 10); }
 
     // Switches product: relabels the weight box, resets defaults the cook has not touched,
     // and shows or hides the cook-model steppers.
@@ -1510,7 +1510,7 @@
 
     // Builds one ticket row once; a voided row has no Recall button.
     function makeRow(t, voided) {
-      const num = h('div', { class: 'rc-num num' }), who = h('span', { class: 'rc-who' });
+      const num = h('div', { class: 'rc-num num' }), who = h('span', { class: 'rc-who', dir: 'auto' });
       const ch = h('span', { class: 'chip rc-ch' }), demo = h('span', { class: 'chip', hidden: true, dataset: { tone: 'info' } }, 'Demo');
       const items = h('div', { class: 'rc-items' }), meta = h('div', { class: 'rc-meta' });
       const badge = h('span', { class: 'rc-badge' });
@@ -1917,7 +1917,7 @@
         rule('snow', 'Keep cold food cold', 'Cold food stays at ' + U.tempText(S.coldHoldF) + ' or below.'),
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + U.tempText(S.hotHoldF) + ', reheat to ' + U.tempText(S.reheatF) + ' within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
-        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat. That is a deliberate difference from the research report this app started from. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
+        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
         rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit means the batch must be thrown out when time is up. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
         rule('snow', 'Cooling', 'From ' + U.tempText(S.hotHoldF) + ' to ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' hours, then to ' + U.tempText(c.finalF) + ' within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
