@@ -40,8 +40,19 @@ function setup(label) {
   fs.chmodSync(fakeSystemctl, 0o755);
   return { tmp, prefix, log, fakeSystemctl };
 }
-async function withHealth(ok, fn) {
-  const srv = http.createServer((req, res) => { res.statusCode = ok ? 200 : 500; res.end('x'); });
+// A stand-in for the service. mode true: like the real hub (/health says {"ok":true}, the page answers). false: errors everywhere.
+// 'old': a build too old to have /health (404) whose page answers. 'old-down': no /health and the page fails. 'garbage': /health answers 200 with
+// something that is not the hub's answer. 'notok': /health answers 200 {"ok":false}.
+async function withHealth(mode, fn) {
+  const srv = http.createServer((req, res) => {
+    const isHealth = (req.url || '').split('?')[0] === '/health';
+    if (mode === true) { res.statusCode = 200; res.setHeader('content-type', isHealth ? 'application/json' : 'text/html'); res.end(isHealth ? '{"ok":true,"hubId":"t"}' : '<html></html>'); }
+    else if (mode === 'old') { res.statusCode = isHealth ? 404 : 200; res.end(isHealth ? 'not found' : '<html></html>'); }
+    else if (mode === 'old-down') { res.statusCode = isHealth ? 404 : 500; res.end('x'); }
+    else if (mode === 'garbage') { res.statusCode = 200; res.end(isHealth ? '<html>captive portal</html>' : '<html></html>'); }
+    else if (mode === 'notok') { res.statusCode = 200; res.end(isHealth ? '{"ok":false}' : '<html></html>'); }
+    else { res.statusCode = 500; res.end('x'); }
+  });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   try { return await fn(srv.address().port); } finally { srv.closeAllConnections?.(); await new Promise((r) => srv.close(r)); }
 }
@@ -62,7 +73,7 @@ test('a good update swaps the build, restarts the service, keeps the old one and
   const tgz = tarball(t.tmp, 'good', (d) => makeTree(d, 'NEW'));
   const self = path.join(t.tmp, 'bin-smokebox-update');
   await withHealth(true, async (port) => {
-    const r = await run({ SMOKEBOX_PREFIX: t.prefix, SMOKEBOX_UPDATE_URL: 'file://' + tgz, SMOKEBOX_SYSTEMCTL: t.fakeSystemctl, SMOKEBOX_HEALTH_URL: 'http://127.0.0.1:' + port + '/', SMOKEBOX_SELF_DEST: self, SMOKEBOX_LOCK: path.join(t.tmp, 'lock') });
+    const r = await run({ SMOKEBOX_PREFIX: t.prefix, SMOKEBOX_UPDATE_URL: 'file://' + tgz, SMOKEBOX_SYSTEMCTL: t.fakeSystemctl, SMOKEBOX_HEALTH_URL: 'http://127.0.0.1:' + port + '/health', SMOKEBOX_SELF_DEST: self, SMOKEBOX_LOCK: path.join(t.tmp, 'lock') });
     assert.equal(r.status, 0, r.stdout + r.stderr);
   });
   assert.equal(marker(t.prefix), 'NEW');
@@ -107,7 +118,7 @@ test('a new build that does not answer is rolled back to the old build and the s
   const t = setup('roll');
   const tgz = tarball(t.tmp, 'roll', (d) => makeTree(d, 'NEW'));
   await withHealth(false, async (port) => {
-    const r = await run({ SMOKEBOX_PREFIX: t.prefix, SMOKEBOX_UPDATE_URL: 'file://' + tgz, SMOKEBOX_SYSTEMCTL: t.fakeSystemctl, SMOKEBOX_HEALTH_URL: 'http://127.0.0.1:' + port + '/', SMOKEBOX_LOCK: path.join(t.tmp, 'lock') });
+    const r = await run({ SMOKEBOX_PREFIX: t.prefix, SMOKEBOX_UPDATE_URL: 'file://' + tgz, SMOKEBOX_SYSTEMCTL: t.fakeSystemctl, SMOKEBOX_HEALTH_URL: 'http://127.0.0.1:' + port + '/health', SMOKEBOX_LOCK: path.join(t.tmp, 'lock') });
     assert.notEqual(r.status, 0);
     assert.match(r.stdout, /putting the previous version back/);
   });
@@ -176,9 +187,21 @@ test('the updater accepts the real (small) deploy archive with its default size 
   const t = setup('real');
   const tgz = realExport(t.tmp);
   await withHealth(true, async (port) => {
-    const r = await run({ SMOKEBOX_PREFIX: t.prefix, SMOKEBOX_UPDATE_URL: 'file://' + tgz, SMOKEBOX_SYSTEMCTL: t.fakeSystemctl, SMOKEBOX_HEALTH_URL: 'http://127.0.0.1:' + port + '/', SMOKEBOX_SELF_DEST: path.join(t.tmp, 'self'), SMOKEBOX_LOCK: path.join(t.tmp, 'lock') }, { SMOKEBOX_MIN_BYTES: '100000' });
+    const r = await run({ SMOKEBOX_PREFIX: t.prefix, SMOKEBOX_UPDATE_URL: 'file://' + tgz, SMOKEBOX_SYSTEMCTL: t.fakeSystemctl, SMOKEBOX_HEALTH_URL: 'http://127.0.0.1:' + port + '/health', SMOKEBOX_SELF_DEST: path.join(t.tmp, 'self'), SMOKEBOX_LOCK: path.join(t.tmp, 'lock') }, { SMOKEBOX_MIN_BYTES: '100000' });
     assert.equal(r.status, 0, r.stdout + r.stderr);
   });
   assert.ok(fs.existsSync(path.join(t.prefix, 'server/server.mjs')) && marker(t.prefix) === null, 'the new build replaced the old one');
   assert.equal(marker(t.prefix + '.old'), 'OLD');
 });
+
+// The post-swap health check itself: what it accepts and what makes it put the old build back.
+for (const [mode, label, expectPass] of [[true, 'the hub answers {"ok":true} at /health', true], ['old', 'a build too old to have /health (404) whose page answers', true], [false, '/health fails (500)', false], ['old-down', '/health is 404 and the page fails too', false], ['garbage', '/health answers 200 with something that is not the hub (a captive-portal page)', false], ['notok', '/health answers {"ok":false}', false]]) {
+  test('health check: ' + label + (expectPass ? ' -> the new build stays' : ' -> the old build is put back'), { skip }, async () => {
+    const t = setup('h-' + String(mode)); const tgz = tarball(t.tmp, 'h', (d) => makeTree(d, 'NEW'));
+    await withHealth(mode, async (port) => {
+      const r = await run({ SMOKEBOX_PREFIX: t.prefix, SMOKEBOX_UPDATE_URL: 'file://' + tgz, SMOKEBOX_SYSTEMCTL: t.fakeSystemctl, SMOKEBOX_HEALTH_URL: 'http://127.0.0.1:' + port + '/health', SMOKEBOX_SELF_DEST: path.join(t.tmp, 'self'), SMOKEBOX_LOCK: path.join(t.tmp, 'lock') });
+      if (expectPass) { assert.equal(r.status, 0, r.stdout + r.stderr); assert.equal(marker(t.prefix), 'NEW'); }
+      else { assert.notEqual(r.status, 0); assert.match(r.stdout, /putting the previous version back/); assert.equal(marker(t.prefix), 'OLD'); }
+    });
+  });
+}

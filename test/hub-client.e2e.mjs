@@ -82,6 +82,19 @@ check('the phone catches up after reconnecting (the hub has its ticket)', await 
   await D.p.evaluate(() => { const real = SB.store.hubStatus; SB.store.hubStatus = () => Object.assign({}, real.call(SB.store), { state: 'offline', lastKnown: true, lastKnownAt: Date.now() - 600000 }); });
   check('a board showing the last saved copy says Last known, from a time, and that taps are saved', await until(async () => /Last known, from \d.*Offline: your taps are saved/.test((await chip(D) || {}).text || ''), 4000), await chip(D));
 }
+// Chip states for a tablet the kitchen refused (the status is stubbed; the pairing test covers the real hub)
+{
+  const D = await tablet(1024, 768);
+  await until(async () => /Connected/.test((await chip(D) || {}).text || ''));
+  const set = (o) => D.p.evaluate((o) => { if (!window.__realHubStatus) window.__realHubStatus = SB.store.hubStatus; SB.store.hubStatus = () => Object.assign({}, window.__realHubStatus.call(SB.store), o); }, o);
+  await set({ state: 'error', error: 'revoked', unsent: 3 });
+  check('a removed tablet says Removed from the kitchen, not Offline, with the waiting taps', await until(async () => { const c = await chip(D); return c && /Removed from the kitchen\. Ask for a new pairing code\./.test(c.text) && /3 taps are waiting/.test(c.text) && !/Offline/.test(c.text) && c.tone === 'bad'; }, 4000), await chip(D));
+  await set({ state: 'error', error: 'unpaired', unsent: 0 });
+  check('a tablet that is not paired says so', await until(async () => /Not paired with the kitchen/.test((await chip(D) || {}).text || ''), 4000), await chip(D));
+  await set({ state: 'error', error: 'wrongVersion', unsent: 0 });
+  check('a tablet on another version says to reload', await until(async () => /run different versions/.test((await chip(D) || {}).text || ''), 4000), await chip(D));
+  await D.p.screenshot({ path: '/tmp/hub-removed.png' });
+}
 check('no page errors', errs.length === 0, errs);
 await browser.close(); await hub.stop();
 console.log(fail ? fail + ' check(s) failed' : 'all checks passed');

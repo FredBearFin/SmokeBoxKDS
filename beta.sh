@@ -60,6 +60,9 @@ if [ ! -s "$ENVF" ]; then
   ( umask 077; printf 'SMOKEBOX_FOLLOW_CODE=%s\nSMOKEBOX_WRITE_CODE=%s\n' "$(mk)" "$(mk)" > "$ENVF" )
   NEWCODES=1
 fi
+# Behind Caddy every screen reaches the hub from 127.0.0.1: with this the hub reads the real address from X-Forwarded-For (only from the local proxy),
+# so wrong codes are counted per screen address and not for everyone together. Added to an older env file too.
+grep -q '^SMOKEBOX_TRUST_PROXY=' "$ENVF" || printf 'SMOKEBOX_TRUST_PROXY=1\n' >> "$ENVF"
 chown root:root "$ENVF"; chmod 600 "$ENVF"
 cat > $R/etc/systemd/system/smokebox-beta.service <<UNIT
 [Unit]
@@ -142,7 +145,7 @@ cat > $R/usr/local/bin/smokebox-beta-update <<UPD
 #!/bin/sh
 [ -x $R/usr/local/bin/smokebox-update ] || { echo "smokebox-beta-update: the real updater is missing"; exit 1; }
 export SMOKEBOX_PREFIX=$PREFIX SMOKEBOX_UPDATE_URL=$URL SMOKEBOX_SYSTEMCTL=$R/usr/local/bin/smokebox-beta-systemctl
-export SMOKEBOX_HEALTH_URL=http://127.0.0.1:$PORT/ SMOKEBOX_LOCK=$R/run/lock/smokebox-beta-update.lock SMOKEBOX_SELF_DEST=$R/run/smokebox-beta-update.unused
+export SMOKEBOX_HEALTH_URL=http://127.0.0.1:$PORT/health SMOKEBOX_LOCK=$R/run/lock/smokebox-beta-update.lock SMOKEBOX_SELF_DEST=$R/run/smokebox-beta-update.unused
 exec $R/usr/local/bin/smokebox-update
 UPD
 chmod 755 $R/usr/local/bin/smokebox-beta-systemctl $R/usr/local/bin/smokebox-beta-update

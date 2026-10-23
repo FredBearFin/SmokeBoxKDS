@@ -61,7 +61,7 @@ PORT=8787 SMOKEBOX_FOLLOW_CODE=ABC123 SMOKEBOX_STARTER=1 node server/server.mjs
 - **Real networks.** Wi-Fi dropping, captive portals, sleeping devices, proxies or tunnels that buffer the stream. The beta script's Caddy settings turn buffering off but have not run on a real server.
 - **Limits reported by the builders:** a plain http address on a local network cannot load offline (no service worker without https or localhost). iPad Safari may clear stored data after about a week unless Smokebox is added to the home screen.
 - **Not checked:** a hub restart that changes its identity, a tablet that reloads with taps waiting, long runs, real clocks.
-- **Security in practice.** When a code is set the hub answers any website, so the code is the only gate. Do not put a hub on the open internet without a login in front of it (`docs/audit/server-security-review.md`). Behind Caddy the hub sees one address for everyone, so its wrong-code lockout counts all screens together.
+- **Security in practice.** When a code is set the hub answers any website, so the code is the only gate. Do not put a hub on the open internet without a login in front of it (`docs/audit/server-security-review.md`). Behind Caddy the hub sees one address for everyone unless `SMOKEBOX_TRUST_PROXY=1` is set (then it reads the screen's address from the last `X-Forwarded-For` entry, which Caddy adds, and only from the local proxy). `beta.sh` and new installs by `server/setup-server.sh` set it; an older main install needs it added once (see below). Tested through a proxy stand-in only.
 
 ## The beta instance (a second, separate Smokebox)
 
@@ -72,3 +72,7 @@ What it does: on the server that already ran `go.sh`, as root, `bash beta.sh [ho
 It adds one `import` line to the real Caddyfile (a copy is kept and the script undoes it if Caddy refuses). Remove everything with `bash beta-remove.sh` (or `--keep-data`). It is a second host name on purpose: under a path like `/beta/` a bare `?hub` would ask the real site's root and not connect.
 
 Do not run the real kitchen on the beta. Do not share screenshots of an address bar: the codes are in it.
+
+**Main server installed before this setting:** `server/setup-server.sh` now puts `Environment=SMOKEBOX_TRUST_PROXY=1` in the main unit, but the nightly update does not rewrite the unit. On an existing server run once, as root: `mkdir -p /etc/systemd/system/smokebox.service.d && printf '[Service]\nEnvironment=SMOKEBOX_TRUST_PROXY=1\n' > /etc/systemd/system/smokebox.service.d/proxy.conf && systemctl daemon-reload && systemctl restart smokebox`. Only do this while Caddy is in front of the hub on 127.0.0.1; if the hub is ever reachable directly, a screen on the same computer could choose its own address. The deploy build's hub ignores the setting until it contains the connected code. Not run on a real server.
+
+**Under a path prefix:** a bare `?hub` or `?follow` now uses the page's own folder (night/a5-c6), so a prefix such as `/beta/` also works; `beta.sh` still uses a second host name because it needs no edit of the real site's block. Proved with the proxy stand-in only (`test/beta-proxy.e2e.mjs`).

@@ -73,6 +73,7 @@ test('installs: hub answers on the beta port, real instance untouched, codes roo
   const r = run('beta.sh'); assert.equal(r.status, 0, r.stderr + r.stdout);
   assert.equal(snapReal(), before, 'the real instance files are exactly as they were');
   const env = fs.readFileSync(path.join(R, 'etc/smokebox-beta.env'), 'utf8'); assert.match(env, /SMOKEBOX_FOLLOW_CODE=[A-Z2-7]{16}/); assert.match(env, /SMOKEBOX_WRITE_CODE=[A-Z2-7]{16}/);
+  assert.match(env, /^SMOKEBOX_TRUST_PROXY=1$/m, 'the beta reads the real screen address behind Caddy');
   assert.equal(fs.statSync(path.join(R, 'etc/smokebox-beta.env')).mode & 0o777, 0o600);
   const unit = fs.readFileSync(path.join(R, 'etc/systemd/system/smokebox-beta.service'), 'utf8');
   for (const k of ['NoNewPrivileges=true', 'ProtectSystem=strict', 'CapabilityBoundingSet=', 'UMask=0077', 'EnvironmentFile=', 'PORT=' + PORT, 'HOST=127.0.0.1']) assert.ok(unit.includes(k), k);
@@ -89,6 +90,17 @@ test('installs: hub answers on the beta port, real instance untouched, codes roo
   const code = /SMOKEBOX_WRITE_CODE=(\w+)/.exec(env)[1];
   const hubEnvRun = fs.readFileSync(path.join(R, 'opt/smokebox-beta/server/server.mjs'), 'utf8'); assert.match(hubEnvRun, /SMOKEBOX_WRITE_CODE/);
   assert.ok(code.length === 16);
+});
+
+test('an env file from before TRUST_PROXY gets the setting added on a re-run, codes unchanged', { skip: !hasConnected }, () => {
+  const f = path.join(R, 'etc/smokebox-beta.env'); const old = fs.readFileSync(f, 'utf8').split('\n').filter((l) => !l.startsWith('SMOKEBOX_TRUST_PROXY')).join('\n'); fs.writeFileSync(f, old);
+  const r = run('beta.sh'); assert.equal(r.status, 0, r.stderr);
+  const now = fs.readFileSync(f, 'utf8'); assert.match(now, /^SMOKEBOX_TRUST_PROXY=1$/m); assert.ok(now.startsWith(old.trimEnd()), 'codes unchanged'); assert.equal(fs.statSync(f).mode & 0o777, 0o600);
+});
+
+test('setup-server.sh sets TRUST_PROXY in the main unit, only once, next to the time zone', () => {
+  const t = fs.readFileSync(path.join(ROOT, 'server/setup-server.sh'), 'utf8');
+  assert.equal((t.match(/Environment=SMOKEBOX_TRUST_PROXY=1/g) || []).length, 1); assert.match(t, /SMOKEBOX_TZ=\$\{TZNAME\}\nEnvironment=SMOKEBOX_TRUST_PROXY=1/);
 });
 
 test('a re-run keeps the codes and the data; the nightly wrapper points only at the beta', { skip: !hasConnected }, () => {
