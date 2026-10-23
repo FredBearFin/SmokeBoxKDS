@@ -1,29 +1,22 @@
 {
- "runStart": "2026-10-23T06:26:43.646Z",
+ "runStart": "2026-10-23T10:57:22.035Z",
  "results": [
   {
    "id": "01-first-run",
    "title": "First run boots clean and the board is ready to use",
    "owner": "board",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 6364,
+   "ms": 6894,
    "checks": 24,
-   "failed": [
-    {
-     "name": "the empty board says \"Let's build your menu\" and offers Add your first dish, Show me how it works and the practice demo",
-     "detail": "Welcome. Let's build your menu.\n\nIt takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.\n\nAdd your first dish\nShow me how it works\nTry the demo",
-     "owner": "board"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
-    "test/.out/qa/first-run-1280.png",
-    "test/.out/qa/fail-01-first-run.png"
+    "test/.out/qa/first-run-1280.png"
    ],
-   "at": "2026-10-23T06:26:50.079Z"
+   "at": "2026-10-23T10:48:22.474Z"
   },
   {
    "id": "02a-send-ticket",
@@ -32,7 +25,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 3110,
+   "ms": 5946,
    "checks": 16,
    "failed": [],
    "skips": [],
@@ -40,7 +33,7 @@
    "shots": [
     "test/.out/qa/cook-order-filled.png"
    ],
-   "at": "2026-10-23T06:26:53.189Z"
+   "at": "2026-10-23T10:29:35.318Z"
   },
   {
    "id": "02b-advance-bump-undo",
@@ -49,21 +42,21 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 19208,
+   "ms": 22774,
    "checks": 21,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "undo toast lifetime",
-     "value": 9.829,
+     "value": 9.779,
      "unit": "s"
     }
    ],
    "shots": [
     "test/.out/qa/cook-after-undo.png"
    ],
-   "at": "2026-10-23T06:27:12.397Z"
+   "at": "2026-10-23T10:29:58.093Z"
   },
   {
    "id": "02c-bump-anyway-void-recall",
@@ -72,7 +65,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 6462,
+   "ms": 9108,
    "checks": 16,
    "failed": [],
    "skips": [],
@@ -80,7 +73,7 @@
    "shots": [
     "test/.out/qa/cook-void-sheet.png"
    ],
-   "at": "2026-10-23T06:27:18.859Z"
+   "at": "2026-10-23T10:30:07.202Z"
   },
   {
    "id": "02d-fire-rush",
@@ -89,13 +82,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 3490,
+   "ms": 4882,
    "checks": 10,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T06:27:22.350Z"
+   "at": "2026-10-23T10:30:12.085Z"
   },
   {
    "id": "03a-station-views",
@@ -104,7 +97,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 4928,
+   "ms": 7531,
    "checks": 32,
    "failed": [],
    "skips": [],
@@ -112,7 +105,7 @@
    "shots": [
     "test/.out/qa/stations-fry.png"
    ],
-   "at": "2026-10-23T06:27:27.278Z"
+   "at": "2026-10-23T10:30:19.616Z"
   },
   {
    "id": "03b-keyboard",
@@ -121,145 +114,88 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 13336,
+   "ms": 20298,
    "checks": 30,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T06:27:40.614Z"
+   "at": "2026-10-23T10:30:39.918Z"
   },
   {
    "id": "04a-hold-cabinet",
    "title": "Hold cabinet: log a temperature, thermal brisket batch yield, below 135 wording, safety line",
    "owner": "sheets",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
-   "error": "locator.click: Timeout 6000ms exceeded. | Call log: | \u001b[2m  - waiting for locator('.fl-cabinet').getByRole('article', { name: /Pulled pork batch 1/ }).getByRole('button', { name: 'Discard' })\u001b[22m | ",
-   "ms": 11939,
-   "checks": 23,
-   "failed": [
-    {
-     "name": "the hold cabinet lists 10 starter batches and says all are holding fine",
-     "detail": "Hold cabinet\n\nGeneral food-safety guidance. Your local health-code rules override this.\n\n?\nEntries are saved as QA.\nSwitch person\nIn the cabinet\n10\nNew batch\n\n10 batches in the cabinet. All are in range. 10 are starter stock (starting amounts, not weighed).\n\nH",
-     "owner": "sheets"
-    },
-    {
-     "name": "the new-batch form shows expected yield, cooked weight and cost per cooked kg",
-     "detail": "What you should get\nExpected yield\n60.2% (cook-loss model)\nCooked weight\n8.43 kg\n\nThe flat 50% rule would plan 7.00 kg of cooked meat (17% too little) and price it at $48.72 per kg (20% too high). This model says 8.43 kg at $40.47 per kg.\n\nBrisket yield comes from the Texas A&M cook-loss model. Raw ",
-     "owner": "sheets"
-    },
-    {
-     "name": "cost per cooked kg equals raw cost per kg divided by the yield",
-     "detail": "{\"rawCost\":24.36,\"yieldPct\":60.2,\"costKg\":0}",
-     "owner": "sheets"
-    },
-    {
-     "name": "the card offers Reheat and Discard",
-     "detail": "",
-     "owner": "sheets"
-    },
-    {
-     "name": "Log reheat puts the batch back in service (\"Holding fine\", no more Reheat now)",
-     "detail": "Hot hold\nBrisket batch 2\nIn range\n0m\nof 8 h\n8.90 kg left of 8.90 kg\nLast reading\n165 °F, just now, checked by QA 6:27 am\nNext reading\ndue in 2 h 00 min\nServe by\n2:27 pm, quality limit\nLog temp",
-     "owner": "sheets"
-    }
-   ],
+   "error": null,
+   "ms": 9112,
+   "checks": 33,
+   "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
     "test/.out/qa/hold-new-batch.png",
-    "test/.out/qa/hold-below-135.png",
-    "test/.out/qa/fail-04a-hold-cabinet.png"
+    "test/.out/qa/hold-below-135.png"
    ],
-   "at": "2026-10-23T06:27:52.554Z"
+   "at": "2026-10-23T10:52:49.647Z"
   },
   {
    "id": "04b-lockout-86",
    "title": "A batch under 135 F for 2 hours is discarded and its menu items go 86 (safety hold)",
    "owner": "sheets",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 13450,
+   "ms": 13876,
    "checks": 9,
-   "failed": [
-    {
-     "name": "the cook is TOLD when a pan is thrown out by the clock (a toast mentioning the batch and discard)",
-     "detail": "[\"Brisket batch 1 is below 135 °F. Reheat it to 165 °F now, or throw it out.\"]",
-     "owner": "sheets"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
     "test/.out/qa/order-86-safety.png",
     "test/.out/qa/hold-lockout.png",
-    "test/.out/qa/order-86-after-lockout.png",
-    "test/.out/qa/fail-04b-lockout-86.png"
+    "test/.out/qa/order-86-after-lockout.png"
    ],
-   "at": "2026-10-23T06:28:06.004Z"
+   "at": "2026-10-23T10:51:59.743Z"
   },
   {
    "id": "04c-board-86",
    "title": "86 board: manual 86 hides the item from the order screen, Back on restores, sync strip is labelled Simulated",
    "owner": "sheets",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 9277,
+   "ms": 9392,
    "checks": 17,
-   "failed": [
-    {
-     "name": "the sync strip says \"Simulated: no live POS connected\"",
-     "detail": "86 board and stock\nMenu\nAll items\n21\nOff the menu\n0\nMeats\nBrisket, 1/4 lb\n$7.50\nOn the menu\n86 it\nBrisket, 1/2 lb\n$14.00\nOn the menu\n86 it\nBurnt ends, 1/2 lb\n$1",
-     "owner": "sheets"
-    },
-    {
-     "name": "the strip still says Simulated after syncing",
-     "detail": "",
-     "owner": "sheets"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
-    "test/.out/qa/board86-manual.png",
-    "test/.out/qa/fail-04c-board-86.png"
+    "test/.out/qa/board86-manual.png"
    ],
-   "at": "2026-10-23T06:28:15.282Z"
+   "at": "2026-10-23T10:52:09.136Z"
   },
   {
    "id": "05-demo-flow",
    "title": "Demo: orders + crew at x15 move tickets, 12-ticket rush, Reset live data with confirm",
    "owner": "sim",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 30774,
+   "ms": 25824,
    "checks": 36,
-   "failed": [
-    {
-     "name": "demo slips are on the board and carry the Demo tag (its \"ticket\" half hides on a crowded board)",
-     "detail": "{\"slips\":13,\"demoTags\":0}",
-     "owner": "sim"
-    },
-    {
-     "name": "Restart demo leaves three fresh pretend tickets, a normal clock, no automatic orders and the welcome card",
-     "detail": "{\"tickets\":3,\"demo\":3,\"speed\":1,\"running\":false,\"welcome\":false}",
-     "owner": "sim"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "demo x15: real seconds until 3 tickets sent and 1 finished",
-     "value": 20,
+     "value": 14,
      "unit": "s"
     },
     {
      "key": "demo x15: tickets sent while watching",
-     "value": 14,
+     "value": 7,
      "unit": "tickets"
     },
     {
@@ -276,10 +212,9 @@
    "shots": [
     "test/.out/qa/demo-traffic-1280.png",
     "test/.out/qa/demo-rush-sheet.png",
-    "test/.out/qa/demo-restarted.png",
-    "test/.out/qa/fail-05-demo-flow.png"
+    "test/.out/qa/demo-restarted.png"
    ],
-   "at": "2026-10-23T06:28:46.056Z"
+   "at": "2026-10-23T10:52:35.570Z"
   },
   {
    "id": "06a-gesture-and-exits",
@@ -288,7 +223,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 26977,
+   "ms": 29790,
    "checks": 25,
    "failed": [],
    "skips": [],
@@ -296,7 +231,7 @@
    "shots": [
     "test/.out/qa/door-open.png"
    ],
-   "at": "2026-10-23T06:29:13.033Z"
+   "at": "2026-10-23T10:32:40.385Z"
   },
   {
    "id": "06b-reduced-motion",
@@ -305,26 +240,26 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 4333,
+   "ms": 4960,
    "checks": 6,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "reduced-motion open time",
-     "value": 19,
+     "value": 25,
      "unit": "ms"
     },
     {
      "key": "normal motion: the ember ring stays in the page for",
-     "value": 863,
+     "value": 937,
      "unit": "ms (the ignition is meant to run about 720 ms)"
     }
    ],
    "shots": [
     "test/.out/qa/door-reduced.png"
    ],
-   "at": "2026-10-23T06:29:17.366Z"
+   "at": "2026-10-23T10:32:45.346Z"
   },
   {
    "id": "06c-pin",
@@ -333,7 +268,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 26874,
+   "ms": 33799,
    "checks": 28,
    "failed": [],
    "skips": [],
@@ -347,30 +282,22 @@
    "shots": [
     "test/.out/qa/pin-keypad.png"
    ],
-   "at": "2026-10-23T06:29:44.241Z"
+   "at": "2026-10-23T10:33:19.145Z"
   },
   {
    "id": "06d-office-button",
    "title": "Back office button: named and visible at every width, opens the office, asks the PIN, header stays on one row",
    "owner": "officeC",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
-   "error": "locator.click: Timeout 6000ms exceeded. | Call log: | \u001b[2m  - waiting for getByRole('menuitem', { name: /^Back office/ })\u001b[22m | ",
-   "ms": 21204,
-   "checks": 14,
-   "failed": [
-    {
-     "name": "1024: the Menu list starts with Back office",
-     "detail": "",
-     "owner": "officeC"
-    }
-   ],
+   "error": null,
+   "ms": 22849,
+   "checks": 23,
+   "failed": [],
    "skips": [],
    "notes": [],
-   "shots": [
-    "test/.out/qa/fail-06d-office-button.png"
-   ],
-   "at": "2026-10-23T06:30:05.446Z"
+   "shots": [],
+   "at": "2026-10-23T10:54:56.259Z"
   },
   {
    "id": "07a-pages-sample",
@@ -379,47 +306,30 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 12697,
+   "ms": 20951,
    "checks": 101,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T06:30:18.144Z"
+   "at": "2026-10-23T10:34:02.878Z"
   },
   {
    "id": "07b-pages-live-only",
    "title": "Office: all 7 pages with Live only and no data say \"Not enough data\" and never draw zeros or NaN",
    "owner": "officeA",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 19895,
+   "ms": 9967,
    "checks": 52,
-   "failed": [
-    {
-     "name": "Safety (live only, no data): says \"Not enough data\" somewhere instead of drawing zeros",
-     "detail": "Safety records are off\n\nYou are not tracking cooked-ahead food, so there are no batches, temperature checks or hold times to report on. Turn it on under Menu, Dishes and prices (Yes, I cook ahead) if ",
-     "owner": "officeB"
-    },
-    {
-     "name": "Safety (live only, no data): opens with a plain headline sentence",
-     "detail": "",
-     "owner": "officeB"
-    },
-    {
-     "name": "Stock and 86 (live only, no data): opens with a plain headline sentence",
-     "detail": "",
-     "owner": "officeB"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
-    "test/.out/qa/office-live-only-empty.png",
-    "test/.out/qa/fail-07b-pages-live-only.png"
+    "test/.out/qa/office-live-only-empty.png"
    ],
-   "at": "2026-10-23T06:30:38.040Z"
+   "at": "2026-10-23T10:55:06.969Z"
   },
   {
    "id": "07c-filters",
@@ -428,53 +338,54 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 12260,
+   "ms": 15125,
    "checks": 15,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T06:30:50.300Z"
+   "at": "2026-10-23T10:34:42.939Z"
   },
   {
    "id": "07d-gantt-themes-keys",
    "title": "Office: ticket gantt opens from Tickets, Ember and Paper themes, [ and ] keys",
    "owner": "officeA",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
-   "error": "locator.click: Timeout 6000ms exceeded. | Call log: | \u001b[2m  - waiting for locator('#sb-office table tbody tr').first()\u001b[22m | \u001b[2m    - locator resolved to <tr class=\"is-click\">…</tr>\u001b[22m",
-   "ms": 16219,
-   "checks": 1,
+   "error": null,
+   "ms": 24445,
+   "checks": 20,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
-    "test/.out/qa/fail-07d-gantt-themes-keys.png"
+    "test/.out/qa/office-gantt.png",
+    "test/.out/qa/office-paper-tickets.png"
    ],
-   "at": "2026-10-23T06:31:06.519Z"
+   "at": "2026-10-23T10:56:02.803Z"
   },
   {
    "id": "07e-data-page",
    "title": "Data page: edit a price, bounds refusal, export JSON, import valid file and garbage, reset flows",
    "owner": "officeC",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
-   "error": "locator.fill: Timeout 6000ms exceeded. | Call log: | \u001b[2m  - waiting for getByRole('spinbutton', { name: 'Price of Brisket, 1/4 lb' })\u001b[22m | ",
-   "ms": 15759,
-   "checks": 1,
-   "failed": [
+   "error": null,
+   "ms": 23201,
+   "checks": 50,
+   "failed": [],
+   "skips": [],
+   "notes": [
     {
-     "name": "setup: Brisket 1/4 lb starts at $7.50",
-     "detail": "",
-     "owner": "officeC"
+     "key": "backup file size",
+     "value": 15,
+     "unit": "KB"
     }
    ],
-   "skips": [],
-   "notes": [],
    "shots": [
-    "test/.out/qa/fail-07e-data-page.png"
+    "test/.out/qa/data-import-refused.png"
    ],
-   "at": "2026-10-23T06:31:22.278Z"
+   "at": "2026-10-23T10:57:45.350Z"
   },
   {
    "id": "08a-reload-keeps",
@@ -483,96 +394,56 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 6566,
+   "ms": 8813,
    "checks": 11,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T06:31:28.844Z"
+   "at": "2026-10-23T10:35:29.380Z"
   },
   {
    "id": "08b-two-pages-sync",
    "title": "Persistence: two pages in one browser stay in sync and never duplicate ticket numbers",
    "owner": "lead",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
-   "error": "locator.click: Timeout 6000ms exceeded. | Call log: | \u001b[2m  - waiting for locator('.fl-slip').filter({ has: locator('.slip-who').filter({ hasText: 'Walk-up' }) }).getByRole('button', { name: /Smoked sausage link/ })\u001b[22m | ",
-   "ms": 19620,
-   "checks": 3,
-   "failed": [
-    {
-     "name": "tickets created on page A appear on page B within 6 s",
-     "detail": "0",
-     "owner": "lead"
-    },
-    {
-     "name": "page B draws the 4 slips",
-     "detail": "0",
-     "owner": "board"
-    }
-   ],
+   "error": null,
+   "ms": 9728,
+   "checks": 15,
+   "failed": [],
    "skips": [],
    "notes": [],
-   "shots": [
-    "test/.out/qa/fail-08b-two-pages-sync.png",
-    "test/.out/qa/fail-08b-two-pages-sync-1.png"
-   ],
-   "at": "2026-10-23T06:31:48.464Z"
+   "shots": [],
+   "at": "2026-10-23T10:48:12.351Z"
   },
   {
    "id": "08c-corrupt-storage",
    "title": "Persistence: corrupt or odd saved data starts fresh, keeps a copy, and TELLS the user",
    "owner": "lead",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 39817,
-   "checks": 50,
-   "failed": [
-    {
-     "name": "broken JSON: a ticket made after the reset is written to storage within 5 s",
-     "detail": "{\"head\":\"{\\\"v\\\":1,\\\"savedAt\\\":1792737109150,\\\"rev\\\":0,\\\"clock\\\":{\\\"virtual\\\":179273710915\",\"status\":{\"persistent\":true,\"lastSaveOk\":true,\"lastSaveAt\":1792737110600,\"corrupt\":null,\"firstRun\":true,\"trimmed\":false,\"repaired\":[],\"outboxDropped\":0,\"saveCostMs\":0.3,\"saveDelayMs\":400,\"speed\":1}}",
-     "owner": "lead"
-    },
-    {
-     "name": "wrong shape: a ticket made after the reset is written to storage within 5 s",
-     "detail": "{\"head\":\"{\\\"v\\\":1,\\\"savedAt\\\":1792737115911,\\\"rev\\\":0,\\\"clock\\\":{\\\"virtual\\\":179273711591\",\"status\":{\"persistent\":true,\"lastSaveOk\":true,\"lastSaveAt\":1792737117488,\"corrupt\":null,\"firstRun\":true,\"trimmed\":false,\"repaired\":[],\"outboxDropped\":0,\"saveCostMs\":0.3,\"saveDelayMs\":400,\"speed\":1}}",
-     "owner": "lead"
-    },
-    {
-     "name": "a bare number: a ticket made after the reset is written to storage within 5 s",
-     "detail": "{\"head\":\"null\",\"status\":{\"persistent\":true,\"lastSaveOk\":true,\"lastSaveAt\":1792737124098,\"corrupt\":null,\"firstRun\":true,\"trimmed\":false,\"repaired\":[],\"outboxDropped\":0,\"saveCostMs\":0.6,\"saveDelayMs\":400,\"speed\":1}}",
-     "owner": "lead"
-    },
-    {
-     "name": "a bare number: a ticket made after the reset is written to storage within 5 s",
-     "detail": "{\"head\":\"{\\\"v\\\":1,\\\"savedAt\\\":1792737129198,\\\"rev\\\":0,\\\"clock\\\":{\\\"virtual\\\":179273712919\",\"status\":{\"persistent\":true,\"lastSaveOk\":true,\"lastSaveAt\":1792737130760,\"corrupt\":null,\"firstRun\":true,\"trimmed\":false,\"repaired\":[],\"outboxDropped\":0,\"saveCostMs\":0.3,\"saveDelayMs\":400,\"speed\":1}}",
-     "owner": "lead"
-    },
-    {
-     "name": "an array: a ticket made after the reset is written to storage within 5 s",
-     "detail": "{\"head\":\"{\\\"v\\\":1,\\\"savedAt\\\":1792737135779,\\\"rev\\\":0,\\\"clock\\\":{\\\"virtual\\\":179273713577\",\"status\":{\"persistent\":true,\"lastSaveOk\":true,\"lastSaveAt\":1792737137375,\"corrupt\":null,\"firstRun\":true,\"trimmed\":false,\"repaired\":[],\"outboxDropped\":0,\"saveCostMs\":0.2,\"saveDelayMs\":400,\"speed\":1}}",
-     "owner": "lead"
-    },
-    {
-     "name": "an old version: a ticket made after the reset is written to storage within 5 s",
-     "detail": "{\"head\":\"{\\\"v\\\":1,\\\"savedAt\\\":1792737142364,\\\"rev\\\":0,\\\"clock\\\":{\\\"virtual\\\":179273714236\",\"status\":{\"persistent\":true,\"lastSaveOk\":true,\"lastSaveAt\":1792737143778,\"corrupt\":null,\"firstRun\":true,\"trimmed\":false,\"repaired\":[],\"outboxDropped\":0,\"saveCostMs\":0.5,\"saveDelayMs\":400,\"speed\":1}}",
-     "owner": "lead"
-    }
-   ],
+   "ms": 16657,
+   "checks": 55,
+   "failed": [],
    "skips": [],
    "notes": [
     {
-     "key": "browser dropped all storage on reload, case repeated: a bare number",
+     "key": "browser dropped all storage on reload, case repeated: wrong shape",
      "value": 1,
+     "unit": "x"
+    },
+    {
+     "key": "browser dropped all storage on reload, case repeated: an array",
+     "value": 2,
      "unit": "x"
     }
    ],
    "shots": [
     "test/.out/qa/corrupt-storage-board.png"
    ],
-   "at": "2026-10-23T06:32:28.281Z"
+   "at": "2026-10-23T10:51:03.336Z"
   },
   {
    "id": "08d-storage-blocked",
@@ -581,13 +452,13 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 1495,
+   "ms": 1057,
    "checks": 7,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T06:32:29.776Z"
+   "at": "2026-10-23T10:51:04.869Z"
   },
   {
    "id": "09a-floor-viewports",
@@ -596,7 +467,7 @@
    "status": "FAIL",
    "reason": "",
    "error": null,
-   "ms": 18280,
+   "ms": 31662,
    "checks": 45,
    "failed": [
     {
@@ -606,7 +477,7 @@
     },
     {
      "name": "every control is at least 44 px tall on a touch screen (board 390)",
-     "detail": "day/normal: 2 under 44 px: a.gd-help \"Help: no sound\" 28px; button.btn.btn-sm \"Back to my kitchen\" 34px | night/normal: 1 under 44 px: button.btn.btn-sm \"Back to my kitchen\" 34px | day/large: 1 under 44 px: button.btn.btn-sm \"Back to my kitchen\" 34px | night/large: 1 under 44 px: button.btn.btn-sm \"Back to my kitchen\" 34px",
+     "detail": "day/normal: 2 under 44 px: a.gd-help \"Help: no sound\" 28px; button.btn.btn-sm \"Back to my kitchen\" 34px | night/normal: 2 under 44 px: a.gd-help \"Help: no sound\" 28px; button.btn.btn-sm \"Back to my kitchen\" 34px | day/large: 1 under 44 px: button.btn.btn-sm \"Back to my kitchen\" 34px | night/large: 1 under 44 px: button.btn.btn-sm \"Back to my kitchen\" 34px",
      "owner": "board"
     },
     {
@@ -626,7 +497,7 @@
     },
     {
      "name": "no control is under 32 px tall (board 2560)",
-     "detail": "day/normal: 1 under 32 px: a.gd-help \"Help: no sound\" 28px | night/normal: 1 under 32 px: a.gd-help \"Help: no sound\" 28px | day/large: 1 under 32 px: a.gd-help \"Help: no sound\" 28px",
+     "detail": "day/normal: 1 under 32 px: a.gd-help \"Help: no sound\" 28px",
      "owner": "board"
     }
    ],
@@ -674,7 +545,7 @@
     "test/.out/qa/fail-09a-floor-viewports.png",
     "test/.out/qa/fail-09a-floor-viewports-1.png"
    ],
-   "at": "2026-10-23T06:32:48.057Z"
+   "at": "2026-10-23T10:37:00.580Z"
   },
   {
    "id": "09b-sheets-wide",
@@ -683,7 +554,7 @@
    "status": "FAIL",
    "reason": "",
    "error": null,
-   "ms": 65515,
+   "ms": 79181,
    "checks": 21,
    "failed": [
     {
@@ -709,7 +580,7 @@
     "test/.out/qa/vp-sheet-hold-1280.png",
     "test/.out/qa/vp-sheet-board86-1280.png"
    ],
-   "at": "2026-10-23T06:33:53.573Z"
+   "at": "2026-10-23T10:38:19.762Z"
   },
   {
    "id": "09c-sheets-narrow",
@@ -718,7 +589,7 @@
    "status": "FAIL",
    "reason": "",
    "error": null,
-   "ms": 43367,
+   "ms": 46550,
    "checks": 14,
    "failed": [
     {
@@ -748,7 +619,7 @@
     "test/.out/qa/vp-sheet-hold-280.png",
     "test/.out/qa/vp-sheet-board86-280.png"
    ],
-   "at": "2026-10-23T06:34:36.940Z"
+   "at": "2026-10-23T10:39:06.312Z"
   },
   {
    "id": "09d-office-wide",
@@ -757,7 +628,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 47632,
+   "ms": 51046,
    "checks": 40,
    "failed": [],
    "skips": [],
@@ -774,7 +645,7 @@
     "test/.out/qa/vp-office-1280-paper-pace.png",
     "test/.out/qa/vp-office-1024-ember-pace.png"
    ],
-   "at": "2026-10-23T06:35:24.572Z"
+   "at": "2026-10-23T10:39:57.359Z"
   },
   {
    "id": "09e-office-narrow",
@@ -783,7 +654,7 @@
    "status": "FAIL",
    "reason": "",
    "error": null,
-   "ms": 47891,
+   "ms": 53790,
    "checks": 40,
    "failed": [
     {
@@ -837,7 +708,7 @@
     "test/.out/qa/vp-office-280-ember-pace.png",
     "test/.out/qa/vp-office-280-ember-money.png"
    ],
-   "at": "2026-10-23T06:36:12.463Z"
+   "at": "2026-10-23T10:40:51.150Z"
   },
   {
    "id": "10a-no-network",
@@ -846,7 +717,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 22649,
+   "ms": 26782,
    "checks": 11,
    "failed": [],
    "skips": [],
@@ -865,7 +736,7 @@
    "shots": [
     "test/.out/qa/offline-board.png"
    ],
-   "at": "2026-10-23T06:36:35.112Z"
+   "at": "2026-10-23T10:41:17.933Z"
   },
   {
    "id": "10b-artifact-host",
@@ -874,7 +745,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 3849,
+   "ms": 4629,
    "checks": 1,
    "failed": [],
    "skips": [],
@@ -886,48 +757,54 @@
     }
    ],
    "shots": [],
-   "at": "2026-10-23T06:36:38.961Z"
+   "at": "2026-10-23T10:41:22.562Z"
   },
   {
    "id": "11a-startup-and-sample",
    "title": "Performance: time to first paint, boot, SB.sim.sample() cold and memoised",
    "owner": "lead",
-   "status": "PASS",
+   "status": "FAIL",
    "reason": "",
    "error": null,
-   "ms": 5443,
+   "ms": 9767,
    "checks": 8,
-   "failed": [],
+   "failed": [
+    {
+     "name": "SB.sim.sample() cold finishes in under 4000 ms",
+     "detail": "{\"coldMs\":4509.599999999977,\"generatedMs\":4509,\"tickets\":2475,\"events\":33227,\"days\":14,\"memoMs\":0,\"json\":3336543}",
+     "owner": "sim"
+    }
+   ],
    "skips": [],
    "notes": [
     {
      "key": "machine load average (1 min, 2 cores shared) before the probes",
-     "value": 1.4,
+     "value": 8.1,
      "unit": ""
     },
     {
      "key": "first paint (median of 3 cold loads)",
-     "value": 208,
+     "value": 196,
      "unit": "ms"
     },
     {
      "key": "first contentful paint (median of 3)",
-     "value": 328,
+     "value": 416,
      "unit": "ms"
     },
     {
      "key": "DOMContentLoaded (parse + run all scripts, median of 3)",
-     "value": 306.6,
+     "value": 366.1,
      "unit": "ms"
     },
     {
      "key": "SB.booted true (median of 3)",
-     "value": 311.1,
+     "value": 384.4,
      "unit": "ms"
     },
     {
      "key": "board has slips or the empty state painted (median of 3)",
-     "value": 311.1,
+     "value": 384.5,
      "unit": "ms"
     },
     {
@@ -937,12 +814,12 @@
     },
     {
      "key": "SB.sim.sample() cold (14 days)",
-     "value": 1460.4,
+     "value": 4509.6,
      "unit": "ms"
     },
     {
      "key": "SB.sim.sample() generatedMs reported by the simulator",
-     "value": 1460,
+     "value": 4509,
      "unit": "ms"
     },
     {
@@ -956,8 +833,11 @@
      "unit": ""
     }
    ],
-   "shots": [],
-   "at": "2026-10-23T06:36:44.404Z"
+   "shots": [
+    "test/.out/qa/fail-11a-startup-and-sample.png",
+    "test/.out/qa/fail-11a-startup-and-sample-1.png"
+   ],
+   "at": "2026-10-23T10:41:32.330Z"
   },
   {
    "id": "11b-office-render",
@@ -966,17 +846,17 @@
    "status": "FAIL",
    "reason": "",
    "error": null,
-   "ms": 27139,
+   "ms": 29784,
    "checks": 6,
    "failed": [
     {
-     "name": "every office page paints within 800 ms of the navigation (worst: data 1587 ms)",
-     "detail": "data 1587, stock 14, safety 12, money 27, stations 15, tickets 11, pace 11, pace 12",
+     "name": "every office page paints within 1500 ms of the navigation (worst: data 3512 ms)",
+     "detail": "data 3512, stock 50, safety 6, money 36, stations 20, tickets 43, pace 12, pace 10",
      "owner": "officeC"
     },
     {
-     "name": "no single long task over 400 ms while paging through the office (worst page: data, 1574 ms)",
-     "detail": "data: 1574",
+     "name": "no single long task over 400 ms while paging through the office (worst page: data, 3484 ms)",
+     "detail": "data: 3484",
      "owner": "officeC"
     }
    ],
@@ -984,64 +864,64 @@
    "notes": [
     {
      "key": "deep link #/office/pace to first chart in the DOM (includes the 0.7 s ignition)",
-     "value": 15004,
+     "value": 15005,
      "unit": "ms"
     },
     {
      "key": "office page \"data\" navigate to painted",
-     "value": 1586.6,
+     "value": 3512.4,
      "unit": "ms"
     },
     {
      "key": "office page \"stock\" navigate to painted",
-     "value": 14,
+     "value": 50,
      "unit": "ms"
     },
     {
      "key": "office page \"safety\" navigate to painted",
-     "value": 11.9,
+     "value": 6.3,
      "unit": "ms"
     },
     {
      "key": "office page \"money\" navigate to painted",
-     "value": 26.7,
+     "value": 36.4,
      "unit": "ms"
     },
     {
      "key": "office page \"stations\" navigate to painted",
-     "value": 14.6,
+     "value": 19.7,
      "unit": "ms"
     },
     {
      "key": "office page \"tickets\" navigate to painted",
-     "value": 11.2,
+     "value": 43.2,
      "unit": "ms"
     },
     {
      "key": "office page \"pace\" navigate to painted",
-     "value": 10.8,
+     "value": 12.4,
      "unit": "ms"
     },
     {
      "key": "office page \"pace\" navigate to painted",
-     "value": 11.8,
+     "value": 10.2,
      "unit": "ms"
     },
     {
      "key": "long tasks (over 50 ms) while paging through the office",
-     "value": "1574",
+     "value": "3484",
      "unit": "ms"
     },
     {
      "key": "Pace: change the date range to 7 days, until painted",
-     "value": 7.8,
+     "value": 22,
      "unit": "ms"
     }
    ],
    "shots": [
     "test/.out/qa/fail-11b-office-render.png"
    ],
-   "at": "2026-10-23T06:37:11.543Z"
+   "at": "2026-10-23T10:42:02.115Z"
   },
   {
    "id": "11c-sixty-tickets",
@@ -1050,7 +930,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 8326,
+   "ms": 9924,
    "checks": 10,
    "failed": [],
    "skips": [],
@@ -1062,39 +942,39 @@
     },
     {
      "key": "board full render with that many slips (lastRenderMs)",
-     "value": 58.2,
+     "value": 87.8,
      "unit": "ms"
     },
     {
      "key": "1 Hz tick with 60 slips: median cost",
-     "value": 7.6,
+     "value": 18.5,
      "unit": "ms"
     },
     {
      "key": "1 Hz tick: worst cost seen (maxTickMs)",
-     "value": 38,
+     "value": 80.9,
      "unit": "ms"
     },
     {
      "key": "frames in 6 s / frames slower than 50 ms / worst frame",
-     "value": "362 / 0 / 21 ms",
+     "value": "321 / 11 / 92 ms",
      "unit": ""
     },
     {
      "key": "long tasks over 50 ms during the 6 s",
-     "value": "none",
+     "value": "58, 65, 57, 61, 56, 83, 56, 64",
      "unit": "ms"
     },
     {
      "key": "one \"All done here\" on a board of 60: dispatch to painted",
-     "value": 27.6,
+     "value": 31,
      "unit": "ms"
     }
    ],
    "shots": [
     "test/.out/qa/perf-60-tickets.png"
    ],
-   "at": "2026-10-23T06:37:19.870Z"
+   "at": "2026-10-23T10:42:12.040Z"
   },
   {
    "id": "12a-structure",
@@ -1103,7 +983,7 @@
    "status": "FAIL",
    "reason": "",
    "error": null,
-   "ms": 23213,
+   "ms": 26285,
    "checks": 41,
    "failed": [
     {
@@ -1128,7 +1008,7 @@
    "shots": [
     "test/.out/qa/fail-12a-structure.png"
    ],
-   "at": "2026-10-23T06:37:43.083Z"
+   "at": "2026-10-23T10:42:38.325Z"
   },
   {
    "id": "12b-keyboard",
@@ -1137,36 +1017,50 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 6537,
+   "ms": 11770,
    "checks": 12,
    "failed": [],
    "skips": [],
    "notes": [
     {
      "key": "distinct tab stops reached in 70 presses on the board",
-     "value": 49,
+     "value": 48,
      "unit": "stops"
     }
    ],
    "shots": [],
-   "at": "2026-10-23T06:37:49.620Z"
+   "at": "2026-10-23T10:42:50.095Z"
   },
   {
    "id": "12c-live-regions",
    "title": "Accessibility: screen reader announcements per minute while the demo runs",
    "owner": "board",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
-   "error": "locator.waitFor: Timeout 10000ms exceeded. | Call log: | \u001b[2m  - waiting for getByRole('dialog', { name: 'Demo and clock' }) to be visible\u001b[22m | ",
-   "ms": 11048,
-   "checks": 0,
+   "error": null,
+   "ms": 32762,
+   "checks": 7,
    "failed": [],
    "skips": [],
-   "notes": [],
-   "shots": [
-    "test/.out/qa/fail-12c-live-regions.png"
+   "notes": [
+    {
+     "key": "screen reader announcements during 30 s of the demo at x15 (distinct)",
+     "value": 2,
+     "unit": "announcements"
+    },
+    {
+     "key": "announcements per real minute at x15",
+     "value": 4,
+     "unit": "/min"
+    },
+    {
+     "key": "sample of what was announced",
+     "value": "\"Ticket #103 added for Table 11.\" | \"Ticket #106 added for Pickup.\"",
+     "unit": ""
+    }
    ],
-   "at": "2026-10-23T06:38:00.669Z"
+   "shots": [],
+   "at": "2026-10-23T10:47:13.997Z"
   },
   {
    "id": "12d-contrast-floor",
@@ -1175,7 +1069,7 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 22905,
+   "ms": 26606,
    "checks": 10,
    "failed": [],
    "skips": [],
@@ -1192,7 +1086,7 @@
     }
    ],
    "shots": [],
-   "at": "2026-10-23T06:38:23.574Z"
+   "at": "2026-10-23T10:43:28.248Z"
   },
   {
    "id": "12e-contrast-office",
@@ -1201,7 +1095,7 @@
    "status": "FAIL",
    "reason": "",
    "error": null,
-   "ms": 20165,
+   "ms": 24605,
    "checks": 5,
    "failed": [
     {
@@ -1231,69 +1125,18 @@
    "shots": [
     "test/.out/qa/fail-12e-contrast-office.png"
    ],
-   "at": "2026-10-23T06:38:43.740Z"
+   "at": "2026-10-23T10:43:52.854Z"
   },
   {
    "id": "13a-tour-full-loop",
    "title": "Walkthrough: all nine steps with real clicks, from start to Done",
    "owner": "board",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
-   "error": "locator.click: Timeout 6000ms exceeded. | Call log: | \u001b[2m  - waiting for locator('.tour-card').getByRole('button', { name: 'Done' })\u001b[22m | ",
-   "ms": 58926,
-   "checks": 43,
-   "failed": [
-    {
-     "name": "from step 5 the clock runs fast (x30)",
-     "detail": "1",
-     "owner": "board"
-    },
-    {
-     "name": "step 6 arrives by itself when the brisket sandwich is ready to start",
-     "detail": "Step 5 of 9",
-     "owner": "board"
-    },
-    {
-     "name": "step 6 tells the person to tap START on the brisket sandwich",
-     "detail": "The other dishes are gray on purpose. Smokebox holds them back so everything finishes together. Watch the countdown: it says when to start.",
-     "owner": "board"
-    },
-    {
-     "name": "step 6: the sandwich row is a real button now",
-     "detail": "",
-     "owner": "board"
-    },
-    {
-     "name": "the sweet tea becomes ready to tap by itself",
-     "detail": "",
-     "owner": "board"
-    },
-    {
-     "name": "finishing the last dish moves to step 8",
-     "detail": "Step 7 of 9",
-     "owner": "board"
-    },
-    {
-     "name": "step 8 rings the Bump button and says the clock stops",
-     "detail": "Tap Done on Sweet tea.",
-     "owner": "board"
-    },
-    {
-     "name": "tapping Bump moves to step 9",
-     "detail": "",
-     "owner": "board"
-    },
-    {
-     "name": "step 9 says that is the whole loop and points at the back office",
-     "detail": "Tap Done on Sweet tea.",
-     "owner": "board"
-    },
-    {
-     "name": "step 9 offers Add my own ticket, Start the demo and Done",
-     "detail": "[false,false,false]",
-     "owner": "board"
-    }
-   ],
+   "error": null,
+   "ms": 13053,
+   "checks": 48,
+   "failed": [],
    "skips": [],
    "notes": [],
    "shots": [
@@ -1302,38 +1145,24 @@
     "test/.out/qa/tour-5-1280.png",
     "test/.out/qa/tour-7-1280.png",
     "test/.out/qa/tour-8-1280.png",
-    "test/.out/qa/tour-9-1280.png",
-    "test/.out/qa/fail-13a-tour-full-loop.png"
+    "test/.out/qa/tour-9-1280.png"
    ],
-   "at": "2026-10-23T06:39:42.666Z"
+   "at": "2026-10-23T10:46:26.638Z"
   },
   {
    "id": "13b-tour-skip-escape",
    "title": "Walkthrough: Skip and Escape stop it cleanly and put the clock back; restart begins again",
    "owner": "board",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 3739,
+   "ms": 3962,
    "checks": 13,
-   "failed": [
-    {
-     "name": "at step 5 the clock runs x30",
-     "detail": "{\"speed\":1,\"rings\":1,\"cards\":1,\"active\":true,\"focus\":\"\"}",
-     "owner": "board"
-    },
-    {
-     "name": "Skip leaves a clock speed the person chose themselves",
-     "detail": "1",
-     "owner": "board"
-    }
-   ],
+   "failed": [],
    "skips": [],
    "notes": [],
-   "shots": [
-    "test/.out/qa/fail-13b-tour-skip-escape.png"
-   ],
-   "at": "2026-10-23T06:39:46.406Z"
+   "shots": [],
+   "at": "2026-10-23T10:46:31.233Z"
   },
   {
    "id": "13c-tour-out-of-order",
@@ -1342,30 +1171,28 @@
    "status": "PASS",
    "reason": "",
    "error": null,
-   "ms": 3792,
+   "ms": 3745,
    "checks": 12,
    "failed": [],
    "skips": [],
    "notes": [],
    "shots": [],
-   "at": "2026-10-23T06:39:50.198Z"
+   "at": "2026-10-23T10:45:00.530Z"
   },
   {
    "id": "13d-tour-pauses",
    "title": "Walkthrough: the caption steps aside for a sheet or the office and comes back at the same step",
    "owner": "board",
-   "status": "FAIL",
+   "status": "PASS",
    "reason": "",
-   "error": "locator.waitFor: Timeout 10000ms exceeded. | Call log: | \u001b[2m  - waiting for getByRole('dialog', { name: 'Demo and clock' }) to be visible\u001b[22m | ",
-   "ms": 11238,
-   "checks": 0,
+   "error": null,
+   "ms": 8760,
+   "checks": 11,
    "failed": [],
    "skips": [],
    "notes": [],
-   "shots": [
-    "test/.out/qa/fail-13d-tour-pauses.png"
-   ],
-   "at": "2026-10-23T06:40:01.436Z"
+   "shots": [],
+   "at": "2026-10-23T10:46:40.670Z"
   },
   {
    "id": "13e-tour-layouts",
@@ -1374,17 +1201,17 @@
    "status": "FAIL",
    "reason": "",
    "error": null,
-   "ms": 20954,
+   "ms": 21620,
    "checks": 57,
    "failed": [
     {
      "name": "phone 390: step 9 every ringed element can be seen",
-     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[195,844],\"inside\":true,\"top\":546,\"bottom\":832,\"w\":366,\"targets\":[]}",
+     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[155,844],\"inside\":true,\"top\":546,\"bottom\":832,\"w\":366,\"targets\":[]}",
      "owner": "board"
     },
     {
      "name": "large text 1280: step 9 every ringed element can be seen",
-     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[123,800],\"inside\":true,\"top\":492,\"bottom\":788,\"w\":560,\"targets\":[]}",
+     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[83,800],\"inside\":true,\"top\":492,\"bottom\":788,\"w\":560,\"targets\":[]}",
      "owner": "board"
     }
    ],
@@ -1398,7 +1225,7 @@
     "test/.out/qa/fail-13e-tour-layouts.png",
     "test/.out/qa/fail-13e-tour-layouts-1.png"
    ],
-   "at": "2026-10-23T06:40:22.391Z"
+   "at": "2026-10-23T10:45:33.750Z"
   },
   {
    "id": "13f-tour-busy-board",
@@ -1407,12 +1234,12 @@
    "status": "FAIL",
    "reason": "",
    "error": null,
-   "ms": 11014,
+   "ms": 10987,
    "checks": 34,
    "failed": [
     {
      "name": "busy board 1280: step 9 every ringed element can be seen",
-     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[123,725],\"inside\":true,\"top\":473,\"bottom\":713,\"w\":560,\"targets\":[]}",
+     "detail": "{\"bumpCovered\":false,\"dock\":\"bottom\",\"band\":[83,725],\"inside\":true,\"top\":473,\"bottom\":713,\"w\":560,\"targets\":[]}",
      "owner": "board"
     }
    ],
@@ -1423,7 +1250,7 @@
     "test/.out/qa/tour-9-busy-board-1280.png",
     "test/.out/qa/fail-13f-tour-busy-board.png"
    ],
-   "at": "2026-10-23T06:40:33.406Z"
+   "at": "2026-10-23T10:45:44.738Z"
   }
  ]
 }

@@ -407,6 +407,8 @@ await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
   check('each dock chip has a done/required bar', bars);
   // highlight
   await page.locator('.fl-dchip[data-menu="brisket_half"]').click(); await settle(page, 200);
+  // The outline fades in: read the colour only once every running CSS transition has finished.
+  await page.waitForFunction(() => !document.getAnimations().some((a) => a.constructor.name === 'CSSTransition' && a.playState === 'running'), null, { timeout: 3000 }).catch(() => {});
   const hl = await page.evaluate(() => ({ h: SB.floor.highlighted(), pressed: document.querySelector('.fl-dchip[data-menu="brisket_half"]').getAttribute('aria-pressed'), shadow: getComputedStyle(document.querySelector('.fl-row[data-menu="brisket_half"] > .slip-item')).boxShadow, other: getComputedStyle(document.querySelector('.fl-row[data-menu="mac"] > .slip-item')).boxShadow, clear: !document.querySelector('.fl-dock-clear').hidden, root: document.querySelector('.fl').getAttribute('data-hl') }));
   check('tapping a dock chip highlights matching rows (outline) and no others', hl.h === 'brisket_half' && hl.pressed === 'true' && /rgb\(184, 92, 56\)/.test(hl.shadow) && !/rgb\(184, 92, 56\)/.test(hl.other) && hl.clear && hl.root === 'brisket_half', hl);
   await shot(page, 'highlight-1280x800');

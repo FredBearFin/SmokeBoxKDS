@@ -1,5 +1,6 @@
 // Journey 8: persistence and sync. Reload keeps tickets, settings and theme; two pages in one browser stay in sync; corrupt storage starts fresh with a notice.
-import { startKitchen, seedStandard, boardSummary, storeTickets, settle, wait, dialog, openKey, closeSheets, head } from './_lib.mjs';
+import { realKitchen } from '../_kitchen.mjs';
+import { seedStandard, boardSummary, storeTickets, settle, wait, dialog, openKey, closeSheets, head } from './_lib.mjs';
 
 const ageText = (page, who) => page.evaluate((who) => { const s = Array.from(document.querySelectorAll('.fl-slip')).find((x) => x.querySelector('.slip-who') && x.querySelector('.slip-who').textContent.includes(who)); return s ? s.querySelector('.slip-timer').textContent : null; }, who);
 const secs = (mmss) => { const m = /^(\d+):(\d\d)$/.exec(mmss || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
@@ -59,7 +60,7 @@ export default function (h) {
   });
 
   h.test('08b-two-pages-sync', 'Persistence: two pages in one browser stay in sync and never duplicate ticket numbers', { owner: 'lead', timeout: 80000 }, async (t) => {
-    const a = await t.open({ w: 1100, h: 800 });
+    const a = await t.open({ w: 1100, h: 800, kitchen: true });
     const b = await t.newPage(a);
     t.check('both pages booted', await a.evaluate(() => SB.booted) && await b.evaluate(() => SB.booted));
     await seedStandard(a);
@@ -80,7 +81,9 @@ export default function (h) {
       a.evaluate(() => { for (let i = 0; i < 3; i++) SB.store.dispatchEx('createTicket', { customer: 'A' + i, channel: 'takeout', items: [{ menuId: 'mac' }], src: 'live' }, { source: 'ui' }); }),
       b.evaluate(() => { for (let i = 0; i < 3; i++) SB.store.dispatchEx('createTicket', { customer: 'B' + i, channel: 'dine_in', items: [{ menuId: 'slaw' }], src: 'live' }, { source: 'ui' }); }),
     ]);
-    await wait(2500);
+    // Wait until both pages hold all 10 tickets (the two writers race), up to 8 s, instead of a fixed 2.5 s.
+    await Promise.all([a, b].map((pg) => pg.waitForFunction(() => SB.store.getState().tickets.length >= 10, null, { timeout: 8000 }).catch(() => {})));
+    await wait(800);
     const ta = await storeTickets(a), tb = await storeTickets(b);
     const nums = (arr) => arr.map((x) => x.num).sort((x, y) => x - y);
     const uniq = (arr) => new Set(arr).size === arr.length;
@@ -127,8 +130,9 @@ export default function (h) {
       if (noticed) shownNotice++;
       t.check(name + ': the user is told that the saved data could not be read and the board started fresh', noticed, visible.replace(/\s+/g, ' ').slice(0, 160), 'lead');
       // new work after the reset must persist (the bad payload was replaced): first it must reach storage, then it must survive a reload
-      await startKitchen(page); // the fresh start is an empty kitchen with no stock, so put the starter stock in before selling
-      await page.evaluate(() => SB.store.dispatchEx('createTicket', { customer: 'After', channel: 'takeout', items: [{ menuId: 'mac' }], src: 'live' }, { source: 'ui' }));
+      // The fresh start is a blank real kitchen (the saved keys under test are the real ones), so add one dish and sell it.
+      const made = await realKitchen(page, { dishes: 1, orders: 0 });
+      await page.evaluate((m) => SB.store.dispatchEx('createTicket', { customer: 'After', channel: 'takeout', items: [{ menuId: m }], src: 'live' }, { source: 'ui' }), made.dishes[0]);
       let saved = false;
       for (let i = 0; i < 12 && !saved; i++) { await wait(400); saved = await page.evaluate(() => /"customer":"After"/.test(localStorage.getItem('smokebox.v1.state') || '')); }
       t.check(name + ': a ticket made after the reset is written to storage within 5 s', saved, await page.evaluate(() => ({ head: String(localStorage.getItem('smokebox.v1.state')).slice(0, 70), status: SB.store.status() })), 'lead');
@@ -151,8 +155,8 @@ export default function (h) {
     const page = await t.open({ w: 1280, h: 800, init: block, clear: false });
     const booted = await page.evaluate(() => ({ b: !!SB.booted, err: !!document.getElementById('boot-error') }));
     t.check('with localStorage throwing the app still boots', booted.b && !booted.err, booted, 'lead');
-    await startKitchen(page);
-    await page.evaluate(() => SB.store.dispatchEx('createTicket', { customer: 'NoSave', channel: 'takeout', items: [{ menuId: 'mac' }], src: 'live' }, { source: 'ui' }));
+    const made = await realKitchen(page, { dishes: 1, orders: 0 });
+    await page.evaluate((m) => SB.store.dispatchEx('createTicket', { customer: 'NoSave', channel: 'takeout', items: [{ menuId: m }], src: 'live' }, { source: 'ui' }), made.dishes[0]);
     await settle(page, 400);
     t.check('a ticket can still be made and is drawn', (await boardSummary(page)).slips.some((s) => /NoSave/.test(s.customer)), (await boardSummary(page)).slips.length, 'board');
     const st = await page.evaluate(() => SB.store.status());

@@ -712,6 +712,7 @@ group('9b. Data: saveFile (host, browser, copy)', async () => {
     if (o.d) check('the downloaded file holds the exact text', fs.readFileSync(await o.d.path(), 'utf8') === '{"a":1}');
 
     // through the buttons
+    await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { if (/Spreadsheet files/.test((d.querySelector('summary') || {}).textContent || '')) d.open = true; })); // the CSV buttons sit in a closed group
     const click = async (sel) => { await goPanel(page, 'data'); await page.locator(sel).first().scrollIntoViewIfNeeded(); await page.locator(sel).first().click(); await page.waitForTimeout(200); };
     await page.evaluate(() => { delete window.claude; });
     const ds = new Date(); const ymd = ds.getFullYear() + '-' + String(ds.getMonth() + 1).padStart(2, '0') + '-' + String(ds.getDate()).padStart(2, '0');
