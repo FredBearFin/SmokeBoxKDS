@@ -514,6 +514,29 @@
       size: () => q.size,
     };
   }
+  // Wall mode: the numbers for the three panes, worked out once from the state. money is dollars taken today (paid
+  // orders of this service day), late the overdue ticket count, out86 the names off the menu, brisket says when the
+  // brisket runs out, and open and paid list the orders for the side pane. feed is the deadline feed already built.
+  function wallGlance(state, now, feed, counts) {
+    const out = { money: 0, paidCount: 0, late: counts && counts.overdue ? counts.overdue : 0, out86: [], brisket: { kind: 'none', at: null }, open: [], paid: [] };
+    if (!state || !U.isNum(now)) return out;
+    const day = U.serviceDate(now, state.settings && state.settings.service ? state.settings.service.dayStartHour : undefined);
+    const orders = Array.isArray(state.orders) ? state.orders : [];
+    const totals = E().openOrderTotals(state);
+    for (const o of orders) {
+      if (o.status === 'open') out.open.push({ id: o.id, name: o.customer, rounds: totals.has(o.id) ? totals.get(o.id).rounds : 0, total: totals.has(o.id) ? totals.get(o.id).total : 0, at: o.createdAt });
+      else if (o.status === 'paid' && o.serviceDate === day && o.totals) { out.money += o.totals.total; out.paidCount++; out.paid.push({ id: o.id, name: o.customer, total: o.totals.total, method: o.method, at: o.paidAt }); }
+    }
+    out.open.sort((a, b) => a.at - b.at);
+    out.paid.sort((a, b) => b.at - a.at);
+    out.money = Math.round(out.money * 100) / 100;
+    for (const mi of state.menu || []) { const a = state.avail && state.avail[mi.id]; if (a && !a.ok && !mi.archived) out.out86.push(mi.short || mi.name); }
+    // Brisket: a run-out time from the feed when one is forecast, else whether any is left to sell.
+    const row = (feed || []).find((d) => d.kind === 'shortfall' && d.ing === 'brisket');
+    const left = (state.batches || []).some((b) => b.ing === 'brisket' && b.status !== 'discard' && b.remainingG > 0);
+    out.brisket = row ? { kind: 'runout', at: row.at } : left ? { kind: 'enough', at: null } : { kind: 'none', at: null };
+    return out;
+  }
   // Builds the feed: every deadline worth showing right now, worst first. Each row has id, kind, label, at,
   // msLeft, rung, sev (bad, warn, info), consequence and action. Batch rows also carry projected waste.
   function build(state, now) {
@@ -531,5 +554,5 @@
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending };
+  SB.deadlines = { build, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, nextBatchFit, makeLadder, electLeader, makePending, wallGlance };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
