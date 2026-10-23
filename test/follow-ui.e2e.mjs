@@ -14,7 +14,7 @@ await withPage({ w: 1024, h: 768, init: () => { window.__followNoNav = true; } }
   await page.evaluate(() => window.SB.sheets.open('follow'));
   await page.waitForSelector('[data-part="main"]');
   const main = await page.locator('[data-part="main"]').innerText();
-  ok(/Show only/.test(main) && /hub is not set up/.test(main), 'explains it only shows and the hub is not set up');
+  ok(/Show only/.test(main) && /not set up in this version/.test(main), 'explains it only shows and the hub is not set up');
   ok(await page.locator('[data-role="file-note"]').count() === 1, 'file copy says another screen cannot reach it');
   await page.click('[data-act="follow-connect"]');
   ok(/Type the address/.test(await page.locator('[data-role="msg"]').innerText()), 'empty address: plain error');

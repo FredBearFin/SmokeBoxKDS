@@ -2770,10 +2770,14 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 @media (max-width: 560px) { .fw-modes { grid-template-columns: 1fr; } }
 .fw [hidden] { display: none !important; }
 .fw .fs-row { margin-block: var(--sp-2); }
+<<<<<<< HEAD
 /* Readings: the number box fills the row, so there is no empty gap beside the +5 button. */
 .rd .stepper { display: flex; width: 100%; }
 .rd .stepper .stepper-field { flex: 1 1 auto; min-width: 0; }
 .rd .stepper .stepper-input { flex: 1 1 auto; min-width: 0; width: auto; text-align: center; }
+=======
+.rd-state { white-space: nowrap; }
+>>>>>>> kds/night/a2-c7
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -28854,7 +28858,7 @@ a.of-nav:active { background: var(--press); }
   function checkHubCode(raw) {
     const c = String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
     if (!c) return { ok: true, code: '' };
-    if (!/^[A-Z0-9]{4,12}$/.test(c)) return { ok: false, why: 'The access code is letters and numbers only. Check it with whoever runs the hub.' };
+    if (!/^[A-Z0-9]{4,12}$/.test(c)) return { ok: false, why: 'The access code is letters and numbers only. Check it with whoever runs the main computer.' };
     return { ok: true, code: c };
   }
   // The address of this page without any follow settings, so a button can come back to the own kitchen.
@@ -28871,27 +28875,27 @@ a.of-nav:active { background: var(--press); }
     if (st.state === 'connecting') return { tone: undefined, text: 'Connecting...' };
     if (st.state === 'reconnecting' || st.state === 'stale') return { tone: 'bad', text: 'Lost the connection. This screen may be out of date. Trying again.' + when };
     if (st.state === 'error') {
-      const why = { badCode: 'The access code was not accepted. Check it with whoever runs the hub.', notFound: 'Nothing at that address is a Smokebox hub. Check the address.', unreachable: 'Could not reach that address yet. Check the Wi-Fi and the address. It keeps trying.', wrongVersion: 'This page and the hub are different versions. Reload this page, or ask whoever runs the hub to update it.', tooMany: 'The hub already has as many screens as it allows.' }[st.error];
+      const why = { badCode: 'The access code was not accepted. Check it with whoever runs the main computer.', notFound: 'Nothing at that address is a Smokebox main computer. Check the address.', unreachable: 'Could not reach that address yet. Check the Wi-Fi and the address. It keeps trying.', wrongVersion: 'This page and the main computer are different versions. Reload this page, or ask whoever runs the main computer to update it.', tooMany: 'The main computer already has as many screens as it allows.' }[st.error];
       return { tone: 'bad', text: why || 'Could not connect.' };
     }
     return { tone: undefined, text: 'Not connected to another kitchen.' };
   }
   // Plain words for the state of a tablet that writes through a hub, from the store's own status (or a generic line).
   function hubWords(st) {
-    if (!st) return { tone: undefined, text: 'Not using a hub.' };
+    if (!st) return { tone: undefined, text: 'Not using the main computer.' };
     const when = st.lastUpdate ? ' Last update ' + new Date(st.lastUpdate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' : '';
     const unsent = st.unsent || st.queued || 0;
     const wait = unsent ? ' ' + unsent + ' tap' + (unsent === 1 ? ' is' : 's are') + ' waiting to be sent.' : '';
-    if (st.state === 'connected') return { tone: 'ok', text: 'Using the hub. Orders from every tablet on the hub show here.' + wait + when };
-    if (st.state === 'sending') return { tone: undefined, text: 'Using the hub. Sending your last taps...' + wait + when };
-    if (st.state === 'connecting') return { tone: undefined, text: 'Connecting to the hub...' };
-    if (st.state === 'offline') return { tone: 'bad', text: 'Lost the hub. What you see may be out of date.' + wait + ' Trying again.' + when };
-    if (st.state === 'error') return { tone: 'bad', text: hubErrorWords(st.error) };
-    return { tone: undefined, text: 'Not using a hub.' };
+    if (st.state === 'connected') return { tone: 'ok', text: 'Using the main computer. Orders from every tablet show here.' + wait + when };
+    if (st.state === 'sending') return { tone: undefined, text: 'Using the main computer. Sending your last taps...' + wait + when };
+    if (st.state === 'connecting') return { tone: undefined, text: 'Connecting to the main computer...' };
+    if (st.state === 'offline') return { tone: 'bad', text: 'Lost the main computer. What you see may be out of date.' + wait + ' Trying again.' + when };
+    if (st.state === 'error') return { tone: 'bad', text: st.error === 'revoked' ? 'This tablet has been removed from the kitchen. Ask the owner for a new pairing code to pair it again.' : hubErrorWords(st.error) };
+    return { tone: undefined, text: 'Not using the main computer.' };
   }
   // Plain words for each hub error code (the same codes as the show-only screen, plus a hub that is not empty).
   function hubErrorWords(code) {
-    return { badCode: 'The access code was not accepted. Check it with whoever runs the hub.', notFound: 'Nothing at that address is a Smokebox hub. Check the address.', unreachable: 'Could not reach that address. Check the Wi-Fi and the address, then try again.', wrongVersion: 'This page and the hub are different versions. Reload this page, or ask whoever runs the hub to update it.', tooMany: 'The hub already has as many screens as it allows.', notEmpty: 'The hub already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Nothing was changed.' }[code] || 'Could not use the hub.';
+    return { badCode: 'The access code was not accepted. Check it with whoever runs the main computer.', notFound: 'Nothing at that address is a Smokebox main computer. Check the address.', unreachable: 'Could not reach that address. Check the Wi-Fi and the address, then try again.', wrongVersion: 'This page and the main computer are different versions. Reload this page, or ask whoever runs the main computer to update it.', tooMany: 'The main computer already has as many screens as it allows.', unpaired: 'This tablet is not paired with the main computer. Ask the person who runs the main computer for a pairing code.', revoked: 'This tablet has been removed from the kitchen. Ask the owner for a new pairing code to pair it again.', badPairCode: 'That pairing code did not work. A code works once and only for 10 minutes. Ask for a new one.', tooManyTries: 'Too many tries. Wait a few minutes, then ask for a new code.', badName: 'That screen name cannot be used. Use letters, numbers and spaces, up to 20 characters.', notEmpty: 'The main computer already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Nothing was changed.' }[code] || 'Could not use the main computer.';
   }
   // Opens "Use one kitchen on several tablets": what it is, what is not set up, and the form for the other screen.
   function openFollow() {
@@ -28912,12 +28916,12 @@ a.of-nav:active { background: var(--press); }
     const web = /^https?:/.test(here);
     const mainCard = h('section', { class: 'fs-card fw-main', dataset: { part: 'main' } },
       h('h3', { class: 'fs-h' }, 'On this tablet'),
-      h('p', null, 'Several screens can share one kitchen through a hub. Pick one way below: Show only (a TV or phone that cannot take orders), or Use this hub for orders (a tablet that takes orders too). Both are test features.'),
-      h('p', null, h('strong', null, 'What it needs: '), 'a small program called the hub that keeps the kitchen in one place and sends it to every screen. The hub is not set up in this version. Smokebox does not start one for you. It works only if someone runs the hub for your kitchen, on a laptop or on a server.'),
-      web ? h('p', null, 'If your hub serves this page, type this address on the other screen: ', h('code', { class: 'fw-addr', dataset: { role: 'own-address' } }, here)) : h('p', { class: 'fs-sub', dataset: { role: 'file-note' } }, 'This copy of Smokebox is a file on this tablet, so another screen cannot reach it. Use the address of your hub instead.'),
-      h('p', { class: 'fs-sub' }, 'If the hub has an access code, type that code on the other screen too. Your kitchen is not sent anywhere by this page.'));
+      h('p', null, 'Several screens can share one kitchen through one main computer. Pick one way below: Show only (a TV or phone that cannot take orders), or Use the main computer for orders (a tablet that takes orders too). Both are test features.'),
+      h('p', null, h('strong', null, 'What it needs: '), 'a small program, running on one computer (the main computer, also called the hub), that keeps the kitchen in one place and sends it to every screen. The main computer program is not set up in this version. Smokebox does not start one for you. It works only if someone runs the hub for your kitchen, on a laptop or on a server.'),
+      web ? h('p', null, 'If your main computer serves this page, type this address on the other screen: ', h('code', { class: 'fw-addr', dataset: { role: 'own-address' } }, here)) : h('p', { class: 'fs-sub', dataset: { role: 'file-note' } }, 'This copy of Smokebox is a file on this tablet, so another screen cannot reach it. Use the address of your main computer instead.'),
+      h('p', { class: 'fs-sub' }, 'If the main computer has an access code, type that code on the other screen too. Your kitchen is not sent anywhere by this page.'));
     const url = h('input', { type: 'text', class: 'input', id: 'fw-url', inputmode: 'url', autocomplete: 'off', autocapitalize: 'off', placeholder: 'https://kitchen.example.com', 'aria-label': 'Address of the kitchen', dataset: { field: 'url' } });
-    const code = h('input', { type: 'text', class: 'input', id: 'fw-code', autocomplete: 'off', autocapitalize: 'characters', maxlength: 12, placeholder: 'ABC123 (if asked)', 'aria-label': 'Access code, if the hub asks for one', dataset: { field: 'code' } });
+    const code = h('input', { type: 'text', class: 'input', id: 'fw-code', autocomplete: 'off', autocapitalize: 'characters', maxlength: 12, placeholder: 'ABC123 (if asked)', 'aria-label': 'Access code, if one is needed', dataset: { field: 'code' } });
     const msg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'msg' } });
     // Checks both fields; if they are fine, reopens this page set to follow that kitchen (this device's own saved kitchen is not touched).
     const connect = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'follow-connect' }, onClick: () => {
@@ -28934,14 +28938,15 @@ a.of-nav:active { background: var(--press); }
       h('h3', { class: 'fs-h' }, 'On the other screen: Show another kitchen here'),
       h('p', { class: 'fs-sub' }, 'Open Smokebox on the other screen, then Settings, then this page. Type the address, tap Connect. The screen then follows that kitchen and has no controls. Your own saved kitchen on that screen is not touched.'),
       h('label', { class: 'fs-label', for: 'fw-url' }, 'Address of the kitchen'), url,
-      h('label', { class: 'fs-label', for: 'fw-code' }, 'Access code (only if the hub asks)'), code,
+      h('label', { class: 'fs-label', for: 'fw-code' }, 'Access code (only if one is needed)'), code,
       h('div', { class: 'fs-row' }, connect, isFollowing() ? disconnect : null, isFollowing() ? back : null), msg);
     // ---- Use this hub for orders on this tablet ----
     const hubApi = !!(SB.store.initHubClient && SB.store.probeHub);
     const inHub = () => { try { return !!(SB.store.isHubClient && SB.store.isHubClient()); } catch (e) { return false; } };
-    const hUrl = h('input', { type: 'text', class: 'input', id: 'hu-url', inputmode: 'url', autocomplete: 'off', autocapitalize: 'off', placeholder: 'https://kitchen.example.com', 'aria-label': 'Address of the hub', dataset: { field: 'hub-url' } });
-    const hCode = h('input', { type: 'text', class: 'input', id: 'hu-code', autocomplete: 'off', autocapitalize: 'characters', maxlength: 12, placeholder: 'ABC123 (if asked)', 'aria-label': 'Access code, if the hub asks for one', dataset: { field: 'hub-code' } });
+    const hUrl = h('input', { type: 'text', class: 'input', id: 'hu-url', inputmode: 'url', autocomplete: 'off', autocapitalize: 'off', placeholder: 'https://kitchen.example.com', 'aria-label': 'Address of the main computer', dataset: { field: 'hub-url' } });
+    const hCode = h('input', { type: 'text', class: 'input', id: 'hu-code', autocomplete: 'off', autocapitalize: 'characters', maxlength: 12, placeholder: 'ABC123 (if asked)', 'aria-label': 'Access code, if one is needed', dataset: { field: 'hub-code' } });
     const hName = h('input', { type: 'text', class: 'input', id: 'hu-name', autocomplete: 'off', maxlength: 20, placeholder: 'Pass, Front counter...', 'aria-label': 'Name for this screen', dataset: { field: 'hub-name' } });
+    const hPair = h('input', { type: 'text', class: 'input', id: 'hu-pair', autocomplete: 'off', autocapitalize: 'characters', maxlength: 16, placeholder: 'ABC234', 'aria-label': 'Pairing code', dataset: { field: 'hub-pair' } });
     const hMsg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'hub-msg' } });
     const choiceBox = h('div', { class: 'fw-choice', dataset: { role: 'choice' }, hidden: true });
     const hStatus = h('p', { class: 'fs-sub fw-hubstatus', role: 'status', dataset: { role: 'hub-status' } });
@@ -28954,6 +28959,27 @@ a.of-nav:active { background: var(--press); }
       if (!n) { tell(hMsg, 'Give this screen a name, like Pass or Front counter, so you can tell the tablets apart.', 'bad'); hName.focus(); return null; }
       return { url: a.url, code: c.code, name: n.slice(0, 20) };
     }
+    // Pairing: the hub gives each tablet its own pass in exchange for a one-time code. The old shared access code is only for hubs that do not need passes.
+    // Pair box: shown only when the hub asked for pairing.
+    const pairBtn = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'hub-pair' }, onClick: () => doPair() }, 'Pair this tablet');
+    const pairBox = h('div', { class: 'fw-pairbox', hidden: true, dataset: { role: 'pair-box' } },
+      h('p', null, h('strong', null, 'The main computer needs a pairing code. '), 'Ask the person who runs the main computer for a pairing code. It works once and for 10 minutes.'),
+      h('label', { class: 'fs-label', for: 'hu-pair' }, 'Pairing code'), hPair, h('div', { class: 'fs-row' }, pairBtn));
+    // Hides or shows the old access code field and the pairing box, depending on what the hub asked for.
+    function showPairing(needs) { pairBox.hidden = !needs; accessBox.hidden = !!needs; }
+    // Exchanges the pairing code for this tablet's own pass, then looks at the hub again.
+    function doPair() {
+      const a = checkHubAddress(hUrl.value); if (!a.ok) { tell(hMsg, a.why, 'bad'); hUrl.focus(); return; }
+      const code = String(hPair.value || '').toUpperCase().replace(/[\s-]+/g, '');
+      if (code.length < 6) { tell(hMsg, 'Type the 6-character pairing code.', 'bad'); hPair.focus(); return; }
+      const n = String(hName.value || '').trim().replace(/\s+/g, ' ');
+      if (!n) { tell(hMsg, 'Give this screen a name, like Pass or Front counter, so you can tell the tablets apart.', 'bad'); hName.focus(); return; }
+      tell(hMsg, 'Pairing...');
+      Promise.resolve(SB.store.pairHub({ url: a.url, code, name: n.slice(0, 20) })).then((r) => {
+        if (!r || !r.ok) { tell(hMsg, hubErrorWords(r && r.error), 'bad'); return; }
+        hPair.value = ''; tell(hMsg, 'Paired as ' + (r.name || n) + '.', 'ok'); lookAtHub();
+      }, () => tell(hMsg, hubErrorWords('unreachable'), 'bad'));
+    }
     // Draws the explicit choice after the hub was looked at: use the hub's kitchen, or send this tablet's kitchen (only into an empty hub).
     function paintChoice() {
       U.clear(choiceBox); choiceBox.hidden = !probed; if (!probed) return;
@@ -28961,64 +28987,74 @@ a.of-nav:active { background: var(--press); }
       // Builds one radio option with a bold title and a plain line under it.
       const opt = (val, title, line, disabled) => { const r = h('input', { type: 'radio', name: 'hu-choice', value: val, disabled: !!disabled, dataset: { choice: val } }); r.addEventListener('change', () => { picked = val; join.disabled = false; }); return h('label', { class: 'dp-check-row fw-opt', dataset: { opt: val } }, r, h('span', null, h('strong', null, title), h('br'), line)); };
       choiceBox.append(
-        h('p', null, empty ? 'This hub is empty. Choose what happens. Nothing is combined.' : 'This hub already has a kitchen. Choose what happens. Nothing is combined.'),
-        opt('adopt', 'Show the hub\'s kitchen on this tablet', 'Your own saved kitchen stays safe on this tablet and comes back when you leave the hub.', false),
-        opt('seed', 'Send this tablet\'s kitchen to the hub', empty ? 'The hub is empty, so this works. The hub then holds your kitchen and every tablet shows it.' : 'Only works if the hub is empty.', !empty),
-        empty ? null : h('p', { class: 'fw-stop', dataset: { role: 'stop' }, role: 'alert' }, 'Stop: the hub already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Smokebox will not mix two kitchens. Show the hub\'s kitchen here, or leave this screen.'));
+        h('p', null, empty ? 'The main computer is empty. Choose what happens. Nothing is combined.' : 'The main computer already has a kitchen. Choose what happens. Nothing is combined.'),
+        opt('adopt', 'Show the shared kitchen on this tablet', 'Your own saved kitchen stays untouched on this tablet and comes back when you leave.', false),
+        opt('seed', 'Send this tablet\'s kitchen to the main computer', empty ? 'The main computer is empty, so this works. It then holds your kitchen and every tablet shows it.' : 'Only works if the main computer is empty.', !empty),
+        empty ? null : h('p', { class: 'fw-stop', dataset: { role: 'stop' }, role: 'alert' }, 'Stop: the main computer already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Smokebox will not mix two kitchens. Show the shared kitchen here, or leave this screen.'));
     }
-    // Looks at the hub without joining it, then shows the choice.
-    const check = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'hub-check' }, onClick: () => {
+    // Looks at the hub without joining it, then shows the choice (or asks for a pairing code first).
+    function lookAtHub() {
       const f = hubFields(); if (!f) return;
-      lastFields = f; probed = null; picked = ''; join.disabled = true; paintChoice(); tell(hMsg, 'Looking at the hub...');
+      lastFields = f; probed = null; picked = ''; join.disabled = true; paintChoice(); tell(hMsg, 'Looking at the main computer...');
       Promise.resolve(SB.store.probeHub({ url: f.url, code: f.code })).then((r) => {
+        if (r && (r.error === 'unpaired' || (!r.ok && r.tokensRequired))) { showPairing(true); tell(hMsg, hubErrorWords('unpaired'), 'bad'); return; }
         if (!r || !r.ok) { tell(hMsg, hubErrorWords(r && r.error), 'bad'); return; }
-        probed = { empty: !!r.empty }; tell(hMsg, 'The hub answered. Choose below.', 'ok'); paintChoice();
+        showPairing(!!r.tokensRequired);
+        probed = { empty: !!r.empty }; tell(hMsg, 'The main computer answered. Choose below.', 'ok'); paintChoice();
       }, () => tell(hMsg, hubErrorWords('unreachable'), 'bad'));
-    } }, 'Check the hub');
+    }
+    const check = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'hub-check' }, onClick: lookAtHub }, 'Check the main computer');
     // Joins with the chosen option only; refuses to go on if no choice was made.
     const join = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'hub-join' }, disabled: true, onClick: () => {
       if (!picked || !lastFields) { tell(hMsg, 'Choose one of the two options first.', 'bad'); return; }
-      join.disabled = true; tell(hMsg, 'Joining the hub...');
+      join.disabled = true; tell(hMsg, 'Joining...');
       const opts = { url: lastFields.url, code: lastFields.code, name: lastFields.name }; if (picked === 'seed') opts.seed = true; else opts.adopt = 'hub';
       Promise.resolve(SB.store.initHubClient(opts)).then((r) => {
         if (!r || !r.ok) { tell(hMsg, hubErrorWords(r && r.error), 'bad'); join.disabled = false; return; }
-        tell(hMsg, 'Joined. This tablet now uses the hub.', 'ok'); paintHub();
+        tell(hMsg, 'Joined. This tablet now uses the main computer.', 'ok'); paintHub();
       }, () => { tell(hMsg, hubErrorWords('unreachable'), 'bad'); join.disabled = false; });
-    } }, 'Join the hub');
+    } }, 'Join this kitchen');
     // Leaves the hub and goes back to this tablet's own saved kitchen.
-    const leave = h('button', { type: 'button', class: 'btn', dataset: { act: 'hub-leave' }, onClick: () => doLeave(false) }, 'Leave the hub');
+    const leave = h('button', { type: 'button', class: 'btn', dataset: { act: 'hub-leave' }, onClick: () => doLeave(false) }, 'Leave the shared kitchen');
     // Leaves the hub; if taps were not answered yet it asks first, because leaving anyway loses them.
     function doLeave(force) {
       Promise.resolve(SB.store.leaveHub ? SB.store.leaveHub(force ? { force: true } : undefined) : null).then((r) => {
         if (r && r.ok === false && r.error === 'pending') {
-          tell(hMsg, 'Some taps have not reached the hub yet. If you leave now they are lost. Wait for the connection, or leave anyway.', 'bad');
+          tell(hMsg, 'Some taps have not reached the main computer yet. If you leave now they are lost. Wait for the connection, or leave anyway.', 'bad');
           leaveAnyway.hidden = false; return;
         }
-        leaveAnyway.hidden = true; tell(hMsg, 'You left the hub. This tablet shows its own kitchen again.', 'ok'); paintHub();
-      }, () => tell(hMsg, 'Could not leave the hub. Reload this page.', 'bad'));
+        leaveAnyway.hidden = true; tell(hMsg, 'You left the shared kitchen. This tablet shows its own kitchen again.', 'ok'); paintHub();
+      }, () => tell(hMsg, 'Could not leave the shared kitchen. Reload this page.', 'bad'));
     }
     // The second leave button: leaves even though some taps were never answered.
     const leaveAnyway = h('button', { type: 'button', class: 'btn', hidden: true, dataset: { act: 'hub-leave-anyway' }, onClick: () => doLeave(true) }, 'Leave anyway, lose those taps');
+    // The old shared access code, kept only for hubs that do not need pairing.
+    const accessBox = h('div', { class: 'fw-accessbox', dataset: { role: 'access-box' } }, h('label', { class: 'fs-label', for: 'hu-code' }, 'Access code (only if one is needed)'), hCode);
     const hubForm = h('div', { class: 'fw-hubform', dataset: { role: 'hub-form' } },
-      h('label', { class: 'fs-label', for: 'hu-url' }, 'Address of the hub'), hUrl,
-      h('label', { class: 'fs-label', for: 'hu-code' }, 'Access code (only if the hub asks)'), hCode,
+      h('label', { class: 'fs-label', for: 'hu-url' }, 'Address of the main computer'), hUrl,
+      accessBox,
       h('label', { class: 'fs-label', for: 'hu-name' }, 'Name for this screen'), hName,
-      h('div', { class: 'fs-row' }, check), choiceBox, h('div', { class: 'fs-row' }, join));
+      pairBox, h('div', { class: 'fs-row' }, check), choiceBox, h('div', { class: 'fs-row' }, join));
+    // After this tablet was removed from the hub: forget the pass here and go back to the form, to be paired again.
+    const forget = h('button', { type: 'button', class: 'btn', hidden: true, dataset: { act: 'hub-forget' }, onClick: () => {
+      const a = checkHubAddress(hUrl.value); try { if (a.ok && SB.store.unpair) SB.store.unpair(a.url); } catch (e) { /* nothing to forget */ }
+      Promise.resolve(SB.store.leaveHub ? SB.store.leaveHub({ force: true }) : null).then(() => { tell(hMsg, 'This tablet shows its own kitchen again. Ask for a new pairing code to join again.', 'ok'); paintHub(); });
+    } }, 'Leave and pair again');
     const hubJoined = h('div', { class: 'fw-hubjoined', dataset: { role: 'hub-joined' } }, hStatus,
-      h('p', { class: 'fs-sub' }, 'Your own saved kitchen stays on this tablet, untouched, and comes back when you leave the hub. The hub\'s kitchen stays on the hub. If you reload this page, the tablet goes back to its own kitchen and you join again.'),
-      h('div', { class: 'fs-row' }, leave, leaveAnyway));
+      h('p', { class: 'fs-sub' }, 'Your own saved kitchen stays on this tablet, untouched, and comes back when you leave. The shared kitchen stays on the main computer. If you reload this page, the tablet goes back to its own kitchen and you join again.'),
+      h('div', { class: 'fs-row' }, leave, leaveAnyway, forget));
     const hubCard = h('section', { class: 'fs-card fw-hub', dataset: { part: 'hub' } },
-      h('h3', { class: 'fs-h' }, 'Use this hub for orders on this tablet'),
-      h('p', { class: 'fs-sub' }, 'This tablet takes orders and the hub shares them with every other tablet on it. This is a test feature. It needs the hub running somewhere (this version does not start one), and it has not been tried in a real kitchen.'),
-      hubApi ? null : h('p', { class: 'fw-stop', dataset: { role: 'no-hub-api' } }, 'This build cannot join a hub yet.'), hubApi ? hubForm : null, hubApi ? hubJoined : null, hMsg);
+      h('h3', { class: 'fs-h' }, 'Use the main computer for orders on this tablet'),
+      h('p', { class: 'fs-sub' }, 'This tablet takes orders and the main computer shares them with every other tablet on it. This is a test feature. It needs the main computer running somewhere (this version does not start one), and it has not been tried in a real kitchen.'),
+      hubApi ? null : h('p', { class: 'fw-stop', dataset: { role: 'no-hub-api' } }, 'This build cannot use a main computer yet.'), hubApi ? hubForm : null, hubApi ? hubJoined : null, hMsg);
     // Shows either the join form or the joined state, depending on whether this tablet is using a hub.
     function paintHub() {
       const on = inHub(); hubForm.hidden = on; hubJoined.hidden = !on;
-      if (on) { const w = hubWords(SB.store.hubStatus ? SB.store.hubStatus() : { state: 'connecting' }); tell(hStatus, w.text, w.tone); }
+      if (on) { const hs = SB.store.hubStatus ? SB.store.hubStatus() : { state: 'connecting' }; const w = hubWords(hs); tell(hStatus, w.text, w.tone); forget.hidden = !(hs && (hs.error === 'revoked' || hs.error === 'unpaired')); }
     }
     // Builds one big choice button for the two ways of using another screen.
     const modeBtn = (id, title, line) => h('button', { type: 'button', class: 'fs-card fw-mode', dataset: { mode: id }, 'aria-pressed': 'false', onClick: () => setMode(id) }, h('strong', null, title), h('span', { class: 'fs-sub' }, line));
-    const bShow = modeBtn('show', 'Show only', 'A screen that cannot take orders.'), bHub = modeBtn('orders', 'Use this hub for orders on this tablet', 'This tablet takes orders and shares them through the hub.');
+    const bShow = modeBtn('show', 'Show only', 'A screen that cannot take orders.'), bHub = modeBtn('orders', 'Use the main computer for orders on this tablet', 'This tablet takes orders and shares them through the main computer.');
     // Picks which of the two ways is on screen.
     function setMode(m) { const orders = m === 'orders'; otherCard.hidden = orders; hubCard.hidden = !orders; bShow.setAttribute('aria-pressed', String(!orders)); bHub.setAttribute('aria-pressed', String(orders)); }
     const modes = h('div', { class: 'fw-modes', role: 'group', 'aria-label': 'How to use another screen' }, bShow, bHub);

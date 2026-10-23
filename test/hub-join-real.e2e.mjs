@@ -29,7 +29,7 @@ try {
   const mineBefore = await a.page.evaluate(() => JSON.stringify(Object.keys(localStorage).filter((k) => /smokebox\.v1\.(state|kitchen)/.test(k)).map((k) => [k, localStorage.getItem(k)])));
   await a.page.check('[data-choice="seed"]'); await a.page.click('[data-act="hub-join"]');
   await a.page.waitForSelector('[data-role="hub-joined"]:not([hidden])', { timeout: 8000 });
-  ok(/Using the hub/.test(await a.page.locator('[data-role="hub-status"]').innerText()), 'first tablet joined by sending its kitchen');
+  ok(/Using the main computer/.test(await a.page.locator('[data-role="hub-status"]').innerText()), 'first tablet joined by sending its kitchen');
   const b = await openJoin('Front counter');
   ok(await b.page.locator('[data-role="stop"]').count() === 1 && await b.page.locator('[data-choice="seed"]').isDisabled(), 'second tablet sees a stop: the hub is not empty');
   await b.page.check('[data-choice="adopt"]'); await b.page.click('[data-act="hub-join"]');
@@ -39,5 +39,34 @@ try {
   ok(true, 'second tablet left the hub');
   ok(a.errors.length === 0 && b.errors.length === 0, 'no page errors ' + a.errors.concat(b.errors).join('|').slice(0, 200));
   void mineBefore; void until;
-} finally { await browser.close(); await hub.stop(); }
+} finally { /* the browser and hub close at the end */ }
+// Token mode: the hub needs a pairing code. Skips until the store has pairHub and the hub has the admin command (night/a5-c6 and the store side).
+const serverSrc = fs.readFileSync(new URL('../server/server.mjs', import.meta.url), 'utf8');
+if (/function pairHub/.test(src) && /admin/.test(serverSrc) && /REQUIRE_TOKENS/.test(serverSrc)) {
+  const { execFileSync } = await import('node:child_process');
+  const th = await startHub({ starter: false, env: { SMOKEBOX_REQUIRE_TOKENS: '1' } });
+  // Asks the hub's own command line for a one-time pairing code (owner or not).
+  const newCode = (owner) => /[A-Z0-9]{6}/.exec(execFileSync(process.execPath, ['server/server.mjs', 'admin', 'pair'].concat(owner ? ['--owner'] : [], ['--data', th.file, '--port', String(th.port)]), { cwd: new URL('..', import.meta.url).pathname, encoding: 'utf8' }))[0];
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const page = await ctx.newPage(); const errs = []; page.on('pageerror', (e) => errs.push(String(e)));
+    await page.goto(th.origin + '/', { waitUntil: 'load' });
+    await page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 15000 });
+    await page.evaluate(() => SB.sheets.open('follow')); await page.waitForSelector('[data-mode="orders"]'); await page.click('[data-mode="orders"]');
+    await page.fill('[data-field="hub-url"]', th.origin); await page.fill('[data-field="hub-name"]', 'Pass');
+    await page.click('[data-act="hub-check"]'); await page.waitForSelector('[data-role="pair-box"]:not([hidden])');
+    ok(true, 'token hub: asks for a pairing code');
+    await page.fill('[data-field="hub-pair"]', 'ZZZZZZ'); await page.click('[data-act="hub-pair"]');
+    await page.waitForFunction(() => /did not work|Too many/.test(document.querySelector('[data-role="hub-msg"]').textContent), null, { timeout: 8000 });
+    ok(true, 'wrong pairing code: plain error');
+    await page.fill('[data-field="hub-pair"]', newCode(true)); await page.click('[data-act="hub-pair"]');
+    await page.waitForSelector('[data-opt="adopt"]', { timeout: 8000 });
+    ok(true, 'right pairing code: paired, then the join choice shows');
+    await page.check('[data-choice="seed"]'); await page.click('[data-act="hub-join"]');
+    await page.waitForSelector('[data-role="hub-joined"]:not([hidden])', { timeout: 8000 });
+    ok(true, 'paired tablet joined the token hub');
+    ok(errs.length === 0, 'no page errors ' + errs.join('|').slice(0, 200));
+  } finally { await th.stop(); }
+} else console.log('SKIP: token-mode join (pairHub in the store, the hub admin command) is not in this source tree yet.');
+await browser.close(); await hub.stop().catch(() => {});
 process.exit(fails ? 1 : 0);
