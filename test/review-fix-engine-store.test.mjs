@@ -78,3 +78,56 @@ test('Ada 5: finishing a line whose dish is missing from the menu records no cos
   assert.equal(it.status, 'done');
   assert.equal(it.cost, undefined);
 });
+
+// One ribs batch (4-hour quality limit, 12-hour hard cap) with a fresh good reading copied in at `at`, and no tick since it was made.
+function ribsAt(at) {
+  let s = E.newState({ now: T0, empty: true });
+  s = E.apply(s, 'addBatch', { ing: 'ribs', tempF: 160, cookedG: 6000 }, T0).state;
+  s = JSON.parse(JSON.stringify(s));
+  const b = s.batches[0];
+  b.lastTempAt = at - MIN; b.lastTempF = 160;
+  return { s, id: b.id };
+}
+
+test('Bram 9: keep serving is refused once the hard cap has passed, even before a tick has thrown the batch out', () => {
+  const { s, id } = ribsAt(T0 + 12 * H + 5 * MIN);
+  const r = E.apply(s, 'keepServing', { batchIds: [id], who: 'AB' }, T0 + 12 * H + 5 * MIN, {});
+  assert.equal(r.report, 'batchNotServable');
+  assert.ok(!(r.events || []).some((e) => e.type === 'quality_extend'), 'no extension is logged');
+  // control: inside the hard cap it still works
+  const ok = ribsAt(T0 + 5 * H);
+  assert.equal(E.apply(ok.s, 'keepServing', { batchIds: [ok.id], who: 'AB' }, T0 + 5 * H, {}).report, 'ok');
+});
+
+test('Bram 3: a cooling batch is never kept serving, even when a save gives it a quality limit', () => {
+  const { s, id } = ribsAt(T0 + 5 * H);
+  s.batches[0].kind = 'cooling';
+  const r = E.apply(s, 'keepServing', { batchIds: [id], who: 'AB' }, T0 + 5 * H, {});
+  assert.equal(r.report, 'qualityNotDue');
+});
+
+test('Bram 8: an empty pan cannot be discarded, so no 0 g waste entry is logged', () => {
+  const { s, id } = ribsAt(T0 + 2 * H);
+  s.batches[0].remainingG = 0;
+  const r = E.apply(s, 'discardBatch', { batchId: id, reason: 'manual' }, T0 + 2 * H, {});
+  assert.equal(r.report, 'nothingToDo');
+  assert.match(E.describe(r.report, r.info), /already empty/);
+});
+
+test('Bram 4: a warm cooler or freezer and a thermometer that reads wrong are logged and flagged, never refused', () => {
+  const s = E.newState({ now: T0, empty: true });
+  const one = (type, p) => { const r = E.apply(s, type, p, T0, {}); assert.equal(r.report, 'ok', r.report); return { info: r.info, ev: r.events.find((e) => e.type === (type === 'logEquipmentTemp' ? 'equip_temp' : 'thermometer_checked')) }; };
+  let r = one('logEquipmentTemp', { unit: 'cooler', f: 60 });
+  assert.deepEqual([r.ev.outOfRange, r.ev.maxF, r.info.outOfRange], [true, 41, true]);
+  r = one('logEquipmentTemp', { unit: 'cooler', f: 41 });
+  assert.equal(r.ev.outOfRange, undefined, '41 F is in range');
+  r = one('logEquipmentTemp', { unit: 'freezer', f: 12 });
+  assert.deepEqual([r.ev.outOfRange, r.ev.maxF], [true, 0]);
+  assert.equal(one('logEquipmentTemp', { unit: 'other', f: 150 }).ev.outOfRange, undefined, 'an unknown unit has no limit');
+  r = one('logThermometerCheck', { f: 58, method: 'ice' });
+  assert.deepEqual([r.ev.outOfRange, r.ev.expectF, r.info.outOfRange], [true, 32, true]);
+  assert.equal(one('logThermometerCheck', { f: 33.5, method: 'ice' }).ev.outOfRange, undefined);
+  assert.equal(one('logThermometerCheck', { f: 210, method: 'boiling' }).ev.outOfRange, undefined);
+  assert.equal(one('logThermometerCheck', { f: 205, method: 'boiling' }).ev.expectF, 212);
+  assert.equal(one('logThermometerCheck', { f: 120, method: 'other' }).ev.outOfRange, undefined);
+});

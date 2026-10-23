@@ -201,6 +201,11 @@
     holdWindowV2: true,     // marks settings made after the hold limit moved from a flat 4 hours to per-product limits
     tempIntervalV2: true,   // marks settings made after the check interval default moved from 30 to 120 minutes
   };
+  // What a fridge, freezer or thermometer-check reading should be. A reading outside is logged anyway (never refused)
+  // and flagged, so a warm cooler or a thermometer that reads wrong shows up in the log. Cold units use the cold-hold
+  // limit above; a freezer should be at 0 F or colder (FDA consumer guidance). A food thermometer should read 32 F in ice
+  // water and 212 F in boiling water, give or take 2 F (boiling water reads lower at high altitude, so check that flag there).
+  C.readingChecks = { freezerMaxF: 0, iceF: 32, boilingF: 212, thermometerTolF: 2 };
   // Minutes before a batch's deadline at which each warning rung fires: a soft chime, then a spoken call, then
   // the loud repeating tone. Per-ingredient lists replace the default; long cooks start earlier so there is
   // time to act. Starter values: the owner can tune them.
@@ -209,7 +214,7 @@
   C.ladderMin = { defaultMin: [60, 30, 10], byIng: { brisket: [120, 60, 30, 10], ribs: [90, 45, 20, 10] } };
   // How old each demo starter batch is, in minutes, when a fresh demo kitchen opens. Spread out on purpose so the
   // batches do not all expire at once and the first run shows the warnings working: brisket is the one nearest
-  // its 4-hour limit. Ingredients not listed start fresh.
+  // its 8-hour limit. Ingredients not listed start fresh.
   C.starterAgeMin = { brisket: 455, pork: 410, slaw: 160, ribs: 150, sausage: 120, potato: 100, turkey: 95, mac: 70, beans: 45, pudding: 20 };
   // The allowed range for each owner-editable safety number, as [lowest, highest]. The legal limits are
   // fixed ends: hot hold never below 135 F, cold hold never above 41 F, reheat never below 165 F. The two
