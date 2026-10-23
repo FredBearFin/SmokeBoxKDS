@@ -1071,7 +1071,7 @@
      },
      {
       "t": "p",
-      "x": "The main computer (also called the hub) is a small program that keeps the kitchen in one place. Someone runs it by hand on a laptop or server. Smokebox never starts one. You need its address and, if it needs one, a pairing code or an access code. Then tap **Settings**, then **Use one kitchen on several tablets**."
+      "x": "The main computer (also called the hub) is a small program that keeps the kitchen in one place. Someone runs it by hand. Smokebox never starts one. You need its address and, if it needs one, a pairing code or an access code. Then tap **Settings**, then **Use one kitchen on several tablets**."
      },
      {
       "t": "h",
@@ -1087,7 +1087,7 @@
      },
      {
       "t": "p",
-      "x": "For a tablet that takes orders too. Tap **Use the main computer for orders on this tablet**. Type the address and a name for this screen, like Pass. Tap **Check the main computer**. If it asks for a pairing code, ask the person who runs the main computer for one (it works once and for 10 minutes), type it in the **Pairing code** box and tap **Pair this tablet**. Then choose one:"
+      "x": "For a tablet that takes orders too. Tap **Use the main computer for orders on this tablet**. Type the address and a name for this screen, like Pass. Tap **Check the main computer**. If it asks for a pairing code (one use, 10 minutes), type it in **Pairing code** and tap **Pair this tablet**. Then choose one:"
      },
      {
       "t": "ul",
@@ -1098,7 +1098,7 @@
      },
      {
       "t": "p",
-      "x": "Then tap **Join this kitchen**. Tap **Leave the shared kitchen** to go back. If the main computer removed this tablet, the sheet says so; tap **Leave and pair again**."
+      "x": "Then tap **Join this kitchen**. Tap **Leave the shared kitchen** to go back. If removed, tap **Leave and pair again**."
      },
      {
       "t": "h",
@@ -1110,7 +1110,6 @@
        "\"Connected\": your taps are reaching the hub.",
        "\"Offline: your taps are saved and will be sent\": the link is down. Taps wait on this tablet.",
        "\"Last known, from\" a time: the page reloaded while the hub was down, so it shows the last kitchen it had.",
-       "\"Not confirmed yet\" on a ticket: the hub has not answered that change.",
        "\"Not done:\" and a reason: the hub refused a tap, for example because another tablet got there first."
       ]
      },

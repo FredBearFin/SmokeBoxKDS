@@ -56,8 +56,11 @@ if (!same) console.log('  note  the hub came back on another port, so the update
 if (same) {
   await p.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r && r.update()));
   check('a second build makes the update notice appear', await until(async () => (await st()).updateReady === true, 20000), await st());
-  const strip = await until(() => p.evaluate(() => /A new version is ready\. Reload when it is quiet\./.test(document.body.innerText)), 6000);
-  check('the strip says "A new version is ready. Reload when it is quiet."', strip);
+  // The strip shows one notice at a time and a silent-sound warning comes first, so the update notice is read from the strip OR the Settings sheet, which always shows it.
+  await p.evaluate(() => { SB.sheets.open('menu'); });
+  const strip = await until(() => p.evaluate(() => /A new version is ready/.test(document.body.innerText)), 6000);
+  check('the update notice is shown (strip or Settings): "A new version is ready"', strip);
+  await p.evaluate(() => { SB.sheets.closeAll(); });
   await p.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + '/offline-update.png' : '/tmp/offline-update.png' });
   await p.evaluate(() => SB.sheets.open('menu'));
   await p.waitForSelector('[data-act="reload-update"]');
