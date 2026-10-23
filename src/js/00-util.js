@@ -112,42 +112,48 @@
       }
       return null;
     };
-    // Reads a packed string back: a reference becomes the table entry, a doubled marker loses one marker.
-    const decStr = (str) => {
-      if (str.charCodeAt(0) !== 1) return str;
-      if (str.charCodeAt(1) === 1) return str.slice(1);
-      return dict[parseInt(str.slice(1), 36)];
-    };
-    // Unpacks one packed value into the original value, recursively.
-    const dec = (v) => {
-      if (v === null || typeof v === 'number' || typeof v === 'boolean') return v;
-      if (typeof v === 'string') return decStr(v);
-      if (!Array.isArray(v)) throw new Error('packed value is not packed');
-      if (!v.length) return [];
-      const tag = v[0];
-      if (tag === 0) { const out = new Array(v.length - 1); for (let i = 1; i < v.length; i++) out[i - 1] = dec(v[i]); return out; }
-      const keys = schemas[tag - 1];
-      if (!keys || keys.length !== v.length - 1) throw new Error('packed object does not match its keys');
-      const o = {};
-      // A key named __proto__ is set as plain data (assigning it would change the prototype); the common case takes the quick path.
-      if (keys.hasProto === undefined) keys.hasProto = keys.indexOf('__proto__') >= 0;
-      if (!keys.hasProto) { for (let i = 0; i < keys.length; i++) o[keys[i]] = dec(v[i + 1]); return o; }
-      for (let i = 0; i < keys.length; i++) {
-        if (keys[i] === '__proto__') Object.defineProperty(o, '__proto__', { value: dec(v[i + 1]), enumerable: true, writable: true, configurable: true });
-        else o[keys[i]] = dec(v[i + 1]);
-      }
-      return o;
+    // A reader for packed data with the given tables. It never touches this packer's own tables or remembered rows: a copy written by another tab
+    // (or an earlier page) is numbered by that writer's tables, and mixing the two numberings would damage the next save.
+    const reader = (dictR, schemasR) => {
+      // Reads a packed string back: a reference becomes the table entry, a doubled marker loses one marker.
+      const decStr = (str) => {
+        if (str.charCodeAt(0) !== 1) return str;
+        if (str.charCodeAt(1) === 1) return str.slice(1);
+        const w = dictR[parseInt(str.slice(1), 36)];
+        if (typeof w !== 'string') throw new Error('packed reference is missing');
+        return w;
+      };
+      // Unpacks one packed value into the original value, recursively.
+      const dec = (v) => {
+        if (v === null || typeof v === 'number' || typeof v === 'boolean') return v;
+        if (typeof v === 'string') return decStr(v);
+        if (!Array.isArray(v)) throw new Error('packed value is not packed');
+        if (!v.length) return [];
+        const tag = v[0];
+        if (tag === 0) { const out = new Array(v.length - 1); for (let i = 1; i < v.length; i++) out[i - 1] = dec(v[i]); return out; }
+        const keys = schemasR[tag - 1];
+        if (!keys || keys.length !== v.length - 1) throw new Error('packed object does not match its keys');
+        const o = {};
+        // A key named __proto__ is set as plain data (assigning it would change the prototype); the common case takes the quick path.
+        if (keys.hasProto === undefined) keys.hasProto = keys.indexOf('__proto__') >= 0;
+        if (!keys.hasProto) { for (let i = 0; i < keys.length; i++) o[keys[i]] = dec(v[i + 1]); return o; }
+        for (let i = 0; i < keys.length; i++) {
+          if (keys[i] === '__proto__') Object.defineProperty(o, '__proto__', { value: dec(v[i + 1]), enumerable: true, writable: true, configurable: true });
+          else o[keys[i]] = dec(v[i + 1]);
+        }
+        return o;
+      };
+      return dec;
     };
     return {
       // The packed tree and the tables it needs: { d, s, x }.
       pack(state) { const x = enc(state, undefined); return { d: dict.slice(), s: schemas.map((k) => k.slice()), x }; },
-      // The original state from a packed tree; also adopts its tables so later saves keep the same numbers. Throws when the packed data is damaged.
+      // The original state from a packed tree and its tables, without changing this packer. Throws when the packed data is damaged.
       unpack(p) {
         if (!p || !Array.isArray(p.d) || !Array.isArray(p.s) || p.x === undefined) throw new Error('packed data is incomplete');
-        dict.length = 0; dictIdx.clear(); schemas.length = 0; schemaIdx.clear();
-        for (const d of p.d) { if (typeof d !== 'string') throw new Error('packed table is damaged'); dictIdx.set(d, dict.length); dict.push(d); }
-        for (const k of p.s) { if (!Array.isArray(k) || k.some((x) => typeof x !== 'string')) throw new Error('packed keys are damaged'); schemaIdx.set(k.join('\u0002'), schemas.length); schemas.push(k.slice()); }
-        return dec(p.x);
+        for (const d of p.d) if (typeof d !== 'string') throw new Error('packed table is damaged');
+        const sch = p.s.map((k) => { if (!Array.isArray(k) || k.some((x) => typeof x !== 'string')) throw new Error('packed keys are damaged'); return k.slice(); });
+        return reader(p.d, sch)(p.x);
       },
     };
   };

@@ -247,7 +247,7 @@
     if (!payload || typeof payload !== 'object' || payload.fmt === undefined) return payload;
     const out = Object.assign({}, payload);
     delete out.p;
-    if (payload.fmt === 2) { try { out.state = packer.unpack(payload.p); } catch (e) { out.state = undefined; } } else out.state = undefined;
+    if (payload.fmt === 2) { try { out.state = packer.unpack(payload.p); delete out.fmt; } catch (e) { out.state = undefined; } } else out.state = undefined;
     return out;
   }
   // Whole calendar days from one service day text to a later one.
@@ -431,6 +431,8 @@
         const small = keep ? E().prune(state, keep) : state;
         const env = { v: 1, takenAt: r, reason: why || BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
         if (!E().validateBackup(JSON.stringify(env)).ok) continue;
+        // A big kitchen's copy is saved compact too, so it fits where the plain text would not (the full history is what makes it worth keeping).
+        if (wantCompact(small)) { delete env.state; env.fmt = 2; env.p = packer.pack(small); }
         if (storage.set(LASTGOOD_KEY, env) === false) continue;
         snapAt = r; snapWanted = null; st.lastGoodAt = r; st.beforeRestoreAt = r;
         return r;
@@ -449,12 +451,33 @@
   function undoRestore() {
     const g = storage ? beforeRestoreCopy(realNow()) : null;
     if (!g) { last = { type: 'undoRestore', report: 'noCopy', info: {}, events: [] }; return 'noCopy'; }
-    return importAll(JSON.stringify(g));
+    return importAll(JSON.stringify(openSaved(g)));
+  }
+  // The copy that was set aside as damaged, if it can still be read: { at (when it was set aside), tickets, orders } or null. A compact save set
+  // aside by an older build is read too, which is how a downgrade followed by an upgrade finds the full history again.
+  function parkedCopy() {
+    if (!storage) return null;
+    try {
+      let v = storage.get(CORRUPT_KEY, null);
+      if (typeof v === 'string') v = JSON.parse(v);
+      if (!v || typeof v !== 'object') return null;
+      const chk = E().validateBackup(openSaved(v));
+      if (!chk.ok) return null;
+      return { at: storage.get(CORRUPT_AT_KEY, null), tickets: chk.state.tickets.length, orders: chk.state.orders.length };
+    } catch (e) { return null; }
+  }
+  // Brings the set-aside copy back as the kitchen (the kitchen it replaces is kept for 7 days like any restore). 'ok', 'noCopy' or the import's answer.
+  function restoreParked() {
+    if (!storage) return 'noCopy';
+    let v = null;
+    try { v = storage.get(CORRUPT_KEY, null); if (typeof v === 'string') v = JSON.parse(v); } catch (e) { v = null; }
+    if (!v || typeof v !== 'object') { last = { type: 'restoreParked', report: 'noCopy', info: {}, events: [] }; return 'noCopy'; }
+    return importAll(JSON.stringify(openSaved(v)));
   }
   // Reads the rolling copy and returns { state, takenAt } if it is whole, else null.
   function readSnapshot() {
     try {
-      const env = storage.get(LASTGOOD_KEY, null);
+      const env = openSaved(storage.get(LASTGOOD_KEY, null));
       if (!env || typeof env !== 'object') return null;
       const v = E().validateBackup(env);
       return v.ok ? { state: v.state, takenAt: isNum(env.takenAt) ? env.takenAt : 0, repaired: v.repaired } : null;
@@ -979,6 +1002,12 @@
     // the demo had its own storage) is a real kitchen's.
     let parsed = null;
     try { parsed = JSON.parse(text); } catch (e) { parsed = null; }
+    // A compact save (fmt 2) pasted here, for example the copy set aside as damaged, is unpacked first.
+    if (parsed && typeof parsed === 'object' && parsed.fmt !== undefined) {
+      const opened = openSaved(parsed);
+      if (!opened.state) { last = { type: 'import', report: 'invalidBackup', info: { error: 'a compact save that cannot be read' }, events: [] }; return 'invalidBackup'; }
+      parsed = opened; text = JSON.stringify(opened);
+    }
     if (strict && parsed && typeof parsed === 'object') {
       const from = parsed.mode === 'demo' ? 'demo' : 'real';
       if (from !== mode) { last = { type: 'import', report: 'wrongBackupMode', info: { backup: from, mode }, events: [] }; return 'wrongBackupMode'; }
@@ -1562,13 +1591,13 @@
   function isOwn() { return !!(state && state.catalog === 'own'); }
 
   // Public API: init, destroy, status, getState, now, tick, dispatch, dispatchEx, lastResult, subscribe,
-  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, reconcile, decodeSaved: openSaved, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset,
+  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, reconcile, decodeSaved: openSaved, parkedCopy, restoreParked, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset,
   // resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY.
   SB.store = {
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, reconcile, decodeSaved: openSaved, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, reconcile, decodeSaved: openSaved, parkedCopy, restoreParked, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
