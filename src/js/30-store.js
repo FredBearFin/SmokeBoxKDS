@@ -853,7 +853,7 @@
       raw: (k) => (m.has(k) ? m.get(k) : null),
       // Keeps a value as text in memory only; false when it cannot be turned into text.
       set: (k, v) => { try { m.set(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
-      // Forgets a kept value.
+      // Forgets one kept value by its name.
       remove: (k) => { m.delete(k); },
       // The kept names that start with a prefix.
       keys: (p) => Array.from(m.keys()).filter((k) => k.indexOf(p || '') === 0),
