@@ -6,7 +6,7 @@ import path from 'node:path';
 import { withPage, ROOT } from '../tools/pw.mjs';
 const OUT = path.join(ROOT, 'docs/ux-shots/night/a2/audit');
 fs.mkdirSync(OUT, { recursive: true });
-const SIZES = [[390, 844], [768, 1024], [1024, 768]];
+const SIZES = [[390, 844], [768, 1024], [1024, 768], [1920, 1080]];
 const LOOKS = [['day', 'normal'], ['night', 'normal'], ['day', 'large']];
 const MIN = 44;
 // Reports the small, clipped or sideways-scrolling things inside the top sheet (or the whole page when no sheet is open).
@@ -43,6 +43,12 @@ for (const [w, h] of SIZES) for (const [theme, text] of LOOKS) {
       const m = await page.evaluate(measure);
       await page.screenshot({ path: path.join(OUT, tag + '-' + name + '.png') });
       results.push({ tag, name, ...m });
+      // At the smallest and the widest screen also read the bottom of the sheet, where the long forms end.
+      if (w === 390 || w === 1920) {
+        await page.evaluate(() => { const top = [...document.querySelectorAll('.sheet')].pop(); if (top) top.querySelectorAll('*').forEach((e) => { if (e.scrollHeight > e.clientHeight + 40 && /auto|scroll/.test(getComputedStyle(e).overflowY)) e.scrollTop = e.scrollHeight; }); });
+        await page.waitForTimeout(250);
+        await page.screenshot({ path: path.join(OUT, tag + '-' + name + '-end.png') });
+      }
     };
     await snap('first-run', async () => {});
     await snap('dishes-empty', async () => { await page.evaluate(() => SB.sheets.open('dishes')); });
@@ -57,6 +63,7 @@ for (const [w, h] of SIZES) for (const [theme, text] of LOOKS) {
     await snap('leftovers-card', async () => { await page.evaluate(() => { const id = SB.store.getState().menu[0].id; SB.store.dispatchEx('createTicket', { customer: 'Demo', src: 'demo', items: [{ menuId: id, qty: 1 }] }, { source: 'ui' }); SB.sheets.open('menu'); }); });
     await snap('cold-form', async () => { await page.evaluate(() => { SB.store.dispatchEx('updateSettings', { patch: { modules: { cookAhead: true } } }, { source: 'ui' }); SB.sheets.open('cookahead'); }); await page.waitForTimeout(400); await page.locator('.sheet .seg-opt', { hasText: 'Cold' }).click(); });
     await snap('cold-edit', async () => { await page.evaluate(() => { const r = SB.store.dispatchEx('addIngredient', { name: 'Coleslaw', unit: 'g', tcs: true, hold: 'cold', maxHoldH: 4, holdBasis: 'safety' }, { source: 'ui' }); SB.sheets.open('cookahead', { id: r.info.id }); }); });
+    await snap('recovery-code', async () => { await page.evaluate(() => SB.sheets.open('shop')); await page.waitForTimeout(300); await page.fill('[aria-label="Manager PIN, 4 digits"]', '1234'); await page.getByRole('button', { name: 'Set PIN' }).click(); await page.waitForTimeout(700); });
     await snap('serve', async () => { await page.evaluate(() => SB.sheets.open('serve')); });
     await snap('startover-1', async () => { await page.evaluate(() => SB.sheets.open('startover')); });
     await snap('startover-2', async () => { await page.evaluate(() => SB.sheets.open('startover')); await page.waitForTimeout(300); await page.click('[data-act=so-next1]'); });
