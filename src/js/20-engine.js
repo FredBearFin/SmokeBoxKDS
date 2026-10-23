@@ -54,7 +54,7 @@
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'followerReadOnly', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'followerReadOnly', 'hubKitchen', 'hubChanged', 'hubConnecting', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -85,6 +85,9 @@
     reasonRequired: 'Pick a reason first (for example: wrong order, customer left, dropped).',
     badTemp: 'Enter a temperature between 32 and 300 °F.',
     tempTooLow: 'A reheat needs a reading of at least ' + C.safety.reheatF + ' °F. Keep heating and log it again.' + SAFETY,
+    hubKitchen: 'This tablet is connected to the shared kitchen. Erasing or restoring here would erase it for every screen. Do it on the hub computer.',
+    hubConnecting: 'Still connecting to the shared kitchen. Try again in a moment.',
+    hubChanged: 'The shared kitchen was changed or reset while this screen was away, so this tap was not sent.',
     followerReadOnly: 'This screen only shows the kitchen. Make changes on the main screen.',
     notFridgeBatch: 'This batch is not tracked by place. Only cold items kept in a fridge can be taken out and put back.',
     notReheatable: 'This batch cannot be reheated: Smokebox allows one reheat per batch, and only within ' + C.safety.belowHotGraceH + ' hours of going below ' + C.safety.hotHoldF + ' °F. Discard it.' + SAFETY,
@@ -891,6 +894,7 @@
   Tx.prototype.event = function (type, fields) {
     const t = (this.lastT = stampAfter(this.lastT, this.now));
     const e = Object.assign({ id: 'ev_' + this.next('event'), t, type }, fields);
+    if (this.screen) e.screen = this.screen;          // which screen did it (hub mode only; absent otherwise)
     this.evs.push(e);
     return e;
   };
@@ -3342,7 +3346,7 @@
   }
   /** apply(state, type, payload, now) -> { state, report, events, info }. Total: never throws; non-ok returns the SAME state. */
   // WATCH OUT: a refused action returns the original state, not the ticked one (F-E6).
-  function apply(state, type, payload, now) {
+  function apply(state, type, payload, now, meta) {
     try {
       if (!isState(state)) return { state, report: 'invalidBackup', events: [], info: {} };
       if (typeof type !== 'string' || !hasOwn(A, type)) return { state, report: 'unknownAction', events: [], info: {} };
@@ -3352,6 +3356,7 @@
       const base = Array.isArray(state.orders) ? state : Object.assign({}, state, { orders: [] });
       const t1 = tick(base, now); // catch up first so the action sees the kitchen as it is at `now`
       const tx = new Tx(t1.state, now);
+      if (meta && typeof meta.screen === 'string' && meta.screen) tx.screen = meta.screen;
       const report = A[type](tx, p);
       if (report !== 'ok') {
         if (REPORT_IDS.indexOf(report) < 0) return { state, report: 'badPatch', events: [], info: { internalError: 'bad report ' + report } };
