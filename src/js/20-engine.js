@@ -171,7 +171,7 @@
     updateIngredient: '{ id, patch }',
     moveMenuItem: '{ id, toIndex }',
     setChips: '{ chips: string[] | null }',
-    clearDemoTickets: '{}',
+    clearDemoTickets: '{ ticketId? }',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety", fridge?:boolean, fridgeDays?, outHours? }',
     logEquipmentTemp: '{ unit:"cooler"|"freezer"|"display"|"other", f, label?, who? }',
     logThermometerCheck: '{ f, method?:"ice"|"boiling"|"other", who? }',
@@ -2779,10 +2779,22 @@
   }
   // Removes the old demo and sample tickets found by demoLeftovers, with their orders and events. Used grams of the removed
   // tickets move into the books so stock still balances. Real tickets and real paid orders are never touched. nothingToDo when
-  // there is nothing to remove.
-  A.clearDemoTickets = function (tx) {
+  // there is nothing to remove. With ticketId only that one demo ticket goes (and its order when the order holds nothing else):
+  // the walkthrough cleans up its own ticket this way.
+  A.clearDemoTickets = function (tx, q) {
     const st = tx.state();
     const p = planDemoLeftovers(st);
+    if (q && q.ticketId !== undefined) {
+      if (typeof q.ticketId !== 'string') { tx.info.key = 'ticketId'; return 'badPatch'; }
+      const one = st.tickets.find((t) => t.id === q.ticketId);
+      p.ticketIds = new Set(p.ticketIds.has(q.ticketId) ? [q.ticketId] : []);
+      const oid = one && one.orderId;
+      const alone = oid !== undefined && p.orderIds.has(oid) && st.tickets.every((t) => t.orderId !== oid || t.id === q.ticketId);
+      const o = alone ? st.orders.find((x) => x.id === oid) : null;
+      p.orderIds = new Set(alone ? [oid] : []);
+      p.tickets = p.ticketIds.size; p.orders = p.orderIds.size; p.paidOrders = o && o.status === 'paid' ? 1 : 0;
+      p.events = allEvents(st).filter((e) => (e.ticketId && p.ticketIds.has(e.ticketId)) || (e.orderId && p.orderIds.has(e.orderId))).length;
+    }
     if (!p.ticketIds.size && !p.orderIds.size) return 'nothingToDo';
     const keepT = [];
     for (const t of tx.get('tickets')) {

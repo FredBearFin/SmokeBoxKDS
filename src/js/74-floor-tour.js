@@ -360,11 +360,14 @@
   }
 
   // Ends the walkthrough: removes the card and every ring, puts the clock back and returns focus to the
-  // board. The demo ticket is left alone. A quiet stop (used when restarting) skips the focus move.
+  // board. In a real kitchen the walkthrough ticket is removed, so it never sits in the owner's reports; the demo keeps it.
+  // A quiet stop (used when restarting) skips the focus move.
   function stop(quiet) {
     if (!T) return false;
     const was = T; T = null;
     clearInterval(was.timer);
+    const S = SB.store;
+    if (S && !(S.isDemo && S.isDemo()) && typeof S.dispatchEx === 'function') { try { S.dispatchEx('clearDemoTickets', { ticketId: was.id }, { source: 'sim' }); } catch (e) { /* the leftovers offer still catches it */ } }
     doc.removeEventListener('keydown', onKey);
     restoreSpeed(was);
     doc.querySelectorAll('.tour-ring').forEach((e) => e.classList.remove('tour-ring'));
