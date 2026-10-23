@@ -142,3 +142,31 @@ Found and fixed:
 - **Wording:** one verb for each Data page erase action (Erase live data, Erase everything, in the buttons, boxes, toggle and Guide); the confirm sentence no longer names themes; "Practice kitchen (the demo)" is now "Demo kitchen"; dish-row examples are neutral; "quality limit" kept where the cabinet says it (inspector labels "Kept serving past its quality limit").
 
 Left: charts in black and white print (only the two print pages are print-styled); Legend dash samples for histograms; a weekday sales chart; Friday's busiest dish still needs the page scroll to Top items.
+
+---
+
+## Final summary (round 8, branch night/a3-r8)
+
+**What each page answers** (for a small owner; numbers come from the app's own records)
+- **Pace:** "How is the kitchen doing right now?" The glance cards (paid so far today, open orders, late tickets, 86 list, the cooked-ahead item that runs out soonest) plus four speed tiles and the ticket-time-by-hour chart. More charts sit behind one button.
+- **Tickets:** "When was I slowest, and where does a ticket's time go?" One headline sentence, finished and overdue tickets, how long tickets take, on time by order type.
+- **Stations:** "Was a station behind?" Which station finished last, items waiting by station, overdue tickets by station, prep times against the starter estimates.
+- **Sales and money:** "What did I take in, and what sold best on a day?" One headline (sales, paid orders, collected with tax and tips), the sales tile and average order, money by day and by payment method, top items, sales by hour; the weekday buttons under One day; the End of day card at the bottom; the sales CSV on the Data page.
+- **Safety** (only when cooked-ahead food is tracked): "Were my checks kept, and what did I throw out?" Checks kept on time, the batch timeline, thrown-out food by reason, and the printable record.
+- **Stock and 86** (only when cooked-ahead food is tracked): "Why did something run out, and what should I cook tomorrow?" Plus the sell-out clock; the channel sync strip is practice-only.
+- **Menu and settings, Data:** dishes, times, limits, units, backup, restore, replace a device, erase data.
+
+**Verified in round 8**
+- The sales-by-day download in a real browser (Playwright download event, `test/office-sales-csv.e2e.mjs`): a blank kitchen starts no download and says "No order has been paid yet..."; a three-week history gives `smokebox-sales-by-day-<date>.csv` with the plain header, 20 day rows and a Total row (60 paid orders, methods add up, ten cells per row, no dollar signs); the demo kitchen's file is named `smokebox-sales-by-day-demo-...`.
+- Contrast walk on the merged build: all seven pages, Ember and Paper, no text under 4.5:1 (3:1 large).
+- Close the day from the Orders footer (`test/office-closeday.e2e.mjs`).
+- Two-line charts and histogram outlines with two or more channels now carry a dash pattern (second line dashed, third dotted, fourth dash-dot); area plus line charts rely on the fill versus the line.
+
+**Known limits (be honest with owners)**
+- All history in screenshots and tests is simulated (the 14-day barbecue sample and a generated three-week own-kitchen history). The numbers have never come from a real kitchen, and no page has been compared with a real owner's books.
+- Black-and-white print: only the Close the day and safety record pages are print-styled and are black on white. Printing an office page directly prints the screen layout in color; stacked and bar charts rely on labels and legends, not patterns.
+- Charts still use color for series in two-series stacked and bar charts; ok and bad status colors carry a glyph and a word.
+- No screen reader, real printer, real tablet or real kitchen has been used.
+- `test/office-b.e2e.mjs` is stale against the blank-start and demo-isolation merges (it expects sample data and every page populated): 20 ok, 4 FAIL, then crashes at an empty headline. `test/office-data.e2e.mjs` was not re-run this round. `test/office.e2e.mjs` was not re-run either. These suites need updating by whoever owns the e2e refresh.
+
+**Not done:** starting-cash setting; weekday sales chart; legend samples for dashed lines on histograms; a printed-chart view.

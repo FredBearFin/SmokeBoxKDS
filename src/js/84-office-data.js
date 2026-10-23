@@ -1541,6 +1541,8 @@
       const text = BPs.salesCsv(s, s.settings.service && s.settings.service.dayStartHour);
       const fname = 'smokebox-sales-by-day' + (SB.store.mode && SB.store.mode() === 'demo' ? '-demo' : '') + '-' + todayKey() + '.csv';
       const days = Math.max(0, text.split('\r\n').length - 3);
+      // With no paid orders there is nothing to hand over: say so instead of saving a file that only has column names.
+      if (!days) { exStatus.bad('No order has been paid yet, so there is no sales file to save. Pay an order first.'); return; }
       const res = await saveFile(fname, text, 'text/csv');
       if (res.how === 'host' || res.how === 'browser') exStatus.ok((res.how === 'host' ? 'Saved ' : 'Download started: ') + fname + (days ? ' (' + days + ' ' + U.plural(days, 'day') + ' of sales).' : ': it has only the column names because no order has been paid yet.'));
       else reportSave(res, fname, text, 'sales file');
