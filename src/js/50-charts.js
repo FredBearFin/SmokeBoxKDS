@@ -2284,7 +2284,7 @@
     const aName = spec.aName || 'Starter', bName = spec.bName || 'Learned', cName = spec.cName || 'Observed';
     const n = m.rows.length;
     const flagTone = keyOfTone(spec.flagTone) || 'warn';
-    const flagWord = spec.flagWord || 'Drifted';
+    const flagWord = spec.flagWord || 'Off estimate';
     const anyFlag = m.rows.some((r) => r.flag);
     const labW = Math.min(Math.max(80, W * 0.34), Math.ceil(Math.max.apply(null, m.rows.map((r) => chart.tw(r.label, 12)))) + 4);
     const flagRoom = anyFlag ? (W < 520 ? 22 : chart.tw(flagWord, 12, 600) + 28) : 0;

@@ -454,7 +454,15 @@
     const learnedEl = h('p', { class: 'od-hint od-learned', hidden: true });
     const bom = bomBlock(id, nm, getMi, status);
 
-    const root = h('article', { class: 'od-item', dataset: { id }, 'aria-label': nm },
+    // The compact summary row: name, station, price and prep time on one line; tapping it opens the full form below.
+    const sumName = h('span', { class: 'od-sum-n' }), sumMeta = h('span', { class: 'od-sum-m' }), sumPrice = h('span', { class: 'od-sum-p num' }), sumPrep = h('span', { class: 'od-sum-t num' });
+    const sumBtn = h('button', { type: 'button', class: 'od-sum', 'aria-expanded': 'false' }, sumName, sumMeta, sumPrice, sumPrep, h('span', { class: 'od-sum-i', 'aria-hidden': 'true' }, ico('chevron-down', 18)));
+    const body = h('div', { class: 'od-item-body', hidden: true });
+    // Opens or closes the full form for this dish.
+    const setOpen = (on) => { body.hidden = !on; sumBtn.setAttribute('aria-expanded', on ? 'true' : 'false'); root.dataset.open = on ? 'true' : 'false'; };
+    sumBtn.addEventListener('click', () => setOpen(body.hidden));
+    const root = h('article', { class: 'od-item', dataset: { id, open: 'false' }, 'aria-label': nm }, sumBtn, body);
+    body.append(
       h('div', { class: 'od-item-head' },
         nameField, zoneField, catField,
         h('div', { class: 'od-item-actions' }, archChip, archBtn)),
@@ -466,6 +474,8 @@
 
     return {
       root, id,
+      // Opens the full form, used when the list is filtered to the starter estimates.
+      open: () => setOpen(true),
       // Refreshes this row from the state without touching a field that has focus.
       sync(mi, s) {
         root.dataset.archived = mi.archived ? 'true' : 'false';
@@ -475,6 +485,10 @@
         if (doc.activeElement !== catSel) catSel.value = C.categories.some((c) => c.id === mi.cat) ? mi.cat : '';
         trackSeg.setValue(mi.track === 'two' ? 'two' : 'one');
         root.dataset.zone = mi.zone;
+        sumName.textContent = mi.name;
+        { const zn = C.zoneById[mi.zone] ? C.zoneById[mi.zone].name : '', cn = catName(mi.cat); sumMeta.textContent = (zn.toLowerCase() === cn.toLowerCase() ? zn : zn + ' · ' + cn) + (mi.archived ? ' · Archived' : mi.prepConfirmed ? '' : ' · Starter prep time'); }
+        sumPrice.textContent = money(mi.price); sumPrep.textContent = mmss(mi.prepSec);
+        sumBtn.setAttribute('aria-label', mi.name + ', ' + money(mi.price) + ', prep ' + mmss(mi.prepSec) + '. Tap to edit.');
         price.sync(mi.price); prep.sync(mi.prepSec);
         confSeg.setValue(mi.prepConfirmed ? 'confirmed' : 'starter');
         archChip.hidden = !mi.archived;
@@ -582,7 +596,7 @@
     const addForm = addDishForm((id) => {
       filter.status = 'active'; filter.zone = 'all'; filter.starter = false; applyFilter();
       // The new row is made when the store tells the page; give it a moment, then show it.
-      setTimeout(() => { const row = rows.get(id); if (row) row.root.scrollIntoView({ block: 'nearest', behavior: U.prefersReducedMotion() ? 'auto' : 'smooth' }); }, 80);
+      setTimeout(() => { const row = rows.get(id); if (row) { row.open(); row.root.scrollIntoView({ block: 'nearest', behavior: U.prefersReducedMotion() ? 'auto' : 'smooth' }); } }, 80);
     });
     const addOpenBtn = btn('Add a dish', { icon: 'plus', cls: 'btn-primary' });
     addOpenBtn.addEventListener('click', () => addForm.open());

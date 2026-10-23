@@ -449,7 +449,7 @@
         else if (d.dir !== 'flat' && isNum(d.delta) && d.points) amount = d.points;
         delta.append(ico(ARROW[d.dir], 16, { stroke: 2.4 }), h('span', null, amount + word));
       } else {
-        delta.appendChild(h('span', { class: 'of-nocmp' }, def.noCompare || (!hasValue ? 'Not enough data' : thin ? 'No comparison' : 'No earlier period')));
+        delta.appendChild(h('span', { class: 'of-nocmp' }, !hasValue ? (def.noValue || def.noCompare || 'Not enough data') : (def.noCompare && !thin ? def.noCompare : thin ? '' : 'No earlier period')));
       }
       sr.textContent = (def.label || kpiLabel || '') + ': ' + textVal + (def.unit ? ' ' + def.unit : '') + '. ' + (d && d.text ? d.text : !hasValue ? 'Not enough data in this range.' : thin ? 'There is no full earlier period to compare with.' : 'No earlier period to compare.');
       // sparkline
@@ -767,7 +767,15 @@
       const c = guard('coach', () => coachText(id, coachFacts()));
       const on = !!c;
       root.dataset.coach = on ? 'on' : 'off'; coachEl.hidden = !on;
-      if (on) coachEl.replaceChildren(h('h2', { class: 'of-coach-t' }, c.title), h('p', { class: 'of-coach-b' }, c.body));
+      if (!on) { coachEl.__key = ''; return; }
+      const canSample = !!(SB.sim && typeof SB.sim.setSampleEnabled === 'function') && !sampleFlag() && id !== 'data';
+      const key = c.title + '|' + c.body + '|' + canSample;
+      if (coachEl.__key === key) return;
+      coachEl.__key = key;
+      const kids = [h('h2', { class: 'of-coach-t' }, c.title), h('p', { class: 'of-coach-b' }, c.body)];
+      if (canSample) kids.push(h('button', { type: 'button', class: 'btn btn-sm of-coach-sample', onClick: showSampleNumbers }, 'Show sample numbers'),
+        h('p', { class: 'of-coach-n' }, 'Sample numbers are made up so you can see what this page looks like. They are labeled and never mixed into your own.'));
+      coachEl.replaceChildren(...kids);
     }
     // Redraws the headline, the tiles and every card from the metrics handle p.
     function refreshAll(p) {
@@ -1275,6 +1283,14 @@
     M.dirty = true;
     const wait = Math.max(0, REFRESH_MS - (Date.now() - M.lastRefresh));
     schedule(wait);
+  }
+
+  // The empty-page button: turns the sample history on and looks at the last 14 days of it, labeled as sample.
+  function showSampleNumbers() {
+    if (!M || !SB.sim || typeof SB.sim.setSampleEnabled !== 'function') return;
+    SB.sim.setSampleEnabled(true);
+    M.forcedLive = false; M.filters.source = 'all'; M.srcSeg.setValue('all');
+    setRange('last14');
   }
 
   // The Data page switched the sample history on or off: show it, or fall back to live only, and redraw

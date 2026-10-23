@@ -905,7 +905,7 @@ describe('insights: structure, guards and determinism', () => {
     assert.equal(f.title, 'Smoked brisket'.replace('Smoked brisket', 'Brisket') + ' went 86 at 1:42 pm');
     assert.match(f.body, /7\.3 hours before close/);
     assert.match(f.body, /kg more cooked brisket would have lasted to close/);
-    assert.match(f.body, /Pitcall/);
+    assert.doesNotMatch(f.body, /Pitcall/);
   });
   it('sellout-early stays silent on a thin day (< 30 tickets) and for an 86 in the last 90 minutes', () => {
     assert.ok(!idsOf(craft(25)).includes('sellout-early'));
