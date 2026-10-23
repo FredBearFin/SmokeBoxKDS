@@ -60,13 +60,13 @@ This needs a secure address, so use the beta instance (below) or another https a
 5. To remove: `bash beta-remove.sh` (or `--keep-data`).
    - If the script stops with a message, write it down. It says it undoes its own Caddy change if Caddy refuses.
 
-## Part 5: pairing (only after the pairing field is in the join form)
+## Part 5: pairing
 
-The pairing field is being built (A2, `night/a2-c7`). Until it is in the build you cannot type a code on a screen; skip this part and write that down.
+On the tablet the join form shows **Pairing code** and **Pair this tablet** once the main computer asks for pairing.
 
 1. Start the main computer with `SMOKEBOX_REQUIRE_TOKENS=1 SMOKEBOX_DATA=/path/hub.json`. Open it on a tablet: it should say it is not paired and ask for a pairing code.
 2. On the main computer: `node server/server.mjs admin pair --data /path/hub.json`. It prints six letters and digits and says it works once, for 10 minutes.
-3. Type the code and a name on the tablet. It should join. Use the same code on a second tablet: it should be refused (a code works once).
+3. Type the code in **Pairing code**, tap **Pair this tablet**, then choose and tap **Join this kitchen**. It should join. Use the same code on a second tablet: it should be refused (a code works once).
 4. `node server/server.mjs admin list --data /path/hub.json` shows both screens. Remove one with `admin revoke ID`: that tablet should stop at once and say it was removed. Pair it again with a new code and any taps it was holding should be sent.
 5. Type a wrong code five times: that address is locked for ten minutes, even for the right code.
 
@@ -91,7 +91,7 @@ Also write down, even when everything worked: the main computer's address, which
 5. **The tablet says "Offline".** Check Wi-Fi. Taps are saved and will be sent. Do not reload the page until it says "Connected" (what happens to waiting taps after a reload is not checked).
 6. **A screen shows "Out of date since".** Do not trust it. Check the main computer is running and the network is up.
 7. **The page will not open without the internet.** Check Tablet checks: screen, sound, home screen, the card "Opens without the internet". It needs https. Try **Reset the offline copy** in Help and about.
-8. **A tablet looks wrong or stuck.** Go back to your own kitchen: menu button, then **Back to my own kitchen** (Show only), or **Leave the hub**. Your own saved kitchen is untouched.
+8. **A tablet looks wrong or stuck.** Go back to your own kitchen: menu button, then **Back to my own kitchen** (Show only), or **Leave the shared kitchen**. Your own saved kitchen is untouched.
 9. **The main computer misbehaves.** Stop it with Ctrl+C, start it again with the same `SMOKEBOX_DATA` file. The kitchen is kept. Write down what the terminal said.
 10. **The beta server install stops.** Read its message. It undoes its own Caddy change if Caddy refuses. Run `bash beta-remove.sh` if you want it gone. The real Smokebox must still open; check it first.
 11. **You are not sure.** Stop. Nothing here is a real kitchen. Write it down and move on.

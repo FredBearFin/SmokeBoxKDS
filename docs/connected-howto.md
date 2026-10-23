@@ -4,7 +4,7 @@ For Freddy. Plain engineering notes on what exists on `kds/connected` (82d109f) 
 
 ## Words used here and in the Guide
 
-- **Main computer (the hub):** the program on one computer that keeps the shared kitchen and sends it to every screen. These notes say "main computer" and keep "hub" for the command line, the file names and the labels in the app ("Check the hub", "Join the hub", "Leave the hub").
+- **Main computer (the hub):** the program on one computer that keeps the shared kitchen and sends it to every screen. These notes say "main computer" and keep "hub" for the command line and file names.
 - **Kitchen:** the shared kitchen the main computer keeps (board, tickets, menu). A tablet's own saved kitchen is separate and stays untouched.
 - **Screen:** anything that shows the kitchen. **Tablet:** a screen that takes orders. **Show only screen:** a screen that cannot change anything. **Owner screen:** a tablet paired with the owner setting. **Removed screen:** a screen the owner took off the list.
 - **Pairing code:** six letters and digits that let one new screen join. It works once, for 10 minutes.
@@ -13,8 +13,8 @@ For Freddy. Plain engineering notes on what exists on `kds/connected` (82d109f) 
 
 - **The main computer** (`server/server.mjs`): a small Node program that holds one kitchen, applies actions with the same engine as the app, and streams the result to screens. It also serves the app page, a service worker and a manifest.
 - **Show only** (the follower): a page opened with `?follow=<hub address>` shows the main computer's kitchen and refuses every local write.
-- **Use this hub for orders**: a page opened with `?hub=<hub address>`, or joined from Settings, lets a tablet take orders through the main computer. A bare `?hub` means the main computer that served the page.
-- **Settings, Use one kitchen on several tablets**: the sheet for both. Show only: address, code, **Connect**. Use this hub for orders: address, code, a name for the screen, **Check the hub**, the choice (show the main computer's kitchen, or send this tablet's kitchen into an empty hub), **Join the hub**, **Leave the hub**.
+- **Use the main computer for orders**: a page opened with `?hub=<hub address>`, or joined from Settings, lets a tablet take orders through the main computer. A bare `?hub` means the main computer that served the page.
+- **Settings, Use one kitchen on several tablets**: the sheet for both. Show only: address, code, **Connect**. Use the main computer for orders: address, code, a name for the screen, **Check the main computer**, the choice (show the main computer's kitchen, or send this tablet's kitchen into an empty hub), **Join this kitchen**, **Leave the shared kitchen**.
 - **Refused taps** show "Not done:" with the reason and are rolled back on that tablet only.
 - **Undo** works only on your own last action while nobody else has acted since; otherwise "Someone else changed the kitchen since, so this cannot be undone from here. Fix it by hand."
 - **Last known kitchen:** a page reloaded while the main computer is down shows the last copy ("Last known, from" a time) and keeps trying.
@@ -88,7 +88,7 @@ What each error means. The names and the 403 and 426 answers were checked with `
 | `badPairCode` | "That pairing code is wrong or has expired. Ask the owner for a new one." | Make a new code. Codes work once and last 10 minutes. |
 | `tooManyTries` | "Too many wrong tries. Wait a few minutes, or ask the owner for a new code." | Wait ten minutes, or make a new code. |
 
-The pairing field in the join form (A2, `night/a2-c7`) is not in this build, so there is no screen yet to type the code on. The Guide does not mention pairing until it lands.
+On the tablet, the join form shows **Pairing code** and **Pair this tablet** when the main computer asks for pairing. The code works once and lasts 10 minutes. After a screen is removed it shows **Leave and pair again**. The Guide page "Several screens (test feature)" describes this. The walk proves it against a local main computer.
 
 ## Try it on two browser tabs
 

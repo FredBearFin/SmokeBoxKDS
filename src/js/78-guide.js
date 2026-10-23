@@ -995,22 +995,26 @@
      },
      {
       "t": "h",
-      "x": "Use this hub for orders"
+      "x": "Use the main computer for orders"
      },
      {
       "t": "p",
-      "x": "For a tablet that takes orders too. Tap **Use this hub for orders on this tablet**. Type the address, the code and a name for this screen, like Pass. Tap **Check the hub**, then choose one:"
+      "x": "For a tablet that takes orders too. Tap **Use the main computer for orders on this tablet**. Type the **Address of the main computer** and a name for this screen, like Pass. Tap **Check the main computer**, then choose one:"
      },
      {
       "t": "ul",
       "x": [
-       "Show the hub's kitchen on this tablet. Your own saved kitchen stays untouched.",
-       "Send this tablet's kitchen to the hub. This works only if the main computer has no kitchen yet. Smokebox never mixes two kitchens."
+       "Show the shared kitchen on this tablet. Your own saved kitchen stays untouched.",
+       "Send this tablet's kitchen to the main computer. This works only if it has no kitchen yet. Smokebox never mixes two kitchens."
       ]
      },
      {
       "t": "p",
-      "x": "Then tap **Join the hub**. Tap **Leave the hub** to go back."
+      "x": "Then tap **Join this kitchen**. Tap **Leave the shared kitchen** to go back."
+     },
+     {
+      "t": "p",
+      "x": "If the main computer asks for a **Pairing code**, ask the person who runs it. Type it and tap **Pair this tablet**. The code works once and lasts 10 minutes. If this tablet was removed, tap **Leave and pair again**."
      },
      {
       "t": "h",
