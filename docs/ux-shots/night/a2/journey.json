@@ -146,7 +146,7 @@
     "notes": [
      {
       "kind": "info",
-      "text": "Next-step card: \"Your menu is ready Your menu has 3 dishes. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices. Add more dishes Show me h\""
+      "text": "Next-step card: \"Your menu is ready Your menu has 3 dishes. Tap New ticket to take a first order. Tax, hours and PIN are under Settings, Dishes and prices. Add more dishes Show \""
      }
     ],
     "screen": "Kitchen board",
@@ -249,7 +249,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 2797,
+  "addThreeDishesWallMs": 2872,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -516,7 +516,7 @@
     "notes": [
      {
       "kind": "info",
-      "text": "Next-step card: \"Your menu is ready Your menu has 3 dishes. Tap New ticket to take a first order. Tax, hours and PIN are under Menu, Dishes and prices. Add more dishes Show me h\""
+      "text": "Next-step card: \"Your menu is ready Your menu has 3 dishes. Tap New ticket to take a first order. Tax, hours and PIN are under Settings, Dishes and prices. Add more dishes Show \""
      }
     ],
     "screen": "Kitchen board",
@@ -571,7 +571,7 @@
     ],
     "screen": "Kitchen board",
     "toasts": [
-     "Ticket #101 sent to 1 station. Paid $20.00 by cash."
+     "Ticket #101 sent. Paid $20.00 by cash."
     ],
     "shot": "08-D-first-paid-ticket.png"
    },
@@ -619,7 +619,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 2046,
+  "addThreeDishesWallMs": 2276,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -690,7 +690,7 @@
     "notes": [
      {
       "kind": "info",
-      "text": "Question card: Do you cook any of this ahead and hold it? Soup in a warmer, salads in a cooler. If you do, Smokebox can track each batc"
+      "text": "Question card: Do you cook food ahead? Soup in a warmer, salads in a cooler. If you do, Smokebox can track each batch and warn you befo"
      },
      {
       "kind": "tap",
