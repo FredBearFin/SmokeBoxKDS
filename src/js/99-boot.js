@@ -109,18 +109,12 @@
 
   // Watches for a device clock that jumped far ahead (or saved times far ahead of it) and asks the owner, once per episode, whether the new time is right.
   function watchClock() {
-    let asking = false, toldWrong = false;
+    let toldWrong = false;
     setInterval(() => {
       try {
         const s = SB.store.status();
         if (s.clockWrong && !toldWrong && SB.ui && SB.ui.toast) { toldWrong = true; SB.ui.toast("This device's clock looks wrong: some saved times are far ahead of it. Smokebox kept the device clock. Check the date and time in the device's settings.", { tone: 'warn', ms: 20000 }); }
-        // On the board the calm strip notice asks instead (a box over the screen would block tickets).
-        if (SB.floor && SB.floor.isMounted && SB.floor.isMounted()) return;
-        if (!s.clockSuspect || asking || !SB.ui || !SB.ui.confirm) return;
-        asking = true;
-        const days = Math.round(s.clockSuspect.aheadMs / 86400000);
-        SB.ui.confirm({ title: "This device's clock jumped ahead", body: ["The date or time on this device just moved ahead by about " + (days >= 2 ? days + ' days' : Math.round(s.clockSuspect.aheadMs / 3600000) + ' hours') + '. Smokebox is still counting from the old time so no batch is thrown out by mistake.', 'If the new time is right (the device was off or asleep that long), choose Use the new time. If the clock is wrong, fix it in the device settings and choose Keep the old time.'], confirmLabel: 'Use the new time', cancelLabel: 'Keep the old time', tone: 'danger' })
-          .then((yes) => { if (yes) { SB.store.acceptClockJump(); asking = false; } else setTimeout(() => { asking = false; }, 10 * 60e3); });
+        // The board's strip notice and the slim banner on back-office pages (60-shell.js) ask about a clock jump; no box covers the screen.
       } catch (e) { /* the watcher must never break the board */ }
     }, 5000);
   }

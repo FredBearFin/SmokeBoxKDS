@@ -731,3 +731,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 @media (min-width: 3000px) { .sb-banner { min-height: 64px; font-size: 28px; } .sb-banner .btn { min-height: 52px; font-size: 24px; } }
 /* On touch-sized screens the buttons in the reminder and demo bars are full 44 px targets. */
 @media (max-width: 1024px), (pointer: coarse) { .sb-banner .btn { min-height: 44px; } }
+
+/* The clock question may use two lines so a phone can read it all; the page below starts under the whole strip. */
+.sb-banner[data-kind="clock"] { min-height: 40px; align-items: center; }
+.sb-banner[data-kind="clock"] .sb-banner-t { white-space: normal; overflow: visible; line-height: 1.25; }

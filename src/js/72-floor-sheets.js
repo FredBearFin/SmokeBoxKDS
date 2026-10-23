@@ -1789,7 +1789,7 @@
       text(dLive, String(s.tickets.length - demo)); text(dDemo, String(demo));
       if (!sim || typeof sim.sampleInfo !== 'function') { text(dSample, 'Not loaded'); return; }
       if (sim.sampleEnabled && !sim.sampleEnabled()) { text(dSample, 'Switched off'); return; }
-      if (paintCounts.info) { text(dSample, U.fmtNum(paintCounts.info.tickets) + ' tickets over ' + paintCounts.info.days + ' days'); return; }
+      if (paintCounts.info) { text(dSample, U.fmtNum(paintCounts.info.tickets) + ' ' + plural(paintCounts.info.tickets, 'ticket') + ' over ' + paintCounts.info.days + ' ' + plural(paintCounts.info.days, 'day')); return; }
       text(dSample, 'Counting...');
       if (!paintCounts.asked) {
         paintCounts.asked = true;

@@ -53,7 +53,7 @@
         eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
     }
-    // Discards whose batch has since been dropped from the cabinet list are still in the safety record (kept about six months):
+    // Discards whose batch has since been dropped from the cabinet list are still in the safety record (kept for the engine's safety-record time):
     // show them from that entry, with what the entry holds (the amount, the reason, who) and nothing invented.
     const ingName = (id) => { const i = (state.ingredients || []).find((x) => x && x.id === id); return i && i.name ? i.name : id || 'Food'; };
     for (const [batchId, row] of logged) {

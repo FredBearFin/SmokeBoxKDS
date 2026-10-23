@@ -64,3 +64,6 @@
 .ox-acts .ox-how { min-width: 140px; gap: var(--sp-1); }
 .ox-how-k { color: var(--ink2); font-weight: var(--w-semi); }
 .ox-how-v { font-weight: var(--w-heavy); }
+
+/* A closed-day sale keeps a quiet, dashed Reopen button that explains itself; a tap still gives the full reason. */
+.ox-acts .ox-reopen.is-shut { border-style: dashed; color: var(--muted, inherit); white-space: normal; text-align: center; }
