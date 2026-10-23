@@ -1289,6 +1289,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .pin-forgot p { margin: var(--sp-2) 0; }
 /* On a 4K screen the reminder bar grows with the board, so the demo or backup notice is readable from across the room. */
 @media (min-width: 3000px) { .sb-banner { min-height: 64px; font-size: 28px; } .sb-banner .btn { min-height: 52px; font-size: 24px; } }
+/* On touch-sized screens the buttons in the reminder and demo bars are full 44 px targets. */
+@media (max-width: 1024px), (pointer: coarse) { .sb-banner .btn { min-height: 44px; } }
 
 </style>
 </head>
@@ -1503,7 +1505,14 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   U.dateKey = (ts) => { const d = new Date(ts); return d.getFullYear() + '-' + U.pad2(d.getMonth() + 1) + '-' + U.pad2(d.getDate()); };
   // The service day a moment belongs to. 12:45 am on the 18th gives the 17th, because the day only
   // turns over at dayStartHour (4 am unless given).
-  U.serviceDate = (ts, dayStartHour) => U.dateKey(ts - (dayStartHour == null ? U.DAY_START_HOUR : dayStartHour) * 3600e3);
+  // WATCH OUT: it goes by the clock on the wall, not by subtracting hours, so on the two daylight-saving nights the day still
+  // turns over at 4 am by the wall clock (subtracting 4 hours of real time moved the turn-over to 3 am or 5 am).
+  U.serviceDate = (ts, dayStartHour) => {
+    const h = dayStartHour == null ? U.DAY_START_HOUR : dayStartHour;
+    const d = new Date(ts);
+    const early = d.getHours() + d.getMinutes() / 60 < h;
+    return U.dateKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() - (early ? 1 : 0), 12).getTime());
+  };
   // Turns "YYYY-MM-DD" back into the moment of local midnight starting that date.
   U.dateKeyToMs = (key) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d).getTime(); };
   // Date text n days later (earlier if n is negative). It steps from midday so a daylight-saving change
@@ -1575,7 +1584,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.cookAheadSkipped', 'lastgood', 'corruptat', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'lastgood', 'corruptat', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -4157,6 +4166,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
       stage = 'store';
       if (SB.store && typeof SB.store.init === 'function') SB.store.init({ blank: true, mode: SB.util.mode() }); // a brand-new install starts empty; saved data is never changed
       // The demo (its own saved data) opens with its sample tickets the first time.
+      // A brand-new empty kitchen gets neutral station and menu-section names (saved with it); old kitchens and the demo keep theirs.
+      if (SB.store && SB.store.isBlank && SB.store.isBlank() && SB.store.applyStarterNames) SB.store.applyStarterNames();
       if (SB.store && SB.store.isDemo && SB.store.isDemo() && SB.store.status().firstRun && SB.sim && SB.sim.seedFirstRun) SB.sim.seedFirstRun();
       // A first run is a real, empty kitchen: the demo tickets and batches only load when the user asks for the demo.
       stage = 'shell';

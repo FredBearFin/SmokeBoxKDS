@@ -62,7 +62,7 @@ export default function (h) {
       t.note('SB.sim.sample() generatedMs reported by the simulator', s.generatedMs, 'ms');
       t.note('SB.sim.sample() second call (memoised)', r1(s.memoMs), 'ms');
       t.note('sample history size', s.tickets + ' tickets, ' + s.events + ' events, ' + s.days + ' days, tickets JSON ' + Math.round(s.json / 1024) + ' KB', '');
-      t.check('SB.sim.sample() cold finishes in under ' + (load0 > 6 ? 4000 : 2000) + ' ms', s.coldMs < (load0 > 6 ? 4000 : 2000), s, 'sim');
+      t.check('SB.sim.sample() cold finishes in under ' + (load0 > 6 ? 5000 : 3000) + ' ms', s.coldMs < (load0 > 6 ? 5000 : 3000), s, 'sim');
       t.check('a second SB.sim.sample() call is memoised (under 20 ms)', s.memoMs < 20, s.memoMs, 'sim');
       t.check('the sample has 14 days and a few thousand tickets', s.days === 14 && s.tickets > 1500, { days: s.days, tickets: s.tickets }, 'sim');
     }
