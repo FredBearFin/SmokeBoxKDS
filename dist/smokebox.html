@@ -3871,6 +3871,8 @@ a.of-nav:active { background: var(--press); }
 .si-table { width: 100%; border-collapse: collapse; font-size: var(--fs-2); }
 .si-table th, .si-table td { padding: 6px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft, var(--line)); }
 .si-corr { font-style: italic; }
+.si-fact { color: var(--ink3); font-size: var(--fs-2); }
+.si-notcovered { color: var(--ink3); }
 .si-preview { overflow-x: auto; }
 @media print {
   body:has(.sb-printroot) > *:not(.sb-printroot) { display: none !important; }
@@ -27955,7 +27957,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "The Danger zone has **Erase live data** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either."
+      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either."
      }
     ]
    },
@@ -32101,7 +32103,7 @@ a.of-nav:active { background: var(--press); }
           set('hold', 'Each product has its own hold limit, never more than ' + (S.hardCapH) + ' hours', 'The throw-out time throws the batch out when it is reached. A quality limit is a house rule for food held at temperature: at the limit the batch is taken off the menu but stays on the board until someone tastes it, and it can be kept serving for 30 minutes or 1 hour at a time while a reading of ' + S.hotHoldF + ' F or higher (cold food ' + S.coldHoldF + ' F or lower) is logged within the check interval. Every extension is logged with who and when. The hard cap of ' + (S.hardCapH) + ' hours throws out any batch (products whose limit is at or above it have no quality stage). Slaw, potato salad and banana pudding start with a quality limit for the owner to confirm: if you hold them outside temperature control, make theirs a safety limit. Your local health department\'s rules apply to quality extensions. Brisket and pulled pork starter limits are placeholders for the owner to confirm.');
           set('grace', 'Grace of ' + S.belowHotGraceH + ' hours below ' + T(S.hotHoldF) + ' (cold food: ' + S.aboveColdGraceH + ' hours above ' + T(S.coldHoldF) + ')', 'The clock starts at the first reading outside the limit. After the grace time the batch is thrown out.');
           set('checks', 'A temperature reading every ' + U.minutesText(S.tempCheckEveryMin), 'A late reading is flagged and counted here. It does not stop service by itself.');
-          set('sanitize', 'Sanitize food-contact surfaces every ' + S.sanitizeEveryH + ' hours', 'A late round is a warning on the line and counts against the checks-kept score. FDA Food Code 4-602.11.');
+          set('sanitize', 'Sanitize food-contact surfaces every ' + S.sanitizeEveryH + ' hours', 'A late round is a warning on the line and counts against the checks-kept score. Four hours is our starting value; set the limit your health department gives you.');
           // Kept on purpose: the grace clock starts later here than in the research report (finding F-E1).
           B.setText(note, 'Smokebox starts the ' + S.belowHotGraceH + '-hour clock at the first reading below ' + T(S.hotHoldF) + '. Some health departments start it when the food left the heat, which is stricter. Check which one yours uses.');
         };
@@ -32846,7 +32848,7 @@ a.of-nav:active { background: var(--press); }
       label: 'Opening amount (par)', aria: 'Opening amount of ' + nm, value: ing0.parG, min: 0, max: 1e7, step: pieces ? 1 : 100, big: pieces ? 10 : 1000, unit: pieces ? 'pieces' : 'g', meta: parMeta,
       read: pieces ? null : (u) => U.weightText(u),
       // Par saves through the engine; the line under the row confirms it.
-      save: (v) => mkPatch({ parG: v }, 'Saved. Par is ' + amountText(ing0, v) + '. After you reset live data and keep settings, opening stock starts at this amount.', parMeta), onSaved: (t) => status.ok(t),
+      save: (v) => mkPatch({ parG: v }, 'Saved. Par is ' + amountText(ing0, v) + '. After you erase tickets and records and keep settings, opening stock starts at this amount.', parMeta), onSaved: (t) => status.ok(t),
     });
     const thr = numField({
       label: 'Sold out at', aria: 'Sold out at, ' + nm, value: ing0.thresholdG, min: 0, max: 1e7, step: pieces ? 1 : 50, big: pieces ? 10 : 500, unit: pieces ? 'pieces' : 'g', meta: thrMeta,
@@ -33139,7 +33141,7 @@ a.of-nav:active { background: var(--press); }
     hotHoldF: 'The model Food Code sets 135\u00a0°F as the minimum for hot holding. Your local health code applies and may be stricter (some states use 140).',
     reheatF: 'The FDA Food Code sets 165 °F as the minimum reheat target. Your local health code applies.',
     coldHoldF: 'The FDA Food Code sets 41 °F as the maximum for cold holding. Your local health code applies.',
-    belowHotGraceH: 'Our starting value is 2 hours; the model Food Code sets no fixed limit here. Set the limit your local health department gives you.', aboveColdGraceH: 'Our starting value is 4 hours; the model Food Code sets no fixed limit here. Set the limit your local health department gives you.', sanitizeEveryH: 'The model Food Code (4-602.11) says at most 4 hours between wipe-downs. Check your local code.',
+    belowHotGraceH: 'Our starting value is 2 hours; the model Food Code sets no fixed limit here. Set the limit your local health department gives you.', aboveColdGraceH: 'Our starting value is 4 hours; the model Food Code sets no fixed limit here. Set the limit your local health department gives you.', sanitizeEveryH: 'Our starting value is 4 hours. Set the limit your local health department gives you.',
   };
 
   // Panel 5: food-safety limits, always inside the legal bounds, with the legal note shown.
@@ -33380,16 +33382,6 @@ a.of-nav:active { background: var(--press); }
         else { outTog.setValue(!v); sst.bad(refusal(r, { name: 'Sound outside open hours' })); }
       },
     });
-    // Minutes a dish off the menu for a quality limit waits before the channels hear it, in case it is kept serving.
-    const qMeta = { name: 'Wait before other apps are told', fmt: (v) => v + ' min' };
-    META['service.qualitySyncHoldMin'] = qMeta;
-    const qHold = numField({
-      label: 'Wait before other apps are told an item is past its quality limit', value: (cur() || {}).settings.service.qualitySyncHoldMin, min: 0, max: 30, step: 1, unit: 'min', meta: qMeta,
-      hint: 'A dish past its quality limit may be tasted and kept. The delivery apps are told it is off only after this wait. A safety lock tells them at once.',
-      // Saves the wait as a service setting and confirms it in words.
-      save: (v) => saveSetting('service.qualitySyncHoldMin', v, 'Saved. Channels wait ' + v + ' min.', qMeta), onSaved: (t) => sst.ok(t),
-    });
-    hgrid.appendChild(qHold.el);
     pn.body.append(hgrid, h('div', { class: 'od-toggle-row' }, outTog), sst.el);
 
     // Sales tax: one rate that is added to every order when it is paid.
@@ -33819,8 +33811,8 @@ a.of-nav:active { background: var(--press); }
     // Danger zone: two reset buttons, each opening a box that asks for a typed word before it will act.
     pn.body.appendChild(h('h3', { class: 'od-sub od-danger-h', id: undefined }, 'Danger zone: erase data'));
     const resetStatus = statusLine();
-    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I erase live data', checked: true });
-    const resetLiveBtn = btn('Erase live data', { icon: 'trash', cls: 'btn-danger' });
+    const keep = SB.ui.toggle({ label: 'Keep my dishes, settings and PIN when I erase tickets and records', checked: true });
+    const resetLiveBtn = btn('Erase tickets and records', { icon: 'trash', cls: 'btn-danger' });
     resetLiveBtn.dataset.action = 'reset-live';
     const resetAllBtn = btn('Erase everything', { icon: 'trash', cls: 'btn-danger' });
     resetAllBtn.dataset.action = 'reset-all';
@@ -33852,7 +33844,7 @@ a.of-nav:active { background: var(--press); }
     resetLiveBtn.addEventListener('click', () => {
       const s = stateNow(), k = keep.getValue();
       askTyped({
-        opener: resetLiveBtn, title: 'Erase live data?', word: 'ERASE', label: 'Erase live data',
+        opener: resetLiveBtn, title: 'Erase tickets and records?', word: 'ERASE', label: 'Erase tickets and records',
         lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any demo orders, and sets the clock back to real time.',
           k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
           'There is no undo. Back up first if you might want this data.'],
@@ -33880,7 +33872,7 @@ a.of-nav:active { background: var(--press); }
       });
     });
     pn.body.append(
-      para('Erasing live data removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
+      para('Erasing tickets and records removes tickets, records and batches. Erasing everything also puts the dishes, ingredients and every setting back to the starter values. Neither can be undone, so back up first (card 1 above).', 'od-p'),
       h('div', { class: 'od-toggle-row' }, keep),
       h('div', { class: 'od-actions' }, resetLiveBtn, resetAllBtn), dangerBox, resetStatus.el);
 
@@ -34881,7 +34873,7 @@ a.of-nav:active { background: var(--press); }
     const paintLine = () => {
       const d = drawerExpected(drawer.text, m);
       U.clear(line);
-      if (d.bad) { line.append('Type the starting cash as dollars, like 150 or 150.00, or leave it empty. Without it: cash paid today is ', h('strong', { class: 'num' }, money(d.expected)), '.'); return; }
+      if (d.bad) { line.append('Type the starting cash as an amount, like 150 or 150.00, or leave it empty. Without it: cash paid today is ', h('strong', { class: 'num' }, money(d.expected)), '.'); return; }
       line.append('Cash in the drawer should be ', h('strong', { class: 'num' }, money(d.expected)), ': ', d.start ? money(d.start) + ' you started with, plus ' : '', money(d.cashSales) + ' of cash payments' + (d.cashTips > 0 ? ' and ' + money(d.cashTips) + ' of tips paid in cash' : '') + '. This is a helper for counting the drawer, not an audit.');
     };
     // Keeps the typed text and updates the sentence on every keystroke.
@@ -35090,9 +35082,9 @@ a.of-nav:active { background: var(--press); }
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const KIND = {
     temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
-    sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
+    batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
   };
-  const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other' };
+  const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit' };
 
   // ---- 1. Pure rows ----
 
@@ -35117,11 +35109,59 @@ a.of-nav:active { background: var(--press); }
       case 'temp_logged': return (isNum(e.f) ? U.tempText(e.f) : '') + (lateWords(e) ? ', ' + lateWords(e) : '');
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
       case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '');
+      case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
       case 'cooling_started': return isNum(e.g) ? U.weightText(e.g) : '';
       case 'sanitize_done': return lateWords(e);
       case 'quality_extend': return isNum(e.until) ? 'Until ' + U.fmtTime(e.until) : '';
       default: return e.note || '';
     }
+  }
+
+  // How long a span is, in plain words: "45 min" under two hours, else "2.5 h".
+  function spanWords(ms) {
+    const min = Math.max(0, Math.round(ms / 60000));
+    return min < 120 ? min + ' min' : Math.round(min / 6) / 10 + ' h';
+  }
+
+  // The plain facts about the batch an entry is about: when it was made, days since for cold food, and for cooling
+  // the readings so far against the owner's own cooling limits. Words only, never a rule; empty when the batch is gone.
+  function factsOf(state, e) {
+    const b = (state.batches || []).find((x) => x && x.id === e.batchId);
+    if (!b || !isNum(b.enteredAt)) return [];
+    const out = [];
+    const made = isNum(b.coolStartAt) ? b.coolStartAt : b.enteredAt;
+    const S = (state.settings || {}).safety || {};
+    if (b.kind === 'cooling') {
+      out.push('Cooling began ' + U.fmtDateShort(U.dateKey(made)) + ' ' + U.fmtTime(made));
+      if (isNum(e.t) && e.type === 'temp_logged' && e.t >= made) out.push(spanWords(e.t - made) + ' into cooling');
+      const c = S.cooling || {};
+      if (isNum(c.stage1ToF) && isNum(c.stage1H) && isNum(c.finalF) && isNum(c.totalH)) out.push('Your limit: ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' h, ' + U.tempText(c.finalF) + ' within ' + c.totalH + ' h');
+      if (e.type === 'cooling_started') return out.concat(readingsOf(b, made));
+      return out;
+    }
+    out.push(b.fridge && b.madeOn ? 'Made ' + madeWords(b.madeOn) : 'Made ' + U.fmtDateShort(U.dateKey(b.enteredAt)) + ' ' + U.fmtTime(b.enteredAt));
+    if (b.fridge) {
+      if (isNum(b.fridgeDays) && b.madeOn) out.push('Your fridge limit: ' + b.fridgeDays + ' ' + U.plural(b.fridgeDays, 'day', 'days') + ', last day ' + madeWords(U.addDays(b.madeOn, b.fridgeDays - 1)));
+      const ci = isNum(e.t) && SB.engine && SB.engine.coldInfo ? SB.engine.coldInfo(b, e.t) : null;
+      const outMs = isNum(e.outMs) ? e.outMs : ci ? ci.outMs : isNum(b.lineMs) ? b.lineMs : null;
+      if (isNum(outMs)) out.push('Out of the fridge so far: ' + spanWords(outMs) + (isNum(b.outHours) ? ' (your limit ' + b.outHours + ' h)' : ''));
+      return out;
+    }
+    if (b.kind === 'cold' && isNum(e.t) && e.t >= b.enteredAt) {
+      const days = Math.floor((e.t - b.enteredAt) / 86400e3);
+      out.push(days + ' ' + U.plural(days, 'day', 'days') + ' in the fridge');
+    }
+    if (isNum(b.maxHoldH) && (e.type === 'batch_discard' || e.type === 'quality_extend')) out.push('Your limit: ' + U.plural(b.maxHoldH, b.maxHoldH + ' hour', b.maxHoldH + ' hours'));
+    return out;
+  }
+
+  // A made-on day key as short words, like "Sat 10/17".
+  function madeWords(key) { return U.fmtDateShort(key); }
+
+  // The cooling readings of a batch as short words, oldest first, at most six.
+  function readingsOf(b, from) {
+    const t = (b.temps || []).filter((r) => r && isNum(r.t) && isNum(r.f)).slice(0, 6);
+    return t.length ? ['Readings: ' + t.map((r) => U.fmtTime(r.t) + ' ' + U.tempText(r.f) + ' (' + spanWords(r.t - from) + ')').join(', ')] : [];
   }
 
   // Safety log rows from `from` up to (not including) `to`, oldest first:
@@ -35130,7 +35170,7 @@ a.of-nav:active { background: var(--press); }
     if (!state || !SB.engine || !SB.engine.safetyLog) return [];
     const rows = SB.engine.safetyLog(state).filter((r) => r.event.type !== 'safety_correction' && isNum(r.event.t) && r.event.t >= from && r.event.t < to);
     return rows.map((r) => ({
-      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), who: r.event.who || '',
+      id: r.event.id, at: r.event.t, kind: KIND[r.event.type] || 'Safety entry', food: foodOf(state, r.event), detail: detailOf(r.event), facts: factsOf(state, r.event), who: r.event.who || '',
       corrections: r.corrections.map((c) => ({ at: c.t, who: c.who || '', note: c.note || '' })),
     }));
   }
@@ -35147,7 +35187,7 @@ a.of-nav:active { background: var(--press); }
     return { from: at(first), to: at(next), label: r.days === 1 ? U.fmtDateShort(today) : U.fmtDateShort(first) + ' to ' + U.fmtDateShort(today) };
   }
 
-  O.inspectorPure = { inspectorRows, rangeFor, RANGES };
+  O.inspectorPure = { inspectorRows, factsOf, rangeFor, RANGES };
   if (!g.document) return; // Node: the pure rows are all the tests need
 
   // ---- 2. The sheet and printing ----
@@ -35159,12 +35199,15 @@ a.of-nav:active { background: var(--press); }
   // Builds the printable table for a window as an element (used for both the preview and the print block).
   function recordTable(rows) {
     const body = rows.map((r) => h('tr', null,
-      h('td', null, U.fmtDateShort(U.dateKey(r.at)) + ' ' + U.fmtTime(r.at)), h('td', null, r.kind), h('td', null, r.food), h('td', null, r.detail), h('td', null, r.who || 'not recorded'),
+      h('td', null, U.fmtDateShort(U.dateKey(r.at)) + ' ' + U.fmtTime(r.at)), h('td', null, r.kind), h('td', null, r.food), h('td', null, r.detail, (r.facts || []).map((f) => h('div', { class: 'si-fact' }, f))), h('td', null, r.who || 'not recorded'),
       h('td', null, r.corrections.map((c) => h('div', { class: 'si-corr' }, 'Correction ' + U.fmtDateShort(U.dateKey(c.at)) + ' ' + U.fmtTime(c.at) + (c.who ? ' by ' + c.who : '') + ': ' + c.note)))));
     return h('table', { class: 'si-table' },
       h('thead', null, h('tr', null, ['When', 'What', 'Food', 'Detail', 'Logged by', 'Corrections added later'].map((t) => h('th', null, t)))),
       h('tbody', null, body.length ? body : h('tr', null, h('td', { colspan: 6 }, 'No safety entries in this range.'))));
   }
+
+  // The honest line about what this record does not hold, so nobody reads it as the whole paperwork.
+  const NOT_COVERED = 'This record covers batches only. It has no cooler or freezer readings, sanitizer strip readings or thermometer checks; keep those on your own sheet and ask your health department what to keep and for how long.';
 
   // Opens the sheet: pick a date range, see the record, print it.
   function openInspectorLog() {
@@ -35187,6 +35230,7 @@ a.of-nav:active { background: var(--press); }
     const doPrint = () => printRecord(rangeId);
     sheet.body.append(
       h('p', { class: 'si-lead' }, 'This is your own record of readings, reheats, cooling, sanitize rounds and thrown-out food. It is not an inspection result. Entries are never edited; if something was wrong, a correction is added under it.'),
+      h('p', { class: 'si-lead si-notcovered' }, NOT_COVERED),
       h('div', { class: 'si-actions' }, h('label', null, 'Range ', sel), h('button', { type: 'button', class: 'btn btn-primary', onClick: doPrint }, 'Print')), preview);
     paint();
     return sheet;
@@ -35204,6 +35248,7 @@ a.of-nav:active { background: var(--press); }
       h('p', { class: 'si-note' }, 'The owner\'s own record of what was logged in this kitchen. It is not an inspection result. Entries are never edited; corrections are added under the entry they correct.'),
       demo ? h('p', { class: 'si-note' }, 'This is a demo kitchen, so these entries are demo entries.') : null,
       recordTable(rows),
+      h('p', { class: 'si-note' }, NOT_COVERED),
       h('p', { class: 'si-note' }, 'Printed ' + U.fmtDateShort(U.dateKey(Date.now())) + ' ' + U.fmtTime(Date.now()) + '. Reviewed by: ______________   Date: ________'));
     document.body.appendChild(root);
     // Removes the print-only block once the print dialog is done (or at once when printing is unavailable).
