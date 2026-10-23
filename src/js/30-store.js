@@ -234,6 +234,22 @@
     st.saveDelayMs = wait;
     saveTimer = setTimeout(timedSave, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
   }
+  // Compact saved form (fmt 2): used for big kitchens, so the same browser space holds about twice the history. The packer keeps its tables for the
+  // life of the page. compactMode is 'auto' (compact once the kitchen has 300 tickets or 2,500 events), 'always' or 'never' (init option compact).
+  const packer = U.makePacker();
+  let compactMode = 'auto';
+  // True when this state should be saved in the compact form.
+  const wantCompact = (s2) => compactMode === 'always' || (compactMode === 'auto' && (s2.tickets.length >= 300 || E().allEvents(s2).length >= 2500));
+  // Turns a stored copy into the readable shape every other part expects: a compact copy (fmt 2) is unpacked, anything else is returned as it is.
+  // A compact copy that cannot be unpacked comes back without a state, so the usual damaged-save handling takes over. A newer format number is
+  // treated the same way (this build cannot read it).
+  function openSaved(payload) {
+    if (!payload || typeof payload !== 'object' || payload.fmt === undefined) return payload;
+    const out = Object.assign({}, payload);
+    delete out.p;
+    if (payload.fmt === 2) { try { out.state = packer.unpack(payload.p); } catch (e) { out.state = undefined; } } else out.state = undefined;
+    return out;
+  }
   // Whole calendar days from one service day text to a later one.
   const daysBetween = (a, b) => Math.round((U.dateKeyToMs(b) - U.dateKeyToMs(a)) / 864e5);
   // Forgets the oldest saved day, so the next save starts counting again (after a restore, a reset or Close the month, which remove history on purpose).
@@ -344,7 +360,11 @@
     let nt = Math.min(state.tickets.length, 1500), ne = Math.min(E().allEvents(state).length, 10000);
     for (let tries = 0; tries < 12; tries++) {
       const s2 = lim ? E().prune(state, lim) : state;
-      try { ok = storage.set(KEY, { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, ops: journal, era, state: s2 }) !== false; } catch (e) { ok = false; }
+      try {
+        const env = { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, ops: journal, era };
+        if (wantCompact(s2)) { env.fmt = 2; env.p = packer.pack(s2); } else env.state = s2;
+        ok = storage.set(KEY, env) !== false;
+      } catch (e) { ok = false; }
       if (ok) { st.trimmed = !!lim; kept2 = s2; break; }
       // Under pressure the rolling copy goes first: it is only a convenience, the live save is the data.
       if (!snapDropped && strict) { snapDropped = true; snapAt = 0; try { storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } tries--; continue; }
@@ -469,7 +489,7 @@
   // Loads the newest saved copy from storage and returns it checked, or null.
   function loadStored() {
     let payload = null;
-    try { payload = storage.get(KEY, null); } catch (e) { payload = null; }
+    try { payload = openSaved(storage.get(KEY, null)); } catch (e) { payload = null; }
     if (payload == null) return null;
     const v = E().validateBackup(payload);
     return v.ok ? v.state : null;
@@ -477,7 +497,7 @@
   // Same, but also gives the journal of action ids the saved copy carries (null for a copy from an older build): { state, ops } or null.
   function loadStoredFull() {
     let payload = null;
-    try { payload = storage.get(KEY, null); } catch (e) { payload = null; }
+    try { payload = openSaved(storage.get(KEY, null)); } catch (e) { payload = null; }
     if (payload == null) return null;
     const v = E().validateBackup(payload);
     if (!v.ok) return null;
@@ -745,7 +765,7 @@
     outbox = []; seenOps = new Set(); acked.clear();      // opN is never reset: an action id must not repeat in one page, or a hub or another tab that remembers it takes the new action for a repeat
     const r = realNow();
     let payload = null;
-    try { payload = storage.get(KEY, null); } catch (e) { payload = null; }
+    try { payload = openSaved(storage.get(KEY, null)); } catch (e) { payload = null; }
     try { baseSid = storage.get(SID_KEY, null); } catch (e) { baseSid = null; }
     journal = payload && Array.isArray(payload.ops) ? payload.ops.filter((x) => typeof x === 'string').slice(-JOURNAL_MAX) : [];
     era = payload && typeof payload.era === 'string' ? payload.era : '';
@@ -795,6 +815,7 @@
     snapWanted = null;
     // History fill bookkeeping, and a request that the browser keeps this site's data (real kitchens only; where the browser cannot, nothing happens).
     quotaChars = isNum(opts.quotaBytes) && opts.quotaBytes > 0 ? opts.quotaBytes : 5e6;
+    compactMode = opts.compact === 'always' || opts.compact === 'never' ? opts.compact : 'auto';
     hist = { oldest: null, days: 0, at: 0, droppedBefore: null }; hn = { warnAt: 0, trimAck: 0 };
     try { const h0 = storage.get(HIST_KEY, null); if (h0 && typeof h0 === 'object') hist = Object.assign(hist, { oldest: typeof h0.oldest === 'string' ? h0.oldest : null, days: isNum(h0.days) ? h0.days : 0, at: isNum(h0.at) ? h0.at : 0, droppedBefore: typeof h0.droppedBefore === 'string' ? h0.droppedBefore : null }); } catch (e) { /* none */ }
     try { const n0 = storage.get(HIST_NOTICE_KEY, null); if (n0 && typeof n0 === 'object') hn = { warnAt: isNum(n0.warnAt) ? n0.warnAt : 0, trimAck: isNum(n0.trimAck) ? n0.trimAck : 0 }; } catch (e) { /* none */ }
@@ -1541,13 +1562,13 @@
   function isOwn() { return !!(state && state.catalog === 'own'); }
 
   // Public API: init, destroy, status, getState, now, tick, dispatch, dispatchEx, lastResult, subscribe,
-  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, reconcile, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset,
+  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, reconcile, decodeSaved: openSaved, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset,
   // resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY.
   SB.store = {
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, reconcile, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, reconcile, decodeSaved: openSaved, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").

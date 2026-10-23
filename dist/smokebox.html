@@ -4378,6 +4378,91 @@ a.of-nav:active { background: var(--press); }
     }
     return h.map((x) => ('00000000' + (x >>> 0).toString(16)).slice(-8)).join('');
   };
+  /* ---------- compact saved form (fmt 2): the same data with fewer characters ---------- */
+  // Keys whose string values come from a small set (stations, channels, statuses, event types, dish names...). Their values are replaced by a short
+  // reference into a table kept with the save. Other strings stay as they are.
+  const PACK_ENUM_KEYS = { menuId: 1, zone: 1, cat: 1, channel: 1, src: 1, status: 1, type: 1, method: 1, track: 1, kind: 1, ing: 1, who: 1, name: 1, short: 1, reason: 1, unit: 1, leftovers: 1, place: 1, holdBasis: 1, action: 1, serviceDate: 1, day: 1 };
+  const PACK_MARK = '\u0001', PACK_DICT_MAX = 3000;
+  // A packer turns a saved state into a compact tree and back, losslessly. Every object becomes [schema number + 1, value, value...] where a schema is
+  // the exact list of its keys in order, every non-empty array becomes [0, item, item...], and enum-key strings become references. The tables only
+  // grow while the packer lives, so the packed form of an object that was not changed stays the same from one save to the next: such objects (tickets,
+  // orders, events, archive chunks) are remembered by identity and not worked out again. pack and unpack never change what they are given.
+  U.makePacker = function makePacker() {
+    const dict = [], dictIdx = new Map(), schemas = [], schemaIdx = new Map();
+    const cache = new WeakMap();
+    // The reference text for an enum string (adds it to the table), or the string itself when the table is full or the string is odd.
+    const ref = (str) => {
+      if (str.charCodeAt(0) === 1) return PACK_MARK + str;          // a real string that starts with the marker is escaped by doubling it
+      let i = dictIdx.get(str);
+      if (i === undefined) {
+        if (dict.length >= PACK_DICT_MAX || str.length > 60) return str;
+        i = dict.length; dict.push(str); dictIdx.set(str, i);
+      }
+      return PACK_MARK + i.toString(36);
+    };
+    // Packs any value; key is the key it sits under (decides whether a string becomes a reference).
+    const enc = (v, key) => {
+      if (v === null || typeof v === 'number' || typeof v === 'boolean') return v;
+      if (typeof v === 'string') return key !== undefined && PACK_ENUM_KEYS[key] === 1 ? ref(v) : (v.charCodeAt(0) === 1 ? PACK_MARK + v : v);
+      if (Array.isArray(v)) {
+        if (!v.length) return [];
+        const out = new Array(v.length + 1); out[0] = 0;
+        for (let i = 0; i < v.length; i++) out[i + 1] = enc(v[i], undefined);
+        return out;
+      }
+      if (v && typeof v === 'object') {
+        const hit = cache.get(v);
+        if (hit) return hit;
+        // Keys whose value is undefined are left out, exactly as JSON leaves them out of the plain save.
+        const keys = Object.keys(v).filter((k) => v[k] !== undefined && typeof v[k] !== 'function' && typeof v[k] !== 'symbol'), sk = keys.join('\u0002');
+        let si = schemaIdx.get(sk);
+        if (si === undefined) { si = schemas.length; schemas.push(keys); schemaIdx.set(sk, si); }
+        const out = new Array(keys.length + 1); out[0] = si + 1;
+        for (let i = 0; i < keys.length; i++) out[i + 1] = enc(v[keys[i]], keys[i]);
+        cache.set(v, out);
+        return out;
+      }
+      return null;
+    };
+    // Reads a packed string back: a reference becomes the table entry, a doubled marker loses one marker.
+    const decStr = (str) => {
+      if (str.charCodeAt(0) !== 1) return str;
+      if (str.charCodeAt(1) === 1) return str.slice(1);
+      return dict[parseInt(str.slice(1), 36)];
+    };
+    // Unpacks one packed value into the original value, recursively.
+    const dec = (v) => {
+      if (v === null || typeof v === 'number' || typeof v === 'boolean') return v;
+      if (typeof v === 'string') return decStr(v);
+      if (!Array.isArray(v)) throw new Error('packed value is not packed');
+      if (!v.length) return [];
+      const tag = v[0];
+      if (tag === 0) { const out = new Array(v.length - 1); for (let i = 1; i < v.length; i++) out[i - 1] = dec(v[i]); return out; }
+      const keys = schemas[tag - 1];
+      if (!keys || keys.length !== v.length - 1) throw new Error('packed object does not match its keys');
+      const o = {};
+      // A key named __proto__ is set as plain data (assigning it would change the prototype); the common case takes the quick path.
+      if (keys.hasProto === undefined) keys.hasProto = keys.indexOf('__proto__') >= 0;
+      if (!keys.hasProto) { for (let i = 0; i < keys.length; i++) o[keys[i]] = dec(v[i + 1]); return o; }
+      for (let i = 0; i < keys.length; i++) {
+        if (keys[i] === '__proto__') Object.defineProperty(o, '__proto__', { value: dec(v[i + 1]), enumerable: true, writable: true, configurable: true });
+        else o[keys[i]] = dec(v[i + 1]);
+      }
+      return o;
+    };
+    return {
+      // The packed tree and the tables it needs: { d, s, x }.
+      pack(state) { const x = enc(state, undefined); return { d: dict.slice(), s: schemas.map((k) => k.slice()), x }; },
+      // The original state from a packed tree; also adopts its tables so later saves keep the same numbers. Throws when the packed data is damaged.
+      unpack(p) {
+        if (!p || !Array.isArray(p.d) || !Array.isArray(p.s) || p.x === undefined) throw new Error('packed data is incomplete');
+        dict.length = 0; dictIdx.clear(); schemas.length = 0; schemaIdx.clear();
+        for (const d of p.d) { if (typeof d !== 'string') throw new Error('packed table is damaged'); dictIdx.set(d, dict.length); dict.push(d); }
+        for (const k of p.s) { if (!Array.isArray(k) || k.some((x) => typeof x !== 'string')) throw new Error('packed keys are damaged'); schemaIdx.set(k.join('\u0002'), schemas.length); schemas.push(k.slice()); }
+        return dec(p.x);
+      },
+    };
+  };
   // Cleans typed text for names and notes: strips the invisible characters, squeezes runs of white space to single spaces and trims both ends.
   U.cleanText = (s) => U.stripInvisible(s).replace(/\s+/g, ' ').trim();
   /* ---------- secret hashing (PIN and recovery code) ---------- */
@@ -11243,6 +11328,22 @@ a.of-nav:active { background: var(--press); }
     st.saveDelayMs = wait;
     saveTimer = setTimeout(timedSave, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
   }
+  // Compact saved form (fmt 2): used for big kitchens, so the same browser space holds about twice the history. The packer keeps its tables for the
+  // life of the page. compactMode is 'auto' (compact once the kitchen has 300 tickets or 2,500 events), 'always' or 'never' (init option compact).
+  const packer = U.makePacker();
+  let compactMode = 'auto';
+  // True when this state should be saved in the compact form.
+  const wantCompact = (s2) => compactMode === 'always' || (compactMode === 'auto' && (s2.tickets.length >= 300 || E().allEvents(s2).length >= 2500));
+  // Turns a stored copy into the readable shape every other part expects: a compact copy (fmt 2) is unpacked, anything else is returned as it is.
+  // A compact copy that cannot be unpacked comes back without a state, so the usual damaged-save handling takes over. A newer format number is
+  // treated the same way (this build cannot read it).
+  function openSaved(payload) {
+    if (!payload || typeof payload !== 'object' || payload.fmt === undefined) return payload;
+    const out = Object.assign({}, payload);
+    delete out.p;
+    if (payload.fmt === 2) { try { out.state = packer.unpack(payload.p); } catch (e) { out.state = undefined; } } else out.state = undefined;
+    return out;
+  }
   // Whole calendar days from one service day text to a later one.
   const daysBetween = (a, b) => Math.round((U.dateKeyToMs(b) - U.dateKeyToMs(a)) / 864e5);
   // Forgets the oldest saved day, so the next save starts counting again (after a restore, a reset or Close the month, which remove history on purpose).
@@ -11353,7 +11454,11 @@ a.of-nav:active { background: var(--press); }
     let nt = Math.min(state.tickets.length, 1500), ne = Math.min(E().allEvents(state).length, 10000);
     for (let tries = 0; tries < 12; tries++) {
       const s2 = lim ? E().prune(state, lim) : state;
-      try { ok = storage.set(KEY, { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, ops: journal, era, state: s2 }) !== false; } catch (e) { ok = false; }
+      try {
+        const env = { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, ops: journal, era };
+        if (wantCompact(s2)) { env.fmt = 2; env.p = packer.pack(s2); } else env.state = s2;
+        ok = storage.set(KEY, env) !== false;
+      } catch (e) { ok = false; }
       if (ok) { st.trimmed = !!lim; kept2 = s2; break; }
       // Under pressure the rolling copy goes first: it is only a convenience, the live save is the data.
       if (!snapDropped && strict) { snapDropped = true; snapAt = 0; try { storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } tries--; continue; }
@@ -11478,7 +11583,7 @@ a.of-nav:active { background: var(--press); }
   // Loads the newest saved copy from storage and returns it checked, or null.
   function loadStored() {
     let payload = null;
-    try { payload = storage.get(KEY, null); } catch (e) { payload = null; }
+    try { payload = openSaved(storage.get(KEY, null)); } catch (e) { payload = null; }
     if (payload == null) return null;
     const v = E().validateBackup(payload);
     return v.ok ? v.state : null;
@@ -11486,7 +11591,7 @@ a.of-nav:active { background: var(--press); }
   // Same, but also gives the journal of action ids the saved copy carries (null for a copy from an older build): { state, ops } or null.
   function loadStoredFull() {
     let payload = null;
-    try { payload = storage.get(KEY, null); } catch (e) { payload = null; }
+    try { payload = openSaved(storage.get(KEY, null)); } catch (e) { payload = null; }
     if (payload == null) return null;
     const v = E().validateBackup(payload);
     if (!v.ok) return null;
@@ -11754,7 +11859,7 @@ a.of-nav:active { background: var(--press); }
     outbox = []; seenOps = new Set(); acked.clear();      // opN is never reset: an action id must not repeat in one page, or a hub or another tab that remembers it takes the new action for a repeat
     const r = realNow();
     let payload = null;
-    try { payload = storage.get(KEY, null); } catch (e) { payload = null; }
+    try { payload = openSaved(storage.get(KEY, null)); } catch (e) { payload = null; }
     try { baseSid = storage.get(SID_KEY, null); } catch (e) { baseSid = null; }
     journal = payload && Array.isArray(payload.ops) ? payload.ops.filter((x) => typeof x === 'string').slice(-JOURNAL_MAX) : [];
     era = payload && typeof payload.era === 'string' ? payload.era : '';
@@ -11804,6 +11909,7 @@ a.of-nav:active { background: var(--press); }
     snapWanted = null;
     // History fill bookkeeping, and a request that the browser keeps this site's data (real kitchens only; where the browser cannot, nothing happens).
     quotaChars = isNum(opts.quotaBytes) && opts.quotaBytes > 0 ? opts.quotaBytes : 5e6;
+    compactMode = opts.compact === 'always' || opts.compact === 'never' ? opts.compact : 'auto';
     hist = { oldest: null, days: 0, at: 0, droppedBefore: null }; hn = { warnAt: 0, trimAck: 0 };
     try { const h0 = storage.get(HIST_KEY, null); if (h0 && typeof h0 === 'object') hist = Object.assign(hist, { oldest: typeof h0.oldest === 'string' ? h0.oldest : null, days: isNum(h0.days) ? h0.days : 0, at: isNum(h0.at) ? h0.at : 0, droppedBefore: typeof h0.droppedBefore === 'string' ? h0.droppedBefore : null }); } catch (e) { /* none */ }
     try { const n0 = storage.get(HIST_NOTICE_KEY, null); if (n0 && typeof n0 === 'object') hn = { warnAt: isNum(n0.warnAt) ? n0.warnAt : 0, trimAck: isNum(n0.trimAck) ? n0.trimAck : 0 }; } catch (e) { /* none */ }
@@ -12550,13 +12656,13 @@ a.of-nav:active { background: var(--press); }
   function isOwn() { return !!(state && state.catalog === 'own'); }
 
   // Public API: init, destroy, status, getState, now, tick, dispatch, dispatchEx, lastResult, subscribe,
-  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, reconcile, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset,
+  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, reconcile, decodeSaved: openSaved, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset,
   // resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY.
   SB.store = {
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, reconcile, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, reconcile, decodeSaved: openSaved, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").

@@ -66,6 +66,91 @@
     }
     return h.map((x) => ('00000000' + (x >>> 0).toString(16)).slice(-8)).join('');
   };
+  /* ---------- compact saved form (fmt 2): the same data with fewer characters ---------- */
+  // Keys whose string values come from a small set (stations, channels, statuses, event types, dish names...). Their values are replaced by a short
+  // reference into a table kept with the save. Other strings stay as they are.
+  const PACK_ENUM_KEYS = { menuId: 1, zone: 1, cat: 1, channel: 1, src: 1, status: 1, type: 1, method: 1, track: 1, kind: 1, ing: 1, who: 1, name: 1, short: 1, reason: 1, unit: 1, leftovers: 1, place: 1, holdBasis: 1, action: 1, serviceDate: 1, day: 1 };
+  const PACK_MARK = '\u0001', PACK_DICT_MAX = 3000;
+  // A packer turns a saved state into a compact tree and back, losslessly. Every object becomes [schema number + 1, value, value...] where a schema is
+  // the exact list of its keys in order, every non-empty array becomes [0, item, item...], and enum-key strings become references. The tables only
+  // grow while the packer lives, so the packed form of an object that was not changed stays the same from one save to the next: such objects (tickets,
+  // orders, events, archive chunks) are remembered by identity and not worked out again. pack and unpack never change what they are given.
+  U.makePacker = function makePacker() {
+    const dict = [], dictIdx = new Map(), schemas = [], schemaIdx = new Map();
+    const cache = new WeakMap();
+    // The reference text for an enum string (adds it to the table), or the string itself when the table is full or the string is odd.
+    const ref = (str) => {
+      if (str.charCodeAt(0) === 1) return PACK_MARK + str;          // a real string that starts with the marker is escaped by doubling it
+      let i = dictIdx.get(str);
+      if (i === undefined) {
+        if (dict.length >= PACK_DICT_MAX || str.length > 60) return str;
+        i = dict.length; dict.push(str); dictIdx.set(str, i);
+      }
+      return PACK_MARK + i.toString(36);
+    };
+    // Packs any value; key is the key it sits under (decides whether a string becomes a reference).
+    const enc = (v, key) => {
+      if (v === null || typeof v === 'number' || typeof v === 'boolean') return v;
+      if (typeof v === 'string') return key !== undefined && PACK_ENUM_KEYS[key] === 1 ? ref(v) : (v.charCodeAt(0) === 1 ? PACK_MARK + v : v);
+      if (Array.isArray(v)) {
+        if (!v.length) return [];
+        const out = new Array(v.length + 1); out[0] = 0;
+        for (let i = 0; i < v.length; i++) out[i + 1] = enc(v[i], undefined);
+        return out;
+      }
+      if (v && typeof v === 'object') {
+        const hit = cache.get(v);
+        if (hit) return hit;
+        // Keys whose value is undefined are left out, exactly as JSON leaves them out of the plain save.
+        const keys = Object.keys(v).filter((k) => v[k] !== undefined && typeof v[k] !== 'function' && typeof v[k] !== 'symbol'), sk = keys.join('\u0002');
+        let si = schemaIdx.get(sk);
+        if (si === undefined) { si = schemas.length; schemas.push(keys); schemaIdx.set(sk, si); }
+        const out = new Array(keys.length + 1); out[0] = si + 1;
+        for (let i = 0; i < keys.length; i++) out[i + 1] = enc(v[keys[i]], keys[i]);
+        cache.set(v, out);
+        return out;
+      }
+      return null;
+    };
+    // Reads a packed string back: a reference becomes the table entry, a doubled marker loses one marker.
+    const decStr = (str) => {
+      if (str.charCodeAt(0) !== 1) return str;
+      if (str.charCodeAt(1) === 1) return str.slice(1);
+      return dict[parseInt(str.slice(1), 36)];
+    };
+    // Unpacks one packed value into the original value, recursively.
+    const dec = (v) => {
+      if (v === null || typeof v === 'number' || typeof v === 'boolean') return v;
+      if (typeof v === 'string') return decStr(v);
+      if (!Array.isArray(v)) throw new Error('packed value is not packed');
+      if (!v.length) return [];
+      const tag = v[0];
+      if (tag === 0) { const out = new Array(v.length - 1); for (let i = 1; i < v.length; i++) out[i - 1] = dec(v[i]); return out; }
+      const keys = schemas[tag - 1];
+      if (!keys || keys.length !== v.length - 1) throw new Error('packed object does not match its keys');
+      const o = {};
+      // A key named __proto__ is set as plain data (assigning it would change the prototype); the common case takes the quick path.
+      if (keys.hasProto === undefined) keys.hasProto = keys.indexOf('__proto__') >= 0;
+      if (!keys.hasProto) { for (let i = 0; i < keys.length; i++) o[keys[i]] = dec(v[i + 1]); return o; }
+      for (let i = 0; i < keys.length; i++) {
+        if (keys[i] === '__proto__') Object.defineProperty(o, '__proto__', { value: dec(v[i + 1]), enumerable: true, writable: true, configurable: true });
+        else o[keys[i]] = dec(v[i + 1]);
+      }
+      return o;
+    };
+    return {
+      // The packed tree and the tables it needs: { d, s, x }.
+      pack(state) { const x = enc(state, undefined); return { d: dict.slice(), s: schemas.map((k) => k.slice()), x }; },
+      // The original state from a packed tree; also adopts its tables so later saves keep the same numbers. Throws when the packed data is damaged.
+      unpack(p) {
+        if (!p || !Array.isArray(p.d) || !Array.isArray(p.s) || p.x === undefined) throw new Error('packed data is incomplete');
+        dict.length = 0; dictIdx.clear(); schemas.length = 0; schemaIdx.clear();
+        for (const d of p.d) { if (typeof d !== 'string') throw new Error('packed table is damaged'); dictIdx.set(d, dict.length); dict.push(d); }
+        for (const k of p.s) { if (!Array.isArray(k) || k.some((x) => typeof x !== 'string')) throw new Error('packed keys are damaged'); schemaIdx.set(k.join('\u0002'), schemas.length); schemas.push(k.slice()); }
+        return dec(p.x);
+      },
+    };
+  };
   // Cleans typed text for names and notes: strips the invisible characters, squeezes runs of white space to single spaces and trims both ends.
   U.cleanText = (s) => U.stripInvisible(s).replace(/\s+/g, ' ').trim();
   /* ---------- secret hashing (PIN and recovery code) ---------- */

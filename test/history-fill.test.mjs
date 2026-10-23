@@ -103,11 +103,11 @@ test('the browser is asked to keep the data, and the answer is in historyFill().
 });
 
 test('at 250 tickets a day the nudge comes before anything is dropped, and Close the month every few days keeps it that way', { timeout: 120e3 }, async () => {
-  const idle = await runEndurance({ kitchen: 'blank', seed: 1, days: 12, perDayFixed: 250, plain: true });
+  const idle = await runEndurance({ kitchen: 'blank', seed: 1, days: 14, perDayFixed: 250, plain: true, quota: 2.5e6 });
   assert.deepEqual(idle.problems, []);
   assert.ok(idle.summary.firstNearFullDay !== null && idle.summary.firstTrimDay !== null, JSON.stringify(idle.summary));
   assert.ok(idle.summary.firstNearFullDay < idle.summary.firstWarnDay && idle.summary.firstWarnDay < idle.summary.firstTrimDay, 'the card (70) and the notice (85) come before the first drop: ' + JSON.stringify([idle.summary.firstNearFullDay, idle.summary.firstWarnDay, idle.summary.firstTrimDay]));
-  const closed = await runEndurance({ kitchen: 'blank', seed: 1, days: 16, perDayFixed: 250, plain: true, closeMonthAt: [3, 6, 9, 12, 15] });
+  const closed = await runEndurance({ kitchen: 'blank', seed: 1, days: 16, perDayFixed: 250, plain: true, quota: 2.5e6, closeMonthAt: [3, 6, 9, 12, 15] });
   assert.deepEqual(closed.problems, []);
   assert.equal(closed.summary.firstTrimDay, null, 'nothing was dropped');
   assert.ok(closed.summary.prunedByCloseMonth > 0 && closed.notes.some((n) => /day 15: Close the month removed/.test(n)), 'day 15 cleared days: ' + closed.notes.join(' | '));
