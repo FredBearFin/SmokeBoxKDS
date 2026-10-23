@@ -1351,7 +1351,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .fl[data-far="on"] { --fl-far: 1.8; --fl-tl: 1.35; }
 .fl[data-far="on"] .fl-slip[data-tier="1"] { --fl-esc: 1.45; }
 .fl[data-far="on"] .fl-strip-rowwrap[data-i="2"] { display: none; }
-.fl[data-far="on"] .fl-slip[data-level="breach"] { outline: calc(6px * var(--fl-k)) solid var(--crimson); outline-offset: -3px; }
+.fl[data-far="on"] .fl-slip[data-level="breach"] { outline: calc(6px * var(--fl-k)) solid var(--crimson); outline-offset: calc(-6px * var(--fl-k)); }
 @media (min-width: 1700px) { .fl { --fl-k: 1.2; } }
 @media (min-width: 2200px) { .fl { --fl-k: 1.5; } }
 /* A 4K screen (3840 px wide, a 55 inch TV or bigger) draws the board at twice the size, so it reads from across the room. */
@@ -1360,9 +1360,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 /* Quiet board: a ticket that is on time carries no badge, so only late and warning tickets speak. */
 .fl-badge[data-level="ok"] { display: none; }
 /* Overdue tickets are ranked, worst first (the order comes from the script). The worst one is the biggest and has the
-   heaviest outline, the next two are a little smaller, the rest keep the normal size with the red edge. */
-.fl-slip[data-tier="1"] { --fl-esc: 1.3; outline: calc(7px * var(--fl-k)) solid var(--crimson); outline-offset: -3px; }
-.fl-slip[data-tier="2"] { --fl-esc: 1.15; outline: calc(4px * var(--fl-k)) solid var(--crimson); outline-offset: -2px; }
+   heaviest outline, the next two are a little smaller, the rest keep the normal size with the red edge.
+   WATCH OUT: the outlines sit wholly inside the ticket, on the paper, where the dark red stands out in Night too (on the dark board it would not). */
+.fl-slip[data-tier="1"] { --fl-esc: 1.3; outline: calc(7px * var(--fl-k)) solid var(--crimson); outline-offset: calc(-7px * var(--fl-k)); }
+.fl-slip[data-tier="2"] { --fl-esc: 1.15; outline: calc(4px * var(--fl-k)) solid var(--crimson); outline-offset: calc(-4px * var(--fl-k)); }
 
 /* The attention strip: the most urgent deadlines, big enough to read from across the kitchen. */
 .fl-strip { flex: none; display: flex; flex-direction: column; background: var(--sub); border-bottom: 2px solid var(--line); }
@@ -1501,8 +1502,9 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
   .fl-chip-w { display: inline; }
 }
 
-/* below 1000 the tools and chips move into the Menu button's list; the tabs and New ticket stay. 1024-wide tablets keep Hold, 86 and Recall in the header. */
-@media (max-width: 999.98px) {
+/* Phones (700 px or less): the tools and chips move into the Menu button's list; the tabs and New ticket stay. Every tablet, portrait too,
+   keeps the Sanitize chip, Recall and 86 in the header (the Cabinet tab sits with the stations), so a cook never opens a menu for them. */
+@media (max-width: 700px) {
   .fl-status, .fl-tools { display: none; }
 }
 
@@ -1516,14 +1518,20 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
 /* Then the words on Recall, Hold and 86 go too: icon and count only, so all three stay on a 1024 px tablet. */
 .fl-head[data-fit="toollabels"] .fl-tools .fl-tool-label { display: none; }
 
-/* phones and small tablets: actions on top, the six station tabs underneath as one wide row (the DOM order is switched to match, see layoutHead) */
-@media (max-width: 900px) {
+/* phones and portrait tablets (under 1000 px): actions on top, the station tabs underneath as one wide row (the DOM order is switched to
+   match, see layoutHead; the script's breakpoint must stay the same as this one) */
+@media (max-width: 999.98px) {
   .fl-head { padding: var(--sp-2) var(--sp-3); }
   .fl-tabs { flex: 1 0 100%; padding-top: calc(10px * var(--fl-k)); }
   .fl-seg.seg { display: flex; width: 100%; }
   .fl-seg .seg-opt { flex: 1 1 0; min-width: 0; }
   .fl-new { flex: 1 1 auto; }
   .fl-spacer { display: none; }
+  /* The Demo button stays in the Menu list here (the demo is not a kitchen job), so Recall and 86 have the room. */
+  .fl-tools [data-tool="demo"] { display: none; }
+  /* The Sanitize chip puts its two words on two lines beside the icon, so the top row still fits on a 720 px tablet. */
+  .fl-san { display: inline-grid; grid-template-columns: auto auto; align-content: center; justify-content: start; row-gap: 0; text-align: left; }
+  .fl-san > .icon { grid-row: 1 / span 2; }
 }
 /* On a phone the four buttons (New ticket, Orders, Back office, Menu) need the whole row, so the logo steps aside and New ticket may shrink to fit. */
 @media (max-width: 520px) {
@@ -1792,7 +1800,7 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl-main[data-density="compact"] .nm-full { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* still read aloud */
 .fl-main[data-density="compact"] .fl-row .fl-act, .fl-main[data-density="compact"] .fl-row .fl-fire, .fl-main[data-density="compact"] .fl-row .fl-state { grid-area: a; margin-left: 0; }
 .fl-main[data-density="compact"] .fl-row .fl-sub { grid-area: s; padding-left: 0; flex: none; gap: 2px var(--sp-1); }
-.fl-main[data-density="compact"] .fl-sub .chip { min-height: calc(20px * var(--fl-k)); padding-block: 0; font-size: var(--fs-1); }
+.fl-main[data-density="compact"] .fl-sub .chip { min-height: calc(20px * var(--fl-k)); padding-block: 0; font-size: var(--fs-2); }
 .fl-main[data-density="compact"] .fl-act { min-width: calc(64px * var(--fl-k)); min-height: max(44px, calc(44px * var(--fl-k))); padding: 2px var(--sp-2); box-shadow: 0 calc(2px * var(--fl-k)) 0 var(--ink); }
 .fl-main[data-density="compact"] .fl-act[data-act="finish"] { box-shadow: 0 calc(2px * var(--fl-k)) 0 var(--sage); }
 .fl-main[data-density="compact"] .fl-act[data-act="cook"] { box-shadow: 0 calc(2px * var(--fl-k)) 0 var(--slip-amber); }
@@ -1970,10 +1978,11 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
    Overdue badge, so a wall of late tickets still shows where to start. */
 .fl-slip[data-tier="1"]::before, .fl-slip[data-tier="2"]::before {
   position: absolute; z-index: 3; top: calc(5px * var(--fl-k)); left: calc(12px * var(--fl-k)); padding: 1px calc(8px * var(--fl-k));
-  font: var(--w-heavy) calc(12px * var(--fl-k)) / 1.5 var(--font-display); letter-spacing: 0.06em; text-transform: uppercase;
+  font: var(--w-heavy) calc(15px * var(--fl-k)) / 1.4 var(--font-display); letter-spacing: 0.06em; text-transform: uppercase;
   border-radius: 4px; color: var(--on-danger, #fff); background: var(--crimson);
 }
-.fl-slip[data-tier="1"], .fl-slip[data-tier="2"] { padding-top: calc(24px * var(--fl-k)); }
+.fl-slip[data-tier="1"], .fl-slip[data-tier="2"],
+.fl-main[data-density="compact"] .fl-slip[data-tier="1"], .fl-main[data-density="compact"] .fl-slip[data-tier="2"] { padding-top: calc(29px * var(--fl-k)); } /* room for the tag, compact too */
 .fl-slip[data-tier="1"]::before { content: "Do this first"; }
 .fl-slip[data-tier="2"]::before { content: "Next"; background: var(--slip-ink); color: var(--slip); }
 .fl-slip[data-tier="2"][data-level="breach"] .slip-head, .fl-slip[data-tier="2"][data-level="breach"] .slip-body, .fl-slip[data-tier="2"][data-level="breach"] .slip-tear,
@@ -2014,7 +2023,8 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-row .slip-name { font-size: calc(var(--fs-item) * 1.15); }
 .fl-row[data-state="queued"] .slip-name { font-weight: var(--w-bold); color: var(--ink2); }
 .fl-sub { padding-left: calc(var(--qty-w) + var(--sp-3)); gap: 0 var(--sp-2); }
-.fl-sub .chip { min-height: calc(22px * var(--fl-k)); padding-block: 0; font-size: var(--fs-1); }
+/* Modifier chips ("No onions", "Sauce on the side") change what gets made, so they read at the size of other helper text, not the smallest. */
+.fl-sub .chip { min-height: calc(24px * var(--fl-k)); padding-block: 0; font-size: var(--fs-2); }
 .fl-deck { font-size: var(--fs-1); } /* the cooking countdown (.fl-cook) keeps its larger size: it is read from across the line */
 .fl-deck { color: var(--ink3); }
 .slip-next { margin: var(--sp-1) var(--sp-3) 0; padding: calc(4px * var(--fl-k)) var(--sp-2); font-size: var(--fs-2); font-weight: var(--w-semi); }
@@ -2685,6 +2695,8 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* The rarely needed facts stay on the card only when they matter (late readings keep their red). */
 .hc-dl dt:nth-of-type(n+3), .hc-dl dd:nth-of-type(n+3) { display: none; }
 .hc-dl dt:nth-of-type(4), .hc-dl dd:nth-of-type(4) { display: block; }
+/* "Resting until" (5th) and "Kept serving" (6th) show only while they apply: the script unhides them then, and the card must not hide them again. */
+.hc-dl dt:nth-of-type(n+5):not([hidden]), .hc-dl dd:nth-of-type(n+5):not([hidden]) { display: block; }
 .hc-actions { flex-wrap: nowrap; gap: var(--sp-2); align-items: stretch; }
 .hc-actions .btn { flex: 1 1 auto; min-height: var(--tap); }
 .hc-actions .hc-sec { display: none; }
@@ -3036,10 +3048,11 @@ ul.gd-list { list-style: disc; }
   html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
   /* Other print rules (Close the day, the inspector page) hide everything in the body but their own sheet; while the Guide is open it must stay. */
   body:has(.layer-guide:not([hidden])) > #app { display: block !important; }
-  .sb-shell { position: static !important; overflow: visible !important; background: #fff !important; }
-  .sb-shell > :not(.layer-guide), .skip-link { display: none !important; }
+  /* WATCH OUT: only while the Guide is open; otherwise these rules would print a blank page for the back office. */
+  body:has(.layer-guide:not([hidden])) .sb-shell { position: static !important; overflow: visible !important; background: #fff !important; }
+  body:has(.layer-guide:not([hidden])) .sb-shell > :not(.layer-guide), .skip-link { display: none !important; }
   .layer-guide { position: static !important; display: block !important; overflow: visible !important; background: #fff !important; }
-  .gd-top, .gd-nav, .gd-pager, .gd-print { display: none !important; }
+  .gd-top, .gd-nav, .gd-pager, .gd-print, .gd-search, .gd-search-n, .gd-results { display: none !important; }
   .gd-body { display: block; max-width: none; padding: 0; }
   .gd-article { border: 0; box-shadow: none; padding: 0; max-width: none; background: #fff; }
   .gd-page-title { font-size: 28pt; color: #000; }
@@ -3047,8 +3060,9 @@ ul.gd-list { list-style: disc; }
   .gd-p, .gd-list, .gd-lede { font-size: 14pt; }
   .gd-check li { font-size: 15pt; margin-bottom: 10pt; }
   .gd-check li::before { border-color: #000; background: #fff; }
-  .gd-ui { border-color: #000; background: #fff; }
+  .gd-ui { border-color: #000; background: #fff; color: #000; }
   .gd-fig, .gd-list li { break-inside: avoid; }
+  .gd-h { break-after: avoid; }
   /* Pictures print in black, white and gray, so they stay readable on a black-and-white printer. */
   .ga-bg { fill: #fff; stroke: #000; stroke-width: 2; }
   .ga-badge, .ga-badge-warn, .ga-badge-bad, .ga-step-1, .ga-step-2, .ga-step-3, .ga-step-4 { fill: #000; }
@@ -3057,6 +3071,10 @@ ul.gd-list { list-style: disc; }
   .ga-ink, .ga-ink2, .ga-warn-t, .ga-bad-t, .ga-slip-ink, .ga-slip-ink3, .ga-slip-amber { fill: #000; }
   .ga-card, .ga-slip, .ga-note { fill: #fff; stroke: #000; }
   .ga-leader, .ga-dot { stroke: #000; fill: none; } .ga-dot { fill: #000; }
+  /* The speaker, its sound waves, the arrows and the spine use screen ink, which is near white in Night: black on paper. */
+  .ga-fill-ink { fill: #000; }
+  .ga-wave, .ga-arrow, .ga-spine { stroke: #000; }
+  .gd-fig figcaption { color: #333; }
 }
 
 /* ===== 30-office.css ===== */
@@ -3165,7 +3183,7 @@ a.of-nav:active { background: var(--press); }
 .of-tiles[data-n="5"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .of-tile { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--sp-4) var(--sp-4) var(--sp-4) var(--sp-5); margin-top: -1px; border-top: 1px solid var(--line-soft); border-left: 1px solid var(--line-soft); }
 .of-tile-label { display: flex; align-items: flex-end; font-size: var(--fs-2); font-weight: var(--w-medium); color: var(--ink2); line-height: 1.25; min-height: 2.5em; }
-.of-tile-val { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 1px; margin-top: 2px; font: var(--w-semi) clamp(36px, 3.5vw, 54px)/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--ink); letter-spacing: 0; min-height: 1em; }
+.of-tile-val { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 1px; margin-top: 2px; font: var(--w-semi) clamp(36px, 3.5vw, 54px)/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--ink); letter-spacing: 0; min-height: 1em; overflow-wrap: anywhere; }
 .of-u, .of-uw { font-size: 0.46em; font-weight: var(--w-medium); color: var(--ink2); margin-left: 1px; letter-spacing: 0.01em; }
 .of-uw { margin-left: 6px; }
 .of-cur { font-size: 0.62em; font-weight: var(--w-medium); color: var(--ink2); margin-right: 2px; align-self: flex-start; padding-top: 0.12em; }
@@ -3436,6 +3454,21 @@ a.of-nav:active { background: var(--press); }
 .of-how summary { cursor: pointer; display: inline-block; padding: 6px 0; min-height: 32px; color: var(--ink2); text-decoration: underline; text-underline-offset: 3px; }
 .of-how p { margin: var(--sp-1) 0 0; line-height: 1.5; }
 .of-page[data-coach="on"] > .of-how { display: none; }
+
+/* Browser print (Ctrl+P) of an office page: the whole page column on white paper, without the rail, and no card split across two
+   pages. The script switches to the Paper look while printing, so text stays dark. The dedicated print pages (safety record, close
+   day, pilot report) hide all of this with their own rule. */
+@media print {
+  body:has(.layer-office:not([hidden])):not(:has(.layer-guide:not([hidden]))) .sb-shell { position: static !important; overflow: visible !important; background: #fff !important; }
+  body:has(.layer-office:not([hidden])):not(:has(.layer-guide:not([hidden]))) .sb-shell > :not(.layer-office) { display: none !important; }
+  .layer-office { position: static !important; display: block !important; overflow: visible !important; background: #fff !important; }
+  .layer-office[hidden] { display: none !important; }
+  .of { display: block; background: #fff; color: #000; }
+  .of-rail { display: none; }
+  .of-col { overflow: visible; height: auto; }
+  .of-main { max-width: none; padding: 0; }
+  .of-card, .ch { break-inside: avoid; }
+}
 
 /* ===== 31-office-money.css ===== */
 /*
@@ -3929,7 +3962,7 @@ a.of-nav:active { background: var(--press); }
 .cd-table th, .cd-table td { white-space: nowrap; }
 .cd-table th.num, .cd-table td.num { text-align: right; }
 .cd-table tfoot th, .cd-table tfoot td { font-weight: var(--w-semi); border-bottom: 0; }
-.cd-drawer { margin: 0; padding: var(--sp-2) var(--sp-3); border-left: 3px solid var(--accent, currentColor); font-size: var(--fs-3, 16px); color: var(--ink); }
+.cd-drawer { margin: 0; padding: var(--sp-2) var(--sp-3); border-left: 3px solid var(--amber, currentColor); font-size: var(--fs-3, 16px); color: var(--ink); }
 .cd-counts { margin: 0; font-size: var(--fs-2); color: var(--ink3); }
 .cd-radio { display: flex; gap: var(--sp-3); align-items: flex-start; min-height: 44px; padding: 6px 0; cursor: pointer; }
 .cd-radio span { display: grid; }
@@ -3971,12 +4004,12 @@ a.of-nav:active { background: var(--press); }
   .si-printroot h1 { font-size: 20px; margin: 0 0 8px; }
   .si-note { margin: 6px 0; font-size: 11px; }
   /* Six columns on paper: small type, tight padding and fixed widths so no word is broken in the middle and a row stays short. */
-  .si-printroot .si-table { table-layout: fixed; width: 100%; font-size: 10px; line-height: 1.3; }
+  .si-printroot .si-table { table-layout: fixed; width: 100%; font-size: 11px; line-height: 1.3; }
   .si-printroot .si-table th, .si-printroot .si-table td { padding: 3px 4px; overflow-wrap: break-word; hyphens: manual; }
   .si-printroot .si-table th:nth-child(1) { width: 13%; } .si-printroot .si-table th:nth-child(2) { width: 12%; } .si-printroot .si-table th:nth-child(3) { width: 21%; }
   .si-printroot .si-table th:nth-child(4) { width: 32%; } .si-printroot .si-table th:nth-child(5) { width: 8%; } .si-printroot .si-table th:nth-child(6) { width: 14%; }
   .si-table th, .si-table td { border-bottom: 1px solid #999; color: #000; }
-  .si-table .si-fact, .si-table .si-corr { color: #000; font-size: 9px; }
+  .si-table .si-fact, .si-table .si-corr { color: #000; font-size: 10px; } /* the corrections and facts are what an inspector reads: never smaller than 10 px */
   .si-table thead { display: table-header-group; }
   .si-table tr { break-inside: avoid; page-break-inside: avoid; }
 }
@@ -11612,7 +11645,8 @@ a.of-nav:active { background: var(--press); }
   // Before a restore replaces the kitchen: keeps a whole copy of the current one in the last-good slot (full history if the
   // browser has room, else the small rolling size). Returns the time it was taken, or null when there was nothing worth
   // keeping (an empty kitchen, the demo, no storage) or the browser had no room. Never throws.
-  function snapshotBeforeRestore(why) {
+  // carried is the names and setup lists to keep with it, read before a restore began changing them (read now when not given).
+  function snapshotBeforeRestore(why, carried) {
     if (!strict || mode !== 'real' || !storage || !state || isBlank()) return null;
     const r = realNow();
     // Full history first, then the small rolling size, then only what a kitchen cannot do without (menu, settings, PIN, safety records).
@@ -11620,6 +11654,9 @@ a.of-nav:active { background: var(--press); }
       try {
         const small = keep ? E().prune(state, keep) : state;
         const env = { v: 1, takenAt: r, reason: why || BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
+        // The names and setup lists a restore overwrites go in too, even when empty, so undoing puts them back exactly as they were.
+        Object.assign(env, carried || carriedSetup(true));
+        if (keep) env.trimmed = true; // the screens say the copy holds only recent history
         if (!E().validateBackup(JSON.stringify(env)).ok) continue;
         // A big kitchen's copy is saved compact too, so it fits where the plain text would not (the full history is what makes it worth keeping).
         if (wantCompact(small)) { delete env.state; env.fmt = 2; env.p = packer.pack(small); }
@@ -11630,11 +11667,12 @@ a.of-nav:active { background: var(--press); }
     }
     return null;
   }
-  // Tells the screens about the 'before restore' copy: { takenAt, expiresAt } or null when there is none now.
+  // Tells the screens about the 'before restore' copy: { takenAt, expiresAt, reason, trimmed } or null when there is none now.
+  // trimmed is true when the browser was short on space and the copy keeps only recent tickets (menu, settings, PIN and safety records stay).
   function beforeRestoreInfo() {
     if (!storage) return null;
     const g = beforeRestoreCopy(realNow());
-    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS, reason: g.reason } : null;
+    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS, reason: g.reason, trimmed: g.trimmed === true } : null;
   }
   // Puts the 'before restore' copy back as the kitchen (the way back from a wrong restore). Returns 'ok', or 'noCopy'.
   // The copy it replaces is kept the same way, so this can be undone once too.
@@ -12170,13 +12208,18 @@ a.of-nav:active { background: var(--press); }
     const r = realNow();
     const env = { v: 1, savedAt: r, rev: state.rev, clock: { virtual: now(), real: r, speed: clk.speed }, state };
     if (strict) env.mode = mode;
-    // Owner choices from the setup screens that live outside the board state travel with the backup too.
-    const setup = {};
-    for (const k of SETUP_LISTS) { let v = null; try { v = storage ? storage.get(SETUP_KEYS[k], null) : null; } catch (e) { v = null; } if (Array.isArray(v)) setup[k] = v.filter((x) => typeof x === 'string').slice(0, 200); }
-    if (Object.keys(setup).length) env.setup = setup;
+    return Object.assign(env, carriedSetup(false));
+  }
+  // Owner choices from the setup screens that live outside the board state: { setup, names }, each left out when there is
+  // nothing in it. With always true both are filled even when empty (the 'before restore' copy, so undo clears what a restore added).
+  function carriedSetup(always) {
+    const out = {}, setup = {};
+    for (const k of SETUP_LISTS) { let v = null; try { v = storage ? storage.get(SETUP_KEYS[k], null) : null; } catch (e) { v = null; } if (Array.isArray(v)) setup[k] = v.filter((x) => typeof x === 'string').slice(0, 200); else if (always) setup[k] = []; }
+    if (Object.keys(setup).length) out.setup = setup;
     const nm = ownerNames();
-    if (nm) env.names = nm;
-    return env;
+    if (nm) out.names = nm;
+    else if (always && SB.config && typeof SB.config.customSpec === 'function') out.names = { rename: {}, add: {} };
+    return out;
   }
   // The setup-screen lists a backup carries: stations the owner hid from the tiles, and dishes that came from the examples.
   const SETUP_KEYS = { hiddenStations: 'smokebox.v1.setup.hiddenStations', examples: 'smokebox.v1.setup.examples' };
@@ -12229,6 +12272,8 @@ a.of-nav:active { background: var(--press); }
     // not dropped. A backup without names (an older one) leaves the current names alone. A refused import
     // puts the old names back.
     const C = SB.config;
+    // WATCH OUT: read the names and setup lists for the 'before restore' copy now, before this restore starts overwriting them.
+    const carriedBefore = carriedSetup(true);
     let namesBefore = null, namesGiven = null;
     if (C && typeof C.applyCustom === 'function' && typeof C.customSpec === 'function') {
       try {
@@ -12245,7 +12290,7 @@ a.of-nav:active { background: var(--press); }
     if (namesGiven && typeof C.saveCustom === 'function') { try { C.saveCustom(namesGiven); } catch (e) { /* the names stay applied for this session */ } }
     if (parsed && isObjLike(parsed.setup)) for (const k of SETUP_LISTS) if (Array.isArray(parsed.setup[k])) { try { storage.set(SETUP_KEYS[k], parsed.setup[k].filter((x) => typeof x === 'string').slice(0, 200)); } catch (e) { /* the list is a convenience */ } }
     // Keep the kitchen being replaced, so a wrong restore can be undone: a visible copy in the last-good slot.
-    const beforeAt = snapshotBeforeRestore();
+    const beforeAt = snapshotBeforeRestore(BEFORE_RESTORE, carriedBefore);
     const ns = v.state;
     // The revision must go up so other tabs treat the imported copy as newer; the clock must not be behind
     // its times.
@@ -21561,7 +21606,9 @@ a.of-nav:active { background: var(--press); }
     const spacer = h('div', { class: 'fl-spacer', 'aria-hidden': 'true' });
     const head = h('header', { class: 'fl-head' }, brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn);
     // The same parts in two orders; layoutHead picks one so keyboard order matches what the eye sees.
-    m.headParts = { wide: [brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn], narrow: [brandBox, spacer, newBtn, tOrders.b, officeBtn, menuBtn, tabs, status, tools] };
+    m.headParts = { wide: [brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn], narrow: [brandBox, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn, tabs] };
+    // WATCH OUT: on a portrait tablet the Sanitize chip, Recall and 86 sit on the top row with New ticket, so a cook reaches them without the Menu.
+    // On a phone (700 px or less) the stylesheet moves them into the Menu list.
 
     // ----- board
     const grid = h('div', { class: 'fl-grid' });
@@ -21628,8 +21675,8 @@ a.of-nav:active { background: var(--press); }
     layoutHead(true);
     fitHead();
     try {
-      const q = g.matchMedia('(max-width: 900px)');
-      // Re-orders the header when the screen crosses the phone breakpoint, then squeezes it to fit.
+      const q = g.matchMedia('(max-width: 999.98px)');
+      // Re-orders the header when the screen crosses the tablet breakpoint (tabs on their own row below 1000 px), then squeezes it to fit.
       const fn = () => { layoutHead(false); fitHead(); };
       if (q.addEventListener) { q.addEventListener('change', fn); m.offs.push(() => q.removeEventListener('change', fn)); }
     } catch (e) { /* ignore */ }
@@ -21694,7 +21741,7 @@ a.of-nav:active { background: var(--press); }
   // WATCH OUT: the DOM order is changed to match, so keyboard order follows the eye. Focus is restored.
   function layoutHead(force) {
     if (!m || !m.headParts) return;
-    const narrow = mq('(max-width: 900px)');
+    const narrow = mq('(max-width: 999.98px)');
     if (!force && narrow === m.narrow) return;
     m.narrow = narrow;
     const a = doc.activeElement;
@@ -29918,7 +29965,7 @@ a.of-nav:active { background: var(--press); }
       "t": "ul",
       "x": [
        "**Undo** appears for 10 seconds after an action. After that, fix it by hand.",
-       "To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. Cancelled tickets are still counted in your reports."
+       "To cancel a ticket, open its small menu on the board, tap **Void ticket** and say why. A cancelled ticket is left out of your sales and money, and shows only in the count of voided tickets."
       ]
      }
     ]
@@ -30065,8 +30112,8 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "Open the **Cabinet** tab. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
        "Each batch has a card with two main buttons. **Pull** takes out the usual amount, like Pull 4.50 kg, as food leaves the cabinet. **Log temp** writes down a temperature reading. Take one at every check. A reading in range keeps the batch on the menu.",
-       "The button can change. When a batch is too cool it becomes **Reheat**. Smokebox allows one reheat per batch: its own rule, not a health code rule. When a batch is past its quality limit it becomes **Keep serving**: check the food, then decide.",
-       "The **More for this batch** button (...) opens **Pull**, **Start cooling** and **Discard**, and **Remind me in 10 min** while a warning is showing. Tap **Discard** and pick a reason when a batch is out of time or out of range."
+       "The button can change. A batch too cool for under 2 hours becomes **Reheat**; later, it must be thrown out. One reheat per batch is Smokebox's own rule. When a batch is past its quality limit it becomes **Keep serving**: check the food, then decide.",
+       "The **More for this batch** button (...) opens **Pull**, **Start cooling** and **Discard**, and **Remind me in 10 min** while a warning is showing. Tap **Discard** and pick a reason when a batch is out of time or range."
       ]
      },
      {
@@ -30090,7 +30137,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Some foods warn earlier, and you can change the times in Settings. A nearly empty batch stays quiet."
+      "x": "Some foods warn earlier. Change the times in Menu and settings, **Batch expiry warnings only**. A nearly empty batch stays quiet."
      },
      {
       "t": "p",
@@ -30301,14 +30348,18 @@ a.of-nav:active { background: var(--press); }
       "t": "ol",
       "x": [
        "In the second card, **Restore from a backup**, tap **Choose a backup file**. Pick the newest one, named smokebox-backup-(date).json. Or paste the text and tap **Check pasted backup**.",
-       "Read the summary: the saved date, the tickets and the batches should match what you expect. Nothing has changed yet.",
-       "If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN. There is no undo, so back up what is here first if you might want it.",
+       "Read the summary: the date, tickets and batches should match what you expect. Nothing has changed yet.",
+       "If it is right, tap **Replace everything with this backup**. This replaces all data on this device, including the PIN and your station names. Back up what is here first if you might want it.",
        "Open the board and check your menu and your food. Sound and loudness are set per device, so test them again."
       ]
      },
      {
       "t": "p",
-      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. What was here is kept too, so you can undo once more."
+      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. What was here is kept too, so you can undo once more. If the browser was short on room, the copy keeps only recent tickets, or none can be kept and the restore says so."
+     },
+     {
+      "t": "p",
+      "x": "The look, text size, sound and starting cash stay on each device and are not in a backup."
      },
      {
       "t": "p",
@@ -30747,7 +30798,7 @@ a.of-nav:active { background: var(--press); }
       "t": "ul",
       "x": [
        "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Smokebox writes down the cooler, freezer, thermometer and sanitizer strip readings you type under Readings. It cannot check them, and it may not be the record your health department asks for. Keep a paper log if they require one. Your own food-safety plan, your training and your thermometer checks still apply.",
-       "Your local health code. The limits Smokebox starts with (such as 4 hours, the check interval and one reheat per batch) are starting values, not your local rules. Set the limits your local health department gives you.",
+       "Your local health code. The limits Smokebox starts with (such as each dish's hold time, 4 to 8 hours, and the check interval) are starting values, not your local rules. Set the limits your local health department gives you. The one reheat per batch is Smokebox's own fixed rule; if your local rule is stricter, follow it.",
        "Card processing. Smokebox only writes down how an order was paid. Keep your card reader and your processor.",
        "Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.",
        "Allergy care. A note on a ticket is a reminder. Tell your staff about every allergy, and follow your own allergen rules.",
@@ -30790,7 +30841,7 @@ a.of-nav:active { background: var(--press); }
       "t": "check",
       "x": [
        "Orders: every open order paid or cancelled, then Close the day",
-       "If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)",
+       "If you cook ahead: every batch left in the cabinet decided (keep it, or throw it out)",
        "If you cook ahead: surfaces wiped and Sanitize logged",
        "Food kept over a day: labeled with a date, as your local rule says",
        "Final cooler and freezer readings written down",
@@ -32749,6 +32800,13 @@ a.of-nav:active { background: var(--press); }
     paintFilterSummary();
   }
 
+  // Switches every office surface to the Paper look while printing (on true), or back to the owner's chosen look (on false).
+  function paperForPrint(on) {
+    const want = on ? 'paper' : (SB.theme && SB.theme.office ? SB.theme.office() : 'ember');
+    doc.querySelectorAll('.office[data-otheme]').forEach((el) => el.setAttribute('data-otheme', want));
+    try { if (SB.charts && SB.charts.refreshTheme) SB.charts.refreshTheme(); } catch (e) { warnOnce('refreshTheme', e); }
+  }
+
   // Opens the office inside el: builds the frame and filters, subscribes to the store, theme and sample
   // switch, then shows the page.
   // WATCH OUT: everything made here (timers, subscriptions, listeners) is tracked so unmount removes all of it.
@@ -32768,6 +32826,10 @@ a.of-nav:active { background: var(--press); }
     scope.offs.push(tracked('subs', SB.store && SB.store.subscribe ? SB.store.subscribe(onStoreChange) : () => {}));
     scope.offs.push(tracked('subs', SB.sim && SB.sim.onSampleChange ? SB.sim.onSampleChange(onSampleChange) : () => {}));
     scope.on(doc, 'visibilitychange', () => { if (!doc.hidden && M && M.dirty) schedule(0); });
+    // Browser print (Ctrl+P) of an office page uses the light Paper look, so cards and chart labels stay dark on white paper
+    // (browsers drop the dark backgrounds when printing); the chosen look comes back after.
+    scope.on(g, 'beforeprint', () => paperForPrint(true));
+    scope.on(g, 'afterprint', () => paperForPrint(false));
     scope.on(doc, 'keydown', (e) => {
       if (!M || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key !== '[' && e.key !== ']') return;
@@ -34718,6 +34780,8 @@ a.of-nav:active { background: var(--press); }
 
   const SAVE_DELAY = 600;           // ms after the last change before a field is written (longer than the stepper's 500 ms hold-repeat gap)
   const MAX_IMPORT_CHARS = 20e6;    // same ceiling as SB.store.importAll
+  // Said with the undo copy when the browser was short on space and it keeps only recent tickets.
+  const TRIMMED_WORDS = 'This browser was short on space, so the copy keeps only your most recent tickets. Your menu, settings, PIN and food safety records are all in it.';
 
   // Builds the always-visible "Saved history" card of the Data page: a plain meter of how full the saved history is, a calm amber note with a
   // button into Close the month from 70 percent, the sentence about history already dropped, and the browser-may-delete line. Reads the store's
@@ -36065,7 +36129,7 @@ a.of-nav:active { background: var(--press); }
   function buildNames() {
     const wrap = h('div', { class: 'od-names' });
     wrap.appendChild(sub('Station, category and channel names'));
-    wrap.appendChild(para('Rename a station, a menu category or an order channel, or add a new one. Ids and history never change, only what people read. Changes show on every screen after you reload. Backups do not carry these names, so repeat them on a replacement device before restoring.', 'od-hint'));
+    wrap.appendChild(para('Rename a station, a menu category or an order channel, or add a new one. Ids and history never change, only what people read. Changes show on every screen after you reload. Backups carry these names, and restoring a backup puts them back.', 'od-hint'));
     const status = statusLine();
     // Reloads the page so every screen picks up the saved names.
     const reload = btn('Reload to apply', { icon: 'refresh', cls: 'btn-sm', onClick: () => g.location.reload() });
@@ -36164,6 +36228,11 @@ a.of-nav:active { background: var(--press); }
     if (text.length > MAX_IMPORT_CHARS) return { ok: false, reason: backupReason('too large') };
     let env;
     try { env = JSON.parse(text); } catch (e) { return { ok: false, reason: backupReason('not JSON') }; }
+    // A compact save (fmt 2) is unpacked first, the same way the restore itself reads it, so the check and the restore agree.
+    if (env && typeof env === 'object' && env.fmt !== undefined && SB.store.decodeSaved) {
+      env = SB.store.decodeSaved(env);
+      if (!env.state) return { ok: false, reason: 'It is a compact Smokebox save that cannot be read, so it cannot be restored.' };
+    }
     const v = SB.engine.validateBackup(env);
     if (!v.ok) return { ok: false, reason: backupReason(v.error) };
     const bySrc = { live: 0, demo: 0, sample: 0 };
@@ -36250,7 +36319,7 @@ a.of-nav:active { background: var(--press); }
 
   // Builds the restore card's working parts on the Data page (choose a file or paste text, check it, show what is inside, replace everything after a confirm and the PIN, and the way back from a restore) and returns what the page needs afterwards.
   function buildImportCard(env) {
-    const { stateNow, card2, card3, downloadBackup } = env;
+    const { stateNow, card2, card3, downloadBackup, P } = env;
     // Import: a chosen file or pasted text is checked and summarized before anything changes.
     const impResult = h('div', { class: 'od-impresult', 'aria-live': 'polite' });
     const fileIn = h('input', { type: 'file', accept: '.json,application/json,text/plain', class: 'visually-hidden', tabindex: -1, 'aria-hidden': 'true', id: U.uid('odfile') });
@@ -36269,6 +36338,7 @@ a.of-nav:active { background: var(--press); }
       b.dataset.action = 'undo-restore';
       undoBox.replaceChildren(
         h('p', { class: 'od-p od-undo-line' }, 'Your kitchen before this restore is kept for ' + days + ' ' + U.plural(days, 'day') + ' (until ' + U.fmtDateShort(U.dateKey(info.expiresAt)) + ' ' + U.fmtTime(info.expiresAt) + '). It was saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + '.'),
+        info.trimmed ? h('p', { class: 'od-hint' }, TRIMMED_WORDS) : null,
         h('div', { class: 'od-actions' }, b));
     }
     // After a confirm dialog and the PIN, puts the kitchen from before the restore back. Nothing changes if the PIN is not entered.
@@ -36276,7 +36346,7 @@ a.of-nav:active { background: var(--press); }
       const info = SB.store.beforeRestoreInfo ? SB.store.beforeRestoreInfo() : null;
       if (!info) { paintUndo(); return; }
       const ok = await SB.ui.confirm({ title: 'Undo this restore?', tone: 'danger', confirmLabel: 'Put my old kitchen back', cancelLabel: 'Keep what I have',
-        body: ['This puts back the kitchen you had before the restore (saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + ') and replaces what is here now. What is here now is kept for the same time, so this can be undone once too.'] });
+        body: ['This puts back the kitchen you had before the restore (saved ' + U.fmtDateShort(U.dateKey(info.takenAt)) + ' ' + U.fmtTime(info.takenAt) + ') and replaces what is here now. What is here now is kept for the same time, so this can be undone once too.'].concat(info.trimmed ? [TRIMMED_WORDS] : []) });
       if (!ok) return;
       if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
       const rep = SB.store.undoRestore();
@@ -36293,6 +36363,8 @@ a.of-nav:active { background: var(--press); }
     card2.body.append(
       para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
       h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
+    // A month close, or the copy's 7 days running out, while this page is open shows here on the next refresh.
+    P.syncs.push(() => paintUndo());
     card3.body.append(
       h('ol', { class: 'od-steps' },
         h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
@@ -36330,7 +36402,7 @@ a.of-nav:active { background: var(--press); }
         h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'This ' + source + ' is a valid Smokebox backup.')),
         h('dl', { class: 'od-stats od-stats-tight' }, rows.map(([k, v]) => h('div', { class: 'od-stat' }, h('dt', null, k), h('dd', { class: 'od-stat-v' }, v)))),
         repairs ? h('p', { class: 'od-hint' }, 'Smokebox repaired ' + repairs + ' small ' + U.plural(repairs, 'problem') + ' while reading it: ' + res.repaired.slice(0, 3).join('; ') + (repairs > 3 ? '; and ' + (repairs - 3) + ' more.' : '.')) : null,
-        h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This replaces everything on this device: ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', your menu edits and your settings. Back up first if you might want what is here.')),
+        h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This replaces everything on this device: ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', your menu edits, your settings, and your station, category and channel names and hidden stations. Back up first if you might want what is here.')),
         h('div', { class: 'od-actions' },
           btn('Back up what is here first', { icon: 'download', cls: 'btn-sm', onClick: downloadBackup }),
           // The replace button asks again in a dialog before anything is written.
@@ -36344,8 +36416,8 @@ a.of-nav:active { background: var(--press); }
       const p = pending, live = stateNow();
       const ok = await SB.ui.confirm({
         title: 'Replace everything on this device?', tone: 'danger', confirmLabel: 'Replace everything', cancelLabel: 'Keep what I have',
-        body: ['This replaces ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', every setting, your menu edits and the PIN with the backup\'s ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.',
-          'There is no undo. If you might want what is here now, cancel and download a backup first.'],
+        body: ['This replaces ' + U.fmtNum(live.tickets.length) + ' ' + U.plural(live.tickets.length, 'ticket') + ', ' + U.fmtNum(live.batches.length) + ' ' + U.plural(live.batches.length, 'batch', 'batches') + ', every setting, your menu edits, the PIN, and your station, category and channel names and hidden stations with the backup\'s ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.',
+          'Smokebox keeps a copy of what is here now for 7 days so this can be undone, but only if this browser has room for it. To be safe, cancel and download a backup first.'],
       });
       if (!ok) return;
       // With a PIN set, restoring a backup asks for it again, even inside the back office grace period.
@@ -36353,7 +36425,11 @@ a.of-nav:active { background: var(--press); }
       const rep = SB.store.importAll(p.text);
       if (rep === 'ok') {
         clearImport(); pasteArea.value = ''; fileIn.value = '';
-        impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.'))));
+        const kept = ((SB.store.lastResult() || {}).info || {}).beforeRestore === true;
+        const hadData = live.tickets.length + live.batches.length > 0;
+        impResult.replaceChildren(h('div', { class: 'od-card', 'data-tone': 'ok', role: 'status' }, h('p', { class: 'od-card-h' }, ico('check-circle', 20), h('span', null, 'Backup restored: ' + U.fmtNum(p.state.tickets.length) + ' ' + U.plural(p.state.tickets.length, 'ticket') + ' and ' + U.fmtNum(p.state.batches.length) + ' ' + U.plural(p.state.batches.length, 'batch', 'batches') + '.')),
+          // WATCH OUT: when the browser had no room for the copy there is no undo, and the owner must hear that now.
+          !kept && hadData ? h('p', { class: 'od-warn' }, ico('alert', 18), h('span', null, 'This browser had no room to keep a copy of the kitchen that was here, so this restore cannot be undone. A backup file you downloaded earlier is the only way back.')) : null));
         SB.ui.toast('Backup restored.', { tone: 'ok' });
         paintUndo();
       } else {
@@ -36449,7 +36525,7 @@ a.of-nav:active { background: var(--press); }
     card1.body.append(
       lastLine,
       para('A backup is one file with your dishes, orders, settings and records. Back up at the end of every day, and keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
-      para('The starting cash you type on Close the day is remembered on this device only. It is not in a backup.', 'od-hint'),
+      para('Some choices are kept on this device only and are not in a backup: the starting cash you type on Close the day, the look (day or night), text size, and sound and screen-on. Set them again on a new device.', 'od-hint'),
       h('div', { class: 'od-actions' }, dlBtn, cpBtn), exStatus.el, fb);
     // The spreadsheet files and the pilot report are less common, so they sit in a closed group below the flow.
     pn.body.appendChild(h('details', { class: 'od-paste-det od-more' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Spreadsheet files and the pilot report')),
@@ -36593,7 +36669,7 @@ a.of-nav:active { background: var(--press); }
     }
     buildExportCard({ stateNow, exStatus, reportSave, downloadCsv, downloadBackup, copyBackup, card1, fb, pn, P });
 
-    const { check } = buildImportCard({ stateNow, card2, card3, downloadBackup });
+    const { check } = buildImportCard({ stateNow, card2, card3, downloadBackup, P });
 
     const { resetStatus } = buildDangerZone({ pn, stateNow });
 
@@ -37946,6 +38022,22 @@ a.of-nav:active { background: var(--press); }
     return 'Changed ' + (SETTING_NAME[last] || (key || 'a setting')) + ' from ' + settingValue(last, from) + ' to ' + settingValue(last, to);
   }
 
+  // Temperature readings grouped by batch, in log order, worked out once per state (the engine never changes a state in place), so a long
+  // record does not replay the whole log for every cold reading row.
+  const tempCache = new WeakMap();
+  function tempsByBatch(state) {
+    let m = tempCache.get(state);
+    if (m) return m;
+    m = new Map();
+    for (const x of SB.engine.allEvents(state)) {
+      if (!x || x.type !== 'temp_logged') continue;
+      if (!m.has(x.batchId)) m.set(x.batchId, []);
+      m.get(x.batchId).push(x);
+    }
+    tempCache.set(state, m);
+    return m;
+  }
+
   // For a cold-food reading: whether it was above the cold limit and how much time above the limit the batch has used up so far.
   // The engine adds up the time across separate stretches (an in-range reading does not wipe it), so this replays the batch's
   // readings in order the same way. Returns '' when the batch is not cold food or the limit is unknown.
@@ -37954,8 +38046,8 @@ a.of-nav:active { background: var(--press); }
     const lim = state.settings && state.settings.safety ? state.settings.safety.coldHoldF : null;
     if (!b || b.kind !== 'cold' || !isNum(lim) || !isNum(e.f) || !SB.engine || !SB.engine.allEvents) return '';
     let since = null, used = 0;
-    for (const x of SB.engine.allEvents(state)) {
-      if (x.type !== 'temp_logged' || x.batchId !== e.batchId || x.reverted || !isNum(x.f) || !isNum(x.t) || x.t > e.t) continue;
+    for (const x of tempsByBatch(state).get(e.batchId) || []) {
+      if (x.reverted || !isNum(x.f) || !isNum(x.t) || x.t > e.t) continue;
       if (x.f > lim) { if (since == null) since = x.t; } else if (since != null) { used += x.t - since; since = null; }
       if (x === e || x.id === e.id) break;
     }
