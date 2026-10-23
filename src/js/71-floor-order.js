@@ -925,7 +925,7 @@
       });
       touched();
       if (skipped.length) SB.ui.toast(cb.name + ': left out ' + skipped.join(', ') + ' because ' + (skipped.length === 1 ? 'it is' : 'they are') + ' 86 or at the limit.', { tone: 'warn' });
-      else say(cb.name + ' added, ' + added.length + ' lines');
+      else say(cb.name + ' added, ' + added.length + ' ' + U.plural(added.length, 'line'));
     }
     // Repeat last order: copies the previous order into this one, asking first if this one already has items.
     function doRepeat() {
