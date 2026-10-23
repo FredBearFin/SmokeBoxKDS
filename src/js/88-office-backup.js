@@ -58,8 +58,8 @@
     const t = v == null ? '' : String(v);
     return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
   }
-  // Dollars as plain digits with two decimals ("12.40"), with no dollar sign or thousands commas, so a spreadsheet adds them up.
-  const plainMoney = (v) => (isNum(v) ? (Math.round(v * 100) / 100).toFixed(2) : '0.00');
+  // Whole cents as plain digits with two decimals (1240 gives "12.40"), with no dollar sign or thousands commas, so a spreadsheet adds them up.
+  const plainMoney = (v) => (isNum(v) ? (Math.round(v) / 100).toFixed(2) : '0.00');
 
   // The sales-by-day CSV for an accountant, from the saved state: one row per service day with paid orders, then a Total row.
   // Columns: Date, Orders paid, Sales (after discounts), Discounts given, Tax, Tips, Total collected, then collected by Cash, Card and Other.
@@ -72,9 +72,11 @@
       if (!o || o.status !== 'paid' || !isNum(o.paidAt) || !o.totals) return;
       const day = U.serviceDate(o.paidAt, dsh);
       const d = days[day] || (days[day] = { orders: 0, sales: 0, discounts: 0, tax: 0, tips: 0, total: 0, cash: 0, card: 0, other: 0 });
-      const T = o.totals, tip = isNum(o.tip) ? o.tip : 0;
-      const collected = (isNum(T.total) ? T.total : 0) + tip;
-      d.orders++; d.sales += (T.subtotal || 0) - (T.discount || 0); d.discounts += T.discount || 0; d.tax += T.tax || 0; d.tips += tip; d.total += collected;
+      // Every amount is added in whole cents so a long list never picks up a stray cent.
+      const cc = (v) => Math.round((isNum(v) ? v : 0) * 100);
+      const T = o.totals, tip = cc(o.tip);
+      const collected = cc(T.total) + tip;
+      d.orders++; d.sales += cc(T.subtotal) - cc(T.discount); d.discounts += cc(T.discount); d.tax += cc(T.tax); d.tips += tip; d.total += collected;
       d[o.method === 'cash' ? 'cash' : o.method === 'card' ? 'card' : 'other'] += collected;
     });
     const head = ['Date', 'Orders paid', 'Sales (after discounts)', 'Discounts given', 'Tax', 'Tips', 'Total collected', 'Collected in cash', 'Collected by card', 'Collected other'];

@@ -85,7 +85,8 @@
     }
     if (pageId === 'money') {
       // the thrown-away ledger on this page needs no sales, so a discard also counts as data here
-      if (f.tickets > 0 || f.discards > 0) return null;
+      if (isNum(f.paid) ? f.paid > 0 || f.discards > 0 : f.tickets > 0 || f.discards > 0) return null;
+      if (isNum(f.paid) && f.tickets > 0) return { title: 'Nothing to show yet', body: 'The orders so far are not paid. Pay an order from Orders and the money shows up here.' };
       return !f.anyLive
         ? { title: 'Take your first order', body: 'Sales come from your own orders. Take an order on the kitchen board and pay it from Orders, and the money shows up here.' }
         : { title: 'No sales' + where, body: 'Nothing was sold in this range. Use the arrows or the range buttons to look at a day you were open.' };
@@ -686,6 +687,12 @@
 
     const page = {
       el: root, grid,
+      // how adds a one-tap "How is this worked out?" note under the headline, in plain words.
+      how(text) {
+        const d = h('details', { class: 'of-how' }, h('summary', null, 'How is this worked out?'), h('p', null, text));
+        headEl.after(d);
+        return page;
+      },
       // headline switches the headline sentence on and draws it. _paintHeadline redraws it from the
       // metrics handle p.
       headline() { state.headline = true; headEl.hidden = false; paintCoach(); this._paintHeadline(ctx.prepared()); return page; },
@@ -782,12 +789,12 @@
     // Counts what falls inside the range (tickets, batches, safety records) for the empty-state coach.
     function coachFacts() {
       const ds = ctx.dataset(), r = ctx.filters.range, inR = (t) => isNum(t) && t >= r.from && t < r.to;
-      let tickets = 0, batches = 0, records = 0, discards = 0, finished = 0;
+      let tickets = 0, batches = 0, records = 0, discards = 0, finished = 0, paid = 0;
       for (const t of ds.tickets || []) if (inR(t.createdAt)) { tickets++; if (t.status !== 'active' && t.status !== 'voided') finished++; }
-      for (const o of ds.orders || []) if (inR(o.createdAt)) tickets++;
+      for (const o of ds.orders || []) { if (inR(o.createdAt)) tickets++; if (o.status === 'paid' && inR(o.paidAt)) paid++; }
       for (const b of ds.batches || []) if (b.src !== 'starter' && inR(b.enteredAt)) batches++;
       for (const e of ds.events || []) if (e && (e.type === 'temp_logged' || e.type === 'sanitize_done' || e.type === 'batch_discard') && inR(e.t)) { records++; if (e.type === 'batch_discard') discards++; }
-      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, finished, batches, records, discards, label: r.label };
+      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, finished, paid, batches, records, discards, label: r.label };
     }
     // Shows the "what to do next" message in place of blank tiles and charts when the range has no data.
     function paintCoach() {

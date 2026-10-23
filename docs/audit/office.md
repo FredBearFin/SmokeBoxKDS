@@ -179,3 +179,34 @@ Left: charts in black and white print (only the two print pages are print-styled
 - **Middle dots** in the dish rows ("Pit · Meats · Starter prep time") and the Close the day counts line replaced with commas ("Pit, Meats, starter prep time"), per the "no middots" rule in docs/design-notes.md. The dish-row buttons no longer carry a separate aria-label, so the accessible name now contains the visible text (qa 12a label-in-name passes).
 - **qa 12e (office contrast):** the "Not tracking" rail words were too faint (4.36:1 in Paper); they now use the main ink color. Passes.
 - **e2e suites brought up to the current UI** (all deliberate UI changes, no UI regressions): the CSV buttons sit in a closed "Spreadsheet files and the pilot report" group (the test opens it); the restore summary now lists Kind, Dishes, Orders, Tickets and Manager PIN; the two erase buttons open a typed-word box instead of a confirm dialog (the test types ERASE); the Data page bundle in the test now includes `88-office-backup.js`; the dish-summary middle-dot exemption was removed. In `test/office.e2e.mjs` the pace ring, the slowest-tickets table and the one-column check at 768 px now account for the "Show more charts and findings" fold: those cards are folded away on purpose, so the tests open the fold or skip hidden cards (deliberate, not a layout bug).
+
+---
+
+## Numbers I verified (round 11, branch night/a3-r11)
+
+Method: `test/reconcile.test.mjs` builds random own kitchens with the real engine (several seeds, tax rates 0, 6, 7.25, 8.875 and 10.5 percent, odd-cent prices, quantities, dollar and percent discounts, tips, cash/card/other, voided orders, an order re-opened and paid again, orders paid after midnight, weeks across the 2026 US clock changes) and the barbecue sample history for three anchor dates (ordinary, 12 March, 4 November). Everything is compared with an independent ledger in whole cents. Run it also with `TZ=America/New_York node --test test/reconcile.test.mjs` (the sandbox default is UTC, which has no daylight saving).
+
+| Number | Checked against | Result |
+|---|---|---|
+| Sales (after discounts), discounts, tax, tips, collected (Sales and money headline and tiles) | sum of every paid order's frozen totals, in cents | agrees, 8 kitchens and 3 sample fortnights |
+| Money by day | ledger per service day; days add up to the total | agrees |
+| Money by payment method | ledger per method; methods add up to collected | agrees |
+| Sales by hour, by order type (order counts and sales) | add up to the paid-order count and sales | agrees |
+| Accountant CSV (Total row, every day row, method columns) | ledger | agrees; amounts are added in whole cents |
+| Close the day sheet (sales, tax, tips, collected, per method, paid count) | ledger for that day and the engine's `day_closed` event | agrees |
+| A day closed twice | second event covers the whole day; sheet equals it; one extra order adds exactly its total and tip | agrees |
+| Orders paid after midnight | stay in the service day until 4 am, then belong to the next | agrees |
+| One-day range, one-order range, empty range | ledger, exactly that order, zeros and an empty CSV | agrees |
+| Items sold and item lines (Top items) | done items on finished tickets (items left undone on a force-sent ticket are not sold: 100 of 9,942 in the sample, by design) | agrees |
+| Finished tickets | tickets neither active nor voided | agrees |
+| Order total = subtotal - discount + tax | every paid order, in cents; tax rounding | agrees except one case below |
+| Close-the-day print summary, glance "paid so far today" | same `M.sales`/ledger functions | not separately measured |
+
+**Mismatches found**
+- **Engine:** an exact half cent of tax rounds down ($2.00 at 7.25 percent gives 14 cents instead of 15; $0.40 at 8.875 percent gives 3 instead of 4) because of binary floating point. Reported to A5 with a failing test (marked todo in the test file); A5 says it is fixed on `night/a5-r11`, so remove the todo flag after merging it. No screen disagrees with another because of it: totals are frozen when paid.
+- **Mine, fixed:** the sales aggregator added floating-point dollars, so long lists could pick up dust; it now adds in whole cents (`40-metrics.js` addUp), and so does the CSV. The safety record's date ranges added hours in milliseconds to midnight, which is an hour off on the two daylight-saving days; they now use the wall clock.
+- **Empty states:** Sales and money showed four "Not enough data" tiles when orders existed but none were paid; it now says "Nothing to show yet. The orders so far are not paid."
+
+**"How is this worked out?"** A one-tap note under the headline on Sales and money, Pace, Tickets and Stations, in plain words (what counts, which day, what is left out). Safety and Stock are A4's and were not touched.
+
+**Not verified:** splits across several payment methods and refunds do not exist in the engine (one method per order; a wrong payment is reopened and paid again, which is covered). Sales by hour on the two daylight-saving days (the hour bucket is computed from midnight and may be one hour off after the change); stations and pace counts beyond the ticket and item totals; the Safety page and Stock numbers; the glance panel was reasoned from the same functions, not tested in a browser.

@@ -325,6 +325,7 @@
 
     const salesOf = B.memoP((p) => M.sales(p));
     page.headline();
+    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day turns over at the hour set in Menu and settings (4 am to start). Open and voided orders are not counted. Average order is sales divided by paid orders. Every figure is added up in whole cents from the paid orders themselves.');
 
     page.tiles([
       // The one main money figure: sales after discounts from paid orders (blank until an order is paid).

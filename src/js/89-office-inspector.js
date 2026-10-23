@@ -67,8 +67,8 @@
     const r = RANGES.find((x) => x.id === id) || RANGES[1];
     const today = U.serviceDate(now, dayStartHour);
     const first = U.addDays(today, -(r.days - 1)), next = U.addDays(today, 1);
-    // The moment a service day starts: local midnight plus the day-start hour.
-    const at = (key) => U.dateKeyToMs(key) + dayStartHour * 3600e3;
+    // The moment a service day starts on the wall clock (the day-start hour that morning), even on a daylight-saving day.
+    const at = (key) => { const p = key.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2], dayStartHour, 0, 0, 0).getTime(); };
     return { from: at(first), to: at(next), label: r.days === 1 ? U.fmtDateShort(today) : U.fmtDateShort(first) + ' to ' + U.fmtDateShort(today) };
   }
 
