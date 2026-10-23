@@ -905,7 +905,7 @@
           const ing = ingName(a.ing);
           const msg = a.reason === 'manual' ? t.mi.name + ' is turned off by hand. Turn it back on in the 86 board.'
             : a.reason === 'safety' ? t.mi.name + ' is on a safety hold. Reheat or throw out the batch in the Hold cabinet.'
-            : a.reason === 'quality' ? t.mi.name + ' is past its quality limit. Taste it in the Hold cabinet, or log a fresh batch to sell it again.'
+            : a.reason === 'quality' ? t.mi.name + ' is past its quality limit. Check it in the Hold cabinet, or log a fresh batch to sell it again.'
             : 'Out of ' + ing + '. Log a batch to sell ' + t.mi.name + ' again.';
           SB.ui.toast(msg, { tone: 'warn' });
           paintTiles();
