@@ -831,7 +831,7 @@
   M.queueLoad = (ds, opts) => {
     const ctx = makeCtx(ds, opts); const bmin = bucketMinOf(ctx), bm = bmin * MIN, fold = !!ctx.o.opts.fold, now = ctx.nowMs();
     const res = { bucketMin: bmin, fold, days: 0, zones: [], names: {}, peak: null, points: [], series: [] };
-    const iv = []; let t0 = Infinity;
+    const iv = [];
     // Step 1: turn each open item into an interval from when it fired to when it ended.
     for (const { it, v } of ctx.lines(true)) {
       if (!num(it.firedAt) || !it.zone) continue;
@@ -844,13 +844,15 @@
       else end = now;
       if (!num(end) || end <= it.firedAt) continue;
       // A line open over 12 hours is cut off at 12, so one forgotten ticket cannot paint days of load.
-      iv.push([it.firedAt, Math.min(end, it.firedAt + 12 * H), it.zone]); if (it.firedAt < t0) t0 = it.firedAt;
+      iv.push([it.firedAt, Math.min(end, it.firedAt + 12 * H), it.zone]);
     }
     if (!iv.length) return res;
-    // Step 2: per station and bucket, add up the milliseconds of open-line time inside the bucket.
-    const off = tzOff(t0), acc = {}; let kmin = Infinity, kmax = -Infinity;
+    // Step 2: per station and bucket, add up the milliseconds of open-line time inside the bucket. Buckets are
+    // counted on the wall clock like throughput: each line uses the clock offset at its own start, so a range
+    // that crosses a clock change keeps every day's buckets on the hour the kitchen's clock showed.
+    const acc = {}; let kmin = Infinity, kmax = -Infinity;
     for (const [s, e, z] of iv) {
-      const m = acc[z] || (acc[z] = {});
+      const off = tzOff(s), m = acc[z] || (acc[z] = {});
       const a = Math.floor((s + off) / bm), b = Math.floor((e + off - 1e-6) / bm);
       for (let k = a; k <= b; k++) { const bs = k * bm - off; const ov = Math.min(e, bs + bm) - Math.max(s, bs); if (ov > 0) m[k] = (m[k] || 0) + ov; }
       if (a < kmin) kmin = a; if (b > kmax) kmax = b;
@@ -859,7 +861,10 @@
     const zones = C.workZones.filter((z) => acc[z]).concat(Object.keys(acc).filter((z) => C.workZones.indexOf(z) < 0).sort());
     let pts = [];
     for (let k = kmin; k <= kmax; k++) {
-      const st = stamp(ctx, k * bm - off); const bs = st.t;
+      // The real moment the wall-clock bucket starts; a wall time the clock skipped (spring forward) has no bucket.
+      const wall = k * bm, t = wall - tzOff(wall - tzOff(wall));
+      if (t + tzOff(t) !== wall) continue;
+      const st = stamp(ctx, t); const bs = st.t;
       // The bucket holding an explicit opts.now is divided by the time elapsed so far, not its full width
       // (F-M8).
       const div = ctx.o.now !== null && now > bs && now < bs + bm ? now - bs : bm; const v = {}; let tot = 0;
