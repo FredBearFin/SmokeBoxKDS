@@ -300,8 +300,9 @@
   function compact(v, dec) {
     if (!isNum(v)) return '-';
     const a = Math.abs(v);
-    if (a >= 1e9) return trim0((v / 1e9).toFixed(1)) + 'B';
-    if (a >= 1e6) return trim0((v / 1e6).toFixed(a >= 1e7 ? 0 : 1)) + 'M';
+    // WATCH OUT: the unit is picked after rounding, so 999,950 reads 1M and not 1000K.
+    if (a >= 1e9 || Number((a / 1e6).toFixed(0)) >= 1000) return trim0((v / 1e9).toFixed(1)) + 'B';
+    if (a >= 1e6 || Number((a / 1e3).toFixed(0)) >= 1000) return trim0((v / 1e6).toFixed(a >= 1e7 ? 0 : 1)) + 'M';
     if (a >= 1e4) return trim0((v / 1e3).toFixed(a >= 1e5 ? 0 : 1)) + 'K';
     if (a >= 1e3 && dec === 0) return grp(String(Math.round(v)));
     return trim0(v.toFixed(dec == null ? (a >= 100 ? 0 : a >= 10 ? 1 : 2) : dec));
@@ -1111,15 +1112,17 @@
     cfg = cfg || {}; o = o || {};
     const fmt = resolveFormat(o.format != null ? o.format : cfg.format, F.num);
     let lo = isNum(dMin) ? dMin : 0, hi = isNum(dMax) ? dMax : 1;
-    if (isNum(cfg.min)) lo = cfg.min;
+    // WATCH OUT: bars and areas (zero 'force') ignore a minimum above zero; a cut baseline makes a small bar look tiny.
+    const minSet = isNum(cfg.min) && !(o.zero === 'force' && cfg.min > 0);
+    if (minSet) lo = cfg.min;
     if (isNum(cfg.max)) hi = cfg.max;
     // Bars always start at zero. Lines start at zero only if the low end is under about half the high end,
     // so a line near 95 is not squashed flat.
-    if (o.zero && !isNum(cfg.min) && lo > 0 && (o.zero === 'force' || lo < 0.55 * hi)) lo = 0;
+    if (o.zero && !minSet && lo > 0 && (o.zero === 'force' || lo < 0.55 * hi)) lo = 0;
     if (o.zero && !isNum(cfg.max) && hi < 0) hi = 0;
     if (lo > hi) { const t = lo; lo = hi; hi = t; }
     const count = clamp(Math.floor(len / (o.spacing || 44)) + 1, 3, o.maxTicks || 7);
-    const nt = M.valueTicks(fmt, lo, hi, count, { fixMin: isNum(cfg.min) ? cfg.min : undefined, fixMax: isNum(cfg.max) ? cfg.max : undefined, nice: true });
+    const nt = M.valueTicks(fmt, lo, hi, count, { fixMin: minSet ? cfg.min : undefined, fixMax: isNum(cfg.max) ? cfg.max : undefined, nice: true });
     // d0 and d1 are the axis ends after rounding outward to tidy ticks; full(v) is tooltip text.
     return { d0: nt.min, d1: nt.max, step: nt.step, fmt, full: (v) => fmt.full(v), ticks: nt.ticks.map((v) => ({ v, label: fmt.axis(v, nt.step) })) };
   }
@@ -1305,7 +1308,8 @@
     const see = (v) => { if (isNum(v)) { if (v < yLo) yLo = v; if (v > yHi) yHi = v; } };
     if (stacked) { stack.pos.forEach(see); see(0); }
     else vis.forEach((s) => s.pts.forEach((p) => { see(p.y); if (s.band) see(p.y2); }));
-    (spec.refLines || []).forEach((r) => { if (r && isNum(r.y)) see(r.y); });
+    // A level line may come as {y} or {value}; both are drawn across, so both must fit in the y range or it is clipped.
+    (spec.refLines || []).forEach((r) => { if (r) see(r.value != null ? r.value : r.y); });
     (spec.bandY || []).forEach((b) => { if (b) { see(b.y0); see(b.y1); } });
     (spec.annotations || []).forEach((a) => { if (a) see(a.y); });
     const anyArea = vis.some((s) => s.area);
@@ -1643,6 +1647,9 @@
     let lo = 0, hi = 0;
     // Value of series s in category c.
     const val = (s, c) => s.values[c];
+    // WATCH OUT: percent bars are drawn as shares of the positive total, so their labels and tooltips use it too
+    // (the signed total would disagree with the bar sizes once a segment is negative).
+    const posTot = (c) => vis.reduce((a, s) => { const v = val(s, c); return a + (isNum(v) && v > 0 ? v : 0); }, 0);
     let stackL = null;
     if (stacked) {
       const vals = vis.map((s) => m.order.map((c) => { const v = val(s, c); return v == null ? null : v; }));
@@ -1681,7 +1688,7 @@
     const tipFor = (c, hotSi) => {
       const rows = vis.map((s) => {
         const v = val(s, c);
-        const share = percent && m.total(c) > 0 && isNum(v) ? ' (' + F.pct100.full((v / m.total(c)) * 100) + ')' : '';
+        const share = percent && posTot(c) > 0 && isNum(v) ? ' (' + F.pct100.full((v / posTot(c)) * 100) + ')' : '';
         return { key: { css: css(barKey(s, c)), shape: 'box' }, v: v == null ? '-' : fmt0.full(v) + share, k: s.name };
       });
       if (stacked && vis.length > 1) rows.push({ key: null, v: fmt0.full(m.total(c)), k: 'Total' });
@@ -1761,7 +1768,7 @@
             const p = chart.fillShape(svg, g1, d, barKey(q.s, c));
             visEls.push(p);
             if (labelsMode !== 'none' && (labelsMode === 'all' || true)) {
-              const tvv = percent ? shareCell(((val(q.s, c)) / (m.total(c) || 1)) * 100) : fmt0.full(val(q.s, c));
+              const tvv = percent ? shareCell(((val(q.s, c)) / (posTot(c) || 1)) * 100) : fmt0.full(val(q.s, c));
               const tw_ = pxText(tvv);
               if (bot_ - top_ >= 16 && tw_ + 8 <= bw && (labelsMode !== 'none')) gl.appendChild(txt(tvv, cx, (top_ + bot_) / 2, 'ch-in', 'middle', { dy: '.35em', style: 'fill:' + chart.inkOn(barKey(q.s, c)) }));
             }
@@ -1871,7 +1878,7 @@
             if (r_ - l_ < 1) r_ = l_ + 1;
             const d = barPath(l_, cy - bwid / 2, r_ - l_, bwid, 4, outer ? (q.neg ? 'left' : 'right') : 'none');
             const p = chart.fillShape(svg, g1, d, barKey(q.s, c)); visEls.push(p);
-            const tvv = percent ? shareCell(((val(q.s, c)) / (m.total(c) || 1)) * 100) : fmt0.full(val(q.s, c));
+            const tvv = percent ? shareCell(((val(q.s, c)) / (posTot(c) || 1)) * 100) : fmt0.full(val(q.s, c));
             const tw_ = pxText(tvv);
             if (labelsMode !== 'none' && r_ - l_ >= tw_ + 12 && bwid >= 14) gl.appendChild(txt(tvv, (l_ + r_) / 2, cy, 'ch-in', 'middle', { dy: '.35em', style: 'fill:' + chart.inkOn(barKey(q.s, c)) }));
           });
@@ -2299,8 +2306,9 @@
     const l = labW + 12, r = W - 10 - flagRoom - lblRoom * 0 - 6;
     const pitch = isNum(spec.height) ? (spec.height - 34) / Math.max(1, n) : 36;
     const top = 6, bot = top + n * pitch, H0 = bot + 30;
-    let mx = 0; m.rows.forEach((q) => { [q.a, q.b, q.c].forEach((v) => { if (v != null && v > mx) mx = v; }); });
-    const ax = valueAxis(spec.x || {}, 0, mx || 1, r - l - lblRoom, { format: spec.format, zero: 'force', spacing: 70, maxTicks: 6 });
+    // The scale runs from zero, or lower when a value is below zero, so no dot lands in the row labels.
+    let mx = 0, mn = 0; m.rows.forEach((q) => { [q.a, q.b, q.c].forEach((v) => { if (v != null && v > mx) mx = v; if (v != null && v < mn) mn = v; }); });
+    const ax = valueAxis(spec.x || {}, mn, mx || 1, r - l - lblRoom, { format: spec.format, zero: 'force', spacing: 70, maxTicks: 6 });
     // domain padded on the right so end labels fit
     const V = M.linear(ax.d0, ax.d1, l, r - lblRoom);
     ax.ticks.forEach((t) => { const x = V(t.v); svg.appendChild(vline(x, top, bot, Math.abs(t.v - ax.d0) < 1e-9 ? 'ch-ax' : 'ch-gl')); });
@@ -2330,8 +2338,11 @@
       let rightmost = Math.max(pa == null ? -1e9 : pa, pb == null ? -1e9 : pb, pc == null ? -1e9 : pc);
       if (pa != null && pb != null) {
         const lowP = Math.min(pa, pb), highP = Math.max(pa, pb), lowT = pa <= pb ? aT : bT, highT = pa <= pb ? bT : aT;
-        if (highP - lowP < chart.tw(lowT, 12) + 16) {
-          { const both = aT === bT ? bT : aT + ' to ' + bT; svg.appendChild(txt(highP + 14 + chart.tw(both, 12, 600) <= W - flagRoom - 4 ? both : bT, highP + 14, cy, 'ch-v', 'start', { dy: '.35em' })); }
+        const both = aT === bT ? bT : aT + ' to ' + bT;
+        // Ends that nearly touch share one label on the right; when it does not fit, each end keeps its own label
+        // outside the pair, so the starter value is never dropped.
+        if (highP - lowP < chart.tw(lowT, 12) + 16 && highP + 14 + chart.tw(both, 12, 600) <= W - flagRoom - 4) {
+          svg.appendChild(txt(both, highP + 14, cy, 'ch-v', 'start', { dy: '.35em' }));
         } else {
           svg.appendChild(txt(lowT, lowP - 11, cy, 'ch-lbl2', 'end', { dy: '.35em' }));
           svg.appendChild(txt(highT, highP + 11, cy, 'ch-v', 'start', { dy: '.35em' }));
@@ -2514,9 +2525,13 @@
   // 1) and the status.
   function meterModel(spec) {
     const v = isNum(spec.value) ? spec.value : null;
-    const max = isNum(spec.max) && spec.max > 0 ? spec.max : (v != null && v > 0 ? v : 1);
+    // WATCH OUT: with no max the value alone would fill the bar every time, so the scale reaches past the larger of
+    // the value and the warn and breach limits, and the table says no full scale was set.
+    const scaleSet = isNum(spec.max) && spec.max > 0;
+    const top = Math.max(v != null && v > 0 ? v : 0, isNum(spec.warn) ? spec.warn : 0, isNum(spec.breach) ? spec.breach : 0);
+    const max = scaleSet ? spec.max : top > 0 ? top * 1.25 : 1;
     const st = stateOf(spec, v);
-    return { spec, v, max, st, empty: false, summary: '' };
+    return { spec, v, max, scaleSet, st, empty: false, summary: '' };
   }
   // Draws label and value text, a track with a filled bar, ticks at the warn and breach limits and an
   // optional sub line; one hover area. Returns the height.
@@ -2561,7 +2576,7 @@
   }
   // Meter and ring show a table only if spec.table is true (tableOptIn), draw their own subtitle (ownSub),
   // and emptyHeight sizes the "no data" message.
-  TYPES.meter = { noun: 'Meter', tableOptIn: true, table: (m) => ({ head: ['Measure', 'Value'], rows: [[m.spec.label || 'Value', resolveFormat(m.spec.format, F.num).full(m.v)], ['Full scale', resolveFormat(m.spec.format, F.num).full(m.max)]] }), model: meterModel, draw: meterDraw, emptyHeight: 40, ownSub: true };
+  TYPES.meter = { noun: 'Meter', tableOptIn: true, table: (m) => ({ head: ['Measure', 'Value'], rows: [[m.spec.label || 'Value', resolveFormat(m.spec.format, F.num).full(m.v)], ['Full scale', m.scaleSet ? resolveFormat(m.spec.format, F.num).full(m.max) : 'not set']] }), model: meterModel, draw: meterDraw, emptyHeight: 40, ownSub: true };
 
   // Draws a progress ring: big value in the middle, optional label, status shape and word, target tick and
   // wrapped sub text. Returns the height.
@@ -2617,7 +2632,7 @@
     return y + 4;
   }
   // The ring reuses the meter's model with its own drawing function.
-  TYPES.ring = { noun: 'Ring', tableOptIn: true, table: (m) => ({ head: ['Measure', 'Value'], rows: [[m.spec.label || 'Value', resolveFormat(m.spec.format, F.num).full(m.v)], ['Full scale', resolveFormat(m.spec.format, F.num).full(m.max)]] }), model: meterModel, draw: ringDraw, emptyHeight: 120, ownSub: true };
+  TYPES.ring = { noun: 'Ring', tableOptIn: true, table: (m) => ({ head: ['Measure', 'Value'], rows: [[m.spec.label || 'Value', resolveFormat(m.spec.format, F.num).full(m.v)], ['Full scale', m.scaleSet ? resolveFormat(m.spec.format, F.num).full(m.max) : 'not set']] }), model: meterModel, draw: ringDraw, emptyHeight: 120, ownSub: true };
 
   /* =====================================================================================================
    * 15. SPARK (tiny inline trend). spec: { values:[], prev?:[], area?, ref?, width?, height?, format, labels?:[], tone?, label? }
