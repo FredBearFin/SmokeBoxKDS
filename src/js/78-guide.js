@@ -92,7 +92,7 @@
      },
      {
       "t": "p",
-      "x": "Tap **Back office**, then **Menu and settings**. Find Data, backup and reset and tap **Download backup (JSON)**. Keep a copy off this device: email it to yourself or put it on a USB drive."
+      "x": "Tap **Back office**, then **Menu and settings**. Find Data, backup and reset and tap **Download backup (JSON)**. This saves a file. Keep a copy off this device: email it to yourself or put it on a USB drive."
      }
     ]
    },
@@ -100,7 +100,7 @@
     "id": "setup-recipes",
     "group": "guide",
     "title": "Setup recipes",
-    "summary": "Four ways to set up Smokebox. Pick the one closest to your place. Each uses only what the app has: a few stations, one cooking-ahead switch and counted dishes.",
+    "summary": "Four ways to set up Smokebox. Pick the one closest to your place. Each uses only what the app can do today. A station is a place in your kitchen, like the grill or the cold counter.",
     "blocks": [
      {
       "t": "h",
@@ -139,7 +139,7 @@
       "x": [
        "Stations: rename the starting stations (Kitchen, Prep, Fryer, Cold and drinks) to match your line. Expo stays.",
        "Settings: choose **Dine-in** and a table on each order. Set a PIN to keep cooks out of the back office.",
-       "The board: a station gets a tab once a dish is made there. Each cook opens their tab and sees only their dishes. Expo sees whole tickets, each dish tagged with its station, and taps **Bump** when the plate is complete."
+       "The board: a station gets a tab once a dish is made there. Each cook opens their tab and sees only their dishes. Expo is the person who checks and packs whole orders. Expo sees whole tickets, each dish tagged with its station, and taps **Bump** when the plate is complete."
       ]
      },
      {
@@ -422,7 +422,7 @@
       "x": [
        "In **Dishes and prices**, find \"Do you cook food ahead?\" and tap **Yes, I cook ahead**. The cooked-ahead sheet opens.",
        "Type what you cook ahead and choose Hot or Cold.",
-       "Set how long it may stay. For hot food it is one number of hours. For cold food two optional boxes ask how many days it may stay in the fridge and how many hours it may be out of the fridge. Use the limits your local health department gives you. Leave a box empty if no limit is set: Smokebox then only shows the time. Batches of cold food are described in Cold items in the fridge.",
+       "Set how long it may stay. Hot food takes one number of hours. Cold food has two optional boxes: days in the fridge, and hours out of the fridge. Use the limits your local health department gives you. Leave a box empty if none is set, and Smokebox will only show the time. See Cold items in the fridge.",
        "Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.",
        "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**. To change an item later, open it from the list and tap **Save changes**."
       ]
@@ -446,7 +446,7 @@
      {
       "t": "fig",
       "id": "cabinet",
-      "alt": "Steps for a batch in the hold cabinet: it goes in, it is checked, portions are taken out, and it ends by being reheated or thrown out.",
+      "alt": "Steps for a batch in the hold cabinet: it goes in, it is checked, portions are pulled out, and it ends by being reheated or thrown out.",
       "cap": "A batch in the hold cabinet."
      },
      {
@@ -457,9 +457,9 @@
       "t": "ol",
       "x": [
        "Open the **Cabinet** tab. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
-       "Each batch has a card with one main button. Usually it is **Log temp**: take a reading at every check. A reading in range keeps the batch on the menu. When a batch is too cool the button becomes **Reheat**. Smokebox allows one reheat per batch. That is its own rule, not a health code rule. When it is past its best, it becomes **Keep serving**.",
-       "The **More for this batch** button (...) opens the rest: **Pull** as portions leave the cabinet, **Start cooling**, and **Discard**.",
-       "A batch out of time or out of range is thrown out: tap **Discard** and pick a reason."
+       "Each batch has a card with two main buttons. **Pull** takes out the usual amount, like Pull 4.50 kg, as food leaves the cabinet. **Log temp** writes down a temperature reading. Take one at every check. A reading in range keeps the batch on the menu.",
+       "The button can change. When a batch is too cool it becomes **Reheat**. Smokebox allows one reheat per batch: its own rule, not a health code rule. When a batch is past its quality limit it becomes **Keep serving**: check the food, then decide.",
+       "The **More for this batch** button (...) opens **Pull**, **Start cooling** and **Discard**, and **Remind me in 10 min** while a warning is showing. Tap **Discard** and pick a reason when a batch is out of time or out of range."
       ]
      },
      {
@@ -483,11 +483,11 @@
      },
      {
       "t": "p",
-      "x": "Some foods warn earlier. You can change the times in Settings. A batch that is almost empty, or on pace to sell out in time, stays quiet."
+      "x": "Some foods warn earlier, and you can change the times in Settings. A nearly empty batch stays quiet."
      },
      {
       "t": "p",
-      "x": "Warnings only sound while the screen is on and Smokebox is open on the board. They do not sound when the tablet is asleep, the page is closed, the volume is off, or it is outside your opening hours."
+      "x": "Warnings sound only while the screen is on and Smokebox is open on the board, with the volume up, inside your opening hours."
      }
     ]
    },
@@ -528,6 +528,54 @@
      {
       "t": "p",
       "x": "The days and hours are the numbers you typed. Smokebox does not know your local rules and does not say what they are. It only counts the time against your limits."
+     }
+    ]
+   },
+   {
+    "id": "readings",
+    "group": "guide",
+    "title": "Readings",
+    "summary": "Write down fridge, thermometer and sanitizer strip readings in one place. You see Readings only if you cook food ahead.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Open it"
+     },
+     {
+      "t": "p",
+      "x": "Tap **Settings**, then **Readings**."
+     },
+     {
+      "t": "h",
+      "x": "Three things you can write down"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "**Fridge, freezer or display case**: pick which one, add a name if you like (like Walk-in), type the temperature, and tap **Log reading**.",
+       "**Food thermometer check**: type what the thermometer says, say how you checked it (Ice water, Boiling water or Other), and tap **Log check**.",
+       "**Sanitizer strip**: type the strip reading in parts per million. Add the sanitizer and where if you like. Tap **Log strip reading**. This also marks surfaces as sanitized."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "Each entry goes in the safety record with your initials. Type the number the thermometer or strip really shows before you tap the log button."
+     },
+     {
+      "t": "h",
+      "x": "What it does not do"
+     },
+     {
+      "t": "p",
+      "x": "Smokebox writes down what you type. It does not know what a good reading is and cannot see the food. Use the numbers your health department and the sanitizer's label give you."
+     },
+     {
+      "t": "h",
+      "x": "Fix a wrong entry"
+     },
+     {
+      "t": "p",
+      "x": "Open the entry in **Recent readings** and tap **Save fix**. The old entry stays, with your fix next to it."
      }
     ]
    },
@@ -690,7 +738,7 @@
       "x": [
        "On the old device, if it still works, download a backup (see Backup and restore). Copy the file somewhere else: email it to yourself or use a USB drive.",
        "On the new device, copy the same smokebox.html file onto it and open it. Install it as an app: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app.",
-       "Tap **Settings**, then **Set up this tablet: first steps**. Sound and keeping the screen on are set on each device, so do them again here.",
+       "Tap **Settings**, then **Tablet checks: screen, sound, home screen**. Sound and keeping the screen on are set on each device, so do them again here.",
        "Tap **Back office**, then **Menu and settings**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
        "Check the board and your menu. Save a fresh backup from the new device, then retire the old one."
       ]
@@ -702,6 +750,46 @@
      {
       "t": "p",
       "x": "Separate devices do not share data yet. Two tabs on the same device stay in step."
+     }
+    ]
+   },
+   {
+    "id": "get-the-tablet-ready",
+    "group": "guide",
+    "title": "Get the tablet ready",
+    "summary": "Five quick checks so the board keeps working during service.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Open it"
+     },
+     {
+      "t": "p",
+      "x": "Tap **Settings**, then **Tablet checks: screen, sound, home screen**. Each check shows a check mark, or a plain line saying what to do. A check mark means you or the tablet confirmed it. It is not a promise it stays that way all day. For the longer first-time list, open **Set up this tablet: first steps**."
+     },
+     {
+      "t": "h",
+      "x": "The five checks"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "**Screen stays awake**: warnings cannot sound while the screen is off. Smokebox asks the browser to keep it on, but also set the tablet to never sleep and keep it plugged in. Tap **Check again** after you change it.",
+       "**Sound is on** and **Volume is loud enough**: tap **Test the sound**. Tap **Yes, I heard it**, or turn the volume up and try again. A tablet speaker is easy to miss in a loud kitchen. A small Bluetooth speaker near the cutting board helps.",
+       "**Added to the home screen**: open Smokebox from its icon, not from the browser.",
+       "**Full screen**: tap **Go full screen**, or install the app so it opens without the browser bars."
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Two lines you may see on the board"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "\"This screen may go to sleep, and warnings stop while it sleeps.\" Keep the tablet plugged in with its screen set to stay on.",
+       "\"Warnings are silent: sound is off on this tablet. Tap to turn on.\" Tap it once."
+      ]
      }
     ]
    },
@@ -721,7 +809,7 @@
        "If the board says \"Tap here to turn on warning sounds\", tap it. Browsers need one tap first.",
        "Turn the tablet volume up and check its silent switch.",
        "Tap **Settings** and check that Sound is on and the loudness is not low.",
-       "Tap **Settings**, then **Set up this tablet: first steps**, then **Play a test warning**.",
+       "Tap **Settings**, then **Tablet checks: screen, sound, home screen**, then **Test the sound**.",
        "If the bar says \"Sound paused\", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.",
        "Close any second Smokebox tab. Only the tab on screen makes sound."
       ]
@@ -732,7 +820,7 @@
      },
      {
       "t": "p",
-      "x": "Warnings cannot sound while the screen is off. Smokebox asks the browser to keep the screen on, but some browsers say no. Set the tablet to never sleep (Auto-Lock on an iPad, Screen timeout on Android) and keep it plugged in. When you wake it, check the times on the cards."
+      "x": "Warnings cannot sound while the screen is off. Smokebox asks the browser to keep the screen on, but some browsers say no. Set the tablet to never sleep (Auto-Lock on an iPad, Screen timeout on Android) and keep it plugged in. **Tablet checks: screen, sound, home screen** checks this. When you wake it, check the times on the cards."
      },
      {
       "t": "h",
@@ -960,7 +1048,7 @@
      {
       "t": "ul",
       "x": [
-       "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Smokebox does not log cooler or freezer temperatures, sanitizer strength or thermometer checks: keep a paper log for those. Your own food-safety plan, your training and your thermometer checks still apply.",
+       "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Smokebox writes down the cooler, freezer, thermometer and sanitizer strip readings you type under Readings. It cannot check them, and it may not be the record your health department asks for. Keep a paper log if they require one. Your own food-safety plan, your training and your thermometer checks still apply.",
        "Your local health code. The limits Smokebox starts with (such as 4 hours, the check interval and one reheat per batch) are starting values, not your local rules. Set the limits your local health department gives you.",
        "Card processing. Smokebox only writes down how an order was paid. Keep your card reader and your processor.",
        "Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.",
@@ -983,7 +1071,7 @@
      },
      {
       "t": "p",
-      "x": "A hub: a small program that keeps the kitchen in one place. Someone runs it by hand on a laptop or server. Smokebox never starts one. You need its address and its access code, if it has one. Then tap **Settings**, then **Use one kitchen on several tablets**."
+      "x": "The main computer (also called the hub) is a small program that keeps the kitchen in one place. Someone runs it by hand on a laptop or server. Smokebox never starts one. You need its address and, if it needs one, a pairing code or an access code. Then tap **Settings**, then **Use one kitchen on several tablets**."
      },
      {
       "t": "h",
@@ -995,22 +1083,22 @@
      },
      {
       "t": "h",
-      "x": "Use this hub for orders"
+      "x": "Use the main computer for orders"
      },
      {
       "t": "p",
-      "x": "For a tablet that takes orders too. Tap **Use this hub for orders on this tablet**. Type the address, the code and a name for this screen, like Pass. Tap **Check the hub**, then choose one:"
+      "x": "For a tablet that takes orders too. Tap **Use the main computer for orders on this tablet**. Type the address and a name for this screen, like Pass. Tap **Check the main computer**. If it asks for a pairing code, ask the person who runs the main computer for one (it works once and for 10 minutes), type it in the **Pairing code** box and tap **Pair this tablet**. Then choose one:"
      },
      {
       "t": "ul",
       "x": [
-       "Show the hub's kitchen on this tablet. Your own saved kitchen stays untouched.",
-       "Send this tablet's kitchen to the hub. This works only if the hub is empty. Smokebox never mixes two kitchens."
+       "Show the shared kitchen on this tablet. Your own saved kitchen stays untouched.",
+       "Send this tablet's kitchen to the main computer. This works only if the main computer is empty. Smokebox never mixes two kitchens."
       ]
      },
      {
       "t": "p",
-      "x": "Then tap **Join the hub**. Tap **Leave the hub** to go back."
+      "x": "Then tap **Join this kitchen**. Tap **Leave the shared kitchen** to go back. If the main computer removed this tablet, the sheet says so; tap **Leave and pair again**."
      },
      {
       "t": "h",
@@ -1037,29 +1125,6 @@
     ]
    },
    {
-    "id": "card-opening-checklist",
-    "group": "cards",
-    "title": "Opening checklist",
-    "summary": "Print this card and keep it by the tablet.",
-    "blocks": [
-     {
-      "t": "check",
-      "x": [
-       "Tablet plugged in, and set to never sleep",
-       "Volume up. Smokebox open on the kitchen board",
-       "Tap the warning bar once, or use Play a test warning under Set up this tablet: first steps",
-       "Check the 86 board: what is out today?",
-       "Counted dishes: how many did you make today?",
-       "Hand sink works and is stocked. Anyone unwell? Tell the manager",
-       "Thermometer checked in ice water. Cooler and freezer readings on your paper log",
-       "If you cook ahead: log a first temperature on each batch in the cabinet",
-       "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
-       "Yesterday's backup saved and a copy kept off the device"
-      ]
-     }
-    ]
-   },
-   {
     "id": "opening-without-the-internet",
     "group": "guide",
     "title": "Opening without the internet (test feature)",
@@ -1080,6 +1145,29 @@
     ]
    },
    {
+    "id": "card-opening-checklist",
+    "group": "cards",
+    "title": "Opening checklist",
+    "summary": "Print this card and keep it by the tablet.",
+    "blocks": [
+     {
+      "t": "check",
+      "x": [
+       "Tablet plugged in, and set to never sleep",
+       "Volume up. Smokebox open on the kitchen board",
+       "Tap the warning bar once, or use Test the sound under Tablet checks: screen, sound, home screen",
+       "Check the 86 board: what is out today?",
+       "Counted dishes: how many did you make today?",
+       "Hand sink works and is stocked. Anyone unwell? Tell the manager",
+       "Thermometer checked in ice water. Cooler and freezer readings written down (Settings, Readings, or your paper log)",
+       "If you cook ahead: log a first temperature on each batch in the cabinet",
+       "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
+       "Yesterday's backup saved and a copy kept off the device"
+      ]
+     }
+    ]
+   },
+   {
     "id": "card-closing-checklist",
     "group": "cards",
     "title": "Closing checklist",
@@ -1092,7 +1180,7 @@
        "If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)",
        "If you cook ahead: surfaces wiped and Sanitize logged",
        "Food kept over a day: labeled with a date, as your local rule says",
-       "Final cooler and freezer readings on your paper log",
+       "Final cooler and freezer readings written down",
        "Sales and money looks right in the Back office",
        "Log of thrown-out batches saved or printed",
        "Backup downloaded and a copy kept off the device",
@@ -1110,7 +1198,7 @@
      {
       "t": "check",
       "x": [
-       "No sound: tap the warning bar, turn the volume up, then Settings, Set up this tablet: first steps, Play a test warning",
+       "No sound: tap the warning bar, turn the volume up, then Settings, Tablet checks: screen, sound, home screen, Test the sound",
        "Screen asleep: wake it and check the times on the cards. Set it to never sleep",
        "Wrong tap: Undo, within 10 seconds",
        "Bumped by mistake: Recall it from the board header",
@@ -1186,7 +1274,7 @@
       "x": [
        "Open Smokebox and add it to the home screen: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app",
        "Keep it awake: set Auto-Lock (iPad) or Screen timeout (Android) to Never, and plug it in",
-       "Turn the volume up. Tap Settings, Set up this tablet: first steps, then Play a test warning",
+       "Turn the volume up. Tap Settings, Tablet checks: screen, sound, home screen, then Test the sound",
        "Wifi: not needed. Smokebox works without internet",
        "Backups go where you save them: the Downloads folder, or an email to yourself. Smokebox does not send them anywhere",
        "Keep a copy of every backup off this tablet",
@@ -1214,6 +1302,7 @@
        "Gray dish: waiting on purpose. Start now goes early",
        "Clock amber, then red: the order is late",
        "Sold out: tap 86 board and mark it",
+       "Cooked food leaves the cabinet: tap Pull",
        "Wrong tap: Undo, within 10 seconds",
        "Bumped by mistake: Recall, in the header"
       ]

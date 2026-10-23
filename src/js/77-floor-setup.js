@@ -1221,7 +1221,7 @@
     return true;
   }
 
-  /* ---------- Get this tablet ready ---------- */
+  /* ---------- Tablet checks ---------- */
 
   // Plays one short, clear beep through the browser's own audio, at this tablet's saved loudness. Returns true when a beep was started.
   // A tap is needed first on most tablets: it is only called from a button.
@@ -1244,7 +1244,7 @@
   function isInstalled() {
     try { return !!(g.navigator && g.navigator.standalone) || !!(g.matchMedia && (g.matchMedia('(display-mode: standalone)').matches || g.matchMedia('(display-mode: fullscreen)').matches)); } catch (e) { return false; }
   }
-  // Opens "Get this tablet ready": five checks in plain words, each with a green tick or a plain "do this" line. It only reports what the
+  // Opens "Tablet checks": five checks in plain words, each with a green tick or a plain "do this" line. It only reports what the
   // browser can really tell (screen awake, installed, full screen); sound and volume are confirmed by the person who hears the beep.
   function openReady() {
     const sheet = SB.ui.sheet({ title: 'Tablet checks', side: 'right', width: 'min(720px, 96vw)', name: 'ready', onClose: () => { releaseWake(); } });
@@ -1257,7 +1257,7 @@
     const cAwake = card('awake', 'Screen stays awake'), cSound = card('sound', 'Sound is on'), cVol = card('volume', 'Volume is loud enough'), cOff = card('offline', 'Opens without the internet'), cInst = card('installed', 'Added to the home screen'), cFull = card('full', 'Full screen');
     const summary = h('p', { class: 'fs-sub rd-summary', role: 'status' });
     // Counts the ticks and says how many checks are done.
-    function paintSummary() { const n = [cAwake, cSound, cVol, cInst, cFull, cOff].filter((c) => c.el.dataset.ok === 'true').length; tell(summary, n + ' of 6 ready. A check mark means the tablet or you confirmed it; it is not a promise it stays that way all day.', n === 5 ? 'ok' : undefined); }
+    function paintSummary() { const n = [cAwake, cSound, cVol, cInst, cFull, cOff].filter((c) => c.el.dataset.ok === 'true').length; tell(summary, n + ' of 6 ready. A check mark means the tablet or you confirmed it; it is not a promise it stays that way all day.', n === 6 ? 'ok' : undefined); }
 
     // 1. Screen awake: ask the browser to hold the screen on now (a tap lets it), or say how to set the tablet itself.
     // Asks for the screen hold and shows the result; the tablet's own timeout is still the first thing to set.
@@ -1565,7 +1565,7 @@
 
   // The visit steps, in order: what to do, where in the app, and minutes allowed. Kept as plain data so the printed card and the doc match.
   const PILOT_STEPS = [
-    { min: 3, what: 'Get this tablet ready', how: 'Settings, Get this tablet ready. Screen never sleeps, plugged in, sound test heard, added to the home screen, full screen.' },
+    { min: 3, what: 'Tablet checks', how: 'Settings, Tablet checks. Screen never sleeps, plugged in, sound test heard, added to the home screen, full screen.' },
     { min: 3, what: 'Put the menu in', how: 'Import their spreadsheet (Settings, Dishes and prices, More ways to add dishes) or add the first dishes by hand. Check the preview before saving.' },
     { min: 2, what: 'Tax, hours and PIN', how: 'Settings, Tax, hours and PIN. Set the manager PIN and write down the recovery code with the owner.' },
     { min: 2, what: 'Name stations and menu sections', how: 'Use their words. Hide stations they do not have (Change stations).' },

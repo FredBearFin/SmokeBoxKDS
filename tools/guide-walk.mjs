@@ -145,6 +145,7 @@ async function cooked(browser) {
   await tap(p, 'Put in hold cabinet'); await p.waitForTimeout(800);
   // The card shows one main button (Log temp here) and a "..." button named More for this batch; the rest are in its menu.
   check('batch card: Log temp', await seen(p, 'Log temp', '.sheet-root:last-of-type'));
+  check('batch card: Pull beside Log temp', await p.evaluate(() => [...document.querySelectorAll('button')].some((e) => e.getClientRects().length && /^Pull \d/.test(e.textContent.trim()))));
   check('batch card: More for this batch', await p.evaluate(() => !!document.querySelector('button[aria-label="More for this batch"]')));
   await p.click('button[aria-label="More for this batch"]'); await p.waitForTimeout(400);
   for (const t of ['Pull', 'Start cooling', 'Discard']) check('batch card menu: ' + t, await p.evaluate((t) => [...document.querySelectorAll('[role=menuitem]')].some((e) => e.getClientRects().length && e.textContent.trim().startsWith(t)), t));
@@ -420,7 +421,7 @@ async function severalScreens(browser) {
     await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
     check('settings: Use one kitchen on several tablets', await tap(p, 'Use one kitchen on several tablets')); await p.waitForTimeout(500);
     const fs = '.sheet-root:last-of-type';
-    for (const t of ['Show only', 'Use this hub for orders on this tablet', 'a small program called the hub']) check('several tablets sheet: ' + t, await has(p, t, fs));
+    for (const t of ['Show only', 'Use the main computer for orders on this tablet', 'a small program, running on one computer']) check('several tablets sheet: ' + t, await has(p, t, fs));
     check('several tablets: tapping Show only', await tap(p, 'Show only')); await p.waitForTimeout(400);
     for (const t of ['Address of the kitchen', 'Connect']) check('show only: ' + t, await has(p, t, fs));
     await p.fill('#fw-url', H); await p.fill('#fw-code', 'abc123');
@@ -442,18 +443,18 @@ async function severalScreens(browser) {
     await q.goto(H + '/'); await q.waitForTimeout(900);
     await q.evaluate(() => document.querySelector('button.fl-menu').click()); await q.waitForTimeout(400);
     await tap(q, 'Use one kitchen on several tablets'); await q.waitForTimeout(500);
-    check('join: Use this hub for orders on this tablet', await tap(q, 'Use this hub for orders on this tablet')); await q.waitForTimeout(400);
+    check('join: Use the main computer for orders on this tablet', await tap(q, 'Use the main computer for orders on this tablet')); await q.waitForTimeout(400);
     const js = '.sheet-root:last-of-type';
-    for (const t of ['Address of the hub', 'Name for this screen', 'Check the hub', 'Join the hub']) check('join form: ' + t, await has(q, t, js));
+    for (const t of ['Address of the main computer', 'Name for this screen', 'Check the main computer', 'Join this kitchen']) check('join form: ' + t, await has(q, t, js));
     await q.fill('#hu-url', H); await q.fill('#hu-code', 'abc123'); await q.fill('#hu-name', 'Pass');
-    await tap(q, 'Check the hub'); await q.waitForTimeout(1500);
-    for (const t of ["Show the hub's kitchen on this tablet", "Send this tablet's kitchen to the hub", 'Stop: the hub already has a kitchen']) check('join choice: ' + t, await has(q, t, js));
+    await tap(q, 'Check the main computer'); await q.waitForTimeout(1500);
+    for (const t of ['Show the shared kitchen on this tablet', "Send this tablet's kitchen to the main computer", 'Stop: the main computer already has a kitchen']) check('join choice: ' + t, await has(q, t, js));
     await q.evaluate(() => document.querySelector('input[name="hu-choice"][value="adopt"]').click()); await q.waitForTimeout(300);
-    check('join: Join the hub', await tap(q, 'Join the hub')); await q.waitForTimeout(2000);
-    check('join: Joined. This tablet now uses the hub.', await has(q, 'Joined. This tablet now uses the hub.', js));
-    check('join: Leave the hub', await has(q, 'Leave the hub', js));
-    check('join: leaving works', await tap(q, 'Leave the hub')); await q.waitForTimeout(1200);
-    check('join: You left the hub.', await has(q, 'You left the hub.', js));
+    check('join: Join this kitchen', await tap(q, 'Join this kitchen')); await q.waitForTimeout(2000);
+    check('join: Joined. This tablet now uses the hub.', await has(q, 'Joined. This tablet now uses the main computer.', js));
+    check('join: Leave the shared kitchen', await has(q, 'Leave the shared kitchen', js));
+    check('join: leaving works', await tap(q, 'Leave the shared kitchen')); await q.waitForTimeout(1200);
+    check('join: You left the shared kitchen.', await has(q, 'You left the shared kitchen.', js));
     await q.close();
     // A writing tablet: undo only while nobody else has acted, the offline card, then the last known kitchen after the hub is gone.
     const r = await fresh(browser);
@@ -483,6 +484,28 @@ async function severalScreens(browser) {
   } finally { try { hub.kill(); } catch (e) { /* already stopped */ } }
 }
 
+// The Readings and Tablet checks walk: the three logs on the Readings sheet and the six checks on Tablet checks: screen, sound, home screen.
+async function readingsAndChecks(browser) {
+  console.log('Readings and tablet checks');
+  const p = await fresh(browser);
+  await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  await p.evaluate(() => SB.store.dispatchEx('updateSettings', { patch: { modules: { cookAhead: true } } }, { source: 'ui' }));
+  await p.reload(); await p.waitForTimeout(900);
+  await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
+  check('settings: Readings', await tap(p, 'Readings')); await p.waitForTimeout(600);
+  const rs = '.sheet-root:last-of-type';
+  for (const t of ['Fridge, freezer or display case', 'Log reading', 'Food thermometer check', 'Log check', 'Ice water', 'Boiling water', 'Sanitizer strip', 'Log strip reading', 'Recent readings']) check('readings: ' + t, await has(p, t, rs));
+  check('readings: Temperature of the fridge, freezer or case', await p.evaluate(() => !!document.querySelector('.sheet-root:last-of-type input[aria-label="Temperature of the fridge, freezer or case"]')));
+  await p.fill(rs + ' input[aria-label="Temperature of the fridge, freezer or case"]', '38');
+  check('readings: Log reading', await tap(p, 'Log reading')); await p.waitForTimeout(700);
+  check('readings: the entry is listed', await p.evaluate(() => !/No readings yet/.test(document.querySelector('.sheet-root:last-of-type').innerText)), await p.evaluate(() => document.querySelector('.sheet-root:last-of-type').innerText.slice(-300)));
+  await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(300);
+  await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
+  check('settings: Tablet checks: screen, sound, home screen', await tap(p, 'Tablet checks: screen, sound, home screen')); await p.waitForTimeout(700);
+  for (const t of ['Screen stays awake', 'Sound is on', 'Volume is loud enough', 'Added to the home screen', 'Full screen', 'Opens without the internet', 'Test the sound']) check('tablet checks: ' + t, await has(p, t, rs));
+  await p.close();
+}
+
 // The demo walk: a fresh browser context opened with ?demo has sample dishes and tickets, and a normal tab in the same context stays empty.
 async function demoMode(browser) {
   console.log('Demo mode (?demo)');
@@ -498,7 +521,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'screens') await severalScreens(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await severalScreens(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'screens') await severalScreens(browser); else if (process.env.WALK_ONLY === 'readings') await readingsAndChecks(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await severalScreens(browser); await readingsAndChecks(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);
