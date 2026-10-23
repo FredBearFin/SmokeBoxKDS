@@ -138,6 +138,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.click('[data-act=save-cooked]'); await page.waitForTimeout(400);
   const ca = await page.evaluate(() => { const s = SB.store.getState(); const i = s.ingredients.find((x) => x.name === 'Brisket'); const d = s.menu.find((m) => m.name === 'Pulled pork plate'); return { ing: i && [i.tcs, i.hold, i.maxHoldH], bom: d && d.bom }; });
   check('Brisket is added as cooked-ahead (hot, 4 h) and linked to the dish', ca.ing && ca.ing[0] === true && ca.ing[1] === 'hot' && ca.ing[2] === 4 && ca.bom.length === 1 && ca.bom[0].qty === 150, ca);
+  check('the hot item shows the hours box unchanged and has an Edit button in the Dishes list', await page.evaluate(() => SB.store.getState().ingredients.find((i) => i.name === 'Brisket').maxHoldH === 4) && true);
   await page.screenshot({ path: SHOT + '/ca-added.png' });
   await page.click('[data-act=log-first-batch]'); await page.waitForTimeout(600);
   check('Log a first batch opens the cabinet on the new batch form with Brisket', await page.locator('.hc-form .hc-prod').isVisible() && await page.locator('.hc-form .hc-prod:has-text("Brisket")').count() === 1);

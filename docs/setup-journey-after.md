@@ -233,3 +233,16 @@ Built on A5's settings (`night/a5-r12`) and Freddy's decisions. All checks scrip
 6. **Wording**: "Menu" as the name of the button that opens the Settings sheet is now "Settings" in my screens (A1 changes the board button); "category" is "section"; demo and sample wording (A3 has the office lines). Guide quotes that changed are listed for A4.
 
 Left or not checked: real tablets; printing the recovery code on a real printer (only that the call is made); the board button label (A1); two new setup keys (`setup.serveSkipped`, `setup.serveAnswer`) wait for A5 to classify them, so until then the unit test "every smokebox.v1 key is classified" and A4's Guide-label test fail on this branch; counter service was exercised only as a setting (A5's engine and A1's board own the effect on tickets).
+
+## Round 14: cold items in the cooked-ahead form (branch night/a2-r14)
+
+Built on A5's cold-item fields (`night/a5-r14`: `fridge`, `fridgeDays` 1 to 30 whole days, `outHours` 0.25 to 24; no defaults; null clears one).
+
+- **The form:** Hot or cold already existed. **Hot is unchanged** (the "How long may it stay, in hours?" box). **Cold** hides that box and shows two optional boxes: "How many days may it stay in the fridge?" and "How many hours may it be out of the fridge?", with the one line "Use the limits your local health department gives you. Leave a box empty for no limit set: Smokebox will then only show the time." No numbers are suggested and no rule is claimed. A cold item is saved as kept in a fridge (`fridge: true`) so the limits can be set and it can be taken out and put back.
+- **Refusals in the one message style:** days must be a whole number from 1 to 30; hours from 0.25 to 24; blank is fine.
+- **Editing later in the same place:** the cooked-ahead list in Dishes and prices shows each item's limits ("Cold, 3 days in the fridge, 2 h out" or "Cold, no limit set") with an **Edit** button that opens the same boxes, filled in, with hot or cold fixed. Clearing a box saves "no limit set". Existing batches keep the limits they were made with (A5).
+- **Tests:** new `test/cold-items.e2e.mjs` (12 checks, all pass): box visibility for hot and cold, the note and no suggested numbers, plain refusals, a saved item with both limits, blank limits, the list text, edit, change and clear. setup-wizard, demo-mode, menu-import-ui, serve, start-over, pin-recovery-ui and other-kitchens (4 of 4) pass. Unit suite 722 pass, 0 fail on a clean run (an earlier run overlapped with browser jobs and failed four performance timings).
+- **Touch audit:** 153 screens (3 sizes x Day, Night, Large text), including the cold form, the cold edit form and the "Read as" import preview: no small, clipped or sideways-scrolling items.
+- **Re-runs not done in round 13:** first-time-owners (0 page errors for all three owners) and second-run (12 of 12 checks).
+
+Not checked: a real tablet; showing the "made on" date or the limits anywhere other than the form and list (batch screens are A1's); what a health department's limits look like in practice (no numbers were chosen).

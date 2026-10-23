@@ -714,8 +714,8 @@
       daysField.setError(null); outField.setError(null);
       if (!isCold && (hrs == null || hrs < 0.5 || hrs > 12)) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
       let days = null, outH = null;
-      if (isCold && daysIn.value.trim()) { days = readNum(daysIn); if (days == null || days < 1 || days > 60 || !Number.isInteger(days)) { daysField.setError('Type a whole number of days from 1 to 60, or leave it empty.'); return; } }
-      if (isCold && outIn.value.trim()) { outH = readNum(outIn); if (outH == null || outH <= 0 || outH > 24) { outField.setError('Type hours above 0 and up to 24, or leave it empty.'); return; } }
+      if (isCold && daysIn.value.trim()) { days = readNum(daysIn); if (days == null || days < 1 || days > 30 || !Number.isInteger(days)) { daysField.setError('Type a whole number of days from 1 to 30, or leave it empty.'); return; } }
+      if (isCold && outIn.value.trim()) { outH = readNum(outIn); if (outH == null || outH < 0.25 || outH > 24) { outField.setError('Type hours from 0.25 to 24, or leave it empty.'); return; } }
       if (kgIn.value.trim() && (kg == null || kg <= 0 || kg > 1000)) { tell(status, 'Batch size: type kilograms like 4, or leave it empty.'); return; }
       // With dishes on the menu but none selected, nothing would use this item: say so once, and save only on a second tap.
       if (dishRows.length && !dishRows.some((x) => x.cb.checked) && !warnedNoDish) {
@@ -724,6 +724,7 @@
         return;
       }
       const payload = { name, unit: 'g', tcs: true, hold: kind.getValue(), maxHoldH: hrs == null ? 4 : hrs, holdBasis: 'safety' };
+      if (isCold) payload.fridge = true; // a cold item is kept in a fridge, so it can be taken out and put back and its two limits can be set
       if (days != null) payload.fridgeDays = days;
       if (outH != null) payload.outHours = outH;
       if (kg) payload.parG = Math.round(kg * 1000);
@@ -754,9 +755,10 @@
       const patch = { name };
       if (editing.hold === 'cold') {
         const dv = daysIn.value.trim() ? readNum(daysIn) : null, ov = outIn.value.trim() ? readNum(outIn) : null;
-        if (dv != null && (dv < 1 || dv > 60 || !Number.isInteger(dv))) { daysField.setError('Type a whole number of days from 1 to 60, or leave it empty.'); return; }
-        if (ov != null && (ov <= 0 || ov > 24)) { outField.setError('Type hours above 0 and up to 24, or leave it empty.'); return; }
+        if (dv != null && (dv < 1 || dv > 30 || !Number.isInteger(dv))) { daysField.setError('Type a whole number of days from 1 to 30, or leave it empty.'); return; }
+        if (ov != null && (ov < 0.25 || ov > 24)) { outField.setError('Type hours from 0.25 to 24, or leave it empty.'); return; }
         patch.fridgeDays = dv; patch.outHours = ov;
+        if (editing.fridge !== true && (dv != null || ov != null)) patch.fridge = true;
       } else {
         const hv = readNum(hoursIn);
         if (hv == null || hv < 0.5 || hv > 12) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
