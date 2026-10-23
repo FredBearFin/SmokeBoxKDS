@@ -416,6 +416,53 @@ async function coldItem(browser) {
   check('cold: tapping Put back', await tap(p, 'Put back')); await p.waitForTimeout(500);
   await p.evaluate(() => document.querySelector('[data-act="skip-who"]').click()); await p.waitForTimeout(800);
   check('cold: the clock is paused', await p.evaluate(() => /put back\. The out-of-fridge clock is paused/.test(document.body.innerText)));
+  // The safety record: a limit change line, a cold reading above the limit, and the keep time from the engine.
+  const ev = await p.evaluate(() => {
+    const S = SB.store, d = (t, pl) => S.dispatchEx(t, pl, { source: 'ui' }), b = S.getState().batches.find((x) => x.kind === 'cold' || x.fridge);
+    const a1 = d('updateSettings', { patch: { safety: { coldHoldF: 39 } } });
+    const a2 = b ? d('logTemp', { batchId: b.id, tempF: 46 }) : null;
+    return { limit: a1.report, temp: a2 && a2.report, batch: !!b, keep: SB.retention && SB.retention.days() };
+  });
+  check('safety record: a limit change and a cold reading were logged', ev.limit === 'ok' && ev.temp === 'ok', ev);
+  await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(300);
+  await tap(p, 'Back office'); await p.waitForTimeout(1200);
+  await p.click('#sb-office nav >> text=Safety'); await p.waitForTimeout(1500);
+  check('safety page: Print the safety record', await tap(p, 'Print the safety record')); await p.waitForTimeout(900);
+  const rec = await p.evaluate(() => (document.querySelector('.sheet-root:last-of-type') || document.body).innerText);
+  check('safety record: Changed the cold limit from X to Y', /Changed the cold limit from .* to .*/.test(rec), rec.slice(0, 400));
+  check('safety record: a reading above the cold limit', /above the cold limit/.test(rec), rec.slice(0, 400));
+  check('safety record: the keep time comes from the engine', ev.keep ? new RegExp('Safety records are kept for about ' + ev.keep + ' days').test(rec) : /not kept forever/.test(rec), rec.slice(-300));
+  await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(300);
+  const dr = await p.evaluate(() => { const b = SB.store.getState().batches[0]; return b ? SB.store.dispatchEx('discardBatch', { batchId: b.id, reason: 'quality' }, { source: 'ui' }).report : 'nobatch'; });
+  check('thrown-out log: a batch was discarded', dr === 'ok', dr);
+  await p.evaluate(() => { if (SB.office && SB.office.close) SB.office.close(); }); 
+  await p.goto(FILE); await p.waitForTimeout(1000);
+  await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
+  await tap(p, 'Thrown-out log'); await p.waitForTimeout(800);
+  check('thrown-out log: Showing every batch thrown out since', await p.evaluate(() => /Showing (every batch|the \d+ batch)/.test(document.body.innerText)), await p.evaluate(() => document.body.innerText.slice(-300)));
+  await p.close();
+}
+
+// The restore walk: after a restore the Data page says how long the old kitchen is kept and offers Undo this restore.
+async function restoreUndo(browser) {
+  console.log('Undo this restore');
+  const p = await fresh(browser);
+  await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  const backup = await p.evaluate(() => SB.store.exportAll());
+  await addDish(p, { name: 'Wings', short: 'Wings', zone: 'fry', price: 9 });
+  await tap(p, 'Back office'); await p.waitForTimeout(1200);
+  await p.click('#sb-office nav >> text=Menu and settings'); await p.waitForTimeout(1500);
+  await p.evaluate((t) => { const b = [...document.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Check pasted backup'); let n = b; let a = null; while (n && !a) { n = n.parentElement; a = n && n.querySelector('textarea'); } if (a) { const d = a.closest('details'); if (d) d.open = true; a.value = t; a.dispatchEvent(new Event('input', { bubbles: true })); } }, backup);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Check pasted backup'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } }); await p.waitForTimeout(1200);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.getClientRects().length && e.textContent.trim() === 'Replace everything with this backup'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } }); await p.waitForTimeout(800);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].reverse().find((e) => e.getClientRects().length && e.textContent.trim() === 'Replace everything'); if (b) b.click(); }); await p.waitForTimeout(1500);
+  const txt = () => p.evaluate(() => document.body.innerText);
+  check('restore: Your kitchen before this restore is kept for N days', /Your kitchen before this restore is kept for \d+ days?/.test(await txt()));
+  check('restore: Undo this restore', await p.evaluate(() => [...document.querySelectorAll('button')].some((e) => e.getClientRects().length && e.textContent.trim() === 'Undo this restore')));
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.getClientRects().length && e.textContent.trim() === 'Undo this restore'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } }); await p.waitForTimeout(800);
+  for (const t of ['Undo this restore?', 'Put my old kitchen back', 'Keep what I have']) check('restore undo confirm: ' + t, (await txt()).indexOf(t) >= 0);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].reverse().find((e) => e.getClientRects().length && e.textContent.trim() === 'Put my old kitchen back'); if (b) b.click(); }); await p.waitForTimeout(1500);
+  check('restore undo: the old kitchen is back (Wings again)', await p.evaluate(() => SB.store.getState().menu.some((m) => m.name === 'Wings')));
   await p.close();
 }
 
@@ -527,7 +574,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'startover') await startOver(browser); else if (process.env.WALK_ONLY === 'notices') await notices(browser); else if (process.env.WALK_ONLY === 'readings') await readingsAndChecks(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await readingsAndChecks(browser); await startOver(browser); await notices(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else if (process.env.WALK_ONLY === 'restore') await restoreUndo(browser); else if (process.env.WALK_ONLY === 'startover') await startOver(browser); else if (process.env.WALK_ONLY === 'notices') await notices(browser); else if (process.env.WALK_ONLY === 'readings') await readingsAndChecks(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await restoreUndo(browser); await readingsAndChecks(browser); await startOver(browser); await notices(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);
