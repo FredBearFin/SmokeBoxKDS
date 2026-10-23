@@ -162,6 +162,7 @@
     addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two", prepGuess?:boolean }',
     updateIngredient: '{ id, patch }',
     moveMenuItem: '{ id, toIndex }',
+    setChips: '{ chips: string[] | null }',
     clearDemoTickets: '{}',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety" }',
     setPortions: '{ menuId, on:boolean, count? }',
@@ -171,7 +172,7 @@
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient', 'moveMenuItem'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient', 'moveMenuItem', 'setChips'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -1170,6 +1171,8 @@
     const ev = { ticketId: t.id, itemId: it.id, zone: it.zone, menuId: it.menuId, workMs: w.doneAt - (w.startedAt != null ? w.startedAt : w.firedAt), qty: it.qty };
     if (w.cost !== undefined) ev.cost = w.cost;
     if (shortG > 0) ev.shortG = shortG;
+    // Counter service finishes the item without a kitchen step: flagged auto, with no work time, so no prep time is ever invented.
+    if (opts && opts.auto) { w.auto = true; ev.workMs = 0; ev.auto = true; }
     tx.event('item_done', ev);
     return { itemId: it.id, before, after: timesOf(w) };
   }
@@ -1401,7 +1404,28 @@
     w.status = 'paid'; w.paidAt = stampAfter(o.createdAt, tx.now); w.method = pay.method; w.tip = pay.tip; w.discount = t0.discount; w.totals = t0;
     tx.event('order_paid', { orderId: o.id, method: pay.method, subtotal: t0.subtotal, discount: t0.discount, tax: t0.tax, total: t0.total, tip: pay.tip, rounds: t0.rounds });
     tx.info = Object.assign({}, tx.info, { orderId: o.id, total: t0.total, tip: pay.tip, method: pay.method });
+    if (counterOn(tx.get('settings'))) tx.info.autoFinished = autoFinishOrder(tx, o.id);
     return 'ok';
+  }
+  // Counter service: when an order is paid, every live ticket of that order is finished and bumped at once. Items still open are
+  // marked done (stock is used as for any finished item, nothing is learned about prep times) and flagged auto; the ticket is
+  // bumped and flagged auto, so the board has nothing to show and the reports leave it out of kitchen-time statistics. Items
+  // and tickets already done or voided are left as they are. Returns how many items were finished this way.
+  function autoFinishOrder(tx, orderId) {
+    let n = 0;
+    const tickets = tx.get('tickets');
+    for (let ti = 0; ti < tickets.length; ti++) {
+      const t0 = tickets[ti];
+      if (t0.orderId !== orderId || t0.status !== 'active') continue;
+      for (let ii = 0; ii < t0.items.length; ii++) if (tx.get('tickets')[ti].items[ii].status !== 'done') { completeInto(tx, ti, ii, new Map(), { noLearn: true, auto: true }); n++; }
+      const t = tx.get('tickets')[ti];
+      let exp = stampAfter(t.createdAt, tx.now);
+      for (const it of t.items) for (const k of ['doneAt', 'startedAt', 'firedAt']) if (isNum(it[k]) && it[k] > exp) exp = it[k];
+      const w = tx.ticket(ti);
+      w.status = 'expedited'; w.expeditedAt = exp; w.auto = true; delete w.forced;
+      tx.event('ticket_expedited', { ticketId: t.id, totalMs: exp - t.createdAt, forced: false, auto: true });
+    }
+    return n;
   }
   // Takes payment on an open order: method (cash, card or other), an optional tip and an optional discount, all in
   // dollars. The totals are frozen at that moment, so later menu or price changes never alter a paid order.
@@ -2193,14 +2217,14 @@
   // Every setting the owner may change, with its rule. Anything not listed is refused (badPatch).
   const SET_SCHEMA = {
     pacing: { enabled: { t: 'bool' }, learnK: R(0, 50), floorSec: R(1, 600), minFactor: R(0.1, 1), maxFactor: R(1, 10), outlierFactor: R(1, 20), qtyFactor: R(0, 2), qtyCap: R(1, 10) },
-    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20), soundStartHour: R(0, 23, true), soundOutsideHours: { t: 'bool' }, qualitySyncHoldMin: R(0, 30, true) },
+    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20), soundStartHour: R(0, 23, true), soundOutsideHours: { t: 'bool' }, counter: { t: 'bool' }, chips: { t: 'chips' }, qualitySyncHoldMin: R(0, 30, true) },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
       defaultMaxHoldH: B('defaultMaxHoldH'), hardCapH: B('hardCapH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
       cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' }, holdWindowV2: { t: 'bool' } },
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
     syncTargetSec: R(10, 600),
-    ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, sound: { t: 'bool' }, tempUnit: { t: 'enum', v: ['F', 'C'] }, weightUnit: { t: 'enum', v: ['kg', 'lb'] } },
+    ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, currency: { t: 'currency' }, sound: { t: 'bool' }, tempUnit: { t: 'enum', v: ['F', 'C'] }, weightUnit: { t: 'enum', v: ['kg', 'lb'] } },
     office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' } },
     alerts: { ladderThresholds: { t: 'ladder' } },
     modules: { cookAhead: { t: 'bool' } },
@@ -2230,10 +2254,37 @@
     }
     return null;
   }
+  // The most customer chips (quick names) the order screen offers, and the longest chip label.
+  const CHIP_MAX = 12, CHIP_LEN = 24;
+  // Checks a list of customer chips: up to 12 labels of 1 to 24 characters, already tidy (no stray spaces or control
+  // characters), no label twice (any case). An empty list is allowed and means no chips. Returns null or { report, key, ... }.
+  function checkChips(v, key) {
+    if (!Array.isArray(v)) return { report: 'badPatch', key };
+    if (v.length > CHIP_MAX) return { report: 'outOfBounds', key, min: 0, max: CHIP_MAX };
+    const seen = new Set();
+    for (let i = 0; i < v.length; i++) {
+      const c = v[i];
+      if (typeof c !== 'string' || /[\u0000-\u001f\u007f]/.test(c) || cleanText(c) !== c) return { report: 'badPatch', key: key + '.' + i };
+      if (c.length < 1 || c.length > CHIP_LEN) return { report: 'outOfBounds', key: key + '.' + i, min: 1, max: CHIP_LEN };
+      const k = c.toLowerCase();
+      if (seen.has(k)) return { report: 'badPatch', key: key + '.' + i };
+      seen.add(k);
+    }
+    return null;
+  }
+  // The customer chips the order screen offers: the owner's list (possibly empty), else the built-in quick names.
+  function chipsOf(settings) {
+    const c = settings && settings.service && settings.service.chips;
+    return Array.isArray(c) ? c.slice() : C.quickNames.slice();
+  }
+  // True when counter service is on: a paid order's tickets finish and bump by themselves.
+  const counterOn = (settings) => !!(settings && settings.service && settings.service.counter === true);
   // Validates one leaf of the settings; returns null when fine, else { report, key, min?, max? }.
   function checkLeaf(spec, v, key) {
     if (spec.t === 'bool') return typeof v === 'boolean' ? null : { report: 'badPatch', key };
     if (spec.t === 'enum') { const list = typeof spec.vf === 'function' ? spec.vf() : spec.v; return typeof v === 'string' && list.indexOf(v) >= 0 ? null : { report: 'badPatch', key }; }
+    if (spec.t === 'chips') return checkChips(v, key);
+    if (spec.t === 'currency') return U.validCurrency(v) ? null : { report: 'badPatch', key };
     if (spec.t === 'pin') return v === null || (typeof v === 'string' && v.length <= 128) ? null : { report: 'badPatch', key };
     if (spec.t === 'ladder') return checkLadder(v, key);
     if (spec.t === 'num') {
@@ -2284,9 +2335,11 @@
         if (r.report) return r;
         out[k] = r.value;
       } else if (spec.t) {
-        const e = checkLeaf(spec, patch[k], key);
+        // Chip labels are tidied (spaces squeezed) before they are checked, so " Table  1 " is accepted as "Table 1".
+        const pv = spec.t === 'chips' && Array.isArray(patch[k]) ? patch[k].map((x) => (typeof x === 'string' ? cleanText(x) : x)) : patch[k];
+        const e = checkLeaf(spec, pv, key);
         if (e) return e;
-        if (out[k] !== patch[k]) { out[k] = patch[k]; keys.push(key); }
+        if (JSON.stringify(out[k]) !== JSON.stringify(pv)) { out[k] = pv; keys.push(key); }
       } else {
         const r = mergeSchema(isObj(cur[k]) ? cur[k] : {}, patch[k], spec, key, keys);
         if (r.report) return r;
@@ -2524,6 +2577,35 @@
     const w = tx.mut('menu');
     const [mi] = w.splice(d.to, 1);
     w.splice(d.from, 0, mi);
+    return 'ok';
+  };
+  // Sets the customer chips the order screen offers (Walk-up, Table 1 ...): a list of up to 12 labels of up to 24 characters,
+  // tidied and checked like the settings patch; an empty list means no chips; null goes back to the built-in list. Same
+  // list gives nothingToDo. Undoable while the list is still what this change made it.
+  A.setChips = function (tx, p) {
+    const raw = p.chips;
+    const next = raw === null ? null : Array.isArray(raw) ? raw.map((x) => (typeof x === 'string' ? cleanText(x) : x)) : undefined;
+    if (next === undefined) { tx.info.key = 'chips'; return 'badPatch'; }
+    if (next !== null) { const e = checkChips(next, 'service.chips'); if (e) { tx.info = { key: e.key, min: e.min, max: e.max }; return e.report; } }
+    const S = tx.get('settings');
+    const before = Array.isArray(S.service.chips) ? S.service.chips.slice() : null;
+    if (JSON.stringify(before) === JSON.stringify(next)) return 'nothingToDo';
+    const svc = Object.assign({}, S.service);
+    if (next === null) delete svc.chips; else svc.chips = next;
+    tx.set('settings', Object.assign({}, S, { service: svc }));
+    tx.event('settings_changed', { keys: ['service.chips'] });
+    pushUndo(tx, 'chips', 'Customer chips changed', { before, after: next });
+    tx.info = { chips: chipsOf(tx.get('settings')), keys: ['service.chips'] };
+    return 'ok';
+  };
+  // Undo of a chips change: the old list (or the built-in one) comes back, unless the list was changed again since.
+  UNDO.chips = function (tx, d) {
+    const S = tx.get('settings');
+    const now = Array.isArray(S.service.chips) ? S.service.chips : null;
+    if (JSON.stringify(now) !== JSON.stringify(d.after)) return 'undoConflict';
+    const svc = Object.assign({}, S.service);
+    if (d.before === null) delete svc.chips; else svc.chips = d.before.slice();
+    tx.set('settings', Object.assign({}, S, { service: svc }));
     return 'ok';
   };
   // The most ingredients a kitchen may hold, so a typing slip cannot fill the saved data.
@@ -3826,7 +3908,7 @@
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, describe, safetyLog, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.

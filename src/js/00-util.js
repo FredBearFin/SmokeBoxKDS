@@ -133,16 +133,25 @@
   };
   /** Hour-of-service label for a decimal hour ("13.25" -> "1 pm", 24.75 -> "12 am"). */
   U.fmtHour = (h) => { const hh = ((Math.floor(h) % 24) + 24) % 24; const ap = hh >= 12 ? 'pm' : 'am'; const x = hh % 12 === 0 ? 12 : hh % 12; return x + ' ' + ap; };
-  // Dollars with thousands commas, like "$1,234.50". Negatives read "-$5.00". Not a number gives "-".
+  // The money symbol shown before amounts: $ unless the owner set another (settings.ui.currency). One short word of 1 to 3
+  // letters or currency signs, such as $, a euro sign, a pound sign or KSh. Everything that shows money goes through here.
+  let CURRENCY = '$';
+  // True when text is an allowed money symbol (1 to 3 letters, currency signs or dots, nothing else).
+  U.validCurrency = (c) => typeof c === 'string' && /^[\p{L}\p{Sc}.]{1,3}$/u.test(c);
+  // Sets the symbol (an invalid or missing one means $). Returns the symbol now in use.
+  U.setCurrency = (c) => { CURRENCY = U.validCurrency(c) ? c : '$'; return CURRENCY; };
+  // The money symbol that is in use right now.
+  U.currencySymbol = () => CURRENCY;
+  // Money with thousands commas, like "$1,234.50" (the symbol is the owner's). Negatives read "-$5.00". Not a number gives "-".
   U.fmtMoney = (n, dec = 2) => {
     if (!U.isNum(n)) return '-';
     const neg = n < 0; const s = Math.abs(n).toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return (neg ? '-$' : '$') + s;
+    return (neg ? '-' : '') + CURRENCY + s;
   };
   // Reads typed dollars like "2.50", "$3" or ".5" into a number rounded to cents. A blank box is 0, anything else
   // (letters, a minus sign, more than two decimals, over 99,999.99) is NaN so the screen can say what is wrong.
   U.parseDollars = (txt) => {
-    const t = String(txt == null ? '' : txt).trim().replace(/^\$/, '');
+    const t = String(txt == null ? '' : txt).trim().replace(/^[\p{Sc}]|^\p{L}{1,3}(?=\s*\d)/u, '').trim();
     if (t === '') return 0;
     if (!/^\d{0,5}(\.\d{0,2})?$/.test(t) || t === '.') return NaN;
     return Math.round(parseFloat(t) * 100) / 100;
@@ -281,7 +290,7 @@
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'lastgood', 'corruptat', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
