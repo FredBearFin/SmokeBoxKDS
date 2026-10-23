@@ -153,8 +153,8 @@
   // ingredient can have both: leftoverG (grams in batches still alive at close) and unmetG (demand nobody could
   // serve). Also runOutAt (the first moment demand went unserved), runOutCause ('rest-gap' when a batch is still
   // resting and ready later, gapEndAt; 'limit' when a batch passing its limit ended the supply, limitBatchId and
-  // limitQuality; else 'stock'), wasteBefore (grams that passed their limit before close) and wasteById (the same
-  // grams per batch id).
+  // limitQuality; else 'stock'), wasteBefore (grams that passed their limit before close), wasteById (the same
+  // grams per batch id) and plannedLeftG (the part of leftoverG in planned batches, ids starting 'plan:').
   function sweepToClose(batches, rate, now, closeAt) {
     const bs = batches.map((b) => ({ rem: b.remainingG, ent: b.enteredAt, ready: Math.max(now, b.readyAt || 0), exp: b.expAt, id: b.id, quality: !!b.quality })).sort((x, y) => x.ent - y.ent);
     const marks = new Set([now, closeAt]);
@@ -180,7 +180,8 @@
       for (const b of bs) if (b.exp <= z && b.rem > 0) { wasteBefore += b.rem; if (b.id != null) wasteById[b.id] = (wasteById[b.id] || 0) + b.rem; b.rem = 0; if (!lastLimit || b.exp >= lastLimit.exp) lastLimit = { exp: b.exp, id: b.id, quality: b.quality }; }
     }
     const alive = bs.reduce((acc, b) => acc + (b.exp > closeAt ? b.rem : 0), 0);
-    return { leftoverG: alive, unmetG: unmet, gapUnmetG: gapUnmet, runOutAt, runOutCause: cause, gapEndAt, limitBatchId, limitQuality, wasteBefore, wasteById };
+    const plannedLeft = bs.reduce((acc, b) => acc + (b.exp > closeAt && String(b.id).indexOf('plan:') === 0 ? b.rem : 0), 0);
+    return { leftoverG: alive, plannedLeftG: plannedLeft, unmetG: unmet, gapUnmetG: gapUnmet, runOutAt, runOutCause: cause, gapEndAt, limitBatchId, limitQuality, wasteBefore, wasteById };
   }
   // Grams of each batch the pace will not sell before that batch's own limit, keyed by batch id. Runs the same
   // time-stepped sweep as the close check, but past close to the last limit, so a younger batch only sells once the
@@ -229,9 +230,16 @@
   function closeRows(info, ing, name, now, out) {
     if (!info) return;
     const { closeAt, stock, r } = info;
-    if (r.leftoverG >= Math.max(NOTABLE_G, NOTABLE_SHARE * stock)) {
-      out.push({ id: 'leftover:' + ing.id, kind: 'leftover', ing: ing.id, label: name, at: closeAt, msLeft: closeAt - now, rung: 0, rungs: 0, sev: 'info', leftoverG: r.leftoverG,
-        consequence: 'At the current pace about ' + U.weightText(r.leftoverG) + ' of ' + name + ' will be left at close, not counting what is already on the block.', action: 'Sell it: run a special, tell the front.', unknown: false });
+    // WATCH OUT: grams in a planned batch were never cooked, so they are not food to sell off; they are told apart as
+    // a smaller plan.
+    const planLeft = r.plannedLeftG || 0, realLeft = Math.max(0, r.leftoverG - planLeft);
+    const realNote = realLeft >= Math.max(NOTABLE_G, NOTABLE_SHARE * stock), planNote = planLeft >= NOTABLE_G;
+    if (realNote || planNote) {
+      const consequence = (realNote ? 'At the current pace about ' + U.weightText(realLeft) + ' of ' + name + ' will be left at close, not counting what is already on the block.' : '')
+        + (planNote ? (realNote ? ' ' : '') + 'The planned batch would leave about ' + U.weightText(planLeft) + (realNote ? ' more' : ' of ' + name) + ' at close.' : '');
+      const action = realNote ? 'Sell it: run a special, tell the front.' + (planNote ? ' Plan a smaller batch.' : '') : 'Plan a smaller batch, or none.';
+      out.push({ id: 'leftover:' + ing.id, kind: 'leftover', ing: ing.id, label: name, at: closeAt, msLeft: closeAt - now, rung: 0, rungs: 0, sev: 'info', leftoverG: realLeft, plannedLeftG: planLeft,
+        consequence, action, unknown: false });
     }
     if ((r.runOutCause === 'rest-gap' ? r.gapUnmetG : r.unmetG) < NOTABLE_G || r.runOutAt == null || (r.runOutCause === 'limit' && r.limitQuality)) return;
     let consequence, action, sb = null;

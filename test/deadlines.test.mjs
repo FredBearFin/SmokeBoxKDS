@@ -501,6 +501,19 @@ test('planned batch: the shortfall row switches to the rescue wording, and back 
   assert.ok(/runs out at 6:10 pm\./.test(closeFeed(c.state, now).find((x) => x.kind === 'shortfall').consequence));
 });
 
+test('planned batch: grams it would leave at close are told as a smaller plan, never as cooked food to sell off', () => {
+  const s0 = closeKit('mac', 12000, closeAt(15), [[closeAt(15, 30), 2000], [closeAt(16), 2000], [closeAt(16, 30), 2000]]);
+  const now = closeAt(16, 40);
+  const r = E.apply(s0, 'planBatch', { ing: 'mac', grams: 30000, offAt: closeAt(17, 30) }, now);
+  assert.equal(r.report, 'ok');
+  const row = closeFeed(r.state, now).find((x) => x.kind === 'leftover');
+  assert.ok(row, 'a big plan raises a leftover row');
+  assert.equal(row.leftoverG, 0, 'no cooked food is left over');
+  assert.ok(row.plannedLeftG > 5000, String(row.plannedLeftG));
+  assert.match(row.consequence, /^The planned batch would leave about/);
+  assert.match(row.action, /Plan a smaller batch/);
+});
+
 test('planned batch: it is supply only, never stock: no 86 and no ledger movement', () => {
   const s0 = closeKit('mac', 12000, closeAt(15), [[closeAt(15, 30), 2000]]);
   const r = E.apply(s0, 'planBatch', { ing: 'mac', grams: 8000, offAt: closeAt(18, 30) }, closeAt(16));
