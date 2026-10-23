@@ -35,3 +35,6 @@ Do this on the real tablet, from a freshly cleared browser (Settings, site data,
 - **Four other kitchens** (pizza, bakery, taco truck, bar) each reach a first paid ticket with no barbecue words on the screens the owner works in.
 - **Still to time with a person:** everything above. See the checklist in this file and `docs/try-this-first.md`, steps 1 to 16.
 
+
+## Round 16 additions (modeled)
+Run F, Get this tablet ready plus reading the pilot card: 6 taps, no typing, 2 screens read, about 0.3 min. Pilot visit plan total: 14 minutes (3 tablet, 3 menu, 2 tax/hours/PIN, 2 names, 1 cook-ahead, 2 test ticket, 1 backup). Plan, not measured.

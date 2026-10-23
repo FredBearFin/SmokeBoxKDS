@@ -260,3 +260,12 @@ Not checked: a real tablet; showing the "made on" date or the limits anywhere ot
   7. The "Full menu editor (ingredients, prep times)" button wrapped with its icon off to one side. Shortened to "Full menu editor".
 - **Seen but not mine:** the "Tap here to turn on warning sounds" bar is the biggest thing on the first-run phone screen (A1's board); the "Sanitize not logged" button appears as soon as cooking ahead is on (A1's board).
 - **Final journey numbers (re-run):** A 13 taps / 6 typed fields / about 1.4 min; D (one station) 10 taps; E (cook-ahead) 14 taps / 3 typed fields / about 0.9 min. See `docs/setup-timing.md`. `docs/try-this-first.md` now has steps 11 to 16 for How you serve, counter service, cold items, the PIN recovery code, Start over and the import cents choice.
+
+## Round 16: Get this tablet ready and the pilot visit card
+
+- New sheet "Get this tablet ready" (Settings, and the top of Set up this tablet). Five cards, each with a green tick ("Ready") or an amber "Do this" line: screen stays awake, sound is on, volume is loud enough, added to the home screen, full screen.
+- The browser can only report some things. Screen awake (browser hold), installed and full screen are read from the page. Sound and volume cannot be read, so the sheet plays a real beep ("Test the sound") and asks "Did you hear it?". A Yes ticks both. The summary line says a tick is not a promise it stays that way all day.
+- Nothing new is stored: the answers live only while the sheet is open, so no new storage keys. The sheet holds its own screen hold only while open and lets go on close.
+- "Pilot visit checklist" sheet (Settings): seven steps with minutes, total 14, tick boxes and a Print this card button. Same content as `docs/pilot-visit-checklist.md`.
+- Journey run F (modeled): 6 taps, 2 screens read, about 0.3 min for the app side. The rest of the 14 minutes is talking with the owner and the menu import, not modeled.
+- Not checked: any real tablet, real speaker, iPad Safari behavior of the wake lock, or an actual visit. The 14 minutes is a plan.

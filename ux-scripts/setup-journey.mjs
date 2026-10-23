@@ -258,12 +258,36 @@ async function runE() {
   });
 }
 
+// Run F: the tablet-ready checks and the pilot card, as far as the app can be driven (the talk with the owner is not modeled).
+async function runF() {
+  return withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
+    await page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 8000 });
+    await page.waitForTimeout(600);
+    const R = recorder(page, 'F');
+    R.begin('Get this tablet ready', 'Open the five checks and test the beep.');
+    await page.evaluate(() => SB.sheets.open('ready'));
+    await page.waitForSelector('[data-check="awake"]');
+    R.rec.taps += 2; // Menu, then the Get this tablet ready link
+    await R.tap('[data-act="sound-test"]', 'Test the sound');
+    await R.tap('[data-act="sound-yes"]', 'Yes, I heard it');
+    await R.end('tablet-ready');
+    R.begin('Read the visit card', 'Open the pilot visit checklist.');
+    await page.evaluate(() => SB.sheets.open('pilot'));
+    await page.waitForSelector('.pv-step');
+    R.rec.taps += 2;
+    await R.end('pilot-card');
+    R.rec.pilotMinutes = await page.evaluate(() => (document.querySelector('.pv-total').textContent.match(/About (\d+)/) || [])[1]);
+    R.rec.errors = logs.errors.length + logs.pageErrors.length;
+    return R.rec;
+  });
+}
+
 // Turns a run into modeled seconds.
 function modeled(rec) { return Math.round(rec.taps * TAP_S + rec.typed * TYPE_S + rec.chars * CHAR_S + rec.picks * PICK_S + rec.reads * READ_S); }
 
-const A = await runA(); const B = await runB(); const C = await runC(); const D = await runA(true); const E = await runE();
-for (const r of [A, B, C, D, E]) r.modeledSeconds = modeled(r);
-const out = { generated: 'modeled, headless Chromium 1280x800, empty storage; not a real person or tablet', model: { TAP_S, TYPE_S, CHAR_S, PICK_S, READ_S }, A, B, C, D, E };
+const A = await runA(); const B = await runB(); const C = await runC(); const D = await runA(true); const E = await runE(); const F = await runF();
+for (const r of [A, B, C, D, E, F]) r.modeledSeconds = modeled(r);
+const out = { generated: 'modeled, headless Chromium 1280x800, empty storage; not a real person or tablet', model: { TAP_S, TYPE_S, CHAR_S, PICK_S, READ_S }, A, B, C, D, E, F };
 fs.writeFileSync(path.join(OUT, 'journey.json'), JSON.stringify(out, null, 1));
 const line = (r) => 'taps ' + r.taps + ', typed fields ' + r.typed + ' (' + r.chars + ' chars), list choices ' + r.picks + ', screens read ' + r.reads + ', dead ends ' + r.deadEnds + ', confusing ' + r.confusing + ', modeled ' + (r.modeledSeconds / 60).toFixed(1) + ' min';
 console.log('A guided path :', line(A), ' | paid:', A.firstPaidTicket, ' | errors:', A.errors);
@@ -271,6 +295,7 @@ console.log('B naive path  :', line(B));
 console.log('C find menu   :', line(C));
 console.log('D one station :', line(D), ' | paid:', D.firstPaidTicket);
 console.log('E cook-ahead :', line(E), ' | batches:', E.batchesLogged, '| paid:', E.firstPaidTicket, '| errors:', E.errors);
+console.log('F tablet ready:', line(F), '| pilot card minutes:', F.pilotMinutes, '| errors:', F.errors);
 console.log('first open    :', JSON.stringify(A.firstOpenInventory));
-for (const r of [A, B, C, D, E]) for (const s of r.steps) { console.log('\n[' + r.run + s.n + '] ' + s.name + ' -> ' + s.screen + ' (' + s.shot + ') taps ' + s.taps + ' typed ' + s.typed); for (const n of s.notes) if (n.kind !== 'tap' && n.kind !== 'type' && n.kind !== 'pick') console.log('   ' + n.kind + ': ' + n.text); }
+for (const r of [A, B, C, D, E, F]) for (const s of r.steps) { console.log('\n[' + r.run + s.n + '] ' + s.name + ' -> ' + s.screen + ' (' + s.shot + ') taps ' + s.taps + ' typed ' + s.typed); for (const n of s.notes) if (n.kind !== 'tap' && n.kind !== 'type' && n.kind !== 'pick') console.log('   ' + n.kind + ': ' + n.text); }
 void fileURLToPath;
