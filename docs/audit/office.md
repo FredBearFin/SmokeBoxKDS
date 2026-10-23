@@ -210,3 +210,15 @@ Method: `test/reconcile.test.mjs` builds random own kitchens with the real engin
 **"How is this worked out?"** A one-tap note under the headline on Sales and money, Pace, Tickets and Stations, in plain words (what counts, which day, what is left out). Safety and Stock are A4's and were not touched.
 
 **Not verified:** splits across several payment methods and refunds do not exist in the engine (one method per order; a wrong payment is reopened and paid again, which is covered). Sales by hour on the two daylight-saving days (the hour bucket is computed from midnight and may be one hour off after the change); stations and pace counts beyond the ticket and item totals; the Safety page and Stock numbers; the glance panel was reasoned from the same functions, not tested in a browser.
+
+## Round 12: the owner's questions, round 2
+
+- **Sales by hour on daylight-saving days:** hours are now wall-clock hours since midnight of the service date (`wallHours` in `40-metrics.js`), so the 2026 spring-forward and fall-back days no longer shift buckets by an hour. Unit test in `test/reconcile.test.mjs`.
+- **Best day of the week:** a card on Sales and money with a how-note, a table view and the empty state "Needs at least two weeks to compare days" (shown with the 13-day sample, by design).
+- **Cash in the drawer (Close the day):** optional starting cash, remembered from yesterday; expected = start + cash sales only, no tip rules. No engine setting carries it, so it is stored on this device under `smokebox.v1.office.startCash` (A5 classified the key as kitchen data). It does not travel with a backup of the settings; moving it into settings is a later engine change.
+- **Counter service:** Pace (now Speed), Tickets and Stations read `settings.service.counter` (absent means off) and, when on, say "counter service: kitchen times are not measured" instead of zero-time medians.
+- **Currency:** office KPI tiles and chart axes use the owner's symbol (`U.currencySymbol()` with a `$` fallback); CSV stays plain digits.
+- **Removed:** the "Channel sync" strip and its insight and tests.
+- **Wording (Freddy's decisions):** Pace page is "Speed" (hash stays `#/office/pace`); the pacing setting is "Finish together"; "best-by" is "quality limit"; safety limit is "Throw-out time"; "Demo" and "Sample history" replace practice/made-up; office text says "Settings" for the main board button; food-safety notes say "model Food Code" and "our starting value" where the code sets no fixed limit; reheat-once is described as our own rule. "Erase live data" was left as is because the Guide quotes the button name.
+- **Phone (390 wide), seven pages plus Data, Day and Night:** no horizontal overflow; screenshots in `docs/ux-shots/night/a3/r12-*`. Not checked on a real phone.
+- **Least-risky defaults chosen:** device-local start cash; counter gating off when the setting is absent; hash and ids unchanged.

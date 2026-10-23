@@ -44,7 +44,7 @@ export default function (h) {
     await tapFlame(page, 5, 70);
     await waitOffice(page);
     t.check('5 quick taps within 2.5 s open the office', await officeOpen(page), await hashOf(page));
-    t.check('the address says #/office (Pace is the office home, #/office/pace also works) and the page is Pace', /^#\/office(\/pace)?$/.test(await hashOf(page)) && /^Pace$/.test(await page.locator('#sb-office .of-title').first().innerText().catch(() => '')), await hashOf(page));
+    t.check('the address says #/office (Pace is the office home, #/office/pace also works) and the page is Speed', /^#\/office(\/pace)?$/.test(await hashOf(page)) && /^Speed$/.test(await page.locator('#sb-office .of-title').first().innerText().catch(() => '')), await hashOf(page));
     const frame = await page.evaluate(() => ({ nav: !!document.querySelector('#sb-office nav[aria-label]'), main: !!document.querySelector('#sb-office main'), back: !!document.querySelector('#sb-office [data-back-to-line]'), floorInert: document.getElementById('sb-floor') && (document.getElementById('sb-floor').inert || document.getElementById('sb-floor').hasAttribute('inert') || document.getElementById('sb-floor').closest('[inert]') != null) }));
     t.check('the office has a nav landmark, a main landmark and a Back to the line button', frame.nav && frame.main && frame.back, frame);
     t.check('the floor underneath is inert (keys and taps cannot reach it)', !!frame.floorInert, frame);

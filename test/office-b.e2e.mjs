@@ -166,8 +166,8 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   for (const id of PAGES) {
     await boot(page, id);
     const f = await page.evaluate(() => {
-      // The End of day panel is a button panel, not a chart or table card, so it has no "What to look for" caption.
-      const cards = [...document.querySelectorAll('.of-card')].filter((c) => !/^End of day/.test((c.querySelector('.of-card-title') || {}).textContent || ''));
+      // The Best day card shows its honest empty state with under two weeks of data. The End of day panel is a button panel, not a chart or table card, so it has no "What to look for" caption.
+      const cards = [...document.querySelectorAll('.of-card')].filter((c) => !/^End of day|^Best day of the week/.test((c.querySelector('.of-card-title') || {}).textContent || ''));
       const chartCards = cards.filter((c) => ['bar', 'line', 'gantt', 'ring', 'meter', 'scatter'].indexOf(c.dataset.type) >= 0);
       return {
         h1: document.querySelector('h1.of-title').textContent, headline: document.querySelector('.of-headline').textContent, hn: document.querySelectorAll('.of-headline .of-hn').length,
@@ -179,8 +179,8 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
       };
     });
     check(id + ': title, a headline with bold numbers, no error cards', f.h1 === TITLES[id] && f.headline.length > 40 && f.hn >= 2 && f.errors === 0, f);
-    check(id + ': every card has a "What to look for" caption', f.cards >= 7 && f.looks === f.cards, f);
-    check(id + ': every chart has an aria-label of a sentence and none is blank', f.charts >= 3 && f.labelled === f.charts, f);
+    check(id + ': every card has a "What to look for" caption', f.cards >= 5 && f.looks === f.cards, f);
+    check(id + ': every chart has an aria-label of a sentence and none is blank', f.charts >= 2 && f.labelled === f.charts, f);
     check(id + ': with data no chart shows its empty state', f.emptyShown === 0, f);
     check(id + ': no NaN, undefined, null or [object] in the text', !BAD_TEXT.test(await mainText(page)), (await mainText(page)).match(BAD_TEXT));
     if (id === 'money') check('money: four KPI tiles', f.tiles === 4, f.tiles);
@@ -421,7 +421,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   check('sell-out clock: the aria-label says how many and the earliest', new RegExp(ref.so.rows + ' sell-outs in ' + ref.so.dayCount + ' days').test(await svgLabel(page, 'When each protein went 86')), await svgLabel(page, 'When each protein went 86'));
   // suggestions
   const sg = await page.locator('.ob-sg').evaluateAll((els) => els.map((e) => e.textContent));
-  check('cook tomorrow: one card per protein with the numbers it used', sg.length === ref.so.proteins.length && sg.every((s) => /Cook about [\d.]+ kg|Not enough/.test(s) && /Suggestion from (days that include simulated sample data|your own days)|Not enough/.test(s)), sg);
+  check('cook tomorrow: one card per protein with the numbers it used', sg.length === ref.so.proteins.length && sg.every((s) => /Cook about [\d.]+ kg|Not enough/.test(s) && /Suggestion from (days that include sample history|your own days)|Not enough/.test(s)), sg);
   check('cook tomorrow: clearly labelled as a suggestion from the days in range, not a forecast', /suggestion from the days in the range above, not a forecast/i.test(await card(page, 'What to cook tomorrow').locator('.of-card-sub').textContent()));
   check('cook tomorrow: no Pitcall note is shown to the owner', !/Pitcall/.test(await mainText(page)));
   // pickers
@@ -450,11 +450,8 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   const toS = (s) => { const m = s.match(/(?:(\d+)h )?(\d+)m/); return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 : s.indexOf('Under') === 0 ? 0 : NaN; };
   check('86 cost: no spell is longer than one opening day (10 hours)', times.length > 0 && times.every((s) => toS(s) <= 10 * 3600), times);
   check('86 cost: refused order lines are numbers when recorded (the sample records them)', (await card(page, 'Times food went off the menu').locator('tbody tr td:last-child').allTextContents()).every((s) => /^\d+$/.test(s.trim())));
-  // sync
-  const sy = await card(page, 'How fast 86 reaches the channels').textContent();
-  check('sync: labelled "Simulated: no live POS connected"', /Simulated: no live POS connected/.test(sy));
-  check('sync: median, 90th percentile, max and the share inside 60 s match SB.metrics', [ref.sl.median, ref.sl.p90, ref.sl.max, ref.sl.within].every((x) => sy.indexOf(x) >= 0), [ref.sl, sy.slice(0, 300)]);
-  check('sync: the channel chart is labelled simulated too', /simulated/i.test(await svgLabel(page, 'Sync time by channel (simulated)')));
+  // the channel sync section is gone from the office
+  check('no channel sync section on the stock page', !/Channel sync|How fast 86 reaches|Sync time by channel/.test(await mainText(page)));
   check('stock page carries no pounds or ounces', !/\b(lb|lbs|oz|pounds?|ounces?)\b/i.test((await mainText(page)).replace(/Brisket, 1\/[24] lb|Burnt ends, 1\/2 lb/g, '')));
   noErrors('stock', logs);
 });
@@ -488,7 +485,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   await page.evaluate(() => SB.theme.setOffice('ember'));
   // refresh in place: nodes keep their identity, nothing is rebuilt
   await boot(page, 'stock');
-  await page.evaluate(() => { window.__marks = ['.ob-sg', '.ob-sentences li', '.ob-stats .ob-stat', '.ob-callout', '.of-card select', '.of-table tbody tr', '.ch-svg'].map((s) => { const e = document.querySelector(s); if (e) e.__mark = s; return [s, !!e]; }); });
+  await page.evaluate(() => { window.__marks = ['.ob-sg', '.ob-sentences li', '.ob-callout', '.of-card select', '.of-table tbody tr', '.ch-svg'].map((s) => { const e = document.querySelector(s); if (e) e.__mark = s; return [s, !!e]; }); });
   await page.evaluate(() => { SB.office._debug.refreshNow(); SB.office._debug.refreshNow(); });
   await wait(3600);
   const kept = await page.evaluate(() => window.__marks.map(([s, had]) => [s, had, !had || document.querySelector(s).__mark === s]));
@@ -519,7 +516,7 @@ for (const [name, ds] of variants) {
     for (const id of PAGES) {
       await boot(page, id, { ds });
       const f = await page.evaluate(() => {
-        const cards = [...document.querySelectorAll('.of-card')].filter((c) => !/^End of day/.test((c.querySelector('.of-card-title') || {}).textContent || '')); // the End of day panel has no caption
+        const cards = [...document.querySelectorAll('.of-card')].filter((c) => !/^End of day|^Best day of the week/.test((c.querySelector('.of-card-title') || {}).textContent || '')); // the End of day panel has no caption
         return { cards: cards.length, looks: cards.filter((c) => c.querySelector('.of-look')).length, errors: document.querySelectorAll('.of-error').length, empties: [...document.querySelectorAll('.of-empty .of-empty-b, .ch-empty')].filter((e) => e.offsetParent).map((e) => e.textContent.trim()), headline: document.querySelector('.of-headline').textContent, coach: (() => { const c = document.querySelector('.of-coach'); return c && c.offsetParent ? c.textContent.trim() : ''; })() };
       });
       check(name + ' ' + id + ': draws, with captions and no error cards', f.cards >= 5 && f.looks === f.cards && f.errors === 0, f);

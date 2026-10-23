@@ -127,7 +127,7 @@
     const root = h('div', { class: 'sb-printroot si-printroot' },
       h('h1', null, 'Food safety record, ' + w.label),
       h('p', { class: 'si-note' }, 'The owner\'s own record of what was logged in this kitchen. It is not an inspection result. Entries are never edited; corrections are added under the entry they correct.'),
-      demo ? h('p', { class: 'si-note' }, 'This kitchen has practice data in it, so some entries are practice entries.') : null,
+      demo ? h('p', { class: 'si-note' }, 'This is a demo kitchen, so these entries are demo entries.') : null,
       recordTable(rows),
       h('p', { class: 'si-note' }, 'Printed ' + U.fmtDateShort(U.dateKey(Date.now())) + ' ' + U.fmtTime(Date.now()) + '. Reviewed by: ______________   Date: ________'));
     document.body.appendChild(root);

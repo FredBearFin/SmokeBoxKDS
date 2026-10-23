@@ -44,6 +44,8 @@
   const amountText = (ing, v) => (ing && ing.unit === 'ea' ? num(v, 1) + ' ' + U.plural(v, 'piece') : U.weightText(v));
   // Dollars with cents, as shown in field messages.
   const money = (v) => U.fmtMoney(v, 2);
+  // The currency symbol the shared formatter prints ($ unless another one was chosen).
+  const curSymbol = () => { try { return (U.currencySymbol && U.currencySymbol()) || '$'; } catch (e) { return '$'; } };
   // An ingredient note from the config may quote a price per pound; show kilograms instead (this app never
   // shows pounds).
   function kgNote(t) {
@@ -217,7 +219,7 @@
     { id: 'menu', label: 'Menu', title: 'Dishes and what goes in them', group: 'Shop' },
     { id: 'ingredients', label: 'Ingredients', title: 'Ingredients', group: 'Kitchen' },
     { id: 'times', label: 'Time limits', title: 'Ticket time limits by channel', group: 'Kitchen' },
-    { id: 'pacing', label: 'Pacing', title: 'Meal pacing', group: 'Advanced' },
+    { id: 'pacing', label: 'Finish together', title: 'Finish together', group: 'Advanced' },
     { id: 'safety', label: 'Food safety', title: 'Food safety limits', group: 'Safety' },
     { id: 'pin', label: 'PIN', title: 'Manager PIN', group: 'Shop' },
     { id: 'look', label: 'Appearance', title: 'Appearance and service hours', group: 'Shop' },
@@ -390,7 +392,7 @@
     // Category decides which tab the dish sits under on the order screen.
     const catSel = h('select', { class: 'select' }, C.categories.map((c) => h('option', { value: c.id }, c.name)));
     catSel.value = mi0.cat;
-    const catField = SB.ui.field({ label: 'Category on the order screen', control: catSel });
+    const catField = SB.ui.field({ label: 'Menu section', control: catSel });
     catSel.setAttribute('aria-label', 'Category for ' + nm);
     catSel.addEventListener('change', () => {
       const before = getMi().cat, to = catSel.value;
@@ -421,7 +423,7 @@
 
     const priceMeta = { name: 'The price', fmt: money };
     const price = numField({
-      label: 'Price ($)', aria: 'Price of ' + nm, value: mi0.price, min: 0, max: 1000, step: 0.25, big: 1, meta: priceMeta,
+      label: 'Price (' + curSymbol() + ')', aria: 'Price of ' + nm, value: mi0.price, min: 0, max: 1000, step: 0.25, big: 1, meta: priceMeta,
       // Writes the new price; the confirmation says what it changes.
       save: (v) => {
         const r = send('updateMenuItem', { id, patch: { price: v } });
@@ -519,9 +521,9 @@
     const zoneSel = h('select', { class: 'select' }, C.workZones.map((z) => h('option', { value: z }, C.zoneById[z].name)));
     const zoneField = SB.ui.field({ label: 'Station that cooks it', control: zoneSel });
     const catSel = h('select', { class: 'select' }, C.categories.map((c) => h('option', { value: c.id }, c.name)));
-    const catField = SB.ui.field({ label: 'Category on the order screen', control: catSel });
+    const catField = SB.ui.field({ label: 'Menu section', control: catSel });
     const priceIn = h('input', { class: 'input od-add-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00' });
-    const priceField = SB.ui.field({ label: 'Price ($)', control: priceIn });
+    const priceField = SB.ui.field({ label: 'Price (' + curSymbol() + ')', control: priceIn });
     const minIn = h('input', { class: 'input od-add-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', value: '2', 'aria-label': 'Prep time, minutes' });
     const secIn = h('input', { class: 'input od-add-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', value: '0', 'aria-label': 'Prep time, seconds' });
     const prepErr = h('div', { class: 'field-error', role: 'alert', hidden: true });
@@ -612,7 +614,7 @@
     const liveStarters = () => { const s = cur(); return s ? s.menu.filter((m) => C.menuById[m.id] && !m.archived) : []; };
     starterBtn.addEventListener('click', () => {
       const n = liveStarters().length;
-      starterMsg.textContent = 'This archives the ' + n + ' made-up starter ' + U.plural(n, 'dish', 'dishes') + ' that came with the app, so only the dishes you add can be ordered. Past tickets keep them. You can unarchive any of them later.';
+      starterMsg.textContent = 'This archives the ' + n + ' demo starter ' + U.plural(n, 'dish', 'dishes') + ' that came with the app, so only the dishes you add can be ordered. Past tickets keep them. You can unarchive any of them later.';
       starterBox.hidden = false; starterYes.focus();
     });
     starterNo.addEventListener('click', () => { starterBox.hidden = true; starterBtn.focus(); });
@@ -719,7 +721,7 @@
     const costKey = pieces ? 'costEach' : 'costPerKg';
     const costMeta = { name: pieces ? 'The cost each' : 'The cost per kg', fmt: money };
     const cost = numField({
-      label: pieces ? 'Cost each ($)' : 'Raw cost per kg ($)', aria: (pieces ? 'Cost each of ' : 'Cost per kg of ') + nm, value: ing0[costKey] || 0, min: 0, max: 10000, step: pieces ? 0.05 : 0.25, big: pieces ? 0 : 1, meta: costMeta,
+      label: pieces ? 'Cost each (' + curSymbol() + ')' : 'Raw cost per kg (' + curSymbol() + ')', aria: (pieces ? 'Cost each of ' : 'Cost per kg of ') + nm, value: ing0[costKey] || 0, min: 0, max: 10000, step: pieces ? 0.05 : 0.25, big: pieces ? 0 : 1, meta: costMeta,
       // The cost saves the same way, as dollars per kg or each.
       save: (v) => mkPatch({ [costKey]: v }, 'Saved. Costs and margins use ' + money(v) + (pieces ? ' each' : ' per kg') + ' from now on.', costMeta), onSaved: (t) => status.ok(t),
     });
@@ -741,7 +743,7 @@
       const holdMeta = { name: 'The hold limit', unit: 'h' }, restMeta = { name: 'The rest time', unit: 'h' };
       holdF = numField({
         label: 'Hold limit (hours in the cabinet)', aria: 'Hold limit of ' + nm, value: ing0.maxHoldH || 4, min: 0.5, max: 12, step: 0.5, big: 1, unit: 'h', meta: holdMeta,
-        hint: 'A batch reaches its limit this long after it goes in (a safety limit throws it out, a quality limit takes it off the menu). Starter limit: owner to confirm.',
+        hint: 'A batch reaches its limit this long after it goes in (the throw-out time throws it out, a quality limit takes it off the menu). Starter limit: owner to confirm.',
         // The hold limit saves through the engine like the other fields.
         save: (v) => mkPatch({ maxHoldH: v }, 'Saved. New batches of ' + lower1(nm) + ' reach their hold limit ' + v + ' hours after they go in.', holdMeta), onSaved: (t) => status.ok(t),
       });
@@ -760,7 +762,7 @@
       });
       basisSeg = SB.ui.segmented({
         label: 'Kind of hold limit for ' + nm, value: ing0.holdBasis === 'safety' ? 'safety' : 'quality',
-        options: [{ id: 'quality', label: 'Quality limit' }, { id: 'safety', label: 'Safety limit' }],
+        options: [{ id: 'quality', label: 'Quality limit' }, { id: 'safety', label: 'Throw-out time' }],
         // Marks the limit as a house quality limit or as time as a public health control.
         onChange: (v) => {
           const r = send('updateIngredient', { id, patch: { holdBasis: v } });
@@ -811,7 +813,7 @@
         yieldBlock,
         h('div', { class: 'od-block' }, cost.el),
         pull ? h('div', { class: 'od-block' }, pull.el) : null,
-        holdF ? h('div', { class: 'od-block' }, holdF.el, basisSeg, ing0.confirmBasis ? hintLine('Starter basis, owner to confirm: if ' + lower1(nm) + ' is held outside temperature control, choose Safety limit.') : null) : null,
+        holdF ? h('div', { class: 'od-block' }, holdF.el, basisSeg, ing0.confirmBasis ? hintLine('Starter basis, owner to confirm: if ' + lower1(nm) + ' is held outside temperature control, choose Throw-out time.') : null) : null,
         restF ? h('div', { class: 'od-block' }, restF.el, cookF.el) : null),
       noteEl, status.el);
     return {
@@ -927,16 +929,16 @@
 
   // Panel 4: the on/off switch and seven numbers, each inside the engine's range.
   function buildPacing(P) {
-    const pn = panel(SECTIONS[3], 'Meal pacing times all the items for a plate to finish together: the slowest item starts first, and quicker items are held back until it is time to start them. Rush tickets skip pacing and send every item to its station at once.');
+    const pn = panel(SECTIONS[3], 'Finish together times all the items for a plate to finish together: the slowest item starts first, and quicker items are held back until it is time to start them. Rush tickets skip pacing and send every item to its station at once.');
     const status = statusLine();
     const on = !!((cur() || {}).settings.pacing || {}).enabled;
     const tog = SB.ui.toggle({
-      label: 'Pace tickets', checked: on,
+      label: 'Finish together', checked: on,
       // Turns pacing on or off; tickets already on the board keep the plan they were made with.
       onChange: (v) => {
         const r = send('updateSettings', { patch: { pacing: { enabled: v } } });
-        if (good(r)) status.ok(v ? 'Pacing is on. New tickets are paced; tickets already on the board keep the plan they were made with.' : 'Pacing is off. New tickets send every item to its station at once.');
-        else { tog.setValue(!v); status.bad(refusal(r, { name: 'Pacing' })); }
+        if (good(r)) status.ok(v ? 'Finish together is on. New tickets are timed to finish together; tickets already on the board keep the plan they were made with.' : 'Finish together is off. New tickets send every item to its station at once.');
+        else { tog.setValue(!v); status.bad(refusal(r, { name: 'Finish together' })); }
       },
     });
     tog.id = 'od-pacing-toggle';
@@ -963,7 +965,7 @@
       const patch = { pacing: {} };
       PACING.forEach((p) => { patch.pacing[p.key] = C.pacing[p.key]; });
       const r = send('updateSettings', { patch });
-      if (r.report === 'ok') status.ok('Saved. The pacing numbers are back to the starter values. The on/off switch is unchanged.');
+      if (r.report === 'ok') status.ok('Saved. The Finish together numbers are back to the starter values. The on/off switch is unchanged.');
       else if (r.report === 'nothingToDo') status.ok('Already at the starter values.');
       else status.bad(refusal(r, null));
     });
@@ -997,10 +999,10 @@
   ];
   // The legal reason shown under a field and added to its refusal.
   const LEGAL_NOTE = {
-    hotHoldF: 'The FDA Food Code sets 135\u00a0°F as the minimum for hot holding. Your local health code applies and may be stricter.',
+    hotHoldF: 'The model Food Code sets 135\u00a0°F as the minimum for hot holding. Your local health code applies and may be stricter (some states use 140).',
     reheatF: 'The FDA Food Code sets 165 °F as the minimum reheat target. Your local health code applies.',
     coldHoldF: 'The FDA Food Code sets 41 °F as the maximum for cold holding. Your local health code applies.',
-    belowHotGraceH: 'The FDA Food Code allows at most 2 hours. Your local health code applies.', aboveColdGraceH: 'The FDA Food Code allows at most 4 hours. Your local health code applies.', sanitizeEveryH: 'The FDA Food Code allows at most 4 hours between wipe-downs. Your local health code applies.',
+    belowHotGraceH: 'Our starting value is 2 hours; the model Food Code sets no fixed limit here. Set the limit your local health department gives you.', aboveColdGraceH: 'Our starting value is 4 hours; the model Food Code sets no fixed limit here. Set the limit your local health department gives you.', sanitizeEveryH: 'The model Food Code (4-602.11) says at most 4 hours between wipe-downs. Check your local code.',
   };
 
   // Panel 5: food-safety limits, always inside the legal bounds, with the legal note shown.
@@ -1008,7 +1010,7 @@
     const pn = panel(SECTIONS[4]);
     pn.body.append(
       h('p', { class: 'od-safetyline' }, ico('shield-check', 20), h('span', null, C.safetyLine)),
-      para('Smokebox refuses a hot-hold limit below 135\u00a0°F (the FDA Food Code minimum; your local health code applies and may be stricter), and it refuses any limit outside the range shown under each field, naming the one that is wrong. These limits drive the hold cabinet, the temperature checks and the sanitize timer. A change applies from the next check on; batches already in the cabinet are re-checked against it.', 'od-intro'));
+      para('Smokebox refuses a hot-hold limit below 135\u00a0°F (the model Food Code minimum; your local health code applies and may be stricter), and it refuses any limit outside the range shown under each field, naming the one that is wrong. These limits drive the hold cabinet, the temperature checks and the sanitize timer. A change applies from the next check on; batches already in the cabinet are re-checked against it.', 'od-intro'));
     const status = statusLine();
     // Builds one safety field from its spec and the bounds in the config. Returns {f, path}.
     const mk = (spec, path, legalKey) => {
@@ -1022,7 +1024,8 @@
       // Cross-field wording: the total cooling time has to be longer than the first stage.
       if (path === 'safety.cooling.totalH') meta.words = (info) => (info.min > lo ? 'The total cooling time has to be longer than the first stage (' + num(((cur() || {}).settings.safety.cooling || {}).stage1H) + ' hours): ' + num(info.min) + ' hours or more.' : null);
       META[path] = meta;
-      const legalWord = spec.legal === 'min' ? ' FDA Food Code minimum ' + lo + unitText + '.' : spec.legal === 'max' ? ' FDA Food Code maximum ' + hi + unitText + '.' : '';
+      const startOnly = /GraceH$|sanitizeEveryH$/.test(spec.key);
+      const legalWord = startOnly ? ' Our starting value; set the limit your local health department gives you.' : spec.legal === 'min' ? ' Model Food Code minimum ' + lo + unitText + '.' : spec.legal === 'max' ? ' Model Food Code maximum ' + hi + unitText + '.' : '';
       const start = getPath((cur() || {}).settings, path);
       const f = numField({
         label: spec.name, value: start, min: lo, max: hi, step: spec.step, big: spec.big || 0, unit: spec.unit, meta, hint: spec.mean + ' Allowed: ' + num(lo) + ' to ' + num(hi) + unitText + '.' + legalWord,
@@ -1244,7 +1247,7 @@
     const qMeta = { name: 'Wait before other apps are told', fmt: (v) => v + ' min' };
     META['service.qualitySyncHoldMin'] = qMeta;
     const qHold = numField({
-      label: 'Wait before other apps are told an item is past best-by', value: (cur() || {}).settings.service.qualitySyncHoldMin, min: 0, max: 30, step: 1, unit: 'min', meta: qMeta,
+      label: 'Wait before other apps are told an item is past its quality limit', value: (cur() || {}).settings.service.qualitySyncHoldMin, min: 0, max: 30, step: 1, unit: 'min', meta: qMeta,
       hint: 'A dish past its quality limit may be tasted and kept. The delivery apps are told it is off only after this wait. A safety lock tells them at once.',
       // Saves the wait as a service setting and confirms it in words.
       save: (v) => saveSetting('service.qualitySyncHoldMin', v, 'Saved. Channels wait ' + v + ' min.', qMeta), onSaved: (t) => sst.ok(t),
@@ -1349,7 +1352,7 @@
   }
 
   // 8. Data: what is stored, sample history, export, import, reset
-  const SAMPLE_NOTE = 'Sample history is generated by a simulator that runs the real engine; it is not your restaurant\'s data. Days 1 to 5 run without pacing and days 6 to 14 with it so you can see the difference.';
+  const SAMPLE_NOTE = 'Sample history is 14 days generated by the app; it is not your restaurant\'s data. Days 1 to 5 run without Finish together and days 6 to 14 with it so you can see the difference.';
 
   // Turns a backup check error into a sentence a cook can understand.
   function backupReason(err) {
@@ -1444,7 +1447,7 @@
     const noteText = () => { try { const i = SB.sim && SB.sim.sampleEnabled && SB.sim.sampleEnabled() && SB.sim.sampleInfo && SB.sim.sampleInfo(); if (i && typeof i.note === 'string' && i.note) return i.note; } catch (e) { /* default below */ } return SAMPLE_NOTE; };
     const noteP = para(noteText(), 'od-p');
     if (sampleToggle) sampleBox.append(sampleToggle, noteP);
-    else sampleBox.append(h('p', { class: 'od-p od-warnline' }, ico('alert', 18), h('span', null, 'Simulator not loaded. This build has no sample history, so the back office shows only live tickets.')), para(SAMPLE_NOTE, 'od-hint'));
+    else sampleBox.append(h('p', { class: 'od-p od-warnline' }, ico('alert', 18), h('span', null, 'Sample history is not available in this build, so the back office shows only your own tickets.')), para(SAMPLE_NOTE, 'od-hint'));
 
     // Export: JSON backup and CSV tables go through saveFile, with copy as the fallback.
     // The three-card flow at the top of the page: back up, restore, replace a device.
@@ -1597,7 +1600,7 @@
     pasteBtn.dataset.action = 'import-check-paste';
     const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
     card2.body.append(
-      para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (practice or real).', 'od-p'),
+      para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
       h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult);
     card3.body.append(
       h('ol', { class: 'od-steps' },
@@ -1711,8 +1714,8 @@
       const s = stateNow(), k = keep.getValue();
       askTyped({
         opener: resetLiveBtn, title: 'Erase live data?', word: 'ERASE', label: 'Erase live data',
-        lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any practice orders, and sets the clock back to real time.',
-          k ? 'Your dishes, ingredient edits, limits, pacing and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
+        lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any demo orders, and sets the clock back to real time.',
+          k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
           'There is no undo. Back up first if you might want this data.'],
         // Clears the live data after the word was typed.
         run: () => {
@@ -1753,7 +1756,7 @@
     const pn = panel(SECTIONS[8]);
     const items = [
       ['This build', VERSION + '. One file that works offline. Your data stays in this browser, on this device.'],
-      ['What is simulated', 'Order-channel sync is simulated. When an item goes 86, the counter POS, online ordering, drive-thru board and delivery-app feeds are updated after a pretend delay of a few seconds; nothing is sent to a real POS or delivery app. Sample history is generated by a simulator too.'],
+      ['What is demo or sample', 'The demo kitchen and the sample history are generated by the app so you can see how the screens work. Smokebox is not connected to any POS, online ordering or delivery app, and nothing is sent anywhere.'],
       ['What is a starter estimate', 'Prep times, cooked yields and ingredient costs began as starter numbers. Prep times and yields keep the label "starter estimate" until you confirm them. Costs stay starter numbers until you replace them with your invoices.'],
       ['What has not been tested', 'It was tested in Chromium at phone, tablet and desktop sizes. Not tested: real sunlight on a real screen, and other devices and browsers. Try the line on the actual tablet before service.'],
       ['Several devices', 'Separate devices do not share data. Tablets open in the same browser on the same device do, and stay in step.'],
