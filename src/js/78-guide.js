@@ -726,6 +726,14 @@
      {
       "t": "p",
       "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first."
+     },
+     {
+      "t": "h",
+      "x": "How full the saved history is"
+     },
+     {
+      "t": "p",
+      "x": "Settings and the Data page show **Saved history**, how full this tablet is. When it is nearly full, **Close the month...** is offered there."
      }
     ]
    },
@@ -998,6 +1006,22 @@
      {
       "t": "p",
       "x": "If a message says some saved records could not be read and were left out, the data as it was is kept. Do not clear the browser data. Ask whoever set up Smokebox. If a full-screen message says the saved data could not be read, tap **Download the old data** or **Show the data so I can copy it**. Only then can you continue."
+     },
+     {
+      "t": "h",
+      "x": "A copy that was set aside"
+     },
+     {
+      "t": "p",
+      "x": "When Smokebox could not read your saved data at start-up, it kept the unreadable copy aside for 30 days and began with its last good copy. If that set-aside copy can be read now (for example after going back to a newer version), the Data page shows a card: **A copy of your kitchen was set aside**. It says when it was set aside and how many tickets and orders it holds."
+     },
+     {
+      "t": "p",
+      "x": "To bring it back, open Back office, Menu and settings, then Data. In the card, tap **Save a backup of what is here now first** and check that the file arrived. Then type **RESTORE** and tap **Bring the set-aside copy back**. If a PIN is set, Smokebox asks for it first. Everything on this device is replaced by the set-aside copy. What was here before is kept for 7 days: tap **Undo this restore** to put it back."
+     },
+     {
+      "t": "p",
+      "x": "To forget the set-aside copy, tap **Throw the set-aside copy away**. Your kitchen as it is now is not touched, and the copy cannot be brought back."
      }
     ]
    },

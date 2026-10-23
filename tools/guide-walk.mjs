@@ -399,8 +399,8 @@ async function coldItem(browser) {
   const cs = '.sheet-root:last-of-type';
   await p.fill(cs + ' input >> nth=0', 'House potato salad');
   await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-root:last-of-type button, .sheet-root:last-of-type [role=radio]')].find((e) => e.getClientRects().length && e.textContent.trim().indexOf('Cold') === 0); if (b) b.click(); }); await p.waitForTimeout(300);
-  await p.fill('input[aria-label="Days it may stay in the fridge"]', '3');
-  await p.fill('input[aria-label="Hours it may be out of the fridge"]', '2');
+  await p.fill('input[aria-label="How many days may it stay in the fridge?"]', '3');
+  await p.fill('input[aria-label="How many hours may it be out of the fridge?"]', '2');
   await p.click(cs + ' input[type=checkbox] >> nth=0').catch(() => {});
   await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700);
   if (!(await seen(p, 'Log a first batch', cs))) { await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700); }

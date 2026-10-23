@@ -30,3 +30,7 @@ To empty your kitchen and begin again with a blank menu, see Start over with an 
 ## Erasing
 
 The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first.
+
+## How full the saved history is
+
+Settings and the Data page show **Saved history**, how full this tablet is. When it is nearly full, **Close the month...** is offered there.

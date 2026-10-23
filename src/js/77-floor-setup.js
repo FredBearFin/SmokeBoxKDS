@@ -684,18 +684,18 @@
     const kind = SB.ui.segmented({ label: 'Is it kept hot or cold?', value: 'hot', options: [{ id: 'hot', label: 'Hot' }, { id: 'cold', label: 'Cold' }],
       // Shows the boxes that fit hot or cold food.
       onChange: () => paintKind() });
-    const hoursIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: '4', 'aria-label': 'Hours it may stay' });
+    const hoursIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: '4', 'aria-label': 'How long may it stay, in hours?' });
     const hoursField = SB.ui.field({ label: 'How long may it stay, in hours?', control: hoursIn, hint: '4 hours is a careful starting point. Your local health code decides what is allowed: ask your health department and change this to match.' });
     // Cold food: two optional limits the owner gets from their health department. Blank means no limit is set and Smokebox only shows the time.
-    const daysIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Days it may stay in the fridge' });
+    const daysIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'How many days may it stay in the fridge?' });
     const daysField = SB.ui.field({ label: 'How many days may it stay in the fridge?', control: daysIn });
-    const outIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Hours it may be out of the fridge' });
+    const outIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'How many hours may it be out of the fridge?' });
     const outField = SB.ui.field({ label: 'How many hours may it be out of the fridge?', control: outIn });
     const coldBox = h('div', { class: 'dp-cold', hidden: true }, daysField, outField,
       h('p', { class: 'fs-sub' }, 'Use the limits your local health department gives you. Leave a box empty for no limit set: Smokebox will then only show the time.'));
     // Shows the hours box for hot food and the two fridge boxes for cold food.
     function paintKind() { const cold = kind.getValue() === 'cold'; coldBox.hidden = !cold; hoursField.hidden = cold; }
-    const kgIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Usual batch size in kilograms' });
+    const kgIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Usual batch size, in kg' });
     const kgField = SB.ui.field({ label: 'Usual batch size, in kg', control: kgIn, hint: 'A normal pan or batch, like 4. Leave it empty if you are not sure.' });
     // One checkbox row per dish: tick the dishes that use this food and say about how many grams each takes.
     const dishRows = activeDishes().map((m) => {
