@@ -2,6 +2,7 @@
 // described in src/js/30-store.js) that talks to server/server.mjs over HTTP and server-sent events, and
 // newClient(...) boots a second copy of the store in its own VM context so one test can run two "devices".
 // PARTS: hubTransport, newClient. USES: src/js/*.js, the hub. USED BY: test/hub-sync.test.mjs.
+// The transport adopts the hub's authoritative state on every change (message type 'state').
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,24 +12,19 @@ import { ROOT } from './_load.mjs';
 /** hubTransport(port, clientId) -> a store transport plus setOnline(bool) to simulate losing the network. */
 export function hubTransport(port, clientId) {
   let deliver = null, req = null, online = true, lastSeq = null, closed = false;
-  const t = { name: 'hub-test', clientId, snapshots: 0, catchups: 0 };
+  const t = { name: 'hub-test', clientId, snapshots: 0 };
 
-  // Hands one hub message to the store, skipping what this device did itself (it already applied it locally).
-  function onOp(op) {
-    if (!deliver || !op || op.by === clientId) return;
-    deliver({ type: 'action', opId: op.opId, actionType: op.actionType, payload: op.payload, now: op.now });
-  }
-  // Reads one named event from the stream and routes it by name.
+  // Reads one named event from the stream. A snapshot or state event hands the store the hub's whole state plus the
+  // opIds already in it; the store adopts it and replays its own unconfirmed actions on top (store transport 'state' message).
   function onEvent(name, data) {
     if (typeof data.seq === 'number') lastSeq = data.seq;
     if (name === 'snapshot') t.snapshots++;
-    else if (name === 'catchup') { t.catchups++; data.ops.forEach(onOp); }
-    else if (name === 'state' && data.op) onOp(data.op);
+    if ((name === 'snapshot' || name === 'state') && deliver) deliver({ type: 'state', state: data.state, opIds: data.opIds });
   }
   // Opens the event stream (asking only for what was missed if we have been connected before).
   function connect() {
     if (!online || closed) return;
-    const q = lastSeq === null ? '' : '?since=' + lastSeq;
+    const q = ''; // always ask for a full snapshot: the store adopts it (the hub's ?since= catch-up is not used here)
     req = http.get({ host: '127.0.0.1', port, path: '/events' + q }, (res) => {
       let buf = '';
       res.setEncoding('utf8');

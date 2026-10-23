@@ -75,7 +75,8 @@ export async function createHub(opts = {}) {
     if (dataFile && dirty) { dirty = false; try { writeSaved(dataFile, state, seq); } catch (e) { console.warn('[hub] save failed: ' + e.message); } }
   }
   // Builds the message every screen gets: the whole state, the hub clock and the change counter.
-  const view = (extra) => Object.assign({ state, serverNow: now(), seq }, extra || {});
+  // opIds lists the actions in the recent log, so a screen knows which of its own unconfirmed actions are already in this state.
+  const view = (extra) => Object.assign({ state, serverNow: now(), seq, opIds: ops.map((o) => o.opId).filter(Boolean) }, extra || {});
   // Sends one server-sent event (a named message with a JSON body) to one connected screen.
   const send = (res, event, data) => res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n');
   // Counts one more change, tells every connected screen, and queues a save.

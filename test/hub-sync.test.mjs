@@ -46,7 +46,9 @@ test('two clients converge when they act one after the other', async () => {
     // same tickets with the same numbers on all three (the hub and both clients)
     const nums = (s) => Array.from(s.tickets, (t) => t.num + ':' + t.customer);
     assert.deepEqual(nums(r.A.store.getState()), nums(r.hub.snapshot().state));
+    await until(() => r.B.store.outbox().length === 0, 'B outbox to empty');
     assert.deepEqual(nums(r.B.store.getState()), nums(r.hub.snapshot().state));
+    assert.deepEqual(nums(r.A.store.getState()), nums(r.hub.snapshot().state));
   } finally { await r.stop(); }
 });
 
@@ -73,15 +75,13 @@ test('an offline client queues actions and they replay after it reconnects', asy
     await until(() => r.A.store.getState().tickets.length === 3 && r.B.store.getState().tickets.length === 3, 'both clients to hold three tickets');
     assert.deepEqual(names(r.A.store), ['Offline 1', 'Offline 2', 'While away']);
     assert.deepEqual(names(r.B.store), ['Offline 1', 'Offline 2', 'While away']);
-    assert.equal(r.B.transport.catchups, 1, 'B asked only for what it missed instead of a full snapshot');
+    assert.equal(r.B.transport.snapshots >= 2, true, 'B took a fresh snapshot of the hub when it reconnected');
   } finally { await r.stop(); }
 });
 
-// KNOWN GAP (prototype): the clients apply their own actions at once and other devices' actions when they arrive, while
-// the hub applies everything in the order it received it. After a reconnect the three can hold the same tickets under
-// different ticket numbers. Fixing it needs the client to adopt the hub's state (a snapshot message in the transport
-// interface), which is not in a2/transport yet. This test records the gap and is marked todo so it does not fail the suite.
-test('ticket numbers match everywhere after an offline replay', { todo: 'needs snapshot adoption in the transport interface' }, async () => {
+// After an offline replay the hub's order wins: the store adopts the hub state (transport 'state' message) and replays its
+// own unconfirmed actions on top, so ticket numbers match on the hub and both clients.
+test('ticket numbers match everywhere after an offline replay', async () => {
   const r = await rig();
   try {
     r.B.transport.setOnline(false);
@@ -91,7 +91,9 @@ test('ticket numbers match everywhere after an offline replay', { todo: 'needs s
     r.B.transport.setOnline(true); r.B.store.syncNow();
     await until(() => r.hub.snapshot().state.tickets.length === 2 && r.B.store.getState().tickets.length === 2 && r.A.store.getState().tickets.length === 2, 'all to hold two tickets');
     const nums = (s) => Array.from(s.tickets, (t) => t.num + ':' + t.customer).sort();
+    await until(() => r.B.store.outbox().length === 0, 'B outbox to empty');
     assert.deepEqual(nums(r.B.store.getState()), nums(r.hub.snapshot().state));
+    assert.deepEqual(nums(r.A.store.getState()), nums(r.hub.snapshot().state));
   } finally { await r.stop(); }
 });
 

@@ -30,7 +30,7 @@ Then open `http://127.0.0.1:8787/`. The page served is the normal single-file ap
 - `POST /action` accepts an optional `at` (the time the device did the action, for example a queued action replayed after being offline). The hub uses `at` only between the time of its last applied action and its own clock, so time never runs backwards or into the future.
 
 ## Known limits (prototype)
-- Clients apply their own actions at once and others' actions on arrival; the hub applies in the order it receives them. After an offline replay the three can hold the same tickets under different ticket numbers. Fixing it needs the client to adopt the hub's state, which the transport interface (`a2/transport`) cannot do yet. `test/hub-sync.test.mjs` records this as a todo test.
+- Snapshot and `state` events also carry `opIds` (the actions in the recent log). A client that adopts the hub state (store transport message `{ type: 'state', state, opIds }`) treats those as confirmed and replays its own unconfirmed actions on top, so ticket numbers follow the hub's order; `test/hub-sync.test.mjs` checks this after an offline replay. The `opIds` list grows with the log (up to 5000), which is fine for a prototype only.
 - No login, no TLS: use only on a trusted network.
 - Whole state is sent on every change (fine for a small kitchen, not for a big one).
 - The opId memory resets on restart.
