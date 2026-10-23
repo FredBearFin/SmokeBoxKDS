@@ -3296,7 +3296,9 @@ a.of-nav:active { background: var(--press); }
   .of { --of-rail: 88px; --of-gut: var(--sp-5); }
   .of-rail { padding: var(--sp-4) var(--sp-2); }
   .of-rail-brand { justify-content: center; padding: 0 0 var(--sp-4); }
-  .of-rail-name, .of-nav-full, .of-soon { display: none; }
+  .of-rail-name, .of-soon { display: none; }
+  /* The full page name stays in the link for screen readers (clipped, not hidden) while the short name is drawn. */
+  .of-nav-full { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   .of-nav-short { display: block; }
   .of-nav { flex-direction: column; justify-content: center; gap: 4px; min-height: 58px; padding: var(--sp-2) 2px; text-align: center; font-size: 12px; }
   .of-nav-w { justify-items: center; }
@@ -4218,6 +4220,8 @@ a.of-nav:active { background: var(--press); }
 
 .ch-m { outline: none; }
 .ch-m:focus-visible { outline: 2px solid var(--ch-text); outline-offset: 2px; }
+/* The chart itself when it is a tab stop: the ring uses the chart's own text color, so it shows on the dark chart surface as on the light one. */
+.ch-svg:focus-visible { outline: 3px solid var(--ch-text); outline-offset: 2px; }
 .ch-hot { filter: brightness(1.16); }
 
 /* big numbers use the condensed display face, proportional figures */
@@ -32249,10 +32253,9 @@ a.of-nav:active { background: var(--press); }
     const current = M && M.pageId === p.id;
     if (!r) {
       return h('li', { class: 'of-rail-li' }, h('span', { class: 'of-nav is-soon', role: 'link', 'aria-disabled': 'true', 'aria-label': title + ', coming soon', title: title + ' is coming soon' },
-        ico(icon, 22), h('span', { class: 'of-nav-w' }, h('span', { class: 'of-nav-full' }, title), h('span', { class: 'of-nav-short' }, p.short), h('span', { class: 'of-soon' }, 'Coming soon'))));
+        ico(icon, 22), h('span', { class: 'of-nav-w' }, h('span', { class: 'of-nav-full' }, title), h('span', { class: 'of-nav-short', 'aria-hidden': 'true' }, p.short), h('span', { class: 'of-soon' }, 'Coming soon'))));
     }
     const a = h('a', { class: 'of-nav', href: '#/office' + (p.id === 'pace' ? '' : '/' + p.id), dataset: { page: p.id }, title });
-    a.setAttribute('aria-label', title);
     if (current) a.setAttribute('aria-current', 'page');
     const off = pageIsOff(p.id);
     if (off) { a.classList.add('is-off'); a.title = title + (COUNTER_PAGES[p.id] && counterOn() ? ' (counter service: not measured)' : ' (not tracking cooked-ahead food)'); }
@@ -36113,7 +36116,9 @@ a.of-nav:active { background: var(--press); }
       // Runs the erase once, then closes the box.
       const run = () => { if (go.disabled) return; cancel(); o.run(); };
       go.addEventListener('click', run);
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); if (e.key === 'Escape') cancel(); });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+      // Escape anywhere in the box closes only the box (the page-wide Escape would otherwise leave the back office) and gives focus back to the erase button.
+      dangerBox.onkeydown = (e) => { if (e.key === 'Escape' && !dangerBox.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); } };
       const descId = U.uid('oddesc');
       input.setAttribute('aria-describedby', descId);
       dangerBox.replaceChildren(h('p', { class: 'od-danger-t' }, ico('alert', 20), h('strong', null, o.title)), h('div', { id: descId }, ...o.lines.map((t) => h('p', { class: 'od-p' }, t))),

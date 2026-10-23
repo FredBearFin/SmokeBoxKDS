@@ -1530,7 +1530,9 @@ a.of-nav:active { background: var(--press); }
   .of { --of-rail: 88px; --of-gut: var(--sp-5); }
   .of-rail { padding: var(--sp-4) var(--sp-2); }
   .of-rail-brand { justify-content: center; padding: 0 0 var(--sp-4); }
-  .of-rail-name, .of-nav-full, .of-soon { display: none; }
+  .of-rail-name, .of-soon { display: none; }
+  /* The full page name stays in the link for screen readers (clipped, not hidden) while the short name is drawn. */
+  .of-nav-full { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   .of-nav-short { display: block; }
   .of-nav { flex-direction: column; justify-content: center; gap: 4px; min-height: 58px; padding: var(--sp-2) 2px; text-align: center; font-size: 12px; }
   .of-nav-w { justify-items: center; }
@@ -2214,6 +2216,8 @@ a.of-nav:active { background: var(--press); }
 
 .ch-m { outline: none; }
 .ch-m:focus-visible { outline: 2px solid var(--ch-text); outline-offset: 2px; }
+/* The chart itself when it is a tab stop: the ring uses the chart's own text color, so it shows on the dark chart surface as on the light one. */
+.ch-svg:focus-visible { outline: 3px solid var(--ch-text); outline-offset: 2px; }
 .ch-hot { filter: brightness(1.16); }
 
 /* big numbers use the condensed display face, proportional figures */
@@ -2426,6 +2430,8 @@ a.of-nav:active { background: var(--press); }
     // A reader for packed data with the given tables. It never touches this packer's own tables or remembered rows: a copy written by another tab
     // (or an earlier page) is numbered by that writer's tables, and mixing the two numberings would damage the next save.
     const reader = (dictR, schemasR) => {
+      // Which schemas hold a key named __proto__ (indexed by schema number + 1).
+      const protoKey = [false].concat(schemasR.map((k) => k.indexOf('__proto__') >= 0));
       // Reads a packed string back: a reference becomes the table entry, a doubled marker loses one marker.
       const decStr = (str) => {
         if (str.charCodeAt(0) !== 1) return str;
@@ -2446,8 +2452,7 @@ a.of-nav:active { background: var(--press); }
         if (!keys || keys.length !== v.length - 1) throw new Error('packed object does not match its keys');
         const o = {};
         // A key named __proto__ is set as plain data (assigning it would change the prototype); the common case takes the quick path.
-        if (keys.hasProto === undefined) keys.hasProto = keys.indexOf('__proto__') >= 0;
-        if (!keys.hasProto) { for (let i = 0; i < keys.length; i++) o[keys[i]] = dec(v[i + 1]); return o; }
+        if (!protoKey[tag]) { for (let i = 0; i < keys.length; i++) o[keys[i]] = dec(v[i + 1]); return o; }
         for (let i = 0; i < keys.length; i++) {
           if (keys[i] === '__proto__') Object.defineProperty(o, '__proto__', { value: dec(v[i + 1]), enumerable: true, writable: true, configurable: true });
           else o[keys[i]] = dec(v[i + 1]);
@@ -2456,7 +2461,37 @@ a.of-nav:active { background: var(--press); }
       };
       return dec;
     };
+    // JSON text of packed values, remembered like the packed tree: an unchanged object, and a long array that was not changed, cost one lookup.
+    const textCache = new WeakMap();
+    // The JSON text of the packed form of one value; key is the key it sits under. Equal to JSON.stringify(enc(v, key)).
+    const txt = (v, key) => {
+      if (v && typeof v === 'object') {
+        const hit = textCache.get(v);
+        if (hit !== undefined) return hit;
+        let t;
+        if (Array.isArray(v)) {
+          if (!v.length) return '[]';
+          const parts = new Array(v.length);
+          for (let i = 0; i < v.length; i++) parts[i] = txt(v[i], undefined);
+          t = '[0,' + parts.join(',') + ']';
+          if (v.length >= 16) textCache.set(v, t);
+        } else { t = JSON.stringify(enc(v, key)); textCache.set(v, t); }
+        return t;
+      }
+      return JSON.stringify(enc(v, key));
+    };
     return {
+      // The packed tree as JSON text, built mostly from remembered pieces: the same text as JSON.stringify of pack(state), far cheaper on a big
+      // kitchen where little changed since the last save.
+      packText(state) {
+        const keys = Object.keys(state).filter((k) => state[k] !== undefined && typeof state[k] !== 'function' && typeof state[k] !== 'symbol'), sk = keys.join('\u0002');
+        let si = schemaIdx.get(sk);
+        if (si === undefined) { si = schemas.length; schemas.push(keys); schemaIdx.set(sk, si); }
+        const parts = new Array(keys.length);
+        for (let i = 0; i < keys.length; i++) parts[i] = txt(state[keys[i]], keys[i]);
+        const x = '[' + (si + 1) + (parts.length ? ',' + parts.join(',') : '') + ']';
+        return '{"d":' + JSON.stringify(dict) + ',"s":' + JSON.stringify(schemas) + ',"x":' + x + '}';
+      },
       // The packed tree and the tables it needs: { d, s, x }.
       pack(state) { const x = enc(state, undefined); return { d: dict.slice(), s: schemas.map((k) => k.slice()), x }; },
       // The original state from a packed tree and its tables, without changing this packer. Throws when the packed data is damaged.
@@ -2769,6 +2804,10 @@ a.of-nav:active { background: var(--press); }
       let raw; try { raw = JSON.stringify(val); } catch (e) { return false; }
       try { if (ls) ls.setItem(key, raw); else mem.set(key, raw); return true; } catch (e) { mem.set(key, raw); return false; }
     },
+    // Saves text that is already JSON (the caller built it), skipping the step that turns a value into text. Same answers as set.
+    setText(key, raw) {
+      try { if (ls) ls.setItem(key, raw); else mem.set(key, raw); return true; } catch (e) { mem.set(key, raw); return false; }
+    },
     // Deletes a saved value from the browser and from memory.
     remove(key) { try { if (ls) ls.removeItem(key); } catch (e) { /* ignore */ } mem.delete(key); },
     // Every saved key that starts with the prefix (browser and memory). Never throws.
@@ -2787,7 +2826,7 @@ a.of-nav:active { background: var(--press); }
   const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'callouts', 'far', 'wall', 'dock'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
-  const DATA_KEYS = ['state', 'sid', 'writer', 'histtrim', 'histnotice', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
+  const DATA_KEYS = ['state', 'sid', 'writer', 'histtrim', 'histnotice', 'sleepSnap', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
     'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'dropped', 'droppedat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
@@ -2826,6 +2865,8 @@ a.of-nav:active { background: var(--press); }
       raw: (key) => (typeof base.raw === 'function' ? base.raw(keyFor(key, m())) : null),
       // Saves a value through the translated key.
       set: (key, val) => base.set(keyFor(key, m()), val),
+      // Saves text that is already JSON through the translated key (false when the storage cannot).
+      setText: (key, raw) => (typeof base.setText === 'function' ? base.setText(keyFor(key, m()), raw) : base.set(keyFor(key, m()), JSON.parse(raw))),
       // Deletes a value through the translated key.
       remove: (key) => base.remove(keyFor(key, m())),
       // Every saved key with this prefix, exactly as named in the browser (not translated).
@@ -8982,8 +9023,11 @@ a.of-nav:active { background: var(--press); }
       const s2 = lim ? E().prune(state, lim) : state;
       try {
         const env = { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, ops: journal, era };
-        if (wantCompact(s2)) { env.fmt = 2; env.p = packer.pack(s2); } else env.state = s2;
-        ok = storage.set(KEY, env) !== false;
+        if (wantCompact(s2)) {
+          // The compact text is put together from remembered pieces and handed over as text, so a save costs the writing, not a second encoding.
+          if (typeof storage.setText === 'function') ok = storage.setText(KEY, JSON.stringify(env).slice(0, -1) + ',"fmt":2,"p":' + packer.packText(s2) + '}') !== false;
+          else { env.fmt = 2; env.p = packer.pack(s2); ok = storage.set(KEY, env) !== false; }
+        } else { env.state = s2; ok = storage.set(KEY, env) !== false; }
       } catch (e) { ok = false; }
       if (ok) { st.trimmed = !!lim; kept2 = s2; break; }
       // Under pressure the rolling copy goes first: it is only a convenience, the live save is the data.
@@ -9147,10 +9191,26 @@ a.of-nav:active { background: var(--press); }
     const ops = payload && Array.isArray(payload.ops) ? payload.ops.filter((x) => typeof x === 'string') : null;
     return { state: v.state, ops, era: payload && typeof payload.era === 'string' ? payload.era : '' };
   }
+  // The action ids listed near the start of the saved text, as a Set, or null when the text does not show them there (an older save, or no storage text).
+  function peekOps() {
+    try {
+      const raw = typeof storage.raw === 'function' ? storage.raw(KEY) : null;
+      if (typeof raw !== 'string') return null;
+      const i = raw.indexOf('"ops":[');
+      if (i < 0 || i > 400) return null;
+      const j = raw.indexOf(']', i);
+      if (j < 0) return null;
+      return new Set(JSON.parse(raw.slice(i + 6, j + 1)));
+    } catch (e) { return null; }
+  }
   // Checks the saved copy for this tab's own recent actions. If another tab overwrote the copy without them (it read an older copy), they are
   // applied again on top of what is there and saved. True when something was put back.
   function reconcile() {
     if (!storage || !state || writeBlocked || !tr) return false;
+    // Cheap first look: the list of action ids sits near the start of the saved text, so it is read without opening the whole save. Only when one
+    // of this tab's recent actions is missing from it is the save read in full.
+    const peek = peekOps();
+    if (peek && !recent.some((p) => !peek.has(p.opId))) return false;
     const full = loadStoredFull();
     if (!full || !full.ops) return false;
     const have = new Set(full.ops);
@@ -17667,10 +17727,9 @@ a.of-nav:active { background: var(--press); }
     const current = M && M.pageId === p.id;
     if (!r) {
       return h('li', { class: 'of-rail-li' }, h('span', { class: 'of-nav is-soon', role: 'link', 'aria-disabled': 'true', 'aria-label': title + ', coming soon', title: title + ' is coming soon' },
-        ico(icon, 22), h('span', { class: 'of-nav-w' }, h('span', { class: 'of-nav-full' }, title), h('span', { class: 'of-nav-short' }, p.short), h('span', { class: 'of-soon' }, 'Coming soon'))));
+        ico(icon, 22), h('span', { class: 'of-nav-w' }, h('span', { class: 'of-nav-full' }, title), h('span', { class: 'of-nav-short', 'aria-hidden': 'true' }, p.short), h('span', { class: 'of-soon' }, 'Coming soon'))));
     }
     const a = h('a', { class: 'of-nav', href: '#/office' + (p.id === 'pace' ? '' : '/' + p.id), dataset: { page: p.id }, title });
-    a.setAttribute('aria-label', title);
     if (current) a.setAttribute('aria-current', 'page');
     const off = pageIsOff(p.id);
     if (off) { a.classList.add('is-off'); a.title = title + (COUNTER_PAGES[p.id] && counterOn() ? ' (counter service: not measured)' : ' (not tracking cooked-ahead food)'); }
@@ -19650,7 +19709,9 @@ a.of-nav:active { background: var(--press); }
       // Runs the erase once, then closes the box.
       const run = () => { if (go.disabled) return; cancel(); o.run(); };
       go.addEventListener('click', run);
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); if (e.key === 'Escape') cancel(); });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+      // Escape anywhere in the box closes only the box (the page-wide Escape would otherwise leave the back office) and gives focus back to the erase button.
+      dangerBox.onkeydown = (e) => { if (e.key === 'Escape' && !dangerBox.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); } };
       const descId = U.uid('oddesc');
       input.setAttribute('aria-describedby', descId);
       dangerBox.replaceChildren(h('p', { class: 'od-danger-t' }, ico('alert', 20), h('strong', null, o.title)), h('div', { id: descId }, ...o.lines.map((t) => h('p', { class: 'od-p' }, t))),
