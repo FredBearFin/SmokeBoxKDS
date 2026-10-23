@@ -4764,11 +4764,12 @@ a.of-nav:active { background: var(--press); }
     raw(key) {
       try { const raw = ls ? ls.getItem(key) : mem.get(key); return raw == null ? null : String(raw); } catch (e) { return null; }
     },
-    // Saves a value as text. Returns false if the value cannot be turned into text or the browser refused it
-    // (then it is kept in memory only, so the page still works until it is closed).
+    // Saves a value as text. Returns false if the value cannot be turned into text or the browser refused it.
+    // WATCH OUT: a refused value is NOT readable back through get(); the caller keeps its own copy (the store keeps the
+    // kitchen in memory and shows the failed save), and the last value the browser accepted stays what get() returns.
     set(key, val) {
       let raw; try { raw = JSON.stringify(val); } catch (e) { return false; }
-      try { if (ls) ls.setItem(key, raw); else mem.set(key, raw); return true; } catch (e) { mem.set(key, raw); return false; }
+      try { if (ls) ls.setItem(key, raw); else mem.set(key, raw); return true; } catch (e) { return false; }
     },
     // Deletes a saved value from the browser and from memory.
     remove(key) { try { if (ls) ls.removeItem(key); } catch (e) { /* ignore */ } mem.delete(key); },
@@ -4789,7 +4790,7 @@ a.of-nav:active { background: var(--press); }
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'writer', 'histtrim', 'histnotice', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'dropped', 'droppedat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'lastgood2', 'corruptat', 'dropped', 'droppedat', 'corrupt.prev', 'corruptat.prev', 'dropped.prev', 'droppedat.prev', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -5290,6 +5291,11 @@ a.of-nav:active { background: var(--press); }
     holdWindowV2: true,     // marks settings made after the hold limit moved from a flat 4 hours to per-product limits
     tempIntervalV2: true,   // marks settings made after the check interval default moved from 30 to 120 minutes
   };
+  // What a fridge, freezer or thermometer-check reading should be. A reading outside is logged anyway (never refused)
+  // and flagged, so a warm cooler or a thermometer that reads wrong shows up in the log. Cold units use the cold-hold
+  // limit above; a freezer should be at 0 F or colder (FDA consumer guidance). A food thermometer should read 32 F in ice
+  // water and 212 F in boiling water, give or take 2 F (boiling water reads lower at high altitude, so check that flag there).
+  C.readingChecks = { freezerMaxF: 0, iceF: 32, boilingF: 212, thermometerTolF: 2 };
   // Minutes before a batch's deadline at which each warning rung fires: a soft chime, then a spoken call, then
   // the loud repeating tone. Per-ingredient lists replace the default; long cooks start earlier so there is
   // time to act. Starter values: the owner can tune them.
@@ -5298,7 +5304,7 @@ a.of-nav:active { background: var(--press); }
   C.ladderMin = { defaultMin: [60, 30, 10], byIng: { brisket: [120, 60, 30, 10], ribs: [90, 45, 20, 10] } };
   // How old each demo starter batch is, in minutes, when a fresh demo kitchen opens. Spread out on purpose so the
   // batches do not all expire at once and the first run shows the warnings working: brisket is the one nearest
-  // its 4-hour limit. Ingredients not listed start fresh.
+  // its 8-hour limit. Ingredients not listed start fresh.
   C.starterAgeMin = { brisket: 455, pork: 410, slaw: 160, ribs: 150, sausage: 120, potato: 100, turkey: 95, mac: 70, beans: 45, pudding: 20 };
   // The allowed range for each owner-editable safety number, as [lowest, highest]. The legal limits are
   // fixed ends: hot hold never below 135 F, cold hold never above 41 F, reheat never below 165 F. The two
@@ -5360,8 +5366,9 @@ a.of-nav:active { background: var(--press); }
   // choices are kept in this browser (not in the saved kitchen state) under CUSTOM_KEY and applied right
   // here, while this file loads, so the engine, the board and the office all see the same lists. Ids never
   // change: a rename only changes what people read. A change made in the app takes effect after a reload.
-  // WATCH OUT: a backup file does not carry these names. Restoring on a device without them would drop
-  // tickets that sit on an added station, so copy the names too (Data page) when moving devices.
+  // WATCH OUT: they live outside the kitchen state, so only a backup file carries them to another device (the store
+  // writes them into the backup and puts them in place before a restore checks the tickets). An older backup has none,
+  // and restoring it on a device without the names would drop tickets that sit on an added station.
   const CUSTOM_KEY = 'smokebox.v1.names';
   // Size limits so a typing slip cannot grow the screen without end: names up to 24 letters.
   const CUSTOM_MAX = { zones: 8, categories: 12, channels: 8, name: 24 };
@@ -5955,7 +5962,7 @@ a.of-nav:active { background: var(--press); }
  *   validateBackup(objOrText)             -> { ok, state?, error?, repaired: string[] }
  *   serialize(state) -> string             deserialize(text) -> validateBackup result
  *   allEvents(state)                      -> Event[] (archive chunks + recent window, oldest first; memoised)
- *   prune(state, { maxTickets?, maxEvents? }) -> state (drops oldest completed tickets / oldest events, keeps the ledger whole)
+ *   prune(state, { maxTickets?, maxEvents?, now? }) -> state (drops oldest completed tickets / oldest events, keeps the ledger whole)
  *   findTicket(state, id) -> ticket|undefined      channelThresholds(settings, channelId) -> { warnSec, breachSec }
  *   views.*: activeTickets, ticketsForZone, expoTickets, recent, voided, counts, unavailable, batches (pure, used by SB.store.select)
  *   REPORTS (id -> plain-English message with the fix), REPORT_IDS, describe(report, info, settings) -> message with live numbers
@@ -6733,7 +6740,10 @@ a.of-nav:active { background: var(--press); }
   function safetyOnly(list) { return list.filter((e) => hasOwn(SAFETY_EVENT, e.type)); }
   // Adds newly dropped safety events to the retention bucket and lets go of entries older than SAFETY_KEEP_DAYS
   // (measured from refT, the newest time known). The bucket is never trimmed by size, only by age.
-  function keepSafety(prev, dropped, refT) {
+  // WATCH OUT: pass now as well when there is one. A future-dated event (a device clock set ahead) must never move the
+  // 400-day cut forward, so the reference time is the newest event or now, whichever is earlier.
+  function keepSafety(prev, dropped, refT, now) {
+    if (isNum(now) && now > 0 && isNum(refT) && now < refT) refT = now;
     const all = (Array.isArray(prev) ? prev : []).concat(dropped);
     if (!isNum(refT)) return all;
     const cut = refT - SAFETY_KEEP_MS;
@@ -6851,7 +6861,7 @@ a.of-nav:active { background: var(--press); }
       const ev = this.get('events');
       const r = appendEvents(ev, this.get('eventArchive') || [], this.evs, this.own.has(ev));
       s.events = r.events; s.eventArchive = r.archive;
-      if (r.dropped.length) s.safetyKeep = keepSafety(this.get('safetyKeep'), r.dropped, this.evs[this.evs.length - 1].t);
+      if (r.dropped.length) s.safetyKeep = keepSafety(this.get('safetyKeep'), r.dropped, this.evs[this.evs.length - 1].t, this.now);
     }
     if (s.tickets !== this.s0.tickets && !this.pruned) {
       const old = ACTIVE.get(this.s0.tickets);
@@ -7185,7 +7195,7 @@ a.of-nav:active { background: var(--press); }
       // A dish with no recipe, or an ingredient with no cost, records no cost at all (never 0).
       if (d.cost === null) delete w.cost; else w.cost = d.cost;
       if (!(opts && opts.noLearn)) learnInto(tx, w, mi, learnedBefore);
-    } else { w.depleted = []; w.cost = 0; }
+    } else { w.depleted = []; delete w.cost; }
     const ev = { ticketId: t.id, itemId: it.id, zone: it.zone, menuId: it.menuId, workMs: w.doneAt - (w.startedAt != null ? w.startedAt : w.firedAt), qty: it.qty };
     if (w.cost !== undefined) ev.cost = w.cost;
     if (shortG > 0) ev.shortG = shortG;
@@ -7929,7 +7939,8 @@ a.of-nav:active { background: var(--press); }
       cookedG = Math.round(rawG * y); yieldPct = round(y * 100, 2);
     }
     if (!(cookedG > 0)) return 'badWeight';
-    if (rawG !== undefined) costPerCookedKg = round((rawG / 1000) * rawCost / (cookedG / 1000), 4);
+    // WATCH OUT: an ingredient with no price per kg stays unpriced (undefined), never a cost of 0.
+    if (rawG !== undefined && isNum(ing.costPerKg)) costPerCookedKg = round((rawG / 1000) * rawCost / (cookedG / 1000), 4);
     else costPerCookedKg = hasUnitCost(ing) ? round(nominalUnitCost(ing) * 1000, 4) : undefined;
     const b = intakeInto(tx, ing, { cookedG, rawG, yieldPct, costPerCookedKg, src, tempF: p.tempF, label,
       endpointC: ty && p.endpointC != null ? ty.endpointC : undefined, holdH: ty && p.holdH != null ? ty.holdH : undefined });
@@ -8127,8 +8138,10 @@ a.of-nav:active { background: var(--press); }
       const bi = findBatchIdx(tx.get('batches'), id);
       const b = bi >= 0 ? tx.get('batches')[bi] : null;
       let why = null;
+      // WATCH OUT: cooling food has no quality stage (its gate ignores keepUntil), and past the hard cap there is nothing left to keep.
       if (!b) why = 'unknownBatch';
-      else if (!hasQualityStage(b, S) || b.status === 'discard' || !(tx.now > b.enteredAt + holdLimitMs(b, S))) why = 'qualityNotDue';
+      else if (b.status === 'discard' || !(tx.now < b.enteredAt + hardLimitMs(S))) why = 'batchNotServable';
+      else if (b.kind === 'cooling' || !hasQualityStage(b, S) || !(tx.now > b.enteredAt + holdLimitMs(b, S))) why = 'qualityNotDue';
       else if (b.outSince != null || !isNum(b.lastTempAt) || tx.now - b.lastTempAt > S.tempCheckEveryMin * MIN || !isNum(b.lastTempF) || (b.kind === 'cold' ? b.lastTempF > S.coldHoldF : b.lastTempF < S.hotHoldF)) why = 'tempReadingNeeded';
       if (why) { skipped.push({ batchId: id, report: why }); if (!firstReason) firstReason = why; continue; }
       const keepUntil = Math.min(until, b.enteredAt + hardLimitMs(S));
@@ -8289,6 +8302,8 @@ a.of-nav:active { background: var(--press); }
     if (typeof p.reason !== 'string' || DISCARD_REASONS.indexOf(p.reason) < 0) return 'reasonRequired';
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
+    // An empty pan has nothing to throw out; a 0 g discard would only add a false entry to the waste figures.
+    if (!(b.remainingG > 0) && b.kind !== 'cooling') { tx.info.why = 'empty'; return 'nothingToDo'; }
     const who = readWho(p);
     if (who === null) return 'badWho';
     // An optional few words of why, kept with the entry (most useful with the reason "other").
@@ -8345,8 +8360,12 @@ a.of-nav:active { background: var(--press); }
       if (v.length > 30) { tx.info = { key: 'label', min: 0, max: 30 }; return 'outOfBounds'; }
       if (v) f.label = v;
     }
+    // A cold unit above its limit is still logged, flagged with the limit it broke.
+    const maxF = p.unit === 'freezer' ? C.readingChecks.freezerMaxF : p.unit === 'other' ? null : safetyOf(tx.get('settings')).coldHoldF;
+    if (maxF !== null && p.f > maxF) { f.outOfRange = true; f.maxF = maxF; }
     tx.event('equip_temp', whoField(f, who));
     tx.info = { unit: p.unit, f: p.f };
+    if (f.outOfRange) Object.assign(tx.info, { outOfRange: true, maxF });
     return 'ok';
   };
   // Logs that the food thermometer was checked against ice water or boiling water, with the reading it gave.
@@ -8356,8 +8375,13 @@ a.of-nav:active { background: var(--press); }
     if (!p || !isNum(p.f) || p.f < 0 || p.f > 300) { tx.info = { key: 'f', min: 0, max: 300 }; return 'outOfBounds'; }
     const method = p.method == null ? 'other' : p.method;
     if (['ice', 'boiling', 'other'].indexOf(method) < 0) { tx.info.key = 'method'; return 'badPatch'; }
-    tx.event('thermometer_checked', whoField({ f: p.f, method }, who));
+    // A reading more than the tolerance away from ice or boiling water is still logged, flagged with what it should have read.
+    const RC = C.readingChecks, ev = { f: p.f, method };
+    const expectF = method === 'ice' ? RC.iceF : method === 'boiling' ? RC.boilingF : null;
+    if (expectF !== null && Math.abs(p.f - expectF) > RC.thermometerTolF) { ev.outOfRange = true; ev.expectF = expectF; }
+    tx.event('thermometer_checked', whoField(ev, who));
     tx.info = { f: p.f, method };
+    if (ev.outOfRange) Object.assign(tx.info, { outOfRange: true, expectF });
     return 'ok';
   };
 
@@ -9156,23 +9180,32 @@ a.of-nav:active { background: var(--press); }
    * ==================================================================================================== */
   // When there are more tickets than max, drops the oldest finished ones (never active) to about 2 percent
   // under max. Their used grams move into the ledger so the books still balance (I2).
+  // WATCH OUT: finished tickets on an order that is still open go last, because the check adds up their food. They go only when
+  // nothing else is left to drop (a kitchen that takes payment elsewhere leaves every order open, and the cap must still hold).
   function pruneTicketsInto(tx, max) {
     const arr = tx.get('tickets');
     if (!(arr.length > max)) return;
     const target = Math.max(0, max - Math.max(1, Math.floor(max * 0.02)));
     let drop = arr.length - target;
+    const open = new Set();
+    for (const o of tx.get('orders') || []) if (o && o.status === 'open') open.add(o.id);
+    // True when the ticket belongs to a check that is still open.
+    const onOpen = (t) => !!(t.orderId && open.has(t.orderId));
+    // First pass: the oldest finished tickets not on an open check; second pass, only if still too many: the rest.
+    const gone = new Set();
+    for (const late of [false, true]) for (const t of arr) {
+      if (drop > 0 && t.status !== 'active' && onOpen(t) === late && !gone.has(t)) { gone.add(t); drop--; }
+    }
+    if (!gone.size) return;
     const keep = [];
     for (const t of arr) {
-      if (drop > 0 && t.status !== 'active') {
-        drop--;
-        for (const it of t.items) for (const r of it.depleted || []) if (r.g > 0) { const L = tx.ledger(r.ing); L.prunedUsed = (L.prunedUsed || 0) + r.g; }
-        continue;
-      }
+      if (gone.has(t)) { for (const it of t.items) for (const r of it.depleted || []) if (r.g > 0) { const L = tx.ledger(r.ing); L.prunedUsed = (L.prunedUsed || 0) + r.g; } continue; }
       keep.push(t);
     }
-    if (keep.length !== arr.length) { tx.own.add(keep); tx.ch.tickets = keep; tx.pruned = true; }
+    tx.own.add(keep); tx.ch.tickets = keep; tx.pruned = true;
   }
-  /** prune(state, { maxTickets?, maxEvents? }) -> state. Used by the store to fit storage quotas. Keeps I2 (ledger) whole. */
+  /** prune(state, { maxTickets?, maxEvents?, now? }) -> state. Used by the store to fit storage quotas. Keeps I2 (ledger) whole.
+   *  now, when given, caps the time the 400-day safety cut is measured from. */
   function prune(state, lim) {
     if (!isState(state)) return state;
     lim = isObj(lim) ? lim : {};
@@ -9182,7 +9215,7 @@ a.of-nav:active { background: var(--press); }
       let flat = allEvents(state);
       if (flat.length > lim.maxEvents) {
         const gone = safetyOnly(flat.slice(0, flat.length - lim.maxEvents));
-        if (gone.length) tx.set('safetyKeep', keepSafety(state.safetyKeep, gone, flat[flat.length - 1].t));
+        if (gone.length) tx.set('safetyKeep', keepSafety(state.safetyKeep, gone, flat[flat.length - 1].t, lim.now));
         flat = flat.slice(flat.length - lim.maxEvents);
         const ar = [];
         while (flat.length >= 2 * EVENT_CHUNK) { ar.push(flat.slice(0, EVENT_CHUNK)); flat = flat.slice(EVENT_CHUNK); }
@@ -9259,9 +9292,14 @@ a.of-nav:active { background: var(--press); }
     const tickets = new Set();
     for (const t of state.tickets) if (tickCand.has(t.id) && (t.orderId === undefined || ordCand.has(t.orderId) || !orders.some((o) => o.id === t.orderId))) tickets.add(t.id);
     const eventIds = new Set(); let safetyKept = 0, dayRecordsKept = 0;
+    // A ticket or order that stays (still live, or on an open check) keeps its whole story, even its events from an old day.
+    const staysT = new Set(), staysO = new Set();
+    for (const t of state.tickets) if (!tickets.has(t.id)) staysT.add(t.id);
+    for (const o of orders) if (!ordCand.has(o.id)) staysO.add(o.id);
     for (const e of flat) {
       if (hasOwn(SAFETY_EVENT, e.type)) { safetyKept++; continue; }
       if (e.type === 'day_closed') { dayRecordsKept++; continue; }
+      if ((e.ticketId !== undefined && staysT.has(e.ticketId)) || (e.orderId !== undefined && staysO.has(e.orderId))) continue;
       if (goes(U.serviceDate(e.t, dsh))) eventIds.add(e.id);
     }
     const days = new Set();
@@ -10021,7 +10059,8 @@ a.of-nav:active { background: var(--press); }
         if (!isNum(out.remainingG) || out.remainingG < 0) { out.remainingG = 0; repaired.push('batch ' + b.id + '.remainingG clamped'); }
         if (!hasOwn(BATCH_STATUS, out.status)) out.status = 'check';
         if (out.status === 'discard') { out.canServe = false; out.remainingG = 0; out.action = 'DISCARD_LOCKOUT'; if (DISCARD_REASONS.indexOf(out.discardReason) < 0) out.discardReason = 'other'; if (!isNum(out.discardedAt)) out.discardedAt = out.enteredAt; }
-        if (typeof out.canServe !== 'boolean' || out.kind === 'cooling') out.canServe = out.kind === 'cooling' ? false : !!out.canServe;
+        // Only a real true counts: anything else (the text "false", a number) is read as not servable.
+        if (typeof out.canServe !== 'boolean' || out.kind === 'cooling') out.canServe = false;
         if (!isInt(out.reheats) || out.reheats < 0) out.reheats = 0;
         if (out.label !== undefined) { const lb = fitText(out.label, 40, 'batch ' + b.id + '.label', repaired); if (lb) out.label = lb; else delete out.label; }
         if (!Array.isArray(out.temps)) out.temps = [];
@@ -10041,6 +10080,13 @@ a.of-nav:active { background: var(--press); }
           if (isNum(out.outHours) && !(out.outHours > 0 && out.outHours <= 24)) delete out.outHours;
         }
         if (!hasOwn(SRC_BATCH, out.src)) out.src = 'cook';
+        // WATCH OUT: a stored "servable" is only trusted when the gate agrees at the batch's own last recorded moment. The
+        // gate can only get stricter as time passes, so food it locks then is locked now; the first tick finishes the job.
+        if (out.canServe === true && out.status !== 'discard') {
+          const refT = Math.max.apply(null, ['enteredAt', 'lastTempAt', 'outSince', 'lineSince', 'movedAt'].map((k) => (isNum(out[k]) ? out[k] : -Infinity)));
+          const gt = gate(out, refT, settings.safety);
+          if (!gt.canServe) { out.canServe = false; out.action = gt.action; if (gt.status !== 'discard') out.status = gt.status; repaired.push('batch ' + b.id + ' taken off the menu (its own readings say so)'); }
+        }
         bIds.add(b.id);
         batches.push(out);
       }
@@ -10271,7 +10317,7 @@ a.of-nav:active { background: var(--press); }
       case 'wrongBackupMode': return i.backup === 'demo' ? 'That backup comes from the demo, not from your kitchen. Nothing was changed. Choose a backup made from your own kitchen.' : 'That backup comes from a real kitchen, so it cannot be loaded into the demo. Nothing was changed. Leave the demo first, then load it into your own kitchen.';
       case 'ordersStillOpen': return isInt(i.count) && i.count > 0 ? i.count + ' ' + U.plural(i.count, 'order') + ' still open. Take payment on ' + (i.count === 1 ? 'it' : 'each one') + ', or void ' + (i.count === 1 ? 'it' : 'them') + ', then close the day again.' : REPORTS.ordersStillOpen;
       case 'outOfBounds': return isNum(i.min) && isNum(i.max) ? 'That value is outside the allowed range (' + i.min + ' to ' + i.max + '). Enter a value inside it.' : REPORTS.outOfBounds;
-      case 'nothingToDo': return i.why === 'onDeck' ? 'That item is still waiting for its start time. Tap Start now to begin it early.' : i.why === 'notBelow' ? 'This batch is not below the hold temperature, so it does not need a reheat.' : 'Nothing to change.';
+      case 'nothingToDo': return i.why === 'onDeck' ? 'That item is still waiting for its start time. Tap Start now to begin it early.' : i.why === 'notBelow' ? 'This batch is not below the hold temperature, so it does not need a reheat.' : i.why === 'empty' ? 'That pan is already empty, so there is nothing to throw out.' : 'Nothing to change.';
       default: return hasOwn(REPORTS, report) ? REPORTS[report] : REPORTS.badPatch;
     }
   }
@@ -11151,6 +11197,9 @@ a.of-nav:active { background: var(--press); }
   const DROPPED_AT_KEY = 'smokebox.v1.droppedat';
   // One small rolling copy of the last good state (menu, ingredients, settings, PIN, safety records, recent history).
   const LASTGOOD_KEY = 'smokebox.v1.lastgood';
+  // While a 'before restore' or 'before month close' copy holds the last-good slot, the 6-hour rolling copy goes here instead,
+  // so a damaged save is never recovered from a copy that is days old.
+  const ROLLING_KEY = 'smokebox.v1.lastgood2';
   // The owner's answer to the one-time offer to clear old demo tickets: true once they chose to keep them.
   const KEPT_KEY = 'smokebox.v1.demoLeftoversKept';
   // The word that must be typed to start over with an empty menu, and the setup-progress keys that start over clears.
@@ -11275,7 +11324,14 @@ a.of-nav:active { background: var(--press); }
         v = susp.base + Math.max(0, r - susp.r0);
       } else if (susp) { susp = null; st.clockSuspect = null; }
     }
-    if (v < lastNow) v = lastNow;
+    // WATCH OUT: a real step back of the device clock (more than a second) re-bases the clock at the last time, so time keeps
+    // moving at its real pace from there. Only repeating the last time would freeze every hold, cooling and discard timer
+    // until the device caught up (an hour for a one-hour correction). The kitchen's clock then runs that much ahead of the
+    // device, which is the careful side: deadlines come early, never late.
+    if (v < lastNow) {
+      if (lastNow - v > 1000 && !susp) clk = { base: lastNow, realBase: r, speed: clk.speed };
+      v = lastNow;
+    }
     lastNow = v;
     return v;
   }
@@ -11382,7 +11438,8 @@ a.of-nav:active { background: var(--press); }
   // Whole calendar days from one service day text to a later one.
   const daysBetween = (a, b) => Math.round((U.dateKeyToMs(b) - U.dateKeyToMs(a)) / 864e5);
   // Forgets the oldest saved day, so the next save starts counting again (after a restore, a reset or Close the month, which remove history on purpose).
-  function histRebase() { hist.oldest = null; }
+  // WATCH OUT: it is written to storage too, or a reload reads back the old day and counts the removed days as dropped.
+  function histRebase() { hist.oldest = null; try { if (storage) storage.set(HIST_KEY, hist); } catch (e) { /* the count is kept in memory */ } }
   // Called after each good save with the copy that was written: if its oldest ticket day moved forward, history was dropped to make room (the size
   // limit of the app or of the browser), and the days are added up so the owner can be told once.
   function histTrack(saved, r) {
@@ -11399,7 +11456,7 @@ a.of-nav:active { background: var(--press); }
   function savedChars() {
     if (!storage || typeof storage.raw !== 'function') return 0;
     let n = 0;
-    try { for (const k of [KEY, LASTGOOD_KEY]) { const t = storage.raw(k); if (typeof t === 'string') n += t.length; } } catch (e) { return 0; }
+    try { for (const k of [KEY, LASTGOOD_KEY, ROLLING_KEY]) { const t = storage.raw(k); if (typeof t === 'string') n += t.length; } } catch (e) { return 0; }
     return n;
   }
   // How full the saved history is, as a percent of the tightest of three limits (tickets, events, browser space), and what the owner can be told.
@@ -11476,6 +11533,8 @@ a.of-nav:active { background: var(--press); }
     if (skipRebase) skipRebase = false; else rebaseIfStale();
     // With several tabs and no lock, claim the write and rebuild on the newest copy if another tab got in first (up to 3 times, then write anyway).
     if (tr && !inLock && !lockManager()) for (let i = 0; i < 3 && !claimWrite(); i++) { if (forced) break; rebaseIfStale(); }
+    // Reading the other tab's copy may have found one that could not be set aside: then it is not written over either.
+    if (writeBlocked) { st.lastSaveOk = false; return false; }
     const r = realNow();
     const v = now();
     let ok = false;
@@ -11488,7 +11547,7 @@ a.of-nav:active { background: var(--press); }
     // in memory (finding F-E5).
     let nt = Math.min(state.tickets.length, 1500), ne = Math.min(E().allEvents(state).length, 10000);
     for (let tries = 0; tries < 12; tries++) {
-      const s2 = lim ? E().prune(state, lim) : state;
+      const s2 = lim ? E().prune(state, Object.assign({ now: v }, lim)) : state;
       try {
         const env = { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, ops: journal, era };
         if (wantCompact(s2)) { env.fmt = 2; env.p = packer.pack(s2); } else env.state = s2;
@@ -11496,7 +11555,7 @@ a.of-nav:active { background: var(--press); }
       } catch (e) { ok = false; }
       if (ok) { st.trimmed = !!lim; kept2 = s2; break; }
       // Under pressure the rolling copy goes first: it is only a convenience, the live save is the data.
-      if (!snapDropped && strict) { snapDropped = true; snapAt = 0; try { storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } tries--; continue; }
+      if (!snapDropped && strict) { snapDropped = true; snapAt = 0; try { storage.remove(ROLLING_KEY); storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } tries--; continue; }
       // History is already tiny: trimming further will not help, so give up and report the failed save.
       if (nt < 20 && ne < 200) break;
       lim = { maxTickets: nt, maxEvents: ne };
@@ -11526,8 +11585,9 @@ a.of-nav:active { background: var(--press); }
   function maybeSnapshot(r) {
     if (!strict || mode !== 'real' || !storage || !state) return false;
     if (!snapWanted && r - snapAt < SNAP_EVERY_MS) return false;
-    // A 'before restore' copy is the owner's way back from a wrong restore: the 6-hour refresh leaves it alone for 7 days.
-    if (!snapWanted) { const g = beforeRestoreCopy(r); if (g) return false; }
+    // A 'before restore' copy is the owner's way back from a wrong restore: the 6-hour refresh leaves it alone for 7 days
+    // and writes to the second slot meanwhile.
+    const slot = !snapWanted && beforeRestoreCopy(r) ? ROLLING_KEY : LASTGOOD_KEY;
     try {
       // When the saved kitchen already fills half the browser's space, the rolling copy shrinks to a few tickets (menu, settings, PIN and safety records
       // stay): a fat copy is what pushes the live save over the limit and gets the copy dropped anyway.
@@ -11535,7 +11595,8 @@ a.of-nav:active { background: var(--press); }
       const env = { v: 1, takenAt: r, reason: snapWanted || 'interval', rev: state.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
       const text = JSON.stringify(env);
       if (!E().validateBackup(text).ok) return false; // never keep a copy that would not load
-      if (storage.set(LASTGOOD_KEY, env) === false) { storage.remove(LASTGOOD_KEY); return false; }
+      if (storage.set(slot, env) === false) { storage.remove(slot); return false; }
+      if (slot === LASTGOOD_KEY) storage.remove(ROLLING_KEY);   // the second slot is older now
       snapAt = r; snapWanted = null;
       st.lastGoodAt = r;
       return true;
@@ -11603,14 +11664,19 @@ a.of-nav:active { background: var(--press); }
     if (!v || typeof v !== 'object') { last = { type: 'restoreParked', report: 'noCopy', info: {}, events: [] }; return 'noCopy'; }
     return importAll(JSON.stringify(openSaved(v)));
   }
-  // Reads the rolling copy and returns { state, takenAt } if it is whole, else null.
+  // Reads the newest whole copy of the two last-good slots and returns { state, takenAt, repaired }, else null.
   function readSnapshot() {
-    try {
-      const env = openSaved(storage.get(LASTGOOD_KEY, null));
-      if (!env || typeof env !== 'object') return null;
-      const v = E().validateBackup(env);
-      return v.ok ? { state: v.state, takenAt: isNum(env.takenAt) ? env.takenAt : 0, repaired: v.repaired } : null;
-    } catch (e) { return null; }
+    let best = null;
+    for (const k of [LASTGOOD_KEY, ROLLING_KEY]) {
+      try {
+        const env = openSaved(storage.get(k, null));
+        if (!env || typeof env !== 'object') continue;
+        const v = E().validateBackup(env);
+        const at = isNum(env.takenAt) ? env.takenAt : 0;
+        if (v.ok && (!best || at > best.takenAt)) best = { state: v.state, takenAt: at, repaired: v.repaired };
+      } catch (e) { /* try the other slot */ }
+    }
+    return best;
   }
   // Public name for saving right now.
   function flush() { return persistNow(); }
@@ -11678,7 +11744,14 @@ a.of-nav:active { background: var(--press); }
     if (sid == null || sid === baseSid) return;
     const full = loadStoredFull();
     baseSid = sid;
-    if (!full) return;
+    // Another tab wrote a copy this tab cannot read (a newer build, or damage). The next save would write over it, so it is set
+    // aside first like a damaged save at start-up; if even that fails, nothing is written over it.
+    if (!full) {
+      let stored = null;
+      try { stored = storage.get(KEY, null); if (stored == null && typeof storage.raw === 'function') stored = storage.raw(KEY); } catch (e) { stored = null; }
+      if (stored != null && !parkText(CORRUPT_KEY, CORRUPT_AT_KEY, stored, realNow())) { writeBlocked = true; heldText = rawOf(stored); st.heldInMemory = true; }
+      return;
+    }
     atLeast(lastStamp(full.state));
     const m = mergeForeign(full.state, full.ops, full.era);
     if (m.keep) return;
@@ -11959,12 +12032,13 @@ a.of-nav:active { background: var(--press); }
     if (!st.corrupt) {
       try {
         const at = storage.get(CORRUPT_AT_KEY, null);
-        if (isNum(at) && r - at > CORRUPT_KEEP_MS) { storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); st.corruptCleared = true; }
+        if (isNum(at) && r - at > CORRUPT_KEEP_MS) { dropParked(CORRUPT_KEY, CORRUPT_AT_KEY); st.corruptCleared = true; }
         const da = storage.get(DROPPED_AT_KEY, null);
-        if (isNum(da) && r - da > CORRUPT_KEEP_MS && !st.droppedCount) { storage.remove(DROPPED_KEY); storage.remove(DROPPED_AT_KEY); }
+        if (isNum(da) && r - da > CORRUPT_KEEP_MS && !st.droppedCount) dropParked(DROPPED_KEY, DROPPED_AT_KEY);
       } catch (e) { /* ignore */ }
     }
-    try { const g0 = storage.get(LASTGOOD_KEY, null); snapAt = g0 && isNum(g0.takenAt) ? g0.takenAt : 0; } catch (e) { snapAt = 0; }
+    snapAt = 0;
+    for (const k of [LASTGOOD_KEY, ROLLING_KEY]) { try { const g0 = storage.get(k, null); if (g0 && isNum(g0.takenAt) && g0.takenAt > snapAt) snapAt = g0.takenAt; } catch (e) { /* none */ } }
     snapWanted = null;
     // History fill bookkeeping, and a request that the browser keeps this site's data (real kitchens only; where the browser cannot, nothing happens).
     quotaChars = isNum(opts.quotaBytes) && opts.quotaBytes > 0 ? opts.quotaBytes : 5e6;
@@ -12001,9 +12075,18 @@ a.of-nav:active { background: var(--press); }
     return status();
   }
   // Keeps a copy of damaged or about-to-be-repaired data under its own key. True only when the copy was really written; a full browser store says no.
+  // WATCH OUT: a copy already parked there may not have been looked at yet, so it moves to the '.prev' key first (best effort, one older copy).
   function parkText(key, atKey, value, at) {
-    try { if (storage.set(key, value) === false) return false; storage.set(atKey, at); return true; } catch (e) { return false; }
+    try {
+      const old = typeof storage.raw === 'function' ? storage.raw(key) : null;
+      if (typeof old === 'string' && old !== JSON.stringify(value)) {
+        try { if (storage.set(key + '.prev', JSON.parse(old)) !== false) storage.set(atKey + '.prev', storage.get(atKey, null)); } catch (e) { /* the older copy could not be kept */ }
+      }
+      if (storage.set(key, value) === false) return false; storage.set(atKey, at); return true;
+    } catch (e) { return false; }
   }
+  // Removes a parked copy, its time and the older copy kept behind it.
+  function dropParked(key, atKey) { for (const k of [key, atKey, key + '.prev', atKey + '.prev']) storage.remove(k); }
   // The exact saved text for a payload, so a person can download what could not be kept safe.
   function rawOf(payload) {
     try { const raw = typeof storage.raw === 'function' ? storage.raw(KEY) : null; if (raw != null) return raw; } catch (e) { /* fall back to the parsed copy */ }
@@ -12402,7 +12485,8 @@ a.of-nav:active { background: var(--press); }
     if (now() > realNow()) rebaseClock();
     const rep = dispatch('resetLive', opts || {}, { source: 'user' });
     // Back to real time means the real pace too, not only the real hour.
-    if (rep === 'ok') { if (clk.speed !== 1) setSpeed(1); persistNow(); }
+    // The cleared history was removed on purpose, so the next save must not report it as dropped for lack of space.
+    if (rep === 'ok') { if (clk.speed !== 1) setSpeed(1); histRebase(); persistNow(); }
     return rep;
   }
 
@@ -12675,8 +12759,10 @@ a.of-nav:active { background: var(--press); }
     for (const k of START_OVER_KEYS) { try { storage.remove(k); } catch (e) { /* ignore */ } }
     // Only now that the erase went in: the rolling last-good copy and any set-aside damaged copy still hold the old kitchen's
     // customers and orders, so both are dropped and the last-good copy is retaken from the new empty kitchen.
-    try { storage.remove(LASTGOOD_KEY); storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); } catch (e) { /* ignore */ }
-    st.corrupt = null;
+    // The copy kept from before a repair at load holds the whole old kitchen too, and the dropped-history count belongs to it.
+    try { for (const k of [LASTGOOD_KEY, ROLLING_KEY, HIST_KEY, HIST_NOTICE_KEY]) storage.remove(k); dropParked(CORRUPT_KEY, CORRUPT_AT_KEY); dropParked(DROPPED_KEY, DROPPED_AT_KEY); } catch (e) { /* ignore */ }
+    st.corrupt = null; st.droppedCount = null;
+    hist = { oldest: null, days: 0, at: 0, droppedBefore: null }; hn = { warnAt: 0, trimAck: 0 };
     // Actions queued for a hub that it never confirmed belong to the erased kitchen: they are dropped (and marked, so another
     // tab's saved copy cannot bring them back), and only the erase itself stays in the queue so the hub is told. Nothing queued
     // is touched when the erase failed, because we returned above.
@@ -27504,9 +27590,11 @@ a.of-nav:active { background: var(--press); }
     // Runs then(who) with the remembered initials (asked once per tablet), then says the result.
     const withWho = (verb, then) => { if (SB.who && SB.who.ask) SB.who.ask(null, verb, then); else then(''); };
     // Tells the cook what happened, in words, and refreshes the recent list.
-    const done = (res, okText) => {
+    // A reading the engine flagged as out of range is saved, but the line says so in the warning color.
+    const done = (res, okText, warnText) => {
       if (res.report !== 'ok') { status.textContent = SB.engine && SB.engine.describe ? (SB.engine.describe(res.report, res.info, SB.store.getState().settings) || 'That was not saved.') : 'That was not saved.'; status.dataset.tone = 'bad'; return; }
-      status.textContent = okText; status.dataset.tone = 'ok'; paintRecent();
+      const warn = res.info && res.info.outOfRange && warnText;
+      status.textContent = warn ? okText + ' ' + warnText : okText; status.dataset.tone = warn ? 'warn' : 'ok'; paintRecent();
     };
     // A text box with the last names as one-tap chips under it.
     function nameField(label, key, placeholder) {
@@ -27549,7 +27637,8 @@ a.of-nav:active { background: var(--press); }
       const res = run('logEquipmentTemp', Object.assign({ unit, f: U.tempStored(eqTemp.getValue()) }, label ? { label } : {}, who ? { who } : {}));
       if (res.report === 'ok') { rec.unit = unit; remember(rec, 'labels', label); save(rec); eqName.paint(); }
       if (res.report === 'ok') eqGate.reset();
-      done(res, 'Logged ' + (label || (UNITS.find((u) => u.id === unit) || {}).label) + ' at ' + U.tempText(U.tempStored(eqTemp.getValue())) + '.');
+      done(res, 'Logged ' + (label || (UNITS.find((u) => u.id === unit) || {}).label) + ' at ' + U.tempText(U.tempStored(eqTemp.getValue())) + '.',
+        res.info && U.isNum(res.info.maxF) ? 'That is above ' + U.tempText(res.info.maxF) + '. Move the food somewhere colder, fix the unit, and check it again.' : '');
     }) }, ico('thermometer', 22), h('span', null, 'Log reading'));
     const eqGate = needsNumber(eqTemp, eqBtn);
     const secEq = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Fridge, freezer or display case' }, h('h3', { class: 'fs-h' }, 'Fridge, freezer or display case'), unitSeg, eqName.el, h('div', { class: 'hc-fld' }, eqTemp), eqBtn);
@@ -27564,7 +27653,8 @@ a.of-nav:active { background: var(--press); }
       const f = U.tempStored(thTemp.getValue());
       const res = run('logThermometerCheck', Object.assign({ f, method }, who ? { who } : {}));
       if (res.report === 'ok') thGate.reset();
-      done(res, 'Thermometer check logged: it read ' + U.tempText(f) + ' in ' + (method === 'ice' ? 'ice water' : method === 'boiling' ? 'boiling water' : 'the test') + '.');
+      done(res, 'Thermometer check logged: it read ' + U.tempText(f) + ' in ' + (method === 'ice' ? 'ice water' : method === 'boiling' ? 'boiling water' : 'the test') + '.',
+        res.info && U.isNum(res.info.expectF) ? 'It should read about ' + U.tempText(res.info.expectF) + '. Adjust the thermometer or replace it before you use it.' + (method === 'boiling' ? ' High up, water boils cooler, so a lower reading there can be fine.' : '') : '');
     }) }, ico('check-circle', 22), h('span', null, 'Log check'));
     const thGate = needsNumber(thTemp, thBtn);
     const secTh = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Food thermometer check' }, h('h3', { class: 'fs-h' }, 'Food thermometer check'), methodSeg, h('div', { class: 'hc-fld' }, thTemp), thBtn);
@@ -37883,8 +37973,8 @@ a.of-nav:active { background: var(--press); }
       case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
       case 'safety_setting_changed': return changeLine(e);
       case 'month_closed': return 'Saved ' + (isNum(e.days) ? e.days + ' ' + (e.days === 1 ? 'day' : 'days') : 'old days') + ' before ' + (e.before ? U.fmtDateShort(e.before) : 'a set date') + ' to a backup and cleared them from this tablet' + (isNum(e.tickets) ? ' (' + e.tickets + ' tickets, ' + (isNum(e.orders) ? e.orders : 0) + ' orders)' : '');
-      case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '');
-      case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '');
+      case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '') + (e.outOfRange && isNum(e.maxF) ? ', above ' + U.tempText(e.maxF) : '');
+      case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '') + (e.outOfRange && isNum(e.expectF) ? ', should read ' + U.tempText(e.expectF) : '');
       case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
       case 'cooling_started': return isNum(e.g) ? U.weightText(e.g) : '';
       case 'sanitize_done': return [lateWords(e), isNum(e.ppm) ? 'strip ' + e.ppm + ' ppm' : '', e.product || '', e.where ? 'at ' + e.where : ''].filter(Boolean).join(', ');
