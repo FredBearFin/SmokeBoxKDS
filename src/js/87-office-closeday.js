@@ -153,7 +153,10 @@
       }
       const blocked = blockedLine(m);
       const status = h('p', { class: 'cd-status', role: 'status' }, blocked);
-      const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', disabled: !!m.open.length }, 'Close the day');
+      const conn = O.connection ? O.connection() : 'solo';
+      const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', disabled: !!m.open.length || conn === 'follower' }, 'Close the day');
+      if (conn === 'follower') status.textContent = 'This screen only shows the shared kitchen. Close the day on the main screen. You can still print today\'s summary.';
+      else if (conn === 'hub') status.textContent = 'Closing the day here closes it for every screen on this kitchen.';
       go.addEventListener('click', () => {
         go.disabled = true;
         let rep = 'error';

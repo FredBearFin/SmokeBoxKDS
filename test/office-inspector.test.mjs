@@ -107,3 +107,11 @@ test('equipment, thermometer, strip and date-mark entries have plain words, and 
   assert.ok(f.includes('First cooling mark reached'), f.join('|'));
   assert.ok(!factsOf(state, { type: 'temp_logged', batchId: 'k2', t: T0 + 60 * MIN }).includes('First cooling mark reached'));
 });
+
+test('a screen name on an entry shows as "at Pass" data; no name means no field', () => {
+  const s0 = E.newState({ now: T0 });
+  let s = E.apply(s0, 'sanitizeDone', { who: 'JM' }, T0 + MIN).state;
+  assert.equal(inspectorRows(s, T0, T0 + 3600e3)[0].screen, '', 'a single device records no screen');
+  s = Object.assign({}, s, { events: s.events.map((e) => (e.type === 'sanitize_done' ? Object.assign({}, e, { screen: '  Pass  ' }) : e)) });
+  assert.equal(inspectorRows(s, T0, T0 + 3600e3)[0].screen, 'Pass');
+});

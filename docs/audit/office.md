@@ -264,3 +264,19 @@ Each new type goes in `SAFETY_EVENT` so the record picks it up unchanged; I will
 **Also this round:** the "Wait before other apps are told" field (it belonged to the removed channel sync) is hidden; the sanitize interval says "our starting value" instead of a code section; the drawer text says "an amount" not "dollars".
 
 **Round 14 follow-up (A5's `night/a5-r15`, d22b27c):** the record now has words for `equip_temp` (unit, label, reading), `thermometer_checked` (reading and method), sanitizer strip `ppm`, product and place on `sanitize_done`, the discard `note`, the reason "Past the date mark", and names the first and final cooling marks from `stage1At` and `finalAt`. The not-covered line now says those entries appear only if someone logged them. Written to the field names A5 sent and not run against their branch; the new row words are not unit tested (the engine here lacks the events). The app has no screen yet to log equipment, thermometer or strip readings, so nothing creates these entries until a floor surface is built (A1/A2). `verifiedBy` is still open: A5 offered to add it to `closeDay`.
+
+## Connected: office and attribution (night/a3-c3, based on kds/connected af5d394)
+
+Checked in a browser against the real hub (`test/office-follower.e2e.mjs`, a follower at `/?follow`).
+
+**On a follower (read-only, memory-only) screen:**
+- **Works as on a single device:** all six chart pages (Speed, Tickets, Stations, Sales and money, Safety, Stock and 86) read the hub's copy; Print the safety record; Close the day's sheet opens so the day can be read and printed.
+- **Backup and spreadsheet files are allowed:** Download backup, Copy backup, and the sales and other CSV files read the follower's in-memory copy of the hub's kitchen (about 16 KB with the starter kitchen). They write nothing. Reason: reading is harmless and a copy from the owner's phone is useful.
+- **Shut, with a banner at the top of the Data page:** every edit control (dishes, prices, times, limits, PIN, look), the restore controls (choose file, paste, replace) and both erase buttons, plus "Close the day" itself (the sheet says "Close the day on the main screen"). Reason: the screen cannot write ("This screen only shows the kitchen"), so a control that looks usable would only refuse; controls built after the first paint are shut too (a mutation observer).
+- **Not yet handled:** the pilot report's sound numbers on a follower read zero because warnings are saved on the main screen. That text lives in `35-pilot.js`, which this branch has in its older form; the note is in the round 16 branch's follow-up (add `follower` to the report options once the two branches meet).
+
+**On a hub-connected tablet (writes to the shared kitchen):** the Data page says "This tablet is connected to the shared kitchen... Restoring or erasing here would erase it for every screen, so those are done on the main computer." Restore (choose file, paste, replace) and both erase buttons are shut; edits and backup stay; Close the day says it closes the day for every screen. The check is `SB.office.connection()`, which returns 'follower', 'hub' or 'solo' from `SB.store.isFollower()` and `SB.store.isHub()` (the second does not exist yet, so a hub tablet reads as solo until A5 adds it). The hub tablet was tested with a stand-in.
+
+**Attribution:** when an event or ticket carries `screen` (string, trimmed to 24), the safety record shows "at Pass" under "Logged by" and the Tickets drawer says "Entered by Pass". With no name nothing shows. `who` is not reused: it is already the person's initials on safety entries.
+
+**Not checked:** the real hub with stage 2 writes, the field name A5 will actually use, the 390-wide look of the Data page banner, and a real device.

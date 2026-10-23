@@ -248,6 +248,10 @@
       // Draws the panel. If the ticket has left the data it says so instead.
       render(body) {
         const ds = ctx.dataset(), gt = M.ticketGantt(ds, row.ticketId);
+        // A shared kitchen records which screen entered the ticket; a single device records none, so nothing shows.
+        const tk = ((SB.store && SB.store.getState && SB.store.getState().tickets) || []).find((t) => t && t.id === row.ticketId);
+        const scr = O.screenName ? O.screenName(tk) : '';
+        if (scr) body.appendChild(h('p', { class: 'of-look' }, 'Entered by ' + scr + '.'));
         if (!gt || !gt.rows.length) { body.appendChild(K.empty({ title: 'This ticket is no longer in the data', body: 'It may have been cleared since the table was drawn. Close this panel and pick another ticket.' }).el); return null; }
         body.appendChild(h('p', { class: 'of-look' }, h('span', { class: 'of-look-l' }, 'What to look for: '), 'Each row is one item against the ticket clock. The gray bar is the paced hold, then waiting for a cook, then hands-on work. The last row is finished food waiting at expo.'));
         const host = h('div', { class: 'of-chart' }); body.appendChild(host);
