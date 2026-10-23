@@ -1324,6 +1324,95 @@
     return sheet;
   }
 
+  /* ---------- Show this kitchen on another screen ---------- */
+
+  // Checks a hub address typed by the owner; returns {ok, url} with a clean address, or {ok:false, why} in plain words.
+  function checkHubAddress(raw) {
+    let s = String(raw || '').trim();
+    if (!s) return { ok: false, why: 'Type the address of the kitchen you want to show.' };
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) s = (/^(localhost|\d{1,3}(\.\d{1,3}){3})(:|\/|$)/i.test(s) ? 'http://' : 'https://') + s;
+    let u;
+    try { u = new URL(s); } catch (e) { return { ok: false, why: 'That does not look like an address. It should look like https://kitchen.example.com' }; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, why: 'The address must start with http:// or https://' };
+    if (!u.hostname || (u.hostname.indexOf('.') < 0 && u.hostname !== 'localhost')) return { ok: false, why: 'That address is missing its ending, like .com. Check it and try again.' };
+    return { ok: true, url: u.origin + (u.pathname.replace(/\/+$/, '')) };
+  }
+  // Checks the pairing code; empty is allowed (not every hub asks). Returns {ok, code} or {ok:false, why}.
+  function checkHubCode(raw) {
+    const c = String(raw || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (!c) return { ok: true, code: '' };
+    if (!/^[A-Z0-9]{4,12}$/.test(c)) return { ok: false, why: 'The access code is letters and numbers only. Check it with whoever runs the hub.' };
+    return { ok: true, code: c };
+  }
+  // The address of this page without any follow settings, so a button can come back to the own kitchen.
+  function ownPageUrl() { const l = g.location; return l.origin && l.origin !== 'null' ? l.origin + l.pathname : l.protocol + '//' + l.pathname; }
+  // True when this page was opened to follow another kitchen.
+  function isFollowing() { try { if (SB.store.isFollower) return !!SB.store.isFollower(); if (SB.followMode) return !!SB.followMode(); return /[?&]follow(=|&|$)/.test(g.location.search); } catch (e) { return false; } }
+  // Leaves the follower view and reopens this device's own saved kitchen (a plain reload without the follow setting).
+  function leaveFollow() { try { g.location.assign(ownPageUrl()); } catch (e) { /* the page stays as it is */ } }
+  // Plain words for a follower status from the store, or a generic line when the store has none.
+  function followWords(st) {
+    if (!st) return { tone: undefined, text: 'Not connected to another kitchen.' };
+    const when = st.lastUpdate ? ' Last update ' + new Date(st.lastUpdate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' : '';
+    if (st.state === 'following') return { tone: 'ok', text: 'Showing the other kitchen live.' + when };
+    if (st.state === 'connecting') return { tone: undefined, text: 'Connecting...' };
+    if (st.state === 'reconnecting' || st.state === 'stale') return { tone: 'bad', text: 'Lost the connection. This screen may be out of date. Trying again.' + when };
+    if (st.state === 'error') {
+      const why = { badCode: 'The access code was not accepted. Check it with whoever runs the hub.', notFound: 'Nothing at that address is a Smokebox hub. Check the address.', unreachable: 'Could not reach that address yet. Check the Wi-Fi and the address. It keeps trying.', wrongVersion: 'This page and the hub are different versions. Reload this page, or ask whoever runs the hub to update it.', tooMany: 'The hub already has as many screens as it allows.' }[st.error];
+      return { tone: 'bad', text: why || 'Could not connect.' };
+    }
+    return { tone: undefined, text: 'Not connected to another kitchen.' };
+  }
+  // Opens "Show this kitchen on another screen": what it is, what is not set up, and the form for the other screen.
+  function openFollow() {
+    const sheet = SB.ui.sheet({ title: 'Show this kitchen on another screen', side: 'right', width: 'min(720px, 96vw)', name: 'follow' });
+    const root = h('div', { class: 'dp fw' });
+    if (SB.store.isDemo && SB.store.isDemo()) {
+      root.append(h('p', { class: 'fs-sub' }, 'This is not available in the demo. Go back to your own kitchen first.'));
+      sheet.body.appendChild(root); return sheet;
+    }
+    const status = h('p', { class: 'fs-sub fw-status', role: 'status' });
+    // Reads the store's follow status (if this build has one) and writes it in plain words.
+    function paintStatus() {
+      const raw = SB.store.followStatus ? SB.store.followStatus() : null;
+      const w = isFollowing() ? followWords(raw || { state: 'connecting' }) : { tone: undefined, text: 'Not connected to another kitchen.' };
+      tell(status, w.text, w.tone);
+    }
+    const here = ownPageUrl();
+    const web = /^https?:/.test(here);
+    const mainCard = h('section', { class: 'fs-card fw-main', dataset: { part: 'main' } },
+      h('h3', { class: 'fs-h' }, 'On this tablet'),
+      h('p', null, 'A second screen, like a TV above the pass or a phone, can show what this kitchen board shows. It only shows. It cannot take or change orders.'),
+      h('p', null, h('strong', null, 'What it needs: '), 'a small program called the hub that keeps the kitchen in one place and sends it to every screen. The hub is not set up in this version. Smokebox does not start one for you. It works only if someone runs the hub for your kitchen, on a laptop or on a server.'),
+      web ? h('p', null, 'If your hub serves this page, type this address on the other screen: ', h('code', { class: 'fw-addr', dataset: { role: 'own-address' } }, here)) : h('p', { class: 'fs-sub', dataset: { role: 'file-note' } }, 'This copy of Smokebox is a file on this tablet, so another screen cannot reach it. Use the address of your hub instead.'),
+      h('p', { class: 'fs-sub' }, 'If the hub has an access code, type that code on the other screen too. Your kitchen is not sent anywhere by this page.'));
+    const url = h('input', { type: 'text', class: 'input', id: 'fw-url', inputmode: 'url', autocomplete: 'off', autocapitalize: 'off', placeholder: 'https://kitchen.example.com', 'aria-label': 'Address of the kitchen', dataset: { field: 'url' } });
+    const code = h('input', { type: 'text', class: 'input', id: 'fw-code', autocomplete: 'off', autocapitalize: 'characters', maxlength: 12, placeholder: 'ABC123 (if asked)', 'aria-label': 'Access code, if the hub asks for one', dataset: { field: 'code' } });
+    const msg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'msg' } });
+    // Checks both fields; if they are fine, reopens this page set to follow that kitchen (this device's own saved kitchen is not touched).
+    const connect = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'follow-connect' }, onClick: () => {
+      const a = checkHubAddress(url.value); if (!a.ok) { tell(msg, a.why, 'bad'); url.focus(); return; }
+      const c = checkHubCode(code.value); if (!c.ok) { tell(msg, c.why, 'bad'); code.focus(); return; }
+      const target = here + '?follow=' + encodeURIComponent(a.url) + (c.code ? '&code=' + encodeURIComponent(c.code) : '');
+      tell(msg, 'Connecting to ' + a.url + '...');
+      if (g.__followNoNav) { g.__followTarget = target; return; }
+      try { g.location.assign(target); } catch (e) { tell(msg, 'This browser would not open it.', 'bad'); }
+    } }, 'Connect');
+    const disconnect = h('button', { type: 'button', class: 'btn', dataset: { act: 'follow-disconnect' }, onClick: leaveFollow }, 'Disconnect');
+    const back = h('button', { type: 'button', class: 'btn', dataset: { act: 'follow-back' }, onClick: leaveFollow }, 'Back to my own kitchen');
+    const otherCard = h('section', { class: 'fs-card fw-other', dataset: { part: 'other' } },
+      h('h3', { class: 'fs-h' }, 'On the other screen: Show another kitchen here'),
+      h('p', { class: 'fs-sub' }, 'Open Smokebox on the other screen, then Settings, then this page. Type the address, tap Connect. The screen then follows that kitchen and has no controls. Your own saved kitchen on that screen is not touched.'),
+      h('label', { class: 'fs-label', for: 'fw-url' }, 'Address of the kitchen'), url,
+      h('label', { class: 'fs-label', for: 'fw-code' }, 'Access code (only if the hub asks)'), code,
+      h('div', { class: 'fs-row' }, connect, isFollowing() ? disconnect : null, isFollowing() ? back : null), msg);
+    root.append(mainCard, otherCard, h('section', { class: 'fs-card', dataset: { part: 'status' } }, h('h3', { class: 'fs-h' }, 'Status'), status));
+    paintStatus();
+    const timer = setInterval(() => { if (!doc.body.contains(root)) clearInterval(timer); else paintStatus(); }, 2000);
+    sheet.body.appendChild(root); keepInView(root);
+    return sheet;
+  }
+
   /* ---------- Pilot visit checklist ---------- */
 
   // The visit steps, in order: what to do, where in the app, and minutes allowed. Kept as plain data so the printed card and the doc match.
@@ -1438,6 +1527,7 @@
   SB.sheets.register('dishes', openDishes);
   SB.sheets.register('shop', openShop);
   SB.sheets.register('ready', openReady);
+  SB.sheets.register('follow', openFollow);
   SB.sheets.register('pilot', openPilot);
   SB.sheets.register('serve', openServe);
   SB.sheets.register('startover', openStartOver);
@@ -1445,5 +1535,5 @@
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { showRecoveryCode, leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { leaveFollow, checkHubAddress, checkHubCode, showRecoveryCode, leftoversCard, tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
