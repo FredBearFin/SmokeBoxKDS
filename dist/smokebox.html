@@ -1287,6 +1287,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .pin-forgot { margin-top: var(--sp-3); font-size: var(--fs-2); color: var(--ink2); }
 .pin-forgot summary { cursor: pointer; font-weight: var(--w-semi); min-height: var(--tap); display: flex; align-items: center; }
 .pin-forgot p { margin: var(--sp-2) 0; }
+/* On a 4K screen the reminder bar grows with the board, so the demo or backup notice is readable from across the room. */
+@media (min-width: 3000px) { .sb-banner { min-height: 64px; font-size: 28px; } .sb-banner .btn { min-height: 52px; font-size: 24px; } }
 
 /* ===== 20-floor.css ===== */
 /*
@@ -1346,6 +1348,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .fl[data-far="on"] .fl-slip[data-level="breach"] { outline: calc(6px * var(--fl-k)) solid var(--crimson); outline-offset: -3px; }
 @media (min-width: 1700px) { .fl { --fl-k: 1.2; } }
 @media (min-width: 2200px) { .fl { --fl-k: 1.5; } }
+/* A 4K screen (3840 px wide, a 55 inch TV or bigger) draws the board at twice the size, so it reads from across the room. */
+@media (min-width: 3000px) { .fl { --fl-k: 2; } }
 
 /* Quiet board: a ticket that is on time carries no badge, so only late and warning tickets speak. */
 .fl-badge[data-level="ok"] { display: none; }
@@ -1965,10 +1969,10 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 }
 .fl-slip[data-tier="1"], .fl-slip[data-tier="2"] { padding-top: calc(24px * var(--fl-k)); }
 .fl-slip[data-tier="1"]::before { content: "Do this first"; }
-.fl-slip[data-tier="2"]::before { content: "Next"; background: var(--ink); color: var(--bg); }
+.fl-slip[data-tier="2"]::before { content: "Next"; background: var(--slip-ink); color: var(--slip); }
 .fl-slip[data-tier="2"][data-level="breach"] .slip-head, .fl-slip[data-tier="2"][data-level="breach"] .slip-body, .fl-slip[data-tier="2"][data-level="breach"] .slip-tear,
 .fl-slip[data-tier="3"][data-level="breach"] .slip-head, .fl-slip[data-tier="3"][data-level="breach"] .slip-body, .fl-slip[data-tier="3"][data-level="breach"] .slip-tear { animation: none; }
-.fl-slip[data-tier="3"][data-level="breach"] .slip-head { background: transparent; }
+.fl-slip[data-tier="3"][data-level="breach"] .slip-head { background: var(--slip); }
 .fl-slip[data-tier="3"][data-level="breach"] .slip-head, .fl-slip[data-tier="3"][data-level="breach"] .slip-body, .fl-slip[data-tier="3"][data-level="breach"] .slip-tear { box-shadow: none; }
 /* Parts that belong to the cook-ahead module (Cabinet tab, Hold button, sanitize chip) disappear fully when it is off. */
 .fl-seg .seg-opt[hidden], .fl-tool[hidden], .fl-chip[hidden] { display: none !important; }
@@ -2016,6 +2020,18 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl[data-far="on"] .fl-sub .chip { min-height: calc(28px * var(--fl-k)); font-size: var(--fs-2); }
 .fl[data-far="on"] .slip-next { font-size: var(--fs-3); }
 .fl-fire { min-height: calc(44px * var(--fl-k)); }
+/* Far display: the sound and pause notes grow too, so they read from across the room. */
+.fl[data-far="on"] .fl-strip-sound { font-size: calc(15px * var(--fl-k) * 1.4); min-height: calc(34px * var(--fl-k) * 1.4); }
+.fl[data-far="on"] .fl-strip-pause { font-size: calc(13px * var(--fl-k) * 1.4); }
+/* Far display, 10 feet test: dish names and the strip's name and explanation are bigger still, so the answer to "which batch,
+   what happens, what do I do" can be read from the doorway. Fewer tickets fit, which is the point of this mode. */
+.fl[data-far="on"] .fl-row .slip-name { font-size: calc(var(--fs-item) * 1.15 * 1.3); }
+.fl[data-far="on"] .slip-next { font-size: calc(var(--fs-3) * 1.2); }
+.fl[data-far="on"] .fl-strip-what { font-size: calc(19px * var(--fl-k) * var(--fl-far) * 1.25); }
+.fl[data-far="on"] .fl-strip-why { font-size: calc(14px * var(--fl-k) * var(--fl-far) * 1.25); }
+/* Touch size: the sound and pause bars and their clear (x) buttons are at least 44 px high. */
+.fl-strip-sound, .fl-strip-pause { min-height: max(44px, var(--tap)); }
+.fl-strip-x { min-height: max(44px, var(--tap)); min-width: max(44px, var(--tap)); }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -20127,7 +20143,8 @@ a.of-nav:active { background: var(--press); }
     const batchy = (d) => !ck && (d.batchId || d.kind === 'sanitize' || d.kind === 'check' || d.kind === 'shortfall' || d.kind === 'leftover' || d.kind === 'keepcheck' || d.kind === 'expiry' || d.kind === 'expired' || d.kind === 'past');
     const feed = all.filter((d) => !d.trivial && !batchy(d) && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
     // A tablet screen is short: one warning row there (the next shows when this one is cleared or done), two on a tall or far screen.
-    const maxRows = !F.wallActive() && (far || (g.innerHeight || 0) >= 900) ? 2 : 1;
+    // A far display below 1300 px tall keeps one big row, so the tickets keep most of the screen; a taller one has room for two.
+    const maxRows = !F.wallActive() && (far ? (g.innerHeight || 0) >= 1300 : (g.innerHeight || 0) >= 900) ? 2 : 1;
     const top = feed.slice(0, maxRows);
     const moreRows = feed.length - top.length;
     const needSound = sound && !audioReady();
@@ -20390,7 +20407,7 @@ a.of-nav:active { background: var(--press); }
   async function startEmpty() {
     const ok = await SB.ui.confirm({
       title: 'Start with an empty board?', confirmLabel: 'Clear the board', cancelLabel: 'Keep the tickets',
-      body: ['This removes the practice tickets and anything else logged on this device. Settings stay.'],
+      body: ['This removes the demo tickets and anything else logged on this device. Settings stay.'],
     });
     if (!ok || !m) return;
     try { if (SB.sim && SB.sim.live) SB.sim.live.stop(); } catch (e) { /* the simulator may not be running */ }
@@ -20412,7 +20429,7 @@ a.of-nav:active { background: var(--press); }
     const title = firstRun ? 'Welcome. Let\'s build your menu.' : stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
     const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
-      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or run the busy-night demo. Demo orders are for practice.';
+      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
     const sig = title + '|' + text;
     if (e.dataset.sig === sig) return;
     e.dataset.sig = sig;
@@ -20437,7 +20454,7 @@ a.of-nav:active { background: var(--press); }
 
   // Starts the demo orders and crew when the simulator is loaded; otherwise opens the demo sheet.
   function startDemo() {
-    // In a real kitchen the button opens the practice kitchen in its own space; only inside the demo does it start the crew.
+    // In a real kitchen the button opens the demo kitchen in its own space; only inside the demo does it start the crew.
     if (SB.setup && SB.setup.tryDemo && store().isDemo && !store().isDemo()) { SB.setup.tryDemo(); return; }
     // A real kitchen never turns into the demo: the demo is a separate mode (own saved data), entered with a reload.
     if (store().isolated && store().isolated() && !store().isDemo()) { store().enterDemo(); return; }
@@ -20448,7 +20465,7 @@ a.of-nav:active { background: var(--press); }
       try {
         live.start({ rate: 'normal' });
         if (typeof live.crew === 'function') live.crew(true);
-        toast('Busy-night demo started. Orders and the crew are for practice. Open Demo to stop it.', { tone: 'info' });
+        toast('Demo started. The orders and the crew are not real. Open Demo to stop it.', { tone: 'info' });
         return;
       } catch (e) { console.error('[smokebox] demo failed to start', e); }
     }
@@ -21950,7 +21967,7 @@ a.of-nav:active { background: var(--press); }
   function safetyNote(extra) {
     return h('div', { class: 'fs-note fs-safety' }, ico('shield-check', 20), h('div', null, extra ? h('p', null, extra) : null, h('p', null, C.safetyLine)));
   }
-  function simPill() { return h('span', { class: 'fs-sim' }, ico('info', 16), h('span', null, 'Practice only: no live POS connected')); }
+  function simPill() { return h('span', { class: 'fs-sim' }, ico('info', 16), h('span', null, 'Demo only: no live POS connected')); }
 
   // Keep `parent`'s children in the order of `items`. New keys are created
   // with make(item); existing nodes are never replaced and only
@@ -22258,7 +22275,7 @@ a.of-nav:active { background: var(--press); }
       const unsnoozeT = h('span', null, 'Cancel reminder');
       const bUnsnooze = h('button', { type: 'button', class: 'btn', dataset: { act: 'unsnooze' }, hidden: true }, ico('x', 20), unsnoozeT);
       // One main action per card; every other action sits behind the "..." button so all cards look the same.
-      const bMore = h('button', { type: 'button', class: 'btn btn-icon hc-more', 'aria-label': 'More for this batch', title: 'More', hidden: true }, ico('more', 22));
+      const bMore = h('button', { type: 'button', class: 'btn btn-icon hc-more', dataset: { act: 'more' }, 'aria-label': 'More for this batch', title: 'More', hidden: true }, ico('more', 22));
       const actions = h('div', { class: 'hc-actions' }, bKeep, bUnkeep, bSnooze, bUnsnooze, bPull, bLog, bReheat, bCool, bDiscard, bMore);
       const editorSlot = h('div', { class: 'hc-editor-slot' });
       // Card layout: heading, ring and facts, message and lock note, cooling steps, then the buttons.
@@ -22324,7 +22341,7 @@ a.of-nav:active { background: var(--press); }
       text(rec.name, b.label || 'Batch');
       attr(rec.el, 'aria-label', (b.label || 'Batch') + ': ' + sv.word);
       if (rec.kindKey !== b.kind) { rec.kindKey = b.kind; U.clear(rec.kindEl); rec.kindEl.append(ico(KIND_ICON[b.kind] || 'flame', 18), h('span', null, KIND_WORD[b.kind] || 'Hold')); }
-      const srcWord = b.src === 'sample' ? 'Practice batch' : ''; // starter stock is named once in the summary line, not on every card
+      const srcWord = b.src === 'sample' ? 'Demo batch' : ''; // starter stock is named once in the summary line, not on every card
       setHidden(rec.srcChip, !srcWord); if (srcWord) { text(rec.srcChip, srcWord); attr(rec.srcChip, 'data-tone', 'info'); }
       setState(rec.status, sv.tone, sv.icon, sv.word);
       attr(rec.el, 'data-tone', sv.tone); attr(rec.el, 'data-status', gt.status);
@@ -22605,7 +22622,7 @@ a.of-nav:active { background: var(--press); }
         // Sends the ticked batches to the engine with the chosen length and the initials, then reports what was kept.
         onConfirm: (sh) => {
           const ids = past.filter((x) => picks.get(x.id).checked).map((x) => x.id);
-          if (!ids.length) { err.textContent = 'Tick at least one batch. A batch needs a fresh temperature reading first.'; err.hidden = false; return; }
+          if (!ids.length) { err.textContent = 'Select at least one batch. A batch needs a fresh temperature reading first.'; err.hidden = false; return; }
           const payload = { batchIds: ids, who: wf.get() };
           const mode = dur.getValue();
           if (mode === 'until') {
@@ -22878,7 +22895,7 @@ a.of-nav:active { background: var(--press); }
     const footer = h('div', { class: 'hc-foot' }, err, addBtn);
 
     // With no cooked-ahead item yet the Product list is empty, so say so and offer the way to add one.
-    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cooked-ahead items yet. Add the food you cook ahead, like brisket, and then log a batch of it here.'),
+    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cooked-ahead items yet. Add the food you cook ahead, like pulled pork or chili, and then log a batch of it here.'),
       // Opens the Cooked-ahead food sheet where the first item is added.
       h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add a cooked-ahead item'))));
     // With nothing to log yet, only the explanation and the Add button show; the weight steppers wait for a product.
@@ -23041,7 +23058,7 @@ a.of-nav:active { background: var(--press); }
     const syncSec = () => (st().settings && st().settings.syncTargetSec) || C.syncTargetSec;
     // Folded away by default and kept below the menu and stock, so the real controls come first.
     const syncBox = h('details', { class: 'fs-section bd-sync', 'aria-label': 'Channel sync' },
-      h('summary', { class: 'fs-row', style: 'cursor:pointer' }, h('h3', { class: 'fs-h grow' }, 'Channel sync (practice only)'), simPill()),
+      h('summary', { class: 'fs-row', style: 'cursor:pointer' }, h('h3', { class: 'fs-h grow' }, 'Channel sync (demo only)'), simPill()),
       syncGrid,
       h('p', { class: 'fs-sub bd-sync-note' }, 'There is no live POS or delivery app connected. These four chips show how a real 86 would reach each channel. Changes catch up within ' + syncSec() + ' seconds.'));
 
@@ -23114,7 +23131,7 @@ a.of-nav:active { background: var(--press); }
         return 'Marked 86 by hand' + (m && U.isNum(m.since) ? ', ' + agoText(now - m.since) : '') + '.';
       }
       const ing = ingOf(a.ing);
-      if (a.reason === 'safety') return ingName(a.ing) + ' is locked for safety. Reheat or discard the batch in the hold cabinet. It comes back on when a batch that is in range is in.';
+      if (a.reason === 'safety') return ingName(a.ing) + ' is held back. Reheat or throw out the batch in the Hold cabinet. It comes back when a batch that is in range is in.';
       if (a.reason === 'quality') {
         // A channel update still waiting out its hold can be cancelled by keeping the batch serving.
         const held = (st().syncs || []).filter((sy) => sy.menuId === mi.id && sy.kind === '86' && U.isNum(sy.holdUntil) && sy.holdUntil > now)[0];
@@ -23162,7 +23179,7 @@ a.of-nav:active { background: var(--press); }
       const res = run('toggle86', { menuId: mi.id, on });
       if (res.report !== 'ok') { toast(say(res), 'warn'); return; }
       const a = SB.store.select.availability(mi.id), nm = mi.short || mi.name;
-      if (on) undoToast(nm + ' is 86. The sync strip shows the practice channels catching up.', 'ok');
+      if (on) undoToast(nm + ' is 86. The sync strip shows the demo channels catching up.', 'ok');
       else if (a && a.ok) undoToast(nm + ' is back on.', 'ok');
       else toast('Manual 86 removed, but ' + nm + ' is still ' + stateOf86(a).word.toLowerCase() + '. ' + whyLine(a, mi, nowMs()), 'warn');
       update(nowMs());
@@ -23459,7 +23476,7 @@ a.of-nav:active { background: var(--press); }
   const simLive = () => (SB.sim && SB.sim.live ? SB.sim.live : null);
   // What the simulator says it is doing (running, rate, crew), or an empty answer if it cannot say.
   const simStatus = () => { const l = simLive(); try { return l && typeof l.status === 'function' ? l.status() || {} : {}; } catch (e) { return {}; } };
-  const simDo = (what, fn) => { try { return fn(); } catch (e) { console.error('[smokebox] practice mode ' + what + ' failed', e); toast('The practice mode had a problem (' + what + '). Try again. If it keeps happening, reload the page.', 'bad'); return undefined; } };
+  const simDo = (what, fn) => { try { return fn(); } catch (e) { console.error('[smokebox] demo ' + what + ' failed', e); toast('The demo had a problem (' + what + '). Try again. If it keeps happening, reload the page.', 'bad'); return undefined; } };
   // The kitchen clock speed (1 is real time).
   const speedNow = () => (SB.store.speed ? SB.store.speed() : 1);
 
@@ -23522,12 +23539,12 @@ a.of-nav:active { background: var(--press); }
         toast((typeof n === 'number' ? n : 12) + ' demo tickets sent to the board.', 'ok'); paint();
       } }, ico('zap', 22), h('span', null, 'Add 12-ticket rush'));
       simBox.append(
-        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Automatic orders'), h('p', { class: 'fs-sub' }, 'Practice tickets arrive on the kitchen clock, so a faster clock means faster orders. They are labeled Demo.'), ordersSeg),
-        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A practice cook who works while automatic orders run. Turn it off to practice by hand.'), crewTog),
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Automatic orders'), h('p', { class: 'fs-sub' }, 'Demo tickets arrive on the kitchen clock, so a faster clock means faster orders. They are labeled Demo.'), ordersSeg),
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A demo cook who works while automatic orders run. Turn it off to practice by hand.'), crewTog),
         h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Rush'), h('p', { class: 'fs-sub' }, 'Twelve tickets at once, like a lunch rush.'), burstBtn));
     } else {
       simBox.append(h('div', { class: 'fs-note', 'data-tone': 'warn', role: 'status' }, ico('alert', 20),
-        h('div', null, h('strong', null, 'Practice mode not loaded.'), h('p', null, 'Automatic orders, the auto crew, the 12-ticket rush and practice history come from a part of Smokebox that is not in this copy. The clock speed and Reset live data below still work.'))));
+        h('div', null, h('strong', null, 'The demo is not loaded.'), h('p', null, 'Automatic orders, the auto crew, the 12-ticket rush and sample history come from a part of Smokebox that is not in this copy. The clock speed and Reset live data below still work.'))));
     }
 
     // clock
@@ -23535,19 +23552,19 @@ a.of-nav:active { background: var(--press); }
     const clockBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Clock speed (demo only)'), h('p', { class: 'fs-sub' }, 'Speeds up the whole kitchen so you can watch a busy night in a minute. It shows only while the demo is loaded. Never use it in real service.'), clockCtl.el);
     clockCtl.wrap = clockBox; setHidden(clockBox, !demoOn());
 
-    // practice history
+    // sample history
     const sampleBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Data counts'));
     const countsDl = h('dl', { class: 'fs-dl dm-counts' });
     const dLive = h('dd', { class: 'num' }), dDemo = h('dd', { class: 'num' }), dSample = h('dd', { class: 'num' });
-    countsDl.append(h('dt', null, 'Live tickets on this device'), dLive, h('dt', null, 'Demo tickets on this device'), dDemo, h('dt', null, 'Practice history'), dSample);
+    countsDl.append(h('dt', null, 'Live tickets on this device'), dLive, h('dt', null, 'Demo tickets on this device'), dDemo, h('dt', null, 'Sample history'), dSample);
     sampleBox.append(countsDl);
     const sim = SB.sim;
     if (sim && typeof sim.setSampleEnabled === 'function' && typeof sim.sampleEnabled === 'function') {
-      // Whether the back office includes the made-up practice history.
-      sampleTog = SB.ui.toggle({ label: 'Include practice history in the back office', checked: !!sim.sampleEnabled(), onChange: (on) => { simDo('practice history', () => sim.setSampleEnabled(on)); paintCounts(); } });
+      // Whether the back office includes the made-up sample history.
+      sampleTog = SB.ui.toggle({ label: 'Include sample history in the back office', checked: !!sim.sampleEnabled(), onChange: (on) => { simDo('sample history', () => sim.setSampleEnabled(on)); paintCounts(); } });
       sampleBox.append(sampleTog);
     }
-    sampleInfoBox = h('p', { class: 'fs-sub dm-sample-note' }, 'Practice history is made by the app, not recorded in your kitchen. It is clearly labeled wherever it appears.');
+    sampleInfoBox = h('p', { class: 'fs-sub dm-sample-note' }, 'Sample history is made by the app, not recorded in your kitchen. It is clearly labeled wherever it appears.');
     sampleBox.append(sampleInfoBox);
 
     // Reset live data asks first (see doReset).
@@ -23558,10 +23575,10 @@ a.of-nav:active { background: var(--press); }
     const restartBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg dm-restart', onClick: () => doRestart() }, ico('refresh', 22), h('span', null, 'Restart demo'));
     const tourBtn = h('button', { type: 'button', class: 'btn btn-lg', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', null, 'Show me how it works'));
     const startBox = h('section', { class: 'fs-section dm-start' }, h('h3', { class: 'fs-h' }, 'Load the demo'),
-      h('p', { class: 'fs-sub' }, 'For practice only. Loads practice food in the cabinet and three practice tickets, and erases what is on this device now. Nothing runs by itself: you tap START and DONE, and the timers show when each dish should begin.'),
+      h('p', { class: 'fs-sub' }, 'Demo only. Loads demo food in the cabinet and three demo tickets, and erases what is on this device now. Nothing runs by itself: you tap Start and Done, and the timers show when each dish should begin.'),
       h('div', { class: 'fs-row' }, restartBtn, tourBtn));
 
-    sheet.body.append(h('div', { class: 'dm' }, h('div', { class: 'fs-note', 'data-tone': 'warn' }, ico('alert', 20), h('div', null, h('strong', null, 'Everything here is for practice.'), h('p', null, 'Demo orders, the auto crew and the 14-day practice history are made by the app for practice. They are not your sales and not your food. Use Reset live data below to go back to real service.'))), statusBox, startBox, simBox, clockBox, sampleBox, resetBox));
+    sheet.body.append(h('div', { class: 'dm' }, h('div', { class: 'fs-note', 'data-tone': 'warn' }, ico('alert', 20), h('div', null, h('strong', null, 'Everything here is for the demo and is not real.'), h('p', null, 'Demo orders, the auto crew and the 14-day sample history are made by the app. They are not your sales and not your food. Use Reset live data below to go back to real service.'))), statusBox, startBox, simBox, clockBox, sampleBox, resetBox));
 
     // Clears the board after a confirm and puts the fresh demo tickets back. Settings stay.
     async function doRestart() {
@@ -23570,7 +23587,7 @@ a.of-nav:active { background: var(--press); }
       const own = s.catalog === 'own' && (s.menu.length > 0 || s.orders.length > 0 || s.tickets.length > 0);
       const ok = await SB.ui.confirm({
         title: 'Restart the demo?', confirmLabel: own ? 'Erase my dishes and restart' : 'Restart demo', cancelLabel: 'Keep everything', tone: real || own ? 'danger' : undefined,
-        body: [(own ? 'This erases YOUR dishes, prices and orders and loads the sample barbecue menu in their place. ' : '') + 'This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (real ? ' (' + real + ' not from the demo)' : '') + ' and everything logged on this device, then puts three fresh practice tickets on the board. Settings stay.'],
+        body: [(own ? 'This erases your dishes, prices and orders and loads the sample barbecue menu in their place. ' : '') + 'This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (real ? ' (' + real + ' not from the demo)' : '') + ' and everything logged on this device, then puts three fresh demo tickets on the board. Settings stay.'],
       });
       if (!ok) return;
       if (SB.tour && SB.tour.running && SB.tour.running() && SB.tour.stop) SB.tour.stop();
@@ -23581,12 +23598,12 @@ a.of-nav:active { background: var(--press); }
       closeThen(sheet, () => { if (SB.router && SB.router.go) SB.router.go({ kind: 'floor', zone: 'all' }); });
     }
 
-    // Clears tickets, batches and events on this device after a confirm. Settings and practice history stay.
+    // Clears tickets, batches and events on this device after a confirm. Settings and sample history stay.
     async function doReset() {
       const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length;
       const ok = await SB.ui.confirm({
         title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep everything',
-        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and practice history stay. This cannot be undone.'],
+        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
@@ -23599,7 +23616,7 @@ a.of-nav:active { background: var(--press); }
     function paintStatus() {
       const sp = speedNow(), s = simStatus();
       let tone = 'info', icon = 'info', words;
-      if (!live) { tone = 'warn'; icon = 'alert'; words = 'Practice mode is not loaded, so there are no automatic orders.'; }
+      if (!live) { tone = 'warn'; icon = 'alert'; words = 'The demo is not loaded, so there are no automatic orders.'; }
       else if (s.running) { tone = 'ok'; icon = 'play'; words = 'Demo running: ' + (RATE_WORD[s.rate] || 'orders') + '. ' + (U.isNum(s.sent) ? s.sent + ' sent, ' + (s.completed || 0) + ' finished.' : '') + (s.crew ? ' Auto crew on.' : ' Auto crew off.'); }
       else { words = 'Demo is off. The board shows only real tickets' + (st().tickets.some((t) => t.src === 'demo') ? ' and the demo tickets already on it.' : '.'); }
       if (sp !== 1) words += ' Clock x' + (Math.round(sp * 100) / 100) + '.';
@@ -23691,7 +23708,7 @@ a.of-nav:active { background: var(--press); }
         helpItem('history', 'Recall', 'Brings a bumped ticket back. Open Recall, find the ticket and tap Recall.'),
         helpItem('list', 'The all-day bar', 'Counts what is still to make across every ticket. Tap an item to highlight it on the board.'),
         helpItem('thermometer', 'Hold cabinet', 'Log a temperature when food goes in and at every check. Smokebox warns before a batch runs out of time and locks one that has.'),
-        helpItem('ban', '86 board', 'Marks an item sold out. It also goes 86 by itself when stock runs low or a batch is locked for safety.'),
+        helpItem('ban', '86 board', 'Marks an item sold out. It also goes 86 by itself when stock runs low or a batch is held back.'),
       ]));
   }
 
@@ -23721,7 +23738,7 @@ a.of-nav:active { background: var(--press); }
       h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Availability'),
         h('ul', { class: 'hp-words' },
           wordRow(stateEl('bad', 'ban', '86 sold out'), 'An ingredient has run down to its 86 level.'),
-          wordRow(stateEl('bad', 'ban', '86 safety hold'), 'The only batch is locked for safety: too old, too cold or too warm.'),
+          wordRow(stateEl('bad', 'ban', '86 safety hold'), 'The only batch is held back: too old, too cold or too warm.'),
           wordRow(stateEl('bad', 'ban', '86 past quality limit'), 'The only batch is past its quality limit and waits until someone tastes it. Keep it serving or throw it out in the hold cabinet.'),
           wordRow(stateEl('bad', 'ban', '86 manual'), 'Someone marked it 86 on the 86 board.'))),
       h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Hold cabinet'),
@@ -23773,12 +23790,12 @@ a.of-nav:active { background: var(--press); }
   function helpAbout(sheet) {
     return h('div', { class: 'hp-pane' },
       helpList([
-        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for a BBQ line: tickets, paced start times, a hold cabinet and an 86 board.'),
+        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants that cook food ahead: tickets, paced start times, a hold cabinet and a sold-out list.'),
         helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
         helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
-        helpItem('info', 'Channel sync is for practice only', 'There is no live POS or delivery app connected. The 86 board shows how a real sync would look and says so.'),
+        helpItem('info', 'Channel sync is for the demo only', 'There is no live POS or delivery app connected. The 86 board shows how a real sync would look and says so.'),
         helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
-        helpItem('sparkle', 'Demo and practice data', 'Demo tickets and the practice history are made by the app. They are labeled wherever they appear.'),
+        helpItem('sparkle', 'Demo and sample data', 'Demo tickets and the sample history are made by the app. They are labeled wherever they appear.'),
       ]),
       h('div', { class: 'fs-row hp-links' },
         // All three buttons close Help first, so only one sheet is ever open.
@@ -23913,9 +23930,9 @@ a.of-nav:active { background: var(--press); }
       sec('Honest notes',
         helpList([
           helpItem('sun', 'Not tested in real sunlight', 'Contrast is calculated from colors. It has not been measured on a screen in daylight, on a greasy glass, or through gloves.'),
-          helpItem('info', 'Practice channels', 'There is no live POS or delivery connection. The 86 sync strip is practice only and says so.'),
+          helpItem('info', 'Demo channels', 'There is no live POS or delivery connection. The 86 sync strip is for the demo only and says so.'),
           helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
-          helpItem('sparkle', 'Practice data', 'Demo tickets and the practice history are made by the app.'),
+          helpItem('sparkle', 'Demo and sample data', 'Demo tickets and the sample history are made by the app.'),
           helpItem('shield', 'Local rules win', C.safetyLine),
         ]))));
 
