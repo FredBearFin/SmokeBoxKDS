@@ -112,7 +112,7 @@ test('storage so small that even a trimmed save fails: the app keeps running in 
 
 test('damaged copies of every smaller key never stop the app from starting', () => {
   const keys = ['smokebox.v1.names', 'smokebox.v1.sid', 'smokebox.v1.outbox', 'smokebox.v1.dlog', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations',
-    'smokebox.v1.setup.lastZone', 'smokebox.v1.lastbackup', 'smokebox.v1.welcome', 'smokebox.v1.sample', 'smokebox.v1.theme', 'smokebox.v1.pinlock', 'smokebox.v1.initials', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
+    'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory', 'smokebox.v1.lastbackup', 'smokebox.v1.welcome', 'smokebox.v1.sample', 'smokebox.v1.theme', 'smokebox.v1.pinlock', 'smokebox.v1.initials', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   const junk = ['{not json', 'null', '"text"', '[1,2', '{"rename":5,"add":"x"}', '123456789', 'undefined', '\u0000\u0001'];
   const s = E.apply(E.newState({ now: T, blank: true }), 'addMenuItem', { name: 'Pie', zone: 'cold', cat: 'cold', price: 4, prepSec: 30, track: 'one' }, T).state;
   const good = JSON.stringify({ v: 1, savedAt: T, rev: s.rev, clock: { virtual: T, real: T, speed: 1 }, state: s });
