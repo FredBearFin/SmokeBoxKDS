@@ -634,6 +634,8 @@
       parsed = res; rows = res.rows.map((r) => Object.assign({ keep: r.ok && !r.hidden }, r));
       // A category that is only digits usually means a price like 4,50 was split at its comma: warn, and leave the row unticked.
       rows.forEach((r) => {
+        // The importer's own warnings about extra columns or a digits-only category also leave the row unticked.
+        if ((r.problems || []).some((p) => p.code === 'extraColumns' || p.code === 'numericCategory')) { r.keep = false; return; }
         if (/^\d+$/.test(String(r.categoryText || '').trim())) { r.problems = (r.problems || []).concat([{ code: 'priceSplit', level: 'warn', message: 'The category here is "' + r.categoryText + '", which looks like the end of a price split at a comma (4,50).', fix: 'Check the price, tick the row when it is right. In your file, put prices with commas inside quotes.' }]); r.keep = false; }
       });
       if (res.summary && res.summary.unmatched) res.summary.unmatched.categories = res.summary.unmatched.categories.filter((c) => !/^\d+$/.test(String(c).trim()));
