@@ -52,7 +52,11 @@
      },
      {
       "t": "p",
-      "x": "The same page asks if you cook food ahead. Leave it on No if you cook to order. Yes adds the **Cabinet** for batches you cook ahead."
+      "x": "If you cook food ahead and hold it hot or cold, say so in **Dishes and prices** (see Cooked-ahead food and portions). If you cook everything to order, skip it."
+     },
+     {
+      "t": "p",
+      "x": "Temperatures and weights show in °F and kilograms. To change them, open **Back office**, then **Menu and settings**, and look for Temperatures and Weights."
      },
      {
       "t": "h",
@@ -222,6 +226,57 @@
     ]
    },
    {
+    "id": "cooked-ahead-and-portions",
+    "group": "guide",
+    "title": "Cooked-ahead food and portions",
+    "summary": "Two ways to keep track of food you make before the order comes in.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Count portions"
+     },
+     {
+      "t": "p",
+      "x": "Use this for a dish you make a batch of and sell until it is gone, like 20 sandwiches."
+     },
+     {
+      "t": "ol",
+      "x": [
+       "Tap **Menu**, then **Dishes and prices**. Under the dish, tap **I count what I made**.",
+       "Type how many you made and tap **Start counting**.",
+       "The dish shows how many are left, like \"20 left\". Tap **+10** or **Add** when you make more.",
+       "At zero the dish shows as sold out. **Stop counting** turns it off."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "Counting does not track temperature or time."
+     },
+     {
+      "t": "h",
+      "x": "Track food you hold hot or cold"
+     },
+     {
+      "t": "p",
+      "x": "Use this for food kept in a warmer or cooler, like chili or potato salad, so Smokebox can warn you before it runs out of time."
+     },
+     {
+      "t": "ol",
+      "x": [
+       "In **Dishes and prices**, find \"Do you cook any of this ahead and hold it?\" and tap **Yes, I cook ahead**. Then tap **Add a cooked-ahead item**.",
+       "Type what you cook ahead and choose Hot or Cold.",
+       "Set how long it may stay. 4 hours is a careful starting point. Ask your health department and change it to match.",
+       "Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.",
+       "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "Choose **No, skip this** if you cook everything to order. You can add cooked-ahead items later from the Cabinet."
+     }
+    ]
+   },
+   {
     "id": "hold-cabinet-and-warnings",
     "group": "guide",
     "title": "Hold cabinet and warnings",
@@ -239,21 +294,17 @@
      },
      {
       "t": "p",
-      "x": "No **Cabinet** tab? Set Cooking ahead to Yes under **Tax, hours and PIN** (Menu, then Dishes and prices)."
+      "x": "No **Cabinet** tab? Say yes to cooking ahead first (see Cooked-ahead food and portions)."
      },
      {
       "t": "ol",
       "x": [
-       "Open the **Cabinet** tab or the **Hold cabinet**. Tap **New batch** and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
+       "Open the **Cabinet** tab or the **Hold cabinet**. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.",
        "Take a reading at every check with **Log temp**. A reading in range keeps the batch on the menu.",
        "Tap **Pull** as portions leave the cabinet. The amount left goes down.",
        "A batch that is too cool can be reheated once with **Reheat**.",
        "A batch out of time or out of range is thrown out: tap **Discard** and pick a reason."
       ]
-     },
-     {
-      "t": "p",
-      "x": "The cabinet tracks food by ingredient. If the Product list in New batch is empty, Smokebox has no ingredient to track yet."
      },
      {
       "t": "h",
@@ -288,31 +339,74 @@
     "id": "closing-the-day",
     "group": "guide",
     "title": "Closing the day",
-    "summary": "A short routine for the end of service.",
+    "summary": "Close the day when the last order is paid. It saves the day's totals and gives you a page to print.",
     "blocks": [
      {
       "t": "h",
-      "x": "Before you close"
+      "x": "Close the day"
      },
      {
       "t": "ol",
       "x": [
-       "Finish the open orders. Tap **Orders**. For each open order tap Pay, or void it if the customer left.",
-       "If you cook ahead, look in the **Hold cabinet**. Decide what to do with each batch that is left, using your own rules. To throw a batch out, tap **Discard** and pick a reason.",
-       "If you cook ahead, wipe down food-contact surfaces and tap the **Sanitize** button on the board to log it."
+       "Tap **Orders**, then **Close the day** at the bottom.",
+       "If an order is still open, it is listed. Every order must be paid or voided first. Tap **Open Orders to pay or void**, then come back.",
+       "If you cook ahead and food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).",
+       "Read Money today: cash, card and other. The cash line says what should be in the drawer, plus the cash you started with.",
+       "Tap **Close the day**.",
+       "Tap **Back up today's data now** and **Print today's summary**."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "Closing does not lock anything. You can still take orders, and closing again later includes them. The app's day turns over at 4 am."
+     },
+     {
+      "t": "h",
+      "x": "Also"
+     },
+     {
+      "t": "ul",
+      "x": [
+       "Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.",
+       "Open the thrown-out log from the board's menu and save or print it if your health department asks.",
+       "Keep a copy of the backup off this device (see Backup and restore)."
+      ]
+     }
+    ]
+   },
+   {
+    "id": "who-made-this-entry",
+    "group": "guide",
+    "title": "Who made this entry",
+    "summary": "Initials go next to temperature readings and thrown-out batches, so the log shows who did what. A wrong entry is fixed, not erased.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Initials"
+     },
+     {
+      "t": "ol",
+      "x": [
+       "The first time you log a temperature or throw a batch out on a tablet, Smokebox asks \"Who is this?\". Type your initials. **Skip** is allowed, and the action still goes ahead.",
+       "The tablet remembers them while you keep working, and asks again after two idle hours.",
+       "When someone else takes over, tap **Switch person** in the cabinet."
       ]
      },
      {
       "t": "h",
-      "x": "After you close"
+      "x": "Fix an entry"
      },
      {
       "t": "ol",
       "x": [
-       "Look at the day. In **Back office**, open **Sales and money** for what you collected and **Safety** for the checks you logged and the food you threw out.",
-       "Save the log of thrown-out batches. Open it from the board's menu, then tap **Save as spreadsheet** or **Print or save as PDF**. Your health department may ask to see it.",
-       "Save a backup (see Backup and restore). After closing time Smokebox shows a bar with **Back up now**. It is a reminder, not a block."
+       "Open the thrown-out log from the board's menu.",
+       "Tap **Fix** on the row.",
+       "Say what was wrong, add your initials and tap **Save the fix**."
       ]
+     },
+     {
+      "t": "p",
+      "x": "The old entry stays in the log. Your fix is saved as a new entry next to it, with your initials and the time. That keeps the record honest."
      }
     ]
    },
@@ -353,7 +447,7 @@
      },
      {
       "t": "p",
-      "x": "A file that is not a valid backup is refused, and nothing is changed."
+      "x": "A file that is not a valid backup is refused, and nothing is changed. So is a backup from the demo (or a demo given a real one)."
      }
     ]
    },
@@ -422,7 +516,7 @@
        "Clear the search box and choose the All category on the New ticket screen.",
        "Open the **86 board**. A dish that is sold out or off the menu is listed there with the reason.",
        "Open **Dishes and prices** to see every dish you have added. A dish you removed is under **Removed dishes**: tap **Bring it back**.",
-       "No **Cabinet** tab or **Sanitize** button? Those show only when Cooking ahead is Yes (Menu, Dishes and prices, Tax, hours and PIN)."
+       "No **Cabinet** tab or **Sanitize** button? They show only after you say **Yes, I cook ahead** in **Dishes and prices**."
       ]
      },
      {
@@ -497,6 +591,31 @@
     ]
    },
    {
+    "id": "trying-the-demo",
+    "group": "guide",
+    "title": "Trying the demo",
+    "summary": "See Smokebox with food on it, without touching your own kitchen.",
+    "blocks": [
+     {
+      "t": "ol",
+      "x": [
+       "Open Smokebox with ?demo on the end of its address, like smokebox.html?demo.",
+       "It opens with sample dishes, three sample tickets and food in the cabinet. Cook, bump, pay and throw out food as much as you like.",
+       "Nothing you do in the demo reaches your own kitchen. The demo keeps its own saved data.",
+       "To go back, open Smokebox again without ?demo."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "A backup made in the demo cannot be loaded into your own kitchen, and the other way round. Smokebox refuses it and changes nothing."
+     },
+     {
+      "t": "p",
+      "x": "Sample numbers are made up. They are never your sales or your food."
+     }
+    ]
+   },
+   {
     "id": "questions-and-answers",
     "group": "guide",
     "title": "Questions and answers",
@@ -556,7 +675,15 @@
      },
      {
       "t": "p",
-      "x": "The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN**, and choose Yes under Cooking ahead."
+      "x": "The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Menu**, then **Dishes and prices**, and tap **Yes, I cook ahead**."
+     },
+     {
+      "t": "h",
+      "x": "Can I try it without risking my data?"
+     },
+     {
+      "t": "p",
+      "x": "Yes. See Trying the demo."
      },
      {
       "t": "h",
@@ -609,6 +736,7 @@
        "Volume up. Smokebox open on the kitchen board",
        "Tap the warning bar once, or use Play a test warning under Set up this tablet",
        "Check the 86 board: what is out today?",
+       "Counted dishes: how many did you make today?",
        "If you cook ahead: log a first temperature on each batch in the Hold cabinet",
        "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
        "Yesterday's backup saved and a copy kept off the device"
@@ -625,7 +753,7 @@
      {
       "t": "check",
       "x": [
-       "Every open order paid or voided (Orders)",
+       "Orders: every open order paid or voided, then Close the day",
        "If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)",
        "If you cook ahead: surfaces wiped and Sanitize logged",
        "Sales and money looks right in the Back office",
