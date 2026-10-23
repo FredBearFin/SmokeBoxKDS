@@ -122,6 +122,7 @@ export async function createHub(opts = {}) {
   // with 413 at once and the connection is closed, so nothing large is ever held. A Content-Length that is already too big is refused up front.
   function readJson(req, res, cb) {
     let n = 0, done = false; const chunks = [];
+    // Refuses a request that is too large: answers 413 once and closes the connection.
     const tooBig = () => {
       if (done) return; done = true;
       res.writeHead(413, { 'content-type': 'application/json', connection: 'close' });
