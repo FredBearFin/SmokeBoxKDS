@@ -120,12 +120,12 @@
     };
     // Shows a plain message when the hub refuses this screen, with a way back to the device's own kitchen.
     const fail = (res) => {
-      const words = { noFollower: 'This version of Smokebox cannot show another screen. Update it and try again.', badCode: 'The access code was not accepted. Check it and try again.', notFound: 'This address is not a Smokebox hub.', wrongVersion: 'This hub runs another version of Smokebox. Update this page and try again.', tooMany: 'The hub has too many screens connected right now. Try again in a minute.' };
+      const words = { noFollower: 'This version of Smokebox cannot show another screen. Update it and try again.', badCode: 'The access code was not accepted. Check it and try again.', notFound: 'This address is not a Smokebox kitchen.', wrongVersion: 'The kitchen runs another version of Smokebox. Update this page and try again.', tooMany: 'The kitchen has too many screens connected right now. Try again in a minute.' };
       const wrap = doc.createElement('div');
       wrap.className = 'follow-fail';
       wrap.setAttribute('role', 'alert');
       const h2 = doc.createElement('h2'); h2.textContent = kind === 'hub' ? 'This tablet could not join the kitchen' : 'This screen could not follow the kitchen';
-      const p = doc.createElement('p'); p.textContent = words[res.error] || 'The hub could not be reached or answered with an error.';
+      const p = doc.createElement('p'); p.textContent = words[res.error] || 'The kitchen could not be reached or answered with an error.';
       const back = doc.createElement('button'); back.type = 'button'; back.className = 'btn btn-primary btn-lg'; back.textContent = 'Back to my own kitchen';
       back.addEventListener('click', () => { try { if (SB.setup && SB.setup.leaveFollow) SB.setup.leaveFollow(); else g.location.href = g.location.pathname; } catch (e) { g.location.href = g.location.pathname; } });
       wrap.append(h2, p, back);

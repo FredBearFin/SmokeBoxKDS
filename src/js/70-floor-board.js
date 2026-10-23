@@ -2041,7 +2041,7 @@
     if (f.word.textContent !== v.text) f.word.textContent = v.text;
     if (f.sub.textContent !== v.sub) f.sub.textContent = v.sub;
     const pend = unconfirmedTickets();
-    const msg = pend.size ? pend.size + (pend.size === 1 ? ' change is' : ' changes are') + ' not confirmed yet. They show here until the hub answers.' : '';
+    const msg = pend.size ? pend.size + (pend.size === 1 ? ' change is' : ' changes are') + ' not confirmed yet. They show here until the kitchen answers.' : '';
     if (f.note.textContent !== msg) f.note.textContent = msg;
     setHidden(f.note, !msg);
     for (const rec of m.slips.values()) {
@@ -2053,7 +2053,7 @@
   }
   // Tells the cook, on the screen that tapped, that the hub did not do a tap, and why. The change shown here was already taken back.
   function onHubRefusal(r) {
-    const text = (r && (r.text || r.reason)) || 'The hub did not accept that tap.';
+    const text = (r && (r.text || r.reason)) || 'The kitchen did not accept that tap.';
     toast(/^Not done/i.test(text) ? text : 'Not done: ' + text, { tone: 'warn', ms: 12000 });
     const rec = r && r.ticketId ? m && m.slips.get(r.ticketId) : null;
     if (rec) flash(rec.el.querySelector('.slip-head'));
@@ -2070,14 +2070,14 @@
   // What the follower store says about the connection, in the three words the chip uses: ok, wait or bad.
   function followView() {
     const st = SB.store && typeof SB.store.followStatus === 'function' ? SB.store.followStatus() : null;
-    if (!st || st.mode !== 'follower') return { tone: 'bad', text: 'Not connected', sub: 'The hub could not be reached.', stale: false };
+    if (!st || st.mode !== 'follower') return { tone: 'bad', text: 'Not connected', sub: 'The kitchen could not be reached.', stale: false };
     const at = st.staleSince || st.lastUpdate || 0;
     const since = at ? U.fmtTime(at) : '';
     if (st.state === 'following') return { tone: 'ok', text: 'Connected', sub: st.lastUpdate ? 'Updated ' + U.fmtTime(st.lastUpdate) : '', stale: false };
     if (st.state === 'connecting') return { tone: 'wait', text: 'Connecting...', sub: '', stale: false };
     if (st.state === 'reconnecting') return { tone: 'wait', text: 'Reconnecting...', sub: since ? 'Last update ' + since : '', stale: false };
-    if (st.state === 'stale') return { tone: 'bad', text: 'Out of date since ' + since, sub: 'Looking for the hub again.', stale: true, since };
-    return { tone: 'bad', text: 'Not connected', sub: st.reason || 'The hub could not be reached.', stale: !!at, since };
+    if (st.state === 'stale') return { tone: 'bad', text: 'Out of date since ' + since, sub: 'Looking for the kitchen again.', stale: true, since };
+    return { tone: 'bad', text: 'Not connected', sub: st.reason || 'The kitchen could not be reached.', stale: !!at, since };
   }
   // Builds the bar under the header: connection chip (big enough for a TV), the calm "only shows" line and the out-of-date banner.
   function buildFollowBar() {
