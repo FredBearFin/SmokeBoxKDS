@@ -57,7 +57,11 @@ await withPage({ w: 1280, h: 900, hash: '' }, async (page, logs) => {
   await card.locator('[data-action="close-month"]').click();
   await page.waitForTimeout(300);
   const hasFlow = await page.evaluate(() => !!(SB.setup && SB.setup.openCloseMonth));
-  if (!hasFlow) check('without the confirm flow the button says so and changes nothing', /not available in this build/.test(await card.innerText()) && (await page.evaluate(() => SB.store.getState().orders.length)) === before);
+  if (hasFlow) {
+    await page.waitForSelector('.sheet', { timeout: 8000 });
+    check('the real confirm flow opens as a sheet and nothing is changed yet', (await page.evaluate(() => SB.store.getState().orders.length)) === before);
+    await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.sheet-backdrop'), null, { timeout: 5000 }).catch(() => {});
+  } else check('without the confirm flow the button says so and changes nothing', /not available in this build/.test(await card.innerText()) && (await page.evaluate(() => SB.store.getState().orders.length)) === before);
   // With a flow present the button calls it with the day to count back from
   await page.evaluate(() => { window.__cmArgs = null; SB.setup = SB.setup || {}; SB.setup.openCloseMonth = async (o) => { window.__cmArgs = o; }; });
   await card.locator('[data-action="close-month"]').click();

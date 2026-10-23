@@ -55,7 +55,10 @@
       U.h('p', { class: 'od-p' }, 'Close the month saves a complete backup and spreadsheet files of your old, closed days, then clears those days\' tickets, orders and plain activity from this tablet so it stays quick. End-of-day totals, the safety record and open orders stay. Nothing is cleared until you confirm the files are saved, and the whole kitchen can be put back from the backup.'),
       sum, notes, U.h('div', { class: 'od-actions' }, start), hint);
     paint();
-    return card.el;
+    // Keeps the preview in step with the store, redrawing only when the orders, the cleared-days mark or the day changed (the plan is not cheap).
+    let seen = '';
+    function sync(st) { const k = st.orders.length + '|' + (st.archivedBefore || '') + '|' + U.serviceDate(SB.store.now(), (st.settings.service || {}).dayStartHour); if (k !== seen) { seen = k; paint(); } }
+    return { el: card.el, sync };
   }
   const VERSION = 'Smokebox KDS ' + (C && C.version ? 'v' + C.version : '');
 
@@ -1499,7 +1502,7 @@
     flow.append(card1.el, card2.el, card3.el);
     // Close the month: not in the demo and not on a tablet that works through a hub (the store refuses it there too).
     const hubTablet = (() => { try { return !!(SB.store.hubKitchen && SB.store.hubKitchen()); } catch (e) { return false; } })();
-    if (!(SB.store.isDemo && SB.store.isDemo()) && !hubTablet && SB.store.closeMonthPreview) flow.append(closeMonthCard(flowCard));
+    if (!(SB.store.isDemo && SB.store.isDemo()) && !hubTablet && SB.store.closeMonthPreview) { const cm = closeMonthCard(flowCard); flow.append(cm.el); P.syncs.push(cm.sync); }
     pn.body.prepend(flow);
     const exStatus = statusLine();
     const fbLabelId = U.uid('odfb');
