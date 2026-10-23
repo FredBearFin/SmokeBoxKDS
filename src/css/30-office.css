@@ -231,7 +231,9 @@ a.of-nav:active { background: var(--press); }
   .of { --of-rail: 88px; --of-gut: var(--sp-5); }
   .of-rail { padding: var(--sp-4) var(--sp-2); }
   .of-rail-brand { justify-content: center; padding: 0 0 var(--sp-4); }
-  .of-rail-name, .of-nav-full, .of-soon { display: none; }
+  .of-rail-name, .of-soon { display: none; }
+  /* The full page name stays in the link for screen readers (clipped, not hidden) while the short name is drawn. */
+  .of-nav-full { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   .of-nav-short { display: block; }
   .of-nav { flex-direction: column; justify-content: center; gap: 4px; min-height: 58px; padding: var(--sp-2) 2px; text-align: center; font-size: 12px; }
   .of-nav-w { justify-items: center; }
