@@ -1861,7 +1861,7 @@
     const rule = (icon, title, body) => helpItem(icon, title, body);
     return h('div', { class: 'hp-pane' },
       safetyNote(),
-      h('p', { class: 'fs-sub' }, 'These are the limits Smokebox is using right now. They start from the FDA Food Code (3-501.14, 3-501.16, 3-403.11 and 4-602.11) and are starter values until the owner confirms them. Some rules, such as one reheat per batch, are Smokebox's own and not part of the code.'),
+      h('p', { class: 'fs-sub' }, 'These are the limits Smokebox is using right now. They start from the FDA Food Code (3-501.14, 3-501.16, 3-403.11 and 4-602.11) and are starter values until the owner confirms them. Some rules, such as one reheat per batch, are Smokebox\'s own and not part of the code.'),
       helpList([
         rule('flame', 'Keep hot food hot', 'Hot food stays at ' + U.tempText(S.hotHoldF) + ' or above.'),
         rule('snow', 'Keep cold food cold', 'Cold food stays at ' + U.tempText(S.coldHoldF) + ' or below.'),
