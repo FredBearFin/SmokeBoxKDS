@@ -19,16 +19,16 @@ Back up every day at close. If the browser data is cleared or the device is repl
 
 A file that is not a valid backup is refused, and nothing is changed. A backup from the demo is refused too.
 
-Spreadsheet files, like the sales file, are for reading. You cannot restore from them.
+Spreadsheet files, like the sales file, cannot be restored.
 
 ## Start over with an empty menu
-
 1. Tap **Menu**. At the bottom, tap **Start over with an empty menu**.
-2. It lists what goes (every dish, ticket, order and record on this device) and what stays (tax, hours, PIN and station names; clear the box to reset those too). Tap **Next: save a backup**.
-3. Tap **Save a backup now** and keep the file.
-4. Type START OVER, then tap **Erase everything and start over**.
+2. Read what goes and what stays. Clear **Keep my tax, hours, PIN and station names** to reset those too. Tap **Next: save a backup**.
+3. This step only explains: the backup is saved at the moment of erasing, and if it fails, nothing is erased. Tap **Next: confirm**.
+4. Type ERASE, then tap **Erase everything and start over**.
+5. At "Done. Your kitchen is empty." tap **Save the backup again** or **Go to the first screen**.
 
-There is no undo. To go back, restore the backup you just saved.
+There is no undo. To go back, restore the backup file. Left-over practice tickets get **Clear them** or **Keep them**.
 
 ## Erasing
 

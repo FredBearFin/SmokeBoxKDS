@@ -24,6 +24,8 @@
   const KEPT_KEY = 'smokebox.v1.demoLeftoversKept';
   // The word that must be typed to start over with an empty menu, and the setup-progress keys that start over clears.
   const START_OVER_WORD = 'ERASE';
+  // Neutral starter names for a new empty kitchen. The ids (pit, meat ...) never change, only what people read.
+  const STARTER_NAMES = { rename: { zones: { pit: 'Kitchen', sides: 'Prep', fry: 'Fryer' }, categories: { meat: 'Mains', sandwich: 'Sides', side: 'Snacks', fried: 'Desserts', cold: 'Drinks' } }, add: {} };
   const START_OVER_KEYS = ['smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone',
     'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
@@ -926,6 +928,23 @@
     reloadPage();
     return true;
   }
+  // Gives a brand-new empty kitchen neutral station and menu-section names instead of the barbecue ones (Pit, Meats ...),
+  // through the owner-names mechanism, so they are saved with the kitchen and carried in backups. Does nothing in the demo,
+  // in a kitchen that has dishes or began from the sample, or when the owner already chose names. Returns true when applied.
+  function applyStarterNames() {
+    const C = SB.config;
+    if (!state || mode === 'demo' || state.catalog !== 'own' || !C || typeof C.applyCustom !== 'function' || typeof C.customSpec !== 'function') return false;
+    if (state.menu.some((m) => !m.archived)) return false;
+    try {
+      const cur = C.customSpec();
+      // True when a part of the saved names holds at least one rename or added entry.
+      const used = (o) => o && typeof o === 'object' && Object.keys(o).some((k) => (Array.isArray(o[k]) ? o[k].length : o[k] && typeof o[k] === 'object' && Object.keys(o[k]).length));
+      if (used(cur.rename) || used(cur.add)) return false;
+      const res = C.applyCustom(STARTER_NAMES);
+      if (res.rejected.length) { C.applyCustom(cur); return false; }
+      return C.saveCustom(STARTER_NAMES) !== false;
+    } catch (e) { return false; }
+  }
   // Starts the real kitchen over with an empty menu. Needs opts.confirm to be the typed word (SB.store.START_OVER_WORD, any case),
   // refuses in the demo, and takes a full backup first: if the backup cannot be made nothing is cleared. Then it clears dishes,
   // ingredients, stock, batches, tickets, orders and history (resetLive, catalog 'blank') and the setup-progress choices, so the
@@ -952,6 +971,7 @@
     if (!keep && SB.config && typeof SB.config.applyCustom === 'function') {
       try { SB.config.applyCustom({}); SB.config.saveCustom({ rename: {}, add: {} }); } catch (e) { /* the names stay as they were */ }
     }
+    if (!keep) applyStarterNames();
     last = { type: 'startOver', report: 'ok', info: { keepSettings: keep }, events: [] };
     const d = new Date(savedAt);
     // Two-digit number for the file name.
@@ -995,7 +1015,7 @@
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").

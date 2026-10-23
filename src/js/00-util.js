@@ -202,7 +202,14 @@
   U.dateKey = (ts) => { const d = new Date(ts); return d.getFullYear() + '-' + U.pad2(d.getMonth() + 1) + '-' + U.pad2(d.getDate()); };
   // The service day a moment belongs to. 12:45 am on the 18th gives the 17th, because the day only
   // turns over at dayStartHour (4 am unless given).
-  U.serviceDate = (ts, dayStartHour) => U.dateKey(ts - (dayStartHour == null ? U.DAY_START_HOUR : dayStartHour) * 3600e3);
+  // WATCH OUT: it goes by the clock on the wall, not by subtracting hours, so on the two daylight-saving nights the day still
+  // turns over at 4 am by the wall clock (subtracting 4 hours of real time moved the turn-over to 3 am or 5 am).
+  U.serviceDate = (ts, dayStartHour) => {
+    const h = dayStartHour == null ? U.DAY_START_HOUR : dayStartHour;
+    const d = new Date(ts);
+    const early = d.getHours() + d.getMinutes() / 60 < h;
+    return U.dateKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() - (early ? 1 : 0), 12).getTime());
+  };
   // Turns "YYYY-MM-DD" back into the moment of local midnight starting that date.
   U.dateKeyToMs = (key) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d).getTime(); };
   // Date text n days later (earlier if n is negative). It steps from midday so a daylight-saving change
