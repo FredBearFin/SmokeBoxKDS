@@ -265,7 +265,7 @@ export async function createHub(opts = {}) {
   function handle(req, res) {
     const url = (req.url || '/').split('?')[0];
     if (req.method === 'GET' && url === '/events') {
-      if (clients.size >= MAX_CLIENTS) { res.writeHead(503, { 'content-type': 'text/plain', 'retry-after': '10' }); res.end('too many screens connected'); return; }
+      if (clients.size + followers.size >= MAX_CLIENTS) { res.writeHead(503, { 'content-type': 'text/plain', 'retry-after': '10' }); res.end('too many screens connected'); return; }
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', connection: 'keep-alive' });
       clients.add(res);
       req.on('close', () => clients.delete(res));
@@ -331,7 +331,7 @@ export async function createHub(opts = {}) {
       if (t.state === state) return;
       // A tick that changed something is part of the ordered history too, so a follower that replays the history ends in the same state.
       const entry = { seq: seq + 1, opId: null, type: 'tick', payload: {}, now: tt, by: null };
-      try { walAppend(entry, false); } catch (e) { console.warn('[hub] could not record a tick: ' + e.message); }
+      try { walAppend(entry, true); } catch (e) { console.warn('[hub] could not record a tick: ' + e.message); }
       state = t.state; lastAt = tt;
       const op = remember(entry);
       changed({ type: 'tick', op });
