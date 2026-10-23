@@ -2770,14 +2770,11 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 @media (max-width: 560px) { .fw-modes { grid-template-columns: 1fr; } }
 .fw [hidden] { display: none !important; }
 .fw .fs-row { margin-block: var(--sp-2); }
-<<<<<<< HEAD
 /* Readings: the number box fills the row, so there is no empty gap beside the +5 button. */
 .rd .stepper { display: flex; width: 100%; }
 .rd .stepper .stepper-field { flex: 1 1 auto; min-width: 0; }
 .rd .stepper .stepper-input { flex: 1 1 auto; min-width: 0; width: auto; text-align: center; }
-=======
 .rd-state { white-space: nowrap; }
->>>>>>> kds/night/a2-c7
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -4334,6 +4331,8 @@ a.of-nav:active { background: var(--press); }
   // True only for a real, finite number (not text, not "not a number", not infinity).
   // Used before any maths on values that may be missing.
   U.isNum = (n) => typeof n === 'number' && isFinite(n);
+  // The folder the page was served from as an address prefix ('' at the site root, '/beta' behind a path prefix), for calls to its own hub.
+  U.pageFolder = (g) => { try { const p = g && g.location && typeof g.location.pathname === 'string' ? g.location.pathname : '/'; return p.replace(/[^/]*$/, '').replace(/\/+$/, ''); } catch (e) { return ''; } };
   // Forces a number into the range lo to hi, so clamp(15, 0, 10) gives 10.
   U.clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   // Slides from a to b by the fraction t (t = 0 gives a, t = 1 gives b).
@@ -12468,7 +12467,7 @@ a.of-nav:active { background: var(--press); }
     const d = g.document;
     if (!d || !d.head || d.querySelector('link[rel="manifest"]')) return;
     const l = d.createElement('link');
-    l.rel = 'manifest'; l.href = '/manifest.webmanifest'; l.crossOrigin = 'use-credentials';
+    l.rel = 'manifest'; l.href = 'manifest.webmanifest'; l.crossOrigin = 'use-credentials';
     d.head.appendChild(l);
   }
 
@@ -12491,7 +12490,7 @@ a.of-nav:active { background: var(--press); }
     });
     try {
       set({ state: 'installing' });
-      reg = await c.register('/sw.js', { scope: '/', updateViaCache: 'none' });
+      reg = await c.register('sw.js', { scope: './', updateViaCache: 'none' });
       reg.addEventListener('updatefound', () => {
         const w = reg.installing;
         if (!w) return;
@@ -20503,7 +20502,7 @@ a.of-nav:active { background: var(--press); }
     // Decodes one part of the address, empty when it is damaged.
     const dec = (v) => { try { return decodeURIComponent(v || ''); } catch (e) { return ''; } };
     const c = /[?&]code=([^&]*)/.exec(q);
-    return { on: true, url: dec(hit[1]).replace(/\/+$/, ''), code: c ? dec(c[1]) : '' };
+    return { on: true, url: (dec(hit[1]) || U.pageFolder(g)).replace(/\/+$/, ''), code: c ? dec(c[1]) : '' };
   }
   const FOLLOW = readFollow();
   // Says whether this page is a read-only follower screen, and which hub it follows.
@@ -20517,7 +20516,7 @@ a.of-nav:active { background: var(--press); }
     // Decodes one part of the address, empty when it is damaged.
     const dec = (v) => { try { return decodeURIComponent(v || ''); } catch (e) { return ''; } };
     const c = /[?&]code=([^&]*)/.exec(q);
-    return { on: true, url: dec(hit[1]).replace(/\/+$/, ''), code: c ? dec(c[1]) : '' };
+    return { on: true, url: (dec(hit[1]) || U.pageFolder(g)).replace(/\/+$/, ''), code: c ? dec(c[1]) : '' };
   }
   const HUB = readHub();
   // Says whether this tablet writes through a hub (its taps go to the hub, which answers each one).
