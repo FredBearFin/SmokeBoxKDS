@@ -223,6 +223,7 @@
     // A server (or another device) can hand over a confirmation or an action done elsewhere.
     if (d && d.tab !== tabId && d.type === 'ack') { ackOps(d.opIds); return; }
     if (d && d.tab !== tabId && d.type === 'action') { applyRemote(d); return; }
+    if (d && d.tab !== tabId && d.type === 'state') { adoptState(d); return; }
     // Messages about alerts (sound leader, played, acknowledged) go to whoever listens; they are not saves.
     if (d && d.tab !== tabId && typeof d.type === 'string' && d.type.indexOf('alert-') === 0) { bcListeners.forEach((fn) => { try { fn(d); } catch (e) { /* a listener must not stop the others */ } }); return; }
     if (!d || d.tab === tabId || d.type !== 'saved' || !storage) return;
@@ -262,6 +263,10 @@
    *   { type: 'ack', opIds: [...] }                 the server confirms these actions; they leave the outbox.
    *   { type: 'action', opId, actionType, payload, now }   an action done on another device. It is applied
    *                       once (repeats of an opId are ignored), is not queued again, and a refusal is dropped.
+   *   { type: 'state', state, opIds }               the authoritative state (an object or backup text). The
+   *                       store adopts it, treats opIds as confirmed (they leave the outbox), then replays any
+   *                       actions still in the outbox on top, so a device's own unconfirmed work is kept while
+   *                       its numbering follows the hub. An invalid state is ignored.
    *   { type: 'saved', ... } and { type: 'alert-*', ... }  same-browser tab messages (see the tab channel).
    * Messages carrying tab equal to this tab's id are ignored, so a transport may echo.
    *
@@ -358,6 +363,29 @@
       const out = t.push(outbox.map((x) => Object.assign({}, x)));
       if (out && typeof out.then === 'function') out.then(done, fail); else done(out);
     } catch (e) { fail(); }
+  }
+  // Takes the authoritative state sent by a hub: confirmed actions leave the outbox, the state replaces ours,
+  // and actions still unconfirmed are replayed on top (a refused one is dropped). Ticket numbers then follow
+  // the hub's order, not the order this device did things in.
+  function adoptState(d) {
+    if (!state || !storage) return;
+    const v = E().validateBackup(d.state);
+    if (!v.ok) return;
+    const ids = Array.isArray(d.opIds) ? d.opIds.filter((x) => typeof x === 'string') : [];
+    for (const id of ids) seenOps.add(id);
+    ackOps(ids);
+    let ns = v.state;
+    atLeast(lastStamp(ns));
+    for (const p of outbox) {
+      const r = E().apply(ns, p.type, p.payload, Math.max(p.now, lastStamp(ns)));
+      if (r.report === 'ok') ns = r.state;
+    }
+    ns = E().tick(ns, now()).state;
+    ns.rev = Math.max(ns.rev, (state.rev || 0) + 1);
+    state = ns;
+    pending = []; skipRebase = true; pendingBroadcast = true;
+    persistNow();
+    scheduleNotify();
   }
   // Applies an action that another device did. Each opId is applied once; the action is not queued again.
   function applyRemote(d) {
