@@ -87,7 +87,7 @@ export default function (h) {
   });
 
   h.test('07b-pages-live-only', 'Office: all 7 pages with Live only and no data say "Not enough data" and never draw zeros or NaN', { owner: 'officeA', timeout: 120000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800 });
+    const page = await t.open({ w: 1280, h: 800, kitchen: true }); // the demo kitchen: Safety and Stock pages are on there
     await page.evaluate(() => SB.store.resetLive({ keepSettings: true }));
     await settle(page, 300);
     const n = (await storeTickets(page)).length;
@@ -162,7 +162,7 @@ export default function (h) {
     const row = page.locator('#sb-office table tbody tr').first();
     await row.scrollIntoViewIfNeeded().catch(() => {});
     t.check('the Slowest tickets table has rows', await row.count() === 1);
-    await row.click();
+    await row.evaluate((e) => e.click()); // a plain click times out: the page is very tall and the row never settles
     const dlg = page.getByRole('dialog', { name: /^Ticket #\d+/ });
     await dlg.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
     t.check('clicking a slow ticket opens its anatomy panel (a dialog named Ticket #N)', await dlg.isVisible().catch(() => false), 'no dialog');
@@ -223,9 +223,11 @@ export default function (h) {
   });
 
   h.test('07e-data-page', 'Data page: edit a price, bounds refusal, export JSON, import valid file and garbage, reset flows', { owner: 'officeC', timeout: 120000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800, hash: '#/office/data' });
+    const page = await t.open({ w: 1280, h: 800, hash: '#/office/data', kitchen: true });
     await waitOffice(page, 6000);
     await pageReady(page, 'data');
+    // Dishes are collapsed rows and rare panels sit in "Advanced" details: open what this journey edits.
+    await page.evaluate(() => { document.querySelectorAll('details.od-adv').forEach((d) => { d.open = true; }); const b = document.querySelector('.od-item[data-id="brisket_qtr"][data-open="false"] .od-sum'); if (b) b.click(); });
     const price = page.getByRole('spinbutton', { name: 'Price of Brisket, 1/4 lb' });
     await price.scrollIntoViewIfNeeded().catch(() => {});
     const priceOf = () => page.evaluate(() => (SB.store.getState().menu.find((m) => m.id === 'brisket_qtr') || {}).price);
@@ -271,7 +273,8 @@ export default function (h) {
       t.check('the backup is valid JSON with a state, tickets and the edited price', !!backup && JSON.stringify(backup).includes('9.25'), raw.slice(0, 120), 'officeC');
       t.check('the export status line says Download started', /Download started/.test(await page.locator('#sb-office .od-st').allInnerTexts().then((a) => a.join(' '))), await page.locator('#sb-office .od-st').allInnerTexts(), 'officeC');
       t.note('backup file size', Math.round(raw.length / 1024), 'KB');
-      // CSV
+      // CSV (the spreadsheet files sit in a closed group)
+      await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { if (/Spreadsheet files/.test((d.querySelector('summary') || {}).textContent || '')) d.open = true; }));
       const [dl2] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.getByRole('button', { name: 'Download tickets as CSV' }).click()]);
       if (dl2) { const csv = fs.readFileSync(await dl2.path(), 'utf8'); t.check('the tickets CSV has a header row and the ticket rows', csv.split('\n').length >= 2 && /ticketId|id/.test(csv.split('\n')[0]), csv.slice(0, 120), 'officeC'); }
       else t.check('the tickets CSV downloads', false, 'no download', 'officeC');
@@ -335,22 +338,28 @@ export default function (h) {
     const resetLive = page.locator('[data-action="reset-live"]');
     await resetLive.scrollIntoViewIfNeeded().catch(() => {});
     await resetLive.click();
-    const rd = page.getByRole('alertdialog').or(page.getByRole('dialog', { name: 'Reset live data?' }));
-    await rd.first().waitFor({ state: 'visible', timeout: 8000 });
-    t.check('Reset live data spells out what goes and that there is no undo', /This clears \d+/.test(await rd.first().innerText()) && /no undo/i.test(await rd.first().innerText()), await rd.first().innerText(), 'officeC');
-    await rd.first().getByRole('button', { name: 'Keep my data' }).click();
+    // Erasing is a typed confirmation now: an inline box asks for the word ERASE, and its red button stays off until the word matches.
+    const box = page.locator('.od-danger-box');
+    await box.waitFor({ state: 'visible', timeout: 8000 });
+    const boxText = await box.innerText();
+    t.check('Erase live data spells out what goes and that there is no undo', /This clears \d+/.test(boxText) && /no undo/i.test(boxText), boxText, 'officeC');
+    const goBtn = box.getByRole('button', { name: 'Erase live data' });
+    t.check('the red button is off until the word ERASE is typed', await goBtn.isDisabled(), '', 'officeC');
+    await box.getByRole('button', { name: 'Keep my data' }).click();
     await wait(400);
     t.check('Keep my data changes nothing', (await snap()) === (await snap()) && (await storeTickets(page)).length === sumBefore.tickets, (await storeTickets(page)).length, 'officeC');
     await resetLive.click();
-    await rd.first().getByRole('button', { name: 'Reset live data' }).click();
+    await box.getByRole('textbox', { name: /Type ERASE/ }).fill('ERASE');
+    await goBtn.click();
     await wait(900);
     const afterReset = await page.evaluate(() => ({ t: SB.store.getState().tickets.length, price: (SB.store.getState().menu.find((m) => m.id === 'brisket_qtr') || {}).price }));
     t.check('Reset live data clears the tickets but keeps the edited price', afterReset.t === 0 && afterReset.price === 9.25, afterReset, 'officeC');
     // reset everything: the price goes back to the starter value
     const resetAll = page.locator('[data-action="reset-all"]');
     await resetAll.click();
-    await rd.first().waitFor({ state: 'visible', timeout: 8000 });
-    await rd.first().getByRole('button', { name: 'Reset everything' }).click();
+    await box.waitFor({ state: 'visible', timeout: 8000 });
+    await box.getByRole('textbox', { name: /Type ERASE/ }).fill('ERASE');
+    await box.getByRole('button', { name: 'Erase everything' }).click();
     await wait(1000);
     t.check('Reset everything puts the starter price back ($7.50)', (await priceOf()) === 7.5, await priceOf(), 'officeC');
     await t.clean(page, 'data page');

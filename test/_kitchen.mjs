@@ -33,3 +33,22 @@ export async function startKitchen(page, opts = {}) {
   }
   return page.evaluate(kitchenScript(opts));
 }
+
+/** A REAL kitchen (no ?demo) that has a menu and some orders, built only through the normal actions: a few dishes, then orders for them. A real
+ *  install starts blank, so tests that need "data on the device" (the backup nudge, the Orders list) use this. Returns { dishes, orders }. */
+export async function realKitchen(page, { dishes = 3, orders = 2 } = {}) {
+  await page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 15000 });
+  return page.evaluate(({ dishes, orders }) => {
+    const S = SB.store, out = { dishes: [], orders: [], bad: [] };
+    const specs = [['Smoked brisket plate', 'pit', 'meat', 14, 600, 'two'], ['Mac and cheese', 'sides', 'side', 5, 120, 'one'], ['Sweet tea', 'cold', 'cold', 3, 30, 'one'], ['Fried pickles', 'fry', 'fried', 6, 240, 'two']];
+    for (const [name, zone, cat, price, prepSec, track] of specs.slice(0, dishes)) {
+      const r = S.dispatchEx('addMenuItem', { name, zone, cat, price, prepSec, track }, { source: 'ui' });
+      if (r.report === 'ok') out.dishes.push(r.info.id); else out.bad.push(name + ': ' + r.report);
+    }
+    for (let i = 0; i < orders && out.dishes.length; i++) {
+      const r = S.dispatchEx('createTicket', { customer: 'Table ' + (i + 1), channel: 'dine_in', items: [{ menuId: out.dishes[i % out.dishes.length] }] }, { source: 'ui' });
+      if (r.report === 'ok') out.orders.push(r.info && r.info.ticketId); else out.bad.push('order ' + i + ': ' + r.report);
+    }
+    return out;
+  }, { dishes, orders });
+}

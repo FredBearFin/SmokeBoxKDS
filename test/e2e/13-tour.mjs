@@ -105,7 +105,7 @@ async function walk(t, page, label, busy) {
 
 export default function (h) {
   h.test('13a-tour-full-loop', 'Walkthrough: all nine steps with real clicks, from start to Done', { owner: 'board', timeout: 120000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800 });
+    const page = await t.open({ w: 1280, h: 800, kitchen: true });
     if (!(await page.evaluate(() => !!(window.SB && SB.tour)))) t.skip('SB.tour is not built yet');
     await clearBoard(page);
     t.check('before it starts there is no caption card', (await snap(page)).cards === 0);
@@ -192,7 +192,7 @@ export default function (h) {
   });
 
   h.test('13b-tour-skip-escape', 'Walkthrough: Skip and Escape stop it cleanly and put the clock back; restart begins again', { owner: 'board', timeout: 60000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800 });
+    const page = await t.open({ w: 1280, h: 800, kitchen: true });
     if (!(await page.evaluate(() => !!(window.SB && SB.tour)))) t.skip('SB.tour is not built yet');
     await clearBoard(page);
     await page.evaluate(() => SB.tour.start());
@@ -240,7 +240,7 @@ export default function (h) {
   });
 
   h.test('13c-tour-out-of-order', 'Walkthrough: doing things in another order never strands the caption', { owner: 'board', timeout: 60000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800 });
+    const page = await t.open({ w: 1280, h: 800, kitchen: true });
     if (!(await page.evaluate(() => !!(window.SB && SB.tour)))) t.skip('SB.tour is not built yet');
     await clearBoard(page);
     await page.evaluate(() => SB.tour.start());
@@ -282,7 +282,7 @@ export default function (h) {
   });
 
   h.test('13d-tour-pauses', 'Walkthrough: the caption steps aside for a sheet or the office and comes back at the same step', { owner: 'board', timeout: 60000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800 });
+    const page = await t.open({ w: 1280, h: 800, kitchen: true });
     if (!(await page.evaluate(() => !!(window.SB && SB.tour)))) t.skip('SB.tour is not built yet');
     await clearBoard(page);
     await page.evaluate(() => SB.tour.start());
@@ -319,13 +319,13 @@ export default function (h) {
   });
 
   h.test('13e-tour-layouts', 'Walkthrough: the card stays on screen and off the ring on a phone and in Large text', { owner: 'board', timeout: 120000 }, async (t) => {
-    const phone = await t.open({ w: 390, h: 844, touch: true });
+    const phone = await t.open({ w: 390, h: 844, touch: true, kitchen: true });
     if (!(await phone.evaluate(() => !!(window.SB && SB.tour)))) t.skip('SB.tour is not built yet');
     await walk(t, phone, 'phone 390', false);
     t.check('phone: the page never scrolls sideways', await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), await phone.evaluate(() => [document.documentElement.scrollWidth, innerWidth]));
     await t.clean(phone, 'phone walkthrough');
 
-    const big = await t.open({ w: 1280, h: 800 });
+    const big = await t.open({ w: 1280, h: 800, kitchen: true });
     await big.evaluate(() => SB.theme.setTextSize('large'));
     await settle(big, 400);
     await walk(t, big, 'large text 1280', false);
@@ -336,7 +336,7 @@ export default function (h) {
   });
 
   h.test('13f-tour-busy-board', 'Walkthrough: with other tickets on the board the new ticket is found and the card sits beside it', { owner: 'board', timeout: 120000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800 });
+    const page = await t.open({ w: 1280, h: 800, kitchen: true });
     if (!(await page.evaluate(() => !!(window.SB && SB.tour)))) t.skip('SB.tour is not built yet');
     await walk(t, page, 'busy board 1280', true);
     await page.evaluate(() => SB.tour.start());

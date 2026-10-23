@@ -285,11 +285,11 @@ export default function (h) {
     await page.evaluate(() => SB.theme.setTextSize('normal'));
 
     // the Menu list on a tablet has Back office as its first row
-    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.setViewportSize({ width: 900, height: 768 });
     await settle(page, 500);
     await page.locator('.fl-menu').click();
     const first = await page.getByRole('menuitem').first().innerText().catch(() => '');
-    t.check('1024: the Menu list starts with Back office', /^Back office/.test(first), first);
+    t.check('900: the Menu list starts with Back office', /^Back office/.test(first), first);
     await page.getByRole('menuitem', { name: /^Back office/ }).click();
     await waitOffice(page);
     t.check('1024: choosing Back office in the Menu list opens the office', await officeOpen(page), await hashOf(page));

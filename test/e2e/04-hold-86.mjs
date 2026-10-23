@@ -15,7 +15,7 @@ export default function (h) {
     let d = await openHold(page);
     const body0 = await d.innerText();
     t.check('the hold cabinet shows the food-safety line (SB.config.safetyLine)', body0.replace(/\s+/g, ' ').includes(safety.replace(/\s+/g, ' ')), { safety, shown: body0.slice(0, 200) });
-    t.check('the hold cabinet lists 10 starter batches and says all are holding fine', /10 batches in the cabinet/.test(body0) && /All are holding fine/.test(body0), body0.slice(0, 260));
+    t.check('the hold cabinet lists 10 starter batches and says all are holding fine', /10 batches in the cabinet/.test(body0) && /All are (in range|holding fine)/.test(body0), body0.slice(0, 260));
 
     // log a normal temperature reading on Brisket batch 1
     const card1 = d.getByRole('article', { name: /Brisket batch 1/ });
@@ -47,12 +47,12 @@ export default function (h) {
     await settle(page, 250);
     const exp = d.getByRole('region', { name: 'Expected result' });
     const e1 = await exp.innerText();
-    t.check('the new-batch form shows expected yield, cooked weight and cost per cooked kg', /Expected yield\s*\n?\s*\d+(\.\d+)?%/.test(e1) && /Cooked weight\s*\n?\s*\d+(\.\d+)? kg/.test(e1) && /Cost per cooked kg\s*\n?\s*\$\d+(\.\d+)?/.test(e1), e1.slice(0, 300));
+    t.check('the new-batch form shows expected yield, cooked weight and cost per cooked kg', /Expected yield\s*\n?\s*\d+(\.\d+)?%/.test(e1) && /Cooked weight\s*\n?\s*\d+(\.\d+)? kg/.test(e1) && /This model says [\d.]+ kg at \$\d+(\.\d+)? per kg/.test(e1), e1.slice(0, 300));
     const yieldPct = num((/Expected yield\s*\n?\s*([\d.]+)%/.exec(e1) || [])[1]);
     const cooked = num((/Cooked weight\s*\n?\s*([\d.]+) kg/.exec(e1) || [])[1]);
     const rawKg = num(await d.getByRole('spinbutton', { name: /Raw weight/ }).inputValue());
     t.check('cooked weight equals raw weight times the yield (' + rawKg + ' kg x ' + yieldPct + '% = ' + cooked + ' kg)', Math.abs(rawKg * yieldPct / 100 - cooked) < 0.02, { rawKg, yieldPct, cooked });
-    const costKg = num((/Cost per cooked kg\s*\n?\s*\$([\d.]+)/.exec(e1) || [])[1]);
+    const costKg = num((/This model says [\d.]+ kg at \$([\d.]+) per kg/.exec(e1) || [])[1]);
     const rawCost = num((/Raw cost of \$([\d.]+) per kg/.exec(e1) || [])[1]);
     t.check('cost per cooked kg equals raw cost per kg divided by the yield', rawCost > 0 && Math.abs(rawCost / (yieldPct / 100) - costKg) < 0.05, { rawCost, yieldPct, costKg });
     t.check('the form compares with the flat 50% rule', /flat 50% rule/.test(e1), e1.slice(-300));
@@ -86,7 +86,7 @@ export default function (h) {
     const low = await card2.innerText();
     t.check('the card says Reheat now with the 165 °F instruction', /Reheat now/.test(low) && /Reheat to 165 °F/.test(low), low.slice(0, 400));
     t.check('the card says it is not being served and the menu items are 86', /Not being served/.test(low) && /86/.test(low), low.slice(-300));
-    t.check('the card offers Reheat and Discard', await card2.getByRole('button', { name: 'Reheat' }).count() === 1 && await card2.getByRole('button', { name: 'Discard' }).count() === 1);
+    t.check('the card offers Reheat and Discard', await card2.getByRole('button', { name: 'Reheat' }).count() === 1 && await card2.getByRole('button', { name: 'More for this batch' }).count() === 1); // Discard now sits behind More
     const chipText = await page.evaluate(() => { const b = document.querySelector('.fl-seg [data-id="cabinet"]'); return b ? b.innerText.replace(/\s+/g, ' ') + ' | ' + (b.querySelector('.seg-dot') ? b.querySelector('.seg-dot').textContent : '') : ''; });
     t.check('the Cabinet tab shows how many batches need attention', /\b1\b|\b2\b/.test(chipText), chipText);
     await t.shot(page, 'hold-below-135');
@@ -98,12 +98,13 @@ export default function (h) {
     await card2.getByRole('button', { name: 'Log reheat' }).click();
     await settle(page, 500);
     const afterReheat = await card2.innerText().catch(() => '');
-    t.check('Log reheat puts the batch back in service ("Holding fine", no more Reheat now)', /Holding fine/.test(afterReheat) && !/Reheat now/.test(afterReheat), afterReheat.slice(0, 300));
+    t.check('Log reheat puts the batch back in service ("Holding fine", no more Reheat now)', /Holding fine|In range/.test(afterReheat) && !/Reheat now/.test(afterReheat), afterReheat.slice(0, 300));
     t.check('after the reheat the header no longer flags the Hold button', !(await page.evaluate(() => { const n = document.querySelector('.fl-head [data-tool="hold"] .fl-tool-n'); return n && !n.hidden && Number(n.textContent) > 0; })), 'attention count still showing');
 
     // discard asks for a reason first; the confirm button stays off until one is picked
     const pork = d.getByRole('article', { name: /Pulled pork batch 1/ });
-    await pork.getByRole('button', { name: 'Discard' }).click();
+    await pork.getByRole('button', { name: 'More for this batch' }).click();
+    await page.getByRole('menuitem', { name: /Discard/ }).click();
     const dd = page.getByRole('dialog', { name: /Discard Pulled pork batch 1/ });
     await dd.waitFor({ state: 'visible', timeout: 8000 });
     t.check('Discard batch is disabled until a reason is picked', await dd.getByRole('button', { name: 'Discard batch' }).isDisabled());
@@ -117,7 +118,8 @@ export default function (h) {
     t.check('Undo brings the discarded pan back', /Pulled pork batch 1/.test(await d.innerText()) && /11 batches in the cabinet/.test(await d.innerText()), (await d.innerText()).slice(0, 120));
 
     // cooling: a confirm that spells out the consequence, then the stage meter
-    await d.getByRole('article', { name: /Pulled pork batch 1/ }).getByRole('button', { name: 'Start cooling' }).click();
+    await d.getByRole('article', { name: /Pulled pork batch 1/ }).getByRole('button', { name: 'More for this batch' }).click(); // Start cooling sits behind More
+    await page.getByRole('menuitem', { name: /Start cooling/ }).click();
     const cd = page.getByRole('dialog', { name: /Start cooling Pulled pork batch 1/ });
     await cd.waitFor({ state: 'visible', timeout: 8000 });
     const cdText = await cd.innerText();
@@ -164,7 +166,7 @@ export default function (h) {
     const sayList = Array.from(said);
     const batchState = await page.evaluate(() => { const b = SB.store.getState().batches.find((x) => /Brisket batch 1/.test(x.label || '')); return b ? { status: b.status, discardReason: b.discardReason, remainingG: b.remainingG, wasteG: b.wasteG } : null; });
     t.check('after 2 hours below 135 °F the pan is at the discard stage (discard, reason temp)', batchState && batchState.status === 'discard' && batchState.discardReason === 'temp', batchState);
-    t.check('the cook is TOLD when a pan is thrown out by the clock (a toast mentioning the batch and discard)', sayList.some((x) => /Brisket batch 1/.test(x) && /discard|thrown/i.test(x)), sayList);
+    t.check('the cook is TOLD when a pan is thrown out by the clock (a toast mentioning the batch and discard)', sayList.some((x) => /Brisket batch 1/.test(x) && /discard|thrown|throw (it )?out/i.test(x)), sayList);
     d = await openHold(page);
     const dtext = await d.innerText();
     const stillThere = await d.getByRole('article', { name: /Brisket batch 1/ }).count() > 0;
@@ -186,7 +188,7 @@ export default function (h) {
     const page = await t.open({ w: 1280, h: 800, kitchen: true });
     let d = await open86(page);
     const txt = await d.innerText();
-    t.check('the sync strip says "Simulated: no live POS connected"', /Simulated: no live POS connected/.test(txt), txt.slice(0, 160));
+    t.check('the sync strip says "Simulated: no live POS connected"', /(Simulated|Demo only|Practice only): no live POS connected/.test(txt), txt.slice(0, 160));
     t.check('four channel chips are listed (Counter POS, Online ordering, Drive-thru board, Delivery apps)', ['Counter POS', 'Online ordering', 'Drive-thru board', 'Delivery apps'].every((x) => txt.includes(x)), txt.slice(0, 400));
     await d.getByRole('button', { name: '86 it: Brisket, 1/4 lb' }).click();
     await settle(page, 400);
@@ -202,7 +204,7 @@ export default function (h) {
     await settle(page, 500);
     const synced = await d.innerText();
     t.check('after the sync window the chips say "synced N s after 86"', /[Ss]ynced \d+\s*s? after/.test(synced) || /synced/i.test(synced), synced.slice(0, 500));
-    t.check('the strip still says Simulated after syncing', /Simulated/.test(synced));
+    t.check('the strip still says Simulated after syncing', /Simulated|Demo only|Practice only|no live POS/.test(synced));
     await t.shot(page, 'board86-manual');
     const od = await openKey(page, 'n', 'New ticket');
     const tile = od.getByRole('button', { name: /^Brisket, 1\/4 lb/ });

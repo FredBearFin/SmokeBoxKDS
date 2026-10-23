@@ -208,7 +208,7 @@ export default function (h) {
 
   // ---------------------------------------------------------------------------------------------------------------------
   h.test('12c-live-regions', 'Accessibility: screen reader announcements per minute while the demo runs', { owner: 'board', timeout: 120000 }, async (t) => {
-    const page = await t.open({ w: 1280, h: 800 });
+    const page = await t.open({ w: 1280, h: 800, kitchen: true });
     if (!(await has(page, 'SB.sim.live'))) t.skip('SB.sim.live is not built yet');
     await page.evaluate(() => {
       window.__ann = [];
