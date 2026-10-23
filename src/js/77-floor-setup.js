@@ -582,7 +582,7 @@
     offs.push(SB.store.subscribe(() => paintCook()));
 
     // How do you serve? A skippable question under the dishes. Each answer only sets the settings found under Settings, How you serve.
-    const svBox = h('section', { class: 'fs-card dp-ca dp-serve', hidden: true });
+    const svBox = h('section', { class: 'fs-card dp-sv dp-serve', hidden: true });
     // The three answers: what each sets, in the order shown. Table service is the starting state, so it only records the answer.
     const SERVE_CHOICES = [
       { id: 'table', label: 'Table and kitchen tickets', sets: { counter: false, chips: null } },
