@@ -249,7 +249,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 2571,
+  "addThreeDishesWallMs": 2535,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -619,7 +619,7 @@
    "tilesShown": 0,
    "tilesSoldOut": 0
   },
-  "addThreeDishesWallMs": 2028,
+  "addThreeDishesWallMs": 1892,
   "dishesAfter": 3,
   "firstPaidTicket": true,
   "inventoryAtEnd": {
@@ -690,7 +690,7 @@
     "notes": [
      {
       "kind": "info",
-      "text": "Question card: Do you cook any of this ahead and hold it? Brisket in the morning, slaw in the cooler. If you do, Smokebox can track eac"
+      "text": "Question card: Do you cook any of this ahead and hold it? Chili in a warmer, potato salad in a cooler. If you do, Smokebox can track ea"
      },
      {
       "kind": "tap",
