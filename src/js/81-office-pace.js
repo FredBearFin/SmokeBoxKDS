@@ -97,6 +97,10 @@
     // pacing check and the findings.
     render(container, ctx) {
       const page = K.page(container, ctx, { id: 'pace' });
+      // The live at-a-glance panel sits above the page (it ignores the date range on purpose).
+      const glanceHost = U.h('div', { class: 'of-glance-host' });
+      container.insertBefore(glanceHost, page.el);
+      const glance = typeof O.glance === 'function' ? O.glance(glanceHost) : null;
       page.headline();
       page.tiles(paceTiles());
 
@@ -190,7 +194,7 @@
 
       page.insights({ limit: 6, only: ['pace-overview', 'pacing-effect', 'slow-hour', 'channel-gap', 'expo-dwell', 'forced-bumps'], empty: 'Findings about pace appear once there are about 20 finished tickets in the range.' });
       // The kit removes every card, chart and listener when the page closes.
-      return { destroy() { page.destroy(); } };
+      return { destroy() { if (glance) glance.destroy(); glanceHost.remove(); page.destroy(); } };
     },
   });
 

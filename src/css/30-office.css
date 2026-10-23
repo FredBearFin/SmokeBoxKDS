@@ -317,3 +317,22 @@ a.of-nav:active { background: var(--press); }
 .of-rowbtn { padding-block: 5px; margin-block: -5px; }
 /* Reset buttons in Menu and settings match the other big buttons. */
 .of .btn-danger { min-height: 44px; }
+
+/* The at-a-glance panel (SB.office.glance): five cards in two columns on a phone, one row on a wide screen. */
+.sb-glance { margin: 0 0 var(--sp-5); }
+.sb-glance-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.sb-g-card { display: grid; gap: 2px; align-content: start; padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line-soft, var(--line)); border-left-width: 4px; border-radius: var(--r-3, 12px); background: var(--ch-surface, transparent); min-width: 0; }
+.sb-g-card.is-wide { grid-column: 1 / -1; }
+.sb-g-card[data-tone="good"] { border-left-color: var(--o-good, var(--ok)); }
+.sb-g-card[data-tone="info"] { border-left-color: var(--o-accent, var(--amber)); }
+.sb-g-card[data-tone="warn"] { border-left-color: var(--o-warn, var(--amber)); }
+.sb-g-card[data-tone="bad"] { border-left-color: var(--o-bad, var(--red)); }
+.sb-g-l { font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink2); }
+.sb-g-v { font: var(--w-semi) clamp(26px, 5vw, 38px)/1.1 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
+.sb-g-s { font-size: var(--fs-2); line-height: 1.35; color: var(--ink2); overflow-wrap: anywhere; }
+.sb-glance-note { margin: var(--sp-2) 0 0; font-size: var(--fs-1); color: var(--ink2); }
+@media (min-width: 900px) { .sb-glance[data-size="phone"] .sb-glance-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Wall size: big type for a screen across the room. */
+.sb-glance[data-size="wall"] .sb-g-l { font-size: clamp(18px, 2.2vw, 30px); }
+.sb-glance[data-size="wall"] .sb-g-v { font-size: clamp(44px, 7vw, 96px); }
+.sb-glance[data-size="wall"] .sb-g-s { font-size: clamp(16px, 1.8vw, 26px); }
