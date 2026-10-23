@@ -15,10 +15,10 @@ A single HTML file (`dist/smokebox.html`) that runs in a browser. It is a kitche
 
 ## Devices and data
 
-- **One device.** Each device has its own menu, tickets and settings. There is no sync between tablets (a read-only second screen is a test feature, below). Two tabs of the same browser on the same device stay in step.
+- **One device.** Each device has its own menu, tickets and settings. There is no sync between tablets (a hub for several tablets is a test feature, below). Two tabs of the same browser on the same device stay in step.
 - **Data lives in the browser on that device.** Clearing site data, using another browser or a private window, or replacing the device shows an empty Smokebox. A backup file (Data page) is the only copy that can be moved. A PIN recovery code is shown once when a PIN is set; with no code and no backup, getting past a forgotten PIN means clearing the site data, which erases everything on the device.
 - **Sound, loudness, theme and text size are per device** and are not in a backup.
-- **A second screen exists as a test feature.** A page opened to follow a hub shows that hub's kitchen read-only, with an "Out of date" banner when the hub is unreachable. It is not part of the normal install: someone must run the hub (`server/server.mjs`) by hand, and Smokebox never starts one. Tablets cannot write through the hub yet, so two tablets still do not share a board. Nothing about it has been tried on real devices. How to try it: `docs/connected-howto.md`.
+- **Several tablets on one kitchen is a test feature.** Under Settings, "Use one kitchen on several tablets", a screen can either only show a hub's kitchen ("Show only", read-only, with an "Out of date" banner when the hub is unreachable) or join the hub to take orders ("Use this hub for orders on this tablet"). It is not part of the normal install: someone must run the hub (`server/server.mjs`) by hand, and Smokebox never starts one. A tablet that joins keeps its own saved kitchen untouched and gets it back when it leaves; the hub's kitchen is separate, and two kitchens are never merged. Taps made while offline wait on the tablet and are sent later; the hub may refuse one (for example another tablet got there first). Reloading the page puts a tablet back on its own kitchen. It has been tried only in desktop browsers with a simulated network drop, never on real devices. How to try it: `docs/connected-howto.md`.
 
 ## Warnings
 

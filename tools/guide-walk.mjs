@@ -418,9 +418,11 @@ async function severalScreens(browser) {
     const p = await fresh(browser);
     await p.goto(H + '/'); await p.waitForTimeout(900);
     await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
-    check('settings: Show this kitchen on another screen', await tap(p, 'Show this kitchen on another screen')); await p.waitForTimeout(500);
+    check('settings: Use one kitchen on several tablets', await tap(p, 'Use one kitchen on several tablets')); await p.waitForTimeout(500);
     const fs = '.sheet-root:last-of-type';
-    for (const t of ['Address of the kitchen', 'Connect', 'It only shows', 'a small program called the hub']) check('follow sheet: ' + t, await has(p, t, fs));
+    for (const t of ['Show only', 'Use this hub for orders on this tablet', 'a small program called the hub']) check('several tablets sheet: ' + t, await has(p, t, fs));
+    check('several tablets: tapping Show only', await tap(p, 'Show only')); await p.waitForTimeout(400);
+    for (const t of ['Address of the kitchen', 'Connect']) check('show only: ' + t, await has(p, t, fs));
     await p.fill('#fw-url', H); await p.fill('#fw-code', 'abc123');
     await tap(p, 'Connect'); await p.waitForTimeout(2500);
     const body = () => p.evaluate(() => document.body.innerText);
@@ -435,6 +437,24 @@ async function severalScreens(browser) {
     await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
     check('follower menu: Back to my own kitchen', await p.evaluate(() => [...document.querySelectorAll('[role=menuitem]')].some((e) => e.textContent.trim().indexOf('Back to my own kitchen') === 0)));
     await p.keyboard.press('Escape');
+    // A second tablet joins the hub to take orders: check the hub, choose, join, then leave.
+    const q = await fresh(browser);
+    await q.goto(H + '/'); await q.waitForTimeout(900);
+    await q.evaluate(() => document.querySelector('button.fl-menu').click()); await q.waitForTimeout(400);
+    await tap(q, 'Use one kitchen on several tablets'); await q.waitForTimeout(500);
+    check('join: Use this hub for orders on this tablet', await tap(q, 'Use this hub for orders on this tablet')); await q.waitForTimeout(400);
+    const js = '.sheet-root:last-of-type';
+    for (const t of ['Address of the hub', 'Name for this screen', 'Check the hub', 'Join the hub']) check('join form: ' + t, await has(q, t, js));
+    await q.fill('#hu-url', H); await q.fill('#hu-code', 'abc123'); await q.fill('#hu-name', 'Pass');
+    await tap(q, 'Check the hub'); await q.waitForTimeout(1500);
+    for (const t of ["Show the hub's kitchen on this tablet", "Send this tablet's kitchen to the hub", 'Stop: the hub already has a kitchen']) check('join choice: ' + t, await has(q, t, js));
+    await q.evaluate(() => document.querySelector('input[name="hu-choice"][value="adopt"]').click()); await q.waitForTimeout(300);
+    check('join: Join the hub', await tap(q, 'Join the hub')); await q.waitForTimeout(2000);
+    check('join: Joined. This tablet now uses the hub.', await has(q, 'Joined. This tablet now uses the hub.', js));
+    check('join: Leave the hub', await has(q, 'Leave the hub', js));
+    check('join: leaving works', await tap(q, 'Leave the hub')); await q.waitForTimeout(1200);
+    check('join: You left the hub.', await has(q, 'You left the hub.', js));
+    await q.close();
     hub.kill();
     await p.waitForTimeout(5000);
     check('follower: Reconnecting... when the hub is gone', /Reconnecting/.test(await body()));
