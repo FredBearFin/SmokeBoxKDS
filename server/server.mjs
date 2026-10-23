@@ -36,14 +36,14 @@ function loadSaved(E, file) {
     const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     const v = E.validateBackup(saved.state);
     if (!v.ok) { console.warn('[hub] saved file refused: ' + v.error); return null; }
-    return { state: v.state, seq: Number.isInteger(saved.seq) ? saved.seq : 0, hubId: typeof saved.hubId === 'string' ? saved.hubId : null };
+    return { state: v.state, seq: Number.isInteger(saved.seq) ? saved.seq : 0, hubId: typeof saved.hubId === 'string' ? saved.hubId : null, seeded: saved.seeded === true };
   } catch (e) { console.warn('[hub] saved file unreadable: ' + e.message); return null; }
 }
 
 // Writes state and seq to the JSON file through a temp file and a rename, so a crash never leaves half a file.
-function writeSaved(file, state, seq, hubId) {
+function writeSaved(file, state, seq, hubId, seeded) {
   const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify({ v: 1, seq, hubId, state }));
+  fs.writeFileSync(tmp, JSON.stringify({ v: 1, seq, hubId, seeded: seeded === true, state }));
   fs.renameSync(tmp, file);
 }
 
@@ -60,8 +60,11 @@ export async function createHub(opts = {}) {
   let seq = saved ? saved.seq : 0;
   // A name for this kitchen's history. It stays the same across restarts (it is saved with the state), and changes only when the
   // history is lost, so a follower that remembers a change number from a different history is sent a fresh snapshot instead.
-  const hubId = (saved && saved.hubId) || crypto.randomBytes(6).toString('hex');
+  let hubId = (saved && saved.hubId) || crypto.randomBytes(6).toString('hex');
+  let seeded = !!(saved && saved.seeded);   // true once a device sent its kitchen here: the hub is no longer "empty" even at change number 0
   const followCode = opts.followCode !== undefined ? opts.followCode : (process.env.SMOKEBOX_FOLLOW_CODE || '');
+  // The code a screen needs to change anything (write actions, send its kitchen). Empty means writing needs no code (a trusted network).
+  const writeCode = opts.writeCode !== undefined ? opts.writeCode : (process.env.SMOKEBOX_WRITE_CODE || '');
   const walFile = opts.walFile !== undefined ? opts.walFile : (dataFile ? dataFile + '.wal' : null);
   const clients = new Set();
   const followers = new Set();
@@ -104,7 +107,7 @@ export async function createHub(opts = {}) {
     walLines = keep.length;
   }
   // The shape stored in the record and in the log of recent actions.
-  const walEntry = (o) => ({ seq: o.seq, opId: o.opId, type: o.actionType, payload: o.payload, now: o.now, by: o.by, info: o.info });
+  const walEntry = (o) => ({ seq: o.seq, opId: o.opId, type: o.actionType, payload: o.payload, now: o.now, by: o.by, screen: o.screen, info: o.info });
   // Reads the record and puts back what the state file does not have yet: replays each entry through the engine in order, and rebuilds the
   // recent log and the answers already given. A damaged last line (a crash mid-write) is ignored. Returns how many entries were replayed.
   function walReplay() {
@@ -115,11 +118,13 @@ export async function createHub(opts = {}) {
       if (!line) continue;
       let e;
       try { e = JSON.parse(line); } catch (err) { console.warn('[hub] a damaged record line was ignored'); continue; }
+      // An answered refusal: remembered so a resent action id gets the same answer after a restart.
+      if (e && e.ref === true && typeof e.opId === 'string') { replies.set(e.opId, { ok: false, report: e.report, info: e.info ?? {}, seq: e.seq, words: E.describe(e.report, e.info ?? {}) }); if (replies.size > MAX_REPLIES) replies.delete(replies.keys().next().value); continue; }
       if (!e || !Number.isInteger(e.seq) || typeof e.type !== 'string') continue;
       walLines++;
       if (e.seq <= seq) { remember(e); continue; }        // already in the saved state: only the log and the answers are rebuilt
       if (e.seq !== seq + 1) { console.warn('[hub] a gap in the record at ' + e.seq + '; replay stopped'); break; }
-      const r = e.type === 'tick' ? { report: 'ok', state: E.tick(state, e.now).state } : E.apply(state, e.type, e.payload, e.now);
+      const r = e.type === 'tick' ? { report: 'ok', state: E.tick(state, e.now).state } : E.apply(state, e.type, e.payload, e.now, { screen: e.screen });
       if (r.report !== 'ok') { console.warn('[hub] record entry ' + e.seq + ' did not replay (' + r.report + '); replay stopped'); break; }
       state = r.state; seq = e.seq; lastAt = Math.max(lastAt, e.now); n++;
       remember(e);
@@ -128,11 +133,11 @@ export async function createHub(opts = {}) {
   }
   // Keeps a replayed or applied entry in the recent log and, when it has an action id, its answer.
   function remember(e) {
-    const op = { seq: e.seq, opId: e.opId || null, actionType: e.type, payload: e.payload ?? {}, now: e.now, by: e.by ?? null, info: e.info };
+    const op = { seq: e.seq, opId: e.opId || null, actionType: e.type, payload: e.payload ?? {}, now: e.now, by: e.by ?? null, screen: e.screen || undefined, info: e.info };
     op.bytes = JSON.stringify(op).length;
     ops.push(op); opsBytes += op.bytes;
     while (ops.length > MAX_OPS || (opsBytes > MAX_OPS_BYTES && ops.length > 1)) opsBytes -= ops.shift().bytes || 0;
-    if (op.opId) { replies.set(op.opId, { report: 'ok', info: op.info ?? {}, seq: op.seq }); if (replies.size > MAX_REPLIES) replies.delete(replies.keys().next().value); }
+    if (op.opId) { replies.set(op.opId, { ok: true, report: 'ok', info: op.info ?? {}, seq: op.seq }); if (replies.size > MAX_REPLIES) replies.delete(replies.keys().next().value); }
     return op;
   }
 
@@ -146,7 +151,7 @@ export async function createHub(opts = {}) {
   // Writes the file right now if anything changed since the last write.
   function flush() {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-    if (dataFile && dirty) { dirty = false; try { writeSaved(dataFile, state, seq, hubId); walCompact(); } catch (e) { console.warn('[hub] save failed: ' + e.message); } }
+    if (dataFile && dirty) { dirty = false; try { writeSaved(dataFile, state, seq, hubId, seeded); walCompact(); } catch (e) { console.warn('[hub] save failed: ' + e.message); } }
   }
   // Builds the message every screen gets: the whole state, the hub clock and the change counter.
   // opIds lists the actions in the recent log, so a screen knows which of its own unconfirmed actions are already in this state.
@@ -169,29 +174,35 @@ export async function createHub(opts = {}) {
   }
   const MAX_FOLLOW_BACKLOG = 4 * 1024 * 1024;
   // What a follower receives for one applied action or tick: its place in the order, what it was, and the hub clock.
-  const opMessage = (o) => ({ seq: o.seq, opId: o.opId, type: o.actionType, payload: o.payload, now: o.now, by: o.by, serverNow: now() });
+  const opMessage = (o) => ({ seq: o.seq, opId: o.opId, type: o.actionType, payload: o.payload, now: o.now, by: o.by, screen: o.screen, serverNow: now() });
 
   // Runs one action through the engine with the hub clock; repeats of a known opId get the first answer back.
   function runAction(body) {
     const { type, payload, clientId, opId, at } = body || {};
+    // The screen's name (not a security feature): short plain text, stamped on the events the action makes.
+    const screen = typeof body.who === 'string' ? body.who.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20) : '';
     if (typeof type !== 'string') return { status: 400, body: { report: 'unknownAction', info: {}, seq } };
     if (typeof opId === 'string' && replies.has(opId)) return { status: 200, body: Object.assign({}, replies.get(opId), { duplicate: true }) };
     // A client may say when it did the action (a queued action replayed after being offline). The hub trusts that
     // time only between the last applied action and its own clock, so time never runs backwards or into the future.
     const t = typeof at === 'number' && isFinite(at) ? Math.min(now(), Math.max(lastAt, at)) : Math.max(lastAt, now());
-    const r = E.apply(state, type, payload, t);
+    const r = E.apply(state, type, payload, t, { screen });
     let reply;
     if (r.report === 'ok') {
       const by = typeof clientId === 'string' ? clientId : null;
-      const entry = { seq: seq + 1, opId: typeof opId === 'string' ? opId : null, type, payload: payload ?? {}, now: t, by, info: r.info };
+      const entry = { seq: seq + 1, opId: typeof opId === 'string' ? opId : null, type, payload: payload ?? {}, now: t, by, screen: screen || undefined, info: r.info };
       // Durable first: if the record cannot be written the action is not applied and not acknowledged.
       try { walAppend(entry, true); } catch (e) { console.warn('[hub] could not record an action: ' + e.message); return { status: 500, body: { report: 'badPatch', info: { error: 'could not record the action' }, seq } }; }
       state = r.state;
       lastAt = t;
       const op = remember(entry);
       changed({ by, opId: op.opId, type, op });
-      reply = { report: 'ok', info: r.info, seq };
-    } else reply = { report: r.report, info: r.info, seq };
+      reply = { ok: true, report: 'ok', info: r.info, seq };
+    } else {
+      reply = { ok: false, report: r.report, info: r.info, seq, words: E.describe(r.report, r.info) };
+      // A refusal with an action id is recorded too, so the same id gets the same answer after a restart.
+      if (typeof opId === 'string') { try { walAppend({ ref: true, opId, report: r.report, info: r.info, seq }, true); } catch (e) { /* the answer is still given, only not durable */ } }
+    }
     if (typeof opId === 'string') {
       replies.set(opId, reply);
       if (replies.size > MAX_REPLIES) replies.delete(replies.keys().next().value);
@@ -201,16 +212,17 @@ export async function createHub(opts = {}) {
 
   // Reads a request body up to MAX_BODY bytes and calls back with the parsed JSON (or null if it is not JSON). A bigger body is answered
   // with 413 at once and the connection is closed, so nothing large is ever held. A Content-Length that is already too big is refused up front.
-  function readJson(req, res, cb) {
+  function readJson(req, res, cb, maxBody) {
+    const LIMIT = maxBody || MAX_BODY;
     let n = 0, done = false; const chunks = [];
     // Refuses a request that is too large: answers 413 once and closes the connection.
     const tooBig = () => {
       if (done) return; done = true;
       res.writeHead(413, { 'content-type': 'application/json', connection: 'close' });
-      res.end(JSON.stringify({ report: 'badPatch', info: { error: 'body too large', max: MAX_BODY }, seq }), () => req.destroy());
+      res.end(JSON.stringify({ report: 'badPatch', info: { error: 'body too large', max: LIMIT }, seq }), () => req.destroy());
     };
-    if (Number(req.headers['content-length']) > MAX_BODY) return tooBig();
-    req.on('data', (c) => { n += c.length; if (n > MAX_BODY) tooBig(); else if (!done) chunks.push(c); });
+    if (Number(req.headers['content-length']) > LIMIT) return tooBig();
+    req.on('data', (c) => { n += c.length; if (n > LIMIT) tooBig(); else if (!done) chunks.push(c); });
     req.on('end', () => {
       if (done) return; done = true;
       let body = null;
@@ -223,27 +235,37 @@ export async function createHub(opts = {}) {
   const failures = new Map(); // remote address -> { n, until }: wrong access codes are counted so a code cannot be guessed quickly
   const FAIL_MAX = 10, FAIL_LOCK_MS = 60000;
   // True when the given code equals the hub's access code (compared without leaking where they differ).
-  function codeOk(given) {
-    const a = crypto.createHash('sha256').update(String(given || '')).digest(), b = crypto.createHash('sha256').update(followCode).digest();
+  function codeEq(given, want) {
+    const a = crypto.createHash('sha256').update(String(given || '')).digest(), b = crypto.createHash('sha256').update(String(want)).digest();
     return crypto.timingSafeEqual(a, b);
+  }
+  // True when a reading screen's code is right: either code opens the stream (a writing screen also reads), and no code set means open.
+  const readOk = (given) => (!followCode && !writeCode) || (!!followCode && codeEq(given, followCode)) || (!!writeCode && codeEq(given, writeCode));
+  // True when a writing screen's code is right (no write code set means open).
+  const writeOk = (given) => !writeCode || codeEq(given, writeCode);
+  // Counts a wrong code against the caller's address and returns the status to answer (403, or 429 while locked); null when fine to try.
+  function lockState(who) {
+    const f = failures.get(who);
+    return f && f.until > Date.now() ? 429 : null;
+  }
+  // Records one wrong code for an address; ten in a row lock it for a minute.
+  function noteFailure(who) {
+    const f = failures.get(who);
+    const n = (f ? (f.until && f.until <= Date.now() ? 0 : f.n) : 0) + 1;
+    failures.set(who, { n, until: n >= FAIL_MAX ? Date.now() + FAIL_LOCK_MS : 0 });
+    if (failures.size > 1000) failures.delete(failures.keys().next().value);
   }
   // Answers a read-only follower: checks the access code, then sends hello, then either a snapshot or the ordered actions it missed (if the
   // log still reaches back and is smaller than a snapshot), then every new action as it is applied. It can never write.
   function handleFollow(req, res) {
     const q = new URL(req.url, 'http://x').searchParams;
-    const cors = followCode ? { 'access-control-allow-origin': '*' } : {};
+    const cors = followCode || writeCode ? { 'access-control-allow-origin': '*' } : {};
     // Answers a refused follower with a status and a short reason in JSON, then closes the connection.
     const fail = (code, error, extra) => { res.writeHead(code, Object.assign({ 'content-type': 'application/json', connection: 'close' }, cors, extra || {})); res.end(JSON.stringify({ error })); };
     const who = req.socket.remoteAddress || '?';
-    if (followCode) {
-      const f = failures.get(who);
-      if (f && f.until > Date.now()) return fail(429, 'tooManyTries', { 'retry-after': '60' });
-      if (!codeOk(q.get('code'))) {
-        const n = (f ? (f.until && f.until <= Date.now() ? 0 : f.n) : 0) + 1;
-        failures.set(who, { n, until: n >= FAIL_MAX ? Date.now() + FAIL_LOCK_MS : 0 });
-        if (failures.size > 1000) failures.delete(failures.keys().next().value);
-        return fail(403, 'badCode');
-      }
+    if (followCode || writeCode) {
+      if (lockState(who)) return fail(429, 'tooManyTries', { 'retry-after': '60' });
+      if (!readOk(q.get('code'))) { noteFailure(who); return fail(403, 'badCode'); }
       failures.delete(who);
     }
     if (clients.size + followers.size >= MAX_CLIENTS) return fail(503, 'tooMany', { 'retry-after': '10' });
@@ -259,7 +281,55 @@ export async function createHub(opts = {}) {
     if (missed && (missed.length === 0 || missed.reduce((a, o) => a + (o.bytes || 0), 0) <= stateBytes)) {
       for (const o of missed) send(res, 'op', opMessage(o));
       send(res, 'resumed', { seq, hubId, count: missed.length, serverNow: now() });
-    } else send(res, 'snapshot', { state, seq, hubId, proto: PROTO, serverNow: now() });
+    } else send(res, 'snapshot', { state, seq, hubId, proto: PROTO, serverNow: now(), opIds: ops.slice(-1000).map((o) => o.opId).filter(Boolean) });
+  }
+  // Tells a screen about this hub without joining: its protocol, its history name, and whether it is empty (no action ever applied and
+  // no kitchen sent to it), so a device can decide whether it may send its own kitchen here.
+  function handleProbe(req, res) {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const cors = followCode || writeCode ? { 'access-control-allow-origin': '*' } : {};
+    const who = req.socket.remoteAddress || '?';
+    // Writes one JSON answer with the given status.
+    const answer = (code, body) => { res.writeHead(code, Object.assign({ 'content-type': 'application/json' }, cors)); res.end(JSON.stringify(body)); };
+    if (followCode || writeCode) {
+      if (lockState(who)) return answer(429, { error: 'tooManyTries' });
+      if (!readOk(q.get('code'))) { noteFailure(who); return answer(403, { error: 'badCode' }); }
+      failures.delete(who);
+    }
+    answer(200, { proto: PROTO, hubId, seq, empty: seq === 0 && !seeded, serverNow: now() });
+  }
+  // A device sends its whole kitchen to an empty hub (change number 0, nothing seeded before). Needs the write code; refuses with 409
+  // notEmpty otherwise. The hub starts a new history from it: new history name, every connected stream is ended so screens take a fresh
+  // snapshot, and the record is reset. Same-origin and JSON only, like actions.
+  function handleSeed(req, res) {
+    const ct = String(req.headers['content-type'] || '').toLowerCase(), origin = req.headers.origin;
+    let sameOrigin = true;
+    if (origin) { try { sameOrigin = new URL(origin).host === req.headers.host; } catch (e) { sameOrigin = false; } }
+    // Writes one JSON answer with the given status.
+    const reply = (code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
+    if (!ct.startsWith('application/json') || !sameOrigin) { req.resume(); return reply(!sameOrigin ? 403 : 415, { ok: false, report: 'badPatch', info: { error: 'refused' } }); }
+    readJson(req, res, (body) => {
+      const who = req.socket.remoteAddress || '?';
+      if (writeCode) {
+        if (lockState(who)) return reply(429, { ok: false, report: 'badCode' });
+        if (!(body && typeof body === 'object' && writeOk(body.code))) { noteFailure(who); return reply(403, { ok: false, report: 'badCode' }); }
+        failures.delete(who);
+      }
+      if (!body || typeof body !== 'object' || !body.state) return reply(400, { ok: false, report: 'badPatch', info: { error: 'no state' } });
+      if (seq !== 0 || seeded) return reply(409, { ok: false, report: 'notEmpty', info: {} });
+      const v = E.validateBackup(body.state);
+      if (!v.ok) return reply(400, { ok: false, report: 'invalidBackup', info: { error: v.error } });
+      state = v.state; seeded = true; seq = 0; lastAt = 0;
+      hubId = crypto.randomBytes(6).toString('hex');
+      ops.length = 0; opsBytes = 0; replies.clear();
+      if (walFd !== null) { try { fs.closeSync(walFd); } catch (e) { /* ignore */ } walFd = null; }
+      if (walFile) { try { fs.rmSync(walFile, { force: true }); } catch (e) { /* ignore */ } walLines = 0; }
+      dirty = true; flush();
+      for (const r of Array.from(clients)) r.end();
+      for (const r of Array.from(followers)) r.end();
+      clients.clear(); followers.clear();
+      reply(200, { ok: true, report: 'ok', hubId, seq });
+    }, 8 * 1024 * 1024);
   }
   // Answers one HTTP request: the page, the event stream, or an action.
   function handle(req, res) {
@@ -279,6 +349,8 @@ export async function createHub(opts = {}) {
       return;
     }
     if (req.method === 'GET' && url === '/follow') return handleFollow(req, res);
+    if (req.method === 'GET' && url === '/probe') return handleProbe(req, res);
+    if (req.method === 'POST' && url === '/seed') return handleSeed(req, res);
     if (req.method === 'POST' && url === '/action') {
       // Cross-site request forgery: a web page the signed-in person visits could send a "simple" POST here and the browser would attach the
       // cached login. Two cheap guards: the body must say it is application/json (a cross-site page cannot send that without a permission
@@ -294,6 +366,13 @@ export async function createHub(opts = {}) {
         return;
       }
       readJson(req, res, (body) => {
+        // Writing needs the write code when the hub has one; wrong tries are counted like for the stream.
+        const who = req.socket.remoteAddress || '?';
+        if (writeCode) {
+          if (lockState(who)) { res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '60' }); res.end(JSON.stringify({ ok: false, report: 'badCode', info: { error: 'tooManyTries' }, seq })); return; }
+          if (!(body && typeof body === 'object' && writeOk(body.code))) { noteFailure(who); res.writeHead(403, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: false, report: 'badCode', info: { error: 'badCode' }, seq })); return; }
+          failures.delete(who);
+        }
         // An action that makes the engine throw is answered with 500 and changes nothing, instead of taking the hub down.
         let out;
         try { out = body && typeof body === 'object' && !Array.isArray(body) ? runAction(body) : { status: 400, body: { report: 'badPatch', info: { error: 'not a JSON object' }, seq } }; }

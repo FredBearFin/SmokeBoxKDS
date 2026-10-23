@@ -27,4 +27,6 @@ None of this has been tried on a real tablet yet; everything above was checked o
 
 17. Open Settings, then Get this tablet ready. Tap Test the sound and answer. Read the amber lines: they say what to set on the tablet. Then open Pilot visit checklist and print it or read it on screen.
 
-18. Open Settings, then Show this kitchen on another screen. Read the plain explanation: a second screen only shows the board, and it needs a hub that is not set up in this version. On the other screen, type an address and tap Connect. Try a wrong address and a wrong code to see the plain errors. Not tried against a real hub yet.
+18. Open Settings, then Use one kitchen on several tablets. Pick Show only. Read the plain explanation: a second screen only shows the board, and it needs a hub that is not set up in this version. On the other screen, type an address and tap Connect. Try a wrong address and a wrong code to see the plain errors. Not tried against a real hub yet.
+
+19. In the same place pick Use this hub for orders on this tablet. Fill the address, access code (if any) and a name like Pass, then Check the hub. Read the two choices: show the hub's kitchen here, or send this tablet's kitchen (only allowed when the hub is empty; otherwise you see a stop). Nothing joins until you choose. This is a test feature. It needs a hub running somewhere; this version does not start one. Not tried on real tablets or in a real kitchen.

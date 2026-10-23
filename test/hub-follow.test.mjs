@@ -244,3 +244,29 @@ test('size fallback: when the missed actions together are bigger than the state,
     g.stop();
   } finally { await hub.close(); }
 });
+
+test('answers are stable: a repeated action id gets the same answer (applied or refused) with ok and plain words, even after a power cut; the screen name is on the events', async () => {
+  const file = tmp();
+  let t = T0;
+  const h1 = await createHub({ dataFile: file, starter: true, tickMs: 600000, saveMs: 3600000, now: () => t });
+  const p1 = await h1.listen(0);
+  t += 1000;
+  const a1 = await post(p1, { type: 'createTicket', payload: { customer: 'S', items: [{ menuId: 'tea' }] }, opId: 'd:1', who: '  Front   desk ' });
+  assert.deepEqual([a1.ok, a1.report], [true, 'ok']);
+  const a2 = await post(p1, { type: 'createTicket', payload: { customer: 'S', items: [{ menuId: 'tea' }] }, opId: 'd:1', who: 'Front desk' });
+  assert.equal(a2.duplicate, true); assert.equal(a2.seq, a1.seq); assert.equal(h1.snapshot().state.tickets.length, 1);
+  const r1 = await post(p1, { type: 'bumpTicket', payload: { ticketId: 'nope' }, opId: 'd:2' });
+  assert.equal(r1.ok, false); assert.ok(r1.report && r1.report !== 'ok'); assert.ok(typeof r1.words === 'string' && r1.words.length > 5);
+  const ev = h1.snapshot().state.events.filter((e) => e.screen);
+  assert.ok(ev.length > 0 && ev.every((e) => e.screen === 'Front desk'), 'the name is cleaned and stamped');
+  await h1.crash();
+  const h2 = await createHub({ dataFile: file, starter: true, tickMs: 600000, now: () => t });
+  const p2 = await h2.listen(0);
+  try {
+    const b1 = await post(p2, { type: 'createTicket', payload: { customer: 'S', items: [{ menuId: 'tea' }] }, opId: 'd:1' });
+    assert.equal(b1.duplicate, true); assert.equal(b1.ok, true); assert.equal(h2.snapshot().state.tickets.length, 1);
+    const b2 = await post(p2, { type: 'bumpTicket', payload: { ticketId: 'nope' }, opId: 'd:2' });
+    assert.equal(b2.duplicate, true); assert.equal(b2.ok, false); assert.equal(b2.report, r1.report); assert.equal(b2.words, r1.words);
+    assert.ok(h2.snapshot().state.events.filter((e) => e.screen).every((e) => e.screen === 'Front desk'), 'the name survives the restart');
+  } finally { await h2.close(); }
+});

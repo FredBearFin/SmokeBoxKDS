@@ -62,7 +62,8 @@
   // a redraw, a save or a broadcast to other tabs is pending.
   let state = null;
   // The follower: null in every normal kitchen and in the demo. Only initFollower sets it (see the follower section below).
-  let fol = null;
+  let fol = null, lastInit = null;
+  const refusalSubs = new Set();
   const followSubs = new Set();
   let storage = null;
   // The real clock. Tests replace it with a fake one through init({ now }).
@@ -505,6 +506,7 @@
   function init(opts) {
     opts = opts || {};
     destroy();
+    if (!opts.memoryOnly) lastInit = opts;                  // remembered so leaving a hub can restart on the device's own kitchen
     realNow = typeof opts.now === 'function' ? opts.now : () => Date.now();
     // The mode: named by the caller, else the page's own. A named mode also puts the store in strict mode (see above).
     strict = opts.mode === 'demo' || opts.mode === 'real';
@@ -615,10 +617,11 @@
   function dispatchEx(type, payload, opts) {
     if (!state) init({ noTimers: true, noSync: true });
     // A follower screen only shows the hub's kitchen: nothing is applied, queued, logged or sent.
-    if (fol) {
+    if (fol && !fol.hub) {
       last = { type: typeof type === 'string' ? type : String(type), report: 'followerReadOnly', info: {}, events: [], opId: null };
       return { report: 'followerReadOnly', info: {}, events: [], opId: null };
     }
+    if (fol) return hubDispatch(type, payload);
     const source = opts && opts.source === 'sim' ? 'sim' : 'user';
     const n = now();
     const opId = tabId + ':' + (++opN);
@@ -689,7 +692,7 @@
   // Replaces the whole state from backup text. Returns "ok", "invalidBackup" or "exportTooLarge". A refused
   // import changes nothing. Repairs it made are listed in lastResult().info.repaired.
   function importAll(text) {
-    if (fol) { last = { type: 'import', report: 'followerReadOnly', info: {}, events: [] }; return 'followerReadOnly'; }
+    if (fol) { const rp = fol.hub ? 'hubKitchen' : 'followerReadOnly'; last = { type: 'import', report: rp, info: {}, events: [] }; return rp; }
     if (typeof text !== 'string') { last = { type: 'import', report: 'invalidBackup', info: { error: 'not text' }, events: [] }; return 'invalidBackup'; }
     if (text.length > MAX_TEXT) { last = { type: 'import', report: 'exportTooLarge', info: { chars: text.length, max: MAX_TEXT }, events: [] }; return 'exportTooLarge'; }
     // A backup made in the demo cannot be loaded into the real kitchen, nor the reverse. A backup with no mode (made before
@@ -803,7 +806,7 @@
   // Throws everything away and starts a fresh state. Ticket and event counters carry on so ids are never
   // reused. Saves at once. Returns "ok".
   function reset() {
-    if (fol) return 'followerReadOnly';
+    if (fol) return fol.hub ? 'hubKitchen' : 'followerReadOnly';
     rebaseClock();
     const old = state;
     const ns = E().newState({ now: now(), starter: false, seq: old ? old.seq : undefined, blank: !!(old && old.catalog === 'own') });
@@ -816,6 +819,7 @@
   // Clears live tickets, events and batches (the engine keeps settings and menu unless keepSettings is
   // false). Returns the engine's report.
   function resetLive(opts) {
+    if (fol) return fol.hub ? 'hubKitchen' : 'followerReadOnly';
     if (!state) init({ noTimers: true, noSync: true });
     // If the demo clock ran ahead, return to real time first: the cleared state has no times to conflict
     // with.
@@ -860,9 +864,10 @@
     };
   }
   // Is this store a read-only follower right now?
-  const isFollower = () => !!fol;
+  const isFollower = () => !!fol && !fol.hub;
   // The words and numbers a screen needs about the follower: state, address, last message, how stale, change number, clock offset, error.
   function followStatus() {
+    if (fol && fol.hub) return hubStatus();
     if (!fol) return { mode: 'off', state: 'off', url: '', lastUpdate: null, since: null, staleSince: null, seq: null, hubId: null, offsetMs: 0, error: null, connected: false, retryInMs: 0, reason: '' };
     return { mode: 'follower', state: folState(), url: fol.url, lastUpdate: fol.lastMsgAt, since: fol.goodSince, staleSince: folStale() ? fol.lastMsgAt : null, seq: fol.seq, hubId: fol.hubId,
       offsetMs: Math.round(fol.offset), error: fol.error, connected: folState() === 'following', retryInMs: fol.retryInMs, reason: fol.error ? (FOLLOW_REASON[fol.error] || FOLLOW_REASON.error) : '' };
@@ -879,7 +884,7 @@
   // Calls the follow subscribers when the status word or the error changed.
   function folNotify(force) {
     if (!fol) return;
-    const key = folState() + '|' + fol.error;
+    const key = (fol.hub ? hubState() : folState()) + '|' + fol.error + '|' + (fol.hub ? hubQueued() : 0);
     if (!force && key === fol.lastKey) return;
     fol.lastKey = key;
     const s = followStatus();
@@ -898,19 +903,25 @@
     if (f.retryTimer) clearTimeout(f.retryTimer);
     if (f.timer) clearInterval(f.timer);
     fol = null;
-    followSubs.clear();
+    followSubs.clear(); refusalSubs.clear();
   }
   // Starts following a hub. Resolves after the first snapshot (ok: true), a fatal error, or the first failed attempt to reach it.
-  function initFollower(opts) {
+  function initFollower(opts) { return folBegin(opts, false); }
+  // Starts following a hub as a read-only screen (hub false) or as a screen that writes through it (hub true, see initHubClient).
+  function folBegin(opts, hub) {
     opts = opts || {};
     if (typeof opts.url !== 'string') return Promise.resolve({ ok: false, error: 'notFound', status: followStatus() });
-    const keepSubs = Array.from(followSubs);
-    init({ now: opts.now, storage: memoryBackend(), mode: 'real', noSync: true, noTimers: true, blank: true });
+    const keepSubs = Array.from(followSubs), keepRef = Array.from(refusalSubs);
+    init({ now: opts.now, storage: memoryBackend(), mode: 'real', noSync: true, noTimers: true, blank: true, memoryOnly: true });
     keepSubs.forEach((fn) => followSubs.add(fn));
+    keepRef.forEach((fn) => refusalSubs.add(fn));
     const url = opts.url.replace(/\/+$/, '');
     const f = fol = { url, code: typeof opts.code === 'string' ? opts.code : '', staleMs: isNum(opts.staleMs) && opts.staleMs > 0 ? opts.staleMs : 45000, offset: 0, seq: null, hubId: null, connected: false, everConnected: false,
       error: null, lastMsgAt: null, goodSince: null, retryInMs: 0, retryStep: 0, closed: false, gen: 0, ctrl: null, retryTimer: null, timer: null, lastKey: '', resolve: null, resyncs: 0,
+      base: null, hub: false, pend: [], name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
       fetchFn: opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null), Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
+    f.hub = !!hub;
+    f.name = typeof opts.name === 'string' ? opts.name.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20) : '';
     f.timer = opts.noTimers ? null : setInterval(folTick, 1000);
     const p = new Promise((resolve) => { f.resolve = resolve; });
     folConnect();
@@ -922,6 +933,7 @@
     const n = now();
     if (fol.connected && folStale() && fol.ctrl) { fol.connected = false; try { fol.ctrl.abort(); } catch (e) { /* ignore */ } }
     folNotify(false);
+    if (fol.hub) folSend();
     tickSubs.forEach((fn) => { try { fn(n); } catch (e) { if (g.console) console.error('[smokebox] tick subscriber failed', e); } });
   }
   // Schedules the next connection attempt after a failure: 1, 2, 4, 8, then every 15 seconds.
@@ -1008,25 +1020,248 @@
     if (name === 'hello') {
       if (d.proto !== 1) { f.error = 'wrongVersion'; try { f.ctrl.abort(); } catch (e) { /* ignore */ } folRetry('wrongVersion'); return; }
       f.pendingHub = d.hubId;
+      if (f.hub) hubHello(d);
     } else if (name === 'snapshot') {
       const v = E().validateBackup(d.state);
       if (!v.ok || !isNum(d.seq)) { folResync(); return; }
-      state = v.state; f.seq = d.seq; f.hubId = d.hubId || f.pendingHub; atLeast(lastStamp(state));
+      f.base = v.state; f.seq = d.seq; f.hubId = d.hubId || f.pendingHub;
+      if (f.hub) hubAfterSnapshot(d);
+      folShow();
       syncUnits();
       folGood();
     } else if (name === 'op') {
       if (!isNum(d.seq) || f.seq === null) return;
       if (d.seq <= f.seq) return;                                   // already applied
       if (d.seq !== f.seq + 1 || typeof d.type !== 'string') { folResync(); return; }
-      const r = d.type === 'tick' ? { report: 'ok', state: E().tick(state, d.now).state } : E().apply(state, d.type, d.payload, d.now);
+      const r = d.type === 'tick' ? { report: 'ok', state: E().tick(f.base, d.now).state } : E().apply(f.base, d.type, d.payload, d.now, { screen: d.screen });
       if (r.report !== 'ok') { folResync(); return; }
-      state = r.state; f.seq = d.seq;
+      f.base = r.state; f.seq = d.seq;
+      if (f.hub && typeof d.opId === 'string') hubConfirm(d.opId);
+      folShow();
       if (!f.connected) folGood(); else folNotify(false);
       scheduleNotify();
     } else if (name === 'resumed') {
       f.hubId = d.hubId || f.pendingHub;
+      if (f.hub) hubAfterResume();
       folGood();
     }
+  }
+
+
+  /* ---------- hub client: a screen that writes through the hub (stage 2) ---------- */
+  /*
+   * initHubClient({ url, code?, name?, adopt:'hub' | seed:true, ... }) -> Promise<{ ok, error?, status }>. The hub's ordered stream is the truth.
+   * A tap is applied at once as a PREDICTION and queued as an action with an opId, sent to the hub one at a time in order. The state shown is
+   * the hub's state with the still-unconfirmed taps replayed on top. When the hub answers: applied (the prediction stays until the hub's own
+   * stream delivers the action, then the hub's result replaces it), or refused with a reason (the prediction is rolled back and
+   * subscribeRefusals fires with plain words). If the link drops the status is 'offline', taps keep queuing (saved in the device's hub queue,
+   * key smokebox.v1.hubqueue) and the hub answers each in order on reconnect; the hub's order always wins. Memory only for the kitchen: the
+   * device's own saved kitchen is never written or replaced, and leaveHub() restores it. Exactly one of adopt:'hub' (show the hub's kitchen)
+   * or seed:true (send this device's kitchen to an EMPTY hub first; refused with notEmpty otherwise) must be given.
+   */
+  const QUEUE_KEY = 'smokebox.v1.hubqueue';
+  const hubQueued = () => (fol ? fol.pend.filter((p) => !p.answered).length : 0);
+  // The status word for a hub client: connecting, connected, sending (taps not yet answered), offline, or error.
+  function hubState() {
+    const f = fol;
+    if (FOLLOW_FATAL[f.error]) return 'error';
+    if (!f.everConnected) return 'connecting';
+    if (!f.connected || (f.sendFail && hubQueued() > 0) || folStale()) return 'offline';
+    return hubQueued() > 0 ? 'sending' : 'connected';
+  }
+  // What a screen shows about the hub connection: state, address, screen name, last message, unanswered taps, error words, clock offset.
+  function hubStatus() {
+    if (!fol || !fol.hub) return { mode: 'off', state: 'off', url: '', name: '', lastUpdate: null, lastOk: null, queued: 0, unsent: 0, error: null, reason: '', seq: null, hubId: null, offsetMs: 0, connected: false };
+    const q = hubQueued(), st = hubState();
+    return { mode: 'hub', state: st, url: fol.url, name: fol.name, lastUpdate: fol.lastMsgAt, lastOk: fol.lastMsgAt, queued: q, unsent: q, error: fol.error, reason: fol.error ? (FOLLOW_REASON[fol.error] || FOLLOW_REASON.error) : '',
+      seq: fol.seq, hubId: fol.hubId, offsetMs: Math.round(fol.offset), connected: st === 'connected' || st === 'sending' };
+  }
+  // True when this store is a screen that writes through a hub.
+  const isHubClient = () => !!fol && fol.hub;
+  // Registers fn for refusals; returns a remover. fn gets { opId, type, payload, report, info, text, at, ticketId?, batchId?, orderId? }.
+  function subscribeRefusals(fn) { if (typeof fn !== 'function') return () => {}; refusalSubs.add(fn); return () => refusalSubs.delete(fn); }
+  // Tells the refusal subscribers that one tap was not applied, with the plain words for the reason.
+  function hubRefused(p, report, info, words) {
+    const text = words || (E().describe ? E().describe(report, info || {}) : report);
+    const pl = isObjLike(p.payload) ? p.payload : {};
+    const o = { opId: p.opId, type: p.type, payload: p.payload, report, info: info || {}, text, at: now() };
+    if (typeof pl.ticketId === 'string') o.ticketId = pl.ticketId;
+    if (typeof pl.batchId === 'string') o.batchId = pl.batchId;
+    if (typeof pl.orderId === 'string') o.orderId = pl.orderId;
+    refusalSubs.forEach((fn) => { try { fn(o); } catch (e) { if (g.console) console.error('[smokebox] refusal subscriber failed', e); } });
+  }
+  // Which tickets, batches and orders have taps the hub has not confirmed yet (from the queued taps' payloads).
+  function pendingFor() {
+    const out = { tickets: [], batches: [], orders: [] };
+    if (!fol || !fol.hub) return out;
+    for (const p of fol.pend) {
+      const pl = isObjLike(p.payload) ? p.payload : {};
+      if (typeof pl.ticketId === 'string' && out.tickets.indexOf(pl.ticketId) < 0) out.tickets.push(pl.ticketId);
+      if (typeof pl.batchId === 'string' && out.batches.indexOf(pl.batchId) < 0) out.batches.push(pl.batchId);
+      if (typeof pl.orderId === 'string' && out.orders.indexOf(pl.orderId) < 0) out.orders.push(pl.orderId);
+    }
+    return out;
+  }
+  // Saves the unconfirmed taps (and which hub they belong to) so a reload does not lose them; removes the key when there are none.
+  function hubSaveQueue() {
+    const f = fol;
+    if (!f || !f.hub || !f.queueChecked) return;
+    try {
+      if (!f.pend.length) U.rawStorage.remove(QUEUE_KEY);
+      else U.rawStorage.set(QUEUE_KEY, { v: 1, url: f.url, hubId: f.hubId, entries: f.pend.map((p) => ({ opId: p.opId, type: p.type, payload: p.payload, now: p.now })) });
+    } catch (e) { /* the queue still lives in memory */ }
+  }
+  // Shows the hub's state with the unconfirmed taps replayed on top (a tap that no longer fits is skipped; the hub will refuse it).
+  function folShow() {
+    const f = fol;
+    if (!f || !f.base) return;
+    let s = f.base;
+    if (f.hub) {
+      f.pend = f.pend.filter((p) => !(p.answered && isNum(p.seq) && isNum(f.seq) && p.seq <= f.seq));
+      for (const p of f.pend) {
+        const r = E().apply(s, p.type, p.payload, Math.max(p.now, lastStamp(s)), { screen: f.name });
+        if (r.report === 'ok') s = r.state;
+      }
+    }
+    const same = state && s.settings === state.settings;
+    state = s;
+    if (!same) syncUnits();
+    scheduleNotify();
+  }
+  // The hub's own stream delivered an action: if it is one of ours, the hub's result replaces our prediction.
+  function hubConfirm(opId) {
+    const f = fol;
+    const i = f.pend.findIndex((p) => p.opId === opId);
+    if (i >= 0) { f.pend.splice(i, 1); hubSaveQueue(); }
+  }
+  // After a snapshot: drop taps the hub already applied (its recent action ids, or its change number for answered ones).
+  function hubAfterSnapshot(d) {
+    const f = fol;
+    const ids = new Set(Array.isArray(d.opIds) ? d.opIds : []);
+    f.pend = f.pend.filter((p) => !ids.has(p.opId) && !(p.answered && isNum(p.seq) && p.seq <= d.seq));
+    hubSaveQueue();
+  }
+  // After a resume the missed actions arrived as ops, which already confirmed ours; nothing more to do.
+  function hubAfterResume() { hubSaveQueue(); }
+  // First message from the hub: bring back the saved queue if it belongs to this hub and history, else tell the screen it was dropped.
+  function hubHello(d) {
+    const f = fol;
+    if (f.queueChecked) return;
+    let q = null;
+    try { q = U.rawStorage.get(QUEUE_KEY, null); } catch (e) { q = null; }
+    f.queueChecked = true;
+    if (!q || !Array.isArray(q.entries) || !q.entries.length) return;
+    if (q.url === f.url && q.hubId === d.hubId) {
+      const have = new Set(f.pend.map((p) => p.opId));
+      for (const e of q.entries) if (e && typeof e.opId === 'string' && typeof e.type === 'string' && isNum(e.now) && !have.has(e.opId)) f.pend.push({ opId: e.opId, type: e.type, payload: e.payload, now: e.now, answered: false });
+    } else {
+      for (const e of q.entries) if (e && typeof e.opId === 'string') hubRefused(e, 'hubChanged', {}, null);
+      try { U.rawStorage.remove(QUEUE_KEY); } catch (e) { /* ignore */ }
+    }
+  }
+  // A tap in hub mode: predicted on the shown state, queued, and sent to the hub in order. Returns the same shape as a normal dispatch.
+  function hubDispatch(type, payload) {
+    const f = fol;
+    // Records and returns one answer for a tap that was not queued.
+    const mk = (report, info) => { last = { type: typeof type === 'string' ? type : String(type), report, info: info || {}, events: [], opId: null }; return { report, info: info || {}, events: [], opId: null }; };
+    if (type === 'resetLive') return mk('hubKitchen');
+    if (!f.base || !f.queueChecked) return mk('hubConnecting');
+    const n = now();
+    const r = E().apply(state, type, payload, n, { screen: f.name });
+    const opId = tabId + ':' + (++opN);
+    last = { type: typeof type === 'string' ? type : String(type), report: r.report, info: r.info, events: r.events, opId };
+    if (r.report === 'ok' && r.state !== state) {
+      f.pend.push({ opId, type, payload, now: n, answered: false });
+      hubSaveQueue();
+      state = r.state;
+      scheduleNotify();
+      folNotify(false);
+      folSend();
+    }
+    return { report: r.report, info: r.info, events: r.events, opId };
+  }
+  // Sends the oldest unanswered tap to the hub and handles its answer: applied (kept until the hub's stream delivers it), refused (rolled
+  // back and reported), or no answer (offline: retry later with 1, 2, 4, 8, then 15 seconds; the hub answers a repeated opId the same way).
+  async function folSend() {
+    const f = fol;
+    if (!f || !f.hub || f.closed || f.sending || FOLLOW_FATAL[f.error] || f.sendRetryAt > realNow()) return;
+    const next = f.pend.find((p) => !p.answered);
+    if (!next || !f.fetchFn) return;
+    f.sending = true;
+    let res = null, body = null;
+    try {
+      res = await f.fetchFn(f.url + '/action', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store',
+        body: JSON.stringify({ type: next.type, payload: next.payload, opId: next.opId, clientId: tabId, who: f.name, at: next.now, code: f.code }) });
+      try { body = await res.json(); } catch (e) { body = null; }
+    } catch (e) { res = null; }
+    f.sending = false;
+    if (fol !== f || f.closed) return;
+    if (res && (res.status === 403 || res.status === 429)) { f.error = 'badCode'; folNotify(true); return; }
+    if (!res || res.status >= 500 || !body || typeof body !== 'object') {
+      f.sendFail = true; f.sendRetryAt = realNow() + Math.min(15000, 1000 * Math.pow(2, f.sendStep++));
+      folNotify(false);
+      return;
+    }
+    f.sendFail = false; f.sendStep = 0; f.sendRetryAt = 0;
+    const i = f.pend.indexOf(next);
+    if (i >= 0) {
+      if (body.ok === true || body.report === 'ok') { next.answered = true; next.seq = isNum(body.seq) ? body.seq : null; if (isNum(f.seq) && isNum(next.seq) && next.seq <= f.seq) f.pend.splice(i, 1); }
+      else { f.pend.splice(i, 1); hubRefused(next, typeof body.report === 'string' ? body.report : 'badPatch', body.info, typeof body.words === 'string' ? body.words : null); }
+      hubSaveQueue();
+      folShow();
+    }
+    folNotify(false);
+    if (f.pend.some((p) => !p.answered)) setTimeout(folSend, 0);
+  }
+  // Reads the hub's address and says whether it is a Smokebox hub, which code is needed and whether it is empty, without joining it.
+  async function probeHub(opts) {
+    opts = opts || {};
+    const fetchFn = opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null);
+    if (typeof opts.url !== 'string' || !fetchFn) return { ok: false, error: 'notFound' };
+    let res;
+    try { res = await fetchFn(opts.url.replace(/\/+$/, '') + '/probe?code=' + encodeURIComponent(typeof opts.code === 'string' ? opts.code : ''), { cache: 'no-store' }); } catch (e) { return { ok: false, error: 'unreachable' }; }
+    if (res.status === 403 || res.status === 429) return { ok: false, error: 'badCode' };
+    if (res.status === 404) return { ok: false, error: 'notFound' };
+    if (res.status === 503) return { ok: false, error: 'tooMany' };
+    let b = null;
+    try { b = await res.json(); } catch (e) { b = null; }
+    if (!res.ok || !b || typeof b !== 'object' || !('proto' in b)) return { ok: false, error: res.ok ? 'notFound' : 'error' };
+    if (b.proto !== 1) return { ok: false, error: 'wrongVersion' };
+    return { ok: true, empty: b.empty === true, hubId: b.hubId };
+  }
+  // Joins a hub as a screen that writes through it. See the section comment above for the two choices and what is never touched.
+  async function initHubClient(opts) {
+    opts = opts || {};
+    // Builds the answer for a join that did not happen.
+    const fail = (error) => ({ ok: false, error, status: hubStatus() });
+    if (typeof opts.url !== 'string') return fail('notFound');
+    if ((opts.adopt === 'hub') === (opts.seed === true)) return fail('choiceRequired');
+    if (fol) return fail('error');
+    const probe = await probeHub(opts);
+    if (!probe.ok) return fail(probe.error);
+    if (opts.seed === true) {
+      if (!probe.empty) return fail('notEmpty');
+      if (!state) return fail('error');
+      const fetchFn = opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null);
+      let res, b = null;
+      try {
+        res = await fetchFn(opts.url.replace(/\/+$/, '') + '/seed', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ state, code: typeof opts.code === 'string' ? opts.code : '' }) });
+        try { b = await res.json(); } catch (e) { b = null; }
+      } catch (e) { return fail('unreachable'); }
+      if (res.status === 403 || res.status === 429) return fail('badCode');
+      if (res.status === 409) return fail('notEmpty');
+      if (!res.ok || !b || b.ok !== true) return fail('error');
+    }
+    return folBegin(opts, true);
+  }
+  // Leaves the hub: refuses while taps are unanswered unless force is true; then restarts the store on the device's own saved kitchen.
+  async function leaveHub(opts) {
+    if (!fol || !fol.hub) return { ok: false, error: 'notInHub' };
+    const q = hubQueued();
+    if (q > 0 && !(opts && opts.force === true)) return { ok: false, error: 'pending', pending: q };
+    try { U.rawStorage.remove(QUEUE_KEY); } catch (e) { /* ignore */ }
+    init(lastInit || {});
+    return { ok: true };
   }
 
   /* ---------- selectors (memoised per state reference) ---------- */
@@ -1279,6 +1514,7 @@
     // Records and returns a refusal; nothing has been changed when this is used.
     const fail = (report, info) => { last = { type: 'startOver', report, info: info || {}, events: [] }; return { ok: false, report, info: info || {} }; };
     if (!state) return fail('invalidBackup');
+    if (fol) return fail(fol.hub ? 'hubKitchen' : 'followerReadOnly');
     if (mode === 'demo') return fail('notInDemo');
     if (typeof opts.confirm !== 'string' || opts.confirm.trim().toUpperCase() !== START_OVER_WORD) return fail('confirmWord', { word: START_OVER_WORD });
     if (opts.keepSettings != null && typeof opts.keepSettings !== 'boolean') return fail('badPatch', { key: 'keepSettings' });
@@ -1352,6 +1588,6 @@
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
-    initFollower, followStatus, subscribeFollow, isFollower, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
+    initFollower, followStatus, subscribeFollow, isFollower, initHubClient, probeHub, hubStatus, subscribeHub: subscribeFollow, subscribeRefusals, pendingFor, isHubClient, isHub: isHubClient, leaveHub, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

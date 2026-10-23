@@ -111,6 +111,21 @@
   // Says whether this page is a read-only follower screen, and which hub it follows.
   SB.followMode = () => FOLLOW;
   const following = FOLLOW.on;
+  // Hub address for a tablet that writes through the hub: ?hub=<hub address>&code=<code>; a bare ?hub means the page's own hub.
+  function readHub() {
+    const q = g.location && typeof g.location.search === 'string' ? g.location.search : '';
+    const hit = /[?&]hub(?:=([^&]*))?(?=&|$)/.exec(q);
+    if (!hit || FOLLOW.on) return { on: false, url: '', code: '' };
+    // Decodes one part of the address, empty when it is damaged.
+    const dec = (v) => { try { return decodeURIComponent(v || ''); } catch (e) { return ''; } };
+    const c = /[?&]code=([^&]*)/.exec(q);
+    return { on: true, url: dec(hit[1]).replace(/\/+$/, ''), code: c ? dec(c[1]) : '' };
+  }
+  const HUB = readHub();
+  // Says whether this tablet writes through a hub (its taps go to the hub, which answers each one).
+  SB.hubMode = () => HUB;
+  const hubOn = HUB.on;
+  if (hubOn) doc.documentElement.dataset.hub = 'on';
   if (following) doc.documentElement.dataset.follow = 'on';
   // A follower screen is silent unless the owner turns sound on for this screen (its own switch, off by default).
   const KEY_FSOUND = 'smokebox.v1.follow.sound';
@@ -523,6 +538,7 @@
     paintHints();
     m.offs.push(store().subscribe(onStore));
     m.offs.push(store().subscribeTick(onTick));
+    if (hubOn) watchHubRefusals();
     doc.addEventListener('keydown', onKey);
     m.offs.push(() => doc.removeEventListener('keydown', onKey));
     // Keep the screen awake while the board shows, and ask again when the page returns to the front.
@@ -600,7 +616,7 @@
   // Builds the whole page once. WATCH OUT: nothing built here is replaced later; updates change
   // text and attributes only.
   function buildDom() {
-    const root = h('div', { class: 'fl', dataset: { zone: m.zone, mode: modeOf(m.zone), far: far ? 'on' : 'off', follow: following ? 'on' : 'off' } });
+    const root = h('div', { class: 'fl', dataset: { zone: m.zone, mode: modeOf(m.zone), far: far ? 'on' : 'off', follow: following ? 'on' : 'off', hub: hubOn ? 'on' : 'off' } });
     m.root = root;
     // ----- header
     const brand = SB.shell && SB.shell.brand ? SB.shell.brand() : h('span', null, 'Smokebox');
@@ -690,7 +706,7 @@
     const belowT = h('span', null, '');
     const below = h('button', { type: 'button', class: 'btn fl-below', hidden: true, onClick: () => { main.scrollBy({ top: Math.round(main.clientHeight * 0.85), behavior: reduced() ? 'auto' : 'smooth' }); } }, ico('chevron-down', 20), belowT);
     // A follower screen has a bar under the header: the connection chip, the out-of-date banner and the "only shows" line.
-    const fbar = following ? buildFollowBar() : null;
+    const fbar = following ? buildFollowBar() : hubOn ? buildHubBar() : null;
     if (fbar) m.fbar = fbar;
     root.append(...[head, fbar ? fbar.el : null, strip.el, wl.el, main, dock, wr.el, below].filter(Boolean));
     m.below = below; m.belowT = belowT;
@@ -1726,7 +1742,7 @@
       if (co === 'on' && m.zone !== 'all') F.setZone('all'); }
     if (!m.belowAt || now - m.belowAt > 1000 || now < m.belowAt) { m.belowAt = now; updateBelow(); }
     paintRole();
-    if (following) paintFollow();
+    if (following) paintFollow(); else if (hubOn) paintHub();
     updateStrip(now);
     driveCallouts(now);
     if (m.root.dataset.wall === 'on') updateWall(now);
@@ -1854,7 +1870,7 @@
       { hide: front || !cookOn(), label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
       // 86 and Demo open their sheets too.
       { label: '86 board' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
-      { hide: kit, label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
+      { hide: kit || hubOn, label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
       // The sanitize entry opens its own small menu on the same anchor.
       { hide: !cookOn(), label: 'Readings', icon: 'thermometer', onClick: () => openSheet('readings') },
       { hide: !cookOn(), label: 'Sanitize timer' + (m.sanText.textContent ? ': ' + m.sanText.textContent : ''), icon: 'shield-check', onClick: () => sanitiseMenu(anchor) },
@@ -1966,7 +1982,7 @@
     const title = firstRun ? 'Welcome. Let\'s build your menu.' : stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
     const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
-      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
+      : hubOn ? 'New orders land here the moment they are sent, from this tablet or any other screen in the kitchen.' : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
     if (following) { const sg = 'follow|' + zone + '|' + stationBusy; if (e.dataset.sig === sg) return; e.dataset.sig = sg; U.clear(e); e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.')); return; }
     const cardUp = !!(m.welcome && !m.welcome.hidden);
     const sig = title + '|' + text + '|' + cardUp;
@@ -1991,18 +2007,77 @@
     e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
   }
 
+  /* ---------- hub mode: this tablet writes through the hub ---------- */
+  // What the hub client says about the connection, as a tone and words for the small chip. Never blocks any work.
+  function hubView() {
+    const st = SB.store && typeof SB.store.hubStatus === 'function' ? SB.store.hubStatus() : null;
+    if (!st || st.mode === 'off') return { tone: 'wait', text: 'Connecting...', sub: '', unsent: 0 };
+    const n = Math.max(0, Number(st.unsent) || 0);
+    if (st.state === 'offline' || st.state === 'error') return { tone: 'wait', text: 'Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
+    if (st.state === 'connecting') return { tone: 'wait', text: 'Connecting...', sub: n ? n + ' waiting' : '', unsent: n };
+    if (n > 0) return { tone: 'wait', text: 'Sending ' + n + '...', sub: '', unsent: n };
+    return { tone: 'ok', text: 'Connected', sub: '', unsent: 0 };
+  }
+  // Builds the slim bar under the header: a small calm chip and, when something is unconfirmed, one plain line.
+  function buildHubBar() {
+    const dot = h('span', { class: 'fl-hdot', 'aria-hidden': 'true' });
+    const word = h('span', { class: 'fl-hword' }), sub = h('span', { class: 'fl-hsub' });
+    const chip = h('div', { class: 'fl-hchip', role: 'status', 'aria-live': 'polite', dataset: { tone: 'wait' } }, dot, word, sub);
+    const note = h('span', { class: 'fl-hnote', hidden: true });
+    return { el: h('div', { class: 'fl-hub' }, chip, note), chip, word, sub, note };
+  }
+  // The ids of tickets this tablet changed that the hub has not confirmed yet (empty when the store cannot say).
+  function unconfirmedTickets() {
+    const f = SB.store && SB.store.pendingFor;
+    if (typeof f !== 'function') return new Set();
+    try { const p = f.call(SB.store); const t = p && p.tickets; return t instanceof Set ? t : new Set(Array.isArray(t) ? t : []); } catch (e) { return new Set(); }
+  }
+  // Updates the chip, the "not confirmed yet" line and the small marker on each slip changed here (text only when it changes).
+  function paintHub() {
+    const f = m && m.fbar;
+    if (!f) return;
+    const v = hubView();
+    if (f.chip.dataset.tone !== v.tone) f.chip.dataset.tone = v.tone;
+    if (f.word.textContent !== v.text) f.word.textContent = v.text;
+    if (f.sub.textContent !== v.sub) f.sub.textContent = v.sub;
+    const pend = unconfirmedTickets();
+    const msg = pend.size ? pend.size + (pend.size === 1 ? ' change is' : ' changes are') + ' not confirmed yet. They show here until the kitchen answers.' : '';
+    if (f.note.textContent !== msg) f.note.textContent = msg;
+    setHidden(f.note, !msg);
+    for (const rec of m.slips.values()) {
+      const on = pend.has(rec.id);
+      if (!!rec.pendEl === on) continue;
+      if (on) { rec.pendEl = h('div', { class: 'slip-pending' }, 'Not confirmed yet'); const hd = rec.el.querySelector('.slip-head'); if (hd) hd.after(rec.pendEl); rec.el.dataset.pending = 'on'; }
+      else { rec.pendEl.remove(); rec.pendEl = null; delete rec.el.dataset.pending; }
+    }
+  }
+  // Tells the cook, on the screen that tapped, that the hub did not do a tap, and why. The change shown here was already taken back.
+  function onHubRefusal(r) {
+    const text = (r && (r.text || r.reason)) || 'The kitchen did not accept that tap.';
+    toast(/^Not done/i.test(text) ? text : 'Not done: ' + text, { tone: 'warn', ms: 12000 });
+    const rec = r && r.ticketId ? m && m.slips.get(r.ticketId) : null;
+    if (rec) flash(rec.el.querySelector('.slip-head'));
+  }
+  // Starts listening for the hub's refusals once the board is on screen.
+  function watchHubRefusals() {
+    const sub = SB.store && (SB.store.subscribeRefusals || SB.store.subscribeHubRefusals);
+    if (typeof sub !== 'function') return;
+    const off = sub.call(SB.store, onHubRefusal);
+    if (typeof off === 'function') m.offs.push(off);
+  }
+
   /* ---------- follower screen: a read-only second screen that mirrors the hub ---------- */
   // What the follower store says about the connection, in the three words the chip uses: ok, wait or bad.
   function followView() {
     const st = SB.store && typeof SB.store.followStatus === 'function' ? SB.store.followStatus() : null;
-    if (!st || st.mode !== 'follower') return { tone: 'bad', text: 'Not connected', sub: 'The hub could not be reached.', stale: false };
+    if (!st || st.mode !== 'follower') return { tone: 'bad', text: 'Not connected', sub: 'The kitchen could not be reached.', stale: false };
     const at = st.staleSince || st.lastUpdate || 0;
     const since = at ? U.fmtTime(at) : '';
     if (st.state === 'following') return { tone: 'ok', text: 'Connected', sub: st.lastUpdate ? 'Updated ' + U.fmtTime(st.lastUpdate) : '', stale: false };
     if (st.state === 'connecting') return { tone: 'wait', text: 'Connecting...', sub: '', stale: false };
     if (st.state === 'reconnecting') return { tone: 'wait', text: 'Reconnecting...', sub: since ? 'Last update ' + since : '', stale: false };
-    if (st.state === 'stale') return { tone: 'bad', text: 'Out of date since ' + since, sub: 'Looking for the hub again.', stale: true, since };
-    return { tone: 'bad', text: 'Not connected', sub: st.reason || 'The hub could not be reached.', stale: !!at, since };
+    if (st.state === 'stale') return { tone: 'bad', text: 'Out of date since ' + since, sub: 'Looking for the kitchen again.', stale: true, since };
+    return { tone: 'bad', text: 'Not connected', sub: st.reason || 'The kitchen could not be reached.', stale: !!at, since };
   }
   // Builds the bar under the header: connection chip (big enough for a TV), the calm "only shows" line and the out-of-date banner.
   function buildFollowBar() {
