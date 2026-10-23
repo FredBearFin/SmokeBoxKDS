@@ -230,10 +230,9 @@ test('startOver: the demo keys are never touched', () => {
   S.destroy();
 });
 
-// KNOWN DESIGN QUESTION (owner A5): Start over refreshes the rolling last-good copy BEFORE erasing (so a failed erase can be undone), and that copy
-// keeps the old customers and orders in browser storage until the next snapshot (6 hours or close of day). A later damaged save brings them back.
-// Marked todo so the suite stays green; it turns into a failure to fix the day the copy is dropped or replaced by the empty kitchen after the erase.
-test('startOver then a damaged save: the rolling last-good copy must not bring the erased kitchen back (privacy)', { todo: 'A5: replace or remove the last-good copy once the erase has succeeded' }, () => {
+// Start over drops the rolling last-good copy and any set-aside damaged copy once the erase has gone in, and retakes the last-good copy from the
+// new empty kitchen, so a later damaged save can never bring the erased customers and orders back.
+test('startOver then a damaged save: the rolling last-good copy must not bring the erased kitchen back (privacy)', () => {
   const storage = memStorage();
   const { clock } = boot({ storage });
   S.dispatch('createTicket', { items: [{ menuId: S.getState().menu[0].id }], customer: 'Secret Customer', allowPast: true });
