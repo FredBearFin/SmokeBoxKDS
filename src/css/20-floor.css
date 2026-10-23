@@ -766,5 +766,22 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl[data-counter="on"] .slip[data-level] .slip-head, .fl[data-counter="on"] .slip[data-level] .slip-body, .fl[data-counter="on"] .slip[data-level] .slip-tear { animation: none; box-shadow: none; }
 .fl[data-counter="on"] .slip-timer { color: var(--slip-ink); }
 /* The last-checked stamp sits at the right end of the all-day strip, quiet and small. */
-.fl-checked { flex: none; margin-left: auto; padding: 0 var(--sp-3); font-size: var(--fs-1); color: var(--ink2); white-space: nowrap; }
+.fl-checked { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; margin-left: auto; padding: 0 var(--sp-3); font-size: var(--fs-1); color: var(--ink2); white-space: nowrap; }
+/* On a very narrow screen the stamp gives way to the dishes: it shows only when there is room for it. */
+@media (max-width: 340px) { .fl-checked { display: none; } }
 .mn-test { display: grid; gap: var(--sp-2); }
+/* Phone width, compact tickets: the name and the channel with its "0 of 3 done" share one line, so a rush takes fewer screens. A long name or
+   channel still wraps rather than squeezing; the tap targets are unchanged. */
+@media (max-width: 560px) {
+  .fl-main[data-density="compact"] .fl-slip .slip-who { grid-column: 1; grid-row: 2; min-width: 0; overflow-wrap: anywhere; }
+  .fl-main[data-density="compact"] .fl-slip .slip-meta { grid-column: 2; grid-row: 2; align-self: start; justify-self: end; margin-top: 0; text-align: right; min-width: 0; }
+  /* A little less padding around each dish row (the 44 px tap tile stays), and a tighter gap between tickets. */
+  .fl-main[data-density="compact"] .fl-row .slip-item { padding-block: calc(2px * var(--fl-k)); }
+  .fl-main[data-density="compact"] .fl-slip { padding-top: calc(4px * var(--fl-k)); }
+  .fl-main[data-density="compact"] .fl-slip .slip-head { padding-bottom: 6px; }
+  .fl-main[data-density="compact"] .fl-slip .slip-foot { padding-block: calc(3px * var(--fl-k)); }
+  .fl-main[data-density="compact"] .fl-grid { row-gap: calc(10px * var(--fl-k)); }
+  /* The next-step line is one line with an ellipsis (each dish row already shows its own "Start in" time), and sits closer to the dishes. */
+  .fl-main[data-density="compact"] .slip-next { margin-top: 2px; padding-block: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+}

@@ -559,6 +559,8 @@
     U.clear(i.el);
   };
 
+  // How many slips a station switch builds before painting; the rest follow right after.
+  const FIRST_SCREEN = 36;
   // Switches to another station tab and announces the result. Called by the shell when the address changes.
   F.setZone = function (zone) {
     const z = TABS.indexOf(zone) >= 0 ? zone : 'all';
@@ -571,9 +573,16 @@
     // Count this redraw as the first, so slips do not print in or chime as if they were new.
     m.first = true; m.coPrimed = false;
     m.hl = null; paintHighlight();
+    // A big board paints its first screenful at once and the rest a moment later, so the tap is answered quickly.
+    m.buildLimit = FIRST_SCREEN;
     render();
+    m.buildLimit = 0;
     m.first = false;
-    const n = m.slips.size, zn = z === 'all' ? 'All stations' : zoneById(z).name;
+    if (m.deferred) {
+      m.deferred = false;
+      setTimeout(() => { if (!m || m.zone !== z) return; m.first = true; render(); m.first = false; }, 25);
+    }
+    const n = store().select.ticketsForZone(z).length, zn = z === 'all' ? 'All stations' : zoneById(z).name;
     say(zn + ': ' + (n ? n + ' ' + U.plural(n, 'ticket') : 'no tickets') + '.');
     return z;
   };
@@ -1006,7 +1015,11 @@
       const t = list[i];
       seen.add(t.id);
       let rec = m.slips.get(t.id);
-      if (!rec) { rec = buildSlip(t, mode, now); m.slips.set(t.id, rec); added.push(rec); } else syncSlip(rec, t, now);
+      if (!rec) {
+        // After a tab switch only the first slips are built now; the rest come in the next pass.
+        if (m.buildLimit && added.length >= m.buildLimit) { m.deferred = true; continue; }
+        rec = buildSlip(t, mode, now); m.slips.set(t.id, rec); added.push(rec);
+      } else syncSlip(rec, t, now);
       want.push(rec);
     }
     for (const rec of Array.from(m.slips.values())) if (!seen.has(rec.id)) removeSlip(rec);
