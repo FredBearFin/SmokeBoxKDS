@@ -41,6 +41,8 @@
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
   // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
   const SNAP_KEEP = { maxTickets: 300, maxEvents: 2000 };
+  // The smaller rolling copy used when the browser's space is getting full.
+  const SNAP_KEEP_TIGHT = { maxTickets: 40, maxEvents: 300 };
   // The 'before restore' copy stays in the last-good slot for 7 days, or until a close-day copy replaces it, so a wrong restore can be undone.
   const BEFORE_RESTORE = 'before restore', BEFORE_MONTH_CLOSE = 'before month close', BEFORE_RESTORE_KEEP_MS = 7 * 24 * 3600e3;
   const SID_KEY = 'smokebox.v1.sid';
@@ -81,6 +83,22 @@
   // Two tabs saving at the same moment must not drop each other's work (F-L9). baseSid names the save this tab last
   // loaded or wrote; pending lists this tab's actions since then, so they can be replayed on top of a newer save.
   let baseSid = null, pending = [], skipRebase = false, sidN = 0;
+  // Asks the browser to keep this site's data when it is short of room (an iPad may otherwise clear it after a week unused). The answer lands in status.persisted.
+  function askPersist(target) {
+    try {
+      const sg = g.navigator && g.navigator.storage;
+      if (!sg || typeof sg.persisted !== 'function') return;
+      sg.persisted().then((p) => {
+        if (p || typeof sg.persist !== 'function') { target.persisted = !!p; return null; }
+        return sg.persist().then((ok) => { target.persisted = !!ok; });
+      }).then(() => scheduleNotify()).catch(() => {});
+    } catch (e) { /* the browser cannot say */ }
+  }
+  // History fill: the browser keeps about 5 million characters for the whole app. quotaChars is that limit (a test or a bigger store can say another);
+  // hist remembers the oldest saved service day and how many days were dropped to make room (not by Close the month); hn remembers which notices
+  // the owner has already seen. NEAR_FULL_PCT and WARN_PCT are the percent of the tightest limit where the calm card and the one-time notice appear.
+  const HIST_KEY = 'smokebox.v1.histtrim', HIST_NOTICE_KEY = 'smokebox.v1.histnotice', NEAR_FULL_PCT = 70, WARN_PCT = 85;
+  let quotaChars = 5e6, hist = { oldest: null, days: 0, at: 0, droppedBefore: null }, hn = { warnAt: 0, trimAck: 0 };
   // Reading what another tab wrote can be late (a browser's storage is a per-process copy), so the save id alone cannot prove nothing was missed.
   // Each saved copy also lists the ids of the actions it contains (journal, last JOURNAL_MAX). recent holds this tab's own actions of the last
   // five minutes (at most 200). Whenever another tab's copy is adopted, every recent action of this tab that its journal lacks is applied on top
@@ -216,6 +234,67 @@
     st.saveDelayMs = wait;
     saveTimer = setTimeout(timedSave, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
   }
+  // Whole calendar days from one service day text to a later one.
+  const daysBetween = (a, b) => Math.round((U.dateKeyToMs(b) - U.dateKeyToMs(a)) / 864e5);
+  // Forgets the oldest saved day, so the next save starts counting again (after a restore, a reset or Close the month, which remove history on purpose).
+  function histRebase() { hist.oldest = null; }
+  // Called after each good save with the copy that was written: if its oldest ticket day moved forward, history was dropped to make room (the size
+  // limit of the app or of the browser), and the days are added up so the owner can be told once.
+  function histTrack(saved, r) {
+    const oldest = saved.tickets.length ? saved.tickets[0].serviceDate : null;
+    if (typeof oldest !== 'string') return;
+    if (typeof hist.oldest === 'string' && oldest > hist.oldest) {
+      hist.days += Math.max(1, daysBetween(hist.oldest, oldest)); hist.at = r; hist.droppedBefore = oldest;
+      hist.oldest = oldest;
+      try { storage.set(HIST_KEY, hist); } catch (e) { /* the count is kept in memory */ }
+    }
+    hist.oldest = oldest;
+  }
+  // How many characters the saved kitchen takes (the main save plus the last-good copy), read as text without parsing it. 0 when the storage cannot tell.
+  function savedChars() {
+    if (!storage || typeof storage.raw !== 'function') return 0;
+    let n = 0;
+    try { for (const k of [KEY, LASTGOOD_KEY]) { const t = storage.raw(k); if (typeof t === 'string') n += t.length; } } catch (e) { return 0; }
+    return n;
+  }
+  // How full the saved history is, as a percent of the tightest of three limits (tickets, events, browser space), and what the owner can be told.
+  // { tickets, ticketsCap, events, eventsCap, bytes, quotaBytes, pct, nearFull (70 percent), warn (85 percent), persisted (true, false, or null when
+  // unknown), daysLeft (days at the recent pace until a limit is reached, or null), keepDays (what Close the month would keep now), trimmedSince }.
+  // trimmedSince is null, or { days, at, droppedBefore }: days dropped to make room since the owner last saw the notice, when, and the first day still kept.
+  function historyFill() {
+    if (!state) return null;
+    const L = SB.config.limits, events = E().allEvents(state).length, tickets = state.tickets.length, bytes = savedChars();
+    const pct = Math.round(100 * Math.max(tickets / L.maxTickets, events / L.maxEvents, quotaChars > 0 ? bytes / quotaChars : 0));
+    let daysLeft = null;
+    if (tickets) {
+      const today = U.serviceDate(now(), state.settings.service.dayStartHour), oldest = state.tickets[0].serviceDate;
+      const span = Math.max(1, daysBetween(oldest, today) + 1);
+      if (span >= 3) daysLeft = Math.max(0, Math.floor(Math.min((L.maxTickets - tickets) / (tickets / span), (L.maxEvents - events) / (events / span), bytes > 0 && quotaChars > bytes ? (quotaChars - bytes) / (bytes / span) : Infinity)));
+    }
+    const unseen = hist.days - (hn.trimAck || 0);
+    return {
+      tickets, ticketsCap: L.maxTickets, events, eventsCap: L.maxEvents, bytes, quotaBytes: quotaChars, pct, nearFull: pct >= NEAR_FULL_PCT, warn: pct >= WARN_PCT,
+      persisted: st.persisted === undefined ? null : !!st.persisted, daysLeft: daysLeft !== null && isFinite(daysLeft) ? daysLeft : null,
+      keepDays: E().adaptiveKeepDays(state, now(), monthOpts({}).fill),
+      trimmedSince: unseen > 0 ? { days: unseen, at: hist.at, droppedBefore: hist.droppedBefore } : null,
+    };
+  }
+  // The one-time notice for the board, or null: kind 'full' once when the history passes 85 percent, kind 'trimmed' after older history was dropped.
+  // Call historyNoticeSeen(kind) when it was shown. The 'full' notice comes back only after the history has fallen under 60 percent.
+  function historyNotice() {
+    const f = historyFill();
+    if (!f) return null;
+    if (f.pct < 60 && hn.warnAt) { hn.warnAt = 0; try { storage.set(HIST_NOTICE_KEY, hn); } catch (e) { /* ignore */ } }
+    if (f.trimmedSince) return { kind: 'trimmed', days: f.trimmedSince.days, words: 'Older history was dropped to make room: ' + f.trimmedSince.days + (f.trimmedSince.days === 1 ? ' day' : ' days') + '. Close the month regularly to keep it in files.' };
+    if (f.warn && !hn.warnAt) return { kind: 'full', pct: f.pct, words: 'Your saved history is ' + f.pct + '% full. Close the month to keep older days in files before they are dropped.' };
+    return null;
+  }
+  // Marks a notice as shown, so it is not shown again until something new happens.
+  function historyNoticeSeen(kind) {
+    if (kind === 'full') hn.warnAt = realNow(); else if (kind === 'trimmed') hn.trimAck = hist.days; else return false;
+    try { storage.set(HIST_NOTICE_KEY, hn); } catch (e) { /* ignore */ }
+    return true;
+  }
   // The browser's lock manager when it has one, else null.
   const lockManager = () => { try { const n = g.navigator; return n && n.locks && typeof n.locks.request === 'function' ? n.locks : null; } catch (e) { return null; } };
   // True while a save runs inside the lock (then no tag check is needed: no other tab can be saving).
@@ -259,14 +338,14 @@
     const prevSaveOk = st.lastSaveOk;
     let snapDropped = false;
     // full copy first; if the quota refuses it, keep halving the history (oldest completed tickets and events go first)
-    let lim = null;
+    let lim = null, kept2 = null;
     // First trimmed attempt keeps at most 1500 tickets and 10 000 events. A failed save never loses the copy
     // in memory (finding F-E5).
     let nt = Math.min(state.tickets.length, 1500), ne = Math.min(E().allEvents(state).length, 10000);
     for (let tries = 0; tries < 12; tries++) {
       const s2 = lim ? E().prune(state, lim) : state;
       try { ok = storage.set(KEY, { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, ops: journal, era, state: s2 }) !== false; } catch (e) { ok = false; }
-      if (ok) { st.trimmed = !!lim; break; }
+      if (ok) { st.trimmed = !!lim; kept2 = s2; break; }
       // Under pressure the rolling copy goes first: it is only a convenience, the live save is the data.
       if (!snapDropped && strict) { snapDropped = true; snapAt = 0; try { storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } tries--; continue; }
       // History is already tiny: trimming further will not help, so give up and report the failed save.
@@ -287,6 +366,7 @@
       pending = [];
       if (tr && !noTimersOpt && !reconcileTimer && typeof setTimeout === 'function') reconcileTimer = setTimeout(() => { reconcileTimer = null; reconcile(); }, RECONCILE_MS);
     }
+    if (ok && kept2) histTrack(kept2, r);
     if (ok && !st.trimmed) maybeSnapshot(r);
     if (ok && pendingBroadcast && tr) { try { tr.post({ type: 'saved', rev: state.rev, tab: tabId, sid }); } catch (e) { /* ignore */ } }
     pendingBroadcast = false;
@@ -300,7 +380,9 @@
     // A 'before restore' copy is the owner's way back from a wrong restore: the 6-hour refresh leaves it alone for 7 days.
     if (!snapWanted) { const g = beforeRestoreCopy(r); if (g) return false; }
     try {
-      const small = E().prune(state, SNAP_KEEP);
+      // When the saved kitchen already fills half the browser's space, the rolling copy shrinks to a few tickets (menu, settings, PIN and safety records
+      // stay): a fat copy is what pushes the live save over the limit and gets the copy dropped anyway.
+      const small = E().prune(state, savedChars() > quotaChars * 0.5 ? SNAP_KEEP_TIGHT : SNAP_KEEP);
       const env = { v: 1, takenAt: r, reason: snapWanted || 'interval', rev: state.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
       const text = JSON.stringify(env);
       if (!E().validateBackup(text).ok) return false; // never keep a copy that would not load
@@ -660,7 +742,7 @@
     st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: SAVE_MS };
     last = null; writeBlocked = false; heldText = null; susp = null;
     baseSid = null; pending = []; recent = []; journal = []; skipRebase = false; noTimersOpt = !!opts.noTimers; if (reconcileTimer) { clearTimeout(reconcileTimer); reconcileTimer = null; }
-    outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
+    outbox = []; seenOps = new Set(); acked.clear();      // opN is never reset: an action id must not repeat in one page, or a hub or another tab that remembers it takes the new action for a repeat
     const r = realNow();
     let payload = null;
     try { payload = storage.get(KEY, null); } catch (e) { payload = null; }
@@ -711,6 +793,12 @@
     }
     try { const g0 = storage.get(LASTGOOD_KEY, null); snapAt = g0 && isNum(g0.takenAt) ? g0.takenAt : 0; } catch (e) { snapAt = 0; }
     snapWanted = null;
+    // History fill bookkeeping, and a request that the browser keeps this site's data (real kitchens only; where the browser cannot, nothing happens).
+    quotaChars = isNum(opts.quotaBytes) && opts.quotaBytes > 0 ? opts.quotaBytes : 5e6;
+    hist = { oldest: null, days: 0, at: 0, droppedBefore: null }; hn = { warnAt: 0, trimAck: 0 };
+    try { const h0 = storage.get(HIST_KEY, null); if (h0 && typeof h0 === 'object') hist = Object.assign(hist, { oldest: typeof h0.oldest === 'string' ? h0.oldest : null, days: isNum(h0.days) ? h0.days : 0, at: isNum(h0.at) ? h0.at : 0, droppedBefore: typeof h0.droppedBefore === 'string' ? h0.droppedBefore : null }); } catch (e) { /* none */ }
+    try { const n0 = storage.get(HIST_NOTICE_KEY, null); if (n0 && typeof n0 === 'object') hn = { warnAt: isNum(n0.warnAt) ? n0.warnAt : 0, trimAck: isNum(n0.trimAck) ? n0.trimAck : 0 }; } catch (e) { /* none */ }
+    if (strict && mode === 'real') askPersist(st);
     // After a reload the virtual time continues from where it was saved, plus the real time spent away, and
     // never earlier than the real time. Speed goes back to 1.
     let vNow = r;
@@ -902,7 +990,7 @@
     atLeast(lastStamp(ns));
     state = E().tick(ns, now()).state; syncUnits();
     pendingBroadcast = true;
-    skipRebase = true; pending = []; recent = []; journal = []; era = newEra();   // an import or reset is meant to win over what another tab saved
+    skipRebase = true; pending = []; recent = []; journal = []; era = newEra(); histRebase();   // an import or reset is meant to win over what another tab saved
     persistNow();
     scheduleNotify();
     last = { type: 'import', report: 'ok', info: { repaired: v.repaired, beforeRestore: beforeAt != null, beforeRestoreAt: beforeAt, beforeRestoreKeepDays: beforeAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, events: [] };
@@ -929,9 +1017,17 @@
   // before (the real boundary), safetyEventsKept, dayRecordsKept, openTicketsKept, openOrdersKept, uncoveredDays, paidTotal.
   function closeMonthPreview(opts) {
     if (!state) return monthAnswer('closeMonthPreview', false, 'invalidBackup');
-    const r = E().monthPlan(state, opts, now());
+    const r = E().monthPlan(state, monthOpts(opts), now());
     if (!r.ok) return monthAnswer('closeMonthPreview', false, r.report, r.info);
     return monthAnswer('closeMonthPreview', true, 'ok', {}, { preview: planView(r.plan) });
+  }
+  // The options for the engine's plan: what the caller asked for, plus how full the saved history is, so the default keep window can follow the
+  // kitchen's pace (a busy kitchen keeps fewer days, because the limits would drop them anyway).
+  function monthOpts(opts) {
+    const today = state ? U.serviceDate(now(), state.settings.service.dayStartHour) : null;
+    // The saved copy may hold fewer days than memory (older ones were dropped to fit), so its pace is counted over the days it really holds.
+    const spanDays = today && typeof hist.oldest === 'string' ? Math.max(1, daysBetween(hist.oldest, today) + 1) : null;
+    return Object.assign({}, opts, { fill: { bytes: savedChars(), quotaBytes: quotaChars, spanDays } });
   }
   // File name part for a date like 2026-09-01 without dashes.
   const flatDay = (d) => String(d).replace(/-/g, '');
@@ -942,7 +1038,7 @@
   function closeMonthExport(opts) {
     if (!state) return monthAnswer('closeMonthExport', false, 'invalidBackup');
     if (mode === 'demo') return monthAnswer('closeMonthExport', false, 'notInDemo');
-    const r = E().monthPlan(state, opts, now());
+    const r = E().monthPlan(state, monthOpts(opts), now());
     if (!r.ok) return monthAnswer('closeMonthExport', false, r.report, r.info);
     const pl = r.plan;
     if (!pl.tickets && !pl.orders && !pl.events) return monthAnswer('closeMonthExport', false, 'nothingToDo', { before: pl.before });
@@ -969,7 +1065,7 @@
       files: files.map((f) => ({ name: f.name, kind: f.kind, chars: f.chars, sha256: f.sha256 })),
     };
     add('smokebox-month-manifest-' + range + '.json', 'manifest', 'application/json', JSON.stringify(manifest, null, 2) + '\n');
-    monthExport = { before: pl.before, planKey: planKey(pl), backup: { chars: files[0].chars, sha256: files[0].sha256 } };
+    monthExport = { before: pl.before, requestedBefore: pl.requestedBefore, keepDays: pl.keepDays, planKey: planKey(pl), backup: { chars: files[0].chars, sha256: files[0].sha256 } };
     last = { type: 'closeMonthExport', report: 'ok', info: { files: files.length }, events: [] };
     return { ok: true, report: 'ok', info: { files: files.length }, files, manifest };
   }
@@ -988,7 +1084,9 @@
     if (tr && typeof tr.push === 'function') return fail('hubKitchen');
     const cb = opts.confirmBackupSaved;
     if (!cb || typeof cb !== 'object' || typeof cb.filename !== 'string' || !cb.filename.trim() || !(Number.isFinite(cb.chars) && cb.chars > 0) || typeof cb.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(cb.sha256)) return fail('backupRequired');
-    const r = E().monthPlan(state, opts, now());
+    // The window the export used stays the window for the prune, even if the history has grown a little since.
+    const o2 = monthOpts(opts.keepDays === undefined && monthExport && monthExport.requestedBefore === opts.before ? Object.assign({}, opts, { keepDays: monthExport.keepDays }) : opts);
+    const r = E().monthPlan(state, o2, now());
     if (!r.ok) return fail(r.report, r.info);
     const pl = r.plan;
     if (!pl.tickets && !pl.orders && !pl.events) return fail('nothingToDo', { before: pl.before });
@@ -997,14 +1095,14 @@
     // Make sure what is in storage is this very kitchen before anything is removed.
     persistNow();
     const before = state, savedAt = realNow();
-    const out = E().closeMonth(state, { before: opts.before, keepDays: opts.keepDays, backup: cb }, now());
+    const out = E().closeMonth(state, { before: opts.before, keepDays: o2.keepDays, backup: cb }, now());
     if (out.report !== 'ok') return fail(out.report, out.info);
     const copyAt = snapshotBeforeRestore(BEFORE_MONTH_CLOSE);
     const ns = out.state;
     ns.rev = Math.max(ns.rev, (before.rev || 0) + 1);
     atLeast(lastStamp(ns));
     state = ns; syncUnits();
-    pendingBroadcast = true; skipRebase = true; pending = []; recent = []; journal = []; era = newEra();
+    pendingBroadcast = true; skipRebase = true; pending = []; recent = []; journal = []; era = newEra(); histRebase();
     const ok = persistNow();
     if (!ok) {
       // The save did not go in: the kitchen in memory goes back to what it was, and what is stored is still the full copy.
@@ -1107,7 +1205,7 @@
     const ns = E().newState({ now: now(), starter: false, seq: old ? old.seq : undefined, blank: !!(old && old.catalog === 'own') });
     ns.rev = (old ? old.rev : 0) + 1;
     commit(ns, true);
-    skipRebase = true; pending = []; recent = []; journal = []; era = newEra();
+    skipRebase = true; pending = []; recent = []; journal = []; era = newEra(); histRebase();
     persistNow();
     return 'ok';
   }
@@ -1213,6 +1311,8 @@
     };
     // Days before this date were archived by Close the month: their day totals stay (day_closed events), their tickets and orders are in the owner's files.
     if (typeof state.archivedBefore === 'string') ds.archivedBefore = state.archivedBefore;
+    // Days before this one were dropped to make room (the size limits), as opposed to saved to files by Close the month (archivedBefore).
+    if (hist.days > 0 && typeof hist.droppedBefore === 'string') ds.droppedBefore = hist.droppedBefore;
     m[key] = { smp, ds };
     return ds;
   }
@@ -1441,13 +1541,13 @@
   function isOwn() { return !!(state && state.catalog === 'own'); }
 
   // Public API: init, destroy, status, getState, now, tick, dispatch, dispatchEx, lastResult, subscribe,
-  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, reconcile, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset,
+  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, reconcile, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset,
   // resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY.
   SB.store = {
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, reconcile, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, reconcile, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").

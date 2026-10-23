@@ -106,7 +106,7 @@ export async function createHub(opts = {}) {
   // Empties the log once the saved file holds everything in it.
   function walReset() {
     if (!walFile) return;
-    try { if (walFd !== null) { fs.closeSync(walFd); walFd = null; } fs.writeFileSync(walFile, ''); } catch (e) { /* the next save tries again */ }
+    try { if (walFd !== null) { fs.closeSync(walFd); walFd = null; } fs.rmSync(walFile, { force: true }); } catch (e) { /* the next save tries again */ }
   }
   // Replays the log on top of the saved state: lines newer than the saved file are applied in order (each at the time it was first applied)
   // and every answer is remembered. A half-written last line is ignored. Returns how many actions were applied.
