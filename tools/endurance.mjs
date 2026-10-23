@@ -92,7 +92,7 @@ export async function runEndurance(opts) {
   let { S, E, U, M, C } = tab;
   const KEY = 'smokebox.v1.state';
   // Starts (or restarts, as after a reload) the store on the shared storage. sync turns on the tab channel for the two-tab episodes.
-  const boot = (sync) => S.init({ now: () => clock.real, storage, noTimers: true, noSync: !sync, mode: 'real', blank: true });
+  const boot = (sync) => S.init({ now: () => clock.real, storage, noTimers: true, noSync: !sync, mode: 'real', blank: true, quotaBytes: quota });
   // Start dates: a spring run crosses the US clock change in March; an autumn run crosses November and the following March.
   const start = seed % 2 ? new Date(2026, 2, 1, 6, 0, 0) : new Date(2026, 8, 20, 6, 0, 0);
   clock.real = start.getTime();
@@ -387,6 +387,8 @@ export async function runEndurance(opts) {
     pin1: 2, pin2: midMonth(0.55), damaged: midMonth(0.25), jump: midMonth(0.35), startOver: kitchen === 'cookahead' ? midMonth(0.5) : -1,
     twoTabs: [Math.min(days - 1, 4), midMonth(0.45)], restore: midMonth(0.85), monthEnd: [],
   };
+  // plain: no special episodes (pin, damaged save, clock jump, start over, two tabs, restore, calendar month close); closeMonthAt: days on which to close the month.
+  if (opts.plain) { for (const k of Object.keys(episodeDays)) episodeDays[k] = Array.isArray(episodeDays[k]) ? [] : -1; }
   for (let d = 0; d < days; d++) {
     const dayDate = new Date(start.getFullYear(), start.getMonth(), start.getDate() + d, 10, 30, 0);
     const key = U.serviceDate(dayDate.getTime());
@@ -414,13 +416,15 @@ export async function runEndurance(opts) {
     if (d === episodeDays.jump) clockJump(d);
     // end of each calendar month: close the month
     const next = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate() + 1);
-    if (next.getDate() === 1 && d >= 20) closeTheMonth(d, U.dateKey(next.getTime()));
+    if ((opts.closeMonthAt || []).includes(d)) closeTheMonth(d, '2099-01-01');
+    else if (!opts.plain && next.getDate() === 1 && d >= 20) closeTheMonth(d, U.dateKey(next.getTime()));
     if (d === episodeDays.restore) restoreOld(d);
     const c = boundaryChecks(d, weekly || d === days - 1);
     if (pinSet === null && false) notes.push('');
     if (typeof globalThis.gc === 'function' && d % 7 === 6) globalThis.gc();      // with --expose-gc the heap column is the live data, not garbage
     const mem = process.memoryUsage();
-    const row = { day: d, date: key, tickets: c.tickets, orders: c.orders, events: c.events, safety: c.safety, bytes: storage.bytes(), heapMB: Math.round(mem.heapUsed / 1048576) };
+    const fill = S.historyFill();
+    const row = { pct: fill ? fill.pct : null, daysLeft: fill ? fill.daysLeft : null, keepDays: fill ? fill.keepDays : null, lostDays: fill && fill.trimmedSince ? fill.trimmedSince.days : 0, day: d, date: key, tickets: c.tickets, orders: c.orders, events: c.events, safety: c.safety, bytes: storage.bytes(), heapMB: Math.round(mem.heapUsed / 1048576) };
     rows.push(row);
     if (opts.onLog && (d % (opts.logEvery || 7) === 6 || d === days - 1)) opts.onLog(row);
   }
@@ -460,6 +464,7 @@ export async function runEndurance(opts) {
   const summary = {
     kitchen, seed, days, quota, ticketsServed: created, ticketsKept: last.tickets, trimmedBySizeCap: Math.max(0, trimmed), prunedByCloseMonth: closedPruned, droppedByRecoveryRestoreStartOver: lostByEvents,
     peakBytes: storage.peak, refusedWrites: storage.refused, trimmedSaves, finalBytes: last.bytes, maxHeapMB: Math.max(0, ...rows.map((x) => x.heapMB)), refusals,
+    firstNearFullDay: (rows.find((x) => x.pct >= 70) || {}).day ?? null, firstTrimDay: (rows.find((x) => x.lostDays > 0) || {}).day ?? null, firstWarnDay: (rows.find((x) => x.pct >= 85) || {}).day ?? null,
     episodes: { startedOver, damaged, jumped, restored }, seconds: Math.round((Date.now() - t0) / 100) / 10, problems: problems.length,
   };
   return { rows, problems, notes, summary };
