@@ -10,7 +10,7 @@ This is the formal companion to SPEC sections 5-10. It follows Wordsworth's styl
 +---------------------------------    tau       = the evaluation time of a state (the `now` of the apply/tick that made it)
 ```
 
-The code is `src/js/20-engine.js` (`SB.engine`); the invariant checker `checkInvariants(state, now)` implements the predicates marked I1-I15. Property tests run every predicate after every step of 12,000+ random steps (`test/engine.fuzz.test.mjs`).
+The code is `src/js/20-engine.js` (`SB.engine`); the invariant checker `checkInvariants(state, now)` implements the predicates marked I1-I17. Property tests run every predicate after every step of 12,000+ random steps (`test/engine.fuzz.test.mjs`).
 
 ---
 
@@ -145,6 +145,7 @@ gate(b, t) for kind cooling (never servable): finalAt def -> NONE ('cooled'); t 
 | forall t : tickets . t.recalls >= 0                                                [I11]
 | forall m : dom learned . minFactor * prepSec(m) <= learned(m).est <= maxFactor * prepSec(m)   [I14]
 | forall m : menu . avail(m) |> {ok, reason, ing} = availability(self, m)            [I15]
+| lastClose = <> \/ (lastClose.day is a YYYY-MM-DD date /\ lastClose.at is a time /\ lastClose.leftovers in {keep, discard})   [I17]
 | forall t : tickets, i : t.items . t.status = active /\ i.status = queued => i.fireAt > tau     [I5, at tau]
 +--------------------------------------------------------------------------------------------
 ```
@@ -223,6 +224,14 @@ CreateTicket == CreateTicketOK \/ Refuse(emptyOrder | badPatch | tooManyItems | 
 | SetRush | ticket; `on` boolean (`badPatch`); active; changes something (`nothingToDo`) | on: queued items -> displayed now, offset 0, `fireAt = createdAt`, `rushed` |
 
 **Complete (shared by every path to done):** `doneAt = max(startedAt ?? firedAt, now)`. Depletion: for each BOM line, `need = qty_bom * item.qty`. TCS ingredients draw first-in-first-out from servable batches (oldest `enteredAt` first, never a locked one: I8). Others draw from `stock`. What cannot be drawn is recorded as `short` and logged (`stock_short`); nothing goes negative (I1). Learning: unless `override` or (two-step with no `startedAt`), `sample = min((doneAt - (startedAt ?? firedAt)) / 1000 / qtyScale, outlierFactor * starter)`, `n' = n + 1`, `ema' = (n = 0 ? sample : 0.8 ema + 0.2 sample)`, `est' = learnEst(n', ema', starter)` (I14).
+
+### 6.2b Orders and closing the day
+
+| op | precondition (else report) | effect |
+|---|---|---|
+| CloseDay `{ leftovers?: keep or discard }` | `leftovers` is keep (default) or discard (`badLeftovers`); **no order is open** (`ordersStillOpen`, info `count`, `orderIds`, `customers`): each one must be paid or voided first | appends one `day_closed` event for the service day of `now`, sets `lastClose = { day, at, leftovers }`. With discard, every batch still holding food is discarded as reason `other` (a plain, non-safety discard) and the grams land in waste, so I2 holds. Not undoable. |
+
+`day_closed` carries, for the paid orders whose `paidAt` falls in that service day: `orders`, `subtotal`, `discount`, `tax`, `total`, `tip`, and `byMethod` (`cash`, `card`, `other`, each with `count`, `subtotal`, `discount`, `tax`, `total`, `tip`, in dollars to the cent). It also carries `voidedOrders`, `tickets` and `voidedTickets` for that day, `leftovers`, `discarded` (batches), `discardedG`, and `again` (true when that day was closed before). Closing the same day twice is allowed on purpose: late sales after the first close are caught by the second, which covers the whole day. `resetLive` clears `lastClose`. Saves written before this action have no `lastClose`; `validateBackup` accepts that and drops a malformed one (`repaired` says `lastClose dropped`).
 
 ### 6.3 Stock, availability and the hold cabinet
 

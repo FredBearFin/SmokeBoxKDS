@@ -70,7 +70,7 @@ function genAction(rng, s) {
   const tcs = s.ingredients.filter((i) => i.tcs);
   const W = [['createTicket', 16], ['advanceItem', 18], ['completeItem', 5], ['fireNow', 5], ['completeZone', 4], ['bumpTicket', 8], ['recallTicket', 3],
     ['voidTicket', 3], ['setRush', 3], ['toggle86', 4], ['restock', 3], ['addBatch', 5], ['logTemp', 5], ['reheatBatch', 2], ['startCooling', 1],
-    ['discardBatch', 2], ['pullBatch', 3], ['keepServing', 2], ['endKeepServing', 1], ['planBatch', 1.5], ['cancelPlan', 2], ['snoozeAlert', 2], ['clearSnooze', 1.5], ['sanitizeDone', 2], ['updateSettings', 2], ['updateMenuItem', 1], ['addMenuItem', 0.6], ['payOrder', 4], ['reopenOrder', 1], ['voidOrder', 1], ['updateIngredient', 1], ['undo', 7], ['resetLive', 0.2], ['junkType', 2]];
+    ['discardBatch', 2], ['pullBatch', 3], ['keepServing', 2], ['endKeepServing', 1], ['planBatch', 1.5], ['cancelPlan', 2], ['snoozeAlert', 2], ['clearSnooze', 1.5], ['sanitizeDone', 2], ['updateSettings', 2], ['updateMenuItem', 1], ['addMenuItem', 0.6], ['payOrder', 4], ['reopenOrder', 1], ['voidOrder', 1], ['closeDay', 0.6], ['updateIngredient', 1], ['undo', 7], ['resetLive', 0.2], ['junkType', 2]];
   let r = rng.next() * W.reduce((a, x) => a + x[1], 0);
   let type = W[0][0];
   for (const [k, w] of W) { r -= w; if (r <= 0) { type = k; break; } }
@@ -119,6 +119,7 @@ function genAction(rng, s) {
     case 'updateMenuItem': p = { id: menuId, patch: pick([{ prepSec: pick([30, 120, 400]) }, { price: 9.5 }, { archived: rng.next() < 0.3 }, { bom: [{ ing: 'pork', qty: 120 }] }, { zone: pick(['pit', 'fry', 'expo']) }]) }; break;
     case 'payOrder': p = { orderId: (anyOrder || {}).id, method: pick(['cash', 'card', 'other', 'cash', 'gold']), tip: pick([0, 3, 12.34, undefined, -2]), discount: pick([0, 1, 2.5, undefined, 9999]) }; break;
     case 'reopenOrder': p = { orderId: (pick(rng.next() < 0.8 && paidOrders.length ? paidOrders : orders) || {}).id }; break;
+    case 'closeDay': p = { leftovers: pick(['keep', 'discard', undefined, 'maybe']) }; break;
     case 'voidOrder': p = { orderId: (anyOrder || {}).id, reason: pick(['customer left', 'duplicate', '']) }; break;
     case 'addMenuItem': p = { name: 'Dish ' + Math.floor(rng.next() * 40), zone: pick(['pit', 'sides', 'fry', 'cold', 'expo']), cat: pick(['meat', 'side', 'cold', 'other']), price: pick([8, 12.5, 0, -1]), prepSec: pick([60, 240, 900, 4]), track: pick(['one', 'two', 'three']) }; break;
     case 'updateIngredient': p = { id: ing.id, patch: pick([{ thresholdG: pick([0, 100, 900, 5000]) }, { yield: pick([0.5, 0.6]) }, { costPerKg: 12 }]) }; break;
@@ -283,7 +284,7 @@ test('fuzz: 200 random sequences x 60 steps keep I1-I15 after every step', () =>
   assert.equal(total, 200 * 60);
   // coverage: every action type succeeded at least once, and a healthy share of steps changed the state
   // keepServing and endKeepServing need a past-quality batch with a fresh reading; the unit tests cover their success paths.
-  for (const type of Object.keys(SB.engine.ACTIONS).filter((x) => x !== 'uiReport' && x !== 'keepServing' && x !== 'endKeepServing')) assert.ok(stats[type + ':ok'] > 0, 'never succeeded: ' + type);
+  for (const type of Object.keys(SB.engine.ACTIONS).filter((x) => x !== 'uiReport' && x !== 'closeDay' && x !== 'keepServing' && x !== 'endKeepServing')) assert.ok(stats[type + ':ok'] > 0, 'never succeeded: ' + type);
   assert.ok(ok / total > 0.25, 'ok share ' + ok / total);
   const distinct = new Set(Object.keys(stats).map((k) => k.split(':')[1]));
   assert.ok(distinct.size >= 25, 'reports exercised: ' + distinct.size);
