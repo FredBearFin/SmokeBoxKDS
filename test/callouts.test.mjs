@@ -20,7 +20,7 @@ function state(extra) {
 test('wants: a new ticket is called for the all view with the item count, and a paced dish is not called before its time', () => {
   const w = D.calloutWants(state(), T0 + 1000, 'all');
   assert.deepEqual(w.map((x) => x.id), ['n:t1']);
-  assert.equal(w[0].text, 'Order up! Ticket 12! 3 items!');
+  assert.equal(w[0].text, 'Order up! Ticket twelve! three items!');
 });
 
 test('wants: when a paced dish is due it gets a start-now call naming the dish and the ticket', () => {
@@ -29,7 +29,7 @@ test('wants: when a paced dish is due it gets a start-now call naming the dish a
   const w = D.calloutWants(s, T0 + 301e3, 'all');
   const st = w.find((x) => x.kind === 'start');
   assert.equal(st.id, 's:t1:' + Math.floor((T0 + 300e3) / 1000));
-  assert.equal(st.text, 'Fire Ribs now! Ticket 12!');
+  assert.equal(st.text, 'Fire Ribs now! Ticket twelve!');
   assert.equal(st.at, T0 + 300e3);
 });
 
@@ -41,7 +41,7 @@ test('wants: a dish that starts with the ticket is called too, and dishes due at
   s.tickets[0].items[1].fireAt = T0;
   const starts = D.calloutWants(s, T0 + 5000, 'all').filter((x) => x.kind === 'start');
   assert.equal(starts.length, 1);
-  assert.equal(starts[0].text, 'Fire 2 Brisket, Ribs now! Ticket 12!');
+  assert.equal(starts[0].text, 'Fire two Brisket, Ribs now! Ticket twelve!');
 });
 
 test('station filter: a station only hears its own dishes, and a ticket with nothing for it is silent', () => {
@@ -50,9 +50,9 @@ test('station filter: a station only hears its own dishes, and a ticket with not
   const firsts = (w) => w.filter((x) => x.id.split(':').length < 4); // leave out the reminders
   const fry = firsts(D.calloutWants(s, T0 + 400e3, 'fry'));
   assert.deepEqual(fry.map((x) => x.id).sort(), ['n:t1', 's:t1:' + Math.floor((T0 + 240e3) / 1000)].sort());
-  assert.equal(fry.find((x) => x.kind === 'new').text, 'Order up, ticket 12! Hush puppies!');
+  assert.equal(fry.find((x) => x.kind === 'new').text, 'Order up, ticket twelve! Hush puppies!');
   const pit = firsts(D.calloutWants(s, T0 + 400e3, 'pit'));
-  assert.equal(pit.find((x) => x.kind === 'new').text, 'Order up, ticket 12! 2 Brisket, Ribs!');
+  assert.equal(pit.find((x) => x.kind === 'new').text, 'Order up, ticket twelve! two Brisket, Ribs!');
   assert.deepEqual(pit.filter((x) => x.kind === 'start').map((x) => x.id), ['s:t1:' + Math.floor((T0 + 300e3) / 1000)]);
   assert.deepEqual(D.calloutWants(s, T0 + 400e3, 'cold'), []);
 });
@@ -111,9 +111,9 @@ test('prime: what is already true when call-outs start is not read out, but late
 });
 
 test('chef voice: every spoken line is short and sharp, in the one built-in style', () => {
-  assert.equal(D.phrase('start', { name: '2 brisket sandwich', num: 12 }), 'Fire 2 brisket sandwich now! Ticket 12!');
-  assert.equal(D.phrase('expire', { who: 'Brisket', many: false, mins: 10, goes86: true, approx: false }), 'Heads up! Brisket goes 86 in 10 minutes! Act now!');
-  assert.equal(D.phrase('expire', { who: 'Ribs and 1 more', many: true, mins: 30, approx: true }), 'Heads up! Ribs and 1 more expire in about 30 minutes! Act now!');
+  assert.equal(D.phrase('start', { name: '2 brisket sandwich', num: 12 }), 'Fire two brisket sandwich now! Ticket twelve!');
+  assert.equal(D.phrase('expire', { who: 'Brisket', many: false, mins: 10, goes86: true, approx: false }), 'Heads up! Brisket goes eighty-six in ten minutes! Act now!');
+  assert.equal(D.phrase('expire', { who: 'Ribs and 1 more', many: true, mins: 30, approx: true }), 'Heads up! Ribs and one more expire in about thirty minutes! Act now!');
   assert.equal(D.phrase('past', { who: 'Pork', many: false }), 'Pork is past quality! Check it now!');
   assert.equal(D.phrase('expired', { who: 'Pork', many: false }), 'Pork expired! Pull it and log it now!');
   assert.ok(D.CHEF_VOICE.rate > 1 && D.CHEF_VOICE.pitch >= 1, 'faster and sharper than a default voice');
@@ -149,7 +149,7 @@ test('ring out: when every dish on a ticket is done the counter hears it, with r
   s.tickets[0].items.forEach((it, i) => { it.status = 'done'; it.doneAt = T0 + 100e3 + i * 1000; });
   const w = D.calloutWants(s, T0 + 110e3, 'all');
   assert.deepEqual(w.map((x) => x.id), ['r:t1']);
-  assert.equal(w[0].text, 'Ticket 12 is up! Ring it out!');
+  assert.equal(w[0].text, 'Ticket twelve is up! Ring it out!');
   assert.equal(w[0].at, T0 + 102e3, 'at the time the last dish finished');
   assert.deepEqual(D.calloutWants(s, T0 + 140e3, 'all', 'normal').map((x) => x.id), ['r:t1', 'r:t1:1']);
   assert.equal(D.calloutWants(s, T0 + 400e3, 'all', 'full').length, 3, 'full: the call plus two reminders');
