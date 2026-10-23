@@ -10,7 +10,7 @@ const flicker = (page) => page.evaluate(() => {
 });
 const hashOf = (page) => page.evaluate(() => location.hash);
 const keypad = (page) => page.getByRole('dialog', { name: 'Manager PIN' });
-async function typePin(page, pin) { const kp = keypad(page); for (const c of pin) await kp.getByRole('button', { name: 'Digit ' + c, exact: true }).click(); await wait(350); }
+async function typePin(page, pin) { const kp = keypad(page); for (const c of pin) await kp.getByRole('button', { name: 'Digit ' + c, exact: true }).click(); await wait(350); await page.waitForFunction(() => { const k = document.querySelector('.sheet-root .keypad'); return !k || !/checking/i.test(k.innerText) && !k.hasAttribute('data-busy'); }, null, { timeout: 5000 }).catch(() => {}); await wait(700); }
 const pinMsg = (page) => keypad(page).locator('.pin-msg').innerText();
 
 /** Open the Data page and set a 4-digit PIN through the form, as a manager would. */
