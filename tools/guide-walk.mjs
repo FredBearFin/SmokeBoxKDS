@@ -376,6 +376,37 @@ async function importMenu(browser) {
   await p.close();
 }
 
+// The cold-item walk: a cold item with days and hours typed in the setup form, a batch, then Take out and Put back on its card.
+async function coldItem(browser) {
+  console.log('Cold item: fridge days, hours out, Take out and Put back');
+  const p = await fresh(browser);
+  await addDish(p, { name: 'Potato salad', short: 'Potato salad', zone: 'cold', cat: 'cold', price: 4 });
+  await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
+  await p.evaluate(() => document.querySelector('[data-act="menu-edit"]').click()); await p.waitForTimeout(600);
+  check('cold: Yes, I cook ahead', await tap(p, 'Yes, I cook ahead')); await p.waitForTimeout(700);
+  const cs = '.sheet-root:last-of-type';
+  await p.fill(cs + ' input >> nth=0', 'House potato salad');
+  await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-root:last-of-type button, .sheet-root:last-of-type [role=radio]')].find((e) => e.getClientRects().length && e.textContent.trim().indexOf('Cold') === 0); if (b) b.click(); }); await p.waitForTimeout(300);
+  await p.fill('input[aria-label="Days it may stay in the fridge"]', '3');
+  await p.fill('input[aria-label="Hours it may be out of the fridge"]', '2');
+  await p.click(cs + ' input[type=checkbox] >> nth=0').catch(() => {});
+  await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700);
+  if (!(await seen(p, 'Log a first batch', cs))) { await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700); }
+  check('cold: Log a first batch', await tap(p, 'Log a first batch')); await p.waitForTimeout(700);
+  check('cold: Put in hold cabinet', await tap(p, 'Put in hold cabinet')); await p.waitForTimeout(900);
+  for (const t of ['In the fridge since', 'Use by', 'Not taken out yet', 'Take out']) check('cold card: ' + t, await has(p, t, cs));
+  check('cold card: Use by the third day', await p.evaluate(() => /Use by .*\(your 3 days\)/.test(document.body.innerText)));
+  check('cold: tapping Take out', await tap(p, 'Take out')); await p.waitForTimeout(500);
+  check('cold: initials before Take out', await has(p, 'Who is this?', '.sheet-root:last-of-type'));
+  await p.evaluate(() => document.querySelector('[data-act="skip-who"]').click()); await p.waitForTimeout(800);
+  check('cold: the out-of-fridge clock is running', await p.evaluate(() => /taken out\. The out-of-fridge clock is running/.test(document.body.innerText)));
+  for (const t of ['Out of the fridge since', 'Put back']) check('cold card (out): ' + t, await has(p, t, cs));
+  check('cold: tapping Put back', await tap(p, 'Put back')); await p.waitForTimeout(500);
+  await p.evaluate(() => document.querySelector('[data-act="skip-who"]').click()); await p.waitForTimeout(800);
+  check('cold: the clock is paused', await p.evaluate(() => /put back\. The out-of-fridge clock is paused/.test(document.body.innerText)));
+  await p.close();
+}
+
 // The demo walk: a fresh browser context opened with ?demo has sample dishes and tickets, and a normal tab in the same context stays empty.
 async function demoMode(browser) {
   console.log('Demo mode (?demo)');
@@ -391,7 +422,7 @@ async function demoMode(browser) {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
-try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
+try { if (process.env.WALK_ONLY === 'recipes') await recipes(browser); else if (process.env.WALK_ONLY === 'import') await importMenu(browser); else if (process.env.WALK_ONLY === 'cold') await coldItem(browser); else { await blank(browser); await cookAhead(browser); await cooked(browser); await closeDay(browser); await settings(browser); await pinCode(browser); await importMenu(browser); await coldItem(browser); await startOver(browser); await recipes(browser); await tryDemo(browser); await demoMode(browser); } } finally { await browser.close(); }
 const bad = results.filter((r) => !r.ok);
 console.log('\n' + (results.length - bad.length) + ' of ' + results.length + ' checks held' + (bad.length ? '; ' + bad.length + ' failed' : ''));
 process.exit(bad.length ? 1 : 0);
