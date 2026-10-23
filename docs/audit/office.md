@@ -264,3 +264,19 @@ Each new type goes in `SAFETY_EVENT` so the record picks it up unchanged; I will
 **Also this round:** the "Wait before other apps are told" field (it belonged to the removed channel sync) is hidden; the sanitize interval says "our starting value" instead of a code section; the drawer text says "an amount" not "dollars".
 
 **Round 14 follow-up (A5's `night/a5-r15`, d22b27c):** the record now has words for `equip_temp` (unit, label, reading), `thermometer_checked` (reading and method), sanitizer strip `ppm`, product and place on `sanitize_done`, the discard `note`, the reason "Past the date mark", and names the first and final cooling marks from `stage1At` and `finalAt`. The not-covered line now says those entries appear only if someone logged them. Written to the field names A5 sent and not run against their branch; the new row words are not unit tested (the engine here lacks the events). The app has no screen yet to log equipment, thermometer or strip readings, so nothing creates these entries until a floor surface is built (A1/A2). `verifiedBy` is still open: A5 offered to add it to `closeDay`.
+
+## Round 16: pilot report for the current app
+
+Checked in the real app (headless browser, own blank kitchen and `?demo`) and in a 3-day simulated pilot unit test (`test/pilot-report.test.mjs`). Files: `35-pilot.js` (report and text/CSV; outside my usual list but this round's package), the Data page row in `84-office-data.js`.
+
+- **Own blank kitchen:** the report reads calmly with zeros. With cook-ahead off it says there are no batches or pulls to count and that the pull-tap gate does not apply, instead of "0 percent, below the gate".
+- **Demo:** the text starts "DEMO KITCHEN ... NOT pilot data", the CSV has `window,demo kitchen,yes`, and the file is named `smokebox-demo-pilot-report-...`. Demo tickets, and sample or starter batches, are left out and counted; pulls from sample batches are now left out too.
+- **Counter service:** tickets finished by payment (`auto`) are not timed, so ticket time is not a meaningless zero; the text says ticket times are not measured.
+- **Cold items and Start over:** cold batches count as batches like any other; a fresh kitchen after Start over reports zeros without errors (tested).
+- **One page, plain words:** "The gates, in plain words": pull-tap rate against the 50 percent gate; batches logged against the observer's batch count (new "Batches counted" box); discard cost, with "costs missing" naming the cooked-ahead ingredients that have no cost per kg and how to enter them (Settings, Dishes and prices, about a minute each); warnings "shown" and "tapped" (never "heard"); time to first ticket; undo taps, events undone and refusals shown; then the old detail lines; then "What the app cannot measure by itself".
+- **Print and CSV:** new Print button (one page); CSV gains batches, gate, costs, warnings (with "heard" left empty and labeled "observer writes this down"), first ticket and undo sections.
+
+**The app cannot measure by itself:** whether a warning was heard from the pit, cuts nobody tapped, batches cooked but never logged, whether the owner can name a discard cost, whether the owner would pay, and the real setup time (there is no setup clock; time to first ticket counts from the first record in the log and is approximate).
+
+**Not checked:** a real pilot on a real tablet; the Print button on paper; the 390-wide look of the longer text.
+**Request to A5 (optional):** a setup-started timestamp in settings (or an event `setup_started`) would make time to first ticket honest.
