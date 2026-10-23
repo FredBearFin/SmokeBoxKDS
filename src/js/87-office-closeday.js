@@ -164,7 +164,9 @@
       const blocked = blockedLine(m);
       const status = h('p', { class: 'cd-status', role: 'status' }, blocked);
       const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', disabled: !!m.open.length }, 'Close the day');
+      // True when closing will also throw out the food still in the cabinet.
       const throwing = () => cookAheadOn() && m.leftovers.count > 0 && leftovers === 'discard';
+      // Names the food on the button when it will be thrown out, else the plain label.
       setGoLabel = () => { go.textContent = throwing() ? 'Close the day and throw out ' + U.weightText(m.leftovers.g) : 'Close the day'; };
       setGoLabel();
       go.addEventListener('click', () => {
