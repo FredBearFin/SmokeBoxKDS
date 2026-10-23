@@ -289,7 +289,7 @@
         const sb = burn(p, d.date, ing);
         if (sb && sb.intakeG > 0) rows.push({ date: d.date, intakeG: sb.intakeG, usedG: sb.usedG, wasteG: sb.wasteG });
       });
-      const v = { n: rows.length, medianIntake: B.median(rows.map((r) => r.intakeG)), medianUsed: B.median(rows.map((r) => r.usedG)), rows };
+      const v = { n: rows.length, medianIntake: B.median(rows.map((r) => r.intakeG)), medianUsed: B.median(rows.map((r) => r.usedG)), medianWaste: B.median(rows.map((r) => r.wasteG || 0)), rows };
       m.set(ing, v);
       return v;
     }
@@ -374,8 +374,11 @@
           if (suggest > tp.medianIntake * 1.03) parts.push(srcWord + ': ' + fmt.g(suggest - tp.medianIntake) + ' more than usual, and ' + topUp + '.');
           else parts.push(srcWord + ': keep the amount and ' + topUp + '. It looks like timing, not quantity.');
         } else {
-          parts.push('Never sold out. A normal day: cooks ' + fmt.g(tp.medianIntake) + ', serves ' + fmt.g(tp.medianUsed) + '.');
-          if (suggest < tp.medianIntake * 0.85) parts.push(srcWord + ': ' + fmt.g(tp.medianIntake - suggest) + ' less than usual would still cover it.');
+          const wasted = tp.medianWaste > 0 ? ' and throws away ' + fmt.g(tp.medianWaste) : '';
+          parts.push('Never sold out. A normal day: cooks ' + fmt.g(tp.medianIntake) + ', serves ' + fmt.g(tp.medianUsed) + wasted + '.');
+          // WATCH OUT: the suggestion is what guests ate. Food thrown away during service (past its hold limit) is cooked food that
+          // never reached a plate, so cutting by the whole gap is only safe when that waste goes too; the text says so.
+          if (suggest < tp.medianIntake * 0.85) parts.push(srcWord + ': ' + fmt.g(tp.medianIntake - suggest) + ' less than usual would still cover what guests ate' + (tp.medianWaste > 0 ? ', as long as less is thrown away. Check the Thrown-out log first: food that passed its hold limit during service needs a later, smaller batch, not less food.' : '.'));
           else parts.push(srcWord + ': the cook count looks about right.');
         }
         out.parts = parts; out.text = parts.join(' ');
