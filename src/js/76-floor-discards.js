@@ -40,12 +40,16 @@
   // The discarded batches, newest first, as plain rows ready to show, print or save.
   function rows(state, rec) {
     const out = [];
+    // The engine's own discard entries by batch: who threw it out, the entry id for a fix, and fixes already made.
+    const logged = new Map();
+    for (const row of SB.engine.safetyLog(state)) if (row.event.type === 'batch_discard' && row.event.batchId) logged.set(row.event.batchId, row);
     for (const b of state.batches) {
       if (b.status !== 'discard' || !Number.isFinite(b.discardedAt)) continue;
       out.push({
         id: b.id, t: b.discardedAt, date: U.fmtDateShort(U.dateKey(b.discardedAt)), food: b.label || b.ing,
         amount: U.fmtG(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
-        initials: rec.initials[b.id] || '', extra: rec.extra[b.id] || '',
+        initials: rec.initials[b.id] || (logged.get(b.id) && logged.get(b.id).event.who) || '', extra: rec.extra[b.id] || '',
+        eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
     }
     return out.sort((a, b) => b.t - a.t);
@@ -100,6 +104,26 @@
     const wrap = h('div', { class: 'dlog-wrap', style: 'overflow:auto' });
     const colsBox = h('div', { class: 'dlog-cols', hidden: true });
 
+    // Opens a small box to fix a wrong entry. The log never erases anything: the fix is saved as a new entry next to the old one.
+    function fixEntry(r, opener) {
+      const sh = SB.ui.sheet({ title: 'Fix this entry', side: 'center', width: 480, name: 'fix-entry', opener });
+      const note = h('input', { class: 'input', type: 'text', maxlength: 120, 'aria-label': 'What was wrong', placeholder: 'What was wrong, like "wrong food picked"' });
+      const who = h('input', { class: 'input', type: 'text', maxlength: 12, 'aria-label': 'Your initials', placeholder: 'Your initials', value: SB.who ? SB.who.get() : '' });
+      const err = h('p', { class: 'fs-sub', role: 'alert', hidden: true });
+      sh.body.append(h('p', null, 'The old entry stays in the log, so the record is honest. Your fix is saved as a new entry next to it, with your initials and the time.'),
+        h('p', { class: 'fs-sub' }, r.food + ', thrown out at ' + r.out + '.'), h('div', { class: 'field-label' }, 'What was wrong?'), note, h('div', { class: 'field-label' }, 'Your initials'), who, err);
+      // Saves the fix through the engine; a refusal is shown in plain words and nothing is lost.
+      const saveFix = () => {
+        const res = SB.store.dispatchEx('correctSafety', { eventId: r.eventId, note: note.value, who: who.value }, { source: 'ui' });
+        if (res.report !== 'ok') { err.textContent = SB.engine.describe(res.report, res.info, SB.store.getState().settings); err.hidden = false; return; }
+        if (SB.who) SB.who.set(who.value.trim());
+        sh.close('saved'); draw();
+        SB.ui.toast('Fix saved as a new entry.', { tone: 'ok' });
+      };
+      // Cancel closes the box and changes nothing.
+      const cancelFix = () => sh.close('cancel');
+      sh.footer.append(h('button', { type: 'button', class: 'btn', onClick: cancelFix }, 'Cancel'), h('button', { type: 'button', class: 'btn btn-primary', onClick: saveFix }, 'Save the fix'));
+    }
     // Draws the table from the current state and column settings.
     function draw() {
       U.clear(wrap);
@@ -107,19 +131,23 @@
       const cols = rec.cols.filter((c) => c.on);
       if (!list.length) { wrap.appendChild(h('div', { class: 'empty' }, ico('trash', 40), h('h3', null, 'Nothing thrown out yet'), h('p', null, 'Batches you throw out show up here with their time and reason.'))); return; }
       const table = h('table', { class: 'dlog-table', style: 'border-collapse:collapse;width:100%' });
-      table.appendChild(h('thead', null, h('tr', null, ...cols.map((c) => h('th', { style: 'text-align:left;padding:8px;border-bottom:2px solid var(--line)' }, c.label)))));
+      table.appendChild(h('thead', null, h('tr', null, ...cols.map((c) => h('th', { style: 'text-align:left;padding:8px;border-bottom:2px solid var(--line)' }, c.label)), h('th', { style: 'padding:8px;border-bottom:2px solid var(--line)' }, h('span', { class: 'visually-hidden' }, 'Fix')))));
       const tb = h('tbody');
       list.forEach((r) => {
+        // Opens the fix box for this row.
+        const openFix = (e) => fixEntry(r, e.currentTarget);
         tb.appendChild(h('tr', null, ...cols.map((c) => {
           let cell;
           if (c.key === 'initials' || c.key === 'extra') {
             const bag = c.key === 'initials' ? rec.initials : rec.extra;
-            cell = h('input', { class: 'input', type: 'text', maxlength: c.key === 'initials' ? 6 : 60, value: bag[r.id] || '', 'aria-label': c.label + ' for ' + r.food, style: 'min-width:' + (c.key === 'initials' ? 80 : 180) + 'px' });
+            cell = h('input', { class: 'input', type: 'text', maxlength: c.key === 'initials' ? 6 : 60, value: c.key === 'initials' ? r.initials : (bag[r.id] || ''), 'aria-label': c.label + ' for ' + r.food, style: 'min-width:' + (c.key === 'initials' ? 80 : 180) + 'px' });
             // Saves what was typed for this row as soon as the box loses focus or changes.
             cell.addEventListener('change', () => { bag[r.id] = cell.value.trim(); save(rec); });
+          } else if (c.key === 'food' && r.fixes.length) {
+            cell = h('div', null, r.food, ...r.fixes.map((f) => h('div', { class: 'fs-sub dlog-fix' }, 'Fixed by ' + f.who + ' at ' + U.fmtTime(f.t) + ': ' + f.note)));
           } else cell = doc.createTextNode(r[c.key]);
           return h('td', { style: 'padding:8px;border-bottom:1px solid var(--line);vertical-align:middle' }, cell);
-        })));
+        }), h('td', { style: 'padding:8px;border-bottom:1px solid var(--line);vertical-align:middle' }, r.eventId ? h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'fix-entry' }, onClick: openFix }, 'Fix this entry') : null)));
       });
       table.appendChild(tb);
       wrap.appendChild(table);

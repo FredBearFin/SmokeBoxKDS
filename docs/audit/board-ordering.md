@@ -68,3 +68,17 @@ Fixed:
 - **One-tap pay:** a "Paid by Cash" switch beside Pay (menu: Cash, Card, Other). The Pay button names the method, the choice is remembered on the device (`smokebox.v1.paymethod`), the Tip or discount sheet also remembers it, and the 10 s undo is unchanged.
 
 Left: P2 items 3, 6-11 of the first list; the "New tablet?" 15 s toast (A2); Help sheet text about the cabinet still shows when the module is off.
+
+## Round 4 status
+
+Screenshots: `docs/ux-shots/night/a1/r4-*.png` (blank with the module off and on, demo, 1024 and 1280, Day and Night, Large text, blank 86 board, blank New ticket page, thrown-out log, PIN fold, help links). Test: `test/board-round4.e2e.mjs`. Simulated in headless Chromium only.
+
+Fixed:
+- **Empty menu:** combos no longer appear unless every dish in them is on the menu; the blank New ticket page hides search and categories and shows "No dishes yet" with "Add your first dish" (which now opens the Dishes screen); the blank 86 board shows the same friendly block instead of two zero tabs, an empty Stock heading and Channel sync. Settings text no longer says "Hush puppies"; Stock and the sound line drop food and batch talk when cook-ahead is off.
+- **"?" help links** (guarded on `SB.guide`): Orders and Take payment sheets, New ticket sheet and page, Hold cabinet sheet and page, the sound bar, and the PIN pad. Not done by me: Set up this tablet (A2's file).
+- **Close the day** button in the Orders footer (shows only when `SB.office.openCloseDay` exists).
+- **Staff initials:** asked once per tablet (and again after 2 idle hours) when logging a temperature, reheating, discarding or marking surfaces sanitized, only with cook-ahead on; "Skip" never blocks the action. The cabinet shows "Entries are saved as JM" with Switch person, the batch card says "checked by JM 2:40 pm", and the thrown-out log fills initials from the entry.
+- **Fix an entry** in the thrown-out log uses `correctSafety`: the old entry stays, the fix is a new entry with initials and time, and the box says so in plain words.
+- **PIN lock-out:** a "Forgot the PIN?" fold under the keypad (what the PIN protects, that it cannot be recovered, ask whoever set it, clear site data, restore a backup that brings its old PIN back). The lock message points to it. Options for Freddy: `docs/audit/pin-recovery-options.md`. No PIN logic changed.
+
+Left: the tour toast on an empty menu (message sent to A4 with the new text); the "?" on Set up this tablet (A2); "Fix this entry" only covers thrown-out entries (not temperature or sanitize rows, which need a safety page owner); initials are not asked for start cooling or keep serving beyond the existing keep-serving box; P2 items 3 and 6 to 11 of the first list.

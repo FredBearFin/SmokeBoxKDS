@@ -65,6 +65,7 @@
   // the module is on (absent means on), or some batch still holds food, which is never hidden.
   function cookOn() {
     const s = store().getState();
+    if (E() && typeof E().cookAheadActive === 'function') return E().cookAheadActive(s);
     if (!E() || typeof E().moduleOn !== 'function' || E().moduleOn(s, 'cookAhead')) return true;
     return (s.batches || []).some((b) => b && b.status !== 'discard' && b.remainingG > 0);
   }
@@ -1423,7 +1424,7 @@
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
-    const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, clearBtn('Clear this notice', 'snd'));
+    const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear this notice', 'snd'));
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
     const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
@@ -1672,7 +1673,7 @@
   function sanitiseMenu(anchor) {
     SB.ui.menu(anchor, [
       // Logging a check goes through run(), so it can be undone like any action.
-      { label: 'Mark surfaces sanitized', icon: 'check-circle', onClick: () => run('sanitizeDone', {}) },
+      { label: 'Mark surfaces sanitized', icon: 'check-circle', onClick: () => { const go = (who) => run('sanitizeDone', who ? { who } : {}); if (SB.who && SB.who.ask) SB.who.ask(anchor, 'Mark sanitized', go); else go(''); } },
       { label: 'Open the hold cabinet', icon: 'thermometer', onClick: () => showCabinet(true) },
     ].filter((it) => !(roleNow() === 'front' && /cabinet/.test(it.label))), { label: 'Sanitize timer' });
   }

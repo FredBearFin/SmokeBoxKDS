@@ -722,3 +722,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 
 /* A station, category or channel added by the owner has no hue of its own, so it gets a neutral one. */
 [data-zone]:not([data-zone="pit"], [data-zone="sides"], [data-zone="fry"], [data-zone="cold"], [data-zone="expo"]) { --zc: var(--ink3); }
+
+/* The "Forgot the PIN?" help folded under the keypad. */
+.pin-forgot { margin-top: var(--sp-3); font-size: var(--fs-2); color: var(--ink2); }
+.pin-forgot summary { cursor: pointer; font-weight: var(--w-semi); min-height: var(--tap); display: flex; align-items: center; }
+.pin-forgot p { margin: var(--sp-2) 0; }

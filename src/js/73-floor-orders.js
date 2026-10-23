@@ -130,7 +130,13 @@
     let built = null;
     // Nothing here takes focus by itself, so a touch tablet keeps its keyboard down.
     const sheet = SB.ui.sheet({ title: 'Orders', side: 'right', width: 'min(760px, 96vw)', name: 'orders', onClose: () => { if (built) built.teardown(); } });
+    SB.ui.sheetHelp(sheet, 'getting-started', 'taking payment');
     built = buildOrders({ body: sheet.body, close: sheet.close, isPage: false }, opts);
+    // The end-of-day screen lives in the back office code; the button only shows when it is part of this copy.
+    if (SB.office && typeof SB.office.openCloseDay === 'function') {
+      sheet.footer.appendChild(h('button', { type: 'button', class: 'btn', dataset: { act: 'closeday' }, onClick: () => { sheet.close('closeday'); setTimeout(() => SB.office.openCloseDay(), 60); } }, ico('check-circle', 20), h('span', null, 'Close the day')));
+      sheet.footer.hidden = false;
+    }
     return sheet;
   }
 
@@ -337,6 +343,7 @@
       initialFocus: () => (methodSeg ? methodSeg.querySelector('[aria-checked="true"]') : null),
       onClose: () => offs.splice(0).forEach((f) => f()),
     });
+    SB.ui.sheetHelp(sheet, 'getting-started', 'taking payment');
 
     const ch = channelOf(o0.channel);
     const head = h('p', { class: 'ox-pay-who' }, h('strong', null, whoOf(o0)), h('span', { class: 'chip ox-ch' }, ico(ch.icon, 16), h('span', null, ch.name)));

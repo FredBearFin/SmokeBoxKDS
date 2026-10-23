@@ -563,3 +563,4 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dp-undo, .dp-back { align-items: center; gap: var(--sp-2); }
 .dp-back[hidden], .dp-undo[hidden] { display: none; }
 .dp-strow .btn { flex: none; white-space: nowrap; min-height: 44px; }
+.hc-who { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0; color: var(--ink2); font-size: var(--fs-2); }

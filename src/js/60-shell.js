@@ -715,6 +715,13 @@
     });
     toastRaf = toasts.length ? requestAnimationFrame(toastLoop) : 0;
   }
+  // Adds a small "?" to a sheet's header that opens one Guide page (the sheet closes first). Adds nothing when the Guide is missing.
+  ui.sheetHelp = function (sheet, page, label) {
+    const a = SB.guide && typeof SB.guide.link === 'function' ? SB.guide.link(page, label) : null;
+    if (!a || !sheet || !sheet.header) return;
+    a.addEventListener('click', () => sheet.close('help'));
+    sheet.header.insertBefore(a, sheet.header.lastChild);
+  };
   // Shows a small message strip; returns {el, close()}. o.tone: ok, warn, bad, info. o.undo (a function)
   // adds an Undo button and keeps it for undoMs (10 000 ms = the 10 seconds you get to undo). Others stay 5
   // s, 6 s for warn, and an error (bad) stays until cleared (starter estimates, owner to confirm); o.ms overrides.
@@ -1329,7 +1336,14 @@
       for (let n = 1; n <= 9; n++) pad.appendChild(mkKey(String(n), 'Digit ' + n, () => push(String(n))));
       pad.append(mkKey('Clear', 'Clear all digits', () => { entry = ''; paint(); }, true), mkKey('0', 'Digit 0', () => push('0')), mkKey(ico('backspace', 26), 'Delete last digit', () => { entry = entry.slice(0, -1); paint(); }, true));
       const note = h('p', { class: 'pin-note' }, 'This PIN keeps line cooks out of the back office. It is not real security: it is stored on this device, and anyone who can use the device can get around it.');
-      sh.body.append(dots, msg, status, pad, note);
+      // What to do when the PIN is forgotten: said plainly, because there is no reset button and nothing here may pretend otherwise.
+      const forgot = h('details', { class: 'pin-forgot' },
+        h('summary', null, 'Forgot the PIN?'),
+        h('p', null, 'The PIN only locks the back office: sales, menu and settings. The kitchen board and New ticket stay open.'),
+        h('p', null, 'Smokebox cannot reset or recover a PIN. It is saved only on this device. First ask whoever set it.'),
+        h('p', null, 'If nobody knows it, the only way back in is to clear this site\'s saved data in your browser settings. That erases everything on this device: tickets, dishes and settings. Then open Smokebox and restore your latest backup (Back office, Data, Import). A backup brings back the PIN it was saved with, so use one made before the PIN was set or changed.'),
+        SB.guide && SB.guide.link ? SB.guide.link('empty-lost-or-locked', 'forgot the PIN') : null);
+      sh.body.append(dots, msg, status, pad, note, forgot);
       // The Cancel button closes the keypad and answers false.
       sh.footer.appendChild(h('button', { type: 'button', class: 'btn', onClick: () => finish(false) }, 'Cancel'));
       // Lights as many dots as digits typed and updates the spoken count.
@@ -1341,7 +1355,7 @@
       // Reads the saved lock: while it runs keys stay off and seconds count down; at the end they return.
       function tickLock() {
         const s = lockState(); const left = Math.ceil((s.until - Date.now()) / 1000);
-        if (left > 0) { setLocked(true); say('Too many wrong tries. Try again in ' + left + ' s.', 'bad'); return; }
+        if (left > 0) { setLocked(true); say('Too many wrong tries. Try again in ' + left + ' s. Forgot the PIN? See below.', 'bad'); return; }
         clearInterval(timer); if (locked) { setLocked(false); U.storage.set(KEY.pinlock, { fails: 0, until: 0 }); say('Enter the 4-digit PIN.'); }
       }
       // Starts checking the lock twice a second (every 500 ms).
