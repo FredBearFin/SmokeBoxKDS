@@ -7,6 +7,8 @@ Print this card and keep it by the tablet.
 - [ ] Tap the warning bar once, or use Play a test warning under Set up this tablet
 - [ ] Check the 86 board: what is out today?
 - [ ] Counted dishes: how many did you make today?
+- [ ] Hand sink works and is stocked. Anyone unwell? Tell the manager
+- [ ] Thermometer checked in ice water. Cooler and freezer readings on your paper log
 - [ ] If you cook ahead: log a first temperature on each batch in the cabinet
 - [ ] If you cook ahead: wipe food-contact surfaces and tap Sanitize
 - [ ] Yesterday's backup saved and a copy kept off the device

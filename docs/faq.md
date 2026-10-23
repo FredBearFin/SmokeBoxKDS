@@ -1,4 +1,4 @@
-<!-- Generated from docs/sop/15-questions-and-answers.md by tools/build-guide.mjs. Edit that file, then run the tool. -->
+<!-- Generated from docs/sop/16-questions-and-answers.md by tools/build-guide.mjs. Edit that file, then run the tool. -->
 
 # Questions and answers
 

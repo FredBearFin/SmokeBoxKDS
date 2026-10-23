@@ -44,7 +44,7 @@
      },
      {
       "t": "p",
-      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Problem rows are flagged before anything is added. New menu sections in the file? Tap **Add these sections**."
+      "x": "Have your menu in a file? See Import a menu."
      },
      {
       "t": "h",
@@ -192,7 +192,7 @@
      },
      {
       "t": "p",
-      "x": "Pick $, € or £, or **Your own**: one to three characters, like kr. It shows with every price. It does not convert anything."
+      "x": "Pick $, € or £, or **Your own**: one to three characters, like kr. It shows with every price, and open screens update when you close the sheet. It does not convert anything."
      },
      {
       "t": "h",
@@ -201,6 +201,51 @@
      {
       "t": "p",
       "x": "If the page closes or reloads in the middle of an order, tap **New ticket**. Your dishes come back with the note \"Restored your unfinished order\". Tap **Clear order** to start fresh."
+     }
+    ]
+   },
+   {
+    "id": "import-a-menu",
+    "group": "guide",
+    "title": "Import a menu",
+    "summary": "Bring dishes in from a spreadsheet or a point-of-sale export, instead of typing each one.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "Open it"
+     },
+     {
+      "t": "p",
+      "x": "Tap **Settings**, **Dishes and prices**, **More ways to add dishes**, then **Have a menu file? Import it**. Choose a file or paste a list, then tap **Check it**. Nothing is added yet."
+     },
+     {
+      "t": "h",
+      "x": "Read the preview"
+     },
+     {
+      "t": "p",
+      "x": "Smokebox says what kind of file it thinks this is, such as a spreadsheet or a Lightspeed items export. Square, Toast and Clover exports work the same way. Each row shows its dish, its price and \"Read as $14.00\", the price it understood. Fix a name or price in the row, or clear the box to leave a dish out. A row with a problem says what is wrong and starts cleared."
+     },
+     {
+      "t": "ul",
+      "x": [
+       "Prices may be in cents. If every price is a large whole number, Smokebox asks. Tap **These prices are in cents**, or **These prices are in dollars** to undo it.",
+       "Columns it does not use are listed, like \"Ignored column: Calories\". Notes and descriptions are not kept. Only the name, price, station and section are.",
+       "Pick one station for every dish in **Put all these dishes at**, and one section in **Put all these dishes in**.",
+       "New sections in the file? Tap **Add these sections**."
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Add them"
+     },
+     {
+      "t": "p",
+      "x": "Tap **Import** with the number shown, like Import 12 dishes. Changed your mind? Tap **Remove these** and the whole import comes off the menu."
+     },
+     {
+      "t": "p",
+      "x": "Adding dishes by hand in Dishes and prices works just as well."
      }
     ]
    },
@@ -377,9 +422,9 @@
       "x": [
        "In **Dishes and prices**, find \"Do you cook food ahead?\" and tap **Yes, I cook ahead**. The cooked-ahead sheet opens.",
        "Type what you cook ahead and choose Hot or Cold.",
-       "Set how long it may stay. Set the limit your local health department gives you.",
+       "Set how long it may stay. For hot food it is one number of hours. For cold food two optional boxes ask how many days it may stay in the fridge and how many hours it may be out of the fridge. Use the limits your local health department gives you. Leave a box empty if no limit is set: Smokebox then only shows the time.",
        "Select the dishes that use it. Smokebox takes about 150 grams off the batch for each dish made, a starting guess you can change.",
-       "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**."
+       "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**. To change an item later, open it from the list and tap **Save changes**."
       ]
      },
      {
@@ -462,7 +507,7 @@
        "Tap **Orders**, then **Close the day** at the bottom.",
        "If an order is still open, it is listed. Every order must be paid or cancelled first. Tap **Open Orders to pay or void**, then come back.",
        "If you cook ahead and food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).",
-       "Read Money today: cash, card and other. The cash line says how much should be in the drawer, on top of the cash you started with.",
+       "Read Money today: cash, card and other. If you like, type **Cash you started the day with**. Smokebox remembers it on this device and adds today's cash payments, and tips paid in cash, to say how much should be in the drawer. It is a helper for counting.",
        "Tap **Close the day**.",
        "Tap **Back up today's data now** and **Print today's summary**."
       ]
@@ -481,6 +526,7 @@
        "Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.",
        "If your health department asks, save or print the thrown-out log. Open it from the **Settings** button on the board.",
        "Keep a copy of the backup off this device (see Backup and restore).",
+       "Which weekday sells best? In **Back office**, open **Sales and money** and look at **Best day of the week**.",
        "For your accountant: in **Menu and settings**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other."
       ]
      }
@@ -866,8 +912,8 @@
      {
       "t": "ul",
       "x": [
-       "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Your own food-safety plan, your training and your thermometer checks still apply.",
-       "Your local health code. The limits Smokebox starts with (such as 4 hours, the check interval and one reheat per batch) are its own starting values or house rules, not code. Set the limits your local health department gives you.",
+       "Food-safety procedures. Smokebox reminds you to take temperatures and flags readings and times outside the limits you set. It cannot see, taste or measure your food. Smokebox does not log cooler or freezer temperatures, sanitizer strength or thermometer checks: keep a paper log for those. Your own food-safety plan, your training and your thermometer checks still apply.",
+       "Your local health code. The limits Smokebox starts with (such as 4 hours, the check interval and one reheat per batch) are starting values, not your local rules. Set the limits your local health department gives you.",
        "Card processing. Smokebox only writes down how an order was paid. Keep your card reader and your processor.",
        "Your register or POS. Smokebox is a kitchen display with simple order entry. It does not file taxes, run payroll or replace your bookkeeping. Sales tax is one flat percent that you set.",
        "Allergy care. A note on a ticket is a reminder. Tell your staff about every allergy, and follow your own allergen rules.",
@@ -891,6 +937,8 @@
        "Tap the warning bar once, or use Play a test warning under Set up this tablet",
        "Check the 86 board: what is out today?",
        "Counted dishes: how many did you make today?",
+       "Hand sink works and is stocked. Anyone unwell? Tell the manager",
+       "Thermometer checked in ice water. Cooler and freezer readings on your paper log",
        "If you cook ahead: log a first temperature on each batch in the cabinet",
        "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
        "Yesterday's backup saved and a copy kept off the device"
@@ -910,6 +958,8 @@
        "Orders: every open order paid or cancelled, then Close the day",
        "If you cook ahead: every batch left in the cabinet decided (keep, or throw out with a reason)",
        "If you cook ahead: surfaces wiped and Sanitize logged",
+       "Food kept over a day: labeled with a date, as your local rule says",
+       "Final cooler and freezer readings on your paper log",
        "Sales and money looks right in the Back office",
        "Log of thrown-out batches saved or printed",
        "Backup downloaded and a copy kept off the device",
