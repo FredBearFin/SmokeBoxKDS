@@ -133,6 +133,52 @@ for (const min of [2, 20, 90]) {
   await p.ctx.close();
 }
 
+
+// 6. A put-off ("remind me later") reminder across a sleep: quiet while put off, one call when it is due, never twice
+{
+  const p = await open();
+  // Only the ribs batch stays, so every spoken line is about it.
+  await p.evaluate(() => { for (const b of SB.store.getState().batches) if (b.id !== 'b_13') SB.store.dispatchEx('discardBatch', { batchId: b.id, reason: 'manual' }, { source: 'ui' }); });
+  await p.clock.runFor(215 * 60e3); // the 45 minute call is already past; the next rung (20 minutes left) comes at 220
+  await p.evaluate(() => { window.__said.length = 0; });
+  const sn = await p.evaluate(() => SB.store.dispatchEx('snoozeAlert', { batchId: 'b_13', forMin: 10 }, { source: 'ui' }).report);
+  check('the reminder was put off for ten minutes', sn === 'ok', sn);
+  await hide(p); await p.clock.fastForward(7 * 60e3); await show(p); await p.clock.runFor(2000);
+  const q1 = await p.evaluate(() => ({ said: window.__said.slice(), until: SB.store.getState().alertSnoozes && SB.store.getState().alertSnoozes.b_13, now: SB.store.now() }));
+  check('a sleep that crosses a rung inside the put-off time: nothing is said, and the put-off survived', q1.said.length === 0 && q1.until > q1.now, q1);
+  await hide(p); await p.clock.fastForward(6 * 60e3); await show(p); await p.clock.runFor(2000);
+  const said1 = await p.evaluate(() => window.__said.slice());
+  console.log('  note  after the put-off: ' + JSON.stringify({ said: said1, osc: await p.evaluate(() => window.__osc), rows: await p.evaluate(() => SB.deadlines.build(SB.store.getState(), SB.store.now()).filter((d) => d.batchId === 'b_13').map((d) => [d.kind, d.rung, Math.round(d.msLeft / 60e3), d.snoozedUntil || 0])) }));
+  check('a sleep past the put-off time: the reminder is spoken once, about the ribs', said1.length === 1 && /ribs/i.test(said1[0]), said1);
+  await p.clock.runFor(30e3);
+  const said2 = await p.evaluate(() => window.__said.slice());
+  check('and not again in the next 30 seconds', said2.length === said1.length || said2.slice(1).every((x) => x !== said1[0]), said2);
+  await p.ctx.close();
+}
+
+// 7. The browser discarded the page and reloaded it after 90 minutes: back from the saved state with one summary line
+{
+  const p = await open();
+  await p.evaluate(() => SB.store.flush());
+  await hide(p);
+  await p.clock.fastForward(90 * 60e3);
+  const t0 = Date.now();
+  await p.reload();
+  await p.waitForFunction(() => window.SB && SB.booted === true);
+  const boot = Date.now() - t0;
+  await p.evaluate(() => { SB.floor.setWelcome(false); });
+  await p.clock.runFor(1500);
+  const r = await p.evaluate(() => ({ slips: document.querySelectorAll('.fl-slip').length, tickets: SB.store.getState().tickets.length, said: window.__said.slice(), osc: window.__osc }));
+  check('after the reload the board shows the saved tickets', r.slips === 3 && r.tickets === 3, r);
+  check('and nothing is spoken or sounded before anyone has tapped', r.said.length === 0 && r.osc === 0, r);
+  await p.mouse.click(500, 400); await p.clock.runFor(1500);
+  const r2 = await p.evaluate(() => ({ said: window.__said.slice(), osc: window.__osc }));
+  check('after the first tap at most one spoken line and one tone', r2.said.length <= 1 && r2.osc <= 3, r2);
+  const lines = (await strip(p)).join(' | ');
+  check('one summary line says what changed while the page was away', /While this screen was asleep: .*went late/.test(lines), lines);
+  console.log('  note  reload after 90 minutes: boot ' + boot + ' ms wall');
+  await p.ctx.close();
+}
 check('no uncaught page errors', errs.length === 0, errs.slice(0, 3));
 await browser.close();
 console.log(fail ? fail + ' check(s) failed' : 'all checks passed');

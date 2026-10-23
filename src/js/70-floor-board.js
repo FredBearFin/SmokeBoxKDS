@@ -454,6 +454,26 @@
     if (wakeState !== 'unsupported' && wakeState !== 'refused') return '';
     return 'This screen may go to sleep, and warnings stop while it sleeps. Keep the tablet plugged in with its screen set to stay on.';
   }
+  // Keeps the "went to the background" snapshot for this browser tab, so a page the browser threw away and reloaded can still say what changed.
+  function rememberSleep(at, snap) {
+    try {
+      if (!at || !snap) { g.sessionStorage.removeItem('smokebox.v1.sleepSnap'); return; }
+      g.sessionStorage.setItem('smokebox.v1.sleepSnap', JSON.stringify({ at, overdue: snap.overdue, past: Array.from(snap.past).slice(0, 200) }));
+    } catch (e) { /* private window or no storage: the live page still keeps it in memory */ }
+  }
+  // On a fresh start, reads the snapshot left by a page that went to the background and never came back (the browser discarded it) and
+  // sets the same "While this screen was asleep" line as a normal wake.
+  function restoreSleep() {
+    try {
+      const raw = g.sessionStorage.getItem('smokebox.v1.sleepSnap');
+      if (!raw) return;
+      const d = JSON.parse(raw), used = Number(d.used) || Date.now(), min = Math.round((used - d.at) / 60e3);
+      // Used once: the board may be set up again within ten minutes (it keeps the line), and after that the snapshot goes.
+      if (!(min >= 1) || min > 24 * 60 || !Array.isArray(d.past) || Date.now() - used > 10 * 60e3) { g.sessionStorage.removeItem('smokebox.v1.sleepSnap'); return; }
+      if (!d.used) g.sessionStorage.setItem('smokebox.v1.sleepSnap', JSON.stringify(Object.assign({}, d, { used })));
+      m.away = { at: used, min, summary: sleepSummary({ overdue: Number(d.overdue) || 0, past: new Set(d.past) }) };
+    } catch (e) { /* a damaged snapshot is ignored */ }
+  }
   // What was already late or past its limit when the page went to the background, so waking can say only what is new.
   function sleepSnapshot() {
     try {
@@ -562,14 +582,15 @@
           const min = Math.round((Date.now() - m.hiddenAt) / 60e3);
           // The first look after waking: one tick right now (not a loop of missed seconds), then one summary of what changed while asleep.
           if (min >= 1) { try { store().tick(); } catch (e) { /* the next timer tick does it */ } m.away = { at: Date.now(), min, summary: sleepSummary(m.sleepSnap) }; }
-          m.hiddenAt = null; m.sleepSnap = null;
+          m.hiddenAt = null; m.sleepSnap = null; rememberSleep(0, null);
         }
-      } else if (m) { m.hiddenAt = Date.now(); m.sleepSnap = sleepSnapshot(); }
+      } else if (m && !m.hiddenAt) { m.hiddenAt = Date.now(); m.sleepSnap = sleepSnapshot(); rememberSleep(m.hiddenAt, m.sleepSnap); }
     };
     doc.addEventListener('visibilitychange', onVis);
     m.offs.push(() => { doc.removeEventListener('pointerdown', onGesture, true); doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
     if (sound) hookAudioUnlock();
     m.offs.push(joinLeadership());
+    restoreSleep();
     // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
     if (SB.discards) { SB.discards.persist(); setTimeout(() => { try { SB.discards.remind(); } catch (e) { /* optional */ } }, 4000); }
     if (SB.sim && SB.sim.live && typeof SB.sim.live.onChange === 'function') {
