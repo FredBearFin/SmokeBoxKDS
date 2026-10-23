@@ -114,10 +114,10 @@
     badWho: 'Initials must be 1 to 12 characters. Shorten them, or leave them blank if the screen allows.',
     unknownSafetyEntry: 'That safety log entry is not here, or it is not a temperature, discard, cooling, reheat, sanitize or keep-serving entry. Pick one from the safety log.',
     wrongBackupMode: 'That backup does not belong to this kitchen (one is from the demo, the other from a real kitchen). Nothing was changed. Choose a backup made from this kitchen.',
-    moduleOff: 'Cook-ahead tracking (batches, the hold cabinet, temperature checks and sanitizing) is switched off. Turn it on in Menu and settings first.',
+    moduleOff: 'Cook-ahead tracking (batches, the hold cabinet, temperature checks and sanitizing) is switched off. Turn it on under Dishes and prices: Yes, I cook ahead.',
     nameTaken: 'Another ingredient already has that name. Pick a different name, or use the one that exists.',
     tooManyIngredients: 'The ingredient list is full (' + 80 + ' ingredients). Archive one you no longer use, then add this one.',
-    portionsConflict: 'This dish already lists ingredients, so it cannot also count portions. Remove its ingredients first, or keep tracking it by ingredients.',
+    portionsConflict: 'This dish already uses ingredients, so it cannot also be counted by portions. Remove its ingredients first, or keep it as it is.',
     badSnooze: 'A reminder can be put off for 1 to 30 minutes, only for a batch still on the menu, and never past 5 minutes before its last warning. The last warning, a past-quality batch and a thrown-out batch cannot be put off.',
   };
 
