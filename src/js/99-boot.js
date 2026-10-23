@@ -95,6 +95,22 @@
     try { dl.focus(); } catch (e) { /* ignore */ }
   }
 
+  // Watches for a device clock that jumped far ahead (or saved times far ahead of it) and asks the owner, once per episode, whether the new time is right.
+  function watchClock() {
+    let asking = false, toldWrong = false;
+    setInterval(() => {
+      try {
+        const s = SB.store.status();
+        if (s.clockWrong && !toldWrong && SB.ui && SB.ui.toast) { toldWrong = true; SB.ui.toast("This device's clock looks wrong: some saved times are far ahead of it. Smokebox kept the device clock. Check the date and time in the device's settings.", { tone: 'warn', ms: 20000 }); }
+        if (!s.clockSuspect || asking || !SB.ui || !SB.ui.confirm) return;
+        asking = true;
+        const days = Math.round(s.clockSuspect.aheadMs / 86400000);
+        SB.ui.confirm({ title: "This device's clock jumped ahead", body: ["The date or time on this device just moved ahead by about " + (days >= 2 ? days + ' days' : Math.round(s.clockSuspect.aheadMs / 3600000) + ' hours') + '. Smokebox is still counting from the old time so no batch is thrown out by mistake.', 'If the new time is right (the device was off or asleep that long), choose Use the new time. If the clock is wrong, fix it in the device settings and choose Keep the old time.'], confirmLabel: 'Use the new time', cancelLabel: 'Keep the old time', tone: 'danger' })
+          .then((yes) => { if (yes) { SB.store.acceptClockJump(); asking = false; } else setTimeout(() => { asking = false; }, 10 * 60e3); });
+      } catch (e) { /* the watcher must never break the board */ }
+    }, 5000);
+  }
+
   // Tells the person, once at start-up, when the saved board was unreadable, was repaired, or cannot be saved in this
   // browser (private windows block storage). Silent when everything is fine.
   function storageNotices() {
@@ -135,6 +151,7 @@
       if (SB.store && typeof SB.store.getState === 'function') SB.dev = { state: () => SB.store.getState() };
       SB.booted = true;
       storageNotices();
+      watchClock();
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });
     } catch (e) { showBootError(e, stage); }

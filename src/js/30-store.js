@@ -90,6 +90,8 @@
   // snapAt is when the rolling copy was last taken (real time); snapWanted is set by close day so the next save takes one.
   let snapAt = 0, snapWanted = null;
   let writeBlocked = false, heldText = null;     // set when a damaged save could not be copied aside: nothing is written over it
+  let susp = null;           // a big forward jump of the device clock that has not been accepted: { r0 first reading, base trusted time }
+  const CLOCK_JUMP_MAX_MS = 36 * 3600e3;     // a forward step bigger than this (a tablet asleep for a day and a half) needs the owner's yes
   let last = null;
   let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: 400 };
   const tabId = 'tab_' + Math.floor(Math.random() * 1e9).toString(36);
@@ -103,9 +105,26 @@
     // Never go backwards (rule I9): if the real clock steps back or gives garbage, the last time is
     // repeated.
     if (!isNum(v)) v = lastNow;
+    // A real kitchen does not follow a big forward jump of the device clock by itself (a dead clock battery, a wrong date): it keeps counting from
+    // the last trusted time, says so in the status, and waits for the owner to accept the new time. A jump that goes away again changes nothing.
+    if (strict && mode === 'real' && clk.speed === 1) {
+      if (v - lastNow > CLOCK_JUMP_MAX_MS) {
+        if (!susp) susp = { r0: r, base: lastNow };
+        st.clockSuspect = { aheadMs: v - lastNow, since: susp.r0 };
+        v = susp.base + Math.max(0, r - susp.r0);
+      } else if (susp) { susp = null; st.clockSuspect = null; }
+    }
     if (v < lastNow) v = lastNow;
     lastNow = v;
     return v;
+  }
+  // Accepts the device clock's new time after a big jump (the owner says it is right). Does nothing when there is no jump waiting.
+  function acceptClockJump() {
+    if (!susp) return false;
+    const r = realNow();
+    clk = { base: Math.floor(r), realBase: r, speed: 1 }; lastNow = Math.floor(r); susp = null; st.clockSuspect = null;
+    schedulePersist(false); scheduleNotify();
+    return true;
   }
   // Sets the demo speed (0.1 to 1000, where 1 is real time). Re-bases the clock first so the time does not
   // jump. Returns false for a bad speed.
@@ -123,6 +142,8 @@
   function atLeast(t) { // move the clock forward so it is not behind stamps in a loaded state
     if (!isNum(t)) return;
     const v = now();
+    // Stamps far ahead of the clock do not move it in a real kitchen: the clock is wrong, not the data.
+    if (strict && mode === 'real' && t - v > CLOCK_JUMP_MAX_MS) { st.clockWrong = { aheadMs: t - v }; return; }
     if (t > v) { clk = { base: t, realBase: realNow(), speed: clk.speed }; lastNow = t; }
   }
   // Newest time found in a state: the last event or one of the last 50 tickets (tickets run oldest to
@@ -513,7 +534,7 @@
     baseStorage = given || U.rawStorage;
     storage = given ? (strict && mode === 'demo' ? U.storageFor(given, 'demo') : given) : (strict ? U.storageFor(U.rawStorage, mode) : U.storage);
     st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: SAVE_MS };
-    last = null; writeBlocked = false; heldText = null;
+    last = null; writeBlocked = false; heldText = null; susp = null;
     baseSid = null; pending = []; skipRebase = false;
     outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
     const r = realNow();
@@ -568,7 +589,7 @@
     // never earlier than the real time. Speed goes back to 1.
     let vNow = r;
     const c = payload && payload.clock;
-    if (loaded && c && isNum(c.virtual)) vNow = Math.max(r, c.virtual + Math.max(0, r - (isNum(c.real) ? c.real : r)));
+    if (loaded && c && isNum(c.virtual) && !(strict && mode === 'real')) vNow = Math.max(r, c.virtual + Math.max(0, r - (isNum(c.real) ? c.real : r)));   // a real kitchen always starts from the device clock
     vNow = Math.floor(vNow);
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
@@ -1098,6 +1119,9 @@
     if (mode === 'demo') return fail('notInDemo');
     if (typeof opts.confirm !== 'string' || opts.confirm.trim().toUpperCase() !== START_OVER_WORD) return fail('confirmWord', { word: START_OVER_WORD });
     if (opts.keepSettings != null && typeof opts.keepSettings !== 'boolean') return fail('badPatch', { key: 'keepSettings' });
+    // The screen must say a backup file was really saved (its name and size) before anything is erased.
+    const bs = opts.backupSaved;
+    if (!bs || typeof bs !== 'object' || typeof bs.filename !== 'string' || !bs.filename.trim() || !(Number.isFinite(bs.chars) && bs.chars > 0)) return fail('backupRequired');
     const keep = opts.keepSettings !== false;
     const text = exportAll();
     if (text == null) { const lr = last || {}; return fail(lr.report || 'invalidBackup', lr.info); }
@@ -1164,7 +1188,7 @@
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").

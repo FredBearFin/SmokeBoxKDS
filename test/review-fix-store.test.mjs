@@ -96,3 +96,76 @@ test('#2: a repair that drops nothing does not park anything', () => {
   assert.equal(storage.m.get('smokebox.v1.dropped') == null, true);
   assert.ok(!st.droppedCount);
 });
+
+test('start over refuses until the screen says a backup file was saved, and changes nothing when it refuses', () => {
+  const { clock, storage } = savedKitchen();
+  boot(storage, clock);
+  const before = JSON.stringify(S.getState());
+  for (const bad of [undefined, null, {}, { filename: '', chars: 5 }, { filename: 'b.json', chars: 0 }, { filename: 'b.json', chars: NaN }, { filename: 7, chars: 5 }]) {
+    const r = S.startOver({ confirm: 'ERASE', backupSaved: bad });
+    assert.equal(r.ok, false); assert.equal(r.report, 'backupRequired');
+  }
+  assert.equal(JSON.stringify(S.getState()), before);
+  assert.equal(S.startOver({ confirm: 'ERASE', backupSaved: { filename: 'b.json', chars: 100 } }).ok, true);
+});
+
+const HOUR = 3600e3, DAYMS = 24 * HOUR, TEN_YEARS = 3650 * DAYMS;
+// A real kitchen with a clock the test can move, one batch cooking, ticking each time the clock moves.
+function clocked() {
+  const clock = { real: T0 }, storage = memStorage();
+  boot(storage, clock);
+  return { clock, storage, tick: () => { S.now(); S.tick(); } };
+}
+
+test('#5: one reading ten years ahead, then back to normal, moves nothing and discards nothing', () => {
+  const { clock, storage, tick } = clocked();
+  const batchesBefore = S.getState().batches.map((b) => b.status).join();
+  clock.real = T0 + TEN_YEARS; tick();
+  assert.ok(S.status().clockSuspect, 'the status says the clock jumped');
+  assert.ok(S.now() - T0 < HOUR, 'the app clock stayed with the last trusted time');
+  clock.real = T0 + 5000; tick();
+  assert.equal(S.status().clockSuspect, null, 'and it clears when the clock is normal again');
+  assert.ok(S.now() - T0 < HOUR);
+  assert.equal(S.getState().batches.map((b) => b.status).join(), batchesBefore, 'no batch was thrown out');
+  S.flush();
+  const st = boot(storage, clock);
+  assert.ok(S.now() - clock.real < 5 * 60e3, 'after a reload the app clock is still the device clock: ' + (S.now() - clock.real));
+  assert.equal(st.clockSuspect == null, true);
+});
+
+test('#5: a jump that stays is held until the owner accepts it; time keeps running meanwhile', () => {
+  const { clock, tick } = clocked();
+  clock.real = T0 + TEN_YEARS; tick();
+  clock.real += 60e3; tick();
+  assert.ok(S.status().clockSuspect && S.status().clockSuspect.aheadMs > 3000 * DAYMS);
+  assert.ok(S.now() >= T0 + 59e3 && S.now() < T0 + HOUR, 'a minute passed on the held clock');
+  assert.equal(S.getState().batches.some((b) => b.status === 'discard'), false);
+  assert.equal(S.acceptClockJump(), true);
+  assert.ok(Math.abs(S.now() - clock.real) < 1000, 'after accepting, the clock follows the device');
+  assert.equal(S.status().clockSuspect, null);
+  assert.equal(S.acceptClockJump(), false, 'nothing to accept now');
+});
+
+test('#5: an ordinary wake-up gap (8 hours) is followed at once, as before', () => {
+  const { clock, tick } = clocked();
+  clock.real = T0 + 8 * HOUR; tick();
+  assert.equal(S.status().clockSuspect == null, true);
+  assert.ok(Math.abs(S.now() - clock.real) < 1000);
+});
+
+test('#5: a saved or restored kitchen stamped far in the future does not move the clock', () => {
+  const { clock, storage, tick } = clocked();
+  const menu = S.getState().menu[0].id;
+  S.dispatch('createTicket', { customer: 'Future', items: [{ menuId: menu }] });
+  const text = S.exportAll();
+  const env = JSON.parse(text);
+  const s = env.state || env;
+  // Moves every time field of a record ten years on, so the record is still consistent with itself.
+  const shift = (x) => { if (Array.isArray(x)) x.forEach(shift); else if (x && typeof x === 'object') for (const k of Object.keys(x)) { if (typeof x[k] === 'number' && (/At$/.test(k) || k === 't')) x[k] += TEN_YEARS; else shift(x[k]); } };
+  shift(s.tickets); shift(s.orders); shift(s.events);
+  const r = S.importAll(JSON.stringify(env));
+  assert.equal(r, 'ok', JSON.stringify(S.lastResult()));
+  tick();
+  assert.ok(S.now() - clock.real < HOUR, 'the clock is still the device clock after the restore: ' + (S.now() - clock.real) + ' ' + JSON.stringify(r).slice(0, 80));
+  assert.ok(S.status().clockWrong, 'and the status says the stamps look wrong');
+});

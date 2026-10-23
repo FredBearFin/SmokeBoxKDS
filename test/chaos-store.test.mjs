@@ -163,17 +163,17 @@ test('startOver: refuses a wrong word, a non-string, a bad keepSettings and the 
   boot();
   const before = S.exportAll();
   for (const confirm of [undefined, null, '', 'erase it', 'ERAS', 5, {}, [], 'ERASE ERASE']) {
-    const r = S.startOver({ confirm });
+    const r = S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm });
     assert.equal(r.ok, false, 'confirm ' + JSON.stringify(confirm) + ' must be refused');
   }
-  assert.equal(S.startOver({ confirm: 'ERASE', keepSettings: 'no' }).ok, false);
-  assert.equal(S.startOver({ confirm: 'ERASE', keepSettings: 0 }).ok, false);
+  assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: 'ERASE', keepSettings: 'no' }).ok, false);
+  assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: 'ERASE', keepSettings: 0 }).ok, false);
   assert.equal(S.startOver().ok, false);
   assert.equal(S.startOver(null).ok, false);
   assert.equal(S.exportAll(), before, 'nothing changed');
   S.destroy();
   boot({ mode: 'demo' });
-  assert.equal(S.startOver({ confirm: 'ERASE' }).report, 'notInDemo');
+  assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: 'ERASE' }).report, 'notInDemo');
   S.destroy();
 });
 
@@ -181,11 +181,11 @@ test('startOver: double call, then ids are never reused and the kitchen is empty
   boot();
   const a = S.dispatchEx('createTicket', { items: [{ menuId: S.getState().menu[0].id }], allowPast: true }, { source: 'ui' });
   const num0 = a.info.num;
-  const r1 = S.startOver({ confirm: 'erase' });
+  const r1 = S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: 'erase' });
   assert.equal(r1.ok, true);
   assert.equal(S.getState().tickets.length, 0);
   assert.equal(S.getState().menu.filter((m) => !m.archived).length, 0, 'empty menu');
-  const r2 = S.startOver({ confirm: 'ERASE' });
+  const r2 = S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: 'ERASE' });
   assert.equal(r2.ok, true, 'a second call on an already empty kitchen is harmless');
   assert.deepEqual(E.checkInvariants(S.getState(), S.now()), []);
   // the backup it hands over restores through the normal importer
@@ -207,7 +207,7 @@ test('startOver: a storage quota error part-way leaves either the old kitchen or
     for (let i = 0; i < 3; i++) S.dispatch('createTicket', { items: [{ menuId: S.getState().menu[i].id }], allowPast: true });
     S.flush();
     storage.failAfter = storage.writes + failAt;
-    let r; try { r = S.startOver({ confirm: 'ERASE' }); } catch (e) { r = { ok: false, threw: e.message }; }
+    let r; try { r = S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: 'ERASE' }); } catch (e) { r = { ok: false, threw: e.message }; }
     S.destroy();
     storage.failAfter = Infinity;
     const again = S.init({ now: () => clock.real, storage, noTimers: true, noSync: true, mode: 'real' });
@@ -225,7 +225,7 @@ test('startOver: the demo keys are never touched', () => {
   storage.set('smokebox.demo.theme', 'x');
   boot({ storage });
   const before = JSON.stringify(storage.keys('smokebox.demo.').map((k) => [k, storage.m.get(k)]));
-  assert.equal(S.startOver({ confirm: 'ERASE' }).ok, true);
+  assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: 'ERASE' }).ok, true);
   assert.equal(JSON.stringify(storage.keys('smokebox.demo.').map((k) => [k, storage.m.get(k)])), before);
   S.destroy();
 });
@@ -237,7 +237,7 @@ test('startOver then a damaged save: the rolling last-good copy must not bring t
   const { clock } = boot({ storage });
   S.dispatch('createTicket', { items: [{ menuId: S.getState().menu[0].id }], customer: 'Secret Customer', allowPast: true });
   S.flush();
-  assert.equal(S.startOver({ confirm: 'ERASE' }).ok, true);
+  assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: 'ERASE' }).ok, true);
   S.flush();
   S.destroy();
   // damage the live save
@@ -480,7 +480,7 @@ test('two tabs: Start over in one while the other takes an order leaves one cons
   const dish = S.getState().menu[0].id;
   // both tabs act before either save reaches the other
   real += 1000;
-  const startOver = S.startOver({ confirm: 'ERASE' });
+  const startOver = S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: 'ERASE' });
   real += 1000;
   const order = B.dispatch('createTicket', { items: [{ menuId: dish }], allowPast: true });
   S.flush(); B.flush();
