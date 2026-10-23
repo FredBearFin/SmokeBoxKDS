@@ -378,7 +378,7 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 /* ---------- banner: save failure and daily backup nudge, a strip across the top of the shell ---------- */
 /* The strip sits above the layers; while it shows, the layers start below it (--sb-banner-h). */
 .sb-banner {
-  position: absolute; top: 0; left: 0; right: 0; z-index: var(--zi-toast); min-height: var(--sb-banner-h, 52px);
+  position: absolute; top: 0; left: 0; right: 0; z-index: calc(var(--zi-sheet) - 1); min-height: var(--sb-banner-h, 52px); /* above the pages, below sheets, so a sheet's title and close button are never covered */
   display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--gutter);
   background: var(--tint-warn); color: var(--ink); border-bottom: 3px solid var(--amber);
 }
