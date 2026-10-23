@@ -3903,6 +3903,15 @@ a.of-nav:active { background: var(--press); }
   .pr-printroot pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; color: #000; margin: 0; }
 }
 
+/* Saved history: a plain meter and, from 70 percent full, a calm amber card. Words carry the meaning; the bar is a picture of the same number. */
+.od-hist { display: grid; gap: var(--sp-2); }
+.od-hist-track { height: 10px; border-radius: 6px; background: var(--line-soft, var(--line)); overflow: hidden; }
+.od-hist-bar { display: block; height: 100%; background: var(--ink2); border-radius: 6px; }
+.od-hist[data-tone="warn"] { border-left: 4px solid var(--amber, #b9770e); background: var(--tint-warn, transparent); }
+.od-hist[data-tone="warn"] .od-hist-bar { background: var(--amber, #b9770e); }
+.od-hist-alert { margin: 0; font-weight: var(--w-semi); }
+.od-hist-meter { margin: 0; }
+
 /* ===== 33-office-closeday.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the Close the day sheet and its print-only end-of-day summary.
@@ -3939,6 +3948,7 @@ a.of-nav:active { background: var(--press); }
 }
 .cd-startl { display: grid; gap: 4px; font-size: var(--fs-2); color: var(--ink2); max-width: 28em; }
 .cd-drawerbox { display: grid; gap: var(--sp-2); }
+.cd-hist { border-left: 4px solid var(--amber, #b9770e); padding-left: var(--sp-2); font-weight: var(--w-semi); }
 
 /* ===== 34-office-inspector.css ===== */
 /*
@@ -31141,6 +31151,14 @@ a.of-nav:active { background: var(--press); }
     return 'Days before ' + U.fmtDateShort(before) + ' were saved to your month files and cleared from this tablet. Totals for those days are not shown here.';
   }
   O.archivedWords = archivedWords;
+  // The matching note for days dropped to make room when the saved history filled up (`day` is the first day still kept), or '' when the
+  // range starts on or after it.
+  function droppedRangeWords(day, from, dsh) {
+    if (typeof day !== 'string' || !/^\d{4}-\d\d-\d\d$/.test(day)) return '';
+    if (isNum(from) && from >= dayStartMs(day, isNum(dsh) ? dsh : 4)) return '';
+    return 'Older history was dropped to make room: days before ' + U.fmtDateShort(day) + ' are not here, so totals for those days are missing.';
+  }
+  O.droppedRangeWords = droppedRangeWords;
 
   O.pure = { PAGES, customRange, coachText, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
 
@@ -32160,7 +32178,7 @@ a.of-nav:active { background: var(--press); }
     }
     const b = bannerText(info);
     // Pages that add up history say when the range reaches days that were cleared from this tablet (the safety record keeps its own).
-    if (M.pageId !== 'safety' && M.pageId !== 'data') { const aw = O.archivedWords(ds && ds.archivedBefore, F.range.from, svcHour()); if (aw) b.text += ' ' + aw; }
+    if (M.pageId !== 'safety' && M.pageId !== 'data') { const aw = O.archivedWords(ds && ds.archivedBefore, F.range.from, svcHour()); if (aw) b.text += ' ' + aw; const dw = O.droppedRangeWords(ds && ds.droppedBefore, F.range.from, svcHour()); if (dw) b.text += ' ' + dw; }
     const t = M.banner.querySelector('.of-banner-t');
     if (t.textContent !== b.text) t.textContent = b.text;
     M.banner.dataset.kind = b.kind;
@@ -34321,6 +34339,42 @@ a.of-nav:active { background: var(--press); }
   const SAVE_DELAY = 600;           // ms after the last change before a field is written (longer than the stepper's 500 ms hold-repeat gap)
   const MAX_IMPORT_CHARS = 20e6;    // same ceiling as SB.store.importAll
 
+  // Builds the always-visible "Saved history" card of the Data page: a plain meter of how full the saved history is, a calm amber note with a
+  // button into Close the month from 70 percent, the sentence about history already dropped, and the browser-may-delete line. Reads the store's
+  // historyFill(); a store without it draws nothing.
+  function historyCard() {
+    const BP = SB.office && SB.office.backupPure;
+    const el = U.h('section', { class: 'od-fcard od-hist', 'aria-label': 'Saved history' });
+    const bar = U.h('span', { class: 'od-hist-bar' }), track = U.h('div', { class: 'od-hist-track', 'aria-hidden': 'true' }, bar);
+    const meter = U.h('p', { class: 'od-p od-hist-meter', role: 'status' }), alert = U.h('p', { class: 'od-p od-hist-alert', hidden: true });
+    const dropped = U.h('p', { class: 'od-hint od-hist-dropped', hidden: true }), safari = U.h('p', { class: 'od-hint od-hist-safari', hidden: true });
+    const go = U.h('button', { type: 'button', class: 'btn btn-sm', 'data-action': 'history-close-month', hidden: true }, 'Close the month...');
+    go.addEventListener('click', () => { try { if (SB.setup && typeof SB.setup.openCloseMonth === 'function') SB.setup.openCloseMonth(); } catch (e) { /* the flow shows its own refusals */ } });
+    el.append(U.h('h3', { class: 'od-fh' }, U.h('span', null, 'Saved history')), track, meter, alert, U.h('div', { class: 'od-actions' }, go), dropped, safari);
+    // Redraws the card from the store.
+    function paint() {
+      const st = SB.store.getState(), fill = SB.store.historyFill ? SB.store.historyFill() : null;
+      const v = BP.historyView(fill, st, SB.store.now());
+      el.hidden = !fill;
+      if (!fill) return;
+      el.dataset.tone = v.level === 'ok' ? '' : 'warn'; el.dataset.level = v.level;
+      bar.style.width = (v.pct === null ? 0 : v.pct) + '%';
+      track.setAttribute('data-pct', String(v.pct === null ? '' : v.pct));
+      meter.textContent = v.meter || 'Saved history size is not known on this device.';
+      alert.textContent = v.alert; alert.hidden = !v.alert; go.hidden = !v.alert;
+      const ts = fill.trimmedSince && typeof fill.trimmedSince === 'object' ? fill.trimmedSince.droppedBefore : '';
+      let ds = null; try { ds = SB.store.dataset({ sample: false }); } catch (e) { ds = null; }
+      const dday = (ds && ds.droppedBefore) || ts || '';
+      const dw = BP.droppedWords(dday); dropped.textContent = dw; dropped.hidden = !dw;
+      safari.textContent = v.safari; safari.hidden = !v.safari;
+    }
+    paint();
+    // Keeps the card in step with the store, redrawing only when the tickets, events or day changed.
+    let seen = '';
+    function sync(st) { const k = st.tickets.length + '|' + (st.events || []).length + '|' + (st.archivedBefore || '') + '|' + (st.droppedBefore || '') + '|' + U.serviceDate(SB.store.now(), (st.settings.service || {}).dayStartHour); if (k !== seen) { seen = k; try { paint(); } catch (e) { /* the rest of the page still draws */ } } }
+    return { el, sync };
+  }
+
   // Builds the "Close the month" card for the Data page: one plain paragraph on what it does, the numbers from the store's own preview,
   // and a Start button that opens the guarded confirm flow (SB.setup.openCloseMonth). Nothing here changes any data.
   function closeMonthCard(flowCard) {
@@ -36101,6 +36155,7 @@ a.of-nav:active { background: var(--press); }
     const hubTablet = (() => { try { return !!(SB.store.hubKitchen && SB.store.hubKitchen()); } catch (e) { return false; } })();
     if (!(SB.store.isDemo && SB.store.isDemo()) && !hubTablet && SB.store.closeMonthPreview) { const cm = closeMonthCard(flowCard); flow.append(cm.el); P.syncs.push(cm.sync); }
     pn.body.prepend(flow);
+    if (SB.store.historyFill && !(SB.store.isDemo && SB.store.isDemo())) { const hc = historyCard(); pn.body.prepend(hc.el); P.syncs.push(hc.sync); }
     const exStatus = statusLine();
     const fbLabelId = U.uid('odfb');
     const fbText = h('textarea', { class: 'textarea od-fbtext', readonly: true, rows: 6, 'aria-labelledby': fbLabelId, spellcheck: 'false' });
@@ -37093,6 +37148,12 @@ a.of-nav:active { background: var(--press); }
     function paintReview(m) {
       const help = SB.guide && SB.guide.link ? SB.guide.link('closing-the-day', 'closing the day') : null;
       body.appendChild(h('p', { class: 'cd-lead' }, 'Today is ' + U.fmtDateShort(m.day) + '. ', whatClosingDoes((stateNow().settings.service || {}).dayStartHour), help ? h('span', null, ' ', help) : null));
+      // From 85 percent full the sheet repeats the saved-history warning, because closing the day is when the owner is already looking at the numbers.
+      try {
+        const BPh = SB.office && SB.office.backupPure, fill = SB.store.historyFill ? SB.store.historyFill() : null;
+        const hv = BPh && fill ? BPh.historyView(fill, stateNow(), SB.store.now()) : null;
+        if (hv && (hv.level === 'urgent' || hv.level === 'full')) body.appendChild(h('p', { class: 'cd-note cd-hist', role: 'status' }, hv.alert));
+      } catch (e) { /* the sheet works without the warning */ }
       if (m.closedAt) body.appendChild(h('p', { class: 'cd-note' }, 'Closed once already today at ' + U.fmtTime(m.closedAt) + '. Closing again covers the whole day, including anything sold since.'));
       // Open orders block
       const sec1 = h('section', { class: 'cd-sec' }, h('h3', null, m.open.length ? 'Orders still open (' + m.open.length + ')' : 'No open orders'));
@@ -37391,7 +37452,49 @@ a.of-nav:active { background: var(--press); }
     return String(typed == null ? '' : typed).trim().toLowerCase() === String(word || 'reset').toLowerCase();
   }
 
-  O.backupPure = { backupFreshness, describeBackup, resetWordOk, salesCsv };
+  // How full the saved history is and what to tell the owner, from the store's historyFill() numbers and the kitchen's state. The fill is the
+  // largest of tickets, events and bytes against their limits; the pace (tickets and events per day over the last 14 days, at least 3 days of
+  // them) gives the days left. Returns { pct, level: 'ok' | 'near' (70 percent) | 'urgent' (85) | 'full', meter, alert, daysLeft, safari }.
+  function historyView(fill, state, now) {
+    const out = { pct: null, level: 'ok', meter: '', alert: '', daysLeft: null, safari: '' };
+    if (!fill || typeof fill !== 'object') return out;
+    const parts = [];
+    if (isNum(fill.tickets) && isNum(fill.ticketsCap) && fill.ticketsCap > 0) parts.push(fill.tickets / fill.ticketsCap);
+    if (isNum(fill.events) && isNum(fill.eventsCap) && fill.eventsCap > 0) parts.push(fill.events / fill.eventsCap);
+    if (isNum(fill.bytes) && isNum(fill.quotaBytes) && fill.quotaBytes > 0) parts.push(fill.bytes / fill.quotaBytes);
+    if (parts.length) out.pct = Math.min(100, Math.floor(Math.max.apply(null, parts) * 100));
+    if (fill.persisted === false) out.safari = 'This browser may delete saved data if the tablet is unused for a while. Add Smokebox to the home screen to keep it.';
+    if (out.pct === null) return out;
+    out.level = out.pct >= 100 ? 'full' : out.pct >= 85 ? 'urgent' : out.pct >= 70 ? 'near' : 'ok';
+    // The pace over the last 14 days, from the tickets and the event log.
+    const DAY = 864e5, from = (isNum(now) ? now : Date.now()) - 14 * DAY;
+    let nT = 0, firstT = Infinity;
+    for (const t of (state && state.tickets) || []) if (t && isNum(t.createdAt) && t.createdAt > from && t.createdAt <= now) { nT++; if (t.createdAt < firstT) firstT = t.createdAt; }
+    let nE = 0;
+    if (SB.engine && SB.engine.allEvents && state) for (const e of SB.engine.allEvents(state)) if (e && isNum(e.t) && e.t > from && e.t <= now) nE++;
+    const span = nT ? Math.min(14, Math.max(1, Math.ceil((now - firstT) / DAY))) : 0;
+    if (out.level !== 'full' && Object.prototype.hasOwnProperty.call(fill, 'daysLeft')) {
+      // The store knows all three limits (including the browser's space), so its own estimate wins; null means under three days of history.
+      out.daysLeft = isNum(fill.daysLeft) ? Math.floor(fill.daysLeft) : null;
+    } else if (out.level !== 'full' && span >= 3) {
+      const room = [];
+      if (nT && isNum(fill.ticketsCap)) room.push(Math.max(0, fill.ticketsCap - fill.tickets) / (nT / span));
+      if (nE && isNum(fill.eventsCap)) room.push(Math.max(0, fill.eventsCap - fill.events) / (nE / span));
+      if (room.length) out.daysLeft = Math.floor(Math.min.apply(null, room));
+    }
+    const left = out.daysLeft === null ? '' : out.daysLeft > 365 ? ' (more than a year at today\'s pace)' : ' (about ' + out.daysLeft + ' more ' + (out.daysLeft === 1 ? 'day' : 'days') + ' at today\'s pace)';
+    out.meter = out.level === 'full' ? 'Your saved history is full.' : 'Your saved history: ' + out.pct + '% full' + left;
+    if (out.level === 'full') out.alert = 'Your saved history is full, so older days are being dropped to make room. Close the month to save them to files.';
+    else if (out.level !== 'ok') out.alert = 'Your saved history is ' + out.pct + '% full. Close the month to save it to files before older days are dropped.';
+    return out;
+  }
+  // The sentence for history that was already dropped to make room: the first day still kept is `day` (YYYY-MM-DD).
+  function droppedWords(day) {
+    if (typeof day !== 'string' || !/^\d{4}-\d\d-\d\d$/.test(day)) return '';
+    return 'Older history was dropped to make room (days before ' + U.fmtDateShort(day) + '). Close the month regularly to keep it in files.';
+  }
+
+  O.backupPure = { backupFreshness, describeBackup, resetWordOk, salesCsv, historyView, droppedWords };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 88-office-backup.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'88-office-backup.js',message:String(e&&e.message||e)});}
