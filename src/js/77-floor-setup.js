@@ -1420,7 +1420,91 @@
   }
   // Plain words for each hub error code (the same codes as the show-only screen, plus a hub that is not empty).
   function hubErrorWords(code) {
-    return { badCode: 'The access code was not accepted. Check it with whoever runs the main computer.', notFound: 'Nothing at that address is a Smokebox main computer. Check the address.', unreachable: 'Could not reach that address. Check the Wi-Fi and the address, then try again.', wrongVersion: 'This page and the main computer are different versions. Reload this page, or ask whoever runs the main computer to update it.', tooMany: 'The main computer already has as many screens as it allows.', unpaired: 'This tablet is not paired with the main computer. Ask the person who runs the main computer for a pairing code.', revoked: 'This tablet has been removed from the kitchen. Ask the owner for a new pairing code to pair it again.', badPairCode: 'That pairing code did not work. A code works once and only for 10 minutes. Ask for a new one.', tooManyTries: 'Too many tries. Wait a few minutes, then ask for a new code.', badName: 'That screen name cannot be used. Use letters, numbers and spaces, up to 20 characters.', notEmpty: 'The main computer already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Nothing was changed.' }[code] || 'Could not use the main computer.';
+    return { badCode: 'The access code was not accepted. Check it with whoever runs the main computer.', notFound: 'Nothing at that address is a Smokebox main computer. Check the address.', unreachable: 'Could not reach that address. Check the Wi-Fi and the address, then try again.', wrongVersion: 'This page and the main computer are different versions. Reload this page, or ask whoever runs the main computer to update it.', tooMany: 'The main computer already has as many screens as it allows.', notOwner: 'Only an owner screen can do that.', unpaired: 'This tablet is not paired with the main computer. Ask the person who runs the main computer for a pairing code.', revoked: 'This tablet has been removed from the kitchen. Ask the owner for a new pairing code to pair it again.', badPairCode: 'That pairing code did not work. A code works once and only for 10 minutes. Ask for a new one.', tooManyTries: 'Too many tries. Wait a few minutes, then ask for a new code.', badName: 'That screen name cannot be used. Use letters, numbers and spaces, up to 20 characters.', notEmpty: 'The main computer already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Nothing was changed.' }[code] || 'Could not use the main computer.';
+  }
+  // Words for how long ago a screen was last seen ("just now", "5 minutes ago", "yesterday"); an unknown time says so.
+  function seenWords(t, now) {
+    if (!t) return 'not seen yet';
+    const s = Math.max(0, Math.round((now - t) / 1000));
+    if (s < 60) return 'just now';
+    const m = Math.round(s / 60); if (m < 60) return m + (m === 1 ? ' minute ago' : ' minutes ago');
+    const hr = Math.round(m / 60); if (hr < 24) return hr + (hr === 1 ? ' hour ago' : ' hours ago');
+    const d = Math.round(hr / 24); return d === 1 ? 'yesterday' : d + ' days ago';
+  }
+  // Builds "Screens in this kitchen": for an owner tablet, the list of paired screens with Remove and Add a screen; for any other paired tablet, a read-only line.
+  function buildScreensCard(urlNow) {
+    const card = h('section', { class: 'fs-card fw-screens', hidden: true, dataset: { part: 'screens' } });
+    const list = h('div', { class: 'sc-list', dataset: { role: 'screen-list' } });
+    const msg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'screen-msg' } });
+    const codeBox = h('div', { class: 'sc-codebox', hidden: true, dataset: { role: 'code-box' } });
+    let timer = null, expiresAt = 0, lastUrl = '';
+    // Stops the countdown when a new code replaces the old one or the sheet closes.
+    const stopTimer = () => { if (timer) { clearInterval(timer); timer = null; } };
+    // Plain words for an owner call that failed.
+    const why = (e) => ({ notOwner: 'Only an owner screen can add or remove screens.', unpaired: 'This tablet is not paired with the main computer. Pair it first.', revoked: 'This tablet was removed from the kitchen.', unreachable: 'Could not reach the main computer. Check the Wi-Fi and try again.', tooManyTries: 'Too many tries. Wait a few minutes.', wrongVersion: 'This page and the main computer are different versions. Reload this page.' }[e] || 'That did not work. Try again.');
+    // Shows the new code big, with a one-use note, a 10-minute countdown, Copy and what to do on the other tablet.
+    function showCode(code, minutes) {
+      stopTimer(); U.clear(codeBox); codeBox.hidden = false; expiresAt = Date.now() + (minutes || 10) * 60000;
+      const big = h('div', { class: 'rc-code sc-code', role: 'textbox', 'aria-label': 'Pairing code for the other tablet', dataset: { role: 'new-code' } }, String(code).replace(/(.{3})(.{3})/, '$1 $2'));
+      const left = h('p', { class: 'fs-sub', role: 'timer', dataset: { role: 'countdown' } });
+      const copy = h('button', { type: 'button', class: 'btn', dataset: { act: 'code-copy' }, onClick: () => { Promise.resolve(SB.ui.copyText ? SB.ui.copyText(String(code)) : false).then((ok) => tell(msg, ok ? 'Copied.' : 'Copy did not work. Type the code by hand.', ok ? 'ok' : 'bad')); } }, ico('copy', 20), h('span', null, 'Copy'));
+      // Shows the minutes and seconds left; at zero the code is no good any more.
+      const tick = () => { const ms = expiresAt - Date.now(); if (ms <= 0) { tell(left, 'This code has expired. Make a new one.', 'bad'); big.setAttribute('data-expired', 'true'); stopTimer(); return; } const s = Math.ceil(ms / 1000); left.textContent = 'Works once. Good for ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' more.'; };
+      codeBox.append(h('p', null, h('strong', null, 'Type this code on the other tablet: '), 'Settings > Use one kitchen on several tablets.'), big, left, h('div', { class: 'fs-row' }, copy));
+      tick(); timer = setInterval(() => { if (!doc.body.contains(card)) stopTimer(); else tick(); }, 1000);
+    }
+    // Asks the main computer for a new one-time code.
+    function addScreen() {
+      tell(msg, 'Making a code...');
+      Promise.resolve(SB.store.hubNewPairingCode({ url: lastUrl })).then((r) => {
+        if (!r || !r.ok) { tell(msg, why(r && r.error), 'bad'); return; }
+        tell(msg, ''); showCode(r.code, r.minutes);
+      }, () => tell(msg, why('unreachable'), 'bad'));
+    }
+    // Draws the list of screens; an owner gets Remove on each row except this tablet and the last owner.
+    function drawList(screens, me, owner) {
+      U.clear(list);
+      const live = (screens || []).filter((s) => !s.revokedAt), now = Date.now();
+      const owners = live.filter((s) => s.owner).length;
+      live.forEach((s) => {
+        const mine = s.id === me, lastOwner = s.owner && owners <= 1;
+        const row = h('div', { class: 'sc-row', dataset: { screen: s.id } });
+        const nameLine = h('div', { class: 'sc-name' }, h('strong', null, s.name || '(no name)'), mine ? h('span', { class: 'sc-tag', dataset: { role: 'this-tablet' } }, 'this tablet') : null, s.owner ? h('span', { class: 'sc-tag' }, 'owner') : null);
+        row.append(nameLine, h('div', { class: 'fs-sub' }, mine ? 'Last seen: now' : 'Last seen ' + seenWords(s.lastSeen, now)));
+        if (owner) {
+          if (mine) row.append(h('p', { class: 'fs-sub' }, 'You cannot remove the tablet you are using.'));
+          else if (lastOwner) row.append(h('p', { class: 'fs-sub' }, 'The last owner screen cannot be removed.'));
+          else {
+            const ask = h('div', { class: 'sc-confirm', hidden: true, role: 'alert' });
+            const rm = h('button', { type: 'button', class: 'btn', dataset: { act: 'screen-remove' }, onClick: () => { ask.hidden = false; rm.hidden = true; } }, 'Remove');
+            // Keep it: closes the question and shows Remove again, changing nothing.
+            const keepBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'screen-remove-no' }, onClick: () => { ask.hidden = true; rm.hidden = false; } }, 'Keep it');
+            // Asks again in plain words before cutting a screen off.
+            ask.append(h('p', null, 'Remove ' + (s.name || 'this screen') + '? It is cut off at once and must be paired again with a new code to come back.'),
+              h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'screen-remove-yes' }, onClick: () => {
+                tell(msg, 'Removing...');
+                Promise.resolve(SB.store.hubRemoveScreen({ url: lastUrl, id: s.id })).then((r) => { if (!r || !r.ok) { tell(msg, why(r && r.error), 'bad'); return; } tell(msg, (s.name || 'The screen') + ' was removed.', 'ok'); refresh(); }, () => tell(msg, why('unreachable'), 'bad'));
+              } }, 'Yes, remove it'), keepBtn));
+            row.append(rm, ask);
+          }
+        }
+        list.appendChild(row);
+      });
+      if (!live.length) list.appendChild(h('p', { class: 'fs-sub' }, 'No screens are paired yet.'));
+    }
+    // Looks up who this tablet is on the main computer it uses, then draws the right version of the card.
+    function refresh() {
+      const url = urlNow(); lastUrl = url || '';
+      const who = url && SB.store.pairedFor ? SB.store.pairedFor(url) : { paired: false };
+      card.hidden = !(url && who && who.paired);
+      if (card.hidden) { stopTimer(); return; }
+      U.clear(card); card.append(h('h3', { class: 'fs-h' }, 'Screens in this kitchen'));
+      if (!who.owner) { card.append(h('p', { class: 'fs-sub', dataset: { role: 'read-only' } }, 'This tablet is "' + (who.name || 'a screen') + '". Ask the owner to add or remove screens.')); return; }
+      card.append(list, h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'screen-add' }, onClick: addScreen }, ico('plus', 20), h('span', null, 'Add a screen'))), codeBox, msg);
+      Promise.resolve(SB.store.hubScreens({ url })).then((r) => { if (!r || !r.ok) { tell(msg, why(r && r.error), 'bad'); return; } drawList(r.screens, who.id, true); }, () => tell(msg, why('unreachable'), 'bad'));
+    }
+    card.refresh = refresh;
+    return card;
   }
   // Opens "Use one kitchen on several tablets": what it is, what is not set up, and the form for the other screen.
   function openFollow() {
@@ -1475,7 +1559,7 @@
     const hMsg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'hub-msg' } });
     const choiceBox = h('div', { class: 'fw-choice', dataset: { role: 'choice' }, hidden: true });
     const hStatus = h('p', { class: 'fs-sub fw-hubstatus', role: 'status', dataset: { role: 'hub-status' } });
-    let probed = null, picked = '', lastFields = null;
+    let probed = null, picked = '', lastFields = null, lastOn = null, screensCard = null;
     // Reads and checks the three fields; returns {url, code, name} or null after saying what is wrong.
     function hubFields() {
       const a = checkHubAddress(hUrl.value); if (!a.ok) { tell(hMsg, a.why, 'bad'); hUrl.focus(); return null; }
@@ -1575,6 +1659,8 @@
     // Shows either the join form or the joined state, depending on whether this tablet is using a hub.
     function paintHub() {
       const on = inHub(); hubForm.hidden = on; hubJoined.hidden = !on;
+      // The Screens card is drawn again only when this tablet joins or leaves, not on every status tick.
+      if (on !== lastOn) { lastOn = on; if (screensCard) screensCard.refresh(); }
       if (on) { const hs = SB.store.hubStatus ? SB.store.hubStatus() : { state: 'connecting' }; const w = hubWords(hs); tell(hStatus, w.text, w.tone); forget.hidden = !(hs && (hs.error === 'revoked' || hs.error === 'unpaired')); }
     }
     // Builds one big choice button for the two ways of using another screen.
@@ -1583,7 +1669,10 @@
     // Picks which of the two ways is on screen.
     function setMode(m) { const orders = m === 'orders'; otherCard.hidden = orders; hubCard.hidden = !orders; bShow.setAttribute('aria-pressed', String(!orders)); bHub.setAttribute('aria-pressed', String(orders)); }
     const modes = h('div', { class: 'fw-modes', role: 'group', 'aria-label': 'How to use another screen' }, bShow, bHub);
-    root.append(mainCard, modes, otherCard, hubCard, h('section', { class: 'fs-card', dataset: { part: 'status' } }, h('h3', { class: 'fs-h' }, 'Status'), status));
+    // The main computer this tablet is using now: the joined one, or the one it is showing as a follower.
+    const usedUrl = () => { try { const hs = inHub() && SB.store.hubStatus ? SB.store.hubStatus() : null; if (hs && hs.url) return hs.url; const fs = isFollowing() && SB.store.followStatus ? SB.store.followStatus() : null; return fs && fs.url ? fs.url : ''; } catch (e) { return ''; } };
+    screensCard = buildScreensCard(usedUrl);
+    root.append(mainCard, modes, otherCard, hubCard, screensCard, h('section', { class: 'fs-card', dataset: { part: 'status' } }, h('h3', { class: 'fs-h' }, 'Status'), status));
     setMode(inHub() ? 'orders' : 'show'); paintStatus(); paintHub();
     const timer = setInterval(() => { if (!doc.body.contains(root)) clearInterval(timer); else { paintStatus(); paintHub(); } }, 2000);
     sheet.body.appendChild(root); keepInView(root);
