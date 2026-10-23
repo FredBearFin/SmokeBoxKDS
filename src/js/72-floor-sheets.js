@@ -153,11 +153,20 @@
   const endDot = (s) => (/[.!?]$/.test(s) ? s : s + '.');
   const listWords = (a) => (a.length <= 3 ? a.join(', ') : a.slice(0, 3).join(', ') + ' and ' + (a.length - 3) + ' more');
 
+  // The id of the engine's newest undo record, or null (the action an Undo button would revert right now).
+  function topUndoId() {
+    const s = st(), u = s && Array.isArray(s.undo) ? s.undo : [];
+    return u.length && u[u.length - 1] ? u[u.length - 1].id || null : null;
+  }
   // Toast with Undo that runs the engine's own undo.
+  // WATCH OUT: the engine only undoes its newest action. The toast remembers which record that was when it was raised,
+  // and refuses when another action (from another tablet, say) came after, so Undo never reverts what it does not name.
   function undoToast(msg, tone) {
+    const mine = topUndoId();
     toast(msg, tone || 'ok', {
       // Undo asks the engine to undo its newest action (only the newest one can be undone).
       undo: () => {
+        if (mine && topUndoId() !== mine) { toast('Cannot undo: something else was done after it. Fix it by hand instead.', 'warn'); return; }
         const r = run('undo', {});
         if (r.report !== 'ok') toast(say(r), 'warn'); else SB.ui.announce('Undone.');
       },
@@ -272,8 +281,16 @@
   // audit:data-end
   const H1 = 3600e3;
 
-  // How long a batch may stay in the cabinet: its own limit or the shop limit, whichever is shorter.
-  const holdLimitMs = (b) => Math.min(U.isNum(b.maxHoldH) ? b.maxHoldH : Infinity, safety().defaultMaxHoldH) * H1;
+  // The safety settings with every default filled in, the same way the engine and the warnings read them.
+  const fullSafety = () => Object.assign({}, C.safety, safety());
+  // The hard cap in hours: no batch stays longer than this, whatever its own limit (engine hardCapH).
+  const hardCapH = () => { const S = fullSafety(); return U.isNum(S.hardCapH) ? S.hardCapH : S.defaultMaxHoldH; };
+  // How long a batch may stay in the cabinet: the engine's own number (its limit, or the default, capped by the hard
+  // cap), so the card shows the time the engine will act on.
+  const holdLimitMs = (b) => E()._internal.holdLimitMs(b, fullSafety());
+  // True when going past the limit only takes the batch off the menu for a check (a quality limit below the hard cap);
+  // otherwise the batch is thrown out at that time.
+  const qualityStage = (b) => b.fridge !== true && b.holdBasis === 'quality' && (U.isNum(b.maxHoldH) ? b.maxHoldH : fullSafety().defaultMaxHoldH) < hardCapH();
   // A number with at most one decimal, like 1.5 or 2.
   const trimNum = (n) => String(Math.round(n * 10) / 10);
 
@@ -554,7 +571,7 @@
       const coolingNow = b.kind === 'cooling';
       setHidden(rec.dtServe, coolingNow); setHidden(rec.ddServe, coolingNow);
       // One answer per row: the label says which kind of limit it is and the value is just the time.
-      if (!coolingNow) { text(rec.dtServe, b.holdBasis === 'safety' ? 'Throw out at' : 'Quality limit'); text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b))); }
+      if (!coolingNow) { text(rec.dtServe, qualityStage(b) ? 'Quality limit' : 'Throw out at'); text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b))); }
       // A cold item shows its fridge date instead: the last day in the fridge, or that no days were set.
       if (ci) {
         text(rec.dtServe, 'Fridge date');
@@ -1741,8 +1758,8 @@
       // A kitchen with its own dishes loses them too: the demo puts the sample barbecue menu in their place.
       const own = s.catalog === 'own' && (s.menu.length > 0 || s.orders.length > 0 || s.tickets.length > 0);
       const ok = await SB.ui.confirm({
-        title: 'Restart the demo?', confirmLabel: own ? 'Erase my dishes and restart' : 'Restart demo', cancelLabel: 'Keep everything', tone: real || own ? 'danger' : undefined,
-        body: [(own ? 'This erases your dishes, prices and orders and loads the sample barbecue menu in their place. ' : '') + 'This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (real ? ' (' + real + ' not from the demo)' : '') + ' and everything logged on this device, then puts three fresh demo tickets on the board. Settings stay.'],
+        title: 'Restart the demo?', confirmLabel: own ? 'Erase my dishes and restart' : 'Restart demo', cancelLabel: 'Keep everything', tone: 'danger',
+        body: [(own ? 'This erases your dishes, prices and orders and loads the sample barbecue menu in their place. ' : '') + 'This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (real ? ' (' + real + ' not from the demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' in the cabinet and the event log on this device, then puts three fresh demo tickets on the board. Settings stay.'],
       });
       if (!ok) return;
       if (SB.tour && SB.tour.running && SB.tour.running() && SB.tour.stop) SB.tour.stop();
@@ -1753,12 +1770,13 @@
       closeThen(sheet, () => { if (SB.router && SB.router.go) SB.router.go({ kind: 'floor', zone: 'all' }); });
     }
 
-    // Clears tickets, batches and events on this device after a confirm. Settings and sample history stay.
+    // Clears tickets, orders, batches and events on this device after a confirm. Settings, menu, the food safety record and
+    // sample history stay (A.resetLive in 20-engine.js).
     async function doReset() {
       const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length;
       const ok = await SB.ui.confirm({
         title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep everything',
-        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings, the food safety record and sample history stay. This cannot be undone.'],
+        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.orders.length + ' ' + plural(s.orders.length, 'order') + ' with their payments, ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ', the 86 list, stock counts and the event log, so the sales figures start again from zero. It also sets the clock back to real time.', 'Settings, the menu, the food safety record and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
       // With a PIN set, clearing live data asks for it.
@@ -1824,7 +1842,7 @@
   // audit:data-start
   const FALLBACK_KEYS = [
     { key: 'N', label: 'New ticket' }, { key: 'R', label: 'Recall a bumped ticket' }, { key: 'H', label: 'Hold cabinet' }, { key: '8', label: '86 board' },
-    { key: 'D', label: 'Demo' }, { key: '1 to 6', label: 'Station: All, PIT, HOT, FRY, CLD, EXP' }, { key: 'Z', label: 'Undo the last action (10 seconds)' },
+    { key: 'D', label: 'Demo' }, { key: '1 to 6', label: 'Station: All, PIT, HOT, FRY, CLD, EXP' }, { key: 'Z', label: 'Undo the last action' },
     { key: '?', label: 'Help' }, { key: 'Esc', label: 'Close a screen' },
   ];
   // audit:data-end
@@ -1910,9 +1928,12 @@
   // The Keys tab. The shortcuts come from the board, with a built-in list if the board is not loaded.
   function helpKeys() {
     const list = (SB.floor && Array.isArray(SB.floor.shortcuts) && SB.floor.shortcuts.length ? SB.floor.shortcuts : FALLBACK_KEYS);
+    // The undo window is a setting, so the Z line names this kitchen's own number of seconds.
+    const undoS = Math.round((st().settings.undoMs || C.undoMs) / 1000);
+    const label = (k) => (k.key === 'Z' ? k.label + ' (' + undoS + ' seconds)' : k.label);
     return h('div', { class: 'hp-pane' },
       h('p', { class: 'fs-sub' }, 'On the board, these keys work when no screen is open and you are not typing in a field.'),
-      h('ul', { class: 'hp-keys' }, ...list.map((k) => h('li', { class: 'hp-key' }, h('span', { class: 'kbd' }, k.key), h('span', null, k.label)))),
+      h('ul', { class: 'hp-keys' }, ...list.map((k) => h('li', { class: 'hp-key' }, h('span', { class: 'kbd' }, k.key), h('span', null, label(k))))),
       h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Inside New ticket'),
         h('ul', { class: 'hp-keys' },
           h('li', { class: 'hp-key' }, h('span', { class: 'kbd' }, 'Enter'), h('span', null, 'In the search box: add the first match.')),
