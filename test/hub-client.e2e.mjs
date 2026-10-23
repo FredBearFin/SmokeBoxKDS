@@ -74,6 +74,14 @@ await C.p.waitForTimeout(500);
 await C.p.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + '/hub-offline-390.png' : '/tmp/hub-offline-390.png' });
 await C.ctx.setOffline(false);
 check('the phone catches up after reconnecting (the hub has its ticket)', await until(async () => /Connected/.test((await chip(C) || {}).text || '')) && await until(async () => (await B.p.evaluate(() => SB.store.getState().tickets.some((t) => t.customer === 'Phone')))), await chip(C));
+
+// The chip after a reload with the hub unreachable (the status is stubbed: the page itself comes from the hub, so a real reload cannot happen)
+{
+  const D = await tablet(1024, 768);
+  await until(async () => /Connected/.test((await chip(D) || {}).text || ''));
+  await D.p.evaluate(() => { const real = SB.store.hubStatus; SB.store.hubStatus = () => Object.assign({}, real.call(SB.store), { state: 'offline', lastKnown: true, lastKnownAt: Date.now() - 600000 }); });
+  check('a board showing the last saved copy says Last known, from a time, and that taps are saved', await until(async () => /Last known, from \d.*Offline: your taps are saved/.test((await chip(D) || {}).text || ''), 4000), await chip(D));
+}
 check('no page errors', errs.length === 0, errs);
 await browser.close(); await hub.stop();
 console.log(fail ? fail + ' check(s) failed' : 'all checks passed');
