@@ -2164,7 +2164,11 @@
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       clockBlock,
-      settingBlock('More', '', links)));
+      settingBlock('More', '', links),
+      // Start over sits alone at the very bottom, away from the everyday buttons. In the demo it is replaced by the way back.
+      SB.store.isDemo && SB.store.isDemo()
+        ? settingBlock('The demo', 'You are in the demo, not your kitchen.', h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => SB.store.leaveDemo() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Back to my kitchen')))
+        : settingBlock('Start over', 'Empty the menu and begin again. You will be asked to save a backup first.', link('trash', 'Start over with an empty menu', 'startover'))));
 
     // Keep every control in step when something else changes the look, the station or the clock.
     offs.push(SB.theme.onChange(() => { themeSeg.setValue(SB.theme.get()); textSeg.setValue(SB.theme.textSize()); sizeSeg.setValue(SB.theme.density()); hintsTog.setValue(SB.theme.hints()); }));
