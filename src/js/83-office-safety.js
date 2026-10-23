@@ -25,7 +25,7 @@
   const h = U.h;
 
   // Legend words, chart color slots, stacking order, and which discard reasons count as safety breaches.
-  const TONE_NAMES = { ok: 'Safe to serve', check: 'Temperature check due', reheat: 'Reheat or chill now', discard: 'Thrown away' };
+  const TONE_NAMES = { ok: 'In range', check: 'Temperature check due', reheat: 'Reheat or chill now', discard: 'Thrown out' };
   const REASON_SLOT = { expired: 1, temp: 2, cooling: 3, manual: 4, quality: 5, other: 6 };
   const REASON_ORDER = ['temp', 'expired', 'cooling', 'manual', 'quality', 'other'];
   const SAFETY_REASONS = { temp: 1, expired: 1, cooling: 1 };
@@ -99,9 +99,9 @@
     function judge(f) {
       const k = f.k;
       const none = !(k.tempChecks.count || k.sanitize.count || k.discards.count || k.batchesIn || k.lockouts.spellCount);
-      if (none) return { tone: 'info', word: 'Nothing yet', title: 'No food-safety records in this range yet.', body: 'Temperature readings, sanitize rounds and discards fill this page once the hold cabinet has been used. Log a batch and its temperature on the line screen, or pick a longer range.', problem: null };
+      if (none) return { tone: 'info', word: 'Nothing yet', title: 'No food-safety records in this range yet.', body: 'Temperature readings, sanitize rounds and discards fill this page once the hold cabinet has been used. Log a batch and its temperature on the kitchen board, or pick a longer range.', problem: null };
       // Food went into the cabinet but nothing was logged: that is not the same as safe, so say so.
-      if (!k.tempChecks.count && !k.sanitize.count && !k.discards.count && !k.lockouts.spellCount) return { tone: 'info', word: 'Nothing to judge', title: 'No temperature checks or sanitize rounds were logged in this range.', body: 'Food went into the hold cabinet, but without readings there is no way to say whether it stayed safe. Log temperature checks from the line.', problem: null };
+      if (!k.tempChecks.count && !k.sanitize.count && !k.discards.count && !k.lockouts.spellCount) return { tone: 'info', word: 'Nothing to judge', title: 'No temperature checks or sanitize rounds were logged in this range.', body: 'Food went into the hold cabinet, but without readings there is nothing to show whether it stayed in range. Log temperature checks from the kitchen board.', problem: null };
       const safetyDis = f.dis.filter((d) => SAFETY_REASONS[d.reason]);
       const score = k.score;
       const costly = f.lock.filter((c) => c.openMs >= COSTLY_MS);
@@ -128,7 +128,7 @@
         const worst = Object.values(byDay).sort((a, b) => b.open - a.open)[0];
         const names = onceEach(worst.names);
         const what = B.list(names.slice(0, 2)) + (names.length > 2 ? ' and ' + (names.length - 2) + ' more' : '');
-        problem = { date: worst.date, text: what + ' ' + (names.length === 1 ? 'was' : 'were') + ' taken off the menu for food safety on ' + dayLabel(worst.date) + ', for ' + fmt.ms(worst.open) + ' of opening hours. A batch could not be served, so sales were lost.' };
+        problem = { date: worst.date, text: what + ' ' + (names.length === 1 ? 'was' : 'were') + ' taken off the menu for a time or temperature limit on ' + dayLabel(worst.date) + ', for ' + fmt.ms(worst.open) + ' of opening hours. A batch could not be served, so sales were lost.' };
       }
       // Second choice: with a low score, blame the day with the most late temperature checks, else sanitize.
       if (!problem && lowScore) {
@@ -145,7 +145,7 @@
         const worst = Object.values(byDay).sort((a, b) => b.g - a.g)[0];
         const topReason = Object.keys(worst.reasons).sort((a, b) => worst.reasons[b] - worst.reasons[a])[0];
         const topIng = Object.keys(worst.ings).sort((a, b) => worst.ings[b] - worst.ings[a])[0];
-        problem = { date: worst.date, text: 'The most food was thrown away on ' + dayLabel(worst.date) + ': ' + kgWords(worst.g) + ' (' + B.reasonWord(topReason).toLowerCase() + ', mostly ' + B.ingName(f.ds, topIng).toLowerCase() + (worst.cost > 0 ? ', ' + fmt.money(worst.cost, 0) : '') + ').' };
+        problem = { date: worst.date, text: 'The most food was thrown out on ' + dayLabel(worst.date) + ': ' + kgWords(worst.g) + ' (' + B.reasonWord(topReason).toLowerCase() + ', mostly ' + B.ingName(f.ds, topIng).toLowerCase() + (worst.cost > 0 ? ', ' + fmt.money(worst.cost, 0) : '') + ').' };
       }
 
       // The body sentence: on-time rates for both checks, then what was thrown away, then any short lockouts.
@@ -153,27 +153,27 @@
       if (k.tempChecks.count) parts.push('Temperature checks were on time ' + fmt.pct(k.tempChecks.onTimePct, 0) + ' of the time (' + k.tempChecks.onTime + ' of ' + k.tempChecks.count + ')');
       if (k.sanitize.count) parts.push('sanitize rounds ' + fmt.pct(k.sanitize.onTimePct, 0) + ' (' + k.sanitize.onTime + ' of ' + k.sanitize.count + ')');
       let body = parts.length ? parts[0] + (parts[1] ? ', ' + parts[1] : '') + '.' : 'No temperature checks or sanitize rounds were logged.';
-      if (k.discards.count) body += ' ' + k.discards.count + ' ' + B.plural(k.discards.count, 'batch was', 'batches were') + ' thrown away (' + kgWords(k.discards.g) + ', ' + fmt.money(k.discards.cost, 0) + '), ' + safetyDis.length + ' for time or temperature rules.';
-      else body += ' Nothing was thrown away.';
-      if (brief.length) body += brief.length === 1 ? ' Food safety also took an item off the menu once, for ' + fmt.ms(brief[0].openMs) + '.' : ' Food safety also took items off the menu ' + brief.length + ' times for a few minutes each, the longest ' + fmt.ms(Math.max.apply(null, brief.map((c) => c.openMs))) + '.';
+      if (k.discards.count) body += ' ' + k.discards.count + ' ' + B.plural(k.discards.count, 'batch was', 'batches were') + ' thrown out (' + kgWords(k.discards.g) + ', ' + fmt.money(k.discards.cost, 0) + '), ' + safetyDis.length + ' for time or temperature rules.';
+      else body += ' Nothing was thrown out.';
+      if (brief.length) body += brief.length === 1 ? ' A time or temperature limit also took an item off the menu once, for ' + fmt.ms(brief[0].openMs) + '.' : ' Time or temperature limits also took items off the menu ' + brief.length + ' times for a few minutes each, the longest ' + fmt.ms(Math.max.apply(null, brief.map((c) => c.openMs))) + '.';
       // A red verdict is worded by cause: lost selling time, or checks that fell behind.
-      const title = tone === 'good' ? 'The kitchen stayed safe.' : tone === 'warn' ? 'The kitchen stayed mostly safe, with one thing to look at.' : worstLoss >= 30 * 60000 ? 'Food safety slipped and cost sales.' : 'Food safety checks fell behind.';
+      const title = tone === 'good' ? 'All checks were kept and no food was thrown out for time or temperature.' : tone === 'warn' ? 'Most checks were kept, with one thing to look at.' : worstLoss >= 30 * 60000 ? 'Some checks were missed and a dish was off the menu.' : 'Temperature or sanitize checks fell behind.';
       return { tone, title, body, problem };
     }
 
     // One verdict per refresh, shared by the panel and by the timeline's choice of day.
     const verdictOf = B.memoP((p) => judge(facts(p)));
     const verdict = page.panel({
-      span: 12, title: 'Was the kitchen safe?', sub: scope(),
+      span: 12, title: 'How did the checks go?', sub: scope(),
       caption: 'One plain answer, and the single day to look at first. The pages below show the evidence.',
       // Fills the verdict box. Its button jumps the timeline to the day named as the problem.
       render: (body, p0) => {
         const co = B.callout(body, kit);
-        // Shows the current verdict; the tone picks the word (Safe, Watch or Problem) and the button.
+        // Shows the current verdict; the tone picks the word (On track, Watch or Needs attention) and the button.
         const paint = (p) => {
           const v = verdictOf(p);
           co.set({
-            tone: v.tone, word: v.tone === 'good' ? 'Safe' : v.tone === 'warn' ? 'Watch' : v.tone === 'bad' ? 'Problem' : undefined,
+            tone: v.tone, word: v.tone === 'good' ? 'On track' : v.tone === 'warn' ? 'Watch' : v.tone === 'bad' ? 'Needs attention' : undefined,
             title: v.title, body: v.body, extra: v.problem ? v.problem.text : (v.tone === 'good' ? 'No single problem stands out.' : ''),
             // The button takes the owner to the problem day in the timeline.
             action: v.problem ? { label: 'Show ' + dayLabel(v.problem.date) + ' in the timeline', icon: 'calendar', onClick: () => { jumpTo(v.problem.date); } } : null,
@@ -195,7 +195,7 @@
     const WORDS = { ok: 'On track', warn: 'Slipping', bad: 'Needs attention' };
 
     const ringCard = page.card({
-      type: 'ring', span: 4, title: 'Compliance score', sub: 'Average of the two measures beside it',
+      type: 'ring', span: 4, title: 'Checks kept on time', sub: 'Average of the two measures beside it',
       caption: 'One number for the whole night. Green is 90% or better; below 75% a check or two were being skipped.',
       empty: { title: 'No score yet', body: 'The score needs temperature checks or sanitize rounds to be logged in this range.', icon: 'shield-check' },
       // Compliance ring: the average of the two on-time rates, empty until a check is logged.
@@ -203,8 +203,8 @@
         const k = facts(p).k;
         if (!isNum(k.score)) return null;
         // Thresholds in percent: below 90 warns, below 75 breaches; inverted because a higher score is better.
-        return { value: k.score * 100, max: 100, label: 'Compliance', sub: 'Temperature checks and sanitize rounds on time', format: 'pct100', warn: 90, breach: 75, invert: true, words: WORDS, size: 188,
-          ariaLabel: 'Compliance score ' + fmt.pct(k.score, 0) + ', the average of temperature checks and sanitize rounds logged on time.' };
+        return { value: k.score * 100, max: 100, label: 'Checks kept', sub: 'Temperature checks and sanitize rounds on time', format: 'pct100', warn: 90, breach: 75, invert: true, words: WORDS, size: 188,
+          ariaLabel: 'Checks kept on time ' + fmt.pct(k.score, 0) + ', the average of temperature checks and sanitize rounds logged on time.' };
       },
     });
     const tempCard = page.card({
@@ -275,7 +275,7 @@
         marks: r.marks.map((m) => ({ at: m.at, label: m.label, tone: /^Reheat/.test(m.label) ? 'reheat' : /^Discarded/.test(m.label) ? 'discard' : undefined })),
       });
       if (!rows.length) {
-        return { rows: [], empty: all.length ? 'No batch had a problem on ' + lbl + '. Every one of the ' + all.length + ' batches stayed in its safe range.' : 'No batch went into the cabinet on ' + lbl + '.', ariaLabel: 'Timeline of hold-cabinet batches for ' + lbl + ': none to show.' };
+        return { rows: [], empty: all.length ? 'No batch had a problem on ' + lbl + '. Every one of the ' + all.length + ' batches stayed in range.' : 'No batch went into the cabinet on ' + lbl + '.', ariaLabel: 'Timeline of hold-cabinet batches for ' + lbl + ': none to show.' };
       }
       // Row height in px; a long day gets shorter rows so it stays on one screen.
       const pitch = rows.length <= 12 ? 34 : 26;
@@ -283,12 +283,12 @@
         rows: rows.map(row), x: { type: 'time' }, toneNames: TONE_NAMES, legend,
         refLines: [{ x: t.openMs, label: 'Open', tone: 'muted' }, { x: t.closeMs, label: 'Close', tone: 'muted' }].filter((r) => isNum(r.x)),
         height: Math.round(rows.length * pitch + 32 + 18),
-        ariaLabel: 'Timeline of ' + all.length + ' hold-cabinet batches on ' + lbl + ': ' + (problems ? problems + ' had a problem' : 'none had a problem') + (st.show === 'problems' ? '; showing only those' : '') + '. Green is safe to serve, amber needs a temperature check, orange needs a reheat or chill, red was thrown away.',
+        ariaLabel: 'Timeline of ' + all.length + ' hold-cabinet batches on ' + lbl + ': ' + (problems ? problems + ' had a problem' : 'none had a problem') + (st.show === 'problems' ? '; showing only those' : '') + '. Green is in range, amber needs a temperature check, orange needs a reheat or chill, red was thrown out.',
       };
     }
     const timeline = page.card({
       type: 'gantt', span: 12, title: 'Batch timeline', sub: scope(),
-      caption: 'Green bars are safe to serve. Amber means a temperature check was due, orange a reheat or chill, red a batch that was thrown away. Diamonds are readings.',
+      caption: 'Green bars are batches whose readings were in range. Amber means a temperature check was due, orange a reheat or chill, red a batch that was thrown out. Diamonds are readings.',
       empty: { title: 'No batches in this range', body: 'Batches appear here once you log food cooked into the hold cabinet. Log your first batch on the line screen, or pick a longer range.', icon: 'thermometer' },
       spec: timelineSpec,
     });
@@ -305,11 +305,11 @@
     }
 
     // ---------- discards ----------
-    page.section('What was thrown away', 'Cooked food that could not be served, and why.');
+    page.section('What was thrown out', 'Cooked food that could not be served, and why.');
     const discardCard = page.card({
-      type: 'bar', span: 7, title: 'Discards by reason', sub: scope(),
-      caption: 'Which reasons waste the most. Red-flag reasons are temperature, time and cooling; hand-thrown and quality losses are a kitchen habit, not a safety breach.',
-      empty: { title: 'Nothing was thrown away', body: 'Discarded batches appear here by day and reason. An empty chart in a busy range is a good sign.', icon: 'check-circle' },
+      type: 'bar', span: 7, title: 'Thrown out by reason', sub: scope(),
+      caption: 'Which reasons waste the most. Red-flag reasons are temperature, time and cooling; food thrown out by hand or for quality is a kitchen habit, not a missed time or temperature limit.',
+      empty: { title: 'Nothing was thrown out', body: 'Batches thrown out appear here by day and reason.', icon: 'check-circle' },
       // Stacked bars of discards per day, split by reason, in weight or cost.
       spec: (p) => {
         const w = facts(p).waste.filter((d) => d.count > 0 || d.g > 0);
@@ -333,7 +333,7 @@
 
     const wasteCard = page.card({
       type: 'line', span: 5, title: 'Waste by day', sub: scope(),
-      caption: 'Share of the food you cooked that was thrown away. Days above the watch line mean too much is being cooked, held too long, or let slip out of temperature.',
+      caption: 'Share of the food you cooked that was thrown out. Days above the watch line mean too much is cooked, held too long, or let out of range.',
       empty: { title: 'No waste figures yet', body: 'The share needs food to be cooked into the cabinet. Days with intake fill this line, and a clean day shows as zero.', icon: 'chart-line' },
       // Line of the share of cooked food thrown away each day, with the 8% watch line.
       spec: (p) => {
@@ -344,17 +344,17 @@
         return {
           series: [{ id: 'waste', name: 'Waste', points: pts, slot: 2 }], x: { type: 'cat', label: 'Day' }, y: { format: 'pct' },
           refLines: [{ y: 0.08, label: 'Watch line, 8%', tone: 'warn' }], markers: pts.length <= 20 ? 'all' : 'auto', height: 300,
-          ariaLabel: 'Line chart of the share of cooked food thrown away each day. The worst day was ' + dayLabel(worst.date) + ' at ' + fmt.pct(worst.wastePct, 0) + '. A watch line marks 8 percent.',
+          ariaLabel: 'Line chart of the share of cooked food thrown out each day. The worst day was ' + dayLabel(worst.date) + ' at ' + fmt.pct(worst.wastePct, 0) + '. A watch line marks 8 percent.',
         };
       },
     });
 
     // ---------- lockouts ----------
-    page.section('When food safety stopped a sale', 'A lockout means a batch was out of its safe window and could not be served, so the menu items made from it were taken off. Only time inside opening hours counts, because that is when a sale can be lost.');
+    page.section('When food safety stopped a sale', 'A lockout means a batch was outside its time or temperature limits and could not be served, so the menu items made from it were taken off. Only time inside opening hours counts, because that is when a sale can be lost.');
     const lockouts = page.table({
       span: 12, title: 'Items taken off the menu for food safety', sub: scope(),
       caption: 'How often, and for how long, a safety rule cost you a sale. A long lockout at a busy hour is the expensive kind.',
-      empty: { title: 'No item was taken off the menu for food safety in opening hours', body: 'Items appear here when a batch had to be thrown away and nothing safe was left to sell. None in this range is good news.', icon: 'shield-check' },
+      empty: { title: 'No item was taken off the menu for food safety in opening hours', body: 'Items appear here when a batch had to be thrown out and nothing in range was left to sell. None in this range.', icon: 'shield-check' },
       columns: [
         { key: 'label', label: 'Day', sort: true, sortKey: 'date', nowrap: true },
         { key: 'what', label: 'What went off', sort: true, firstDir: 'asc' },
@@ -397,15 +397,15 @@
           const S = B.settings(ctx.dataset()).safety;
           // Writes the title and the detail text for one rule.
           const set = (k, t, d) => { B.setText(nodes[k].t, t); B.setText(nodes[k].d, d); };
-          set('hot', 'Hot food stays at ' + T(S.hotHoldF) + ' or above', 'A pan reading below ' + T(S.hotHoldF) + ' must be reheated or thrown away. Food Code 3-501.16.');
-          set('cold', 'Cold food stays at ' + T(S.coldHoldF) + ' or below', 'A pan reading above ' + T(S.coldHoldF) + ' must be chilled again or thrown away.');
-          set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'A batch may be reheated one time. If it drops below the limit again it is thrown away. Food Code 3-403.11.');
-          set('hold', 'Each product has its own hold limit, never more than ' + (S.hardCapH) + ' hours', 'A safety limit (time as a health control) throws the batch away at the limit. A quality limit is a house rule for food held at temperature: at the limit the batch is taken off the menu but stays on the board until someone tastes it, and it can be kept serving for 30 minutes or 1 hour at a time while a reading of ' + S.hotHoldF + ' F or higher (cold food ' + S.coldHoldF + ' F or lower) is logged within the check interval. Every extension is logged with who and when. The hard cap of ' + (S.hardCapH) + ' hours throws out any batch (products whose limit is at or above it have no quality stage). Slaw, potato salad and banana pudding start with a quality limit for the owner to confirm: if you hold them outside temperature control, make theirs a safety limit. Your local health department\'s rules apply to quality extensions. Brisket and pulled pork starter limits are placeholders for the owner to confirm.');
-          set('grace', 'Grace of ' + S.belowHotGraceH + ' hours below ' + T(S.hotHoldF) + ' (cold food: ' + S.aboveColdGraceH + ' hours above ' + T(S.coldHoldF) + ')', 'The clock starts at the first reading outside the limit. After the grace time the batch is thrown away.');
+          set('hot', 'Hot food stays at ' + T(S.hotHoldF) + ' or above', 'A pan reading below ' + T(S.hotHoldF) + ' must be reheated or thrown out. FDA Food Code 3-501.16; your local code applies.');
+          set('cold', 'Cold food stays at ' + T(S.coldHoldF) + ' or below', 'A pan reading above ' + T(S.coldHoldF) + ' must be chilled again or thrown out.');
+          set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'A batch may be reheated one time. If it drops below the limit again it is thrown out. FDA Food Code 3-403.11.');
+          set('hold', 'Each product has its own hold limit, never more than ' + (S.hardCapH) + ' hours', 'A safety limit throws the batch out at the limit. A quality limit is a house rule for food held at temperature: at the limit the batch is taken off the menu but stays on the board until someone tastes it, and it can be kept serving for 30 minutes or 1 hour at a time while a reading of ' + S.hotHoldF + ' F or higher (cold food ' + S.coldHoldF + ' F or lower) is logged within the check interval. Every extension is logged with who and when. The hard cap of ' + (S.hardCapH) + ' hours throws out any batch (products whose limit is at or above it have no quality stage). Slaw, potato salad and banana pudding start with a quality limit for the owner to confirm: if you hold them outside temperature control, make theirs a safety limit. Your local health department\'s rules apply to quality extensions. Brisket and pulled pork starter limits are placeholders for the owner to confirm.');
+          set('grace', 'Grace of ' + S.belowHotGraceH + ' hours below ' + T(S.hotHoldF) + ' (cold food: ' + S.aboveColdGraceH + ' hours above ' + T(S.coldHoldF) + ')', 'The clock starts at the first reading outside the limit. After the grace time the batch is thrown out.');
           set('checks', 'A temperature reading every ' + U.minutesText(S.tempCheckEveryMin), 'A late reading is flagged and counted here. It does not stop service by itself.');
-          set('sanitize', 'Sanitize food-contact surfaces every ' + S.sanitizeEveryH + ' hours', 'A late round is a warning on the line and counts against the score. Food Code 4-602.11.');
+          set('sanitize', 'Sanitize food-contact surfaces every ' + S.sanitizeEveryH + ' hours', 'A late round is a warning on the line and counts against the checks-kept score. FDA Food Code 4-602.11.');
           // Kept on purpose: the grace clock starts later here than in the research report (finding F-E1).
-          B.setText(note, 'Smokebox starts the ' + S.belowHotGraceH + '-hour clock at the first reading below ' + T(S.hotHoldF) + '. The research report it was built from starts it when the food left the heat, which is stricter. Check which one your health department uses.');
+          B.setText(note, 'Smokebox starts the ' + S.belowHotGraceH + '-hour clock at the first reading below ' + T(S.hotHoldF) + '. Some health departments start it when the food left the heat, which is stricter. Check which one yours uses.');
         };
         paint();
         return { update: paint };

@@ -1,5 +1,5 @@
 /*
- * WHAT THIS FILE IS: The discard log sheet. Every batch thrown out (expired, too cold, cooling missed, by hand)
+ * WHAT THIS FILE IS: The thrown-out log sheet. Every batch thrown out (expired, too cold, cooling missed, by hand)
  *    in one table an inspector can read: date, food, amount, times, reason, initials. The owner can rename or
  *    hide columns to match the local health department's form, add one free-text column, print the log or save
  *    it as a spreadsheet file, and gets a daily reminder to save a copy.
@@ -24,7 +24,7 @@
     { key: 'since', label: 'In the cabinet since', on: true }, { key: 'out', label: 'Thrown out at', on: true }, { key: 'reason', label: 'Reason', on: true },
     { key: 'initials', label: 'Initials', on: true }, { key: 'extra', label: 'Notes', on: false },
   ];
-  // Plain-words reasons for each discard code.
+  // Plain-words reasons for each reason code.
   const REASON = { expired: 'Hold time ran out', temp: 'Temperature out of range', cooling: 'Cooling missed', manual: 'Thrown out by hand', quality: 'Quality', other: 'Other' };
 
   // The saved log settings: column labels and visibility, initials and notes per batch, last save time. Always
@@ -57,7 +57,7 @@
     const cols = rec.cols.filter((c) => c.on);
     const head = '<tr>' + cols.map((c) => '<th>' + esc(c.label) + '</th>').join('') + '</tr>';
     const body = list.map((r) => '<tr>' + cols.map((c) => '<td>' + esc(r[c.key]) + '</td>').join('') + '</tr>').join('');
-    return '<!doctype html><meta charset="utf-8"><title>Discard log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Discard log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p><table>' + head + body + '</table>';
+    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p><table>' + head + body + '</table>';
   }
   // Builds the log as CSV text with the columns that are switched on.
   function csv(list, rec) {
@@ -80,7 +80,7 @@
     try {
       const url = URL.createObjectURL(new Blob([csv(list, rec)], { type: 'text/csv' }));
       const a = doc.createElement('a');
-      a.href = url; a.download = 'smokebox-discard-log-' + new Date().toISOString().slice(0, 10) + '.csv'; a.style.display = 'none';
+      a.href = url; a.download = 'smokebox-thrown-out-log-' + new Date().toISOString().slice(0, 10) + '.csv'; a.style.display = 'none';
       doc.body.appendChild(a); a.click();
       setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 1000);
       rec.exportedAt = SB.store.now(); save(rec);
@@ -88,14 +88,14 @@
     } catch (e) { return false; }
   }
 
-  // Opens the discard log sheet and keeps its table in step with the saved data.
+  // Opens the thrown-out log sheet and keeps its table in step with the saved data.
   function openDiscards() {
     const rec = load();
     const offs = [];
     // Stops listening to the store when the sheet closes.
     const onClose = () => offs.splice(0).forEach((f) => f());
-    const sheet = SB.ui.sheet({ title: 'Discard log', side: 'right', width: 'min(1040px, 96vw)', name: 'discards', onClose });
-    const note = h('p', { class: 'fs-sub' }, 'Every batch thrown out, newest first. Add initials on each row. Copy these to your health department\'s own form if it asks for a different layout. Save a copy every day: this log lives in this browser only.');
+    const sheet = SB.ui.sheet({ title: 'Thrown-out log', side: 'right', width: 'min(1040px, 96vw)', name: 'discards', onClose });
+    const note = h('p', { class: 'fs-sub' }, 'Every batch thrown out, newest first. Add initials on each row. Copy these to your health department\'s own form if it asks for a different layout. Save a copy every day: this log lives on this device only.');
     const status = h('p', { class: 'fs-sub', role: 'status' });
     const wrap = h('div', { class: 'dlog-wrap', style: 'overflow:auto' });
     const colsBox = h('div', { class: 'dlog-cols', hidden: true });
@@ -105,7 +105,7 @@
       U.clear(wrap);
       const list = rows(SB.store.getState(), rec);
       const cols = rec.cols.filter((c) => c.on);
-      if (!list.length) { wrap.appendChild(h('div', { class: 'empty' }, ico('trash', 40), h('h3', null, 'Nothing thrown out yet'), h('p', null, 'Discarded batches show up here with their time and reason.'))); return; }
+      if (!list.length) { wrap.appendChild(h('div', { class: 'empty' }, ico('trash', 40), h('h3', null, 'Nothing thrown out yet'), h('p', null, 'Batches you throw out show up here with their time and reason.'))); return; }
       const table = h('table', { class: 'dlog-table', style: 'border-collapse:collapse;width:100%' });
       table.appendChild(h('thead', null, h('tr', null, ...cols.map((c) => h('th', { style: 'text-align:left;padding:8px;border-bottom:2px solid var(--line)' }, c.label)))));
       const tb = h('tbody');
@@ -152,7 +152,7 @@
     return sheet;
   }
 
-  // At the start of a service, reminds the owner to save a copy of the discard log when there are entries not
+  // At the start of a service, reminds the owner to save a copy of the thrown-out log when there are entries not
   // saved yet. Shows once per page load.
   let reminded = false;
   function remind() {
@@ -161,10 +161,10 @@
     const unsaved = rows(SB.store.getState(), rec).filter((r) => r.t > rec.exportedAt).length;
     if (!unsaved || SB.store.now() - rec.exportedAt < 20 * H1) return;
     reminded = true;
-    // Opens the discard log from the reminder.
+    // Opens the thrown-out log from the reminder.
     const openLog = () => SB.sheets.open('discards');
     const open = h('button', { type: 'button', class: 'btn', onClick: openLog }, 'Open the log');
-    SB.ui.toast(h('span', null, unsaved + ' discard ' + U.plural(unsaved, 'entry', 'entries') + ' not saved yet. ', open), { tone: 'warn', ms: 12000 });
+    SB.ui.toast(h('span', null, unsaved + ' thrown-out ' + U.plural(unsaved, 'batch', 'batches') + ' not saved yet. ', open), { tone: 'warn', ms: 12000 });
   }
   // Asks the browser to keep this site's saved data even when space runs low. Ignored where unsupported.
   function persist() { try { if (g.navigator && g.navigator.storage && g.navigator.storage.persist) g.navigator.storage.persist(); } catch (e) { /* optional */ } }

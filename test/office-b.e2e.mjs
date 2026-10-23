@@ -311,7 +311,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   check('verdict: a plain answer in a tone with a word, not colour alone', ['good', 'warn', 'bad'].indexOf(v.tone) >= 0 && v.word.length > 2 && v.title.length > 15, v);
   check('verdict: the body quotes the compliance numbers', v.body.indexOf(Math.round(ref.temp * 100) + '%') >= 0 && v.body.indexOf(String(ref.tempN)) >= 0, [v.body, ref]);
   if (v.tone !== 'good') check('verdict: the one problem is named with a day and a button to it', /Mon|Tue|Wed|Thu|Fri|Sat|Sun/.test(v.extra) && /^Show/.test(v.btn.trim()), v);
-  const ringTxt = await card(page, 'Compliance score').textContent();
+  const ringTxt = await card(page, 'Checks kept on time').textContent();
   check('ring: the compliance score is shown and matches', ringTxt.indexOf(Math.round(ref.score * 100) + '%') >= 0, [ringTxt.slice(-120), ref.score]);
   const tsub = await card(page, 'Temperature checks on time').locator('.of-card-sub').textContent();
   const ssub = await card(page, 'Sanitize rounds on time').locator('.of-card-sub').textContent();
@@ -345,7 +345,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   const heightAll2 = await card(page, 'Batch timeline').locator('.ch-svg').evaluate((s) => s.getBoundingClientRect().height);
   check('timeline: all batches draws a taller chart than problems only', heightAll2 >= heightAll, [heightAll, heightAll2]);
   const leg = await card(page, 'Batch timeline').textContent();
-  check('timeline: legend names the four colours in words', ['Safe to serve', 'Temperature check due', 'Reheat or chill now', 'Thrown away'].every((w) => leg.indexOf(w) >= 0));
+  check('timeline: legend names the four colours in words', ['In range', 'Temperature check due', 'Reheat or chill now', 'Thrown out'].every((w) => leg.indexOf(w) >= 0));
   // verdict button jumps
   if (v.tone !== 'good') {
     await page.locator('.ob-co-act .btn').click();
@@ -355,10 +355,10 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
     check('verdict button: moves the timeline to the problem day', sel.indexOf(day) === 0, [sel, day]);
   }
   // discards
-  const d0 = await svgLabel(page, 'Discards by reason');
-  await card(page, 'Discards by reason').locator('.seg-opt', { hasText: 'Cost' }).click();
+  const d0 = await svgLabel(page, 'Thrown out by reason');
+  await card(page, 'Thrown out by reason').locator('.seg-opt', { hasText: 'Cost' }).click();
   await wait(300);
-  const d1 = await svgLabel(page, 'Discards by reason');
+  const d1 = await svgLabel(page, 'Thrown out by reason');
   check('discards: the Weight/Cost switch changes the chart', d0 !== d1 && /by cost/.test(d1) && /by weight/.test(d0), [d0, d1]);
   check('waste by day has a watch line', /watch line/i.test(await svgLabel(page, 'Waste by day')));
   // lockouts

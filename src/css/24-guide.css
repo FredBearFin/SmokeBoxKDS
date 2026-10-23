@@ -1,0 +1,69 @@
+/* WHAT THIS FILE IS: the look of the in-app Guide screen (#/guide): a page list on the left and the text on the right.
+ * On narrow screens the list sits above the text. It uses only the shared tokens from 00-tokens.css, so Day and Night
+ * both work. Class names start with gd- (guide). USED BY: 78-guide.js.
+ */
+
+/* ---------- the layer that holds the Guide ---------- */
+/* Same full-screen layer as the board; it is drawn above the board while the Guide is open. */
+.layer-guide { z-index: calc(var(--zi-base) + 1); }
+.gd { display: flex; flex-direction: column; min-height: 100%; }
+
+/* ---------- top bar: back button and the word Guide ---------- */
+/* Sticks to the top so the way back is always one tap away. */
+.gd-top {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-3) var(--gutter); background: var(--paper); border-bottom: var(--bw-thin) solid var(--line-soft);
+}
+.gd-title { display: flex; align-items: center; gap: var(--sp-2); margin: 0; font: var(--w-bold) var(--fs-5)/var(--lh-snug) var(--font-display); color: var(--ink); }
+.gd-back { min-height: var(--tap); }
+
+/* ---------- two columns: page list and text ---------- */
+/* The list is 260 px wide; below 760 px the two stack and the list goes first. */
+.gd-body {
+  display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: var(--sp-6);
+  width: 100%; max-width: 1100px; margin: 0 auto; padding: var(--sp-5) var(--gutter) var(--sp-9); box-sizing: border-box;
+}
+.gd-main { min-width: 0; }
+.gd-nav { align-self: start; position: sticky; top: calc(var(--tap) + var(--sp-6)); }
+.gd-nav-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.gd-link {
+  display: flex; align-items: center; gap: var(--sp-3); min-height: var(--tap); padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-btn); border: var(--bw-thin) solid transparent; color: var(--ink); text-decoration: none;
+  font: var(--w-medium) var(--fs-3)/var(--lh-snug) var(--font-body);
+}
+.gd-link:hover { background: var(--hover); }
+.gd-link[aria-current="page"] { background: var(--paper); border-color: var(--line); box-shadow: inset 4px 0 0 var(--amber); font-weight: var(--w-semi); }
+.gd-link:focus-visible, .gd-pg:focus-visible, .gd-back:focus-visible, .gd-page-title:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: 2px; }
+.gd-num { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--r-pill); background: var(--sub); color: var(--ink2); font: var(--w-bold) var(--fs-1)/1 var(--font-display); }
+.gd-link[aria-current="page"] .gd-num { background: var(--amber); color: var(--on-primary); }
+
+/* ---------- the reading pane ---------- */
+/* One page of text on a white card, kept to a comfortable line length. */
+.gd-article { background: var(--paper); border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-panel); padding: var(--sp-6); max-width: calc(var(--measure) + 2 * var(--sp-6)); box-shadow: var(--shadow); }
+.gd-page-title { margin: 0 0 var(--sp-2); font: var(--w-bold) var(--fs-6)/var(--lh-snug) var(--font-display); color: var(--ink); }
+.gd-page-title:focus { outline: none; }
+.gd-lede { margin: 0 0 var(--sp-5); font-size: var(--fs-3); line-height: var(--lh-body); color: var(--ink2); }
+.gd-h { margin: var(--sp-6) 0 var(--sp-2); font: var(--w-bold) var(--fs-4)/var(--lh-snug) var(--font-display); color: var(--ink); }
+.gd-p, .gd-list { font-size: var(--fs-3); line-height: var(--lh-body); color: var(--ink); }
+.gd-p { margin: 0 0 var(--sp-3); }
+.gd-list { margin: 0 0 var(--sp-3); padding-left: var(--sp-6); }
+.gd-list li { margin: 0 0 var(--sp-2); padding-left: var(--sp-1); }
+/* The name of a button or screen, shown like a small label so it is easy to find on the real screen. */
+.gd-ui { display: inline-block; padding: 0 var(--sp-2); border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-chip); background: var(--sub); color: var(--ink); font-weight: var(--w-semi); }
+
+/* ---------- Previous and Next ---------- */
+.gd-pager { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-3); margin-top: var(--sp-7); }
+.gd-pg { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: var(--tap); text-decoration: none; }
+.gd-pg-prev { margin-right: auto; }
+.gd-pg-next { margin-left: auto; }
+
+/* ---------- narrow screens: the list goes on top ---------- */
+@media (max-width: 760px) {
+  .gd-body { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); padding-top: var(--sp-4); }
+  .gd-nav { position: static; }
+  .gd-link { min-height: 44px; font-size: var(--fs-2); }
+  .gd-article { padding: var(--sp-4); }
+  .gd-page-title { font-size: var(--fs-5); }
+  .gd-p, .gd-list, .gd-lede { font-size: var(--fs-2); }
+  .gd-back span { font-size: var(--fs-2); }
+}
