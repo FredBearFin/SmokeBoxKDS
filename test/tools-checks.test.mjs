@@ -41,3 +41,27 @@ test('code fingerprint: accept with no file names refuses, and check fails on a 
   const c = spawnSync(process.execPath, [fp, 'check', f], { encoding: 'utf8' });
   assert.equal(c.status, 1, c.stdout); assert.match(c.stdout, /NO BASELINE/);
 });
+
+test('contract check: failed inspections and broken contracts are problems, and only "performance:"/"timing:" tests count as timing', async () => {
+  const { analyze, emptyScan } = await import('../tools/contract-check.mjs');
+  const err = { __err: 'Execution context was destroyed' };
+  const R = {
+    boot: { booted: true, floorMounted: true, sheetNames: [], actions: [], iconNames: [], chartTypes: [] },
+    smoke: {
+      sheets: [Object.assign({ name: 'order' }, err)], officeMounted: true,
+      pages: [{ id: 'pace', inspectErr: err.__err }, { id: 'menu', cur: 'pace', cards: 3, text: 900 }],
+      paceBaseline: { timers: 0 }, leaks: [{ id: 'menu', inspectErr: err.__err }], afterClose: err,
+      misc: [err, { name: 'sim.sample', days: 13 }, { name: 'sim.live', skipped: 'SB.sim.live missing' }],
+    },
+  };
+  const unit = { ran: true, pass: 10, fail: 2, failing: ['syncLatency: median, p90, max and the share inside 60 s', 'performance: 5000 tickets / 40000 events'] };
+  const { problems } = analyze(emptyScan(), R, null, { unit });
+  const keys = problems.map((p) => p.key);
+  const has = (re) => assert.ok(keys.some((k) => re.test(k)), re + ' in ' + keys.join(' ; '));
+  has(/^smoke-inspect\|71-floor-order\.js\|order:inspect$/); has(/^smoke-inspect\|.*\|pace:inspect$/); has(/^smoke-inspect\|.*\|menu:leak-inspect$/);
+  has(/^smoke-inspect\|60-shell\.js\|afterclose:inspect$/); has(/^smoke-inspect\|45-sim\.js\|misc:inspect/);
+  has(/^office-page\|.*\|menu:landed:pace$/); has(/^contract\|45-sim\.js\|sample-days:13$/); has(/^smoke\|45-sim\.js\|sim\.live:skipped$/);
+  has(/^unit\|test\/\|unit:syncLatency/);
+  const onlyTiming = analyze(emptyScan(), null, null, { unit: { ran: true, pass: 10, fail: 1, failing: ['timing: generation time is within budget'] } });
+  assert.ok(!onlyTiming.problems.some((p) => p.kind === 'unit') && onlyTiming.notes.some((n) => n.kind === 'unit-perf'), 'a timing-only failure stays a note');
+});

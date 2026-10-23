@@ -1172,7 +1172,7 @@ describe('performance: 5000 tickets / 40000 events', () => {
     assert.ok(median < 400, `median ${median.toFixed(1)} ms (runs ${tries.map((x) => x.toFixed(0)).join(', ')})`);
     return last;
   };
-  it('summary + byHour + heatmap + insights finish in under 400 ms (median of three)', (t) => {
+  it('timing: summary + byHour + heatmap + insights finish in under 400 ms (median of three)', (t) => {
     const d = big();
     assert.equal(d.tickets.length, 5000); assert.equal(d.events.length, 40000);
     M.insights(dataset({ tickets: d.tickets.slice(0, 100), events: d.events.slice(0, 500) }));      // warm-up on a small slice so JIT start-up is not billed to the budget
