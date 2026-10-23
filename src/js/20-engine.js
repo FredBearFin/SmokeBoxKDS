@@ -3275,6 +3275,7 @@
     const lastClose = new Map();
     for (const e of flat) if (e.type === 'day_closed' && typeof e.day === 'string' && (!lastClose.has(e.day) || e.t > lastClose.get(e.day))) lastClose.set(e.day, e.t);
     const late = new Set();
+    // Notes the day as late when the time is after that day's last close.
     const mark = (day, t) => { if (isNum(t) && lastClose.has(day) && t > lastClose.get(day)) late.add(day); };
     for (const o of orders) {
       mark(o.serviceDate, o.createdAt);
