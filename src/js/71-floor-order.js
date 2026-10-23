@@ -29,7 +29,35 @@
     const parts = items.map((it) => nameOf(it.menuId) + (it.qty > 1 ? ' x' + it.qty : ''));
     return parts.length <= 3 ? parts.join(', ') : parts.slice(0, 3).join(', ') + ' and ' + (parts.length - 3) + ' more';
   }
-  SB.orderLogic = { recentNames, summarize };
+
+  // Splits a note into its allergy list and the rest. A note that starts "ALLERGY: peanut, dairy. Sauce on side"
+  // gives { list: ['peanut', 'dairy'], rest: 'Sauce on side' }. A note without that start has an empty list.
+  function parseAllergy(note) {
+    const m = /^\s*allergy:\s*([^.]*)\.\s*/i.exec(String(note || ''));
+    if (!m) return { list: [], rest: String(note || '').trim() };
+    const list = m[1].split(',').map((x) => x.trim()).filter(Boolean);
+    return { list, rest: String(note).slice(m[0].length).trim() };
+  }
+  // Puts a note back together with the allergy first, so cooks read it before anything else.
+  function buildNote(list, rest) {
+    const r = String(rest || '').trim();
+    return list.length ? 'ALLERGY: ' + list.join(', ') + '.' + (r ? ' ' + r : '') : r;
+  }
+  // Adds one allergen to the list or takes it off again (ignoring capital letters). Returns the new note.
+  function toggleAllergen(note, name) {
+    const p = parseAllergy(note), at = p.list.findIndex((x) => x.toLowerCase() === name.toLowerCase());
+    if (at >= 0) p.list.splice(at, 1); else p.list.push(name);
+    return buildNote(p.list, p.rest);
+  }
+  // Adds a ready-made phrase (like "Sauce on the side") at the end of the note. Returns { note, ok }; ok is false and the
+  // note unchanged when the phrase is already there or would pass the length limit.
+  function addPhrase(note, phrase, max) {
+    const cur = String(note || '').trim();
+    if (cur.toLowerCase().indexOf(phrase.toLowerCase()) >= 0) return { note: cur, ok: false, why: 'there' };
+    const next = cur ? cur.replace(/[.\s]+$/, '') + '. ' + phrase : phrase;
+    return next.length > max ? { note: cur, ok: false, why: 'long' } : { note: next, ok: true };
+  }
+  SB.orderLogic = { recentNames, summarize, parseAllergy, buildNote, toggleAllergen, addPhrase };
 
   if (!doc) return; // Node: the sheet is DOM only
 
@@ -73,7 +101,7 @@
   // It is cleared on send, Clear order or Discard.
   // orderId is the open order this round is added to (null starts a new one); pay is how it is paid when sent
   // ('' leaves it open); tip is the tip text as typed.
-  const D = { lines: [], customer: '', channel: 'dine_in', note: '', rush: false, orderId: null, pay: '', tip: '' };
+  const D = { lines: [], customer: '', channel: 'dine_in', note: '', rush: false, orderId: null, pay: '', tip: '', allergy: '' };
   // How the last order was paid when it was sent ('' = left open). A counter that takes cash all day starts the next
   // order on cash, one tap fewer; Pay later is still one tap away.
   let payDefault = '';
@@ -88,8 +116,8 @@
   const subtotal = () => D.lines.reduce((s, l) => { const mi = menuById(l.menuId); return s + (mi ? mi.price * l.qty : 0); }, 0);
   // A separate copy of the order, kept so Undo can put it back.
   const copyDraft = () => JSON.parse(JSON.stringify(D));
-  function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; }
-  function resetDraft() { D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = payDefault; D.tip = ''; }
+  function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; D.allergy = snap.allergy || ''; }
+  function resetDraft() { D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = payDefault; D.tip = ''; D.allergy = ''; }
   // The orders still open, oldest first, for the Add to open order list.
   function openOrdersList() { return (st().orders || []).filter((o) => o.status === 'open').sort((a, b) => a.createdAt - b.createdAt); }
   // A short name for an order in a list: who it is for and where, like "Table 4 (Dine-in)".
@@ -414,14 +442,75 @@
     const noteField = SB.ui.field({ label: 'Note for the line', control: noteInput, hint: 'Put allergies first. Cooks read the first line.' });
     noteField.classList.add('ord-note');
     noteField.appendChild(noteCount);
-    const allergyHint = h('div', { class: 'ord-allergy', hidden: true, role: 'status' }, ico('alert', 18), h('span', null, 'A line says allergy, see note. Write the allergy in the note.'));
+    const allergyHint = h('div', { class: 'ord-allergy', hidden: true, role: 'status' }, ico('alert', 18), h('span', null, 'A line says allergy, see note. Tap Allergy above and pick it, or write it in the note.'));
     noteField.appendChild(allergyHint);
     // Rush skips pacing: every item starts now and the ticket goes to the front.
-    const rushToggle = SB.ui.toggle({ label: 'Rush', checked: D.rush, onChange: (on) => { D.rush = on; touched(); } });
-    const rushBox = h('div', { class: 'ord-rush' }, rushToggle, h('p', { class: 'ord-rush-copy t-muted' }, 'Rush skips pacing: every item starts now and the ticket goes to the front.'));
+    const rushToggle = SB.ui.toggle({ label: 'Rush ticket', checked: D.rush, onChange: (on) => { D.rush = on; touched(); } });
+    const rushCopy = h('p', { class: 'ord-rush-copy t-muted' }, '');
+    const rushBox = h('div', { class: 'ord-rush' }, rushToggle, rushCopy);
+    // Says in words what the Rush switch does right now, so a cook never has to guess whether it is on.
+    function paintRush() {
+      text(rushCopy, D.rush ? 'RUSH is on: every item starts now and this ticket goes to the front of the board.' : 'Rush is off: items start on the kitchen plan above. Switch it on only when the guest is waiting.');
+      rushBox.classList.toggle('is-on', D.rush);
+    }
+
+    /* allergy first: asked before anything else, written as the first words of the note */
+    const ALLERGENS = ['Peanut', 'Tree nut', 'Dairy', 'Egg', 'Gluten', 'Soy', 'Fish', 'Shellfish', 'Sesame'];
+    const allergyNo = h('button', { type: 'button', class: 'chip ord-allergy-no', 'aria-pressed': 'false' }, h('span', null, 'No allergy'));
+    const allergyYes = h('button', { type: 'button', class: 'chip ord-allergy-yes', 'aria-pressed': 'false' }, ico('alert', 16), h('span', null, 'Allergy'));
+    const allergyChips = h('div', { class: 'ord-chips ord-allergens', role: 'group', 'aria-label': 'Allergens', hidden: true });
+    const allergenBtns = new Map();
+    const allergyWarn = h('p', { class: 'ord-allergy-pick', role: 'status', hidden: true }, 'Tap what the guest is allergic to.');
+    const allergyBox = h('div', { class: 'ord-block ord-allergybox' },
+      h('div', { class: 'ord-label' }, 'Any food allergy?'), h('div', { class: 'ord-chips' }, allergyNo, allergyYes), allergyChips, allergyWarn);
+    // Sets the note text from code and redraws everything that shows it.
+    function setNote(v) { D.note = v; noteInput.value = v; hideError(); paintNote(); }
+    allergyNo.addEventListener('click', () => {
+      // Saying "No allergy" removes any allergy words from the note.
+      const p = SB.orderLogic.parseAllergy(D.note);
+      D.allergy = D.allergy === 'no' ? '' : 'no';
+      setNote(p.rest); touched();
+    });
+    allergyYes.addEventListener('click', () => { D.allergy = D.allergy === 'yes' ? '' : 'yes'; if (D.allergy === '') setNote(SB.orderLogic.parseAllergy(D.note).rest); touched(); });
+    // Makes one button per allergen, plus any other allergy already typed into the note.
+    function paintAllergy() {
+      const parsed = SB.orderLogic.parseAllergy(D.note);
+      if (parsed.list.length && D.allergy !== 'yes') D.allergy = 'yes';
+      const yes = D.allergy === 'yes';
+      allergyNo.setAttribute('aria-pressed', D.allergy === 'no' ? 'true' : 'false');
+      allergyYes.setAttribute('aria-pressed', yes ? 'true' : 'false');
+      setHidden(allergyChips, !yes);
+      setHidden(allergyWarn, !(yes && !parsed.list.length));
+      const all = ALLERGENS.concat(parsed.list.filter((x) => !ALLERGENS.some((a) => a.toLowerCase() === x.toLowerCase())));
+      all.forEach((nm) => {
+        let b = allergenBtns.get(nm);
+        if (!b) {
+          b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, nm));
+          // Each tap adds the allergen to the front of the note, or takes it off again.
+          b.addEventListener('click', () => { setNote(SB.orderLogic.toggleAllergen(D.note, nm)); touched(); });
+          allergenBtns.set(nm, b); allergyChips.appendChild(b);
+        }
+        b.setAttribute('aria-pressed', parsed.list.some((x) => x.toLowerCase() === nm.toLowerCase()) ? 'true' : 'false');
+      });
+      allergenBtns.forEach((b, nm) => { if (all.indexOf(nm) < 0) { b.remove(); allergenBtns.delete(nm); } });
+    }
+
+    /* note templates: one tap adds a common phrase after the allergy words */
+    const TEMPLATES = ['Sauce on the side', 'No sauce', 'Cut in half', 'Extra napkins', 'Birthday', 'Pack to go'];
+    const tplRow = h('div', { class: 'ord-chips ord-templates', role: 'group', 'aria-label': 'Note phrases' });
+    TEMPLATES.forEach((t) => {
+      const b = h('button', { type: 'button', class: 'chip' }, h('span', null, t));
+      // Adds the phrase unless it is already there or the note would pass its length limit.
+      b.addEventListener('click', () => {
+        const r = SB.orderLogic.addPhrase(D.note, t, L.maxNoteLen);
+        if (r.ok) { setNote(r.note); touched(); } else if (r.why === 'long') showNotice('That phrase does not fit: the note holds ' + L.maxNoteLen + ' characters. Keep the allergy and cut the rest.');
+      });
+      tplRow.appendChild(b);
+    });
+    noteField.querySelector('.field-label').after(tplRow);
 
     const details = h('div', { class: 'ord-details', dataset: { add: 'false' } }, orderBox, custField, channelBox, payBox);
-    orderPane.append(head, notice, linesBox, details, plan, noteField, rushBox);
+    orderPane.append(head, notice, allergyBox, linesBox, details, plan, noteField, rushBox);
     root.append(paneSeg, menuPane, orderPane);
 
     // Footer: total, inline error, Send.
@@ -511,6 +600,7 @@
       noteField.setError(over ? 'The note is ' + len + ' characters. The limit is ' + L.maxNoteLen + '. Keep the allergy and cut the rest.' : null);
       const needs = D.lines.some((l) => l.mods.some((m) => /allergy/i.test(m))) && len === 0;
       setHidden(allergyHint, !needs);
+      paintAllergy();
     }
     // Refreshes everything that depends on the size of the order:
     // counts, total, button words and the empty state.
@@ -534,6 +624,7 @@
       setHidden(emptyEl, !draftEmpty());
       setHidden(linesEl, draftEmpty());
       rushStamp.hidden = !D.rush;
+      paintRush();
     }
 
     /* the plan: rebuilt as a whole on purpose (it has nothing to press), cheap even at 30 lines */
@@ -772,7 +863,7 @@
           if (!r.ok) { const mi = menuById(it.menuId); skipped.push(mi ? mi.short || mi.name : it.menuId); }
         });
         D.channel = last.channel || 'dine_in'; channelSeg.setValue(D.channel);
-        D.customer = ''; custInput.value = ''; D.note = ''; noteInput.value = ''; D.rush = false; rushToggle.setValue(false);
+        D.customer = ''; custInput.value = ''; D.note = ''; noteInput.value = ''; D.allergy = ''; D.rush = false; rushToggle.setValue(false);
         touched();
         if (skipped.length) showNotice('Order #' + last.num + ' copied. Left out because they are 86 right now: ' + skipped.join(', ') + '.');
         else showNotice('Order #' + last.num + ' copied. Add the customer and send.');
