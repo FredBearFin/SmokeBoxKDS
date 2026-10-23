@@ -54,10 +54,7 @@
 
 
   // Quotes one value for a CSV cell: wraps it in quotes when it holds a comma, quote or line break.
-  function csvCell(v) {
-    const t = v == null ? '' : String(v);
-    return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
-  }
+  function csvCell(v) { return SB.csv.cell(v); }
   // Whole cents as plain digits with two decimals (1240 gives "12.40"), with no dollar sign or thousands commas, so a spreadsheet adds them up.
   const plainMoney = (v) => (isNum(v) ? (Math.round(v) / 100).toFixed(2) : '0.00');
 
