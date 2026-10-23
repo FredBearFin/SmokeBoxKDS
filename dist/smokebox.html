@@ -4353,6 +4353,47 @@ a.of-nav:active { background: var(--press); }
   U.isNum = (n) => typeof n === 'number' && isFinite(n);
   // The folder the page was served from as an address prefix ('' at the site root, '/beta' behind a path prefix), for calls to its own hub.
   U.pageFolder = (g) => { try { const p = g && g.location && typeof g.location.pathname === 'string' ? g.location.pathname : '/'; return p.replace(/[^/]*$/, '').replace(/\/+$/, ''); } catch (e) { return ''; } };
+  /* ---------- secret hashing (PIN and recovery code) ---------- */
+  // Rounds of PBKDF2 for a saved PIN or recovery code: about a tenth of a second on a tablet. A 4-digit PIN stays a door latch whatever this is.
+  const KDF_ROUNDS = 100000;
+  // Turns bytes into lowercase hex text, two characters each.
+  const toHex = (buf) => Array.from(new Uint8Array(buf)).map((b) => (b < 16 ? '0' : '') + b.toString(16)).join('');
+  // The browser's crypto when it can do PBKDF2 and random bytes, else null.
+  const subtleOf = () => { const c = g.crypto; return c && c.subtle && typeof c.subtle.deriveBits === 'function' && typeof c.getRandomValues === 'function' && typeof TextEncoder !== 'undefined' ? c.subtle : null; };
+  // Runs PBKDF2-SHA256 over text with a salt and a round count and returns the bytes.
+  async function derive(sub, text, salt, rounds) {
+    const key = await sub.importKey('raw', new TextEncoder().encode(text), 'PBKDF2', false, ['deriveBits']);
+    return sub.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: rounds }, key, 256);
+  }
+  // Scrambles a secret into 'pbkdf2:<rounds>:<salt>:<hash>' with a fresh random salt; null where this browser cannot (the caller then keeps the old plain
+  // SHA-256 form). domain is a fixed label put in front of the secret so a PIN hash and a recovery hash never match each other.
+  U.secretHash = async (domain, plain) => {
+    const sub = subtleOf();
+    if (!sub) return null;
+    try {
+      const salt = g.crypto.getRandomValues(new Uint8Array(16));
+      return 'pbkdf2:' + KDF_ROUNDS + ':' + toHex(salt) + ':' + toHex(await derive(sub, domain + String(plain), salt, KDF_ROUNDS));
+    } catch (e) { return null; }
+  };
+  // Checks a secret against a saved scramble of either form. Returns { ok, legacy }: legacy is true for the old unsalted 'sha256:' form, which still
+  // works; the caller should save a fresh U.secretHash after an ok legacy check. ok is false (never a throw) for anything unreadable.
+  U.secretCheck = async (domain, plain, stored) => {
+    try {
+      const sub = g.crypto && g.crypto.subtle;
+      if (typeof stored !== 'string' || !sub) return { ok: false, legacy: false };
+      if (stored.indexOf('pbkdf2:') === 0) {
+        const m = /^pbkdf2:(\d{1,7}):([0-9a-f]{2,128}):([0-9a-f]{64})$/.exec(stored);
+        const sk = subtleOf();
+        if (!m || !sk || Number(m[1]) < 1 || Number(m[1]) > 2000000) return { ok: false, legacy: false };
+        const salt = new Uint8Array(m[2].match(/../g).map((h) => parseInt(h, 16)));
+        return { ok: toHex(await derive(sk, domain + String(plain), salt, Number(m[1]))) === m[3], legacy: false };
+      }
+      if (stored.indexOf('sha256:') === 0 && typeof sub.digest === 'function' && typeof TextEncoder !== 'undefined') {
+        return { ok: 'sha256:' + toHex(await sub.digest('SHA-256', new TextEncoder().encode(domain + String(plain)))) === stored, legacy: true };
+      }
+    } catch (e) { /* unreadable: no match */ }
+    return { ok: false, legacy: false };
+  };
   // Forces a number into the range lo to hi, so clamp(15, 0, 10) gives 10.
   U.clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   // Slides from a to b by the fraction t (t = 0 gives a, t = 1 gives b).
@@ -4630,7 +4671,7 @@ a.of-nav:active { background: var(--press); }
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept', 'hubqueue', 'hubcache', 'hubtoken'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'dropped', 'droppedat', 'dropped', 'droppedat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept', 'hubqueue', 'hubcache', 'hubtoken'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -5179,7 +5220,7 @@ a.of-nav:active { background: var(--press); }
   // ticket spec), note (140, long enough for an allergy note), and how many tickets (5000) and log events
   // (40000) are kept before the oldest are dropped so the saved data stays small enough for the browser.
   // Starter values.
-  C.limits = { maxItemsPerTicket: 30, maxQty: 20, maxCustomerLen: 40, maxNoteLen: 140, maxTickets: 5000, maxEvents: 40000, maxOrders: 5000, maxMoney: 10000 };
+  C.limits = { maxItemsPerTicket: 30, maxQty: 20, maxCustomerLen: 40, maxNoteLen: 140, maxTickets: 5000, maxEvents: 40000, maxOrders: 5000, maxMoney: 10000, maxPrice: 1000, maxOrderMoney: 10000000 };
   // How an order can be paid. Smokebox only records which one it was; the card itself is taken on the owner's own
   // card reader, and no card number ever enters this app.
   C.payMethods = [{ id: 'cash', name: 'Cash' }, { id: 'card', name: 'Card' }, { id: 'other', name: 'Other' }];
@@ -5293,7 +5334,7 @@ a.of-nav:active { background: var(--press); }
 
   // The engine's own bounds for a dish, copied here because this file loads before the engine. A test checks the engine
   // refuses exactly what these refuse. 150 dishes, names up to 60 characters, price 0 to 1000 dollars.
-  const LIMITS = { maxDishes: 150, nameMax: 60, priceMax: 1000, textMax: 1000000, rowsRead: 2000 };
+  const LIMITS = { maxDishes: 150, nameMax: 60, priceMax: 1000, textMax: 1000000, rowsRead: 2000, lineMax: 1000 };
   M.limits = LIMITS;
   // The dish form fields the importer uses when the file does not say: one tap to finish, a 5 minute guess.
   const DEFAULTS = { prepSec: 300, track: 'one' };
@@ -5442,6 +5483,10 @@ a.of-nav:active { background: var(--press); }
   // Reads one typed line such as "Brisket plate, 14.00, pit", "Burger 9.50", "Name - $9" or a tab or semicolon line.
   // Returns { name, priceText, extras:[] } or null when the line has no usable shape (it still becomes a row with problems).
   function readLine(line) {
+    // A line this long is not a dish. It is not read at all (so nothing can be slow on it); the caller marks the row.
+    if (line.length > LIMITS.lineMax) return { name: clean(line.slice(0, LIMITS.nameMax)), priceText: '', extras: [], tooLong: line.length };
+    // Runs of spaces become one space (tabs stay, they separate columns), so the patterns below take time in proportion to the line, not its square.
+    line = line.replace(/[^\S\t]+/g, ' ');
     const delims = ['\t', ';'];
     let parts = null;
     // "Pickles 3,50": a single comma that only marks the cents is not a column separator.
@@ -5554,6 +5599,7 @@ a.of-nav:active { background: var(--press); }
       }
       const f = readLine(raw.trim());
       const row = newRow(i + 1);
+      if (f.tooLong) row.problems.push(prob('lineTooLong', 'error', 'This line is ' + f.tooLong + ' characters long, far too long to be a dish.', 'Cut it down to a name and a price, or delete the line.'));
       row.name = clean(unguard(f.name));
       setPrice(row, f.priceText, opts.priceUnit === 'cents');
       // Extra cells after the price: a station, a category, or a note.
@@ -5808,7 +5854,7 @@ a.of-nav:active { background: var(--press); }
     'emptyOrder', 'badQty', 'tooManyItems', 'badCustomer', 'badChannel', 'noteTooLong', 'itemUnavailable', 'ticketNotActive',
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
-    'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
+    'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'dayClosed', 'orderEmpty',
     'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'followerReadOnly', 'hubKitchen', 'hubChanged', 'hubConnecting', 'undoElsewhere', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
@@ -5861,6 +5907,7 @@ a.of-nav:active { background: var(--press); }
     unknownOrder: 'That order is no longer here. It may have been cleared; check the open orders list.',
     orderNotOpen: 'That order is already paid or voided. Reopen it first if it needs changing.',
     orderNotPaid: 'Only a paid order can be reopened.',
+    dayClosed: 'That sale belongs to a day that is already closed, so it cannot be opened again: it would move to another day and count twice. Make the correction in your own records, or ask whoever keeps the books.',
     orderEmpty: 'There is nothing on this order to pay. Add items first, or void the order.',
     orderNotEmpty: 'That order still has food on it. Void its tickets first, or take payment.',
     badPayment: 'Pick how it was paid (cash, card or other), and enter the tip and discount as dollar amounts.',
@@ -7187,6 +7234,16 @@ a.of-nav:active { background: var(--press); }
     const taxC = Math.floor((taxableC * Math.round(rate * 1e4) + 500000) / 1e6);
     return { subtotal: subCents / 100, discount: discC / 100, taxRate: rate, tax: taxC / 100, total: (taxableC + taxC) / 100, qty, rounds };
   }
+  // Totals for lines that are not on an order yet (the draft on the order screen), with the same whole-cent rule the charge uses, so what the
+  // screen shows is what the register charges. items are { price, qty }; opts: extraSubtotalCents (food already on the order), discount, taxRatePct.
+  function totalsOf(items, opts) {
+    let sub = isNum(opts && opts.extraSubtotalCents) ? Math.max(0, Math.round(opts.extraSubtotalCents)) : 0, qty = 0;
+    for (const it of Array.isArray(items) ? items : []) {
+      const q = isNum(it && it.qty) && it.qty > 0 ? Math.round(it.qty) : 0;
+      sub += toCents(isNum(it && it.price) ? it.price : 0) * q; qty += q;
+    }
+    return totalsFrom(sub, qty, 0, opts && opts.discount, opts && opts.taxRatePct);
+  }
   // The sales tax rate in force now, in percent (0 when none is set).
   const taxRateOf = (settings) => (settings && settings.service && isNum(settings.service.taxRatePct) ? settings.service.taxRatePct : 0);
   // What an order adds up to: the food on its tickets that are not voided, less the discount, plus tax. A paid
@@ -7239,6 +7296,7 @@ a.of-nav:active { background: var(--press); }
     const o = tx.get('orders')[oi];
     const t0 = orderTotals(tx.state(), o, { discount: pay.discount });
     if (!(t0.subtotal > 0)) return 'orderEmpty';
+    if (!Number.isFinite(t0.total) || t0.total > C.limits.maxOrderMoney) { tx.info = { key: 'total', min: 0, max: C.limits.maxOrderMoney }; return 'outOfBounds'; }
     if (pay.discount > t0.subtotal + 1e-9) { tx.info = { key: 'discount', min: 0, max: t0.subtotal }; return 'outOfBounds'; }
     const w = tx.mutIn(tx.mut('orders'), oi);
     w.status = 'paid'; w.paidAt = stampAfter(o.createdAt, tx.now); w.method = pay.method; w.tip = pay.tip; w.discount = t0.discount; w.totals = t0;
@@ -7284,6 +7342,9 @@ a.of-nav:active { background: var(--press); }
     if (oi < 0) return 'unknownOrder';
     const o = tx.get('orders')[oi];
     if (o.status !== 'paid') return 'orderNotPaid';
+    // A sale stays in the day it was made: once that day is closed, paying it again would count it in two day_closed records.
+    const lc = tx.get('lastClose');
+    if (lc && isNum(o.paidAt) && U.serviceDate(o.paidAt, tx.get('settings').service.dayStartHour) <= lc.day) { tx.info = { day: lc.day }; return 'dayClosed'; }
     const w = tx.mutIn(tx.mut('orders'), oi);
     w.status = 'open'; delete w.paidAt; delete w.method; delete w.tip; delete w.discount; delete w.totals;
     tx.event('order_reopened', { orderId: o.id });
@@ -9592,7 +9653,7 @@ a.of-nav:active { background: var(--press); }
         if (typeof out.name !== 'string' || !out.name) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.name = base.name; }
         if (C.workZones.indexOf(out.zone) < 0) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.zone = base.zone; repaired.push('menu ' + x.id + '.zone reset'); }
         if (!isNum(out.prepSec) || out.prepSec < 5 || out.prepSec > 3600) { out.prepSec = base ? base.prepSec : 120; repaired.push('menu ' + x.id + '.prepSec reset'); }
-        if (!isNum(out.price) || out.price < 0) { out.price = base ? base.price : 0; repaired.push('menu ' + x.id + '.price reset'); }
+        if (!isNum(out.price) || out.price < 0 || out.price > C.limits.maxPrice) { out.price = base ? base.price : 0; repaired.push('menu ' + x.id + '.price reset'); }
         if (out.track !== 'one' && out.track !== 'two') out.track = 'one';
         if (!Array.isArray(out.bom) || out.bom.some((l) => !isObj(l) || !im.has(l.ing) || !isNum(l.qty) || l.qty <= 0)) {
           out.bom = base ? base.bom.map((l) => ({ ing: l.ing, qty: l.qty })) : (Array.isArray(out.bom) ? out.bom.filter((l) => isObj(l) && im.has(l.ing) && isNum(l.qty) && l.qty > 0) : []);
@@ -9838,7 +9899,8 @@ a.of-nav:active { background: var(--press); }
       const x = Object.assign({}, it);
       if (x.track !== 'one' && x.track !== 'two') x.track = 'one';
       if (!Array.isArray(x.mods)) x.mods = [];
-      if (!isNum(x.price)) x.price = 0;
+      if (!isNum(x.price) || x.price < 0 || x.price > C.limits.maxPrice) { if (isNum(x.price)) repaired.push('ticket ' + t.id + ' price reset'); x.price = 0; }
+      if (x.qty > C.limits.maxQty) { x.qty = C.limits.maxQty; repaired.push('ticket ' + t.id + ' quantity lowered'); }
       for (const k of ['firedAt', 'startedAt', 'doneAt', 'cost']) if (x[k] !== undefined && !isNum(x[k])) return null;
       if (x.depleted !== undefined && (!Array.isArray(x.depleted) || x.depleted.some((r) => !isObj(r) || typeof r.ing !== 'string' || !isNum(r.g) || r.g < 0))) return null;
       items.push(x);
@@ -9861,8 +9923,8 @@ a.of-nav:active { background: var(--press); }
     };
     if (o.status === 'paid') {
       const T = o.totals;
-      const money = isObj(T) && ['subtotal', 'discount', 'tax', 'total'].every((k) => isNum(T[k]) && T[k] >= 0);
-      if (!money || !hasOwn(C.payMethodById, o.method) || !isNum(o.paidAt) || !isNum(o.tip) || o.tip < 0) return null;
+      const money = isObj(T) && ['subtotal', 'discount', 'tax', 'total'].every((k) => isNum(T[k]) && T[k] >= 0 && T[k] <= C.limits.maxOrderMoney);
+      if (!money || !hasOwn(C.payMethodById, o.method) || !isNum(o.paidAt) || !isNum(o.tip) || o.tip < 0 || o.tip > C.limits.maxOrderMoney) return null;
       out.paidAt = o.paidAt; out.method = o.method; out.tip = o.tip; out.discount = T.discount;
       out.totals = { subtotal: T.subtotal, discount: T.discount, taxRate: isNum(T.taxRate) && T.taxRate >= 0 ? T.taxRate : 0, tax: T.tax, total: T.total, qty: isInt(T.qty) && T.qty >= 0 ? T.qty : 0, rounds: isInt(T.rounds) && T.rounds >= 0 ? T.rounds : 0 };
       if (out.paidAt < out.createdAt) out.paidAt = out.createdAt;
@@ -9911,7 +9973,7 @@ a.of-nav:active { background: var(--press); }
   // The public door: everything other files may use. _internal is for tests and tools.
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
-    pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
+    pacingPlan, planFor, ticketTiming, ticketProgress, totalsOf, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
     channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
@@ -10774,6 +10836,8 @@ a.of-nav:active { background: var(--press); }
   const CORRUPT_KEY = 'smokebox.v1.corrupt';
   // When the damaged copy was set aside (a time), so it can be cleared after 30 days.
   const CORRUPT_AT_KEY = 'smokebox.v1.corruptat';
+  const DROPPED_KEY = 'smokebox.v1.dropped';          // the saved text exactly as it was before a repair at load threw records away
+  const DROPPED_AT_KEY = 'smokebox.v1.droppedat';
   // One small rolling copy of the last good state (menu, ingredients, settings, PIN, safety records, recent history).
   const LASTGOOD_KEY = 'smokebox.v1.lastgood';
   // The owner's answer to the one-time offer to clear old demo tickets: true once they chose to keep them.
@@ -10847,6 +10911,9 @@ a.of-nav:active { background: var(--press); }
   let mode = 'real', strict = false, baseStorage = null, reloadFn = null;
   // snapAt is when the rolling copy was last taken (real time); snapWanted is set by close day so the next save takes one.
   let snapAt = 0, snapWanted = null;
+  let writeBlocked = false, heldText = null;     // set when a damaged save could not be copied aside: nothing is written over it
+  let susp = null;           // a big forward jump of the device clock that has not been accepted: { r0 first reading, base trusted time }
+  const CLOCK_JUMP_MAX_MS = 36 * 3600e3;     // a forward step bigger than this (a tablet asleep for a day and a half) needs the owner's yes
   let last = null;
   let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: 400 };
   const tabId = 'tab_' + Math.floor(Math.random() * 1e9).toString(36);
@@ -10861,9 +10928,26 @@ a.of-nav:active { background: var(--press); }
     // Never go backwards (rule I9): if the real clock steps back or gives garbage, the last time is
     // repeated.
     if (!isNum(v)) v = lastNow;
+    // A real kitchen does not follow a big forward jump of the device clock by itself (a dead clock battery, a wrong date): it keeps counting from
+    // the last trusted time, says so in the status, and waits for the owner to accept the new time. A jump that goes away again changes nothing.
+    if (strict && mode === 'real' && clk.speed === 1) {
+      if (v - lastNow > CLOCK_JUMP_MAX_MS) {
+        if (!susp) susp = { r0: r, base: lastNow };
+        st.clockSuspect = { aheadMs: v - lastNow, since: susp.r0 };
+        v = susp.base + Math.max(0, r - susp.r0);
+      } else if (susp) { susp = null; st.clockSuspect = null; }
+    }
     if (v < lastNow) v = lastNow;
     lastNow = v;
     return v;
+  }
+  // Accepts the device clock's new time after a big jump (the owner says it is right). Does nothing when there is no jump waiting.
+  function acceptClockJump() {
+    if (!susp) return false;
+    const r = realNow();
+    clk = { base: Math.floor(r), realBase: r, speed: 1 }; lastNow = Math.floor(r); susp = null; st.clockSuspect = null;
+    schedulePersist(false); scheduleNotify();
+    return true;
   }
   // Sets the demo speed (0.1 to 1000, where 1 is real time). Re-bases the clock first so the time does not
   // jump. Returns false for a bad speed.
@@ -10881,6 +10965,8 @@ a.of-nav:active { background: var(--press); }
   function atLeast(t) { // move the clock forward so it is not behind stamps in a loaded state
     if (!isNum(t)) return;
     const v = now();
+    // Stamps far ahead of the clock do not move it in a real kitchen: the clock is wrong, not the data.
+    if (strict && mode === 'real' && t - v > CLOCK_JUMP_MAX_MS) { st.clockWrong = { aheadMs: t - v }; return; }
     if (t > v) { clk = { base: t, realBase: realNow(), speed: clk.speed }; lastNow = t; }
   }
   // Newest time found in a state: the last event or one of the last 50 tickets (tickets run oldest to
@@ -10947,6 +11033,8 @@ a.of-nav:active { background: var(--press); }
     if (fol) return true;                             // a follower never saves anything
     if (!storage || !state) return false;
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    // The saved text is a damaged copy nobody could keep elsewhere: it stays exactly as it is until the owner has saved it.
+    if (writeBlocked) { st.lastSaveOk = false; return false; }
     // If another tab saved since this tab last loaded or saved, build on its copy first so nothing is lost.
     if (skipRebase) skipRebase = false; else rebaseIfStale();
     const r = realNow();
@@ -11274,7 +11362,7 @@ a.of-nav:active { background: var(--press); }
     baseStorage = given || U.rawStorage;
     storage = given ? (strict && mode === 'demo' ? U.storageFor(given, 'demo') : given) : (strict ? U.storageFor(U.rawStorage, mode) : U.storage);
     st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: SAVE_MS };
-    last = null;
+    last = null; writeBlocked = false; heldText = null; susp = null;
     baseSid = null; pending = []; skipRebase = false;
     outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
     const r = realNow();
@@ -11290,14 +11378,23 @@ a.of-nav:active { background: var(--press); }
     let loaded = null;
     if (unreadable !== null) {
       st.corrupt = 'The saved data is not readable text.';
-      try { storage.set(CORRUPT_KEY, unreadable); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
+      if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, unreadable, r)) { writeBlocked = true; heldText = unreadable; st.heldInMemory = true; }
     } else if (payload != null) {
       const v = E().validateBackup(payload);
       // A saved copy that fails the check is parked under CORRUPT_KEY and the app starts fresh. It never
       // crashes on bad storage.
-      if (v.ok) { loaded = v.state; st.repaired = v.repaired; } else {
+      if (v.ok) {
+        loaded = v.state; st.repaired = v.repaired;
+        // Records the check threw away are not gone for good: the text as it was is kept, and the status counts what was dropped.
+        const dc = droppedCounts(v.repaired);
+        if (dc) {
+          st.droppedCount = dc;
+          const raw = rawOf(payload);
+          if (!parkText(DROPPED_KEY, DROPPED_AT_KEY, payload, r)) { writeBlocked = true; heldText = raw; st.heldInMemory = true; }
+        }
+      } else {
         st.corrupt = v.error;
-        try { storage.set(CORRUPT_KEY, payload); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
+        if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, payload, r)) { writeBlocked = true; heldText = rawOf(payload); st.heldInMemory = true; }
       }
     } else st.firstRun = true;
     // A damaged save: the rolling last-good copy takes its place (real kitchens), and the damaged one stays set aside.
@@ -11310,6 +11407,8 @@ a.of-nav:active { background: var(--press); }
       try {
         const at = storage.get(CORRUPT_AT_KEY, null);
         if (isNum(at) && r - at > CORRUPT_KEEP_MS) { storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); st.corruptCleared = true; }
+        const da = storage.get(DROPPED_AT_KEY, null);
+        if (isNum(da) && r - da > CORRUPT_KEEP_MS && !st.droppedCount) { storage.remove(DROPPED_KEY); storage.remove(DROPPED_AT_KEY); }
       } catch (e) { /* ignore */ }
     }
     try { const g0 = storage.get(LASTGOOD_KEY, null); snapAt = g0 && isNum(g0.takenAt) ? g0.takenAt : 0; } catch (e) { snapAt = 0; }
@@ -11318,7 +11417,7 @@ a.of-nav:active { background: var(--press); }
     // never earlier than the real time. Speed goes back to 1.
     let vNow = r;
     const c = payload && payload.clock;
-    if (loaded && c && isNum(c.virtual)) vNow = Math.max(r, c.virtual + Math.max(0, r - (isNum(c.real) ? c.real : r)));
+    if (loaded && c && isNum(c.virtual) && !(strict && mode === 'real')) vNow = Math.max(r, c.virtual + Math.max(0, r - (isNum(c.real) ? c.real : r)));   // a real kitchen always starts from the device clock
     vNow = Math.floor(vNow);
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
@@ -11332,7 +11431,7 @@ a.of-nav:active { background: var(--press); }
     const t = E().tick(state, now());
     state = t.state;
     syncUnits();
-    if (st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
+    if (st.corrupt && !writeBlocked) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
     if (!opts.noTimers && typeof setInterval === 'function') interval = setInterval(tickNow, 1000);
     if (!opts.noSync) openTransport(opts.transport);
     if (!opts.noTimers) {
@@ -11340,6 +11439,26 @@ a.of-nav:active { background: var(--press); }
       if (g.document && typeof g.document.addEventListener === 'function') on(g.document, 'visibilitychange', () => { if (g.document.visibilityState === 'hidden') flushIfDirty(); });
     }
     return status();
+  }
+  // Keeps a copy of damaged or about-to-be-repaired data under its own key. True only when the copy was really written; a full browser store says no.
+  function parkText(key, atKey, value, at) {
+    try { if (storage.set(key, value) === false) return false; storage.set(atKey, at); return true; } catch (e) { return false; }
+  }
+  // The exact saved text for a payload, so a person can download what could not be kept safe.
+  function rawOf(payload) {
+    try { const raw = typeof storage.raw === 'function' ? storage.raw(KEY) : null; if (raw != null) return raw; } catch (e) { /* fall back to the parsed copy */ }
+    try { return JSON.stringify(payload); } catch (e) { return ''; }
+  }
+  // Counts what a repair dropped, in words a person knows; null when it dropped nothing.
+  function droppedCounts(repaired) {
+    const c = { tickets: 0, orders: 0, batches: 0, other: 0 };
+    let any = false;
+    for (const x of Array.isArray(repaired) ? repaired : []) {
+      if (!/^dropped\b/.test(x)) continue;
+      any = true;
+      if (/ticket/.test(x)) c.tickets++; else if (/order/.test(x)) c.orders++; else if (/batch/.test(x)) c.batches++; else c.other++;
+    }
+    return any ? c : null;
   }
   // A copy of the save status plus the current speed: persistent, lastSaveOk, lastSaveAt, corrupt, firstRun,
   // trimmed, repaired, speed.
@@ -12397,7 +12516,9 @@ a.of-nav:active { background: var(--press); }
   }
   // The stored form of a recovery code: a salted SHA-256 (only this is ever saved, never the code).
   async function hashCode(plain) {
-    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);
+    const salted = await U.secretHash('smokebox-recovery-v1:', plain);
+    if (salted !== null) return salted;
+    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);     // a browser without PBKDF2 keeps the old plain form
     return hex === null ? null : 'sha256:' + hex;
   }
   // True when a back office PIN is set.
@@ -12434,10 +12555,10 @@ a.of-nav:active { background: var(--press); }
     if (rec.until > t) return { ok: false, report: 'recoveryLocked', info: { waitMs: rec.until - t } };
     if (rec.until && rec.until <= t) rec = { fails: 0, until: 0 };
     const plain = normalizeCode(code);
-    const hash = plain ? await hashCode(plain) : null;
-    if (plain && hash === null) return { ok: false, report: 'noCrypto', info: {} };
     const stored = state.settings.office.recoveryHash;
-    if (!plain || hash !== stored) {
+    const chk = plain ? await U.secretCheck('smokebox-recovery-v1:', plain, stored) : { ok: false };
+    if (plain && !chk.ok && !(g.crypto && g.crypto.subtle)) return { ok: false, report: 'noCrypto', info: {} };
+    if (!plain || !chk.ok) {
       rec.fails++;
       const locked = rec.fails >= RECOVERY_TRIES;
       if (locked) rec = { fails: 0, until: t + RECOVERY_LOCK_MS };
@@ -12466,6 +12587,9 @@ a.of-nav:active { background: var(--press); }
     if (mode === 'demo') return fail('notInDemo');
     if (typeof opts.confirm !== 'string' || opts.confirm.trim().toUpperCase() !== START_OVER_WORD) return fail('confirmWord', { word: START_OVER_WORD });
     if (opts.keepSettings != null && typeof opts.keepSettings !== 'boolean') return fail('badPatch', { key: 'keepSettings' });
+    // The screen must say a backup file was really saved (its name and size) before anything is erased.
+    const bs = opts.backupSaved;
+    if (!bs || typeof bs !== 'object' || typeof bs.filename !== 'string' || !bs.filename.trim() || !(Number.isFinite(bs.chars) && bs.chars > 0)) return fail('backupRequired');
     const keep = opts.keepSettings !== false;
     const text = exportAll();
     if (text == null) { const lr = last || {}; return fail(lr.report || 'invalidBackup', lr.info); }
@@ -12532,7 +12656,7 @@ a.of-nav:active { background: var(--press); }
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
@@ -19940,9 +20064,9 @@ a.of-nav:active { background: var(--press); }
   const pinHash = () => { try { const s = SB.store && SB.store.getState && SB.store.getState(); return (s && s.settings && s.settings.office && s.settings.office.pinHash) || null; } catch (e) { return null; } };
   // True when a manager PIN is set.
   S.hasPin = () => !!pinHash();
-  // Scrambles a PIN into 'sha256:' + 64 hex characters (with 'smokebox.v1:' put in front). Browser crypto
-  // first, pure copy as fallback; same result. The real number is never stored.
-  S.hashPin = async function (pin) {
+  // The old unsalted form of a PIN scramble: 'sha256:' + 64 hex characters of the digest of 'smokebox.v1:' + pin. Browser crypto first, the pure copy as
+  // fallback; same result. Kept so a PIN saved by an older build still works.
+  async function legacyPinHash(pin) {
     const text = 'smokebox.v1:' + String(pin);
     try {
       if (g.crypto && g.crypto.subtle && typeof TextEncoder !== 'undefined') {
@@ -19951,9 +20075,27 @@ a.of-nav:active { background: var(--press); }
       }
     } catch (e) { /* fall back to the pure implementation, which gives the same digest */ }
     return 'sha256:' + sha256hex(text);
+  }
+  // Scrambles a PIN for saving: salted PBKDF2 ('pbkdf2:rounds:salt:hash') where the browser can, the old unsalted form where it cannot. The real
+  // number is never stored. A 4-digit PIN is a door latch for the back office, not a lock: anyone with the device or a backup file can still try
+  // all 10 000 PINs, the salt and rounds only make each try cost real work.
+  S.hashPin = async function (pin) {
+    const salted = await U.secretHash('smokebox.v1:', pin);
+    return salted !== null ? salted : legacyPinHash(pin);
   };
-  // True if the PIN matches the saved scramble. True for anything when no PIN is set.
-  S.checkPin = async function (pin) { const want = pinHash(); if (!want) return true; return (await S.hashPin(pin)) === want; };
+  // True if the PIN matches the saved scramble (either form). True for anything when no PIN is set. A right PIN saved in the old form is saved again
+  // in the new form on the spot.
+  S.checkPin = async function (pin) {
+    const want = pinHash();
+    if (!want) return true;
+    const r = await U.secretCheck('smokebox.v1:', pin, want);
+    let ok = r.ok;
+    if (!ok && !(g.crypto && g.crypto.subtle) && want.indexOf('sha256:') === 0) ok = (await legacyPinHash(pin)) === want;      // no browser crypto: the pure copy
+    if (ok && r.legacy) {
+      try { const fresh = await U.secretHash('smokebox.v1:', pin); if (fresh) SB.store.dispatch('updateSettings', { patch: { office: { pinHash: fresh } } }, { source: 'user' }); } catch (e) { /* the old form keeps working */ }
+    }
+    return ok;
+  };
   // Sets (4 digits) or removes (null or '') the manager PIN. Only the scramble is saved, through the store
   // (settings.office.pinHash); any unlock is forgotten. Resolves {ok, report}; bad input gives 'badPin'.
   // Asks for the current PIN right now (the keypad), even inside the 2-minute grace. True at once when no PIN is set; false when cancelled.
@@ -37759,13 +37901,67 @@ a.of-nav:active { background: var(--press); }
     try { reload.focus(); } catch (e) { /* ignore */ }
   }
 
+  // Blocks the screen with a plain message when saved data could not be read AND could not be copied aside (the browser store is full). The
+  // damaged text is offered as a file; nothing is written over it until the person says they have saved it.
+  function showHeldData(text) {
+    const wrap = doc.createElement('div');
+    wrap.id = 'held-data'; wrap.setAttribute('role', 'alertdialog');
+    wrap.style.cssText = 'position:fixed;inset:0;overflow:auto;padding:16px;background:#F5F2EB;color:#1E2224;font-family:system-ui,sans-serif;z-index:99999';
+    const card = doc.createElement('div'); card.className = 'error-card';
+    const h2 = doc.createElement('h2'); h2.textContent = 'Your saved data could not be read, and could not be kept safe';
+    const p = doc.createElement('p'); p.textContent = 'This browser is too full to set the old data aside, so Smokebox has not touched it. Nothing new will be saved on this device until you choose below. Download the old data now and keep the file. Then free some space, or continue and let Smokebox replace the old data.';
+    const row = doc.createElement('div'); row.className = 'row';
+    const dl = doc.createElement('button'); dl.type = 'button'; dl.className = 'btn btn-primary'; dl.textContent = 'Download the old data';
+    dl.addEventListener('click', () => {
+      try {
+        const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' }));
+        const a = doc.createElement('a'); a.href = url; a.download = 'smokebox-damaged-data.json'; doc.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => { try { g.URL.revokeObjectURL(url); } catch (e) { /* ignore */ } }, 5000);
+      } catch (e) { box.hidden = false; box.focus(); }
+    });
+    const go = doc.createElement('button'); go.type = 'button'; go.className = 'btn'; go.textContent = 'I have the file: continue and replace it';
+    go.addEventListener('click', () => { try { SB.store.releaseHold(); } catch (e) { /* ignore */ } wrap.remove(); });
+    const box = doc.createElement('textarea'); box.readOnly = true; box.hidden = true; box.value = text; box.rows = 8; box.style.cssText = 'width:100%;margin-top:12px';
+    box.setAttribute('aria-label', 'The old data, to copy by hand');
+    row.append(dl, go);
+    card.append(h2, p, row, box);
+    wrap.appendChild(card);
+    doc.body.appendChild(wrap);
+    try { dl.focus(); } catch (e) { /* ignore */ }
+  }
+
+  // Watches for a device clock that jumped far ahead (or saved times far ahead of it) and asks the owner, once per episode, whether the new time is right.
+  function watchClock() {
+    let asking = false, toldWrong = false;
+    setInterval(() => {
+      try {
+        const s = SB.store.status();
+        if (s.clockWrong && !toldWrong && SB.ui && SB.ui.toast) { toldWrong = true; SB.ui.toast("This device's clock looks wrong: some saved times are far ahead of it. Smokebox kept the device clock. Check the date and time in the device's settings.", { tone: 'warn', ms: 20000 }); }
+        if (!s.clockSuspect || asking || !SB.ui || !SB.ui.confirm) return;
+        asking = true;
+        const days = Math.round(s.clockSuspect.aheadMs / 86400000);
+        SB.ui.confirm({ title: "This device's clock jumped ahead", body: ["The date or time on this device just moved ahead by about " + (days >= 2 ? days + ' days' : Math.round(s.clockSuspect.aheadMs / 3600000) + ' hours') + '. Smokebox is still counting from the old time so no batch is thrown out by mistake.', 'If the new time is right (the device was off or asleep that long), choose Use the new time. If the clock is wrong, fix it in the device settings and choose Keep the old time.'], confirmLabel: 'Use the new time', cancelLabel: 'Keep the old time', tone: 'danger' })
+          .then((yes) => { if (yes) { SB.store.acceptClockJump(); asking = false; } else setTimeout(() => { asking = false; }, 10 * 60e3); });
+      } catch (e) { /* the watcher must never break the board */ }
+    }, 5000);
+  }
+
   // Tells the person, once at start-up, when the saved board was unreadable, was repaired, or cannot be saved in this
   // browser (private windows block storage). Silent when everything is fine.
   function storageNotices() {
     const s = SB.store && typeof SB.store.status === 'function' ? SB.store.status() : null;
     if (!s || !SB.ui || typeof SB.ui.toast !== 'function') return;
+    if (s.heldInMemory && SB.store.damagedText && SB.store.damagedText()) { showHeldData(SB.store.damagedText()); return; }
     if (s.corrupt && s.restoredFromCopy) SB.ui.toast('Your saved board could not be read, so Smokebox restored the last good copy from ' + new Date(s.restoredFromCopy).toLocaleString() + '. Orders and history after that time are missing. A copy of the damaged data was kept in this browser.', { tone: 'warn', ms: 20000 });
     else if (s.corrupt) SB.ui.toast('Your saved board could not be read, so Smokebox started with an empty board. A copy of the old data was kept on this device.', { tone: 'warn', ms: 15000 });
+    else if (s.droppedCount) {
+      const d = s.droppedCount, bits = [];
+      if (d.orders) bits.push(d.orders + (d.orders === 1 ? ' order' : ' orders'));
+      if (d.tickets) bits.push(d.tickets + (d.tickets === 1 ? ' ticket' : ' tickets'));
+      if (d.batches) bits.push(d.batches + (d.batches === 1 ? ' batch' : ' batches'));
+      if (d.other) bits.push(d.other + (d.other === 1 ? ' other saved item' : ' other saved items'));
+      SB.ui.toast('Smokebox could not read some saved records and left out ' + bits.join(', ') + ' while opening. The data as it was has been kept on this device. Ask whoever set up Smokebox to look at it before you close the page for good.', { tone: 'warn', ms: 20000 });
+    }
     else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox updated a few saved settings while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
     if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }
@@ -37795,6 +37991,7 @@ a.of-nav:active { background: var(--press); }
       SB.booted = true;
       startOffline();
       storageNotices();
+      watchClock();
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });
     } catch (e) { showBootError(e, stage); }

@@ -18,6 +18,8 @@
   const CORRUPT_KEY = 'smokebox.v1.corrupt';
   // When the damaged copy was set aside (a time), so it can be cleared after 30 days.
   const CORRUPT_AT_KEY = 'smokebox.v1.corruptat';
+  const DROPPED_KEY = 'smokebox.v1.dropped';          // the saved text exactly as it was before a repair at load threw records away
+  const DROPPED_AT_KEY = 'smokebox.v1.droppedat';
   // One small rolling copy of the last good state (menu, ingredients, settings, PIN, safety records, recent history).
   const LASTGOOD_KEY = 'smokebox.v1.lastgood';
   // The owner's answer to the one-time offer to clear old demo tickets: true once they chose to keep them.
@@ -91,6 +93,9 @@
   let mode = 'real', strict = false, baseStorage = null, reloadFn = null;
   // snapAt is when the rolling copy was last taken (real time); snapWanted is set by close day so the next save takes one.
   let snapAt = 0, snapWanted = null;
+  let writeBlocked = false, heldText = null;     // set when a damaged save could not be copied aside: nothing is written over it
+  let susp = null;           // a big forward jump of the device clock that has not been accepted: { r0 first reading, base trusted time }
+  const CLOCK_JUMP_MAX_MS = 36 * 3600e3;     // a forward step bigger than this (a tablet asleep for a day and a half) needs the owner's yes
   let last = null;
   let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: 400 };
   const tabId = 'tab_' + Math.floor(Math.random() * 1e9).toString(36);
@@ -105,9 +110,26 @@
     // Never go backwards (rule I9): if the real clock steps back or gives garbage, the last time is
     // repeated.
     if (!isNum(v)) v = lastNow;
+    // A real kitchen does not follow a big forward jump of the device clock by itself (a dead clock battery, a wrong date): it keeps counting from
+    // the last trusted time, says so in the status, and waits for the owner to accept the new time. A jump that goes away again changes nothing.
+    if (strict && mode === 'real' && clk.speed === 1) {
+      if (v - lastNow > CLOCK_JUMP_MAX_MS) {
+        if (!susp) susp = { r0: r, base: lastNow };
+        st.clockSuspect = { aheadMs: v - lastNow, since: susp.r0 };
+        v = susp.base + Math.max(0, r - susp.r0);
+      } else if (susp) { susp = null; st.clockSuspect = null; }
+    }
     if (v < lastNow) v = lastNow;
     lastNow = v;
     return v;
+  }
+  // Accepts the device clock's new time after a big jump (the owner says it is right). Does nothing when there is no jump waiting.
+  function acceptClockJump() {
+    if (!susp) return false;
+    const r = realNow();
+    clk = { base: Math.floor(r), realBase: r, speed: 1 }; lastNow = Math.floor(r); susp = null; st.clockSuspect = null;
+    schedulePersist(false); scheduleNotify();
+    return true;
   }
   // Sets the demo speed (0.1 to 1000, where 1 is real time). Re-bases the clock first so the time does not
   // jump. Returns false for a bad speed.
@@ -125,6 +147,8 @@
   function atLeast(t) { // move the clock forward so it is not behind stamps in a loaded state
     if (!isNum(t)) return;
     const v = now();
+    // Stamps far ahead of the clock do not move it in a real kitchen: the clock is wrong, not the data.
+    if (strict && mode === 'real' && t - v > CLOCK_JUMP_MAX_MS) { st.clockWrong = { aheadMs: t - v }; return; }
     if (t > v) { clk = { base: t, realBase: realNow(), speed: clk.speed }; lastNow = t; }
   }
   // Newest time found in a state: the last event or one of the last 50 tickets (tickets run oldest to
@@ -191,6 +215,8 @@
     if (fol) return true;                             // a follower never saves anything
     if (!storage || !state) return false;
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    // The saved text is a damaged copy nobody could keep elsewhere: it stays exactly as it is until the owner has saved it.
+    if (writeBlocked) { st.lastSaveOk = false; return false; }
     // If another tab saved since this tab last loaded or saved, build on its copy first so nothing is lost.
     if (skipRebase) skipRebase = false; else rebaseIfStale();
     const r = realNow();
@@ -518,7 +544,7 @@
     baseStorage = given || U.rawStorage;
     storage = given ? (strict && mode === 'demo' ? U.storageFor(given, 'demo') : given) : (strict ? U.storageFor(U.rawStorage, mode) : U.storage);
     st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: SAVE_MS };
-    last = null;
+    last = null; writeBlocked = false; heldText = null; susp = null;
     baseSid = null; pending = []; skipRebase = false;
     outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
     const r = realNow();
@@ -534,14 +560,23 @@
     let loaded = null;
     if (unreadable !== null) {
       st.corrupt = 'The saved data is not readable text.';
-      try { storage.set(CORRUPT_KEY, unreadable); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
+      if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, unreadable, r)) { writeBlocked = true; heldText = unreadable; st.heldInMemory = true; }
     } else if (payload != null) {
       const v = E().validateBackup(payload);
       // A saved copy that fails the check is parked under CORRUPT_KEY and the app starts fresh. It never
       // crashes on bad storage.
-      if (v.ok) { loaded = v.state; st.repaired = v.repaired; } else {
+      if (v.ok) {
+        loaded = v.state; st.repaired = v.repaired;
+        // Records the check threw away are not gone for good: the text as it was is kept, and the status counts what was dropped.
+        const dc = droppedCounts(v.repaired);
+        if (dc) {
+          st.droppedCount = dc;
+          const raw = rawOf(payload);
+          if (!parkText(DROPPED_KEY, DROPPED_AT_KEY, payload, r)) { writeBlocked = true; heldText = raw; st.heldInMemory = true; }
+        }
+      } else {
         st.corrupt = v.error;
-        try { storage.set(CORRUPT_KEY, payload); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
+        if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, payload, r)) { writeBlocked = true; heldText = rawOf(payload); st.heldInMemory = true; }
       }
     } else st.firstRun = true;
     // A damaged save: the rolling last-good copy takes its place (real kitchens), and the damaged one stays set aside.
@@ -554,6 +589,8 @@
       try {
         const at = storage.get(CORRUPT_AT_KEY, null);
         if (isNum(at) && r - at > CORRUPT_KEEP_MS) { storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); st.corruptCleared = true; }
+        const da = storage.get(DROPPED_AT_KEY, null);
+        if (isNum(da) && r - da > CORRUPT_KEEP_MS && !st.droppedCount) { storage.remove(DROPPED_KEY); storage.remove(DROPPED_AT_KEY); }
       } catch (e) { /* ignore */ }
     }
     try { const g0 = storage.get(LASTGOOD_KEY, null); snapAt = g0 && isNum(g0.takenAt) ? g0.takenAt : 0; } catch (e) { snapAt = 0; }
@@ -562,7 +599,7 @@
     // never earlier than the real time. Speed goes back to 1.
     let vNow = r;
     const c = payload && payload.clock;
-    if (loaded && c && isNum(c.virtual)) vNow = Math.max(r, c.virtual + Math.max(0, r - (isNum(c.real) ? c.real : r)));
+    if (loaded && c && isNum(c.virtual) && !(strict && mode === 'real')) vNow = Math.max(r, c.virtual + Math.max(0, r - (isNum(c.real) ? c.real : r)));   // a real kitchen always starts from the device clock
     vNow = Math.floor(vNow);
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
@@ -576,7 +613,7 @@
     const t = E().tick(state, now());
     state = t.state;
     syncUnits();
-    if (st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
+    if (st.corrupt && !writeBlocked) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
     if (!opts.noTimers && typeof setInterval === 'function') interval = setInterval(tickNow, 1000);
     if (!opts.noSync) openTransport(opts.transport);
     if (!opts.noTimers) {
@@ -584,6 +621,26 @@
       if (g.document && typeof g.document.addEventListener === 'function') on(g.document, 'visibilitychange', () => { if (g.document.visibilityState === 'hidden') flushIfDirty(); });
     }
     return status();
+  }
+  // Keeps a copy of damaged or about-to-be-repaired data under its own key. True only when the copy was really written; a full browser store says no.
+  function parkText(key, atKey, value, at) {
+    try { if (storage.set(key, value) === false) return false; storage.set(atKey, at); return true; } catch (e) { return false; }
+  }
+  // The exact saved text for a payload, so a person can download what could not be kept safe.
+  function rawOf(payload) {
+    try { const raw = typeof storage.raw === 'function' ? storage.raw(KEY) : null; if (raw != null) return raw; } catch (e) { /* fall back to the parsed copy */ }
+    try { return JSON.stringify(payload); } catch (e) { return ''; }
+  }
+  // Counts what a repair dropped, in words a person knows; null when it dropped nothing.
+  function droppedCounts(repaired) {
+    const c = { tickets: 0, orders: 0, batches: 0, other: 0 };
+    let any = false;
+    for (const x of Array.isArray(repaired) ? repaired : []) {
+      if (!/^dropped\b/.test(x)) continue;
+      any = true;
+      if (/ticket/.test(x)) c.tickets++; else if (/order/.test(x)) c.orders++; else if (/batch/.test(x)) c.batches++; else c.other++;
+    }
+    return any ? c : null;
   }
   // A copy of the save status plus the current speed: persistent, lastSaveOk, lastSaveAt, corrupt, firstRun,
   // trimmed, repaired, speed.
@@ -1641,7 +1698,9 @@
   }
   // The stored form of a recovery code: a salted SHA-256 (only this is ever saved, never the code).
   async function hashCode(plain) {
-    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);
+    const salted = await U.secretHash('smokebox-recovery-v1:', plain);
+    if (salted !== null) return salted;
+    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);     // a browser without PBKDF2 keeps the old plain form
     return hex === null ? null : 'sha256:' + hex;
   }
   // True when a back office PIN is set.
@@ -1678,10 +1737,10 @@
     if (rec.until > t) return { ok: false, report: 'recoveryLocked', info: { waitMs: rec.until - t } };
     if (rec.until && rec.until <= t) rec = { fails: 0, until: 0 };
     const plain = normalizeCode(code);
-    const hash = plain ? await hashCode(plain) : null;
-    if (plain && hash === null) return { ok: false, report: 'noCrypto', info: {} };
     const stored = state.settings.office.recoveryHash;
-    if (!plain || hash !== stored) {
+    const chk = plain ? await U.secretCheck('smokebox-recovery-v1:', plain, stored) : { ok: false };
+    if (plain && !chk.ok && !(g.crypto && g.crypto.subtle)) return { ok: false, report: 'noCrypto', info: {} };
+    if (!plain || !chk.ok) {
       rec.fails++;
       const locked = rec.fails >= RECOVERY_TRIES;
       if (locked) rec = { fails: 0, until: t + RECOVERY_LOCK_MS };
@@ -1710,6 +1769,9 @@
     if (mode === 'demo') return fail('notInDemo');
     if (typeof opts.confirm !== 'string' || opts.confirm.trim().toUpperCase() !== START_OVER_WORD) return fail('confirmWord', { word: START_OVER_WORD });
     if (opts.keepSettings != null && typeof opts.keepSettings !== 'boolean') return fail('badPatch', { key: 'keepSettings' });
+    // The screen must say a backup file was really saved (its name and size) before anything is erased.
+    const bs = opts.backupSaved;
+    if (!bs || typeof bs !== 'object' || typeof bs.filename !== 'string' || !bs.filename.trim() || !(Number.isFinite(bs.chars) && bs.chars > 0)) return fail('backupRequired');
     const keep = opts.keepSettings !== false;
     const text = exportAll();
     if (text == null) { const lr = last || {}; return fail(lr.report || 'invalidBackup', lr.info); }
@@ -1776,7 +1838,7 @@
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
