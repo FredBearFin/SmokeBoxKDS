@@ -13,6 +13,8 @@
   // True only for a real, finite number (not text, not "not a number", not infinity).
   // Used before any maths on values that may be missing.
   U.isNum = (n) => typeof n === 'number' && isFinite(n);
+  // The folder the page was served from as an address prefix ('' at the site root, '/beta' behind a path prefix), for calls to its own hub.
+  U.pageFolder = (g) => { try { const p = g && g.location && typeof g.location.pathname === 'string' ? g.location.pathname : '/'; return p.replace(/[^/]*$/, '').replace(/\/+$/, ''); } catch (e) { return ''; } };
   // Forces a number into the range lo to hi, so clamp(15, 0, 10) gives 10.
   U.clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   // Slides from a to b by the fraction t (t = 0 gives a, t = 1 gives b).
