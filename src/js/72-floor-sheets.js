@@ -466,6 +466,8 @@
       askWho(opener, type === 'coldTakeOut' ? 'Take out' : 'Put back', (who) => {
         const res = run(type, who ? { batchId: id, who } : { batchId: id });
         if (res.report !== 'ok') { toast(say(res), 'warn'); return; }
+        // When the move itself ended the batch (its limit had just run out), the cook is told so in the engine's own words.
+        if (res.info && res.info.discarded) { toast((b.label || 'Batch') + ': ' + (res.info.words || 'Past your limit, so it was thrown out.'), 'warn'); return; }
         undoToast((b.label || 'Batch') + (type === 'coldTakeOut' ? ' taken out. The out-of-fridge clock is running.' : ' put back. The out-of-fridge clock is paused.'));
       });
     }

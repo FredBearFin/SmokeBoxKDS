@@ -1552,6 +1552,28 @@
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
     tell(PH('expire', { who, many, mins, goes86: first.goes86, approx: top.level === 2 }));
   }
+  // Says a cold item's low-time row once when it first shows (or gets worse), in plain words that name the owner's limit.
+  // The first pass after the board opens only remembers what is already there, so a reload does not read old news aloud.
+  function sayColdRows(all) {
+    if (!m.coldSaid) m.coldSaid = new Set();
+    const live = new Set(), fresh = [];
+    for (const d of all) {
+      if (d.kind !== 'coldOut' && d.kind !== 'coldDate') continue;
+      const key = d.id + ':' + d.sev;
+      live.add(key);
+      if (!m.coldSaid.has(key)) { m.coldSaid.add(key); fresh.push(d); }
+    }
+    for (const k of Array.from(m.coldSaid)) if (!live.has(k)) m.coldSaid.delete(k);
+    if (!m.coldPrimed) { m.coldPrimed = true; return; }
+    if (!fresh.length || !isLeader()) return;
+    const d = fresh.sort((x, y) => x.msLeft - y.msLeft)[0];
+    const mins = Math.max(0, Math.round(d.msLeft / 60e3));
+    const text = d.kind === 'coldOut'
+      ? d.label + (d.msLeft > 0 ? ': ' + mins + (mins === 1 ? ' minute' : ' minutes') + ' left of your out-of-fridge limit.' : ' is past your out-of-fridge limit.')
+      : d.label + ': the last day of your fridge limit ends at midnight.';
+    chime(); speak(text);
+    if (m.strip && m.strip.announce) m.strip.announce.textContent = text;
+  }
   // A tap on a strip row counts as seeing it: the loud tone stops until the next rung.
   function acknowledge(key) { saveAlertRecord({ t: store().now(), id: key, ack: true }); ladder.acknowledge(key); pending.forget(key); if (lead.coordinated && SB.store.broadcast) SB.store.broadcast({ type: 'alert-ack', id: key }); }
   // Rewrites the strip from the deadline feed: the top three rows, or hidden when the feed is empty.
@@ -1568,6 +1590,7 @@
       let late = [];
       if (lead.needDrain && isLeader()) { lead.needDrain = false; late = pending.drain(all, (id) => ladder.isAcked(id)); }
       playCalls(late.concat(calls));
+      sayColdRows(all);
     }
     // Info rows only show for batches and run-outs; an expired notice goes away once someone taps it.
     // The strip is for what needs a cook soon: a row waits until the deadline is within the hour (or is already bad, past or out), so a quiet kitchen has no strip.
