@@ -405,6 +405,11 @@
       const bUnkeep = h('button', { type: 'button', class: 'btn', dataset: { act: 'unkeep' }, hidden: true }, ico('x', 20), h('span', null, 'Correct: not kept'));
       const dtKept = h('dt', null, 'Kept serving'), ddKept = h('dd', { class: 'num' });
       dtKept.hidden = true; ddKept.hidden = true;
+      // A cold item kept in a fridge has a Take out / Put back main action and a line that says how long it has been out.
+      const bOut = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'take-out' }, hidden: true }, ico('arrow-right', 20), h('span', null, 'Take out'));
+      const bBack = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'put-back' }, hidden: true }, ico('snow', 20), h('span', null, 'Put back'));
+      const coldLine = h('p', { class: 'hc-cold', hidden: true });
+      const dtSince = h('dt', null, 'In the cabinet since');
       const pullT = h('span', null, 'Pull');
       const bPull = h('button', { type: 'button', class: 'btn', dataset: { act: 'pull' }, hidden: true }, ico('package', 20), pullT);
       // Early warnings can be put off ("remind me later") while a batch is still on the menu and its last warning is not yet due.
@@ -414,16 +419,17 @@
       const bUnsnooze = h('button', { type: 'button', class: 'btn', dataset: { act: 'unsnooze' }, hidden: true }, ico('x', 20), unsnoozeT);
       // One main action per card; every other action sits behind the "..." button so all cards look the same.
       const bMore = h('button', { type: 'button', class: 'btn btn-icon hc-more', dataset: { act: 'more' }, 'aria-label': 'More for this batch', title: 'More', hidden: true }, ico('more', 22));
-      const actions = h('div', { class: 'hc-actions' }, bKeep, bUnkeep, bSnooze, bUnsnooze, bPull, bLog, bReheat, bCool, bDiscard, bMore);
+      const actions = h('div', { class: 'hc-actions' }, bKeep, bOut, bBack, bUnkeep, bSnooze, bUnsnooze, bPull, bLog, bReheat, bCool, bDiscard, bMore);
       const editorSlot = h('div', { class: 'hc-editor-slot' });
       // Card layout: heading, ring and facts, message and lock note, cooling steps, then the buttons.
       const el = h('article', { class: 'hc-card', dataset: { batch: b.id, tone: 'ok' }, 'aria-label': 'Batch' },
         h('header', { class: 'hc-head' }, h('div', { class: 'hc-title' }, kindEl, name, srcChip), status),
         h('div', { class: 'hc-body' }, ring,
           h('div', { class: 'hc-facts' }, h('div', { class: 'hc-stock' }, meter, stockT),
-            h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, h('dt', null, 'In the cabinet since'), ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept))),
-        costLine, msg, lock, cool, actions, editorSlot);
-      rec.bMore = bMore; rec.acts = [bKeep, bReheat, bLog, bUnkeep, bSnooze, bUnsnooze, bPull, bCool, bDiscard];
+            h('dl', { class: 'fs-dl hc-dl' }, h('dt', null, 'Last reading'), ddLast, dtNext, ddNext, dtSince, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept))),
+        coldLine, costLine, msg, lock, cool, actions, editorSlot);
+      rec.bMore = bMore; rec.bOut = bOut; rec.bBack = bBack; rec.coldLine = coldLine; rec.dtSince = dtSince;
+      rec.acts = [bKeep, bOut, bBack, bReheat, bLog, bUnkeep, bSnooze, bUnsnooze, bPull, bCool, bDiscard];
       Object.assign(rec, { el, name, kindEl, srcChip, status, ring, ringT, ringS, meter, stockT, ddLast, dtNext, ddNext, ddSince, dtServe, ddServe, dtRest, ddRest, dtKept, ddKept, bKeep, bUnkeep, bSnooze, bUnsnooze, unsnoozeT, costLine, msg, msgIcon, msgT, lock, cool, step1, step2, bPull, pullT, bLog, bReheat, bCool, bDiscard, editorSlot });
       // The "..." button lists the secondary actions that are available right now; choosing one presses that button.
       bMore.addEventListener('click', () => {
@@ -435,6 +441,8 @@
       bCool.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openCooling(bb, bCool); });
       bDiscard.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) openDiscard(bb, bDiscard); });
       bPull.addEventListener('click', () => { const bb = batchOf(rec.id); if (bb) pullFrom(bb); });
+      bOut.addEventListener('click', () => moveCold(rec.id, 'coldTakeOut', bOut));
+      bBack.addEventListener('click', () => moveCold(rec.id, 'coldReturn', bBack));
       bKeep.addEventListener('click', () => openKeep(rec.id, bKeep));
       bUnkeep.addEventListener('click', () => openUnkeep(rec.id, bUnkeep));
       // Puts the early warnings off for 10 minutes, or cancels that, and says what happened.
@@ -450,6 +458,16 @@
       const rest = (x) => (U.isNum(x.restUntil) && x.restUntil > now ? 1 : 0);
       // The source is the first in line: ready batches before resting ones, then the oldest.
       return !st().batches.some((x) => x !== b && x.ing === b.ing && x.remainingG > 0 && x.canServe === true && x.status !== 'discard' && x.kind !== 'cooling' && (rest(x) < rest(b) || (rest(x) === rest(b) && x.enteredAt < b.enteredAt)));
+    }
+    // Takes a cold item out of the fridge or puts it back (asks for initials once), then says what happened with Undo.
+    function moveCold(id, type, opener) {
+      const b = batchOf(id);
+      if (!b) return;
+      askWho(opener, type === 'coldTakeOut' ? 'Take out' : 'Put back', (who) => {
+        const res = run(type, who ? { batchId: id, who } : { batchId: id });
+        if (res.report !== 'ok') { toast(say(res), 'warn'); return; }
+        undoToast((b.label || 'Batch') + (type === 'coldTakeOut' ? ' taken out. The out-of-fridge clock is running.' : ' put back. The out-of-fridge clock is paused.'));
+      });
     }
     // Takes one set unit (the product's pull size) out of the cabinet, oldest batch first, with Undo.
     function pullFrom(b) {
@@ -476,6 +494,8 @@
       const S = safety();
       const gt = E().gate(b, now, S);
       const sv = statusView(b, gt);
+      // Plain facts for a cold item kept in a fridge (null for every other batch, so hot cards stay as they were).
+      const ci = typeof E().coldInfo === 'function' ? E().coldInfo(b, now) : null;
       text(rec.name, b.label || 'Batch');
       attr(rec.el, 'aria-label', (b.label || 'Batch') + ': ' + sv.word);
       if (rec.kindKey !== b.kind) { rec.kindKey = b.kind; U.clear(rec.kindEl); rec.kindEl.append(ico(KIND_ICON[b.kind] || 'flame', 18), h('span', null, KIND_WORD[b.kind] || 'Hold')); }
@@ -493,6 +513,14 @@
       attr(rec.ring, 'data-tone', frac >= 1 ? 'bad' : frac >= 0.75 ? 'warn' : 'ok');
       text(rec.ringT, hmShort(elapsed)); text(rec.ringS, 'of ' + trimNum(limitMs / H1) + ' h');
       attr(rec.ring, 'aria-label', (b.kind === 'cooling' ? 'Time cooling: ' : 'Time in the cabinet: ') + hmLong(elapsed) + ' of ' + trimNum(limitMs / H1) + ' hours');
+      // A cold item's ring counts the time out of the fridge against the owner's hours (no ring fill when no hours are set).
+      if (ci) {
+        const f2 = ci.outHours ? ci.outMs / (ci.outHours * H1) : 0, v2 = Math.min(100, f2 * 100).toFixed(1);
+        if (rec.ring._v !== v2) { rec.ring._v = v2; rec.ring.style.setProperty('--v', v2); }
+        attr(rec.ring, 'data-tone', ci.state === 'bad' ? 'bad' : ci.state === 'warn' ? 'warn' : 'ok');
+        text(rec.ringT, hmShort(ci.outMs)); text(rec.ringS, ci.outHours ? 'of ' + trimNum(ci.outHours) + ' h out' : 'out, no limit');
+        attr(rec.ring, 'aria-label', 'Time out of the fridge: ' + hmLong(ci.outMs) + (ci.outHours ? ' of ' + trimNum(ci.outHours) + ' hours' : ', no limit set'));
+      }
 
       // what is left
       const left = b.cookedG > 0 ? Math.max(0, Math.min(1, b.remainingG / b.cookedG)) : 0;
@@ -503,10 +531,33 @@
       // facts
       text(rec.ddLast, U.isNum(b.lastTempF) ? fmtF(b.lastTempF) + ', ' + agoText(now - b.lastTempAt) + (lastCheckBy(b.id) ? ', checked by ' + lastCheckBy(b.id) : '') : 'No reading yet');
       text(rec.ddSince, U.fmtTime(b.enteredAt));
+      attr(rec.el, 'data-cold', ci ? 'on' : 'off');
+      if (ci) {
+        // "In the fridge since <date>, made <date>": the day it went back in (or the day it was made) and the made-on day.
+        const sinceTs = U.isNum(b.movedAt) ? b.movedAt : b.enteredAt;
+        const made = ci.madeOn ? ', made ' + U.fmtDateShort(ci.madeOn) : '';
+        text(rec.dtSince, ci.place === 'line' ? 'Out of the fridge since' : 'In the fridge since');
+        text(rec.ddSince, ci.place === 'line' && ci.outSince ? U.fmtTime(ci.outSince) + made : U.fmtDateShort(U.dateKey(sinceTs)) + made);
+        const out = ci.outMs < 60e3 ? 'under 1 min' : hmLong(ci.outMs), outCap = out.charAt(0).toUpperCase() + out.slice(1);
+        const line = ci.place === 'line'
+          ? (ci.outHours ? outCap + ' out of your ' + trimNum(ci.outHours) + ' h limit' : 'Out for ' + out + ', no limit set')
+          : (ci.outMs > 0 ? 'In the fridge. ' + (ci.outHours ? out + ' out so far of your ' + trimNum(ci.outHours) + ' h limit' : 'Out for ' + out + ' so far, no limit set') : 'In the fridge. Not taken out yet' + (ci.outHours ? ' (your limit out of the fridge is ' + trimNum(ci.outHours) + ' h)' : ', no out-of-fridge limit set'));
+        const frac = ci.outHours ? ci.outMs / (ci.outHours * H1) : 0;
+        setHidden(rec.coldLine, false); text(rec.coldLine, line); attr(rec.coldLine, 'data-tone', ci.state === 'bad' || frac >= 1 ? 'bad' : frac >= 0.75 ? 'warn' : 'ok');
+      } else {
+        if (rec.dtSince.textContent !== 'In the cabinet since') text(rec.dtSince, 'In the cabinet since');
+        setHidden(rec.coldLine, true);
+      }
       // Serve-by time with the kind of limit it is: quality (house limit, held at temperature) or safety (time as a health control).
       const coolingNow = b.kind === 'cooling';
       setHidden(rec.dtServe, coolingNow); setHidden(rec.ddServe, coolingNow);
       if (!coolingNow) text(rec.ddServe, U.fmtTime(b.enteredAt + holdLimitMs(b)) + ', ' + (b.holdBasis === 'safety' ? 'throw-out time' : 'quality limit'));
+      // A cold item shows its fridge date instead: the last day in the fridge, or that no days were set.
+      if (ci) {
+        text(rec.dtServe, 'Fridge date');
+        text(rec.ddServe, ci.useBy ? 'Use by ' + U.fmtDateShort(ci.useBy) + ' (your ' + trimNum(ci.fridgeDays) + ' ' + plural(ci.fridgeDays, 'day') + ')' : 'No limit set');
+        setHidden(rec.dtServe, false); setHidden(rec.ddServe, false);
+      } else if (rec.dtServe.textContent !== 'Serve by') text(rec.dtServe, 'Serve by');
       const resting = U.isNum(b.restUntil) && b.restUntil > now && !coolingNow;
       setHidden(rec.dtRest, !resting); setHidden(rec.ddRest, !resting);
       if (resting) text(rec.ddRest, U.fmtTime(b.restUntil));
@@ -530,8 +581,9 @@
       else {
         const due = (U.isNum(b.lastTempAt) ? b.lastTempAt : b.enteredAt) + S.tempCheckEveryMin * 60000;
         text(rec.dtNext, 'Next reading');
-        text(rec.ddNext, due - now >= 0 ? 'due in ' + hmLong(due - now) : 'overdue by ' + hmLong(now - due));
-        cls(rec.ddNext, 'is-late', due - now < 0);
+        const outNow = !!(ci && ci.place === 'line');
+        text(rec.ddNext, outNow ? 'Not needed while it is out' : due - now >= 0 ? 'due in ' + hmLong(due - now) : 'overdue by ' + hmLong(now - due));
+        cls(rec.ddNext, 'is-late', !outNow && due - now < 0);
       }
 
       // cost line (honest: starter numbers say so)
@@ -575,6 +627,9 @@
       if (showPull) { const pg = ingOf(b.ing); text(rec.pullT, 'Pull ' + qtyText(pg, Math.min(b.remainingG, pg && U.isNum(pg.pullG) ? pg.pullG : 1000))); }
       cls(rec.bLog, 'btn-primary', gt.action === 'CHECK_TEMP');
       setHidden(rec.bReheat, gt.action !== 'REHEAT_IMMEDIATE');
+      // Take out while it is in the fridge, Put back while it is out; neither once the batch is thrown out.
+      setHidden(rec.bOut, !(ci && ci.place === 'fridge' && b.status !== 'discard'));
+      setHidden(rec.bBack, !(ci && ci.place === 'line' && b.status !== 'discard'));
       setHidden(rec.bCool, !(b.kind === 'hot' && b.remainingG > 0 && gt.action !== 'DISCARD_LOCKOUT'));
       layoutActions(rec);
       if (rec.ed && rec.mode) refreshHint(rec, b);
@@ -583,7 +638,7 @@
 
     // Picks the one main button of a card (taste and keep, then reheat, then log temp) and moves the others behind "...".
     function layoutActions(rec) {
-      const main = [rec.bKeep, rec.bReheat, rec.bLog].find((a) => !a.hidden) || rec.bLog;
+      const main = [rec.bKeep, rec.bReheat, rec.bOut, rec.bBack, rec.bLog].find((a) => !a.hidden) || rec.bLog;
       rec.primary = main;
       let others = 0;
       rec.acts.forEach((a) => { const sec = a !== main; if (a.classList.contains('hc-sec') !== sec) a.classList.toggle('hc-sec', sec); if (sec && !a.hidden) others++; });
