@@ -4114,7 +4114,8 @@
         if (!isNum(out.remainingG) || out.remainingG < 0) { out.remainingG = 0; repaired.push('batch ' + b.id + '.remainingG clamped'); }
         if (!hasOwn(BATCH_STATUS, out.status)) out.status = 'check';
         if (out.status === 'discard') { out.canServe = false; out.remainingG = 0; out.action = 'DISCARD_LOCKOUT'; if (DISCARD_REASONS.indexOf(out.discardReason) < 0) out.discardReason = 'other'; if (!isNum(out.discardedAt)) out.discardedAt = out.enteredAt; }
-        if (typeof out.canServe !== 'boolean' || out.kind === 'cooling') out.canServe = out.kind === 'cooling' ? false : !!out.canServe;
+        // Only a real true counts: anything else (the text "false", a number) is read as not servable.
+        if (typeof out.canServe !== 'boolean' || out.kind === 'cooling') out.canServe = false;
         if (!isInt(out.reheats) || out.reheats < 0) out.reheats = 0;
         if (out.label !== undefined) { const lb = fitText(out.label, 40, 'batch ' + b.id + '.label', repaired); if (lb) out.label = lb; else delete out.label; }
         if (!Array.isArray(out.temps)) out.temps = [];
@@ -4134,6 +4135,13 @@
           if (isNum(out.outHours) && !(out.outHours > 0 && out.outHours <= 24)) delete out.outHours;
         }
         if (!hasOwn(SRC_BATCH, out.src)) out.src = 'cook';
+        // WATCH OUT: a stored "servable" is only trusted when the gate agrees at the batch's own last recorded moment. The
+        // gate can only get stricter as time passes, so food it locks then is locked now; the first tick finishes the job.
+        if (out.canServe === true && out.status !== 'discard') {
+          const refT = Math.max.apply(null, ['enteredAt', 'lastTempAt', 'outSince', 'lineSince', 'movedAt'].map((k) => (isNum(out[k]) ? out[k] : -Infinity)));
+          const gt = gate(out, refT, settings.safety);
+          if (!gt.canServe) { out.canServe = false; out.action = gt.action; if (gt.status !== 'discard') out.status = gt.status; repaired.push('batch ' + b.id + ' taken off the menu (its own readings say so)'); }
+        }
         bIds.add(b.id);
         batches.push(out);
       }

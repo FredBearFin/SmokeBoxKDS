@@ -131,3 +131,23 @@ test('Bram 4: a warm cooler or freezer and a thermometer that reads wrong are lo
   assert.equal(one('logThermometerCheck', { f: 205, method: 'boiling' }).ev.expectF, 212);
   assert.equal(one('logThermometerCheck', { f: 120, method: 'other' }).ev.outOfRange, undefined);
 });
+
+test('Bram 7: a restore never trusts a servable flag that is not a real true, or that the batch\'s own readings contradict', () => {
+  const a = ribsAt(T0 + 2 * H);
+  a.s.batches[0].canServe = 'false';
+  const va = E.validateBackup(JSON.stringify(a.s));
+  assert.equal(va.ok, true, va.error);
+  assert.equal(va.state.batches[0].canServe, false, 'the text "false" is not servable');
+  // below 135 F since hour 1, last reading at hour 4: past the 2-hour grace at its own last reading, yet stored as servable
+  const b = ribsAt(T0 + 4 * H);
+  Object.assign(b.s.batches[0], { outSince: T0 + H, lastTempF: 120, canServe: true, status: 'ok', action: 'NONE' });
+  const vb = E.validateBackup(JSON.stringify(b.s));
+  assert.equal(vb.ok, true, vb.error);
+  assert.equal(vb.state.batches[0].canServe, false);
+  assert.ok(vb.repaired.some((x) => /taken off the menu/.test(x)));
+  // a healthy batch keeps its flag and no repair is listed
+  const c = ribsAt(T0 + 2 * H);
+  const vc = E.validateBackup(JSON.stringify(c.s));
+  assert.equal(vc.state.batches[0].canServe, true);
+  assert.ok(!vc.repaired.some((x) => /taken off the menu/.test(x)));
+});
