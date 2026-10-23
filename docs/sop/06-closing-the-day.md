@@ -18,3 +18,4 @@ Closing does not lock anything. You can still take orders, and closing again lat
 - Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.
 - If your health department asks, save or print the thrown-out log. Open it from the **Menu** button on the board.
 - Keep a copy of the backup off this device (see Backup and restore).
+- For your accountant: in **Menu and settings**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other.

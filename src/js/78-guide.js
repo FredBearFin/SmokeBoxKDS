@@ -30,7 +30,7 @@
       "t": "ol",
       "x": [
        "A new Smokebox starts empty on purpose. Tap **Add your first dish** on the welcome screen.",
-       "Type what the dish is called and its price. Tap where it is made: Pit, Hot sides, Fry or Cold and drinks.",
+       "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made: Pit, Hot sides, Fry or Cold and drinks.",
        "Tap **Save and add another** until your menu is in. Then tap **Save and finish**."
       ]
      },
@@ -40,15 +40,11 @@
      },
      {
       "t": "p",
-      "x": "The arrow buttons beside each dish change the order they appear in."
+      "x": "The arrow buttons beside each dish change the order they appear in. The category list on a dish's row moves it to another category."
      },
      {
       "t": "p",
-      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**."
-     },
-     {
-      "t": "p",
-      "x": "For a one-minute walkthrough, tap **Show me how it works**."
+      "x": "Have your menu in a spreadsheet? In Dishes and prices, tap **Have a menu file? Import it**. Smokebox flags any row with a problem before adding anything. New categories in the file? Tap **Add these categories**."
      },
      {
       "t": "h",
@@ -56,15 +52,11 @@
      },
      {
       "t": "p",
-      "x": "Tap **Menu**, then **Dishes and prices**, then **Tax, hours and PIN** at the bottom. Enter your sales tax (0 if you charge none) and your opening hours. A PIN is optional. It keeps your cooks out of the back office."
+      "x": "Tap **Menu**, then **Tax, hours and PIN**. Enter your sales tax (0 if you charge none) and your opening hours. A PIN is optional. It keeps your cooks out of the back office."
      },
      {
       "t": "p",
       "x": "Cook food ahead and keep it hot or cold? Say so in **Dishes and prices** (see Cooked-ahead food and portions)."
-     },
-     {
-      "t": "p",
-      "x": "Temperatures show in °F and weights in kilograms. Change them in the **Back office**, under **Menu and settings**."
      },
      {
       "t": "h",
@@ -376,7 +368,8 @@
       "x": [
        "Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.",
        "If your health department asks, save or print the thrown-out log. Open it from the **Menu** button on the board.",
-       "Keep a copy of the backup off this device (see Backup and restore)."
+       "Keep a copy of the backup off this device (see Backup and restore).",
+       "For your accountant: in **Menu and settings**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other."
       ]
      }
     ]
@@ -455,6 +448,10 @@
      {
       "t": "p",
       "x": "A file that is not a valid backup is refused, and nothing is changed. A backup from the demo is refused too."
+     },
+     {
+      "t": "p",
+      "x": "Spreadsheet files, like the sales file, are for reading. You cannot restore from them."
      },
      {
       "t": "h",

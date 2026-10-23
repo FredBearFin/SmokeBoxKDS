@@ -129,3 +129,18 @@ Re-ran `tools/extract-strings.mjs`: 4,581 strings. Most open rows above now read
 | 20-engine.js:567, 25-deadlines.js:134 | `... or discard it.` | `... or throw it out.` (low priority) | A5 |
 
 My own files (74-floor-tour.js, 76-floor-discards.js, 83-office-safety.js, the Guide) have no open rows.
+
+## Final status (kds/deploy e7e9c93, checked in round 8)
+
+Re-ran `tools/extract-strings.mjs`: 4,649 strings. **Every row from rounds 5 to 7 has landed.** Searched the merged strings for each old phrase: "research report", "stage 1", "or discard it", "pretend tickets", "kept safe", "untick", "like tea or slaw", "Clear live data", "Ember or Paper", "Practice kitchen", "line screen" and "Tick " all return nothing. The Data page now uses Erase live data and Erase everything on both the buttons and the boxes.
+
+**Left, waiting for decisions (not errors):**
+| where | what | decision |
+|---|---|---|
+| 84-office-data.js:1750, 40-metrics.js:1690, 85-office-stock.js:451 | the fake channel sync: "Order-channel sync is simulated", "practice only", "simulated sync" | remove the strip (decisions-for-freddy.md, item 11) |
+| 72-floor-sheets.js:1686 to 1711 | demo tools still say "Reset live data" and "practice" | demo wording (item 4); the Data page says Erase |
+| 84-office-data.js:1594, 1708 | "practice" in the backup and erase sentences | item 4 |
+| 77-floor-setup.js:518, 84-office-data.js:616, 45-sim.js:881 | "made-up prices", "made-up starter", "made-up service days" | item 4 (one word for fake data) |
+| 84-office-data.js:1248 | "past best-by" in a Settings label | item 8 (best-by or quality limit, one word everywhere) |
+
+No new safety or compliance claims, no non-US spelling and no barbecue-only wording on a neutral screen turned up in the 68 strings added since round 6 (sales CSV, price read-back, "Reads as", "Add these categories", the Tax link in Menu).
