@@ -679,7 +679,7 @@
           else stats.set([
             { k: 'checks', label: 'Orders paid', value: fmt.num(s.checks, 0), note: isNum(s.avgCheck) ? fmt.money(s.avgCheck, 2) + ' average order' : '' },
             { k: 'net', label: 'Sales', value: fmt.money(s.net, 2), note: s.discounts > 0 ? fmt.money(s.discounts, 2) + ' given as discounts' : 'before tax and tips' },
-            { k: 'tax', label: 'Tax collected', value: fmt.money(s.tax, 2), note: s.tax > 0 ? '' : 'No tax rate is set' },
+            { k: 'tax', label: 'Tax collected', value: fmt.money(s.tax, 2), note: s.tax > 0 ? '' : (isNum(B.settings(ctx.dataset()).service.taxRatePct) && B.settings(ctx.dataset()).service.taxRatePct > 0 ? 'No tax on these orders' : 'No tax rate is set') },
             { k: 'tips', label: 'Tips', value: fmt.money(s.tips, 2), note: isNum(s.tipPct) ? fmt.pct(s.tipPct, 0) + ' of sales' : '' },
             { k: 'all', label: 'Total collected', value: fmt.money(s.collected, 2), note: 'sales, tax and tips' },
           ]);

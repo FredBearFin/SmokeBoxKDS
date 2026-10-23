@@ -200,7 +200,7 @@
     const WORDS = { ok: 'On track', warn: 'Slipping', bad: 'Needs attention' };
 
     const ringCard = page.card({
-      type: 'ring', span: 4, title: 'Checks kept on time', sub: 'Average of the two measures beside it',
+      type: 'ring', span: 4, title: 'Checks kept on time', sub: 'Average of the measures beside it that have readings',
       caption: 'One number for the whole night. Green is 90% or better; below 75% a check or two were being skipped.',
       empty: { title: 'No score yet', body: 'The score needs temperature checks or sanitize rounds to be logged in this range.', icon: 'shield-check' },
       // Compliance ring: the average of the two on-time rates, empty until a check is logged.
@@ -209,7 +209,7 @@
         if (!isNum(k.score)) return null;
         // Thresholds in percent: below 90 warns, below 75 breaches; inverted because a higher score is better.
         return { value: k.score * 100, max: 100, label: 'Checks kept', sub: 'Temperature checks and sanitize rounds on time', format: 'pct100', warn: 90, breach: 75, invert: true, words: WORDS, size: 188,
-          ariaLabel: 'Checks kept on time ' + fmt.pct(k.score, 0) + ', the average of temperature checks and sanitize rounds logged on time.' };
+          ariaLabel: 'Checks kept on time ' + fmt.pct(k.score, 0) + (k.tempChecks.count && k.sanitize.count ? ', the average of temperature checks and sanitize rounds logged on time.' : k.tempChecks.count ? ', from temperature checks alone; no sanitize rounds were logged.' : ', from sanitize rounds alone; no temperature checks were logged.') };
       },
     });
     const tempCard = page.card({
@@ -404,8 +404,8 @@
           const set = (k, t, d) => { B.setText(nodes[k].t, t); B.setText(nodes[k].d, d); };
           set('hot', 'Hot food stays at ' + T(S.hotHoldF) + ' or above', 'A pan reading below ' + T(S.hotHoldF) + ' must be reheated or thrown out. FDA Food Code 3-501.16; your local code applies.');
           set('cold', 'Cold food stays at ' + T(S.coldHoldF) + ' or below', 'A pan reading above ' + T(S.coldHoldF) + ' must be chilled again or thrown out.');
-          set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'The model Food Code (3-403.11) sets the 165 °F target. Reheating a batch only once is our own rule: if it drops below the limit again it is thrown out.');
-          set('hold', 'Each product has its own hold limit, never more than ' + (S.hardCapH) + ' hours', 'The throw-out time throws the batch out when it is reached. A quality limit is a house rule for food held at temperature: at the limit the batch is taken off the menu but stays on the board until someone tastes it, and it can be kept serving for 30 minutes or 1 hour at a time while a reading of ' + S.hotHoldF + ' F or higher (cold food ' + S.coldHoldF + ' F or lower) is logged within the check interval. Every extension is logged with who and when. The hard cap of ' + (S.hardCapH) + ' hours throws out any batch (products whose limit is at or above it have no quality stage). Slaw, potato salad and banana pudding start with a quality limit for the owner to confirm: if you hold them outside temperature control, make theirs a safety limit. Your local health department\'s rules apply to quality extensions. Brisket and pulled pork starter limits are placeholders for the owner to confirm.');
+          set('reheat', 'Reheat to ' + T(S.reheatF) + ', once only', 'The model Food Code (3-403.11) sets ' + T(165) + ' as the target' + (S.reheatF !== 165 ? '; yours is set to ' + T(S.reheatF) : '') + '. Reheating a batch only once is our own rule: if it drops below the limit again it is thrown out.');
+          set('hold', 'Each product has its own hold limit, never more than ' + (S.hardCapH) + ' hours', 'The throw-out time throws the batch out when it is reached. A quality limit is a house rule for food held at temperature: at the limit the batch is taken off the menu but stays on the board until someone tastes it, and it can be kept serving for 30 minutes or 1 hour at a time while a reading of ' + T(S.hotHoldF) + ' or higher (cold food ' + T(S.coldHoldF) + ' or lower) is logged within the check interval. Every extension is logged with who and when. The hard cap of ' + (S.hardCapH) + ' hours throws out any batch (products whose limit is at or above it have no quality stage). Slaw, potato salad and banana pudding start with a quality limit for the owner to confirm: if you hold them outside temperature control, make theirs a safety limit. Your local health department\'s rules apply to quality extensions. Brisket and pulled pork starter limits are placeholders for the owner to confirm.');
           set('grace', 'Grace of ' + S.belowHotGraceH + ' hours below ' + T(S.hotHoldF) + ' (cold food: ' + S.aboveColdGraceH + ' hours above ' + T(S.coldHoldF) + ')', 'The clock starts at the first reading outside the limit. After the grace time the batch is thrown out.');
           set('checks', 'A temperature reading every ' + U.minutesText(S.tempCheckEveryMin), 'A late reading is flagged and counted here. It does not stop service by itself.');
           set('sanitize', 'Sanitize food-contact surfaces every ' + S.sanitizeEveryH + ' hours', 'A late round is a warning on the line and counts against the checks-kept score. Four hours is our starting value; set the limit your health department gives you.');
