@@ -528,15 +528,20 @@
         // Opens the Menu and settings page, where a missing cost is entered.
         const go = kit.button({ label: 'Open Menu and settings', icon: 'sliders', onClick: () => ctx.navigate('data') });
         const goWrap = h('div', { class: 'ob-actions' }, go);
-        body.append(list, none, goWrap);
+        // How much of what sold the Food cost tile really covers, since it leaves out items with no cost.
+        const cov = h('p', { class: 'ob-note', hidden: true });
+        body.append(cov, list, none, goWrap);
         let last = '';
         // Lists items that sold with no cost, then items whose cost covers only part of their sales.
         const paint = (p) => {
           const rows = itemRows(p).filter((r) => r.sold > 0 && (r.cost === null || r.costCoverage === 0)).sort((a, b) => b.sold - a.sold);
           const partial = itemRows(p).filter((r) => r.sold > 0 && r.cost !== null && isNum(r.costCoverage) && r.costCoverage < 1);
           // A signature of what the list shows: if it is unchanged nothing is rebuilt, so there is no flicker.
-          const sig = JSON.stringify([rows.map((r) => [r.menuId, r.sold]), partial.map((r) => [r.menuId, r.costCoverage]), itemRows(p).length]);
+          const fc = M.foodCostPct(p), share = fc && isNum(fc.coverage) ? fc.coverage : null;
+          const sig = JSON.stringify([rows.map((r) => [r.menuId, r.sold]), partial.map((r) => [r.menuId, r.costCoverage]), itemRows(p).length, share]);
           if (sig === last) return; last = sig;
+          cov.hidden = !(share !== null && share < 0.995 && share > 0);
+          if (!cov.hidden) setText(cov, 'The Food cost figure at the top covers ' + fmt.pct(share, 0) + ' of the priced items sold. The rest have no cost on file, so the real food cost is not known for them.');
           U.clear(list);
           rows.forEach((r) => list.appendChild(h('li', { class: 'ob-li' },
             h('span', { class: 'ob-li-n' }, r.name),
@@ -782,7 +787,7 @@
 
     const salesOf = B.memoP((p) => M.sales(p));
     page.headline();
-    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu and settings (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Every figure is added up in whole cents from the paid orders themselves.');
+    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu and settings (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Food cost is ingredient cost as a share of menu price, counted only over items with a cost on file. Every figure is added up in whole cents from the paid orders themselves.');
 
     page.tiles([
       // The one main money figure: sales after discounts from paid orders (blank until an order is paid).
