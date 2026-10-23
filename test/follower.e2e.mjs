@@ -35,6 +35,7 @@ const p = await ctx.newPage();
 p.on('pageerror', (e) => errs.push(String(e)));
 // A short stale limit for the test (the real default is 45 s), set by wrapping the store call before the page boots.
 await p.addInitScript(() => { let wrapped = false; const tryWrap = () => { if (wrapped || !window.SB || !SB.store || !SB.store.initFollower) return; wrapped = true; const f = SB.store.initFollower; SB.store.initFollower = (o) => f(Object.assign({ staleMs: 6000 }, o)); }; const iv = setInterval(() => { tryWrap(); if (wrapped) clearInterval(iv); }, 1); });
+await p.addInitScript("window.__said = []; window.SpeechSynthesisUtterance = function (t) { this.text = t; }; Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { speak: (u) => window.__said.push(u.text), cancel() {}, getVoices: () => [{ name: 'Samantha', lang: 'en-US', localService: true }] } });");
 await p.goto(base + '/?follow');
 await p.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 15000 });
 const chip = () => p.evaluate(() => { const c = document.querySelector('.fl-fchip'); return c ? { text: c.innerText.replace(/\n/g, ' '), tone: c.dataset.tone, h: Math.round(c.getBoundingClientRect().height), fs: parseFloat(getComputedStyle(c).fontSize) } : null; });
@@ -70,6 +71,8 @@ check('the hub still holds exactly what the leader did (follower writes nothing)
 const keys = await p.evaluate(() => Object.keys(localStorage).filter((k) => /state|outbox|names|initials|dlog|lastbatch|menu/.test(k)));
 check('no "not saving" or backup banner on the follower', !/not saving|Back up now/.test(await p.evaluate(() => document.body.innerText)));
 check('the follower saves no kitchen data on this device', keys.length === 0, keys);
+await p.waitForTimeout(1500);
+check('the follower speaks nothing (no call-outs, no warnings) unless the owner turned sound on for this screen', (await p.evaluate(() => window.__said.length)) === 0, await p.evaluate(() => window.__said));
 check('the follower is silent unless turned on for this screen', (await p.evaluate(() => SB.floor.sound())) === false && !/turn on warning sounds/.test(await p.evaluate(() => document.body.innerText)));
 
 // Wall mode and far display
