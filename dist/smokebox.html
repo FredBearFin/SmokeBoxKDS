@@ -4603,7 +4603,7 @@ a.of-nav:active { background: var(--press); }
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept', 'hubqueue'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept', 'hubqueue', 'hubcache'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -5782,7 +5782,7 @@ a.of-nav:active { background: var(--press); }
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'followerReadOnly', 'hubKitchen', 'hubChanged', 'hubConnecting', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'followerReadOnly', 'hubKitchen', 'hubChanged', 'hubConnecting', 'undoElsewhere', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -5814,6 +5814,7 @@ a.of-nav:active { background: var(--press); }
     badTemp: 'Enter a temperature between 32 and 300 °F.',
     tempTooLow: 'A reheat needs a reading of at least ' + C.safety.reheatF + ' °F. Keep heating and log it again.' + SAFETY,
     hubKitchen: 'This tablet is connected to the shared kitchen. Erasing or restoring here would erase it for every screen. Do it on the hub computer.',
+    undoElsewhere: 'Someone else changed the kitchen since, so this cannot be undone from here. Fix it by hand.',
     hubConnecting: 'Still connecting to the shared kitchen. Try again in a moment.',
     hubChanged: 'The shared kitchen was changed or reset while this screen was away, so this tap was not sent.',
     followerReadOnly: 'This screen only shows the kitchen. Make changes on the main screen.',
@@ -10654,7 +10655,7 @@ a.of-nav:active { background: var(--press); }
   const RECOVERY_KEY = 'smokebox.v1.pinrecovery', RECOVERY_TRIES = 5, RECOVERY_LOCK_MS = 15 * 60e3;
   // Letters and digits for a recovery code, leaving out I, O, 0 and 1 so a handwritten card is not misread. 32 characters, 10 in a code: 50 bits.
   const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const START_OVER_KEYS = ['smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
+  const START_OVER_KEYS = ['smokebox.v1.hubcache', 'smokebox.v1.hubqueue', 'smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
     'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.setup.serveSkipped', 'smokebox.v1.setup.serveAnswer', 'smokebox.v1.readings', 'smokebox.v1.lastproduct', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
@@ -10819,7 +10820,7 @@ a.of-nav:active { background: var(--press); }
     let ok = false;
     const t0 = perfNow();
     const prevSaveOk = st.lastSaveOk;
-    let snapDropped = false;
+    let snapDropped = false, cacheDropped = false;
     // full copy first; if the quota refuses it, keep halving the history (oldest completed tickets and events go first)
     let lim = null;
     // First trimmed attempt keeps at most 1500 tickets and 10 000 events. A failed save never loses the copy
@@ -10830,6 +10831,7 @@ a.of-nav:active { background: var(--press); }
       try { ok = storage.set(KEY, { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, state: s2 }) !== false; } catch (e) { ok = false; }
       if (ok) { st.trimmed = !!lim; break; }
       // Under pressure the rolling copy goes first: it is only a convenience, the live save is the data.
+      if (!cacheDropped) { cacheDropped = true; try { U.rawStorage.remove('smokebox.v1.hubcache'); } catch (e) { /* ignore */ } tries--; continue; }
       if (!snapDropped && strict) { snapDropped = true; snapAt = 0; try { storage.remove(LASTGOOD_KEY); } catch (e) { /* ignore */ } tries--; continue; }
       // History is already tiny: trimming further will not help, so give up and report the failed save.
       if (nt < 20 && ne < 200) break;
@@ -11462,6 +11464,30 @@ a.of-nav:active { background: var(--press); }
    * the offset learned from the hub. followStatus() says what it is doing; subscribeFollow(fn) fires when that changes.
    * Fatal errors (no retry): badCode, notFound, wrongVersion, tooMany. unreachable and other failures keep retrying.
    */
+  const CODE_SKEY = 'smokebox.session.hubcode';
+  // The address without a trailing slash, as the hub address is compared and remembered.
+  const normUrl = (u) => String(u || '').replace(/\/+$/, '');
+  // The access code remembered for this hub address in this browser tab (session storage), or ''.
+  function rememberedCode(url) {
+    try { const v = JSON.parse(g.sessionStorage.getItem(CODE_SKEY) || 'null'); return v && v.url === normUrl(url) && typeof v.code === 'string' ? v.code : ''; } catch (e) { return ''; }
+  }
+  // Takes the code from the options (or the one remembered for this address), keeps a given code for the tab, and removes ?code= from the
+  // visible address, so the code is not left in the address bar, history or a shared link.
+  function codeFor(opts) {
+    const given = typeof opts.code === 'string' ? opts.code : '';
+    if (given) {
+      try { g.sessionStorage.setItem(CODE_SKEY, JSON.stringify({ url: normUrl(opts.url), code: given })); } catch (e) { /* the code is still used for this load */ }
+      try {
+        const L = g.location;
+        if (L && g.history && typeof g.history.replaceState === 'function') {
+          const search = L.search || '';
+          if (/[?&]code=/.test(search)) g.history.replaceState(null, '', (L.pathname || '/') + search.replace(/([?&])code=[^&]*&?/, '$1').replace(/[?&]$/, '') + (L.hash || ''));
+        }
+      } catch (e) { /* leave the address as it is */ }
+      return given;
+    }
+    return rememberedCode(opts.url);
+  }
   const FOLLOW_FATAL = { badCode: 1, notFound: 1, wrongVersion: 1, tooMany: 1 };
   const FOLLOW_REASON = {
     badCode: 'The access code is wrong or missing.', notFound: 'That address is not a Smokebox hub.', wrongVersion: 'This screen and the hub do not speak the same version. Reload the page from the hub.',
@@ -11528,8 +11554,9 @@ a.of-nav:active { background: var(--press); }
   }
   // Starts following a hub. Resolves after the first snapshot (ok: true), a fatal error, or the first failed attempt to reach it.
   function initFollower(opts) { return folBegin(opts, false); }
-  // Starts following a hub as a read-only screen (hub false) or as a screen that writes through it (hub true, see initHubClient).
-  function folBegin(opts, hub) {
+  // Starts following a hub as a read-only screen (hub false) or as a screen that writes through it (hub true, see initHubClient). cache is a saved
+  // hub snapshot to show first when the hub cannot be reached (hub clients only).
+  function folBegin(opts, hub, cache) {
     opts = opts || {};
     if (typeof opts.url !== 'string') return Promise.resolve({ ok: false, error: 'notFound', status: followStatus() });
     const keepSubs = Array.from(followSubs), keepRef = Array.from(refusalSubs);
@@ -11537,14 +11564,22 @@ a.of-nav:active { background: var(--press); }
     keepSubs.forEach((fn) => followSubs.add(fn));
     keepRef.forEach((fn) => refusalSubs.add(fn));
     const url = opts.url.replace(/\/+$/, '');
-    const f = fol = { url, code: typeof opts.code === 'string' ? opts.code : '', staleMs: isNum(opts.staleMs) && opts.staleMs > 0 ? opts.staleMs : 45000, offset: 0, seq: null, hubId: null, connected: false, everConnected: false,
+    const f = fol = { url, code: codeFor(opts), staleMs: isNum(opts.staleMs) && opts.staleMs > 0 ? opts.staleMs : 45000, offset: 0, seq: null, hubId: null, connected: false, everConnected: false,
       error: null, lastMsgAt: null, goodSince: null, retryInMs: 0, retryStep: 0, closed: false, gen: 0, ctrl: null, retryTimer: null, timer: null, lastKey: '', resolve: null, resyncs: 0,
-      base: null, hub: false, pend: [], name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
+      base: null, hub: false, offsetKnown: false, pend: [], owners: new Map(), baseKey: null, topOwner: null, lastActKey: null, fromCache: false, cachedAt: null, cacheAt: 0, cacheDirty: false, name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
       fetchFn: opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null), Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
     f.hub = !!hub;
     f.name = typeof opts.name === 'string' ? opts.name.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20) : '';
     f.timer = opts.noTimers ? null : setInterval(folTick, 1000);
     const p = new Promise((resolve) => { f.resolve = resolve; });
+    if (hub && cache) {
+      // The hub cannot be reached: show the last known kitchen, marked as such, and let taps be predicted and queued from the start.
+      f.base = cache.state; f.seq = cache.seq; f.hubId = cache.hubId; f.offset = cache.offset || 0; f.fromCache = true; f.cachedAt = cache.savedAt; f.everConnected = true;
+      hubHello({ hubId: cache.hubId });
+      folShow();
+      folSettle({ ok: true, cached: true });
+    }
+    if (hub && !opts.noTimers && typeof g.addEventListener === 'function') on(g, 'pagehide', () => hubCacheSave(true));
     folConnect();
     return p;
   }
@@ -11554,7 +11589,7 @@ a.of-nav:active { background: var(--press); }
     const n = now();
     if (fol.connected && folStale() && fol.ctrl) { fol.connected = false; try { fol.ctrl.abort(); } catch (e) { /* ignore */ } }
     folNotify(false);
-    if (fol.hub) folSend();
+    if (fol.hub) { folSend(); if (fol.cacheDirty) hubCacheSave(false); }
     tickSubs.forEach((fn) => { try { fn(n); } catch (e) { if (g.console) console.error('[smokebox] tick subscriber failed', e); } });
   }
   // Schedules the next connection attempt after a failure: 1, 2, 4, 8, then every 15 seconds.
@@ -11577,10 +11612,12 @@ a.of-nav:active { background: var(--press); }
     const gen = ++f.gen;
     if (!f.fetchFn || !f.Abort || !f.Dec) { f.error = 'error'; folRetry('error'); return; }
     f.ctrl = new f.Abort();
-    let q = '?code=' + encodeURIComponent(f.code);
-    if (f.hubId != null && isNum(f.seq)) q += '&since=' + f.seq + '&hub=' + encodeURIComponent(f.hubId);
+    let q = '';
+    if (f.hubId != null && isNum(f.seq)) q = '?since=' + f.seq + '&hub=' + encodeURIComponent(f.hubId);
+    const hdr = { accept: 'text/event-stream' };
+    if (f.code) hdr['x-smokebox-code'] = f.code;                // the code travels in a header, never in the address
     let res;
-    try { res = await f.fetchFn(f.url + '/follow' + q, { signal: f.ctrl.signal, cache: 'no-store', headers: { accept: 'text/event-stream' } }); } catch (e) { if (f.closed || gen !== f.gen) return; folRetry('unreachable'); return; }
+    try { res = await f.fetchFn(f.url + '/follow' + q, { signal: f.ctrl.signal, cache: 'no-store', headers: hdr }); } catch (e) { if (f.closed || gen !== f.gen) return; folRetry('unreachable'); return; }
     if (f.closed || gen !== f.gen) return;
     if (!res.ok) {
       const st = res.status;
@@ -11615,7 +11652,16 @@ a.of-nav:active { background: var(--press); }
     folRetry('closed');
   }
   // Takes the hub's time from a message: the offset is what the hub's clock reads minus this device's.
-  function folClock(d) { if (isNum(d.serverNow)) fol.offset = d.serverNow - realNow(); fol.lastMsgAt = realNow(); }
+  function folClock(d) {
+    if (isNum(d.serverNow)) {
+      const off = d.serverNow - realNow();
+      // The first time the hub's time is learned, or when it differs by a big step (a wrong or changed device clock), the "never goes backwards" guard is
+      // reset to the hub-corrected time; otherwise a fast tablet would stay clamped to its own later time and show every age too old. Small drift keeps
+      // the guard, so the shown time does not go backwards in normal use.
+      if (!fol.offsetKnown || Math.abs(off - fol.offset) > 2000) { fol.offset = off; fol.offsetKnown = true; lastNow = Math.floor(realNow() + off); } else fol.offset = off;
+    }
+    fol.lastMsgAt = realNow();
+  }
   // Marks the connection good after a snapshot or a resume.
   function folGood() {
     const f = fol;
@@ -11641,12 +11687,19 @@ a.of-nav:active { background: var(--press); }
     if (name === 'hello') {
       if (d.proto !== 1) { f.error = 'wrongVersion'; try { f.ctrl.abort(); } catch (e) { /* ignore */ } folRetry('wrongVersion'); return; }
       f.pendingHub = d.hubId;
-      if (f.hub) hubHello(d);
+      if (f.hub && f.fromCache && f.hubId && d.hubId !== f.hubId) {
+        // The hub was reset or replaced while this screen was away: the taps queued from the saved copy belong to a kitchen that is gone.
+        for (const p of f.pend) hubRefused(p, 'hubChanged', {}, null);
+        f.pend = []; f.queueChecked = true;
+        try { U.rawStorage.remove(QUEUE_KEY); U.rawStorage.remove(CACHE_KEY); } catch (e) { /* ignore */ }
+      }
+      if (f.hub) { f.fromCache = false; hubHello(d); }
     } else if (name === 'snapshot') {
       const v = E().validateBackup(d.state);
       if (!v.ok || !isNum(d.seq)) { folResync(); return; }
       f.base = v.state; f.seq = d.seq; f.hubId = d.hubId || f.pendingHub;
-      if (f.hub) hubAfterSnapshot(d);
+      f.owners = new Map(); f.baseKey = null;
+      if (f.hub) { f.fromCache = false; hubAfterSnapshot(d); hubCacheSave(true); }
       folShow();
       syncUnits();
       folGood();
@@ -11657,7 +11710,14 @@ a.of-nav:active { background: var(--press); }
       const r = d.type === 'tick' ? { report: 'ok', state: E().tick(f.base, d.now).state } : E().apply(f.base, d.type, d.payload, d.now, { screen: d.screen });
       if (r.report !== 'ok') { folResync(); return; }
       f.base = r.state; f.seq = d.seq;
+      if (f.hub && d.type !== 'tick' && d.type !== 'uiReport') {
+        f.baseKey = d.opId || 'seq:' + d.seq;
+        const tp = undoTop(f.base);
+        if (tp && !f.owners.has(tp)) f.owners.set(tp, { key: f.baseKey, mine: d.by === tabId });
+        if (f.owners.size > 400) { const live = new Set((f.base.undo || []).map((x) => x.id)); for (const k of Array.from(f.owners.keys())) if (!live.has(k)) f.owners.delete(k); }
+      }
       if (f.hub && typeof d.opId === 'string') hubConfirm(d.opId);
+      if (f.hub) hubCacheSave(false);
       folShow();
       if (!f.connected) folGood(); else folNotify(false);
       scheduleNotify();
@@ -11681,6 +11741,32 @@ a.of-nav:active { background: var(--press); }
    * or seed:true (send this device's kitchen to an EMPTY hub first; refused with notEmpty otherwise) must be given.
    */
   const QUEUE_KEY = 'smokebox.v1.hubqueue';
+  const CACHE_KEY = 'smokebox.v1.hubcache', CACHE_MAX = 1500000;      // the last hub snapshot kept on the device, and the most characters it may use
+  // Keeps the hub's latest state on the device (not the shown state) so a reload while the hub is unreachable can show the last known kitchen.
+  // Throttled (see below) unless forced; skipped when it would be bigger than the cap; the browser refusing it is not an error.
+  function hubCacheSave(force) {
+    const f = fol;
+    if (!f || !f.hub || !f.base || f.hubId == null || !isNum(f.seq)) return;
+    // A small kitchen is kept at most every 2 seconds, a big one every 15, so saving never costs the board anything noticeable.
+    if (!force && realNow() - f.cacheAt < (f.cacheBytes > 200000 ? 15000 : 2000)) { f.cacheDirty = true; return; }
+    f.cacheAt = realNow(); f.cacheDirty = false;
+    try {
+      const rec = { v: 1, url: f.url, hubId: f.hubId, seq: f.seq, savedAt: realNow(), offset: Math.round(f.offset), state: f.base };
+      f.cacheBytes = JSON.stringify(rec).length;
+      if (f.cacheBytes > CACHE_MAX) { U.rawStorage.remove(CACHE_KEY); return; }
+      U.rawStorage.set(CACHE_KEY, rec);
+    } catch (e) { /* the copy is a convenience only */ }
+  }
+  // Reads the saved hub snapshot for this address, checked like a backup, or null.
+  function loadHubCache(url) {
+    try {
+      const c = U.rawStorage.get(CACHE_KEY, null);
+      if (!c || c.v !== 1 || c.url !== normUrl(url) || typeof c.hubId !== 'string' || !isNum(c.seq) || !isNum(c.savedAt)) return null;
+      const v = E().validateBackup(c.state);
+      return v.ok ? { state: v.state, hubId: c.hubId, seq: c.seq, savedAt: c.savedAt, offset: isNum(c.offset) ? c.offset : 0 } : null;
+    } catch (e) { return null; }
+  }
+  // How many taps this screen has sent or queued that the hub has not answered yet.
   const hubQueued = () => (fol ? fol.pend.filter((p) => !p.answered).length : 0);
   // The status word for a hub client: connecting, connected, sending (taps not yet answered), offline, or error.
   function hubState() {
@@ -11695,7 +11781,7 @@ a.of-nav:active { background: var(--press); }
     if (!fol || !fol.hub) return { mode: 'off', state: 'off', url: '', name: '', lastUpdate: null, lastOk: null, queued: 0, unsent: 0, error: null, reason: '', seq: null, hubId: null, offsetMs: 0, connected: false };
     const q = hubQueued(), st = hubState();
     return { mode: 'hub', state: st, url: fol.url, name: fol.name, lastUpdate: fol.lastMsgAt, lastOk: fol.lastMsgAt, queued: q, unsent: q, error: fol.error, reason: fol.error ? (FOLLOW_REASON[fol.error] || FOLLOW_REASON.error) : '',
-      seq: fol.seq, hubId: fol.hubId, offsetMs: Math.round(fol.offset), connected: st === 'connected' || st === 'sending' };
+      seq: fol.seq, hubId: fol.hubId, offsetMs: Math.round(fol.offset), connected: st === 'connected' || st === 'sending', lastKnown: !!fol.fromCache, lastKnownAt: fol.fromCache ? fol.cachedAt : null };
   }
   // True when this store is a screen that writes through a hub.
   const isHubClient = () => !!fol && fol.hub;
@@ -11737,18 +11823,30 @@ a.of-nav:active { background: var(--press); }
     const f = fol;
     if (!f || !f.base) return;
     let s = f.base;
+    // A kitchen shown from the saved copy has no ticks coming from the hub, so time-driven changes are worked out here for display only.
+    if (f.fromCache) s = E().tick(s, now()).state;
     if (f.hub) {
       f.pend = f.pend.filter((p) => !(p.answered && isNum(p.seq) && isNum(f.seq) && p.seq <= f.seq));
+      // Who made the newest undo entry, and which action is the last one: an undo is only offered for the last action of the whole kitchen.
+      let owner = f.owners.get(undoTop(f.base)) || null, lastKey = f.baseKey;       // owner: { key, mine }
       for (const p of f.pend) {
         const r = E().apply(s, p.type, p.payload, Math.max(p.now, lastStamp(s)), { screen: f.name });
-        if (r.report === 'ok') s = r.state;
+        if (r.report !== 'ok') continue;
+        const before = undoTop(s);
+        s = r.state;
+        if (p.type === 'uiReport') continue;
+        lastKey = p.opId;
+        owner = p.type === 'undo' ? null : (undoTop(s) !== before ? { key: p.opId, mine: true } : owner);
       }
+      f.topOwner = owner; f.lastActKey = lastKey;
     }
     const same = state && s.settings === state.settings;
     state = s;
     if (!same) syncUnits();
     scheduleNotify();
   }
+  // The id of the newest undo entry in a state, or null.
+  function undoTop(st) { const u = st && st.undo; return Array.isArray(u) && u.length ? u[u.length - 1].id : null; }
   // The hub's own stream delivered an action: if it is one of ours, the hub's result replaces our prediction.
   function hubConfirm(opId) {
     const f = fol;
@@ -11788,6 +11886,11 @@ a.of-nav:active { background: var(--press); }
     if (type === 'resetLive') return mk('hubKitchen');
     if (!f.base || !f.queueChecked) return mk('hubConnecting');
     const n = now();
+    // An undo names the action it takes back; it is offered only for the last action of the whole kitchen, never someone else's.
+    if (type === 'undo') {
+      if (!f.topOwner || !f.topOwner.mine || f.topOwner.key !== f.lastActKey) { const a = mk('undoElsewhere'); hubLogRefusal('undo', 'undoElsewhere'); return a; }
+      payload = { ofOpId: f.topOwner.key };
+    }
     const r = E().apply(state, type, payload, n, { screen: f.name });
     const opId = tabId + ':' + (++opN);
     last = { type: typeof type === 'string' ? type : String(type), report: r.report, info: r.info, events: r.events, opId };
@@ -11798,8 +11901,21 @@ a.of-nav:active { background: var(--press); }
       scheduleNotify();
       folNotify(false);
       folSend();
-    }
+    } else if (r.report !== 'ok' && r.report !== 'nothingToDo' && type !== 'uiReport') hubLogRefusal(type, r.report);
     return { report: r.report, info: r.info, events: r.events, opId };
+  }
+  // A refused tap is written to the kitchen's log as a screen report (like in a normal kitchen), so the pilot's count of refused taps is right.
+  function hubLogRefusal(type, report) {
+    const f = fol;
+    if (!f || !f.base || !f.queueChecked) return;
+    const n = now(), payload = { action: String(type).slice(0, 40) || '?', report };
+    const r = E().apply(state, 'uiReport', payload, n, { screen: f.name });
+    if (r.report !== 'ok') return;
+    f.pend.push({ opId: tabId + ':' + (++opN), type: 'uiReport', payload, now: n, answered: false });
+    hubSaveQueue();
+    state = r.state;
+    scheduleNotify();
+    folSend();
   }
   // Sends the oldest unanswered tap to the hub and handles its answer: applied (kept until the hub's stream delivers it), refused (rolled
   // back and reported), or no answer (offline: retry later with 1, 2, 4, 8, then 15 seconds; the hub answers a repeated opId the same way).
@@ -11827,7 +11943,7 @@ a.of-nav:active { background: var(--press); }
     const i = f.pend.indexOf(next);
     if (i >= 0) {
       if (body.ok === true || body.report === 'ok') { next.answered = true; next.seq = isNum(body.seq) ? body.seq : null; if (isNum(f.seq) && isNum(next.seq) && next.seq <= f.seq) f.pend.splice(i, 1); }
-      else { f.pend.splice(i, 1); hubRefused(next, typeof body.report === 'string' ? body.report : 'badPatch', body.info, typeof body.words === 'string' ? body.words : null); }
+      else { f.pend.splice(i, 1); hubRefused(next, typeof body.report === 'string' ? body.report : 'badPatch', body.info, typeof body.words === 'string' ? body.words : null); if (next.type !== 'uiReport') { folShow(); hubLogRefusal(next.type, typeof body.report === 'string' ? body.report : 'badPatch'); } }
       hubSaveQueue();
       folShow();
     }
@@ -11839,8 +11955,9 @@ a.of-nav:active { background: var(--press); }
     opts = opts || {};
     const fetchFn = opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null);
     if (typeof opts.url !== 'string' || !fetchFn) return { ok: false, error: 'notFound' };
+    const code = codeFor(opts);
     let res;
-    try { res = await fetchFn(opts.url.replace(/\/+$/, '') + '/probe?code=' + encodeURIComponent(typeof opts.code === 'string' ? opts.code : ''), { cache: 'no-store' }); } catch (e) { return { ok: false, error: 'unreachable' }; }
+    try { res = await fetchFn(opts.url.replace(/\/+$/, '') + '/probe', { cache: 'no-store', headers: code ? { 'x-smokebox-code': code } : {} }); } catch (e) { return { ok: false, error: 'unreachable' }; }
     if (res.status === 403 || res.status === 429) return { ok: false, error: 'badCode' };
     if (res.status === 404) return { ok: false, error: 'notFound' };
     if (res.status === 503) return { ok: false, error: 'tooMany' };
@@ -11857,21 +11974,29 @@ a.of-nav:active { background: var(--press); }
     const fail = (error) => ({ ok: false, error, status: hubStatus() });
     if (typeof opts.url !== 'string') return fail('notFound');
     if ((opts.adopt === 'hub') === (opts.seed === true)) return fail('choiceRequired');
+    // The screen name is plain: letters, digits, spaces and a few marks, up to 20 characters; anything else is refused, not trimmed away.
+    if (opts.name != null && (typeof opts.name !== 'string' || (opts.name.trim() !== '' && !/^[\p{L}\p{N} .,'&()#_-]{1,20}$/u.test(opts.name.trim())))) return fail('badName');
     if (fol) return fail('error');
     const probe = await probeHub(opts);
-    if (!probe.ok) return fail(probe.error);
+    if (!probe.ok) {
+      // A reload while the hub is unreachable: the last known kitchen is shown from the saved copy, taps are queued, and it keeps trying.
+      const c = probe.error === 'unreachable' && opts.adopt === 'hub' ? loadHubCache(opts.url) : null;
+      if (c) return folBegin(opts, true, c);
+      return fail(probe.error);
+    }
     if (opts.seed === true) {
       if (!probe.empty) return fail('notEmpty');
       if (!state) return fail('error');
       const fetchFn = opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null);
       let res, b = null;
       try {
-        res = await fetchFn(opts.url.replace(/\/+$/, '') + '/seed', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ state, code: typeof opts.code === 'string' ? opts.code : '' }) });
+        res = await fetchFn(opts.url.replace(/\/+$/, '') + '/seed', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ state, code: codeFor(opts) }) });
         try { b = await res.json(); } catch (e) { b = null; }
       } catch (e) { return fail('unreachable'); }
       if (res.status === 403 || res.status === 429) return fail('badCode');
       if (res.status === 409) return fail('notEmpty');
       if (!res.ok || !b || b.ok !== true) return fail('error');
+      try { U.rawStorage.remove(CACHE_KEY); U.rawStorage.remove(QUEUE_KEY); } catch (e) { /* ignore */ }
     }
     return folBegin(opts, true);
   }
@@ -11880,7 +12005,7 @@ a.of-nav:active { background: var(--press); }
     if (!fol || !fol.hub) return { ok: false, error: 'notInHub' };
     const q = hubQueued();
     if (q > 0 && !(opts && opts.force === true)) return { ok: false, error: 'pending', pending: q };
-    try { U.rawStorage.remove(QUEUE_KEY); } catch (e) { /* ignore */ }
+    try { U.rawStorage.remove(QUEUE_KEY); U.rawStorage.remove(CACHE_KEY); } catch (e) { /* ignore */ }
     init(lastInit || {});
     return { ok: true };
   }
@@ -12209,7 +12334,7 @@ a.of-nav:active { background: var(--press); }
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
-    initFollower, followStatus, subscribeFollow, isFollower, initHubClient, probeHub, hubStatus, subscribeHub: subscribeFollow, subscribeRefusals, pendingFor, isHubClient, isHub: isHubClient, leaveHub, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
+    initFollower, followStatus, subscribeFollow, isFollower, initHubClient, probeHub, rememberedCode, hubStatus, subscribeHub: subscribeFollow, subscribeRefusals, pendingFor, isHubClient, isHub: isHubClient, leaveHub, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
@@ -22030,6 +22155,8 @@ a.of-nav:active { background: var(--press); }
     const st = SB.store && typeof SB.store.hubStatus === 'function' ? SB.store.hubStatus() : null;
     if (!st || st.mode === 'off') return { tone: 'wait', text: 'Connecting...', sub: '', unsent: 0 };
     const n = Math.max(0, Number(st.unsent) || 0);
+    // After a reload with the hub unreachable the board shows the last copy it had; it says so until the first live update.
+    if (st.lastKnown && st.state !== 'connected' && st.state !== 'sending') return { tone: 'wait', text: 'Last known' + (st.lastKnownAt ? ', from ' + U.fmtTime(st.lastKnownAt) : '') + '. Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
     if (st.state === 'offline' || st.state === 'error') return { tone: 'wait', text: 'Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
     if (st.state === 'connecting') return { tone: 'wait', text: 'Connecting...', sub: n ? n + ' waiting' : '', unsent: n };
     if (n > 0) return { tone: 'wait', text: 'Sending ' + n + '...', sub: '', unsent: n };
