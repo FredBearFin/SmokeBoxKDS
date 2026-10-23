@@ -132,7 +132,8 @@
     // A page that cannot follow (an older store) never falls back to opening a kitchen of its own.
     if (!SB.store || typeof SB.store.initFollower !== 'function') { fail({ error: 'noFollower' }); return; }
     let p;
-    try { p = SB.store.initFollower({ url: f.url, code: f.code }); } catch (e) { fail({ error: 'unreachable' }); return; }
+    // The browser's own fetch must be called on the page, so it is handed over wrapped.
+    try { p = SB.store.initFollower({ url: f.url, code: f.code, fetch: (u, o) => g.fetch(u, o), AbortController: g.AbortController, TextDecoder: g.TextDecoder }); } catch (e) { fail({ error: 'unreachable' }); return; }
     Promise.resolve(p).then((res) => { if (res && res.ok === false && res.error && res.error !== 'unreachable') fail(res); else show(); }, () => show());
   }
 

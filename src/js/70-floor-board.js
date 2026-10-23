@@ -692,7 +692,7 @@
     // A follower screen has a bar under the header: the connection chip, the out-of-date banner and the "only shows" line.
     const fbar = following ? buildFollowBar() : null;
     if (fbar) m.fbar = fbar;
-    root.append(head, fbar ? fbar.el : null, strip.el, wl.el, main, dock, wr.el, below);
+    root.append(...[head, fbar ? fbar.el : null, strip.el, wl.el, main, dock, wr.el, below].filter(Boolean));
     m.below = below; m.belowT = belowT;
     // Scrolling the board refreshes the pill once per animation frame at most.
     let belowRaf = 0;

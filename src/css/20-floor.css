@@ -584,7 +584,11 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl-wall { display: none; }
 @media (min-width: 1700px) {
   .fl[data-wall="on"] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.6fr) minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }
-  .fl[data-wall="on"] > .fl-head, .fl[data-wall="on"] > .fl-strip { grid-column: 1 / -1; }
+  .fl[data-wall="on"][data-follow="on"] { grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
+  .fl[data-wall="on"][data-follow="on"] > .fl-main { grid-row: 4; }
+  .fl[data-wall="on"][data-follow="on"] > .fl-dock { grid-row: 5; }
+  .fl[data-wall="on"][data-follow="on"] > .fl-wall-orders, .fl[data-wall="on"][data-follow="on"] > .fl-wall-glance { grid-row: 4 / 6; }
+  .fl[data-wall="on"] > .fl-head, .fl[data-wall="on"] > .fl-strip, .fl[data-wall="on"] > .fl-follow { grid-column: 1 / -1; }
   .fl[data-wall="on"] > .fl-main { grid-column: 2; grid-row: 3; }
   .fl[data-wall="on"] > .fl-dock { grid-column: 2; grid-row: 4; }
   .fl[data-wall="on"] > .fl-wall-orders { grid-column: 1; grid-row: 3 / 5; }

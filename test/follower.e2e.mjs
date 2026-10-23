@@ -19,7 +19,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, ms = 8000) { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return true; await sleep(100); } return false; }
 const dataFile = path.join(os.tmpdir(), 'smokebox-follower-' + process.pid + '.json');
 try { fs.unlinkSync(dataFile); } catch (e) { /* none yet */ }
-let hub = await createHub({ dataFile, starter: true });
+let hub = await createHub({ dataFile, starter: true, heartbeatMs: 500 });
 const port = await hub.listen(0);
 const base = 'http://127.0.0.1:' + port;
 let n = 0;
@@ -60,14 +60,15 @@ const vis = await p.evaluate(() => {
 });
 check('no New ticket, Bump, More, Orders or Recall controls are shown', vis.newBtn === 0 && vis.bump === 0 && vis.zone === 0 && vis.orders === 0 && vis.more === 0 && vis.next === 0, vis);
 check('buttons left on the slips cannot be tapped', vis.pe, vis);
-const before = JSON.stringify((await (await fetch(base + '/events', { signal: AbortSignal.timeout(500) }).catch(() => null)) ? 1 : 0));
+const statusBefore = await p.evaluate((i) => SB.store.getState().tickets[0].items.find((x) => x.id === i).status, it);
 await p.evaluate(() => { const b = document.querySelector('.fl-slip button[data-act="item"]'); if (b) b.click(); });
 await p.keyboard.press('n'); await p.keyboard.press('b'); await p.waitForTimeout(600);
-check('a forced tap and the N and B keys do nothing', (await p.locator('.ord-tile').count()) === 0 && (await p.evaluate((i) => SB.store.getState().tickets[0].items.find((x) => x.id === i).status, it)) === (await p.evaluate((i) => SB.store.getState().tickets[0].items.find((x) => x.id === i).status, it)));
+check('a forced tap and the N and B keys do nothing', (await p.locator('.ord-tile').count()) === 0 && (await p.evaluate((i) => SB.store.getState().tickets[0].items.find((x) => x.id === i).status, it)) === statusBefore, statusBefore);
 const hubTicket = hub.snapshot().state.tickets[0];
 const folTicket = await p.evaluate(() => SB.store.getState().tickets[0]);
 check('the hub still holds exactly what the leader did (follower writes nothing)', JSON.stringify(hubTicket.items.map((x) => x.status)) === JSON.stringify(folTicket.items.map((x) => x.status)), [hubTicket.items.map((x) => x.status), folTicket.items.map((x) => x.status)]);
 const keys = await p.evaluate(() => Object.keys(localStorage).filter((k) => /state|outbox|names|initials|dlog|lastbatch|menu/.test(k)));
+check('no "not saving" or backup banner on the follower', !/not saving|Back up now/.test(await p.evaluate(() => document.body.innerText)));
 check('the follower saves no kitchen data on this device', keys.length === 0, keys);
 check('the follower is silent unless turned on for this screen', (await p.evaluate(() => SB.floor.sound())) === false && !/turn on warning sounds/.test(await p.evaluate(() => document.body.innerText)));
 
@@ -86,7 +87,7 @@ check('with the hub gone the chip says Reconnecting or Out of date', await until
 check('after the stale limit the chip says Out of date since a time and a banner shows', await until(async () => /Out of date since \d/.test((await chip() || {}).text || '') && (await p.locator('.fl-fstale:visible').count()) === 1, 20000), await chip());
 await p.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + '/follower-stale-1920.png' : '/tmp/follower-stale-1920.png' });
 // The hub returns (same saved kitchen, same port) and the leader acts while the follower was away
-hub = await createHub({ dataFile, starter: true });
+hub = await createHub({ dataFile, starter: true, heartbeatMs: 500 });
 await new Promise((res, rej) => hub.server.once('error', rej).listen(port, '127.0.0.1', res)).catch(() => null);
 await act('createTicket', { customer: 'While away', channel: 'takeout', items: [{ menuId: 'tea', qty: 1 }], note: '', rush: false });
 check('when the hub returns the follower shows Connected again', await until(async () => /Connected/.test((await chip() || {}).text || ''), 30000), await chip());
