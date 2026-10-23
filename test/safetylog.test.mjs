@@ -71,7 +71,7 @@ test('corrections are new entries; the original is never edited', () => {
   go(k, 'correctSafety', { eventId: orig.id, note: '  ', who: 'AB' }, 'reasonRequired');
   go(k, 'correctSafety', { eventId: orig.id, note: 'x'.repeat(500), who: 'AB' }, 'noteTooLong');
   go(k, 'correctSafety', { eventId: 'ev_99999', note: 'x', who: 'AB' }, 'unknownSafetyEntry');
-  const other = E.allEvents(k.s).find((e) => e.type === 'order_opened' || e.type === 'avail_changed' || e.type === 'safety_correction');
+  const other = E.allEvents(k.s).find((e) => e.type === 'order_opened' || e.type === 'avail_changed' || e.type === 'batch_in');
   go(k, 'correctSafety', { eventId: other.id, note: 'x', who: 'AB' }, 'unknownSafetyEntry');
   go(k, 'correctSafety', { eventId: 7, note: 'x', who: 'AB' }, 'unknownSafetyEntry');
 });

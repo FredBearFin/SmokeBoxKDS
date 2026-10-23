@@ -27,7 +27,7 @@
  *   planFor(state, lines, now, rush?)     -> same as pacingPlan, using the state's settings/learned/menu
  *   ticketTiming(ticket, now, settings)   -> { elapsedMs, level: 'ok'|'warn'|'breach', warnMs, breachMs, pct }
  *   ticketProgress(ticket)                -> { total, done, queued, displayed, cooking, qtyTotal, qtyDone, pct, ready, byZone }
- *   checkInvariants(state, now?)          -> string[] (empty = healthy; I1-I18 of SPEC 10, structural parts)
+ *   checkInvariants(state, now?)          -> string[] (empty = healthy; I1-I19 of SPEC 10, structural parts)
  *   validateBackup(objOrText)             -> { ok, state?, error?, repaired: string[] }
  *   serialize(state) -> string             deserialize(text) -> validateBackup result
  *   allEvents(state)                      -> Event[] (archive chunks + recent window, oldest first; memoised)
@@ -182,6 +182,12 @@
   const BATCH_STATUS = { ok: 1, check: 1, reheat: 1, chill: 1, past: 1, discard: 1 };
   const BATCH_KIND = { hot: 1, cold: 1, cooling: 1 };
   const STATUS_OF = { NONE: 'ok', CHECK_TEMP: 'check', REHEAT_IMMEDIATE: 'reheat', CHILL_NOW: 'chill', PAST_QUALITY: 'past', DISCARD_LOCKOUT: 'discard' };
+  // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
+  // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
+  // safetyKeep bucket instead of being dropped.
+  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, cooling_started: 1, sanitize_done: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months, the minimum to keep).
+  const SAFETY_KEEP_MS = 190 * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
 
@@ -666,6 +672,18 @@
     if (ar && ar.length) { const c = ar[ar.length - 1]; if (c.length) return c[c.length - 1].t; }
     return undefined;
   }
+  // Only the safety-log events from a list of events.
+  function safetyOnly(list) { return list.filter((e) => hasOwn(SAFETY_EVENT, e.type)); }
+  // Adds newly dropped safety events to the retention bucket and lets go of entries older than 190 days
+  // (measured from refT, the newest time known). The bucket is never trimmed by size, only by age.
+  function keepSafety(prev, dropped, refT) {
+    const all = (Array.isArray(prev) ? prev : []).concat(dropped);
+    if (!isNum(refT)) return all;
+    const cut = refT - SAFETY_KEEP_MS;
+    let i = 0;
+    while (i < all.length && all[i].t < cut) i++;
+    return i ? all.slice(i) : all;
+  }
   // Adds new events to the log and keeps it small. When the recent window reaches 2048 events, the oldest
   // 1024 move into a frozen archive chunk (F-E2). The whole log is capped at the maxEvents limit by
   // dropping the oldest. owned says the window array is already our private copy. Returns the new window
@@ -680,12 +698,14 @@
     }
     const max = C.limits.maxEvents;
     let total = ev.length; for (const c of ar) total += c.length;
+    // Safety entries among the dropped events are handed back, so the caller can move them to safetyKeep.
+    let dropped = [];
     if (total > max) {
       ar = ar === archive ? ar.slice() : ar;
-      while (total > max && ar.length) { total -= ar[0].length; ar.shift(); }
-      if (total > max) ev = ev.slice(total - max);
+      while (total > max && ar.length) { total -= ar[0].length; dropped = dropped.concat(safetyOnly(ar[0])); ar.shift(); }
+      if (total > max) { dropped = dropped.concat(safetyOnly(ev.slice(0, total - max))); ev = ev.slice(total - max); }
     }
-    return { events: ev, archive: ar };
+    return { events: ev, archive: ar, dropped };
   }
   const FLAT = new WeakMap();
   // Every event, oldest first: archive chunks, then the recent window. The joined list is remembered, so
@@ -774,6 +794,7 @@
       const ev = this.get('events');
       const r = appendEvents(ev, this.get('eventArchive') || [], this.evs, this.own.has(ev));
       s.events = r.events; s.eventArchive = r.archive;
+      if (r.dropped.length) s.safetyKeep = keepSafety(this.get('safetyKeep'), r.dropped, this.evs[this.evs.length - 1].t);
     }
     if (s.tickets !== this.s0.tickets && !this.pruned) {
       const old = ACTIVE.get(this.s0.tickets);
@@ -1723,8 +1744,6 @@
     return 'ok';
   };
 
-  // The event types that make up the safety log. Corrections never edit these; they add a safety_correction.
-  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, cooling_started: 1, sanitize_done: 1, quality_extend: 1, quality_extend_corrected: 1 };
   // Reads the optional initials on a safety action. Returns '' when none were given (old screens and old saves
   // have none), the trimmed initials, or null when they are unusable (not text, or over 12 characters).
   function readWho(p) {
@@ -1932,9 +1951,10 @@
   function safetyLog(state) {
     const out = [], byId = new Map();
     if (!isState(state)) return out;
-    for (const e of allEvents(state)) {
-      if (hasOwn(SAFETY_EVENT, e.type)) { const row = { event: e, corrections: [] }; out.push(row); byId.set(e.id, row); }
-      else if (e.type === 'safety_correction' && byId.has(e.of)) byId.get(e.of).corrections.push(e);
+    for (const e of (Array.isArray(state.safetyKeep) ? state.safetyKeep : []).concat(allEvents(state))) {
+      // A correction hangs under the entry it points at; every other safety entry is a row of its own.
+      if (e.type === 'safety_correction' && byId.has(e.of)) byId.get(e.of).corrections.push(e);
+      else if (hasOwn(SAFETY_EVENT, e.type)) { const row = { event: e, corrections: [] }; out.push(row); byId.set(e.id, row); }
     }
     return out;
   }
@@ -2531,6 +2551,8 @@
     if (isInt(lim.maxEvents) && lim.maxEvents >= 0) {
       let flat = allEvents(state);
       if (flat.length > lim.maxEvents) {
+        const gone = safetyOnly(flat.slice(0, flat.length - lim.maxEvents));
+        if (gone.length) tx.set('safetyKeep', keepSafety(state.safetyKeep, gone, flat[flat.length - 1].t));
         flat = flat.slice(flat.length - lim.maxEvents);
         const ar = [];
         while (flat.length >= 2 * EVENT_CHUNK) { ar.push(flat.slice(0, EVENT_CHUNK)); flat = flat.slice(EVENT_CHUNK); }
@@ -2740,7 +2762,7 @@
     // The whole state. The clock is not stored here; the store keeps it.
     const st = {
       v: 1, rev: 0, settings, menu, ingredients, tickets: [], orders: [], batches, stock, manual86: {}, avail: {}, syncs: [], planned: [], alertSnoozes: {},
-      learned: isObj(opts.learned) ? opts.learned : {}, sanitize: { dueAt: now }, seq, events: [], eventArchive: [], undo: [], ledger,
+      learned: isObj(opts.learned) ? opts.learned : {}, sanitize: { dueAt: now }, seq, events: [], eventArchive: [], safetyKeep: [], undo: [], ledger,
     };
     const av = computeAvail(st);
     for (const k of Object.keys(av)) av[k].since = now;
@@ -3023,6 +3045,18 @@
     // I9
     let lt = -Infinity;
     for (const e of allEvents(state)) { if (!(e.t >= lt)) { add('I9 event ' + e.id + ' t goes backwards'); break; } lt = e.t; }
+    // I19: the safety bucket holds only safety entries, oldest first.
+    if (state.safetyKeep !== undefined) {
+      if (!Array.isArray(state.safetyKeep)) add('I19 safetyKeep is not a list');
+      else {
+        let pt = -Infinity;
+        for (const e of state.safetyKeep) {
+          if (!isObj(e) || typeof e.id !== 'string' || !isNum(e.t) || !hasOwn(SAFETY_EVENT, e.type)) { add('I19 safetyKeep holds a non-safety entry'); break; }
+          if (e.t < pt) { add('I19 safetyKeep goes backwards at ' + e.id); break; }
+          pt = e.t;
+        }
+      }
+    }
     // I18: initials on a safety entry are 1 to 12 characters; a correction names who, says why and points at an earlier entry.
     for (const e of allEvents(state)) {
       if (e.who !== undefined && !(typeof e.who === 'string' && e.who.length >= 1 && e.who.length <= 12)) { add('I18 event ' + e.id + ' bad initials'); break; }
@@ -3237,6 +3271,12 @@
       for (const e of flat) { if (!evOk(e)) { bad++; continue; } if (goodEv.length && e.t < goodEv[goodEv.length - 1].t) unsorted = true; goodEv.push(e); }
       if (bad) repaired.push('dropped ' + bad + ' bad events');
       if (unsorted) { goodEv.sort((a, b) => a.t - b.t); repaired.push('events re-sorted by time'); }
+      // Safety entries pushed out by the event cap, and any saved safetyKeep bucket, stay in the bucket.
+      const overflow = goodEv.length > C.limits.maxEvents ? safetyOnly(goodEv.slice(0, goodEv.length - C.limits.maxEvents)) : [];
+      const evIds = new Set(goodEv.map((e) => e.id));
+      const savedKeep = Array.isArray(st.safetyKeep) ? st.safetyKeep.filter((e) => evOk(e) && hasOwn(SAFETY_EVENT, e.type) && !evIds.has(e.id)) : [];
+      savedKeep.sort((a, b) => a.t - b.t);
+      const keepList = keepSafety(savedKeep, overflow, goodEv.length ? goodEv[goodEv.length - 1].t : undefined);
       let rest = goodEv.length > C.limits.maxEvents ? goodEv.slice(goodEv.length - C.limits.maxEvents) : goodEv;
       while (rest.length >= 2 * EVENT_CHUNK) { archive.push(rest.slice(0, EVENT_CHUNK)); rest = rest.slice(EVENT_CHUNK); }
       events = rest;
@@ -3254,7 +3294,7 @@
       // Counters never fall below the highest id already used, so a new id can never repeat an old one.
       const so = isObj(st.seq) ? st.seq : {};
       const maxId = (arr, pre) => { let m = 0; for (const x of arr) { const id = x && x.id; if (typeof id === 'string' && id.indexOf(pre) === 0) { const n = Number(id.slice(pre.length)); if (isInt(n) && n > m) m = n; } } return m; };
-      const allEv = archive.reduce((a, c) => a.concat(c), []).concat(events);
+      const allEv = keepList.concat(archive.reduce((a, c) => a.concat(c), [])).concat(events);
       const seq = {
         ticket: Math.max(isInt(so.ticket) ? so.ticket : 0, maxId(tickets, 't_')),
         order: Math.max(isInt(so.order) ? so.order : 0, maxId(orders, 'o_')),
@@ -3276,7 +3316,7 @@
       sanitize.dueAt = isNum(sz.dueAt) ? sz.dueAt : isNum(sanitize.lastAt) ? sanitize.lastAt + settings.safety.sanitizeEveryH * H : 0;
       const out = {
         v: 1, rev: isInt(st.rev) && st.rev >= 0 ? st.rev : 0, settings, menu, ingredients, tickets, orders, batches, stock, manual86, avail: {}, syncs, planned, alertSnoozes, learned, sanitize, seq,
-        events, eventArchive: archive, undo: [], ledger: {},
+        events, eventArchive: archive, safetyKeep: keepList, undo: [], ledger: {},
       };
       // ledger: keep stored counters; if they do not balance, re-open the books at the current physical stock
       const ledger = {};
