@@ -2051,6 +2051,15 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 /* Wall list: a long customer name wraps onto up to two lines instead of being cut to a few letters. */
 .fl-wall-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .fl-wall-row { align-items: center; }
+/* Counter service (settings.service.counter): no station switching, no START or DONE wording, no next-step line and no late
+   colours. A ticket stays a plain, readable list of what was ordered, ended with Bump. */
+.fl[data-counter="on"] .fl-seg { display: none; }
+.fl[data-counter="on"] .slip-next, .fl[data-counter="on"] .fl-act-word, .fl[data-counter="on"] .fl-deck, .fl[data-counter="on"] .fl-badge, .fl[data-counter="on"] .fl-fire { display: none; }
+.fl[data-counter="on"] .fl-slip::before { display: none; }
+.fl[data-counter="on"] .fl-slip[data-level="warn"] .slip-head, .fl[data-counter="on"] .fl-slip[data-level="breach"] .slip-head { background: var(--slip); }
+.fl[data-counter="on"] .fl-slip[data-level="breach"], .fl[data-counter="on"] .fl-slip[data-tier] { outline: none; }
+.fl[data-counter="on"] .slip[data-level] .slip-head, .fl[data-counter="on"] .slip[data-level] .slip-body, .fl[data-counter="on"] .slip[data-level] .slip-tear { animation: none; box-shadow: none; }
+.fl[data-counter="on"] .slip-timer { color: var(--slip-ink); }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -2073,7 +2082,6 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fs-note[data-tone="bad"] { background: var(--tint-bad); color: var(--ink); border: var(--bw-thin) solid var(--crimson); }
 .fs-note[data-tone="bad"] .icon { color: var(--crimson); }
 .fs-note > div, .fs-note > span { min-width: 0; }
-.fs-sim { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font: var(--w-bold) var(--fs-2) / 1.2 var(--font-body); color: var(--amber-ink); background: var(--tint-warn); border: var(--bw) solid var(--amber); border-radius: var(--r-chip); }
 .fs-list { display: grid; gap: var(--sp-2); min-width: 0; }
 .fs-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); min-width: 0; }
 .fs-row > .grow { flex: 1 1 14ch; }
@@ -2186,6 +2194,7 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .ord-label { font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink); margin-bottom: 6px; }
 .ord-cust { gap: 8px; }
 .ord-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ord-chips[hidden] { display: none; }
 .ord-chips .chip { min-height: 44px; }
 .ord-cust-input { min-height: 48px; }
 .ord-counter { font-size: var(--fs-1); color: var(--ink3); text-align: right; }
@@ -2421,18 +2430,6 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 
 /* The whole 86 board page, and the strip of four simulated channels at the top. */
 .bd { display: grid; gap: var(--sp-5); min-width: 0; }
-.bd-sync-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: var(--sp-2); }
-.bd-chip { display: flex; align-items: flex-start; gap: 10px; min-width: 0; padding: 10px var(--sp-3); background: var(--paper); border: var(--bw) solid var(--line); border-left-width: 6px; border-radius: var(--r-panel); }
-.bd-chip[data-tone="ok"] { border-left-color: var(--sage); }
-.bd-chip[data-tone="warn"] { border-left-color: var(--amber); }
-.bd-chip[data-tone="muted"] { border-left-color: var(--line-soft); }
-.bd-chip-i { flex: none; margin-top: 1px; color: var(--ink3); }
-.bd-chip[data-tone="ok"] .bd-chip-i { color: var(--sage-ink); }
-.bd-chip[data-tone="warn"] .bd-chip-i { color: var(--amber-ink); }
-.bd-chip-t { min-width: 0; display: grid; gap: 1px; }
-.bd-chip-n { font-weight: var(--w-bold); }
-.bd-chip-state { font-weight: var(--w-semi); font-size: var(--fs-2); }
-.bd-chip-sub { font-size: var(--fs-1); color: var(--ink3); overflow-wrap: anywhere; }
 
 /* Menu on the left, stock on the right where there is room. Below 900 px they stack. */
 .bd-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--sp-6); align-items: start; }
@@ -2607,7 +2604,6 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 
 /* Touch size: the Warning loudness slider and the 86 board Channel sync row are at least 44 px tall. */
 input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
-.bd-sync > summary { min-height: var(--tap, 44px); display: flex; align-items: center; }
 
 /* An empty menu: the friendly "No dishes yet" block spans the whole tile grid and its button keeps one line. */
 .ord-nodishes { grid-column: 1 / -1; padding: var(--sp-5, 24px) var(--sp-3, 12px); text-align: center; }
@@ -4344,16 +4340,25 @@ a.of-nav:active { background: var(--press); }
   };
   /** Hour-of-service label for a decimal hour ("13.25" -> "1 pm", 24.75 -> "12 am"). */
   U.fmtHour = (h) => { const hh = ((Math.floor(h) % 24) + 24) % 24; const ap = hh >= 12 ? 'pm' : 'am'; const x = hh % 12 === 0 ? 12 : hh % 12; return x + ' ' + ap; };
-  // Dollars with thousands commas, like "$1,234.50". Negatives read "-$5.00". Not a number gives "-".
+  // The money symbol shown before amounts: $ unless the owner set another (settings.ui.currency). One short word of 1 to 3
+  // letters or currency signs, such as $, a euro sign, a pound sign or KSh. Everything that shows money goes through here.
+  let CURRENCY = '$';
+  // True when text is an allowed money symbol (1 to 3 letters, currency signs or dots, nothing else).
+  U.validCurrency = (c) => typeof c === 'string' && /^[\p{L}\p{Sc}.]{1,3}$/u.test(c);
+  // Sets the symbol (an invalid or missing one means $). Returns the symbol now in use.
+  U.setCurrency = (c) => { CURRENCY = U.validCurrency(c) ? c : '$'; return CURRENCY; };
+  // The money symbol that is in use right now.
+  U.currencySymbol = () => CURRENCY;
+  // Money with thousands commas, like "$1,234.50" (the symbol is the owner's). Negatives read "-$5.00". Not a number gives "-".
   U.fmtMoney = (n, dec = 2) => {
     if (!U.isNum(n)) return '-';
     const neg = n < 0; const s = Math.abs(n).toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return (neg ? '-$' : '$') + s;
+    return (neg ? '-' : '') + CURRENCY + s;
   };
   // Reads typed dollars like "2.50", "$3" or ".5" into a number rounded to cents. A blank box is 0, anything else
   // (letters, a minus sign, more than two decimals, over 99,999.99) is NaN so the screen can say what is wrong.
   U.parseDollars = (txt) => {
-    const t = String(txt == null ? '' : txt).trim().replace(/^\$/, '');
+    const t = String(txt == null ? '' : txt).trim().replace(/^[\p{Sc}]|^\p{L}{1,3}(?=\s*\d)/u, '').trim();
     if (t === '') return 0;
     if (!/^\d{0,5}(\.\d{0,2})?$/.test(t) || t === '.') return NaN;
     return Math.round(parseFloat(t) * 100) / 100;
@@ -4492,7 +4497,7 @@ a.of-nav:active { background: var(--press); }
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'lastgood', 'corruptat', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -5160,6 +5165,8 @@ a.of-nav:active { background: var(--press); }
   // The dish form fields the importer uses when the file does not say: one tap to finish, a 5 minute guess.
   const DEFAULTS = { prepSec: 300, track: 'one' };
 
+  // The money symbol in use (the owner's, or $), for messages.
+  const cs = () => (SB.util && SB.util.currencySymbol ? SB.util.currencySymbol() : '$');
   // Collapses runs of white space and trims, as the engine does to a dish name.
   const clean = (s) => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
   // The name compared for duplicates: lower case, single spaces.
@@ -5174,7 +5181,10 @@ a.of-nav:active { background: var(--press); }
     if (!t) return { error: 'missing' };
     if (/^(mp|m\/p|market( price)?|varies|variable|ask|tbd|\?+)$/i.test(t)) return { error: 'variable' };
     if (/\d\s*(-|to|–|—)\s*\$?\s*\d/i.test(t.replace(/^\$/, ''))) return { error: 'range' };
-    t = t.replace(/usd|us\$|[$€£]/gi, '').replace(/\s+/g, '');
+    t = t.replace(/usd|us\$|\p{Sc}/giu, '');
+    const sym = cs();
+    if (sym && /^\p{L}+$/u.test(sym) && t.toLowerCase().indexOf(sym.toLowerCase()) === 0) t = t.slice(sym.length);   // a lettered symbol such as KSh
+    t = t.replace(/\s+/g, '');
     if (!/^[+-]?[\d.,]+$/.test(t)) return { error: 'bad' };
     let neg = false;
     if (t[0] === '-') { neg = true; t = t.slice(1); } else if (t[0] === '+') t = t.slice(1);
@@ -5347,15 +5357,15 @@ a.of-nav:active { background: var(--press); }
     else if (pr === 'bad') P.push(prob('badPrice', 'error', 'The price "' + row.priceText + '" is not a number.', 'Use digits only, for example 9.50.'));
     else if (typeof row.price === 'number') {
       if (row.price < 0) P.push(prob('negativePrice', 'error', 'The price ' + row.price + ' is below zero.', 'Enter the price as a positive amount.'));
-      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above $' + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "Prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950.'));
-      else if (row.price === 0) P.push(prob('freeItem', 'warn', 'The price is $0.00.', 'Keep it if the dish is free, or enter a price.'));
+      else if (row.price > LIMITS.priceMax) P.push(prob('hugePrice', 'error', 'The price ' + row.price + ' is above ' + cs() + LIMITS.priceMax + '.', row.fromCents ? 'The file may already be in dollars; choose "Prices are in dollars".' : 'Check for a stray digit, for example 9.50 not 950.'));
+      else if (row.price === 0) P.push(prob('freeItem', 'warn', 'The price is ' + cs() + '0.00.', 'Keep it if the dish is free, or enter a price.'));
       if (row.rounded) P.push(prob('priceRounded', 'warn', 'The price had more than two decimals and was rounded to the cent.', 'Check the price shown.'));
     }
     if (row.extraCells) P.push(prob('extraColumns', 'warn', 'This row has ' + row.extraCells + ' more ' + (row.extraCells === 1 ? 'column' : 'columns') + ' than the header, so a value may have been split at a comma.' + (row.maybePrice ? ' The price may be ' + row.maybePrice + ', not ' + row.price + '.' : ''), 'Put quotes around a price with a comma (for example "4,50"), or use a dot (4.50), then read the file again.'));
-    else if (/^\d+([.,]\d+)?$/.test(row.categoryText || '')) P.push(prob('numericCategory', 'warn', 'The category "' + row.categoryText + '" is a number, which usually means a price was split in two.', 'Check the price and the category in the file.'));
+    else if (/^\d+([.,]\d+)?$/.test(row.categoryText || '')) P.push(prob('numericCategory', 'warn', 'The menu section (category) "' + row.categoryText + '" is a number, which usually means a price was split in two.', 'Check the price and the menu section (category) in the file.'));
     if (row.stationText && !row.station) P.push(prob('unknownStation', 'warn', 'The station "' + row.stationText + '" is not one of yours, so the default station is used.', 'Pick the station after adding the dish.'));
-    if (row.categoryText && !row.category) P.push(prob('unknownCategory', 'warn', 'The category "' + row.categoryText + '" is not one of yours, so the default category is used.', 'Change the category after adding the dish.'));
-    if (row.fromCents) P.push(prob('centsConverted', 'warn', 'The price was read in cents (' + row.priceText + ' becomes $' + (row.price != null ? row.price.toFixed(2) : '?') + ').', 'If this is wrong, choose "Prices are in dollars".'));
+    if (row.categoryText && !row.category) P.push(prob('unknownCategory', 'warn', 'The menu section (category) "' + row.categoryText + '" is not one of yours, so the default section is used.', 'Change the menu section after adding the dish.'));
+    if (row.fromCents) P.push(prob('centsConverted', 'warn', 'The price was read in cents (' + row.priceText + ' becomes ' + cs() + (row.price != null ? row.price.toFixed(2) : '?') + ').', 'If this is wrong, choose "Prices are in dollars".'));
     row.ok = !P.some((p) => p.level === 'error');
   }
 
@@ -5402,7 +5412,7 @@ a.of-nav:active { background: var(--press); }
   }
 
   // Rows from a table with a header row. cols tells where each field is; square joins the variation name when an item has several.
-  function parseTable(table, format, opts) {
+  function parseTable(table, format, opts, summary) {
     const headers = table[0].map(norm);
     const col = {
       name: findCol(headers, format === 'toast' ? ['itemname', 'menuitem', 'menuitemname', 'name'] : WORDS.name),
@@ -5415,6 +5425,9 @@ a.of-nav:active { background: var(--press); }
       hidden: Math.max(headers.indexOf('hidden'), headers.indexOf('archived'), headers.indexOf('visibility')),
     };
     if (col.price < 0) col.price = findCol(headers, ['cost']);
+    // Columns the importer does not use are named, so a screen can say what was left out ("Ignored column: Notes").
+    const usedCols = new Set([col.name, col.price, col.station, col.category, col.description, col.variation, col.priceType, col.hidden].filter((x) => x >= 0));
+    if (summary) summary.ignoredColumns = table[0].map((h, i) => [clean(h), i]).filter(([h, i]) => h && !usedCols.has(i)).map(([h]) => h);
     const cents = opts.priceUnit === 'cents' || (opts.priceUnit !== 'dollars' && format === 'clover');
     const data = [];
     for (let i = 1; i < table.length && data.length < LIMITS.rowsRead; i++) {
@@ -5460,7 +5473,7 @@ a.of-nav:active { background: var(--press); }
   // zones and categories (override the config lists). Returns { format, label, rows, summary, error? }; never throws.
   M.parse = function parse(text, opts) {
     opts = opts || {};
-    const res = { format: null, label: '', rows: [], summary: { total: 0, ok: 0, errors: 0, warnings: 0, notes: [] } };
+    const res = { format: null, label: '', rows: [], summary: { total: 0, ok: 0, errors: 0, warnings: 0, notes: [], ignoredColumns: [] } };
     try {
       if (typeof text !== 'string') { res.error = 'No text to read.'; return res; }
       text = stripBom(text);
@@ -5479,8 +5492,8 @@ a.of-nav:active { background: var(--press); }
       res.format = format; res.label = FORMAT_LABEL[format] || format;
       if (format === 'lines') res.rows = parseLines(text, opts);
       else {
-        if (table.length < 2) { res.summary.notes.push('The file has a header row but no dishes under it.'); res.rows = []; } else res.rows = parseTable(table, format, opts);
-        if (format === 'clover' && opts.priceUnit !== 'dollars') res.summary.notes.push('Clover prices are read as cents (1400 is $14.00). If the first rows look wrong, read the file again with prices in dollars.');
+        if (table.length < 2) { res.summary.notes.push('The file has a header row but no dishes under it.'); res.rows = []; } else res.rows = parseTable(table, format, opts, res.summary);
+        if (format === 'clover' && opts.priceUnit !== 'dollars') res.summary.notes.push('Clover prices are read as cents (1400 is ' + cs() + '14.00). If the first rows look wrong, read the file again with prices in dollars.');
       }
       if (res.rows.length >= LIMITS.rowsRead) res.summary.notes.push('Only the first ' + LIMITS.rowsRead + ' rows were read.');
       const existing = new Set(((opts.existing) || []).map((m) => key(m && m.name)));
@@ -5622,7 +5635,7 @@ a.of-nav:active { background: var(--press); }
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'confirmWord', 'notInDemo'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -5682,6 +5695,11 @@ a.of-nav:active { background: var(--press); }
     badWho: 'Initials must be 1 to 12 characters. Shorten them, or leave them blank if the screen allows.',
     unknownSafetyEntry: 'That safety log entry is not here, or it is not a temperature, discard, cooling, reheat, sanitize or keep-serving entry. Pick one from the safety log.',
     wrongBackupMode: 'That backup does not belong to this kitchen (one is from the demo, the other from a real kitchen). Nothing was changed. Choose a backup made from this kitchen.',
+    pinRequired: 'Set a back office PIN first. A recovery code belongs to a PIN.',
+    noRecoveryCode: 'No recovery code was made for this PIN, so it cannot be reset this way. Use the backup, or make a recovery code while you still know the PIN.',
+    wrongRecoveryCode: 'That is not the recovery code. Check the letters and numbers on the card you wrote it down on. Nothing was changed.',
+    recoveryLocked: 'Too many wrong recovery codes. Wait a little, then try again. Nothing was changed.',
+    noCrypto: 'This browser cannot make the secure code Smokebox needs. Nothing was changed.',
     confirmWord: 'Type the confirmation word exactly as shown to go ahead. Nothing was changed.',
     notInDemo: 'This only works in your own kitchen, not in the demo. Nothing was changed.',
     moduleOff: 'Cook-ahead tracking (batches, the hold cabinet, temperature checks and sanitizing) is switched off. Turn it on under Dishes and prices: Yes, I cook ahead.',
@@ -5730,6 +5748,7 @@ a.of-nav:active { background: var(--press); }
     addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two", prepGuess?:boolean }',
     updateIngredient: '{ id, patch }',
     moveMenuItem: '{ id, toIndex }',
+    setChips: '{ chips: string[] | null }',
     clearDemoTickets: '{}',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety" }',
     setPortions: '{ menuId, on:boolean, count? }',
@@ -5739,7 +5758,7 @@ a.of-nav:active { background: var(--press); }
   };
   // audit:data-end
   // The actions that can be undone inside the undo window.
-  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient', 'moveMenuItem'];
+  const UNDOABLE = ['advanceItem', 'completeItem', 'completeZone', 'bumpTicket', 'voidTicket', 'toggle86', 'fireNow', 'pullBatch', 'discardBatch', 'sanitizeDone', 'planBatch', 'cancelPlan', 'snoozeAlert', 'clearSnooze', 'addIngredient', 'moveMenuItem', 'setChips'];
 
   // Time units in milliseconds: H is one hour, MIN is one minute.
   const H = 3600e3, MIN = 60e3;
@@ -6135,7 +6154,7 @@ a.of-nav:active { background: var(--press); }
     // after twice the interval.
     const iv = S.tempCheckEveryMin * MIN;
     // In range but past its quality limit: off the menu, still on the board, waiting for a taste test or a discard.
-    if (pastQ) return gateOut('PAST_QUALITY', false, 'pastQuality', 'bad', 'Past its quality limit. Taste it, then keep serving or throw it out.', exp);
+    if (pastQ) return gateOut('PAST_QUALITY', false, 'pastQuality', 'bad', 'Past its quality limit. Check it, then decide: keep serving or throw it out. Your food-safety plan comes first.', exp);
     if (batch.lastTempAt == null) return gateOut('CHECK_TEMP', true, 'noReading', now - batch.enteredAt > iv ? 'bad' : 'warn', 'No temperature logged yet. Check it now.' + SAFETY, exp);
     const due = batch.lastTempAt + iv;
     if (now > due) return gateOut('CHECK_TEMP', true, 'checkDue', now > batch.lastTempAt + 2 * iv ? 'bad' : 'warn', 'Temperature check is due. Log a reading.' + SAFETY, exp);
@@ -6738,6 +6757,8 @@ a.of-nav:active { background: var(--press); }
     const ev = { ticketId: t.id, itemId: it.id, zone: it.zone, menuId: it.menuId, workMs: w.doneAt - (w.startedAt != null ? w.startedAt : w.firedAt), qty: it.qty };
     if (w.cost !== undefined) ev.cost = w.cost;
     if (shortG > 0) ev.shortG = shortG;
+    // Counter service finishes the item without a kitchen step: flagged auto, with no work time, so no prep time is ever invented.
+    if (opts && opts.auto) { w.auto = true; ev.workMs = 0; ev.auto = true; }
     tx.event('item_done', ev);
     return { itemId: it.id, before, after: timesOf(w) };
   }
@@ -6969,7 +6990,28 @@ a.of-nav:active { background: var(--press); }
     w.status = 'paid'; w.paidAt = stampAfter(o.createdAt, tx.now); w.method = pay.method; w.tip = pay.tip; w.discount = t0.discount; w.totals = t0;
     tx.event('order_paid', { orderId: o.id, method: pay.method, subtotal: t0.subtotal, discount: t0.discount, tax: t0.tax, total: t0.total, tip: pay.tip, rounds: t0.rounds });
     tx.info = Object.assign({}, tx.info, { orderId: o.id, total: t0.total, tip: pay.tip, method: pay.method });
+    if (counterOn(tx.get('settings'))) tx.info.autoFinished = autoFinishOrder(tx, o.id);
     return 'ok';
+  }
+  // Counter service: when an order is paid, every live ticket of that order is finished and bumped at once. Items still open are
+  // marked done (stock is used as for any finished item, nothing is learned about prep times) and flagged auto; the ticket is
+  // bumped and flagged auto, so the board has nothing to show and the reports leave it out of kitchen-time statistics. Items
+  // and tickets already done or voided are left as they are. Returns how many items were finished this way.
+  function autoFinishOrder(tx, orderId) {
+    let n = 0;
+    const tickets = tx.get('tickets');
+    for (let ti = 0; ti < tickets.length; ti++) {
+      const t0 = tickets[ti];
+      if (t0.orderId !== orderId || t0.status !== 'active') continue;
+      for (let ii = 0; ii < t0.items.length; ii++) if (tx.get('tickets')[ti].items[ii].status !== 'done') { completeInto(tx, ti, ii, new Map(), { noLearn: true, auto: true }); n++; }
+      const t = tx.get('tickets')[ti];
+      let exp = stampAfter(t.createdAt, tx.now);
+      for (const it of t.items) for (const k of ['doneAt', 'startedAt', 'firedAt']) if (isNum(it[k]) && it[k] > exp) exp = it[k];
+      const w = tx.ticket(ti);
+      w.status = 'expedited'; w.expeditedAt = exp; w.auto = true; delete w.forced;
+      tx.event('ticket_expedited', { ticketId: t.id, totalMs: exp - t.createdAt, forced: false, auto: true });
+    }
+    return n;
   }
   // Takes payment on an open order: method (cash, card or other), an optional tip and an optional discount, all in
   // dollars. The totals are frozen at that moment, so later menu or price changes never alter a paid order.
@@ -7761,15 +7803,15 @@ a.of-nav:active { background: var(--press); }
   // Every setting the owner may change, with its rule. Anything not listed is refused (badPatch).
   const SET_SCHEMA = {
     pacing: { enabled: { t: 'bool' }, learnK: R(0, 50), floorSec: R(1, 600), minFactor: R(0.1, 1), maxFactor: R(1, 10), outlierFactor: R(1, 20), qtyFactor: R(0, 2), qtyCap: R(1, 10) },
-    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20), soundStartHour: R(0, 23, true), soundOutsideHours: { t: 'bool' }, qualitySyncHoldMin: R(0, 30, true) },
+    service: { dayStartHour: R(0, 8, true), openHour: R(0, 23), closeHour: R(1, 30), taxRatePct: R(0, 20), soundStartHour: R(0, 23, true), soundOutsideHours: { t: 'bool' }, counter: { t: 'bool' }, chips: { t: 'chips' }, qualitySyncHoldMin: R(0, 30, true) },
     safety: { hotHoldF: B('hotHoldF'), coldHoldF: B('coldHoldF'), reheatF: B('reheatF'), belowHotGraceH: B('belowHotGraceH'), aboveColdGraceH: B('aboveColdGraceH'),
       defaultMaxHoldH: B('defaultMaxHoldH'), hardCapH: B('hardCapH'), tempCheckEveryMin: B('tempCheckEveryMin'), sanitizeEveryH: B('sanitizeEveryH'),
       cooling: { stage1ToF: R(41, 70), stage1H: R(0.5, 2), totalH: R(1, 6), finalF: R(33, 41) }, tempIntervalV2: { t: 'bool' }, holdWindowV2: { t: 'bool' } },
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
     syncTargetSec: R(10, 600),
-    ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, sound: { t: 'bool' }, tempUnit: { t: 'enum', v: ['F', 'C'] }, weightUnit: { t: 'enum', v: ['kg', 'lb'] } },
-    office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' } },
+    ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, currency: { t: 'currency' }, sound: { t: 'bool' }, tempUnit: { t: 'enum', v: ['F', 'C'] }, weightUnit: { t: 'enum', v: ['kg', 'lb'] } },
+    office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' }, recoveryHash: { t: 'pin' } },
     alerts: { ladderThresholds: { t: 'ladder' } },
     modules: { cookAhead: { t: 'bool' } },
   };
@@ -7798,10 +7840,37 @@ a.of-nav:active { background: var(--press); }
     }
     return null;
   }
+  // The most customer chips (quick names) the order screen offers, and the longest chip label.
+  const CHIP_MAX = 12, CHIP_LEN = 24;
+  // Checks a list of customer chips: up to 12 labels of 1 to 24 characters, already tidy (no stray spaces or control
+  // characters), no label twice (any case). An empty list is allowed and means no chips. Returns null or { report, key, ... }.
+  function checkChips(v, key) {
+    if (!Array.isArray(v)) return { report: 'badPatch', key };
+    if (v.length > CHIP_MAX) return { report: 'outOfBounds', key, min: 0, max: CHIP_MAX };
+    const seen = new Set();
+    for (let i = 0; i < v.length; i++) {
+      const c = v[i];
+      if (typeof c !== 'string' || /[\u0000-\u001f\u007f]/.test(c) || cleanText(c) !== c) return { report: 'badPatch', key: key + '.' + i };
+      if (c.length < 1 || c.length > CHIP_LEN) return { report: 'outOfBounds', key: key + '.' + i, min: 1, max: CHIP_LEN };
+      const k = c.toLowerCase();
+      if (seen.has(k)) return { report: 'badPatch', key: key + '.' + i };
+      seen.add(k);
+    }
+    return null;
+  }
+  // The customer chips the order screen offers: the owner's list (possibly empty), else the built-in quick names.
+  function chipsOf(settings) {
+    const c = settings && settings.service && settings.service.chips;
+    return Array.isArray(c) ? c.slice() : C.quickNames.slice();
+  }
+  // True when counter service is on: a paid order's tickets finish and bump by themselves.
+  const counterOn = (settings) => !!(settings && settings.service && settings.service.counter === true);
   // Validates one leaf of the settings; returns null when fine, else { report, key, min?, max? }.
   function checkLeaf(spec, v, key) {
     if (spec.t === 'bool') return typeof v === 'boolean' ? null : { report: 'badPatch', key };
     if (spec.t === 'enum') { const list = typeof spec.vf === 'function' ? spec.vf() : spec.v; return typeof v === 'string' && list.indexOf(v) >= 0 ? null : { report: 'badPatch', key }; }
+    if (spec.t === 'chips') return checkChips(v, key);
+    if (spec.t === 'currency') return U.validCurrency(v) ? null : { report: 'badPatch', key };
     if (spec.t === 'pin') return v === null || (typeof v === 'string' && v.length <= 128) ? null : { report: 'badPatch', key };
     if (spec.t === 'ladder') return checkLadder(v, key);
     if (spec.t === 'num') {
@@ -7852,9 +7921,11 @@ a.of-nav:active { background: var(--press); }
         if (r.report) return r;
         out[k] = r.value;
       } else if (spec.t) {
-        const e = checkLeaf(spec, patch[k], key);
+        // Chip labels are tidied (spaces squeezed) before they are checked, so " Table  1 " is accepted as "Table 1".
+        const pv = spec.t === 'chips' && Array.isArray(patch[k]) ? patch[k].map((x) => (typeof x === 'string' ? cleanText(x) : x)) : patch[k];
+        const e = checkLeaf(spec, pv, key);
         if (e) return e;
-        if (out[k] !== patch[k]) { out[k] = patch[k]; keys.push(key); }
+        if (JSON.stringify(out[k]) !== JSON.stringify(pv)) { out[k] = pv; keys.push(key); }
       } else {
         const r = mergeSchema(isObj(cur[k]) ? cur[k] : {}, patch[k], spec, key, keys);
         if (r.report) return r;
@@ -8092,6 +8163,35 @@ a.of-nav:active { background: var(--press); }
     const w = tx.mut('menu');
     const [mi] = w.splice(d.to, 1);
     w.splice(d.from, 0, mi);
+    return 'ok';
+  };
+  // Sets the customer chips the order screen offers (Walk-up, Table 1 ...): a list of up to 12 labels of up to 24 characters,
+  // tidied and checked like the settings patch; an empty list means no chips; null goes back to the built-in list. Same
+  // list gives nothingToDo. Undoable while the list is still what this change made it.
+  A.setChips = function (tx, p) {
+    const raw = p.chips;
+    const next = raw === null ? null : Array.isArray(raw) ? raw.map((x) => (typeof x === 'string' ? cleanText(x) : x)) : undefined;
+    if (next === undefined) { tx.info.key = 'chips'; return 'badPatch'; }
+    if (next !== null) { const e = checkChips(next, 'service.chips'); if (e) { tx.info = { key: e.key, min: e.min, max: e.max }; return e.report; } }
+    const S = tx.get('settings');
+    const before = Array.isArray(S.service.chips) ? S.service.chips.slice() : null;
+    if (JSON.stringify(before) === JSON.stringify(next)) return 'nothingToDo';
+    const svc = Object.assign({}, S.service);
+    if (next === null) delete svc.chips; else svc.chips = next;
+    tx.set('settings', Object.assign({}, S, { service: svc }));
+    tx.event('settings_changed', { keys: ['service.chips'] });
+    pushUndo(tx, 'chips', 'Customer chips changed', { before, after: next });
+    tx.info = { chips: chipsOf(tx.get('settings')), keys: ['service.chips'] };
+    return 'ok';
+  };
+  // Undo of a chips change: the old list (or the built-in one) comes back, unless the list was changed again since.
+  UNDO.chips = function (tx, d) {
+    const S = tx.get('settings');
+    const now = Array.isArray(S.service.chips) ? S.service.chips : null;
+    if (JSON.stringify(now) !== JSON.stringify(d.after)) return 'undoConflict';
+    const svc = Object.assign({}, S.service);
+    if (d.before === null) delete svc.chips; else svc.chips = d.before.slice();
+    tx.set('settings', Object.assign({}, S, { service: svc }));
     return 'ok';
   };
   // The most ingredients a kitchen may hold, so a typing slip cannot fill the saved data.
@@ -9379,6 +9479,8 @@ a.of-nav:active { background: var(--press); }
         const mi = typeof i.name === 'string' && i.name ? i.name : typeof i.menuId === 'string' && hasOwn(C.menuById, i.menuId) ? C.menuById[i.menuId].name : 'That item';
         return mi + ' is ' + why + '. Take it off the order or pick something else.';
       }
+      case 'recoveryLocked': { const m = isNum(i.waitMs) ? Math.max(1, Math.ceil(i.waitMs / 60000)) : 0; return m ? 'Too many wrong recovery codes. Try again in ' + m + ' ' + U.plural(m, 'minute') + '. Nothing was changed.' : REPORTS.recoveryLocked; }
+      case 'wrongRecoveryCode': return isNum(i.triesLeft) && i.triesLeft > 0 ? REPORTS.wrongRecoveryCode + ' ' + i.triesLeft + ' ' + U.plural(i.triesLeft, 'try', 'tries') + ' left.' : REPORTS.wrongRecoveryCode;
       case 'wrongBackupMode': return i.backup === 'demo' ? 'That backup comes from the demo, not from your kitchen. Nothing was changed. Choose a backup made from your own kitchen.' : 'That backup comes from a real kitchen, so it cannot be loaded into the demo. Nothing was changed. Leave the demo first, then load it into your own kitchen.';
       case 'ordersStillOpen': return isInt(i.count) && i.count > 0 ? i.count + ' ' + U.plural(i.count, 'order') + ' still open. Take payment on ' + (i.count === 1 ? 'it' : 'each one') + ', or void ' + (i.count === 1 ? 'it' : 'them') + ', then close the day again.' : REPORTS.ordersStillOpen;
       case 'outOfBounds': return isNum(i.min) && isNum(i.max) ? 'That value is outside the allowed range (' + i.min + ' to ' + i.max + '). Enter a value inside it.' : REPORTS.outOfBounds;
@@ -9394,7 +9496,7 @@ a.of-nav:active { background: var(--press); }
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, describe, safetyLog, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.
@@ -9540,9 +9642,9 @@ a.of-nav:active { background: var(--press); }
     const ing = state.ingredients.find((x) => x.id === b.ing);
     const name = ing ? ing.name : b.ing;
     const left = state.batches.some((x) => x !== b && x.ing === b.ing && x.status !== 'discard' && x.canServe === true && x.remainingG > 0);
-    const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
+    const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' (' + U.currencySymbol() + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
     out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
-      consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Taste it, then keep serving or throw it out.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
+      consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Check it, then decide: keep serving or throw it out. Your food-safety plan comes first.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
   }
   // The next closing time after now, in ms, from the service hours (a close above 24 means after midnight, so last
   // night's close can still be ahead at 12:30 am). Null once today's close has passed.
@@ -9695,12 +9797,12 @@ a.of-nav:active { background: var(--press); }
         const trivial = b.remainingG < TRIVIAL_G || (waste != null && waste < NOTABLE_G && waste < NOTABLE_SHARE * b.remainingG);
         const usd = waste != null && U.isNum(b.costPerCookedKg) ? waste / 1000 * b.costPerCookedKg : null;
         let consequence, action;
-        const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' ($' + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
+        const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' (' + U.currencySymbol() + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
         const goes86 = lastOne ? ' and ' + name + ' goes 86' : '';
         const fate = q ? 'pass its quality limit' : 'be thrown out';
         if (msLeft <= 0) { consequence = 'Expired: ' + amount + ' must be thrown out' + goes86 + '.'; action = 'Discard and log it.'; }
         else if (waste == null) { consequence = 'Pace unknown (nothing pulled yet): up to ' + amount + ' may ' + (q ? 'pass its quality limit' : 'be thrown out') + goes86 + '.'; action = 'Use it first, and log pulls so the pace can be worked out.'; }
-        else if (waste > 50) { consequence = 'About ' + U.weightText(waste) + ' of ' + U.weightText(b.remainingG) + ' will ' + fate + (usd != null ? ' ($' + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
+        else if (waste > 50) { consequence = 'About ' + U.weightText(waste) + ' of ' + U.weightText(b.remainingG) + ' will ' + fate + (usd != null ? ' (' + U.currencySymbol() + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
         else { consequence = 'On pace to sell all ' + U.weightText(b.remainingG) + ' in time.'; action = 'Nothing to do.'; }
         // A batch gets a row once a rung is crossed, or earlier when the pace says food will be thrown out within 2 hours.
         const isLim = !!lim && lim.limitBatchId === b.id;
@@ -9746,7 +9848,7 @@ a.of-nav:active { background: var(--press); }
       const ing = state.ingredients.find((x) => x.id === b.ing);
       const name = ing ? ing.name : b.ing;
       const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');
-      const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' ($' + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
+      const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' (' + U.currencySymbol() + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
       out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
         consequence: 'Expired and thrown out: ' + U.weightText(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
     }
@@ -10125,7 +10227,14 @@ a.of-nav:active { background: var(--press); }
   const START_OVER_WORD = 'ERASE';
   // Neutral starter names for a new empty kitchen. The ids (pit, meat ...) never change, only what people read.
   const STARTER_NAMES = { rename: { zones: { pit: 'Kitchen', sides: 'Prep', fry: 'Fryer' }, categories: { meat: 'Mains', sandwich: 'Sides', side: 'Snacks', fried: 'Desserts', cold: 'Drinks' } }, add: {} };
-  const START_OVER_KEYS = ['smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
+  // The half-built order on the New ticket screen: kept so a reload or closed tab loses nothing. At most 20,000 characters, and a
+  // draft older than 12 hours is forgotten (yesterday's half-order should not come back).
+  const DRAFT_KEY = 'smokebox.v1.orderdraft', DRAFT_MAX_CHARS = 20000, DRAFT_MAX_AGE_MS = 12 * 3600e3;
+  // PIN recovery: attempts are counted in this key (kitchen data) so a reload does not reset the count. 5 wrong codes lock it for 15 minutes.
+  const RECOVERY_KEY = 'smokebox.v1.pinrecovery', RECOVERY_TRIES = 5, RECOVERY_LOCK_MS = 15 * 60e3;
+  // Letters and digits for a recovery code, leaving out I, O, 0 and 1 so a handwritten card is not misread. 32 characters, 10 in a code: 50 bits.
+  const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const START_OVER_KEYS = ['smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
     'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
@@ -10672,7 +10781,7 @@ a.of-nav:active { background: var(--press); }
   function status() { return Object.assign({}, st, { speed: clk.speed }); }
 
   // Tells the formatting helpers which units the saved settings ask for (degrees F or C, kg or lb).
-  function syncUnits() { try { if (state && state.settings) U.setUnits(state.settings.ui); } catch (e) { /* formatting keeps its old choice */ } }
+  function syncUnits() { try { if (state && state.settings) { U.setUnits(state.settings.ui); U.setCurrency(state.settings.ui && state.settings.ui.currency); } } catch (e) { /* formatting keeps its old choice */ } }
   // Makes ns the current state if it differs, then schedules a save and a redraw. broadcast tells other
   // tabs.
   function commit(ns, broadcast) {
@@ -10710,6 +10819,7 @@ a.of-nav:active { background: var(--press); }
         if (source === 'user') enqueueOp({ opId, type, payload, now: n });
       }
       if (type === 'closeDay') snapWanted = 'closeDay';
+      if (type === 'createTicket' && source === 'user') clearDraft();
       commit(r.state, true);
     }
     else if (source === 'user' && r.report !== 'nothingToDo' && type !== 'uiReport') {
@@ -11044,6 +11154,100 @@ a.of-nav:active { background: var(--press); }
       return C.saveCustom(STARTER_NAMES) !== false;
     } catch (e) { return false; }
   }
+  // Saves the half-built order from the New ticket screen (any plain JSON object the screen can rebuild from). Returns true when
+  // saved; false when it is not a plain object, too big (20,000 characters) or the browser refuses. Not part of backups.
+  // In the demo it is saved under the demo's own key. A successful createTicket by a person clears it.
+  function saveDraft(draft) {
+    if (!storage || !draft || typeof draft !== 'object' || Array.isArray(draft)) return false;
+    try {
+      const rec = { v: 1, at: realNow(), draft };
+      if (JSON.stringify(rec).length > DRAFT_MAX_CHARS) return false;
+      return storage.set(DRAFT_KEY, rec) !== false;
+    } catch (e) { return false; }
+  }
+  // The saved half-built order, or null when there is none, it is older than 12 hours, or the saved text is damaged (a damaged
+  // or stale draft is removed). Returns a copy the screen may change.
+  function loadDraft() {
+    if (!storage) return null;
+    try {
+      let rec = null;
+      try { rec = storage.get(DRAFT_KEY, null); } catch (e) { rec = null; }
+      if (rec == null) { if (storage.raw && storage.raw(DRAFT_KEY) != null) storage.remove(DRAFT_KEY); return null; }
+      const ok = rec && typeof rec === 'object' && rec.v === 1 && isNum(rec.at) && rec.draft && typeof rec.draft === 'object' && !Array.isArray(rec.draft)
+        && realNow() - rec.at <= DRAFT_MAX_AGE_MS && rec.at <= realNow() + DRAFT_MAX_AGE_MS && JSON.stringify(rec).length <= DRAFT_MAX_CHARS;
+      if (!ok) { storage.remove(DRAFT_KEY); return null; }
+      return JSON.parse(JSON.stringify(rec.draft));
+    } catch (e) { return null; }
+  }
+  // Throws the saved half-built order away (the order was sent or cancelled).
+  function clearDraft() { try { if (storage) storage.remove(DRAFT_KEY); } catch (e) { /* ignore */ } }
+  // The SHA-256 of text as 64 hex characters, or null when this browser has no secure hashing. Asynchronous.
+  async function sha256Hex(text) {
+    const c = g.crypto && g.crypto.subtle;
+    if (!c || typeof c.digest !== 'function' || typeof TextEncoder === 'undefined') return null;
+    const buf = await c.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map((b) => (b < 16 ? '0' : '') + b.toString(16)).join('');
+  }
+  // A recovery code as typed (any case, spaces and dashes allowed) made into its plain form, or '' when it cannot be a code.
+  function normalizeCode(text) {
+    const t = String(text == null ? '' : text).toUpperCase().replace(/[\s-]+/g, '');
+    return t.length === 10 && t.split('').every((ch) => RECOVERY_ALPHABET.indexOf(ch) >= 0) ? t : '';
+  }
+  // The stored form of a recovery code: a salted SHA-256 (only this is ever saved, never the code).
+  async function hashCode(plain) {
+    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);
+    return hex === null ? null : 'sha256:' + hex;
+  }
+  // True when a back office PIN is set.
+  const hasPin = () => !!(state && state.settings && state.settings.office && state.settings.office.pinHash);
+  // True when a recovery code has been made for the current PIN.
+  function hasRecoveryCode() { return !!(state && state.settings && state.settings.office && state.settings.office.recoveryHash); }
+  // Makes a new recovery code for the current PIN, saves only its hash in the settings, and returns the code once as { ok, code }
+  // ("ABCDE-FGHJK") for the screen to show and the owner to write down. Any earlier code stops working. Needs a PIN
+  // (pinRequired); works for a PIN that was set before recovery codes existed. The code is never stored or logged.
+  async function createRecoveryCode() {
+    if (!state) return { ok: false, report: 'invalidBackup', info: {} };
+    if (!hasPin()) return { ok: false, report: 'pinRequired', info: {} };
+    const bytes = new Uint8Array(10);
+    if (!g.crypto || typeof g.crypto.getRandomValues !== 'function') return { ok: false, report: 'noCrypto', info: {} };
+    g.crypto.getRandomValues(bytes);
+    const plain = Array.from(bytes).map((b) => RECOVERY_ALPHABET[b % 32]).join('');
+    const hash = await hashCode(plain);
+    if (hash === null) return { ok: false, report: 'noCrypto', info: {} };
+    const rep = dispatch('updateSettings', { patch: { office: { recoveryHash: hash } } }, { source: 'user' });
+    if (rep !== 'ok') return { ok: false, report: rep, info: {} };
+    persistNow();
+    return { ok: true, report: 'ok', code: plain.slice(0, 5) + '-' + plain.slice(5), info: {} };
+  }
+  // Uses a recovery code to reset the back office PIN. newPinHash is the new PIN's hash (the same form the PIN screen saves) or null
+  // to remove the PIN. A wrong code is counted: after 5 wrong codes it is locked for 15 minutes, even for the right code, and the
+  // count survives a reload. The right code is spent (a new one can be made once the new PIN is set). Returns { ok, report, info }.
+  async function recoverPin(code, newPinHash) {
+    if (!state) return { ok: false, report: 'invalidBackup', info: {} };
+    if (newPinHash !== null && !(typeof newPinHash === 'string' && newPinHash.length > 0 && newPinHash.length <= 128)) return { ok: false, report: 'badPatch', info: { key: 'newPinHash' } };
+    if (!hasRecoveryCode()) return { ok: false, report: 'noRecoveryCode', info: {} };
+    const t = realNow();
+    let rec = { fails: 0, until: 0 };
+    try { const r = storage ? storage.get(RECOVERY_KEY, null) : null; if (r && typeof r === 'object' && isNum(r.fails) && isNum(r.until)) rec = { fails: Math.max(0, Math.floor(r.fails)), until: r.until }; } catch (e) { rec = { fails: 0, until: 0 }; }
+    if (rec.until > t) return { ok: false, report: 'recoveryLocked', info: { waitMs: rec.until - t } };
+    if (rec.until && rec.until <= t) rec = { fails: 0, until: 0 };
+    const plain = normalizeCode(code);
+    const hash = plain ? await hashCode(plain) : null;
+    if (plain && hash === null) return { ok: false, report: 'noCrypto', info: {} };
+    const stored = state.settings.office.recoveryHash;
+    if (!plain || hash !== stored) {
+      rec.fails++;
+      const locked = rec.fails >= RECOVERY_TRIES;
+      if (locked) rec = { fails: 0, until: t + RECOVERY_LOCK_MS };
+      try { if (storage) storage.set(RECOVERY_KEY, rec); } catch (e) { /* the count is kept in memory only */ }
+      return locked ? { ok: false, report: 'recoveryLocked', info: { waitMs: RECOVERY_LOCK_MS } } : { ok: false, report: 'wrongRecoveryCode', info: { triesLeft: RECOVERY_TRIES - rec.fails } };
+    }
+    const rep = dispatch('updateSettings', { patch: { office: { pinHash: newPinHash, recoveryHash: null } } }, { source: 'user' });
+    if (rep !== 'ok' && rep !== 'nothingToDo') return { ok: false, report: rep, info: {} };
+    try { if (storage) storage.remove(RECOVERY_KEY); } catch (e) { /* ignore */ }
+    persistNow();
+    return { ok: true, report: 'ok', info: { pinRemoved: newPinHash === null } };
+  }
   // Starts the real kitchen over with an empty menu. Needs opts.confirm to be the typed word (SB.store.START_OVER_WORD, any case),
   // refuses in the demo, and takes a full backup first: if the backup cannot be made nothing is cleared. Then it clears dishes,
   // ingredients, stock, batches, tickets, orders and history (resetLive, catalog 'blank') and the setup-progress choices, so the
@@ -11114,7 +11318,7 @@ a.of-nav:active { background: var(--press); }
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
@@ -11267,7 +11471,7 @@ a.of-nav:active { background: var(--press); }
 
   // ---------- 3. text and CSV ----------
   // Writes a money amount in dollars with two cents digits.
-  const usd = (n) => '$' + (U.isNum(n) ? n.toFixed(2) : '0.00');
+  const usd = (n) => U.currencySymbol() + (U.isNum(n) ? n.toFixed(2) : '0.00');
   // Plain-words summary of a report, one line per fact, for the screen and for pasting into notes.
   function toText(r) {
     const L = [];
@@ -11491,7 +11695,7 @@ a.of-nav:active { background: var(--press); }
   function lineModel(it, v, pc) {
     const qty = lineQty(it), price = it.price, cost = it.cost, done = it.status === 'done';
     let work = null, resp = null;
-    if (done) {
+    if (done && it.auto !== true) {      // an item finished by counter service has no work or response time to learn from
       const f = it.firedAt, d = it.doneAt, st = it.startedAt;
       if (num(f) && num(d) && d >= f) {
         if (num(st)) { if (st >= f && st <= d) { work = d - st; resp = st - f; } }
@@ -11577,7 +11781,8 @@ a.of-nav:active { background: var(--press); }
       const t = v.t;
       if (t.status === 'expedited' && num(t.expeditedAt) && t.expeditedAt >= t.createdAt) {
         v.expeditedAt = t.expeditedAt; v.totalMs = t.expeditedAt - t.createdAt; v.level = levelOf(v.totalMs, ctx.th(v.channel));
-        spd.push(v);
+        // Counter service closes a ticket when it is paid: that is not a kitchen time, so it stays out of every speed statistic.
+        if (t.auto !== true) spd.push(v);
       }
     }
     ctx.all = all;                                     // every ticket in scope (any status)
@@ -18943,6 +19148,13 @@ a.of-nav:active { background: var(--press); }
   const C = SB.config;
   // The rules engine (SB.engine), looked up on each call and never kept.
   const E = () => SB.engine;
+  // True when the kitchen runs as counter service (settings.service.counter): orders are taken and paid at the counter, with no
+  // cooking steps to track. Absent or false means the normal kitchen board.
+  function counterOn() {
+    const sv = store().getState().settings && store().getState().settings.service;
+    if (SB.engine && typeof SB.engine.counterOn === 'function') return !!SB.engine.counterOn(store().getState().settings);
+    return !!(sv && sv.counter === true);
+  }
   // True when the cook-ahead parts (batches, Cabinet tab, Hold button, temperature checks, sanitize timer) should show:
   // the module is on (absent means on), or some batch still holds food, which is never hidden.
   function cookOn() {
@@ -19378,6 +19590,14 @@ a.of-nav:active { background: var(--press); }
   };
 
   // Stops every listener, timer and observer and empties the element. Safe to call twice.
+  // Applies the saved station, category and channel names to the live app without a reload: reloads the name lists and draws
+  // the board again on the same element, on the same station tab. Safe to call when the board is not mounted.
+  F.refreshNames = function () {
+    try { C.applyCustom(C.customSpec()); } catch (e) { console.error('[smokebox] names failed', e); return false; }
+    if (m && m.el) { const el = m.el, zone = m.zone; F.unmount(); pendingZone = TABS.indexOf(zone) >= 0 ? zone : null; F.mount(el); }
+    return true;
+  };
+  // Stops the board's timers and listeners and takes it off the screen.
   F.unmount = function () {
     if (!m) return;
     const i = m;
@@ -19465,7 +19685,7 @@ a.of-nav:active { background: var(--press); }
 
     // New ticket opens the order sheet. Menu opens the full menu, or a short list on a narrow screen.
     const newBtn = h('button', { type: 'button', class: 'btn btn-primary fl-new', 'aria-keyshortcuts': 'N', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket'));
-    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Menu', onClick: (e) => { if (mq('(max-width: 999px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Menu'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
+    const menuBtn = h('button', { type: 'button', class: 'btn fl-menu', 'aria-label': 'Settings', onClick: (e) => { if (mq('(max-width: 999px)') || headSqueezed()) quickMenu(e.currentTarget); else openSheet('menu'); } }, ico('menu', 22), h('span', { class: 'fl-menu-label' }, 'Settings'), h('span', { class: 'fl-menu-dot', hidden: true, 'aria-hidden': 'true' }));
     // Back office is a plain labeled button for managers: sales, speed, stock and the menu. It asks for the PIN when one is set.
     const officeBtn = h('button', { type: 'button', class: 'btn fl-tool fl-office', 'aria-label': 'Back office', 'aria-keyshortcuts': 'Control+Shift+O', onClick: (e) => openOffice(e.currentTarget) }, ico('gauge', 24), h('span', { class: 'fl-tool-label fl-office-label' }, 'Back office'));
     try { SB.ui.tooltip(officeBtn, 'Back office: sales, speed, stock and your menu'); } catch (e) { /* ignore */ }
@@ -20429,8 +20649,12 @@ a.of-nav:active { background: var(--press); }
     if (!m.dis) m.dis = new Set();
     // With the cook-ahead part off (and no food in a batch) rows about batches, temperatures and sanitizing stay out of the strip.
     const ck = cookOn();
+    // Counter service has no cooking steps and no late tickets, so the strip leaves those rows out.
+    const co = counterOn();
+    const ticketRow = (d) => co && (d.kind === 'late' || d.kind === 'start' || d.kind === 'ready' || d.kind === 'new');
+    // Rows about batches, temperatures and sanitizing count as cook-ahead rows.
     const batchy = (d) => !ck && (d.batchId || d.kind === 'sanitize' || d.kind === 'check' || d.kind === 'shortfall' || d.kind === 'leftover' || d.kind === 'keepcheck' || d.kind === 'expiry' || d.kind === 'expired' || d.kind === 'past');
-    const feed = all.filter((d) => !d.trivial && !batchy(d) && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
+    const feed = all.filter((d) => !d.trivial && !batchy(d) && !ticketRow(d) && (d.sev !== 'info' || d.kind === 'expiry' || d.kind === 'leftover' || d.kind === 'keepcheck') && !(d.kind === 'expired' && ladder.isAcked(d.id)) && soon(d) && !m.dis.has('row:' + d.id + ':' + (d.step || '')));
     // A tablet screen is short: one warning row there (the next shows when this one is cleared or done), two on a tall or far screen.
     // A far display below 1300 px tall keeps one big row, so the tickets keep most of the screen; a taller one has room for two.
     const maxRows = !F.wallActive() && (far ? (g.innerHeight || 0) >= 1300 : (g.innerHeight || 0) >= 900) ? 2 : 1;
@@ -20487,6 +20711,9 @@ a.of-nav:active { background: var(--press); }
     const c = S.select.counts();
     m.counts = c;
     applyCook(cookOn());
+    { const co = counterOn() ? 'on' : 'off'; if (m.root.dataset.counter !== co) { m.root.dataset.counter = co; m.fitKey = null; }
+      // At the counter there is one list of orders, so a station tab left open is switched back to All.
+      if (co === 'on' && m.zone !== 'all') F.setZone('all'); }
     if (!m.belowAt || now - m.belowAt > 1000 || now < m.belowAt) { m.belowAt = now; updateBelow(); }
     paintRole();
     updateStrip(now);
@@ -20552,7 +20779,7 @@ a.of-nav:active { background: var(--press); }
     // the menu button carries a dot when something on the quick list needs a look
     const needs = c.hold > 0 || c.sanitizeOverdue || demoOn;
     setHidden(m.menuBtn.querySelector('.fl-menu-dot'), !needs);
-    const menuName = needs ? 'Menu, something needs a look' : 'Menu';
+    const menuName = needs ? 'Settings, something needs a look' : 'Settings';
     if (m.menuBtn.getAttribute('aria-label') !== menuName) m.menuBtn.setAttribute('aria-label', menuName);
     toolCount(m.tool.demo, demoOn ? 1 : 0, 'warn', demoOn ? (speed > 1 ? 'clock running at x' + (Math.round(speed * 10) / 10) : 'demo orders running') : '', demoOn ? (speed > 1 ? 'x' + (Math.round(speed * 10) / 10) : 'on') : '');
     refit();
@@ -20624,7 +20851,7 @@ a.of-nav:active { background: var(--press); }
     ].filter((it) => !it.hide);
     // Hiding rows can leave a separator at the top, the bottom or twice in a row; those go.
     const clean = items.filter((it, i) => !(it.separator && (i === 0 || i === items.length - 1 || items[i - 1].separator)));
-    SB.ui.menu(anchor, clean, { label: 'Menu' });
+    SB.ui.menu(anchor, clean, { label: 'Settings' });
   }
 
   // Opens the back office from a visible button; the shell asks for the manager PIN first when one is set.
@@ -20872,7 +21099,10 @@ a.of-nav:active { background: var(--press); }
     const t = E().findTicket(store().getState(), rec.id);
     if (!t) { toast(E().REPORTS.unknownTicket, { tone: 'warn' }); return; }
     const left = notDoneItems(t);
-    if (!left.length) { run('bumpTicket', { ticketId: rec.id }); return; }
+    // At the counter nobody ticks off dishes one by one, so Bump never asks about unfinished items.
+    // The dishes are marked done first so the office numbers do not count a forced bump.
+    if (counterOn() && left.length) left.forEach((it) => { try { store().dispatchEx('completeItem', { ticketId: rec.id, itemId: it.id }, { source: 'ui' }); } catch (e) { /* the bump below then reports it */ } });
+    if (!left.length || counterOn()) { run('bumpTicket', { ticketId: rec.id }); return; }
     const names = left.slice(0, 3).map((it) => it.short || it.name).join(', ') + (left.length > 3 ? ' and ' + (left.length - 3) + ' more' : '');
     SB.ui.confirm({
       title: left.length + ' ' + U.plural(left.length, 'item') + ' not done. Bump anyway?',
@@ -21196,8 +21426,40 @@ a.of-nav:active { background: var(--press); }
   const subtotal = () => D.lines.reduce((s, l) => { const mi = menuById(l.menuId); return s + (mi ? mi.price * l.qty : 0); }, 0);
   // A separate copy of the order, kept so Undo can put it back.
   const copyDraft = () => JSON.parse(JSON.stringify(D));
-  function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; D.allergy = snap.allergy || ''; }
-  function resetDraft() { D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = payDefault; D.tip = ''; D.allergy = ''; }
+  function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; D.allergy = snap.allergy || ''; saveDraftNow(); }
+  function resetDraft() { clearStoredDraft(); D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = payDefault; D.tip = ''; D.allergy = ''; }
+  // The half-built order is also kept in the browser, so a reload or a closed tab brings it back. Uses the store's own draft
+  // calls (saveDraft, loadDraft, clearDraft) when this copy has them, and a plain browser-storage key until then.
+  const KEY_DRAFT = 'smokebox.v1.orderdraft';
+  // Saves the draft now (or forgets it when it is empty). Never throws: a full disk must not stop an order.
+  function saveDraftNow() {
+    try {
+      if (draftEmpty()) { clearStoredDraft(); return; }
+      const data = { lines: D.lines.map((l) => ({ menuId: l.menuId, qty: l.qty, mods: l.mods.slice() })), customer: D.customer, channel: D.channel, note: D.note, rush: D.rush, orderId: D.orderId, pay: D.pay, tip: D.tip, allergy: D.allergy, savedAt: Date.now() };
+      if (SB.store && typeof SB.store.saveDraft === 'function') SB.store.saveDraft(data); else U.storage.set(KEY_DRAFT, data);
+    } catch (e) { /* keeping a draft is a convenience, never a reason to fail */ }
+  }
+  // Forgets the saved draft (after a send, Clear order or Discard).
+  function clearStoredDraft() {
+    try { if (SB.store && typeof SB.store.clearDraft === 'function') SB.store.clearDraft(); else U.storage.remove(KEY_DRAFT); } catch (e) { /* ignore */ }
+  }
+  // The saved draft, or null when there is none or it is not usable.
+  function loadStoredDraft() {
+    try {
+      const d = SB.store && typeof SB.store.loadDraft === 'function' ? SB.store.loadDraft() : U.storage.get(KEY_DRAFT, null);
+      return d && typeof d === 'object' && Array.isArray(d.lines) ? d : null;
+    } catch (e) { return null; }
+  }
+  // Puts a saved draft into the working order, keeping only dishes that are still on the menu and an order that is still open.
+  function applyStoredDraft(d) {
+    D.lines = d.lines.filter((l) => l && typeof l.menuId === 'string' && menuById(l.menuId) && !menuById(l.menuId).archived).slice(0, L.maxItemsPerTicket).map((l) => ({ key: 'l' + (++seq), menuId: l.menuId, qty: Math.max(1, Math.min(L.maxQty, Math.floor(+l.qty) || 1)), mods: Array.isArray(l.mods) ? l.mods.filter((m) => typeof m === 'string').slice(0, 8) : [] }));
+    D.customer = typeof d.customer === 'string' ? d.customer.slice(0, 40) : '';
+    D.channel = C.channelById[d.channel] ? d.channel : 'dine_in';
+    D.note = typeof d.note === 'string' ? d.note.slice(0, 200) : '';
+    D.rush = d.rush === true; D.pay = typeof d.pay === 'string' && (d.pay === '' || C.payMethodById[d.pay]) ? d.pay : ''; D.tip = typeof d.tip === 'string' ? d.tip : ''; D.allergy = typeof d.allergy === 'string' ? d.allergy : '';
+    const o = d.orderId ? SB.engine.findOrder(st(), d.orderId) : null;
+    D.orderId = o && o.status === 'open' ? o.id : null;
+  }
   // The orders still open, oldest first, for the Add to open order list.
   function openOrdersList() { return (st().orders || []).filter((o) => o.status === 'open').sort((a, b) => a.createdAt - b.createdAt); }
   // A short name for an order in a list: who it is for and where, like "Table 4 (Dine-in)".
@@ -21330,6 +21592,9 @@ a.of-nav:active { background: var(--press); }
   // isPage }. Returns { teardown, startFocus, leave } so the frame can focus it, close it and ask before leaving.
   function buildOrder(host, opts) {
     // Opened from the Orders screen to add another round: pick that order when it is still open.
+    // After a reload nothing is in memory, so look for the order saved in the browser before starting empty.
+    let fromStore = false;
+    if (draftEmpty()) { const sv = loadStoredDraft(); if (sv) { applyStoredDraft(sv); fromStore = !draftEmpty(); } }
     if (opts && opts.orderId) { const o0 = SB.engine.findOrder(st(), opts.orderId); if (o0 && o0.status === 'open') D.orderId = o0.id; }
     const fine = (() => { try { return g.matchMedia('(pointer: fine)').matches; } catch (e) { return false; } })();
     let searchInput = null;
@@ -21442,8 +21707,12 @@ a.of-nav:active { background: var(--press); }
     const custInput = h('input', { class: 'input ord-cust-input', type: 'text', autocomplete: 'off', autocapitalize: 'words', spellcheck: 'false', enterkeyhint: 'done', placeholder: 'Or type a name' });
     const custCount = h('span', { class: 'ord-counter num', hidden: true });
     const custField = SB.ui.field({ label: 'Customer', control: custInput, hint: 'Leave it blank for Walk-up.' });
+    // The quick names come from the owner's list (settings.service.chips) when there is one; no list means the standard names,
+    // and an empty list means no chip row at all.
+    const svc = st().settings && st().settings.service;
+    const chipList = SB.engine && typeof SB.engine.chipsOf === 'function' ? SB.engine.chipsOf(st().settings) : svc && Array.isArray(svc.chips) ? svc.chips.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim().slice(0, 24)).slice(0, 12) : C.quickNames;
     const chipsEl = h('div', { class: 'ord-chips', role: 'group', 'aria-label': 'Quick names' });
-    C.quickNames.forEach((nm) => {
+    chipList.forEach((nm) => {
       const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, nm));
       b.addEventListener('click', () => { D.customer = D.customer === nm ? '' : nm; custInput.value = D.customer; paintCustomer(); touched(); });
       chipsEl.appendChild(b); view.chipBtns.set(nm, b);
@@ -21452,7 +21721,7 @@ a.of-nav:active { background: var(--press); }
     const recentEl = h('div', { class: 'ord-chips ord-recent', role: 'group', 'aria-label': 'Recent customers', hidden: true });
     // Rebuilds the Recent buttons when the newest orders bring a different set of names.
     function paintRecent() {
-      const names = recentNames(st(), C.quickNames, 4);
+      const names = recentNames(st(), chipList, 4);
       const sig = names.join('\u0001');
       if (recentEl.dataset.sig !== sig) {
         recentEl.dataset.sig = sig; U.clear(recentEl); view.recentBtns.clear();
@@ -21467,6 +21736,7 @@ a.of-nav:active { background: var(--press); }
     }
     // The name box comes first so it is always in view; the quick names sit under it.
     custInput.after(chipsEl);
+    if (!chipList.length) chipsEl.hidden = true;
     chipsEl.after(recentEl);
     custField.classList.add('ord-cust');
     custField.appendChild(custCount);
@@ -21508,10 +21778,10 @@ a.of-nav:active { background: var(--press); }
       // A way of paying marks the order to be paid when it is sent; Pay later leaves it open.
       onChange: (id) => { D.pay = id === 'later' ? '' : id; touched(); },
     });
-    const tipInput = h('input', { class: 'input ord-tip-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Tip in dollars' });
+    const tipInput = h('input', { class: 'input ord-tip-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Tip amount' });
     // Typing a tip keeps the text in the draft, so closing the screen never loses it.
     tipInput.addEventListener('input', () => { D.tip = tipInput.value; hideError(); paintCheck(); });
-    const tipField = SB.ui.field({ label: 'Tip in dollars (optional)', control: tipInput });
+    const tipField = SB.ui.field({ label: 'Tip (optional)', control: tipInput });
     tipField.classList.add('ord-tip');
     // Tip buttons for pay-now orders: No tip and 15, 18, 20, 25 percent of the food, with the dollar amount shown.
     const tipChips = h('div', { class: 'ord-chips ord-tip-chips', role: 'group', 'aria-label': 'Quick tips' });
@@ -21902,10 +22172,10 @@ a.of-nav:active { background: var(--press); }
         if (t.d.pct) text(t.b.lastChild, t.d.pct + '% ' + U.fmtMoney(a));
         t.b.setAttribute('aria-pressed', !Number.isNaN(tip) && (t.d.pct ? Math.abs(tip - a) < 0.005 && tip > 0 : D.tip === '') ? 'true' : 'false');
       });
-      tipField.setError(D.pay && Number.isNaN(tip) ? 'Type dollars and cents, like 2.50.' : null);
+      tipField.setError(D.pay && Number.isNaN(tip) ? 'Type an amount, like 2.50.' : null);
       if (!D.pay) { text(payNote, 'The order stays open. Take payment later from Orders.'); return; }
       const pt = pendingTotal(), pm = C.payMethodById[D.pay];
-      text(payNote, 'Marked paid by ' + (pm ? pm.name.toLowerCase() : D.pay) + ' when sent: ' + U.fmtMoney(pt.total) + (pt.tax > 0 ? ' with ' + U.fmtMoney(pt.tax) + ' tax' : '') + (tip > 0 ? ', plus a ' + U.fmtMoney(tip) + ' tip' : '') + '. Smokebox only records this; it does not charge cards.' + ((st().settings.service.taxRatePct || 0) === 0 ? ' No sales tax is added. Set it under Menu, Tax, hours and PIN.' : ''));
+      text(payNote, 'Marked paid by ' + (pm ? pm.name.toLowerCase() : D.pay) + ' when sent: ' + U.fmtMoney(pt.total) + (pt.tax > 0 ? ' with ' + U.fmtMoney(pt.tax) + ' tax' : '') + (tip > 0 ? ', plus a ' + U.fmtMoney(tip) + ' tip' : '') + '. Smokebox only records this; it does not charge cards.' + ((st().settings.service.taxRatePct || 0) === 0 ? ' No sales tax is added. Set it in Settings.' : ''));
     }
 
     function paintAll() {
@@ -21913,6 +22183,7 @@ a.of-nav:active { background: var(--press); }
     }
     /** Something about the draft changed (a tap, a stepper, a field): refresh what depends on it. */
     function touched() {
+      saveDraftNow();
       hideError(); hideNotice();
       paintTiles(); syncLines(); paintCounts(); paintCustomer(); paintNote(); paintPlan(); paintCheck();
       applyFilter();
@@ -22022,7 +22293,7 @@ a.of-nav:active { background: var(--press); }
       if (D.orderId) payload.orderId = D.orderId;
       if (D.pay) {
         const tip = dollars(D.tip);
-        if (Number.isNaN(tip)) { paintCheck(); showError('The tip must be dollars and cents, like 2.50. Clear it for no tip.'); setPane('order'); tipInput.focus(); return; }
+        if (Number.isNaN(tip)) { paintCheck(); showError('The tip must be an amount, like 2.50. Clear it for no tip.'); setPane('order'); tipInput.focus(); return; }
         payload.pay = { method: D.pay, tip };
       }
       const addedTo = D.orderId ? SB.engine.findOrder(st(), D.orderId) : null;
@@ -22119,7 +22390,7 @@ a.of-nav:active { background: var(--press); }
     custInput.value = D.customer; noteInput.value = D.note; channelSeg.setValue(D.channel); rushToggle.setValue(D.rush); tipInput.value = D.tip;
     live = view;
     paintAll();
-    if (!draftEmpty()) { showNotice('Your unsent order is back. Clear it to start fresh.'); setPane('order'); }
+    if (!draftEmpty()) { showNotice(fromStore ? 'Restored your unfinished order. Clear it to start fresh.' : 'Your unsent order is back. Clear it to start fresh.'); setPane('order'); }
     // The search box when a mouse or keyboard is in use, so a touch tablet keeps its on-screen keyboard down.
     const startFocus = () => (fine && searchInput ? searchInput : null);
     // Leaving the screen the way Esc does: close an empty order, ask first when there are items.
@@ -22264,7 +22535,6 @@ a.of-nav:active { background: var(--press); }
   function safetyNote(extra) {
     return h('div', { class: 'fs-note fs-safety' }, ico('shield-check', 20), h('div', null, extra ? h('p', null, extra) : null, h('p', null, C.safetyLine)));
   }
-  function simPill() { return h('span', { class: 'fs-sim' }, ico('info', 16), h('span', null, 'Demo only: no live POS connected')); }
 
   // Keep `parent`'s children in the order of `items`. New keys are created
   // with make(item); existing nodes are never replaced and only
@@ -23341,54 +23611,6 @@ a.of-nav:active { background: var(--press); }
     // Wide, so the menu and the stock sit side by side on a big screen.
     const sheet = SB.ui.sheet({ title: '86 board and stock', side: 'right', width: 'min(1060px, 96vw)', name: 'board86', onClose: () => offs.splice(0).forEach((f) => f()) });
 
-    // The sync strip: one chip per simulated channel. Nothing is really sent to any outside system.
-    const syncMap = new Map();
-    const syncGrid = h('div', { class: 'bd-sync-grid' });
-    C.syncTargets.forEach((t) => {
-      const st1 = h('div', { class: 'bd-chip-state' }), st2 = h('div', { class: 'bd-chip-sub' });
-      const icon = h('span', { class: 'bd-chip-i' });
-      const el = h('div', { class: 'bd-chip', dataset: { target: t.id, tone: 'muted' } }, icon, h('div', { class: 'bd-chip-t' }, h('div', { class: 'bd-chip-n' }, t.name), st1, st2));
-      syncMap.set(t.id, { el, st1, st2, icon, key: '' });
-      syncGrid.appendChild(el);
-    });
-    // Seconds a simulated channel takes to catch up (starter value from config).
-    const syncSec = () => (st().settings && st().settings.syncTargetSec) || C.syncTargetSec;
-    // Folded away by default and kept below the menu and stock, so the real controls come first.
-    const syncBox = h('details', { class: 'fs-section bd-sync', 'aria-label': 'Channel sync' },
-      h('summary', { class: 'fs-row', style: 'cursor:pointer' }, h('h3', { class: 'fs-h grow' }, 'Channel sync (demo only)'), simPill()),
-      syncGrid,
-      h('p', { class: 'fs-sub bd-sync-note' }, 'There is no live POS or delivery app connected. These four chips show how a real 86 would reach each channel. Changes catch up within ' + syncSec() + ' seconds.'));
-
-    // Updates the channel chips: syncing, synced after N seconds, or no changes yet.
-    function paintSync() {
-      const syncs = st().syncs || [];
-      const target = syncSec();
-      C.syncTargets.forEach((t) => {
-        const rec = syncMap.get(t.id);
-        let pending = 0, latest = null;
-        for (let i = syncs.length - 1; i >= 0; i--) {
-          const x = syncs[i].targets && syncs[i].targets[t.id];
-          if (!x) continue;
-          if (x.doneAt == null) pending++; else if (!latest) latest = { sy: syncs[i], x };
-        }
-        let tone, icon, line1, line2 = '';
-        if (pending) { tone = 'warn'; icon = 'clock'; line1 = 'Syncing...'; line2 = pending > 1 ? pending + ' changes on the way' : '1 change on the way'; }
-        else if (latest) {
-          const secs = Math.max(0, Math.round((latest.x.doneAt - latest.sy.t) / 1000));
-          const late = secs > target;
-          tone = late ? 'warn' : 'ok'; icon = late ? 'alert' : 'check-circle';
-          line1 = 'Synced ' + secs + ' s after ' + (latest.sy.kind === 'back' ? 'back on' : '86');
-          const mi = menuOf(latest.sy.menuId);
-          line2 = (mi ? mi.short || mi.name : '') + (late ? ', over the ' + target + ' s target' : '');
-        } else { tone = 'muted'; icon = 'info'; line1 = 'No changes yet'; line2 = 'Nothing has been 86\'d'; }
-        const key = tone + '|' + icon + '|' + line1 + '|' + line2;
-        if (rec.key === key) return;
-        rec.key = key; attr(rec.el, 'data-tone', tone);
-        U.clear(rec.icon); rec.icon.appendChild(ico(icon, 22));
-        text(rec.st1, line1); text(rec.st2, line2); setHidden(rec.st2, !line2);
-      });
-    }
-
     // Filter: all items, or only the ones that are off the menu.
     const filterSeg = SB.ui.segmented({ label: 'Show', class: 'bd-filter', value: filter, options: [{ id: 'all', label: 'All items', count: 0 }, { id: 'off', label: 'Off the menu', count: 0 }], onChange: (id) => { filter = id; applyFilter(); } });
     const menuBox = h('section', { class: 'fs-section bd-menu', 'aria-label': 'Menu availability' }, h('div', { class: 'fs-row' }, h('h3', { class: 'fs-h grow' }, 'Menu'), filterSeg));
@@ -23595,13 +23817,13 @@ a.of-nav:active { background: var(--press); }
     const noDishBtn = h('button', { type: 'button', class: 'btn btn-primary', onClick: () => closeThen(sheet, () => SB.sheets.open('dishes')) }, ico('plus', 20), h('span', null, 'Add your first dish'));
     const noDishBox = h('div', { class: 'empty bd-nodishes', hidden: true }, ico('ban', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your first dish. Then you can mark it sold out here, and Smokebox marks it for you when stock runs low.'), noDishBtn);
     const bdCols = h('div', { class: 'bd-cols' }, menuBox, stockBox);
-    sheet.body.append(h('div', { class: 'bd' }, noDishBox, bdCols, syncBox));
+    sheet.body.append(h('div', { class: 'bd' }, noDishBox, bdCols));
 
     // Repaints the dish rows and stock rows, and swaps in the no-dishes message when the menu is empty.
     function update(now) {
       const s = st();
       const menu = s.menu.filter((m) => !m.archived);
-      setHidden(noDishBox, menu.length > 0); setHidden(bdCols, menu.length === 0); setHidden(syncBox, menu.length === 0);
+      setHidden(noDishBox, menu.length > 0); setHidden(bdCols, menu.length === 0);
       // categories keep a stable order; a category appears the first time one of its items does
       const order = C.categories.map((c) => c.id);
       menu.forEach((m) => { if (order.indexOf(m.cat) < 0) order.push(m.cat); });
@@ -23623,7 +23845,6 @@ a.of-nav:active { background: var(--press); }
       let off = 0; rows.forEach((r) => { if (r.off) off++; });
       filterSeg.setCount('all', rows.size); filterSeg.setCount('off', off, { alert: off > 0 });
       applyFilter();
-      paintSync();
     }
     update(nowMs());
     watch(offs, () => update(nowMs()), (now) => update(now));
@@ -23837,7 +24058,7 @@ a.of-nav:active { background: var(--press); }
       } }, ico('zap', 22), h('span', null, 'Add 12-ticket rush'));
       simBox.append(
         h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Automatic orders'), h('p', { class: 'fs-sub' }, 'Demo tickets arrive on the kitchen clock, so a faster clock means faster orders. They are labeled Demo.'), ordersSeg),
-        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A demo cook who works while automatic orders run. Turn it off to practice by hand.'), crewTog),
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A demo cook who works while automatic orders run. Turn it off to work the demo by hand.'), crewTog),
         h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Rush'), h('p', { class: 'fs-sub' }, 'Twelve tickets at once, like a lunch rush.'), burstBtn));
     } else {
       simBox.append(h('div', { class: 'fs-note', 'data-tone': 'warn', role: 'status' }, ico('alert', 20),
@@ -24075,7 +24296,7 @@ a.of-nav:active { background: var(--press); }
         rule('snow', 'Keep cold food cold', 'Cold food stays at ' + U.tempText(S.coldHoldF) + ' or below.'),
         rule('thermometer', 'Log a temperature', 'At least every ' + U.minutesText(S.tempCheckEveryMin) + '. A late check shows Check temp and is counted.'),
         rule('refresh', 'Reheat once', 'Below ' + U.tempText(S.hotHoldF) + ', reheat to ' + U.tempText(S.reheatF) + ' within ' + S.belowHotGraceH + ' hours of the first low reading. One reheat per batch. After that, discard it.'),
-        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat. A pan that dips for a minute at hour three is not treated as if it had been cold for two hours.'),
+        rule('clock', 'Where the two hours start', 'The ' + S.belowHotGraceH + '-hour clock starts at the first reading below ' + U.tempText(S.hotHoldF) + ', not when the food left the heat.'),
         rule('package', 'Hold limit', 'Each batch has its own hold limit, shown on its card as Serve by. A safety limit means the batch must be thrown out when time is up. A quality limit takes it off the menu: taste it, then keep it serving 30 minutes or 1 hour at a time with a fresh reading in range. Nothing stays longer than ' + (S.hardCapH || S.defaultMaxHoldH) + ' hours. Your local health department\'s rules apply to quality extensions.'),
         rule('snow', 'Cooling', 'From ' + U.tempText(S.hotHoldF) + ' to ' + U.tempText(c.stage1ToF) + ' within ' + c.stage1H + ' hours, then to ' + U.tempText(c.finalF) + ' within ' + (c.totalH - c.stage1H) + ' more hours (' + c.totalH + ' hours in all).'),
         rule('shield-check', 'Sanitize surfaces', 'Food-contact surfaces every ' + S.sanitizeEveryH + ' hours. An overdue timer is a warning, never a block.'),
@@ -24090,7 +24311,6 @@ a.of-nav:active { background: var(--press); }
         helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants that cook food ahead: tickets, paced start times, a hold cabinet and a sold-out list.'),
         helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
         helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
-        helpItem('info', 'Channel sync is for the demo only', 'There is no live POS or delivery app connected. The 86 board shows how a real sync would look and says so.'),
         helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
         helpItem('sparkle', 'Demo and sample data', 'Demo tickets and the sample history are made by the app. They are labeled wherever they appear.'),
       ]),
@@ -24328,7 +24548,7 @@ a.of-nav:active { background: var(--press); }
       // Start over sits alone at the very bottom, away from the everyday buttons. In the demo it is replaced by the way back.
       SB.store.isDemo && SB.store.isDemo()
         ? settingBlock('The demo', 'You are in the demo, not your kitchen.', h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => SB.store.leaveDemo() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Back to my kitchen')))
-        : settingBlock('Start over', 'Empty the menu and begin again. You will be asked to save a backup first.', link('trash', 'Start over with an empty menu', 'startover'))));
+        : settingBlock('Start over', 'Empty the menu and begin again. A backup is saved for you first.', link('trash', 'Start over with an empty menu', 'startover'))));
 
     // Keep every control in step when something else changes the look, the station or the clock.
     offs.push(SB.theme.onChange(() => { themeSeg.setValue(SB.theme.get()); textSeg.setValue(SB.theme.textSize()); sizeSeg.setValue(SB.theme.density()); hintsTog.setValue(SB.theme.hints()); }));
@@ -24379,7 +24599,7 @@ a.of-nav:active { background: var(--press); }
     const out = [{ label: 'Exact', amount: cents(due) }], seen = new Set([cents(due)]);
     [5, 10, 20, 50, 100].forEach((step) => {
       const amt = Math.ceil(cents(due) / step - 1e-9) * step;
-      if (amt > 0 && !seen.has(amt) && out.length < 5) { seen.add(amt); out.push({ label: '$' + amt, amount: amt }); }
+      if (amt > 0 && !seen.has(amt) && out.length < 5) { seen.add(amt); out.push({ label: (g.SB.util && g.SB.util.currencySymbol ? g.SB.util.currencySymbol() : '$') + amt, amount: amt }); }
     });
     return out;
   }
@@ -24703,11 +24923,11 @@ a.of-nav:active { background: var(--press); }
     const itemsP = h('p', { class: 'ox-pay-items' });
     // The order's money lines, rewritten whenever the discount changes.
     const calc = h('dl', { class: 'ox-calc' });
-    const discInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Discount in dollars' });
-    const discField = SB.ui.field({ label: 'Discount in dollars (optional)', control: discInput });
-    const tipInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Tip in dollars' });
-    const tipField = SB.ui.field({ label: 'Tip in dollars (optional)', control: tipInput });
-    const cashInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Cash the guest handed over, in dollars' });
+    const discInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Discount amount' });
+    const discField = SB.ui.field({ label: 'Discount (optional)', control: discInput });
+    const tipInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Tip amount' });
+    const tipField = SB.ui.field({ label: 'Tip (optional)', control: tipInput });
+    const cashInput = h('input', { class: 'input ox-pay-input', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00', 'aria-label': 'Cash the guest handed over' });
     const cashField = SB.ui.field({ label: 'Cash handed over (to work out the change)', control: cashInput });
     const change = h('p', { class: 'ox-change', role: 'status' });
     const err = h('p', { class: 'ox-pay-err', role: 'alert', hidden: true });
@@ -24778,10 +24998,10 @@ a.of-nav:active { background: var(--press); }
     // Reads the boxes: the discount, tip and cash as numbers, or the first problem in plain words.
     function read() {
       const d = U.parseDollars(P.disc), t = U.parseDollars(P.tip), c = U.parseDollars(P.cash);
-      if (Number.isNaN(d)) return { err: 'Type the discount as dollars and cents, like 2.50.', box: discInput };
+      if (Number.isNaN(d)) return { err: 'Type the discount as an amount, like 2.50.', box: discInput };
       if (d > food() + 1e-9) return { err: 'The discount cannot be more than the food, ' + money(food()) + '.', box: discInput };
-      if (Number.isNaN(t)) return { err: 'Type the tip as dollars and cents, like 2.50.', box: tipInput };
-      if (Number.isNaN(c)) return { err: 'Type the cash as dollars and cents, like 40.00.', box: cashInput };
+      if (Number.isNaN(t)) return { err: 'Type the tip as an amount, like 2.50.', box: tipInput };
+      if (Number.isNaN(c)) return { err: 'Type the cash as an amount, like 40.00.', box: cashInput };
       return { d, t, c };
     }
     // Redraws the lines, the money rows, chip states, the change line and the Mark paid button.
@@ -32377,7 +32597,9 @@ a.of-nav:active { background: var(--press); }
       C.applyCustom(before);
       if (res.rejected.length) { status.bad('That name cannot be used: it is empty, longer than ' + C.customLimits.name + ' letters, already taken, or the list is full.'); return false; }
       if (!C.saveCustom(spec)) { status.bad('This browser would not save the change.'); return false; }
-      status.ok('Saved. Reload the page to see it everywhere.'); reload.hidden = false;
+      // The board redraws with the new names at once; only a build without that call asks for a reload.
+      if (SB.floor && typeof SB.floor.refreshNames === 'function' && SB.floor.refreshNames()) status.ok('Saved. The new names show everywhere now.');
+      else { status.ok('Saved. Reload the page to see it everywhere.'); reload.hidden = false; }
       return true;
     }
     const groups = [

@@ -26,7 +26,7 @@
     const out = [{ label: 'Exact', amount: cents(due) }], seen = new Set([cents(due)]);
     [5, 10, 20, 50, 100].forEach((step) => {
       const amt = Math.ceil(cents(due) / step - 1e-9) * step;
-      if (amt > 0 && !seen.has(amt) && out.length < 5) { seen.add(amt); out.push({ label: (U.currencySymbol ? U.currencySymbol() : '$') + amt, amount: amt }); }
+      if (amt > 0 && !seen.has(amt) && out.length < 5) { seen.add(amt); out.push({ label: (g.SB.util && g.SB.util.currencySymbol ? g.SB.util.currencySymbol() : '$') + amt, amount: amt }); }
     });
     return out;
   }
