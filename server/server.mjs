@@ -12,6 +12,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import zlib from 'node:zlib';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,6 +25,38 @@ if (process.env.SMOKEBOX_TZ) process.env.TZ = process.env.SMOKEBOX_TZ;
 async function loadEngine() {
   for (const n of ['00-util', '10-config', '20-engine']) await import(pathToFileURL(path.join(ROOT, 'src/js', n + '.js')).href);
   return globalThis.SB;
+}
+
+// Offline page load: the service worker template (version stamp filled in per request), the small web manifest and the icons.
+const SW_TEMPLATE = path.join(ROOT, 'server', 'sw.template.js');
+// A worker that removes itself and the app's stores: served when the hub is started with the service worker off, so a tablet that has the
+// worker can be cleaned from the hub side the next time it checks for a newer worker. It never reloads a page.
+const SW_KILL = "'use strict';\nself.addEventListener('install', () => self.skipWaiting());\nself.addEventListener('activate', (event) => { event.waitUntil((async () => { for (const k of await caches.keys()) if (k.indexOf('smokebox-') === 0) await caches.delete(k); await self.registration.unregister(); })()); });\n";
+// The app icon as a vector picture: a warm square with a flame-like shape.
+const ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="96" fill="#b4452a"/><path d="M256 96c30 70 96 104 96 190a96 96 0 0 1-192 0c0-52 34-72 52-112 12 22 20 34 34 40-8-40 0-78 10-118z" fill="#f7e6c4"/></svg>';
+// Builds a plain PNG of the icon at a size: a warm square with a light circle, no outside libraries.
+function iconPng(size) {
+  const crcTable = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; crcTable[n] = c >>> 0; }
+  // CRC-32 of a buffer, as PNG chunks need.
+  const crc = (buf) => { let c = 0xffffffff; for (const b of buf) c = crcTable[(c ^ b) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  // One PNG chunk: length, type, data and checksum.
+  const chunk = (type, data) => { const t = Buffer.from(type), len = Buffer.alloc(4), cr = Buffer.alloc(4); len.writeUInt32BE(data.length); cr.writeUInt32BE(crc(Buffer.concat([t, data]))); return Buffer.concat([len, t, data, cr]); };
+  const rows = [], r = size * 0.22, cx = size / 2, cy = size * 0.58, rad = size * 0.27;
+  for (let y = 0; y < size; y++) {
+    const row = Buffer.alloc(1 + size * 4);
+    for (let x = 0; x < size; x++) {
+      const dx = Math.max(r - x, 0, x - (size - 1 - r)), dy = Math.max(r - y, 0, y - (size - 1 - r));
+      const inside = dx * dx + dy * dy <= r * r;
+      const inCircle = (x - cx) * (x - cx) + (y - cy) * (y - cy) <= rad * rad;
+      const o = 1 + x * 4;
+      if (!inside) { row[o + 3] = 0; continue; }
+      const c = inCircle ? [247, 230, 196] : [180, 69, 42];
+      row[o] = c[0]; row[o + 1] = c[1]; row[o + 2] = c[2]; row[o + 3] = 255;
+    }
+    rows.push(row);
+  }
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4); ihdr[8] = 8; ihdr[9] = 6;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(Buffer.concat(rows))), chunk('IEND', Buffer.alloc(0))]);
 }
 
 // The follower stream version: a follower that expects another number is told 'wrongVersion' and stops.
@@ -68,6 +101,53 @@ export async function createHub(opts = {}) {
   const walFile = opts.walFile !== undefined ? opts.walFile : (dataFile ? dataFile + '.wal' : null);
   const clients = new Set();
   const followers = new Set();
+  // Offline page load can be switched off (option serviceWorker:false or SMOKEBOX_NO_SW=1): then /sw.js is a worker that removes itself.
+  const swOn = opts.serviceWorker !== undefined ? opts.serviceWorker !== false : process.env.SMOKEBOX_NO_SW !== '1';
+  let pageStamp = null;       // { key, version }: the hash of the page file, worked out again only when the file changes
+  // The version stamp of the page being served: a short hash of the page file (null if the file is missing).
+  function pageVersion() {
+    try {
+      const st = fs.statSync(htmlFile), key = st.mtimeMs + ':' + st.size;
+      if (!pageStamp || pageStamp.key !== key) pageStamp = { key, version: crypto.createHash('sha256').update(fs.readFileSync(htmlFile)).digest('hex').slice(0, 12) };
+      return pageStamp.version;
+    } catch (e) { return null; }
+  }
+  const pngCache = new Map();
+  // Answers the offline-load requests (/sw.js, /manifest.webmanifest, the icons). Returns true when the request was one of them.
+  function handleOffline(req, res, url) {
+    if (req.method !== 'GET') return false;
+    const base = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
+    if (url === '/sw.js') {
+      const v = pageVersion();
+      if (!swOn || !v) {
+        res.writeHead(swOn ? 404 : 200, Object.assign({ 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache, no-store, must-revalidate' }, base));
+        res.end(swOn ? 'no page to store' : SW_KILL);
+        return true;
+      }
+      let src = null;
+      try { src = fs.readFileSync(SW_TEMPLATE, 'utf8'); } catch (e) { src = null; }       // a missing worker file is a 404, never a crash
+      if (src === null) { res.writeHead(404, Object.assign({ 'content-type': 'text/plain' }, base)); res.end('no worker file'); return true; }
+      res.writeHead(200, Object.assign({ 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache, no-store, must-revalidate', 'service-worker-allowed': '/' }, base));
+      res.end(src.split('__VERSION__').join(v));
+      return true;
+    }
+    if (!swOn) return false;
+    if (url === '/manifest.webmanifest') {
+      res.writeHead(200, Object.assign({ 'content-type': 'application/manifest+json; charset=utf-8', 'cache-control': 'no-cache' }, base));
+      res.end(JSON.stringify({ name: 'Smokebox', short_name: 'Smokebox', start_url: '/', scope: '/', display: 'standalone', background_color: '#1b1511', theme_color: '#b4452a',
+        icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' }, { src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }));
+      return true;
+    }
+    if (url === '/icon.svg') { res.writeHead(200, Object.assign({ 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' }, base)); res.end(ICON_SVG); return true; }
+    const m = /^\/icon-(192|512)\.png$/.exec(url);
+    if (m) {
+      if (!pngCache.has(m[1])) pngCache.set(m[1], iconPng(Number(m[1])));
+      res.writeHead(200, Object.assign({ 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' }, base));
+      res.end(pngCache.get(m[1]));
+      return true;
+    }
+    return false;
+  }
   const ops = []; // recent applied actions {seq, opId, actionType, payload, now, by}, so a returning screen can catch up
   const MAX_OPS = opts.maxOps ?? 5000;
   let lastAt = 0; // the time of the last applied action; action times never go backwards
@@ -378,6 +458,7 @@ export async function createHub(opts = {}) {
       res.end();
       return;
     }
+    if (handleOffline(req, res, url)) return;
     if (req.method === 'GET' && url === '/follow') return handleFollow(req, res);
     if (req.method === 'GET' && url === '/probe') return handleProbe(req, res);
     if (req.method === 'POST' && url === '/seed') return handleSeed(req, res);
@@ -414,7 +495,7 @@ export async function createHub(opts = {}) {
     }
     if (req.method === 'GET' && (url === '/' || url === '/smokebox.html')) {
       if (!fs.existsSync(htmlFile)) { res.writeHead(404, { 'content-type': 'text/plain' }); res.end('dist/smokebox.html is not built; run node tools/build.mjs'); return; }
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'x-frame-options': 'DENY' });
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'x-frame-options': 'DENY' });
       fs.createReadStream(htmlFile).on('error', () => res.destroy()).pipe(res);
       return;
     }
