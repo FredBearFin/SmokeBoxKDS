@@ -1067,6 +1067,14 @@
   };
 
   /* ================= safety ================= */
+  // Dollar words for a set of discards ({count, cost, noCostCount}): "cost not recorded" when none has a cost, and the
+  // known part named as such when only some do, so an unknown cost never reads as $0.
+  M.discardCostWords = (d, fmtMoney) => {
+    const f = fmtMoney || ((v) => U.fmtMoney(v, 0)), n = d && num(d.noCostCount) ? d.noCostCount : 0;
+    if (!d || !d.count) return f(0);
+    if (n >= d.count) return 'cost not recorded';
+    return f(d.cost) + (n ? ' for the ' + (d.count - n) + ' with a recorded cost' : '');
+  };
   // Every discard in the range: batch_discard events, plus discarded batches that have no event. Nothing
   // missed, nothing counted twice.
   function discardList(ctx) {
@@ -1100,7 +1108,7 @@
    * Food-safety compliance from events (and batches for discards). onTimePct are fractions of events that say whether they were on time.
    * score = average of the available temperature-check and sanitise on-time shares (null when neither is known).
    * @returns {{tempChecks:{count,onTime,late,onTimePct,avgLateMs,maxLateMs},sanitize:{count,onTime,late,onTimePct,avgLateMs,maxLateMs},
-   *   discards:{count,g,cost,byReason:Array<{reason,count,g,cost}>},lockouts:{batchCount:number,spellCount:number,totalMs:number,spells:Array},
+   *   discards:{count,g,cost,noCostCount,byReason:Array<{reason,count,g,cost}>},lockouts:{batchCount:number,spellCount:number,totalMs:number,spells:Array},
    *   reheats:number,batchesIn:number,intakeG:number,wastePct:number|null,score:number|null}}
    */
   M.compliance = (ds, opts) => {
@@ -1116,7 +1124,8 @@
     const spells = eightySixList(ctx).filter((s) => s.reason === 'safety');
     const bl = ctx.ev('batch_status').filter((e) => e.action === 'DISCARD_LOCKOUT' || e.to === 'discard').length;
     const dg = sumOf(dl.map((d) => d.g)), ig = sumOf(il.map((d) => d.g)); const parts = [tc.onTimePct, sn.onTimePct].filter(num);
-    return { tempChecks: tc, sanitize: sn, discards: { count: dl.length, g: dg, cost: sumOf(dl.map((d) => d.cost)), byReason: reasonAgg(dl) },
+    // WATCH OUT: cost adds only the discards with a known cost; noCostCount says how many had none, so 0 is not "free".
+    return { tempChecks: tc, sanitize: sn, discards: { count: dl.length, g: dg, cost: sumOf(dl.map((d) => d.cost)), noCostCount: dl.filter((d) => d.cost === null).length, byReason: reasonAgg(dl) },
       lockouts: { batchCount: bl, spellCount: spells.length, totalMs: sumOf(spells.map((s) => s.durationMs)), spells },
       reheats: ctx.ev('batch_reheat').length, batchesIn: il.length, intakeG: ig, wastePct: ig > 0 ? dg / ig : null, score: parts.length ? mean(parts) : null };
   };
@@ -1778,7 +1787,7 @@
       }
       case 'safety': {
         const k = M.compliance(c); if (!k.tempChecks.count && !k.sanitize.count && !k.discards.count) return 'No food-safety records in this range yet.';
-        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + money(k.discards.cost) + ').' : 'nothing was discarded.');
+        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + M.discardCostWords(k.discards, money) + ').' : 'nothing was discarded.');
       }
       case 'stock': {
         const so = M.sellOutClock(c), n = so.rows.length; if (!so.dayCount) return 'No sell-outs in this range yet.';

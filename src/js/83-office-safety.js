@@ -156,7 +156,7 @@
       if (k.tempChecks.count) parts.push('Temperature checks were on time ' + fmt.pct(k.tempChecks.onTimePct, 0) + ' of the time (' + k.tempChecks.onTime + ' of ' + k.tempChecks.count + ')');
       if (k.sanitize.count) parts.push('sanitize rounds ' + fmt.pct(k.sanitize.onTimePct, 0) + ' (' + k.sanitize.onTime + ' of ' + k.sanitize.count + ')');
       let body = parts.length ? parts[0] + (parts[1] ? ', ' + parts[1] : '') + '.' : 'No temperature checks or sanitize rounds were logged.';
-      if (k.discards.count) body += ' ' + k.discards.count + ' ' + B.plural(k.discards.count, 'batch was', 'batches were') + ' thrown out (' + kgWords(k.discards.g) + ', ' + fmt.money(k.discards.cost, 0) + '), ' + safetyDis.length + ' for time or temperature rules.';
+      if (k.discards.count) body += ' ' + k.discards.count + ' ' + B.plural(k.discards.count, 'batch was', 'batches were') + ' thrown out (' + kgWords(k.discards.g) + ', ' + SB.metrics.discardCostWords(k.discards, (v) => fmt.money(v, 0)) + '), ' + safetyDis.length + ' for time or temperature rules.';
       else body += ' Nothing was thrown out.';
       if (brief.length) body += brief.length === 1 ? ' A time or temperature limit also took an item off the menu once, for ' + fmt.ms(brief[0].openMs) + '.' : ' Time or temperature limits also took items off the menu ' + brief.length + ' times for a few minutes each, the longest ' + fmt.ms(Math.max.apply(null, brief.map((c) => c.openMs))) + '.';
       // A red verdict is worded by cause: lost selling time, or checks that fell behind.

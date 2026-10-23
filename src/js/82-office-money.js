@@ -836,7 +836,7 @@
         // One list row: the name, this week's dollars (or "cost not recorded") and last week's for comparison.
         const row = (name, a, b) => h('li', { class: 'ob-li' },
           h('span', { class: 'ob-li-n' }, name),
-          h('span', { class: 'ob-li-v' }, h('span', { class: 'num' }, a.cost > 0 ? fmt.money(a.cost, 2) : 'cost not recorded'), h('span', { class: 'num ob-li-s' }, fmt.g(a.g) + ' this week, ' + (b ? (b.cost > 0 ? fmt.money(b.cost, 2) : fmt.g(b.g)) : 'none') + ' last week')));
+          h('span', { class: 'ob-li-v' }, h('span', { class: 'num' }, a.cost > 0 ? fmt.money(a.cost, 2) : 'cost not recorded'), h('span', { class: 'num ob-li-s' }, fmt.g(a.g) + ' this week' + (a.cost > 0 && a.noCostCount > 0 ? ' (' + a.noCostCount + ' with no cost, not in the dollars)' : '') + ', ' + (b ? (b.cost > 0 ? fmt.money(b.cost, 2) : fmt.g(b.g)) : 'none') + ' last week')));
         // Fills one list from this week's rows, matching each to the same key last week.
         const fill = (ul, rows, lastRows, key, nameOf, none) => {
           U.clear(ul);

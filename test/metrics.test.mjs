@@ -1349,3 +1349,17 @@ describe('discardSentence: the plain line above the weekly ledger', () => {
     assert.equal(M.discardSentence({ thisWeek: win(0, 0, 0), lastWeek: win(0, 0, 0) }), 'Nothing was thrown away this week or last week.');
   });
 });
+
+describe('discard cost words: an unknown cost never reads as $0', () => {
+  const disc = (id, g, cost) => event({ t: at(0), type: 'batch_discard', batchId: id, ing: 'brisket', g, reason: 'expired', cost });
+  const R = { from: at(0) - 3600e3, to: at(0) + 3600e3 };
+  it('compliance counts the discards with no cost, and the words name them', () => {
+    const none = M.compliance(dataset({ events: [disc('b1', 1000, null), disc('b2', 500, null)] }), R).discards;
+    assert.equal(none.noCostCount, 2);
+    assert.equal(M.discardCostWords(none), 'cost not recorded');
+    const part = M.compliance(dataset({ events: [disc('b1', 1000, null), disc('b2', 500, 6)] }), R).discards;
+    assert.equal(part.noCostCount, 1);
+    assert.match(M.discardCostWords(part), /^\$6 for the 1 with a recorded cost$/);
+    assert.equal(M.discardCostWords({ count: 2, cost: 12, noCostCount: 0 }), '$12');
+  });
+});
