@@ -21,6 +21,9 @@
   function openSetup() {
     const sheet = SB.ui.sheet({ title: 'Set up this tablet', side: 'right', width: 'min(720px, 96vw)', name: 'setup' });
     const list = h('div', { class: 'setup-list' });
+    // A small "?" help line at the top: the guide pages about setting up and about sound trouble, when the guide is in this build.
+    const gl = SB.guide && typeof SB.guide.link === 'function' ? [SB.guide.link('getting-started', 'setting up'), SB.guide.link('troubleshooting', 'no sound')].filter(Boolean) : [];
+    if (gl.length) list.appendChild(h('p', { class: 'fs-sub' }, 'Help: ', ...gl.flatMap((a, i) => (i ? [' · ', a] : [a]))));
     // Adds one checklist step: a title, plain words, an optional button and a status line.
     function step(title, words, action) {
       const status = h('p', { class: 'fs-sub', role: 'status' });
@@ -37,8 +40,8 @@
       btn('Play a test warning', 'volume', () => { if (SB.floor && SB.floor.setSound) { SB.floor.setSound(true); if (SB.floor.setSpeech) SB.floor.setSpeech(true); return 'You should have heard a chime and a voice. If not, turn the tablet volume up and tap again.'; } return 'The kitchen board is not loaded.'; }));
     const wake = SB.floor && SB.floor.wakeLock ? SB.floor.wakeLock() : 'unknown';
     step('2. Keep the screen on', 'The board asks the browser to keep the screen awake' + (wake === 'on' ? ' (it is on now).' : wake === 'unsupported' ? ', but this browser does not support that.' : ', but this browser has not allowed it.') + ' Also set the tablet itself: Settings, Display, Auto-Lock (iPad) or Screen timeout (Android), to Never. Plug the tablet into power.');
-    const prot = step('3. Protect your data', 'Everything is saved in this browser only. Ask the browser to keep it safe, and save a copy of the discard log every day.',
-      btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Your browser agreed to keep this data. Still save a backup every day.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save the discard log every day.'; }));
+    const prot = step('3. Protect your data', 'Everything is saved in this browser only. Ask the browser to keep it safe, and save a backup every day (Menu and settings, then Data). If you cook ahead, save the thrown-out log too.',
+      btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Your browser agreed to keep this data. Still save a backup every day.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save a backup every day.'; }));
     step('4. Install as an app', 'On an iPad: Share, then Add to Home Screen. In Chrome on Android or a computer: the menu, then Install app or Add to Home screen. An installed app opens full screen and the browser is less likely to clear its data.');
     step('5. Where the tablet sits', 'Put the tablet where the person at the cutting board can tap it without walking. If it is out of reach, batch times will not get logged and the waste numbers will be wrong.');
     // Closes this sheet and opens the Menu and settings page of the back office.
@@ -172,6 +175,28 @@
   function cookOn() { return SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : true; }
   // The cooked-ahead items the owner has made: cook-ahead food that is not archived.
   function cookItems() { return SB.store.getState().ingredients.filter((i) => i.tcs && !i.archived); }
+
+  /* ---------- Try the demo ---------- */
+
+  // Asks once, in plain words, then opens the demo: a practice kitchen in this tab. The owner's own kitchen is saved first
+  // and comes back with the Back to my kitchen button.
+  async function tryDemo(skipAsk) {
+    const store = SB.store;
+    if (!store.enterDemo || store.isDemo()) return false;
+    const ok = skipAsk || !SB.ui.confirm ? true : await SB.ui.confirm({ title: 'Try the demo?', confirmLabel: 'Try the demo', cancelLabel: 'Not now',
+      body: ['The demo is a practice kitchen with a sample barbecue menu and pretend tickets. Nothing in it is your kitchen.', 'Your own dishes and orders are kept safe. A bar at the top of every screen has a Back to my kitchen button.'] });
+    if (!ok) return false;
+    if (!store.enterDemo() && SB.ui.toast) SB.ui.toast('This browser would not open the demo. Try again, or add ?demo to the address.', { tone: 'warn' });
+    return true;
+  }
+  // The body of the Demo sheet in a real kitchen: what the demo is, and one button that opens it.
+  function demoIntro() {
+    return h('div', { class: 'dm' }, h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Try the demo'),
+      h('p', { class: 'fs-sub' }, 'A practice kitchen with a sample barbecue menu, pretend tickets and a crew that sends orders, so you can see Smokebox busy. Nothing in it is your kitchen, and nothing you do there reaches your real dishes, orders or numbers.'),
+      h('p', { class: 'fs-sub' }, 'A bar at the top of every demo screen says so and has a Back to my kitchen button. Leaving erases the demo.'),
+      // Opens the demo after the plain-words question.
+      h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'try-demo' }, onClick: () => tryDemo(true) }, ico('play', 22), h('span', null, 'Try the demo'))));
+  }
 
   /* ---------- the Dishes and prices sheet ---------- */
 
@@ -443,7 +468,9 @@
       exStatus.textContent = 'Example dishes removed.';
     });
     const ways = h('details', { class: 'dp-fold dp-ways' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'More ways to add dishes')),
-      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'An example barbecue menu with made-up prices, so you can see how Smokebox looks with food on it. You can edit or remove every dish.'), h('div', { class: 'fs-row' }, exBtn, exRemove), exStatus));
+      h('div', { class: 'dp-more' }, h('p', { class: 'fs-sub' }, 'An example barbecue menu with made-up prices, so you can see how Smokebox looks with food on it. You can edit or remove every dish.'), h('div', { class: 'fs-row' }, exBtn, exRemove), exStatus,
+        // A quiet link to the optional menu import screen.
+        h('p', { class: 'fs-sub' }, h('button', { type: 'button', class: 'btn btn-link', dataset: { act: 'open-import' }, onClick: () => SB.sheets.open('menuimport') }, 'Have a menu file? Import it'))));
 
     // Links to the other small settings and to the full menu editor in the back office.
     const shopBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('shop'), 60); } }, ico('sliders', 20), h('span', null, 'Tax, hours and PIN'));
@@ -512,6 +539,124 @@
     sheet.body.appendChild(h('div', { class: 'dp' }, h('p', { class: 'fs-sub' }, 'Optional. Skip this and you can still take every order. Later you can add more from the Cabinet.'),
       h('div', { class: 'dp-form' }, nameField, h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Hot or cold'), kind), hoursField, kgField, dishBox, h('div', { class: 'fs-row' }, save), status, after)));
     setTimeout(() => nameIn.focus(), 50);
+    return sheet;
+  }
+
+  /* ---------- the Import a menu sheet ---------- */
+
+  // Opens "Import a menu": choose a file or paste text, check it, fix the rows in a preview, then import the ticked ones.
+  // Also has "Export my menu". Optional; the form is still the easy way to add dishes.
+  function openImport() {
+    const M = SB.menuImport;
+    const sheet = SB.ui.sheet({ title: 'Import a menu', side: 'right', width: 'min(900px, 96vw)', name: 'menuimport' });
+    const root = h('div', { class: 'dp' });
+    if (!M) { sheet.body.appendChild(h('p', { class: 'fs-sub' }, 'Menu import is not part of this copy of Smokebox.')); return sheet; }
+    const area = h('textarea', { class: 'textarea', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Paste your menu here', placeholder: 'Paste your menu here, one dish per line like "Pulled pork plate 12.50", or the text of a spreadsheet.' });
+    const fileIn = h('input', { type: 'file', accept: '.csv,.tsv,.txt,text/csv,text/plain', 'aria-label': 'Choose a menu file' });
+    const status = h('p', { class: 'fs-sub', role: 'status' });
+    const preview = h('div', { class: 'dp-preview' });
+    let parsed = null, rows = [];
+    // The station used for a row that names none: the first station still in use.
+    const defaultZone = () => visibleStations()[0].id;
+    // Runs the importer on the text and draws the preview, or says plainly what is wrong with the text.
+    function check(text, from) {
+      U.clear(preview); status.textContent = '';
+      const res = M.parse(text, { existing: SB.store.getState().menu });
+      if (res.error) { status.textContent = res.error; parsed = null; return; }
+      parsed = res; rows = res.rows.map((r) => Object.assign({ keep: r.ok && !r.hidden }, r));
+      paintPreview(from);
+    }
+    // Says why a typed name cannot be used: 'removed' (a removed dish has it), 'menu' (a dish on the menu), 'list' (another row here), or ''.
+    function takenBy(r) {
+      const nm = String(r.name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      const hit = SB.store.getState().menu.find((m) => m.name.toLowerCase() === nm);
+      if (hit) return hit.archived ? 'removed' : 'menu';
+      return rows.some((o) => o !== r && o.keep && String(o.name || '').trim().toLowerCase() === nm) ? 'list' : '';
+    }
+    // True when an edited row can be imported: a name, a price from 0 to 1000 and a name that is not taken.
+    function rowOk(r) {
+      const nm = String(r.name || '').replace(/\s+/g, ' ').trim();
+      return !!nm && nm.length <= 60 && typeof r.price === 'number' && r.price >= 0 && r.price <= 1000 && !takenBy(r);
+    }
+    // Draws the format line, any file notes, the table of rows (tick, name, price, station, problems) and the Import button.
+    function paintPreview(from) {
+      U.clear(preview);
+      const sm = parsed.summary;
+      preview.append(h('p', { class: 'fs-sub dp-fmt' }, 'Read ' + (from || 'the text') + ' as: ' + parsed.label + '. ' + sm.message));
+      (sm.notes || []).forEach((n) => preview.appendChild(h('p', { class: 'fs-note', 'data-tone': 'warn' }, n)));
+      const body = h('div', { class: 'dp-ptable', role: 'table', 'aria-label': 'Dishes found' });
+      const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'import-go' } }, 'Import');
+      // Updates the Import button's count and enabled state from the ticked, valid rows.
+      const paintGo = () => { const n = rows.filter((r) => r.keep && r.ok).length; go.disabled = n === 0; go.textContent = n ? 'Import ' + n + ' ' + U.plural(n, 'dish', 'dishes') : 'Nothing to import'; };
+      rows.forEach((r) => {
+        const keep = h('input', { type: 'checkbox', checked: r.keep, 'aria-label': 'Import ' + r.name });
+        const nm = h('input', { class: 'input', type: 'text', maxlength: 60, value: r.name || '', 'aria-label': 'Name, line ' + r.line });
+        const pr = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: typeof r.price === 'number' ? r.price.toFixed(2) : '', 'aria-label': 'Price, line ' + r.line });
+        const zs = h('select', { class: 'select', 'aria-label': 'Station, line ' + r.line }, stations().map((z) => h('option', { value: z.id, selected: (r.station || defaultZone()) === z.id }, z.name)));
+        const prob = h('div', { class: 'fs-sub dp-prob' });
+        const rowEl = h('div', { class: 'dp-prow', role: 'row', dataset: { ok: r.ok ? 'true' : 'false' } }, keep, nm, pr, zs, prob);
+        // Redraws this row's plain problems and its tick after any edit.
+        const redo = () => {
+          r.ok = rowOk(r); if (!r.ok) r.keep = false;
+          keep.checked = r.keep; rowEl.dataset.ok = r.ok ? 'true' : 'false';
+          if (r.ok) prob.textContent = '';
+          else prob.textContent = (!String(r.name || '').trim() ? 'Type a name. ' : '') + (typeof r.price !== 'number' ? 'Type a price like 12.50. ' : '') + ({ removed: 'A removed dish has this name. Bring it back in Dishes and prices, or use another name.', menu: 'That name is already on the menu.', list: 'That name is in this list twice.' }[takenBy(r)] || '');
+          paintGo();
+        };
+        // Ticking a row in or out changes only whether it is imported.
+        keep.addEventListener('change', () => { r.keep = keep.checked && (r.ok = rowOk(r)); keep.checked = r.keep; paintGo(); });
+        // Typing a new name or price re-checks the row and ticks it in when it has become valid.
+        const edit = () => { r.name = nm.value.replace(/\s+/g, ' ').trim(); const p = SB.menuImport.readPrice(pr.value); r.price = p && typeof p.value === 'number' ? p.value : null; r.station = zs.value; r.ok = rowOk(r); r.keep = r.ok; redo(); };
+        nm.addEventListener('change', edit); pr.addEventListener('change', edit); zs.addEventListener('change', () => { r.station = zs.value; });
+        prob.textContent = (r.problems || []).map((p) => p.message + (p.fix ? ' ' + p.fix : '')).join(' ');
+        body.appendChild(rowEl);
+      });
+      // Imports the ticked rows through the importer's actions, then offers one-tap undo of that batch.
+      go.addEventListener('click', () => {
+        const picked = rows.filter((r) => r.keep && r.ok).map((r) => Object.assign({}, r, { station: r.station || defaultZone() }));
+        const out = M.toActions(picked, SB.store.getState().menu, { zone: defaultZone() });
+        const ids = [];
+        out.actions.forEach((a) => { const res = send(a.type, a.payload); if (res.ok && res.info && res.info.id) ids.push(res.info.id); });
+        const bad = out.actions.length - ids.length + out.skipped.length;
+        status.textContent = 'Imported ' + ids.length + ' ' + U.plural(ids.length, 'dish', 'dishes') + (bad ? '. ' + bad + ' could not be imported' + (out.skipped.length ? ': ' + out.skipped.map((s) => s.name + ' (' + s.reason + ')').join('; ') : '.') : '.');
+        U.clear(preview);
+        if (ids.length) {
+          // Takes the imported dishes off the menu again in one step (they are removed, not deleted).
+          preview.appendChild(h('button', { type: 'button', class: 'btn', dataset: { act: 'import-undo' }, onClick: () => { ids.forEach((id) => send('updateMenuItem', { id, patch: { archived: true } })); status.textContent = 'Removed the ' + ids.length + ' imported ' + U.plural(ids.length, 'dish', 'dishes') + '.'; U.clear(preview); } }, 'Remove these ' + ids.length));
+        }
+      });
+      preview.append(body, h('div', { class: 'fs-row' }, go));
+      paintGo();
+    }
+    // Reads the chosen file as text and checks it like pasted text.
+    fileIn.addEventListener('change', () => {
+      const f = fileIn.files && fileIn.files[0];
+      if (!f) return;
+      if (f.size > M.limits.textMax) { status.textContent = 'That file is too big to read. Use a file under 1 MB.'; return; }
+      const rd = new g.FileReader();
+      // When the file is read, check its text; a failed read says so.
+      rd.onload = () => { area.value = String(rd.result || ''); check(area.value, 'the file'); };
+      rd.onerror = () => { status.textContent = 'That file could not be read.'; };
+      rd.readAsText(f);
+    });
+    const checkBtn = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'import-check' } }, ico('check', 20), h('span', null, 'Check it'));
+    // Checks the pasted text.
+    checkBtn.addEventListener('click', () => check(area.value, 'the pasted text'));
+    // Export: the menu as a spreadsheet file, so it can be edited elsewhere or kept as a copy.
+    const exp = h('button', { type: 'button', class: 'btn', dataset: { act: 'export-menu' } }, ico('download', 20), h('span', null, 'Export my menu'));
+    // Builds the menu CSV and starts a download; says so if the browser blocks it.
+    exp.addEventListener('click', () => {
+      const text = M.exportMenu(SB.store.getState().menu);
+      try {
+        const url = g.URL.createObjectURL(new g.Blob([text], { type: 'text/csv' }));
+        const a = doc.createElement('a'); a.href = url; a.download = 'smokebox-menu.csv'; a.style.display = 'none'; doc.body.appendChild(a); a.click();
+        setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 1000);
+        status.textContent = 'Saved smokebox-menu.csv. Open it in a spreadsheet, or import it again later.';
+      } catch (e) { area.value = text; status.textContent = 'Your browser blocked the download. The menu is in the box above: copy it into a file named smokebox-menu.csv.'; }
+    });
+    root.append(h('p', { class: 'fs-sub' }, 'Optional. Choose a spreadsheet (CSV) or an item export from Square, Toast or Clover, or paste a list. You will see every dish and can fix or untick any before anything is added. Adding dishes by hand in Dishes and prices is just as good.'),
+      h('div', { class: 'fs-row' }, fileIn), area, h('div', { class: 'fs-row' }, checkBtn, exp), status, preview);
+    sheet.body.appendChild(root);
     return sheet;
   }
 
@@ -588,8 +733,9 @@
   SB.sheets.register('setup', openSetup);
   SB.sheets.register('dishes', openDishes);
   SB.sheets.register('shop', openShop);
+  SB.sheets.register('menuimport', openImport);
   SB.sheets.register('cookahead', openCookAhead);
   SB.sheets.register('wizard', openDishes); // the old name, kept so older links still open the right sheet
   // dishCount: how many dishes can be ordered. done: setup counts as finished once there is one. noDishes: first run.
-  SB.setup = { hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
+  SB.setup = { tryDemo, demoIntro, hiddenStations: () => U.storage.get(KEY_HIDDEN, []), dishCount: () => activeDishes().length, done: () => activeDishes().length > 0, noDishes, wizardDone: () => activeDishes().length > 0 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

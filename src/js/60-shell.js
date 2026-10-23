@@ -1681,6 +1681,8 @@
     const store = SB.store;
     if (!store || !store.status || !store.getState) return null;
     const ss = store.status(), s = store.getState();
+    // In the demo this strip always shows, above every other message, and always has the Back button.
+    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
     if (!s) return null;
@@ -1697,10 +1699,10 @@
     if (bn.el) bn.el.remove();
     bn.kind = w.kind;
     // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
-    const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => S.ignite({ section: 'data' }) }, w.act);
+    const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
     const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: 'Hide for 45 minutes', onClick: () => { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } }, ico('x', 18), h('span', { class: 'visually-hidden' }, 'Later')) : null;
-    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
     st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip

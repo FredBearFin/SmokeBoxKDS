@@ -1630,7 +1630,10 @@
   function openDemo() {
     const offs = [];
     // Listeners are removed when the sheet closes, so nothing keeps updating a screen that is gone.
-    const sheet = SB.ui.sheet({ title: 'Demo and clock', side: 'right', width: 'min(640px, 96vw)', name: 'demo', onClose: () => offs.splice(0).forEach((f) => f()) });
+    // In a real kitchen (not the demo tab) this sheet only explains the demo and opens it; the crew and clock live in the demo.
+    const realKitchen = !!(SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() && SB.setup && SB.setup.demoIntro);
+    const sheet = SB.ui.sheet({ title: realKitchen ? 'Try the demo' : 'Demo and clock', side: 'right', width: 'min(640px, 96vw)', name: 'demo', onClose: () => offs.splice(0).forEach((f) => f()) });
+    if (realKitchen) { sheet.body.appendChild(SB.setup.demoIntro()); return sheet; }
     const live = simLive();
 
     // status line
@@ -2128,7 +2131,7 @@
     // The Guide opens only when the guide page is part of this copy of Smokebox.
     const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, link('check-circle', 'Set up this tablet', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       settingBlock('Look', 'Day is the bright parchment board. Night is charcoal, easier on the eyes in a dim kitchen.', themeSeg),
