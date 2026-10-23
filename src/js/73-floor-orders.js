@@ -60,7 +60,10 @@
   // The channel record for an id, with a safe fallback so an old order never breaks the list.
   const channelOf = (id) => C.channelById[id] || { name: id || 'Order', icon: 'plate' };
   // The way of paying used last, offered first next time (a counter usually takes the same kind all day).
-  let lastMethod = C.payMethods[0].id;
+  const KEY_METHOD = 'smokebox.v1.paymethod'; // the remembered way of paying on this device
+  let lastMethod = (() => { const v = U.storage.get(KEY_METHOD, null); return v && C.payMethodById[v] ? v : C.payMethods[0].id; })();
+  // Sets and remembers the way of paying that the one-tap Pay button uses.
+  function setMethod(id) { if (!C.payMethodById[id]) return; lastMethod = id; U.storage.set(KEY_METHOD, id); }
 
   // The short lowercase word for a way of paying, like cash or card.
   const methodWord = (id) => (C.payMethodById[id] ? C.payMethodById[id].name.toLowerCase() : id);
@@ -197,13 +200,15 @@
       const total = h('span', { class: 'ox-total num' }), sub = h('span', { class: 'ox-sub num' });
       const add = h('button', { type: 'button', class: 'btn ox-add', dataset: { act: 'add' } }, ico('plus', 20), h('span', null, 'Add items'));
       const quick = h('button', { type: 'button', class: 'btn btn-primary ox-quick', dataset: { act: 'quickpay' } }, ico('dollar', 20), h('span', null, 'Pay'));
+      // Shows how Pay will record the money (Cash, Card or Other); one tap here changes it, so a card is never booked as cash by accident.
+      const how = h('button', { type: 'button', class: 'btn ox-how', dataset: { act: 'method' } }, h('span', { class: 'ox-how-k' }, 'Paid by'), h('span', { class: 'ox-how-v' }, ''), ico('chevron-down', 18));
       const pay = h('button', { type: 'button', class: 'btn ox-take', dataset: { act: 'pay' } }, ico('receipt', 20), h('span', null, 'Tip or discount'));
       const del = h('button', { type: 'button', class: 'btn btn-ghost ox-void', dataset: { act: 'void' }, hidden: true }, ico('trash', 20), h('span', null, 'Void empty order'));
       const el = h('li', { class: 'ox-row', dataset: { order: o.id } },
         h('div', { class: 'ox-main' }, h('div', { class: 'ox-top' }, who, ch, round, demo), items, meta),
         h('div', { class: 'ox-money' }, total, sub),
-        h('div', { class: 'ox-acts' }, add, pay, quick, del));
-      const rec = { el, o, who, ch, round, demo, items, meta, total, sub, add, pay, quick, del, chKey: '' };
+        h('div', { class: 'ox-acts' }, add, pay, how, quick, del));
+      const rec = { el, o, who, ch, round, demo, items, meta, total, sub, add, pay, quick, how, del, chKey: '' };
       // Add items closes this screen and opens New ticket already pointed at this order.
       add.addEventListener('click', () => {
         const id = rec.o.id;
@@ -213,6 +218,7 @@
       // Tip or discount opens the payment box; Pay marks it paid at once the usual way, with Undo.
       pay.addEventListener('click', () => openPay(rec.o.id));
       quick.addEventListener('click', () => quickPay(rec.o.id));
+      how.addEventListener('click', () => SB.ui.menu(how, C.payMethods.map((pm) => ({ label: pm.name, checked: pm.id === lastMethod, onClick: () => { setMethod(pm.id); update(); } })), { label: 'Paid by' }));
       // Void order closes an order that has no food left on it, and says so.
       del.addEventListener('click', () => {
         const r = run('voidOrder', { orderId: rec.o.id, reason: 'nothing ordered' });
@@ -239,6 +245,9 @@
       rec.pay.disabled = !(tot.subtotal > 0);
       rec.quick.disabled = !(tot.subtotal > 0);
       text(rec.quick.lastChild, 'Pay ' + money(tot.total) + ' ' + methodWord(lastMethod));
+      text(rec.how.querySelector('.ox-how-v'), C.payMethodById[lastMethod].name);
+      rec.how.setAttribute('aria-label', 'Paid by ' + methodWord(lastMethod) + '. Press to change how this is paid.');
+      setHidden(rec.how, live.length === 0);
       setHidden(rec.quick, live.length === 0);
       setHidden(rec.del, live.length > 0);
       setHidden(rec.pay, live.length === 0);
@@ -455,7 +464,7 @@
       if (r.err) { setHidden(err, false); text(err, r.err); r.box.focus(); return; }
       const res = run('payOrder', { orderId, method: P.method, tip: r.t, discount: r.d });
       if (res.report === 'ok') {
-        lastMethod = P.method;
+        setMethod(P.method);
         sheet.close('paid');
         const info = res.info || {}, pm = C.payMethodById[P.method];
         toast('Paid ' + money(info.total) + ' by ' + (pm ? pm.name.toLowerCase() : P.method) + (r.t > 0 ? ', plus a ' + money(r.t) + ' tip' : '') + '.', 'ok');

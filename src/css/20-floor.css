@@ -645,9 +645,9 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-welcome-mark { display: none; }
 .fl-welcome { grid-template-columns: minmax(0, 1fr) auto; }
 .fl-welcome h2 { font-size: var(--fs-3); }
-.fl-welcome-p { font-size: var(--fs-2); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fl-welcome-p { font-size: var(--fs-2); margin-top: 2px; }
 .fl-welcome-actions { margin-top: var(--sp-2); gap: var(--sp-2); }
-.fl-welcome-actions .btn { min-height: calc(38px * var(--fl-k)); padding-block: 4px; font-size: var(--fs-2); }
+.fl-welcome-actions .btn { min-height: var(--tap); padding-block: 4px; font-size: var(--fs-2); }
 
 /* Notifications at the top can be cleared: each bar and row sits beside a small X that hides it until it says something new. */
 .fl-strip-bar, .fl-strip-rowwrap { display: flex; align-items: stretch; width: 100%; }
@@ -679,3 +679,12 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-slip[data-tier="3"][data-level="breach"] .slip-head, .fl-slip[data-tier="3"][data-level="breach"] .slip-body, .fl-slip[data-tier="3"][data-level="breach"] .slip-tear { animation: none; }
 .fl-slip[data-tier="3"][data-level="breach"] .slip-head { background: transparent; }
 .fl-slip[data-tier="3"][data-level="breach"] .slip-head, .fl-slip[data-tier="3"][data-level="breach"] .slip-body, .fl-slip[data-tier="3"][data-level="breach"] .slip-tear { box-shadow: none; }
+/* Parts that belong to the cook-ahead module (Cabinet tab, Hold button, sanitize chip) disappear fully when it is off. */
+.fl-seg .seg-opt[hidden], .fl-tool[hidden], .fl-chip[hidden] { display: none !important; }
+
+/* A station tab with nothing on it shows no "0" bubble; the tab alone says the station is quiet. */
+.fl-seg .seg-count[data-zero="true"] { display: none; }
+/* The all-day chips fade out at the right edge so a cut-off chip reads as "scroll for more", not as a mistake. */
+.fl-dock-list { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+/* Wall mode keeps one notice row and no sound-pause note: the TV is for glancing, and the three panes need the height. */
+.fl[data-wall="on"] .fl-bar-pause { display: none; }
