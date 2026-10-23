@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadSB } from './_load.mjs';
 
-const SB = await loadSB(['00-util', '10-config', '20-engine', '40-metrics', '88-office-backup']);
+const SB = await loadSB(['00-util', '10-config', '20-engine', '36-csv', '40-metrics', '88-office-backup']);
 const E = SB.engine, M = SB.metrics, BP = SB.office.backupPure;
 const T0 = new Date(2026, 9, 14, 12, 0, 0).getTime();
 

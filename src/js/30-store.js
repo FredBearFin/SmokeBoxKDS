@@ -18,6 +18,8 @@
   const CORRUPT_KEY = 'smokebox.v1.corrupt';
   // When the damaged copy was set aside (a time), so it can be cleared after 30 days.
   const CORRUPT_AT_KEY = 'smokebox.v1.corruptat';
+  const DROPPED_KEY = 'smokebox.v1.dropped';          // the saved text exactly as it was before a repair at load threw records away
+  const DROPPED_AT_KEY = 'smokebox.v1.droppedat';
   // One small rolling copy of the last good state (menu, ingredients, settings, PIN, safety records, recent history).
   const LASTGOOD_KEY = 'smokebox.v1.lastgood';
   // The owner's answer to the one-time offer to clear old demo tickets: true once they chose to keep them.
@@ -39,7 +41,13 @@
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
   // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
   const SNAP_KEEP = { maxTickets: 300, maxEvents: 2000 };
+  // The 'before restore' copy stays in the last-good slot for 7 days, or until a close-day copy replaces it, so a wrong restore can be undone.
+  const BEFORE_RESTORE = 'before restore', BEFORE_RESTORE_KEEP_MS = 7 * 24 * 3600e3;
   const SID_KEY = 'smokebox.v1.sid';
+  // Two tabs of one browser must not overwrite each other's save. Where the browser has Web Locks, a timed save waits for the lock named
+  // LOCK_NAME, so only one tab at a time reads the save id, builds the text and writes it. Where it does not, a tab writes its own tag to
+  // WRITER_KEY first and checks both the tag and the save id again before writing (the tab-sync fallback).
+  const LOCK_NAME = 'smokebox-save-lock', WRITER_KEY = 'smokebox.v1.writer', LOCK_WAIT = 'waiting-for-lock';
   // The actions this device has done that no server has confirmed yet (only used when a transport can push).
   const OUTBOX_KEY = 'smokebox.v1.outbox';
   const OUTBOX_MAX = 5000; // oldest unconfirmed actions are dropped past this, and st.outboxDropped says so
@@ -91,6 +99,9 @@
   let mode = 'real', strict = false, baseStorage = null, reloadFn = null;
   // snapAt is when the rolling copy was last taken (real time); snapWanted is set by close day so the next save takes one.
   let snapAt = 0, snapWanted = null;
+  let writeBlocked = false, heldText = null;     // set when a damaged save could not be copied aside: nothing is written over it
+  let susp = null;           // a big forward jump of the device clock that has not been accepted: { r0 first reading, base trusted time }
+  const CLOCK_JUMP_MAX_MS = 36 * 3600e3;     // a forward step bigger than this (a tablet asleep for a day and a half) needs the owner's yes
   let last = null;
   let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: 400 };
   const tabId = 'tab_' + Math.floor(Math.random() * 1e9).toString(36);
@@ -105,9 +116,26 @@
     // Never go backwards (rule I9): if the real clock steps back or gives garbage, the last time is
     // repeated.
     if (!isNum(v)) v = lastNow;
+    // A real kitchen does not follow a big forward jump of the device clock by itself (a dead clock battery, a wrong date): it keeps counting from
+    // the last trusted time, says so in the status, and waits for the owner to accept the new time. A jump that goes away again changes nothing.
+    if (strict && mode === 'real' && clk.speed === 1) {
+      if (v - lastNow > CLOCK_JUMP_MAX_MS) {
+        if (!susp) susp = { r0: r, base: lastNow };
+        st.clockSuspect = { aheadMs: v - lastNow, since: susp.r0 };
+        v = susp.base + Math.max(0, r - susp.r0);
+      } else if (susp) { susp = null; st.clockSuspect = null; }
+    }
     if (v < lastNow) v = lastNow;
     lastNow = v;
     return v;
+  }
+  // Accepts the device clock's new time after a big jump (the owner says it is right). Does nothing when there is no jump waiting.
+  function acceptClockJump() {
+    if (!susp) return false;
+    const r = realNow();
+    clk = { base: Math.floor(r), realBase: r, speed: 1 }; lastNow = Math.floor(r); susp = null; st.clockSuspect = null;
+    schedulePersist(false); scheduleNotify();
+    return true;
   }
   // Sets the demo speed (0.1 to 1000, where 1 is real time). Re-bases the clock first so the time does not
   // jump. Returns false for a bad speed.
@@ -125,6 +153,8 @@
   function atLeast(t) { // move the clock forward so it is not behind stamps in a loaded state
     if (!isNum(t)) return;
     const v = now();
+    // Stamps far ahead of the clock do not move it in a real kitchen: the clock is wrong, not the data.
+    if (strict && mode === 'real' && t - v > CLOCK_JUMP_MAX_MS) { st.clockWrong = { aheadMs: t - v }; return; }
     if (t > v) { clk = { base: t, realBase: realNow(), speed: clk.speed }; lastNow = t; }
   }
   // Newest time found in a state: the last event or one of the last 50 tickets (tickets run oldest to
@@ -182,17 +212,45 @@
     // 400 ms and 5 seconds, so a busy rush never spends most of its time writing.
     const wait = Math.min(SAVE_MAX_MS, Math.max(SAVE_MS, Math.round(st.saveCostMs * 8)));
     st.saveDelayMs = wait;
-    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
+    saveTimer = setTimeout(timedSave, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
   }
+  // The browser's lock manager when it has one, else null.
+  const lockManager = () => { try { const n = g.navigator; return n && n.locks && typeof n.locks.request === 'function' ? n.locks : null; } catch (e) { return null; } };
+  // True while a save runs inside the lock (then no tag check is needed: no other tab can be saving).
+  let inLock = false;
+  // Runs when the save timer fires. With several tabs and Web Locks it takes the lock first, then saves; otherwise it saves at once.
+  function timedSave() {
+    const L = tr ? lockManager() : null;
+    if (!L) { saveTimer = null; persistNow(); return; }
+    saveTimer = LOCK_WAIT;
+    // Saves inside the lock if this save is still the wanted one (a direct flush may have saved already).
+    const run = () => { if (saveTimer !== LOCK_WAIT) return; saveTimer = null; inLock = true; try { persistNow(); } finally { inLock = false; } };
+    try { L.request(LOCK_NAME, run).catch(() => { run(); }); } catch (e) { run(); }
+  }
+  // Without Web Locks: writes this tab's tag, then reads the tag and the save id back. True when nobody else saved or claimed meanwhile.
+  function claimWrite() {
+    const tag = tabId + ':' + (++claimN);
+    try {
+      storage.set(WRITER_KEY, tag);
+      const sid = storage.get(SID_KEY, null), mine = storage.get(WRITER_KEY, null);
+      return mine === tag && (sid == null ? baseSid == null : sid === baseSid);
+    } catch (e) { return true; }
+  }
+  let claimN = 0;
   // Saves the state to the browser right now and returns true if it worked. If the browser says it is full,
   // it retries with less history (oldest finished tickets and events first), halving up to 12 times. After a
   // good save it announces the new revision to other tabs.
   function persistNow() {
     if (fol) return true;                             // a follower never saves anything
     if (!storage || !state) return false;
-    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    if (saveTimer) { if (saveTimer !== LOCK_WAIT) clearTimeout(saveTimer); saveTimer = null; }
+    // The saved text is a damaged copy nobody could keep elsewhere: it stays exactly as it is until the owner has saved it.
+    if (writeBlocked) { st.lastSaveOk = false; return false; }
     // If another tab saved since this tab last loaded or saved, build on its copy first so nothing is lost.
+    const forced = skipRebase;
     if (skipRebase) skipRebase = false; else rebaseIfStale();
+    // With several tabs and no lock, claim the write and rebuild on the newest copy if another tab got in first (up to 3 times, then write anyway).
+    if (tr && !inLock && !lockManager()) for (let i = 0; i < 3 && !claimWrite(); i++) { if (forced) break; rebaseIfStale(); }
     const r = realNow();
     const v = now();
     let ok = false;
@@ -238,6 +296,8 @@
   function maybeSnapshot(r) {
     if (!strict || mode !== 'real' || !storage || !state) return false;
     if (!snapWanted && r - snapAt < SNAP_EVERY_MS) return false;
+    // A 'before restore' copy is the owner's way back from a wrong restore: the 6-hour refresh leaves it alone for 7 days.
+    if (!snapWanted) { const g = beforeRestoreCopy(r); if (g) return false; }
     try {
       const small = E().prune(state, SNAP_KEEP);
       const env = { v: 1, takenAt: r, reason: snapWanted || 'interval', rev: state.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
@@ -248,6 +308,44 @@
       st.lastGoodAt = r;
       return true;
     } catch (e) { return false; }
+  }
+  // The stored 'before restore' envelope when it is still within its 7 days at time r, else null.
+  function beforeRestoreCopy(r) {
+    try {
+      const g = storage.get(LASTGOOD_KEY, null);
+      return g && typeof g === 'object' && g.reason === BEFORE_RESTORE && isNum(g.takenAt) && r - g.takenAt < BEFORE_RESTORE_KEEP_MS && r >= g.takenAt ? g : null;
+    } catch (e) { return null; }
+  }
+  // Before a restore replaces the kitchen: keeps a whole copy of the current one in the last-good slot (full history if the
+  // browser has room, else the small rolling size). Returns the time it was taken, or null when there was nothing worth
+  // keeping (an empty kitchen, the demo, no storage) or the browser had no room. Never throws.
+  function snapshotBeforeRestore() {
+    if (!strict || mode !== 'real' || !storage || !state || isBlank()) return null;
+    const r = realNow();
+    for (const keep of [null, SNAP_KEEP]) {
+      try {
+        const small = keep ? E().prune(state, keep) : state;
+        const env = { v: 1, takenAt: r, reason: BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
+        if (!E().validateBackup(JSON.stringify(env)).ok) continue;
+        if (storage.set(LASTGOOD_KEY, env) === false) continue;
+        snapAt = r; snapWanted = null; st.lastGoodAt = r; st.beforeRestoreAt = r;
+        return r;
+      } catch (e) { /* try the smaller copy */ }
+    }
+    return null;
+  }
+  // Tells the screens about the 'before restore' copy: { takenAt, expiresAt } or null when there is none now.
+  function beforeRestoreInfo() {
+    if (!storage) return null;
+    const g = beforeRestoreCopy(realNow());
+    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS } : null;
+  }
+  // Puts the 'before restore' copy back as the kitchen (the way back from a wrong restore). Returns 'ok', or 'noCopy'.
+  // The copy it replaces is kept the same way, so this can be undone once too.
+  function undoRestore() {
+    const g = storage ? beforeRestoreCopy(realNow()) : null;
+    if (!g) { last = { type: 'undoRestore', report: 'noCopy', info: {}, events: [] }; return 'noCopy'; }
+    return importAll(JSON.stringify(g));
   }
   // Reads the rolling copy and returns { state, takenAt } if it is whole, else null.
   function readSnapshot() {
@@ -518,7 +616,7 @@
     baseStorage = given || U.rawStorage;
     storage = given ? (strict && mode === 'demo' ? U.storageFor(given, 'demo') : given) : (strict ? U.storageFor(U.rawStorage, mode) : U.storage);
     st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: SAVE_MS };
-    last = null;
+    last = null; writeBlocked = false; heldText = null; susp = null;
     baseSid = null; pending = []; skipRebase = false;
     outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
     const r = realNow();
@@ -534,14 +632,23 @@
     let loaded = null;
     if (unreadable !== null) {
       st.corrupt = 'The saved data is not readable text.';
-      try { storage.set(CORRUPT_KEY, unreadable); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
+      if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, unreadable, r)) { writeBlocked = true; heldText = unreadable; st.heldInMemory = true; }
     } else if (payload != null) {
       const v = E().validateBackup(payload);
       // A saved copy that fails the check is parked under CORRUPT_KEY and the app starts fresh. It never
       // crashes on bad storage.
-      if (v.ok) { loaded = v.state; st.repaired = v.repaired; } else {
+      if (v.ok) {
+        loaded = v.state; st.repaired = v.repaired;
+        // Records the check threw away are not gone for good: the text as it was is kept, and the status counts what was dropped.
+        const dc = droppedCounts(v.repaired);
+        if (dc) {
+          st.droppedCount = dc;
+          const raw = rawOf(payload);
+          if (!parkText(DROPPED_KEY, DROPPED_AT_KEY, payload, r)) { writeBlocked = true; heldText = raw; st.heldInMemory = true; }
+        }
+      } else {
         st.corrupt = v.error;
-        try { storage.set(CORRUPT_KEY, payload); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
+        if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, payload, r)) { writeBlocked = true; heldText = rawOf(payload); st.heldInMemory = true; }
       }
     } else st.firstRun = true;
     // A damaged save: the rolling last-good copy takes its place (real kitchens), and the damaged one stays set aside.
@@ -554,6 +661,8 @@
       try {
         const at = storage.get(CORRUPT_AT_KEY, null);
         if (isNum(at) && r - at > CORRUPT_KEEP_MS) { storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); st.corruptCleared = true; }
+        const da = storage.get(DROPPED_AT_KEY, null);
+        if (isNum(da) && r - da > CORRUPT_KEEP_MS && !st.droppedCount) { storage.remove(DROPPED_KEY); storage.remove(DROPPED_AT_KEY); }
       } catch (e) { /* ignore */ }
     }
     try { const g0 = storage.get(LASTGOOD_KEY, null); snapAt = g0 && isNum(g0.takenAt) ? g0.takenAt : 0; } catch (e) { snapAt = 0; }
@@ -562,7 +671,7 @@
     // never earlier than the real time. Speed goes back to 1.
     let vNow = r;
     const c = payload && payload.clock;
-    if (loaded && c && isNum(c.virtual)) vNow = Math.max(r, c.virtual + Math.max(0, r - (isNum(c.real) ? c.real : r)));
+    if (loaded && c && isNum(c.virtual) && !(strict && mode === 'real')) vNow = Math.max(r, c.virtual + Math.max(0, r - (isNum(c.real) ? c.real : r)));   // a real kitchen always starts from the device clock
     vNow = Math.floor(vNow);
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
@@ -576,7 +685,7 @@
     const t = E().tick(state, now());
     state = t.state;
     syncUnits();
-    if (st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
+    if (st.corrupt && !writeBlocked) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
     if (!opts.noTimers && typeof setInterval === 'function') interval = setInterval(tickNow, 1000);
     if (!opts.noSync) openTransport(opts.transport);
     if (!opts.noTimers) {
@@ -584,6 +693,26 @@
       if (g.document && typeof g.document.addEventListener === 'function') on(g.document, 'visibilitychange', () => { if (g.document.visibilityState === 'hidden') flushIfDirty(); });
     }
     return status();
+  }
+  // Keeps a copy of damaged or about-to-be-repaired data under its own key. True only when the copy was really written; a full browser store says no.
+  function parkText(key, atKey, value, at) {
+    try { if (storage.set(key, value) === false) return false; storage.set(atKey, at); return true; } catch (e) { return false; }
+  }
+  // The exact saved text for a payload, so a person can download what could not be kept safe.
+  function rawOf(payload) {
+    try { const raw = typeof storage.raw === 'function' ? storage.raw(KEY) : null; if (raw != null) return raw; } catch (e) { /* fall back to the parsed copy */ }
+    try { return JSON.stringify(payload); } catch (e) { return ''; }
+  }
+  // Counts what a repair dropped, in words a person knows; null when it dropped nothing.
+  function droppedCounts(repaired) {
+    const c = { tickets: 0, orders: 0, batches: 0, other: 0 };
+    let any = false;
+    for (const x of Array.isArray(repaired) ? repaired : []) {
+      if (!/^dropped\b/.test(x)) continue;
+      any = true;
+      if (/ticket/.test(x)) c.tickets++; else if (/order/.test(x)) c.orders++; else if (/batch/.test(x)) c.batches++; else c.other++;
+    }
+    return any ? c : null;
   }
   // A copy of the save status plus the current speed: persistent, lastSaveOk, lastSaveAt, corrupt, firstRun,
   // trimmed, repaired, speed.
@@ -723,6 +852,8 @@
     }
     if (namesGiven && typeof C.saveCustom === 'function') { try { C.saveCustom(namesGiven); } catch (e) { /* the names stay applied for this session */ } }
     if (parsed && isObjLike(parsed.setup)) for (const k of SETUP_LISTS) if (Array.isArray(parsed.setup[k])) { try { storage.set(SETUP_KEYS[k], parsed.setup[k].filter((x) => typeof x === 'string').slice(0, 200)); } catch (e) { /* the list is a convenience */ } }
+    // Keep the kitchen being replaced, so a wrong restore can be undone: a visible copy in the last-good slot.
+    const beforeAt = snapshotBeforeRestore();
     const ns = v.state;
     // The revision must go up so other tabs treat the imported copy as newer; the clock must not be behind
     // its times.
@@ -733,7 +864,7 @@
     skipRebase = true; pending = [];   // an import or reset is meant to win over what another tab saved
     persistNow();
     scheduleNotify();
-    last = { type: 'import', report: 'ok', info: { repaired: v.repaired }, events: [] };
+    last = { type: 'import', report: 'ok', info: { repaired: v.repaired, beforeRestore: beforeAt != null, beforeRestoreAt: beforeAt, beforeRestoreKeepDays: beforeAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, events: [] };
     return 'ok';
   }
   // Time in ms as readable date text for spreadsheets, or empty text when missing.
@@ -922,7 +1053,7 @@
   // Registers fn for status changes; returns a remover.
   function subscribeFollow(fn) { if (typeof fn !== 'function') return () => {}; followSubs.add(fn); return () => followSubs.delete(fn); }
   // Ends the first-attempt promise once.
-  function folSettle(res) { if (fol && fol.resolve) { const r = fol.resolve; fol.resolve = null; r(Object.assign({ status: followStatus() }, res)); } }
+  function folSettle(res) { if (fol && fol.resolve) { const r = fol.resolve; fol.resolve = null; r(Object.assign({ status: followStatus() }, res, res && res.ok === false && res.error ? { reason: FOLLOW_REASON[res.error] || '' } : {})); } }
   // Stops following: closes the stream and timers. The store keeps its last state until init is called again.
   function folStop() {
     if (!fol) return;
@@ -948,7 +1079,7 @@
     const url = opts.url.replace(/\/+$/, '');
     const f = fol = { url, code: codeFor(opts), staleMs: isNum(opts.staleMs) && opts.staleMs > 0 ? opts.staleMs : 45000, offset: 0, seq: null, hubId: null, connected: false, everConnected: false,
       error: null, lastMsgAt: null, goodSince: null, retryInMs: 0, retryStep: 0, closed: false, gen: 0, ctrl: null, retryTimer: null, timer: null, lastKey: '', resolve: null, resyncs: 0,
-      base: null, hub: false, offsetKnown: false, pend: [], owners: new Map(), baseKey: null, topOwner: null, lastActKey: null, fromCache: false, cachedAt: null, cacheAt: 0, cacheDirty: false, name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
+      base: null, hub: false, trim: Number.isInteger(opts.trim) && opts.trim >= 1 && opts.trim <= 365 ? opts.trim : 0, trimmed: null, offsetKnown: false, pend: [], owners: new Map(), baseKey: null, topOwner: null, lastActKey: null, fromCache: false, cachedAt: null, cacheAt: 0, cacheDirty: false, name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
       fetchFn: opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null), Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
     f.hub = !!hub;
     const bound = hub ? tokenFor(url) : null;
@@ -957,7 +1088,7 @@
     const p = new Promise((resolve) => { f.resolve = resolve; });
     if (hub && cache) {
       // The hub cannot be reached: show the last known kitchen, marked as such, and let taps be predicted and queued from the start.
-      f.base = cache.state; f.seq = cache.seq; f.hubId = cache.hubId; f.offset = cache.offset || 0; f.fromCache = true; f.cachedAt = cache.savedAt; f.everConnected = true;
+      f.base = cache.state; f.seq = cache.seq; f.hubId = cache.hubId; f.offset = cache.offset || 0; f.trimmed = f.trim && cache.trimmed ? cache.trimmed : null; f.fromCache = true; f.cachedAt = cache.savedAt; f.everConnected = true;
       hubHello({ hubId: cache.hubId });
       folShow();
       folSettle({ ok: true, cached: true });
@@ -995,8 +1126,10 @@
     const gen = ++f.gen;
     if (!f.fetchFn || !f.Abort || !f.Dec) { f.error = 'error'; folRetry('error'); return; }
     f.ctrl = new f.Abort();
-    let q = '';
-    if (f.hubId != null && isNum(f.seq)) q = '?since=' + f.seq + '&hub=' + encodeURIComponent(f.hubId);
+    const qp = [];
+    if (f.hubId != null && isNum(f.seq)) qp.push('since=' + f.seq, 'hub=' + encodeURIComponent(f.hubId));
+    if (f.trim) qp.push('trim=' + f.trim);
+    const q = qp.length ? '?' + qp.join('&') : '';
     const hdr = hubHeaders(f.url, f.code, { accept: 'text/event-stream' });       // the token or code travels in a header, never in the address
     let res;
     try { res = await f.fetchFn(f.url + '/follow' + q, { signal: f.ctrl.signal, cache: 'no-store', headers: hdr }); } catch (e) { if (f.closed || gen !== f.gen) return; folRetry('unreachable'); return; }
@@ -1080,6 +1213,7 @@
       const v = E().validateBackup(d.state);
       if (!v.ok || !isNum(d.seq)) { folResync(); return; }
       f.base = v.state; f.seq = d.seq; f.hubId = d.hubId || f.pendingHub;
+      f.trimmed = f.trim && d.trimmed && isNum(d.trimmed.since) ? d.trimmed : null;      // what the hub left out, kept so pages can say so
       f.owners = new Map(); f.baseKey = null;
       if (f.hub) { f.fromCache = false; hubAfterSnapshot(d); hubCacheSave(true); }
       folShow();
@@ -1091,6 +1225,8 @@
       if (d.seq !== f.seq + 1 || typeof d.type !== 'string') { folResync(); return; }
       const r = d.type === 'tick' ? { report: 'ok', state: E().tick(f.base, d.now).state } : E().apply(f.base, d.type, d.payload, d.now, { screen: d.screen });
       if (r.report !== 'ok') { folResync(); return; }
+      // A trimmed copy that no longer matches the hub's change count has drifted (an action touched left-out history): start again from a fresh copy.
+      if (f.trimmed && isNum(d.rev) && isNum(r.state.rev) && d.rev !== r.state.rev) { folResync(); return; }
       f.base = r.state; f.seq = d.seq;
       if (f.hub && d.type !== 'tick' && d.type !== 'uiReport') {
         f.baseKey = d.opId || 'seq:' + d.seq;
@@ -1196,7 +1332,7 @@
     if (!force && realNow() - f.cacheAt < (f.cacheBytes > 200000 ? 15000 : 2000)) { f.cacheDirty = true; return; }
     f.cacheAt = realNow(); f.cacheDirty = false;
     try {
-      const rec = { v: 1, url: f.url, hubId: f.hubId, seq: f.seq, savedAt: realNow(), offset: Math.round(f.offset), state: f.base };
+      const rec = { v: 1, url: f.url, hubId: f.hubId, seq: f.seq, savedAt: realNow(), offset: Math.round(f.offset), state: f.base, trimmed: f.trimmed || undefined };
       f.cacheBytes = JSON.stringify(rec).length;
       if (f.cacheBytes > CACHE_MAX) { U.rawStorage.remove(CACHE_KEY); return; }
       U.rawStorage.set(CACHE_KEY, rec);
@@ -1208,7 +1344,7 @@
       const c = U.rawStorage.get(CACHE_KEY, null);
       if (!c || c.v !== 1 || c.url !== normUrl(url) || typeof c.hubId !== 'string' || !isNum(c.seq) || !isNum(c.savedAt)) return null;
       const v = E().validateBackup(c.state);
-      return v.ok ? { state: v.state, hubId: c.hubId, seq: c.seq, savedAt: c.savedAt, offset: isNum(c.offset) ? c.offset : 0 } : null;
+      return v.ok ? { state: v.state, hubId: c.hubId, seq: c.seq, savedAt: c.savedAt, offset: isNum(c.offset) ? c.offset : 0, trimmed: c.trimmed && isNum(c.trimmed.since) ? c.trimmed : null } : null;
     } catch (e) { return null; }
   }
   // How many taps this screen has sent or queued that the hub has not answered yet.
@@ -1417,7 +1553,7 @@
   async function initHubClient(opts) {
     opts = opts || {};
     // Builds the answer for a join that did not happen.
-    const fail = (error) => ({ ok: false, error, status: hubStatus() });
+    const fail = (error) => ({ ok: false, error, reason: FOLLOW_REASON[error] || '', status: hubStatus() });
     if (typeof opts.url !== 'string') return fail('notFound');
     if ((opts.adopt === 'hub') === (opts.seed === true)) return fail('choiceRequired');
     // The screen name is plain: letters, digits, spaces and a few marks, up to 20 characters; anything else is refused, not trimmed away.
@@ -1641,7 +1777,9 @@
   }
   // The stored form of a recovery code: a salted SHA-256 (only this is ever saved, never the code).
   async function hashCode(plain) {
-    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);
+    const salted = await U.secretHash('smokebox-recovery-v1:', plain);
+    if (salted !== null) return salted;
+    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);     // a browser without PBKDF2 keeps the old plain form
     return hex === null ? null : 'sha256:' + hex;
   }
   // True when a back office PIN is set.
@@ -1678,10 +1816,10 @@
     if (rec.until > t) return { ok: false, report: 'recoveryLocked', info: { waitMs: rec.until - t } };
     if (rec.until && rec.until <= t) rec = { fails: 0, until: 0 };
     const plain = normalizeCode(code);
-    const hash = plain ? await hashCode(plain) : null;
-    if (plain && hash === null) return { ok: false, report: 'noCrypto', info: {} };
     const stored = state.settings.office.recoveryHash;
-    if (!plain || hash !== stored) {
+    const chk = plain ? await U.secretCheck('smokebox-recovery-v1:', plain, stored) : { ok: false };
+    if (plain && !chk.ok && !(g.crypto && g.crypto.subtle)) return { ok: false, report: 'noCrypto', info: {} };
+    if (!plain || !chk.ok) {
       rec.fails++;
       const locked = rec.fails >= RECOVERY_TRIES;
       if (locked) rec = { fails: 0, until: t + RECOVERY_LOCK_MS };
@@ -1710,6 +1848,9 @@
     if (mode === 'demo') return fail('notInDemo');
     if (typeof opts.confirm !== 'string' || opts.confirm.trim().toUpperCase() !== START_OVER_WORD) return fail('confirmWord', { word: START_OVER_WORD });
     if (opts.keepSettings != null && typeof opts.keepSettings !== 'boolean') return fail('badPatch', { key: 'keepSettings' });
+    // The screen must say a backup file was really saved (its name and size) before anything is erased.
+    const bs = opts.backupSaved;
+    if (!bs || typeof bs !== 'object' || typeof bs.filename !== 'string' || !bs.filename.trim() || !(Number.isFinite(bs.chars) && bs.chars > 0)) return fail('backupRequired');
     const keep = opts.keepSettings !== false;
     const text = exportAll();
     if (text == null) { const lr = last || {}; return fail(lr.report || 'invalidBackup', lr.info); }
@@ -1770,16 +1911,16 @@
   function isOwn() { return !!(state && state.catalog === 'own'); }
 
   // Public API: init, destroy, status, getState, now, tick, dispatch, dispatchEx, lastResult, subscribe,
-  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, exportCsv, reset,
+  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset,
   // resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY.
   SB.store = {
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
-    initFollower, followStatus, subscribeFollow, isFollower, initHubClient, probeHub, rememberedCode, pairHub, pairedFor, unpair, hubScreens, hubNewPairingCode, hubRemoveScreen, hubStatus, subscribeHub: subscribeFollow, subscribeRefusals, pendingFor, isHubClient, isHub: isHubClient, leaveHub, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
+    initFollower, trimInfo: () => (fol && fol.trimmed ? Object.assign({}, fol.trimmed) : null), followStatus, subscribeFollow, isFollower, initHubClient, probeHub, rememberedCode, pairHub, pairedFor, unpair, hubScreens, hubNewPairingCode, hubRemoveScreen, hubStatus, subscribeHub: subscribeFollow, subscribeRefusals, pendingFor, isHubClient, isHub: isHubClient, leaveHub, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -1292,6 +1292,10 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 /* On touch-sized screens the buttons in the reminder and demo bars are full 44 px targets. */
 @media (max-width: 1024px), (pointer: coarse) { .sb-banner .btn { min-height: 44px; } }
 
+/* The clock question may use two lines so a phone can read it all; the page below starts under the whole strip. */
+.sb-banner[data-kind="clock"] { min-height: 40px; align-items: center; }
+.sb-banner[data-kind="clock"] .sb-banner-t { white-space: normal; overflow: visible; line-height: 1.25; }
+
 /* ===== 20-floor.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the floor board: the header with station tabs, the paper ticket slips, item
@@ -2121,7 +2125,22 @@ html[data-hub="on"] .fl-demo-chip, html[data-hub="on"] .fl-start-demo, html[data
   /* The next-step line is one line with an ellipsis (each dish row already shows its own "Start in" time), and sits closer to the dishes. */
   .fl-main[data-density="compact"] .slip-next { margin-top: 2px; padding-block: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+/* The device-clock notice on the strip: calm, wraps, two plain buttons that are not the width of the screen. */
+.fl-bar-clock { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-4); background: var(--tint-warn, var(--paper)); border-bottom: var(--bw) solid var(--amber); }
+.fl-bar-clock[hidden] { display: none; }
+.fl-clock-t { flex: 1 1 260px; min-width: 0; font: var(--w-semi) var(--fs-3) / 1.3 var(--font-body); }
+.fl-bar-clock .btn { min-height: var(--tap, 44px); flex: 0 1 auto; }
+.fl-bar-clock > .icon { flex: none; margin-left: var(--sp-4); }
+
+/* On a phone the clock notice puts its words on the full width and the two choices side by side below them. */
+@media (max-width: 640px) {
+  .fl-clock-t { flex: 1 1 calc(100% - 64px); }
+  .fl-bar-clock .btn { flex: 1 1 40%; align-self: stretch; }
+  .fl-bar-clock > .icon { margin-left: 0; }
 }
+
+/* On a show-only screen the next step on each dish stays as a quiet word (it says what the line should do next) but no longer looks like a button to press. */
+.fl[data-follow="on"] .fl-item .fl-act, .fl[data-follow="on"] .fl-item[data-state] .fl-act { background: transparent; border-color: transparent !important; box-shadow: none !important; opacity: 0.75; }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -2795,6 +2814,16 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .rd .stepper .stepper-field { flex: 1 1 auto; min-width: 0; }
 .rd .stepper .stepper-input { flex: 1 1 auto; min-width: 0; width: auto; text-align: center; }
 
+/* Screens in this kitchen (sc-): the list, tags, the big new code. */
+.sc-list { display: grid; gap: var(--sp-2); }
+.sc-row { display: grid; gap: var(--sp-1); padding: var(--sp-2) 0; border-bottom: 1px solid var(--line); }
+.sc-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.sc-tag { font: var(--w-bold) var(--fs-2) / 1 var(--font-body); padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; }
+.sc-confirm { display: grid; gap: var(--sp-2); }
+.sc-codebox { display: grid; gap: var(--sp-2); }
+.sc-code { font-size: 40px; letter-spacing: 0.12em; text-align: center; }
+.sc-code[data-expired="true"] { opacity: 0.4; text-decoration: line-through; }
+
 /* ===== 22-floor-tour.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the "Show me how it works" walkthrough: the pulsing ring and the caption card.
@@ -2923,6 +2952,9 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .ox-acts .ox-how { min-width: 140px; gap: var(--sp-1); }
 .ox-how-k { color: var(--ink2); font-weight: var(--w-semi); }
 .ox-how-v { font-weight: var(--w-heavy); }
+
+/* A closed-day sale keeps a quiet, dashed Reopen button that explains itself; a tap still gives the full reason. */
+.ox-acts .ox-reopen.is-shut { border-style: dashed; color: var(--muted, inherit); white-space: normal; text-align: center; }
 
 /* ===== 24-guide.css ===== */
 /* WHAT THIS FILE IS: the look of the in-app Guide screen (#/guide): a page list on the left and the text on the right.
@@ -4353,6 +4385,56 @@ a.of-nav:active { background: var(--press); }
   U.isNum = (n) => typeof n === 'number' && isFinite(n);
   // The folder the page was served from as an address prefix ('' at the site root, '/beta' behind a path prefix), for calls to its own hub.
   U.pageFolder = (g) => { try { const p = g && g.location && typeof g.location.pathname === 'string' ? g.location.pathname : '/'; return p.replace(/[^/]*$/, '').replace(/\/+$/, ''); } catch (e) { return ''; } };
+  // Removes characters nobody can see that can fool a reader: text-direction controls (U+202A to U+202E, U+2066 to U+2069) and zero-width
+  // characters (U+200B, U+200C, U+2060, U+FEFF). A zero-width joiner (U+200D) is kept only inside an emoji sequence (a pictograph on both
+  // sides, with an optional variation selector or skin tone before it), so family and flag emoji still work; anywhere else it is removed.
+  const INVISIBLE_RE = /[\u200B\u200C\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/g;
+  const ZWJ_RE = /(\p{Extended_Pictographic}[\uFE0F\u{1F3FB}-\u{1F3FF}]*\u200D(?=\p{Extended_Pictographic}))|\u200D/gu;
+  // Returns the text with those invisible characters removed (emoji joiners stay).
+  U.stripInvisible = (s) => String(s).replace(INVISIBLE_RE, '').replace(ZWJ_RE, (m, keep) => (keep ? m : ''));
+  // Cleans typed text for names and notes: strips the invisible characters, squeezes runs of white space to single spaces and trims both ends.
+  U.cleanText = (s) => U.stripInvisible(s).replace(/\s+/g, ' ').trim();
+  /* ---------- secret hashing (PIN and recovery code) ---------- */
+  // Rounds of PBKDF2 for a saved PIN or recovery code: about a tenth of a second on a tablet. A 4-digit PIN stays a door latch whatever this is.
+  const KDF_ROUNDS = 100000;
+  // Turns bytes into lowercase hex text, two characters each.
+  const toHex = (buf) => Array.from(new Uint8Array(buf)).map((b) => (b < 16 ? '0' : '') + b.toString(16)).join('');
+  // The browser's crypto when it can do PBKDF2 and random bytes, else null.
+  const subtleOf = () => { const c = g.crypto; return c && c.subtle && typeof c.subtle.deriveBits === 'function' && typeof c.getRandomValues === 'function' && typeof TextEncoder !== 'undefined' ? c.subtle : null; };
+  // Runs PBKDF2-SHA256 over text with a salt and a round count and returns the bytes.
+  async function derive(sub, text, salt, rounds) {
+    const key = await sub.importKey('raw', new TextEncoder().encode(text), 'PBKDF2', false, ['deriveBits']);
+    return sub.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: rounds }, key, 256);
+  }
+  // Scrambles a secret into 'pbkdf2:<rounds>:<salt>:<hash>' with a fresh random salt; null where this browser cannot (the caller then keeps the old plain
+  // SHA-256 form). domain is a fixed label put in front of the secret so a PIN hash and a recovery hash never match each other.
+  U.secretHash = async (domain, plain) => {
+    const sub = subtleOf();
+    if (!sub) return null;
+    try {
+      const salt = g.crypto.getRandomValues(new Uint8Array(16));
+      return 'pbkdf2:' + KDF_ROUNDS + ':' + toHex(salt) + ':' + toHex(await derive(sub, domain + String(plain), salt, KDF_ROUNDS));
+    } catch (e) { return null; }
+  };
+  // Checks a secret against a saved scramble of either form. Returns { ok, legacy }: legacy is true for the old unsalted 'sha256:' form, which still
+  // works; the caller should save a fresh U.secretHash after an ok legacy check. ok is false (never a throw) for anything unreadable.
+  U.secretCheck = async (domain, plain, stored) => {
+    try {
+      const sub = g.crypto && g.crypto.subtle;
+      if (typeof stored !== 'string' || !sub) return { ok: false, legacy: false };
+      if (stored.indexOf('pbkdf2:') === 0) {
+        const m = /^pbkdf2:(\d{1,7}):([0-9a-f]{2,128}):([0-9a-f]{64})$/.exec(stored);
+        const sk = subtleOf();
+        if (!m || !sk || Number(m[1]) < 1 || Number(m[1]) > 2000000) return { ok: false, legacy: false };
+        const salt = new Uint8Array(m[2].match(/../g).map((h) => parseInt(h, 16)));
+        return { ok: toHex(await derive(sk, domain + String(plain), salt, Number(m[1]))) === m[3], legacy: false };
+      }
+      if (stored.indexOf('sha256:') === 0 && typeof sub.digest === 'function' && typeof TextEncoder !== 'undefined') {
+        return { ok: 'sha256:' + toHex(await sub.digest('SHA-256', new TextEncoder().encode(domain + String(plain)))) === stored, legacy: true };
+      }
+    } catch (e) { /* unreadable: no match */ }
+    return { ok: false, legacy: false };
+  };
   // Forces a number into the range lo to hi, so clamp(15, 0, 10) gives 10.
   U.clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   // Slides from a to b by the fraction t (t = 0 gives a, t = 1 gives b).
@@ -4629,8 +4711,8 @@ a.of-nav:active { background: var(--press); }
   const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'callouts', 'far', 'wall', 'dock', 'follow.sound'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
-  const DATA_KEYS = ['state', 'sid', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept', 'hubqueue', 'hubcache', 'hubtoken'].map((k) => 'smokebox.v1.' + k);
+  const DATA_KEYS = ['state', 'sid', 'writer', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'dropped', 'droppedat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept', 'hubqueue', 'hubcache', 'hubtoken'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {
@@ -5179,7 +5261,7 @@ a.of-nav:active { background: var(--press); }
   // ticket spec), note (140, long enough for an allergy note), and how many tickets (5000) and log events
   // (40000) are kept before the oldest are dropped so the saved data stays small enough for the browser.
   // Starter values.
-  C.limits = { maxItemsPerTicket: 30, maxQty: 20, maxCustomerLen: 40, maxNoteLen: 140, maxTickets: 5000, maxEvents: 40000, maxOrders: 5000, maxMoney: 10000 };
+  C.limits = { maxItemsPerTicket: 30, maxQty: 20, maxCustomerLen: 40, maxNoteLen: 140, maxTickets: 5000, maxEvents: 40000, maxOrders: 5000, maxMoney: 10000, maxPrice: 1000, maxOrderMoney: 10000000 };
   // How an order can be paid. Smokebox only records which one it was; the card itself is taken on the owner's own
   // card reader, and no card number ever enters this app.
   C.payMethods = [{ id: 'cash', name: 'Cash' }, { id: 'card', name: 'Card' }, { id: 'other', name: 'Other' }];
@@ -5210,8 +5292,8 @@ a.of-nav:active { background: var(--press); }
   const slug = (prefix, name) => prefix + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 16);
   // The first three letters of a name, upper case, for the small tag on tickets and tabs.
   const codeOf = (name) => String(name).replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || '???';
-  // Cleans one typed name: trims spaces, squeezes runs of spaces; returns '' when it is not usable.
-  const cleanName = (x) => (typeof x === 'string' ? x.replace(/\s+/g, ' ').trim() : '');
+  // Cleans one typed name: trims spaces, squeezes runs of spaces, strips invisible direction and zero-width characters; returns '' when it is not usable.
+  const cleanName = (x) => (typeof x === 'string' ? (SB.util && SB.util.cleanText ? SB.util.cleanText(x) : x.replace(/\s+/g, ' ').trim()) : '');
   // Checks a typed name against the others in a list (ignoring one id): true if another entry has it.
   const nameTaken = (list, name, exceptId) => list.some((e) => e.id !== exceptId && e.name.toLowerCase() === name.toLowerCase());
   // Rebuilds the lookup tables in place, so code that already holds them still sees the new entries.
@@ -5293,7 +5375,7 @@ a.of-nav:active { background: var(--press); }
 
   // The engine's own bounds for a dish, copied here because this file loads before the engine. A test checks the engine
   // refuses exactly what these refuse. 150 dishes, names up to 60 characters, price 0 to 1000 dollars.
-  const LIMITS = { maxDishes: 150, nameMax: 60, priceMax: 1000, textMax: 1000000, rowsRead: 2000 };
+  const LIMITS = { maxDishes: 150, nameMax: 60, priceMax: 1000, textMax: 1000000, rowsRead: 2000, lineMax: 1000 };
   M.limits = LIMITS;
   // The dish form fields the importer uses when the file does not say: one tap to finish, a 5 minute guess.
   const DEFAULTS = { prepSec: 300, track: 'one' };
@@ -5301,7 +5383,7 @@ a.of-nav:active { background: var(--press); }
   // The money symbol in use (the owner's, or $), for messages.
   const cs = () => (SB.util && SB.util.currencySymbol ? SB.util.currencySymbol() : '$');
   // Collapses runs of white space and trims, as the engine does to a dish name.
-  const clean = (s) => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
+  const clean = (s) => (SB.util && SB.util.stripInvisible ? SB.util.stripInvisible : (x) => x)(String(s == null ? '' : s)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
   // The name compared for duplicates: lower case, single spaces.
   const key = (s) => clean(s).toLowerCase();
 
@@ -5442,6 +5524,10 @@ a.of-nav:active { background: var(--press); }
   // Reads one typed line such as "Brisket plate, 14.00, pit", "Burger 9.50", "Name - $9" or a tab or semicolon line.
   // Returns { name, priceText, extras:[] } or null when the line has no usable shape (it still becomes a row with problems).
   function readLine(line) {
+    // A line this long is not a dish. It is not read at all (so nothing can be slow on it); the caller marks the row.
+    if (line.length > LIMITS.lineMax) return { name: clean(line.slice(0, LIMITS.nameMax)), priceText: '', extras: [], tooLong: line.length };
+    // Runs of spaces become one space (tabs stay, they separate columns), so the patterns below take time in proportion to the line, not its square.
+    line = line.replace(/[^\S\t]+/g, ' ');
     const delims = ['\t', ';'];
     let parts = null;
     // "Pickles 3,50": a single comma that only marks the cents is not a column separator.
@@ -5554,6 +5640,7 @@ a.of-nav:active { background: var(--press); }
       }
       const f = readLine(raw.trim());
       const row = newRow(i + 1);
+      if (f.tooLong) row.problems.push(prob('lineTooLong', 'error', 'This line is ' + f.tooLong + ' characters long, far too long to be a dish.', 'Cut it down to a name and a price, or delete the line.'));
       row.name = clean(unguard(f.name));
       setPrice(row, f.priceText, opts.priceUnit === 'cents');
       // Extra cells after the price: a station, a category, or a note.
@@ -5808,7 +5895,7 @@ a.of-nav:active { background: var(--press); }
     'emptyOrder', 'badQty', 'tooManyItems', 'badCustomer', 'badChannel', 'noteTooLong', 'itemUnavailable', 'ticketNotActive',
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
-    'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
+    'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'dayClosed', 'orderEmpty',
     'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'followerReadOnly', 'hubKitchen', 'hubChanged', 'hubConnecting', 'undoElsewhere', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
@@ -5861,6 +5948,7 @@ a.of-nav:active { background: var(--press); }
     unknownOrder: 'That order is no longer here. It may have been cleared; check the open orders list.',
     orderNotOpen: 'That order is already paid or voided. Reopen it first if it needs changing.',
     orderNotPaid: 'Only a paid order can be reopened.',
+    dayClosed: 'That sale belongs to a day that is already closed, so it cannot be opened again: it would move to another day and count twice. Make the correction in your own records, or ask whoever keeps the books.',
     orderEmpty: 'There is nothing on this order to pay. Add items first, or void the order.',
     orderNotEmpty: 'That order still has food on it. Void its tickets first, or take payment.',
     badPayment: 'Pick how it was paid (cash, card or other), and enter the tip and discount as dollar amounts.',
@@ -5971,9 +6059,11 @@ a.of-nav:active { background: var(--press); }
   // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
   // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
   // safetyKeep bucket instead of being dropped.
-  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
-  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months). This is our own choice; no source gives a minimum, so ask your health department how long to keep records.
-  const SAFETY_KEEP_MS = 190 * 24 * H;
+  const SAFETY_EVENT = { safety_setting_changed: 1, temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  // 400 days: how long the safetyKeep bucket holds a safety entry (a year and a month, so a yearly inspection can look back a full year). This is our own
+  // choice; no source gives one minimum for everyone, so ask your health department how long to keep records. Safety entries are small and the bucket is
+  // never trimmed by size, only by age.
+  const SAFETY_KEEP_DAYS = 400, SAFETY_KEEP_MS = SAFETY_KEEP_DAYS * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
 
@@ -6008,8 +6098,18 @@ a.of-nav:active { background: var(--press); }
   }
   /** Simulated propagation delay for one channel target: 2..40 s, fixed per (syncId, target). */
   const syncDelayMs = (syncId, targetId) => 2000 + (hashStr(syncId + '|' + targetId) % 38001);
-  // Squeezes runs of spaces, tabs and line breaks into single spaces and trims both ends.
-  const cleanText = (s) => s.replace(/\s+/g, ' ').trim();
+  // Squeezes runs of spaces, tabs and line breaks into single spaces, trims both ends, and strips invisible direction and zero-width characters.
+  const cleanText = (s) => U.cleanText(s);
+  // Cuts text to at most max characters without leaving half of an emoji (a lone first half of a surrogate pair) at the end.
+  const cutText = (s, max) => { if (s.length <= max) return s; let t = s.slice(0, max); const c = t.charCodeAt(t.length - 1); if (c >= 0xD800 && c <= 0xDBFF) t = t.slice(0, -1); return t; };
+  // Cleans a text field of a loaded record and cuts it to max characters (names and labels squeeze white space; a note keeps its line breaks).
+  // Returns the fixed text, or null when the field was not text. Adds a line to repaired when anything changed.
+  function fitText(v, max, what, repaired, note) {
+    if (typeof v !== 'string') return null;
+    const c = cutText(note ? U.stripInvisible(v).trim() : cleanText(v), max).trim();
+    if (c !== v) repaired.push(what + ' cleaned or shortened');
+    return c;
+  }
   // True when the sorted list a contains x. Halves the search each step, so it stays fast on long lists.
   const sortedHas = (a, x) => { let lo = 0, hi = a.length - 1; while (lo <= hi) { const m = (lo + hi) >> 1; if (a[m] === x) return true; if (a[m] < x) lo = m + 1; else hi = m - 1; } return false; };
 
@@ -6315,7 +6415,7 @@ a.of-nav:active { background: var(--press); }
       return gateOut('NONE', true, 'onLine', 'ok', 'Out of the fridge, ' + used + ' min so far' + (isNum(b.outHours) ? ' of your ' + U.round(b.outHours, 2) + '-hour limit.' : '. No out-of-fridge limit set.'), end);
     }
     if (b.outSince != null) {
-      const lim = b.outSince + S.aboveColdGraceH * H;
+      const lim = coldOutLimit(b, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, end));
     }
@@ -6397,7 +6497,7 @@ a.of-nav:active { background: var(--press); }
         if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Below ' + f0(S.hotHoldF) + ' for more than ' + S.belowHotGraceH + ' hours. Discard.' + SAFETY);
         return gateOut('REHEAT_IMMEDIATE', false, 'belowHot', 'bad', 'Below ' + f0(S.hotHoldF) + '. Reheat to ' + f0(S.reheatF) + ' now (Smokebox allows one reheat per batch) or discard.' + SAFETY, Math.min(lim, exp));
       }
-      const lim = batch.outSince + S.aboveColdGraceH * H;
+      const lim = coldOutLimit(batch, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, exp));
     }
@@ -6434,7 +6534,7 @@ a.of-nav:active { background: var(--press); }
     if (b.outSince != null) {
       const want = b.kind === 'cold' ? 'chill' : 'reheat';
       if (b.status !== want || (b.kind !== 'cold' && b.reheats >= 1)) return -Infinity;
-      return Math.min(q ? hard : exp, b.outSince + (b.kind === 'cold' ? S.aboveColdGraceH : S.belowHotGraceH) * H);
+      return Math.min(q ? hard : exp, b.kind === 'cold' ? coldOutLimit(b, S) : b.outSince + S.belowHotGraceH * H);
     }
     // A past batch stays past (a late temperature check does not change it) until the hard cap.
     if (b.status === 'past') return q ? hard : -Infinity;
@@ -6552,7 +6652,7 @@ a.of-nav:active { background: var(--press); }
   }
   // Only the safety-log events from a list of events.
   function safetyOnly(list) { return list.filter((e) => hasOwn(SAFETY_EVENT, e.type)); }
-  // Adds newly dropped safety events to the retention bucket and lets go of entries older than 190 days
+  // Adds newly dropped safety events to the retention bucket and lets go of entries older than SAFETY_KEEP_DAYS
   // (measured from refT, the newest time known). The bucket is never trimmed by size, only by age.
   function keepSafety(prev, dropped, refT) {
     const all = (Array.isArray(prev) ? prev : []).concat(dropped);
@@ -7057,7 +7157,7 @@ a.of-nav:active { background: var(--press); }
     let note = p.note == null ? '' : p.note;
     if (typeof note !== 'string') { tx.info.key = 'note'; return 'badPatch'; }
     if (note.length > 4 * L.maxNoteLen) return 'noteTooLong';
-    note = note.trim();
+    note = U.stripInvisible(note).trim();
     if (note.length > L.maxNoteLen) return 'noteTooLong';
     const rush = p.rush == null ? false : p.rush;
     if (typeof rush !== 'boolean') { tx.info.key = 'rush'; return 'badPatch'; }
@@ -7187,6 +7287,16 @@ a.of-nav:active { background: var(--press); }
     const taxC = Math.floor((taxableC * Math.round(rate * 1e4) + 500000) / 1e6);
     return { subtotal: subCents / 100, discount: discC / 100, taxRate: rate, tax: taxC / 100, total: (taxableC + taxC) / 100, qty, rounds };
   }
+  // Totals for lines that are not on an order yet (the draft on the order screen), with the same whole-cent rule the charge uses, so what the
+  // screen shows is what the register charges. items are { price, qty }; opts: extraSubtotalCents (food already on the order), discount, taxRatePct.
+  function totalsOf(items, opts) {
+    let sub = isNum(opts && opts.extraSubtotalCents) ? Math.max(0, Math.round(opts.extraSubtotalCents)) : 0, qty = 0;
+    for (const it of Array.isArray(items) ? items : []) {
+      const q = isNum(it && it.qty) && it.qty > 0 ? Math.round(it.qty) : 0;
+      sub += toCents(isNum(it && it.price) ? it.price : 0) * q; qty += q;
+    }
+    return totalsFrom(sub, qty, 0, opts && opts.discount, opts && opts.taxRatePct);
+  }
   // The sales tax rate in force now, in percent (0 when none is set).
   const taxRateOf = (settings) => (settings && settings.service && isNum(settings.service.taxRatePct) ? settings.service.taxRatePct : 0);
   // What an order adds up to: the food on its tickets that are not voided, less the discount, plus tax. A paid
@@ -7239,6 +7349,7 @@ a.of-nav:active { background: var(--press); }
     const o = tx.get('orders')[oi];
     const t0 = orderTotals(tx.state(), o, { discount: pay.discount });
     if (!(t0.subtotal > 0)) return 'orderEmpty';
+    if (!Number.isFinite(t0.total) || t0.total > C.limits.maxOrderMoney) { tx.info = { key: 'total', min: 0, max: C.limits.maxOrderMoney }; return 'outOfBounds'; }
     if (pay.discount > t0.subtotal + 1e-9) { tx.info = { key: 'discount', min: 0, max: t0.subtotal }; return 'outOfBounds'; }
     const w = tx.mutIn(tx.mut('orders'), oi);
     w.status = 'paid'; w.paidAt = stampAfter(o.createdAt, tx.now); w.method = pay.method; w.tip = pay.tip; w.discount = t0.discount; w.totals = t0;
@@ -7284,6 +7395,9 @@ a.of-nav:active { background: var(--press); }
     if (oi < 0) return 'unknownOrder';
     const o = tx.get('orders')[oi];
     if (o.status !== 'paid') return 'orderNotPaid';
+    // A sale stays in the day it was made: once that day is closed, paying it again would count it in two day_closed records.
+    const lc = tx.get('lastClose');
+    if (lc && isNum(o.paidAt) && U.serviceDate(o.paidAt, tx.get('settings').service.dayStartHour) <= lc.day) { tx.info = { day: lc.day }; return 'dayClosed'; }
     const w = tx.mutIn(tx.mut('orders'), oi);
     w.status = 'open'; delete w.paidAt; delete w.method; delete w.tip; delete w.discount; delete w.totals;
     tx.event('order_reopened', { orderId: o.id });
@@ -7752,6 +7866,9 @@ a.of-nav:active { background: var(--press); }
     const w = p.who.trim();
     return w.length > 12 ? null : w;
   }
+  // The moment cold food that is above its limit must be thrown out: the grace time (aboveColdGraceH) minus the time it already spent above the limit
+  // in earlier stretches (coldOutMs), counted from when it went out of range this time. One good reading does not wipe the earlier time away.
+  const coldOutLimit = (b, S) => b.outSince + Math.max(0, S.aboveColdGraceH * H - (isNum(b.coldOutMs) ? b.coldOutMs : 0));
   // Records a temperature reading, then re-runs the gate. A hot reading below the hot-hold limit, or a cold
   // one above its limit, starts the out-of-range clock (outSince); an in-range cold reading clears it. A
   // cooling batch records stage 1 and final. Also logs whether the check was on time.
@@ -7781,7 +7898,7 @@ a.of-nav:active { background: var(--press); }
       if (b.stage1At == null && f <= c.stage1ToF) { w.stage1At = t; w.stage1F = f; }
       if (w.stage1At != null && b.finalAt == null && f <= c.finalF) { w.finalAt = t; w.finalF = f; }
     } else if (b.kind === 'cold') {
-      if (f > S.coldHoldF) { if (b.outSince == null && b.place !== 'line') w.outSince = t; } else if (b.outSince != null) delete w.outSince;
+      if (f > S.coldHoldF) { if (b.outSince == null && b.place !== 'line') w.outSince = t; } else if (b.outSince != null) { w.coldOutMs = Math.round((isNum(b.coldOutMs) ? b.coldOutMs : 0) + Math.max(0, t - b.outSince)); delete w.outSince; }
     } else if (f < S.hotHoldF) {
       if (b.outSince == null) w.outSince = t;
     } else if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1) && t - b.outSince <= S.belowHotGraceH * H) {
@@ -8342,7 +8459,15 @@ a.of-nav:active { background: var(--press); }
       refreshAllBatches(tx);
     }
     if (S.pacing !== cur.pacing) recomputeLearned(tx);
-    tx.event('settings_changed', { keys });
+    // A change to a food-safety number is a safety record: one entry per number with the old and the new value (stored units: degrees F, hours, minutes).
+    const rest = [];
+    for (const k of keys) {
+      if (k.indexOf('safety.') !== 0) { rest.push(k); continue; }
+      // Reads the value at the dotted key path from a settings object, or undefined when any step is missing.
+      const at = (root) => k.split('.').reduce((o, part) => (o !== null && typeof o === 'object' ? o[part] : undefined), root);
+      tx.event('safety_setting_changed', { key: k, from: at(cur) === undefined ? null : at(cur), to: at(S) === undefined ? null : at(S) });
+    }
+    if (rest.length) tx.event('settings_changed', { keys: rest });
     tx.info = { keys };
     return 'ok';
   };
@@ -9572,6 +9697,9 @@ a.of-nav:active { background: var(--press); }
         if (out.tcs && out.holdBasis !== 'safety') out.holdBasis = 'quality';
         if (holdMigrate && base && x.maxHoldH === 4 && isNum(base.maxHoldH) && base.maxHoldH > 4) out.maxHoldH = base.maxHoldH;
         if (typeof out.tcs !== 'boolean' || (out.unit !== 'g' && out.unit !== 'ea') || typeof out.name !== 'string') { repaired.push('dropped ingredient ' + x.id); continue; }
+        out.name = fitText(out.name, ING_PATCH.name.max, 'ingredient ' + x.id + '.name', repaired);
+        if (!out.name) { if (!base) { repaired.push('dropped ingredient ' + x.id); continue; } out.name = base.name; }
+        if (out.note !== undefined) { const nt = fitText(out.note, C.limits.maxNoteLen, 'ingredient ' + x.id + '.note', repaired, true); if (nt === null) delete out.note; else out.note = nt; }
         for (const k of Object.keys(ING_PATCH)) if (ING_PATCH[k].t === 'num' && out[k] !== undefined && checkLeaf(ING_PATCH[k], out[k], k)) { out[k] = base && base[k] !== undefined ? base[k] : undefined; if (out[k] === undefined) delete out[k]; repaired.push('ingredient ' + x.id + '.' + k + ' reset'); }
         if (out.tcs && out.hold !== 'hot' && out.hold !== 'cold') out.hold = 'hot';
         // Fridge flag and the owner's two limits only on a cold cooked-ahead product.
@@ -9589,10 +9717,12 @@ a.of-nav:active { background: var(--press); }
         if (!isObj(x) || !safeKey(x.id) || seenMenu.has(x.id)) { repaired.push('dropped a bad menu item'); continue; }
         const base = !own && hasOwn(C.menuById, x.id) ? C.menuById[x.id] : null;
         const out = Object.assign({ prepConfirmed: false, archived: false }, base || {}, x);
+        if (typeof out.name === 'string') out.name = fitText(out.name, MENU_PATCH.name.max, 'menu ' + x.id + '.name', repaired);
         if (typeof out.name !== 'string' || !out.name) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.name = base.name; }
+        if (out.short !== undefined) { const sh = fitText(out.short, MENU_PATCH.short.max, 'menu ' + x.id + '.short', repaired); out.short = sh || cutText(out.name, MENU_PATCH.short.max).trim(); }
         if (C.workZones.indexOf(out.zone) < 0) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.zone = base.zone; repaired.push('menu ' + x.id + '.zone reset'); }
         if (!isNum(out.prepSec) || out.prepSec < 5 || out.prepSec > 3600) { out.prepSec = base ? base.prepSec : 120; repaired.push('menu ' + x.id + '.prepSec reset'); }
-        if (!isNum(out.price) || out.price < 0) { out.price = base ? base.price : 0; repaired.push('menu ' + x.id + '.price reset'); }
+        if (!isNum(out.price) || out.price < 0 || out.price > C.limits.maxPrice) { out.price = base ? base.price : 0; repaired.push('menu ' + x.id + '.price reset'); }
         if (out.track !== 'one' && out.track !== 'two') out.track = 'one';
         if (!Array.isArray(out.bom) || out.bom.some((l) => !isObj(l) || !im.has(l.ing) || !isNum(l.qty) || l.qty <= 0)) {
           out.bom = base ? base.bom.map((l) => ({ ing: l.ing, qty: l.qty })) : (Array.isArray(out.bom) ? out.bom.filter((l) => isObj(l) && im.has(l.ing) && isNum(l.qty) && l.qty > 0) : []);
@@ -9657,10 +9787,11 @@ a.of-nav:active { background: var(--press); }
         if (out.status === 'discard') { out.canServe = false; out.remainingG = 0; out.action = 'DISCARD_LOCKOUT'; if (DISCARD_REASONS.indexOf(out.discardReason) < 0) out.discardReason = 'other'; if (!isNum(out.discardedAt)) out.discardedAt = out.enteredAt; }
         if (typeof out.canServe !== 'boolean' || out.kind === 'cooling') out.canServe = out.kind === 'cooling' ? false : !!out.canServe;
         if (!isInt(out.reheats) || out.reheats < 0) out.reheats = 0;
+        if (out.label !== undefined) { const lb = fitText(out.label, 40, 'batch ' + b.id + '.label', repaired); if (lb) out.label = lb; else delete out.label; }
         if (!Array.isArray(out.temps)) out.temps = [];
         out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS)
           .map((x) => (typeof x.who === 'string' && x.who.length >= 1 && x.who.length <= 12 ? { t: x.t, f: x.f, who: x.who } : { t: x.t, f: x.f }));
-        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
+        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coldOutMs', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
         for (const k of ['stage1F', 'finalF', 'lineMs', 'lineSince', 'movedAt', 'fridgeDays', 'outHours']) if (out[k] !== undefined && !isNum(out[k])) delete out[k];
         // Place and the owner's limits exist only on a cold batch made from a fridge-kept product; anything else is cleared.
         if (out.fridge !== true || out.kind !== 'cold') { for (const k of ['fridge', 'place', 'lineMs', 'lineSince', 'movedAt', 'madeOn', 'fridgeDays', 'outHours']) delete out[k]; }
@@ -9820,14 +9951,14 @@ a.of-nav:active { background: var(--press); }
     if (!isInt(t.num) || t.num < 1) return null;
     const out = Object.assign({}, t);
     if (typeof out.serviceDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(out.serviceDate)) { out.serviceDate = U.serviceDate(out.createdAt); repaired.push('ticket ' + t.id + '.serviceDate recomputed'); }
-    if (typeof out.customer !== 'string') out.customer = 'Walk-up';
+    out.customer = fitText(out.customer, C.limits.maxCustomerLen, 'ticket ' + t.id + '.customer', repaired) || 'Walk-up';
     if (!hasOwn(C.channelById, out.channel)) { out.channel = 'dine_in'; repaired.push('ticket ' + t.id + '.channel reset'); }
     if (!isInt(out.recalls) || out.recalls < 0) out.recalls = 0;
     if (!hasOwn(SRC_TICKET, out.src)) out.src = 'live';
     out.rush = out.rush === true;
     out.pacing = out.pacing !== false;
     if (out.orderId !== undefined && !(typeof out.orderId === 'string' && safeKey(out.orderId) && oSeq(out.orderId) === oSeq(out.orderId))) { delete out.orderId; delete out.round; repaired.push('ticket ' + t.id + '.orderId cleared'); }
-    if (typeof out.note !== 'string') out.note = '';
+    out.note = fitText(out.note, C.limits.maxNoteLen, 'ticket ' + t.id + '.note', repaired, true) || '';
     if (!isNum(out.dmaxSec) || out.dmaxSec < 0) return null;
     if (out.status === 'voided' && !(typeof out.voidReason === 'string' && out.voidReason.trim())) { out.voidReason = 'other'; repaired.push('ticket ' + t.id + '.voidReason set'); }
     if (out.status !== 'expedited') { delete out.expeditedAt; delete out.forced; }
@@ -9838,7 +9969,10 @@ a.of-nav:active { background: var(--press); }
       const x = Object.assign({}, it);
       if (x.track !== 'one' && x.track !== 'two') x.track = 'one';
       if (!Array.isArray(x.mods)) x.mods = [];
-      if (!isNum(x.price)) x.price = 0;
+      else x.mods = x.mods.slice(0, 10).map((m) => (typeof m === 'string' ? cutText(cleanText(m), 60) : '')).filter(Boolean);
+      for (const [k, max] of [['name', MENU_PATCH.name.max], ['short', MENU_PATCH.short.max]]) if (x[k] !== undefined) { const v = fitText(x[k], max, 'ticket ' + t.id + ' item ' + k, repaired); if (v) x[k] = v; else delete x[k]; }
+      if (!isNum(x.price) || x.price < 0 || x.price > C.limits.maxPrice) { if (isNum(x.price)) repaired.push('ticket ' + t.id + ' price reset'); x.price = 0; }
+      if (x.qty > C.limits.maxQty) { x.qty = C.limits.maxQty; repaired.push('ticket ' + t.id + ' quantity lowered'); }
       for (const k of ['firedAt', 'startedAt', 'doneAt', 'cost']) if (x[k] !== undefined && !isNum(x[k])) return null;
       if (x.depleted !== undefined && (!Array.isArray(x.depleted) || x.depleted.some((r) => !isObj(r) || typeof r.ing !== 'string' || !isNum(r.g) || r.g < 0))) return null;
       items.push(x);
@@ -9855,14 +9989,14 @@ a.of-nav:active { background: var(--press); }
     if (!isObj(o) || typeof o.id !== 'string' || !safeKey(o.id) || oSeq(o.id) !== oSeq(o.id) || !isNum(o.createdAt) || !hasOwn(ORDER_STATUS, o.status)) return null;
     const out = {
       id: o.id, serviceDate: typeof o.serviceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.serviceDate) ? o.serviceDate : U.serviceDate(o.createdAt),
-      customer: typeof o.customer === 'string' && o.customer ? o.customer.slice(0, C.limits.maxCustomerLen) : 'Walk-up',
+      customer: fitText(o.customer, C.limits.maxCustomerLen, 'order ' + o.id + '.customer', repaired) || 'Walk-up',
       channel: hasOwn(C.channelById, o.channel) ? o.channel : 'dine_in', createdAt: o.createdAt, status: o.status,
       src: hasOwn(SRC_TICKET, o.src) ? o.src : 'live', rounds: isInt(o.rounds) && o.rounds >= 0 ? o.rounds : 0,
     };
     if (o.status === 'paid') {
       const T = o.totals;
-      const money = isObj(T) && ['subtotal', 'discount', 'tax', 'total'].every((k) => isNum(T[k]) && T[k] >= 0);
-      if (!money || !hasOwn(C.payMethodById, o.method) || !isNum(o.paidAt) || !isNum(o.tip) || o.tip < 0) return null;
+      const money = isObj(T) && ['subtotal', 'discount', 'tax', 'total'].every((k) => isNum(T[k]) && T[k] >= 0 && T[k] <= C.limits.maxOrderMoney);
+      if (!money || !hasOwn(C.payMethodById, o.method) || !isNum(o.paidAt) || !isNum(o.tip) || o.tip < 0 || o.tip > C.limits.maxOrderMoney) return null;
       out.paidAt = o.paidAt; out.method = o.method; out.tip = o.tip; out.discount = T.discount;
       out.totals = { subtotal: T.subtotal, discount: T.discount, taxRate: isNum(T.taxRate) && T.taxRate >= 0 ? T.taxRate : 0, tax: T.tax, total: T.total, qty: isInt(T.qty) && T.qty >= 0 ? T.qty : 0, rounds: isInt(T.rounds) && T.rounds >= 0 ? T.rounds : 0 };
       if (out.paidAt < out.createdAt) out.paidAt = out.createdAt;
@@ -9906,12 +10040,36 @@ a.of-nav:active { background: var(--press); }
   }
 
   /* ======================================================================================================
+   * 18b. Trimmed copy for a screen that does not need the whole history
+   * ==================================================================================================== */
+  // Makes a smaller copy of a kitchen for a read-mostly screen: every open order and active ticket, everything newer than the last `days` days, the menu,
+  // ingredients, settings, batches, counters and the ledger as they are, and only the recent events and safety entries. The hub keeps everything; this
+  // never changes the state it is given. The second result says what was left out, so a page can say "Showing the last N days".
+  function trimState(state, now, days) {
+    if (!isState(state) || !isNum(now) || !isNum(days) || days < 1) return { state, trimmed: null };
+    const since = now - days * 86400000;
+    // True when a record was made inside the window.
+    const recent = (x) => isNum(x && x.createdAt) && x.createdAt >= since;
+    const keepOrder = new Set();
+    for (const o of state.orders) if (o.status === 'open' || recent(o)) keepOrder.add(o.id);
+    // True when a ticket is open work, recent, or belongs to an order that stays.
+    const keepTicket = (t) => t.status === 'active' || recent(t) || (t.orderId !== undefined && keepOrder.has(t.orderId));
+    for (const t of state.tickets) if (keepTicket(t) && t.orderId !== undefined) keepOrder.add(t.orderId);   // a kept ticket keeps its order
+    const tickets = state.tickets.filter(keepTicket), orders = state.orders.filter((o) => keepOrder.has(o.id));
+    const evs = Array.isArray(state.events) ? state.events.filter((e) => isNum(e.t) && e.t >= since) : [];
+    const keep = Array.isArray(state.safetyKeep) ? state.safetyKeep.filter((e) => isNum(e.t) && e.t >= since) : [];
+    const cut = { tickets: state.tickets.length - tickets.length, orders: state.orders.length - orders.length, events: (Array.isArray(state.events) ? state.events.length : 0) - evs.length + (Array.isArray(state.eventArchive) ? state.eventArchive.reduce((n, c) => n + (Array.isArray(c) ? c.length : 0), 0) : 0) };
+    const out = Object.assign({}, state, { tickets, orders, events: evs, eventArchive: [], safetyKeep: keep });
+    return { state: out, trimmed: { since, days, left: cut } };
+  }
+
+  /* ======================================================================================================
    * 19. Exports
    * ==================================================================================================== */
   // The public door: everything other files may use. _internal is for tests and tools.
   Object.assign(E, {
-    apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
-    pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
+    SAFETY_KEEP_DAYS, SAFETY_KEEP_MS, apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
+    pacingPlan, planFor, ticketTiming, ticketProgress, totalsOf, checkInvariants, validateBackup, trimState, serialize, deserialize, allEvents, prune,
     channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
@@ -10774,6 +10932,8 @@ a.of-nav:active { background: var(--press); }
   const CORRUPT_KEY = 'smokebox.v1.corrupt';
   // When the damaged copy was set aside (a time), so it can be cleared after 30 days.
   const CORRUPT_AT_KEY = 'smokebox.v1.corruptat';
+  const DROPPED_KEY = 'smokebox.v1.dropped';          // the saved text exactly as it was before a repair at load threw records away
+  const DROPPED_AT_KEY = 'smokebox.v1.droppedat';
   // One small rolling copy of the last good state (menu, ingredients, settings, PIN, safety records, recent history).
   const LASTGOOD_KEY = 'smokebox.v1.lastgood';
   // The owner's answer to the one-time offer to clear old demo tickets: true once they chose to keep them.
@@ -10795,7 +10955,13 @@ a.of-nav:active { background: var(--press); }
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
   // The rolling copy keeps this much history: enough to see today, small enough to be a sliver of the live save.
   const SNAP_KEEP = { maxTickets: 300, maxEvents: 2000 };
+  // The 'before restore' copy stays in the last-good slot for 7 days, or until a close-day copy replaces it, so a wrong restore can be undone.
+  const BEFORE_RESTORE = 'before restore', BEFORE_RESTORE_KEEP_MS = 7 * 24 * 3600e3;
   const SID_KEY = 'smokebox.v1.sid';
+  // Two tabs of one browser must not overwrite each other's save. Where the browser has Web Locks, a timed save waits for the lock named
+  // LOCK_NAME, so only one tab at a time reads the save id, builds the text and writes it. Where it does not, a tab writes its own tag to
+  // WRITER_KEY first and checks both the tag and the save id again before writing (the tab-sync fallback).
+  const LOCK_NAME = 'smokebox-save-lock', WRITER_KEY = 'smokebox.v1.writer', LOCK_WAIT = 'waiting-for-lock';
   // The actions this device has done that no server has confirmed yet (only used when a transport can push).
   const OUTBOX_KEY = 'smokebox.v1.outbox';
   const OUTBOX_MAX = 5000; // oldest unconfirmed actions are dropped past this, and st.outboxDropped says so
@@ -10847,6 +11013,9 @@ a.of-nav:active { background: var(--press); }
   let mode = 'real', strict = false, baseStorage = null, reloadFn = null;
   // snapAt is when the rolling copy was last taken (real time); snapWanted is set by close day so the next save takes one.
   let snapAt = 0, snapWanted = null;
+  let writeBlocked = false, heldText = null;     // set when a damaged save could not be copied aside: nothing is written over it
+  let susp = null;           // a big forward jump of the device clock that has not been accepted: { r0 first reading, base trusted time }
+  const CLOCK_JUMP_MAX_MS = 36 * 3600e3;     // a forward step bigger than this (a tablet asleep for a day and a half) needs the owner's yes
   let last = null;
   let st = { persistent: false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: 400 };
   const tabId = 'tab_' + Math.floor(Math.random() * 1e9).toString(36);
@@ -10861,9 +11030,26 @@ a.of-nav:active { background: var(--press); }
     // Never go backwards (rule I9): if the real clock steps back or gives garbage, the last time is
     // repeated.
     if (!isNum(v)) v = lastNow;
+    // A real kitchen does not follow a big forward jump of the device clock by itself (a dead clock battery, a wrong date): it keeps counting from
+    // the last trusted time, says so in the status, and waits for the owner to accept the new time. A jump that goes away again changes nothing.
+    if (strict && mode === 'real' && clk.speed === 1) {
+      if (v - lastNow > CLOCK_JUMP_MAX_MS) {
+        if (!susp) susp = { r0: r, base: lastNow };
+        st.clockSuspect = { aheadMs: v - lastNow, since: susp.r0 };
+        v = susp.base + Math.max(0, r - susp.r0);
+      } else if (susp) { susp = null; st.clockSuspect = null; }
+    }
     if (v < lastNow) v = lastNow;
     lastNow = v;
     return v;
+  }
+  // Accepts the device clock's new time after a big jump (the owner says it is right). Does nothing when there is no jump waiting.
+  function acceptClockJump() {
+    if (!susp) return false;
+    const r = realNow();
+    clk = { base: Math.floor(r), realBase: r, speed: 1 }; lastNow = Math.floor(r); susp = null; st.clockSuspect = null;
+    schedulePersist(false); scheduleNotify();
+    return true;
   }
   // Sets the demo speed (0.1 to 1000, where 1 is real time). Re-bases the clock first so the time does not
   // jump. Returns false for a bad speed.
@@ -10881,6 +11067,8 @@ a.of-nav:active { background: var(--press); }
   function atLeast(t) { // move the clock forward so it is not behind stamps in a loaded state
     if (!isNum(t)) return;
     const v = now();
+    // Stamps far ahead of the clock do not move it in a real kitchen: the clock is wrong, not the data.
+    if (strict && mode === 'real' && t - v > CLOCK_JUMP_MAX_MS) { st.clockWrong = { aheadMs: t - v }; return; }
     if (t > v) { clk = { base: t, realBase: realNow(), speed: clk.speed }; lastNow = t; }
   }
   // Newest time found in a state: the last event or one of the last 50 tickets (tickets run oldest to
@@ -10938,17 +11126,45 @@ a.of-nav:active { background: var(--press); }
     // 400 ms and 5 seconds, so a busy rush never spends most of its time writing.
     const wait = Math.min(SAVE_MAX_MS, Math.max(SAVE_MS, Math.round(st.saveCostMs * 8)));
     st.saveDelayMs = wait;
-    saveTimer = setTimeout(() => { saveTimer = null; persistNow(); }, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
+    saveTimer = setTimeout(timedSave, tr && baseSid ? wait + Math.floor(Math.random() * 300) : wait);
   }
+  // The browser's lock manager when it has one, else null.
+  const lockManager = () => { try { const n = g.navigator; return n && n.locks && typeof n.locks.request === 'function' ? n.locks : null; } catch (e) { return null; } };
+  // True while a save runs inside the lock (then no tag check is needed: no other tab can be saving).
+  let inLock = false;
+  // Runs when the save timer fires. With several tabs and Web Locks it takes the lock first, then saves; otherwise it saves at once.
+  function timedSave() {
+    const L = tr ? lockManager() : null;
+    if (!L) { saveTimer = null; persistNow(); return; }
+    saveTimer = LOCK_WAIT;
+    // Saves inside the lock if this save is still the wanted one (a direct flush may have saved already).
+    const run = () => { if (saveTimer !== LOCK_WAIT) return; saveTimer = null; inLock = true; try { persistNow(); } finally { inLock = false; } };
+    try { L.request(LOCK_NAME, run).catch(() => { run(); }); } catch (e) { run(); }
+  }
+  // Without Web Locks: writes this tab's tag, then reads the tag and the save id back. True when nobody else saved or claimed meanwhile.
+  function claimWrite() {
+    const tag = tabId + ':' + (++claimN);
+    try {
+      storage.set(WRITER_KEY, tag);
+      const sid = storage.get(SID_KEY, null), mine = storage.get(WRITER_KEY, null);
+      return mine === tag && (sid == null ? baseSid == null : sid === baseSid);
+    } catch (e) { return true; }
+  }
+  let claimN = 0;
   // Saves the state to the browser right now and returns true if it worked. If the browser says it is full,
   // it retries with less history (oldest finished tickets and events first), halving up to 12 times. After a
   // good save it announces the new revision to other tabs.
   function persistNow() {
     if (fol) return true;                             // a follower never saves anything
     if (!storage || !state) return false;
-    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    if (saveTimer) { if (saveTimer !== LOCK_WAIT) clearTimeout(saveTimer); saveTimer = null; }
+    // The saved text is a damaged copy nobody could keep elsewhere: it stays exactly as it is until the owner has saved it.
+    if (writeBlocked) { st.lastSaveOk = false; return false; }
     // If another tab saved since this tab last loaded or saved, build on its copy first so nothing is lost.
+    const forced = skipRebase;
     if (skipRebase) skipRebase = false; else rebaseIfStale();
+    // With several tabs and no lock, claim the write and rebuild on the newest copy if another tab got in first (up to 3 times, then write anyway).
+    if (tr && !inLock && !lockManager()) for (let i = 0; i < 3 && !claimWrite(); i++) { if (forced) break; rebaseIfStale(); }
     const r = realNow();
     const v = now();
     let ok = false;
@@ -10994,6 +11210,8 @@ a.of-nav:active { background: var(--press); }
   function maybeSnapshot(r) {
     if (!strict || mode !== 'real' || !storage || !state) return false;
     if (!snapWanted && r - snapAt < SNAP_EVERY_MS) return false;
+    // A 'before restore' copy is the owner's way back from a wrong restore: the 6-hour refresh leaves it alone for 7 days.
+    if (!snapWanted) { const g = beforeRestoreCopy(r); if (g) return false; }
     try {
       const small = E().prune(state, SNAP_KEEP);
       const env = { v: 1, takenAt: r, reason: snapWanted || 'interval', rev: state.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
@@ -11004,6 +11222,44 @@ a.of-nav:active { background: var(--press); }
       st.lastGoodAt = r;
       return true;
     } catch (e) { return false; }
+  }
+  // The stored 'before restore' envelope when it is still within its 7 days at time r, else null.
+  function beforeRestoreCopy(r) {
+    try {
+      const g = storage.get(LASTGOOD_KEY, null);
+      return g && typeof g === 'object' && g.reason === BEFORE_RESTORE && isNum(g.takenAt) && r - g.takenAt < BEFORE_RESTORE_KEEP_MS && r >= g.takenAt ? g : null;
+    } catch (e) { return null; }
+  }
+  // Before a restore replaces the kitchen: keeps a whole copy of the current one in the last-good slot (full history if the
+  // browser has room, else the small rolling size). Returns the time it was taken, or null when there was nothing worth
+  // keeping (an empty kitchen, the demo, no storage) or the browser had no room. Never throws.
+  function snapshotBeforeRestore() {
+    if (!strict || mode !== 'real' || !storage || !state || isBlank()) return null;
+    const r = realNow();
+    for (const keep of [null, SNAP_KEEP]) {
+      try {
+        const small = keep ? E().prune(state, keep) : state;
+        const env = { v: 1, takenAt: r, reason: BEFORE_RESTORE, rev: small.rev, clock: { virtual: now(), real: r, speed: 1 }, state: small };
+        if (!E().validateBackup(JSON.stringify(env)).ok) continue;
+        if (storage.set(LASTGOOD_KEY, env) === false) continue;
+        snapAt = r; snapWanted = null; st.lastGoodAt = r; st.beforeRestoreAt = r;
+        return r;
+      } catch (e) { /* try the smaller copy */ }
+    }
+    return null;
+  }
+  // Tells the screens about the 'before restore' copy: { takenAt, expiresAt } or null when there is none now.
+  function beforeRestoreInfo() {
+    if (!storage) return null;
+    const g = beforeRestoreCopy(realNow());
+    return g ? { takenAt: g.takenAt, expiresAt: g.takenAt + BEFORE_RESTORE_KEEP_MS } : null;
+  }
+  // Puts the 'before restore' copy back as the kitchen (the way back from a wrong restore). Returns 'ok', or 'noCopy'.
+  // The copy it replaces is kept the same way, so this can be undone once too.
+  function undoRestore() {
+    const g = storage ? beforeRestoreCopy(realNow()) : null;
+    if (!g) { last = { type: 'undoRestore', report: 'noCopy', info: {}, events: [] }; return 'noCopy'; }
+    return importAll(JSON.stringify(g));
   }
   // Reads the rolling copy and returns { state, takenAt } if it is whole, else null.
   function readSnapshot() {
@@ -11274,7 +11530,7 @@ a.of-nav:active { background: var(--press); }
     baseStorage = given || U.rawStorage;
     storage = given ? (strict && mode === 'demo' ? U.storageFor(given, 'demo') : given) : (strict ? U.storageFor(U.rawStorage, mode) : U.storage);
     st = { persistent: storage.persistent !== false, lastSaveOk: null, lastSaveAt: undefined, corrupt: null, firstRun: false, trimmed: false, repaired: [], outboxDropped: 0, saveCostMs: 0, saveDelayMs: SAVE_MS };
-    last = null;
+    last = null; writeBlocked = false; heldText = null; susp = null;
     baseSid = null; pending = []; skipRebase = false;
     outbox = []; seenOps = new Set(); acked.clear(); opN = 0;
     const r = realNow();
@@ -11290,14 +11546,23 @@ a.of-nav:active { background: var(--press); }
     let loaded = null;
     if (unreadable !== null) {
       st.corrupt = 'The saved data is not readable text.';
-      try { storage.set(CORRUPT_KEY, unreadable); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
+      if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, unreadable, r)) { writeBlocked = true; heldText = unreadable; st.heldInMemory = true; }
     } else if (payload != null) {
       const v = E().validateBackup(payload);
       // A saved copy that fails the check is parked under CORRUPT_KEY and the app starts fresh. It never
       // crashes on bad storage.
-      if (v.ok) { loaded = v.state; st.repaired = v.repaired; } else {
+      if (v.ok) {
+        loaded = v.state; st.repaired = v.repaired;
+        // Records the check threw away are not gone for good: the text as it was is kept, and the status counts what was dropped.
+        const dc = droppedCounts(v.repaired);
+        if (dc) {
+          st.droppedCount = dc;
+          const raw = rawOf(payload);
+          if (!parkText(DROPPED_KEY, DROPPED_AT_KEY, payload, r)) { writeBlocked = true; heldText = raw; st.heldInMemory = true; }
+        }
+      } else {
         st.corrupt = v.error;
-        try { storage.set(CORRUPT_KEY, payload); storage.set(CORRUPT_AT_KEY, r); } catch (e) { /* ignore */ }
+        if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, payload, r)) { writeBlocked = true; heldText = rawOf(payload); st.heldInMemory = true; }
       }
     } else st.firstRun = true;
     // A damaged save: the rolling last-good copy takes its place (real kitchens), and the damaged one stays set aside.
@@ -11310,6 +11575,8 @@ a.of-nav:active { background: var(--press); }
       try {
         const at = storage.get(CORRUPT_AT_KEY, null);
         if (isNum(at) && r - at > CORRUPT_KEEP_MS) { storage.remove(CORRUPT_KEY); storage.remove(CORRUPT_AT_KEY); st.corruptCleared = true; }
+        const da = storage.get(DROPPED_AT_KEY, null);
+        if (isNum(da) && r - da > CORRUPT_KEEP_MS && !st.droppedCount) { storage.remove(DROPPED_KEY); storage.remove(DROPPED_AT_KEY); }
       } catch (e) { /* ignore */ }
     }
     try { const g0 = storage.get(LASTGOOD_KEY, null); snapAt = g0 && isNum(g0.takenAt) ? g0.takenAt : 0; } catch (e) { snapAt = 0; }
@@ -11318,7 +11585,7 @@ a.of-nav:active { background: var(--press); }
     // never earlier than the real time. Speed goes back to 1.
     let vNow = r;
     const c = payload && payload.clock;
-    if (loaded && c && isNum(c.virtual)) vNow = Math.max(r, c.virtual + Math.max(0, r - (isNum(c.real) ? c.real : r)));
+    if (loaded && c && isNum(c.virtual) && !(strict && mode === 'real')) vNow = Math.max(r, c.virtual + Math.max(0, r - (isNum(c.real) ? c.real : r)));   // a real kitchen always starts from the device clock
     vNow = Math.floor(vNow);
     clk = { base: vNow, realBase: r, speed: 1 }; // speed resets to 1 on reload; time continues from the last virtual time
     lastNow = vNow;
@@ -11332,7 +11599,7 @@ a.of-nav:active { background: var(--press); }
     const t = E().tick(state, now());
     state = t.state;
     syncUnits();
-    if (st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
+    if (st.corrupt && !writeBlocked) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
     if (!opts.noTimers && typeof setInterval === 'function') interval = setInterval(tickNow, 1000);
     if (!opts.noSync) openTransport(opts.transport);
     if (!opts.noTimers) {
@@ -11340,6 +11607,26 @@ a.of-nav:active { background: var(--press); }
       if (g.document && typeof g.document.addEventListener === 'function') on(g.document, 'visibilitychange', () => { if (g.document.visibilityState === 'hidden') flushIfDirty(); });
     }
     return status();
+  }
+  // Keeps a copy of damaged or about-to-be-repaired data under its own key. True only when the copy was really written; a full browser store says no.
+  function parkText(key, atKey, value, at) {
+    try { if (storage.set(key, value) === false) return false; storage.set(atKey, at); return true; } catch (e) { return false; }
+  }
+  // The exact saved text for a payload, so a person can download what could not be kept safe.
+  function rawOf(payload) {
+    try { const raw = typeof storage.raw === 'function' ? storage.raw(KEY) : null; if (raw != null) return raw; } catch (e) { /* fall back to the parsed copy */ }
+    try { return JSON.stringify(payload); } catch (e) { return ''; }
+  }
+  // Counts what a repair dropped, in words a person knows; null when it dropped nothing.
+  function droppedCounts(repaired) {
+    const c = { tickets: 0, orders: 0, batches: 0, other: 0 };
+    let any = false;
+    for (const x of Array.isArray(repaired) ? repaired : []) {
+      if (!/^dropped\b/.test(x)) continue;
+      any = true;
+      if (/ticket/.test(x)) c.tickets++; else if (/order/.test(x)) c.orders++; else if (/batch/.test(x)) c.batches++; else c.other++;
+    }
+    return any ? c : null;
   }
   // A copy of the save status plus the current speed: persistent, lastSaveOk, lastSaveAt, corrupt, firstRun,
   // trimmed, repaired, speed.
@@ -11479,6 +11766,8 @@ a.of-nav:active { background: var(--press); }
     }
     if (namesGiven && typeof C.saveCustom === 'function') { try { C.saveCustom(namesGiven); } catch (e) { /* the names stay applied for this session */ } }
     if (parsed && isObjLike(parsed.setup)) for (const k of SETUP_LISTS) if (Array.isArray(parsed.setup[k])) { try { storage.set(SETUP_KEYS[k], parsed.setup[k].filter((x) => typeof x === 'string').slice(0, 200)); } catch (e) { /* the list is a convenience */ } }
+    // Keep the kitchen being replaced, so a wrong restore can be undone: a visible copy in the last-good slot.
+    const beforeAt = snapshotBeforeRestore();
     const ns = v.state;
     // The revision must go up so other tabs treat the imported copy as newer; the clock must not be behind
     // its times.
@@ -11489,7 +11778,7 @@ a.of-nav:active { background: var(--press); }
     skipRebase = true; pending = [];   // an import or reset is meant to win over what another tab saved
     persistNow();
     scheduleNotify();
-    last = { type: 'import', report: 'ok', info: { repaired: v.repaired }, events: [] };
+    last = { type: 'import', report: 'ok', info: { repaired: v.repaired, beforeRestore: beforeAt != null, beforeRestoreAt: beforeAt, beforeRestoreKeepDays: beforeAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, events: [] };
     return 'ok';
   }
   // Time in ms as readable date text for spreadsheets, or empty text when missing.
@@ -11678,7 +11967,7 @@ a.of-nav:active { background: var(--press); }
   // Registers fn for status changes; returns a remover.
   function subscribeFollow(fn) { if (typeof fn !== 'function') return () => {}; followSubs.add(fn); return () => followSubs.delete(fn); }
   // Ends the first-attempt promise once.
-  function folSettle(res) { if (fol && fol.resolve) { const r = fol.resolve; fol.resolve = null; r(Object.assign({ status: followStatus() }, res)); } }
+  function folSettle(res) { if (fol && fol.resolve) { const r = fol.resolve; fol.resolve = null; r(Object.assign({ status: followStatus() }, res, res && res.ok === false && res.error ? { reason: FOLLOW_REASON[res.error] || '' } : {})); } }
   // Stops following: closes the stream and timers. The store keeps its last state until init is called again.
   function folStop() {
     if (!fol) return;
@@ -11704,7 +11993,7 @@ a.of-nav:active { background: var(--press); }
     const url = opts.url.replace(/\/+$/, '');
     const f = fol = { url, code: codeFor(opts), staleMs: isNum(opts.staleMs) && opts.staleMs > 0 ? opts.staleMs : 45000, offset: 0, seq: null, hubId: null, connected: false, everConnected: false,
       error: null, lastMsgAt: null, goodSince: null, retryInMs: 0, retryStep: 0, closed: false, gen: 0, ctrl: null, retryTimer: null, timer: null, lastKey: '', resolve: null, resyncs: 0,
-      base: null, hub: false, offsetKnown: false, pend: [], owners: new Map(), baseKey: null, topOwner: null, lastActKey: null, fromCache: false, cachedAt: null, cacheAt: 0, cacheDirty: false, name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
+      base: null, hub: false, trim: Number.isInteger(opts.trim) && opts.trim >= 1 && opts.trim <= 365 ? opts.trim : 0, trimmed: null, offsetKnown: false, pend: [], owners: new Map(), baseKey: null, topOwner: null, lastActKey: null, fromCache: false, cachedAt: null, cacheAt: 0, cacheDirty: false, name: '', sending: false, sendFail: false, sendRetryAt: 0, sendStep: 0, fatal: null,
       fetchFn: opts.fetch || (typeof g.fetch === 'function' ? (u, o) => g.fetch(u, o) : null), Dec: opts.TextDecoder || g.TextDecoder, Abort: opts.AbortController || g.AbortController };
     f.hub = !!hub;
     const bound = hub ? tokenFor(url) : null;
@@ -11713,7 +12002,7 @@ a.of-nav:active { background: var(--press); }
     const p = new Promise((resolve) => { f.resolve = resolve; });
     if (hub && cache) {
       // The hub cannot be reached: show the last known kitchen, marked as such, and let taps be predicted and queued from the start.
-      f.base = cache.state; f.seq = cache.seq; f.hubId = cache.hubId; f.offset = cache.offset || 0; f.fromCache = true; f.cachedAt = cache.savedAt; f.everConnected = true;
+      f.base = cache.state; f.seq = cache.seq; f.hubId = cache.hubId; f.offset = cache.offset || 0; f.trimmed = f.trim && cache.trimmed ? cache.trimmed : null; f.fromCache = true; f.cachedAt = cache.savedAt; f.everConnected = true;
       hubHello({ hubId: cache.hubId });
       folShow();
       folSettle({ ok: true, cached: true });
@@ -11751,8 +12040,10 @@ a.of-nav:active { background: var(--press); }
     const gen = ++f.gen;
     if (!f.fetchFn || !f.Abort || !f.Dec) { f.error = 'error'; folRetry('error'); return; }
     f.ctrl = new f.Abort();
-    let q = '';
-    if (f.hubId != null && isNum(f.seq)) q = '?since=' + f.seq + '&hub=' + encodeURIComponent(f.hubId);
+    const qp = [];
+    if (f.hubId != null && isNum(f.seq)) qp.push('since=' + f.seq, 'hub=' + encodeURIComponent(f.hubId));
+    if (f.trim) qp.push('trim=' + f.trim);
+    const q = qp.length ? '?' + qp.join('&') : '';
     const hdr = hubHeaders(f.url, f.code, { accept: 'text/event-stream' });       // the token or code travels in a header, never in the address
     let res;
     try { res = await f.fetchFn(f.url + '/follow' + q, { signal: f.ctrl.signal, cache: 'no-store', headers: hdr }); } catch (e) { if (f.closed || gen !== f.gen) return; folRetry('unreachable'); return; }
@@ -11836,6 +12127,7 @@ a.of-nav:active { background: var(--press); }
       const v = E().validateBackup(d.state);
       if (!v.ok || !isNum(d.seq)) { folResync(); return; }
       f.base = v.state; f.seq = d.seq; f.hubId = d.hubId || f.pendingHub;
+      f.trimmed = f.trim && d.trimmed && isNum(d.trimmed.since) ? d.trimmed : null;      // what the hub left out, kept so pages can say so
       f.owners = new Map(); f.baseKey = null;
       if (f.hub) { f.fromCache = false; hubAfterSnapshot(d); hubCacheSave(true); }
       folShow();
@@ -11847,6 +12139,8 @@ a.of-nav:active { background: var(--press); }
       if (d.seq !== f.seq + 1 || typeof d.type !== 'string') { folResync(); return; }
       const r = d.type === 'tick' ? { report: 'ok', state: E().tick(f.base, d.now).state } : E().apply(f.base, d.type, d.payload, d.now, { screen: d.screen });
       if (r.report !== 'ok') { folResync(); return; }
+      // A trimmed copy that no longer matches the hub's change count has drifted (an action touched left-out history): start again from a fresh copy.
+      if (f.trimmed && isNum(d.rev) && isNum(r.state.rev) && d.rev !== r.state.rev) { folResync(); return; }
       f.base = r.state; f.seq = d.seq;
       if (f.hub && d.type !== 'tick' && d.type !== 'uiReport') {
         f.baseKey = d.opId || 'seq:' + d.seq;
@@ -11952,7 +12246,7 @@ a.of-nav:active { background: var(--press); }
     if (!force && realNow() - f.cacheAt < (f.cacheBytes > 200000 ? 15000 : 2000)) { f.cacheDirty = true; return; }
     f.cacheAt = realNow(); f.cacheDirty = false;
     try {
-      const rec = { v: 1, url: f.url, hubId: f.hubId, seq: f.seq, savedAt: realNow(), offset: Math.round(f.offset), state: f.base };
+      const rec = { v: 1, url: f.url, hubId: f.hubId, seq: f.seq, savedAt: realNow(), offset: Math.round(f.offset), state: f.base, trimmed: f.trimmed || undefined };
       f.cacheBytes = JSON.stringify(rec).length;
       if (f.cacheBytes > CACHE_MAX) { U.rawStorage.remove(CACHE_KEY); return; }
       U.rawStorage.set(CACHE_KEY, rec);
@@ -11964,7 +12258,7 @@ a.of-nav:active { background: var(--press); }
       const c = U.rawStorage.get(CACHE_KEY, null);
       if (!c || c.v !== 1 || c.url !== normUrl(url) || typeof c.hubId !== 'string' || !isNum(c.seq) || !isNum(c.savedAt)) return null;
       const v = E().validateBackup(c.state);
-      return v.ok ? { state: v.state, hubId: c.hubId, seq: c.seq, savedAt: c.savedAt, offset: isNum(c.offset) ? c.offset : 0 } : null;
+      return v.ok ? { state: v.state, hubId: c.hubId, seq: c.seq, savedAt: c.savedAt, offset: isNum(c.offset) ? c.offset : 0, trimmed: c.trimmed && isNum(c.trimmed.since) ? c.trimmed : null } : null;
     } catch (e) { return null; }
   }
   // How many taps this screen has sent or queued that the hub has not answered yet.
@@ -12173,7 +12467,7 @@ a.of-nav:active { background: var(--press); }
   async function initHubClient(opts) {
     opts = opts || {};
     // Builds the answer for a join that did not happen.
-    const fail = (error) => ({ ok: false, error, status: hubStatus() });
+    const fail = (error) => ({ ok: false, error, reason: FOLLOW_REASON[error] || '', status: hubStatus() });
     if (typeof opts.url !== 'string') return fail('notFound');
     if ((opts.adopt === 'hub') === (opts.seed === true)) return fail('choiceRequired');
     // The screen name is plain: letters, digits, spaces and a few marks, up to 20 characters; anything else is refused, not trimmed away.
@@ -12397,7 +12691,9 @@ a.of-nav:active { background: var(--press); }
   }
   // The stored form of a recovery code: a salted SHA-256 (only this is ever saved, never the code).
   async function hashCode(plain) {
-    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);
+    const salted = await U.secretHash('smokebox-recovery-v1:', plain);
+    if (salted !== null) return salted;
+    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);     // a browser without PBKDF2 keeps the old plain form
     return hex === null ? null : 'sha256:' + hex;
   }
   // True when a back office PIN is set.
@@ -12434,10 +12730,10 @@ a.of-nav:active { background: var(--press); }
     if (rec.until > t) return { ok: false, report: 'recoveryLocked', info: { waitMs: rec.until - t } };
     if (rec.until && rec.until <= t) rec = { fails: 0, until: 0 };
     const plain = normalizeCode(code);
-    const hash = plain ? await hashCode(plain) : null;
-    if (plain && hash === null) return { ok: false, report: 'noCrypto', info: {} };
     const stored = state.settings.office.recoveryHash;
-    if (!plain || hash !== stored) {
+    const chk = plain ? await U.secretCheck('smokebox-recovery-v1:', plain, stored) : { ok: false };
+    if (plain && !chk.ok && !(g.crypto && g.crypto.subtle)) return { ok: false, report: 'noCrypto', info: {} };
+    if (!plain || !chk.ok) {
       rec.fails++;
       const locked = rec.fails >= RECOVERY_TRIES;
       if (locked) rec = { fails: 0, until: t + RECOVERY_LOCK_MS };
@@ -12466,6 +12762,9 @@ a.of-nav:active { background: var(--press); }
     if (mode === 'demo') return fail('notInDemo');
     if (typeof opts.confirm !== 'string' || opts.confirm.trim().toUpperCase() !== START_OVER_WORD) return fail('confirmWord', { word: START_OVER_WORD });
     if (opts.keepSettings != null && typeof opts.keepSettings !== 'boolean') return fail('badPatch', { key: 'keepSettings' });
+    // The screen must say a backup file was really saved (its name and size) before anything is erased.
+    const bs = opts.backupSaved;
+    if (!bs || typeof bs !== 'object' || typeof bs.filename !== 'string' || !bs.filename.trim() || !(Number.isFinite(bs.chars) && bs.chars > 0)) return fail('backupRequired');
     const keep = opts.keepSettings !== false;
     const text = exportAll();
     if (text == null) { const lr = last || {}; return fail(lr.report || 'invalidBackup', lr.info); }
@@ -12526,17 +12825,17 @@ a.of-nav:active { background: var(--press); }
   function isOwn() { return !!(state && state.catalog === 'own'); }
 
   // Public API: init, destroy, status, getState, now, tick, dispatch, dispatchEx, lastResult, subscribe,
-  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, exportCsv, reset,
+  // subscribeTick, flushNotify, setSpeed, speed, clock, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset,
   // resetLive, attachSim, dataset, select, KEY, CORRUPT_KEY.
   SB.store = {
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, exportAll, importAll, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").
-    initFollower, followStatus, subscribeFollow, isFollower, initHubClient, probeHub, rememberedCode, pairHub, pairedFor, unpair, hubScreens, hubNewPairingCode, hubRemoveScreen, hubStatus, subscribeHub: subscribeFollow, subscribeRefusals, pendingFor, isHubClient, isHub: isHubClient, leaveHub, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
+    initFollower, trimInfo: () => (fol && fol.trimmed ? Object.assign({}, fol.trimmed) : null), followStatus, subscribeFollow, isFollower, initHubClient, probeHub, rememberedCode, pairHub, pairedFor, unpair, hubScreens, hubNewPairingCode, hubRemoveScreen, hubStatus, subscribeHub: subscribeFollow, subscribeRefusals, pendingFor, isHubClient, isHub: isHubClient, leaveHub, stopFollower: folStop, channelTransport, outbox: () => outbox.map((x) => Object.assign({}, x)), syncNow: () => { retryAt = 0; pushOutbox(); }, ackOps,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
@@ -12560,7 +12859,9 @@ a.of-nav:active { background: var(--press); }
   const O = (SB.offline = {});
   const st = { supported: false, secure: false, state: 'none', cachedVersion: null, pageVersion: null, updateReady: false, reason: '' };
   const subs = new Set();
-  let reg = null, started = false, timer = null;
+  // regJob is the registration in progress or finished (a second caller gets the same answer, not a half-done one); epoch counts resets, so a
+  // registration that a reset overtook stops quietly instead of putting the worker back.
+  let reg = null, started = false, timer = null, regJob = null, epoch = 0;
 
   // A copy of what is known now, for the screens.
   O.status = () => Object.assign({}, st);
@@ -12599,8 +12900,15 @@ a.of-nav:active { background: var(--press); }
   }
 
   // Registers the worker (once). Resolves { ok, state, reason? }; never throws. Does nothing on file://, with ?nosw, or where workers cannot run.
-  O.register = async function register() {
-    if (started) return { ok: st.state === 'ready' || st.state === 'update', state: st.state, reason: st.reason || undefined };
+  O.register = function register() {
+    if (regJob) return regJob;
+    const job = registerNow().then((r) => { if (regJob === job && !r.ok && r.state !== 'error') regJob = null; return r; });
+    regJob = job;
+    return job;
+  };
+  // Does the registration itself (once); see register.
+  async function registerNow() {
+    const mine = epoch;
     const L = g.location, c = container();
     if (!L || !/^https?:$/.test(L.protocol)) { set({ supported: false, reason: 'file' }); return { ok: false, state: st.state, reason: 'file' }; }
     if (wantsNone()) { await O.reset({ reload: false }); set({ supported: false, state: 'none', reason: 'nosw' }); return { ok: false, state: 'none', reason: 'nosw' }; }
@@ -12617,24 +12925,29 @@ a.of-nav:active { background: var(--press); }
     });
     try {
       set({ state: 'installing' });
-      reg = await c.register('sw.js', { scope: './', updateViaCache: 'none' });
+      const made = await c.register('sw.js', { scope: './', updateViaCache: 'none' });
+      if (mine !== epoch) return { ok: false, state: st.state, reason: 'reset' };
+      reg = made;
       reg.addEventListener('updatefound', () => {
         const w = reg.installing;
         if (!w) return;
         w.addEventListener('statechange', () => { if (w.state === 'redundant' && !st.cachedVersion) set({ state: 'error', reason: 'install failed' }); });
       });
       await c.ready;
+      if (mine !== epoch) return { ok: false, state: st.state, reason: 'reset' };
       const v = await ask(c.controller || reg.active, { type: 'version' });
+      if (mine !== epoch) return { ok: false, state: st.state, reason: 'reset' };
       if (v && typeof v.version === 'string') set({ cachedVersion: v.version, pageVersion: st.pageVersion || v.version });
       if (!wasControlled && !st.pageVersion && v) set({ pageVersion: v.version });
       set({ state: st.updateReady ? 'update' : 'ready' });
       if (!timer && typeof setInterval === 'function') timer = setInterval(() => { try { reg.update(); } catch (e) { /* try again later */ } }, 30 * 60 * 1000);
       return { ok: true, state: st.state };
     } catch (e) {
+      if (mine !== epoch) return { ok: false, state: st.state, reason: 'reset' };
       set({ state: 'error', reason: String((e && e.message) || e || 'error').slice(0, 120) });
       return { ok: false, state: 'error', reason: st.reason };
     }
-  };
+  }
 
   // Can this tablet open Smokebox with no network? Asks the worker to read the stored page and check it is the whole app.
   O.check = async function check() {
@@ -12661,7 +12974,7 @@ a.of-nav:active { background: var(--press); }
       if (c && c.getRegistrations) for (const r of await c.getRegistrations()) { if (await r.unregister()) unregistered++; }
       if (g.caches && g.caches.keys) for (const k of await g.caches.keys()) if (k.indexOf('smokebox-') === 0) { if (await g.caches.delete(k)) deleted++; }
     } catch (e) { /* what could be removed was removed */ }
-    reg = null; started = false;
+    reg = null; started = false; regJob = null; epoch++;
     if (timer) { clearInterval(timer); timer = null; }
     set({ state: 'none', cachedVersion: null, pageVersion: null, reason: '' });
     if (!(opts && opts.reload === false) && g.location && typeof g.location.reload === 'function') g.location.reload();
@@ -12922,15 +13235,83 @@ a.of-nav:active { background: var(--press); }
     for (const k of Object.keys(r.taps.jobs)) { add('taps', k, r.taps.jobs[k].n); add('taps', k + ' per hour', r.taps.jobs[k].perHour, '/h'); }
     add('tickets', 'count', r.tickets.n); add('tickets', 'median seconds to bump', r.tickets.medianSec, 's');
     add('settings', 'hot hold', r.settings.hotHoldF, 'F'); add('settings', 'temperature check', r.settings.tempCheckEveryMin, 'min'); add('settings', 'hard cap', r.settings.hardCapH, 'h');
-    // Quote a cell when it holds a comma, quote or line break; text cells never start with a formula sign.
-    const cell = (v) => { let s = String(v); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-    return rows.map((x) => x.map(cell).join(',')).join('\n') + '\n';
+    // Every cell goes through the shared guard (36-csv.js): text that could run as a formula gets a leading apostrophe.
+    return rows.map((x) => SB.csv.line(x)).join('\n') + '\n';
   }
 
   SB.pilot = { build, toText, toCsv, defaultFrom, KEY_ALERTLOG: 'smokebox.v1.alertlog', LOG_MAX: 400 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 35-pilot.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'35-pilot.js',message:String(e&&e.message||e)});}
+
+/* ===== 36-csv.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The one place that turns values into spreadsheet (CSV) cells safely. A text cell that starts with
+ *    = + - @ or a tab or carriage return could be run as a formula by a spreadsheet (a note typed as =HYPERLINK(...) in a
+ *    file handed to an inspector or an accountant), so such text gets a leading apostrophe. Real numbers and plain
+ *    number text stay numbers.
+ * PARTS: the cell, the line, the whole file.
+ * USES: nothing. USED BY: 35-pilot.js (pilot report), 76-floor-discards.js (thrown-out log), 88-office-backup.js (sales by day),
+ *    tests. The store has its own copy of the same rule for its five data files (30-store.js).
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  // Text that is only a number (an optional minus, digits, an optional decimal part): safe to leave as it is.
+  const PLAIN_NUMBER = /^-?\d+(?:\.\d+)?$/;
+  // Text that a spreadsheet may read as a formula or a command.
+  const DANGEROUS = /^[=+\-@\t\r]/;
+
+  // One CSV cell: numbers as digits, text with a leading apostrophe when it could be a formula, and quotes when it holds a comma, quote or line break.
+  function cell(v) {
+    if (v === undefined || v === null) return '';
+    if (typeof v === 'number') return isFinite(v) ? String(v) : '';
+    if (typeof v === 'boolean') return v ? 'true' : 'false';
+    let s = typeof v === 'string' ? v : String(v);
+    if (DANGEROUS.test(s) && !PLAIN_NUMBER.test(s)) s = "'" + s;
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  // One CSV line from a list of values (no line break at the end).
+  const line = (a) => a.map(cell).join(',');
+  // A whole CSV text from a list of lists, with a carriage return and line feed after each line.
+  const text = (rows) => rows.map(line).join('\r\n') + '\r\n';
+
+  SB.csv = { cell, line, text };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 36-csv.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'36-csv.js',message:String(e&&e.message||e)});}
+
+/* ===== 37-retention.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: How long the app keeps safety records, in one place, so every screen and printout that talks about
+ *    "how far back" reads the engine's own number instead of repeating one. If the engine does not tell us, no number is
+ *    claimed.
+ * PARTS: days, words.
+ * USES: 20-engine.js (SAFETY_KEEP_DAYS or SAFETY_KEEP_MS, when exported).   USED BY: 76-floor-discards.js, 89-office-inspector.js, tests.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+
+  // The number of days the engine keeps a safety record, or null when the engine does not say.
+  function days() {
+    const E = SB.engine || {};
+    if (typeof E.SAFETY_KEEP_DAYS === 'number' && E.SAFETY_KEEP_DAYS > 0) return Math.round(E.SAFETY_KEEP_DAYS);
+    if (typeof E.SAFETY_KEEP_MS === 'number' && E.SAFETY_KEEP_MS > 0) return Math.round(E.SAFETY_KEEP_MS / 86400e3);
+    return null;
+  }
+  // Plain words for the keep time: "Records are kept for about 400 days." or, when unknown, a line that claims no number.
+  function words() {
+    const d = days();
+    return d ? 'Safety records are kept for about ' + d + ' days; older ones are not kept.' : 'Safety records are not kept forever; older ones may be gone.';
+  }
+
+  SB.retention = { days, words };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 37-retention.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'37-retention.js',message:String(e&&e.message||e)});}
 
 /* ===== 40-metrics.js ===== */
 ;try{
@@ -13902,7 +14283,9 @@ a.of-nav:active { background: var(--press); }
    */
   M.stockBurn = (ds, opts) => {
     ds = unwrap(ds); ds = ds && typeof ds === 'object' ? ds : {}; opts = opts && typeof opts === 'object' ? opts : {};
-    const ctx = makeCtx(ds, { from: -Infinity, to: Infinity }); const im = ctx.ingMap(); const ing = opts.ing; const meta = im[ing];
+    // The whole-history context is remembered per dataset (the stock page asks for one day of each protein, dozens of times), so
+    // the day list, the items and the events are walked once instead of once per call.
+    const ctx = M.prepare(ds, { from: -Infinity, to: Infinity }); const im = ctx.ingMap(); const ing = opts.ing; const meta = im[ing];
     const empty = { day: null, ing: ing || null, name: meta ? meta.name : ing || null, unit: meta ? meta.unit : null, tcs: !!(meta && meta.tcs), thresholdG: meta && num(meta.thresholdG) ? meta.thresholdG : null, parG: meta && num(meta.parG) ? meta.parG : null,
       openingG: null, openingAssumed: false, openMs: null, closeMs: null, intakeG: 0, usedG: 0, wasteG: 0, endG: null, minG: null, minAt: null, points: [], batches: [] };
     if (!ing) return empty;
@@ -13911,11 +14294,17 @@ a.of-nav:active { background: var(--press); }
     if (!day) return empty;
     const res = Object.assign({}, empty, { day, openMs: hourMs(day, ctx.svc.openHour), closeMs: hourMs(day, ctx.svc.closeHour) });
     const deltas = []; const tcs = !!(meta && meta.tcs);
-    const dep = []; let anyBatchId = false;
-    for (const v of ctx.all) for (const it of v.items) {
-      if (!it || it.status !== 'done' || !num(it.doneAt) || !Array.isArray(it.depleted)) continue;
-      for (const d of it.depleted) if (d && d.ing === ing && num(d.g) && d.g > 0) { dep.push({ t: it.doneAt, g: d.g, b: d.batchId }); if (d.batchId) anyBatchId = true; }
-    }
+    // Every depletion of every ingredient and every restock, indexed once per context: [{t, g, b}] in the original walk order.
+    const idx = ctx.memo('stockIndex', () => {
+      const depBy = {}, anyBy = {}, restockBy = {}, byBatch = {};
+      for (const v of ctx.all) for (const it of v.items) {
+        if (!it || it.status !== 'done' || !num(it.doneAt) || !Array.isArray(it.depleted)) continue;
+        for (const d of it.depleted) if (d && d.ing && num(d.g) && d.g > 0) { const row = { t: it.doneAt, g: d.g, b: d.batchId, i: 0 }; const list = depBy[d.ing] || (depBy[d.ing] = []); row.i = list.length; list.push(row); if (d.batchId) { anyBy[d.ing] = true; const m = byBatch[d.ing] || (byBatch[d.ing] = {}); (m[d.batchId] || (m[d.batchId] = [])).push(row); } }
+      }
+      for (const e of arr(ds.events)) if (e && e.type === 'restock' && !e.reverted && e.ing && num(e.t) && num(e.g)) (restockBy[e.ing] || (restockBy[e.ing] = [])).push(e);
+      return { depBy, anyBy, restockBy, byBatch };
+    });
+    const dep = idx.depBy[ing] || []; const anyBatchId = !!idx.anyBy[ing];
     // Hot-held (TCS) food: stock is only what that day's batches brought in, minus use and discards.
     // Opening is 0.
     if (tcs) {
@@ -13926,12 +14315,14 @@ a.of-nav:active { background: var(--press); }
         deltas.push({ t: b.enteredAt, d: b.cookedG, kind: 'intake' }); res.batches.push({ id: b.id, label: b.label || b.id, enteredAt: b.enteredAt, cookedG: b.cookedG });
         if (num(b.discardedAt) && num(b.wasteG) && b.wasteG > 0) deltas.push({ t: b.discardedAt, d: -b.wasteG, kind: 'waste' });
       }
-      for (const x of dep) if (anyBatchId ? ids.has(x.b) : ctx.dateOf(x.t) === day) deltas.push({ t: x.t, d: -x.g, kind: 'use' });
+      // With batch ids on the depletions, only this day's batches are looked up (in the original walk order); otherwise the day is matched by time.
+      const mine = anyBatchId ? [].concat(...Array.from(ids).map((id) => (idx.byBatch[ing] || {})[id] || [])).sort((a, b) => a.i - b.i) : dep.filter((x) => ctx.dateOf(x.t) === day);
+      for (const x of mine) deltas.push({ t: x.t, d: -x.g, kind: 'use' });
     } else {
       // Other ingredients: start from the given opening count or the par level (openingAssumed says so),
       // plus restocks.
       res.openingG = num(opts.openingG) ? opts.openingG : (meta && num(meta.parG) ? meta.parG : 0); res.openingAssumed = !num(opts.openingG);
-      for (const e of arr(ds.events)) if (e && e.type === 'restock' && !e.reverted && e.ing === ing && num(e.t) && num(e.g) && ctx.dateOf(e.t) === day) deltas.push({ t: e.t, d: e.g, kind: 'restock' });
+      for (const e of idx.restockBy[ing] || []) if (ctx.dateOf(e.t) === day) deltas.push({ t: e.t, d: e.g, kind: 'restock' });
       for (const x of dep) if (ctx.dateOf(x.t) === day) deltas.push({ t: x.t, d: -x.g, kind: 'use' });
     }
     // At the same moment, stock coming in is counted before stock going out, so the level never dips below
@@ -19940,9 +20331,9 @@ a.of-nav:active { background: var(--press); }
   const pinHash = () => { try { const s = SB.store && SB.store.getState && SB.store.getState(); return (s && s.settings && s.settings.office && s.settings.office.pinHash) || null; } catch (e) { return null; } };
   // True when a manager PIN is set.
   S.hasPin = () => !!pinHash();
-  // Scrambles a PIN into 'sha256:' + 64 hex characters (with 'smokebox.v1:' put in front). Browser crypto
-  // first, pure copy as fallback; same result. The real number is never stored.
-  S.hashPin = async function (pin) {
+  // The old unsalted form of a PIN scramble: 'sha256:' + 64 hex characters of the digest of 'smokebox.v1:' + pin. Browser crypto first, the pure copy as
+  // fallback; same result. Kept so a PIN saved by an older build still works.
+  async function legacyPinHash(pin) {
     const text = 'smokebox.v1:' + String(pin);
     try {
       if (g.crypto && g.crypto.subtle && typeof TextEncoder !== 'undefined') {
@@ -19951,12 +20342,34 @@ a.of-nav:active { background: var(--press); }
       }
     } catch (e) { /* fall back to the pure implementation, which gives the same digest */ }
     return 'sha256:' + sha256hex(text);
+  }
+  // Scrambles a PIN for saving: salted PBKDF2 ('pbkdf2:rounds:salt:hash') where the browser can, the old unsalted form where it cannot. The real
+  // number is never stored. A 4-digit PIN is a door latch for the back office, not a lock: anyone with the device or a backup file can still try
+  // all 10 000 PINs, the salt and rounds only make each try cost real work.
+  S.hashPin = async function (pin) {
+    const salted = await U.secretHash('smokebox.v1:', pin);
+    return salted !== null ? salted : legacyPinHash(pin);
   };
-  // True if the PIN matches the saved scramble. True for anything when no PIN is set.
-  S.checkPin = async function (pin) { const want = pinHash(); if (!want) return true; return (await S.hashPin(pin)) === want; };
+  // True if the PIN matches the saved scramble (either form). True for anything when no PIN is set. A right PIN saved in the old form is saved again
+  // in the new form on the spot.
+  S.checkPin = async function (pin) {
+    const want = pinHash();
+    if (!want) return true;
+    const r = await U.secretCheck('smokebox.v1:', pin, want);
+    let ok = r.ok;
+    if (!ok && !(g.crypto && g.crypto.subtle) && want.indexOf('sha256:') === 0) ok = (await legacyPinHash(pin)) === want;      // no browser crypto: the pure copy
+    if (ok && r.legacy) {
+      try { const fresh = await U.secretHash('smokebox.v1:', pin); if (fresh) SB.store.dispatch('updateSettings', { patch: { office: { pinHash: fresh } } }, { source: 'user' }); } catch (e) { /* the old form keeps working */ }
+    }
+    return ok;
+  };
   // Sets (4 digits) or removes (null or '') the manager PIN. Only the scramble is saved, through the store
   // (settings.office.pinHash); any unlock is forgotten. Resolves {ok, report}; bad input gives 'badPin'.
-  S.setPin = async function (pin) {
+  // Asks for the current PIN right now (the keypad), even inside the 2-minute grace. True at once when no PIN is set; false when cancelled.
+  S.requirePin = () => (S.hasPin() ? promptPin() : Promise.resolve(true));
+  S.setPin = async function (pin, opts) {
+    // With a PIN already set, changing or removing it needs proof that the current PIN was just entered (opts.verified from requirePin).
+    if (S.hasPin() && !(opts && opts.verified === true)) return { ok: false, report: 'pinRequired', message: 'The current PIN is needed to change or remove it.' };
     if (pin != null && pin !== '' && !/^\d{4}$/.test(String(pin))) return { ok: false, report: 'badPin', message: 'Use exactly 4 digits.' };
     const hash = pin == null || pin === '' ? null : await S.hashPin(pin);
     if (!SB.store || typeof SB.store.dispatch !== 'function') return { ok: false, report: 'noStore', message: 'The store is not available.' };
@@ -20344,7 +20757,7 @@ a.of-nav:active { background: var(--press); }
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '', sub: null };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, kind: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -20353,6 +20766,10 @@ a.of-nav:active { background: var(--press); }
   };
   // When the last backup was made on this device (ms), or null if never.
   S.lastBackupAt = () => { const t = U ? U.storage.get(KEY.lastBackup, null) : null; return typeof t === 'number' ? t : null; };
+  // Accepts the device's new time after the person says it is right, then refreshes the strip.
+  function useNewTime() { SB.store.acceptClockJump(); paintBanner(); }
+  // Keeps the old time and stays quiet about the jump for ten minutes.
+  function keepOldTime() { bn.clockSnooze = Date.now() + 10 * 60000; paintBanner(); }
   // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
   function bannerWanted() {
     const store = SB.store;
@@ -20364,6 +20781,11 @@ a.of-nav:active { background: var(--press); }
     if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
+    // Off the board (a back-office page), a device clock that jumped far ahead is asked about here: a slim strip, not a box over the page.
+    if (ss.clockSuspect && Date.now() >= (bn.clockSnooze || 0) && (R.view().kind === 'office' || !(SB.floor && SB.floor.isMounted && SB.floor.isMounted()))) {
+      const dd = Math.round(ss.clockSuspect.aheadMs / 86400000);
+      return { kind: 'clock', tone: 'warn', text: 'The clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(ss.clockSuspect.aheadMs / 3600000) + ' hours') + '. Still on the old time.', act: 'Use the new time', onAct: useNewTime, later: true, laterLabel: 'Keep the old time', onLater: keepOldTime };
+    }
     if (!s) return null;
     const due = backupDue({ service: s.settings && s.settings.service, lastBackupAt: S.lastBackupAt(), snoozeUntil: bn.snoozeUntil, now: Date.now(), hasData: s.tickets.length + s.batches.length > 0 });
     return due ? { kind: 'nudge', tone: 'warn', text: 'Service is over. Save today\'s backup now and keep a copy off this device (email it or use a USB drive).', act: 'Back up now', later: true } : null;
@@ -20380,7 +20802,7 @@ a.of-nav:active { background: var(--press); }
     // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
-    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: 'Hide for 45 minutes', onClick: () => { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } }, ico('x', 18), h('span', { class: 'visually-hidden' }, 'Later')) : null;
+    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: w.laterLabel || 'Hide for 45 minutes', onClick: () => { if (w.onLater) w.onLater(); else { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } } }, ico('x', 18), h('span', { class: 'visually-hidden' }, w.laterLabel || 'Later')) : null;
     bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
@@ -20519,6 +20941,39 @@ a.of-nav:active { background: var(--press); }
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 60-shell.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'60-shell.js',message:String(e&&e.message||e)});}
+
+/* ===== 66-order-math.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The money shown before an order is sent. It asks the engine's own order totals (whole cents, half-up tax) what a
+ *    draft would come to, so the preview on the order screen and the charge are always the same numbers. Nothing here does its own
+ *    rounding of tax. It also splits a tip percentage in whole cents.
+ * PARTS: previewTotals, pctOfDollars.
+ * USES: 20-engine.js (orderTotals). USED BY: 71-floor-order.js (the order screen), 73-floor-orders.js (tip choices), and tests.
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  // What the order would come to if the draft lines were sent now: the food already on the order (if any) plus the draft lines at menu
+  // price, less nothing, plus tax, worked out by the engine's own orderTotals on a copy of the state that holds the draft as one more
+  // ticket. lines is [{ price, qty }]. order is the open order the round goes to, or null for a new order. Returns { sub, tax, total }.
+  function previewTotals(state, order, lines) {
+    const E = SB.engine;
+    const oid = order ? order.id : '_draft';
+    const items = (lines || []).map((l) => ({ price: l.price, qty: l.qty }));
+    const probe = Object.assign({}, state, { tickets: state.tickets.concat([{ id: '_draft', orderId: oid, status: 'active', items }]) });
+    const t = E.orderTotals(probe, order && order.status === 'open' ? order : { id: oid, status: 'open' });
+    return { sub: t.subtotal, tax: t.tax, total: t.total };
+  }
+  // A percentage of a dollar amount in whole cents, half a cent rounding up (15 percent of 23.50 is 3.53, not 3.52), for tip choices.
+  function pctOfDollars(amount, pct) {
+    const c = Math.round(Math.max(0, Number(amount) || 0) * 100 + 1e-7);
+    return Math.floor((c * pct + 50) / 100) / 100;
+  }
+  SB.orderMath = { previewTotals, pctOfDollars };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 66-order-math.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'66-order-math.js',message:String(e&&e.message||e)});}
 
 /* ===== 70-floor-board.js ===== */
 ;try{
@@ -21191,7 +21646,7 @@ a.of-nav:active { background: var(--press); }
       if (!b) return;
       if (id !== 'all') b.dataset.zone = id;
       b.insertBefore(h('span', { class: 'visually-hidden' }, (id === 'all' ? 'All stations' : zoneById(id).long) + ', '), b.firstChild);
-      b.appendChild(h('span', { class: 'visually-hidden' }, id === 'all' || id === 'expo' ? ' tickets' : ' tickets with work here'));
+      b.appendChild(h('span', { class: 'visually-hidden fl-tab-what', dataset: { here: id === 'all' || id === 'expo' ? 'no' : 'yes' } }, tabWhat(0, id)));
     });
     const tabs = h('div', { class: 'fl-tabs' }, seg);
 
@@ -21399,6 +21854,8 @@ a.of-nav:active { background: var(--press); }
     }
     m.fitKey = headKey();
   }
+  // The hidden words after a tab's count: "ticket" for one, "tickets" for the rest, and "with work here" on a station tab.
+  function tabWhat(n, id) { return ' ' + U.plural(n, 'ticket') + (id === 'all' || id === 'expo' ? '' : ' with work here'); }
   // Runs every second: refits the header only when its width or chip text changed, so most ticks cost nothing.
   function refit() {
     if (m && m.head && headKey() !== m.fitKey) fitHead();
@@ -21411,7 +21868,9 @@ a.of-nav:active { background: var(--press); }
   function measureToastTop() {
     if (!m || !m.main) return;
     // Everyday toasts sit just under the header, over the notice strip, where they hide no ticket button.
-    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(m.head.getBoundingClientRect().bottom + 6) + 'px');
+    // While the clock notice shows, toasts start below it so they never cover its two buttons.
+    const cb = m.strip && m.strip.clockBar && !m.strip.clockBar.hidden ? m.strip.clockBar.getBoundingClientRect().bottom : 0;
+    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(Math.max(m.head.getBoundingClientRect().bottom, cb) + 6) + 'px');
     if (m.cabOn) doc.documentElement.style.setProperty('--fl-toast-top', Math.round(m.main.getBoundingClientRect().top + 8) + 'px');
   }
   // Tells the stylesheet how tall the all-day strip is (--fl-lift) so toasts sit above it.
@@ -22119,6 +22578,12 @@ a.of-nav:active { background: var(--press); }
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
+    // The clock notice: the tablet's clock jumped far ahead, the board keeps the old time and asks. Calm, two plain choices, and the board keeps working.
+    const clockT = h('span', { class: 'fl-clock-t' });
+    const clockKeep = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-keep' }, onClick: () => { if (m) { m.clockDis = Date.now() + 10 * 60e3; updateStrip(store().now()); } } }, 'Keep the old time');
+    const clockUse = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-use' }, onClick: askClockUse }, 'Use the new time');
+    const clockWrap = h('div', { class: 'fl-strip-bar fl-bar-clock', role: 'alert', hidden: true }, ico('clock', 22), clockT, clockKeep, clockUse);
+    el.appendChild(clockWrap);
     const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear all notices', () => { if (m && m.noteKey) m.dis.add(m.noteKey); return 'snd'; }));
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
@@ -22141,7 +22606,7 @@ a.of-nav:active { background: var(--press); }
     // A visually hidden live region that changes only when a warning is announced (the leader tab), so a screen reader hears each warning once, never the ticking countdown.
     const announce = h('span', { class: 'visually-hidden', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
     el.appendChild(announce);
-    return { el, rows, soundBar: soundWrap, pauseBar: pauseWrap, pauseBtn: pauseBar, announce };
+    return { el, rows, clockBar: clockWrap, clockText: clockT, soundBar: soundWrap, pauseBar: pauseWrap, pauseBtn: pauseBar, announce };
   }
   // Shows the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { showCabinet(true, { batchId }); } catch (e) { console.error('[smokebox] cabinet failed', e); } }
@@ -22187,6 +22652,14 @@ a.of-nav:active { background: var(--press); }
     if (top.level === 4) { tell(PH('expired', { who, many }), 'expired'); return; }
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
     tell(PH('expire', { who, many, mins, goes86: first.goes86, approx: top.level === 2 }), top.level >= 3 ? 'start' : 'expire');
+  }
+  // Asks, in a small box, whether to use the tablet's new time. It needs a second deliberate tap, and "Keep the old time" is the way out.
+  function askClockUse() {
+    const cs = store().status().clockSuspect;
+    if (!cs || !SB.ui || !SB.ui.confirm) return;
+    const days = Math.round(cs.aheadMs / 86400000);
+    SB.ui.confirm({ title: 'Use the new time?', body: 'Timers and ages on every open ticket will jump forward by about ' + (days >= 2 ? days + ' days' : Math.round(cs.aheadMs / 3600000) + ' hours') + '. Only do this if the date and time on this tablet are right.', confirmLabel: 'Use the new time', cancelLabel: 'Keep the old time', tone: 'danger' })
+      .then((yes) => { if (yes) { store().acceptClockJump(); if (m) updateStrip(store().now()); } else if (m) m.clockDis = Date.now() + 10 * 60e3; });
   }
   // Says a cold item's low-time row once when it first shows (or gets worse), in plain words that name the owner's limit.
   // The first pass after the board opens only remembers what is already there, so a reload does not read old news aloud.
@@ -22262,9 +22735,20 @@ a.of-nav:active { background: var(--press); }
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
     // Only one notice shows at a time (the "tap for sound" bar first, then the note); the bar says how many more wait behind it, and
     // its X clears them all. Warning rows above are separate and always show.
-    const soundShown = needSound && !m.dis.has('snd');
+    // A device clock that jumped ahead comes first: it changes every timer on the board. It never hides the tickets.
+    const cs = store().status().clockSuspect;
+    const clockShown = !!cs && Date.now() >= (m.clockDis || 0);
+    if (clockShown) {
+      const dd = Math.round(cs.aheadMs / 86400000);
+      const t = 'This tablet\'s clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(cs.aheadMs / 3600000) + ' hours') + '. Smokebox is still using the old time, so tickets and timers keep running.';
+      if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
+    }
+    setHidden(m.strip.clockBar, !clockShown);
+    measureToastTop();
+    const soundShown = needSound && !m.dis.has('snd') && !clockShown;
+    setHidden(m.strip.soundBar, !soundShown); // the clock notice goes first, so the sound bar waits behind it
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
-    const showNote = noteWanted && !soundShown;
+    const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
     const more = (noteWanted ? 1 : 0) + behindSilent;
@@ -22276,7 +22760,7 @@ a.of-nav:active { background: var(--press); }
       const want = updateNote() && note === updateNote() ? 'refresh' : 'volume-off';
       if (m.pauseIcon !== want) { m.pauseIcon = want; const old = m.strip.pauseBtn.firstChild; if (old) old.replaceWith(ico(want, 24)); }
     }
-    setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
+    setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote && !clockShown);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
       setHidden(r.wrap, !d);
@@ -22330,6 +22814,8 @@ a.of-nav:active { background: var(--press); }
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
     const tabCount = (id, n, alert) => {
       m.seg.setCount(id, n, { alert });
+      const what = m.seg.querySelector('[data-id="' + id + '"] .fl-tab-what');
+      if (what) { const t = tabWhat(n, id); if (what.textContent !== t) what.textContent = t; }
       const p = m.tabParts[id];
       if (p && p.n !== n) { p.n = n; p.count.dataset.zero = n === 0 ? 'true' : 'false'; }
     };
@@ -22600,6 +23086,8 @@ a.of-nav:active { background: var(--press); }
     }
     // After a reload with the hub unreachable the board shows the last copy it had; it says so until the first live update.
     if (st.lastKnown && st.state !== 'connected' && st.state !== 'sending') return { tone: 'wait', text: 'Last known' + (st.lastKnownAt ? ', from ' + U.fmtTime(st.lastKnownAt) : '') + '. Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
+    // A screen the owner removed (or that was never paired) is told so in plain words, not just shown as offline.
+    if (st.error === 'revoked' || st.error === 'unpaired') return { tone: 'bad', text: st.reason || 'This screen was removed from the kitchen.', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
     if (st.state === 'offline' || st.state === 'error') return { tone: 'wait', text: 'Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
     if (st.state === 'connecting') return { tone: 'wait', text: 'Connecting...', sub: n ? n + ' waiting' : '', unsent: n };
     if (n > 0) return { tone: 'wait', text: 'Sending ' + n + '...', sub: '', unsent: n };
@@ -22640,7 +23128,7 @@ a.of-nav:active { background: var(--press); }
   }
   // Tells the cook, on the screen that tapped, that the hub did not do a tap, and why. The change shown here was already taken back.
   function onHubRefusal(r) {
-    const text = (r && (r.text || r.reason)) || 'The kitchen did not accept that tap.';
+    const text = String((r && (r.text || r.reason)) || 'The kitchen did not accept that tap.').slice(0, 300); // a hub's sentence is shown short
     toast(/^Not done/i.test(text) ? text : 'Not done: ' + text, { tone: 'warn', ms: 12000 });
     const rec = r && r.ticketId ? m && m.slips.get(r.ticketId) : null;
     if (rec) flash(rec.el.querySelector('.slip-head'));
@@ -23214,11 +23702,8 @@ a.of-nav:active { background: var(--press); }
   // What the bill comes to if this round is sent now: the food already on the open order plus this draft, with tax.
   function pendingTotal() {
     const s0 = st(), o = D.orderId ? SB.engine.findOrder(s0, D.orderId) : null;
-    let c = Math.round(subtotal() * 100);
-    if (o) c += Math.round(SB.engine.orderTotals(s0, o).subtotal * 100);
-    const sub = c / 100, rate = s0.settings && s0.settings.service && s0.settings.service.taxRatePct > 0 ? s0.settings.service.taxRatePct : 0;
-    const tax = Math.round(sub * rate) / 100;
-    return { sub, tax, total: Math.round((sub + tax) * 100) / 100 };
+    // The engine's own order totals do the sum and the tax, so what is shown is exactly what will be charged.
+    return SB.orderMath.previewTotals(s0, o, D.lines.map((l) => { const mi = menuById(l.menuId); return { price: mi ? mi.price : 0, qty: l.qty }; }));
   }
 
   /** Add one menu item (or qty) to the draft. Same item with no modifiers merges into the existing line. */
@@ -23539,7 +24024,7 @@ a.of-nav:active { background: var(--press); }
     });
     tipField.appendChild(tipChips);
     // The tip in dollars for a percent of the food on this bill (before tax), in whole cents.
-    const tipAmount = (pct) => (pct ? Math.round(pendingTotal().sub * pct) / 100 : 0);
+    const tipAmount = (pct) => (pct ? SB.orderMath.pctOfDollars(pendingTotal().sub, pct) : 0);
     const payNote = h('p', { class: 'ord-pay-note t-muted', role: 'status' });
     const payBox = h('div', { class: 'ord-block ord-paybox' }, h('div', { class: 'ord-label' }, 'Payment'), paySeg, tipField, payNote);
 
@@ -23983,7 +24468,7 @@ a.of-nav:active { background: var(--press); }
       });
       touched();
       if (skipped.length) SB.ui.toast(cb.name + ': left out ' + skipped.join(', ') + ' because ' + (skipped.length === 1 ? 'it is' : 'they are') + ' 86 or at the limit.', { tone: 'warn' });
-      else say(cb.name + ' added, ' + added.length + ' lines');
+      else say(cb.name + ' added, ' + added.length + ' ' + U.plural(added.length, 'line'));
     }
     // Repeat last order: copies the previous order into this one, asking first if this one already has items.
     function doRepeat() {
@@ -25935,6 +26420,8 @@ a.of-nav:active { background: var(--press); }
         body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
+      // With a PIN set, clearing live data asks for it.
+      if (SB.shell && SB.shell.requirePin && !(await SB.shell.requirePin())) { toast('The PIN was not entered. Nothing was cleared.', 'warn'); return; }
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
       const rep = SB.store.resetLive({ keepSettings: true, starter: false });
       if (rep === 'ok') toast('Live data cleared. The board is empty.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
@@ -25961,7 +26448,7 @@ a.of-nav:active { background: var(--press); }
       text(dLive, String(s.tickets.length - demo)); text(dDemo, String(demo));
       if (!sim || typeof sim.sampleInfo !== 'function') { text(dSample, 'Not loaded'); return; }
       if (sim.sampleEnabled && !sim.sampleEnabled()) { text(dSample, 'Switched off'); return; }
-      if (paintCounts.info) { text(dSample, U.fmtNum(paintCounts.info.tickets) + ' tickets over ' + paintCounts.info.days + ' days'); return; }
+      if (paintCounts.info) { text(dSample, U.fmtNum(paintCounts.info.tickets) + ' ' + plural(paintCounts.info.tickets, 'ticket') + ' over ' + paintCounts.info.days + ' ' + plural(paintCounts.info.days, 'day')); return; }
       text(dSample, 'Counting...');
       if (!paintCounts.asked) {
         paintCounts.asked = true;
@@ -26445,7 +26932,7 @@ a.of-nav:active { background: var(--press); }
   const cents = (v) => Math.round(v * 100) / 100;
   // Tip choices worked out from a base amount (the food after any discount): 15, 18, 20 and 25 percent in dollars.
   function tipPresets(base) {
-    return [15, 18, 20, 25].map((pct) => ({ pct, label: pct + '%', amount: cents((Math.max(0, base) * pct) / 100) }));
+    return [15, 18, 20, 25].map((pct) => ({ pct, label: pct + '%', amount: SB.orderMath ? SB.orderMath.pctOfDollars(base, pct) : cents((Math.max(0, base) * pct) / 100) }));
   }
   // The tip that brings the amount to collect up to a whole dollar (a total of 23.40 gives 0.60); 0 if already whole.
   function roundUpTip(total) { return cents(Math.ceil(cents(total) - 1e-9) - cents(total)); }
@@ -26713,6 +27200,16 @@ a.of-nav:active { background: var(--press); }
       const lines = foodLines(state, o.id), t = o.totals || {}, pm = C.payMethodById[o.method];
       text(rec.items, lines.length ? itemsLine(lines) : 'Items are no longer on the board.');
       text(rec.meta, 'Paid ' + U.fmtTime(o.paidAt) + ' by ' + (pm ? pm.name.toLowerCase() : o.method) + '.' + (o.tip > 0 ? ' Tip ' + money(o.tip) + '.' : '') + (t.discount > 0 ? ' Discount ' + money(t.discount) + '.' : '') + (t.rounds > 1 ? ' ' + t.rounds + ' rounds.' : ''));
+      // A sale from a day that was already closed cannot be opened again, so say so on the button before the tap.
+      const lc = state.lastClose, shut = !!(lc && isFinite(o.paidAt) && U.serviceDate(o.paidAt, state.settings.service.dayStartHour) <= lc.day);
+      if (rec.shut !== shut) {
+        rec.shut = shut;
+        U.clear(rec.reopen);
+        rec.reopen.append(ico('history', 20), h('span', null, shut ? 'Closed day: cannot reopen' : 'Reopen'));
+        rec.reopen.classList.toggle('is-shut', shut);
+        if (shut) rec.reopen.setAttribute('aria-disabled', 'true'); else rec.reopen.removeAttribute('aria-disabled');
+        rec.reopen.title = shut ? 'Tap to see why.' : '';
+      }
       text(rec.total, money(t.total));
       text(rec.sub, t.tax > 0 ? 'incl. ' + money(t.tax) + ' tax' : '');
     }
@@ -26873,7 +27370,7 @@ a.of-nav:active { background: var(--press); }
       if (tot.taxRate > 0) rows.push(['Tax (' + tot.taxRate + '%)', money(tot.tax)]);
       rows.push(['Order total', money(tot.total)]);
       const tip = r.err || Number.isNaN(r.t) ? 0 : r.t;
-      if (tip > 0) rows.push(['Tip', money(tip)], ['To collect', money(tot.total + tip)]);
+      if (tip > 0) rows.push(['Tip', money(tip)], ['To collect', money(Math.round(tot.total * 100 + tip * 100 + 1e-7) / 100)]);
       U.clear(calc);
       rows.forEach((row, i) => calc.append(h('dt', { class: i === rows.length - 1 ? 'is-last' : '' }, row[0]), h('dd', { class: 'num' + (i === rows.length - 1 ? ' is-last' : '') }, row[1])));
       quick.forEach((q) => {
@@ -27491,7 +27988,6 @@ a.of-nav:active { background: var(--press); }
   const SB = (g.SB = g.SB || {});
   const U = SB.util;
   const doc = g.document;
-  if (!doc || !SB.sheets) return;
   const h = U.h;
   // Builds an icon element, or an empty span when icons are missing.
   const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 20 }); } catch (e) { return doc.createElement('span'); } };
@@ -27522,8 +28018,10 @@ a.of-nav:active { background: var(--press); }
     // The engine's own discard entries by batch: who threw it out, the entry id for a fix, and fixes already made.
     const logged = new Map();
     for (const row of SB.engine.safetyLog(state)) if (row.event.type === 'batch_discard' && row.event.batchId) logged.set(row.event.batchId, row);
+    const seen = new Set();
     for (const b of state.batches) {
       if (b.status !== 'discard' || !Number.isFinite(b.discardedAt)) continue;
+      seen.add(b.id);
       out.push({
         id: b.id, t: b.discardedAt, date: U.fmtDateShort(U.dateKey(b.discardedAt)), food: b.label || b.ing,
         amount: U.weightText(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
@@ -27531,37 +28029,67 @@ a.of-nav:active { background: var(--press); }
         eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
     }
+    // Discards whose batch has since been dropped from the cabinet list are still in the safety record (kept for the engine's safety-record time):
+    // show them from that entry, with what the entry holds (the amount, the reason, who) and nothing invented.
+    const ingName = (id) => { const i = (state.ingredients || []).find((x) => x && x.id === id); return i && i.name ? i.name : id || 'Food'; };
+    for (const [batchId, row] of logged) {
+      const e = row.event;
+      if (seen.has(batchId) || !Number.isFinite(e.t)) continue;
+      out.push({
+        id: batchId, t: e.t, date: U.fmtDateShort(U.dateKey(e.t)), food: ingName(e.ing), amount: Number.isFinite(e.g) ? U.weightText(e.g) : '',
+        since: '', out: U.fmtTime(e.t), reason: REASON[e.reason] || 'Other',
+        initials: rec.initials[batchId] || e.who || '', extra: rec.extra[batchId] || e.note || '', eventId: e.id || '', fixes: row.corrections || [],
+      });
+    }
     return out.sort((a, b) => b.t - a.t);
+  }
+  // How far back the log reaches, in plain words, so nobody reads it as more than it is. The keep time comes from the engine
+  // (SB.retention); a kitchen newer than that has everything from its first record.
+  function coverageText(state, list, now) {
+    if (!list.length) return '';
+    const oldest = list[list.length - 1].t;
+    let first = oldest;
+    for (const row of SB.engine.safetyLog(state)) if (Number.isFinite(row.event.t) && row.event.t < first) first = row.event.t;
+    for (const b of state.batches || []) if (b && Number.isFinite(b.enteredAt) && b.enteredAt < first) first = b.enteredAt;
+    const since = U.fmtDateShort(U.dateKey(oldest));
+    const n = list.length + ' ' + U.plural(list.length, 'batch', 'batches');
+    const keep = SB.retention ? SB.retention.days() : null;
+    // A kitchen younger than the keep time (less a two-week margin) has everything from its first record.
+    if (keep && now - first < (keep - 14) * 86400e3) return 'Showing every batch thrown out since ' + U.fmtDateShort(U.dateKey(first)) + ' (' + n + '), the first record this app has.';
+    return 'Showing the ' + n + ' thrown out since ' + since + '. ' + (SB.retention ? SB.retention.words() : '') + ' Older ones are not here.';
   }
   // Escapes text for safe use inside HTML.
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // Builds the log as plain HTML for printing: a heading and one table with the columns that are switched on.
-  function printHtml(list, rec) {
+  function printHtml(list, rec, note) {
     const cols = rec.cols.filter((c) => c.on);
     const head = '<tr>' + cols.map((c) => '<th>' + esc(c.label) + '</th>').join('') + '</tr>';
     const body = list.map((r) => '<tr>' + cols.map((c) => '<td>' + esc(r[c.key]) + '</td>').join('') + '</tr>').join('');
-    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p><table>' + head + body + '</table>';
+    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p>' + (note ? '<p>' + esc(note) + '</p>' : '') + '<table>' + head + body + '</table>';
   }
   // Builds the log as CSV text with the columns that are switched on.
-  function csv(list, rec) {
+  function csv(list, rec, note) {
     const cols = rec.cols.filter((c) => c.on);
-    // Wraps one value in quotes, doubling any quotes inside it, as CSV requires.
-    const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
-    return [cols.map((c) => q(c.label)).join(',')].concat(list.map((r) => cols.map((c) => q(r[c.key])).join(','))).join('\r\n') + '\r\n';
+    // Each cell goes through the shared guard (36-csv.js): quotes where needed and an apostrophe before anything a spreadsheet could run as a formula.
+    const rowsOut = [cols.map((c) => c.label)].concat(list.map((r) => cols.map((c) => r[c.key])));
+    if (note) rowsOut.push([note]);
+    return SB.csv.text(rowsOut);
   }
+  SB.discardsPure = { rows, coverageText, csv, printHtml };
+  if (!doc || !SB.sheets) return;
   // Prints the log through a hidden frame so the board behind the sheet is not printed with it.
-  function printLog(list, rec) {
+  function printLog(list, rec, note) {
     const f = doc.createElement('iframe');
     f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
     doc.body.appendChild(f);
-    f.srcdoc = printHtml(list, rec);
+    f.srcdoc = printHtml(list, rec, note);
     // Prints once the hidden frame has loaded its page, then removes it.
     f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { /* printing is optional */ } setTimeout(() => f.remove(), 2000); };
   }
   // Saves the log as a CSV file with the browser's normal download, and notes the save time.
-  function saveCsv(list, rec) {
+  function saveCsv(list, rec, note) {
     try {
-      const url = URL.createObjectURL(new Blob([csv(list, rec)], { type: 'text/csv' }));
+      const url = URL.createObjectURL(new Blob([csv(list, rec, note)], { type: 'text/csv' }));
       const a = doc.createElement('a');
       a.href = url; a.download = 'smokebox-thrown-out-log-' + new Date().toISOString().slice(0, 10) + '.csv'; a.style.display = 'none';
       doc.body.appendChild(a); a.click();
@@ -27578,8 +28106,11 @@ a.of-nav:active { background: var(--press); }
     // Stops listening to the store when the sheet closes.
     const onClose = () => offs.splice(0).forEach((f) => f());
     const sheet = SB.ui.sheet({ title: 'Thrown-out log', side: 'right', width: 'min(1040px, 96vw)', name: 'discards', onClose });
-    const note = h('p', { class: 'fs-sub' }, 'Every batch thrown out, newest first. Add initials on each row. Copy these to your health department\'s own form if it asks for a different layout. Save a copy every day: this log lives on this device only.');
+    const note = h('p', { class: 'fs-sub' }, 'Batches thrown out, newest first. Add initials on each row. Copy these to your health department\'s own form if it asks for a different layout. Save a copy every day: this log lives on this device only.');
     const status = h('p', { class: 'fs-sub', role: 'status' });
+    const cover = h('p', { class: 'fs-sub dlog-cover' });
+    // The plain words for how far back the log reaches, for the sheet, print and file.
+    const noteFor = (list) => { let t = null; try { t = SB.store.trimInfo ? SB.store.trimInfo() : null; } catch (e) { t = null; } return coverageText(SB.store.getState(), list, SB.store.now()) + (t && t.days > 0 ? ' This screen holds only the last ' + t.days + ' days; the full history is on the hub computer.' : ''); };
     const wrap = h('div', { class: 'dlog-wrap', style: 'overflow:auto' });
     const colsBox = h('div', { class: 'dlog-cols', hidden: true });
 
@@ -27607,6 +28138,7 @@ a.of-nav:active { background: var(--press); }
     function draw() {
       U.clear(wrap);
       const list = rows(SB.store.getState(), rec);
+      cover.textContent = noteFor(list);
       const cols = rec.cols.filter((c) => c.on);
       if (!list.length) { wrap.appendChild(h('div', { class: 'empty' }, ico('trash', 40), h('h3', null, 'Nothing thrown out yet'), h('p', null, 'Batches you throw out show up here with their time and reason.'))); return; }
       const table = h('table', { class: 'dlog-table', style: 'border-collapse:collapse;width:100%' });
@@ -27645,15 +28177,15 @@ a.of-nav:active { background: var(--press); }
       });
     }
     // Prints the log as it stands.
-    const doPrint = () => printLog(rows(SB.store.getState(), rec), rec);
+    const doPrint = () => { const l = rows(SB.store.getState(), rec); printLog(l, rec, noteFor(l)); };
     // Saves a spreadsheet copy and says whether it worked.
-    const doCsv = () => { status.textContent = saveCsv(rows(SB.store.getState(), rec), rec) ? 'Saved a copy to your downloads.' : 'The browser blocked the download. Use Print instead.'; };
+    const doCsv = () => { const l = rows(SB.store.getState(), rec); status.textContent = saveCsv(l, rec, noteFor(l)) ? 'Saved a copy to your downloads.' : 'The browser blocked the download. Use Print instead.'; };
     // Shows or hides the column editor.
     const doCols = () => { colsBox.hidden = !colsBox.hidden; if (!colsBox.hidden) drawCols(); };
     const bPrint = h('button', { type: 'button', class: 'btn', onClick: doPrint }, ico('receipt', 20), h('span', null, 'Print or save as PDF'));
     const bCsv = h('button', { type: 'button', class: 'btn btn-primary', onClick: doCsv }, ico('package', 20), h('span', null, 'Save as spreadsheet'));
     const bCols = h('button', { type: 'button', class: 'btn', onClick: doCols }, ico('sliders', 20), h('span', null, 'Edit columns'));
-    sheet.body.append(note, h('div', { class: 'row', style: 'display:flex;gap:12px;flex-wrap:wrap;margin:12px 0' }, bCsv, bPrint, bCols), status, colsBox, wrap);
+    sheet.body.append(note, cover, h('div', { class: 'row', style: 'display:flex;gap:12px;flex-wrap:wrap;margin:12px 0' }, bCsv, bPrint, bCols), status, colsBox, wrap);
     draw();
     offs.push(SB.store.subscribe(() => draw()));
     return sheet;
@@ -27680,7 +28212,7 @@ a.of-nav:active { background: var(--press); }
   // Rows for the state, with the saved initials and notes filled in.
   const rowsFor = (state) => rows(state, load());
   // The whole log for the state as CSV text.
-  const csvFor = (state) => csv(rows(state, load()), load());
+  const csvFor = (state) => { const l = rows(state, load()); return csv(l, load(), coverageText(state, l, SB.store.now())); };
   SB.discards = { rows: rowsFor, csv: csvFor, remind, persist };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
@@ -28566,7 +29098,7 @@ a.of-nav:active { background: var(--press); }
       if (rows.some((r) => !r.category)) preview.appendChild(h('div', { class: 'fs-row dp-bulk' }, h('label', null, 'Put all these dishes in: '), bulkCat));
       // Choosing a section sets it on every row that has none of its own.
       bulkCat.addEventListener('change', () => { if (bulkCat.value) rows.forEach((r) => { if (!r.categoryText) r.category = bulkCat.value; }); });
-      const body = h('div', { class: 'dp-ptable', role: 'table', 'aria-label': 'Dishes found' });
+      const body = h('div', { class: 'dp-ptable', role: 'list', 'aria-label': 'Dishes found' });
       const go = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'import-go' } }, 'Import');
       // Updates the Import button's count and enabled state from the ticked, valid rows.
       const paintGo = () => { const n = rows.filter((r) => r.keep && r.ok).length; go.disabled = n === 0; go.textContent = n ? 'Import ' + n + ' ' + U.plural(n, 'dish', 'dishes') : 'Nothing to import'; };
@@ -28580,7 +29112,7 @@ a.of-nav:active { background: var(--press); }
         const prCell = h('div', { class: 'dp-prcell' }, pr, readAs);
         const zs = h('select', { class: 'select', 'aria-label': 'Station, line ' + r.line }, stations().map((z) => h('option', { value: z.id, selected: (r.station || defaultZone()) === z.id }, z.name)));
         const prob = h('div', { class: 'fs-sub dp-prob' });
-        const rowEl = h('div', { class: 'dp-prow', role: 'row', dataset: { ok: r.ok ? 'true' : 'false' } }, keepWrap, nm, prCell, zs, prob);
+        const rowEl = h('div', { class: 'dp-prow', role: 'listitem', 'aria-label': 'Line ' + r.line, dataset: { ok: r.ok ? 'true' : 'false' } }, keepWrap, nm, prCell, zs, prob);
         // Redraws this row's plain problems and its tick after any edit.
         const redo = () => {
           r.ok = rowOk(r); if (!r.ok) r.keep = false;
@@ -28680,6 +29212,12 @@ a.of-nav:active { background: var(--press); }
   // Opens "Start over with an empty menu": three plain steps (what goes and what stays, save a backup, type the word). This cannot
   // be undone, so the screen says so first and offers a backup before anything is erased.
   function openStartOver() {
+    // With a PIN set, the keypad comes first; the sheet opens only for the right PIN.
+    if (SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.shell.requirePin) { SB.shell.requirePin().then((ok) => { if (ok) buildStartOver(); }); return null; }
+    return buildStartOver();
+  }
+  // Builds the Start over sheet (after the PIN, when one is set).
+  function buildStartOver() {
     const sheet = SB.ui.sheet({ title: 'Start over with an empty menu', side: 'right', width: 'min(640px, 96vw)', name: 'startover' });
     const root = h('div', { class: 'dp so' });
     const keep = h('input', { type: 'checkbox', checked: true, id: 'so-keep' });
@@ -28694,10 +29232,30 @@ a.of-nav:active { background: var(--press); }
     const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: about your backup');
     step1.appendChild(next1);
 
-    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' } }, 'Next: confirm');
+    const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' }, disabled: true }, 'Next: confirm');
+    let backupInfo = null; // what the backup file was called and how big, once it was handed to the browser
+    const bkSt = h('p', { class: 'fs-sub dp-msg', role: 'status', dataset: { role: 'so-backup-msg' } });
+    // Saves the backup file now, before anything is erased, and asks the person to confirm they can find it.
+    const saveNow = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'so-save-backup' }, onClick: () => {
+      let text = null; try { text = SB.store.exportAll(); } catch (e) { text = null; }
+      if (!text) { tell(bkSt, 'The backup could not be made, so nothing can be erased. Nothing was changed.', 'bad'); return; }
+      // Pads a number to two digits so the backup file name sorts by time.
+      const d = new Date(), pad2 = (n) => String(n).padStart(2, '0');
+      const filename = 'smokebox-backup-before-start-over-' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '-' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.json';
+      try { const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' })); const a = doc.createElement('a'); a.href = url; a.download = filename; a.style.display = 'none'; doc.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 4000); }
+      catch (e) { tell(bkSt, 'This browser would not save the file. Nothing was erased. Try again, or back up from Back office, Data first.', 'bad'); return; }
+      backupInfo = { filename, chars: text.length };
+      tell(bkSt, 'Asked your browser to save ' + filename + ' (' + Math.max(1, Math.round(text.length / 1024)) + ' KB). Look in your downloads folder to be sure it is there.', 'ok');
+      sawIt.disabled = false; saveNow.textContent = 'Save it again';
+    } }, 'Save my backup file now');
+    const sawIt = h('input', { type: 'checkbox', id: 'so-saw', disabled: true, dataset: { act: 'so-saw' } });
+    // The next step opens only after the person says the file is saved and they can find it.
+    sawIt.addEventListener('change', () => { next2.disabled = !(sawIt.checked && backupInfo); });
     const step2 = h('section', { class: 'fs-section so-step', hidden: true },
       h('h3', { class: 'fs-h' }, '2. Your backup'),
-      h('p', { class: 'fs-sub' }, 'The moment you confirm, Smokebox saves a backup file with everything in your kitchen as it is now, then erases. The file goes to your downloads: keep a copy off this device. If the backup cannot be made, nothing is erased.'),
+      h('p', { class: 'fs-sub' }, 'First save a backup file with everything in your kitchen as it is now. It goes to your downloads: keep a copy off this device. Nothing is erased until you say you saved it.'),
+      saveNow, bkSt,
+      h('label', { class: 'dp-check-row', for: 'so-saw' }, sawIt, h('span', null, 'I saved the backup file and I can find it')),
       h('p', { class: 'fs-sub' }, 'To bring everything back later: Back office, Data, Restore.'), next2);
 
     const word = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': 'Type ' + START_OVER_WORD + ' to confirm', placeholder: START_OVER_WORD });
@@ -28719,13 +29277,14 @@ a.of-nav:active { background: var(--press); }
     go.addEventListener('click', () => {
       const keepIt = keep.checked;
       // The store makes its own backup first, clears the kitchen, my saved setup bits and (when asked) the settings and station names.
-      const res = SB.store.startOver({ confirm: word.value, keepSettings: keepIt });
+      const res = SB.store.startOver({ confirm: word.value, keepSettings: keepIt, backupSaved: backupInfo });
       if (!res.ok) {
         let w = res.report;
         try { w = SB.engine.describe(res.report, res.info, SB.store.getState().settings) || w; } catch (e) { /* keep the code */ }
-        if (res.report === 'confirmWord') w = 'Type ' + START_OVER_WORD + ' exactly, then try again. Nothing was erased.';
+        if (res.report === 'backupRequired') w = 'Save the backup file first (step 2). Nothing was erased.';
+        else if (res.report === 'confirmWord') w = 'Type ' + START_OVER_WORD + ' exactly, then try again. Nothing was erased.';
         else if (res.report === 'notInDemo') w = 'You are in the demo, so there is nothing of yours to erase here. Tap Back to my kitchen first.';
-        tell(goSt, w + (res.report === 'confirmWord' || res.report === 'notInDemo' ? '' : ' Nothing was erased.'), 'bad');
+        tell(goSt, w + (res.report === 'confirmWord' || res.report === 'notInDemo' || res.report === 'backupRequired' ? '' : ' Nothing was erased.'), 'bad');
         return;
       }
       const needsReload = !keepIt;
@@ -28881,9 +29440,11 @@ a.of-nav:active { background: var(--press); }
 
   // Makes a new recovery code and shows it once on a "write this down" screen with Copy and Print. The Done button stays off until the
   // owner selects "I saved it". Needs a PIN; says plainly why when it cannot make one. Used after a PIN is set, and from the PIN section.
-  async function showRecoveryCode() {
+  async function showRecoveryCode(opts) {
     const st = SB.store;
     if (!st || typeof st.createRecoveryCode !== 'function') return false;
+    // A new code replaces the old one, so with a PIN set the current PIN must be entered first (unless it was just entered).
+    if (!(opts && opts.verified) && SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.shell.requirePin && !(await SB.shell.requirePin())) { if (SB.ui.toast) SB.ui.toast('The PIN was not entered, so no recovery code was made.', { tone: 'warn' }); return false; }
     const r = await st.createRecoveryCode();
     if (!r.ok) { let w = r.report; try { w = SB.engine.describe(r.report, r.info, st.getState().settings) || w; } catch (e) { /* keep the code */ } if (SB.ui.toast) SB.ui.toast('The recovery code could not be made. ' + w, { tone: 'warn' }); return false; }
     const sheet = SB.ui.sheet({ title: 'Write down your recovery code', side: 'center', width: 'min(560px, 96vw)', name: 'recoverycode' });
@@ -29081,7 +29642,91 @@ a.of-nav:active { background: var(--press); }
   }
   // Plain words for each hub error code (the same codes as the show-only screen, plus a hub that is not empty).
   function hubErrorWords(code) {
-    return { badCode: 'The access code was not accepted. Check it with whoever runs the main computer.', notFound: 'Nothing at that address is a Smokebox main computer. Check the address.', unreachable: 'Could not reach that address. Check the Wi-Fi and the address, then try again.', wrongVersion: 'This page and the main computer are different versions. Reload this page, or ask whoever runs the main computer to update it.', tooMany: 'The main computer already has as many screens as it allows.', unpaired: 'This tablet is not paired with the main computer. Ask the person who runs the main computer for a pairing code.', revoked: 'This tablet has been removed from the kitchen. Ask the owner for a new pairing code to pair it again.', badPairCode: 'That pairing code did not work. A code works once and only for 10 minutes. Ask for a new one.', tooManyTries: 'Too many tries. Wait a few minutes, then ask for a new code.', badName: 'That screen name cannot be used. Use letters, numbers and spaces, up to 20 characters.', notEmpty: 'The main computer already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Nothing was changed.' }[code] || 'Could not use the main computer.';
+    return { badCode: 'The access code was not accepted. Check it with whoever runs the main computer.', notFound: 'Nothing at that address is a Smokebox main computer. Check the address.', unreachable: 'Could not reach that address. Check the Wi-Fi and the address, then try again.', wrongVersion: 'This page and the main computer are different versions. Reload this page, or ask whoever runs the main computer to update it.', tooMany: 'The main computer already has as many screens as it allows.', notOwner: 'Only an owner screen can do that.', unpaired: 'This tablet is not paired with the main computer. Ask the person who runs the main computer for a pairing code.', revoked: 'This tablet has been removed from the kitchen. Ask the owner for a new pairing code to pair it again.', badPairCode: 'That pairing code did not work. A code works once and only for 10 minutes. Ask for a new one.', tooManyTries: 'Too many tries. Wait a few minutes, then ask for a new code.', badName: 'That screen name cannot be used. Use letters, numbers and spaces, up to 20 characters.', notEmpty: 'The main computer already has a kitchen, so this tablet\'s kitchen cannot be sent to it. Nothing was changed.' }[code] || 'Could not use the main computer.';
+  }
+  // Words for how long ago a screen was last seen ("just now", "5 minutes ago", "yesterday"); an unknown time says so.
+  function seenWords(t, now) {
+    if (!t) return 'not seen yet';
+    const s = Math.max(0, Math.round((now - t) / 1000));
+    if (s < 60) return 'just now';
+    const m = Math.round(s / 60); if (m < 60) return m + (m === 1 ? ' minute ago' : ' minutes ago');
+    const hr = Math.round(m / 60); if (hr < 24) return hr + (hr === 1 ? ' hour ago' : ' hours ago');
+    const d = Math.round(hr / 24); return d === 1 ? 'yesterday' : d + ' days ago';
+  }
+  // Builds "Screens in this kitchen": for an owner tablet, the list of paired screens with Remove and Add a screen; for any other paired tablet, a read-only line.
+  function buildScreensCard(urlNow) {
+    const card = h('section', { class: 'fs-card fw-screens', hidden: true, dataset: { part: 'screens' } });
+    const list = h('div', { class: 'sc-list', dataset: { role: 'screen-list' } });
+    const msg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'screen-msg' } });
+    const codeBox = h('div', { class: 'sc-codebox', hidden: true, dataset: { role: 'code-box' } });
+    let timer = null, expiresAt = 0, lastUrl = '';
+    // Stops the countdown when a new code replaces the old one or the sheet closes.
+    const stopTimer = () => { if (timer) { clearInterval(timer); timer = null; } };
+    // Plain words for an owner call that failed.
+    const why = (e) => ({ notOwner: 'Only an owner screen can add or remove screens.', unpaired: 'This tablet is not paired with the main computer. Pair it first.', revoked: 'This tablet was removed from the kitchen.', unreachable: 'Could not reach the main computer. Check the Wi-Fi and try again.', tooManyTries: 'Too many tries. Wait a few minutes.', wrongVersion: 'This page and the main computer are different versions. Reload this page.' }[e] || 'That did not work. Try again.');
+    // Shows the new code big, with a one-use note, a 10-minute countdown, Copy and what to do on the other tablet.
+    function showCode(code, minutes) {
+      stopTimer(); U.clear(codeBox); codeBox.hidden = false; expiresAt = Date.now() + (minutes || 10) * 60000;
+      const big = h('div', { class: 'rc-code sc-code', role: 'textbox', 'aria-label': 'Pairing code for the other tablet', dataset: { role: 'new-code' } }, String(code).replace(/(.{3})(.{3})/, '$1 $2'));
+      const left = h('p', { class: 'fs-sub', role: 'timer', dataset: { role: 'countdown' } });
+      const copy = h('button', { type: 'button', class: 'btn', dataset: { act: 'code-copy' }, onClick: () => { Promise.resolve(SB.ui.copyText ? SB.ui.copyText(String(code)) : false).then((ok) => tell(msg, ok ? 'Copied.' : 'Copy did not work. Type the code by hand.', ok ? 'ok' : 'bad')); } }, ico('copy', 20), h('span', null, 'Copy'));
+      // Shows the minutes and seconds left; at zero the code is no good any more.
+      const tick = () => { const ms = expiresAt - Date.now(); if (ms <= 0) { tell(left, 'This code has expired. Make a new one.', 'bad'); big.setAttribute('data-expired', 'true'); stopTimer(); return; } const s = Math.ceil(ms / 1000); left.textContent = 'Works once. Good for ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' more.'; };
+      codeBox.append(h('p', null, h('strong', null, 'Type this code on the other tablet: '), 'Settings > Use one kitchen on several tablets.'), big, left, h('div', { class: 'fs-row' }, copy));
+      tick(); timer = setInterval(() => { if (!doc.body.contains(card)) stopTimer(); else tick(); }, 1000);
+    }
+    // Asks the main computer for a new one-time code.
+    function addScreen() {
+      tell(msg, 'Making a code...');
+      Promise.resolve(SB.store.hubNewPairingCode({ url: lastUrl })).then((r) => {
+        if (!r || !r.ok) { tell(msg, why(r && r.error), 'bad'); return; }
+        tell(msg, ''); showCode(r.code, r.minutes);
+      }, () => tell(msg, why('unreachable'), 'bad'));
+    }
+    // Draws the list of screens; an owner gets Remove on each row except this tablet and the last owner.
+    function drawList(screens, me, owner) {
+      U.clear(list);
+      const live = (screens || []).filter((s) => !s.revokedAt), now = Date.now();
+      const owners = live.filter((s) => s.owner).length;
+      live.forEach((s) => {
+        const mine = s.id === me, lastOwner = s.owner && owners <= 1;
+        const row = h('div', { class: 'sc-row', dataset: { screen: s.id } });
+        const nameLine = h('div', { class: 'sc-name' }, h('strong', null, s.name || '(no name)'), mine ? h('span', { class: 'sc-tag', dataset: { role: 'this-tablet' } }, 'this tablet') : null, s.owner ? h('span', { class: 'sc-tag' }, 'owner') : null);
+        row.append(nameLine, h('div', { class: 'fs-sub' }, mine ? 'Last seen: now' : 'Last seen ' + seenWords(s.lastSeen, now)));
+        if (owner) {
+          if (mine) row.append(h('p', { class: 'fs-sub' }, 'You cannot remove the tablet you are using.'));
+          else if (lastOwner) row.append(h('p', { class: 'fs-sub' }, 'The last owner screen cannot be removed.'));
+          else {
+            const ask = h('div', { class: 'sc-confirm', hidden: true, role: 'alert' });
+            const rm = h('button', { type: 'button', class: 'btn', dataset: { act: 'screen-remove' }, onClick: () => { ask.hidden = false; rm.hidden = true; } }, 'Remove');
+            // Keep it: closes the question and shows Remove again, changing nothing.
+            const keepBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'screen-remove-no' }, onClick: () => { ask.hidden = true; rm.hidden = false; } }, 'Keep it');
+            // Asks again in plain words before cutting a screen off.
+            ask.append(h('p', null, 'Remove ' + (s.name || 'this screen') + '? It is cut off at once and must be paired again with a new code to come back.'),
+              h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'screen-remove-yes' }, onClick: () => {
+                tell(msg, 'Removing...');
+                Promise.resolve(SB.store.hubRemoveScreen({ url: lastUrl, id: s.id })).then((r) => { if (!r || !r.ok) { tell(msg, why(r && r.error), 'bad'); return; } tell(msg, (s.name || 'The screen') + ' was removed.', 'ok'); refresh(); }, () => tell(msg, why('unreachable'), 'bad'));
+              } }, 'Yes, remove it'), keepBtn));
+            row.append(rm, ask);
+          }
+        }
+        list.appendChild(row);
+      });
+      if (!live.length) list.appendChild(h('p', { class: 'fs-sub' }, 'No screens are paired yet.'));
+    }
+    // Looks up who this tablet is on the main computer it uses, then draws the right version of the card.
+    function refresh() {
+      const url = urlNow(); lastUrl = url || '';
+      const who = url && SB.store.pairedFor ? SB.store.pairedFor(url) : { paired: false };
+      card.hidden = !(url && who && who.paired);
+      if (card.hidden) { stopTimer(); return; }
+      U.clear(card); card.append(h('h3', { class: 'fs-h' }, 'Screens in this kitchen'));
+      if (!who.owner) { card.append(h('p', { class: 'fs-sub', dataset: { role: 'read-only' } }, 'This tablet is "' + (who.name || 'a screen') + '". Ask the owner to add or remove screens.')); return; }
+      card.append(list, h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'screen-add' }, onClick: addScreen }, ico('plus', 20), h('span', null, 'Add a screen'))), codeBox, msg);
+      Promise.resolve(SB.store.hubScreens({ url })).then((r) => { if (!r || !r.ok) { tell(msg, why(r && r.error), 'bad'); return; } drawList(r.screens, who.id, true); }, () => tell(msg, why('unreachable'), 'bad'));
+    }
+    card.refresh = refresh;
+    return card;
   }
   // Opens "Use one kitchen on several tablets": what it is, what is not set up, and the form for the other screen.
   function openFollow() {
@@ -29136,7 +29781,7 @@ a.of-nav:active { background: var(--press); }
     const hMsg = h('p', { class: 'fs-sub', role: 'status', dataset: { role: 'hub-msg' } });
     const choiceBox = h('div', { class: 'fw-choice', dataset: { role: 'choice' }, hidden: true });
     const hStatus = h('p', { class: 'fs-sub fw-hubstatus', role: 'status', dataset: { role: 'hub-status' } });
-    let probed = null, picked = '', lastFields = null;
+    let probed = null, picked = '', lastFields = null, lastOn = null, screensCard = null;
     // Reads and checks the three fields; returns {url, code, name} or null after saying what is wrong.
     function hubFields() {
       const a = checkHubAddress(hUrl.value); if (!a.ok) { tell(hMsg, a.why, 'bad'); hUrl.focus(); return null; }
@@ -29163,7 +29808,7 @@ a.of-nav:active { background: var(--press); }
       tell(hMsg, 'Pairing...');
       Promise.resolve(SB.store.pairHub({ url: a.url, code, name: n.slice(0, 20) })).then((r) => {
         if (!r || !r.ok) { tell(hMsg, hubErrorWords(r && r.error), 'bad'); return; }
-        hPair.value = ''; tell(hMsg, 'Paired as ' + (r.name || n) + '.', 'ok'); lookAtHub();
+        hPair.value = ''; tell(hMsg, 'Paired as ' + String(r.name || n).slice(0, 24) /* a name from the hub is shown short */ + '.', 'ok'); lookAtHub();
       }, () => tell(hMsg, hubErrorWords('unreachable'), 'bad'));
     }
     // Draws the explicit choice after the hub was looked at: use the hub's kitchen, or send this tablet's kitchen (only into an empty hub).
@@ -29236,6 +29881,8 @@ a.of-nav:active { background: var(--press); }
     // Shows either the join form or the joined state, depending on whether this tablet is using a hub.
     function paintHub() {
       const on = inHub(); hubForm.hidden = on; hubJoined.hidden = !on;
+      // The Screens card is drawn again only when this tablet joins or leaves, not on every status tick.
+      if (on !== lastOn) { lastOn = on; if (screensCard) screensCard.refresh(); }
       if (on) { const hs = SB.store.hubStatus ? SB.store.hubStatus() : { state: 'connecting' }; const w = hubWords(hs); tell(hStatus, w.text, w.tone); forget.hidden = !(hs && (hs.error === 'revoked' || hs.error === 'unpaired')); }
     }
     // Builds one big choice button for the two ways of using another screen.
@@ -29244,7 +29891,10 @@ a.of-nav:active { background: var(--press); }
     // Picks which of the two ways is on screen.
     function setMode(m) { const orders = m === 'orders'; otherCard.hidden = orders; hubCard.hidden = !orders; bShow.setAttribute('aria-pressed', String(!orders)); bHub.setAttribute('aria-pressed', String(orders)); }
     const modes = h('div', { class: 'fw-modes', role: 'group', 'aria-label': 'How to use another screen' }, bShow, bHub);
-    root.append(mainCard, modes, otherCard, hubCard, h('section', { class: 'fs-card', dataset: { part: 'status' } }, h('h3', { class: 'fs-h' }, 'Status'), status));
+    // The main computer this tablet is using now: the joined one, or the one it is showing as a follower.
+    const usedUrl = () => { try { const hs = inHub() && SB.store.hubStatus ? SB.store.hubStatus() : null; if (hs && hs.url) return hs.url; const fs = isFollowing() && SB.store.followStatus ? SB.store.followStatus() : null; return fs && fs.url ? fs.url : ''; } catch (e) { return ''; } };
+    screensCard = buildScreensCard(usedUrl);
+    root.append(mainCard, modes, otherCard, hubCard, screensCard, h('section', { class: 'fs-card', dataset: { part: 'status' } }, h('h3', { class: 'fs-h' }, 'Status'), status));
     setMode(inHub() ? 'orders' : 'show'); paintStatus(); paintHub();
     const timer = setInterval(() => { if (!doc.body.contains(root)) clearInterval(timer); else { paintStatus(); paintHub(); } }, 2000);
     sheet.body.appendChild(root); keepInView(root);
@@ -29329,9 +29979,12 @@ a.of-nav:active { background: var(--press); }
       h('button', { type: 'button', class: 'btn', onClick: async () => {
         const v = pin.value.trim();
         if (!/^\d{4}$/.test(v)) { tell(pinSt, 'Use exactly 4 digits.'); return; }
-        const r = SB.shell && SB.shell.setPin ? await SB.shell.setPin(v) : { ok: false };
+        // With a PIN already set, the current PIN must be entered first, so a cook cannot take over the back office.
+        const hadPin = !!(SB.shell && SB.shell.hasPin && SB.shell.hasPin());
+        if (hadPin && !(await SB.shell.requirePin())) { tell(pinSt, 'The PIN was not changed. The current PIN is needed to change it.', 'bad'); return; }
+        const r = SB.shell && SB.shell.setPin ? await SB.shell.setPin(v, { verified: true }) : { ok: false };
         tell(pinSt, r.ok ? 'PIN set. The back office will ask for it.' : 'The PIN could not be saved.');
-        if (r.ok) { pin.value = ''; await showRecoveryCode(); }
+        if (r.ok) { pin.value = ''; await showRecoveryCode({ verified: true }); }
       } }, 'Set PIN'),
       // For a PIN set before recovery codes existed: makes the code now.
       SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.store.hasRecoveryCode && !SB.store.hasRecoveryCode() ? h('button', { type: 'button', class: 'btn', dataset: { act: 'make-recovery' }, onClick: () => showRecoveryCode() }, 'Make a recovery code') : null);
@@ -29984,7 +30637,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Closing does not lock anything. You can still take orders, and closing again later includes them. The app's day turns over at 4 am."
+      "x": "Closing does not lock new orders, and closing again later includes them. A paid order from a day you already closed cannot be opened again. The app's day turns over at 4 am."
      },
      {
       "t": "h",
@@ -30027,7 +30680,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "ol",
       "x": [
-       "Open the thrown-out log from the board's menu.",
+       "Open the thrown-out log from the board's menu. It says which period it covers.",
        "Tap **Fix this entry** on the row.",
        "Say what was wrong, add your initials and tap **Save the fix**."
       ]
@@ -30083,14 +30736,34 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "h",
-      "x": "Start over with an empty menu"
+      "x": "Start over"
      },
+     {
+      "t": "p",
+      "x": "To empty your kitchen and begin again with a blank menu, see Start over with an empty menu."
+     },
+     {
+      "t": "h",
+      "x": "Erasing"
+     },
+     {
+      "t": "p",
+      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first."
+     }
+    ]
+   },
+   {
+    "id": "start-over",
+    "group": "guide",
+    "title": "Start over with an empty menu",
+    "summary": "Empty your kitchen and begin again with a blank menu. A backup file is saved first.",
+    "blocks": [
      {
       "t": "ol",
       "x": [
-       "Tap **Settings**. At the bottom, tap **Start over with an empty menu**.",
+       "Tap **Settings**. At the bottom, tap **Start over with an empty menu**. If a PIN is set, the PIN pad opens first.",
        "Read what goes and what stays. Clear **Keep my tax, hours, PIN and station names** to reset those too. Tap **Next: about your backup**.",
-       "This step only explains: the backup is saved at the moment of erasing, and if it fails, nothing is erased. Tap **Next: confirm**.",
+       "Tap **Save my backup file now**. The file downloads before anything is erased. Look in your downloads folder, select **I saved the backup file and I can find it**, then tap **Next: confirm**.",
        "Type ERASE, then tap **Erase everything and start over**.",
        "At \"Done. Your kitchen is empty.\" tap **Save the backup again** or **Go to the first screen**."
       ]
@@ -30100,12 +30773,8 @@ a.of-nav:active { background: var(--press); }
       "x": "There is no undo. To go back, restore the backup file. Left-over old demo tickets get **Clear them** or **Keep them**."
      },
      {
-      "t": "h",
-      "x": "Erasing"
-     },
-     {
       "t": "p",
-      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either."
+      "x": "With a PIN set, the PIN pad opens first. If the backup cannot be saved, nothing is erased."
      }
     ]
    },
@@ -30224,6 +30893,7 @@ a.of-nav:active { background: var(--press); }
      {
       "t": "ul",
       "x": [
+       "A strip says the tablet's clock jumped ahead? Smokebox keeps the old time, so tickets and timers keep running. Tap **Keep the old time** to hide it for 10 minutes and fix the clock in the device settings. Tap **Use the new time** only if the new time is right. It asks once more before anything changes.",
        "Check the date range and the filters at the top of the Back office page.",
        "Choose **Live only** to leave out the sample history, which is made up.",
        "Unpaid orders are not counted as money collected.",
@@ -30244,7 +30914,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Smokebox saves every change on this device as you go. Open it again the same way, in the same browser, and the board comes back. The clocks kept running while it was closed, and no warning sounded."
+      "x": "Smokebox saves every change as you go. Open it again in the same browser and the board comes back. The clocks kept running, and no warning sounded while it was closed."
      },
      {
       "t": "h",
@@ -30252,7 +30922,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "Your data lives only in the browser on one device. Clearing the browser data, using another browser, another file location or a private window shows an empty Smokebox. Restore your last backup (see Backup and restore)."
+      "x": "Your data lives only in the browser on one device. Clearing the browser data, or using another browser or a private window, shows an empty Smokebox. Restore your last backup (see Backup and restore)."
      },
      {
       "t": "h",
@@ -30260,15 +30930,15 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "When you set a PIN, Smokebox shows a recovery code once. Tap **Copy** or **Print**, keep it away from the tablet, select **I saved it**, then tap **Done**. On the PIN pad, open **Forgot the PIN?**, type the recovery code and a new PIN (or leave it empty to remove the PIN), and tap **Reset the PIN with my code**. A PIN from before codes existed can get one: **Settings**, **Tax, hours and PIN**, **Make a recovery code**."
+      "x": "When you set a PIN, a recovery code shows once. Tap **Copy** or **Print**, keep it away from the tablet, select **I saved it**, then tap **Done**. On the PIN pad, open **Forgot the PIN?**, type the recovery code and a new PIN (or leave it empty to remove the PIN), and tap **Reset the PIN with my code**. A PIN from before codes existed can get one: **Settings**, **Tax, hours and PIN**, **Make a recovery code**."
      },
      {
       "t": "p",
-      "x": "No code? The only way back is to clear this site's saved data in your browser settings. That erases everything on this device, including today's tickets and your menu. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before the PIN was set."
+      "x": "No code? The only way back is to clear this site's saved data in your browser settings. That erases everything on this device. Do it only with a backup you can restore. A backup brings its PIN back, so use one made before it was set."
      },
      {
       "t": "p",
-      "x": "Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not real security."
+      "x": "With a PIN set, changing it or making a new recovery code asks for the current PIN. Five wrong tries lock the pad for 30 seconds. The PIN is a door latch, not security."
      },
      {
       "t": "h",
@@ -30276,7 +30946,7 @@ a.of-nav:active { background: var(--press); }
      },
      {
       "t": "p",
-      "x": "That is by design for a new Smokebox. It starts with no dishes, tickets or food in the cabinet, and it never guesses. Add dishes under **Dishes and prices**. If it was full yesterday, see \"The tablet was replaced or cleared\" above."
+      "x": "That is by design for a new Smokebox. It starts with no dishes and never guesses. Add dishes under **Dishes and prices**. If it was full yesterday, see \"The tablet was replaced or cleared\" above."
      },
      {
       "t": "h",
@@ -30287,8 +30957,24 @@ a.of-nav:active { background: var(--press); }
       "x": [
        "Tickets, dishes, settings and the PIN: in this browser on this device only.",
        "Sound, loudness, Day or Night and text size: on this device only.",
-       "Other devices do not see your board. A backup file is the only copy you can move."
+       "Only a backup file can be moved."
       ]
+     }
+    ]
+   },
+   {
+    "id": "saved-data-that-cannot-be-read",
+    "group": "guide",
+    "title": "Saved data that cannot be read",
+    "summary": "What to do when Smokebox says some of its saved data could not be read.",
+    "blocks": [
+     {
+      "t": "h",
+      "x": "A message at the top"
+     },
+     {
+      "t": "p",
+      "x": "If a message says some saved records could not be read and were left out, the data as it was is kept. Do not clear the browser data. Ask whoever set up Smokebox. If a full-screen message says the saved data could not be read, tap **Download the old data** or **Show the data so I can copy it**. Only then can you continue."
      }
     ]
    },
@@ -31294,6 +31980,11 @@ a.of-nav:active { background: var(--press); }
       if (SB.store && SB.store.isHub && SB.store.isHub()) return 'hub';
     } catch (e) { /* treat an unreadable store as a single device */ }
     return 'solo';
+  };
+  // The plain words for a screen that keeps only the last N days of a shared kitchen, or '' when it keeps everything.
+  O.trimWords = function () {
+    let t = null; try { t = SB.store && SB.store.trimInfo ? SB.store.trimInfo() : null; } catch (e) { t = null; }
+    return t && isNum(t.days) && t.days > 0 ? 'Showing the last ' + t.days + ' days; the full history is on the hub computer.' : '';
   };
   // The name of the screen an event or ticket came from, trimmed and short, or '' when none was recorded.
   O.screenName = function (x) {
@@ -32321,6 +33012,9 @@ a.of-nav:active { background: var(--press); }
       M.bannerCache = { ds: key, from: F.range.from, to: F.range.to, channel: F.channel, n: key ? key.tickets.length : 0, info };
     }
     const b = bannerText(info);
+    // A screen that keeps only the last N days of a shared kitchen says so: ranges older than that are partial here.
+    const trimW = O.trimWords();
+    if (trimW) b.text += ' ' + trimW;
     const t = M.banner.querySelector('.of-banner-t');
     if (t.textContent !== b.text) t.textContent = b.text;
     M.banner.dataset.kind = b.kind;
@@ -35583,7 +36277,7 @@ a.of-nav:active { background: var(--press); }
           pin = n1.input.value;
         }
         let res;
-        try { res = await SB.shell.setPin(pin); } catch (e) { res = { ok: false, report: 'error' }; }
+        try { res = await SB.shell.setPin(pin, { verified: true }); } catch (e) { res = { ok: false, report: 'error' }; }
         if (res && res.ok) {
           closeForm();
           SB.ui.toast(pin ? (m === 'set' ? 'PIN set. The back office will ask for it next time.' : 'PIN changed. The back office will ask for the new one next time.') : 'PIN removed. The back office opens without asking.', { tone: 'ok' });
@@ -36131,6 +36825,8 @@ a.of-nav:active { background: var(--press); }
           'There is no undo. If you might want what is here now, cancel and download a backup first.'],
       });
       if (!ok) return;
+      // With a PIN set, restoring a backup asks for it again, even inside the back office grace period.
+      if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was restored.', { tone: 'warn' }); return; }
       const rep = SB.store.importAll(p.text);
       if (rep === 'ok') {
         clearImport(); pasteArea.value = ''; fileIn.value = '';
@@ -36193,7 +36889,9 @@ a.of-nav:active { background: var(--press); }
           k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
           'There is no undo. Back up first if you might want this data.'],
         // Clears the live data after the word was typed.
-        run: () => {
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
           const rep = SB.store.resetLive({ keepSettings: k, starter: false });
           if (rep === 'ok') { resetStatus.ok('Live data erased. The board is empty' + (k ? '; your settings were kept.' : '; settings are back to the starter values.')); SB.ui.toast('Live data erased.', { tone: 'ok' }); }
           else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
@@ -36208,7 +36906,9 @@ a.of-nav:active { background: var(--press); }
         lines: ['This erases everything Smokebox stored on this device: ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ', your dishes and ingredient edits, every setting and the PIN. The board starts empty.',
           'Your display choices (themes and text size) are kept.', 'There is no undo. Back up first if you might want any of it back.'],
         // Erases everything after the word was typed.
-        run: () => {
+        run: async () => {
+          // With a PIN set, erasing asks for it again, even inside the back office grace period.
+          if (SB.shell.requirePin && !(await SB.shell.requirePin())) { resetStatus.bad('The PIN was not entered. Nothing was erased.'); return; }
           const rep = SB.store.reset();
           if (rep === 'ok') { resetStatus.ok('Everything was reset to the starter values.'); SB.ui.toast('Everything was reset.', { tone: 'ok' }); }
           else resetStatus.bad(SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings));
@@ -36319,7 +37019,7 @@ a.of-nav:active { background: var(--press); }
     // A follower or hub-connected tablet: say so at the top, and shut the controls that would change or erase the shared kitchen.
     const conn = SB.office && SB.office.connection ? SB.office.connection() : 'solo';
     if (conn !== 'solo') {
-      headBox.appendChild(h('p', { class: 'od-p od-conn', role: 'note', 'data-conn': conn }, conn === 'follower' ? SB.office.FOLLOWER_WORDS : SB.office.HUB_WORDS));
+      headBox.appendChild(h('p', { class: 'od-p od-conn', role: 'note', 'data-conn': conn }, (conn === 'follower' ? SB.office.FOLLOWER_WORDS : SB.office.HUB_WORDS) + (SB.office.trimWords() ? ' This screen holds only part of the history, so a backup, a spreadsheet file or a report made here is partial. ' + SB.office.trimWords() : '')));
       lockShared(content, conn, [resetBtnsRef.live, resetBtnsRef.all], P);
     }
     root.append(headBox, h('div', { class: 'od-layout' }, toc, content));
@@ -37384,10 +38084,7 @@ a.of-nav:active { background: var(--press); }
 
 
   // Quotes one value for a CSV cell: wraps it in quotes when it holds a comma, quote or line break.
-  function csvCell(v) {
-    const t = v == null ? '' : String(v);
-    return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
-  }
+  function csvCell(v) { return SB.csv.cell(v); }
   // Whole cents as plain digits with two decimals (1240 gives "12.40"), with no dollar sign or thousands commas, so a spreadsheet adds them up.
   const plainMoney = (v) => (isNum(v) ? (Math.round(v) / 100).toFixed(2) : '0.00');
 
@@ -37446,7 +38143,7 @@ a.of-nav:active { background: var(--press); }
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const KIND = {
     temp_logged: 'Temperature reading', batch_reheat: 'Reheated', batch_discard: 'Thrown out', cooling_started: 'Cooling started',
-    equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
+    settings_changed: 'Changed a safety limit', equip_temp: 'Equipment temperature', thermometer_checked: 'Thermometer check', batch_out: 'Taken out of the fridge', batch_back: 'Put back in the fridge', sanitize_done: 'Sanitized surfaces', quality_extend: 'Kept serving past its quality limit', quality_extend_corrected: 'Quality-limit note corrected',
   };
   const REASON = { expired: 'Expired', quality: 'Quality', temp: 'Temperature', cooling: 'Cooling', manual: 'Other', other: 'Other', fridgeDate: 'Past your fridge limit', outTime: 'Past your out-of-fridge limit', datemark: 'Past the date mark' };
   const UNIT = { cooler: 'Cooler', freezer: 'Freezer', display: 'Display case', other: 'Equipment' };
@@ -37472,12 +38169,35 @@ a.of-nav:active { background: var(--press); }
     return b && b.label ? b.label + (name && b.label.indexOf(name) < 0 ? ' (' + name + ')' : '') : name;
   }
 
+  // The plain names of the food-safety settings an owner can change, by the last part of the setting's name.
+  const SETTING_NAME = {
+    hotHoldF: 'the hot-hold limit', coldHoldF: 'the cold limit', reheatF: 'the reheat temperature', tempCheckEveryMin: 'how often temperatures are checked',
+    belowHotGraceH: 'the time allowed below the hot limit', aboveColdGraceH: 'the time allowed above the cold limit', sanitizeEveryH: 'how often surfaces are sanitized',
+    hardCapH: 'the longest hold time', defaultMaxHoldH: 'the default hold time', stage1ToF: 'the first cooling target', stage1H: 'the first cooling time',
+    totalH: 'the total cooling time', finalF: 'the final cooling target',
+  };
+  // A setting's value in plain words, by what its name ends with: degrees, hours or minutes; anything else as it is.
+  function settingValue(key, v) {
+    if (!isNum(v)) return v == null ? 'nothing' : String(v);
+    if (/F$/.test(key)) return U.tempText(v);
+    if (/Min$/.test(key)) return v + ' min';
+    if (/H$/.test(key)) return v + (v === 1 ? ' hour' : ' hours');
+    return String(v);
+  }
+  // The one plain line for a changed setting: "Changed the cold limit from 41 °F to 45 °F". Reads key, from and to (also old/new).
+  function changeLine(e) {
+    const key = String(e.key || e.setting || ''), last = key.split('.').pop();
+    const from = e.from !== undefined ? e.from : e.old, to = e.to !== undefined ? e.to : e.new;
+    return 'Changed ' + (SETTING_NAME[last] || (key || 'a setting')) + ' from ' + settingValue(last, from) + ' to ' + settingValue(last, to);
+  }
+
   // The detail words for one entry: what was read, weighed or thrown out.
   function detailOf(e) {
     switch (e.type) {
       case 'temp_logged': return (isNum(e.f) ? U.tempText(e.f) : '') + (lateWords(e) ? ', ' + lateWords(e) : '');
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
       case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
+      case 'settings_changed': return changeLine(e);
       case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '');
       case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '');
       case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
@@ -37560,7 +38280,10 @@ a.of-nav:active { background: var(--press); }
     return { from: at(first), to: at(next), label: r.days === 1 ? U.fmtDateShort(today) : U.fmtDateShort(first) + ' to ' + U.fmtDateShort(today) };
   }
 
-  O.inspectorPure = { inspectorRows, factsOf, rangeFor, RANGES };
+  // One row for one safety entry (the same shape inspectorRows gives), for tests and for entries read without the engine's log.
+  function rowFor(e, state) { return { id: e.id, at: e.t, kind: KIND[e.type] || 'Safety entry', food: foodOf(state, e), detail: detailOf(e), facts: factsOf(state, e), screen: screenOf(e), who: e.who || '', corrections: [] }; }
+
+  O.inspectorPure = { inspectorRows, rowFor, factsOf, rangeFor, RANGES };
   if (!g.document) return; // Node: the pure rows are all the tests need
 
   // ---- 2. The sheet and printing ----
@@ -37581,7 +38304,12 @@ a.of-nav:active { background: var(--press); }
   }
 
   // The honest line about what this record does not hold, so nobody reads it as the whole paperwork.
+  // What this record leaves out and how long it keeps things; the keep time is the engine's own number (37-retention.js).
+  const keepWords = () => (SB.retention ? ' ' + SB.retention.words() : '');
   const NOT_COVERED = 'Cooler, freezer, thermometer-check and sanitizer strip entries appear here only if someone logged them in Smokebox; keep anything else on your own sheet and ask your health department what to keep and for how long.';
+
+  // The words for a screen that holds only the last days of a shared kitchen, or '' on a screen that holds everything.
+  const trimNote = () => (SB.office && SB.office.trimWords ? SB.office.trimWords() : '');
 
   // Opens the sheet: pick a date range, see the record, print it.
   function openInspectorLog() {
@@ -37604,7 +38332,8 @@ a.of-nav:active { background: var(--press); }
     const doPrint = () => printRecord(rangeId);
     sheet.body.append(
       h('p', { class: 'si-lead' }, 'This is your own record of readings, reheats, cooling, sanitize rounds and thrown-out food. It is not an inspection result. Entries are never edited; if something was wrong, a correction is added under it.'),
-      h('p', { class: 'si-lead si-notcovered' }, NOT_COVERED),
+      h('p', { class: 'si-lead si-notcovered' }, NOT_COVERED + keepWords()),
+      trimNote() ? h('p', { class: 'si-lead si-trim', role: 'note' }, trimNote()) : null,
       h('div', { class: 'si-actions' }, h('label', null, 'Range ', sel), h('button', { type: 'button', class: 'btn btn-primary', onClick: doPrint }, 'Print')), preview);
     paint();
     return sheet;
@@ -37622,7 +38351,8 @@ a.of-nav:active { background: var(--press); }
       h('p', { class: 'si-note' }, 'The owner\'s own record of what was logged in this kitchen. It is not an inspection result. Entries are never edited; corrections are added under the entry they correct.'),
       demo ? h('p', { class: 'si-note' }, 'This is a demo kitchen, so these entries are demo entries.') : null,
       recordTable(rows),
-      h('p', { class: 'si-note' }, NOT_COVERED),
+      h('p', { class: 'si-note' }, NOT_COVERED + keepWords()),
+      trimNote() ? h('p', { class: 'si-note' }, trimNote()) : null,
       h('p', { class: 'si-note' }, 'Printed ' + U.fmtDateShort(U.dateKey(Date.now())) + ' ' + U.fmtTime(Date.now()) + '. Reviewed by: ______________   Date: ________'));
     document.body.appendChild(root);
     // Removes the print-only block once the print dialog is done (or at once when printing is unavailable).
@@ -37715,13 +38445,75 @@ a.of-nav:active { background: var(--press); }
     try { reload.focus(); } catch (e) { /* ignore */ }
   }
 
+  // Blocks the screen with a plain message when saved data could not be read AND could not be copied aside (the browser store is full). The
+  // damaged text is offered as a file; nothing is written over it until the person says they have saved it.
+  function showHeldData(text) {
+    const wrap = doc.createElement('div');
+    wrap.id = 'held-data'; wrap.setAttribute('role', 'alertdialog'); wrap.setAttribute('aria-labelledby', 'held-data-h');
+    // Follows the tablet's look: Night colors and Large text apply here too, so the screen reads the same as the board behind it.
+    let night = false, large = false;
+    try { night = !!(SB.theme && SB.theme.get && SB.theme.get() === 'night'); large = !!(SB.theme && SB.theme.textSize && SB.theme.textSize() === 'large'); } catch (e) { /* default look */ }
+    wrap.style.cssText = 'position:fixed;inset:0;overflow:auto;padding:16px;font-family:system-ui,sans-serif;z-index:99999;font-size:' + (large ? '120%' : '100%') + ';background:' + (night ? '#1E2224' : '#F5F2EB') + ';color:' + (night ? '#F5F2EB' : '#1E2224');
+    const card = doc.createElement('div'); card.className = 'error-card';
+    if (night) card.style.cssText = 'background:#2B3033;color:#F5F2EB;border-color:#6B7478';
+    const h2 = doc.createElement('h2'); h2.id = 'held-data-h'; h2.textContent = 'Your saved data could not be read, and could not be kept safe';
+    const p = doc.createElement('p'); p.textContent = 'This browser is too full to set the old data aside, so Smokebox has not touched it. Nothing new will be saved on this device until you choose below. Download the old data now and keep the file. Then free some space, or continue and let Smokebox replace the old data.';
+    const row = doc.createElement('div'); row.className = 'row'; row.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-top:12px';
+    const bstyle = 'min-height:48px;flex:1 1 220px';
+    const dl = doc.createElement('button'); dl.type = 'button'; dl.className = 'btn btn-primary'; dl.style.cssText = bstyle; dl.textContent = 'Download the old data';
+    const show = doc.createElement('button'); show.type = 'button'; show.className = 'btn'; show.style.cssText = bstyle; show.textContent = 'Show the data so I can copy it';
+    const go = doc.createElement('button'); go.type = 'button'; go.className = 'btn'; go.style.cssText = bstyle; go.textContent = 'I have the file: continue and replace it';
+    const hint = doc.createElement('p'); hint.setAttribute('role', 'status'); hint.style.cssText = 'margin-top:8px;font-size:90%'; hint.textContent = 'The last button turns on after you download the data or show it to copy.';
+    const box = doc.createElement('textarea'); box.readOnly = true; box.hidden = true; box.value = text; box.rows = 8; box.style.cssText = 'width:100%;margin-top:12px';
+    box.setAttribute('aria-label', 'The old data, to copy by hand');
+    // The way forward is only offered once the person has the old data in hand (downloaded or shown), so it cannot be replaced by a stray tap.
+    go.disabled = true; go.setAttribute('aria-disabled', 'true');
+    const unlock = () => { go.disabled = false; go.setAttribute('aria-disabled', 'false'); hint.textContent = 'Keep the file somewhere safe, then continue.'; };
+    dl.addEventListener('click', () => {
+      try {
+        const url = g.URL.createObjectURL(new g.Blob([text], { type: 'application/json' }));
+        const a = doc.createElement('a'); a.href = url; a.download = 'smokebox-damaged-data.json'; doc.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => { try { g.URL.revokeObjectURL(url); } catch (e) { /* ignore */ } }, 5000);
+        unlock();
+      } catch (e) { box.hidden = false; box.focus(); hint.textContent = 'The download did not work here. Copy the data from the box below, then continue.'; unlock(); }
+    });
+    show.addEventListener('click', () => { box.hidden = false; box.focus(); box.select(); unlock(); });
+    go.addEventListener('click', () => { if (go.disabled) return; try { SB.store.releaseHold(); } catch (e) { /* ignore */ } wrap.remove(); });
+    row.append(dl, show, go);
+    card.append(h2, p, row, hint, box);
+    wrap.appendChild(card);
+    doc.body.appendChild(wrap);
+    try { dl.focus(); } catch (e) { /* ignore */ }
+  }
+
+  // Watches for a device clock that jumped far ahead (or saved times far ahead of it) and asks the owner, once per episode, whether the new time is right.
+  function watchClock() {
+    let toldWrong = false;
+    setInterval(() => {
+      try {
+        const s = SB.store.status();
+        if (s.clockWrong && !toldWrong && SB.ui && SB.ui.toast) { toldWrong = true; SB.ui.toast("This device's clock looks wrong: some saved times are far ahead of it. Smokebox kept the device clock. Check the date and time in the device's settings.", { tone: 'warn', ms: 20000 }); }
+        // The board's strip notice and the slim banner on back-office pages (60-shell.js) ask about a clock jump; no box covers the screen.
+      } catch (e) { /* the watcher must never break the board */ }
+    }, 5000);
+  }
+
   // Tells the person, once at start-up, when the saved board was unreadable, was repaired, or cannot be saved in this
   // browser (private windows block storage). Silent when everything is fine.
   function storageNotices() {
     const s = SB.store && typeof SB.store.status === 'function' ? SB.store.status() : null;
     if (!s || !SB.ui || typeof SB.ui.toast !== 'function') return;
+    if (s.heldInMemory && SB.store.damagedText && SB.store.damagedText()) { showHeldData(SB.store.damagedText()); return; }
     if (s.corrupt && s.restoredFromCopy) SB.ui.toast('Your saved board could not be read, so Smokebox restored the last good copy from ' + new Date(s.restoredFromCopy).toLocaleString() + '. Orders and history after that time are missing. A copy of the damaged data was kept in this browser.', { tone: 'warn', ms: 20000 });
     else if (s.corrupt) SB.ui.toast('Your saved board could not be read, so Smokebox started with an empty board. A copy of the old data was kept on this device.', { tone: 'warn', ms: 15000 });
+    else if (s.droppedCount) {
+      const d = s.droppedCount, bits = [];
+      if (d.orders) bits.push(d.orders + (d.orders === 1 ? ' order' : ' orders'));
+      if (d.tickets) bits.push(d.tickets + (d.tickets === 1 ? ' ticket' : ' tickets'));
+      if (d.batches) bits.push(d.batches + (d.batches === 1 ? ' batch' : ' batches'));
+      if (d.other) bits.push(d.other + (d.other === 1 ? ' other saved item' : ' other saved items'));
+      SB.ui.toast('Smokebox could not read some saved records and left out ' + bits.join(', ') + ' while opening. The data as it was has been kept on this device. Ask whoever set up Smokebox to look at it before you close the page for good.', { tone: 'warn', ms: 20000 });
+    }
     else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox updated a few saved settings while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
     if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }
@@ -37751,6 +38543,7 @@ a.of-nav:active { background: var(--press); }
       SB.booted = true;
       startOffline();
       storageNotices();
+      watchClock();
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });
     } catch (e) { showBootError(e, stage); }
@@ -37760,6 +38553,10 @@ a.of-nav:active { background: var(--press); }
   // support), so the app can open when the server or the internet is down. A failure here never stops the board.
   function startOffline() {
     try { if (SB.offline && typeof SB.offline.register === 'function') SB.offline.register(); } catch (e) { /* offline loading is optional */ }
+  }
+  // The ?trim=<days> in the address (opt-in smaller copy for a screen that does not need the whole history), or 0.
+  function trimDays() {
+    try { const m = /[?&]trim=(\d{1,3})(?=&|$|#)/.exec(g.location.search || ''); const n = m ? Number(m[1]) : 0; return n >= 1 && n <= 365 ? n : 0; } catch (e) { return 0; }
   }
   // Starts a follower screen: connects to the hub, then shows the board. A hub that is only unreachable still opens the board
   // (it keeps trying); a wrong code, a wrong address or a hub of another version shows a plain message instead.
@@ -37782,7 +38579,7 @@ a.of-nav:active { background: var(--press); }
       wrap.className = 'follow-fail';
       wrap.setAttribute('role', 'alert');
       const h2 = doc.createElement('h2'); h2.textContent = kind === 'hub' ? 'This tablet could not join the kitchen' : 'This screen could not follow the kitchen';
-      const p = doc.createElement('p'); p.textContent = words[res.error] || 'The kitchen could not be reached or answered with an error.';
+      const p = doc.createElement('p'); p.textContent = words[res.error] || res.reason || (res.status && res.status.reason) || 'The kitchen could not be reached or answered with an error.';
       const back = doc.createElement('button'); back.type = 'button'; back.className = 'btn btn-primary btn-lg'; back.textContent = 'Back to my own kitchen';
       back.addEventListener('click', () => { try { if (SB.setup && SB.setup.leaveFollow) SB.setup.leaveFollow(); else g.location.href = g.location.pathname; } catch (e) { g.location.href = g.location.pathname; } });
       wrap.append(h2, p, back);
@@ -37793,7 +38590,7 @@ a.of-nav:active { background: var(--press); }
     if (!SB.store || typeof SB.store[starter] !== 'function') { fail({ error: 'noFollower' }); return; }
     let p;
     // The browser's own fetch must be called on the page, so it is handed over wrapped.
-    try { p = SB.store[starter](Object.assign({ url: f.url, code: f.code, fetch: (u, o) => g.fetch(u, o), AbortController: g.AbortController, TextDecoder: g.TextDecoder }, kind === 'hub' ? { adopt: 'hub' } : {})); } catch (e) { fail({ error: 'unreachable' }); return; }
+    try { p = SB.store[starter](Object.assign({ url: f.url, code: f.code, trim: trimDays(), fetch: (u, o) => g.fetch(u, o), AbortController: g.AbortController, TextDecoder: g.TextDecoder }, kind === 'hub' ? { adopt: 'hub' } : {})); } catch (e) { fail({ error: 'unreachable' }); return; }
     Promise.resolve(p).then((res) => { if (res && res.ok === false && res.error && res.error !== 'unreachable') fail(res); else show(); }, () => show());
   }
 

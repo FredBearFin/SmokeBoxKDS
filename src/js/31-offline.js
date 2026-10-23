@@ -14,7 +14,9 @@
   const O = (SB.offline = {});
   const st = { supported: false, secure: false, state: 'none', cachedVersion: null, pageVersion: null, updateReady: false, reason: '' };
   const subs = new Set();
-  let reg = null, started = false, timer = null;
+  // regJob is the registration in progress or finished (a second caller gets the same answer, not a half-done one); epoch counts resets, so a
+  // registration that a reset overtook stops quietly instead of putting the worker back.
+  let reg = null, started = false, timer = null, regJob = null, epoch = 0;
 
   // A copy of what is known now, for the screens.
   O.status = () => Object.assign({}, st);
@@ -53,8 +55,15 @@
   }
 
   // Registers the worker (once). Resolves { ok, state, reason? }; never throws. Does nothing on file://, with ?nosw, or where workers cannot run.
-  O.register = async function register() {
-    if (started) return { ok: st.state === 'ready' || st.state === 'update', state: st.state, reason: st.reason || undefined };
+  O.register = function register() {
+    if (regJob) return regJob;
+    const job = registerNow().then((r) => { if (regJob === job && !r.ok && r.state !== 'error') regJob = null; return r; });
+    regJob = job;
+    return job;
+  };
+  // Does the registration itself (once); see register.
+  async function registerNow() {
+    const mine = epoch;
     const L = g.location, c = container();
     if (!L || !/^https?:$/.test(L.protocol)) { set({ supported: false, reason: 'file' }); return { ok: false, state: st.state, reason: 'file' }; }
     if (wantsNone()) { await O.reset({ reload: false }); set({ supported: false, state: 'none', reason: 'nosw' }); return { ok: false, state: 'none', reason: 'nosw' }; }
@@ -71,24 +80,29 @@
     });
     try {
       set({ state: 'installing' });
-      reg = await c.register('sw.js', { scope: './', updateViaCache: 'none' });
+      const made = await c.register('sw.js', { scope: './', updateViaCache: 'none' });
+      if (mine !== epoch) return { ok: false, state: st.state, reason: 'reset' };
+      reg = made;
       reg.addEventListener('updatefound', () => {
         const w = reg.installing;
         if (!w) return;
         w.addEventListener('statechange', () => { if (w.state === 'redundant' && !st.cachedVersion) set({ state: 'error', reason: 'install failed' }); });
       });
       await c.ready;
+      if (mine !== epoch) return { ok: false, state: st.state, reason: 'reset' };
       const v = await ask(c.controller || reg.active, { type: 'version' });
+      if (mine !== epoch) return { ok: false, state: st.state, reason: 'reset' };
       if (v && typeof v.version === 'string') set({ cachedVersion: v.version, pageVersion: st.pageVersion || v.version });
       if (!wasControlled && !st.pageVersion && v) set({ pageVersion: v.version });
       set({ state: st.updateReady ? 'update' : 'ready' });
       if (!timer && typeof setInterval === 'function') timer = setInterval(() => { try { reg.update(); } catch (e) { /* try again later */ } }, 30 * 60 * 1000);
       return { ok: true, state: st.state };
     } catch (e) {
+      if (mine !== epoch) return { ok: false, state: st.state, reason: 'reset' };
       set({ state: 'error', reason: String((e && e.message) || e || 'error').slice(0, 120) });
       return { ok: false, state: 'error', reason: st.reason };
     }
-  };
+  }
 
   // Can this tablet open Smokebox with no network? Asks the worker to read the stored page and check it is the whole app.
   O.check = async function check() {
@@ -115,7 +129,7 @@
       if (c && c.getRegistrations) for (const r of await c.getRegistrations()) { if (await r.unregister()) unregistered++; }
       if (g.caches && g.caches.keys) for (const k of await g.caches.keys()) if (k.indexOf('smokebox-') === 0) { if (await g.caches.delete(k)) deleted++; }
     } catch (e) { /* what could be removed was removed */ }
-    reg = null; started = false;
+    reg = null; started = false; regJob = null; epoch++;
     if (timer) { clearInterval(timer); timer = null; }
     set({ state: 'none', cachedVersion: null, pageVersion: null, reason: '' });
     if (!(opts && opts.reload === false) && g.location && typeof g.location.reload === 'function') g.location.reload();

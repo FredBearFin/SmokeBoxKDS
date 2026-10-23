@@ -64,17 +64,17 @@ test('the engine cap on the main log also keeps safety entries', () => {
   } finally { C.limits.maxEvents = old; }
 });
 
-test('entries older than 190 days leave the bucket, newer ones never do', () => {
+test('entries older than 400 days leave the bucket, newer ones never do', () => {
   let { s, now } = busy(40, E.newState({ now: T0, starter: true }));
   const first = count(s, 'temp_logged');
   s = E.prune(s, { maxEvents: 0 });
   assert.equal(E.allEvents(s).length, 0);
   assert.equal(count(s, 'temp_logged'), first);
-  // 200 days later, more activity and another prune: the old entries are gone, the new ones stay
-  const later = busy(10, E.tick(s, now + 200 * DAY).state, now + 200 * DAY);
+  // 410 days later, more activity and another prune: the old entries are gone, the new ones stay
+  const later = busy(10, E.tick(s, now + 410 * DAY).state, now + 410 * DAY);
   const p = E.prune(later.s, { maxEvents: 0 });
   assert.equal(count(p, 'temp_logged'), 10);
-  const mid = busy(10, E.tick(s, now + 150 * DAY).state, now + 150 * DAY);
+  const mid = busy(10, E.tick(s, now + 350 * DAY).state, now + 350 * DAY);
   assert.equal(count(E.prune(mid.s, { maxEvents: 0 }), 'temp_logged'), first + 10);
 });
 

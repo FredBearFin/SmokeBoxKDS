@@ -26,7 +26,8 @@ async function rig() {
     return { id, store, transport };
   };
   const A = mk('A'), B = mk('B');
-  await sleep(50); // let both event streams open
+  // Wait until both event streams have really opened (each gets a snapshot first); a fixed sleep is too short on a loaded machine.
+  await until(() => A.transport.snapshots >= 1 && B.transport.snapshots >= 1, 'both event streams to open');
   return { clock, hub, A, B, stop: async () => { A.store.destroy(); B.store.destroy(); await hub.close(); } };
 }
 // Arrays from the other VM context have another Array prototype, so copy them into this realm before comparing.
@@ -129,10 +130,10 @@ test('Start over drops the erased kitchen\'s queued actions but still sends the 
     assert.equal(r.B.store.dispatch('createTicket', order('Secret 2')), 'ok');
     assert.equal(r.B.store.outbox().length, 2);
     // a refused Start over (wrong word) changes nothing
-    assert.equal(r.B.store.startOver({ confirm: 'nope' }).ok, false);
+    assert.equal(r.B.store.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: 'nope' }).ok, false);
     assert.equal(r.B.store.outbox().length, 2);
     r.clock.t += 1000;
-    const res = r.B.store.startOver({ confirm: r.B.store.START_OVER_WORD });
+    const res = r.B.store.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: r.B.store.START_OVER_WORD });
     assert.equal(res.ok, true, JSON.stringify(res));
     assert.deepEqual(Array.from(r.B.store.outbox(), (x) => x.type), ['resetLive']);
     assert.equal(r.B.store.getState().tickets.length, 0);

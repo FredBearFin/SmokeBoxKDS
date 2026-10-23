@@ -319,3 +319,66 @@ Checked in the real app (headless browser, own blank kitchen and `?demo`) and in
 **Follower run:** `office-follower.e2e` passes on a scratch merge of `kds/connected` into this branch (not committed; deleted afterwards). The connected wording now says "the hub computer" everywhere (on night/a3-c3, 4eb036d).
 **Bugs found this round:** drawer cash survived Start over (fixed); CSV and reconciliation had none; the safety record table lacked a caption and column scopes (fixed); the pilot report text was not a named, announced region (fixed); settings steppers too narrow (fixed).
 **Not checked:** the Best day table view in a browser this round, a real CSV opened in Excel or Sheets, real devices.
+
+## Round 20: office pages at real volume (night/a3-c8, based on integration-main 4c0aa9a)
+
+**Method.** `test/_big-kitchen.mjs` builds an own kitchen with the real engine (8 dishes, 5 stations, 4 channels, two cooked-ahead proteins with batches, readings, pulls, sanitize rounds and discards, 4 percent voids, discounts, tips, three payment methods). `tools/volume-browser.mjs <tickets> <days> [--uncap]` serves it to the built app from an in-memory localStorage (no quota) in Chromium and, for every office page, times the hash change until the headline or first card is on screen plus two animation frames, counts long tasks over 50 ms, and reads the JS heap after a garbage collection. It also times the range change to the whole history, Close the day, the sales CSV, the pilot report and the backup text. `PROFILE=<label>`, `WRAP=1` and `DOM=1` give a CPU profile, per-function metrics time and node counts. Run it from the repo root after `node tools/build.mjs`.
+
+**The engine caps history.** The engine keeps at most 5,000 tickets, 5,000 orders and 40,000 events (`C.limits`), so a real kitchen never holds 15,000 tickets in its state: the 15,000-ticket build is trimmed to 4,979. Two 15,000 cases are therefore reported: "15k cap" (what a real device holds) and "15k" (limits raised in memory to hold 14,776 tickets and 119,380 events, a stress case no real device reaches).
+
+**Numbers (ms to first paint, default range, headless Chromium in a shared and busy sandbox, so treat each as about plus or minus 30 percent).** 3k = 3,070 tickets over 90 days (median of three runs, min to max in brackets). Before = the first measurement of the same kitchen before the fixes below (3k, 15k cap and 15k were measured before for the pages that changed; others did not change).
+
+| Page | 3k | 15k cap | 15k (stress) |
+|---|---|---|---|
+| Speed | 169 (139-177) | 264 | 492 |
+| Tickets | 184 (182-185) | 254 | 286 |
+| Stations | 160 (142-202) | 193 | 208 |
+| Sales and money | 301 (288-554) | 394 | 317 |
+| Safety | 197 (113-214) | 186 | 435 |
+| Stock and 86 | 99 (97-113), before 272 | 130 | 200, before 545 |
+| Menu and settings (Data) | 203 (197-283) | 220 | 309 |
+| Range changed to the whole history (slowest page) | 373 (money; 322-756) | 311 | 537 (stations) |
+| Close the day sheet | 33 | 28 | 26 |
+| Sales CSV (function) | 24 | 34 | 27 |
+| Pilot report, build and text | 39 | 72 | 52 |
+| Pilot report CSV | 34 | 123 | 36 |
+| Backup text (exportAll) | 262 | 394 | 297 |
+| App boot with this kitchen | 1,290 | 1,779 | 4,043 |
+| JS heap after the pages | 31 MB | about 50 MB | 105 MB |
+
+Budget: no page over 300 ms at 3,000 tickets and none over 800 ms at 15,000. Met, with two notes: Sales and money at 3k is on the line (301 median, one run 554 on a busy moment), and a range change to the whole history costs 300 to 370 ms at 3k (that is a redraw of every chart, not a first paint). Long tasks over 50 ms: one or two per page, the longest about 300 ms at 15k stress (the first paint), none in the sheets, the CSV or the report.
+
+**Where the time goes.** The metrics code was already cached per dataset (`M.prepare`) and the day lookups per 15-minute slot, so JavaScript in the metrics is under 100 ms on every page. Most of a first paint is the browser laying out and painting the page (about 700 to 1,200 nodes, 100 to 270 of them SVG), which does not grow with ticket count: the same pages paint in about 125 ms with 100 tickets.
+
+**The one real hot spot, fixed.** `M.stockBurn` (the stock page asks for one day of one protein dozens of times, up to 70 per page) rebuilt a whole-history context and walked every ticket item and every event on each call: about 3 s of the 15k-stress page and a one-minute-looking stall in the profile (a million `dateKey` calls). It now takes the remembered whole-history context (`M.prepare`), indexes depletions by ingredient and batch and restocks by ingredient once per context, and looks up only the day's batches. The page went from 545 to 200 ms (15k stress) and 272 to 99 ms (3k). **No number changed:** the old and new `stockBurn`, `sellOutClock`, `eightySixes`, `summary` and `sales` outputs for every ingredient and day of a 1,500-ticket kitchen are byte-identical (compared as JSON), `test/metrics.test.mjs` passes (163), and `test/reconcile.test.mjs` passes under America/New_York, America/Chicago and UTC.
+
+**Not changed, on purpose.** The sales CSV, the pilot report and Close the day are already well inside budget (under 125 ms), so they were left alone. Chart drawing for folded cards was not made lazy: the pages are inside budget and the folded charts are not what costs time. Boot at 15k stress (4 s) is the engine and store parsing 120,000 events, which is outside my files and never reached on a real device (the engine trims at 5,000 tickets and 40,000 events).
+
+**Tests added.** `test/office-volume.test.mjs` builds the 3,000-ticket kitchen and checks generous budgets for the main metrics, 35 `stockBurn` calls (twice, and the second set must give identical answers), the sales CSV and the pilot report; the timing checks skip themselves on a slow machine (a calibration loop decides) and the correctness checks always run.
+
+**Also this round.** On a screen that keeps only the last N days of a shared kitchen (A5's `SB.store.trimInfo()`), the office banner now adds "Showing the last N days; the full history is on the hub computer." Nothing shows when `trimInfo()` is missing or null. (Written against A5's description; `trimInfo` is on their branch, not on this one.)
+
+**Not checked:** real tablets and phones (a tablet is several times slower than this sandbox, so the 300 ms budget there is not shown to hold), a real heap limit on a phone, paint timing with a real GPU, kitchens with more than 8 dishes or 100 ingredients, and the `trimInfo` banner against the real hub.
+
+## Independent review fixes (night/a3-fix1, on integration-main)
+
+- **#6 Thrown-out log covered only the last 150 to 200 batches: fixed.** The rows came only from `state.batches`, and the engine drops finished batches older than a day once there are more than 200. The log (screen, print and file) now also lists every `batch_discard` safety entry whose batch is gone, built from `E.safetyLog` (food from the ingredient, amount, reason, initials and note from the entry; "In the cabinet since" is left empty because the batch is no longer there, and nothing is invented). It says how far back it reaches: "Showing every batch thrown out since DATE (N), the first record this app has" for a kitchen newer than about six months, otherwise "Showing the N thrown out since DATE. Records older than about six months are not kept, so older ones are not here." The same sentence is on the sheet, at the top of the printout and as the last line of the file. Retention confirmed by A5: safety entries are kept 190 days from the newest event (`safetyKeep`). The sheet no longer says "Every batch thrown out".
+- **#11 Formula injection: fixed, in one shared helper.** New `36-csv.js` (`SB.csv.cell`, `line`, `text`): text starting with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading apostrophe; real numbers and plain-number text (`-3.00`) are left alone; quotes only where needed. The thrown-out log, the sales-by-day file and the pilot report CSV all use it. The pilot CSV had its own weaker rule (it let a text starting with `-` and a digit through, such as `-2+3+cmd|...`). The store's five data files keep their own guard (A5's file, the same rule). Safety record and Close the day are print-only. `test/csv-and-discards.test.mjs` covers the helper, the three files and the log's reach.
+- **#9 Tax preview a cent off: not an office preview; reported, not fixed here.** The cause is `src/js/71-floor-order.js:165-166` (`pendingTotal`: `Math.round(sub * rate) / 100` in floating point; 6.25 percent on $2.32 shows 0.14, the engine charges 0.15). A1's file. A5 has `SB.engine.totalsOf(items, { extraSubtotalCents, discount, taxRatePct })` on `night/a5-fix1` and A1 has the name; the exact equivalent formula was sent to A1.
+- **Not checked:** the log with a real 190-day-old record on a real device; opening the files in Excel to see the apostrophe.
+
+## Connected: trimmed follower, retention and setting changes (night/a3-c9, on connected)
+
+- **Baseline on the connected track:** office, office-b, office-data, office-closeday, office-sales-csv and office-follower all passed unchanged on `kds/connected` d3dcdb7 (no drift). This branch also carries `a3-c8` and `a3-fix1` (merged) and A5's trimmed-snapshot commit 37ab8df (cherry-picked, clean) so the trim hook exists.
+- **Trimmed follower, verified against a real hub:** `test/office-trimmed.e2e.mjs` seeds a hub with 60 days (900 tickets), opens `?follow&trim=7`, and checks that Sales and money, Speed, Tickets, Stations and Safety all show "Showing the last 7 days; the full history is on the hub computer." in the page banner; the safety record sheet shows the same line (and prints it); the Data page says a backup, spreadsheet file or report made on that screen is partial; the thrown-out log appends the same sentence on screen, in print and in the file; a follower that holds everything shows none of it. One helper, `SB.office.trimWords()`, makes the sentence.
+- **Retention is read, not typed:** new `37-retention.js` (`SB.retention.days()` and `words()`) reads `SB.engine.SAFETY_KEEP_DAYS` or `SAFETY_KEEP_MS`. The safety record (sheet and print) and the thrown-out log's "how far back" line use it ("Safety records are kept for about N days; older ones are not kept."). The engine does not export the constant yet (it is `190 * 24 * H` inside `20-engine.js`); until A5 exports it the text claims no number ("Safety records are not kept forever; older ones may be gone") and the "first record this app has" shortcut is not used. Tested with 400, 90 and no value.
+- **Setting changes in the safety record:** the inspector log has a row type "Changed a safety limit" that reads `settings_changed` entries (`key`, `from`/`to`, also `old`/`new`, `who`, `t`) as "Changed the cold limit from 41 °F to 45 °F", with the time and initials in the row's own columns. It needs the engine to write the event and list it as a safety event (A5's `night/a5-fix2`, not on kds yet, so tested on hand-built entries only).
+- **Not checked:** the setting-change rows against the real event once A5 lands it, the real keep time in the text once exported, a trimmed follower on a real device.
+
+### Run on night/a3-c9x (carried over from an interrupted run)
+
+- **Request for the engine owner (A5):** please export the keep time from `20-engine.js` as `SB.engine.SAFETY_KEEP_DAYS` (or `SAFETY_KEEP_MS`; both are read). Today the constant is private (`SAFETY_KEEP_MS = 190 * 24 * H`, line 221), so the safety record and thrown-out log claim no number. When the export lands (400 days), the text updates with no office change.
+- **Drift fixed:** `test/office-volume.test.mjs` did not load `36-csv.js` (the sales CSV now uses `SB.csv`); it was failing in every time zone and passes now.
+- **Time zones:** office-core, office-inspector, office-units, office-closeday, office-closeday-drawer, office-volume, csv-and-discards and reconcile unit suites pass under America/New_York, America/Chicago and UTC.
+- **Trimmed follower test:** `test/office-trimmed.e2e.mjs` now also opens Close the day on the trimmed follower (it counts today only, which a trimmed screen always holds, so no banner is needed there) and passes against a real hub.
+- **Not checked:** a trimmed follower on a real device; the keep-time text with the engine's real export.

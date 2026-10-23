@@ -197,6 +197,11 @@
     } catch (e) { /* treat an unreadable store as a single device */ }
     return 'solo';
   };
+  // The plain words for a screen that keeps only the last N days of a shared kitchen, or '' when it keeps everything.
+  O.trimWords = function () {
+    let t = null; try { t = SB.store && SB.store.trimInfo ? SB.store.trimInfo() : null; } catch (e) { t = null; }
+    return t && isNum(t.days) && t.days > 0 ? 'Showing the last ' + t.days + ' days; the full history is on the hub computer.' : '';
+  };
   // The name of the screen an event or ticket came from, trimmed and short, or '' when none was recorded.
   O.screenName = function (x) {
     const n = x && typeof x.screen === 'string' ? x.screen.trim() : '';
@@ -1223,6 +1228,9 @@
       M.bannerCache = { ds: key, from: F.range.from, to: F.range.to, channel: F.channel, n: key ? key.tickets.length : 0, info };
     }
     const b = bannerText(info);
+    // A screen that keeps only the last N days of a shared kitchen says so: ranges older than that are partial here.
+    const trimW = O.trimWords();
+    if (trimW) b.text += ' ' + trimW;
     const t = M.banner.querySelector('.of-banner-t');
     if (t.textContent !== b.text) t.textContent = b.text;
     M.banner.dataset.kind = b.kind;

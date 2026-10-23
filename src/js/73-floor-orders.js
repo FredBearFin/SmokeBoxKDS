@@ -16,7 +16,7 @@
   const cents = (v) => Math.round(v * 100) / 100;
   // Tip choices worked out from a base amount (the food after any discount): 15, 18, 20 and 25 percent in dollars.
   function tipPresets(base) {
-    return [15, 18, 20, 25].map((pct) => ({ pct, label: pct + '%', amount: cents((Math.max(0, base) * pct) / 100) }));
+    return [15, 18, 20, 25].map((pct) => ({ pct, label: pct + '%', amount: SB.orderMath ? SB.orderMath.pctOfDollars(base, pct) : cents((Math.max(0, base) * pct) / 100) }));
   }
   // The tip that brings the amount to collect up to a whole dollar (a total of 23.40 gives 0.60); 0 if already whole.
   function roundUpTip(total) { return cents(Math.ceil(cents(total) - 1e-9) - cents(total)); }
@@ -284,6 +284,16 @@
       const lines = foodLines(state, o.id), t = o.totals || {}, pm = C.payMethodById[o.method];
       text(rec.items, lines.length ? itemsLine(lines) : 'Items are no longer on the board.');
       text(rec.meta, 'Paid ' + U.fmtTime(o.paidAt) + ' by ' + (pm ? pm.name.toLowerCase() : o.method) + '.' + (o.tip > 0 ? ' Tip ' + money(o.tip) + '.' : '') + (t.discount > 0 ? ' Discount ' + money(t.discount) + '.' : '') + (t.rounds > 1 ? ' ' + t.rounds + ' rounds.' : ''));
+      // A sale from a day that was already closed cannot be opened again, so say so on the button before the tap.
+      const lc = state.lastClose, shut = !!(lc && isFinite(o.paidAt) && U.serviceDate(o.paidAt, state.settings.service.dayStartHour) <= lc.day);
+      if (rec.shut !== shut) {
+        rec.shut = shut;
+        U.clear(rec.reopen);
+        rec.reopen.append(ico('history', 20), h('span', null, shut ? 'Closed day: cannot reopen' : 'Reopen'));
+        rec.reopen.classList.toggle('is-shut', shut);
+        if (shut) rec.reopen.setAttribute('aria-disabled', 'true'); else rec.reopen.removeAttribute('aria-disabled');
+        rec.reopen.title = shut ? 'Tap to see why.' : '';
+      }
       text(rec.total, money(t.total));
       text(rec.sub, t.tax > 0 ? 'incl. ' + money(t.tax) + ' tax' : '');
     }
@@ -444,7 +454,7 @@
       if (tot.taxRate > 0) rows.push(['Tax (' + tot.taxRate + '%)', money(tot.tax)]);
       rows.push(['Order total', money(tot.total)]);
       const tip = r.err || Number.isNaN(r.t) ? 0 : r.t;
-      if (tip > 0) rows.push(['Tip', money(tip)], ['To collect', money(tot.total + tip)]);
+      if (tip > 0) rows.push(['Tip', money(tip)], ['To collect', money(Math.round(tot.total * 100 + tip * 100 + 1e-7) / 100)]);
       U.clear(calc);
       rows.forEach((row, i) => calc.append(h('dt', { class: i === rows.length - 1 ? 'is-last' : '' }, row[0]), h('dd', { class: 'num' + (i === rows.length - 1 ? ' is-last' : '') }, row[1])));
       quick.forEach((q) => {

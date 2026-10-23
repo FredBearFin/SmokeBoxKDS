@@ -667,7 +667,7 @@
       if (!b) return;
       if (id !== 'all') b.dataset.zone = id;
       b.insertBefore(h('span', { class: 'visually-hidden' }, (id === 'all' ? 'All stations' : zoneById(id).long) + ', '), b.firstChild);
-      b.appendChild(h('span', { class: 'visually-hidden' }, id === 'all' || id === 'expo' ? ' tickets' : ' tickets with work here'));
+      b.appendChild(h('span', { class: 'visually-hidden fl-tab-what', dataset: { here: id === 'all' || id === 'expo' ? 'no' : 'yes' } }, tabWhat(0, id)));
     });
     const tabs = h('div', { class: 'fl-tabs' }, seg);
 
@@ -875,6 +875,8 @@
     }
     m.fitKey = headKey();
   }
+  // The hidden words after a tab's count: "ticket" for one, "tickets" for the rest, and "with work here" on a station tab.
+  function tabWhat(n, id) { return ' ' + U.plural(n, 'ticket') + (id === 'all' || id === 'expo' ? '' : ' with work here'); }
   // Runs every second: refits the header only when its width or chip text changed, so most ticks cost nothing.
   function refit() {
     if (m && m.head && headKey() !== m.fitKey) fitHead();
@@ -887,7 +889,9 @@
   function measureToastTop() {
     if (!m || !m.main) return;
     // Everyday toasts sit just under the header, over the notice strip, where they hide no ticket button.
-    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(m.head.getBoundingClientRect().bottom + 6) + 'px');
+    // While the clock notice shows, toasts start below it so they never cover its two buttons.
+    const cb = m.strip && m.strip.clockBar && !m.strip.clockBar.hidden ? m.strip.clockBar.getBoundingClientRect().bottom : 0;
+    if (m.head) doc.documentElement.style.setProperty('--fl-head-bottom', Math.round(Math.max(m.head.getBoundingClientRect().bottom, cb) + 6) + 'px');
     if (m.cabOn) doc.documentElement.style.setProperty('--fl-toast-top', Math.round(m.main.getBoundingClientRect().top + 8) + 'px');
   }
   // Tells the stylesheet how tall the all-day strip is (--fl-lift) so toasts sit above it.
@@ -1595,6 +1599,12 @@
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
+    // The clock notice: the tablet's clock jumped far ahead, the board keeps the old time and asks. Calm, two plain choices, and the board keeps working.
+    const clockT = h('span', { class: 'fl-clock-t' });
+    const clockKeep = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-keep' }, onClick: () => { if (m) { m.clockDis = Date.now() + 10 * 60e3; updateStrip(store().now()); } } }, 'Keep the old time');
+    const clockUse = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-use' }, onClick: askClockUse }, 'Use the new time');
+    const clockWrap = h('div', { class: 'fl-strip-bar fl-bar-clock', role: 'alert', hidden: true }, ico('clock', 22), clockT, clockKeep, clockUse);
+    el.appendChild(clockWrap);
     const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear all notices', () => { if (m && m.noteKey) m.dis.add(m.noteKey); return 'snd'; }));
     el.appendChild(soundWrap);
     // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
@@ -1617,7 +1627,7 @@
     // A visually hidden live region that changes only when a warning is announced (the leader tab), so a screen reader hears each warning once, never the ticking countdown.
     const announce = h('span', { class: 'visually-hidden', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' });
     el.appendChild(announce);
-    return { el, rows, soundBar: soundWrap, pauseBar: pauseWrap, pauseBtn: pauseBar, announce };
+    return { el, rows, clockBar: clockWrap, clockText: clockT, soundBar: soundWrap, pauseBar: pauseWrap, pauseBtn: pauseBar, announce };
   }
   // Shows the hold cabinet with one batch scrolled into view and flashed.
   function openHoldFor(batchId) { try { showCabinet(true, { batchId }); } catch (e) { console.error('[smokebox] cabinet failed', e); } }
@@ -1663,6 +1673,14 @@
     if (top.level === 4) { tell(PH('expired', { who, many }), 'expired'); return; }
     const mins = Math.max(1, Math.round(first.msLeft / 60e3));
     tell(PH('expire', { who, many, mins, goes86: first.goes86, approx: top.level === 2 }), top.level >= 3 ? 'start' : 'expire');
+  }
+  // Asks, in a small box, whether to use the tablet's new time. It needs a second deliberate tap, and "Keep the old time" is the way out.
+  function askClockUse() {
+    const cs = store().status().clockSuspect;
+    if (!cs || !SB.ui || !SB.ui.confirm) return;
+    const days = Math.round(cs.aheadMs / 86400000);
+    SB.ui.confirm({ title: 'Use the new time?', body: 'Timers and ages on every open ticket will jump forward by about ' + (days >= 2 ? days + ' days' : Math.round(cs.aheadMs / 3600000) + ' hours') + '. Only do this if the date and time on this tablet are right.', confirmLabel: 'Use the new time', cancelLabel: 'Keep the old time', tone: 'danger' })
+      .then((yes) => { if (yes) { store().acceptClockJump(); if (m) updateStrip(store().now()); } else if (m) m.clockDis = Date.now() + 10 * 60e3; });
   }
   // Says a cold item's low-time row once when it first shows (or gets worse), in plain words that name the owner's limit.
   // The first pass after the board opens only remembers what is already there, so a reload does not read old news aloud.
@@ -1738,9 +1756,20 @@
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
     // Only one notice shows at a time (the "tap for sound" bar first, then the note); the bar says how many more wait behind it, and
     // its X clears them all. Warning rows above are separate and always show.
-    const soundShown = needSound && !m.dis.has('snd');
+    // A device clock that jumped ahead comes first: it changes every timer on the board. It never hides the tickets.
+    const cs = store().status().clockSuspect;
+    const clockShown = !!cs && Date.now() >= (m.clockDis || 0);
+    if (clockShown) {
+      const dd = Math.round(cs.aheadMs / 86400000);
+      const t = 'This tablet\'s clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(cs.aheadMs / 3600000) + ' hours') + '. Smokebox is still using the old time, so tickets and timers keep running.';
+      if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
+    }
+    setHidden(m.strip.clockBar, !clockShown);
+    measureToastTop();
+    const soundShown = needSound && !m.dis.has('snd') && !clockShown;
+    setHidden(m.strip.soundBar, !soundShown); // the clock notice goes first, so the sound bar waits behind it
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
-    const showNote = noteWanted && !soundShown;
+    const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
     const more = (noteWanted ? 1 : 0) + behindSilent;
@@ -1752,7 +1781,7 @@
       const want = updateNote() && note === updateNote() ? 'refresh' : 'volume-off';
       if (m.pauseIcon !== want) { m.pauseIcon = want; const old = m.strip.pauseBtn.firstChild; if (old) old.replaceWith(ico(want, 24)); }
     }
-    setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
+    setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote && !clockShown);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
       setHidden(r.wrap, !d);
@@ -1806,6 +1835,8 @@
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
     const tabCount = (id, n, alert) => {
       m.seg.setCount(id, n, { alert });
+      const what = m.seg.querySelector('[data-id="' + id + '"] .fl-tab-what');
+      if (what) { const t = tabWhat(n, id); if (what.textContent !== t) what.textContent = t; }
       const p = m.tabParts[id];
       if (p && p.n !== n) { p.n = n; p.count.dataset.zero = n === 0 ? 'true' : 'false'; }
     };
@@ -2076,6 +2107,8 @@
     }
     // After a reload with the hub unreachable the board shows the last copy it had; it says so until the first live update.
     if (st.lastKnown && st.state !== 'connected' && st.state !== 'sending') return { tone: 'wait', text: 'Last known' + (st.lastKnownAt ? ', from ' + U.fmtTime(st.lastKnownAt) : '') + '. Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
+    // A screen the owner removed (or that was never paired) is told so in plain words, not just shown as offline.
+    if (st.error === 'revoked' || st.error === 'unpaired') return { tone: 'bad', text: st.reason || 'This screen was removed from the kitchen.', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
     if (st.state === 'offline' || st.state === 'error') return { tone: 'wait', text: 'Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
     if (st.state === 'connecting') return { tone: 'wait', text: 'Connecting...', sub: n ? n + ' waiting' : '', unsent: n };
     if (n > 0) return { tone: 'wait', text: 'Sending ' + n + '...', sub: '', unsent: n };
@@ -2116,7 +2149,7 @@
   }
   // Tells the cook, on the screen that tapped, that the hub did not do a tap, and why. The change shown here was already taken back.
   function onHubRefusal(r) {
-    const text = (r && (r.text || r.reason)) || 'The kitchen did not accept that tap.';
+    const text = String((r && (r.text || r.reason)) || 'The kitchen did not accept that tap.').slice(0, 300); // a hub's sentence is shown short
     toast(/^Not done/i.test(text) ? text : 'Not done: ' + text, { tone: 'warn', ms: 12000 });
     const rec = r && r.ticketId ? m && m.slips.get(r.ticketId) : null;
     if (rec) flash(rec.el.querySelector('.slip-head'));

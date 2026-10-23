@@ -552,7 +552,7 @@ group('7. Manager PIN', async () => {
     await pin.getByRole('button', { name: 'Set PIN' }).click();
     await waitFor(page, () => !!SB.store.getState().settings.office.pinHash);
     const h1 = await hash();
-    check('PIN stored as a hash, not as digits', /^sha256:[0-9a-f]{64}$/.test(h1) && !h1.includes('1234'), h1);
+    check('PIN stored as a hash, not as digits', /^pbkdf2:100000:[0-9a-f]{32}:[0-9a-f]{64}$/.test(h1) && !h1.includes('1234'), h1);
     check('the page now offers Change and Remove', (await pin.getByRole('button', { name: 'Change PIN' }).count()) === 1 && (await pin.getByRole('button', { name: 'Remove PIN' }).count()) === 1);
     check('a toast confirms it', /PIN set/.test(await text(page, '.toast')));
     // change: needs the current PIN
@@ -567,7 +567,7 @@ group('7. Manager PIN', async () => {
     await pin.locator('form button[type="submit"]').click();
     await waitFor(page, (x) => SB.store.getState().settings.office.pinHash !== x, h1);
     const h2 = await hash();
-    check('with the right current PIN the new one is saved', /^sha256:/.test(h2) && h2 !== h1);
+    check('with the right current PIN the new one is saved', /^pbkdf2:/.test(h2) && h2 !== h1);
     check('the new PIN works, the old one does not', (await page.evaluate(async () => (await SB.shell.checkPin('5678')) && !(await SB.shell.checkPin('1234')))) === true);
     // the gate shows up next time the office is opened
     await page.evaluate(async () => { await SB.shell.extinguish(); SB.shell.lock(); }); // leaving starts a 2 minute grace; lock() ends it

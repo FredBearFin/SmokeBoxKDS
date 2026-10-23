@@ -5,7 +5,9 @@
 set -euo pipefail
 
 PREFIX="${SMOKEBOX_PREFIX:-/opt/smokebox}"
-URL="${SMOKEBOX_UPDATE_URL:-https://github.com/FredBearFin/SmokeBoxKDS/archive/refs/heads/deploy.tar.gz}"
+REPO_ARCHIVE="https://github.com/FredBearFin/SmokeBoxKDS/archive"
+REF="${SMOKEBOX_UPDATE_REF:-}"                  # a tag or a full commit id to stay on, instead of following the moving deploy branch
+PUBKEY="${SMOKEBOX_PUBKEY:-/etc/smokebox/update-pubkey}"   # if this file exists the build must carry a signature made with its private key
 SYSTEMCTL="${SMOKEBOX_SYSTEMCTL:-systemctl}"
 HEALTH_URL="${SMOKEBOX_HEALTH_URL:-http://127.0.0.1:8787/health}"
 SELF_DEST="${SMOKEBOX_SELF_DEST:-/usr/local/bin/smokebox-update}"
@@ -14,6 +16,14 @@ MIN_BYTES="${SMOKEBOX_MIN_BYTES:-100000}"     # the built page alone is over a m
 HEALTH_TRIES="${SMOKEBOX_HEALTH_TRIES:-20}"
 say() { echo "smokebox-update: $*"; }
 fail() { say "$*"; exit 1; }
+if [ -n "$REF" ]; then
+  case "$REF" in *[!A-Za-z0-9._/-]*|*..*|/*) fail "SMOKEBOX_UPDATE_REF has characters that are not allowed; the running version is kept" ;; esac
+  if printf '%s' "$REF" | grep -Eq '^[0-9a-f]{40}$'; then DEFAULT_URL="$REPO_ARCHIVE/$REF.tar.gz"; else DEFAULT_URL="$REPO_ARCHIVE/refs/tags/$REF.tar.gz"; fi
+  say "pinned to $REF"
+else
+  DEFAULT_URL="$REPO_ARCHIVE/refs/heads/deploy.tar.gz"
+fi
+URL="${SMOKEBOX_UPDATE_URL:-$DEFAULT_URL}"
 
 # One update at a time (the timer and a hand-started run could overlap).
 mkdir -p "$(dirname "$LOCK")"
@@ -32,8 +42,11 @@ SIZE="$(wc -c < "$WORK/update.tar.gz")"
 gzip -t "$WORK/update.tar.gz" || fail "the download is not a valid gzip file; the running version is kept"
 
 # 2. Refuse archives that could write outside the folder: absolute paths, '..' parts, links of any kind.
-if tar -tzf "$WORK/update.tar.gz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then fail "the archive has unsafe paths; the running version is kept"; fi
-if tar -tvzf "$WORK/update.tar.gz" | grep -Eq '^[lh]'; then fail "the archive contains links; the running version is kept"; fi
+# (The listings go to files first: with "grep -q" straight after a pipe, tar can be cut off early and the check silently counted as "no match".)
+tar -tzf "$WORK/update.tar.gz" > "$WORK/names.txt" || fail "the archive cannot be read; the running version is kept"
+tar -tvzf "$WORK/update.tar.gz" > "$WORK/types.txt" || fail "the archive cannot be read; the running version is kept"
+if grep -Eq '(^/|(^|/)\.\.(/|$))' "$WORK/names.txt"; then fail "the archive has unsafe paths; the running version is kept"; fi
+if grep -Eq '^[^-d]' "$WORK/types.txt"; then fail "the archive contains links, devices or other special files; the running version is kept"; fi
 
 # 3. Unpack beside the live folder and check the pieces the service needs.
 rm -rf "$NEW"; mkdir -p "$NEW"
@@ -43,6 +56,20 @@ for f in server/server.mjs dist/smokebox.html src/js/20-engine.js; do
 done
 HTML_BYTES="$(wc -c < "$NEW/dist/smokebox.html")"
 [ "$HTML_BYTES" -ge "$MIN_BYTES" ] || fail "the new page is only $HTML_BYTES bytes; the running version is kept"
+# Integrity. With a public key installed, the build must carry deploy.manifest (a sha256 line for every file) and deploy.manifest.sig (its signature):
+# the signature must verify, every file must match its line and no file may be missing from or extra to the list. Without a key nothing is verified.
+if [ -f "$PUBKEY" ]; then
+  command -v openssl >/dev/null || fail "openssl is needed to check the signature; the running version is kept"
+  [ -s "$NEW/deploy.manifest" ] && [ -s "$NEW/deploy.manifest.sig" ] || fail "the build is not signed (deploy.manifest.sig is missing) and $PUBKEY exists; the running version is kept"
+  openssl pkeyutl -verify -pubin -inkey "$PUBKEY" -rawin -in "$NEW/deploy.manifest" -sigfile "$NEW/deploy.manifest.sig" >/dev/null 2>&1 || fail "the signature does not match $PUBKEY; the running version is kept"
+  ( cd "$NEW" && sha256sum --quiet -c deploy.manifest >/dev/null 2>&1 ) || fail "a file does not match the signed list; the running version is kept"
+  LISTED="$(sed -E 's/^[0-9a-f]{64}  //' "$NEW/deploy.manifest" | LC_ALL=C sort)"
+  ACTUAL="$(cd "$NEW" && find . -type f ! -name deploy.manifest ! -name deploy.manifest.sig | LC_ALL=C sort)"
+  [ "$LISTED" = "$ACTUAL" ] || fail "the build has files that are not on the signed list (or the list names missing files); the running version is kept"
+  say "signature OK ($PUBKEY)"
+else
+  say "WARNING: updates are NOT verified (no $PUBKEY): whoever can write the deploy branch controls this server. See docs/connected-howto.md to turn signing on."
+fi
 node --check "$NEW/server/server.mjs" || fail "the new server file does not parse; the running version is kept"
 if [ "$(id -u)" -eq 0 ]; then chown -R root:root "$NEW"; fi
 

@@ -12,7 +12,7 @@
 
   // The engine's own bounds for a dish, copied here because this file loads before the engine. A test checks the engine
   // refuses exactly what these refuse. 150 dishes, names up to 60 characters, price 0 to 1000 dollars.
-  const LIMITS = { maxDishes: 150, nameMax: 60, priceMax: 1000, textMax: 1000000, rowsRead: 2000 };
+  const LIMITS = { maxDishes: 150, nameMax: 60, priceMax: 1000, textMax: 1000000, rowsRead: 2000, lineMax: 1000 };
   M.limits = LIMITS;
   // The dish form fields the importer uses when the file does not say: one tap to finish, a 5 minute guess.
   const DEFAULTS = { prepSec: 300, track: 'one' };
@@ -20,7 +20,7 @@
   // The money symbol in use (the owner's, or $), for messages.
   const cs = () => (SB.util && SB.util.currencySymbol ? SB.util.currencySymbol() : '$');
   // Collapses runs of white space and trims, as the engine does to a dish name.
-  const clean = (s) => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
+  const clean = (s) => (SB.util && SB.util.stripInvisible ? SB.util.stripInvisible : (x) => x)(String(s == null ? '' : s)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
   // The name compared for duplicates: lower case, single spaces.
   const key = (s) => clean(s).toLowerCase();
 
@@ -161,6 +161,10 @@
   // Reads one typed line such as "Brisket plate, 14.00, pit", "Burger 9.50", "Name - $9" or a tab or semicolon line.
   // Returns { name, priceText, extras:[] } or null when the line has no usable shape (it still becomes a row with problems).
   function readLine(line) {
+    // A line this long is not a dish. It is not read at all (so nothing can be slow on it); the caller marks the row.
+    if (line.length > LIMITS.lineMax) return { name: clean(line.slice(0, LIMITS.nameMax)), priceText: '', extras: [], tooLong: line.length };
+    // Runs of spaces become one space (tabs stay, they separate columns), so the patterns below take time in proportion to the line, not its square.
+    line = line.replace(/[^\S\t]+/g, ' ');
     const delims = ['\t', ';'];
     let parts = null;
     // "Pickles 3,50": a single comma that only marks the cents is not a column separator.
@@ -273,6 +277,7 @@
       }
       const f = readLine(raw.trim());
       const row = newRow(i + 1);
+      if (f.tooLong) row.problems.push(prob('lineTooLong', 'error', 'This line is ' + f.tooLong + ' characters long, far too long to be a dish.', 'Cut it down to a name and a price, or delete the line.'));
       row.name = clean(unguard(f.name));
       setPrice(row, f.priceText, opts.priceUnit === 'cents');
       // Extra cells after the price: a station, a category, or a note.

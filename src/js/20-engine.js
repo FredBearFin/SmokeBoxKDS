@@ -53,7 +53,7 @@
     'emptyOrder', 'badQty', 'tooManyItems', 'badCustomer', 'badChannel', 'noteTooLong', 'itemUnavailable', 'ticketNotActive',
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
-    'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
+    'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'dayClosed', 'orderEmpty',
     'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'followerReadOnly', 'hubKitchen', 'hubChanged', 'hubConnecting', 'undoElsewhere', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
@@ -106,6 +106,7 @@
     unknownOrder: 'That order is no longer here. It may have been cleared; check the open orders list.',
     orderNotOpen: 'That order is already paid or voided. Reopen it first if it needs changing.',
     orderNotPaid: 'Only a paid order can be reopened.',
+    dayClosed: 'That sale belongs to a day that is already closed, so it cannot be opened again: it would move to another day and count twice. Make the correction in your own records, or ask whoever keeps the books.',
     orderEmpty: 'There is nothing on this order to pay. Add items first, or void the order.',
     orderNotEmpty: 'That order still has food on it. Void its tickets first, or take payment.',
     badPayment: 'Pick how it was paid (cash, card or other), and enter the tip and discount as dollar amounts.',
@@ -216,9 +217,11 @@
   // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
   // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
   // safetyKeep bucket instead of being dropped.
-  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
-  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months). This is our own choice; no source gives a minimum, so ask your health department how long to keep records.
-  const SAFETY_KEEP_MS = 190 * 24 * H;
+  const SAFETY_EVENT = { safety_setting_changed: 1, temp_logged: 1, batch_reheat: 1, batch_discard: 1, batch_out: 1, batch_back: 1, cooling_started: 1, sanitize_done: 1, equip_temp: 1, thermometer_checked: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  // 400 days: how long the safetyKeep bucket holds a safety entry (a year and a month, so a yearly inspection can look back a full year). This is our own
+  // choice; no source gives one minimum for everyone, so ask your health department how long to keep records. Safety entries are small and the bucket is
+  // never trimmed by size, only by age.
+  const SAFETY_KEEP_DAYS = 400, SAFETY_KEEP_MS = SAFETY_KEEP_DAYS * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
 
@@ -253,8 +256,18 @@
   }
   /** Simulated propagation delay for one channel target: 2..40 s, fixed per (syncId, target). */
   const syncDelayMs = (syncId, targetId) => 2000 + (hashStr(syncId + '|' + targetId) % 38001);
-  // Squeezes runs of spaces, tabs and line breaks into single spaces and trims both ends.
-  const cleanText = (s) => s.replace(/\s+/g, ' ').trim();
+  // Squeezes runs of spaces, tabs and line breaks into single spaces, trims both ends, and strips invisible direction and zero-width characters.
+  const cleanText = (s) => U.cleanText(s);
+  // Cuts text to at most max characters without leaving half of an emoji (a lone first half of a surrogate pair) at the end.
+  const cutText = (s, max) => { if (s.length <= max) return s; let t = s.slice(0, max); const c = t.charCodeAt(t.length - 1); if (c >= 0xD800 && c <= 0xDBFF) t = t.slice(0, -1); return t; };
+  // Cleans a text field of a loaded record and cuts it to max characters (names and labels squeeze white space; a note keeps its line breaks).
+  // Returns the fixed text, or null when the field was not text. Adds a line to repaired when anything changed.
+  function fitText(v, max, what, repaired, note) {
+    if (typeof v !== 'string') return null;
+    const c = cutText(note ? U.stripInvisible(v).trim() : cleanText(v), max).trim();
+    if (c !== v) repaired.push(what + ' cleaned or shortened');
+    return c;
+  }
   // True when the sorted list a contains x. Halves the search each step, so it stays fast on long lists.
   const sortedHas = (a, x) => { let lo = 0, hi = a.length - 1; while (lo <= hi) { const m = (lo + hi) >> 1; if (a[m] === x) return true; if (a[m] < x) lo = m + 1; else hi = m - 1; } return false; };
 
@@ -560,7 +573,7 @@
       return gateOut('NONE', true, 'onLine', 'ok', 'Out of the fridge, ' + used + ' min so far' + (isNum(b.outHours) ? ' of your ' + U.round(b.outHours, 2) + '-hour limit.' : '. No out-of-fridge limit set.'), end);
     }
     if (b.outSince != null) {
-      const lim = b.outSince + S.aboveColdGraceH * H;
+      const lim = coldOutLimit(b, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, end));
     }
@@ -642,7 +655,7 @@
         if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Below ' + f0(S.hotHoldF) + ' for more than ' + S.belowHotGraceH + ' hours. Discard.' + SAFETY);
         return gateOut('REHEAT_IMMEDIATE', false, 'belowHot', 'bad', 'Below ' + f0(S.hotHoldF) + '. Reheat to ' + f0(S.reheatF) + ' now (Smokebox allows one reheat per batch) or discard.' + SAFETY, Math.min(lim, exp));
       }
-      const lim = batch.outSince + S.aboveColdGraceH * H;
+      const lim = coldOutLimit(batch, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, exp));
     }
@@ -679,7 +692,7 @@
     if (b.outSince != null) {
       const want = b.kind === 'cold' ? 'chill' : 'reheat';
       if (b.status !== want || (b.kind !== 'cold' && b.reheats >= 1)) return -Infinity;
-      return Math.min(q ? hard : exp, b.outSince + (b.kind === 'cold' ? S.aboveColdGraceH : S.belowHotGraceH) * H);
+      return Math.min(q ? hard : exp, b.kind === 'cold' ? coldOutLimit(b, S) : b.outSince + S.belowHotGraceH * H);
     }
     // A past batch stays past (a late temperature check does not change it) until the hard cap.
     if (b.status === 'past') return q ? hard : -Infinity;
@@ -797,7 +810,7 @@
   }
   // Only the safety-log events from a list of events.
   function safetyOnly(list) { return list.filter((e) => hasOwn(SAFETY_EVENT, e.type)); }
-  // Adds newly dropped safety events to the retention bucket and lets go of entries older than 190 days
+  // Adds newly dropped safety events to the retention bucket and lets go of entries older than SAFETY_KEEP_DAYS
   // (measured from refT, the newest time known). The bucket is never trimmed by size, only by age.
   function keepSafety(prev, dropped, refT) {
     const all = (Array.isArray(prev) ? prev : []).concat(dropped);
@@ -1302,7 +1315,7 @@
     let note = p.note == null ? '' : p.note;
     if (typeof note !== 'string') { tx.info.key = 'note'; return 'badPatch'; }
     if (note.length > 4 * L.maxNoteLen) return 'noteTooLong';
-    note = note.trim();
+    note = U.stripInvisible(note).trim();
     if (note.length > L.maxNoteLen) return 'noteTooLong';
     const rush = p.rush == null ? false : p.rush;
     if (typeof rush !== 'boolean') { tx.info.key = 'rush'; return 'badPatch'; }
@@ -1432,6 +1445,16 @@
     const taxC = Math.floor((taxableC * Math.round(rate * 1e4) + 500000) / 1e6);
     return { subtotal: subCents / 100, discount: discC / 100, taxRate: rate, tax: taxC / 100, total: (taxableC + taxC) / 100, qty, rounds };
   }
+  // Totals for lines that are not on an order yet (the draft on the order screen), with the same whole-cent rule the charge uses, so what the
+  // screen shows is what the register charges. items are { price, qty }; opts: extraSubtotalCents (food already on the order), discount, taxRatePct.
+  function totalsOf(items, opts) {
+    let sub = isNum(opts && opts.extraSubtotalCents) ? Math.max(0, Math.round(opts.extraSubtotalCents)) : 0, qty = 0;
+    for (const it of Array.isArray(items) ? items : []) {
+      const q = isNum(it && it.qty) && it.qty > 0 ? Math.round(it.qty) : 0;
+      sub += toCents(isNum(it && it.price) ? it.price : 0) * q; qty += q;
+    }
+    return totalsFrom(sub, qty, 0, opts && opts.discount, opts && opts.taxRatePct);
+  }
   // The sales tax rate in force now, in percent (0 when none is set).
   const taxRateOf = (settings) => (settings && settings.service && isNum(settings.service.taxRatePct) ? settings.service.taxRatePct : 0);
   // What an order adds up to: the food on its tickets that are not voided, less the discount, plus tax. A paid
@@ -1484,6 +1507,7 @@
     const o = tx.get('orders')[oi];
     const t0 = orderTotals(tx.state(), o, { discount: pay.discount });
     if (!(t0.subtotal > 0)) return 'orderEmpty';
+    if (!Number.isFinite(t0.total) || t0.total > C.limits.maxOrderMoney) { tx.info = { key: 'total', min: 0, max: C.limits.maxOrderMoney }; return 'outOfBounds'; }
     if (pay.discount > t0.subtotal + 1e-9) { tx.info = { key: 'discount', min: 0, max: t0.subtotal }; return 'outOfBounds'; }
     const w = tx.mutIn(tx.mut('orders'), oi);
     w.status = 'paid'; w.paidAt = stampAfter(o.createdAt, tx.now); w.method = pay.method; w.tip = pay.tip; w.discount = t0.discount; w.totals = t0;
@@ -1529,6 +1553,9 @@
     if (oi < 0) return 'unknownOrder';
     const o = tx.get('orders')[oi];
     if (o.status !== 'paid') return 'orderNotPaid';
+    // A sale stays in the day it was made: once that day is closed, paying it again would count it in two day_closed records.
+    const lc = tx.get('lastClose');
+    if (lc && isNum(o.paidAt) && U.serviceDate(o.paidAt, tx.get('settings').service.dayStartHour) <= lc.day) { tx.info = { day: lc.day }; return 'dayClosed'; }
     const w = tx.mutIn(tx.mut('orders'), oi);
     w.status = 'open'; delete w.paidAt; delete w.method; delete w.tip; delete w.discount; delete w.totals;
     tx.event('order_reopened', { orderId: o.id });
@@ -1997,6 +2024,9 @@
     const w = p.who.trim();
     return w.length > 12 ? null : w;
   }
+  // The moment cold food that is above its limit must be thrown out: the grace time (aboveColdGraceH) minus the time it already spent above the limit
+  // in earlier stretches (coldOutMs), counted from when it went out of range this time. One good reading does not wipe the earlier time away.
+  const coldOutLimit = (b, S) => b.outSince + Math.max(0, S.aboveColdGraceH * H - (isNum(b.coldOutMs) ? b.coldOutMs : 0));
   // Records a temperature reading, then re-runs the gate. A hot reading below the hot-hold limit, or a cold
   // one above its limit, starts the out-of-range clock (outSince); an in-range cold reading clears it. A
   // cooling batch records stage 1 and final. Also logs whether the check was on time.
@@ -2026,7 +2056,7 @@
       if (b.stage1At == null && f <= c.stage1ToF) { w.stage1At = t; w.stage1F = f; }
       if (w.stage1At != null && b.finalAt == null && f <= c.finalF) { w.finalAt = t; w.finalF = f; }
     } else if (b.kind === 'cold') {
-      if (f > S.coldHoldF) { if (b.outSince == null && b.place !== 'line') w.outSince = t; } else if (b.outSince != null) delete w.outSince;
+      if (f > S.coldHoldF) { if (b.outSince == null && b.place !== 'line') w.outSince = t; } else if (b.outSince != null) { w.coldOutMs = Math.round((isNum(b.coldOutMs) ? b.coldOutMs : 0) + Math.max(0, t - b.outSince)); delete w.outSince; }
     } else if (f < S.hotHoldF) {
       if (b.outSince == null) w.outSince = t;
     } else if (b.outSince != null && f >= S.reheatF && !(b.reheats >= 1) && t - b.outSince <= S.belowHotGraceH * H) {
@@ -2587,7 +2617,15 @@
       refreshAllBatches(tx);
     }
     if (S.pacing !== cur.pacing) recomputeLearned(tx);
-    tx.event('settings_changed', { keys });
+    // A change to a food-safety number is a safety record: one entry per number with the old and the new value (stored units: degrees F, hours, minutes).
+    const rest = [];
+    for (const k of keys) {
+      if (k.indexOf('safety.') !== 0) { rest.push(k); continue; }
+      // Reads the value at the dotted key path from a settings object, or undefined when any step is missing.
+      const at = (root) => k.split('.').reduce((o, part) => (o !== null && typeof o === 'object' ? o[part] : undefined), root);
+      tx.event('safety_setting_changed', { key: k, from: at(cur) === undefined ? null : at(cur), to: at(S) === undefined ? null : at(S) });
+    }
+    if (rest.length) tx.event('settings_changed', { keys: rest });
     tx.info = { keys };
     return 'ok';
   };
@@ -3817,6 +3855,9 @@
         if (out.tcs && out.holdBasis !== 'safety') out.holdBasis = 'quality';
         if (holdMigrate && base && x.maxHoldH === 4 && isNum(base.maxHoldH) && base.maxHoldH > 4) out.maxHoldH = base.maxHoldH;
         if (typeof out.tcs !== 'boolean' || (out.unit !== 'g' && out.unit !== 'ea') || typeof out.name !== 'string') { repaired.push('dropped ingredient ' + x.id); continue; }
+        out.name = fitText(out.name, ING_PATCH.name.max, 'ingredient ' + x.id + '.name', repaired);
+        if (!out.name) { if (!base) { repaired.push('dropped ingredient ' + x.id); continue; } out.name = base.name; }
+        if (out.note !== undefined) { const nt = fitText(out.note, C.limits.maxNoteLen, 'ingredient ' + x.id + '.note', repaired, true); if (nt === null) delete out.note; else out.note = nt; }
         for (const k of Object.keys(ING_PATCH)) if (ING_PATCH[k].t === 'num' && out[k] !== undefined && checkLeaf(ING_PATCH[k], out[k], k)) { out[k] = base && base[k] !== undefined ? base[k] : undefined; if (out[k] === undefined) delete out[k]; repaired.push('ingredient ' + x.id + '.' + k + ' reset'); }
         if (out.tcs && out.hold !== 'hot' && out.hold !== 'cold') out.hold = 'hot';
         // Fridge flag and the owner's two limits only on a cold cooked-ahead product.
@@ -3834,10 +3875,12 @@
         if (!isObj(x) || !safeKey(x.id) || seenMenu.has(x.id)) { repaired.push('dropped a bad menu item'); continue; }
         const base = !own && hasOwn(C.menuById, x.id) ? C.menuById[x.id] : null;
         const out = Object.assign({ prepConfirmed: false, archived: false }, base || {}, x);
+        if (typeof out.name === 'string') out.name = fitText(out.name, MENU_PATCH.name.max, 'menu ' + x.id + '.name', repaired);
         if (typeof out.name !== 'string' || !out.name) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.name = base.name; }
+        if (out.short !== undefined) { const sh = fitText(out.short, MENU_PATCH.short.max, 'menu ' + x.id + '.short', repaired); out.short = sh || cutText(out.name, MENU_PATCH.short.max).trim(); }
         if (C.workZones.indexOf(out.zone) < 0) { if (!base) { repaired.push('dropped menu item ' + x.id); continue; } out.zone = base.zone; repaired.push('menu ' + x.id + '.zone reset'); }
         if (!isNum(out.prepSec) || out.prepSec < 5 || out.prepSec > 3600) { out.prepSec = base ? base.prepSec : 120; repaired.push('menu ' + x.id + '.prepSec reset'); }
-        if (!isNum(out.price) || out.price < 0) { out.price = base ? base.price : 0; repaired.push('menu ' + x.id + '.price reset'); }
+        if (!isNum(out.price) || out.price < 0 || out.price > C.limits.maxPrice) { out.price = base ? base.price : 0; repaired.push('menu ' + x.id + '.price reset'); }
         if (out.track !== 'one' && out.track !== 'two') out.track = 'one';
         if (!Array.isArray(out.bom) || out.bom.some((l) => !isObj(l) || !im.has(l.ing) || !isNum(l.qty) || l.qty <= 0)) {
           out.bom = base ? base.bom.map((l) => ({ ing: l.ing, qty: l.qty })) : (Array.isArray(out.bom) ? out.bom.filter((l) => isObj(l) && im.has(l.ing) && isNum(l.qty) && l.qty > 0) : []);
@@ -3902,10 +3945,11 @@
         if (out.status === 'discard') { out.canServe = false; out.remainingG = 0; out.action = 'DISCARD_LOCKOUT'; if (DISCARD_REASONS.indexOf(out.discardReason) < 0) out.discardReason = 'other'; if (!isNum(out.discardedAt)) out.discardedAt = out.enteredAt; }
         if (typeof out.canServe !== 'boolean' || out.kind === 'cooling') out.canServe = out.kind === 'cooling' ? false : !!out.canServe;
         if (!isInt(out.reheats) || out.reheats < 0) out.reheats = 0;
+        if (out.label !== undefined) { const lb = fitText(out.label, 40, 'batch ' + b.id + '.label', repaired); if (lb) out.label = lb; else delete out.label; }
         if (!Array.isArray(out.temps)) out.temps = [];
         out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS)
           .map((x) => (typeof x.who === 'string' && x.who.length >= 1 && x.who.length <= 12 ? { t: x.t, f: x.f, who: x.who } : { t: x.t, f: x.f }));
-        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
+        for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coldOutMs', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
         for (const k of ['stage1F', 'finalF', 'lineMs', 'lineSince', 'movedAt', 'fridgeDays', 'outHours']) if (out[k] !== undefined && !isNum(out[k])) delete out[k];
         // Place and the owner's limits exist only on a cold batch made from a fridge-kept product; anything else is cleared.
         if (out.fridge !== true || out.kind !== 'cold') { for (const k of ['fridge', 'place', 'lineMs', 'lineSince', 'movedAt', 'madeOn', 'fridgeDays', 'outHours']) delete out[k]; }
@@ -4065,14 +4109,14 @@
     if (!isInt(t.num) || t.num < 1) return null;
     const out = Object.assign({}, t);
     if (typeof out.serviceDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(out.serviceDate)) { out.serviceDate = U.serviceDate(out.createdAt); repaired.push('ticket ' + t.id + '.serviceDate recomputed'); }
-    if (typeof out.customer !== 'string') out.customer = 'Walk-up';
+    out.customer = fitText(out.customer, C.limits.maxCustomerLen, 'ticket ' + t.id + '.customer', repaired) || 'Walk-up';
     if (!hasOwn(C.channelById, out.channel)) { out.channel = 'dine_in'; repaired.push('ticket ' + t.id + '.channel reset'); }
     if (!isInt(out.recalls) || out.recalls < 0) out.recalls = 0;
     if (!hasOwn(SRC_TICKET, out.src)) out.src = 'live';
     out.rush = out.rush === true;
     out.pacing = out.pacing !== false;
     if (out.orderId !== undefined && !(typeof out.orderId === 'string' && safeKey(out.orderId) && oSeq(out.orderId) === oSeq(out.orderId))) { delete out.orderId; delete out.round; repaired.push('ticket ' + t.id + '.orderId cleared'); }
-    if (typeof out.note !== 'string') out.note = '';
+    out.note = fitText(out.note, C.limits.maxNoteLen, 'ticket ' + t.id + '.note', repaired, true) || '';
     if (!isNum(out.dmaxSec) || out.dmaxSec < 0) return null;
     if (out.status === 'voided' && !(typeof out.voidReason === 'string' && out.voidReason.trim())) { out.voidReason = 'other'; repaired.push('ticket ' + t.id + '.voidReason set'); }
     if (out.status !== 'expedited') { delete out.expeditedAt; delete out.forced; }
@@ -4083,7 +4127,10 @@
       const x = Object.assign({}, it);
       if (x.track !== 'one' && x.track !== 'two') x.track = 'one';
       if (!Array.isArray(x.mods)) x.mods = [];
-      if (!isNum(x.price)) x.price = 0;
+      else x.mods = x.mods.slice(0, 10).map((m) => (typeof m === 'string' ? cutText(cleanText(m), 60) : '')).filter(Boolean);
+      for (const [k, max] of [['name', MENU_PATCH.name.max], ['short', MENU_PATCH.short.max]]) if (x[k] !== undefined) { const v = fitText(x[k], max, 'ticket ' + t.id + ' item ' + k, repaired); if (v) x[k] = v; else delete x[k]; }
+      if (!isNum(x.price) || x.price < 0 || x.price > C.limits.maxPrice) { if (isNum(x.price)) repaired.push('ticket ' + t.id + ' price reset'); x.price = 0; }
+      if (x.qty > C.limits.maxQty) { x.qty = C.limits.maxQty; repaired.push('ticket ' + t.id + ' quantity lowered'); }
       for (const k of ['firedAt', 'startedAt', 'doneAt', 'cost']) if (x[k] !== undefined && !isNum(x[k])) return null;
       if (x.depleted !== undefined && (!Array.isArray(x.depleted) || x.depleted.some((r) => !isObj(r) || typeof r.ing !== 'string' || !isNum(r.g) || r.g < 0))) return null;
       items.push(x);
@@ -4100,14 +4147,14 @@
     if (!isObj(o) || typeof o.id !== 'string' || !safeKey(o.id) || oSeq(o.id) !== oSeq(o.id) || !isNum(o.createdAt) || !hasOwn(ORDER_STATUS, o.status)) return null;
     const out = {
       id: o.id, serviceDate: typeof o.serviceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.serviceDate) ? o.serviceDate : U.serviceDate(o.createdAt),
-      customer: typeof o.customer === 'string' && o.customer ? o.customer.slice(0, C.limits.maxCustomerLen) : 'Walk-up',
+      customer: fitText(o.customer, C.limits.maxCustomerLen, 'order ' + o.id + '.customer', repaired) || 'Walk-up',
       channel: hasOwn(C.channelById, o.channel) ? o.channel : 'dine_in', createdAt: o.createdAt, status: o.status,
       src: hasOwn(SRC_TICKET, o.src) ? o.src : 'live', rounds: isInt(o.rounds) && o.rounds >= 0 ? o.rounds : 0,
     };
     if (o.status === 'paid') {
       const T = o.totals;
-      const money = isObj(T) && ['subtotal', 'discount', 'tax', 'total'].every((k) => isNum(T[k]) && T[k] >= 0);
-      if (!money || !hasOwn(C.payMethodById, o.method) || !isNum(o.paidAt) || !isNum(o.tip) || o.tip < 0) return null;
+      const money = isObj(T) && ['subtotal', 'discount', 'tax', 'total'].every((k) => isNum(T[k]) && T[k] >= 0 && T[k] <= C.limits.maxOrderMoney);
+      if (!money || !hasOwn(C.payMethodById, o.method) || !isNum(o.paidAt) || !isNum(o.tip) || o.tip < 0 || o.tip > C.limits.maxOrderMoney) return null;
       out.paidAt = o.paidAt; out.method = o.method; out.tip = o.tip; out.discount = T.discount;
       out.totals = { subtotal: T.subtotal, discount: T.discount, taxRate: isNum(T.taxRate) && T.taxRate >= 0 ? T.taxRate : 0, tax: T.tax, total: T.total, qty: isInt(T.qty) && T.qty >= 0 ? T.qty : 0, rounds: isInt(T.rounds) && T.rounds >= 0 ? T.rounds : 0 };
       if (out.paidAt < out.createdAt) out.paidAt = out.createdAt;
@@ -4151,12 +4198,36 @@
   }
 
   /* ======================================================================================================
+   * 18b. Trimmed copy for a screen that does not need the whole history
+   * ==================================================================================================== */
+  // Makes a smaller copy of a kitchen for a read-mostly screen: every open order and active ticket, everything newer than the last `days` days, the menu,
+  // ingredients, settings, batches, counters and the ledger as they are, and only the recent events and safety entries. The hub keeps everything; this
+  // never changes the state it is given. The second result says what was left out, so a page can say "Showing the last N days".
+  function trimState(state, now, days) {
+    if (!isState(state) || !isNum(now) || !isNum(days) || days < 1) return { state, trimmed: null };
+    const since = now - days * 86400000;
+    // True when a record was made inside the window.
+    const recent = (x) => isNum(x && x.createdAt) && x.createdAt >= since;
+    const keepOrder = new Set();
+    for (const o of state.orders) if (o.status === 'open' || recent(o)) keepOrder.add(o.id);
+    // True when a ticket is open work, recent, or belongs to an order that stays.
+    const keepTicket = (t) => t.status === 'active' || recent(t) || (t.orderId !== undefined && keepOrder.has(t.orderId));
+    for (const t of state.tickets) if (keepTicket(t) && t.orderId !== undefined) keepOrder.add(t.orderId);   // a kept ticket keeps its order
+    const tickets = state.tickets.filter(keepTicket), orders = state.orders.filter((o) => keepOrder.has(o.id));
+    const evs = Array.isArray(state.events) ? state.events.filter((e) => isNum(e.t) && e.t >= since) : [];
+    const keep = Array.isArray(state.safetyKeep) ? state.safetyKeep.filter((e) => isNum(e.t) && e.t >= since) : [];
+    const cut = { tickets: state.tickets.length - tickets.length, orders: state.orders.length - orders.length, events: (Array.isArray(state.events) ? state.events.length : 0) - evs.length + (Array.isArray(state.eventArchive) ? state.eventArchive.reduce((n, c) => n + (Array.isArray(c) ? c.length : 0), 0) : 0) };
+    const out = Object.assign({}, state, { tickets, orders, events: evs, eventArchive: [], safetyKeep: keep });
+    return { state: out, trimmed: { since, days, left: cut } };
+  }
+
+  /* ======================================================================================================
    * 19. Exports
    * ==================================================================================================== */
   // The public door: everything other files may use. _internal is for tests and tools.
   Object.assign(E, {
-    apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
-    pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
+    SAFETY_KEEP_DAYS, SAFETY_KEEP_MS, apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
+    pacingPlan, planFor, ticketTiming, ticketProgress, totalsOf, checkInvariants, validateBackup, trimState, serialize, deserialize, allEvents, prune,
     channelThresholds, noQualityStage, coldInfo, lastPull, defaultSettings, blankSettings, moduleOn, cookAheadActive, demoLeftovers, chipsOf, counterOn, CHIP_MAX, CHIP_LEN, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),

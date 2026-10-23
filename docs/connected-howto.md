@@ -76,3 +76,54 @@ Do not run the real kitchen on the beta. Do not share screenshots of an address 
 **Main server installed before this setting:** `server/setup-server.sh` now puts `Environment=SMOKEBOX_TRUST_PROXY=1` in the main unit, but the nightly update does not rewrite the unit. On an existing server run once, as root: `mkdir -p /etc/systemd/system/smokebox.service.d && printf '[Service]\nEnvironment=SMOKEBOX_TRUST_PROXY=1\n' > /etc/systemd/system/smokebox.service.d/proxy.conf && systemctl daemon-reload && systemctl restart smokebox`. Only do this while Caddy is in front of the hub on 127.0.0.1; if the hub is ever reachable directly, a screen on the same computer could choose its own address. The deploy build's hub ignores the setting until it contains the connected code. Not run on a real server.
 
 **Under a path prefix:** a bare `?hub` or `?follow` now uses the page's own folder (night/a5-c6), so a prefix such as `/beta/` also works; `beta.sh` still uses a second host name because it needs no edit of the real site's block. Proved with the proxy stand-in only (`test/beta-proxy.e2e.mjs`).
+
+## Risks and limits
+- Not run on a real server (above). Caddy's own parse of the added block is the first real test; the script undoes it if Caddy refuses.
+- One `import` line is added to the real Caddyfile. A copy is kept; `beta-remove.sh` removes the line. A damaged Caddyfile would affect the real site at its next reload.
+- Behind Caddy the hub sees every request from 127.0.0.1, so its wrong-code lockout counts all screens together: ten wrong codes from anyone who got past the login lock the code for a minute for everyone.
+- The codes sit in the address of the tablets (needed to open the page). Do not share screenshots of the address bar.
+- A second Node process uses memory on the same small server; the beta's data is separate and is not backed up by anything.
+- The connected build is experimental: do not run the real kitchen on it. The nightly beta update follows the branch `connected` as it is that night.
+
+## Server update safety (time, signing, pinning) and first-boot checks
+**Not run on a real server.** These steps were tested with fake services (`test/updater.test.mjs`), not with a real systemd, Caddy or GitHub.
+
+**Update time.** The nightly update runs at 4:30 in the zone you gave `go.sh` (the timer line now ends with the zone name). A server installed earlier runs it at 4:30 in the SERVER's zone, which is UTC on a fresh server (that is 11:30 PM or 12:30 AM in New York, during service). To fix an existing server, as root: `sed -i 's/^OnCalendar=.*/OnCalendar=*-*-* 04:30:00 America\/New_York/' /etc/systemd/system/smokebox-update.timer && systemctl daemon-reload && systemctl restart smokebox-update.timer`, then check with `systemctl list-timers smokebox-update.timer` (the NEXT column) and `systemd-analyze calendar '*-*-* 04:30:00 America/New_York'`. The beta timer (04:50) has the same fix in `beta.sh`.
+
+**Signed updates (optional, off by default).** Today the updater trusts whatever the `deploy` branch holds, so whoever can write that branch controls the server as root. The updater logs a WARNING line each night about this. To turn on checking:
+1. On YOUR computer (never on the server, never on GitHub): `openssl genpkey -algorithm ed25519 -out update-key.pem && openssl pkey -in update-key.pem -pubout -out update-pubkey.pem` (OpenSSL 3, as on Ubuntu 22.04 or later).
+2. Before each push to `deploy`, in the folder to be committed: `bash tools/sign-deploy.sh /path/to/update-key.pem`. It writes `deploy.manifest` (a sha256 line per file) and `deploy.manifest.sig` into the tree. They are inside the build, not a separate file next to a tarball, because GitHub's tarball bytes are not stable but the files are.
+3. On the server, as root: `mkdir -p /etc/smokebox && cp update-pubkey.pem /etc/smokebox/update-pubkey`. From then on the updater refuses a build that is unsigned, signed with another key, has a changed file, or has a file that is not on the list, and keeps the running version. To stop checking, delete that file.
+Lose the private key and you must remove the public key on the server by hand before the next update can pass.
+
+**Pinning.** `SMOKEBOX_UPDATE_REF=v1.4.0` (a tag) or a full 40-character commit id makes the updater download that exact version instead of the moving branch. Put it in the update service: `systemctl edit smokebox-update` and add `[Service]` and `Environment=SMOKEBOX_UPDATE_REF=v1.4.0`. Combine with signing for the strongest setting. The updater also refuses archives containing devices, pipes or links (as root they would be extracted).
+
+**Check the service hardening after installing (the settings in `setup-server.sh` were never run on a real systemd).** As root, after `go.sh`:
+- `systemctl status smokebox caddy smokebox-update.timer` (all active)
+- `systemd-analyze security smokebox` (shows an exposure score and each setting; a score of about 2 to 4 "OK" or "MEDIUM" is expected for this unit; look at lines marked with a red or yellow dot that are NOT among: network access, address families)
+- `journalctl -u smokebox -n 50 --no-pager` (no "Failed to set up", "Permission denied" or "namespace" lines)
+- `ls -ld /var/lib/smokebox && ls -l /var/lib/smokebox` (owned by `smokebox`, mode 700 / 600) and `ps -o user,cmd -C node` (runs as `smokebox`)
+- `curl -s http://127.0.0.1:8787/health` (should say `"ok":true`) and open the site from a tablet.
+If the service will not start after install, the most likely cause is a hardening line the server's systemd does not accept: run `journalctl -u smokebox -b --no-pager | tail -30`, comment out the named line in `/etc/systemd/system/smokebox.service`, `systemctl daemon-reload && systemctl restart smokebox`, and tell the developers which line it was.
+
+## Optional hardening: slow down password guessing (`harden.sh`)
+**Not run on a real server.** Tested only against stand-ins (`test/harden-scripts.test.mjs`): the file edits, the validate-then-reload order, the roll-back, the undo and the log pattern are checked; fail2ban itself, a real Caddy log and real bans are not.
+
+**Why.** The sign-in page (Caddy `basic_auth`) has no limit on wrong passwords, and every wrong password costs the small server a bcrypt check. Someone who finds the address can keep the server busy.
+
+**What `bash harden.sh` does (as root, safe to run twice):** turns on Caddy's JSON access log (`/var/log/caddy/access.log`, 10 MB, 3 kept) through a snippet imported into each site block (the main site and the beta); installs fail2ban with a jail `caddy-401` that blocks an address for 1 hour after 8 wrong passwords in 10 minutes (ports 80 and 443; the server itself, 127.0.0.1, is never banned); and turns on automatic SECURITY upgrades without automatic reboot. It runs `caddy validate` before reloading and puts everything back if Caddy refuses. It does NOT add a firewall rate limit (`ufw limit` is made for ssh and would also cut off a kitchen of many tablets behind one Wi-Fi address). `bash harden-remove.sh` undoes it (the packages stay installed).
+
+**Three commands to check it after running it:**
+1. `fail2ban-client status caddy-401` (the jail is listed; "Currently banned" starts at 0)
+2. `caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`
+3. `journalctl -u fail2ban -u caddy -n 40 --no-pager` (no errors about the filter or the log file)
+Then test it: from another computer type 8 wrong passwords at the sign-in page; that computer should be blocked for an hour. Unblock with `fail2ban-client set caddy-401 unbanip ADDRESS`.
+
+**Caution:** a kitchen where all tablets share one public address (one router) shares one limit: eight wrong passwords from any of them block them all for an hour. Type the password carefully or raise `maxretry` in `/etc/fail2ban/jail.d/caddy-401.local`.
+
+## The tunnel (`tunnel.sh`) and its risks
+`tunnel.sh` adds a second address, `https://<random-words>.trycloudflare.com`, that reaches the same server through Cloudflare, for networks that block the server's own address. Plainly:
+- The address is public. Anyone who learns it (a screenshot, a message, a log) reaches the sign-in page. It changes when the tunnel restarts, but it is not a secret to rely on.
+- The password prompt is the only gate, and the password you type travels through Cloudflare in a form Cloudflare can read.
+- Traffic through the tunnel reaches Caddy from 127.0.0.1, so the fail2ban jail above cannot ban the real caller (it sees only the local connector). Guessing through the tunnel is therefore not slowed down. Use a long password (a phrase), and switch the tunnel off when you do not need it: `systemctl disable --now smokebox-tunnel`.
+- The connector (`cloudflared`) is installed from Cloudflare's "latest" release page with only a size check; it is not pinned or signed here.

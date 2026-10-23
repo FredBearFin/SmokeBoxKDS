@@ -66,21 +66,37 @@ const PROTO = 1;
 // The oldest client protocol the hub still accepts when a client says its own (x-smokebox-client). 0 accepts any client, including ones that say nothing.
 const DEFAULT_MIN_CLIENT = 0;
 
-// Reads the saved JSON file and checks it with the engine's validateBackup; returns { state, seq, hubId } or null.
+// Reads the saved JSON file and checks it with the engine's validateBackup. Returns { state, seq }, or { none: true } when there is no file, or
+// { problem } when the file is damaged. A file that is not valid JSON, or not a kitchen at all, is renamed to <file>.bad-<time> (it is never
+// written over); if that cannot be done this throws, so the hub does not start. A file from a different version (for example a newer format after a
+// rollback) is left exactly as it is and this throws, so nothing ever replaces data a newer build could still read.
 function loadSaved(E, file) {
-  if (!file || !fs.existsSync(file)) return null;
-  try {
-    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!file || !fs.existsSync(file)) return { none: true };
+  let text;
+  try { text = fs.readFileSync(file, 'utf8'); } catch (e) { throw new Error('The saved file ' + file + ' cannot be read (' + e.message + '). The hub will not start so nothing is overwritten.'); }
+  let saved = null;
+  try { saved = JSON.parse(text); } catch (e) { saved = null; }
+  let why = 'unreadable';
+  if (saved !== null && typeof saved === 'object') {
     const v = E.validateBackup(saved.state);
-    if (!v.ok) { console.warn('[hub] saved file refused: ' + v.error); return null; }
-    return { state: v.state, seq: Number.isInteger(saved.seq) ? saved.seq : 0, hubId: typeof saved.hubId === 'string' ? saved.hubId : null, seeded: saved.seeded === true };
-  } catch (e) { console.warn('[hub] saved file unreadable: ' + e.message); return null; }
+    if (v.ok) return { state: v.state, seq: Number.isInteger(saved.seq) ? saved.seq : 0, hubId: typeof saved.hubId === 'string' ? saved.hubId : null, seeded: saved.seeded === true };
+    if (/^unsupported version \d/.test(v.error || '')) throw new Error('The saved file ' + file + ' was written by a different version (' + v.error + '). It was left untouched and the hub will not start. Start the build that wrote it, or move the file away on purpose.');
+    why = 'not a valid kitchen (' + v.error + ')';
+  }
+  const bad = file + '.bad-' + new Date().toISOString().replace(/[:.]/g, '-');
+  try { fs.renameSync(file, bad); } catch (e) { throw new Error('The saved file ' + file + ' is ' + why + ' and could not be set aside (' + e.message + '). The hub will not start so nothing is overwritten.'); }
+  console.warn('[hub] saved file ' + why + '; kept as ' + bad + ' and starting with an empty kitchen');
+  return { problem: { words: 'The saved file was ' + why + ', so it was set aside as ' + path.basename(bad) + ' and the hub started with an empty kitchen.', kept: path.basename(bad) } };
 }
 
-// Writes state and seq to the JSON file through a temp file and a rename, so a crash never leaves half a file.
-function writeSaved(file, state, seq, hubId, seeded) {
+// Writes state and seq to the JSON file through a temp file and a rename, so a crash never leaves half a file. The temp file is flushed to disk
+// first, and at most every bakEveryMs the file being replaced is copied to <file>.bak.
+let lastBak = 0;
+function writeSaved(file, state, seq, hubId, seeded, bakEveryMs) {
   const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify({ v: 1, seq, hubId, seeded: seeded === true, state }));
+  const fd = fs.openSync(tmp, 'w');
+  try { fs.writeSync(fd, JSON.stringify({ v: 1, seq, hubId, seeded: seeded === true, state })); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  if (Date.now() - lastBak >= bakEveryMs && fs.existsSync(file)) { try { fs.copyFileSync(file, file + '.bak'); lastBak = Date.now(); } catch (e) { /* the save itself still goes ahead */ } }
   fs.renameSync(tmp, file);
 }
 
@@ -92,7 +108,12 @@ export async function createHub(opts = {}) {
   const tickMs = opts.tickMs ?? 1000, heartbeatMs = opts.heartbeatMs ?? 15000, saveMs = opts.saveMs ?? 500;
   const htmlFile = opts.htmlFile || process.env.SMOKEBOX_HTML || path.join(ROOT, 'dist/smokebox.html');
   const dataFile = opts.dataFile === undefined ? process.env.SMOKEBOX_DATA : opts.dataFile;
-  const saved = loadSaved(E, dataFile);
+  const loaded = loadSaved(E, dataFile);
+  const saved = loaded.state ? loaded : null;
+  const dataProblem = loaded.problem || null;
+  const bakEveryMs = opts.bakEveryMs ?? 10 * 60e3;
+  const maxBacklog = opts.maxClientBacklog ?? 4 * 1024 * 1024;
+  const startedAt = Date.now();
   let state = saved ? saved.state : E.newState({ now: now(), starter: opts.starter ?? process.env.SMOKEBOX_STARTER === '1' });
   let seq = saved ? saved.seq : 0;
   // A name for this kitchen's history. It stays the same across restarts (it is saved with the state), and changes only when the
@@ -246,7 +267,7 @@ export async function createHub(opts = {}) {
   }
   // Keeps a replayed or applied entry in the recent log and, when it has an action id, its answer.
   function remember(e) {
-    const op = { seq: e.seq, opId: e.opId || null, actionType: e.type, payload: e.payload ?? {}, now: e.now, by: e.by ?? null, screen: e.screen || undefined, info: e.info };
+    const op = { seq: e.seq, opId: e.opId || null, actionType: e.type, payload: e.payload ?? {}, now: e.now, by: e.by ?? null, screen: e.screen || undefined, info: e.info, rev: state && state.rev };
     op.bytes = JSON.stringify(op).length;
     ops.push(op); opsBytes += op.bytes;
     while (ops.length > MAX_OPS || (opsBytes > MAX_OPS_BYTES && ops.length > 1)) opsBytes -= ops.shift().bytes || 0;
@@ -264,17 +285,23 @@ export async function createHub(opts = {}) {
   // Writes the file right now if anything changed since the last write.
   function flush() {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-    if (dataFile && dirty) { dirty = false; try { writeSaved(dataFile, state, seq, hubId, seeded); walCompact(); } catch (e) { console.warn('[hub] save failed: ' + e.message); } }
+    if (dataFile && dirty) { dirty = false; try { writeSaved(dataFile, state, seq, hubId, seeded, bakEveryMs); walCompact(); } catch (e) { console.warn('[hub] save failed: ' + e.message); } }
   }
   // Builds the message every screen gets: the whole state, the hub clock and the change counter.
   // opIds lists the actions in the recent log, so a screen knows which of its own unconfirmed actions are already in this state.
   const view = (extra) => Object.assign({ state, serverNow: now(), seq, hubId, opIds: ops.map((o) => o.opId).filter(Boolean) }, extra || {});
   // Sends one server-sent event (a named message with a JSON body) to one connected screen.
   const send = (res, event, data) => res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n');
+  // Sends to one screen unless it has stopped reading: a screen whose unsent backlog passes the cap is cut off (it reconnects and gets a fresh copy), so a
+  // sleeping tablet with a half-open connection can never make the hub's memory grow without end.
+  function sendOrDrop(res, event, data) {
+    if (res.writableLength > maxBacklog) { clients.delete(res); res.destroy(); return; }
+    send(res, event, data);
+  }
   // Counts one more change, tells every connected screen, and queues a save.
   function changed(extra) {
     seq++;
-    for (const res of clients) send(res, 'state', view(extra));
+    for (const res of Array.from(clients)) sendOrDrop(res, 'state', view(extra));
     if (extra && extra.op) {
       const m = opMessage(extra.op);
       for (const res of Array.from(followers)) {
@@ -287,7 +314,7 @@ export async function createHub(opts = {}) {
   }
   const MAX_FOLLOW_BACKLOG = 4 * 1024 * 1024;
   // What a follower receives for one applied action or tick: its place in the order, what it was, and the hub clock.
-  const opMessage = (o) => ({ seq: o.seq, opId: o.opId, type: o.actionType, payload: o.payload, now: o.now, by: o.by, screen: o.screen, serverNow: now() });
+  const opMessage = (o) => ({ seq: o.seq, opId: o.opId, type: o.actionType, payload: o.payload, now: o.now, by: o.by, screen: o.screen, rev: o.rev, serverNow: now() });
 
   // Runs one action through the engine with the hub clock; repeats of a known opId get the first answer back.
   function runAction(body) {
@@ -369,7 +396,6 @@ export async function createHub(opts = {}) {
   // when the connection itself comes from this computer (loopback): from anywhere else the header is ignored, so a screen cannot pick its own address. The
   // last entry is used (the one the proxy added), never the first (which the client can write), and it must be a real IP address.
   const gzipOn = opts.gzip !== undefined ? opts.gzip !== false : process.env.SMOKEBOX_NO_GZIP !== '1';
-  const startedAt = Date.now();
   const trustProxy = opts.trustProxy !== undefined ? !!opts.trustProxy : process.env.SMOKEBOX_TRUST_PROXY === '1';
   // The address used for the per-address limits.
   function addrOf(req) {
@@ -456,6 +482,7 @@ export async function createHub(opts = {}) {
     }
     if (clients.size + followers.size >= MAX_CLIENTS) return fail(503, 'tooMany', { 'retry-after': '10' });
     const gzip = wantsGzip(req);
+    const trimDays = (() => { const n = Number(q.get('trim')); return q.get('trim') !== null && Number.isInteger(n) && n >= 1 && n <= 365 ? n : 0; })();
     res.writeHead(200, Object.assign({ 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', connection: 'keep-alive' }, gzip ? { 'content-encoding': 'gzip', vary: 'Accept-Encoding' } : {}, cors));
     if (gzip) gzipStream(req, res);
     followers.add(res);
@@ -470,7 +497,11 @@ export async function createHub(opts = {}) {
     if (missed && (missed.length === 0 || missed.reduce((a, o) => a + (o.bytes || 0), 0) <= stateBytes)) {
       for (const o of missed) send(res, 'op', opMessage(o));
       send(res, 'resumed', { seq, hubId, count: missed.length, serverNow: now() });
-    } else send(res, 'snapshot', { state, seq, hubId, proto: PROTO, serverNow: now(), opIds: ops.slice(-1000).map((o) => o.opId).filter(Boolean) });
+    } else {
+      // A screen that asked for ?trim=<days> gets only the recent part of the kitchen; the hub keeps everything.
+      const t = trimDays ? E.trimState(state, now(), trimDays) : null;
+      send(res, 'snapshot', Object.assign({ state: t ? t.state : state, seq, hubId, proto: PROTO, serverNow: now(), opIds: ops.slice(-1000).map((o) => o.opId).filter(Boolean) }, t && t.trimmed ? { trimmed: t.trimmed } : {}));
+    }
   }
   // Tells a screen about this hub without joining: its protocol, its history name, and whether it is empty (no action ever applied and
   // no kitchen sent to it), so a device can decide whether it may send its own kitchen here.
@@ -582,10 +613,10 @@ export async function createHub(opts = {}) {
   // Answers one HTTP request: the page, the event stream, or an action.
   function handle(req, res) {
     const url = (req.url || '/').split('?')[0];
-    // Health for an owner's monitor and the updater: no secrets, no codes, only counts.
+    // Health for an owner's monitor and the updater: no secrets, no codes, only counts. dataProblem appears only when the saved file had to be set aside.
     if ((req.method === 'GET' || req.method === 'HEAD') && url === '/health') {
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
-      res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ ok: true, hubId, seq, screens: clients.size + followers.size, uptime: Math.floor((Date.now() - startedAt) / 1000) }));
+      res.end(req.method === 'HEAD' ? undefined : JSON.stringify(Object.assign({ ok: true, hubId, seq, screens: clients.size + followers.size, uptime: Math.floor((Date.now() - startedAt) / 1000) }, dataProblem ? { dataProblem: dataProblem.words + ' (' + dataProblem.kept + ')' } : {})));
       return;
     }
     if (req.method === 'GET' && url === '/events') {
@@ -686,7 +717,7 @@ export async function createHub(opts = {}) {
       const op = remember(entry);
       changed({ type: 'tick', op });
     }, tickMs);
-    hbTimer = setInterval(() => { for (const res of clients) send(res, 'hb', { serverNow: now(), seq }); for (const res of followers) send(res, 'hb', { serverNow: now(), seq, hubId }); }, heartbeatMs);
+    hbTimer = setInterval(() => { for (const res of Array.from(clients)) sendOrDrop(res, 'hb', { serverNow: now(), seq }); for (const res of followers) send(res, 'hb', { serverNow: now(), seq, hubId }); }, heartbeatMs);
     return new Promise((resolve) => server.listen(port, host, () => resolve(server.address().port)));
   }
   // Stops timers, ends every stream, writes the file one last time and closes the server.
@@ -713,7 +744,7 @@ export async function createHub(opts = {}) {
   function snapshot() { return view(); }
   // Which protections are on, with no secret in it (only whether a code exists).
   const protections = { trustProxy, tokensRequired: requireTokens, writeCode: !!writeCode, followCode: !!followCode, serviceWorker: swOn, gzip: gzipOn };
-  return { server, listen, close, crash, flush, snapshot, hubId, replayed, adminKey, screens, protections };
+  return { server, listen, close, crash, flush, snapshot, hubId, replayed, adminKey, screens, protections, dataProblem, clientCount: () => clients.size };
 }
 
 // The owner's commands for a running hub: node server/server.mjs admin pair [--owner] | list | revoke ID  (options --port N, --data FILE).
@@ -760,7 +791,8 @@ async function adminCli(args) {
 // Command line start: reads PORT and HOST, prints the address, and saves on Ctrl-C.
 async function main() {
   if (process.argv[2] === 'admin') { process.exit(await adminCli(process.argv.slice(3))); }
-  const hub = await createHub();
+  let hub;
+  try { hub = await createHub(); } catch (e) { console.error('[hub] ' + e.message); process.exit(1); }
   const port = await hub.listen(Number(process.env.PORT || 8787), process.env.HOST || '127.0.0.1');
   console.log('[hub] Smokebox prototype hub on http://' + (process.env.HOST || '127.0.0.1') + ':' + port + ' (time zone ' + (process.env.TZ || 'system') + ')');
   // Says on or off for one protection.

@@ -41,6 +41,6 @@ Warnings sound only while the screen is on and Smokebox is open on the board, wi
 - Every order makes a ticket. With Counter service on (Settings, How you serve), a paid order's ticket finishes and clears itself, and the board has no station tabs.
 - "Do you cook food ahead?" is a Yes, No or Not sure question. Not sure counts as No. The Cabinet, batch timers and their warnings exist only when it is Yes.
 - Smokebox allows one reheat per batch. That is its own rule, not a health code rule.
-- Start over with an empty menu saves a backup at the moment of erasing and erases nothing if the backup fails. There is no undo apart from restoring that file.
+- Start over with an empty menu asks for the PIN first when one is set. It downloads a backup file before anything is erased, needs you to say you saved it, and erases nothing if the backup cannot be made. There is no undo apart from restoring that file.
 - The demo is a separate demo kitchen. A backup made in the demo cannot be loaded into a real kitchen, and the reverse.
 - Reports from demo or sample data are labeled and are not your sales.

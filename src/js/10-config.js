@@ -249,7 +249,7 @@
   // ticket spec), note (140, long enough for an allergy note), and how many tickets (5000) and log events
   // (40000) are kept before the oldest are dropped so the saved data stays small enough for the browser.
   // Starter values.
-  C.limits = { maxItemsPerTicket: 30, maxQty: 20, maxCustomerLen: 40, maxNoteLen: 140, maxTickets: 5000, maxEvents: 40000, maxOrders: 5000, maxMoney: 10000 };
+  C.limits = { maxItemsPerTicket: 30, maxQty: 20, maxCustomerLen: 40, maxNoteLen: 140, maxTickets: 5000, maxEvents: 40000, maxOrders: 5000, maxMoney: 10000, maxPrice: 1000, maxOrderMoney: 10000000 };
   // How an order can be paid. Smokebox only records which one it was; the card itself is taken on the owner's own
   // card reader, and no card number ever enters this app.
   C.payMethods = [{ id: 'cash', name: 'Cash' }, { id: 'card', name: 'Card' }, { id: 'other', name: 'Other' }];
@@ -280,8 +280,8 @@
   const slug = (prefix, name) => prefix + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 16);
   // The first three letters of a name, upper case, for the small tag on tickets and tabs.
   const codeOf = (name) => String(name).replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || '???';
-  // Cleans one typed name: trims spaces, squeezes runs of spaces; returns '' when it is not usable.
-  const cleanName = (x) => (typeof x === 'string' ? x.replace(/\s+/g, ' ').trim() : '');
+  // Cleans one typed name: trims spaces, squeezes runs of spaces, strips invisible direction and zero-width characters; returns '' when it is not usable.
+  const cleanName = (x) => (typeof x === 'string' ? (SB.util && SB.util.cleanText ? SB.util.cleanText(x) : x.replace(/\s+/g, ' ').trim()) : '');
   // Checks a typed name against the others in a list (ignoring one id): true if another entry has it.
   const nameTaken = (list, name, exceptId) => list.some((e) => e.id !== exceptId && e.name.toLowerCase() === name.toLowerCase());
   // Rebuilds the lookup tables in place, so code that already holds them still sees the new entries.

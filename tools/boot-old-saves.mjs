@@ -44,7 +44,7 @@ await withPage({ w: 1280, h: 800, clearStorage: false, init: seed(JSON.parse(fs.
     await page.waitForSelector('.fl-new', { timeout: 8000 });
     const r = await page.evaluate(() => {
       const no = SB.store.startOver({ confirm: 'nope' });
-      const yes = SB.store.startOver({ confirm: 'erase' });
+      const yes = SB.store.startOver({ confirm: 'erase', backupSaved: { filename: 'check.json', chars: 1 } });
       const s = SB.store.getState();
       return { no: no.report, yes: yes.ok, backupChars: yes.backup && yes.backup.text.length, blank: SB.store.isBlank(), menu: s.menu.length, tickets: s.tickets.length, demoKeys: Object.keys(localStorage).filter((k) => k.indexOf('smokebox.demo.') === 0).length };
     });

@@ -1761,6 +1761,8 @@
         body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
+      // With a PIN set, clearing live data asks for it.
+      if (SB.shell && SB.shell.requirePin && !(await SB.shell.requirePin())) { toast('The PIN was not entered. Nothing was cleared.', 'warn'); return; }
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
       const rep = SB.store.resetLive({ keepSettings: true, starter: false });
       if (rep === 'ok') toast('Live data cleared. The board is empty.', 'ok'); else toast(E().describe(rep, {}, st().settings), 'warn');
@@ -1787,7 +1789,7 @@
       text(dLive, String(s.tickets.length - demo)); text(dDemo, String(demo));
       if (!sim || typeof sim.sampleInfo !== 'function') { text(dSample, 'Not loaded'); return; }
       if (sim.sampleEnabled && !sim.sampleEnabled()) { text(dSample, 'Switched off'); return; }
-      if (paintCounts.info) { text(dSample, U.fmtNum(paintCounts.info.tickets) + ' tickets over ' + paintCounts.info.days + ' days'); return; }
+      if (paintCounts.info) { text(dSample, U.fmtNum(paintCounts.info.tickets) + ' ' + plural(paintCounts.info.tickets, 'ticket') + ' over ' + paintCounts.info.days + ' ' + plural(paintCounts.info.days, 'day')); return; }
       text(dSample, 'Counting...');
       if (!paintCounts.asked) {
         paintCounts.asked = true;

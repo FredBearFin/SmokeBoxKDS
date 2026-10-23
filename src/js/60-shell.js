@@ -1282,9 +1282,9 @@
   const pinHash = () => { try { const s = SB.store && SB.store.getState && SB.store.getState(); return (s && s.settings && s.settings.office && s.settings.office.pinHash) || null; } catch (e) { return null; } };
   // True when a manager PIN is set.
   S.hasPin = () => !!pinHash();
-  // Scrambles a PIN into 'sha256:' + 64 hex characters (with 'smokebox.v1:' put in front). Browser crypto
-  // first, pure copy as fallback; same result. The real number is never stored.
-  S.hashPin = async function (pin) {
+  // The old unsalted form of a PIN scramble: 'sha256:' + 64 hex characters of the digest of 'smokebox.v1:' + pin. Browser crypto first, the pure copy as
+  // fallback; same result. Kept so a PIN saved by an older build still works.
+  async function legacyPinHash(pin) {
     const text = 'smokebox.v1:' + String(pin);
     try {
       if (g.crypto && g.crypto.subtle && typeof TextEncoder !== 'undefined') {
@@ -1293,12 +1293,34 @@
       }
     } catch (e) { /* fall back to the pure implementation, which gives the same digest */ }
     return 'sha256:' + sha256hex(text);
+  }
+  // Scrambles a PIN for saving: salted PBKDF2 ('pbkdf2:rounds:salt:hash') where the browser can, the old unsalted form where it cannot. The real
+  // number is never stored. A 4-digit PIN is a door latch for the back office, not a lock: anyone with the device or a backup file can still try
+  // all 10 000 PINs, the salt and rounds only make each try cost real work.
+  S.hashPin = async function (pin) {
+    const salted = await U.secretHash('smokebox.v1:', pin);
+    return salted !== null ? salted : legacyPinHash(pin);
   };
-  // True if the PIN matches the saved scramble. True for anything when no PIN is set.
-  S.checkPin = async function (pin) { const want = pinHash(); if (!want) return true; return (await S.hashPin(pin)) === want; };
+  // True if the PIN matches the saved scramble (either form). True for anything when no PIN is set. A right PIN saved in the old form is saved again
+  // in the new form on the spot.
+  S.checkPin = async function (pin) {
+    const want = pinHash();
+    if (!want) return true;
+    const r = await U.secretCheck('smokebox.v1:', pin, want);
+    let ok = r.ok;
+    if (!ok && !(g.crypto && g.crypto.subtle) && want.indexOf('sha256:') === 0) ok = (await legacyPinHash(pin)) === want;      // no browser crypto: the pure copy
+    if (ok && r.legacy) {
+      try { const fresh = await U.secretHash('smokebox.v1:', pin); if (fresh) SB.store.dispatch('updateSettings', { patch: { office: { pinHash: fresh } } }, { source: 'user' }); } catch (e) { /* the old form keeps working */ }
+    }
+    return ok;
+  };
   // Sets (4 digits) or removes (null or '') the manager PIN. Only the scramble is saved, through the store
   // (settings.office.pinHash); any unlock is forgotten. Resolves {ok, report}; bad input gives 'badPin'.
-  S.setPin = async function (pin) {
+  // Asks for the current PIN right now (the keypad), even inside the 2-minute grace. True at once when no PIN is set; false when cancelled.
+  S.requirePin = () => (S.hasPin() ? promptPin() : Promise.resolve(true));
+  S.setPin = async function (pin, opts) {
+    // With a PIN already set, changing or removing it needs proof that the current PIN was just entered (opts.verified from requirePin).
+    if (S.hasPin() && !(opts && opts.verified === true)) return { ok: false, report: 'pinRequired', message: 'The current PIN is needed to change or remove it.' };
     if (pin != null && pin !== '' && !/^\d{4}$/.test(String(pin))) return { ok: false, report: 'badPin', message: 'Use exactly 4 digits.' };
     const hash = pin == null || pin === '' ? null : await S.hashPin(pin);
     if (!SB.store || typeof SB.store.dispatch !== 'function') return { ok: false, report: 'noStore', message: 'The store is not available.' };
@@ -1686,7 +1708,7 @@
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '', sub: null };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, kind: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -1695,6 +1717,10 @@
   };
   // When the last backup was made on this device (ms), or null if never.
   S.lastBackupAt = () => { const t = U ? U.storage.get(KEY.lastBackup, null) : null; return typeof t === 'number' ? t : null; };
+  // Accepts the device's new time after the person says it is right, then refreshes the strip.
+  function useNewTime() { SB.store.acceptClockJump(); paintBanner(); }
+  // Keeps the old time and stays quiet about the jump for ten minutes.
+  function keepOldTime() { bn.clockSnooze = Date.now() + 10 * 60000; paintBanner(); }
   // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
   function bannerWanted() {
     const store = SB.store;
@@ -1706,6 +1732,11 @@
     if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
+    // Off the board (a back-office page), a device clock that jumped far ahead is asked about here: a slim strip, not a box over the page.
+    if (ss.clockSuspect && Date.now() >= (bn.clockSnooze || 0) && (R.view().kind === 'office' || !(SB.floor && SB.floor.isMounted && SB.floor.isMounted()))) {
+      const dd = Math.round(ss.clockSuspect.aheadMs / 86400000);
+      return { kind: 'clock', tone: 'warn', text: 'The clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(ss.clockSuspect.aheadMs / 3600000) + ' hours') + '. Still on the old time.', act: 'Use the new time', onAct: useNewTime, later: true, laterLabel: 'Keep the old time', onLater: keepOldTime };
+    }
     if (!s) return null;
     const due = backupDue({ service: s.settings && s.settings.service, lastBackupAt: S.lastBackupAt(), snoozeUntil: bn.snoozeUntil, now: Date.now(), hasData: s.tickets.length + s.batches.length > 0 });
     return due ? { kind: 'nudge', tone: 'warn', text: 'Service is over. Save today\'s backup now and keep a copy off this device (email it or use a USB drive).', act: 'Back up now', later: true } : null;
@@ -1722,7 +1753,7 @@
     // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
-    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: 'Hide for 45 minutes', onClick: () => { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } }, ico('x', 18), h('span', { class: 'visually-hidden' }, 'Later')) : null;
+    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: w.laterLabel || 'Hide for 45 minutes', onClick: () => { if (w.onLater) w.onLater(); else { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } } }, ico('x', 18), h('span', { class: 'visually-hidden' }, w.laterLabel || 'Later')) : null;
     bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
