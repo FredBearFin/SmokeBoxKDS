@@ -18,7 +18,7 @@ How to rerun any suite: `SMOKEBOX_TOOLS=$(npm root -g) node tools/run-slow.mjs <
 | shell | `node test/shell.e2e.mjs` | 83 s | 204 ok, 1 FAIL |
 | contract | `node test/contract.e2e.mjs` | 98 s | 3 of 5 behaviour tests ok; static scan 1 FAIL, behaviour 2 FAIL |
 | artifact | `node test/artifact.e2e.mjs` | 4 s | pass |
-| qa (test/e2e journeys, 45 tests) | `node tools/qa.mjs --no-report` | 901 s (hit my 900 s limit during 11-13); 11b-13f rerun singly | 20 PASS, 25 FAIL (see 3.8) |
+| qa (test/e2e journeys, 45 tests) | `node tools/qa.mjs --no-report` | 901 s (hit my 900 s limit during 11-13); 11b-13f rerun singly | 23 PASS, 22 FAIL (see 3.8) |
 | backup-banner, bumpbar, config-names, order-note, order-page, orders-page, pay-ui, production-mode, quiet-board, setup-wizard (`*.e2e.mjs`, not named in the brief) | `node test/<name>.e2e.mjs` | 2.6 to 14.8 s each | all pass |
 | ux-hidden-restore | `node test/ux-hidden-restore.mjs` | 122 s | pass |
 | ux-sound-leader | `node test/ux-sound-leader.mjs` | 73 s in the loaded run | FAIL once under load, pass 2 of 2 alone (flake, F6) |
