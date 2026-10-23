@@ -3612,6 +3612,7 @@ a.of-nav:active { background: var(--press); }
   border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
   overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin;
 }
+.od-toc { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }   /* a soft right edge says the strip scrolls */
 .od-toc-list { display: flex; gap: var(--sp-2); width: max-content; min-width: 100%; }
 .od-toc-link {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-4); white-space: nowrap;
@@ -3626,10 +3627,10 @@ a.of-nav:active { background: var(--press); }
   .od-layout { grid-template-columns: 184px minmax(0, 1fr); gap: var(--sp-8); align-items: start; }
   .od-toc {
     top: calc(var(--od-sticky-top) + var(--sp-4)); margin: 0; padding: 0; overflow: visible;
-    background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0;
+    background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; -webkit-mask-image: none; mask-image: none;
   }
   .od-toc-list { display: grid; gap: 2px; width: auto; min-width: 0; }
-  .od-toc-link { min-height: 40px; padding: 0 var(--sp-3); border: 0; border-left: 2px solid var(--line-soft); border-radius: 0 var(--r-btn) var(--r-btn) 0; }
+  .od-toc-link { min-height: 44px; padding: 0 var(--sp-3); border: 0; border-left: 2px solid var(--line-soft); border-radius: 0 var(--r-btn) var(--r-btn) 0; }
   .od-toc-link[aria-current="location"] { border-left-color: var(--amber); }
 }
 
@@ -3655,7 +3656,7 @@ a.of-nav:active { background: var(--press); }
 .od-read:empty { display: none; }
 .od-ferr { display: flex; align-items: flex-start; gap: 6px; font-size: var(--fs-2); font-weight: var(--w-semi); line-height: 1.35; color: var(--crimson); }
 .od-ferr .icon { margin-top: 2px; }
-.od .stepper-input { font-size: var(--fs-4); flex: none; }
+.od .stepper-input { font-size: var(--fs-4); flex: none; min-width: 4.8ch; }   /* a 3-digit value must stay readable even when the stepper sized itself for two */
 .od .stepper-btn.is-big { width: auto; min-width: var(--tap-step); padding: 0 var(--sp-2); white-space: nowrap; }   /* "-1000" must stay on one line */
 .od .stepper-field { flex: none; }   /* a stepper may spill sideways before it may hide a digit */
 .od .stepper-unit { max-width: 7em; overflow: hidden; text-overflow: ellipsis; }
@@ -34352,7 +34353,7 @@ a.of-nav:active { background: var(--press); }
     const cutsIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Cuts the observer counted', style: 'width:7em' });
     const batchesIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Batches the observer counted', style: 'width:7em' });
     const whenSel = h('select', { class: 'input', 'aria-label': 'Report window' }, h('option', { value: 'open' }, 'Since opening'), h('option', { value: '4' }, 'Last 4 hours'), h('option', { value: '24' }, 'Last 24 hours'));
-    const repBox = h('pre', { class: 'od-report', hidden: true, style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
+    const repBox = h('pre', { class: 'od-report', hidden: true, role: 'region', 'aria-label': 'Pilot report', tabindex: '0', 'aria-live': 'polite', style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
     // Builds the report for the chosen window and shows it; with download true it also saves the CSV.
     async function makeReport(download) {
       const s = stateNow(), now = SB.store.now();
@@ -34421,6 +34422,7 @@ a.of-nav:active { background: var(--press); }
     card1.body.append(
       lastLine,
       para('A backup is one file with your dishes, orders, settings and records. Back up at the end of every day, and keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
+      para('The starting cash you type on Close the day is remembered on this device only. It is not in a backup.', 'od-hint'),
       h('div', { class: 'od-actions' }, dlBtn, cpBtn), exStatus.el, fb);
     // The spreadsheet files and the pilot report are less common, so they sit in a closed group below the flow.
     pn.body.appendChild(h('details', { class: 'od-paste-det od-more' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Spreadsheet files and the pilot report')),
@@ -35570,9 +35572,20 @@ a.of-nav:active { background: var(--press); }
   // classified as kitchen data in 00-util.js (an unclassified key is kept apart in the demo, which is the safe side).
   const START_KEY = 'smokebox.v1.' + 'office.startCash';
   // The starting cash remembered from the last close, as text ('' when none).
-  function rememberedStart() { try { const v = U.storage.get(START_KEY, ''); return typeof v === 'string' ? v : ''; } catch (e) { return ''; } }
+  // The starting cash remembered from the last close, as text, or '' when none or when it belongs to an older kitchen: it is
+  // saved with the time it was saved, and ignored unless this kitchen has an order from before that time (Start over
+  // empties the orders, so every later order is newer and the old value is dropped).
+  function rememberedStart() {
+    try {
+      const v = U.storage.get(START_KEY, null);
+      if (!v || typeof v !== 'object' || typeof v.t !== 'string' || !isNum(v.at)) return '';
+      const s = stateNow();
+      const orders = s && Array.isArray(s.orders) ? s.orders : [];
+      return orders.some((o) => o && isNum(o.createdAt) && o.createdAt <= v.at) ? v.t : '';
+    } catch (e) { return ''; }
+  }
   // Remembers the starting cash text for tomorrow when it is a valid amount.
-  function rememberStart(text) { try { if (isNum(U.parseDollars(text))) U.storage.set(START_KEY, String(text).trim()); } catch (e) { /* the helper still works without it */ } }
+  function rememberStart(text) { try { if (!String(text == null ? '' : text).trim()) U.storage.remove(START_KEY); else if (isNum(U.parseDollars(text))) U.storage.set(START_KEY, { t: String(text).trim(), at: SB.store.now() }); } catch (e) { /* the helper still works without it */ } }
 
   // The cash-in-the-drawer block: an optional starting cash box and the line that adds it to today's cash payments.
   function drawerBlock(m, drawer) {
@@ -35917,7 +35930,8 @@ a.of-nav:active { background: var(--press); }
       h('td', null, U.fmtDateShort(U.dateKey(r.at)) + ' ' + U.fmtTime(r.at)), h('td', null, r.kind), h('td', null, r.food), h('td', null, r.detail, (r.facts || []).map((f) => h('div', { class: 'si-fact' }, f))), h('td', null, r.who || 'not recorded'),
       h('td', null, r.corrections.map((c) => h('div', { class: 'si-corr' }, 'Correction ' + U.fmtDateShort(U.dateKey(c.at)) + ' ' + U.fmtTime(c.at) + (c.who ? ' by ' + c.who : '') + ': ' + c.note)))));
     return h('table', { class: 'si-table' },
-      h('thead', null, h('tr', null, ['When', 'What', 'Food', 'Detail', 'Logged by', 'Corrections added later'].map((t) => h('th', null, t)))),
+      h('caption', { class: 'visually-hidden' }, 'Food safety entries, oldest first'),
+      h('thead', null, h('tr', null, ['When', 'What', 'Food', 'Detail', 'Logged by', 'Corrections added later'].map((t) => h('th', { scope: 'col' }, t)))),
       h('tbody', null, body.length ? body : h('tr', null, h('td', { colspan: 6 }, 'No safety entries in this range.'))));
   }
 
