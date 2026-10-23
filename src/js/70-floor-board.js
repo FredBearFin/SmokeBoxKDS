@@ -695,7 +695,9 @@
     const spacer = h('div', { class: 'fl-spacer', 'aria-hidden': 'true' });
     const head = h('header', { class: 'fl-head' }, brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn);
     // The same parts in two orders; layoutHead picks one so keyboard order matches what the eye sees.
-    m.headParts = { wide: [brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn], narrow: [brandBox, spacer, newBtn, tOrders.b, officeBtn, menuBtn, tabs, status, tools] };
+    m.headParts = { wide: [brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn], narrow: [brandBox, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn, tabs] };
+    // WATCH OUT: on a portrait tablet the Sanitize chip, Recall and 86 sit on the top row with New ticket, so a cook reaches them without the Menu.
+    // On a phone (700 px or less) the stylesheet moves them into the Menu list.
 
     // ----- board
     const grid = h('div', { class: 'fl-grid' });
@@ -762,8 +764,8 @@
     layoutHead(true);
     fitHead();
     try {
-      const q = g.matchMedia('(max-width: 900px)');
-      // Re-orders the header when the screen crosses the phone breakpoint, then squeezes it to fit.
+      const q = g.matchMedia('(max-width: 999.98px)');
+      // Re-orders the header when the screen crosses the tablet breakpoint (tabs on their own row below 1000 px), then squeezes it to fit.
       const fn = () => { layoutHead(false); fitHead(); };
       if (q.addEventListener) { q.addEventListener('change', fn); m.offs.push(() => q.removeEventListener('change', fn)); }
     } catch (e) { /* ignore */ }
@@ -827,7 +829,7 @@
   // WATCH OUT: the DOM order is changed to match, so keyboard order follows the eye. Focus is restored.
   function layoutHead(force) {
     if (!m || !m.headParts) return;
-    const narrow = mq('(max-width: 900px)');
+    const narrow = mq('(max-width: 999.98px)');
     if (!force && narrow === m.narrow) return;
     m.narrow = narrow;
     const a = doc.activeElement;

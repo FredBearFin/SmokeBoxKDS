@@ -202,8 +202,9 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
   .fl-chip-w { display: inline; }
 }
 
-/* below 1000 the tools and chips move into the Menu button's list; the tabs and New ticket stay. 1024-wide tablets keep Hold, 86 and Recall in the header. */
-@media (max-width: 999.98px) {
+/* Phones (700 px or less): the tools and chips move into the Menu button's list; the tabs and New ticket stay. Every tablet, portrait too,
+   keeps the Sanitize chip, Recall and 86 in the header (the Cabinet tab sits with the stations), so a cook never opens a menu for them. */
+@media (max-width: 700px) {
   .fl-status, .fl-tools { display: none; }
 }
 
@@ -217,14 +218,20 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
 /* Then the words on Recall, Hold and 86 go too: icon and count only, so all three stay on a 1024 px tablet. */
 .fl-head[data-fit="toollabels"] .fl-tools .fl-tool-label { display: none; }
 
-/* phones and small tablets: actions on top, the six station tabs underneath as one wide row (the DOM order is switched to match, see layoutHead) */
-@media (max-width: 900px) {
+/* phones and portrait tablets (under 1000 px): actions on top, the station tabs underneath as one wide row (the DOM order is switched to
+   match, see layoutHead; the script's breakpoint must stay the same as this one) */
+@media (max-width: 999.98px) {
   .fl-head { padding: var(--sp-2) var(--sp-3); }
   .fl-tabs { flex: 1 0 100%; padding-top: calc(10px * var(--fl-k)); }
   .fl-seg.seg { display: flex; width: 100%; }
   .fl-seg .seg-opt { flex: 1 1 0; min-width: 0; }
   .fl-new { flex: 1 1 auto; }
   .fl-spacer { display: none; }
+  /* The Demo button stays in the Menu list here (the demo is not a kitchen job), so Recall and 86 have the room. */
+  .fl-tools [data-tool="demo"] { display: none; }
+  /* The Sanitize chip puts its two words on two lines beside the icon, so the top row still fits on a 720 px tablet. */
+  .fl-san { display: inline-grid; grid-template-columns: auto auto; align-content: center; justify-content: start; row-gap: 0; text-align: left; }
+  .fl-san > .icon { grid-row: 1 / span 2; }
 }
 /* On a phone the four buttons (New ticket, Orders, Back office, Menu) need the whole row, so the logo steps aside and New ticket may shrink to fit. */
 @media (max-width: 520px) {
