@@ -1843,6 +1843,12 @@ button.slip-item.fl-item { cursor: pointer; }
 /* Calmer header: the sanitize chip is only an icon until a check is due within 30 minutes or is late. */
 .fl-san[data-urgent="false"] .fl-chip-t, .fl-san[data-urgent="false"] .fl-chip-w { display: none; }
 .fl-san[data-urgent="false"] { min-width: var(--tap); padding-inline: 0; justify-content: center; opacity: 0.8; }
+/* Device roles: a kitchen device shows only the board, the cabinet, 86 and Recall (plus Menu for settings and help), so
+   New ticket, Orders, Demo and Back office are hidden; a front device hides the Cabinet tab. All-in-one is unchanged. */
+.fl[data-role="kitchen"] .fl-new, .fl[data-role="kitchen"] .fl-orders, .fl[data-role="kitchen"] .fl-office,
+.fl[data-role="kitchen"] [data-tool="demo"], .fl[data-role="kitchen"] .fl-demo-chip,
+.fl[data-role="kitchen"] .fl-empty .btn-primary, .fl[data-role="kitchen"] .fl-start-demo,
+.fl[data-role="front"] .fl-seg [data-id="cabinet"] { display: none; }
 
 /* In the cabinet view the cards have buttons along the bottom-left, where toasts normally sit: toasts go to the top right, under the strip. */
 html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto; top: var(--fl-toast-top, 130px); left: auto; right: var(--gutter); transform: none; width: min(400px, 34vw); }
@@ -3785,6 +3791,45 @@ a.of-nav:active { background: var(--press); }
   // Whole degrees Fahrenheit with the degree sign, like "135 F". Not a number gives "-".
   U.fmtTemp = (f) => (U.isNum(f) ? Math.round(f) + '°F' : '-');
 
+  /* ---------- units setting: store in degrees F and grams, format only at the edges ---------- */
+  // The units the owner chose (settings.ui.tempUnit and weightUnit). The store keeps this in step with the
+  // settings; screens call the helpers below and never read it directly.
+  U.units = { temp: 'F', weight: 'kg' };
+  // Takes the ui part of the settings and remembers the temperature unit (F or C) and weight unit (kg or lb).
+  // Anything else leaves the old choice alone.
+  U.setUnits = (ui) => {
+    if (!ui || typeof ui !== 'object') return U.units;
+    if (ui.tempUnit === 'F' || ui.tempUnit === 'C') U.units.temp = ui.tempUnit;
+    if (ui.weightUnit === 'kg' || ui.weightUnit === 'lb') U.units.weight = ui.weightUnit;
+    return U.units;
+  };
+  const G_PER_LB = 453.59237;
+  // Degrees Celsius to Fahrenheit, and back. Stored temperatures stay Fahrenheit (the food code is in F).
+  U.cToF = (c) => (c * 9) / 5 + 32;
+  U.fToC = (f) => ((f - 32) * 5) / 9;
+  // The unit word shown next to a temperature or weight: "°F", "°C", "kg" or "lb". kind is "temp" or "weight".
+  U.unitLabel = (kind) => (kind === 'weight' ? U.units.weight : '°' + U.units.temp);
+  // A stored Fahrenheit value as the number to show (whole degrees) in the chosen unit; NaN when not a number.
+  U.tempShown = (f) => (U.isNum(f) ? Math.round(U.units.temp === 'C' ? U.fToC(f) : f) : NaN);
+  // A number the person typed (in the chosen unit) back to stored Fahrenheit, rounded to a tenth.
+  U.tempStored = (v) => (U.isNum(v) ? Math.round((U.units.temp === 'C' ? U.cToF(v) : v) * 10) / 10 : NaN);
+  // Stored Fahrenheit as text in the chosen unit: 135 gives "135 °F" or "57 °C". Not a number gives "-".
+  U.tempText = (f) => (U.isNum(f) ? U.tempShown(f) + ' ' + U.unitLabel('temp') : '-');
+  // Stored degrees Celsius (cook endpoints are kept in C) as text in the chosen unit: 85 gives "85 °C" or "185 °F".
+  U.tempTextC = (c) => (U.isNum(c) ? U.tempText(U.cToF(c)) : '-');
+  // Stored grams as the number to show in the chosen weight unit (kg or lb), not rounded. NaN when not a number.
+  U.weightShown = (g) => (U.isNum(g) ? (U.units.weight === 'lb' ? g / G_PER_LB : g / 1000) : NaN);
+  // A weight typed in the chosen unit back to stored grams, rounded to a tenth of a gram.
+  U.weightStored = (v) => (U.isNum(v) ? Math.round((U.units.weight === 'lb' ? v * G_PER_LB : v * 1000) * 10) / 10 : NaN);
+  // Stored grams as text in the chosen unit. Kilograms read like fmtG ("850 g", "2.40 kg"); pounds read
+  // "7.0 oz" under a pound and "5.29 lb" above.
+  U.weightText = (g) => {
+    if (!U.isNum(g)) return '-';
+    if (U.units.weight !== 'lb') return U.fmtG(g);
+    const lb = g / G_PER_LB;
+    return Math.abs(lb) < 1 ? (lb * 16).toFixed(1) + ' oz' : lb.toFixed(2) + ' lb';
+  };
+
   /* ---------- dates (all local time). The "service day" runs from dayStartHour (4 am) so a 12:45 am sale belongs to last night. ---------- */
   // 4 am: the service day turns over at 4 am, so a 12:45 am sale still belongs to the night before.
   U.DAY_START_HOUR = 4;
@@ -4478,7 +4523,7 @@ a.of-nav:active { background: var(--press); }
  *   planFor(state, lines, now, rush?)     -> same as pacingPlan, using the state's settings/learned/menu
  *   ticketTiming(ticket, now, settings)   -> { elapsedMs, level: 'ok'|'warn'|'breach', warnMs, breachMs, pct }
  *   ticketProgress(ticket)                -> { total, done, queued, displayed, cooking, qtyTotal, qtyDone, pct, ready, byZone }
- *   checkInvariants(state, now?)          -> string[] (empty = healthy; I1-I17 of SPEC 10, structural parts)
+ *   checkInvariants(state, now?)          -> string[] (empty = healthy; I1-I19 of SPEC 10, structural parts)
  *   validateBackup(objOrText)             -> { ok, state?, error?, repaired: string[] }
  *   serialize(state) -> string             deserialize(text) -> validateBackup result
  *   allEvents(state)                      -> Event[] (archive chunks + recent window, oldest first; memoised)
@@ -4505,7 +4550,7 @@ a.of-nav:active { background: var(--press); }
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -4562,6 +4607,8 @@ a.of-nav:active { background: var(--press); }
     unknownPlan: 'That planned batch is gone. It may have been used, cancelled or expired.',
     ordersStillOpen: 'The day cannot be closed while orders are still open. Take payment on each open order, or void it, then close the day again.',
     badLeftovers: 'Choose what happens to the batches still in the cabinet: keep them for tomorrow, or discard them.',
+    badWho: 'Initials must be 1 to 12 characters. Shorten them, or leave them blank if the screen allows.',
+    unknownSafetyEntry: 'That safety log entry is not here, or it is not a temperature, discard, cooling, reheat, sanitize or keep-serving entry. Pick one from the safety log.',
     badSnooze: 'A reminder can be put off for 1 to 30 minutes, only for a batch still on the menu, and never past 5 minutes before its last warning. The last warning, a past-quality batch and a thrown-out batch cannot be put off.',
   };
 
@@ -4586,9 +4633,10 @@ a.of-nav:active { background: var(--press); }
     toggle86: '{ menuId, on:boolean }',
     restock: '{ ing, g }',
     addBatch: '{ ing, tempF, rawG?, cookedG?, endpointC?, holdH?, label?, src?:"cook"|"sample"|"starter" }',
-    logTemp: '{ batchId, tempF }',
-    reheatBatch: '{ batchId, tempF }',
-    startCooling: '{ batchId, g? }',
+    logTemp: '{ batchId, tempF, who? }',
+    reheatBatch: '{ batchId, tempF, who? }',
+    startCooling: '{ batchId, g?, who? }',
+    correctSafety: '{ eventId, note, who }',
     pullBatch: '{ ing, g }',
     keepServing: '{ batchIds:string[], forMin?, until?, who }',
     endKeepServing: '{ batchId, who, note? }',
@@ -4596,8 +4644,8 @@ a.of-nav:active { background: var(--press); }
     cancelPlan: '{ planId }',
     snoozeAlert: '{ batchId, forMin }',
     clearSnooze: '{ batchId }',
-    discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other" }',
-    sanitizeDone: '{}',
+    discardBatch: '{ batchId, reason:"expired"|"temp"|"cooling"|"manual"|"quality"|"other", who? }',
+    sanitizeDone: '{ who? }',
     updateSettings: '{ patch }',
     updateMenuItem: '{ id, patch }',
     addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two" }',
@@ -4633,6 +4681,12 @@ a.of-nav:active { background: var(--press); }
   const BATCH_STATUS = { ok: 1, check: 1, reheat: 1, chill: 1, past: 1, discard: 1 };
   const BATCH_KIND = { hot: 1, cold: 1, cooling: 1 };
   const STATUS_OF = { NONE: 'ok', CHECK_TEMP: 'check', REHEAT_IMMEDIATE: 'reheat', CHILL_NOW: 'chill', PAST_QUALITY: 'past', DISCARD_LOCKOUT: 'discard' };
+  // The event types that make up the safety log (readings, reheats, discards, cooling, sanitizing, keep-serving).
+  // Corrections never edit these; they add a safety_correction. When the main log is trimmed, these move to the
+  // safetyKeep bucket instead of being dropped.
+  const SAFETY_EVENT = { temp_logged: 1, batch_reheat: 1, batch_discard: 1, cooling_started: 1, sanitize_done: 1, quality_extend: 1, quality_extend_corrected: 1, safety_correction: 1 };
+  // 190 days: how long the safetyKeep bucket holds a safety entry (just over six months, the minimum to keep).
+  const SAFETY_KEEP_MS = 190 * 24 * H;
   const SRC_TICKET = { live: 1, demo: 1, sample: 1 };
   const SRC_BATCH = { cook: 1, sample: 1, starter: 1 };
 
@@ -4763,7 +4817,7 @@ a.of-nav:active { background: var(--press); }
       channels: C.channels.map((c) => ({ id: c.id, warnSec: c.warnSec, breachSec: c.breachSec })),
       undoMs: C.undoMs,
       syncTargetSec: C.syncTargetSec,
-      ui: { theme: 'day', textSize: 'normal', sound: false },
+      ui: { theme: 'day', textSize: 'normal', sound: false, tempUnit: 'F', weightUnit: 'kg' },
       office: { theme: 'ember', pinHash: null },
       alerts: { ladderThresholds: C.alerts ? C.alerts.ladderThresholds : null },
     };
@@ -5117,6 +5171,18 @@ a.of-nav:active { background: var(--press); }
     if (ar && ar.length) { const c = ar[ar.length - 1]; if (c.length) return c[c.length - 1].t; }
     return undefined;
   }
+  // Only the safety-log events from a list of events.
+  function safetyOnly(list) { return list.filter((e) => hasOwn(SAFETY_EVENT, e.type)); }
+  // Adds newly dropped safety events to the retention bucket and lets go of entries older than 190 days
+  // (measured from refT, the newest time known). The bucket is never trimmed by size, only by age.
+  function keepSafety(prev, dropped, refT) {
+    const all = (Array.isArray(prev) ? prev : []).concat(dropped);
+    if (!isNum(refT)) return all;
+    const cut = refT - SAFETY_KEEP_MS;
+    let i = 0;
+    while (i < all.length && all[i].t < cut) i++;
+    return i ? all.slice(i) : all;
+  }
   // Adds new events to the log and keeps it small. When the recent window reaches 2048 events, the oldest
   // 1024 move into a frozen archive chunk (F-E2). The whole log is capped at the maxEvents limit by
   // dropping the oldest. owned says the window array is already our private copy. Returns the new window
@@ -5131,12 +5197,14 @@ a.of-nav:active { background: var(--press); }
     }
     const max = C.limits.maxEvents;
     let total = ev.length; for (const c of ar) total += c.length;
+    // Safety entries among the dropped events are handed back, so the caller can move them to safetyKeep.
+    let dropped = [];
     if (total > max) {
       ar = ar === archive ? ar.slice() : ar;
-      while (total > max && ar.length) { total -= ar[0].length; ar.shift(); }
-      if (total > max) ev = ev.slice(total - max);
+      while (total > max && ar.length) { total -= ar[0].length; dropped = dropped.concat(safetyOnly(ar[0])); ar.shift(); }
+      if (total > max) { dropped = dropped.concat(safetyOnly(ev.slice(0, total - max))); ev = ev.slice(total - max); }
     }
-    return { events: ev, archive: ar };
+    return { events: ev, archive: ar, dropped };
   }
   const FLAT = new WeakMap();
   // Every event, oldest first: archive chunks, then the recent window. The joined list is remembered, so
@@ -5225,6 +5293,7 @@ a.of-nav:active { background: var(--press); }
       const ev = this.get('events');
       const r = appendEvents(ev, this.get('eventArchive') || [], this.evs, this.own.has(ev));
       s.events = r.events; s.eventArchive = r.archive;
+      if (r.dropped.length) s.safetyKeep = keepSafety(this.get('safetyKeep'), r.dropped, this.evs[this.evs.length - 1].t);
     }
     if (s.tickets !== this.s0.tickets && !this.pruned) {
       const old = ACTIVE.get(this.s0.tickets);
@@ -5353,7 +5422,7 @@ a.of-nav:active { background: var(--press); }
     tx.event('batch_status', { batchId: b.id, from: b.status, to: gt.status, action: gt.action });
   }
   // Throws a batch out: its grams become waste, it can never be served again, and the lost cost is logged.
-  function discardInto(tx, bi, reason) {
+  function discardInto(tx, bi, reason, who) {
     const b = tx.get('batches')[bi];
     const w = tx.batch(bi);
     const g0 = b.remainingG > 0 ? b.remainingG : 0;
@@ -5362,7 +5431,7 @@ a.of-nav:active { background: var(--press); }
     const ing = ingMap(tx.get('ingredients')).get(b.ing);
     const unit = isNum(b.costPerCookedKg) ? b.costPerCookedKg / 1000 : nominalUnitCost(ing);
     tx.event('batch_status', { batchId: b.id, from: b.status, to: 'discard', action: 'DISCARD_LOCKOUT' });
-    tx.event('batch_discard', { batchId: b.id, ing: b.ing, g: g0, reason, cost: round(g0 * unit, 4) });
+    tx.event('batch_discard', whoField({ batchId: b.id, ing: b.ing, g: g0, reason, cost: round(g0 * unit, 4) }, who));
   }
   // Re-runs the gate on every batch that is not already discarded (used when the safety settings change).
   function refreshAllBatches(tx) {
@@ -6221,6 +6290,14 @@ a.of-nav:active { background: var(--press); }
     return 'ok';
   };
 
+  // Reads the optional initials on a safety action. Returns '' when none were given (old screens and old saves
+  // have none), the trimmed initials, or null when they are unusable (not text, or over 12 characters).
+  function readWho(p) {
+    if (p.who === undefined || p.who === null) return '';
+    if (typeof p.who !== 'string') return null;
+    const w = p.who.trim();
+    return w.length > 12 ? null : w;
+  }
   // Records a temperature reading, then re-runs the gate. A hot reading below the hot-hold limit, or a cold
   // one above its limit, starts the out-of-range clock (outSince); an in-range cold reading clears it. A
   // cooling batch records stage 1 and final. Also logs whether the check was on time.
@@ -6229,6 +6306,8 @@ a.of-nav:active { background: var(--press); }
     const bi = findBatchIdx(bs, p.batchId);
     if (bi < 0) return 'unknownBatch';
     if (!isNum(p.tempF) || p.tempF < 32 || p.tempF > 300) return 'badTemp';
+    const who = readWho(p);
+    if (who === null) return 'badWho';
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
     const S = safetyOf(tx.get('settings'));
@@ -6238,7 +6317,7 @@ a.of-nav:active { background: var(--press); }
     const lateMs = Math.max(0, tx.now - dueAt);
     const w = tx.batch(bi);
     const t = stampAfter(b.lastTempAt, stampAfter(b.enteredAt, tx.now));
-    const temps = (b.temps || []).concat([{ t, f }]);
+    const temps = (b.temps || []).concat([who ? { t, f, who } : { t, f }]);
     w.temps = temps.length > MAX_TEMPS ? temps.slice(temps.length - MAX_TEMPS) : temps;
     w.lastTempF = f; w.lastTempAt = t;
     // What a reading means depends on the kind of batch: cooling, cold or hot.
@@ -6255,8 +6334,8 @@ a.of-nav:active { background: var(--press); }
       // a logged reading at reheat temperature inside the grace window IS the reheat (honest input is never refused)
       delete w.outSince; w.reheats = (b.reheats || 0) + 1; reheated = true;
     }
-    tx.event('temp_logged', { batchId: b.id, f, onTime: lateMs === 0, lateMs });
-    if (reheated) tx.event('batch_reheat', { batchId: b.id, f });
+    tx.event('temp_logged', whoField({ batchId: b.id, f, onTime: lateMs === 0, lateMs }, who));
+    if (reheated) tx.event('batch_reheat', whoField({ batchId: b.id, f }, who));
     refreshBatch(tx, bi);
     const nb = tx.get('batches')[bi];
     tx.info = { batchId: b.id, status: nb.status, canServe: nb.canServe, onTime: lateMs === 0, lateMs, reheated };
@@ -6271,6 +6350,8 @@ a.of-nav:active { background: var(--press); }
     const bi = findBatchIdx(bs, p.batchId);
     if (bi < 0) return 'unknownBatch';
     if (!isNum(p.tempF) || p.tempF < 32 || p.tempF > 300) return 'badTemp';
+    const who = readWho(p);
+    if (who === null) return 'badWho';
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
     const S = safetyOf(tx.get('settings'));
@@ -6288,10 +6369,10 @@ a.of-nav:active { background: var(--press); }
       delete w.outSince;
     }
     w.reheats = (b.reheats || 0) + 1;
-    const temps = (b.temps || []).concat([{ t, f: p.tempF }]);
+    const temps = (b.temps || []).concat([who ? { t, f: p.tempF, who } : { t, f: p.tempF }]);
     w.temps = temps.length > MAX_TEMPS ? temps.slice(temps.length - MAX_TEMPS) : temps;
     w.lastTempF = p.tempF; w.lastTempAt = t;
-    tx.event('batch_reheat', { batchId: b.id, f: p.tempF });
+    tx.event('batch_reheat', whoField({ batchId: b.id, f: p.tempF }, who));
     refreshBatch(tx, bi);
     const nb = tx.get('batches')[bi];
     tx.info = { batchId: b.id, status: nb.status, canServe: nb.canServe };
@@ -6310,6 +6391,8 @@ a.of-nav:active { background: var(--press); }
     if (!(b.remainingG > 0)) return 'nothingToDo';
     let gm = p.g == null ? b.remainingG : p.g;
     if (!isNum(gm) || gm <= 0 || gm > b.remainingG + 0.5) return 'badWeight';
+    const who = readWho(p);
+    if (who === null) return 'badWho';
     gm = Math.min(gm, b.remainingG);
     const w = tx.batch(bi);
     w.remainingG = b.remainingG - gm <= EPS ? 0 : b.remainingG - gm;
@@ -6325,7 +6408,7 @@ a.of-nav:active { background: var(--press); }
     tx.own.add(nb);
     tx.mut('batches').push(nb);
     tx.batchTouched = true;
-    tx.event('cooling_started', { batchId: id, from: b.id, ing: b.ing, g: gm });
+    tx.event('cooling_started', whoField({ batchId: id, from: b.id, ing: b.ing, g: gm }, who));
     refreshBatch(tx, tx.get('batches').length - 1);
     tx.info = { batchId: id, g: gm };
     return 'ok';
@@ -6385,6 +6468,42 @@ a.of-nav:active { background: var(--press); }
     tx.info = { batchId: b.id };
     return 'ok';
   };
+
+  // Adds the initials to an event's fields only when there are some, so old-style events keep their exact shape.
+  function whoField(fields, who) { if (who) fields.who = who; return fields; }
+  // Adds a correction to the safety log: a note and the initials of the person making it, pointing at an
+  // earlier entry. WATCH OUT: the original entry is never edited or removed; corrections are new entries, and
+  // an entry can be corrected more than once.
+  A.correctSafety = function (tx, p) {
+    const who = typeof p.who === 'string' ? p.who.trim() : '';
+    if (!who || who.length > 12) return 'whoRequired';
+    if (typeof p.note !== 'string' || p.note.length > 4 * C.limits.maxNoteLen) return 'noteTooLong';
+    const note = cleanText(p.note);
+    if (!note) return 'reasonRequired';
+    if (note.length > C.limits.maxNoteLen) return 'noteTooLong';
+    if (typeof p.eventId !== 'string') return 'unknownSafetyEntry';
+    const evs = allEvents(tx.state());
+    let hit = null;
+    for (let i = evs.length - 1; i >= 0; i--) if (evs[i].id === p.eventId) { hit = evs[i]; break; }
+    if (!hit || !hasOwn(SAFETY_EVENT, hit.type)) return 'unknownSafetyEntry';
+    const f = { of: hit.id, ofType: hit.type, who, note };
+    if (typeof hit.batchId === 'string') f.batchId = hit.batchId;
+    tx.event('safety_correction', f);
+    tx.info = { of: hit.id };
+    return 'ok';
+  };
+  // The safety log, oldest first: each entry is { event, corrections } where corrections are the later
+  // safety_correction entries that point at it. Read-only; nothing here changes the state.
+  function safetyLog(state) {
+    const out = [], byId = new Map();
+    if (!isState(state)) return out;
+    for (const e of (Array.isArray(state.safetyKeep) ? state.safetyKeep : []).concat(allEvents(state))) {
+      // A correction hangs under the entry it points at; every other safety entry is a row of its own.
+      if (e.type === 'safety_correction' && byId.has(e.of)) byId.get(e.of).corrections.push(e);
+      else if (hasOwn(SAFETY_EVENT, e.type)) { const row = { event: e, corrections: [] }; out.push(row); byId.set(e.id, row); }
+    }
+    return out;
+  }
 
   // Planned batches: "this comes off the smoker at HH:MM". Supply for the close projection from the moment it has
   // rested, never stock: it creates no 86 and counts in no ledger. The real batch of the same product used
@@ -6475,7 +6594,9 @@ a.of-nav:active { background: var(--press); }
     if (typeof p.reason !== 'string' || DISCARD_REASONS.indexOf(p.reason) < 0) return 'reasonRequired';
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
-    discardInto(tx, bi, p.reason);
+    const who = readWho(p);
+    if (who === null) return 'badWho';
+    discardInto(tx, bi, p.reason, who);
     const nb = tx.get('batches')[bi];
     pushUndo(tx, 'discard', (b.label || 'Batch') + ' discarded', { batchId: b.id, before: b, discardedAt: nb.discardedAt });
     tx.info = { batchId: b.id, g: nb.wasteG };
@@ -6484,14 +6605,16 @@ a.of-nav:active { background: var(--press); }
 
   // Logs that food-contact surfaces were sanitised and sets the next due time. Records whether it was on
   // time. Overdue is a warning only, never a block.
-  A.sanitizeDone = function (tx) {
+  A.sanitizeDone = function (tx, p) {
+    const who = readWho(p || {});
+    if (who === null) return 'badWho';
     const S = safetyOf(tx.get('settings'));
     const cur = tx.get('sanitize') || {};
     const due = sanitizeDueEff(tx.get('settings'), cur, tx.now);
     const lateMs = isNum(due) ? Math.max(0, tx.now - due) : 0;
     const lastAt = stampAfter(cur.lastAt, tx.now);
     tx.set('sanitize', { lastAt, dueAt: lastAt + S.sanitizeEveryH * H });
-    tx.event('sanitize_done', { onTime: lateMs === 0, lateMs });
+    tx.event('sanitize_done', whoField({ onTime: lateMs === 0, lateMs }, who));
     pushUndo(tx, 'sanitize', 'Sanitize logged', { before: cur, afterLastAt: lastAt });
     tx.info = { onTime: lateMs === 0, lateMs };
     return 'ok';
@@ -6514,7 +6637,7 @@ a.of-nav:active { background: var(--press); }
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
     syncTargetSec: R(10, 600),
-    ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, sound: { t: 'bool' } },
+    ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, sound: { t: 'bool' }, tempUnit: { t: 'enum', v: ['F', 'C'] }, weightUnit: { t: 'enum', v: ['kg', 'lb'] } },
     office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' } },
     alerts: { ladderThresholds: { t: 'ladder' } },
   };
@@ -6975,6 +7098,8 @@ a.of-nav:active { background: var(--press); }
     if (isInt(lim.maxEvents) && lim.maxEvents >= 0) {
       let flat = allEvents(state);
       if (flat.length > lim.maxEvents) {
+        const gone = safetyOnly(flat.slice(0, flat.length - lim.maxEvents));
+        if (gone.length) tx.set('safetyKeep', keepSafety(state.safetyKeep, gone, flat[flat.length - 1].t));
         flat = flat.slice(flat.length - lim.maxEvents);
         const ar = [];
         while (flat.length >= 2 * EVENT_CHUNK) { ar.push(flat.slice(0, EVENT_CHUNK)); flat = flat.slice(EVENT_CHUNK); }
@@ -7184,7 +7309,7 @@ a.of-nav:active { background: var(--press); }
     // The whole state. The clock is not stored here; the store keeps it.
     const st = {
       v: 1, rev: 0, settings, menu, ingredients, tickets: [], orders: [], batches, stock, manual86: {}, avail: {}, syncs: [], planned: [], alertSnoozes: {},
-      learned: isObj(opts.learned) ? opts.learned : {}, sanitize: { dueAt: now }, seq, events: [], eventArchive: [], undo: [], ledger,
+      learned: isObj(opts.learned) ? opts.learned : {}, sanitize: { dueAt: now }, seq, events: [], eventArchive: [], safetyKeep: [], undo: [], ledger,
     };
     const av = computeAvail(st);
     for (const k of Object.keys(av)) av[k].since = now;
@@ -7473,6 +7598,23 @@ a.of-nav:active { background: var(--press); }
       const lc = state.lastClose;
       if (!isObj(lc) || typeof lc.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(lc.day) || !isNum(lc.at) || (lc.leftovers !== 'keep' && lc.leftovers !== 'discard')) add('I17 lastClose is malformed');
     }
+    // I19: the safety bucket holds only safety entries, oldest first.
+    if (state.safetyKeep !== undefined) {
+      if (!Array.isArray(state.safetyKeep)) add('I19 safetyKeep is not a list');
+      else {
+        let pt = -Infinity;
+        for (const e of state.safetyKeep) {
+          if (!isObj(e) || typeof e.id !== 'string' || !isNum(e.t) || !hasOwn(SAFETY_EVENT, e.type)) { add('I19 safetyKeep holds a non-safety entry'); break; }
+          if (e.t < pt) { add('I19 safetyKeep goes backwards at ' + e.id); break; }
+          pt = e.t;
+        }
+      }
+    }
+    // I18: initials on a safety entry are 1 to 12 characters; a correction names who, says why and points at an earlier entry.
+    for (const e of allEvents(state)) {
+      if (e.who !== undefined && !(typeof e.who === 'string' && e.who.length >= 1 && e.who.length <= 12)) { add('I18 event ' + e.id + ' bad initials'); break; }
+      if (e.type === 'safety_correction' && !(typeof e.who === 'string' && typeof e.note === 'string' && e.note && typeof e.of === 'string')) { add('I18 correction ' + e.id + ' incomplete'); break; }
+    }
     // I14
     const mm = menuMap(state.menu);
     for (const id of Object.keys(state.learned || {})) {
@@ -7632,7 +7774,8 @@ a.of-nav:active { background: var(--press); }
         if (typeof out.canServe !== 'boolean' || out.kind === 'cooling') out.canServe = out.kind === 'cooling' ? false : !!out.canServe;
         if (!isInt(out.reheats) || out.reheats < 0) out.reheats = 0;
         if (!Array.isArray(out.temps)) out.temps = [];
-        out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS);
+        out.temps = out.temps.filter((x) => isObj(x) && isNum(x.t) && isNum(x.f)).slice(-MAX_TEMPS)
+          .map((x) => (typeof x.who === 'string' && x.who.length >= 1 && x.who.length <= 12 ? { t: x.t, f: x.f, who: x.who } : { t: x.t, f: x.f }));
         for (const k of ['lastTempAt', 'lastTempF', 'outSince', 'coolStartAt', 'stage1At', 'finalAt', 'wasteG', 'rawG', 'yieldPct', 'costPerCookedKg', 'maxHoldH', 'endpointC', 'holdH', 'discardedAt', 'keepUntil', 'restUntil']) if (out[k] !== undefined && !isNum(out[k])) { delete out[k]; repaired.push('batch ' + b.id + '.' + k + ' cleared'); }
         if (!hasOwn(SRC_BATCH, out.src)) out.src = 'cook';
         bIds.add(b.id);
@@ -7681,6 +7824,12 @@ a.of-nav:active { background: var(--press); }
       for (const e of flat) { if (!evOk(e)) { bad++; continue; } if (goodEv.length && e.t < goodEv[goodEv.length - 1].t) unsorted = true; goodEv.push(e); }
       if (bad) repaired.push('dropped ' + bad + ' bad events');
       if (unsorted) { goodEv.sort((a, b) => a.t - b.t); repaired.push('events re-sorted by time'); }
+      // Safety entries pushed out by the event cap, and any saved safetyKeep bucket, stay in the bucket.
+      const overflow = goodEv.length > C.limits.maxEvents ? safetyOnly(goodEv.slice(0, goodEv.length - C.limits.maxEvents)) : [];
+      const evIds = new Set(goodEv.map((e) => e.id));
+      const savedKeep = Array.isArray(st.safetyKeep) ? st.safetyKeep.filter((e) => evOk(e) && hasOwn(SAFETY_EVENT, e.type) && !evIds.has(e.id)) : [];
+      savedKeep.sort((a, b) => a.t - b.t);
+      const keepList = keepSafety(savedKeep, overflow, goodEv.length ? goodEv[goodEv.length - 1].t : undefined);
       let rest = goodEv.length > C.limits.maxEvents ? goodEv.slice(goodEv.length - C.limits.maxEvents) : goodEv;
       while (rest.length >= 2 * EVENT_CHUNK) { archive.push(rest.slice(0, EVENT_CHUNK)); rest = rest.slice(EVENT_CHUNK); }
       events = rest;
@@ -7698,7 +7847,7 @@ a.of-nav:active { background: var(--press); }
       // Counters never fall below the highest id already used, so a new id can never repeat an old one.
       const so = isObj(st.seq) ? st.seq : {};
       const maxId = (arr, pre) => { let m = 0; for (const x of arr) { const id = x && x.id; if (typeof id === 'string' && id.indexOf(pre) === 0) { const n = Number(id.slice(pre.length)); if (isInt(n) && n > m) m = n; } } return m; };
-      const allEv = archive.reduce((a, c) => a.concat(c), []).concat(events);
+      const allEv = keepList.concat(archive.reduce((a, c) => a.concat(c), [])).concat(events);
       const seq = {
         ticket: Math.max(isInt(so.ticket) ? so.ticket : 0, maxId(tickets, 't_')),
         order: Math.max(isInt(so.order) ? so.order : 0, maxId(orders, 'o_')),
@@ -7720,7 +7869,7 @@ a.of-nav:active { background: var(--press); }
       sanitize.dueAt = isNum(sz.dueAt) ? sz.dueAt : isNum(sanitize.lastAt) ? sanitize.lastAt + settings.safety.sanitizeEveryH * H : 0;
       const out = {
         v: 1, rev: isInt(st.rev) && st.rev >= 0 ? st.rev : 0, settings, menu, ingredients, tickets, orders, batches, stock, manual86, avail: {}, syncs, planned, alertSnoozes, learned, sanitize, seq,
-        events, eventArchive: archive, undo: [], ledger: {},
+        events, eventArchive: archive, safetyKeep: keepList, undo: [], ledger: {},
       };
       // ledger: keep stored counters; if they do not balance, re-open the books at the current physical stock
       const ledger = {};
@@ -7862,7 +8011,7 @@ a.of-nav:active { background: var(--press); }
   Object.assign(E, {
     apply, tick, newState, availability, computeAvail, servable, allDay, gate, thermalYield, staticYieldComparison,
     pacingPlan, planFor, ticketTiming, ticketProgress, checkInvariants, validateBackup, serialize, deserialize, allEvents, prune,
-    channelThresholds, noQualityStage, defaultSettings, describe, views, orderTotals, openOrderTotals,
+    channelThresholds, noQualityStage, defaultSettings, describe, safetyLog, views, orderTotals, openOrderTotals,
     // Looks up one ticket by id; undefined when it is not found.
     findTicket: (state, id) => (isState(state) ? state.tickets[findTicketIdx(state.tickets, id)] : undefined),
     // Looks up one order by id; undefined when it is not found.
@@ -8699,6 +8848,7 @@ a.of-nav:active { background: var(--press); }
     if (!theirs) return;
     atLeast(lastStamp(theirs));
     state = E().tick(replayOnto(theirs), now()).state;
+    syncUnits();
     scheduleNotify();
   }
   // Listeners for alert messages from other tabs.
@@ -8726,7 +8876,7 @@ a.of-nav:active { background: var(--press); }
     atLeast(lastStamp(theirs));
     if (d.sid) baseSid = d.sid;
     if (pending.length) { state = replayOnto(theirs); schedulePersist(true); } else state = theirs;
-    state = E().tick(state, now()).state;
+    state = E().tick(state, now()).state; syncUnits();
     scheduleNotify();
   }
 
@@ -8954,6 +9104,7 @@ a.of-nav:active { background: var(--press); }
     // Catch up anything that became due while the page was closed.
     const t = E().tick(state, now());
     state = t.state;
+    syncUnits();
     if (!loaded && st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
     if (!opts.noTimers && typeof setInterval === 'function') interval = setInterval(tickNow, 1000);
     if (!opts.noSync) openTransport(opts.transport);
@@ -8967,11 +9118,15 @@ a.of-nav:active { background: var(--press); }
   // trimmed, repaired, speed.
   function status() { return Object.assign({}, st, { speed: clk.speed }); }
 
+  // Tells the formatting helpers which units the saved settings ask for (degrees F or C, kg or lb).
+  function syncUnits() { try { if (state && state.settings) U.setUnits(state.settings.ui); } catch (e) { /* formatting keeps its old choice */ } }
   // Makes ns the current state if it differs, then schedules a save and a redraw. broadcast tells other
   // tabs.
   function commit(ns, broadcast) {
     if (ns === state) return;
+    const sameSettings = state && ns.settings === state.settings;
     state = ns;
+    if (!sameSettings) syncUnits();
     schedulePersist(broadcast);
     scheduleNotify();
   }
@@ -9076,7 +9231,7 @@ a.of-nav:active { background: var(--press); }
     // its times.
     ns.rev = Math.max(ns.rev, (state ? state.rev : 0) + 1);
     atLeast(lastStamp(ns));
-    state = E().tick(ns, now()).state;
+    state = E().tick(ns, now()).state; syncUnits();
     pendingBroadcast = true;
     skipRebase = true; pending = [];   // an import or reset is meant to win over what another tab saved
     persistNow();
@@ -17008,6 +17163,15 @@ a.of-nav:active { background: var(--press); }
     { key: '?', keys: ['?'], label: 'Help' },
     { key: 'Esc', keys: ['Esc'], label: 'Close a screen, or clear the all-day highlight' },
   ];
+  // Keys each device role may use. A kitchen device has no order entry, orders or demo; a front device has no hold
+  // cabinet; all-in-one and manager devices keep every key exactly as before.
+  const ROLE_KEYS = { kitchen: 'rh8z?123456', front: 'nor8dz?123456' };
+  // True when a device with this role may use this shortcut key (lower-case letter, digit or ?; Escape always may).
+  F.roleAllows = function (role, key) {
+    if (key === 'Escape') return true;
+    const set = ROLE_KEYS[role];
+    return set ? set.indexOf(String(key).toLowerCase()) >= 0 && String(key).length === 1 : true;
+  };
   // With no page (loaded under plain Node) every call does nothing, so loading never throws.
   if (!doc) { F.mount = F.unmount = F.setZone = F.highlight = F.setSound = F.setCallouts = () => {}; F.sound = F.callouts = () => false; return; }
 
@@ -17066,6 +17230,8 @@ a.of-nav:active { background: var(--press); }
   // The current settings (alert times, undo window), or null before the store loads.
   const settingsNow = () => { const s = store().getState(); return s ? s.settings : null; };
 
+  // This device's job (all, kitchen, front or manager) from the router; all when the router is not there.
+  const roleNow = () => { try { return SB.router && SB.router.role ? SB.router.role() : 'all'; } catch (e) { return 'all'; } };
   // Opens a named sheet (order, hold, 86...). A missing or broken sheet logs an error and nothing more.
   function openSheet(name) { try { if (SB.sheets) SB.sheets.open(name); } catch (e) { console.error('[smokebox] sheet failed', e); } }
 
@@ -17649,6 +17815,7 @@ a.of-nav:active { background: var(--press); }
   // Shows the hold cabinet in the page in place of the tickets (on), or goes back to the tickets (off). The strip and
   // header stay. opts.batchId scrolls to one batch. Opened from the Cabinet tab, the Hold button, H and the strip rows.
   function showCabinet(on, opts) {
+    if (on && roleNow() === 'front') return; // a front-of-house device has no cabinet
     if (!m || !SB.hold) { if (on) openSheet('hold'); return; }
     if (on) {
       if (!m.cab) m.cab = SB.hold.mount(m.cabEl, opts && opts.tab ? { tab: opts.tab } : {});
@@ -18230,6 +18397,17 @@ a.of-nav:active { background: var(--press); }
     m.lateCount = late.length;
   }
 
+  // Applies the device role to the header in place: the stylesheet hides what the role does not use (kitchen: New
+  // ticket, Orders, Demo and Back office; front: the Cabinet tab). Runs every tick but only acts when the role changes.
+  function paintRole() {
+    const r = roleNow();
+    if (m.role === r) return;
+    m.role = r;
+    m.root.dataset.role = r;
+    if (r === 'front' && m.cabOn) showCabinet(false);
+    m.fitKey = null; fitHead();
+  }
+
   // Header: counters, chips and buttons, updated in place.
 
   // Sets hidden only when it changes, so layout is not redone for nothing.
@@ -18369,6 +18547,7 @@ a.of-nav:active { background: var(--press); }
     const S = store();
     const c = S.select.counts();
     m.counts = c;
+    paintRole();
     updateStrip(now);
     driveCallouts(now);
     // station tabs
@@ -18471,31 +18650,36 @@ a.of-nav:active { background: var(--press); }
       // Logging a check goes through run(), so it can be undone like any action.
       { label: 'Mark surfaces sanitized', icon: 'check-circle', onClick: () => run('sanitizeDone', {}) },
       { label: 'Open the hold cabinet', icon: 'thermometer', onClick: () => showCabinet(true) },
-    ], { label: 'Sanitize timer' });
+    ].filter((it) => !(roleNow() === 'front' && /cabinet/.test(it.label))), { label: 'Sanitize timer' });
   }
   // On a narrow screen the Menu button opens this list: the buttons that no longer fit, plus settings.
   function quickMenu(anchor) {
-    const c = m.counts || {};
-    SB.ui.menu(anchor, [
+    const c = m.counts || {}, role = roleNow();
+    // Kitchen devices skip order entry, orders, demo and the back office; front devices skip the cabinet.
+    const kit = role === 'kitchen', front = role === 'front';
+    const items = [
       // The back office is the first row so a manager never has to hunt for it.
-      { label: 'Back office', icon: 'gauge', onClick: () => openOffice(anchor) },
+      { hide: kit, label: 'Back office', icon: 'gauge', onClick: () => openOffice(anchor) },
       // Menu and settings is one tap away too: add a dish, change a price or a prep time.
-      { label: 'Edit the menu', icon: 'sliders', onClick: () => openOffice(anchor, 'data') },
+      { hide: kit, label: 'Edit the menu', icon: 'sliders', onClick: () => openOffice(anchor, 'data') },
       { separator: true },
       // Orders opens the open-orders screen, with how many are open.
-      { label: 'Orders' + (m.openOrders ? ' (' + m.openOrders + ' open)' : ''), icon: 'receipt', onClick: () => openSheet('orders') },
+      { hide: kit, label: 'Orders' + (m.openOrders ? ' (' + m.openOrders + ' open)' : ''), icon: 'receipt', onClick: () => openSheet('orders') },
       // Recall and Hold open the same sheets as their header buttons, with the same counts.
       { label: 'Recall' + (recentCount(store(), store().now()) ? ' (' + recentCount(store(), store().now()) + ')' : ''), icon: 'history', onClick: () => openSheet('recall') },
-      { label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
+      { hide: front, label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
       // 86 and Demo open their sheets too.
       { label: '86 board' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
-      { label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
+      { hide: kit, label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
       // The sanitize entry opens its own small menu on the same anchor.
       { label: 'Sanitize timer' + (m.sanText.textContent ? ': ' + m.sanText.textContent : ''), icon: 'shield-check', onClick: () => sanitiseMenu(anchor) },
       { separator: true },
       // Settings, help and the office sit behind the Menu sheet.
       { label: 'Settings and help', icon: 'settings', onClick: () => openSheet('menu') },
-    ], { label: 'Menu' });
+    ].filter((it) => !it.hide);
+    // Hiding rows can leave a separator at the top, the bottom or twice in a row; those go.
+    const clean = items.filter((it, i) => !(it.separator && (i === 0 || i === items.length - 1 || items[i - 1].separator)));
+    SB.ui.menu(anchor, clean, { label: 'Menu' });
   }
 
   // Opens the back office from a visible button; the shell asks for the manager PIN first when one is set.
@@ -18842,6 +19026,7 @@ a.of-nav:active { background: var(--press); }
     if (SB.sheets && SB.sheets.count && SB.sheets.count() > 0) return;
     if (doc.querySelector('.menu-layer')) return;
     const k = e.key && e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (!F.roleAllows(roleNow(), k)) return;
     let used = true;
     if (k === 'n') openSheet('order');
     else if (k === 'o') openSheet('orders');

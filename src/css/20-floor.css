@@ -564,6 +564,12 @@ button.slip-item.fl-item { cursor: pointer; }
 /* Calmer header: the sanitize chip is only an icon until a check is due within 30 minutes or is late. */
 .fl-san[data-urgent="false"] .fl-chip-t, .fl-san[data-urgent="false"] .fl-chip-w { display: none; }
 .fl-san[data-urgent="false"] { min-width: var(--tap); padding-inline: 0; justify-content: center; opacity: 0.8; }
+/* Device roles: a kitchen device shows only the board, the cabinet, 86 and Recall (plus Menu for settings and help), so
+   New ticket, Orders, Demo and Back office are hidden; a front device hides the Cabinet tab. All-in-one is unchanged. */
+.fl[data-role="kitchen"] .fl-new, .fl[data-role="kitchen"] .fl-orders, .fl[data-role="kitchen"] .fl-office,
+.fl[data-role="kitchen"] [data-tool="demo"], .fl[data-role="kitchen"] .fl-demo-chip,
+.fl[data-role="kitchen"] .fl-empty .btn-primary, .fl[data-role="kitchen"] .fl-start-demo,
+.fl[data-role="front"] .fl-seg [data-id="cabinet"] { display: none; }
 
 /* In the cabinet view the cards have buttons along the bottom-left, where toasts normally sit: toasts go to the top right, under the strip. */
 html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto; top: var(--fl-toast-top, 130px); left: auto; right: var(--gutter); transform: none; width: min(400px, 34vw); }
