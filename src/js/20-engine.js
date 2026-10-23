@@ -312,7 +312,7 @@
       channels: C.channels.map((c) => ({ id: c.id, warnSec: c.warnSec, breachSec: c.breachSec })),
       undoMs: C.undoMs,
       syncTargetSec: C.syncTargetSec,
-      ui: { theme: 'day', textSize: 'normal', sound: false },
+      ui: { theme: 'day', textSize: 'normal', sound: false, tempUnit: 'F', weightUnit: 'kg' },
       office: { theme: 'ember', pinHash: null },
       alerts: { ladderThresholds: C.alerts ? C.alerts.ladderThresholds : null },
     };
@@ -2063,7 +2063,7 @@
     channels: { t: 'channels' },
     undoMs: R(3000, 60000, true),
     syncTargetSec: R(10, 600),
-    ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, sound: { t: 'bool' } },
+    ui: { theme: { t: 'enum', v: ['day', 'night'] }, textSize: { t: 'enum', v: ['normal', 'large'] }, sound: { t: 'bool' }, tempUnit: { t: 'enum', v: ['F', 'C'] }, weightUnit: { t: 'enum', v: ['kg', 'lb'] } },
     office: { theme: { t: 'enum', v: ['ember', 'paper'] }, pinHash: { t: 'pin' } },
     alerts: { ladderThresholds: { t: 'ladder' } },
   };

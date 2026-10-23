@@ -209,6 +209,7 @@
     if (!theirs) return;
     atLeast(lastStamp(theirs));
     state = E().tick(replayOnto(theirs), now()).state;
+    syncUnits();
     scheduleNotify();
   }
   // Listeners for alert messages from other tabs.
@@ -236,7 +237,7 @@
     atLeast(lastStamp(theirs));
     if (d.sid) baseSid = d.sid;
     if (pending.length) { state = replayOnto(theirs); schedulePersist(true); } else state = theirs;
-    state = E().tick(state, now()).state;
+    state = E().tick(state, now()).state; syncUnits();
     scheduleNotify();
   }
 
@@ -464,6 +465,7 @@
     // Catch up anything that became due while the page was closed.
     const t = E().tick(state, now());
     state = t.state;
+    syncUnits();
     if (!loaded && st.corrupt) schedulePersist(false); // replace the corrupt payload; a pristine first run is not written until something happens
     if (!opts.noTimers && typeof setInterval === 'function') interval = setInterval(tickNow, 1000);
     if (!opts.noSync) openTransport(opts.transport);
@@ -477,11 +479,15 @@
   // trimmed, repaired, speed.
   function status() { return Object.assign({}, st, { speed: clk.speed }); }
 
+  // Tells the formatting helpers which units the saved settings ask for (degrees F or C, kg or lb).
+  function syncUnits() { try { if (state && state.settings) U.setUnits(state.settings.ui); } catch (e) { /* formatting keeps its old choice */ } }
   // Makes ns the current state if it differs, then schedules a save and a redraw. broadcast tells other
   // tabs.
   function commit(ns, broadcast) {
     if (ns === state) return;
+    const sameSettings = state && ns.settings === state.settings;
     state = ns;
+    if (!sameSettings) syncUnits();
     schedulePersist(broadcast);
     scheduleNotify();
   }
@@ -586,7 +592,7 @@
     // its times.
     ns.rev = Math.max(ns.rev, (state ? state.rev : 0) + 1);
     atLeast(lastStamp(ns));
-    state = E().tick(ns, now()).state;
+    state = E().tick(ns, now()).state; syncUnits();
     pendingBroadcast = true;
     skipRebase = true; pending = [];   // an import or reset is meant to win over what another tab saved
     persistNow();

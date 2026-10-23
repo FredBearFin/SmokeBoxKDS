@@ -156,6 +156,45 @@
   // Whole degrees Fahrenheit with the degree sign, like "135 F". Not a number gives "-".
   U.fmtTemp = (f) => (U.isNum(f) ? Math.round(f) + '°F' : '-');
 
+  /* ---------- units setting: store in degrees F and grams, format only at the edges ---------- */
+  // The units the owner chose (settings.ui.tempUnit and weightUnit). The store keeps this in step with the
+  // settings; screens call the helpers below and never read it directly.
+  U.units = { temp: 'F', weight: 'kg' };
+  // Takes the ui part of the settings and remembers the temperature unit (F or C) and weight unit (kg or lb).
+  // Anything else leaves the old choice alone.
+  U.setUnits = (ui) => {
+    if (!ui || typeof ui !== 'object') return U.units;
+    if (ui.tempUnit === 'F' || ui.tempUnit === 'C') U.units.temp = ui.tempUnit;
+    if (ui.weightUnit === 'kg' || ui.weightUnit === 'lb') U.units.weight = ui.weightUnit;
+    return U.units;
+  };
+  const G_PER_LB = 453.59237;
+  // Degrees Celsius to Fahrenheit, and back. Stored temperatures stay Fahrenheit (the food code is in F).
+  U.cToF = (c) => (c * 9) / 5 + 32;
+  U.fToC = (f) => ((f - 32) * 5) / 9;
+  // The unit word shown next to a temperature or weight: "°F", "°C", "kg" or "lb". kind is "temp" or "weight".
+  U.unitLabel = (kind) => (kind === 'weight' ? U.units.weight : '°' + U.units.temp);
+  // A stored Fahrenheit value as the number to show (whole degrees) in the chosen unit; NaN when not a number.
+  U.tempShown = (f) => (U.isNum(f) ? Math.round(U.units.temp === 'C' ? U.fToC(f) : f) : NaN);
+  // A number the person typed (in the chosen unit) back to stored Fahrenheit, rounded to a tenth.
+  U.tempStored = (v) => (U.isNum(v) ? Math.round((U.units.temp === 'C' ? U.cToF(v) : v) * 10) / 10 : NaN);
+  // Stored Fahrenheit as text in the chosen unit: 135 gives "135 °F" or "57 °C". Not a number gives "-".
+  U.tempText = (f) => (U.isNum(f) ? U.tempShown(f) + ' ' + U.unitLabel('temp') : '-');
+  // Stored degrees Celsius (cook endpoints are kept in C) as text in the chosen unit: 85 gives "85 °C" or "185 °F".
+  U.tempTextC = (c) => (U.isNum(c) ? U.tempText(U.cToF(c)) : '-');
+  // Stored grams as the number to show in the chosen weight unit (kg or lb), not rounded. NaN when not a number.
+  U.weightShown = (g) => (U.isNum(g) ? (U.units.weight === 'lb' ? g / G_PER_LB : g / 1000) : NaN);
+  // A weight typed in the chosen unit back to stored grams, rounded to a tenth of a gram.
+  U.weightStored = (v) => (U.isNum(v) ? Math.round((U.units.weight === 'lb' ? v * G_PER_LB : v * 1000) * 10) / 10 : NaN);
+  // Stored grams as text in the chosen unit. Kilograms read like fmtG ("850 g", "2.40 kg"); pounds read
+  // "7.0 oz" under a pound and "5.29 lb" above.
+  U.weightText = (g) => {
+    if (!U.isNum(g)) return '-';
+    if (U.units.weight !== 'lb') return U.fmtG(g);
+    const lb = g / G_PER_LB;
+    return Math.abs(lb) < 1 ? (lb * 16).toFixed(1) + ' oz' : lb.toFixed(2) + ' lb';
+  };
+
   /* ---------- dates (all local time). The "service day" runs from dayStartHour (4 am) so a 12:45 am sale belongs to last night. ---------- */
   // 4 am: the service day turns over at 4 am, so a 12:45 am sale still belongs to the night before.
   U.DAY_START_HOUR = 4;
