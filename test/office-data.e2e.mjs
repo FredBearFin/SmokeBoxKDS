@@ -26,7 +26,7 @@ const NO_SHOTS = args.includes('--no-shots');
 /* ---------- private bundle ---------- */
 function buildBundle() {
   const CSS = ['00-tokens.css', '10-base.css', '30-office.css', '32-office-data.css', '40-charts.css'];
-  const JS = ['00-util.js', '05-icons.js', '10-config.js', '20-engine.js', '25-deadlines.js', '30-store.js', '40-metrics.js', '50-charts.js', '60-shell.js', '80-office-core.js', '84-office-data.js', '99-boot.js'];
+  const JS = ['00-util.js', '05-icons.js', '10-config.js', '20-engine.js', '25-deadlines.js', '30-store.js', '40-metrics.js', '50-charts.js', '60-shell.js', '80-office-core.js', '84-office-data.js', '88-office-backup.js', '99-boot.js'];
   let c = '';
   for (const f of CSS) c += `\n/* ===== ${f} ===== */\n` + fs.readFileSync(path.join(root, 'src/css', f), 'utf8');
   let j = '';
@@ -90,6 +90,15 @@ const text = async (page, sel) => ((await page.locator(sel).first().textContent(
 const visible = (page, sel) => page.locator(sel).first().isVisible();
 const eventsOf = (page, type) => page.evaluate((t) => SB.engine.allEvents(SB.store.getState()).filter((e) => e.type === t).length, type);
 const stateJson = (page) => page.evaluate(() => JSON.stringify(SB.store.getState()));
+// Reads the typed-word erase box that the Data page opens, then cancels it or types the word and confirms. Returns the box text.
+async function typedBox(page, which) {
+  const box = page.locator('#od-data .od-danger-box:not([hidden])');
+  await box.waitFor({ timeout: 8000 });
+  const text = await box.innerText();
+  if (which === 'cancel') await box.locator('button', { hasText: 'Keep my data' }).click();
+  else { await box.locator('input').fill(/Erase everything/.test(text) ? 'ERASE' : 'ERASE'); await box.locator('button.btn-danger').click(); }
+  return text;
+}
 async function confirmSheet(page, which) {
   await page.waitForSelector('.sheet[role="alertdialog"]', { timeout: 8000 });
   const t = await page.locator('.sheet[role="alertdialog"]').first().innerText();
@@ -722,6 +731,7 @@ group('9b. Data: saveFile (host, browser, copy)', async () => {
     check('the exported JSON is accepted by validateBackup', valid.ok, valid);
     check('the page says the download started (and what to do if nothing arrives)', /Download started: smokebox-backup-/.test(await text(page, '#od-data .od-st')) && /Copy backup/.test(await text(page, '#od-data .od-st')));
     await makeTickets(page, 3);
+    await page.evaluate(() => { const d = document.querySelector('#od-data .od-more'); if (d) d.open = true; });
     for (const k of ['tickets', 'items', 'events', 'batches']) {
       const [d] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), click(`[data-csv="${k}"]`)]);
       const csv = fs.readFileSync(await d.path(), 'utf8');
@@ -769,7 +779,7 @@ group('9c. Data: import', async () => {
     await fileIn.setInputFiles({ name: 'my-backup.json', mimeType: 'application/json', buffer: Buffer.from(backup) });
     await page.waitForSelector('#od-data .od-impresult .od-card');
     const card = await text(page, '#od-data .od-impresult .od-card');
-    check('a valid file shows a summary before anything changes', /valid Smokebox backup/.test(card) && new RegExp('Tickets' + nT).test(card) && /Logged events/.test(card) && /Menu items21/.test(card), card);
+    check('a valid file shows a summary before anything changes', /valid Smokebox backup/.test(card) && new RegExp('Tickets' + nT).test(card) && /Kind/.test(card) && /Dishes21/.test(card) && /Orders/.test(card), card);
     check('the summary says it replaces everything on this device, with the real counts', card.includes('This replaces everything on this device: 0 tickets, ' + nB + ' batches') && /Back up first/.test(card), card);
     check('nothing has changed yet', (await st(page, () => SB.store.getState().tickets.length)) === 0);
     await page.locator('[data-action="import-replace"]').click();
@@ -844,29 +854,29 @@ group('9d. Data: reset', async () => {
     const live = page.locator('[data-action="reset-live"]');
     await live.scrollIntoViewIfNeeded();
     await live.click();
-    let sheet = await confirmSheet(page, 'cancel');
-    check('reset live data spells out what is cleared, and that settings stay by default', /clears 9 tickets/.test(sheet) && /Your menu, ingredient edits, limits, pacing and PIN stay/.test(sheet) && /no undo/i.test(sheet), sheet);
+    let sheet = await typedBox(page, 'cancel');
+    check('reset live data spells out what is cleared, and that settings stay by default', /clears 9 tickets/.test(sheet) && /Your dishes, ingredient edits, limits, pacing and PIN stay/.test(sheet) && /no undo/i.test(sheet), sheet);
     check('cancel keeps the tickets', (await st(page, () => SB.store.getState().tickets.length)) === 9);
     await live.click();
-    await confirmSheet(page, 'confirm');
+    await typedBox(page, 'confirm');
     await waitFor(page, () => SB.store.getState().tickets.length === 0);
     check('confirming clears tickets', true);
     check('events and batches are reset to the starter set', await st(page, () => SB.engine.allEvents(SB.store.getState()).filter((e) => e.type === 'ticket_created').length === 0));
     check('settings and menu edits are kept (price 9.75)', (await st(page, () => SB.store.getState().menu.find((m) => m.id === 'brisket_qtr').price)) === 9.75);
-    check('the page says what happened', /Live data cleared/.test(await text(page, '#od-data .od-st:last-of-type')) || /Live data cleared/.test(await text(page, '#od-data')));
+    check('the page says what happened', /Live data erased/.test(await text(page, '#od-data')));
     // keep-settings off
     await makeTickets(page, 4);
     await page.locator('#od-data .od-toggle-row .toggle').click();
     await live.click();
-    sheet = await confirmSheet(page, 'confirm');
+    sheet = await typedBox(page, 'confirm');
     await waitFor(page, () => SB.store.getState().tickets.length === 0);
-    check('with "keep" switched off, live reset also restores the starter menu and settings', (await st(page, () => SB.store.getState().menu.find((m) => m.id === 'brisket_qtr').price)) === 7.5 && /puts every setting, menu edit and the PIN back/.test(sheet), sheet);
+    check('with "keep" switched off, live reset also restores the starter menu and settings', (await st(page, () => SB.store.getState().menu.find((m) => m.id === 'brisket_qtr').price)) === 7.5 && /puts every setting, dish edit and the PIN back/.test(sheet), sheet);
     // everything
     await typeNum(page, 'Price of ' + MENU.name, '8');
     await waitFor(page, () => SB.store.getState().menu.find((m) => m.id === 'brisket_qtr').price === 8);
     await makeTickets(page, 5);
     await page.locator('[data-action="reset-all"]').click();
-    sheet = await confirmSheet(page, 'confirm');
+    sheet = await typedBox(page, 'confirm');
     await waitFor(page, () => SB.store.getState().tickets.length === 0 && SB.store.getState().menu.find((m) => m.id === 'brisket_qtr').price === 7.5);
     check('Reset everything clears tickets and puts the menu and settings back', true);
     check('its warning says it erases the PIN and cannot be undone', /PIN/.test(sheet) && /no undo/i.test(sheet), sheet);
@@ -895,11 +905,8 @@ group('10. About and wording', async () => {
     });
     const caps = copy.filter((t) => t.length > 3 && t === t.toUpperCase() && /[A-Z]{4}/.test(t));
     check('no ALL-CAPS labels in buttons, headings or labels', caps.length === 0, caps);
-    // KNOWN BUG (A3, B6 in docs/audit/e2e-triage.md): the dish summary rows read "Pit · Meats · Starter prep time", which breaks the "no middots" rule in docs/design-notes.md.
-    const isDishRow = (t) => / · /.test(t) && /\$\d/.test(t);
     const badCopy = copy.filter((t) => /[→←↑↓⟶·•]/.test(t) || / > /.test(t));
-    check('no arrows or middle-dot meta strings in buttons and labels (dish summary rows aside, a known bug)', badCopy.filter((t) => !isDishRow(t)).length === 0, badCopy.filter((t) => !isDishRow(t)));
-    if (badCopy.some(isDishRow)) console.log('  KNOWN dish summary rows use middle dots (owner A3): ' + badCopy.filter(isDishRow).length + ' rows');
+    check('no arrows or middle-dot meta strings in buttons and labels, dish summary rows included', badCopy.length === 0, badCopy);
     const pageText = await st(page, () => document.querySelector('.od').innerText);
     const stray = pageText.match(/\b(NaN|undefined|null|\[object|Infinity|1e\+\d+)\b/g);
     check('no NaN, undefined, null or [object] anywhere on the page', !stray, stray);

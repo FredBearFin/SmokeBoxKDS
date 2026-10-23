@@ -342,7 +342,9 @@ await withPage({ file: FILE, w: 1280, h: 900, hash: '#/' }, async (page, logs) =
   check('View as table swaps the chart for a real table and sets aria-pressed', vt.pressed === 'true' && vt.shown && vt.rows > 3 && vt.controls, vt);
   await btn.click(); await wait(150);
   check('and toggles back to the chart', await page.evaluate(() => document.querySelector('.of-card .ch-tbtn').getAttribute('aria-pressed') === 'false'));
-  // sortable table
+  // sortable table (the slowest-tickets table sits behind the page's Show more button, so open it first)
+  await page.evaluate(() => { const b = document.querySelector('.of-more-btn'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); });
+  await wait(500);
   const secs = (s) => { const m = /(?:(\d+)m)?\s*(?:(\d+)s)?/.exec(s || ''); return (+m[1] || 0) * 60 + (+m[2] || 0); };
   const timeCol = async () => page.evaluate(() => [...document.querySelectorAll('.of-table tbody tr')].map((tr) => tr.children[3].textContent));
   const th = page.locator('.of-table thead th', { hasText: 'Time' }).locator('button');
@@ -435,6 +437,9 @@ group('Today at 6:15 pm: pace ring, arrows against yesterday, banner');
   await withPage({ file: FILE, w: 1280, h: 800, hash: '#/', init: fakeClock(NOW) }, async (page, logs) => {
     await boot(page, live);
     await clickSeg(page, 'Date range', 'today'); await wait(400);
+    // The pace ring sits behind the page's "Show more charts and findings" button (deliberate: the lead chart comes first).
+    await page.evaluate(() => { const b = document.querySelector('.of-more-btn'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); });
+    await wait(600);
     const r = await page.evaluate(() => ({ ring: !!document.querySelector('.ch--ring svg'), ringText: (document.querySelector('.ch--ring') || {}).textContent, arrows: document.querySelectorAll('.of-tile-delta .icon').length, nocmp: document.querySelectorAll('.of-nocmp').length, note: document.querySelector('.of-tiles-note').textContent, head: document.querySelector('.of-headline').textContent, banner: document.querySelector('.of-banner-t').textContent, spark: document.querySelectorAll('.of-tile-spark .ch').length }));
     check('the pace ring draws from the last 10 tickets of the last 45 minutes', r.ring && /%/.test(r.ringText), r.ringText);
     check('Today has a full day before it, so the tiles show arrows with words', r.arrows >= 4 && /Arrows compare with the day before/.test(r.note), r);
@@ -472,7 +477,8 @@ await withPage({ file: FILE, w: 768, h: 900, hash: '#/' }, async (page, logs) =>
   await boot(page, sample);
   for (const pg of PAGES) {
     await page.evaluate((p) => SB.office.navigate(p), pg); await wait(500);
-    const r = await page.evaluate(() => { const g = document.querySelector('.of-grid').getBoundingClientRect().width; return [...document.querySelectorAll('.of-grid > .of-card')].filter((c) => Math.abs(c.getBoundingClientRect().width - g) > 2).length; });
+    // Cards folded behind Show more have no width, so only visible cards are checked.
+    const r = await page.evaluate(() => { const g = document.querySelector('.of-grid').getBoundingClientRect().width; return [...document.querySelectorAll('.of-grid > .of-card')].filter((c) => c.offsetParent !== null && Math.abs(c.getBoundingClientRect().width - g) > 2).length; });
     check(`768px ${pg}: the grid is one column, every card is full width`, r === 0, r);
   }
   noErrors('tablet 768', logs);

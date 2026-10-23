@@ -345,7 +345,7 @@ a.of-nav:active { background: var(--press); }
 .sb-glance[data-size="wall"] .sb-g-s { font-size: clamp(16px, 1.8vw, 26px); }
 
 /* Pages with nothing to show because cooked-ahead food is not tracked: a quiet rail entry, no filter bar. */
-.of-nav-off { font-size: var(--fs-1); color: var(--ink3); }
+.of-nav-off { font-size: var(--fs-1); color: var(--ink); }
 .of-nav.is-off { opacity: 0.8; }
 .of[data-gated="true"] .of-filters { display: none; }
 .of-section[hidden], .of-card[hidden] { display: none; }
