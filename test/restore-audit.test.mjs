@@ -256,3 +256,19 @@ test('a damaged before-restore copy is refused by Undo restore without touching 
   same(body(S.getState()), before, 'the kitchen is untouched');
   S.destroy();
 });
+
+test('a compact save that parses but will not unpack is parked whole, with its packed body, and a newer format number too', () => {
+  for (const tweak of [(o) => { o.p = Array.isArray(o.p) ? o.p.slice(0, 2) : 'x'; }, (o) => { o.fmt = 3; }]) {
+    const b = mem(); const clock = boot(K, b);
+    S.destroy();
+    const saved = JSON.parse(b.m.get('smokebox.v1.state'));
+    assert.equal(saved.fmt, 2);
+    tweak(saved);
+    b.m.set('smokebox.v1.state', JSON.stringify(saved));
+    S.init({ storage: b, mode: 'real', blank: true, noTimers: true, noSync: true, now: () => clock.t });
+    assert.ok(S.status().corrupt, 'reported');
+    const parked = JSON.parse(b.m.get('smokebox.v1.corrupt'));
+    assert.ok(parked.p !== undefined && parked.fmt === saved.fmt, 'the packed body is kept in the parked copy');
+    S.destroy();
+  }
+});

@@ -787,8 +787,9 @@
     baseSid = null; pending = []; recent = []; journal = []; skipRebase = false; noTimersOpt = !!opts.noTimers; if (reconcileTimer) { clearTimeout(reconcileTimer); reconcileTimer = null; }
     outbox = []; seenOps = new Set(); acked.clear();      // opN is never reset: an action id must not repeat in one page, or a hub or another tab that remembers it takes the new action for a repeat
     const r = realNow();
-    let payload = null;
-    try { payload = openSaved(storage.get(KEY, null)); } catch (e) { payload = null; }
+    // stored is the copy exactly as saved: a damaged compact copy is parked in that form, since the unpacked one has lost its body.
+    let payload = null, stored = null;
+    try { stored = storage.get(KEY, null); payload = openSaved(stored); } catch (e) { payload = null; }
     try { baseSid = storage.get(SID_KEY, null); } catch (e) { baseSid = null; }
     journal = payload && Array.isArray(payload.ops) ? payload.ops.filter((x) => typeof x === 'string').slice(-JOURNAL_MAX) : [];
     era = payload && typeof payload.era === 'string' ? payload.era : '';
@@ -812,12 +813,12 @@
         const dc = droppedCounts(v.repaired);
         if (dc) {
           st.droppedCount = dc;
-          const raw = rawOf(payload);
-          if (!parkText(DROPPED_KEY, DROPPED_AT_KEY, payload, r)) { writeBlocked = true; heldText = raw; st.heldInMemory = true; }
+          const raw = rawOf(stored);
+          if (!parkText(DROPPED_KEY, DROPPED_AT_KEY, stored, r)) { writeBlocked = true; heldText = raw; st.heldInMemory = true; }
         }
       } else {
         st.corrupt = v.error;
-        if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, payload, r)) { writeBlocked = true; heldText = rawOf(payload); st.heldInMemory = true; }
+        if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, stored, r)) { writeBlocked = true; heldText = rawOf(stored); st.heldInMemory = true; }
       }
     } else st.firstRun = true;
     // A damaged save: the rolling last-good copy takes its place (real kitchens), and the damaged one stays set aside.
