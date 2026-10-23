@@ -59,6 +59,8 @@ await withPage({ w: 1280, h: 900, hash: '' }, async (page, logs) => {
   await page.evaluate(axeSource);
   const ax = await page.evaluate(async () => { const res = await window.axe.run(document.querySelector('[aria-label="Saved history"]'), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] } }); return res.violations.map((v) => v.id + ': ' + v.nodes.map((n) => n.target.join(' ')).join(' | ')); });
   check('axe finds nothing on the amber Saved history card', ax.length === 0, ax);
+  const axPage = await page.evaluate(async () => { const res = await window.axe.run(document.querySelector('#od-data'), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] } }); return res.violations.map((v) => v.id + ': ' + v.nodes.slice(0, 3).map((n) => n.target.join(' ')).join(' | ')); });
+  check('and nothing on the whole Data page with the card in it', axPage.length === 0, axPage);
 
   r = await load(180);
   await page.evaluate(() => { SB.sheets.open('orders'); });
@@ -80,10 +82,30 @@ await withPage({ w: 1280, h: 900, hash: '' }, async (page, logs) => {
   t = await cardText();
   check('the card says it is full and what to do', /Your saved history is full, so older days are being dropped to make room\. Close the month to save them to files\./.test(t), t);
 
-  r = await load(100, { persisted: false, trimmedSince: { days: 3, at: Date.now(), droppedBefore: '2026-09-10' } });
+  // The browser line: with the real store it follows the browser's own answer; with the stub we say the browser did not promise.
+  r = await load(100, { persisted: false });
   t = await cardText();
-  check('when the browser did not promise to keep the data the card says to add the app to the home screen', /This browser may delete saved data if the tablet is unused for a while\. Add Smokebox to the home screen/.test(t), t);
-  check('and after a drop it says days before the date were dropped', /Older history was dropped to make room \(days before .+\)\. Close the month regularly to keep it in files\./.test(t), t);
+  const persisted = await page.evaluate(() => SB.store.historyFill().persisted);
+  check('the browser-may-delete line shows exactly when the browser did not promise to keep the data (persisted: ' + persisted + ')', /This browser may delete saved data if the tablet is unused for a while\. Add Smokebox to the home screen/.test(t) === (persisted === false), t);
+
+  // A real drop: a small limit, then more tickets than fit through the store, so the oldest days are dropped and the store notes it.
+  r = await load(50);
+  await page.evaluate(() => { SB.config.limits.maxTickets = 60; });
+  await page.evaluate(() => {
+    const S = SB.store, m = S.getState().menu[0];
+    for (let i = 0; i < 25; i++) {
+      const c = S.dispatchEx('createTicket', { customer: 'Late ' + i, channel: 'dine_in', items: [{ menuId: m.id }] }, { source: 'ui' });
+      if (c.report !== 'ok') continue;
+      const tk = S.getState().tickets.find((x) => x.id === c.info.ticketId);
+      for (const it of tk.items) S.dispatchEx('completeItem', { ticketId: tk.id, itemId: it.id }, { source: 'ui' });
+      S.dispatchEx('bumpTicket', { ticketId: tk.id }, { source: 'ui' }); S.flush();
+    }
+  });
+  const dropped = await page.evaluate(() => SB.store.dataset({ sample: false }).droppedBefore || null);
+  check('(real) the store notes the day before which history was dropped', typeof dropped === 'string', dropped);
+  t = await cardText();
+  check('after a drop the card says days before the date were dropped', /Older history was dropped to make room \(days before .+\)\. Close the month regularly to keep it in files\./.test(t), t);
+  await page.evaluate(() => { SB.config.limits.maxTickets = 200; });
   check('no console or page errors', !logs.errors.length && !logs.pageErrors.length, { e: logs.errors, p: logs.pageErrors });
 });
 process.exit(failed ? 1 : 0);
