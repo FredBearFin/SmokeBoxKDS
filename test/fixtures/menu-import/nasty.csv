@@ -1,0 +1,9 @@
+﻿Name,Price,Category
+"Ribs, ""St. Louis"", half",16,Meats
+
+,
+"Two
+line name",7.25,Meats
+=SUM(A1),5,Meats
+"Burnt ends",15,Meats
+"Burnt ends",15.5,Meats

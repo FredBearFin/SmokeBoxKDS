@@ -1,0 +1,6 @@
+Token,Item Name,Description,Category,SKU,Variation Name,Price,Option Name 1,Option Value 1,Default Tax Rate,Archived
+AAA1,Brisket Sandwich,"Sliced brisket on a bun",Sandwiches,BS1,Regular,$13.50,,,,N
+AAA2,Sweet Tea,Cold tea,Drinks,ST1,Small,$2.50,,,,N
+AAA2,Sweet Tea,Cold tea,Drinks,ST2,Large,$3.50,,,,N
+AAA3,Catering tray,Per person,Catering,CT1,Regular,variable,,,,N
+AAA4,Pulled Pork,,Sandwiches,PP1,Regular,"$11.50",,,,N

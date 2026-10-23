@@ -1,0 +1,5 @@
+Clover ID,Name,Alternate Name,Price,Price Type,Price Unit,Tax Rates,Cost,Product Code,SKU,Modifier Groups,Quantity,Printer Labels,Hidden,Non-revenue item
+ABC123,Brisket plate,Plate,1400,FIXED,,Sales Tax,500,,,,,Kitchen,No,No
+ABC124,Burger,,950,FIXED,,Sales Tax,300,,,,,Kitchen,No,No
+ABC125,Delivery fee,,0,VARIABLE,,,,,,,,,No,Yes
+ABC126,Old special,,1250,FIXED,,,,,,,,,Yes,No

@@ -157,7 +157,7 @@
     sanitizeDone: '{ who? }',
     updateSettings: '{ patch }',
     updateMenuItem: '{ id, patch }',
-    addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two" }',
+    addMenuItem: '{ name, short?, zone, cat, price, prepSec, track:"one"|"two", prepGuess?:boolean }',
     updateIngredient: '{ id, patch }',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety" }',
     setPortions: '{ menuId, on:boolean, count? }',
@@ -2400,7 +2400,8 @@
   A.updateIngredient = (tx, p) => patchEntity(tx, p, 'ingredients', ING_PATCH, 'ingredients');
   // Adds a new dish. It needs a name, station, category, price, prep time and whether one tap or
   // start-then-finish makes it. The id is made from the name and never reuses an old one. The new dish has no
-  // recipe yet, so stock is not tracked for it, and its prep time counts as confirmed because the owner typed it.
+  // recipe yet, so stock is not tracked for it, and its prep time counts as confirmed because the owner typed it
+  // (unless prepGuess is true, as for an imported menu: then the app keeps learning the real time).
   A.addMenuItem = function (tx, p) {
     const list = tx.get('menu');
     if (list.length >= MENU_MAX) { tx.info = { key: 'menu', min: 0, max: MENU_MAX }; return 'outOfBounds'; }
@@ -2423,7 +2424,7 @@
     let id = base, n = 2;
     while (taken.has(id) || hasOwn(C.menuById, id) || !safeKey(id)) id = base + '_' + n++;
     const w = tx.mut('menu');
-    w.push({ id, name, short, zone: p.zone, cat: p.cat, price: p.price, prepSec: Math.round(p.prepSec), track: p.track, bom: [], prepConfirmed: true, archived: false });
+    w.push({ id, name, short, zone: p.zone, cat: p.cat, price: p.price, prepSec: Math.round(p.prepSec), track: p.track, bom: [], prepConfirmed: p.prepGuess !== true, archived: false });
     tx.event('settings_changed', { keys: ['menu.' + id + '.added'] });
     tx.info = { id, keys: ['menu.' + id + '.added'] };
     return 'ok';
