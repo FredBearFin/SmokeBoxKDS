@@ -87,9 +87,9 @@
   // Builds the log as plain HTML for printing: a heading and one table with the columns that are switched on.
   function printHtml(list, rec, note) {
     const cols = rec.cols.filter((c) => c.on);
-    const head = '<tr>' + cols.map((c) => '<th>' + esc(c.label) + '</th>').join('') + '</tr>';
-    const body = list.map((r) => '<tr>' + cols.map((c) => '<td>' + esc(r[c.key]) + '</td>').join('') + '</tr>').join('');
-    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p>' + (note ? '<p>' + esc(note) + '</p>' : '') + '<table>' + head + body + '</table>';
+    const head = '<thead><tr>' + cols.map((c) => '<th scope="col">' + esc(c.label) + '</th>').join('') + '</tr></thead>';
+    const body = '<tbody>' + list.map((r) => '<tr>' + cols.map((c) => '<td>' + esc(r[c.key]) + '</td>').join('') + '</tr>').join('') + '</tbody>';
+    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>@page{margin:14mm}@page{@bottom-right{content:"Page " counter(page) " of " counter(pages);font:10px sans-serif}}body{font:12px/1.35 system-ui,sans-serif;margin:0;color:#000}h1{font-size:20px;margin:0 0 6px}p{margin:4px 0}table{border-collapse:collapse;width:100%;margin-top:8px}th,td{border:1px solid #444;padding:4px 6px;text-align:left;vertical-align:top;overflow-wrap:break-word}th{background:#eee;font-weight:700}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p>' + (note ? '<p>' + esc(note) + '</p>' : '') + '<table>' + head + body + '</table>';
   }
   // Builds the log as CSV text with the columns that are switched on.
   function csv(list, rec, note) {

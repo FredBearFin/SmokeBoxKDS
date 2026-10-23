@@ -76,6 +76,22 @@
       d.orders++; d.sales += cc(T.subtotal) - cc(T.discount); d.discounts += cc(T.discount); d.tax += cc(T.tax); d.tips += tip; d.total += collected;
       d[o.method === 'cash' ? 'cash' : o.method === 'card' ? 'card' : 'other'] += collected;
     });
+    // Days saved to the month files and cleared from this tablet no longer have their orders here, but each closed day left its totals in
+    // a day_closed record. Those records fill in the missing days (the last close of a day covers the whole day), so no day drops out.
+    if (state && SB.engine && SB.engine.isArchivedDay && SB.engine.allEvents) {
+      const last = {};
+      for (const e of SB.engine.allEvents(state)) if (e && e.type === 'day_closed' && !e.reverted && typeof e.day === 'string') last[e.day] = e;
+      for (const day of Object.keys(last)) {
+        if (days[day] || !SB.engine.isArchivedDay(state, day)) continue;
+        const e = last[day], bm = e.byMethod || {};
+        // Dollars as whole cents (a missing amount is zero cents).
+        const cc = (v) => Math.round((isNum(v) ? v : 0) * 100);
+        // Everything collected by one payment method that day, tips included, in cents.
+        const by = (m) => (bm[m] ? cc(bm[m].total) + cc(bm[m].tip) : 0);
+        const other = Object.keys(bm).filter((m) => m !== 'cash' && m !== 'card').reduce((a, m) => a + by(m), 0);
+        days[day] = { orders: isNum(e.orders) ? e.orders : 0, sales: cc(e.subtotal) - cc(e.discount), discounts: cc(e.discount), tax: cc(e.tax), tips: cc(e.tip), total: cc(e.total) + cc(e.tip), cash: by('cash'), card: by('card'), other };
+      }
+    }
     const head = ['Date', 'Orders paid', 'Sales (after discounts)', 'Discounts given', 'Tax', 'Tips', 'Total collected', 'Collected in cash', 'Collected by card', 'Collected other'];
     const sum = { orders: 0, sales: 0, discounts: 0, tax: 0, tips: 0, total: 0, cash: 0, card: 0, other: 0 };
     // One CSV line for a day or for the totals.

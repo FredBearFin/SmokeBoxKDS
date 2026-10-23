@@ -3898,6 +3898,14 @@ a.of-nav:active { background: var(--press); }
 .od-fcard .od-steps { list-style: decimal; padding-left: 1.4em; display: grid; gap: var(--sp-2); }
 .od-fcard .od-steps li { display: list-item; }
 
+/* The pilot report on paper: hidden on screen, the only thing on the page when printing, black on white with wrapped lines. */
+.pr-printroot { display: none; }
+@media print {
+  .pr-printroot { display: block !important; position: static; color: #000; background: #fff; font: 12px/1.4 system-ui, sans-serif; }
+  .pr-printroot h1 { font-size: 20px; margin: 0 0 8px; color: #000; }
+  .pr-printroot pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; color: #000; margin: 0; }
+}
+
 /* ===== 33-office-closeday.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the Close the day sheet and its print-only end-of-day summary.
@@ -3955,9 +3963,15 @@ a.of-nav:active { background: var(--press); }
   .si-printroot { display: block !important; position: static; color: #000; background: #fff; font: 12px/1.4 system-ui, sans-serif; }
   .si-printroot h1 { font-size: 20px; margin: 0 0 8px; }
   .si-note { margin: 6px 0; font-size: 11px; }
+  /* Six columns on paper: small type, tight padding and fixed widths so no word is broken in the middle and a row stays short. */
+  .si-printroot .si-table { table-layout: fixed; width: 100%; font-size: 10px; line-height: 1.3; }
+  .si-printroot .si-table th, .si-printroot .si-table td { padding: 3px 4px; overflow-wrap: break-word; hyphens: manual; }
+  .si-printroot .si-table th:nth-child(1) { width: 13%; } .si-printroot .si-table th:nth-child(2) { width: 12%; } .si-printroot .si-table th:nth-child(3) { width: 21%; }
+  .si-printroot .si-table th:nth-child(4) { width: 32%; } .si-printroot .si-table th:nth-child(5) { width: 8%; } .si-printroot .si-table th:nth-child(6) { width: 14%; }
   .si-table th, .si-table td { border-bottom: 1px solid #999; color: #000; }
+  .si-table .si-fact, .si-table .si-corr { color: #000; font-size: 9px; }
   .si-table thead { display: table-header-group; }
-  .si-table tr { break-inside: avoid; }
+  .si-table tr { break-inside: avoid; page-break-inside: avoid; }
 }
 /* Page margins and page numbers; kept last so an older browser that skips the margin box loses nothing above. */
 @page { margin: 16mm; }
@@ -20885,10 +20899,32 @@ a.of-nav:active { background: var(--press); }
     if (wakeState !== 'unsupported' && wakeState !== 'refused') return '';
     return 'This screen may go to sleep, and warnings stop while it sleeps. Keep the tablet plugged in with its screen set to stay on.';
   }
+  // What was already late or past its limit when the page went to the background, so waking can say only what is new.
+  function sleepSnapshot() {
+    try {
+      const st = store().getState(), now = store().now();
+      const past = new Set(SB.deadlines.build(st, now).filter((d) => d.kind === 'past' || d.kind === 'expired').map((d) => d.batchId || d.id));
+      return { overdue: SB.engine.views.counts(st, now).overdue, past };
+    } catch (e) { return null; }
+  }
+  // One calm sentence about what changed while the page slept ("2 batches passed their time and 3 tickets went late"), or '' when nothing did.
+  function sleepSummary(snap) {
+    if (!snap) return '';
+    try {
+      const st = store().getState(), now = store().now();
+      const nb = SB.deadlines.build(st, now).filter((d) => (d.kind === 'past' || d.kind === 'expired') && !snap.past.has(d.batchId || d.id)).length;
+      const nt = Math.max(0, SB.engine.views.counts(st, now).overdue - snap.overdue);
+      const bits = [];
+      if (nb) bits.push(nb + ' ' + U.plural(nb, 'batch', 'batches') + ' passed ' + U.plural(nb, 'its', 'their') + ' time');
+      if (nt) bits.push(nt + ' ' + U.plural(nt, 'ticket') + ' went late');
+      return bits.length ? 'While this screen was asleep: ' + bits.join(' and ') + '.' : '';
+    } catch (e) { return ''; }
+  }
   // A sentence shown for a while after the board comes back from the background, since warnings were silent in between.
   function awayNote() {
     const a = m && m.away;
     if (!a || Date.now() - a.at > 10 * 60e3) return '';
+    if (a.summary) return a.summary;
     return 'The board was in the background for ' + (a.min < 1 ? 'a moment' : a.min + (a.min === 1 ? ' minute' : ' minutes')) + '. Warnings are silent while it is hidden.';
   }
   // Plays a test chime and a spoken line so a cook can hear that this tablet makes sound, and says what happened.
@@ -20967,8 +21003,13 @@ a.of-nav:active { background: var(--press); }
     const onVis = () => {
       if (doc.visibilityState === 'visible') {
         requestWake();
-        if (m && m.hiddenAt) { const min = Math.round((Date.now() - m.hiddenAt) / 60e3); if (min >= 1) m.away = { at: Date.now(), min }; m.hiddenAt = null; }
-      } else if (m) m.hiddenAt = Date.now();
+        if (m && m.hiddenAt) {
+          const min = Math.round((Date.now() - m.hiddenAt) / 60e3);
+          // The first look after waking: one tick right now (not a loop of missed seconds), then one summary of what changed while asleep.
+          if (min >= 1) { try { store().tick(); } catch (e) { /* the next timer tick does it */ } m.away = { at: Date.now(), min, summary: sleepSummary(m.sleepSnap) }; }
+          m.hiddenAt = null; m.sleepSnap = null;
+        }
+      } else if (m) { m.hiddenAt = Date.now(); m.sleepSnap = sleepSnapshot(); }
     };
     doc.addEventListener('visibilitychange', onVis);
     m.offs.push(() => { doc.removeEventListener('pointerdown', onGesture, true); doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
@@ -27290,9 +27331,9 @@ a.of-nav:active { background: var(--press); }
   // Builds the log as plain HTML for printing: a heading and one table with the columns that are switched on.
   function printHtml(list, rec, note) {
     const cols = rec.cols.filter((c) => c.on);
-    const head = '<tr>' + cols.map((c) => '<th>' + esc(c.label) + '</th>').join('') + '</tr>';
-    const body = list.map((r) => '<tr>' + cols.map((c) => '<td>' + esc(r[c.key]) + '</td>').join('') + '</tr>').join('');
-    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>body{font:14px system-ui,sans-serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p>' + (note ? '<p>' + esc(note) + '</p>' : '') + '<table>' + head + body + '</table>';
+    const head = '<thead><tr>' + cols.map((c) => '<th scope="col">' + esc(c.label) + '</th>').join('') + '</tr></thead>';
+    const body = '<tbody>' + list.map((r) => '<tr>' + cols.map((c) => '<td>' + esc(r[c.key]) + '</td>').join('') + '</tr>').join('') + '</tbody>';
+    return '<!doctype html><meta charset="utf-8"><title>Thrown-out log</title><style>@page{margin:14mm}@page{@bottom-right{content:"Page " counter(page) " of " counter(pages);font:10px sans-serif}}body{font:12px/1.35 system-ui,sans-serif;margin:0;color:#000}h1{font-size:20px;margin:0 0 6px}p{margin:4px 0}table{border-collapse:collapse;width:100%;margin-top:8px}th,td{border:1px solid #444;padding:4px 6px;text-align:left;vertical-align:top;overflow-wrap:break-word}th{background:#eee;font-weight:700}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}</style><h1>Thrown-out log</h1><p>Printed ' + esc(new Date().toLocaleString()) + '</p>' + (note ? '<p>' + esc(note) + '</p>' : '') + '<table>' + head + body + '</table>';
   }
   // Builds the log as CSV text with the columns that are switched on.
   function csv(list, rec, note) {
@@ -30948,6 +30989,15 @@ a.of-nav:active { background: var(--press); }
     return { dir, better, word, text, deltaPct: dp, delta };
   }
 
+  // The calm note for a range that reaches days already saved to the month files and cleared from this tablet, or '' when it does
+  // not. `before` is the state's archivedBefore day, `from` the range start (ms), `dsh` the day-start hour.
+  function archivedWords(before, from, dsh) {
+    if (typeof before !== 'string' || !/^\d{4}-\d\d-\d\d$/.test(before)) return '';
+    if (isNum(from) && from >= dayStartMs(before, isNum(dsh) ? dsh : 4)) return '';
+    return 'Days before ' + U.fmtDateShort(before) + ' were saved to your month files and cleared from this tablet. Totals for those days are not shown here.';
+  }
+  O.archivedWords = archivedWords;
+
   O.pure = { PAGES, customRange, coachText, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
 
   if (!doc) return; // Node: the pure helpers are all the tests need
@@ -31965,6 +32015,8 @@ a.of-nav:active { background: var(--press); }
       M.bannerCache = { ds: key, from: F.range.from, to: F.range.to, channel: F.channel, n: key ? key.tickets.length : 0, info };
     }
     const b = bannerText(info);
+    // Pages that add up history say when the range reaches days that were cleared from this tablet (the safety record keeps its own).
+    if (M.pageId !== 'safety' && M.pageId !== 'data') { const aw = O.archivedWords(ds && ds.archivedBefore, F.range.from, svcHour()); if (aw) b.text += ' ' + aw; }
     const t = M.banner.querySelector('.of-banner-t');
     if (t.textContent !== b.text) t.textContent = b.text;
     M.banner.dataset.kind = b.kind;
@@ -34097,6 +34149,50 @@ a.of-nav:active { background: var(--press); }
 
   const SAVE_DELAY = 600;           // ms after the last change before a field is written (longer than the stepper's 500 ms hold-repeat gap)
   const MAX_IMPORT_CHARS = 20e6;    // same ceiling as SB.store.importAll
+
+  // Builds the "Close the month" card for the Data page: one plain paragraph on what it does, the numbers from the store's own preview,
+  // and a Start button that opens the guarded confirm flow (SB.setup.openCloseMonth). Nothing here changes any data.
+  function closeMonthCard(flowCard) {
+    const card = flowCard('4', 'Close the month', null, null);
+    const keep = (SB.engine && SB.engine.MONTH_KEEP_DAYS) || 35;
+    const sum = U.h('p', { class: 'od-p od-cm-sum', role: 'status' }), notes = U.h('p', { class: 'od-hint od-cm-keep' });
+    const start = U.h('button', { type: 'button', class: 'btn btn-sm', 'data-action': 'close-month' }, 'Close the month...');
+    const hint = U.h('p', { class: 'od-hint od-cm-hint', hidden: true });
+    // The day the preview counts back from: the first of this month (the same default as the guarded flow); the store still keeps the last days.
+    const opts = () => ({ before: U.serviceDate(SB.store.now(), (SB.store.getState().settings.service || {}).dayStartHour).slice(0, 8) + '01' });
+    // Asks the store what Close the month would clear now and writes it in plain words (nothing changes).
+    function paint() {
+      try { paintNow(); } catch (e) { start.disabled = true; sum.textContent = 'The preview is not available right now. Nothing was changed.'; notes.textContent = ''; }
+    }
+    // Does the work of paint; paint wraps it so this card can never stop the rest of the Data page from drawing.
+    function paintNow() {
+      const r = SB.store.closeMonthPreview(opts());
+      start.disabled = false; hint.hidden = true;
+      if (!r.ok || !r.preview || !r.preview.days || !r.preview.days.length || !r.preview.from) {
+        start.disabled = true;
+        sum.textContent = r.report === 'nothingToDo' || r.ok ? 'Nothing is old enough to clear yet: the last ' + keep + ' days, today and any open order always stay on this tablet.' : 'The preview is not available right now. Nothing was changed.';
+        notes.textContent = ''; return;
+      }
+      const p = r.preview;
+      // A count with its unit word, such as "3 days" or "1 order".
+      const n = (k, one, many) => U.fmtNum(k) + ' ' + U.plural(k, one, many || one + 's');
+      sum.textContent = 'Ready to save and clear ' + n(p.days.length, 'day') + ' (' + U.fmtDateShort(p.from) + ' to ' + U.fmtDateShort(U.addDays(p.before, -1)) + '): ' + n(p.tickets, 'ticket') + ', ' + n(p.orders, 'order') + ' and ' + n(p.events, 'activity record') + '. Those orders took in ' + U.fmtMoney(p.paidTotal) + '.';
+      notes.textContent = 'Stays on this tablet: ' + n(p.safetyEventsKept, 'safety record') + ', ' + n(p.dayRecordsKept, 'end-of-day total') + (p.openOrdersKept ? ', ' + n(p.openOrdersKept, 'open order') : '') + (p.uncoveredDays && p.uncoveredDays.length ? '. ' + n(p.uncoveredDays.length, 'older day') + ' never closed, so ' + (p.uncoveredDays.length === 1 ? 'it stays' : 'they stay') + '.' : '.');
+    }
+    start.addEventListener('click', async () => {
+      if (!SB.setup || typeof SB.setup.openCloseMonth !== 'function') { hint.textContent = 'The step-by-step Close the month is not available in this build. Nothing was changed.'; hint.hidden = false; return; }
+      try { await SB.setup.openCloseMonth(opts()); } catch (e) { hint.textContent = 'Close the month could not be started. Nothing was changed.'; hint.hidden = false; }
+      paint();
+    });
+    card.body.append(
+      U.h('p', { class: 'od-p' }, 'Close the month saves a complete backup and spreadsheet files of your old, closed days, then clears those days\' tickets, orders and plain activity from this tablet so it stays quick. End-of-day totals, the safety record and open orders stay. Nothing is cleared until you confirm the files are saved, and the whole kitchen can be put back from the backup.'),
+      sum, notes, U.h('div', { class: 'od-actions' }, start), hint);
+    paint();
+    // Keeps the preview in step with the store, redrawing only when the orders, the cleared-days mark or the day changed (the plan is not cheap).
+    let seen = '';
+    function sync(st) { const k = st.orders.length + '|' + (st.archivedBefore || '') + '|' + U.serviceDate(SB.store.now(), (st.settings.service || {}).dayStartHour); if (k !== seen) { seen = k; paint(); } }
+    return { el: card.el, sync };
+  }
   const VERSION = 'Smokebox KDS ' + (C && C.version ? 'v' + C.version : '');
 
   // Small helpers
@@ -35537,6 +35633,9 @@ a.of-nav:active { background: var(--press); }
     const card2 = flowCard('2', 'Restore from a backup', 'backup-and-restore', 'restoring a backup');
     const card3 = flowCard('3', 'Replacing this device', 'replacing-a-device', 'replacing a device');
     flow.append(card1.el, card2.el, card3.el);
+    // Close the month: not in the demo and not on a tablet that works through a hub (the store refuses it there too).
+    const hubTablet = (() => { try { return !!(SB.store.hubKitchen && SB.store.hubKitchen()); } catch (e) { return false; } })();
+    if (!(SB.store.isDemo && SB.store.isDemo()) && !hubTablet && SB.store.closeMonthPreview) { const cm = closeMonthCard(flowCard); flow.append(cm.el); P.syncs.push(cm.sync); }
     pn.body.prepend(flow);
     const exStatus = statusLine();
     const fbLabelId = U.uid('odfb');
@@ -35603,7 +35702,7 @@ a.of-nav:active { background: var(--press); }
       const s = stateNow(), now = SB.store.now();
       const from = whenSel.value === 'open' ? SB.pilot.defaultFrom(s, now) : now - Number(whenSel.value) * 3600e3;
       const rep = SB.pilot.build(s, { from, to: now, now, alerts: SB.floor && SB.floor.alertLog ? SB.floor.alertLog() : [], cutsCounted: cutsIn.value === '' ? null : Number(cutsIn.value), demoClock: SB.store.speed() > 1, demo: SB.store.isDemo && SB.store.isDemo(), batchesCounted: batchesIn.value === '' ? null : Number(batchesIn.value) });
-      repBox.textContent = SB.pilot.toText(rep); repBox.hidden = false;
+      repBox.textContent = SB.pilot.toText(rep) + (SB.office && SB.office.archivedWords ? (function (w) { return w ? '\n\n' + w : ''; })(SB.office.archivedWords(s.archivedBefore, from, ((s.settings || {}).service || {}).dayStartHour)) : ''); repBox.hidden = false;
       if (!download) { exStatus.ok('Report made for ' + rep.window.hours + ' hours.'); return; }
       const fname = (rep.demo ? 'smokebox-demo-pilot-report-' : 'smokebox-pilot-report-') + todayKey() + '.csv';
       const csv = SB.pilot.toCsv(rep);
@@ -35614,7 +35713,7 @@ a.of-nav:active { background: var(--press); }
     // Prints the report text as one page: builds a print-only block, prints it, and removes it again.
     async function printReport() {
       await makeReport(false);
-      const root = h('div', { class: 'sb-printroot' }, h('h1', null, 'Pilot report'), h('pre', { style: 'white-space:pre-wrap;font-size:13px' }, repBox.textContent));
+      const root = h('div', { class: 'sb-printroot pr-printroot' }, h('h1', null, 'Pilot report'), h('pre', { style: 'white-space:pre-wrap;font-size:13px' }, repBox.textContent));
       document.body.appendChild(root);
       // Removes the print-only block again.
       const done = () => { try { root.remove(); } catch (e) { /* already gone */ } };
@@ -36936,7 +37035,7 @@ a.of-nav:active { background: var(--press); }
       demo ? h('p', { class: 'cd-pnote' }, 'This is a demo kitchen, so these numbers are demo numbers.') : null,
       h('table', { class: 'cd-ptable' }, h('tbody', null,
         prow('Paid orders', String(m.paid)), prow('Sales (after discounts)', money(m.sales)), prow('Tax', money(m.tax)), prow('Tips', money(m.tip)), prow('Total collected', money(m.collected)),
-        ...m.methods.filter((x) => x.count > 0).map((x) => prow('  Paid with ' + x.name.toLowerCase(), x.count + ' orders, ' + money(x.collected))),
+        ...m.methods.filter((x) => x.count > 0).map((x) => prow('  Paid with ' + x.name.toLowerCase(), x.count + ' ' + U.plural(x.count, 'order') + ', ' + money(x.collected))),
         prow('Cash payments today', money(m.cashExpected) + ' (add your starting cash to count the drawer)'),
         prow('Orders voided', String(m.voidedOrders)), prow('Tickets voided', String(m.voidedTickets)),
         prow('Food thrown out', (thrown.count || 0) + ' ' + U.plural(thrown.count || 0, 'batch', 'batches') + ', ' + U.weightText(thrown.g || 0) + (thrown.cost > 0 ? ', about ' + money(thrown.cost) + ' (only items with a recorded cost)' : '')))),
@@ -37043,6 +37142,22 @@ a.of-nav:active { background: var(--press); }
       d.orders++; d.sales += cc(T.subtotal) - cc(T.discount); d.discounts += cc(T.discount); d.tax += cc(T.tax); d.tips += tip; d.total += collected;
       d[o.method === 'cash' ? 'cash' : o.method === 'card' ? 'card' : 'other'] += collected;
     });
+    // Days saved to the month files and cleared from this tablet no longer have their orders here, but each closed day left its totals in
+    // a day_closed record. Those records fill in the missing days (the last close of a day covers the whole day), so no day drops out.
+    if (state && SB.engine && SB.engine.isArchivedDay && SB.engine.allEvents) {
+      const last = {};
+      for (const e of SB.engine.allEvents(state)) if (e && e.type === 'day_closed' && !e.reverted && typeof e.day === 'string') last[e.day] = e;
+      for (const day of Object.keys(last)) {
+        if (days[day] || !SB.engine.isArchivedDay(state, day)) continue;
+        const e = last[day], bm = e.byMethod || {};
+        // Dollars as whole cents (a missing amount is zero cents).
+        const cc = (v) => Math.round((isNum(v) ? v : 0) * 100);
+        // Everything collected by one payment method that day, tips included, in cents.
+        const by = (m) => (bm[m] ? cc(bm[m].total) + cc(bm[m].tip) : 0);
+        const other = Object.keys(bm).filter((m) => m !== 'cash' && m !== 'card').reduce((a, m) => a + by(m), 0);
+        days[day] = { orders: isNum(e.orders) ? e.orders : 0, sales: cc(e.subtotal) - cc(e.discount), discounts: cc(e.discount), tax: cc(e.tax), tips: cc(e.tip), total: cc(e.total) + cc(e.tip), cash: by('cash'), card: by('card'), other };
+      }
+    }
     const head = ['Date', 'Orders paid', 'Sales (after discounts)', 'Discounts given', 'Tax', 'Tips', 'Total collected', 'Collected in cash', 'Collected by card', 'Collected other'];
     const sum = { orders: 0, sales: 0, discounts: 0, tax: 0, tips: 0, total: 0, cash: 0, card: 0, other: 0 };
     // One CSV line for a day or for the totals.
@@ -37151,6 +37266,7 @@ a.of-nav:active { background: var(--press); }
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
       case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
       case 'safety_setting_changed': return changeLine(e);
+      case 'month_closed': return 'Saved ' + (isNum(e.days) ? e.days + ' ' + (e.days === 1 ? 'day' : 'days') : 'old days') + ' before ' + (e.before ? U.fmtDateShort(e.before) : 'a set date') + ' to a backup and cleared them from this tablet' + (isNum(e.tickets) ? ' (' + e.tickets + ' tickets, ' + (isNum(e.orders) ? e.orders : 0) + ' orders)' : '');
       case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '');
       case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '');
       case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
