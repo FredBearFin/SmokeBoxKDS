@@ -1725,6 +1725,8 @@
     const top = feed.slice(0, maxRows);
     const moreRows = feed.length - top.length;
     const needSound = sound && !audioReady();
+    // Clearing the sound bar lasts only while the sound stays blocked: once it plays again, the next block shows the bar again.
+    if (!needSound) m.dis.delete('snd');
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.

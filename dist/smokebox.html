@@ -5973,7 +5973,7 @@ a.of-nav:active { background: var(--press); }
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'dayClosed', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'notFridgeBatch', 'needsChill', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -6005,6 +6005,7 @@ a.of-nav:active { background: var(--press); }
     badTemp: 'Enter a temperature between 32 and 300 °F.',
     tempTooLow: 'A reheat needs a reading of at least ' + C.safety.reheatF + ' °F. Keep heating and log it again.' + SAFETY,
     notFridgeBatch: 'This batch is not tracked by place. Only cold items kept in a fridge can be taken out and put back.',
+    needsChill: 'This batch read above the cold limit. Chill it and log a cold reading before taking it out.' + SAFETY,
     notReheatable: 'This batch cannot be reheated: Smokebox allows one reheat per batch, and only within ' + C.safety.belowHotGraceH + ' hours of going below ' + C.safety.hotHoldF + ' °F. Discard it.' + SAFETY,
     notEnoughData: 'Not enough data yet. Run a few more tickets first.',
     batchNotServable: 'That batch is locked or already discarded, so it cannot be used.' + SAFETY,
@@ -6089,7 +6090,7 @@ a.of-nav:active { background: var(--press); }
     updateIngredient: '{ id, patch }',
     moveMenuItem: '{ id, toIndex }',
     setChips: '{ chips: string[] | null }',
-    clearDemoTickets: '{}',
+    clearDemoTickets: '{ ticketId? }',
     addIngredient: '{ name, unit?:"g"|"ea", costPerKg?, costEach?, parG?, thresholdG?, tcs?, hold?:"hot"|"cold", maxHoldH?, holdBasis?:"quality"|"safety", fridge?:boolean, fridgeDays?, outHours? }',
     logEquipmentTemp: '{ unit:"cooler"|"freezer"|"display"|"other", f, label?, who? }',
     logThermometerCheck: '{ f, method?:"ice"|"boiling"|"other", who? }',
@@ -6482,14 +6483,15 @@ a.of-nav:active { background: var(--press); }
     if (now > fEnd) return gateOut('DISCARD_LOCKOUT', false, 'fridgeDate', 'bad', 'Past your fridge date (last day ' + fridgeLastDay(b) + '). Discard.' + SAFETY);
     if (isNum(b.outHours) && lineElapsedMs(b, now) > b.outHours * H) return gateOut('DISCARD_LOCKOUT', false, 'outTime', 'bad', 'Out of the fridge for more than your ' + U.round(b.outHours, 2) + '-hour limit. Discard.' + SAFETY);
     const end = Math.min(fEnd, lEnd);
-    if (b.place === 'line') {
-      const used = Math.round(lineElapsedMs(b, now) / MIN);
-      return gateOut('NONE', true, 'onLine', 'ok', 'Out of the fridge, ' + used + ' min so far' + (isNum(b.outHours) ? ' of your ' + U.round(b.outHours, 2) + '-hour limit.' : '. No out-of-fridge limit set.'), end);
-    }
+    // An above-cold reading blocks serving wherever the batch is, so moving it to the line never makes it servable.
     if (b.outSince != null) {
       const lim = coldOutLimit(b, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, end));
+    }
+    if (b.place === 'line') {
+      const used = Math.round(lineElapsedMs(b, now) / MIN);
+      return gateOut('NONE', true, 'onLine', 'ok', 'Out of the fridge, ' + used + ' min so far' + (isNum(b.outHours) ? ' of your ' + U.round(b.outHours, 2) + '-hour limit.' : '. No out-of-fridge limit set.'), end);
     }
     const iv = S.tempCheckEveryMin * MIN;
     if (b.lastTempAt == null) return gateOut('CHECK_TEMP', true, 'noReading', now - b.enteredAt > iv ? 'bad' : 'warn', 'No temperature logged yet. Check it now.' + SAFETY, end);
@@ -6500,8 +6502,8 @@ a.of-nav:active { background: var(--press); }
   // The next moment a fridge-kept batch's stored status can change on its own (-Infinity when it already disagrees).
   function coldDeadline(b, S) {
     const end = Math.min(fridgeEndAt(b), lineEndAt(b));
+    if (b.outSince != null) return b.status !== 'chill' ? -Infinity : Math.min(end, coldOutLimit(b, S));
     if (b.place === 'line') return b.status === 'ok' ? end : -Infinity;
-    if (b.outSince != null) return b.status !== 'chill' ? -Infinity : Math.min(end, b.outSince + S.aboveColdGraceH * H);
     if (b.status === 'check') return end;
     if (b.status !== 'ok' || b.lastTempAt == null) return -Infinity;
     return Math.min(end, b.lastTempAt + S.tempCheckEveryMin * MIN);
@@ -8033,6 +8035,7 @@ a.of-nav:active { background: var(--press); }
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
     if (!isFridgeBatch(b)) return 'notFridgeBatch';
+    if (to === 'line' && b.outSince != null) return 'needsChill';
     if (b.place === to) { tx.info.why = to === 'line' ? 'alreadyOut' : 'alreadyIn'; return 'nothingToDo'; }
     // The move time never goes backwards, even if the clock was set back, so out time only ever grows.
     const t = stampAfter(b.movedAt, stampAfter(b.enteredAt, tx.now));
@@ -8695,10 +8698,22 @@ a.of-nav:active { background: var(--press); }
   }
   // Removes the old demo and sample tickets found by demoLeftovers, with their orders and events. Used grams of the removed
   // tickets move into the books so stock still balances. Real tickets and real paid orders are never touched. nothingToDo when
-  // there is nothing to remove.
-  A.clearDemoTickets = function (tx) {
+  // there is nothing to remove. With ticketId only that one demo ticket goes (and its order when the order holds nothing else):
+  // the walkthrough cleans up its own ticket this way.
+  A.clearDemoTickets = function (tx, q) {
     const st = tx.state();
     const p = planDemoLeftovers(st);
+    if (q && q.ticketId !== undefined) {
+      if (typeof q.ticketId !== 'string') { tx.info.key = 'ticketId'; return 'badPatch'; }
+      const one = st.tickets.find((t) => t.id === q.ticketId);
+      p.ticketIds = new Set(p.ticketIds.has(q.ticketId) ? [q.ticketId] : []);
+      const oid = one && one.orderId;
+      const alone = oid !== undefined && p.orderIds.has(oid) && st.tickets.every((t) => t.orderId !== oid || t.id === q.ticketId);
+      const o = alone ? st.orders.find((x) => x.id === oid) : null;
+      p.orderIds = new Set(alone ? [oid] : []);
+      p.tickets = p.ticketIds.size; p.orders = p.orderIds.size; p.paidOrders = o && o.status === 'paid' ? 1 : 0;
+      p.events = allEvents(st).filter((e) => (e.ticketId && p.ticketIds.has(e.ticketId)) || (e.orderId && p.orderIds.has(e.orderId))).length;
+    }
     if (!p.ticketIds.size && !p.orderIds.size) return 'nothingToDo';
     const keepT = [];
     for (const t of tx.get('tickets')) {
@@ -8940,6 +8955,13 @@ a.of-nav:active { background: var(--press); }
       // Learned prep times belong to the dishes; when the dishes are replaced they go too (invariant I14).
       learned: keep && !fresh ? s.learned : undefined,
     });
+    // The food safety record outlives a reset: an inspector may ask for it, and only Erase everything clears it. The demo's
+    // sample load starts clean, and entries stamped after now (a demo clock that ran ahead) are not real records.
+    if (!sample) {
+      const kept = (Array.isArray(s.safetyKeep) ? s.safetyKeep : []).concat(allEvents(s).filter((e) => hasOwn(SAFETY_EVENT, e.type)))
+        .filter((e) => isObj(e) && isNum(e.t) && e.t <= tx.now).sort((a, b) => a.t - b.t);
+      ns.safetyKeep = keepSafety([], kept, tx.now);
+    }
     for (const k of Object.keys(ns)) tx.set(k, ns[k]);
     if (!ns.catalog && hasOwn(s, 'catalog')) tx.set('catalog', undefined);
     if (hasOwn(s, 'lastClose')) tx.set('lastClose', undefined); // a fresh board has never been closed
@@ -11887,8 +11909,9 @@ a.of-nav:active { background: var(--press); }
     baseSid = null; pending = []; recent = []; journal = []; skipRebase = false; noTimersOpt = !!opts.noTimers; if (reconcileTimer) { clearTimeout(reconcileTimer); reconcileTimer = null; }
     outbox = []; seenOps = new Set(); acked.clear();      // opN is never reset: an action id must not repeat in one page, or a hub or another tab that remembers it takes the new action for a repeat
     const r = realNow();
-    let payload = null;
-    try { payload = openSaved(storage.get(KEY, null)); } catch (e) { payload = null; }
+    // stored is the copy exactly as saved: a damaged compact copy is parked in that form, since the unpacked one has lost its body.
+    let payload = null, stored = null;
+    try { stored = storage.get(KEY, null); payload = openSaved(stored); } catch (e) { payload = null; }
     try { baseSid = storage.get(SID_KEY, null); } catch (e) { baseSid = null; }
     journal = payload && Array.isArray(payload.ops) ? payload.ops.filter((x) => typeof x === 'string').slice(-JOURNAL_MAX) : [];
     era = payload && typeof payload.era === 'string' ? payload.era : '';
@@ -11912,12 +11935,12 @@ a.of-nav:active { background: var(--press); }
         const dc = droppedCounts(v.repaired);
         if (dc) {
           st.droppedCount = dc;
-          const raw = rawOf(payload);
-          if (!parkText(DROPPED_KEY, DROPPED_AT_KEY, payload, r)) { writeBlocked = true; heldText = raw; st.heldInMemory = true; }
+          const raw = rawOf(stored);
+          if (!parkText(DROPPED_KEY, DROPPED_AT_KEY, stored, r)) { writeBlocked = true; heldText = raw; st.heldInMemory = true; }
         }
       } else {
         st.corrupt = v.error;
-        if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, payload, r)) { writeBlocked = true; heldText = rawOf(payload); st.heldInMemory = true; }
+        if (!parkText(CORRUPT_KEY, CORRUPT_AT_KEY, stored, r)) { writeBlocked = true; heldText = rawOf(stored); st.heldInMemory = true; }
       }
     } else st.firstRun = true;
     // A damaged save: the rolling last-good copy takes its place (real kitchens), and the damaged one stays set aside.
@@ -12247,7 +12270,11 @@ a.of-nav:active { background: var(--press); }
     const before = state, savedAt = realNow();
     const out = E().closeMonth(state, { before: opts.before, keepDays: o2.keepDays, backup: cb }, now());
     if (out.report !== 'ok') return fail(out.report, out.info);
-    const copyAt = snapshotBeforeRestore(BEFORE_MONTH_CLOSE);
+    // WATCH OUT: there is one undo slot. A recent restore's copy is the only way back from a wrong restore, so it is never
+    // replaced here; the month's backup file (required above) is the way back from this close.
+    const prior = beforeRestoreCopy(realNow());
+    const restoreKept = !!(prior && prior.reason === BEFORE_RESTORE);
+    const copyAt = restoreKept ? null : snapshotBeforeRestore(BEFORE_MONTH_CLOSE);
     const ns = out.state;
     ns.rev = Math.max(ns.rev, (before.rev || 0) + 1);
     atLeast(lastStamp(ns));
@@ -12263,7 +12290,7 @@ a.of-nav:active { background: var(--press); }
     }
     monthExport = null;
     scheduleNotify();
-    last = { type: 'closeMonthPrune', report: 'ok', info: Object.assign({ copyKept: copyAt != null, copyKeepDays: copyAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, out.info), events: [] };
+    last = { type: 'closeMonthPrune', report: 'ok', info: Object.assign({ copyKept: copyAt != null, restoreCopyKept: restoreKept, copyKeepDays: copyAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, out.info), events: [] };
     return { ok: true, report: 'ok', info: last.info, savedAt };
   }
   // Time in ms as readable date text for spreadsheets, or empty text when missing.
@@ -12367,7 +12394,8 @@ a.of-nav:active { background: var(--press); }
     // with.
     if (now() > realNow()) rebaseClock();
     const rep = dispatch('resetLive', opts || {}, { source: 'user' });
-    if (rep === 'ok') persistNow();
+    // Back to real time means the real pace too, not only the real hour.
+    if (rep === 'ok') { if (clk.speed !== 1) setSpeed(1); persistNow(); }
     return rep;
   }
 
@@ -22419,6 +22447,8 @@ a.of-nav:active { background: var(--press); }
     const top = feed.slice(0, maxRows);
     const moreRows = feed.length - top.length;
     const needSound = sound && !audioReady();
+    // Clearing the sound bar lasts only while the sound stays blocked: once it plays again, the next block shows the bar again.
+    if (!needSound) m.dis.delete('snd');
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
@@ -25932,7 +25962,7 @@ a.of-nav:active { background: var(--press); }
 
     // Reset live data asks first (see doReset).
     const resetBtn = h('button', { type: 'button', class: 'btn btn-danger btn-lg', onClick: () => doReset() }, ico('trash', 22), h('span', null, 'Reset live data'));
-    const resetBox = h('section', { class: 'fs-section dm-reset' }, h('h3', { class: 'fs-h' }, 'Back to real service'), h('p', { class: 'fs-sub' }, 'Reset live data erases every ticket, batch and event on this device, including all demo orders, and puts the clock back to real time. The board and the cabinet start empty. Your settings and menu stay. This cannot be undone.'), resetBtn);
+    const resetBox = h('section', { class: 'fs-section dm-reset' }, h('h3', { class: 'fs-h' }, 'Back to real service'), h('p', { class: 'fs-sub' }, 'Reset live data erases every ticket, batch and event on this device, including all demo orders, and puts the clock back to real time. The board and the cabinet start empty. Your settings, menu and food safety record stay. This cannot be undone.'), resetBtn);
 
     // Restart demo: start over with fresh tickets, the way the app looks on its first day.
     const restartBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg dm-restart', onClick: () => doRestart() }, ico('refresh', 22), h('span', null, 'Restart demo'));
@@ -25966,7 +25996,7 @@ a.of-nav:active { background: var(--press); }
       const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length;
       const ok = await SB.ui.confirm({
         title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep everything',
-        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and sample history stay. This cannot be undone.'],
+        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings, the food safety record and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
       // With a PIN set, clearing live data asks for it.
@@ -27300,11 +27330,14 @@ a.of-nav:active { background: var(--press); }
   }
 
   // Ends the walkthrough: removes the card and every ring, puts the clock back and returns focus to the
-  // board. The demo ticket is left alone. A quiet stop (used when restarting) skips the focus move.
+  // board. In a real kitchen the walkthrough ticket is removed, so it never sits in the owner's reports; the demo keeps it.
+  // A quiet stop (used when restarting) skips the focus move.
   function stop(quiet) {
     if (!T) return false;
     const was = T; T = null;
     clearInterval(was.timer);
+    const S = SB.store;
+    if (S && !(S.isDemo && S.isDemo()) && typeof S.dispatchEx === 'function') { try { S.dispatchEx('clearDemoTickets', { ticketId: was.id }, { source: 'sim' }); } catch (e) { /* the leftovers offer still catches it */ } }
     doc.removeEventListener('keydown', onKey);
     restoreSpeed(was);
     doc.querySelectorAll('.tour-ring').forEach((e) => e.classList.remove('tour-ring'));
@@ -28742,7 +28775,7 @@ a.of-nav:active { background: var(--press); }
     const step1 = h('section', { class: 'fs-section so-step' },
       h('h3', { class: 'fs-h' }, '1. What happens'),
       h('p', { class: 'fs-sub' }, 'This empties your kitchen so you can begin again with a blank menu.'),
-      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device.'),
+      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device. The food safety record stays.'),
       h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and sections. Clear the box and those go back to how Smokebox starts.'),
       keepLabel,
       h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'There is no undo. We are sorry to be blunt: once you confirm, the old menu and history cannot be brought back, except from a backup file you saved first.'));
@@ -28959,7 +28992,7 @@ a.of-nav:active { background: var(--press); }
           h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'cm-undo' }, onClick: () => {
             const rep = store.undoRestore();
             if (rep === 'ok' || (rep && rep.ok)) { tell(undoMsg, 'Undone. Your kitchen is back as it was, with all the history.', 'ok'); } else tell(undoMsg, 'The saved copy could not be put back (' + (rep && rep.report ? rep.report : rep) + '). Use the backup file you saved: Back office, Data, Restore.', 'bad');
-          } }, 'Undo')) : h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'No copy could be kept on this tablet, so the files you saved are the only way back: Back office, Data, Restore.'),
+          } }, 'Undo')) : h('p', { class: 'fs-note', 'data-tone': 'warn' }, (i.restoreCopyKept ? 'Your kitchen from before your recent restore is still kept, so no second copy was made here. ' : 'No copy could be kept on this tablet, so ') + 'the files you saved are the only way back from this close: Back office, Data, Restore.'),
         undoMsg,
         // Closes the sheet when the person is finished reading the result.
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'cm-finish' }, onClick: () => SB.sheets.closeAll() }, 'Done'));
@@ -34139,6 +34172,9 @@ a.of-nav:active { background: var(--press); }
       let tone = 'good';
       if (worstLoss >= 30 * 60000 || (isNum(score) && score < 0.75)) tone = 'bad';
       else if (costly.length || lowScore || highWaste) tone = 'warn';
+      // Discards or lockouts with no readings at all are never "on track": nothing shows the food stayed in range.
+      const noChecks = !k.tempChecks.count && !k.sanitize.count;
+      if (noChecks && tone === 'good') tone = 'warn';
 
       // The one problem, in order of what it cost: a lockout (a sale was lost), then late checks,
       // then the heaviest day of waste.
@@ -34181,7 +34217,8 @@ a.of-nav:active { background: var(--press); }
       else body += ' Nothing was thrown out.';
       if (brief.length) body += brief.length === 1 ? ' A time or temperature limit also took an item off the menu once, for ' + fmt.ms(brief[0].openMs) + '.' : ' Time or temperature limits also took items off the menu ' + brief.length + ' times for a few minutes each, the longest ' + fmt.ms(Math.max.apply(null, brief.map((c) => c.openMs))) + '.';
       // A red verdict is worded by cause: lost selling time, or checks that fell behind.
-      const title = tone === 'good' ? 'All checks were kept and no food was thrown out for time or temperature.' : tone === 'warn' ? 'Most checks were kept, with one thing to look at.' : worstLoss >= 30 * 60000 ? 'Some checks were missed and a dish was off the menu.' : 'Temperature or sanitize checks fell behind.';
+      const title = tone === 'good' ? (safetyDis.length ? 'All checks were kept. Food past a time or temperature limit was thrown out, as it should be.' : 'All checks were kept and no food was thrown out for time or temperature.')
+        : tone === 'warn' ? (noChecks ? 'No temperature checks or sanitize rounds were logged, so nothing shows the food stayed in range.' : 'Most checks were kept, with one thing to look at.') : worstLoss >= 30 * 60000 ? 'Some checks were missed and a dish was off the menu.' : 'Temperature or sanitize checks fell behind.';
       return { tone, title, body, problem };
     }
 
@@ -35973,7 +36010,7 @@ a.of-nav:active { background: var(--press); }
       askTyped({
         opener: resetLiveBtn, title: 'Erase tickets and records?', word: 'ERASE', label: 'Erase tickets and records',
         lines: ['This clears ' + U.fmtNum(s.tickets.length) + ' ' + U.plural(s.tickets.length, 'ticket') + ', ' + U.fmtNum(SB.engine.allEvents(s).length) + ' saved records and ' + U.fmtNum(s.batches.length) + ' ' + U.plural(s.batches.length, 'batch', 'batches') + ' on this device, including any demo orders, and sets the clock back to real time.',
-          k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.',
+          (k ? 'Your dishes, ingredient edits, limits, Finish together and PIN stay as they are.' : 'It also puts every setting, dish edit and the PIN back to the starter values.') + ' The food safety record stays.',
           'There is no undo. Back up first if you might want this data.'],
         // Clears the live data after the word was typed.
         run: async () => {
@@ -36812,7 +36849,7 @@ a.of-nav:active { background: var(--press); }
         const sb = burn(p, d.date, ing);
         if (sb && sb.intakeG > 0) rows.push({ date: d.date, intakeG: sb.intakeG, usedG: sb.usedG, wasteG: sb.wasteG });
       });
-      const v = { n: rows.length, medianIntake: B.median(rows.map((r) => r.intakeG)), medianUsed: B.median(rows.map((r) => r.usedG)), rows };
+      const v = { n: rows.length, medianIntake: B.median(rows.map((r) => r.intakeG)), medianUsed: B.median(rows.map((r) => r.usedG)), medianWaste: B.median(rows.map((r) => r.wasteG || 0)), rows };
       m.set(ing, v);
       return v;
     }
@@ -36897,8 +36934,11 @@ a.of-nav:active { background: var(--press); }
           if (suggest > tp.medianIntake * 1.03) parts.push(srcWord + ': ' + fmt.g(suggest - tp.medianIntake) + ' more than usual, and ' + topUp + '.');
           else parts.push(srcWord + ': keep the amount and ' + topUp + '. It looks like timing, not quantity.');
         } else {
-          parts.push('Never sold out. A normal day: cooks ' + fmt.g(tp.medianIntake) + ', serves ' + fmt.g(tp.medianUsed) + '.');
-          if (suggest < tp.medianIntake * 0.85) parts.push(srcWord + ': ' + fmt.g(tp.medianIntake - suggest) + ' less than usual would still cover it.');
+          const wasted = tp.medianWaste > 0 ? ' and throws away ' + fmt.g(tp.medianWaste) : '';
+          parts.push('Never sold out. A normal day: cooks ' + fmt.g(tp.medianIntake) + ', serves ' + fmt.g(tp.medianUsed) + wasted + '.');
+          // WATCH OUT: the suggestion is what guests ate. Food thrown away during service (past its hold limit) is cooked food that
+          // never reached a plate, so cutting by the whole gap is only safe when that waste goes too; the text says so.
+          if (suggest < tp.medianIntake * 0.85) parts.push(srcWord + ': ' + fmt.g(tp.medianIntake - suggest) + ' less than usual would still cover what guests ate' + (tp.medianWaste > 0 ? ', as long as less is thrown away. Check the Thrown-out log first: food that passed its hold limit during service needs a later, smaller batch, not less food.' : '.'));
           else parts.push(srcWord + ': the cook count looks about right.');
         }
         out.parts = parts; out.text = parts.join(' ');
