@@ -50,3 +50,19 @@ Settings already hold temperature (F or C) and weight (kg or lb) and the helpers
 
 - Will the cabinet work on a new kitchen? The New batch Product list is empty because there is no way to create an ingredient on the add-dish form (see decisions-for-freddy.md, item 14).
 - Is there a PIN reset? No. The Guide says so.
+
+## 7. Start over with an empty menu (A2 and A5, round 10; not in the build when written)
+
+Freddy decided yes. Draft for Backup and restore (about 80 words); replace the bracketed words with the real labels, add the steps to `tools/guide-walk.mjs`, then run `node tools/build-guide.mjs` and the Guide test:
+
+> ## Start over with an empty menu
+> Use this to clear your dishes, prices and orders and begin again.
+> 1. Tap [where the button is], then **[Start over with an empty menu]**.
+> 2. Smokebox saves a backup first. Keep that file.
+> 3. It clears [dishes, prices, orders, batches]. It keeps [settings, PIN, and so on: confirm with A5].
+>
+> To undo it, restore the backup (see Restore from a backup).
+
+Before writing it, confirm with A2 and A5: the exact button label and where it lives, what is cleared and kept, where the automatic backup goes, and the wording of the confirm box.
+
+**Update:** written into the Guide (Backup and restore) from A2's branch night/a2-r10; the walk now covers it. A5's old-demo-ticket card is still to come.

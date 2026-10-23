@@ -455,6 +455,23 @@
      },
      {
       "t": "h",
+      "x": "Start over with an empty menu"
+     },
+     {
+      "t": "ol",
+      "x": [
+       "Tap **Menu**. At the bottom, tap **Start over with an empty menu**.",
+       "It lists what goes (every dish, ticket, order and record on this device) and what stays (tax, hours, PIN and station names; clear the box to reset those too). Tap **Next: save a backup**.",
+       "Tap **Save a backup now** and keep the file.",
+       "Type START OVER, then tap **Erase everything and start over**."
+      ]
+     },
+     {
+      "t": "p",
+      "x": "There is no undo. To go back, restore the backup you just saved."
+     },
+     {
+      "t": "h",
       "x": "Erasing"
      },
      {
