@@ -28,7 +28,7 @@ Spreadsheet files, like the sales file, cannot be restored.
 4. Type ERASE, then tap **Erase everything and start over**.
 5. At "Done. Your kitchen is empty." tap **Save the backup again** or **Go to the first screen**.
 
-There is no undo. To go back, restore the backup file. Left-over practice tickets get **Clear them** or **Keep them**.
+There is no undo. To go back, restore the backup file. Left-over old demo tickets get **Clear them** or **Keep them**.
 
 ## Erasing
 
