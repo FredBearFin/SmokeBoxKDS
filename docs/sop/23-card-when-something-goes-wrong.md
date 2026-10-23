@@ -2,7 +2,7 @@
 
 Print this card and keep it by the tablet.
 
-- [ ] No sound: tap the warning bar, turn the volume up, then Settings, Get this tablet ready, Test the sound
+- [ ] No sound: tap the warning bar, turn the volume up, then Settings, Tablet checks: screen, sound, home screen, Test the sound
 - [ ] Screen asleep: wake it and check the times on the cards. Set it to never sleep
 - [ ] Wrong tap: Undo, within 10 seconds
 - [ ] Bumped by mistake: Recall it from the board header

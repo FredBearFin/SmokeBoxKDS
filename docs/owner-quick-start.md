@@ -6,7 +6,7 @@ One page. For the owner or manager. The Guide inside the app (Settings, then Gui
 
 1. Open the Smokebox file in Chrome, Edge or Safari. It works without internet once it is open.
 2. Add it to the home screen. On an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app. Open it from that icon from now on.
-3. Tap **Settings**, then **Get this tablet ready**. Work down the five checks. Set the tablet to never sleep and keep it plugged in.
+3. Tap **Settings**, then **Tablet checks: screen, sound, home screen**. Work down the five checks. Set the tablet to never sleep and keep it plugged in.
 
 ## Your first 10 minutes
 
@@ -21,7 +21,7 @@ One page. For the owner or manager. The Guide inside the app (Settings, then Gui
 
 | What happened | Do this |
 |---|---|
-| No sound | Tap the bar that says "Tap here to turn on warning sounds". Turn the volume up. Settings, **Get this tablet ready**, **Test the sound**. |
+| No sound | Tap the bar that says "Tap here to turn on warning sounds". Turn the volume up. Settings, **Tablet checks: screen, sound, home screen**, **Test the sound**. |
 | Screen went to sleep | Warnings stop while it sleeps. Set Auto-Lock (iPad) or Screen timeout (Android) to Never. |
 | Wrong tap | **Undo**, within 10 seconds. |
 | Bumped by mistake | **Recall**, in the board header. |

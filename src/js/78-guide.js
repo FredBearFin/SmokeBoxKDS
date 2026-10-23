@@ -738,7 +738,7 @@
       "x": [
        "On the old device, if it still works, download a backup (see Backup and restore). Copy the file somewhere else: email it to yourself or use a USB drive.",
        "On the new device, copy the same smokebox.html file onto it and open it. Install it as an app: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app.",
-       "Tap **Settings**, then **Get this tablet ready**. Sound and keeping the screen on are set on each device, so do them again here.",
+       "Tap **Settings**, then **Tablet checks: screen, sound, home screen**. Sound and keeping the screen on are set on each device, so do them again here.",
        "Tap **Back office**, then **Menu and settings**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
        "Check the board and your menu. Save a fresh backup from the new device, then retire the old one."
       ]
@@ -765,7 +765,7 @@
      },
      {
       "t": "p",
-      "x": "Tap **Settings**, then **Get this tablet ready**. Each check shows a check mark, or a plain line saying what to do. A check mark means you or the tablet confirmed it. It is not a promise it stays that way all day. For the longer first-time list, open **Set up this tablet**."
+      "x": "Tap **Settings**, then **Tablet checks: screen, sound, home screen**. Each check shows a check mark, or a plain line saying what to do. A check mark means you or the tablet confirmed it. It is not a promise it stays that way all day. For the longer first-time list, open **Set up this tablet: first steps**."
      },
      {
       "t": "h",
@@ -809,7 +809,7 @@
        "If the board says \"Tap here to turn on warning sounds\", tap it. Browsers need one tap first.",
        "Turn the tablet volume up and check its silent switch.",
        "Tap **Settings** and check that Sound is on and the loudness is not low.",
-       "Tap **Settings**, then **Get this tablet ready**, then **Test the sound**.",
+       "Tap **Settings**, then **Tablet checks: screen, sound, home screen**, then **Test the sound**.",
        "If the bar says \"Sound paused\", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.",
        "Close any second Smokebox tab. Only the tab on screen makes sound."
       ]
@@ -820,7 +820,7 @@
      },
      {
       "t": "p",
-      "x": "Warnings cannot sound while the screen is off. Smokebox asks the browser to keep the screen on, but some browsers say no. Set the tablet to never sleep (Auto-Lock on an iPad, Screen timeout on Android) and keep it plugged in. **Get this tablet ready** checks this. When you wake it, check the times on the cards."
+      "x": "Warnings cannot sound while the screen is off. Smokebox asks the browser to keep the screen on, but some browsers say no. Set the tablet to never sleep (Auto-Lock on an iPad, Screen timeout on Android) and keep it plugged in. **Tablet checks: screen, sound, home screen** checks this. When you wake it, check the times on the cards."
      },
      {
       "t": "h",
@@ -1070,7 +1070,7 @@
       "x": [
        "Tablet plugged in, and set to never sleep",
        "Volume up. Smokebox open on the kitchen board",
-       "Tap the warning bar once, or use Test the sound under Get this tablet ready",
+       "Tap the warning bar once, or use Test the sound under Tablet checks: screen, sound, home screen",
        "Check the 86 board: what is out today?",
        "Counted dishes: how many did you make today?",
        "Hand sink works and is stocked. Anyone unwell? Tell the manager",
@@ -1113,7 +1113,7 @@
      {
       "t": "check",
       "x": [
-       "No sound: tap the warning bar, turn the volume up, then Settings, Get this tablet ready, Test the sound",
+       "No sound: tap the warning bar, turn the volume up, then Settings, Tablet checks: screen, sound, home screen, Test the sound",
        "Screen asleep: wake it and check the times on the cards. Set it to never sleep",
        "Wrong tap: Undo, within 10 seconds",
        "Bumped by mistake: Recall it from the board header",
@@ -1189,7 +1189,7 @@
       "x": [
        "Open Smokebox and add it to the home screen: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app",
        "Keep it awake: set Auto-Lock (iPad) or Screen timeout (Android) to Never, and plug it in",
-       "Turn the volume up. Tap Settings, Get this tablet ready, then Test the sound",
+       "Turn the volume up. Tap Settings, Tablet checks: screen, sound, home screen, then Test the sound",
        "Wifi: not needed. Smokebox works without internet",
        "Backups go where you save them: the Downloads folder, or an email to yourself. Smokebox does not send them anywhere",
        "Keep a copy of every backup off this tablet",

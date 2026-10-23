@@ -62,7 +62,7 @@ async function blank(browser) {
   check('no Cabinet tab while Cooking ahead is No', !(await seen(p, 'Cabinet', '.fl-head')));
   // Menu list.
   await p.click('button.fl-menu'); await p.waitForTimeout(500);
-  for (const t of ['Dishes and prices', 'Tax, hours and PIN', 'Guide', 'Set up this tablet', 'Help and about', 'Back office', 'Show me how it works']) check('menu: ' + t, await seen(p, t, sh));
+  for (const t of ['Dishes and prices', 'Tax, hours and PIN', 'Guide', 'Set up this tablet: first steps', 'Help and about', 'Back office', 'Show me how it works']) check('menu: ' + t, await seen(p, t, sh));
   await p.keyboard.press('Escape'); await p.waitForTimeout(300);
   // Order, cook, pay.
   await p.click('.fl-new'); await p.waitForTimeout(600);
@@ -408,7 +408,7 @@ async function coldItem(browser) {
   await p.close();
 }
 
-// The Readings and Tablet checks walk: the three logs on the Readings sheet and the five checks on Get this tablet ready.
+// The Readings and Tablet checks walk: the three logs on the Readings sheet and the five checks on Tablet checks: screen, sound, home screen.
 async function readingsAndChecks(browser) {
   console.log('Readings and tablet checks');
   const p = await fresh(browser);
@@ -425,7 +425,7 @@ async function readingsAndChecks(browser) {
   check('readings: the entry is listed', await p.evaluate(() => !/No readings yet/.test(document.querySelector('.sheet-root:last-of-type').innerText)), await p.evaluate(() => document.querySelector('.sheet-root:last-of-type').innerText.slice(-300)));
   await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(300);
   await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
-  check('settings: Get this tablet ready', await tap(p, 'Get this tablet ready')); await p.waitForTimeout(700);
+  check('settings: Tablet checks: screen, sound, home screen', await tap(p, 'Tablet checks: screen, sound, home screen')); await p.waitForTimeout(700);
   for (const t of ['Screen stays awake', 'Sound is on', 'Volume is loud enough', 'Added to the home screen', 'Full screen', 'Test the sound']) check('tablet checks: ' + t, await has(p, t, rs));
   await p.close();
 }
