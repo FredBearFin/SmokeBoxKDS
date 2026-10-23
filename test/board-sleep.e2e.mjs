@@ -179,6 +179,22 @@ for (const min of [2, 20, 90]) {
   console.log('  note  reload after 90 minutes: boot ' + boot + ' ms wall');
   await p.ctx.close();
 }
+
+// 8. The one-time notice about saved history (the store's historyNotice / historyNoticeSeen): shown calmly, marked seen once, gone when cleared
+{
+  const p = await open();
+  await p.evaluate(() => { window.__hs = []; let on = true; SB.store.historyNotice = () => (on ? { kind: 'trimmed', words: 'Older history was dropped to make room: 12 days. Close the month regularly to keep it in files.' } : null); SB.store.historyNoticeSeen = (k) => { window.__hs.push(k); on = false; }; });
+  await p.clock.runFor(8000);
+  const lines = (await strip(p)).join(' | ');
+  check('the history notice shows as a calm strip line', /Older history was dropped to make room: 12 days/.test(lines), lines);
+  check('it is marked seen exactly once, with its kind', JSON.stringify(await p.evaluate(() => window.__hs)) === '["trimmed"]', await p.evaluate(() => window.__hs));
+  await p.clock.runFor(8000);
+  check('and it stays up (one line, not repeated) until cleared', ((await strip(p)).join(' | ').match(/Older history/g) || []).length === 1, await strip(p));
+  const x = p.locator('.fl-bar-pause .fl-strip-x:visible').first();
+  if (await x.count()) { await x.click(); await p.clock.runFor(2000); }
+  check('clearing it removes it for good', !/Older history/.test((await strip(p)).join(' | ')), await strip(p));
+  await p.ctx.close();
+}
 check('no uncaught page errors', errs.length === 0, errs.slice(0, 3));
 await browser.close();
 console.log(fail ? fail + ' check(s) failed' : 'all checks passed');

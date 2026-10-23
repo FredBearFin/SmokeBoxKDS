@@ -495,6 +495,17 @@
       return bits.length ? 'While this screen was asleep: ' + bits.join(' and ') + '.' : '';
     } catch (e) { return ''; }
   }
+  // The one-time words about the saved history filling up or being trimmed (from the store, when it has them), or ''. Asked about every few
+  // seconds; once it has been shown it is marked seen so it does not come back, and it stays up until the person clears it.
+  function historyWords() {
+    if (!m || !SB.store || typeof SB.store.historyNotice !== 'function') return '';
+    const t = Date.now();
+    if (!m.histNote && t - (m.histAsk || 0) > 5000) {
+      m.histAsk = t;
+      try { const n = SB.store.historyNotice(); if (n && n.words) { m.histNote = { kind: n.kind, words: String(n.words).slice(0, 300) }; m.histSeen = false; } } catch (e) { /* ignore */ }
+    }
+    return m.histNote ? m.histNote.words : '';
+  }
   // A sentence shown for a while after the board comes back from the background, since warnings were silent in between.
   function awayNote() {
     const a = m && m.away;
@@ -1765,7 +1776,7 @@
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
-    const health = awayNote() || awakeNote();
+    const health = awayNote() || historyWords() || awakeNote();
     const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
@@ -1790,6 +1801,7 @@
     if (moreEl) { const t = 'Tap here to turn on warning sounds. This browser needs one tap first.' + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
+    if (showNote && m.histNote && note === m.histNote.words && !m.histSeen) { m.histSeen = true; try { SB.store.historyNoticeSeen(m.histNote.kind); } catch (e) { /* the store has no such call */ } }
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote && !clockShown);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
