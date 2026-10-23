@@ -54,7 +54,7 @@
     'ticketNotExpedited', 'notAllDone', 'alreadyDone', 'alreadyFired', 'notQueued', 'nothingToDo', 'reasonRequired', 'badTemp',
     'tempTooLow', 'notReheatable', 'notEnoughData', 'batchNotServable', 'badWeight', 'badPatch', 'outOfBounds', 'undoExpired',
     'undoNothing', 'undoConflict', 'invalidBackup', 'exportTooLarge', 'storageBlocked', 'unknownOrder', 'orderNotOpen', 'orderNotPaid', 'dayClosed', 'orderEmpty',
-    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'notFridgeBatch', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
+    'orderNotEmpty', 'badPayment', 'qualityNotDue', 'tempReadingNeeded', 'whoRequired', 'badUntil', 'badPlanTime', 'unknownPlan', 'badSnooze', 'ordersStillOpen', 'badLeftovers', 'badWho', 'unknownSafetyEntry', 'moduleOff', 'nameTaken', 'tooManyIngredients', 'portionsConflict', 'wrongBackupMode', 'notFridgeBatch', 'needsChill', 'confirmWord', 'notInDemo', 'pinRequired', 'noRecoveryCode', 'wrongRecoveryCode', 'recoveryLocked', 'noCrypto'];
 
   // Added to every safety message: the reminder that the local health code overrides this app.
   const SAFETY = ' ' + C.safetyLine;
@@ -86,6 +86,7 @@
     badTemp: 'Enter a temperature between 32 and 300 °F.',
     tempTooLow: 'A reheat needs a reading of at least ' + C.safety.reheatF + ' °F. Keep heating and log it again.' + SAFETY,
     notFridgeBatch: 'This batch is not tracked by place. Only cold items kept in a fridge can be taken out and put back.',
+    needsChill: 'This batch read above the cold limit. Chill it and log a cold reading before taking it out.' + SAFETY,
     notReheatable: 'This batch cannot be reheated: Smokebox allows one reheat per batch, and only within ' + C.safety.belowHotGraceH + ' hours of going below ' + C.safety.hotHoldF + ' °F. Discard it.' + SAFETY,
     notEnoughData: 'Not enough data yet. Run a few more tickets first.',
     batchNotServable: 'That batch is locked or already discarded, so it cannot be used.' + SAFETY,
@@ -563,14 +564,15 @@
     if (now > fEnd) return gateOut('DISCARD_LOCKOUT', false, 'fridgeDate', 'bad', 'Past your fridge date (last day ' + fridgeLastDay(b) + '). Discard.' + SAFETY);
     if (isNum(b.outHours) && lineElapsedMs(b, now) > b.outHours * H) return gateOut('DISCARD_LOCKOUT', false, 'outTime', 'bad', 'Out of the fridge for more than your ' + U.round(b.outHours, 2) + '-hour limit. Discard.' + SAFETY);
     const end = Math.min(fEnd, lEnd);
-    if (b.place === 'line') {
-      const used = Math.round(lineElapsedMs(b, now) / MIN);
-      return gateOut('NONE', true, 'onLine', 'ok', 'Out of the fridge, ' + used + ' min so far' + (isNum(b.outHours) ? ' of your ' + U.round(b.outHours, 2) + '-hour limit.' : '. No out-of-fridge limit set.'), end);
-    }
+    // An above-cold reading blocks serving wherever the batch is, so moving it to the line never makes it servable.
     if (b.outSince != null) {
       const lim = coldOutLimit(b, S);
       if (now > lim) return gateOut('DISCARD_LOCKOUT', false, 'temp', 'bad', 'Above ' + f0(S.coldHoldF) + ' for more than ' + S.aboveColdGraceH + ' hours. Discard.' + SAFETY);
       return gateOut('CHILL_NOW', false, 'aboveCold', 'bad', 'Above ' + f0(S.coldHoldF) + '. Chill it now and log a reading at ' + f0(S.coldHoldF) + ' or below.' + SAFETY, Math.min(lim, end));
+    }
+    if (b.place === 'line') {
+      const used = Math.round(lineElapsedMs(b, now) / MIN);
+      return gateOut('NONE', true, 'onLine', 'ok', 'Out of the fridge, ' + used + ' min so far' + (isNum(b.outHours) ? ' of your ' + U.round(b.outHours, 2) + '-hour limit.' : '. No out-of-fridge limit set.'), end);
     }
     const iv = S.tempCheckEveryMin * MIN;
     if (b.lastTempAt == null) return gateOut('CHECK_TEMP', true, 'noReading', now - b.enteredAt > iv ? 'bad' : 'warn', 'No temperature logged yet. Check it now.' + SAFETY, end);
@@ -581,8 +583,8 @@
   // The next moment a fridge-kept batch's stored status can change on its own (-Infinity when it already disagrees).
   function coldDeadline(b, S) {
     const end = Math.min(fridgeEndAt(b), lineEndAt(b));
+    if (b.outSince != null) return b.status !== 'chill' ? -Infinity : Math.min(end, coldOutLimit(b, S));
     if (b.place === 'line') return b.status === 'ok' ? end : -Infinity;
-    if (b.outSince != null) return b.status !== 'chill' ? -Infinity : Math.min(end, b.outSince + S.aboveColdGraceH * H);
     if (b.status === 'check') return end;
     if (b.status !== 'ok' || b.lastTempAt == null) return -Infinity;
     return Math.min(end, b.lastTempAt + S.tempCheckEveryMin * MIN);
@@ -2114,6 +2116,7 @@
     const b = bs[bi];
     if (b.status === 'discard') return 'batchNotServable';
     if (!isFridgeBatch(b)) return 'notFridgeBatch';
+    if (to === 'line' && b.outSince != null) return 'needsChill';
     if (b.place === to) { tx.info.why = to === 'line' ? 'alreadyOut' : 'alreadyIn'; return 'nothingToDo'; }
     // The move time never goes backwards, even if the clock was set back, so out time only ever grows.
     const t = stampAfter(b.movedAt, stampAfter(b.enteredAt, tx.now));
