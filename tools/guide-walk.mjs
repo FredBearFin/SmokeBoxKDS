@@ -260,8 +260,8 @@ async function recipes(browser) {
   check('cafe: I count what I made', await has(p, 'I count what I made', sh));
   check('cafe: No, skip this', await has(p, 'No, skip this', sh));
   await p.reload(); await p.waitForTimeout(900);
-  const t1 = (await tabTexts(p)).join(' | ');
-  check('cafe: tabs are All stations, Counter, Expo', /All stations/.test(t1) && /Counter/.test(t1) && /Expo/.test(t1) && !/Pit/.test(t1) && !/Fry/.test(t1), t1);
+  const t1 = await tabTexts(p);
+  check('cafe: one station in use shows no station tabs', t1.length === 0, t1);
   await tap(p, 'New ticket'); await p.waitForTimeout(500);
   await tap(p, 'Latte'); await p.waitForTimeout(200);
   for (const t of ['Takeout', 'Dine-in', 'Cash', 'Card', 'Send to kitchen']) check('order screen: ' + t, await seen(p, t));
@@ -278,9 +278,11 @@ async function recipes(browser) {
   await tap(p, 'Burger'); await tap(p, 'Salad'); await tap(p, 'Dine-in'); await tap(p, 'Table 3'); await tap(p, 'Card'); await tap(p, 'Send to kitchen'); await p.waitForTimeout(900);
   check('expo: tab', await tabTap(p, 'Expo')); await p.waitForTimeout(500);
   const ex = await p.evaluate(() => document.body.innerText);
+  const t2 = (await tabTexts(p)).join(' | ');
+  check('line: tabs for stations with dishes, plus Expo', /All stations/.test(t2) && /Fryer/.test(t2) && /Cold/.test(t2) && /Expo/.test(t2) && !/Kitchen/.test(t2) && !/Prep/.test(t2), t2);
   check('expo: sees the whole ticket', /Burger/.test(ex) && /Salad/.test(ex) && /FRY/.test(ex) && /CLD/.test(ex), ex.slice(-400));
   check('expo: Bump', await seen(p, 'Bump'));
-  await tabTap(p, 'Fry'); await p.waitForTimeout(500);
+  await tabTap(p, 'Fryer'); await p.waitForTimeout(500);
   const fr = await p.evaluate(() => document.querySelector('.fl-board, main, body').innerText);
   check('cook tab: only its own dishes', /Burger/.test(fr) && !/Salad, /.test(fr));
   await p.close();
