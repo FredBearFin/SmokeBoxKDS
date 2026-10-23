@@ -27,6 +27,11 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.click('.dp-tile[data-zone=pit]'); await page.click('[data-act=save-again]'); await page.waitForTimeout(200);
   const d1 = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived));
   check('first dish saved with its station, guessed prep time and price', d1.length === 1 && d1[0].zone === 'pit' && d1[0].price === 12.5 && d1[0].prepSec === 300 && d1[0].prepConfirmed === false, d1);
+  // The cooked-ahead question is Yes, No or Not sure (no Skip); Not sure counts as No and says what turning it on adds.
+  check('the cook-ahead question offers Yes, No and Not sure', await page.locator('.dp-ca [data-act=add-cooked]').isVisible() && await page.locator('.dp-ca [data-act=no-cooked]').isVisible() && await page.locator('.dp-ca [data-act=notsure-cooked]').isVisible() && !(await page.locator('[data-act=skip-cooked]').count()));
+  await page.click('.dp-ca [data-act=notsure-cooked]'); await page.waitForTimeout(250);
+  check('Not sure leaves it off and says what turning it on adds and where', /Not sure counts as No/.test(await page.locator('.dp-ca').innerText()) && /Settings, Tax, hours and PIN/.test(await page.locator('.dp-ca').innerText()) && (await page.evaluate(() => SB.engine.moduleOn(SB.store.getState(), 'cookAhead'))) === false);
+  await page.evaluate(() => localStorage.removeItem('smokebox.v1.setup.cookAheadSkipped'));
   check('the station choice is remembered and the name box is empty', (await page.locator('.dp-tile[aria-checked=true]').getAttribute('data-zone')) === 'pit' && (await page.inputValue('.dp-name')) === '');
   await page.fill('.dp-name', 'Mac and cheese'); await page.fill('.dp-price', '4.5'); await page.click('.dp-tile[data-zone=sides]'); await page.click('[data-act=save-again]');
   await page.fill('.dp-name', 'Sweet tea'); await page.fill('.dp-price', '$3'); await page.click('.dp-tile[data-zone=cold]');
@@ -44,7 +49,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   check('a typed price is read back before saving', /Reads as \$12\.50/.test(await page.locator('.dp-echo').textContent()));
   await page.fill('.dp-price', '');
   const nameFirst = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived)[0].name);
-  await page.selectOption('[aria-label="Category of ' + nameFirst + '"]', 'cold'); await page.waitForTimeout(300);
+  await page.selectOption('[aria-label="Section of ' + nameFirst + '"]', 'cold'); await page.waitForTimeout(300);
   check('Move to: the category of a dish changes from its row', await page.evaluate((n) => SB.store.getState().menu.find((m) => m.name === n).cat === 'cold', nameFirst));
   // Menu sections: the add form shows a Menu section list; Change menu sections renames one, marks one Not used (undoable) and adds one.
   check('the add form has a Menu section list', await page.locator('.dp-menusec').isVisible());

@@ -1335,12 +1335,31 @@
       const mkKey = (label, aria, fn, aux) => { const b = h('button', { type: 'button', class: 'btn key' + (aux ? ' is-aux' : ''), 'aria-label': aria || label, onClick: fn }, label); keys.push(b); return b; };
       for (let n = 1; n <= 9; n++) pad.appendChild(mkKey(String(n), 'Digit ' + n, () => push(String(n))));
       pad.append(mkKey('Clear', 'Clear all digits', () => { entry = ''; paint(); }, true), mkKey('0', 'Digit 0', () => push('0')), mkKey(ico('backspace', 26), 'Delete last digit', () => { entry = entry.slice(0, -1); paint(); }, true));
+      // The recovery code form inside Forgot the PIN?: the code, a new PIN (or none to remove it), and one button. Refusals show plain words.
+      function recoveryBox() {
+        if (!SB.store || typeof SB.store.recoverPin !== 'function' || !SB.store.hasRecoveryCode || !SB.store.hasRecoveryCode()) return h('p', { class: 'fs-sub' }, 'No recovery code was saved on this device.');
+        const code = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', placeholder: 'ABCDE-FGHJK', 'aria-label': 'Recovery code' });
+        const np = h('input', { class: 'input', type: 'password', inputmode: 'numeric', maxlength: 4, autocomplete: 'off', 'aria-label': 'New 4-digit PIN, or leave empty to remove the PIN' });
+        const out = h('p', { class: 'pin-msg', role: 'status' });
+        // Checks the code and sets the new PIN (or removes it), then lets the owner in.
+        const go = h('button', { type: 'button', class: 'btn', dataset: { act: 'pin-recover' }, onClick: async () => {
+          const v = np.value.trim();
+          if (v && !/^\d{4}$/.test(v)) { out.textContent = 'The new PIN must be exactly 4 digits, or leave it empty to remove the PIN.'; out.setAttribute('data-tone', 'bad'); return; }
+          const hash = v ? await S.hashPin(v) : null;
+          const r = await SB.store.recoverPin(code.value, hash);
+          if (r.ok) { say(r.info && r.info.pinRemoved ? 'PIN removed. Set a new one under Settings, Tax, hours and PIN.' : 'New PIN saved.', null); finish(true); return; }
+          let w = r.report; try { w = SB.engine.describe(r.report, r.info, SB.store.getState().settings) || w; } catch (e) { /* keep the code */ }
+          out.textContent = w; out.setAttribute('data-tone', 'bad');
+        } }, 'Reset the PIN with my code');
+        return h('div', { class: 'pin-recover' }, h('label', null, 'Recovery code', code), h('label', null, 'New PIN (4 digits, or empty to remove)', np), go, out);
+      }
       const note = h('p', { class: 'pin-note' }, 'This PIN keeps line cooks out of the back office. It is not real security: it is stored on this device, and anyone who can use the device can get around it.');
       // What to do when the PIN is forgotten: said plainly, because there is no reset button and nothing here may pretend otherwise.
       const forgot = h('details', { class: 'pin-forgot' },
         h('summary', null, 'Forgot the PIN?'),
         h('p', null, 'The PIN only locks the back office: sales, menu and settings. The kitchen board and New ticket stay open.'),
-        h('p', null, 'Smokebox cannot reset or recover a PIN. It is saved only on this device. First ask whoever set it.'),
+        h('p', null, 'If you saved a recovery code when you set the PIN, use it below. Otherwise ask whoever set the PIN: it is saved only on this device.'),
+        recoveryBox(),
         h('p', null, 'If nobody knows it, the only way back in is to clear this site\'s saved data in your browser settings. That erases everything on this device: tickets, dishes and settings. Then open Smokebox and restore your latest backup (Back office, Data, Import). A backup brings back the PIN it was saved with, so use one made before the PIN was set or changed.'),
         SB.guide && SB.guide.link ? SB.guide.link('empty-lost-or-locked', 'forgot the PIN') : null);
       sh.body.append(dots, msg, status, pad, note, forgot);

@@ -604,3 +604,7 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dp input[type="file"]::file-selector-button { min-height: 44px; padding: 0 var(--sp-4); margin-right: var(--sp-3); border-radius: var(--r-btn); font: inherit; cursor: pointer; }
 .dp-cat { flex: 0 1 14ch; min-width: 0; }
 .dp-check-row { display: flex; align-items: center; gap: var(--sp-3); min-height: 44px; cursor: pointer; } .dp-check-row input { width: 26px; height: 26px; flex: none; } .so-step { gap: var(--sp-3); }
+.dp-sv { margin-top: var(--sp-2); }
+.rc-code { font: var(--w-bold) 34px / 1.2 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.12em; text-align: center; padding: var(--sp-4); background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--r-panel); user-select: all; overflow-wrap: anywhere; }
+.pin-recover { display: grid; gap: var(--sp-2); }
+.pin-recover label { display: grid; gap: 4px; }

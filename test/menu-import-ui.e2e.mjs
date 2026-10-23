@@ -42,6 +42,11 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.click('[data-act=import-check]'); await page.waitForTimeout(400);
   check('a comma-split price row is unticked and says why', await page.locator('.dp-prow').first().locator('input[type=checkbox]').isChecked() === false && /more column|split/.test(await page.locator('.dp-prow').first().locator('.dp-prob').textContent()));
   check('a normal row beside it stays ticked', await page.locator('.dp-prow').nth(1).locator('input[type=checkbox]').isChecked());
+  // A column the importer does not use is named once in the preview.
+  await page.fill('textarea', 'Item,Price,Calories,Notes\nTea cake,3.00,300,fresh daily\nScone,3.50,250,');
+  await page.click('[data-act=import-check]'); await page.waitForTimeout(400);
+  check('the preview names an ignored column', /Ignored column: Calories/.test(await page.locator('[data-act=ignored-columns]').textContent().catch(() => '')), await page.locator('.dp-preview').innerText());
+  check('the preview says notes and descriptions are not kept', await page.locator('[data-act=notes-ignored]').count() === 1);
   // A messy pasted list with a row to fix.
   await page.fill('textarea', 'Pulled pork plate 12.50\nBad one\nLemonade 3');
   await page.click('[data-act=import-check]'); await page.waitForTimeout(400);
