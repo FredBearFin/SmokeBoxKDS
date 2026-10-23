@@ -109,11 +109,32 @@
   }
 
   /* ====================================================================================================================
+   * Backup nudge: pure decision (works in Node)
+   * ================================================================================================================== */
+  // Decides whether to nudge for the daily backup. a = {service, lastBackupAt, snoozeUntil, now, hasData}.
+  // It is due from closing time until 10 hours after, when no backup was made in the 2 hours before closing
+  // or since, and nothing is snoozed. An empty kitchen (no tickets or batches) has nothing to lose.
+  // WATCH OUT: closeHour above 24 means after midnight, so last night's close is still checked at 12:30 am.
+  function backupDue(a) {
+    const H = 3600000, sv = a && a.service;
+    if (!a || !sv || typeof sv.closeHour !== 'number' || !a.hasData) return false;
+    if (typeof a.snoozeUntil === 'number' && a.snoozeUntil > a.now) return false;
+    let closeAt = null;
+    for (const day of [0, -1]) {
+      const d = new Date(a.now); d.setDate(d.getDate() + day); d.setHours(0, 0, 0, 0);
+      const at = d.getTime() + sv.closeHour * H;
+      if (at <= a.now && (closeAt == null || at > closeAt)) closeAt = at;
+    }
+    if (closeAt == null || a.now - closeAt > 10 * H) return false;
+    return !(typeof a.lastBackupAt === 'number' && a.lastBackupAt >= closeAt - 2 * H);
+  }
+
+  /* ====================================================================================================================
    * Theme
    * ================================================================================================================== */
   const T = (SB.theme = {});
   // Notebook (local storage) entry names for this file's saved choices.
-  const KEY = { theme: 'smokebox.v1.theme', otheme: 'smokebox.v1.otheme', text: 'smokebox.v1.textsize', density: 'smokebox.v1.density', hints: 'smokebox.v1.hints', zone: 'smokebox.v1.zone', pinlock: 'smokebox.v1.pinlock' };
+  const KEY = { theme: 'smokebox.v1.theme', otheme: 'smokebox.v1.otheme', text: 'smokebox.v1.textsize', density: 'smokebox.v1.density', hints: 'smokebox.v1.hints', zone: 'smokebox.v1.zone', pinlock: 'smokebox.v1.pinlock', lastBackup: 'smokebox.v1.lastbackup' };
   // Colour of the browser's top bar for each look; each matches that look's background colour.
   const THEME_COLOR = { day: '#F5F2EB', night: '#15181A', ember: '#181513', paper: '#F0ECE3' };
   // Current choices: floor look, office look (ember dark / paper light), text size. themeSubs = listeners.
@@ -350,7 +371,7 @@
 
   // In Node (tests with no page) stop here: only the router parsing and SHA-256 above are usable there.
   if (!doc) { // Node: pure parts only
-    SB.shell = { sha256: sha256hex };
+    SB.shell = { sha256: sha256hex, backupDue };
     return;
   }
 
@@ -1505,6 +1526,47 @@
     }
   }
 
+  /* ---------- banner: save failure and daily backup nudge ---------- */
+  // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
+  const bn = { el: null, timer: 0, snoozeUntil: 0, kind: '' };
+  // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
+  S.noteBackup = function (at) {
+    const t = typeof at === 'number' ? at : Date.now();
+    if (U) U.storage.set(KEY.lastBackup, t);
+    paintBanner();
+  };
+  // When the last backup was made on this device (ms), or null if never.
+  S.lastBackupAt = () => { const t = U ? U.storage.get(KEY.lastBackup, null) : null; return typeof t === 'number' ? t : null; };
+  // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
+  function bannerWanted() {
+    const store = SB.store;
+    if (!store || !store.status || !store.getState) return null;
+    const ss = store.status(), s = store.getState();
+    if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
+    if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
+    if (!s) return null;
+    const due = backupDue({ service: s.settings && s.settings.service, lastBackupAt: S.lastBackupAt(), snoozeUntil: bn.snoozeUntil, now: Date.now(), hasData: s.tickets.length + s.batches.length > 0 });
+    return due ? { kind: 'nudge', tone: 'warn', text: 'Service is over. Save today\'s backup now and keep a copy off this device (email it or use a USB drive).', act: 'Back up now', later: true } : null;
+  }
+  // Shows, updates or removes the strip at the top of the screen so a problem is seen from the kitchen board.
+  function paintBanner() {
+    if (!st.mounted || !st.shell) return;
+    let w = null;
+    try { w = bannerWanted(); } catch (e) { w = null; }
+    if (!w) { if (bn.el) { bn.el.remove(); bn.el = null; bn.kind = ''; st.shell.removeAttribute('data-banner'); } return; }
+    if (bn.el && bn.kind === w.kind) return;
+    if (bn.el) bn.el.remove();
+    bn.kind = w.kind;
+    // Opens the Data page of the back office, where the backup button is (it asks for the PIN if one is set).
+    const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => S.ignite({ section: 'data' }) }, w.act);
+    // Puts the nudge off for 45 minutes.
+    const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm', onClick: () => { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } }, 'Later') : null;
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : 'download', 22), h('span', { class: 'sb-banner-t' }, w.text), act, later);
+    st.shell.appendChild(bn.el);
+    st.shell.setAttribute('data-banner', w.kind);
+    st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip
+  }
+
   /* ---------- placeholders so the shell is testable alone ---------- */
   // Stand-in floor used when 70-floor-board.js is missing: tabs, menu, demo buttons. Lets the shell be
   // tested.
@@ -1604,6 +1666,9 @@
       U.clear(floor); floor.appendChild(ui.errorCard(e, { title: 'The board could not load', module: '70-floor-board.js', onRetry: () => g.location.reload() }));
     }
     updateThemeColor();
+    bn.el = null; bn.kind = '';
+    paintBanner();
+    clearInterval(bn.timer); bn.timer = setInterval(paintBanner, 5000); // also reacts when a save starts failing
     const v = R.view();
     onRoute(v);
     return S;
@@ -1611,6 +1676,7 @@
   // Takes the frame down: closes sheets, stops route listening, removes layers, dismisses toasts.
   S.unmount = function () {
     if (!st.mounted) return;
+    clearInterval(bn.timer); bn.el = null; bn.kind = '';
     sheets.closeAll();
     if (st.offRoute) st.offRoute();
     resetFx();

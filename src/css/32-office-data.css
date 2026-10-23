@@ -250,3 +250,8 @@
   .od-panel, .od-card, .od-safetyline, .od-warn, .od-warnline, .od-toc-link, .od-archived, .od-pinstate { border-color: CanvasText; }
   .od-toc-link[aria-current="location"] { outline: 2px solid Highlight; }
 }
+
+/* The numbered restore and replace-device steps on the Data page. */
+.od-steps { margin: 0; padding-left: var(--sp-5); display: grid; gap: var(--sp-2); }
+.od-steps li { line-height: 1.45; }
+.od-swap .od-steps { margin: var(--sp-3) 0; }

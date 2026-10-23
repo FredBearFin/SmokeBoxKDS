@@ -33,6 +33,8 @@
   const hourWords = (hr) => U.fmtHour(hr) + (hr >= 24 ? ' (next day)' : '');
   // Lowercases the first letter, and today's real date for file names.
   const lower1 = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+  // Tells the shell a backup was just saved, so the close-of-service nudge stays quiet tonight.
+  const noteBackup = () => { try { if (SB.shell && SB.shell.noteBackup) SB.shell.noteBackup(); } catch (e) { /* the nudge is optional */ } };
   const todayKey = () => U.dateKey(Date.now()); // real calendar date for file names (the demo clock may run ahead)
   // Reads a dotted path from an object, and builds a nested patch from one.
   const getPath = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
@@ -1384,6 +1386,7 @@
       const fname = 'smokebox-backup-' + todayKey() + '.json';
       const res = await saveFile(fname, text, 'application/json');
       reportSave(res, fname, text, 'backup');
+      if (res.how === 'host' || res.how === 'browser') noteBackup();
     }
     // Says in words whether a file was saved, started, declined or blocked.
     function reportSave(res, fname, text, what) {
@@ -1400,7 +1403,7 @@
       const fail = () => { showFallback(text); exStatus.bad('Your browser blocked copying. The backup is selected below: press Ctrl+C (Cmd+C on a Mac) to copy it.'); };
       try {
         const p = g.navigator.clipboard.writeText(text);
-        p.then(() => exStatus.ok('Copied ' + kbText(text.length) + ' to the clipboard.'), fail);
+        p.then(() => { exStatus.ok('Copied ' + kbText(text.length) + ' to the clipboard.'); noteBackup(); }, fail);
       } catch (e) { fail(); }
     }
     // Saves one spreadsheet table and says how many rows it holds.
@@ -1443,12 +1446,18 @@
       b.dataset.csv = k;
       return b;
     });
+    // Says when the last backup was made on this device, so a stale one is easy to spot.
+    const lastLine = para('', 'od-p od-lastbackup');
+    const paintLast = () => { const t = SB.shell && SB.shell.lastBackupAt ? SB.shell.lastBackupAt() : null; lastLine.textContent = t ? 'Last backup from this device: ' + U.fmtDateShort(U.dateKey(t)) + ', ' + U.fmtTime(t) + '.' : 'No backup has been made from this device yet.'; };
+    paintLast(); P.syncs.push(paintLast);
     const dlBtn = btn('Download backup (JSON)', { icon: 'download', cls: 'btn-primary', onClick: downloadBackup });
     dlBtn.dataset.action = 'backup-download';
     const cpBtn = btn('Copy backup', { icon: 'copy', onClick: copyBackup });
     cpBtn.dataset.action = 'backup-copy';
     pn.body.append(
       para('A backup is every ticket, event, batch, menu edit and setting in one JSON file. Keep one before you reset or import. Spreadsheet files (CSV) list one kind of record each and cannot be imported back.', 'od-p'),
+      lastLine,
+      para('Back up at least once a day, at close. Keep a copy off this device (email it to yourself or use a USB drive): if the browser data is cleared or the device is replaced, a copy on the same device is gone too.', 'od-p'),
       h('div', { class: 'od-actions' }, dlBtn, cpBtn),
       h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Spreadsheet files'), csvBtns),
       repRow, repBox,
@@ -1468,7 +1477,24 @@
     const pasteBtn = btn('Check pasted backup', { icon: 'check', cls: 'btn-sm', onClick: () => check(pasteArea.value, 'pasted text') });
     pasteBtn.dataset.action = 'import-check-paste';
     const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
+    // The restore wizard: four plain steps. Step 1 is this button, the file check shows step 2, and the
+    // replace button is step 3 (it asks once more). Step 4 is looking at the board.
+    const wizard = h('ol', { class: 'od-steps' },
+      h('li', null, 'Choose the backup file (below). Pick the newest one, named smokebox-backup-<date>.json.'),
+      h('li', null, 'Read the summary that appears: the saved date, tickets and batches should match what you expect. Nothing has changed yet.'),
+      h('li', null, 'If it is right, press Replace everything. It replaces all data on this device, so back up what is here first if you might want it.'),
+      h('li', null, 'Open the kitchen board and check the batches, the 86 board and your menu. Sound and loudness are set per device, so test them again.'));
+    // The guide for moving to a new device, following the recovery steps in docs/solo-offer.md.
+    const swap = h('details', { class: 'od-paste-det od-swap' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'Replacing this device: step by step')),
+      h('ol', { class: 'od-steps' },
+        h('li', null, 'On the old device, if it still works: download a backup (above) and copy the file somewhere else (email it to yourself or use a USB drive).'),
+        h('li', null, 'On the new device: copy the same smokebox.html file onto it and open it. Install it as an app (Share, then Add to Home Screen, or Install app).'),
+        h('li', null, 'Run Menu, then Set up this tablet. Sound, screen-on and loudness are per device and are redone here.'),
+        h('li', null, 'Open Back office, then Menu and settings (this page), choose the backup file, check the summary and press Replace everything.'),
+        h('li', null, 'Check the board: batches, the 86 board and the menu. Take a fresh backup from the new device, then retire the old one.')),
+      h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
     impHost.append(
+      h('p', { class: 'od-card-h' }, 'Restore from a backup, step by step'), wizard, swap,
       para('Importing checks the backup first and shows what is inside before anything changes. A file that is not a valid backup is refused and nothing is touched.', 'od-p'),
       h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult);
     pn.body.appendChild(impHost);
