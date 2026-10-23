@@ -29,6 +29,10 @@
   // The half-built order on the New ticket screen: kept so a reload or closed tab loses nothing. At most 20,000 characters, and a
   // draft older than 12 hours is forgotten (yesterday's half-order should not come back).
   const DRAFT_KEY = 'smokebox.v1.orderdraft', DRAFT_MAX_CHARS = 20000, DRAFT_MAX_AGE_MS = 12 * 3600e3;
+  // PIN recovery: attempts are counted in this key (kitchen data) so a reload does not reset the count. 5 wrong codes lock it for 15 minutes.
+  const RECOVERY_KEY = 'smokebox.v1.pinrecovery', RECOVERY_TRIES = 5, RECOVERY_LOCK_MS = 15 * 60e3;
+  // Letters and digits for a recovery code, leaving out I, O, 0 and 1 so a handwritten card is not misread. 32 characters, 10 in a code: 50 bits.
+  const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const START_OVER_KEYS = ['smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
     'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
@@ -976,6 +980,73 @@
   }
   // Throws the saved half-built order away (the order was sent or cancelled).
   function clearDraft() { try { if (storage) storage.remove(DRAFT_KEY); } catch (e) { /* ignore */ } }
+  // The SHA-256 of text as 64 hex characters, or null when this browser has no secure hashing. Asynchronous.
+  async function sha256Hex(text) {
+    const c = g.crypto && g.crypto.subtle;
+    if (!c || typeof c.digest !== 'function' || typeof TextEncoder === 'undefined') return null;
+    const buf = await c.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map((b) => (b < 16 ? '0' : '') + b.toString(16)).join('');
+  }
+  // A recovery code as typed (any case, spaces and dashes allowed) made into its plain form, or '' when it cannot be a code.
+  function normalizeCode(text) {
+    const t = String(text == null ? '' : text).toUpperCase().replace(/[\s-]+/g, '');
+    return t.length === 10 && t.split('').every((ch) => RECOVERY_ALPHABET.indexOf(ch) >= 0) ? t : '';
+  }
+  // The stored form of a recovery code: a salted SHA-256 (only this is ever saved, never the code).
+  async function hashCode(plain) {
+    const hex = await sha256Hex('smokebox-recovery-v1:' + plain);
+    return hex === null ? null : 'sha256:' + hex;
+  }
+  // True when a back office PIN is set.
+  const hasPin = () => !!(state && state.settings && state.settings.office && state.settings.office.pinHash);
+  // True when a recovery code has been made for the current PIN.
+  function hasRecoveryCode() { return !!(state && state.settings && state.settings.office && state.settings.office.recoveryHash); }
+  // Makes a new recovery code for the current PIN, saves only its hash in the settings, and returns the code once as { ok, code }
+  // ("ABCDE-FGHJK") for the screen to show and the owner to write down. Any earlier code stops working. Needs a PIN
+  // (pinRequired); works for a PIN that was set before recovery codes existed. The code is never stored or logged.
+  async function createRecoveryCode() {
+    if (!state) return { ok: false, report: 'invalidBackup', info: {} };
+    if (!hasPin()) return { ok: false, report: 'pinRequired', info: {} };
+    const bytes = new Uint8Array(10);
+    if (!g.crypto || typeof g.crypto.getRandomValues !== 'function') return { ok: false, report: 'noCrypto', info: {} };
+    g.crypto.getRandomValues(bytes);
+    const plain = Array.from(bytes).map((b) => RECOVERY_ALPHABET[b % 32]).join('');
+    const hash = await hashCode(plain);
+    if (hash === null) return { ok: false, report: 'noCrypto', info: {} };
+    const rep = dispatch('updateSettings', { patch: { office: { recoveryHash: hash } } }, { source: 'user' });
+    if (rep !== 'ok') return { ok: false, report: rep, info: {} };
+    persistNow();
+    return { ok: true, report: 'ok', code: plain.slice(0, 5) + '-' + plain.slice(5), info: {} };
+  }
+  // Uses a recovery code to reset the back office PIN. newPinHash is the new PIN's hash (the same form the PIN screen saves) or null
+  // to remove the PIN. A wrong code is counted: after 5 wrong codes it is locked for 15 minutes, even for the right code, and the
+  // count survives a reload. The right code is spent (a new one can be made once the new PIN is set). Returns { ok, report, info }.
+  async function recoverPin(code, newPinHash) {
+    if (!state) return { ok: false, report: 'invalidBackup', info: {} };
+    if (newPinHash !== null && !(typeof newPinHash === 'string' && newPinHash.length > 0 && newPinHash.length <= 128)) return { ok: false, report: 'badPatch', info: { key: 'newPinHash' } };
+    if (!hasRecoveryCode()) return { ok: false, report: 'noRecoveryCode', info: {} };
+    const t = realNow();
+    let rec = { fails: 0, until: 0 };
+    try { const r = storage ? storage.get(RECOVERY_KEY, null) : null; if (r && typeof r === 'object' && isNum(r.fails) && isNum(r.until)) rec = { fails: Math.max(0, Math.floor(r.fails)), until: r.until }; } catch (e) { rec = { fails: 0, until: 0 }; }
+    if (rec.until > t) return { ok: false, report: 'recoveryLocked', info: { waitMs: rec.until - t } };
+    if (rec.until && rec.until <= t) rec = { fails: 0, until: 0 };
+    const plain = normalizeCode(code);
+    const hash = plain ? await hashCode(plain) : null;
+    if (plain && hash === null) return { ok: false, report: 'noCrypto', info: {} };
+    const stored = state.settings.office.recoveryHash;
+    if (!plain || hash !== stored) {
+      rec.fails++;
+      const locked = rec.fails >= RECOVERY_TRIES;
+      if (locked) rec = { fails: 0, until: t + RECOVERY_LOCK_MS };
+      try { if (storage) storage.set(RECOVERY_KEY, rec); } catch (e) { /* the count is kept in memory only */ }
+      return locked ? { ok: false, report: 'recoveryLocked', info: { waitMs: RECOVERY_LOCK_MS } } : { ok: false, report: 'wrongRecoveryCode', info: { triesLeft: RECOVERY_TRIES - rec.fails } };
+    }
+    const rep = dispatch('updateSettings', { patch: { office: { pinHash: newPinHash, recoveryHash: null } } }, { source: 'user' });
+    if (rep !== 'ok' && rep !== 'nothingToDo') return { ok: false, report: rep, info: {} };
+    try { if (storage) storage.remove(RECOVERY_KEY); } catch (e) { /* ignore */ }
+    persistNow();
+    return { ok: true, report: 'ok', info: { pinRemoved: newPinHash === null } };
+  }
   // Starts the real kitchen over with an empty menu. Needs opts.confirm to be the typed word (SB.store.START_OVER_WORD, any case),
   // refuses in the demo, and takes a full backup first: if the backup cannot be made nothing is cleared. Then it clears dishes,
   // ingredients, stock, batches, tickets, orders and history (resetLive, catalog 'blank') and the setup-progress choices, so the
@@ -1046,7 +1117,7 @@
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    flush, exportAll, importAll, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").

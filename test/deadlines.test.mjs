@@ -132,7 +132,7 @@ test('feed: a batch past its quality limit gets a past row (off the menu, taste 
   const row = f.find((x) => x.kind === 'past');
   assert.ok(row, f.map((x) => x.id).join());
   assert.equal(row.sev, 'bad');
-  assert.ok(/quality limit/.test(row.consequence) && /Taste it/.test(row.action), row.consequence + ' / ' + row.action);
+  assert.ok(/quality limit/.test(row.consequence) && /Check it/.test(row.action), row.consequence + ' / ' + row.action);
   assert.ok(!f.some((x) => x.kind === 'expiry' && x.batchId === row.batchId), 'no expiry projection for a batch that cannot sell');
 });
 

@@ -278,3 +278,22 @@ test('new settings leave today\'s defaults and start states unchanged', () => {
   assert.deepEqual([d.service.counter, d.service.chips, d.ui.currency], [undefined, undefined, undefined]);
   assert.equal(E.counterOn(d), false);
 });
+
+test('meal pacing is off for a new empty kitchen and unchanged for existing kitchens', () => {
+  clock = T;
+  assert.equal(E.newState({ now: T, blank: true }).settings.pacing.enabled, false);
+  assert.equal(E.newState({ now: T }).settings.pacing.enabled, true);                       // the sample and old kitchens
+  const old = JSON.parse(JSON.stringify(E.newState({ now: T })));                           // an existing saved kitchen keeps its choice
+  old.settings.pacing.enabled = true;
+  assert.equal(E.validateBackup(JSON.stringify(old)).state.settings.pacing.enabled, true);
+  old.settings.pacing.enabled = false;
+  assert.equal(E.validateBackup(JSON.stringify(old)).state.settings.pacing.enabled, false);
+  const b = backend(); start(b);
+  try {
+    S.dispatch('updateSettings', { patch: { pacing: { enabled: true } } });                  // the owner turns it on in a new kitchen
+    assert.equal(S.startOver({ confirm: S.START_OVER_WORD, keepSettings: true }).ok, true);
+    assert.equal(S.getState().settings.pacing.enabled, true);                                // kept with the settings
+    assert.equal(S.startOver({ confirm: S.START_OVER_WORD, keepSettings: false }).ok, true);
+    assert.equal(S.getState().settings.pacing.enabled, false);                               // a fresh start is off again
+  } finally { S.destroy(); }
+});
