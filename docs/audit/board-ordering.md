@@ -102,3 +102,16 @@ Performance (headless Chromium, software rendering, 4 s of a 120x clock with tic
 | 200 | 19.2 / 33.4 / 66.7 ms | 17.3 / 16.8 / 66.6 ms |
 
 Left: weight inputs in kg; "check this reading" and sanitize rows are not fixable from the log yet; P2 items 3 and 6 to 11 of the first list; no before/after of far display at 1024.
+
+## Round 6 status
+
+Screenshots: `docs/ux-shots/night/a1/r6-*.png` (Far display and Wall mode at 1920, 2560 and 3840; blank, late and 60 tickets). Tests: `test/board-contrast.e2e.mjs` and the updated `test/board-round2.e2e.mjs`. Simulated in headless Chromium only.
+
+Fixed:
+- **A real Night bug (mine, from round 3):** late tickets after the first three had a transparent head, so at Night the ticket number, customer and timer were dark text on the dark board (contrast 1.1 to 2:1, unreadable) and the "Next" tag was dark on dark. Heads now use the paper colour and the tag uses the slip colours. The new contrast test would have caught it.
+- **Contrast:** a pair checker over computed styles (4.5:1 small text, 3:1 large) found no other failure on the board, New ticket, Orders and the cabinet in Day, Night and Night with Large text. Focus rings are visible (outline at least 2 px). Keyboard: Tab reaches the controls, Enter opens New ticket and Orders, Escape closes them and focus returns to the board.
+- **Far display and Wall mode:** a 4K screen (3000 px and wider) now draws the board at twice size; Far display also enlarges dish names (1.3 times), the strip batch name and explanation (1.25 times) and the sound note, and keeps one strip row below 1300 px of height; the demo and backup bar grow on 4K. No horizontal scroll at any size; wall panes (orders, glance) work with a blank kitchen, the demo and 60 tickets; the strip never covers tickets (it pushes them down). New numbers against the 10-foot test are in `docs/ux-test-report.md`: which batch passes on a 43 in TV or larger; the explanation line is barely legible; the next-action line fails on a 43 in TV and passes only barely on 55 in and 65 in 4K TVs; a 32 in 1440p monitor fails most lines.
+- **Touch size:** the sound bar, the pause note and their clear buttons are at least 44 px high.
+- **Wording (A4's round 5 rows):** "held back" instead of "locked for safety", "Select" instead of "Tick", "Start and Done", "your dishes", "pulled pork or chili", "Demo batch", "restaurants that cook food ahead", "Sample history", demo wording instead of practice.
+
+Left: the Overdue badge is small at 10 feet (the red outline and the "Do this first" tag carry the message); the physical size of a 2560x1440 32 in monitor needs browser zoom; P2 items 3 and 6 to 11 of the first list.

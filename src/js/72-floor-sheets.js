@@ -108,7 +108,7 @@
   function safetyNote(extra) {
     return h('div', { class: 'fs-note fs-safety' }, ico('shield-check', 20), h('div', null, extra ? h('p', null, extra) : null, h('p', null, C.safetyLine)));
   }
-  function simPill() { return h('span', { class: 'fs-sim' }, ico('info', 16), h('span', null, 'Practice only: no live POS connected')); }
+  function simPill() { return h('span', { class: 'fs-sim' }, ico('info', 16), h('span', null, 'Demo only: no live POS connected')); }
 
   // Keep `parent`'s children in the order of `items`. New keys are created
   // with make(item); existing nodes are never replaced and only
@@ -416,7 +416,7 @@
       const unsnoozeT = h('span', null, 'Cancel reminder');
       const bUnsnooze = h('button', { type: 'button', class: 'btn', dataset: { act: 'unsnooze' }, hidden: true }, ico('x', 20), unsnoozeT);
       // One main action per card; every other action sits behind the "..." button so all cards look the same.
-      const bMore = h('button', { type: 'button', class: 'btn btn-icon hc-more', 'aria-label': 'More for this batch', title: 'More', hidden: true }, ico('more', 22));
+      const bMore = h('button', { type: 'button', class: 'btn btn-icon hc-more', dataset: { act: 'more' }, 'aria-label': 'More for this batch', title: 'More', hidden: true }, ico('more', 22));
       const actions = h('div', { class: 'hc-actions' }, bKeep, bUnkeep, bSnooze, bUnsnooze, bPull, bLog, bReheat, bCool, bDiscard, bMore);
       const editorSlot = h('div', { class: 'hc-editor-slot' });
       // Card layout: heading, ring and facts, message and lock note, cooling steps, then the buttons.
@@ -482,7 +482,7 @@
       text(rec.name, b.label || 'Batch');
       attr(rec.el, 'aria-label', (b.label || 'Batch') + ': ' + sv.word);
       if (rec.kindKey !== b.kind) { rec.kindKey = b.kind; U.clear(rec.kindEl); rec.kindEl.append(ico(KIND_ICON[b.kind] || 'flame', 18), h('span', null, KIND_WORD[b.kind] || 'Hold')); }
-      const srcWord = b.src === 'sample' ? 'Practice batch' : ''; // starter stock is named once in the summary line, not on every card
+      const srcWord = b.src === 'sample' ? 'Demo batch' : ''; // starter stock is named once in the summary line, not on every card
       setHidden(rec.srcChip, !srcWord); if (srcWord) { text(rec.srcChip, srcWord); attr(rec.srcChip, 'data-tone', 'info'); }
       setState(rec.status, sv.tone, sv.icon, sv.word);
       attr(rec.el, 'data-tone', sv.tone); attr(rec.el, 'data-status', gt.status);
@@ -763,7 +763,7 @@
         // Sends the ticked batches to the engine with the chosen length and the initials, then reports what was kept.
         onConfirm: (sh) => {
           const ids = past.filter((x) => picks.get(x.id).checked).map((x) => x.id);
-          if (!ids.length) { err.textContent = 'Tick at least one batch. A batch needs a fresh temperature reading first.'; err.hidden = false; return; }
+          if (!ids.length) { err.textContent = 'Select at least one batch. A batch needs a fresh temperature reading first.'; err.hidden = false; return; }
           const payload = { batchIds: ids, who: wf.get() };
           const mode = dur.getValue();
           if (mode === 'until') {
@@ -1036,7 +1036,7 @@
     const footer = h('div', { class: 'hc-foot' }, err, addBtn);
 
     // With no cooked-ahead item yet the Product list is empty, so say so and offer the way to add one.
-    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cooked-ahead items yet. Add the food you cook ahead, like brisket, and then log a batch of it here.'),
+    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cooked-ahead items yet. Add the food you cook ahead, like pulled pork or chili, and then log a batch of it here.'),
       // Opens the Cooked-ahead food sheet where the first item is added.
       h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add a cooked-ahead item'))));
     // With nothing to log yet, only the explanation and the Add button show; the weight steppers wait for a product.
@@ -1199,7 +1199,7 @@
     const syncSec = () => (st().settings && st().settings.syncTargetSec) || C.syncTargetSec;
     // Folded away by default and kept below the menu and stock, so the real controls come first.
     const syncBox = h('details', { class: 'fs-section bd-sync', 'aria-label': 'Channel sync' },
-      h('summary', { class: 'fs-row', style: 'cursor:pointer' }, h('h3', { class: 'fs-h grow' }, 'Channel sync (practice only)'), simPill()),
+      h('summary', { class: 'fs-row', style: 'cursor:pointer' }, h('h3', { class: 'fs-h grow' }, 'Channel sync (demo only)'), simPill()),
       syncGrid,
       h('p', { class: 'fs-sub bd-sync-note' }, 'There is no live POS or delivery app connected. These four chips show how a real 86 would reach each channel. Changes catch up within ' + syncSec() + ' seconds.'));
 
@@ -1272,7 +1272,7 @@
         return 'Marked 86 by hand' + (m && U.isNum(m.since) ? ', ' + agoText(now - m.since) : '') + '.';
       }
       const ing = ingOf(a.ing);
-      if (a.reason === 'safety') return ingName(a.ing) + ' is locked for safety. Reheat or discard the batch in the hold cabinet. It comes back on when a batch that is in range is in.';
+      if (a.reason === 'safety') return ingName(a.ing) + ' is held back. Reheat or throw out the batch in the Hold cabinet. It comes back when a batch that is in range is in.';
       if (a.reason === 'quality') {
         // A channel update still waiting out its hold can be cancelled by keeping the batch serving.
         const held = (st().syncs || []).filter((sy) => sy.menuId === mi.id && sy.kind === '86' && U.isNum(sy.holdUntil) && sy.holdUntil > now)[0];
@@ -1320,7 +1320,7 @@
       const res = run('toggle86', { menuId: mi.id, on });
       if (res.report !== 'ok') { toast(say(res), 'warn'); return; }
       const a = SB.store.select.availability(mi.id), nm = mi.short || mi.name;
-      if (on) undoToast(nm + ' is 86. The sync strip shows the practice channels catching up.', 'ok');
+      if (on) undoToast(nm + ' is 86. The sync strip shows the demo channels catching up.', 'ok');
       else if (a && a.ok) undoToast(nm + ' is back on.', 'ok');
       else toast('Manual 86 removed, but ' + nm + ' is still ' + stateOf86(a).word.toLowerCase() + '. ' + whyLine(a, mi, nowMs()), 'warn');
       update(nowMs());
@@ -1617,7 +1617,7 @@
   const simLive = () => (SB.sim && SB.sim.live ? SB.sim.live : null);
   // What the simulator says it is doing (running, rate, crew), or an empty answer if it cannot say.
   const simStatus = () => { const l = simLive(); try { return l && typeof l.status === 'function' ? l.status() || {} : {}; } catch (e) { return {}; } };
-  const simDo = (what, fn) => { try { return fn(); } catch (e) { console.error('[smokebox] practice mode ' + what + ' failed', e); toast('The practice mode had a problem (' + what + '). Try again. If it keeps happening, reload the page.', 'bad'); return undefined; } };
+  const simDo = (what, fn) => { try { return fn(); } catch (e) { console.error('[smokebox] demo ' + what + ' failed', e); toast('The demo had a problem (' + what + '). Try again. If it keeps happening, reload the page.', 'bad'); return undefined; } };
   // The kitchen clock speed (1 is real time).
   const speedNow = () => (SB.store.speed ? SB.store.speed() : 1);
 
@@ -1680,12 +1680,12 @@
         toast((typeof n === 'number' ? n : 12) + ' demo tickets sent to the board.', 'ok'); paint();
       } }, ico('zap', 22), h('span', null, 'Add 12-ticket rush'));
       simBox.append(
-        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Automatic orders'), h('p', { class: 'fs-sub' }, 'Practice tickets arrive on the kitchen clock, so a faster clock means faster orders. They are labeled Demo.'), ordersSeg),
-        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A practice cook who works while automatic orders run. Turn it off to practice by hand.'), crewTog),
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Automatic orders'), h('p', { class: 'fs-sub' }, 'Demo tickets arrive on the kitchen clock, so a faster clock means faster orders. They are labeled Demo.'), ordersSeg),
+        h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Auto crew'), h('p', { class: 'fs-sub' }, 'A demo cook who works while automatic orders run. Turn it off to practice by hand.'), crewTog),
         h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Rush'), h('p', { class: 'fs-sub' }, 'Twelve tickets at once, like a lunch rush.'), burstBtn));
     } else {
       simBox.append(h('div', { class: 'fs-note', 'data-tone': 'warn', role: 'status' }, ico('alert', 20),
-        h('div', null, h('strong', null, 'Practice mode not loaded.'), h('p', null, 'Automatic orders, the auto crew, the 12-ticket rush and practice history come from a part of Smokebox that is not in this copy. The clock speed and Reset live data below still work.'))));
+        h('div', null, h('strong', null, 'The demo is not loaded.'), h('p', null, 'Automatic orders, the auto crew, the 12-ticket rush and sample history come from a part of Smokebox that is not in this copy. The clock speed and Reset live data below still work.'))));
     }
 
     // clock
@@ -1693,19 +1693,19 @@
     const clockBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Clock speed (demo only)'), h('p', { class: 'fs-sub' }, 'Speeds up the whole kitchen so you can watch a busy night in a minute. It shows only while the demo is loaded. Never use it in real service.'), clockCtl.el);
     clockCtl.wrap = clockBox; setHidden(clockBox, !demoOn());
 
-    // practice history
+    // sample history
     const sampleBox = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Data counts'));
     const countsDl = h('dl', { class: 'fs-dl dm-counts' });
     const dLive = h('dd', { class: 'num' }), dDemo = h('dd', { class: 'num' }), dSample = h('dd', { class: 'num' });
-    countsDl.append(h('dt', null, 'Live tickets on this device'), dLive, h('dt', null, 'Demo tickets on this device'), dDemo, h('dt', null, 'Practice history'), dSample);
+    countsDl.append(h('dt', null, 'Live tickets on this device'), dLive, h('dt', null, 'Demo tickets on this device'), dDemo, h('dt', null, 'Sample history'), dSample);
     sampleBox.append(countsDl);
     const sim = SB.sim;
     if (sim && typeof sim.setSampleEnabled === 'function' && typeof sim.sampleEnabled === 'function') {
-      // Whether the back office includes the made-up practice history.
-      sampleTog = SB.ui.toggle({ label: 'Include practice history in the back office', checked: !!sim.sampleEnabled(), onChange: (on) => { simDo('practice history', () => sim.setSampleEnabled(on)); paintCounts(); } });
+      // Whether the back office includes the made-up sample history.
+      sampleTog = SB.ui.toggle({ label: 'Include sample history in the back office', checked: !!sim.sampleEnabled(), onChange: (on) => { simDo('sample history', () => sim.setSampleEnabled(on)); paintCounts(); } });
       sampleBox.append(sampleTog);
     }
-    sampleInfoBox = h('p', { class: 'fs-sub dm-sample-note' }, 'Practice history is made by the app, not recorded in your kitchen. It is clearly labeled wherever it appears.');
+    sampleInfoBox = h('p', { class: 'fs-sub dm-sample-note' }, 'Sample history is made by the app, not recorded in your kitchen. It is clearly labeled wherever it appears.');
     sampleBox.append(sampleInfoBox);
 
     // Reset live data asks first (see doReset).
@@ -1716,10 +1716,10 @@
     const restartBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg dm-restart', onClick: () => doRestart() }, ico('refresh', 22), h('span', null, 'Restart demo'));
     const tourBtn = h('button', { type: 'button', class: 'btn btn-lg', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', null, 'Show me how it works'));
     const startBox = h('section', { class: 'fs-section dm-start' }, h('h3', { class: 'fs-h' }, 'Load the demo'),
-      h('p', { class: 'fs-sub' }, 'For practice only. Loads practice food in the cabinet and three practice tickets, and erases what is on this device now. Nothing runs by itself: you tap START and DONE, and the timers show when each dish should begin.'),
+      h('p', { class: 'fs-sub' }, 'Demo only. Loads demo food in the cabinet and three demo tickets, and erases what is on this device now. Nothing runs by itself: you tap Start and Done, and the timers show when each dish should begin.'),
       h('div', { class: 'fs-row' }, restartBtn, tourBtn));
 
-    sheet.body.append(h('div', { class: 'dm' }, h('div', { class: 'fs-note', 'data-tone': 'warn' }, ico('alert', 20), h('div', null, h('strong', null, 'Everything here is for practice.'), h('p', null, 'Demo orders, the auto crew and the 14-day practice history are made by the app for practice. They are not your sales and not your food. Use Reset live data below to go back to real service.'))), statusBox, startBox, simBox, clockBox, sampleBox, resetBox));
+    sheet.body.append(h('div', { class: 'dm' }, h('div', { class: 'fs-note', 'data-tone': 'warn' }, ico('alert', 20), h('div', null, h('strong', null, 'Everything here is for the demo and is not real.'), h('p', null, 'Demo orders, the auto crew and the 14-day sample history are made by the app. They are not your sales and not your food. Use Reset live data below to go back to real service.'))), statusBox, startBox, simBox, clockBox, sampleBox, resetBox));
 
     // Clears the board after a confirm and puts the fresh demo tickets back. Settings stay.
     async function doRestart() {
@@ -1728,7 +1728,7 @@
       const own = s.catalog === 'own' && (s.menu.length > 0 || s.orders.length > 0 || s.tickets.length > 0);
       const ok = await SB.ui.confirm({
         title: 'Restart the demo?', confirmLabel: own ? 'Erase my dishes and restart' : 'Restart demo', cancelLabel: 'Keep everything', tone: real || own ? 'danger' : undefined,
-        body: [(own ? 'This erases YOUR dishes, prices and orders and loads the sample barbecue menu in their place. ' : '') + 'This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (real ? ' (' + real + ' not from the demo)' : '') + ' and everything logged on this device, then puts three fresh practice tickets on the board. Settings stay.'],
+        body: [(own ? 'This erases your dishes, prices and orders and loads the sample barbecue menu in their place. ' : '') + 'This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (real ? ' (' + real + ' not from the demo)' : '') + ' and everything logged on this device, then puts three fresh demo tickets on the board. Settings stay.'],
       });
       if (!ok) return;
       if (SB.tour && SB.tour.running && SB.tour.running() && SB.tour.stop) SB.tour.stop();
@@ -1739,12 +1739,12 @@
       closeThen(sheet, () => { if (SB.router && SB.router.go) SB.router.go({ kind: 'floor', zone: 'all' }); });
     }
 
-    // Clears tickets, batches and events on this device after a confirm. Settings and practice history stay.
+    // Clears tickets, batches and events on this device after a confirm. Settings and sample history stay.
     async function doReset() {
       const s = st(), demo = s.tickets.filter((t) => t.src === 'demo').length;
       const ok = await SB.ui.confirm({
         title: 'Reset live data?', tone: 'danger', confirmLabel: 'Reset live data', cancelLabel: 'Keep everything',
-        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and practice history stay. This cannot be undone.'],
+        body: ['This clears ' + s.tickets.length + ' ' + plural(s.tickets.length, 'ticket') + (demo ? ' (' + demo + ' demo)' : '') + ', ' + s.batches.length + ' ' + plural(s.batches.length, 'batch', 'batches') + ' and the event log, and sets the clock back to real time.', 'Settings and sample history stay. This cannot be undone.'],
       });
       if (!ok) return;
       if (live && typeof live.stop === 'function') simDo('stop', () => live.stop());
@@ -1757,7 +1757,7 @@
     function paintStatus() {
       const sp = speedNow(), s = simStatus();
       let tone = 'info', icon = 'info', words;
-      if (!live) { tone = 'warn'; icon = 'alert'; words = 'Practice mode is not loaded, so there are no automatic orders.'; }
+      if (!live) { tone = 'warn'; icon = 'alert'; words = 'The demo is not loaded, so there are no automatic orders.'; }
       else if (s.running) { tone = 'ok'; icon = 'play'; words = 'Demo running: ' + (RATE_WORD[s.rate] || 'orders') + '. ' + (U.isNum(s.sent) ? s.sent + ' sent, ' + (s.completed || 0) + ' finished.' : '') + (s.crew ? ' Auto crew on.' : ' Auto crew off.'); }
       else { words = 'Demo is off. The board shows only real tickets' + (st().tickets.some((t) => t.src === 'demo') ? ' and the demo tickets already on it.' : '.'); }
       if (sp !== 1) words += ' Clock x' + (Math.round(sp * 100) / 100) + '.';
@@ -1849,7 +1849,7 @@
         helpItem('history', 'Recall', 'Brings a bumped ticket back. Open Recall, find the ticket and tap Recall.'),
         helpItem('list', 'The all-day bar', 'Counts what is still to make across every ticket. Tap an item to highlight it on the board.'),
         helpItem('thermometer', 'Hold cabinet', 'Log a temperature when food goes in and at every check. Smokebox warns before a batch runs out of time and locks one that has.'),
-        helpItem('ban', '86 board', 'Marks an item sold out. It also goes 86 by itself when stock runs low or a batch is locked for safety.'),
+        helpItem('ban', '86 board', 'Marks an item sold out. It also goes 86 by itself when stock runs low or a batch is held back.'),
       ]));
   }
 
@@ -1879,7 +1879,7 @@
       h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Availability'),
         h('ul', { class: 'hp-words' },
           wordRow(stateEl('bad', 'ban', '86 sold out'), 'An ingredient has run down to its 86 level.'),
-          wordRow(stateEl('bad', 'ban', '86 safety hold'), 'The only batch is locked for safety: too old, too cold or too warm.'),
+          wordRow(stateEl('bad', 'ban', '86 safety hold'), 'The only batch is held back: too old, too cold or too warm.'),
           wordRow(stateEl('bad', 'ban', '86 past quality limit'), 'The only batch is past its quality limit and waits until someone tastes it. Keep it serving or throw it out in the hold cabinet.'),
           wordRow(stateEl('bad', 'ban', '86 manual'), 'Someone marked it 86 on the 86 board.'))),
       h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Hold cabinet'),
@@ -1931,12 +1931,12 @@
   function helpAbout(sheet) {
     return h('div', { class: 'hp-pane' },
       helpList([
-        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for a BBQ line: tickets, paced start times, a hold cabinet and an 86 board.'),
+        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants that cook food ahead: tickets, paced start times, a hold cabinet and a sold-out list.'),
         helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
         helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
-        helpItem('info', 'Channel sync is for practice only', 'There is no live POS or delivery app connected. The 86 board shows how a real sync would look and says so.'),
+        helpItem('info', 'Channel sync is for the demo only', 'There is no live POS or delivery app connected. The 86 board shows how a real sync would look and says so.'),
         helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
-        helpItem('sparkle', 'Demo and practice data', 'Demo tickets and the practice history are made by the app. They are labeled wherever they appear.'),
+        helpItem('sparkle', 'Demo and sample data', 'Demo tickets and the sample history are made by the app. They are labeled wherever they appear.'),
       ]),
       h('div', { class: 'fs-row hp-links' },
         // All three buttons close Help first, so only one sheet is ever open.
@@ -2071,9 +2071,9 @@
       sec('Honest notes',
         helpList([
           helpItem('sun', 'Not tested in real sunlight', 'Contrast is calculated from colors. It has not been measured on a screen in daylight, on a greasy glass, or through gloves.'),
-          helpItem('info', 'Practice channels', 'There is no live POS or delivery connection. The 86 sync strip is practice only and says so.'),
+          helpItem('info', 'Demo channels', 'There is no live POS or delivery connection. The 86 sync strip is for the demo only and says so.'),
           helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
-          helpItem('sparkle', 'Practice data', 'Demo tickets and the practice history are made by the app.'),
+          helpItem('sparkle', 'Demo and sample data', 'Demo tickets and the sample history are made by the app.'),
           helpItem('shield', 'Local rules win', C.safetyLine),
         ]))));
 
