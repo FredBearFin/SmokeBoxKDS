@@ -30,6 +30,10 @@ Sold out or off the menu. The **86 board** lists what is out and why.
 
 A number that came with the app, such as a prep time or a cost. It is a guess until you replace it with your own.
 
+## Does Smokebox know how long cold food may keep?
+
+No. For cold food in a fridge you type the days it may stay and the hours it may be out. Smokebox counts against those numbers. Use the limits your local health department gives you.
+
 ## Why is there no Cabinet tab?
 
 The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Settings**, then **Dishes and prices**, and tap **Yes, I cook ahead**.

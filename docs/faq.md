@@ -1,4 +1,4 @@
-<!-- Generated from docs/sop/16-questions-and-answers.md by tools/build-guide.mjs. Edit that file, then run the tool. -->
+<!-- Generated from docs/sop/17-questions-and-answers.md by tools/build-guide.mjs. Edit that file, then run the tool. -->
 
 # Questions and answers
 
@@ -31,6 +31,10 @@ Sold out or off the menu. The **86 board** lists what is out and why.
 ## What is a starter estimate?
 
 A number that came with the app, such as a prep time or a cost. It is a guess until you replace it with your own.
+
+## Does Smokebox know how long cold food may keep?
+
+No. For cold food in a fridge you type the days it may stay and the hours it may be out. Smokebox counts against those numbers. Use the limits your local health department gives you.
 
 ## Why is there no Cabinet tab?
 
