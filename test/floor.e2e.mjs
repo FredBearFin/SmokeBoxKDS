@@ -137,7 +137,7 @@ await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
   check('the board starts on All', h.sel === 'all');
 
   const ord = await page.evaluate(() => T.order());
-  check('slip order: rush first, then oldest', JSON.stringify(ord) === JSON.stringify(['Drive-thru 7', 'Table 4', 'Pickup, Dana', 'Walk-up']), ord);
+  check('slip order: overdue first, then rush, then oldest', JSON.stringify(ord) === JSON.stringify(['Table 4', 'Drive-thru 7', 'Pickup, Dana', 'Walk-up']), ord);
   const lv = await page.evaluate(() => ['Table 4', 'Pickup, Dana', 'Drive-thru 7', 'Walk-up'].map((c) => { const s = T.slip(c); const bw = s.querySelector('.fl-badge .fl-bw'); return s.dataset.level + '|' + (bw.offsetParent ? bw.textContent.replace(/ \+\d+ min$/, '') : '(hidden)') + '|' + s.querySelector('.slip-timer').dataset.level + '|' + s.dataset.rush; }));
   // The "On time" badge is hidden for everyone on purpose (a quiet board); only Overdue and Running late are spoken.
   check('time state: Overdue / Running late with words, On time says nothing', JSON.stringify(lv) === JSON.stringify(['breach|Overdue|breach|false', 'warn|Running late|warn|false', 'ok|(hidden)|ok|true', 'ok|(hidden)|ok|false']), lv);
@@ -272,10 +272,10 @@ await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
   check('slip overflow menu offers Rush, Recall and Void ticket', menuItems.some((t) => /rush/i.test(t)) && menuItems.some((t) => /Recall/.test(t)) && menuItems.includes('Void ticket'), menuItems);
   await page.locator('.menu-item', { hasText: 'Make it a rush' }).click(); await settle(page, 250);
   const rushed = await page.evaluate(() => ({ order: T.order(), stamp: !!T.slip('Walk-up').querySelector('.stamp'), toast: T.toast() }));
-  check('making a ticket a rush moves it up behind the older rush ticket and stamps it', rushed.order[0] === 'Drive-thru 7' && rushed.order[1] === 'Walk-up' && rushed.stamp, rushed);
+  check('making a ticket a rush moves it up behind the overdue and older rush tickets and stamps it', rushed.order[0] === 'Table 4' && rushed.order[1] === 'Drive-thru 7' && rushed.order[2] === 'Walk-up' && rushed.stamp, rushed);
   await page.locator('.fl-slip[data-ticket="' + await page.evaluate(() => T.id('Walk-up')) + '"] button[data-act="more"]').click();
   await page.locator('.menu-item', { hasText: 'Take off rush' }).click(); await settle(page, 250);
-  check('taking the rush off puts it back in age order', JSON.stringify(await page.evaluate(() => T.order())) === JSON.stringify(['Drive-thru 7', 'Table 4', 'Pickup, Dana', 'Walk-up']), await page.evaluate(() => T.order()));
+  check('taking the rush off puts it back in age order', JSON.stringify(await page.evaluate(() => T.order())) === JSON.stringify(['Table 4', 'Drive-thru 7', 'Pickup, Dana', 'Walk-up']), await page.evaluate(() => T.order()));
 
   // bump with undone items asks first
   await page.locator('.fl-slip[data-ticket="' + await page.evaluate(() => T.id('Walk-up')) + '"] button[data-act="bump"]').click(); await settle(page, 200);

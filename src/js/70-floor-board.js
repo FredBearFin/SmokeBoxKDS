@@ -973,7 +973,8 @@
       want.push(rec);
     }
     for (const rec of Array.from(m.slips.values())) if (!seen.has(rec.id)) removeSlip(rec);
-    reorder(m.grid, want.map((r) => r.el));
+    m.want = want;
+    reorder(m.grid, lateFirst(want).map((r) => r.el));
     // Slips present at the first draw just appear; later arrivals print in.
     if (!m.first && added.length) added.forEach((rec, i) => printIn(rec, i));
     else added.forEach((rec) => { if (m.io) m.io.observe(rec.el); });
@@ -1407,9 +1408,16 @@
     }
   }
 
+  // The slips with the overdue ones first (most overdue first) and the rest in the store's order. The page order is
+  // this order, so keyboard and screen reader users meet the worst ticket first, just as the eye does.
+  function lateFirst(recs) {
+    const late = recs.filter((r) => r.overMs > 0).sort((a, b) => (b.overMs - a.overMs) || (a.num - b.num));
+    return late.concat(recs.filter((r) => !(r.overMs > 0)));
+  }
   // Ranks the overdue slips, most overdue first, and tells the stylesheet: data-tier 1 for the worst slip, 2 for the
-  // next two, 3 for the rest, and a CSS order so the worst sit first on the board without moving any node.
-  // WATCH OUT: it only edits attributes and styles, and only when a rank changed.
+  // next two, 3 for the rest. When the ranking changes the slips are also moved in the page, so the reading order
+  // matches what is drawn; a focused control keeps its focus.
+  // WATCH OUT: it only edits attributes and the slip order, and only when something changed.
   function rankOverdue() {
     const late = [];
     for (const rec of m.slips.values()) if (rec.overMs > 0) late.push(rec);
@@ -1419,12 +1427,17 @@
       ranked.add(rec);
       const tier = i === 0 ? '1' : i < 3 ? '2' : '3';
       if (rec.tier !== tier) { rec.tier = tier; rec.el.dataset.tier = tier; }
-      const ord = String(i - 1000);
-      if (rec.ord !== ord) { rec.ord = ord; rec.el.style.order = ord; }
     });
     for (const rec of m.slips.values()) {
       if (ranked.has(rec) || !rec.tier) continue;
-      rec.tier = ''; rec.ord = ''; delete rec.el.dataset.tier; rec.el.style.removeProperty('order');
+      rec.tier = ''; delete rec.el.dataset.tier;
+    }
+    const key = late.map((r) => r.id).join(',');
+    if (key !== m.lateKey && m.want) {
+      m.lateKey = key;
+      const keep = document.activeElement, had = keep && m.grid.contains(keep);
+      reorder(m.grid, lateFirst(m.want.filter((r) => m.slips.get(r.id) === r)).map((r) => r.el));
+      if (had && document.activeElement !== keep) { try { keep.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
     }
     // Late slips on screen right now, for the header and for tests.
     m.lateCount = late.length;
