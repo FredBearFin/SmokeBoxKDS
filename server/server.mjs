@@ -25,21 +25,37 @@ async function loadEngine() {
   return globalThis.SB;
 }
 
-// Reads the saved JSON file and checks it with the engine's validateBackup; returns { state, seq } or null.
+// Reads the saved JSON file and checks it with the engine's validateBackup. Returns { state, seq }, or { none: true } when there is no file, or
+// { problem } when the file is damaged. A file that is not valid JSON, or not a kitchen at all, is renamed to <file>.bad-<time> (it is never
+// written over); if that cannot be done this throws, so the hub does not start. A file from a different version (for example a newer format after a
+// rollback) is left exactly as it is and this throws, so nothing ever replaces data a newer build could still read.
 function loadSaved(E, file) {
-  if (!file || !fs.existsSync(file)) return null;
-  try {
-    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!file || !fs.existsSync(file)) return { none: true };
+  let text;
+  try { text = fs.readFileSync(file, 'utf8'); } catch (e) { throw new Error('The saved file ' + file + ' cannot be read (' + e.message + '). The hub will not start so nothing is overwritten.'); }
+  let saved = null;
+  try { saved = JSON.parse(text); } catch (e) { saved = null; }
+  let why = 'unreadable';
+  if (saved !== null && typeof saved === 'object') {
     const v = E.validateBackup(saved.state);
-    if (!v.ok) { console.warn('[hub] saved file refused: ' + v.error); return null; }
-    return { state: v.state, seq: Number.isInteger(saved.seq) ? saved.seq : 0 };
-  } catch (e) { console.warn('[hub] saved file unreadable: ' + e.message); return null; }
+    if (v.ok) return { state: v.state, seq: Number.isInteger(saved.seq) ? saved.seq : 0 };
+    if (/^unsupported version \d/.test(v.error || '')) throw new Error('The saved file ' + file + ' was written by a different version (' + v.error + '). It was left untouched and the hub will not start. Start the build that wrote it, or move the file away on purpose.');
+    why = 'not a valid kitchen (' + v.error + ')';
+  }
+  const bad = file + '.bad-' + new Date().toISOString().replace(/[:.]/g, '-');
+  try { fs.renameSync(file, bad); } catch (e) { throw new Error('The saved file ' + file + ' is ' + why + ' and could not be set aside (' + e.message + '). The hub will not start so nothing is overwritten.'); }
+  console.warn('[hub] saved file ' + why + '; kept as ' + bad + ' and starting with an empty kitchen');
+  return { problem: { words: 'The saved file was ' + why + ', so it was set aside as ' + path.basename(bad) + ' and the hub started with an empty kitchen.', kept: path.basename(bad) } };
 }
 
-// Writes state and seq to the JSON file through a temp file and a rename, so a crash never leaves half a file.
-function writeSaved(file, state, seq) {
+// Writes state and seq to the JSON file through a temp file and a rename, so a crash never leaves half a file. The temp file is flushed to disk
+// first, and at most every bakEveryMs the file being replaced is copied to <file>.bak.
+let lastBak = 0;
+function writeSaved(file, state, seq, bakEveryMs) {
   const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify({ v: 1, seq, state }));
+  const fd = fs.openSync(tmp, 'w');
+  try { fs.writeSync(fd, JSON.stringify({ v: 1, seq, state })); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  if (Date.now() - lastBak >= bakEveryMs && fs.existsSync(file)) { try { fs.copyFileSync(file, file + '.bak'); lastBak = Date.now(); } catch (e) { /* the save itself still goes ahead */ } }
   fs.renameSync(tmp, file);
 }
 
@@ -51,7 +67,12 @@ export async function createHub(opts = {}) {
   const tickMs = opts.tickMs ?? 1000, heartbeatMs = opts.heartbeatMs ?? 15000, saveMs = opts.saveMs ?? 500;
   const htmlFile = opts.htmlFile || process.env.SMOKEBOX_HTML || path.join(ROOT, 'dist/smokebox.html');
   const dataFile = opts.dataFile === undefined ? process.env.SMOKEBOX_DATA : opts.dataFile;
-  const saved = loadSaved(E, dataFile);
+  const loaded = loadSaved(E, dataFile);
+  const saved = loaded.state ? loaded : null;
+  const dataProblem = loaded.problem || null;
+  const bakEveryMs = opts.bakEveryMs ?? 10 * 60e3;
+  const maxBacklog = opts.maxClientBacklog ?? 4 * 1024 * 1024;
+  const startedAt = Date.now();
   let state = saved ? saved.state : E.newState({ now: now(), starter: opts.starter ?? process.env.SMOKEBOX_STARTER === '1' });
   let seq = saved ? saved.seq : 0;
   const clients = new Set();
@@ -76,17 +97,23 @@ export async function createHub(opts = {}) {
   // Writes the file right now if anything changed since the last write.
   function flush() {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-    if (dataFile && dirty) { dirty = false; try { writeSaved(dataFile, state, seq); } catch (e) { console.warn('[hub] save failed: ' + e.message); } }
+    if (dataFile && dirty) { dirty = false; try { writeSaved(dataFile, state, seq, bakEveryMs); } catch (e) { console.warn('[hub] save failed: ' + e.message); } }
   }
   // Builds the message every screen gets: the whole state, the hub clock and the change counter.
   // opIds lists the actions in the recent log, so a screen knows which of its own unconfirmed actions are already in this state.
   const view = (extra) => Object.assign({ state, serverNow: now(), seq, opIds: ops.map((o) => o.opId).filter(Boolean) }, extra || {});
   // Sends one server-sent event (a named message with a JSON body) to one connected screen.
   const send = (res, event, data) => res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n');
+  // Sends to one screen unless it has stopped reading: a screen whose unsent backlog passes the cap is cut off (it reconnects and gets a fresh copy), so a
+  // sleeping tablet with a half-open connection can never make the hub's memory grow without end.
+  function sendOrDrop(res, event, data) {
+    if (res.writableLength > maxBacklog) { clients.delete(res); res.destroy(); return; }
+    send(res, event, data);
+  }
   // Counts one more change, tells every connected screen, and queues a save.
   function changed(extra) {
     seq++;
-    for (const res of clients) send(res, 'state', view(extra));
+    for (const res of Array.from(clients)) sendOrDrop(res, 'state', view(extra));
     scheduleSave();
   }
 
@@ -142,6 +169,12 @@ export async function createHub(opts = {}) {
   // Answers one HTTP request: the page, the event stream, or an action.
   function handle(req, res) {
     const url = (req.url || '/').split('?')[0];
+    // Health for an owner's monitor and the updater: no secrets; counts only. dataProblem appears only when the saved file had to be set aside.
+    if ((req.method === 'GET' || req.method === 'HEAD') && url === '/health') {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+      res.end(req.method === 'HEAD' ? undefined : JSON.stringify(Object.assign({ ok: true, seq, screens: clients.size, uptime: Math.floor((Date.now() - startedAt) / 1000) }, dataProblem ? { dataProblem: dataProblem.words + ' (' + dataProblem.kept + ')' } : {})));
+      return;
+    }
     if (req.method === 'GET' && url === '/events') {
       if (clients.size >= MAX_CLIENTS) { res.writeHead(503, { 'content-type': 'text/plain', 'retry-after': '10' }); res.end('too many screens connected'); return; }
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', connection: 'keep-alive' });
@@ -200,7 +233,7 @@ export async function createHub(opts = {}) {
       const t = E.tick(state, now());
       if (t.state !== state) { state = t.state; changed({ type: 'tick' }); }
     }, tickMs);
-    hbTimer = setInterval(() => { for (const res of clients) send(res, 'hb', { serverNow: now(), seq }); }, heartbeatMs);
+    hbTimer = setInterval(() => { for (const res of Array.from(clients)) sendOrDrop(res, 'hb', { serverNow: now(), seq }); }, heartbeatMs);
     return new Promise((resolve) => server.listen(port, host, () => resolve(server.address().port)));
   }
   // Stops timers, ends every stream, writes the file one last time and closes the server.
@@ -213,12 +246,13 @@ export async function createHub(opts = {}) {
   }
   // Returns the current state, hub clock and change counter (used by tests).
   function snapshot() { return view(); }
-  return { server, listen, close, flush, snapshot };
+  return { server, listen, close, flush, snapshot, dataProblem, clientCount: () => clients.size };
 }
 
 // Command line start: reads PORT and HOST, prints the address, and saves on Ctrl-C.
 async function main() {
-  const hub = await createHub();
+  let hub;
+  try { hub = await createHub(); } catch (e) { console.error('[hub] ' + e.message); process.exit(1); }
   const port = await hub.listen(Number(process.env.PORT || 8787), process.env.HOST || '127.0.0.1');
   console.log('[hub] Smokebox prototype hub on http://' + (process.env.HOST || '127.0.0.1') + ':' + port + ' (time zone ' + (process.env.TZ || 'system') + ')');
   // Closes the hub cleanly (saving the file) and exits the process.

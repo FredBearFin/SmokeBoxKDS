@@ -69,7 +69,7 @@ test('start over clears the draft', () => {
   clock = T;
   const b = backend(); start(b); S.dispatch('addMenuItem', { name: 'Pie', zone: 'cold', cat: 'cold', price: 4, prepSec: 30, track: 'one' });
   S.saveDraft({ customer: 'x' });
-  assert.equal(S.startOver({ confirm: S.START_OVER_WORD }).ok, true);
+  assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: S.START_OVER_WORD }).ok, true);
   assert.equal(S.loadDraft(), null); S.destroy();
 });
 
@@ -291,9 +291,9 @@ test('meal pacing is off for a new empty kitchen and unchanged for existing kitc
   const b = backend(); start(b);
   try {
     S.dispatch('updateSettings', { patch: { pacing: { enabled: true } } });                  // the owner turns it on in a new kitchen
-    assert.equal(S.startOver({ confirm: S.START_OVER_WORD, keepSettings: true }).ok, true);
+    assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: S.START_OVER_WORD, keepSettings: true }).ok, true);
     assert.equal(S.getState().settings.pacing.enabled, true);                                // kept with the settings
-    assert.equal(S.startOver({ confirm: S.START_OVER_WORD, keepSettings: false }).ok, true);
+    assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: S.START_OVER_WORD, keepSettings: false }).ok, true);
     assert.equal(S.getState().settings.pacing.enabled, false);                               // a fresh start is off again
   } finally { S.destroy(); }
 });

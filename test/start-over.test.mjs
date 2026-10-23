@@ -40,14 +40,14 @@ test('start over is refused without the typed word, in the demo, and with bad op
   const b = backend(); busyKitchen(b);
   try {
     const before = body(S.getState()), writes = b.log.length;
-    for (const confirm of [undefined, '', 'erase it', 'yes', 5, 'ERASE!']) { const r = S.startOver({ confirm }); assert.equal(r.ok, false, String(confirm)); assert.equal(r.report, 'confirmWord'); }
+    for (const confirm of [undefined, '', 'erase it', 'yes', 5, 'ERASE!']) { const r = S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm }); assert.equal(r.ok, false, String(confirm)); assert.equal(r.report, 'confirmWord'); }
     assert.equal(S.startOver().report, 'confirmWord');
-    assert.equal(S.startOver({ confirm: WORD, keepSettings: 'no' }).report, 'badPatch');
+    assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: WORD, keepSettings: 'no' }).report, 'badPatch');
     assert.equal(body(S.getState()), before); assert.equal(b.log.length, writes);
     assert.match(E.describe('confirmWord'), /Type the confirmation word/);
   } finally { S.destroy(); cleanNames(); }
   const d = backend(); start(d, 'demo');
-  const r = S.startOver({ confirm: WORD });
+  const r = S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: WORD });
   assert.deepEqual([r.ok, r.report], [false, 'notInDemo']); assert.equal(d.log.length, 0);
   S.destroy();
 });
@@ -58,7 +58,7 @@ test('start over takes a backup first, clears everything, keeps settings, and is
   try {
     const pre = S.getState(), preBody = body(pre);
     assert.ok(pre.menu.length >= 21 && pre.orders.length === 6);
-    const r = S.startOver({ confirm: ' erase ' });                  // any case, spaces around are fine
+    const r = S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: ' erase ' });                  // any case, spaces around are fine
     assert.equal(r.ok, true); assert.equal(r.report, 'ok');
     assert.ok(r.backup.text.length > 1000 && /\.json$/.test(r.backup.filename) && r.backup.mime === 'application/json');
     assert.equal(JSON.parse(r.backup.text).mode, 'real');
@@ -87,7 +87,7 @@ test('start over with settings reset also clears tax, PIN, hours and station nam
   clock = T;
   const b = backend(); busyKitchen(b);
   try {
-    const r = S.startOver({ confirm: WORD, keepSettings: false });
+    const r = S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: WORD, keepSettings: false });
     assert.equal(r.ok, true);
     const s = S.getState();
     assert.deepEqual([s.settings.service.taxRatePct, s.settings.office.pinHash, s.settings.service.openHour], [0, null, 11]);
@@ -108,7 +108,7 @@ test('start over never reads, writes or removes the demo\'s keys', () => {
   b.log.length = 0;
   start(b, 'real', { blank: false });
   try {
-    assert.equal(S.startOver({ confirm: WORD }).ok, true);
+    assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: WORD }).ok, true);
     S.flush();
     assert.deepEqual(b.log.filter((x) => x[1].indexOf('smokebox.demo.') === 0), []);
     for (const [k, v] of demoKeys) assert.equal(b.m.get(k), v, k);
@@ -124,7 +124,7 @@ test('every old save: start over, then restoring the backup recovers the whole k
     start(b);
     try {
       const pre = body(S.getState());
-      const r = S.startOver({ confirm: WORD });
+      const r = S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: WORD });
       assert.equal(r.ok, true, f);
       assert.equal(S.isBlank(), true, f); assert.deepEqual(E.checkInvariants(S.getState(), S.now()), [], f);
       assert.equal(S.importAll(r.backup.text), 'ok', f);
@@ -158,7 +158,7 @@ test('random work, start over, more random work: invariants hold and the backup 
       };
       work(40);
       const pre = body(S.getState());
-      const r = S.startOver({ confirm: WORD, keepSettings: rnd() < 0.5 });
+      const r = S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: WORD, keepSettings: rnd() < 0.5 });
       assert.equal(r.ok, true, 'seed ' + seed);
       assert.equal(S.isBlank(), true);
       work(30);
@@ -308,11 +308,11 @@ test('a new empty kitchen gets neutral station and section names; old kitchens, 
     cleanNames();
     // start over with settings reset puts the neutral names back instead of the barbecue ones
     const b2 = backend(); busyKitchen(b2);
-    assert.equal(S.startOver({ confirm: WORD, keepSettings: false }).ok, true);
+    assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: WORD, keepSettings: false }).ok, true);
     assert.equal(zoneNames(), 'Kitchen|Prep|Fryer|Cold and drinks|Expo'); S.destroy();
     cleanNames();
     const b3 = backend(); busyKitchen(b3);
-    S.startOver({ confirm: WORD, keepSettings: true });
+    S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: WORD, keepSettings: true });
     assert.equal(C.zoneById.pit.name, 'Smoker'); S.destroy();                                            // kept names stay
   } finally { cleanNames(); }
   assert.deepEqual([zoneNames(), catNames()], orig);

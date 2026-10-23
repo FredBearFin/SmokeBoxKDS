@@ -109,8 +109,8 @@ test('the data file is written only at its own path and an unreadable or hostile
   await post(port, { type: 'createTicket', payload: { items: [{ menuId: 'brisket_half' }] } });
   hub.flush();
   const files = fs.readdirSync(dir);
-  assert.ok(files.every((f) => f === 'state.json' || f === 'state.json.tmp'), 'only the data file and its temp: ' + files);
-  JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.ok(files.every((f) => f === 'state.json' || f === 'state.json.tmp' || f === 'state.json.bak' || /^state\.json\.bad-/.test(f)), 'only the data file, its temp, its backup and the set-aside copy: ' + files);
+  if (fs.existsSync(file)) JSON.parse(fs.readFileSync(file, 'utf8'));   // the damaged file was set aside, so a file exists only once something was saved
 });
 
 test('a replayed opId is answered, not applied twice, even under 200 parallel duplicates', async () => {
