@@ -60,6 +60,45 @@ async function boot(ctx, query) {
   check('Hold sheet does not stick out at 280 px with Large text', w.over <= 0 && w.sw <= 280, w);
   await ctx.close();
 }
+
+// Cabinet card for a cold item kept in a fridge (needs the engine's cold-item model; skipped without it)
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const p = await boot(ctx);
+  const has = await p.evaluate(() => typeof SB.engine.coldInfo === 'function');
+  if (!has) console.log('  skip  cold item card: the engine has no cold-item model');
+  else {
+    await p.evaluate(() => {
+      SB.floor.setWelcome(false);
+      SB.store.dispatchEx('updateSettings', { patch: { modules: { cookAhead: true } } }, { source: 'ui' });
+      SB.store.dispatchEx('addIngredient', { name: 'Chicken salad', tcs: true, hold: 'cold', fridge: true, fridgeDays: 3, outHours: 2, parG: 2000 }, { source: 'ui' });
+      SB.store.dispatchEx('addIngredient', { name: 'Slaw', tcs: true, hold: 'cold', fridge: true, parG: 2000 }, { source: 'ui' });
+      SB.store.dispatchEx('addIngredient', { name: 'Gravy', tcs: true, hold: 'hot', parG: 2000 }, { source: 'ui' });
+      const ing = SB.store.getState().ingredients;
+      ing.forEach((i) => { if (i.tcs) SB.store.dispatchEx('addBatch', { ing: i.id, tempF: i.hold === 'cold' ? 38 : 150, cookedG: 2000, label: i.name + ' batch 1' }, { source: 'ui' }); });
+      SB.sheets.open('hold');
+    });
+    await p.waitForTimeout(900);
+    const card = (n) => p.evaluate((n) => { const c = [...document.querySelectorAll('.hc-card')].find((e) => e.querySelector('.hc-name').textContent.startsWith(n)); return c ? { text: c.innerText, vis: [...c.querySelectorAll('.hc-actions .btn')].filter((b) => b.offsetParent && !b.classList.contains('hc-more')).map((b) => b.textContent.trim()) } : null; }, n);
+    const a = await card('Chicken'), g = await card('Gravy'), sl = await card('Slaw');
+    check('cold card says when it went in the fridge and when it was made', a && /In the fridge since/.test(a.text) && /made/.test(a.text), a);
+    check('cold card main action is Take out', a && a.vis[0] === 'Take out', a);
+    check('cold card shows the out-of-fridge limit in words, not as a rule', a && /out of your 2 h limit|Not taken out yet/.test(a.text) && !/must|required|law/i.test(a.text), a && a.text);
+    check("hot card is unchanged (no Take out, no fridge wording)", g && !/Take out|fridge/i.test(g.text) && g.vis[0] === "Log temp", g);
+    check('blank limit says no limit set', sl && /no limit set/i.test(sl.text), sl && sl.text);
+    await p.click('.hc-card:has(.hc-name:text-matches("^Chicken")) [data-act="take-out"]');
+    await p.waitForTimeout(500);
+    if (await p.locator('input[aria-label="Your initials"]').count()) { await p.fill('input[aria-label="Your initials"]', 'FW'); await p.click('[role="dialog"]:has-text("Who is this") button:has-text("Take out")');  await p.waitForTimeout(600); }
+    const b = await card('Chicken');
+    check('after Take out the main action is Put back and the clock reads out time', b && b.vis[0] === 'Put back' && /out of your 2 h limit/i.test(b.text), b);
+    await p.screenshot({ path: process.env.SHOT_DIR ? process.env.SHOT_DIR + '/cold-card.png' : '/tmp/cold-card.png' });
+    await p.click('.hc-card:has(.hc-name:text-matches("^Chicken")) [data-act="put-back"]');
+    await p.waitForTimeout(600);
+    const c = await card('Chicken');
+    check('after Put back the main action is Take out again', c && c.vis[0] === 'Take out', c);
+  }
+  await ctx.close();
+}
 check('no page errors', errs.length === 0, errs);
 await browser.close();
 console.log(fail ? fail + ' check(s) failed' : 'all checks passed');
