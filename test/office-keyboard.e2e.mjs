@@ -219,6 +219,86 @@ await withPage({ w: 1280, h: 900, hash: '' }, async (page, logs) => {
   check('the confirm button stays off until the word is typed', erase.confirmOff, erase);
   await page.keyboard.press('Escape'); await page.waitForTimeout(300);
   check('Escape closes the erase box and focus returns to the erase button', await page.evaluate(() => { const box = document.querySelector('.od-danger-box'); return (!box || box.hidden) && document.activeElement && document.activeElement.getAttribute('data-action') === 'reset-live'; }), await page.evaluate(() => { const e = document.activeElement; return e ? e.tagName + '.' + e.className : null; }));
+
+  // ---- the restore confirmation dialog: opened from the Data page's "Replace everything with this backup" ----
+  const sheetInside = (name) => page.evaluate((n) => { const d = document.querySelector('.sheet[role=alertdialog], .sheet[role=dialog]'); return { open: !!d, inside: !!d && d.contains(document.activeElement), danger: !!d && !!document.activeElement && document.activeElement.classList.contains('btn-danger') }; });
+  const backup = await page.evaluate(() => SB.store.exportAll());
+  const ticketsBefore = await page.evaluate(() => SB.store.getState().tickets.length);
+  await page.evaluate(() => { location.hash = '#/'; }); await page.waitForTimeout(400);
+  await page.evaluate(() => { location.hash = '#/office/data'; });
+  await page.waitForSelector('#od-data input[type="file"]', { state: 'attached', timeout: 15000 });
+  await page.waitForTimeout(600);
+  await page.locator('#od-data input[type="file"]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(backup) });
+  await page.waitForSelector('[data-action="import-replace"]', { timeout: 10000 });
+  await page.evaluate(() => { const b = document.querySelector('[data-action="import-replace"]'); b.scrollIntoView({ block: 'center' }); b.focus(); b.setAttribute('data-opener', '1'); });
+  await page.keyboard.press('Enter'); await page.waitForSelector('.sheet[role=alertdialog]', { timeout: 8000 }).catch(() => {}); await page.waitForTimeout(400);
+  let d1 = await sheetInside();
+  check('Restore confirmation: Enter on "Replace everything" opens the dialog and focus moves inside', d1.open && d1.inside, d1);
+  check('Restore confirmation: focus does not start on the destructive button', !d1.danger, d1);
+  let leak = 0; for (let i = 0; i < 20; i++) { await page.keyboard.press('Tab'); if (!(await sheetInside()).inside) leak++; }
+  for (let i = 0; i < 4; i++) { await page.keyboard.press('Shift+Tab'); if (!(await sheetInside()).inside) leak++; }
+  check('Restore confirmation: Tab and Shift+Tab stay inside the dialog', leak === 0, { leak });
+  await page.keyboard.press('Escape'); await page.waitForTimeout(500);
+  check('Restore confirmation: Escape cancels, nothing was replaced, and focus goes back to the button', await page.evaluate((n) => !document.querySelector('.sheet[role=alertdialog]') && SB.store.getState().tickets.length === n && document.activeElement && document.activeElement.getAttribute('data-opener') === '1', ticketsBefore), await page.evaluate(() => { const e = document.activeElement; return e ? e.tagName + '.' + e.className : null; }));
+  // and the keyboard path to confirming works: Enter opens, Tab to the danger button, Enter replaces
+  await page.keyboard.press('Enter'); await page.waitForSelector('.sheet[role=alertdialog]', { timeout: 8000 }); await page.waitForTimeout(300);
+  let reached = false; for (let i = 0; i < 8 && !reached; i++) { await page.keyboard.press('Tab'); reached = (await sheetInside()).danger; }
+  check('Restore confirmation: the destructive button can be reached with Tab', reached);
+  await page.keyboard.press('Enter'); await page.waitForTimeout(1200);
+  check('Restore confirmation: Enter on it restores the backup and closes the dialog', await page.evaluate(() => !document.querySelector('.sheet[role=alertdialog]') && /Backup restored/.test((document.querySelector('.od-impresult') || {}).innerText || '')));
+
+  // ---- the manager PIN keypad ----
+  await page.evaluate(async () => { await SB.shell.setPin('1234'); });
+  await page.evaluate(() => { location.hash = '#/office/data'; }); await page.waitForTimeout(600);
+  const pinInside = () => page.evaluate(() => { const d = [...document.querySelectorAll('.sheet')].find((x) => x.querySelector('.keypad')); return { open: !!d, inside: !!d && d.contains(document.activeElement), label: document.activeElement ? document.activeElement.getAttribute('aria-label') : null }; });
+  await page.evaluate(() => { const b = [...document.querySelectorAll('#od-data button')].find((x) => x.getBoundingClientRect().width > 0 && !x.disabled); b.scrollIntoView({ block: 'center' }); b.setAttribute('data-opener', '1'); b.focus(); window.__pin = null; SB.shell.promptPin().then((r) => { window.__pin = r; }); });
+  await page.waitForSelector('.keypad', { timeout: 8000 }); await page.waitForTimeout(400);
+  let pk = await pinInside();
+  check('PIN keypad: it opens with focus on the first key ("' + pk.label + '")', pk.open && pk.inside && pk.label === 'Digit 1', pk);
+  const keyNames = await page.evaluate(() => [...document.querySelectorAll('.keypad button')].map((b) => ({ vis: b.innerText.trim(), name: b.getAttribute('aria-label') })));
+  check('PIN keypad: all 12 keys have a spoken name that contains the digit drawn on them', keyNames.length === 12 && keyNames.every((k) => k.name && (!k.vis || k.name.includes(k.vis) || k.name.toLowerCase().includes(k.vis.toLowerCase()))), keyNames);
+  let pleak = 0; for (let i = 0; i < 30; i++) { await page.keyboard.press('Tab'); if (!(await pinInside()).inside) pleak++; }
+  for (let i = 0; i < 4; i++) { await page.keyboard.press('Shift+Tab'); if (!(await pinInside()).inside) pleak++; }
+  check('PIN keypad: Tab and Shift+Tab stay inside the sheet', pleak === 0, { pleak });
+  await page.locator('.keypad button').first().focus();
+  for (const k of '1111') await page.keyboard.press(k);
+  await page.waitForTimeout(500);
+  check('PIN keypad: typing a wrong PIN with the keyboard says so in an alert region and keeps the keypad open', await page.evaluate(() => /Wrong PIN\. 4 tries left/.test((document.querySelector('.pin-msg') || {}).textContent || '') && document.querySelector('.pin-msg').getAttribute('role') === 'alert' && !!document.querySelector('.keypad') && window.__pin === null));
+  check('PIN keypad: the entered digits are announced politely ("0 of 4 digits entered")', await page.evaluate(() => { const st = document.querySelector('.sheet [role=status][aria-live=polite]'); return !!st && /\d of 4 digits entered/.test(st.textContent); }));
+  for (const k of '1234') await page.keyboard.press(k);
+  await page.waitForTimeout(700);
+  check('PIN keypad: the right PIN opens the way, closes the keypad and gives focus back', await page.evaluate(() => window.__pin === true && !document.querySelector('.keypad') && document.activeElement && document.activeElement.getAttribute('data-opener') === '1'), await page.evaluate(() => ({ pin: window.__pin, a: document.activeElement && document.activeElement.tagName })));
+  await page.evaluate(() => { window.__pin = null; SB.shell.promptPin().then((r) => { window.__pin = r; }); });
+  await page.waitForSelector('.keypad', { timeout: 8000 }); await page.waitForTimeout(300);
+  await page.keyboard.press('Escape'); await page.waitForTimeout(600);
+  check('PIN keypad: Escape cancels (answer is no) and focus goes back to the opener', await page.evaluate(() => window.__pin === false && !document.querySelector('.keypad') && document.activeElement && document.activeElement.getAttribute('data-opener') === '1'), await page.evaluate(() => ({ pin: window.__pin })));
+  await page.evaluate(async () => { await SB.shell.setPin(null, { verified: true }); });
+
+  // ---- A1's thrown-out log sheet ----
+  await page.evaluate(() => { location.hash = '#/office/safety'; }); await page.waitForTimeout(800);
+  await page.evaluate(() => { const b = document.querySelector('#sb-office button'); b.setAttribute('data-opener', '1'); b.focus(); SB.sheets.open('discards'); });
+  await page.waitForSelector('.sheet .dlog-wrap', { timeout: 8000 }).catch(() => {}); await page.waitForTimeout(500);
+  const dl = () => page.evaluate(() => { const sh = document.querySelector('.dlog-wrap') && document.querySelector('.dlog-wrap').closest('.sheet'); return { open: !!sh, inside: !!sh && sh.contains(document.activeElement) }; });
+  let dlo = await dl();
+  check('Thrown-out log: the sheet opens and focus moves inside', dlo.open && dlo.inside, dlo);
+  let dleak = 0; for (let i = 0; i < 40; i++) { await page.keyboard.press('Tab'); if (!(await dl()).inside) dleak++; }
+  for (let i = 0; i < 4; i++) { await page.keyboard.press('Shift+Tab'); if (!(await dl()).inside) dleak++; }
+  check('Thrown-out log: Tab and Shift+Tab stay inside the sheet', dleak === 0, { dleak });
+  const dnames = await page.evaluate(() => { const sh = document.querySelector('.dlog-wrap').closest('.sheet'); return { unnamed: [...sh.querySelectorAll('button, input, select, textarea')].filter((e) => !(e.getAttribute('aria-label') || (e.innerText || '').trim() || (e.labels && e.labels.length) || e.getAttribute('title'))).map((e) => e.tagName + '.' + String(e.className).split(' ')[0]), th: sh.querySelectorAll('th').length, caption: !!sh.querySelector('caption') }; });
+  check('Thrown-out log: every control in it has a name', dnames.unnamed.length === 0, dnames);
+  await page.keyboard.press('Escape'); await page.waitForTimeout(500);
+  check('Thrown-out log: Escape closes it and focus goes back to where it was', await page.evaluate(() => !document.querySelector('.dlog-wrap') && document.activeElement && document.activeElement.getAttribute('data-opener') === '1'), await page.evaluate(() => { const e = document.activeElement; return e ? e.tagName + '.' + e.className : null; }));
+
+  // ---- the manager glance, drawn the way the wall board draws it ----
+  const gl = await page.evaluate(() => {
+    const host = document.createElement('div'); host.id = 'glance-host'; document.body.appendChild(host);
+    const h = SB.office.glance(host, { size: 'wall' });
+    const ctl = [...host.querySelectorAll('button, a[href], input, select, summary, [tabindex="0"]')];
+    const out = { controls: ctl.length, unnamed: ctl.filter((e) => !(e.getAttribute('aria-label') || (e.innerText || '').trim() || e.getAttribute('title'))).length, live: host.querySelectorAll('[aria-live], [role=status], [role=alert]').length, region: !!host.querySelector('[role=region], section[aria-label], [aria-label]'), text: host.innerText.slice(0, 80) };
+    if (h && h.destroy) h.destroy(); host.remove();
+    return out;
+  });
+  check('Manager glance: every control in it has a name and it has a labelled region (' + gl.controls + ' controls, ' + gl.live + ' live regions)', gl.unnamed === 0 && gl.region, gl);
   check('no console or page errors (sheets)', !logs.errors.length && !logs.pageErrors.length, { e: logs.errors.slice(0, 2), p: logs.pageErrors.slice(0, 2) });
 });
 console.log(notes.length ? '\n' + notes.length + ' notes for others' : '');
