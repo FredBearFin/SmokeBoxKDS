@@ -2013,6 +2013,8 @@
     const st = SB.store && typeof SB.store.hubStatus === 'function' ? SB.store.hubStatus() : null;
     if (!st || st.mode === 'off') return { tone: 'wait', text: 'Connecting...', sub: '', unsent: 0 };
     const n = Math.max(0, Number(st.unsent) || 0);
+    // After a reload with the hub unreachable the board shows the last copy it had; it says so until the first live update.
+    if (st.lastKnown && st.state !== 'connected' && st.state !== 'sending') return { tone: 'wait', text: 'Last known' + (st.lastKnownAt ? ', from ' + U.fmtTime(st.lastKnownAt) : '') + '. Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
     if (st.state === 'offline' || st.state === 'error') return { tone: 'wait', text: 'Offline: your taps are saved and will be sent', sub: n ? n + (n === 1 ? ' tap waiting' : ' taps waiting') : '', unsent: n };
     if (st.state === 'connecting') return { tone: 'wait', text: 'Connecting...', sub: n ? n + ' waiting' : '', unsent: n };
     if (n > 0) return { tone: 'wait', text: 'Sending ' + n + '...', sub: '', unsent: n };
