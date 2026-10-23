@@ -443,3 +443,9 @@ Hub: `POST /action` answers `{ ok, report, info, seq, words? }`; `who` is a scre
 **Brute force.** Five wrong pairing codes lock that address for ten minutes, even for the right code; more than thirty wrong codes from anywhere burn every open code and pause pairing for ten minutes. Behind a reverse proxy all screens share the proxy's address, so the hub-wide limit is the real protection; a burned code only costs the owner one new code. Wrong admin keys lock that address from `/admin/*` only.
 
 **Not covered.** The token travels in a header over whatever the connection is (plain http on a local network is readable by anyone on it); a token cannot be moved to another hub or rotated except by pairing again; the admin key is a file: whoever can read it can pair and remove screens.
+
+### 8.14 Behind a reverse proxy: the client address (branch night/a5-c6)
+
+With `SMOKEBOX_TRUST_PROXY=1` (or the `trustProxy` option) the hub uses the address in the **last** entry of `X-Forwarded-For` for its per-address limits (pairing tries, wrong access codes, wrong admin keys) — but only when the connection itself comes from this computer (127.0.0.1 or ::1). From any other address the header is ignored, so a screen that reaches the hub directly cannot choose its own address; the last entry is the one the proxy added, so a client that writes a header of its own names only itself; an entry that is not an IP address (or a header over 500 characters) is ignored. Off by default: then every request through a proxy counts as 127.0.0.1. Caddy's `reverse_proxy` sets `X-Forwarded-For` to the client address and does not trust one sent by a client unless told to.
+
+**Words.** Text a screen or a cook reads says "the kitchen" or "the main computer", never "hub"; "hub" is for owner and admin text (the command line, these notes), written once as "main computer (the hub)" in the guide.

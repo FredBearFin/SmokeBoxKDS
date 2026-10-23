@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
+import net from 'node:net';
 import { createScreens, WORDS } from './screens.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -364,6 +365,19 @@ export async function createHub(opts = {}) {
   const readOk = (given) => (!followCode && !writeCode) || (!!followCode && codeEq(given, followCode)) || (!!writeCode && codeEq(given, writeCode));
   // True when a writing screen's code is right (no write code set means open).
   const writeOk = (given) => !writeCode || codeEq(given, writeCode);
+  // Behind a reverse proxy every screen reaches the hub from 127.0.0.1. With SMOKEBOX_TRUST_PROXY=1 the real address is read from X-Forwarded-For, but only
+  // when the connection itself comes from this computer (loopback): from anywhere else the header is ignored, so a screen cannot pick its own address. The
+  // last entry is used (the one the proxy added), never the first (which the client can write), and it must be a real IP address.
+  const trustProxy = opts.trustProxy !== undefined ? !!opts.trustProxy : process.env.SMOKEBOX_TRUST_PROXY === '1';
+  // The address used for the per-address limits.
+  function addrOf(req) {
+    const direct = req.socket.remoteAddress || '?';
+    if (!trustProxy || !(direct === '127.0.0.1' || direct === '::1' || direct === '::ffff:127.0.0.1')) return direct;
+    const xff = req.headers['x-forwarded-for'];
+    if (typeof xff !== 'string' || xff.length > 500) return direct;
+    const last = xff.split(',').pop().trim().replace(/^::ffff:/, '');
+    return net.isIP(last) ? last : direct;
+  }
   // Reads the token header and checks it. Returns { screen } (a valid token), { none: true } (no token and none needed), or { fail: { status, report } }.
   function authReq(req) {
     const raw = req.headers['x-smokebox-token'];
@@ -416,7 +430,7 @@ export async function createHub(opts = {}) {
     const cors = followCode || writeCode || requireTokens ? { 'access-control-allow-origin': '*' } : {};
     // Answers a refused follower with a status and a short reason in JSON, then closes the connection.
     const fail = (code, error, extra) => { res.writeHead(code, Object.assign({ 'content-type': 'application/json', connection: 'close' }, cors, extra || {})); res.end(JSON.stringify({ error })); };
-    const who = req.socket.remoteAddress || '?';
+    const who = addrOf(req);
     const vf = versionFail(req);
     if (vf) return refuse(res, vf.status, vf.report, cors);
     const au = authReq(req);
@@ -447,7 +461,7 @@ export async function createHub(opts = {}) {
   function handleProbe(req, res) {
     const q = new URL(req.url, 'http://x').searchParams;
     const cors = followCode || writeCode || requireTokens ? { 'access-control-allow-origin': '*' } : {};
-    const who = req.socket.remoteAddress || '?';
+    const who = addrOf(req);
     // Writes one JSON answer with the given status.
     const answer = (code, body) => { res.writeHead(code, Object.assign({ 'content-type': 'application/json' }, cors)); res.end(JSON.stringify(body)); };
     const vf = versionFail(req);
@@ -472,7 +486,7 @@ export async function createHub(opts = {}) {
     const reply = (code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
     if (!ct.startsWith('application/json') || !sameOrigin) { req.resume(); return reply(!sameOrigin ? 403 : 415, { ok: false, report: 'badPatch', info: { error: 'refused' } }); }
     readJson(req, res, (body) => {
-      const who = req.socket.remoteAddress || '?';
+      const who = addrOf(req);
       const vf = versionFail(req);
       if (vf) return refuse(res, vf.status, vf.report);
       const au = authReq(req);
@@ -502,7 +516,7 @@ export async function createHub(opts = {}) {
   // The pairing routes. /pair exchanges a one-time code for a token. /screen/* is for an owner screen (its token). /admin/* is for the person who runs
   // the hub (the admin key in a bearer header, from the command line). Screens cannot reach /admin/*.
   function handleScreens(req, res, url) {
-    const who = req.socket.remoteAddress || '?';
+    const who = addrOf(req);
     if (url === '/pair' && req.method === 'POST') {
       if (!postGuard(req, res)) return;
       return readJson(req, res, (body) => {
@@ -591,7 +605,7 @@ export async function createHub(opts = {}) {
         return;
       }
       readJson(req, res, (body) => {
-        const who = req.socket.remoteAddress || '?';
+        const who = addrOf(req);
         const vf = versionFail(req);
         if (vf) return refuse(res, vf.status, vf.report);
         const au = authReq(req);

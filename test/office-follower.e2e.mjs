@@ -50,13 +50,13 @@ await go('money');
 await page.evaluate(() => document.querySelector('[data-k="close-day"]').click());
 await page.waitForTimeout(800);
 const cd = await page.evaluate(() => ({ disabled: [...document.querySelectorAll('.cd-actions .btn-primary')].map((b) => b.disabled), status: (document.querySelector('.cd-status') || {}).textContent || '' }));
-check('Close the day cannot be pressed and says why', cd.disabled.length === 1 && cd.disabled[0] === true && /Close the day on the main screen/.test(cd.status), cd);
+check('Close the day cannot be pressed and says why', cd.disabled.length === 1 && cd.disabled[0] === true && /Close the day on the hub computer/.test(cd.status), cd);
 // A hub-connected tablet (simulated): edits stay, restore and erase are shut.
 await page.evaluate(() => { SB.store.isFollower = () => false; SB.store.isHub = () => true; location.hash = '#/office/pace'; });
 await page.waitForTimeout(500);
 await go('data');
 const hubInfo = await page.evaluate(() => ({ banner: (document.querySelector('.od-conn') || {}).textContent || '', erase: [...document.querySelectorAll('.od-content .btn-danger')].filter((b) => /^Erase /.test(b.innerText)).every((b) => b.disabled) }));
-check('a hub tablet is told restore and erase are done on the main computer', /shared kitchen/.test(hubInfo.banner) && /main computer/.test(hubInfo.banner) && hubInfo.erase, hubInfo);
+check('a hub tablet is told restore and erase are done on the hub computer', /shared kitchen/.test(hubInfo.banner) && /hub computer/.test(hubInfo.banner) && hubInfo.erase, hubInfo);
 check('no page errors', errs.length === 0, errs);
 await browser.close();
 try { hub.close && hub.close(); } catch (e) { /* closing */ }

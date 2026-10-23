@@ -1406,8 +1406,8 @@
       mo.observe(content, { childList: true, subtree: true });
       P.disposers.push(() => mo.disconnect());
     }
-    for (const b of eraseBtns) if (b) { shut(b); b.title = conn === 'follower' ? 'Done on the main screen.' : 'Done on the main computer, because it erases the shared kitchen.'; }
-    content.querySelectorAll('.od-danger-h').forEach((h3) => { const n = document.createElement('p'); n.className = 'od-p'; n.textContent = conn === 'follower' ? 'Erasing is done on the main screen.' : 'Erasing is done on the main computer, because it would erase the shared kitchen for every screen.'; h3.after(n); });
+    for (const b of eraseBtns) if (b) { shut(b); b.title = conn === 'follower' ? 'Done on the hub computer.' : 'Done on the hub computer, because it erases the shared kitchen.'; }
+    content.querySelectorAll('.od-danger-h').forEach((h3) => { const n = document.createElement('p'); n.className = 'od-p'; n.textContent = conn === 'follower' ? 'Erasing is done on the hub computer.' : 'Erasing is done on the hub computer, because it would erase the shared kitchen for every screen.'; h3.after(n); });
   }
 
   function buildData(P) {
@@ -1541,23 +1541,35 @@
     }
     // Pilot report: the numbers for a real watched service, from the event log and the saved sound log.
     const cutsIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Cuts the observer counted', style: 'width:7em' });
+    const batchesIn = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': 'Batches the observer counted', style: 'width:7em' });
     const whenSel = h('select', { class: 'input', 'aria-label': 'Report window' }, h('option', { value: 'open' }, 'Since opening'), h('option', { value: '4' }, 'Last 4 hours'), h('option', { value: '24' }, 'Last 24 hours'));
     const repBox = h('pre', { class: 'od-report', hidden: true, style: 'white-space:pre-wrap;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:14px' });
     // Builds the report for the chosen window and shows it; with download true it also saves the CSV.
     async function makeReport(download) {
       const s = stateNow(), now = SB.store.now();
       const from = whenSel.value === 'open' ? SB.pilot.defaultFrom(s, now) : now - Number(whenSel.value) * 3600e3;
-      const rep = SB.pilot.build(s, { from, to: now, now, alerts: SB.floor && SB.floor.alertLog ? SB.floor.alertLog() : [], cutsCounted: cutsIn.value === '' ? null : Number(cutsIn.value), demoClock: SB.store.speed() > 1 });
+      const rep = SB.pilot.build(s, { from, to: now, now, alerts: SB.floor && SB.floor.alertLog ? SB.floor.alertLog() : [], cutsCounted: cutsIn.value === '' ? null : Number(cutsIn.value), demoClock: SB.store.speed() > 1, demo: SB.store.isDemo && SB.store.isDemo(), batchesCounted: batchesIn.value === '' ? null : Number(batchesIn.value) });
       repBox.textContent = SB.pilot.toText(rep); repBox.hidden = false;
       if (!download) { exStatus.ok('Report made for ' + rep.window.hours + ' hours.'); return; }
-      const fname = 'smokebox-pilot-report-' + todayKey() + '.csv';
+      const fname = (rep.demo ? 'smokebox-demo-pilot-report-' : 'smokebox-pilot-report-') + todayKey() + '.csv';
       const csv = SB.pilot.toCsv(rep);
       reportSave(await saveFile(fname, csv, 'text/csv'), fname, csv, 'report');
     }
     // The two report buttons: show it on screen, or save the CSV.
     const showReport = () => makeReport(false), saveReport = () => makeReport(true);
-    const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn),
-      btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: showReport }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: saveReport }));
+    // Prints the report text as one page: builds a print-only block, prints it, and removes it again.
+    async function printReport() {
+      await makeReport(false);
+      const root = h('div', { class: 'sb-printroot' }, h('h1', null, 'Pilot report'), h('pre', { style: 'white-space:pre-wrap;font-size:13px' }, repBox.textContent));
+      document.body.appendChild(root);
+      // Removes the print-only block again.
+      const done = () => { try { root.remove(); } catch (e) { /* already gone */ } };
+      window.addEventListener('afterprint', done, { once: true });
+      try { window.print(); } catch (e) { done(); }
+      setTimeout(done, 60000);
+    }
+    const repRow = h('div', { class: 'od-actions od-csv' }, h('span', { class: 'od-lab od-inline' }, 'Pilot report'), whenSel, h('label', { class: 'od-inline' }, 'Cuts counted ', cutsIn), h('label', { class: 'od-inline' }, 'Batches counted ', batchesIn),
+      btn('Show report', { icon: 'receipt', cls: 'btn-sm', onClick: showReport }), btn('Download CSV', { icon: 'download', cls: 'btn-sm', onClick: saveReport }), btn('Print', { cls: 'btn-sm', onClick: printReport }));
     repRow.dataset.pilot = 'report';
     // Saves the sales-by-day file for an accountant: one row per day with sales, tax, tips and how it was paid.
     async function downloadSalesCsv() {

@@ -12,7 +12,7 @@ Your dishes, tickets, settings and PIN live only in that tablet's browser. If th
 
 ## 3. Can two tablets share the same orders?
 
-Not yet. Each device has its own board, its own menu and its own tickets. A second screen that only shows a board exists as a test feature, needs a separate program called the hub, and cannot take orders. Two tabs in the same browser on the same device stay in step, but two devices do not. Today, use one tablet for taking orders and showing the board.
+Not yet. Each device has its own board, its own menu and its own tickets. Several tablets can share one kitchen through a separate program called the hub. That is a test feature that has not been tried on real tablets. Two tabs in the same browser on the same device stay in step, but two devices do not. Today, use one tablet for taking orders and showing the board.
 
 ## 4. Where does my data live?
 

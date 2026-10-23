@@ -1701,6 +1701,11 @@
     const showNote = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note) && (note === health || (needSound ? m.dis.has('snd') : true));
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
+    // The note's icon says what it is about: a new version waiting shows a refresh arrow, everything else the muted speaker.
+    if (showNote) {
+      const want = updateNote() && note === updateNote() ? 'refresh' : 'volume-off';
+      if (m.pauseIcon !== want) { m.pauseIcon = want; const old = m.strip.pauseBtn.firstChild; if (old) old.replaceWith(ico(want, 24)); }
+    }
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
