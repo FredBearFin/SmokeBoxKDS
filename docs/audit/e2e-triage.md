@@ -262,3 +262,39 @@ Every slow suite run singly (two at a time), the 45 qa journeys, and the node:te
 | all other 37 slow suites | PASS | artifact, backup-banner, board-*, bumpbar, cold-items, config-names, demo-mode, menu-import-ui, office*, order-*, pay-ui, pin-recovery-ui, production-mode, quiet-board, serve, setup-wizard, shell, start-over, strip-notices, tablet-ready |
 
 New in this round: `beta.sh` / `beta-remove.sh` (docs/connected-howto.md), proved only against stand-ins by `test/beta-scripts.test.mjs` (8 pass) and `test/beta-proxy.e2e.mjs`; not run on a real server.
+
+## Round 20: the connected track, full regression and fresh soak (kds/connected d3dcdb7)
+
+Every slow suite singly (two at a time; the machine was shared with other agents), the 45 qa journeys, node:test files twice (813 and 852 cases, all pass), and the soak three times for 10 minutes.
+
+| What | Result | Note |
+|---|---|---|
+| node:test files, run 1 and 2 | 813 pass, 852 pass, 0 fail | |
+| slow suites (54) | 52 pass; floor and voice-ui failed | floor: timing only (tick 13 ms mean against 8 ms under load); passes alone (122 s). voice-ui: see bugs |
+| qa journeys (45) | 43 pass, 2 fail | 07a and 12c, both real, see bugs; both fail alone |
+| connected-e2e, connected-write-e2e, connected-pair, hub-client, hub-join-*, follower, office-follower, beta-proxy | pass | |
+| soak, 10 min, seed 111 | 56 pass, 1 fail | the one failure was the checker (invariant I5 "due but still queued" a second after an item became due; the checker now looks again after the next ticks) |
+| soak, 10 min, seed 222 | 57 pass, 0 fail | |
+| soak, 10 min, seed 333 | 57 pass, 0 fail | |
+
+Soak numbers (seeds 111 / 222 / 333): about 1,070 taps per tablet; 116 / 117 / 112 link cuts; 2 hub kills; 252 / 324 / 265 tickets; hub memory 82 MB at the start and 84 to 85 MB at the end; state file 0.8 to 0.9 MB, record about 0.5 MB at the end.
+
+New in the soak: one tablet paired with a token and removed by the owner at 45 percent (its status says revoked, it tells its person it was removed, its taps stay queued, none reached the hub: 53 held back and 529 queued in one run); a follower opened with `?follow&trim=7` (no code in the source reads `trim`, so it simply follows; the parameter is ignored); three undo races between two tablets (exactly one undo takes effect at the hub, the other is refused and the tablet told); a tablet reloaded while the hub is down (it opens from the stored copy, shows the last known kitchen, queues taps that flow after the hub is back); the service worker updated mid-run (every tablet is told, none reloads itself). Every screen equals the hub, invariants hold, no created ticket is duplicated or lost without a refusal, every opId in the hub's record is unique, ticket numbers are unique and identical everywhere, no page errors.
+
+Real bugs found (connected track, each fails alone):
+1. **A3, qa 07a:** the Sales and money page shows the word "null" after the "Close the day" button. `src/js/82-office-money.js` (End of day panel) passes `null` to `body.append(...)` when the screen is not a follower, and the browser writes "null". Reproduction: `node tools/qa.mjs --only 07a --no-report`.
+2. **A1, qa 12c:** the live region is chatty on the connected track: more than 12 announcements per minute at 15 times speed and the same sentence repeated more than 3 times in 30 s (passes on the main track). Reproduction: `node tools/qa.mjs --only 12c --no-report`.
+3. **A1/A4, voice-ui:** "a burst of six new tickets is one spoken line" hears nothing on the connected track (passes on the main track). Reproduction: `node test/voice-ui.e2e.mjs`.
+4. **Undo of a new ticket:** a just-created ticket cannot be undone (no undo entry), and a tablet answers `undoElsewhere` for it. Not a bug if intended; noted because the word is misleading.
+
+### Backport list for the main-track hub (for A5)
+The main-track `server/server.mjs` keeps answered opIds in memory only (`replies`, a Map), so after a restart a resent action is applied twice (`test/review-fix-restart.test.mjs` fails on the main track). The connected track's hub fixes it with a write-ahead log. To backport exactly (names as in the connected `server/server.mjs`):
+1. State file: `loadSaved` returns `seq` and `hubId`; `writeSaved(file, state, seq, hubId, seeded)` stores them (needed so replay knows where the saved state ends).
+2. Options and constants: `walFile` (default `dataFile + '.wal'`), `WAL_KEEP = 1000`, `WAL_COMPACT_AT = 3000`, `let walFd = null, walLines = 0`.
+3. Functions: `walOpen`, `walAppend(entry, sync)` (write one JSON line, `fsyncSync` when `sync`), `walCompact` (rewrite to the last `WAL_KEEP` entries, called from `flush` after the state file is written), `walEntry(o)`, `walReplay()` (replay each line through `E.apply`, rebuild `ops` and `replies`, stop at a gap or a failing entry, ignore a damaged last line), `remember(e)` (push to `ops`, set `replies` for the opId).
+4. `runAction`: on `ok`, build the entry `{ seq: seq + 1, opId, type, payload, now: t, by, screen, info }` and call `walAppend(entry, true)` BEFORE `state = r.state` and before answering (if it throws, answer 500 and apply nothing); then `remember(entry)`. On a refusal with an opId, `walAppend({ ref: true, opId, report, info, seq }, true)` so the same refusal is answered after a restart.
+5. Start-up: if there is no usable state file but a `.wal` exists, rename it to `.wal.old`; otherwise `replayed = walReplay()`, and if anything was replayed (or the file is new) mark dirty and `flush()`.
+6. Clean stop: `close()` closes `walFd` after the final `flush()`.
+7. The ticks that change state are recorded too (`walAppend({ ..., type: 'tick' })`, not fsynced) so replay reproduces time-driven changes; `hubId`/`seq` are kept across restarts.
+8. Tests to carry over and make pass on main: `test/review-fix-restart.test.mjs`, `test/connected-hub.test.mjs` (restart and crash durability), `test/connected-follow.test.mjs` (crash with followers).
+Not needed for the duplicate fix itself: `/follow`, pairing, tokens, `undoOwner`, `noteApplied`.

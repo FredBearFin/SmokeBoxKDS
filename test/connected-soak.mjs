@@ -198,8 +198,10 @@ async function verify(label, final) {
   console.log(`\n# ${label}`);
   const r = await settle(label);
   check(label + ': every screen equals the hub state', r.ok, r.ok ? null : { last: r.last, hub: (r.hv || '').slice(0, 120), screens: (r.vs || []).map((v) => String(v).slice(0, 120)) });
-  const st = r.ok ? r.st : await snap();
-  const inv = E.checkInvariants(st, st.events && st.events.length ? Date.now() : Date.now());
+  let st = r.ok ? r.st : await snap();
+  // The hub moves time on once a second, so a thing that became due in the last second can look late: look again after the next ticks and fail only if it stays.
+  let inv = E.checkInvariants(st, Date.now());
+  if (inv.length) { await sleep(3000); st = await snap(); inv = E.checkInvariants(st, Date.now() - 2000); }
   let invDetail = inv.slice(0, 5);
   if (inv.length) { const m = /(t_\d+)\.(\d+)/.exec(inv[0]); if (m) { const t = st.tickets.find((x) => x.id === m[1]); const it = t && t.items.find((i) => String(i.id).endsWith('.' + m[2]) || i.id === m[0]); invDetail = { inv: inv.slice(0, 3), hubNow: st.serverNow, now: Date.now(), ticket: t && { id: t.id, status: t.status, createdAt: t.createdAt }, item: it }; } }
   check(label + ': engine invariants hold on the hub state', inv.length === 0, invDetail);
