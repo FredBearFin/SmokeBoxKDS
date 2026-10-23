@@ -198,3 +198,13 @@ What changed:
 Choices made without asking: the counter flag is read defensively (missing means off); a station tab left open when counter turns on is switched to All; the draft is kept per browser, not per user; drafts are not saved in the demo any differently.
 
 Not done or not checked: the shared currency formatter is not in this branch yet, so board, order and payment surfaces still use `U.fmtMoney`; no "Paid, done" screen beyond the existing one-tap pay (counter orders are paid when sent); the engine currently rejects the counter setting from the settings route, so the test switches it on inside the page. `src/js/85-office-stock.js` (A3) still has a "Channel sync (practice only)" section, and `tools/guide-walk.mjs` (A4) clicks a button named "Menu".
+
+## Round 14: cold items in the cabinet, page order, narrow Hold sheet
+
+Checked in headless Chromium with a simulated clock only. Nothing here was tried on a real device or in a real kitchen.
+
+- **Cold item card.** A cold item kept in a fridge (engine `coldInfo`) shows "In the fridge since <date>, made <date>", a Take out or Put back main action (initials asked once, Undo toast), a ring that counts time out of the fridge, and one line in words: "1 h 20 min out of your 2 h limit", or "Out for 1 h 20 min, no limit set" when the hours are blank. A fridge date row reads "Use by Sun 10/25 (your 3 days)" or "No limit set". Next reading says "Not needed while it is out". Colors follow the status and the share of the limit used (normal, then amber from 75 percent, red when used up or the engine says bad). Wording says "your limit" and never states a rule. Hot cards are unchanged and the card does nothing when the engine has no cold-item model.
+- **Page order of slips.** Overdue slips are now moved to the front in the page, most overdue first (before, only a CSS order moved them, so keyboard and screen reader users met them last). A focused control keeps its focus when a slip moves. This is the B3/B4 reorder item in e2e-triage.
+- **Hold sheet at 280 px with Large text** no longer sticks out 9 px: name and status may wrap and the name breaks long words.
+- **Not done:** call-outs for the cold feed rows use the engine's own phrases and I did not add any board wording for them; the strip shows them like other rows (checked only that nothing breaks).
+- **Tests:** `test/board-round14.e2e.mjs`. `test/floor.e2e.mjs` expectations for slip order now put the overdue ticket first.
