@@ -1220,7 +1220,7 @@
           h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'cm-undo' }, onClick: () => {
             const rep = store.undoRestore();
             if (rep === 'ok' || (rep && rep.ok)) { tell(undoMsg, 'Undone. Your kitchen is back as it was, with all the history.', 'ok'); } else tell(undoMsg, 'The saved copy could not be put back (' + (rep && rep.report ? rep.report : rep) + '). Use the backup file you saved: Back office, Data, Restore.', 'bad');
-          } }, 'Undo')) : h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'No copy could be kept on this tablet, so the files you saved are the only way back: Back office, Data, Restore.'),
+          } }, 'Undo')) : h('p', { class: 'fs-note', 'data-tone': 'warn' }, (i.restoreCopyKept ? 'Your kitchen from before your recent restore is still kept, so no second copy was made here. ' : 'No copy could be kept on this tablet, so ') + 'the files you saved are the only way back from this close: Back office, Data, Restore.'),
         undoMsg,
         // Closes the sheet when the person is finished reading the result.
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'cm-finish' }, onClick: () => SB.sheets.closeAll() }, 'Done'));

@@ -272,3 +272,24 @@ test('a compact save that parses but will not unpack is parked whole, with its p
     S.destroy();
   }
 });
+
+test('Close the month right after a restore leaves the restore\'s undo copy alone; the month backup file is the way back', () => {
+  const b = mem(); const clock = boot(K, b, null, K.t + 35 * DAY);
+  const pre = S.getState().tickets.length;
+  // a restore over this kitchen: the kitchen as it was is kept for Undo restore
+  assert.equal(S.importAll(JSON.stringify({ v: 1, state: K.s })), 'ok');
+  assert.equal(S.beforeRestoreInfo().reason, 'before restore');
+  const takenAt = S.beforeRestoreInfo().takenAt;
+  const before = '2099-01-01';
+  const ex = S.closeMonthExport({ before, keepDays: 1 });
+  const backup = ex.files[0];
+  clock.t += 60e3;
+  const pr = S.closeMonthPrune({ before, keepDays: 1, confirmBackupSaved: { filename: backup.name, chars: backup.chars, sha256: backup.sha256 } });
+  assert.equal(pr.ok, true, JSON.stringify(pr));
+  assert.equal(pr.info.copyKept, false); assert.equal(pr.info.restoreCopyKept, true);
+  const info = S.beforeRestoreInfo();
+  assert.equal(info.reason, 'before restore'); assert.equal(info.takenAt, takenAt);
+  assert.equal(S.undoRestore(), 'ok');
+  assert.equal(S.getState().tickets.length, pre, 'Undo restore still gives back the kitchen from before the restore');
+  S.destroy();
+});

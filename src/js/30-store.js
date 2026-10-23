@@ -1148,7 +1148,11 @@
     const before = state, savedAt = realNow();
     const out = E().closeMonth(state, { before: opts.before, keepDays: o2.keepDays, backup: cb }, now());
     if (out.report !== 'ok') return fail(out.report, out.info);
-    const copyAt = snapshotBeforeRestore(BEFORE_MONTH_CLOSE);
+    // WATCH OUT: there is one undo slot. A recent restore's copy is the only way back from a wrong restore, so it is never
+    // replaced here; the month's backup file (required above) is the way back from this close.
+    const prior = beforeRestoreCopy(realNow());
+    const restoreKept = !!(prior && prior.reason === BEFORE_RESTORE);
+    const copyAt = restoreKept ? null : snapshotBeforeRestore(BEFORE_MONTH_CLOSE);
     const ns = out.state;
     ns.rev = Math.max(ns.rev, (before.rev || 0) + 1);
     atLeast(lastStamp(ns));
@@ -1164,7 +1168,7 @@
     }
     monthExport = null;
     scheduleNotify();
-    last = { type: 'closeMonthPrune', report: 'ok', info: Object.assign({ copyKept: copyAt != null, copyKeepDays: copyAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, out.info), events: [] };
+    last = { type: 'closeMonthPrune', report: 'ok', info: Object.assign({ copyKept: copyAt != null, restoreCopyKept: restoreKept, copyKeepDays: copyAt != null ? BEFORE_RESTORE_KEEP_MS / 864e5 : 0 }, out.info), events: [] };
     return { ok: true, report: 'ok', info: last.info, savedAt };
   }
   // Time in ms as readable date text for spreadsheets, or empty text when missing.
