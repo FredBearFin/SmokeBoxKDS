@@ -39,6 +39,13 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.fill('.dp-name', ''); await page.fill('.dp-price', '');
   await page.locator('.dp-rp').first().fill('13'); await page.locator('.dp-rp').first().blur(); await page.waitForTimeout(300);
   check('a price edited in the list is saved', (await page.evaluate(() => SB.store.getState().menu.find((m) => m.name === 'Pulled pork plate').price)) === 13);
+  // Generous prices: "12,50" is read back as $12.50 before saving; a category can be changed from the dish row.
+  await page.fill('.dp-price', '12,50');
+  check('a typed price is read back before saving', /Reads as \$12\.50/.test(await page.locator('.dp-echo').textContent()));
+  await page.fill('.dp-price', '');
+  const nameFirst = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived)[0].name);
+  await page.selectOption('[aria-label="Category of ' + nameFirst + '"]', 'cold'); await page.waitForTimeout(300);
+  check('Move to: the category of a dish changes from its row', await page.evaluate((n) => SB.store.getState().menu.find((m) => m.name === n).cat === 'cold', nameFirst));
   // Reorder: move the first dish down, check the menu order and the order screen follow, then Undo.
   const names0 = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived).map((m) => m.name));
   await page.getByRole('button', { name: 'Move ' + names0[0] + ' down' }).click(); await page.waitForTimeout(300);

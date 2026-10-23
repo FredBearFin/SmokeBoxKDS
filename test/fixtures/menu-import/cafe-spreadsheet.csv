@@ -1,0 +1,26 @@
+Item,Price,Category
+Espresso,$3.00,Coffee
+Americano,3.50,Coffee
+Latte,$4.50,Coffee
+Cappuccino,4,50,Coffee
+Mocha,$5.00,Coffee
+Chai latte,4.75,Tea
+Iced tea,3,Tea
+Hot chocolate,$4,Other drinks
+Orange juice,3.95,Other drinks
+Croissant,$3.25,Pastry
+Blueberry muffin,3.5,Pastry
+Cinnamon roll,$4.25,Pastry
+Bagel with cream cheese,4,Pastry
+Avocado toast,$9.50,Lunch
+Egg sandwich,8,Lunch
+Turkey club,$11.00,Lunch
+Grilled cheese,7.5,Lunch
+Tomato soup,$6,Lunch
+Caesar salad,10,Lunch
+Chicken wrap,$10.50,Lunch
+Latte,4.50,Coffee
+,$5,Lunch
+Brownie,,Pastry
+Cookie,$2.50,Pastry
+Granola cup,4,Pastry
