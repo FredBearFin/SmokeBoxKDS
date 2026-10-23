@@ -50,3 +50,8 @@ test('cold readings say when they are above the limit and that earlier time abov
   // the engine agrees: the batch has used those 20 minutes
   assert.equal(Math.round(k.s.batches.find((x) => x.id === id).coldOutMs / MIN), 20);
 });
+
+test('the month-close entry has a plain label (hand-built entry: the engine event arrives with the Close the month work)', () => {
+  const row = IP.rowFor({ id: 'e9', type: 'month_closed', t: T0, before: '2026-09-01', days: 31, tickets: 900 }, { settings: {}, batches: [], ingredients: [] });
+  assert.equal(row.kind, 'History saved and cleared');
+});
