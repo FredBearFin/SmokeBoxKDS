@@ -88,7 +88,7 @@ test('a screen that is removed is cut off at once: the stream ends, its status i
     // the hub cuts the stream; A's next call is answered "removed"
     await until(() => A.store.hubStatus().state === 'error', 'A to be cut off', 12000);
     const s = A.store.hubStatus();
-    assert.equal(s.error, 'revoked'); assert.match(s.reason, /removed from the hub/);
+    assert.equal(s.error, 'revoked'); assert.match(s.reason, /removed from the kitchen/);
     assert.equal(A.store.dispatch('createTicket', tix(2)), 'ok');                               // still predicted on the screen, but it cannot be sent
     await sleep(300);
     assert.equal(hub.snapshot().state.tickets.length, 1);

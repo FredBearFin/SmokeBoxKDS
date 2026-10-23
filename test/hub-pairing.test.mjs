@@ -119,7 +119,7 @@ test('removing a screen cuts its streams at once and refuses it from then on; th
   await until(() => fa.ended, 'the removed screen\'s stream to end');
   assert.equal(fb.ended, false, 'the other screen is not affected');
   const r = await post(port, '/action', tk(1), { 'x-smokebox-token': A.token });
-  assert.deepEqual([r.status, r.body.report], [403, 'revoked']); assert.match(r.body.words, /removed from the hub/);
+  assert.deepEqual([r.status, r.body.report], [403, 'revoked']); assert.match(r.body.words, /removed from the kitchen/);
   assert.equal((await J(port, '/probe', { headers: { 'x-smokebox-token': A.token } })).body.report, 'revoked');
   assert.equal((await post(port, '/action', tk(2), { 'x-smokebox-token': B.token })).body.ok, true);
   const list = (await admin(hub, port, '/admin/screens')).body.screens;

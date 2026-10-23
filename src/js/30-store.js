@@ -33,7 +33,7 @@
   const RECOVERY_KEY = 'smokebox.v1.pinrecovery', RECOVERY_TRIES = 5, RECOVERY_LOCK_MS = 15 * 60e3;
   // Letters and digits for a recovery code, leaving out I, O, 0 and 1 so a handwritten card is not misread. 32 characters, 10 in a code: 50 bits.
   const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const START_OVER_KEYS = ['smokebox.v1.hubcache', 'smokebox.v1.hubqueue', 'smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
+  const START_OVER_KEYS = ['smokebox.v1.office.startCash', 'smokebox.v1.hubcache', 'smokebox.v1.hubqueue', 'smokebox.v1.orderdraft', 'smokebox.v1.setup.draft', 'smokebox.v1.setup.examples', 'smokebox.v1.setup.hiddenStations', 'smokebox.v1.setup.lastZone', 'smokebox.v1.setup.hiddenCategories', 'smokebox.v1.setup.lastCategory',
     'smokebox.v1.setup.cookAheadSkipped', 'smokebox.v1.setup.serveSkipped', 'smokebox.v1.setup.serveAnswer', 'smokebox.v1.readings', 'smokebox.v1.lastproduct', 'smokebox.v1.welcome', 'smokebox.v1.dlog', 'smokebox.v1.lastbatch', 'smokebox.v1.alertlog'];
   // 30 days in ms: how long a set-aside damaged copy is kept. 6 hours in ms: how often the rolling copy is refreshed.
   const CORRUPT_KEEP_MS = 30 * 24 * 3600e3, SNAP_EVERY_MS = 6 * 3600e3;
@@ -869,11 +869,11 @@
   const FOLLOW_FATAL = { badCode: 1, notFound: 1, wrongVersion: 1, tooMany: 1, unpaired: 1, revoked: 1 };
   const CLIENT_PROTO = 1;                              // the hub protocol this build speaks; sent to the hub, which may require a newer one
   const FOLLOW_REASON = {
-    badCode: 'The access code is wrong or missing.', notFound: 'That address is not a Smokebox hub.', wrongVersion: 'This screen and the hub do not speak the same version. Reload the page from the hub.',
-    unpaired: 'This screen is not paired with the hub. Ask the owner for a pairing code.', revoked: 'This screen was removed from the hub. Ask the owner to pair it again.',
+    badCode: 'The access code is wrong or missing.', notFound: 'That address is not a Smokebox main computer.', wrongVersion: 'This screen and the main computer run different versions. Reload the page from the main computer.',
+    unpaired: 'This screen is not paired with the main computer. Ask the owner for a pairing code.', revoked: 'This screen was removed from the kitchen. Ask the owner to pair it again.',
     badPairCode: 'That pairing code is wrong or has expired. Ask the owner for a new one.', tooManyTries: 'Too many wrong tries. Wait a few minutes, or ask the owner for a new code.',
     badName: 'The screen name may use letters, digits, spaces and . , \' & ( ) # _ - and up to 20 characters.', notOwner: 'Only an owner screen can do that.',
-    tooMany: 'The hub has too many screens connected.', unreachable: 'Cannot reach the hub.', closed: 'The connection to the hub ended.', error: 'Something went wrong talking to the hub.',
+    tooMany: 'The main computer has too many screens connected.', unreachable: 'Cannot reach the main computer.', closed: 'The connection to the main computer ended.', error: 'Something went wrong talking to the main computer.',
   };
   // Memory-only storage with the same methods as the browser's, so the follower never touches the device's saved kitchen.
   function memoryBackend() {
