@@ -22,7 +22,7 @@ Split persistence only; leave the engine and the in-memory state exactly as they
 
 Names are sorted by date and use the service date (`U.serviceDate`), so the key order is the time order. The demo uses the existing `smokebox.demo.` mapping (they would be classified as kitchen data in `U.dataKeys`; the guard test already fails on an unclassified key).
 
-Not moved out of the core: safety events (`safetyKeep`, kept 190 days), `lastClose`, the books (`ledger`, with the grams of removed history already folded into `prunedUsed` and `prunedWaste`), `learned`, and anything about open work.
+Not moved out of the core: safety events (`safetyKeep`, kept 400 days), `lastClose`, the books (`ledger`, with the grams of removed history already folded into `prunedUsed` and `prunedWaste`), `learned`, and anything about open work.
 
 ## 4. When a day becomes "closed"
 
