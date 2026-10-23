@@ -1313,10 +1313,11 @@
   }
   // Adds up a list of paid-order rows into checks, net sales, tax, tips and what was collected in all.
   function addUp(rows) {
-    const t = { checks: rows.length, gross: 0, discounts: 0, net: 0, tax: 0, tips: 0, total: 0, collected: 0 };
-    for (const r of rows) { t.gross += r.gross; t.discounts += r.discount; t.net += r.net; t.tax += r.tax; t.tips += r.tip; t.total += r.total; }
-    t.collected = t.total + t.tips;
-    return t;
+    // Money is added in whole cents and turned back into dollars at the end, so long lists never pick up a stray cent.
+    const c = (v) => Math.round(v * 100);
+    const k = { gross: 0, discounts: 0, net: 0, tax: 0, tips: 0, total: 0 };
+    for (const r of rows) { k.gross += c(r.gross); k.discounts += c(r.discount); k.net += c(r.gross) - c(r.discount); k.tax += c(r.tax); k.tips += c(r.tip); k.total += c(r.gross) - c(r.discount) + c(r.tax); }
+    return { checks: rows.length, gross: k.gross / 100, discounts: k.discounts / 100, net: k.net / 100, tax: k.tax / 100, tips: k.tips / 100, total: k.total / 100, collected: (k.total + k.tips) / 100 };
   }
 
   /**

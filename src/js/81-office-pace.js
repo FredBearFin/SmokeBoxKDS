@@ -96,6 +96,7 @@
       container.insertBefore(glanceHost, page.el);
       const glance = typeof O.glance === 'function' ? O.glance(glanceHost) : null;
       page.headline();
+      page.how('These numbers come from tickets that were sent out in the range above. Ticket time runs from when the ticket was entered until it was sent out, and the median is the middle one: half the tickets were faster. Slowest 1 in 10 is the time that nine in ten tickets beat. On time means a ticket finished before its warning time, which depends on the order type (Menu and settings, Time limits). Tickets per hour is tickets placed divided by the hours in which at least one ticket was placed.');
       page.tiles(paceTiles());
 
       page.card({
@@ -269,6 +270,7 @@
     render(container, ctx) {
       const page = K.page(container, ctx, { id: 'tickets' });
       page.headline();
+      page.how('Finished tickets are tickets that were sent out and not voided, counted on the day they were placed. Ticket time runs from when the ticket was entered until it was sent out; the median is the middle ticket. Overdue means a ticket took longer than the overdue limit for its order type. Voided tickets were cancelled before they were sent out. The arrows compare with the same number of days just before this range.');
       page.tiles([
         { id: 'count', kpi: 'count', label: 'Finished tickets' },
         { id: 'median', kpi: 'medianMs', label: 'Median ticket time' },
@@ -407,6 +409,7 @@
     render(container, ctx) {
       const page = K.page(container, ctx, { id: 'stations' });
       page.headline();
+      page.how('Each item on a ticket belongs to one station. A ticket counts at the station whose item finished last. Waiting means the time between an item being sent to the station and a cook starting it; work is the time the cook spent on it. Prep times are compared with the starter estimates in Menu and settings, and only items with at least 5 finished lines are judged.');
       page.tiles([
         { id: 'overdue', kpi: 'overdue', label: 'Overdue tickets' },
         { id: 'spread', kpi: 'avgSpreadMs', label: 'First to last item' },
