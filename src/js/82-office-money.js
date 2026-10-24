@@ -180,7 +180,7 @@
   B.setText = setText;
 
   /** Where the numbers on a card come from, in one line: the range, the channel (when it applies)
-   *  and whether sample data is in. */
+   *  and, only when they are mixed in, the sample days. */
   B.scopeText = (ctx, o) => {
     o = o || {};
     const F = ctx.filters; let ds = null;
@@ -188,7 +188,8 @@
     const sample = ds && ds.counts ? ds.counts.sample : 0;
     const parts = [F.range.label];
     if (!o.noChannel && F.channel !== 'all') { const c = SB.config && SB.config.channelById && SB.config.channelById[F.channel]; parts.push(c ? c.name : F.channel); }
-    parts.push(F.source === 'all' && sample > 0 ? 'sample and live data' : 'live data only');
+    // Sample days are only named when they are mixed in; otherwise every number is the owner's own.
+    if (F.source === 'all' && sample > 0) parts.push('with sample days');
     return parts.join(', ');
   };
 
