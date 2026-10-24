@@ -112,7 +112,7 @@ test('prime: what is already true when call-outs start is not read out, but late
 
 test('chef voice: every spoken line is short and sharp, in the one built-in style', () => {
   assert.equal(D.phrase('start', { name: '2 brisket sandwich', num: 12 }), 'Fire two brisket sandwich now! Ticket twelve!');
-  assert.equal(D.phrase('expire', { who: 'Brisket', many: false, mins: 10, goes86: true, approx: false }), 'Heads up! Brisket goes eighty-six in ten minutes! Act now!');
+  assert.equal(D.phrase('expire', { who: 'Brisket', many: false, mins: 10, goes86: true, approx: false }), 'Heads up! Brisket runs out in ten minutes! Act now!');
   assert.equal(D.phrase('expire', { who: 'Ribs and 1 more', many: true, mins: 30, approx: true }), 'Heads up! Ribs and one more expire in about thirty minutes! Act now!');
   assert.equal(D.phrase('past', { who: 'Pork', many: false }), 'Pork is past quality! Check it now!');
   assert.equal(D.phrase('expired', { who: 'Pork', many: false }), 'Pork expired! Pull it and log it now!');
