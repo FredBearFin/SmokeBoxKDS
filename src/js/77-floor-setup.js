@@ -606,9 +606,10 @@
     // Paints the question until it is answered or skipped; after an answer it says what was set and where to change it.
     function paintServe(answer) {
       const answered = answer || U.storage.get(KEY_SERVEANS, '');
-      // An owner who already set How you serve (own order buttons, or counter service on) is not asked again.
+      // An owner who already set How you serve (own order buttons, or counter service on) is not asked again. The empty list a new
+      // kitchen starts with is not an answer, so the question still comes.
       const svc = SB.store.getState().settings.service || {};
-      const setUp = Array.isArray(svc.chips) || svc.counter === true;
+      const setUp = (Array.isArray(svc.chips) && svc.chips.length > 0) || svc.counter === true;
       const show = activeDishes().length > 0 && !U.storage.get(KEY_SERVESKIP, false) && (!!answered || !setUp);
       svBox.hidden = !show;
       if (!show) return;

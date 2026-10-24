@@ -194,7 +194,8 @@ test('counter service does not pollute the pace and analytics numbers; sales sti
 
 test('the customer chips: default list, the owner\'s list, none, validation, undo, backups', () => {
   let s = E.newState({ now: T, blank: true });
-  assert.deepEqual(E.chipsOf(s.settings), C.quickNames);                                    // today's list
+  assert.deepEqual(E.chipsOf(s.settings), []);                                              // a new kitchen gets no made-up names
+  assert.deepEqual(E.chipsOf(E.newState({ now: T }).settings), C.quickNames);                // the demo and old kitchens keep the standard list
   assert.equal(E.CHIP_MAX, 12); assert.equal(E.CHIP_LEN, 24);
   const bakery = ['Counter', 'Pickup', 'Order 1'];
   s = ok(E.apply(s, 'setChips', { chips: ['  Counter ', 'Pickup', 'Order  1'] }, T), 'set');
@@ -216,7 +217,7 @@ test('the customer chips: default list, the owner\'s list, none, validation, und
   assert.equal(settingsPatch(s, { service: { chips: ['Phone', 'phone'] } }).report, 'badPatch');
   assert.equal(settingsPatch(s, { service: { chips: bakery } }).report, 'nothingToDo');
   // undo
-  const u = ok(E.apply(s, 'undo', {}, T + 500), 'undo'); assert.deepEqual(E.chipsOf(u.settings), C.quickNames);
+  const u = ok(E.apply(s, 'undo', {}, T + 500), 'undo'); assert.deepEqual(E.chipsOf(u.settings), []);   // back to the new kitchen's empty list
   const s2 = ok(E.apply(s, 'setChips', { chips: ['Only'] }, T + 600), 'again');
   assert.deepEqual(E.chipsOf(ok(E.apply(s2, 'undo', {}, T + 700), 'undo 2').settings), bakery);
   const moved = ok(settingsPatch(s2, { service: { chips: ['Other'] } }, T + 800), 'changed elsewhere');

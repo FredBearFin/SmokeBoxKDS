@@ -1968,6 +1968,10 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-strip-x { flex: none; display: grid; place-items: center; width: calc(44px * var(--fl-k)); border: 0; background: transparent; color: inherit; opacity: 0.75; cursor: pointer; }
 .fl-strip-x:hover, .fl-strip-x:focus-visible { opacity: 1; background: rgba(127, 127, 127, 0.18); }
 .fl-strip-x:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -3px; }
+.fl-strip-bar .fl-strip-x { opacity: 1; }
+/* A warning row's clear button is a real, labeled button a cook can find at a glance, not a faint mark at the edge. */
+.fl-strip-rowwrap .fl-strip-x { display: flex; align-items: center; gap: 6px; width: auto; align-self: center; margin: 6px var(--sp-3); padding: 0 var(--sp-4); border: 2px solid currentColor; border-radius: var(--r-btn); background: var(--paper); color: var(--ink); opacity: 1; font: inherit; font-weight: var(--w-heavy); font-size: var(--fs-2); }
+.fl-strip-rowwrap .fl-strip-x:hover { background: var(--sub); }
 /* A sanitize chip that needs attention names itself ("Sanitize not logged"), so a bare "not logged" is never a puzzle. */
 .fl-san[data-urgent="true"] .fl-chip-w { display: inline; }
 /* Station tab names never break across lines (Cabinet once wrapped to "Cabine" and "t" on a phone). */
@@ -4341,6 +4345,8 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
+window.SB_BUILD = { version: "0.2.0", id: "33f8b10" };
+
 /* ===== 00-util.js ===== */
 ;try{
 /*
@@ -6334,6 +6340,8 @@ a.of-nav:active { background: var(--press); }
     const S = defaultSettings();
     S.pacing.enabled = false;
     S.modules = { cookAhead: false };
+    // No made-up customer buttons (Walk-up, Pickup, Table 1 to 6) in a new kitchen: the owner adds their own in How you serve.
+    S.service.chips = [];
     return S;
   }
   // True when an optional module is switched on. A state with no modules setting (every save made before the
@@ -20750,7 +20758,7 @@ a.of-nav:active { background: var(--press); }
     if (!store || !store.status || !store.getState) return null;
     const ss = store.status(), s = store.getState();
     // In the demo this strip always shows, above every other message, and always has the Back button.
-    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
+    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'Demo: it runs by itself. Watch, or tap a dish to join in.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
     // Off the board (a back-office page), a device clock that jumped far ahead is asked about here: a slim strip, not a box over the page.
@@ -22562,7 +22570,7 @@ a.of-nav:active { background: var(--press); }
     const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); playHere(() => { chime(); speak('Sound is on.'); }); } },
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
-    const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
+    const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 24));
     // The clock notice: the tablet's clock jumped far ahead, the board keeps the old time and asks. Calm, two plain choices, and the board keeps working.
     const clockT = h('span', { class: 'fl-clock-t' });
     const clockKeep = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-keep' }, onClick: () => { if (m) { m.clockDis = Date.now() + 10 * 60e3; updateStrip(store().now()); } } }, 'Keep the old time');
@@ -22583,7 +22591,7 @@ a.of-nav:active { background: var(--press); }
         when, h('span', { class: 'fl-strip-text' }, what, why));
       // Clearing a row counts as seeing it (the loud tone stops) and hides it until its next step on the ladder.
       const rowKey = () => { const r = rows[i]; return r && r.key ? 'row:' + r.key + ':' + (r.el.dataset.step || '') : ''; };
-      const xr = h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': 'Clear this warning until the next one', title: 'Clear until the next warning', onClick: (e) => { e.stopPropagation(); const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (m) { m.dis.add(rowKey()); updateStrip(store().now()); } } }, ico('x', 18));
+      const xr = h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': 'Clear this warning until the next one', title: 'Clear until the next warning', onClick: (e) => { e.stopPropagation(); const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (m) { m.dis.add(rowKey()); updateStrip(store().now()); } } }, ico('check', 22), h('span', { class: 'fl-strip-x-t' }, 'Got it'));
       const wrap = h('div', { class: 'fl-strip-rowwrap', hidden: true, dataset: { i: String(i) } }, row, xr);
       rows.push({ el: row, wrap, when, what, why, key: '', batchId: null, rowKey });
       el.appendChild(wrap);
@@ -22986,14 +22994,15 @@ a.of-nav:active { background: var(--press); }
       const b = sg.querySelector('[data-id="' + id + '"]');
       if (!b || id === 'all' || id === 'expo') return;
       // A station no dish is made at has nothing to show, so its tab waits until a dish is added there (once the menu has dishes).
-      const unused = menuNow.length > 0 && !menuNow.some((d) => d.zone === id);
+      const unused = !menuNow.some((d) => d.zone === id);
       const keep = (hid.indexOf(id) < 0 && !unused) || id === m.zone || (c.zones[id] || 0) > 0;
       b.style.display = keep ? '' : 'none';
     });
     // A one-station kitchen (a taco truck) has nothing to switch between: All, its one station and Expo would show the same tickets,
     // so those tabs go. The Cabinet tab stays when cooking ahead is on; with nothing left to pick the whole tab row hides.
     const shown = TABS.filter((id) => id !== 'all' && id !== 'expo' && sg.querySelector('[data-id="' + id + '"]') && sg.querySelector('[data-id="' + id + '"]').style.display !== 'none');
-    const single = m.zone === 'all' && shown.length <= 1 && hid.length > 0;
+    // A kitchen with no dishes yet has no stations to switch between either, so the whole tab row waits for the first dish.
+    const single = m.zone === 'all' && ((shown.length <= 1 && hid.length > 0) || (menuNow.length === 0 && !(c.all > 0)));
     const cab = sg.querySelector('[data-id="cabinet"]');
     const cabOn = !!cab && !cab.hidden;
     ['expo'].concat(shown).forEach((id) => { const b = sg.querySelector('[data-id="' + id + '"]'); if (b) b.style.display = single ? 'none' : (id === 'expo' ? '' : b.style.display); });
@@ -23017,7 +23026,7 @@ a.of-nav:active { background: var(--press); }
     const zone = m.zone, stationBusy = modeOf(zone) === 'station' && c && c.all > 0;
     const firstRun = !stationBusy && SB.setup && SB.setup.noDishes();
     const title = firstRun ? 'Welcome. Let\'s build your menu.' : stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
-    const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
+    const text = firstRun ? 'Type your own dishes and prices (about two minutes), or first watch a busy night in a sample barbecue kitchen.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
       : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
     const cardUp = !!(m.welcome && !m.welcome.hidden);
@@ -23026,11 +23035,10 @@ a.of-nav:active { background: var(--press); }
     e.dataset.sig = sig;
     U.clear(e);
     const actions = h('div', { class: 'fl-empty-actions' });
-    // First run: one big friendly button, then two quiet links. No New ticket or demo button competes with it.
+    // First run: two big, plain choices and nothing else. The walkthrough needs a dish, so it waits until there is one.
     if (firstRun) {
-      actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'Add your first dish')),
-        h('button', { type: 'button', class: 'btn fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
-        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Try the demo')));
+      actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'Add my menu')),
+        h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('play', 22), h('span', null, 'Watch the demo')));
       e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
       return;
     }
@@ -26340,6 +26348,12 @@ a.of-nav:active { background: var(--press); }
     return sheet;
   }
 
+  // The version of this copy of Smokebox, so the owner can tell at a glance whether an update arrived.
+  function versionLine() {
+    const b = g.SB_BUILD;
+    return h('p', { class: 'fs-sub mn-version', dataset: { role: 'version' } }, b && b.version ? 'Smokebox version ' + b.version + ' (build ' + b.id + ')' : 'Smokebox version: not marked (an old or hand-made build)');
+  }
+
   // Help and about.
   // Shortcut list (key, what it does) used when the board does not supply its own.
   // audit:data-start
@@ -26724,7 +26738,8 @@ a.of-nav:active { background: var(--press); }
       // Start over sits alone at the very bottom, away from the everyday buttons. In the demo it is replaced by the way back.
       SB.store.isDemo && SB.store.isDemo()
         ? settingBlock('The demo', 'You are in the demo, not your kitchen.', h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => SB.store.leaveDemo() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Back to my kitchen')))
-        : settingBlock('Start over', 'Empty the menu and begin again. A backup is saved for you first.', link('trash', 'Start over with an empty menu', 'startover'))));
+        : settingBlock('Start over', 'Empty the menu and begin again. A backup is saved for you first.', link('trash', 'Start over with an empty menu', 'startover')),
+      versionLine()));
 
     // Keep every control in step when something else changes the look, the station or the clock.
     offs.push(SB.theme.onChange(() => { themeSeg.setValue(SB.theme.get()); textSeg.setValue(SB.theme.textSize()); sizeSeg.setValue(SB.theme.density()); hintsTog.setValue(SB.theme.hints()); }));
@@ -28674,9 +28689,10 @@ a.of-nav:active { background: var(--press); }
     // Paints the question until it is answered or skipped; after an answer it says what was set and where to change it.
     function paintServe(answer) {
       const answered = answer || U.storage.get(KEY_SERVEANS, '');
-      // An owner who already set How you serve (own order buttons, or counter service on) is not asked again.
+      // An owner who already set How you serve (own order buttons, or counter service on) is not asked again. The empty list a new
+      // kitchen starts with is not an answer, so the question still comes.
       const svc = SB.store.getState().settings.service || {};
-      const setUp = Array.isArray(svc.chips) || svc.counter === true;
+      const setUp = (Array.isArray(svc.chips) && svc.chips.length > 0) || svc.counter === true;
       const show = activeDishes().length > 0 && !U.storage.get(KEY_SERVESKIP, false) && (!!answered || !setUp);
       svBox.hidden = !show;
       if (!show) return;
@@ -30733,7 +30749,7 @@ a.of-nav:active { background: var(--press); }
       "t": "ol",
       "x": [
        "On the welcome screen, or in the **Settings**, tap **Try the demo**. Then tap **Try the demo** again to confirm. Tap **Not now** to stay where you are.",
-       "The demo opens with sample dishes, three sample tickets and food in the cabinet. A bar at the top says \"You are trying the demo\". Cook, bump, pay and throw out food as much as you like.",
+       "The demo opens with sample dishes, three fresh sample tickets and food in the cabinet, and it runs by itself: new orders arrive and a sample crew cooks and bumps them. A bar at the top says \"Demo\". Watch, or tap any dish to join in. A demo left open for hours starts fresh the next time.",
        "Nothing you do there reaches your own kitchen.",
        "Tap **Back to my kitchen** on the bar to return. Your own dishes and orders are as you left them."
       ]
@@ -38489,6 +38505,31 @@ a.of-nav:active { background: var(--press); }
     if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }
 
+  // A real kitchen that still holds tickets made by an old in-place demo gets them removed at once: they are fake by
+  // definition, and a board full of day-old demo tickets is the first thing a returning owner would otherwise see.
+  // An owner who already chose "keep" is left alone. Real tickets and the orders that hold them are never touched.
+  function clearOldDemo() {
+    const S = SB.store;
+    if (!S || !S.isolated || !S.isolated() || S.isDemo() || typeof S.demoLeftovers !== 'function') return;
+    const c = S.demoLeftovers();
+    if (!c.offer) return;
+    const r = S.clearDemoLeftovers();
+    if (r.ok && SB.ui && SB.ui.toast) SB.ui.toast('Removed ' + r.info.tickets + ' old demo ' + (r.info.tickets === 1 ? 'ticket' : 'tickets') + ' left from an earlier version. Your own data was not touched.', { tone: 'ok', ms: 8000 });
+  }
+
+  // The demo is a show, not homework: it opens on a fresh busy board and runs by itself (orders arrive, the crew
+  // starts and finishes dishes, food in the cabinet ages toward its warnings). A demo left from an earlier visit, with
+  // tickets hours old, starts over fresh instead of opening on a wall of overdue tickets.
+  function playDemo() {
+    const S = SB.store, sim = SB.sim;
+    if (!S || !S.isDemo || !S.isDemo() || !sim || !sim.live) return;
+    const now = S.now(), active = S.getState().tickets.filter((t) => t.status === 'active');
+    const stale = active.some((t) => now - t.createdAt > 2 * 3600e3);
+    if (stale && typeof sim.restartDemo === 'function') sim.restartDemo();
+    sim.live.crew(true);
+    sim.live.start({ rate: 'normal' });
+  }
+
   // Runs the start-up steps in order and remembers which step it is on, so a failure can say where it
   // stopped. A missing shell is an error. Files that failed to load only raise a warning toast, because the
   // rest of the app still works.
@@ -38512,6 +38553,8 @@ a.of-nav:active { background: var(--press); }
     // The app is running from here on: a failure in these extras is logged, never shown as "could not start" over a working board.
     try { storageNotices(); } catch (e) { console.error('[smokebox] start-up notices failed', e); }
     try { watchClock(); } catch (e) { console.error('[smokebox] clock watcher failed', e); }
+    try { clearOldDemo(); } catch (e) { console.error('[smokebox] old demo clean-up failed', e); }
+    try { playDemo(); } catch (e) { console.error('[smokebox] demo start failed', e); }
     try {
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });

@@ -669,6 +669,10 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-strip-x { flex: none; display: grid; place-items: center; width: calc(44px * var(--fl-k)); border: 0; background: transparent; color: inherit; opacity: 0.75; cursor: pointer; }
 .fl-strip-x:hover, .fl-strip-x:focus-visible { opacity: 1; background: rgba(127, 127, 127, 0.18); }
 .fl-strip-x:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -3px; }
+.fl-strip-bar .fl-strip-x { opacity: 1; }
+/* A warning row's clear button is a real, labeled button a cook can find at a glance, not a faint mark at the edge. */
+.fl-strip-rowwrap .fl-strip-x { display: flex; align-items: center; gap: 6px; width: auto; align-self: center; margin: 6px var(--sp-3); padding: 0 var(--sp-4); border: 2px solid currentColor; border-radius: var(--r-btn); background: var(--paper); color: var(--ink); opacity: 1; font: inherit; font-weight: var(--w-heavy); font-size: var(--fs-2); }
+.fl-strip-rowwrap .fl-strip-x:hover { background: var(--sub); }
 /* A sanitize chip that needs attention names itself ("Sanitize not logged"), so a bare "not logged" is never a puzzle. */
 .fl-san[data-urgent="true"] .fl-chip-w { display: inline; }
 /* Station tab names never break across lines (Cabinet once wrapped to "Cabine" and "t" on a phone). */

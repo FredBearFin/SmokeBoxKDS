@@ -1754,7 +1754,7 @@
     if (!store || !store.status || !store.getState) return null;
     const ss = store.status(), s = store.getState();
     // In the demo this strip always shows, above every other message, and always has the Back button.
-    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
+    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'Demo: it runs by itself. Watch, or tap a dish to join in.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
     // Off the board (a back-office page), a device clock that jumped far ahead is asked about here: a slim strip, not a box over the page.
