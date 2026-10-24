@@ -1610,7 +1610,7 @@
     const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); playHere(() => { chime(); speak('Sound is on.'); }); } },
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
-    const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
+    const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 24));
     // The clock notice: the tablet's clock jumped far ahead, the board keeps the old time and asks. Calm, two plain choices, and the board keeps working.
     const clockT = h('span', { class: 'fl-clock-t' });
     const clockKeep = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-keep' }, onClick: () => { if (m) { m.clockDis = Date.now() + 10 * 60e3; updateStrip(store().now()); } } }, 'Keep the old time');
@@ -1631,7 +1631,7 @@
         when, h('span', { class: 'fl-strip-text' }, what, why));
       // Clearing a row counts as seeing it (the loud tone stops) and hides it until its next step on the ladder.
       const rowKey = () => { const r = rows[i]; return r && r.key ? 'row:' + r.key + ':' + (r.el.dataset.step || '') : ''; };
-      const xr = h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': 'Clear this warning until the next one', title: 'Clear until the next warning', onClick: (e) => { e.stopPropagation(); const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (m) { m.dis.add(rowKey()); updateStrip(store().now()); } } }, ico('x', 18));
+      const xr = h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': 'Clear this warning until the next one', title: 'Clear until the next warning', onClick: (e) => { e.stopPropagation(); const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (m) { m.dis.add(rowKey()); updateStrip(store().now()); } } }, ico('check', 22), h('span', { class: 'fl-strip-x-t' }, 'Got it'));
       const wrap = h('div', { class: 'fl-strip-rowwrap', hidden: true, dataset: { i: String(i) } }, row, xr);
       rows.push({ el: row, wrap, when, what, why, key: '', batchId: null, rowKey });
       el.appendChild(wrap);

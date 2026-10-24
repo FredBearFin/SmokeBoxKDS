@@ -1968,6 +1968,10 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-strip-x { flex: none; display: grid; place-items: center; width: calc(44px * var(--fl-k)); border: 0; background: transparent; color: inherit; opacity: 0.75; cursor: pointer; }
 .fl-strip-x:hover, .fl-strip-x:focus-visible { opacity: 1; background: rgba(127, 127, 127, 0.18); }
 .fl-strip-x:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -3px; }
+.fl-strip-bar .fl-strip-x { opacity: 1; }
+/* A warning row's clear button is a real, labeled button a cook can find at a glance, not a faint mark at the edge. */
+.fl-strip-rowwrap .fl-strip-x { display: flex; align-items: center; gap: 6px; width: auto; align-self: center; margin: 6px var(--sp-3); padding: 0 var(--sp-4); border: 2px solid currentColor; border-radius: var(--r-btn); background: var(--paper); color: var(--ink); opacity: 1; font: inherit; font-weight: var(--w-heavy); font-size: var(--fs-2); }
+.fl-strip-rowwrap .fl-strip-x:hover { background: var(--sub); }
 /* A sanitize chip that needs attention names itself ("Sanitize not logged"), so a bare "not logged" is never a puzzle. */
 .fl-san[data-urgent="true"] .fl-chip-w { display: inline; }
 /* Station tab names never break across lines (Cabinet once wrapped to "Cabine" and "t" on a phone). */
@@ -4341,7 +4345,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "6f898af" };
+window.SB_BUILD = { version: "0.2.0", id: "33f8b10" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -22566,7 +22570,7 @@ window.SB_BUILD = { version: "0.2.0", id: "6f898af" };
     const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); playHere(() => { chime(); speak('Sound is on.'); }); } },
       ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
-    const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 18));
+    const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 24));
     // The clock notice: the tablet's clock jumped far ahead, the board keeps the old time and asks. Calm, two plain choices, and the board keeps working.
     const clockT = h('span', { class: 'fl-clock-t' });
     const clockKeep = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'clock-keep' }, onClick: () => { if (m) { m.clockDis = Date.now() + 10 * 60e3; updateStrip(store().now()); } } }, 'Keep the old time');
@@ -22587,7 +22591,7 @@ window.SB_BUILD = { version: "0.2.0", id: "6f898af" };
         when, h('span', { class: 'fl-strip-text' }, what, why));
       // Clearing a row counts as seeing it (the loud tone stops) and hides it until its next step on the ladder.
       const rowKey = () => { const r = rows[i]; return r && r.key ? 'row:' + r.key + ':' + (r.el.dataset.step || '') : ''; };
-      const xr = h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': 'Clear this warning until the next one', title: 'Clear until the next warning', onClick: (e) => { e.stopPropagation(); const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (m) { m.dis.add(rowKey()); updateStrip(store().now()); } } }, ico('x', 18));
+      const xr = h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': 'Clear this warning until the next one', title: 'Clear until the next warning', onClick: (e) => { e.stopPropagation(); const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (m) { m.dis.add(rowKey()); updateStrip(store().now()); } } }, ico('check', 22), h('span', { class: 'fl-strip-x-t' }, 'Got it'));
       const wrap = h('div', { class: 'fl-strip-rowwrap', hidden: true, dataset: { i: String(i) } }, row, xr);
       rows.push({ el: row, wrap, when, what, why, key: '', batchId: null, rowKey });
       el.appendChild(wrap);
