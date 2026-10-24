@@ -4562,7 +4562,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "a8be834" };
+window.SB_BUILD = { version: "0.2.0", id: "f7051e5" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -11700,7 +11700,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a8be834" };
   const MARK = 'k:';
   const DEFAULT = 'bf_emma';
   const MAX_KEEP = 150;
-  const st = { on: false, list: {}, checkedAt: 0, getCtx: null, lines: new Map(), playing: null };
+  const st = { on: false, list: {}, checkedAt: 0, getCtx: null, lines: new Map(), playing: null, queue: [], inFlight: 0, aheadInFlight: 0 };
 
   // True when the page was served by a kitchen server (not opened as a file), the only case with a server voice.
   const served = () => { try { return /^https?:$/.test(g.location.protocol); } catch (e) { return false; } };
@@ -11742,10 +11742,29 @@ window.SB_BUILD = { version: "0.2.0", id: "a8be834" };
     const line = have || { buf: null };
     line.urgent = line.urgent || !!urgent;
     if (!have) { st.lines.set(key, line); if (st.lines.size > MAX_KEEP) st.lines.delete(st.lines.keys().next().value); }
-    g.fetch('/api/voice?v=' + encodeURIComponent(v) + (urgent ? '&p=1' : '') + '&t=' + encodeURIComponent(text), { credentials: 'same-origin' })
+    // Waits in this device's own line, urgent ones first (see pump).
+    const job = { urgent: !!urgent, run: () => g.fetch('/api/voice?v=' + encodeURIComponent(v) + (urgent ? '&p=1' : '') + '&t=' + encodeURIComponent(text), { credentials: 'same-origin' })
       .then((r) => { if (!r.ok) throw new Error('voice ' + r.status); return r.arrayBuffer(); })
       .then((ab) => new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)))
-      .then((buf) => { if (!line.buf) line.buf = buf; }, () => { if (!line.buf && st.lines.get(key) === line) st.lines.delete(key); });
+      .then((buf) => { if (!line.buf) line.buf = buf; }, () => { if (!line.buf && st.lines.get(key) === line) st.lines.delete(key); }) };
+    if (urgent) st.queue.unshift(job); else st.queue.push(job);
+    pump();
+  }
+  // WATCH OUT: a browser opens at most 6 connections to one site, and the server makes lines one at a time. Firing every
+  // fetch at once let lines fetched ahead fill all 6, so a call that was due waited behind them inside the browser. So
+  // requests go out from a short line: at most 2 lines fetched ahead at a time, and urgent ones (calls due now, a voice
+  // test) always get a free slot, up to 4 in all.
+  function pump() {
+    while (st.queue.length) {
+      const i = st.queue.findIndex((j) => j.urgent);
+      const job = i >= 0 ? st.queue[i] : st.queue[0];
+      if (st.inFlight >= 4 || (!job.urgent && st.aheadInFlight >= 2)) return;
+      st.queue.splice(i >= 0 ? i : 0, 1);
+      st.inFlight++; if (!job.urgent) st.aheadInFlight++;
+      // Frees the slot when the line has arrived (or failed) and sends the next one.
+      const free = () => { st.inFlight--; if (!job.urgent) st.aheadInFlight--; pump(); };
+      job.run().then(free, free);
+    }
   }
   // The decoded sound of one sentence in the chosen voice, or null when it is not ready.
   const bufOf = (text) => { const v = voice(), l = v && st.lines.get(v + '|' + text); return l && l.buf ? l.buf : null; };
@@ -21989,7 +22008,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a8be834" };
     voiceLevel = level === 'light' || level === 'full' ? level : 'normal';
     U.storage.set(KEY_VLEVEL, voiceLevel);
     if (m) m.coPrimed = false;
-    if (sound && speech) playHere(() => speak(SB.deadlines.phrase('start', { name: '2 brisket sandwich', num: 12 })));
+    if (sound && speech) playHere(() => speak(sampleLine('start')));
     return voiceLevel;
   };
   // Tells whether warnings are spoken aloud right now.
@@ -22070,10 +22089,10 @@ window.SB_BUILD = { version: "0.2.0", id: "a8be834" };
     // The natural voice is made on the server, so the calls of the next 30 seconds are fetched now, before they are due.
     if (nat) { for (const w of wants) NV.prefetch(w.text, true); for (const w of D.calloutWants(store().getState(), now + 30000, m.zone, voiceLevel)) NV.prefetch(w.text); warmVoice(now); }
     if (performance.now() < voiceFreeAt) return;
-    // A call whose natural audio is still being made waits for it up to 4 seconds, then the device voice says it.
+    // A call whose natural audio is still being made waits for it up to 6 seconds, then the device voice says it.
     if (m.coHeld) {
       const hc = m.coHeld;
-      if (!nat || NV.ready(hc.text) || performance.now() - hc.since > 4000) { m.coHeld = null; speak(hc.text, true, hc.style); }
+      if (!nat || NV.ready(hc.text) || performance.now() - hc.since > 6000) { m.coHeld = null; speak(hc.text, true, hc.style); }
       return;
     }
     const c = m.co.next(now);
@@ -22289,20 +22308,34 @@ window.SB_BUILD = { version: "0.2.0", id: "a8be834" };
     return info ? Object.assign({ supported: true }, info) : { supported: true, name: '', lang: '', local: true };
   };
   // Speaks a sample ticket call in the chef voice and says which voice did it, so a cook can hear and see what this tablet will use.
-  F.testVoice = function () {
+  // A sample call with this kitchen's own next ticket number and first dish, so a test never names a ticket that does not exist.
+  function sampleLine(kind) {
+    const S = store().getState(), D = SB.deadlines;
+    const num = S.tickets.reduce((n, t) => Math.max(n, t.num || 0), 100) + 1;
+    const dish = S.menu.find((x) => !x.archived);
+    return kind === 'start' ? D.phrase('start', { name: dish ? (dish.short || dish.name) : 'the first dish', num }) : D.phrase('new_all', { num, count: 1 });
+  }
+  // onState(word) hears how the test goes: 'preparing' while the kitchen server makes the natural line, then 'natural' when it
+  // plays in the natural voice, or 'device' when the device voice says it instead (no server voice, or it took over 20 s).
+  F.testVoice = function (onState) {
+    const tell = (w) => { if (typeof onState === 'function') { try { onState(w); } catch (e) { /* ignore */ } } };
     if (!sound) F.setSound(true);
     if (!speech) F.setSpeech(true);
     hookAudioUnlock();
     resumeAudio();
-    const line = SB.deadlines.phrase('new_all', { num: 12, count: 3 }), NV = SB.natVoice;
-    // The natural voice's test line is made on the server first (a second or two), then played.
+    const line = sampleLine('new'), NV = SB.natVoice;
+    // The natural voice's test line is made on the server first (a few seconds for a voice not used yet), then played.
     if (NV && NV.enabled() && !NV.ready(line)) {
-      NV.prefetch(line);
+      NV.prefetch(line, true);
+      tell('preparing');
       let n = 0;
-      const t = setInterval(() => { if (NV.ready(line) || ++n > 40) { clearInterval(t); playHere(() => speak(line, false, 'new_all')); } }, 200);
+      const t = setInterval(() => {
+        if (NV.ready(line) || ++n > 100) { clearInterval(t); const ok = NV.ready(line); playHere(() => speak(line, false, 'new_all')); tell(ok ? 'natural' : 'device'); }
+      }, 200);
       return F.voiceInfo();
     }
     playHere(() => speak(line, false, 'new_all'));
+    tell(NV && NV.enabled() ? 'natural' : 'device');
     return F.voiceInfo();
   };
   // Whether this tablet can make sound right now: running, suspended (needs a tap), unsupported or off.
@@ -27805,9 +27838,17 @@ window.SB_BUILD = { version: "0.2.0", id: "a8be834" };
     } }, ico('volume', 20), h('span', null, 'Test the sound'));
     // Test the voice: speaks a sample call and names the voice picked and where it lives (on the tablet or over the internet).
     const voiceSay = h('p', { class: 'fs-sub mn-test-voice', role: 'status' });
+    // Says how a voice test went: getting a natural voice ready on the kitchen server, then which voice spoke.
+    const voiceState = (v) => (w) => {
+      if (w === 'preparing') text(voiceSay, 'Getting ' + v.name.split(',')[0] + ' ready on the kitchen server (a few seconds the first time)...');
+      else if (w === 'natural') text(voiceSay, 'Voice: ' + v.name + '.');
+      else if (w === 'device' && v.natural) text(voiceSay, 'The kitchen server took too long, so the device voice spoke. Try again in a moment.');
+    };
+    // Test the voice: says a sample call in the chosen voice and reports which voice spoke.
     const voiceBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'test-voice' }, disabled: !floorOk, onClick: () => {
-      const v = SB.floor.testVoice ? SB.floor.testVoice() : { supported: false };
-      text(voiceSay, !v.supported ? 'This tablet cannot speak. Warnings will be tones only.' : v.name ? 'Voice: ' + v.name + (v.local ? ', stored on this tablet.' : ', needs the internet.') : 'Voice: the tablet\'s own default voice.');
+      const info = SB.floor.voiceInfo ? SB.floor.voiceInfo() : { supported: false };
+      const v = SB.floor.testVoice ? SB.floor.testVoice(voiceState(info)) : { supported: false };
+      if (!(v.natural && voiceSay.textContent.indexOf('Getting') === 0)) text(voiceSay, !v.supported ? 'This tablet cannot speak. Warnings will be tones only.' : v.name ? 'Voice: ' + v.name + (v.natural ? '.' : v.local ? ', stored on this tablet.' : ', needs the internet.') : 'Voice: the tablet\'s own default voice.');
     } }, ico('volume', 20), h('span', null, 'Test the voice'));
     // Voice chooser: every English voice this device has, so the owner can pick the one that sounds best. Saved on this device;
     // Automatic picks the best one by itself. A choice says a short sample at once.
@@ -27831,8 +27872,9 @@ window.SB_BUILD = { version: "0.2.0", id: "a8be834" };
     if (g.speechSynthesis && typeof g.speechSynthesis.addEventListener === 'function') { g.speechSynthesis.addEventListener('voiceschanged', fillVoices); offs.push(() => g.speechSynthesis.removeEventListener('voiceschanged', fillVoices)); }
     voiceSel.addEventListener('change', () => {
       U.storage.set('smokebox.v1.voicename', voiceSel.value);
-      const v = SB.floor.testVoice ? SB.floor.testVoice() : { supported: false };
-      text(voiceSay, v.name ? 'Voice: ' + v.name + '.' : 'Voice: the device\'s own default voice.');
+      const info = SB.floor.voiceInfo ? SB.floor.voiceInfo() : { supported: false };
+      text(voiceSay, info.name ? 'Voice: ' + info.name + '.' : 'Voice: the device\'s own default voice.');
+      if (SB.floor.testVoice) SB.floor.testVoice(voiceState(info));
     });
     const voiceRow = h('label', { class: 'mn-vol' }, h('span', null, 'Voice'), voiceSel);
     const testRow = h('div', { class: 'mn-test' }, testBtn, testSay, voiceBtn, voiceSay);

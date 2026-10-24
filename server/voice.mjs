@@ -24,6 +24,9 @@ export const VOICES = {
 // The espeak-ng accent for each voice's first letter.
 const ACCENT = { a: 'en-us', b: 'en-gb' };
 const RATE = 24000;
+// Sentences every kitchen hears all day, in the exact words the tablets use (src/js/25-deadlines.js phrase()). Once the model
+// is loaded they are made for every voice in the background, so a voice test or a common call plays at once.
+const COMMON = ['Order up!', 'Ring it out!', 'Ring it out now!', 'Fire it now!', 'one item!', 'two items!', 'three items!', 'four items!'];
 const MAX_TEXT = 200;
 
 /**
@@ -38,13 +41,16 @@ export function createVoice(opts = {}) {
   const cacheDir = opts.cacheDir || process.env.SMOKEBOX_VOICE_CACHE || '/var/lib/smokebox/voice-cache';
   let ort = null, sess = null, vocab = null, off = false;
   const styles = new Map(), mem = new Map(), waiting = new Map();
-  // Lines waiting to be made, one at a time; a call due now (urgent) goes before lines fetched ahead of time.
+  // Lines waiting to be made, one at a time, by priority: 2 a call due now, 1 a line a tablet fetches ahead, 0 the server's
+  // own warm-up. The same priority goes in arrival order.
   const jobs = [];
   let busy = false;
   // Makes the next waiting line, urgent ones first, then the next, until none is left.
   function pump() {
     if (busy || !jobs.length) return;
-    const i = jobs.findIndex((j) => j.urgent), job = jobs.splice(i >= 0 ? i : 0, 1)[0];
+    let i = 0;
+    for (let k = 1; k < jobs.length; k++) if (jobs[k].prio > jobs[i].prio) i = k;
+    const job = jobs.splice(i, 1)[0];
     busy = true;
     make(job.text, job.voice).then(job.resolve, job.reject).finally(() => { busy = false; pump(); });
   }
@@ -58,6 +64,9 @@ export function createVoice(opts = {}) {
       sess = await ort.InferenceSession.create(modelFile, { intraOpNumThreads: opts.threads || 2 });
       try { fs.mkdirSync(cacheDir, { recursive: true }); } catch (e) { /* memory cache still works */ }
       log('natural voice ready');
+      // Warm-up: the common sentences for every voice, behind any line a tablet asks for (they are not urgent).
+      // Emma (the default voice) first, then the others.
+      for (const v of ['bf_emma'].concat(Object.keys(VOICES).filter((x) => x !== 'bf_emma'))) for (const t of COMMON) say(t, v, 0).catch(() => {});
     } catch (e) { off = true; log('natural voice off: ' + e.message); }
   })();
 
@@ -96,21 +105,23 @@ export function createVoice(opts = {}) {
   }
 
   // One line as speech: from memory, from disk, or made now (one at a time, so two tablets asking at once share the work).
-  async function say(text, voice, urgent) {
+  // prio: 2 due now, 1 fetched ahead by a tablet (the default), 0 the server's warm-up. true and false are taken as 2 and 1.
+  async function say(text, voice, prio) {
+    prio = prio === true ? 2 : prio === false || prio === undefined ? 1 : prio;
     const t = String(text || '').replace(/\s+/g, ' ').trim();
     if (!t || t.length > MAX_TEXT || !Object.prototype.hasOwnProperty.call(VOICES, voice)) return null;
     await started;
     if (off) return null;
     const key = crypto.createHash('sha256').update(voice + '|' + t).digest('hex').slice(0, 32);
     if (mem.has(key)) return mem.get(key);
-    if (waiting.has(key)) { if (urgent) { const j = jobs.find((x) => x.key === key); if (j) j.urgent = true; } return waiting.get(key); }
+    if (waiting.has(key)) { const j = jobs.find((x) => x.key === key); if (j && prio > j.prio) j.prio = prio; return waiting.get(key); }
     const file = path.join(cacheDir, key + '.wav');
     // Reads the line from disk, or makes it, then keeps it in memory (the newest 400 lines).
     const p = (async () => {
       let wav = null;
       try { wav = fs.readFileSync(file); } catch (e) { wav = null; }
       if (!wav) {
-        const job = new Promise((resolve, reject) => { jobs.push({ key, text: t, voice, urgent: !!urgent, resolve, reject }); pump(); });
+        const job = new Promise((resolve, reject) => { jobs.push({ key, text: t, voice, prio, resolve, reject }); pump(); });
         wav = await job.catch((e) => { log('voice line failed: ' + e.message); return null; });
         if (wav) { try { fs.writeFileSync(file, wav); } catch (e) { /* kept in memory only */ } }
       }
