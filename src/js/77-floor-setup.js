@@ -272,12 +272,16 @@
     const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'House salad', autocapitalize: 'words', spellcheck: 'false', enterkeyhint: 'next' });
     const nameField = SB.ui.field({ label: 'What is it called?', control: nameIn });
     const priceIn = h('input', { class: 'input dp-price', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '12.50' });
-    const priceField = SB.ui.field({ label: 'Price in dollars', control: priceIn });
+    const priceField = SB.ui.field({ label: 'Price the customer pays', control: priceIn });
     const priceEcho = h('p', { class: 'fs-sub dp-echo', 'aria-live': 'polite' });
     priceField.appendChild(priceEcho);
     // Shows what Smokebox understood from the typed price before anything is saved, so "12,50" is never a surprise.
     priceIn.addEventListener('input', () => { const i = priceInfo(priceIn.value); tell(priceEcho, i ? 'Reads as ' + U.fmtMoney(i.value) + (i.rounded ? ' (rounded to the cent)' : '') : '', 'ok'); });
     let zone = '';
+    // The minutes box, once built: picking a station shows that station's guess in it.
+    let minBox = null;
+    // The guess shown in the empty minutes box for a station.
+    const guessWords = (id) => 'about ' + (id ? Math.max(1, Math.round(defaultsFor(id).sec / 60)) : 5);
     // Menu section: where the dish sits on the order screen. It starts from the station's guess until the owner picks one by hand;
     // after that their last hand pick is used for the next dish (a pizza shop picks "Pizzas" once).
     const catSel = h('select', { class: 'select dp-menusec', 'aria-label': 'Menu section' });
@@ -296,7 +300,7 @@
     catSel.addEventListener('change', () => { catTouched = true; U.storage.set(KEY_LASTCAT, catSel.value); saveDraft(); });
     const tiles = h('div', { class: 'dp-tiles', role: 'radiogroup', 'aria-label': 'Where it is made' });
     const zoneErr = h('div', { class: 'field-error', role: 'alert', hidden: true });
-    const whereLabel = h('div', { class: 'field-label' }, 'Where is it made?');
+    const whereLabel = h('div', { class: 'field-label' }, 'Which station makes it?');
     // Builds one tile per visible station. With only one station there is nothing to ask, so the tiles are hidden
     // and that station is used for every dish.
     function paintTiles() {
@@ -318,6 +322,7 @@
     // Shows which station tile is chosen and clears the "tap where it is made" message.
     function pickZone(id) {
       zone = id; zoneErr.hidden = true; if (!catTouched) paintCats();
+      if (minBox) minBox.placeholder = guessWords(id);
       tiles.querySelectorAll('.dp-tile').forEach((b) => b.setAttribute('aria-checked', b.dataset.zone === id ? 'true' : 'false'));
     }
     // Change stations: rename, hide or add one, using the same saved names the board and tickets read.
@@ -409,18 +414,19 @@
     paintCatRows(); paintCats();
     const whereBlock = h('div', { class: 'field' }, whereLabel, tiles, zoneErr, stFold);
 
-    // More options, folded shut: prep time, category and a short ticket name. Nothing here is needed.
-    const minIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', placeholder: 'auto', 'aria-label': 'Prep time in minutes' });
+    // Minutes to make one sits in the main form: the timing engine starts each dish from it, so it is asked, not hidden. Empty
+    // uses the station's guess (shown in the box) and is marked as a guess that learns from real tickets.
+    const minIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'about 5', 'aria-label': 'Minutes to make one' });
+    minBox = minIn; minIn.placeholder = guessWords(zone);
+    const minField = SB.ui.field({ label: 'Minutes to make one', control: minIn, hint: 'From start to ready. Not sure? Leave it empty: Smokebox uses the guess shown and learns from your tickets.' });
     const shortIn = h('input', { class: 'input', type: 'text', maxlength: 24, autocomplete: 'off', placeholder: 'Same as the name' });
     const more = h('details', { class: 'dp-fold' }, h('summary', null, ico('chevron-down', 18), h('span', null, 'More options')),
-      h('div', { class: 'dp-more' },
-        SB.ui.field({ label: 'Minutes to make one', control: minIn, hint: 'Leave empty and Smokebox guesses from the station, then learns from your tickets.' }),
-        SB.ui.field({ label: 'Short name on tickets', control: shortIn })));
+      h('div', { class: 'dp-more' }, SB.ui.field({ label: 'Short name on tickets', control: shortIn })));
 
     const status = h('p', { class: 'fs-sub dp-status', role: 'status' });
     const again = h('button', { type: 'submit', class: 'btn btn-primary btn-lg dp-again', dataset: { act: 'save-again' } }, ico('plus', 22), h('span', null, 'Save and add another'));
     const done = h('button', { type: 'button', class: 'btn btn-lg dp-done', dataset: { act: 'save-done' } }, ico('check', 22), h('span', null, 'Save and finish'));
-    const form = h('form', { class: 'dp-form', novalidate: '', 'aria-label': 'Add a dish' }, nameField, priceField, whereBlock, SB.ui.field({ label: 'Menu section', control: catSel, hint: 'Where it sits on the order screen. Change the section names under Change menu sections.' }), catFold, more, h('div', { class: 'fs-row dp-actions' }, again, done), status);
+    const form = h('form', { class: 'dp-form', novalidate: '', 'aria-label': 'Add a dish' }, nameField, priceField, whereBlock, minField, SB.ui.field({ label: 'Menu section', control: catSel, hint: 'Where it sits on the order screen. Change the section names under Change menu sections.' }), catFold, more, h('div', { class: 'fs-row dp-actions' }, again, done), status);
 
     // Keeps what has been typed so far, so a closed tab or a stray tap loses nothing.
     function saveDraft() { U.storage.set(KEY_DRAFT, { name: nameIn.value, price: priceIn.value, zone }); }
@@ -445,7 +451,7 @@
     }
     // Checks the form and saves one dish. Returns true when it saved. Each problem shows beside its own box.
     function saveOne() {
-      tell(status, ''); nameField.setError(null); priceField.setError(null); backRow.hidden = true;
+      tell(status, ''); nameField.setError(null); priceField.setError(null); minField.setError(null); backRow.hidden = true;
       const name = nameIn.value.replace(/\s+/g, ' ').trim();
       const price = parsePrice(priceIn.value);
       if (!name) { nameField.setError('Type the dish name.'); nameIn.focus(); return false; }
@@ -454,7 +460,7 @@
       let prepSec = 0;
       if (minIn.value.trim()) {
         const mins = readNum(minIn);
-        if (mins == null || mins < 0.1 || mins > 60) { tell(status, 'Minutes to make one: type a number from 1 to 60, or leave it empty.'); more.open = true; minIn.focus(); return false; }
+        if (mins == null || mins < 0.1 || mins > 60) { minField.setError('Type a number of minutes from 1 to 60, or leave it empty.'); minIn.focus(); return false; }
         prepSec = Math.round(mins * 60);
       }
       const r = addDish(name, price, zone, { prepSec, cat: catSel.value || undefined, short: shortIn.value.trim() });
