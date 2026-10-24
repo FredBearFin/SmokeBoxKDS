@@ -97,7 +97,7 @@
     fry: { cat: 'fried', sec: 240, track: 'two' }, cold: { cat: 'cold', sec: 60, track: 'one' },
   };
   // Section names that fit each station best, in the old and the new starter names (lower case).
-  const SECTION_WORDS = { pit: ['meats', 'mains'], sides: ['hot sides', 'sides'], fry: ['fried', 'snacks'], cold: ['cold and drinks', 'drinks'] };
+  const SECTION_WORDS = { pit: ['meats', 'mains'], sides: ['hot sides', 'sides'], fry: ['fried', 'snacks'], cold: ['cold food and drinks', 'cold and drinks', 'drinks'] };
   // A short plain line under each station name on its tile.
   const ZONE_HINT = { pit: 'Grill, oven or main line', sides: 'Prep and sides', fry: 'Fried foods', cold: 'No cooking: drinks, cold items' };
   // The example menu. Columns: name, price in dollars, station id, category id. Made-up prices, owner to replace.
