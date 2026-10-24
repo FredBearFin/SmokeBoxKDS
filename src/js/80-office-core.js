@@ -355,7 +355,7 @@
       // removes it.
       onFilterChange(fn) { rec.listeners.push(fn); return () => { const i = rec.listeners.indexOf(fn); if (i >= 0) rec.listeners.splice(i, 1); }; },
       navigate: (id) => O.navigate(id),
-      // openSheet opens a sheet by name. theme says which office theme (Ember or Paper) is showing.
+      // openSheet opens a sheet by name. theme says which office look ('ember' for Night, 'paper' for Day) is showing.
       openSheet: (name, opts) => (SB.sheets ? SB.sheets.open(name, opts) : null),
       theme: () => (SB.theme ? SB.theme.office() : 'ember'),
       kit: O.kit,
@@ -981,7 +981,7 @@
 
     const title = h('h1', { class: 'of-title', id: 'of-title', tabindex: '-1' }, 'Speed');
     const themeBtn = h('button', { type: 'button', class: 'btn btn-ghost of-theme' });
-    const backBtn = h('button', { type: 'button', class: 'btn of-back', dataset: { backToLine: '' } }, ico('door', 22), h('span', null, 'Back to the line'));
+    const backBtn = h('button', { type: 'button', class: 'btn of-back', dataset: { backToLine: '' } }, ico('door', 22), h('span', null, 'Back to the board'));
     const top = h('header', { class: 'of-top' }, title, h('div', { class: 'of-top-actions' }, themeBtn, backBtn));
 
     const filters = h('div', { class: 'of-filters', role: 'group', 'aria-label': 'Filters', dataset: { open: 'false' } });
@@ -1017,14 +1017,14 @@
     PAGES.forEach((p) => M.f.railList.appendChild(railItem(p)));
   }
 
-  // Shows the theme button for the theme you would switch to (sun for Paper, moon for Ember).
+  // Shows the Day/Night button for the look you would switch to (sun for Day, moon for Night), the same
+  // words as the board's Settings.
   function paintThemeBtn() {
     if (!M) return;
-    const cur = SB.theme ? SB.theme.office() : 'ember';
-    const next = cur === 'ember' ? 'paper' : 'ember';
+    const dark = (SB.theme ? SB.theme.office() : 'ember') === 'ember';
     const b = M.f.themeBtn; U.clear(b);
-    b.append(ico(cur === 'ember' ? 'sun' : 'moon', 20), h('span', { class: 'of-theme-w' }, cur === 'ember' ? 'Paper' : 'Ember'));
-    b.setAttribute('aria-label', 'Switch to the ' + (next === 'paper' ? 'Paper (light)' : 'Ember (dark)') + ' theme');
+    b.append(ico(dark ? 'sun' : 'moon', 20), h('span', { class: 'of-theme-w' }, dark ? 'Day' : 'Night'));
+    b.setAttribute('aria-label', 'Switch to ' + (dark ? 'Day (light)' : 'Night (dark)'));
   }
 
   // Builds the sticky filter bar: range buttons, two custom date boxes, channel menu, source buttons and
@@ -1440,7 +1440,7 @@
     buildFilters();
     paintThemeBtn();
     paintRail();
-    scope.on(f.themeBtn, 'click', () => { if (SB.theme) SB.theme.setOffice(SB.theme.office() === 'ember' ? 'paper' : 'ember'); });
+    scope.on(f.themeBtn, 'click', () => { if (SB.theme) SB.theme.toggle(); });
     scope.offs.push(tracked('subs', SB.theme ? SB.theme.onChange((what) => { if (what === 'office') { paintThemeBtn(); try { if (SB.charts && SB.charts.refreshTheme) SB.charts.refreshTheme(); } catch (e) { warnOnce('refreshTheme', e); } } }) : () => {}));
     scope.offs.push(tracked('subs', SB.store && SB.store.subscribe ? SB.store.subscribe(onStoreChange) : () => {}));
     scope.offs.push(tracked('subs', SB.sim && SB.sim.onSampleChange ? SB.sim.onSampleChange(onSampleChange) : () => {}));

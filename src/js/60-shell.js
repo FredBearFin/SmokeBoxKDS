@@ -173,15 +173,14 @@
   const KEY = { theme: 'smokebox.v1.theme', otheme: 'smokebox.v1.otheme', text: 'smokebox.v1.textsize', density: 'smokebox.v1.density', hints: 'smokebox.v1.hints', zone: 'smokebox.v1.zone', role: 'smokebox.v1.role', pinlock: 'smokebox.v1.pinlock', lastBackup: 'smokebox.v1.lastbackup' };
   // Colour of the browser's top bar for each look; each matches that look's background colour.
   const THEME_COLOR = { day: '#F5F2EB', night: '#15181A', ember: '#181513', paper: '#F0ECE3' };
-  // Current choices: floor look, office look (ember dark / paper light), text size. themeSubs = listeners.
-  const cur = { theme: 'day', otheme: 'ember', text: 'normal', density: 'compact', hints: true }; // compact tickets by default: full-size ones were too big for a busy board
+  // Current choices: look (Day or Night, shared by the board and the back office), text size. themeSubs = listeners.
+  const cur = { theme: 'day', text: 'normal', density: 'compact', hints: true }; // compact tickets by default: full-size ones were too big for a busy board
   const themeSubs = [];
   // Reads the saved look and text size from the notebook; only known values are accepted.
   function loadTheme() {
     if (!U || !U.storage) return;
-    const t = U.storage.get(KEY.theme, null), o = U.storage.get(KEY.otheme, null), x = U.storage.get(KEY.text, null);
+    const t = U.storage.get(KEY.theme, null), x = U.storage.get(KEY.text, null);
     if (t === 'day' || t === 'night') cur.theme = t;
-    if (o === 'ember' || o === 'paper') cur.otheme = o;
     if (x === 'normal' || x === 'large') cur.text = x;
     const d = U.storage.get(KEY.density, null);
     if (d === 'auto' || d === 'large' || d === 'compact') cur.density = d;
@@ -196,7 +195,7 @@
     let meta = doc.querySelector('meta[name="theme-color"]');
     if (!meta) { meta = doc.createElement('meta'); meta.setAttribute('name', 'theme-color'); doc.head.appendChild(meta); }
     const inOff = !!(S && S.inOffice && S.inOffice());
-    meta.setAttribute('content', inOff ? THEME_COLOR[cur.otheme] : THEME_COLOR[cur.theme]);
+    meta.setAttribute('content', inOff ? THEME_COLOR[T.office()] : THEME_COLOR[cur.theme]);
   }
   // Puts the choices on the page: Day/Night on the top element, large-text class, office look, top bar.
   function applyTheme() {
@@ -204,7 +203,7 @@
     const r = doc.documentElement;
     r.setAttribute('data-theme', cur.theme);
     r.classList.toggle('text-large', cur.text === 'large');
-    doc.querySelectorAll('.office[data-otheme]').forEach((el) => el.setAttribute('data-otheme', cur.otheme));
+    doc.querySelectorAll('.office[data-otheme]').forEach((el) => el.setAttribute('data-otheme', T.office()));
     updateThemeColor();
   }
   // Loads the saved choices and applies them. Returns a copy of the choices.
@@ -214,18 +213,18 @@
   // Switches the floor to 'day' or 'night': saves, applies, tells listeners. Other values are ignored.
   T.set = function (t) {
     if (t !== 'day' && t !== 'night') return cur.theme;
-    cur.theme = t; if (U) U.storage.set(KEY.theme, t); applyTheme(); emitTheme('theme'); return t;
+    cur.theme = t; if (U) U.storage.set(KEY.theme, t); applyTheme();
+    try { if (SB.charts && typeof SB.charts.refreshTheme === 'function') SB.charts.refreshTheme(); } catch (e) { console.error('[smokebox] charts.refreshTheme failed', e); }
+    emitTheme('theme'); emitTheme('office'); return t;
   };
   // Flips Day to Night, or Night to Day.
   T.toggle = () => T.set(cur.theme === 'day' ? 'night' : 'day');
-  // The current office look, 'ember' (dark) or 'paper' (light).
-  T.office = () => cur.otheme;
-  // Like T.set for the office look; also redraws charts, whose colours are set by code, not CSS.
+  // The back office follows the same Day/Night choice: its light look ('paper') for Day, dark ('ember') for Night.
+  T.office = () => (cur.theme === 'night' ? 'ember' : 'paper');
+  // Sets the shared look from an office look name ('paper' is Day, 'ember' is Night); charts are redrawn by T.set.
   T.setOffice = function (o) {
-    if (o !== 'ember' && o !== 'paper') return cur.otheme;
-    cur.otheme = o; if (U) U.storage.set(KEY.otheme, o); applyTheme();
-    try { if (SB.charts && typeof SB.charts.refreshTheme === 'function') SB.charts.refreshTheme(); } catch (e) { console.error('[smokebox] charts.refreshTheme failed', e); }
-    emitTheme('office'); return o;
+    if (o !== 'ember' && o !== 'paper') return T.office();
+    T.set(o === 'ember' ? 'night' : 'day'); return T.office();
   };
   // The current text size, 'normal' or 'large'.
   T.textSize = () => cur.text;
@@ -1513,7 +1512,7 @@
       console.error('[smokebox] office failed to mount', e);
       // Try again clears the flag and builds the office pages from scratch.
       U.clear(el); el.appendChild(ui.errorCard(e, { title: 'The back office could not open', module: 'office (80-*.js to 84-*.js)', onRetry: () => { st.officeContent = false; mountOfficeContent(st.officeSection); } }));
-      el.appendChild(h('div', { class: 'row', style: 'padding:0 16px 16px;justify-content:center' }, h('button', { type: 'button', class: 'btn', dataset: { backToLine: '' } }, ico('door', 20), h('span', null, 'Back to the line'))));
+      el.appendChild(h('div', { class: 'row', style: 'padding:0 16px 16px;justify-content:center' }, h('button', { type: 'button', class: 'btn', dataset: { backToLine: '' } }, ico('door', 20), h('span', null, 'Back to the board'))));
     }
   }
   // Tears the office pages down after closing and empties the layer.
@@ -1640,7 +1639,7 @@
       return openOffice(section);
     });
   };
-  // Back to the line: reverse wipe, then history steps back (or the entry is replaced). False if not open.
+  // Back to the board: reverse wipe, then history steps back (or the entry is replaced). False if not open.
   S.extinguish = function () {
     if (!st.mounted || !st.officeOpen) return Promise.resolve(false);
     const p = closeOffice();
@@ -1836,17 +1835,17 @@
     st.ph.floor = { setZone: (z) => { label.textContent = 'Station: ' + (z === 'all' ? 'All' : z); seg.setValue(z); } };
     st.ph.floor.setZone(R.view().zone || 'all');
   }
-  // Stand-in office used when the office files are missing: page buttons, Ember/Paper switch, way back.
+  // Stand-in office used when the office files are missing: page buttons, Day/Night switch, way back.
   function renderOfficePlaceholder(el, section) {
     U.clear(el);
     const title = h('h2', null, 'Back office placeholder');
     const sec = h('p', { class: 't-muted' });
     // One button per office page; each goes to that page through the router.
     const nav = h('div', { class: 'row' }, SECTIONS.map((s) => h('button', { type: 'button', class: 'btn btn-sm', onClick: () => R.go({ kind: 'office', section: s }) }, s)));
-    // Switches the office between Ember (dark) and Paper (light).
-    const themeBtn = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => T.setOffice(T.office() === 'ember' ? 'paper' : 'ember') }, ico('sun', 18), h('span', null, 'Switch Ember and Paper'));
-    const back = h('button', { type: 'button', class: 'btn btn-primary', dataset: { backToLine: '' } }, ico('door', 22), h('span', null, 'Back to the line'));
-    el.appendChild(h('div', { class: 'ph' }, h('div', { class: 'ph-note' }, title, h('p', { class: 't-muted' }, 'The back office pages did not load. Use Back to the line to leave, then reload the page.'), sec), nav, h('div', { class: 'row' }, themeBtn, back)));
+    // Switches between Day and Night (the board and the back office share the look).
+    const themeBtn = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => T.toggle() }, ico('sun', 18), h('span', null, 'Switch Day and Night'));
+    const back = h('button', { type: 'button', class: 'btn btn-primary', dataset: { backToLine: '' } }, ico('door', 22), h('span', null, 'Back to the board'));
+    el.appendChild(h('div', { class: 'ph' }, h('div', { class: 'ph-note' }, title, h('p', { class: 't-muted' }, 'The back office pages did not load. Use Back to the board to leave, then reload the page.'), sec), nav, h('div', { class: 'row' }, themeBtn, back)));
     // Shows the name of the current office page.
     const setSection = (s) => { sec.textContent = 'Section: ' + s; };
     setSection(section);

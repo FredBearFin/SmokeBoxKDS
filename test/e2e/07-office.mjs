@@ -177,26 +177,29 @@ export default function (h) {
       t.check('Esc closes the panel and stays in the office on Tickets', !(await dlg.isVisible().catch(() => false)) && await officeOpen(page) && /tickets/.test(await page.evaluate(() => location.hash)), await page.evaluate(() => location.hash), 'officeA');
     }
     // themes
-    const themeBtn = page.locator('#sb-office .of-theme, #sb-office button:has-text("Paper"), #sb-office button:has-text("Ember")').first();
+    const themeBtn = page.locator('#sb-office .of-theme').first();
+    // The office follows the board's Day/Night look; start from Night (the dark office) for this check.
+    await page.evaluate(() => SB.theme.set('night'));
+    await wait(300);
     const before = await page.evaluate(() => document.getElementById('sb-office').dataset.otheme);
-    t.check('the office starts in Ember', before === 'ember', before, 'lead');
+    t.check('Night gives the dark office', before === 'ember', before, 'lead');
     await themeBtn.click();
     await wait(500);
-    const paper = await page.evaluate(() => ({ th: document.getElementById('sb-office').dataset.otheme, bg: getComputedStyle(document.querySelector('#sb-office .of')).backgroundColor, stored: localStorage.getItem('smokebox.v1.otheme') }));
-    t.check('the theme button switches to Paper (light) and remembers it', paper.th === 'paper' && /paper/.test(paper.stored || ''), paper, 'officeA');
+    const paper = await page.evaluate(() => ({ th: document.getElementById('sb-office').dataset.otheme, bg: getComputedStyle(document.querySelector('#sb-office .of')).backgroundColor, stored: localStorage.getItem('smokebox.v1.theme') }));
+    t.check('the theme button switches to Day (light) and remembers it', paper.th === 'paper' && /day/.test(paper.stored || ''), paper, 'officeA');
     t.check('Paper really is light (page background luminance > 0.6)', await page.evaluate((bg) => { const m = /(\d+),\s*(\d+),\s*(\d+)/.exec(bg); return m ? (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) / 255 > 0.6 : false; }, paper.bg), paper.bg, 'lead');
     const names = await page.evaluate(() => Array.from(document.querySelectorAll('#sb-office header button, #sb-office .of-top button')).map((b) => b.getAttribute('aria-label') || b.textContent.trim()));
-    t.check('the theme button names the theme it will switch to', names.some((n) => /Ember|dark/i.test(n)), names, 'officeA');
+    t.check('the theme button names the look it will switch to', names.some((n) => /Night|dark/i.test(n)), names, 'officeA');
     const charts = (await chartAudit(page)).filter((c) => c.w > 0);
     t.check('charts redraw in Paper (still have marks)', charts.some((c) => c.marks > 0), charts.map((c) => c.name + ':' + c.marks), 'officeA');
     await t.shot(page, 'office-paper-tickets');
     await page.reload({ waitUntil: 'load' });
     await page.waitForFunction(() => window.SB && SB.booted === true, null, { timeout: 10000 });
     await waitOffice(page, 6000);
-    t.check('Paper survives a reload', (await page.evaluate(() => document.getElementById('sb-office').dataset.otheme)) === 'paper');
+    t.check('Day survives a reload', (await page.evaluate(() => document.getElementById('sb-office').dataset.otheme)) === 'paper');
     await themeBtn.click();
     await wait(400);
-    t.check('and switches back to Ember', (await page.evaluate(() => document.getElementById('sb-office').dataset.otheme)) === 'ember');
+    t.check('and switches back to Night', (await page.evaluate(() => document.getElementById('sb-office').dataset.otheme)) === 'ember');
 
     // [ and ] step through the pages
     await go(page, 'pace');

@@ -42,7 +42,7 @@ a.of-nav:active { background: var(--press); }
 .of-soon { font-size: var(--fs-1); font-weight: var(--w-regular); color: var(--ink3); }
 .of-nav.is-soon .icon { opacity: 0.7; }
 
-/* The page title row with the theme button and Back to the line. */
+/* The page title row with the theme button and Back to the board. */
 .of-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3) var(--sp-4); padding: var(--sp-5) var(--of-gut) var(--sp-3); max-width: 1480px; margin: 0 auto; width: 100%; }
 .of-title { margin: 0; font: var(--w-semi) var(--fs-6)/1.05 var(--font-display); letter-spacing: 0.005em; color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
 .of-title:focus { outline: none; } /* a heading, not a control: it takes focus after a page change so screen readers start there, with no ring */
@@ -318,7 +318,7 @@ a.of-nav:active { background: var(--press); }
 @media (pointer: coarse), (max-width: 719px) {
   .of .of-seg .seg-opt, .of .of-card-actions .btn, .of .of-card-actions .ch-tbtn,
   .of .of-top-actions .btn, .of .of-sortbtn, .of .of-tpager .btn { min-height: 44px; }
-  .of .of-theme { width: 44px; }
+  .of .of-theme { min-width: 44px; }
 }
 /* Ticket numbers in the table are links; the padding grows the hit area without moving the rows. */
 .of-rowbtn { padding-block: 5px; margin-block: -5px; }
