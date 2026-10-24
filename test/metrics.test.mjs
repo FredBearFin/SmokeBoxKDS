@@ -612,8 +612,8 @@ describe('safety: compliance, waste, batch timeline', () => {
     tickets: [quick({ id: 'c1', created: 0, total: 60 })],
     events: [
       ...[...Array(8)].map((_, i) => ev('temp_logged', i * 10, { batchId: 'b', f: 150, onTime: true, lateMs: 0 })),
-      ev('temp_logged', 90, { batchId: 'b', f: 140, onTime: false, lateMs: 60000 }), ev('temp_logged', 100, { batchId: 'b', f: 140, onTime: false, lateMs: 120000 }),
-      ...[true, true, true].map((ok, i) => ev('sanitize_done', 200 + i, { onTime: ok, lateMs: 0 })), ev('sanitize_done', 210, { onTime: false, lateMs: 300000 }),
+      ev('temp_logged', 90, { batchId: 'b', f: 140, onTime: false, lateMs: 360000 }), ev('temp_logged', 100, { batchId: 'b', f: 140, onTime: false, lateMs: 420000 }),
+      ...[true, true, true].map((ok, i) => ev('sanitize_done', 200 + i, { onTime: ok, lateMs: 0 })), ev('sanitize_done', 210, { onTime: false, lateMs: 600000 }),
       ev('batch_discard', 300, { batchId: 'x1', ing: 'brisket', g: 1000, reason: 'expired', cost: 24.36 }),
       ev('batch_discard', 310, { batchId: 'x2', ing: 'pork', g: 500, reason: 'temp', cost: 10 }),
       ev('batch_discard', 320, { batchId: 'x3', ing: 'brisket', g: 700, reason: 'expired', cost: 17 }),
@@ -624,11 +624,21 @@ describe('safety: compliance, waste, batch timeline', () => {
   });
   it('compliance: temp checks on time = 8/10, lateness stats', () => {
     const k = M.compliance(cd()).tempChecks;
-    assert.deepEqual([k.count, k.onTime, k.late, k.onTimePct, k.avgLateMs, k.maxLateMs], [10, 8, 2, 0.8, 90000, 120000]);
+    assert.deepEqual([k.count, k.onTime, k.late, k.onTimePct, k.avgLateMs, k.maxLateMs], [10, 8, 2, 0.8, 390000, 420000]);
+  });
+  it('compliance: a check logged a few seconds or minutes after it was due still counts as on time', () => {
+    const k = M.compliance(dataset({ tickets: [quick({ id: 'g1', created: 0, total: 60 })], events: [
+      ev('sanitize_done', 10, { onTime: false, lateMs: 1000 }), ev('sanitize_done', 20, { onTime: false, lateMs: 4 * 60000 }),
+      ev('sanitize_done', 30, { onTime: false, lateMs: 5 * 60000 }), ev('temp_logged', 40, { batchId: 'b', f: 150, onTime: false, lateMs: 1000 }),
+    ] }));
+    assert.deepEqual([k.sanitize.count, k.sanitize.onTime, k.sanitize.late, k.sanitize.maxLateMs], [3, 2, 1, 300000]);
+    assert.deepEqual([k.tempChecks.onTime, k.tempChecks.late, k.tempChecks.maxLateMs], [1, 0, null]);
+    assert.equal(M.withinGrace({ onTime: false, lateMs: 1000 }), true);
+    assert.equal(M.withinGrace({ onTime: false }), false);
   });
   it('compliance: sanitise 3/4 and the score is the mean of the two on-time shares', () => {
     const k = M.compliance(cd());
-    assert.deepEqual([k.sanitize.count, k.sanitize.onTimePct, k.sanitize.avgLateMs], [4, 0.75, 300000]);
+    assert.deepEqual([k.sanitize.count, k.sanitize.onTimePct, k.sanitize.avgLateMs], [4, 0.75, 600000]);
     near(k.score, 0.775);
   });
   it('compliance: discards by reason (grams, cost), largest grams first; waste share of cooked intake', () => {
@@ -929,8 +939,8 @@ describe('insights: structure, guards and determinism', () => {
   });
   it('returns at most 8, sorted by importance, and opts.limit trims further', () => {
     const extra = [
-      ...evs('temp_logged', 10, (i) => ({ batchId: 'b', f: 150, onTime: i < 4, lateMs: i < 4 ? 0 : 60000 })),
-      ...evs('sanitize_done', 4, (i) => ({ onTime: i < 3, lateMs: i < 3 ? 0 : 120000 })),
+      ...evs('temp_logged', 10, (i) => ({ batchId: 'b', f: 150, onTime: i < 4, lateMs: i < 4 ? 0 : 600000 })),
+      ...evs('sanitize_done', 4, (i) => ({ onTime: i < 3, lateMs: i < 3 ? 0 : 720000 })),
       ...evs('batch_discard', 3, (i) => ({ batchId: 'w' + i, ing: 'brisket', g: 1000, reason: 'expired', cost: 20 })), ...evs('batch_in', 1, { batchId: 'bi', ing: 'brisket', cookedG: 20000 }),
       ...evs('sync_done', 10, (i) => ({ syncId: 's' + i, menuId: 'brisket_qtr', target: 'pos', latencyMs: i < 7 ? 10000 : 90000 })),
       ...evs('ui_report', 8, (i) => ({ action: 'createTicket', report: i < 5 ? 'itemUnavailable' : 'badQty' })),
@@ -974,14 +984,14 @@ describe('insights: each rule fires on crafted data and has its own guard', () =
     assert.equal(find(d, 'pacing-effect').tone, 'warn');
   });
   it('temp-checks: 40 % on time is bad; silent below 10 readings', () => {
-    const mk = (n) => dataset({ tickets: [quick({ id: 'q' })], events: evs('temp_logged', n, (i) => ({ batchId: 'b', f: 150, onTime: i < 4, lateMs: i < 4 ? 0 : 60000 })) });
+    const mk = (n) => dataset({ tickets: [quick({ id: 'q' })], events: evs('temp_logged', n, (i) => ({ batchId: 'b', f: 150, onTime: i < 4, lateMs: i < 4 ? 0 : 600000 })) });
     const f = find(mk(10), 'temp-checks');
-    assert.equal(f.tone, 'bad'); assert.equal(f.title, '40% of temperature checks were on time'); assert.match(f.body, /6 of 10 readings came late, by 1m 00s on average/);
+    assert.equal(f.tone, 'bad'); assert.equal(f.title, '40% of temperature checks were on time'); assert.match(f.body, /6 of 10 readings came late, by 10m 00s on average/);
     assert.match(f.body, /local health-code rules override this/);
     assert.equal(find(mk(9), 'temp-checks'), undefined);
   });
   it('sanitize-late: all on time is good, 3 of 4 is a warning, < 4 events is silent', () => {
-    const mk = (n, ok) => dataset({ events: evs('sanitize_done', n, (i) => ({ onTime: i < ok, lateMs: 60000 })) });
+    const mk = (n, ok) => dataset({ events: evs('sanitize_done', n, (i) => ({ onTime: i < ok, lateMs: 600000 })) });
     assert.equal(find(mk(4, 4), 'sanitize-late').title, 'Every sanitize was on time');
     const w = find(mk(4, 3), 'sanitize-late'); assert.deepEqual([w.tone, w.title], ['warn', '1 of 4 sanitizes were late']);
     assert.equal(find(mk(3, 3), 'sanitize-late'), undefined);
@@ -1069,11 +1079,13 @@ describe('headline sentences', () => {
     assert.equal(M.headline('pace', dataset()), 'No finished tickets in this range yet.');
   });
   it('tickets, stations, money, safety, stock, data each speak in numbers', () => {
-    const d = craft(40, { events: evs('temp_logged', 10, (i) => ({ batchId: 'b', f: 150, onTime: i < 4, lateMs: 60000 })) });
+    const d = craft(40, { events: evs('temp_logged', 10, (i) => ({ batchId: 'b', f: 150, onTime: i < 4, lateMs: 600000 })) });
     assert.match(M.headline('tickets', d), /Most of a ticket's 7m 20s average goes to cooking and plating \(89%\)/);
     assert.match(M.headline('stations', d), /Hot sides finished last on 100% of tickets; 1 item runs outside 0\.8 to 1\.25 times the starter prep time/);
     assert.match(M.headline('money', d), /No paid orders yet\. Finished food worth \$780 at menu price over 40 finished tickets, \$19\.50 per ticket/);
     assert.match(M.headline('safety', d), /40% of 10 temperature checks were on time/);
+    const one = dataset({ tickets: [quick({ id: 'o1', created: 0, total: 60 })], events: [event({ type: 'sanitize_done', at: 10, onTime: false, lateMs: 600000 })] });
+    assert.match(M.headline('safety', one), /^No temperature checks logged, the one sanitize round was late;/);
     assert.match(M.headline('stock', d), /1 protein sell-out in 1 day, the earliest brisket at 1:42 pm \(7\.3 hours before close\)/);
     assert.match(M.headline('data', d), /40 tickets in this range \(0 sample, 40 live\)/);
   });
@@ -1159,7 +1171,7 @@ describe('performance: 5000 tickets / 40000 events', () => {
     const base = local(2026, 10, 1, 11);
     for (let i = 0; i < 5000; i++) {
       const t = base + Math.floor(rng.range(0, 14 * 86400)) * 1000, k = i % 8;
-      events.push(k === 0 ? event({ type: 'temp_logged', t, batchId: 'b', f: 150, onTime: rng.chance(0.9), lateMs: 60000 }) : k === 1 ? event({ type: 'sync_done', t, menuId: 'brisket_qtr', target: 'pos', latencyMs: Math.floor(rng.range(2000, 40000)) })
+      events.push(k === 0 ? event({ type: 'temp_logged', t, batchId: 'b', f: 150, onTime: rng.chance(0.9), lateMs: 600000 }) : k === 1 ? event({ type: 'sync_done', t, menuId: 'brisket_qtr', target: 'pos', latencyMs: Math.floor(rng.range(2000, 40000)) })
         : k === 2 ? event({ type: 'avail_changed', t, menuId: 'brisket_qtr', ok: rng.chance(0.5), reason: 'stock', ing: 'brisket' }) : k === 3 ? event({ type: 'ui_report', t, action: 'createTicket', report: 'itemUnavailable' })
         : k === 4 ? event({ type: 'undo', t }) : k === 5 ? event({ type: 'batch_discard', t, batchId: 'w' + i, ing: 'brisket', g: 500, reason: 'expired', cost: 10 }) : k === 6 ? event({ type: 'batch_in', t, batchId: 'i' + i, ing: 'brisket', cookedG: 5000 }) : event({ type: 'sanitize_done', t, onTime: rng.chance(0.9), lateMs: 60000 }));
     }

@@ -1090,6 +1090,7 @@
     sc.on(dayNext, 'click', () => stepDay(1));
     sc.on(dayIn, 'change', () => pickDay(dayIn.value));
     paintDayPicker();
+    paintSourceNote();
     paintFilterSummary();
   }
 
