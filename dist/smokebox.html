@@ -4341,7 +4341,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "f9e5146" };
+window.SB_BUILD = { version: "0.2.0", id: "8bc2a0a" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -20752,7 +20752,7 @@ window.SB_BUILD = { version: "0.2.0", id: "f9e5146" };
     if (!store || !store.status || !store.getState) return null;
     const ss = store.status(), s = store.getState();
     // In the demo this strip always shows, above every other message, and always has the Back button.
-    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'You are trying the demo. Nothing here is your kitchen.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
+    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'Demo: it runs by itself. Watch, or tap a dish to join in.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
     // Off the board (a back-office page), a device clock that jumped far ahead is asked about here: a slim strip, not a box over the page.
@@ -30742,7 +30742,7 @@ window.SB_BUILD = { version: "0.2.0", id: "f9e5146" };
       "t": "ol",
       "x": [
        "On the welcome screen, or in the **Settings**, tap **Try the demo**. Then tap **Try the demo** again to confirm. Tap **Not now** to stay where you are.",
-       "The demo opens with sample dishes, three sample tickets and food in the cabinet. A bar at the top says \"You are trying the demo\". Cook, bump, pay and throw out food as much as you like.",
+       "The demo opens with sample dishes, three fresh sample tickets and food in the cabinet, and it runs by itself: new orders arrive and a sample crew cooks and bumps them. A bar at the top says \"Demo\". Watch, or tap any dish to join in. A demo left open for hours starts fresh the next time.",
        "Nothing you do there reaches your own kitchen.",
        "Tap **Back to my kitchen** on the bar to return. Your own dishes and orders are as you left them."
       ]
@@ -38510,6 +38510,19 @@ window.SB_BUILD = { version: "0.2.0", id: "f9e5146" };
     if (r.ok && SB.ui && SB.ui.toast) SB.ui.toast('Removed ' + r.info.tickets + ' old demo ' + (r.info.tickets === 1 ? 'ticket' : 'tickets') + ' left from an earlier version. Your own data was not touched.', { tone: 'ok', ms: 8000 });
   }
 
+  // The demo is a show, not homework: it opens on a fresh busy board and runs by itself (orders arrive, the crew
+  // starts and finishes dishes, food in the cabinet ages toward its warnings). A demo left from an earlier visit, with
+  // tickets hours old, starts over fresh instead of opening on a wall of overdue tickets.
+  function playDemo() {
+    const S = SB.store, sim = SB.sim;
+    if (!S || !S.isDemo || !S.isDemo() || !sim || !sim.live) return;
+    const now = S.now(), active = S.getState().tickets.filter((t) => t.status === 'active');
+    const stale = active.some((t) => now - t.createdAt > 2 * 3600e3);
+    if (stale && typeof sim.restartDemo === 'function') sim.restartDemo();
+    sim.live.crew(true);
+    sim.live.start({ rate: 'normal' });
+  }
+
   // Runs the start-up steps in order and remembers which step it is on, so a failure can say where it
   // stopped. A missing shell is an error. Files that failed to load only raise a warning toast, because the
   // rest of the app still works.
@@ -38534,6 +38547,7 @@ window.SB_BUILD = { version: "0.2.0", id: "f9e5146" };
     try { storageNotices(); } catch (e) { console.error('[smokebox] start-up notices failed', e); }
     try { watchClock(); } catch (e) { console.error('[smokebox] clock watcher failed', e); }
     try { clearOldDemo(); } catch (e) { console.error('[smokebox] old demo clean-up failed', e); }
+    try { playDemo(); } catch (e) { console.error('[smokebox] demo start failed', e); }
     try {
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });
