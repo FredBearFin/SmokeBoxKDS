@@ -1293,8 +1293,15 @@
         const r = send('updateSettings', { patch: { service: { counter: on } } });
         if (!r.ok && r.report !== 'nothingToDo') { counterTog.setValue(before); tell(cSt, r.words, 'bad'); return; }
         tell(cSt, on ? 'On. You hand food over at the counter, so orders do not wait on kitchen tickets.' : 'Off. Orders go to the kitchen as tickets.', 'ok');
-        offerUndo('Counter service is ' + (on ? 'on' : 'off') + '.', () => { send('updateSettings', { patch: { service: { counter: before } } }); counterTog.setValue(before); });
+        paintCounter(on);
+        offerUndo('Counter service is ' + (on ? 'on' : 'off') + '.', () => { send('updateSettings', { patch: { service: { counter: before } } }); counterTog.setValue(before); paintCounter(before); });
       } });
+    // Writes On or Off beside the switch, so its state never depends on reading the switch's colors.
+    const counterWord = h('strong', { class: 'so-onoff' }, '');
+    counterTog.querySelector('.toggle-label').append(': ', counterWord);
+    // Sets that word to match the switch.
+    function paintCounter(on) { counterWord.textContent = on ? 'On' : 'Off'; }
+    paintCounter(counterOn());
     const sec1 = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Counter service'),
       h('p', { class: 'fs-sub' }, 'You hand food over at the counter and do not need kitchen tickets. Leave it off if cooks work from tickets.'), counterTog, cSt);
 
@@ -1312,27 +1319,17 @@
       paintChips();
       return true;
     }
-    // Rebuilds the rows: a name box, up, down and Remove for each button, then an add box.
+    // Rebuilds the list: each button now on the order screen as a chip with an x to remove it, then an add box.
+    // No buttons at all says so in words, so an empty list never looks like a missing one.
     function paintChips() {
       U.clear(list);
       const cur = currentChips();
+      const chips = h('div', { class: 'ord-chips so-chips', role: 'group', 'aria-label': 'Order buttons now' });
       cur.forEach((label, i) => {
-        const inp = h('input', { class: 'input', type: 'text', maxlength: CHIP_LEN, value: label, 'aria-label': 'Order button ' + (i + 1) });
-        // Saves a renamed button when the box is left; an empty name is refused.
-        inp.addEventListener('change', () => {
-          const v = inp.value.replace(/\s+/g, ' ').trim();
-          if (!v) { inp.value = label; tell(bSt, 'A button needs a name. Type one, or tap Remove.', 'bad'); return; }
-          if (cur.some((x, j) => j !== i && x.toLowerCase() === v.toLowerCase())) { inp.value = label; tell(bSt, 'There is already a button called ' + v + '. Pick another name.', 'bad'); return; }
-          if (v !== label) saveChips(cur.map((x, j) => (j === i ? v : x)), 'Renamed ' + label + ' to ' + v + '.');
-        });
-        // Moves this button one place up or down.
-        const move = (d) => () => { const n = cur.slice(); const k = i + d; if (k < 0 || k >= n.length) return; [n[i], n[k]] = [n[k], n[i]]; saveChips(n, 'Moved ' + label + (d < 0 ? ' up.' : ' down.')); };
-        list.appendChild(h('div', { class: 'dp-strow' }, inp,
-          h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + label + ' up', disabled: i === 0, onClick: move(-1) }, ico('arrow-up', 20)),
-          h('button', { type: 'button', class: 'btn btn-icon', 'aria-label': 'Move ' + label + ' down', disabled: i === cur.length - 1, onClick: move(1) }, ico('arrow-down', 20)),
-          // Removes this button (it can be added again, or brought back with Undo).
-          h('button', { type: 'button', class: 'btn btn-sm', 'aria-label': 'Remove ' + label, onClick: () => { if (cur.length <= 1) { tell(bSt, 'Keep at least one order button, or reset to the starting list.', 'bad'); return; } saveChips(cur.filter((x, j) => j !== i), 'Removed ' + label + '.'); } }, ico('x', 18), h('span', null, 'Remove'))));
+        // Removes this button (it can be added again, or brought back with Undo).
+        chips.appendChild(h('button', { type: 'button', class: 'chip so-chip', 'aria-label': 'Remove ' + label, onClick: () => saveChips(cur.filter((x, j) => j !== i), 'Removed ' + label + '.') }, h('span', null, label), ico('x', 16)));
       });
+      list.appendChild(cur.length ? chips : h('p', { class: 'fs-sub so-none' }, 'No order buttons now: the order screen shows only the name box. Add one below, or tap Use the starting list (' + chipDefaults().join(', ') + ').'));
       const addIn = h('input', { class: 'input', type: 'text', maxlength: CHIP_LEN, placeholder: 'New button, like Phone', 'aria-label': 'New order button name' });
       // Adds a button with the typed name at the end of the list.
       const add = () => {
@@ -1347,9 +1344,9 @@
     paintChips();
     const reset = h('button', { type: 'button', class: 'btn', dataset: { act: 'chips-reset' },
       // Goes back to the starting list of order buttons (with Undo).
-      onClick: () => saveChips(chipDefaults(), 'Order buttons are back to the starting list.') }, 'Reset to the starting list');
+      onClick: () => saveChips(chipDefaults(), 'Order buttons are back to the starting list.') }, 'Use the starting list');
     const sec2 = h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Order buttons'),
-      h('p', { class: 'fs-sub' }, 'The quick buttons on the order screen for who the order is for: Walk-up, Pickup, tables, Phone, Delivery. Up to ' + CHIP_MAX + '.'), list, reset, bSt);
+      h('p', { class: 'fs-sub' }, 'The quick buttons on the order screen for who the order is for, like Walk-up, Pickup, a table, Phone or Delivery. Tap one below to remove it. Up to ' + CHIP_MAX + '.'), list, reset, bSt);
 
     // 3. Currency symbol.
     const curSt = h('p', { class: 'fs-sub', role: 'status' });
