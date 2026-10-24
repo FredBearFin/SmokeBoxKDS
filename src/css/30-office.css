@@ -85,7 +85,10 @@ a.of-nav:active { background: var(--press); }
 
 /* the headline is the typographic anchor: one plain sentence, numbers in the heavy weight */
 /* The "what to do next" message shown instead of blank tiles and charts when a range has no data. */
-.of-coach { max-width: 40em; padding: var(--sp-5) var(--sp-6); margin: 0 0 var(--sp-6); border: 1px dashed var(--line2, var(--line)); border-radius: var(--r-3, 12px); background: var(--ch-surface, transparent); }
+/* The empty-page message: a centered card with the page's icon, sitting in the middle of the page, not in a corner. */
+.of-coach { display: grid; justify-items: center; text-align: center; max-width: 34em; padding: var(--sp-6) var(--sp-6) var(--sp-5); margin: clamp(var(--sp-4), 8vh, var(--sp-8)) auto var(--sp-6); border: 1px solid var(--line-soft, var(--line)); border-radius: var(--r-3, 12px); background: var(--ch-surface, transparent); }
+.of-coach[hidden] { display: none; }
+.of-coach-i { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; margin-bottom: var(--sp-3); border-radius: 50%; color: var(--amber-ink, var(--ink2)); background: var(--sub, transparent); }
 .of-coach-t { margin: 0 0 var(--sp-2); font: var(--w-semi) var(--fs-5, 22px)/1.2 var(--font-display); color: var(--ink); }
 .of-coach-b { margin: 0; font-size: var(--fs-3, 16px); line-height: 1.5; color: var(--ink2); }
 .of-coach-sample { margin-top: var(--sp-4); }
@@ -156,6 +159,8 @@ a.of-nav:active { background: var(--press); }
 
 /* The boxes for no data yet and for a part that failed to draw. */
 .of-empty { display: grid; justify-items: center; align-content: center; gap: var(--sp-2); min-height: 150px; padding: var(--sp-6) var(--sp-4); text-align: center; color: var(--ink2); border: 1px dashed var(--line-soft); border-radius: var(--r-panel); }
+/* A switched-off page (no cook-ahead tracking, counter service) gets the same centered card as an empty page. */
+.of[data-gated="true"] .of-slot > .of-empty { max-width: 34em; margin: clamp(var(--sp-4), 8vh, var(--sp-8)) auto var(--sp-6); border-style: solid; background: var(--ch-surface, transparent); }
 .of-empty .icon { color: var(--ink3); }
 .of-empty-t { margin: 0; font: var(--w-semi) var(--fs-3)/1.25 var(--font-body); color: var(--ink); }
 .of-empty-b { margin: 0; max-width: 46ch; font-size: var(--fs-2); line-height: 1.4; color: var(--ink2); }

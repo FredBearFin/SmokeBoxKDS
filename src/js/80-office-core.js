@@ -69,26 +69,35 @@
   }
 
   // The plain next-step message for a page with nothing in its range, or null when the page has data (or
-  // is the settings page). f = {anyLive, tickets, batches, records, label}: whether any live ticket
-  // exists at all, and how many tickets, batches and safety records fall in the range.
+  // is the settings page). f = {anyLive, tickets, finished, onBoard, paid, batches, records, label}: whether
+  // any live ticket exists at all, and how many tickets (finished, still on the board, paid), batches and
+  // safety records fall in the range. Each page has its own words and next step.
   function coachText(pageId, f) {
     f = f || {};
     const never = !f.anyLive && !f.batches && !f.records;
     const where = f.label ? ' on ' + f.label : ' in this range';
-    if (pageId === 'pace' || pageId === 'tickets' || pageId === 'stations') {
+    // "3 tickets on the board now" when tickets are waiting, else '' (onBoard may be missing in old callers).
+    const board = isNum(f.onBoard) && f.onBoard > 0 ? f.onBoard + ' ' + (f.onBoard === 1 ? 'ticket is' : 'tickets are') + ' on the board now' : '';
+    const KITCHEN = {
+      pace: { first: 'No speed numbers yet', wait: 'times appear here once they are sent out.', start: 'Take an order on the board and tap Bump when it goes out. How fast your tickets go out shows here.' },
+      tickets: { first: 'No finished tickets yet', wait: 'they are listed here with their times once they are sent out.', start: 'Every ticket you send out is listed here with its times. Take an order on the board and tap Bump when it goes out.' },
+      stations: { first: 'No station times yet', wait: 'each station\'s times appear here once they are sent out.', start: 'Each station\'s speed shows here once its items are done. Take an order on the board and send it out.' },
+    };
+    if (KITCHEN[pageId]) {
+      const k = KITCHEN[pageId];
       // With a finished-ticket count, the page needs finished tickets to say anything; tickets still on the line are not enough.
       if (isNum(f.finished) ? f.finished > 0 : f.tickets > 0) return null;
-      if (isNum(f.finished) && f.tickets > 0) return { title: 'Nothing to show yet', body: 'The tickets on the line are not finished. Send one out and its times appear here.' };
+      if (isNum(f.finished) && f.tickets > 0) return { title: k.first, body: (board || 'The tickets so far are not finished') + '; ' + k.wait };
       return never || !f.anyLive
-        ? { title: 'Nothing to show yet', body: 'Take an order and send it out when it is done, and the times appear here.' }
+        ? { title: k.first, body: k.start }
         : { title: 'No tickets' + where, body: 'Nothing was ordered in this range. Use the arrows or the range buttons to look at a day you were open.' };
     }
     if (pageId === 'money') {
       // the thrown-away ledger on this page needs no sales, so a discard also counts as data here
       if (isNum(f.paid) ? f.paid > 0 || f.discards > 0 : f.tickets > 0 || f.discards > 0) return null;
-      if (isNum(f.paid) && f.tickets > 0) return { title: 'Nothing to show yet', body: 'The orders so far are not paid. Pay an order from Orders and the money shows up here.' };
+      if (isNum(f.paid) && f.tickets > 0) return { title: 'No paid orders yet', body: 'The orders so far are not paid. Tap the Orders button on the board, pay an order, and the money shows up here.' };
       return !f.anyLive
-        ? { title: 'Take your first order', body: 'Sales come from your own orders. Take an order on the kitchen board and pay it from Orders, and the money shows up here.' }
+        ? { title: 'Take your first order', body: 'Sales come from your own orders. Take an order on the board, pay it with the Orders button on the board, and the money shows up here.' }
         : { title: 'No sales' + where, body: 'Nothing was sold in this range. Use the arrows or the range buttons to look at a day you were open.' };
     }
     if (pageId === 'safety') {
@@ -806,11 +815,12 @@
     function coachFacts() {
       const ds = ctx.dataset(), r = ctx.filters.range, inR = (t) => isNum(t) && t >= r.from && t < r.to;
       let tickets = 0, batches = 0, records = 0, discards = 0, finished = 0, paid = 0;
-      for (const t of ds.tickets || []) if (inR(t.createdAt)) { tickets++; if (t.status !== 'active' && t.status !== 'voided') finished++; }
+      let onBoard = 0;
+      for (const t of ds.tickets || []) if (inR(t.createdAt)) { tickets++; if (t.status === 'active') onBoard++; else if (t.status !== 'voided') finished++; }
       for (const o of ds.orders || []) { if (inR(o.createdAt)) tickets++; if (o.status === 'paid' && inR(o.paidAt)) paid++; }
       for (const b of ds.batches || []) if (b.src !== 'starter' && inR(b.enteredAt)) batches++;
       for (const e of ds.events || []) if (e && (e.type === 'temp_logged' || e.type === 'sanitize_done' || e.type === 'batch_discard') && inR(e.t)) { records++; if (e.type === 'batch_discard') discards++; }
-      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, finished, paid, batches, records, discards, label: r.label };
+      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, finished, onBoard, paid, batches, records, discards, label: r.label };
     }
     // Shows the "what to do next" message in place of blank tiles and charts when the range has no data.
     function paintCoach() {
@@ -822,7 +832,8 @@
       const key = c.title + '|' + c.body + '|' + canSample;
       if (coachEl.__key === key) return;
       coachEl.__key = key;
-      const kids = [h('h2', { class: 'of-coach-t' }, c.title), h('p', { class: 'of-coach-b' }, c.body)];
+      const pg = PAGES.find((x) => x.id === id);
+      const kids = [h('span', { class: 'of-coach-i', 'aria-hidden': 'true' }, ico(pg ? pg.icon : 'info', 28)), h('h2', { class: 'of-coach-t' }, c.title), h('p', { class: 'of-coach-b' }, c.body)];
       if (canSample) kids.push(h('button', { type: 'button', class: 'btn btn-sm of-coach-sample', onClick: showSampleNumbers }, 'Show sample numbers'),
         h('p', { class: 'of-coach-n' }, 'Sample numbers are generated so you can see what this page looks like. They are labeled sample and never mixed into your own.'));
       coachEl.replaceChildren(...kids);
