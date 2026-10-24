@@ -299,7 +299,7 @@ async function recipes(browser) {
   await p.evaluate(() => SB.sheets.closeAll && SB.sheets.closeAll()); await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(500);
   check('settings: How you serve', await tap(p, 'How you serve')); await p.waitForTimeout(500);
   const hs = '.sheet-root:last-of-type';
-  for (const t of ['Counter service', 'Order buttons', 'Add button', 'Reset to the starting list', 'Currency symbol', 'Your own']) check('how you serve: ' + t, await has(p, t, hs));
+  for (const t of ['Counter service', 'Order buttons', 'Add button', 'Use the starting list', 'Currency symbol', 'Your own']) check('how you serve: ' + t, await has(p, t, hs));
   await p.evaluate(() => document.querySelector('.sheet-root:last-of-type [role=switch]').click()); await p.waitForTimeout(400);
   check('how you serve: Undo bar after a change', await has(p, 'Undo', hs));
   await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(400);
