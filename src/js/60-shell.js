@@ -143,13 +143,16 @@
   /* ====================================================================================================================
    * Backup nudge: pure decision (works in Node)
    * ================================================================================================================== */
-  // Decides whether to nudge for the daily backup. a = {service, lastBackupAt, snoozeUntil, now, hasData}.
-  // It is due from closing time until 10 hours after, when no backup was made in the 2 hours before closing
-  // or since, and nothing is snoozed. An empty kitchen (no tickets or batches) has nothing to lose.
+  // Decides whether to nudge for the daily backup. a = {service, lastBackupAt, snoozeUntil, now, hasData,
+  // openWork, closedAt}. It is due from closing time (or from Close the day, closedAt, if that came first)
+  // until 10 hours after, when no backup was made in the 2 hours before or since, nothing is snoozed and
+  // service is really over: no ticket on the board and no order still open (openWork 0). An empty kitchen
+  // (no tickets or batches) has nothing to lose.
   // WATCH OUT: closeHour above 24 means after midnight, so last night's close is still checked at 12:30 am.
   function backupDue(a) {
     const H = 3600000, sv = a && a.service;
     if (!a || !sv || typeof sv.closeHour !== 'number' || !a.hasData) return false;
+    if (typeof a.openWork === 'number' && a.openWork > 0) return false;
     if (typeof a.snoozeUntil === 'number' && a.snoozeUntil > a.now) return false;
     let closeAt = null;
     for (const day of [0, -1]) {
@@ -157,6 +160,7 @@
       const at = d.getTime() + sv.closeHour * H;
       if (at <= a.now && (closeAt == null || at > closeAt)) closeAt = at;
     }
+    if (typeof a.closedAt === 'number' && a.closedAt <= a.now && (closeAt == null || a.closedAt > closeAt)) closeAt = a.closedAt;
     if (closeAt == null || a.now - closeAt > 10 * H) return false;
     return !(typeof a.lastBackupAt === 'number' && a.lastBackupAt >= closeAt - 2 * H);
   }
@@ -1763,8 +1767,10 @@
       return { kind: 'clock', tone: 'warn', text: 'The clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(ss.clockSuspect.aheadMs / 3600000) + ' hours') + '. Still on the old time.', act: 'Use the new time', onAct: useNewTime, later: true, laterLabel: 'Keep the old time', onLater: keepOldTime };
     }
     if (!s) return null;
-    const due = backupDue({ service: s.settings && s.settings.service, lastBackupAt: S.lastBackupAt(), snoozeUntil: bn.snoozeUntil, now: Date.now(), hasData: s.tickets.length + s.batches.length > 0 });
-    return due ? { kind: 'nudge', tone: 'warn', text: 'Service is over. Save today\'s backup now and keep a copy off this device (email it or use a USB drive).', act: 'Back up now', later: true } : null;
+    // Service is over only when nothing is left on the board and no order is still open.
+    const openWork = s.tickets.filter((t) => t && t.status === 'active').length + (s.orders || []).filter((o) => o && o.status === 'open').length;
+    const due = backupDue({ service: s.settings && s.settings.service, lastBackupAt: S.lastBackupAt(), snoozeUntil: bn.snoozeUntil, now: Date.now(), hasData: s.tickets.length + s.batches.length > 0, openWork, closedAt: s.lastClose && s.lastClose.at });
+    return due ? { kind: 'nudge', tone: 'warn', text: 'Day is done: save today\'s backup.', act: 'Back up now', later: true } : null;
   }
   // Shows, updates or removes the strip at the top of the screen so a problem is seen from the kitchen board.
   function paintBanner() {
