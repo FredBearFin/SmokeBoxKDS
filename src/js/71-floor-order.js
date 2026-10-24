@@ -114,6 +114,15 @@
   // A separate copy of the order, kept so Undo can put it back.
   const copyDraft = () => JSON.parse(JSON.stringify(D));
   function restoreDraft(snap) { D.lines = snap.lines; D.customer = snap.customer; D.channel = snap.channel; D.note = snap.note; D.rush = snap.rush; D.orderId = snap.orderId; D.pay = snap.pay; D.tip = snap.tip; D.allergy = snap.allergy || ''; saveDraftNow(); }
+  // The order type a quick name implies: Pickup or Takeout means takeout, Drive means drive-thru, Table or Dine means dine-in.
+  // Null when the name says nothing about it.
+  function channelOfName(name) {
+    const n = String(name || '').toLowerCase();
+    if (/pick ?-?up|take ?-?out|to ?go|carry ?out/.test(n)) return 'takeout';
+    if (/drive/.test(n)) return 'drive_thru';
+    if (/\btable\b|dine|\bbar\b|booth|patio/.test(n)) return 'dine_in';
+    return null;
+  }
   // WATCH OUT: every new order starts on Pay later. Carrying the last order's payment over would let the next order be
   // recorded as paid (cash, say) by a cook who never looked at the payment box.
   function resetDraft() { clearStoredDraft(); D.lines = []; D.customer = ''; D.channel = 'dine_in'; D.note = ''; D.rush = false; D.orderId = null; D.pay = ''; D.tip = ''; D.allergy = ''; }
@@ -400,7 +409,14 @@
     const chipsEl = h('div', { class: 'ord-chips', role: 'group', 'aria-label': 'Quick names' });
     chipList.forEach((nm) => {
       const b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, nm));
-      b.addEventListener('click', () => { D.customer = D.customer === nm ? '' : nm; custInput.value = D.customer; paintCustomer(); touched(); });
+      b.addEventListener('click', () => {
+        D.customer = D.customer === nm ? '' : nm; custInput.value = D.customer;
+        // A quick name that says how the food leaves (Pickup, Takeout, Drive-thru, Table 4) sets the order type too, so a
+        // Pickup ticket never reads Dine-in. A name that says nothing about it (Jake) leaves the type alone.
+        const ch = D.customer ? channelOfName(D.customer) : null;
+        if (ch && !D.orderId && C.channelById[ch]) { D.channel = ch; channelSeg.setValue(ch); }
+        paintCustomer(); touched();
+      });
       chipsEl.appendChild(b); view.chipBtns.set(nm, b);
     });
     // Names of recent orders that are not quick names, as one-tap buttons; rebuilt only when the list changes.

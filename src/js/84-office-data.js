@@ -305,7 +305,7 @@
 
   // Panels. The sticky table of contents links to them; each panel is a section with a focusable heading.
   const SECTIONS = [
-    { id: 'menu', label: 'Menu', title: 'Dishes and what goes in them', group: 'Shop' },
+    { id: 'menu', label: 'Menu', title: 'Dishes and prices', group: 'Shop' },
     { id: 'ingredients', label: 'Ingredients', title: 'Ingredients', group: 'Kitchen' },
     { id: 'times', label: 'Time limits', title: 'Ticket time limits by channel', group: 'Kitchen' },
     { id: 'pacing', label: 'Finish together', title: 'Finish together', group: 'Advanced' },

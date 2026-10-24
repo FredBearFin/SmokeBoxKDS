@@ -530,7 +530,9 @@
       const v = Math.min(100, frac * 100).toFixed(1);
       if (rec.ring._v !== v) { rec.ring._v = v; rec.ring.style.setProperty('--v', v); }
       attr(rec.ring, 'data-tone', frac >= 1 ? 'bad' : frac >= 0.75 ? 'warn' : 'ok');
-      text(rec.ringT, hmShort(elapsed)); text(rec.ringS, 'of ' + trimNum(limitMs / H1) + ' h');
+      // The number a cook needs is the time LEFT; the ring still fills with the time used.
+      const leftMs = limitMs - elapsed;
+      text(rec.ringT, hmShort(Math.abs(leftMs))); text(rec.ringS, leftMs >= 0 ? 'left of ' + trimNum(limitMs / H1) + ' h' : 'past the ' + trimNum(limitMs / H1) + ' h');
       attr(rec.ring, 'aria-label', (b.kind === 'cooling' ? 'Time cooling: ' : 'Time in the cabinet: ') + hmLong(elapsed) + ' of ' + trimNum(limitMs / H1) + ' hours');
       // A cold item's ring counts the time out of the fridge against the owner's hours (no ring fill when no hours are set).
       if (ci) {

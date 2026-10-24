@@ -375,7 +375,7 @@
     return Math.round(parseFloat(t) * 100) / 100;
   };
   /** Grams for display. User preference: weights in grams, not cups. 850 -> "850 g", 2400 -> "2.40 kg". */
-  U.fmtG = (g) => { if (!U.isNum(g)) return '-'; return Math.abs(g) >= 1000 ? (g / 1000).toFixed(2) + ' kg' : Math.round(g) + ' g'; };
+  U.fmtG = (g) => { if (!U.isNum(g)) return '-'; return Math.abs(g) >= 1000 ? (g / 1000).toFixed(2).replace(/\.?0+$/, '') + ' kg' : Math.round(g) + ' g'; };   // 14 kg, 2.5 kg, 1.25 kg: no trailing zeros
   // Fraction to percent text: 0.874 gives "87%" (d = number of decimals). Not a number gives "-".
   U.fmtPct = (x, d = 0) => (U.isNum(x) ? (x * 100).toFixed(d) + '%' : '-');
   // Number with thousands commas and d decimals. Not a number gives "-".
@@ -419,7 +419,7 @@
     if (!U.isNum(g)) return '-';
     if (U.units.weight !== 'lb') return U.fmtG(g);
     const lb = g / G_PER_LB;
-    return Math.abs(lb) < 1 ? (lb * 16).toFixed(1) + ' oz' : lb.toFixed(2) + ' lb';
+    return Math.abs(lb) < 1 ? (lb * 16).toFixed(1).replace(/\.0$/, '') + ' oz' : lb.toFixed(2).replace(/\.?0+$/, '') + ' lb';
   };
 
   /* ---------- dates (all local time). The "service day" runs from dayStartHour (4 am) so a 12:45 am sale belongs to last night. ---------- */

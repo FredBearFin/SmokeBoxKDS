@@ -42,10 +42,10 @@ async function blank(browser) {
   console.log('Blank kitchen');
   const p = await fresh(browser);
   check('welcome: Add my menu', await seen(p, 'Add my menu'));
-  check('welcome: Show me how it works', await seen(p, 'Show me how it works'));
+  check('welcome: Watch the demo', await seen(p, 'Watch the demo'));
   await p.click('[data-act="first-dish"]'); await p.waitForTimeout(500);
   const sh = '.sheet-root';
-  for (const t of ['Dishes and prices', 'What is it called?', 'Price in dollars', 'Where is it made?', 'Kitchen', 'Prep', 'Fryer', 'Cold and drinks', 'Save and add another', 'Save and finish', 'Tax, hours and PIN']) check('dishes sheet: ' + t, await seen(p, t, sh));
+  for (const t of ['Dishes and prices', 'What is it called?', 'Price the customer pays', 'Which station makes it?', 'Kitchen', 'Prep', 'Fryer', 'Cold and drinks', 'Save and add another', 'Save and finish', 'Tax, hours and PIN']) check('dishes sheet: ' + t, await seen(p, t, sh));
   await p.fill(sh + ' input >> nth=0', 'Hush puppies'); await p.fill(sh + ' input >> nth=1', '5.50');
   check('price read-back: Reads as', await has(p, 'Reads as $5.50', sh));
   check('dishes sheet: Have a menu file? Import it', await seen(p, 'Have a menu file? Import it', sh));
@@ -77,7 +77,7 @@ async function blank(browser) {
   await p.click('text=Tip or discount'); await p.waitForTimeout(500);
   for (const t of ['Take payment', 'Cash', 'Card', 'Other', 'Mark paid']) check('take payment: ' + t, await seen(p, t));
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(300);
-  check('header: Recall and 86 board', (await seen(p, 'Recall', '.fl-head')) && (await seen(p, '86 board', '.fl-head')));
+  check('header: Recall and Sold out', (await seen(p, 'Recall', '.fl-head')) && (await seen(p, 'Sold out', '.fl-head')));
   // Back office: backup.
   await p.click('button:has-text("Back office")'); await p.waitForTimeout(2200);
   for (const t of ['Sales and money', 'Safety', 'Menu, prices and shop']) check('back office nav: ' + t, await seen(p, t, '#sb-office'));
@@ -224,7 +224,7 @@ async function tryDemo(browser) {
   for (const t of ['Watch the demo?', 'Not now']) check('demo dialog: ' + t, await seen(p, t, '.sheet-host'));
   await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-host button')].find((x) => x.textContent.trim() === 'Watch the demo'); if (b) b.click(); });
   await p.waitForTimeout(2200);
-  check('demo bar: You are trying the demo', await has(p, 'You are trying the demo.'));
+  check('demo bar: Demo: it runs by itself', await has(p, 'Demo: it runs by itself.'));
   check('demo bar: Back to my kitchen', await seen(p, 'Back to my kitchen'));
   check('demo: sample tickets on the board', (await p.evaluate(() => document.querySelectorAll('.fl-slip').length)) > 0);
   await tap(p, 'Back to my kitchen'); await p.waitForTimeout(2200);
@@ -290,7 +290,7 @@ async function recipes(browser) {
   await tap(p, 'Latte'); await p.waitForTimeout(200);
   for (const t of ['Takeout', 'Dine-in', 'Cash', 'Card', 'Pay later', 'Allergy', 'Rush ticket', 'Send to kitchen']) check('order screen: ' + t, await seen(p, t));
   await tap(p, 'Cash'); await tap(p, 'Send to kitchen'); await p.waitForTimeout(900);
-  check('card: Recall and 86 board in the header', (await seen(p, 'Recall')) && (await seen(p, '86 board')));
+  check('card: Recall and Sold out in the header', (await seen(p, 'Recall')) && (await seen(p, 'Sold out')));
   check('cafe: Done on the ticket', await seen(p, 'Done'));
   await p.evaluate(() => document.querySelector('.fl-slip .fl-row button').click()); await p.waitForTimeout(500);
   check('cafe: Bump', await seen(p, 'Bump'));
@@ -507,7 +507,7 @@ async function closeMonth(browser) {
   let tx = await vis(p);
   check('closemonth step 1: This moves out of your kitchen', /This moves out of your kitchen: [\d,]+ days? of history \(.* up to, not including, .*\), with [\d,]+ orders?, [\d,]+ tickets? and [\d,]+ activity records?\./.test(tx), tx.slice(0, 600));
   check('closemonth step 1: This stays (last 35 days, safety records)', /This stays: the last 35 days, today, every open order and open ticket.*your menu and settings, the end-of-day totals, and all food-safety records \(/.test(tx));
-  check('closemonth step 1: the history-gone warning with 7 days', /After step 3 the history is gone from this tablet\. Your files are the only copy of it\. For 7 days Smokebox also keeps your kitchen as it was, and you can undo\./.test(tx));
+  check('closemonth step 1: the history-gone warning with 7 days', /After step 3 the history leaves this device\. For 7 days you can still undo it here; after that, the files you save in step 2 are the only copy\./.test(tx));
   await p.evaluate(() => { const i = document.getElementById('cm-before'); const d = new Date(); i.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); i.dispatchEvent(new Event('change', { bubbles: true })); }); await p.waitForTimeout(400);
   check('closemonth step 1: You picked X, but the last 35 days always stay', /You picked .*, but the last 35 days always stay, so it stops at /.test(await vis(p)));
   check('closemonth: Next: save the files', await btn(p, 'Next: save the files')); await p.waitForTimeout(500);
@@ -551,13 +551,13 @@ async function closeMonth(browser) {
   check('closemonth refusal: back at step 2 with Save the files again, then continue.', tx.indexOf('2. Save the month files now') >= 0 && tx.indexOf('Save the files again, then continue.') >= 0);
   await q.context().close();
   const hb = await open(saved); await hb.evaluate(() => { SB.store.isHubClient = () => true; SB.sheets.open('closemonth'); }); await hb.waitForTimeout(700);
-  check('closemonth refusal: hub tablet', (await vis(hb)).indexOf("This tablet works through the main computer, so the month cannot be closed here. Do this on the main computer's own screen or the main tablet. Nothing was removed.") >= 0);
+  check('closemonth refusal: hub tablet', (await vis(hb)).indexOf("This device works through the main computer, so the month cannot be closed here. Do this on the main computer's own screen or the main tablet.") >= 0);
   await hb.context().close();
   const dm = await open(null, FILE + '?demo'); await dm.evaluate(() => SB.sheets.open('closemonth')); await dm.waitForTimeout(700);
-  check('closemonth refusal: demo', (await vis(dm)).indexOf('You are in the demo, so there is no real history to close here. Tap Back to my kitchen first. Nothing was removed.') >= 0);
+  check('closemonth refusal: demo', (await vis(dm)).indexOf('You are in the demo, so there is no real history to close here. Tap Back to my kitchen first.') >= 0);
   await dm.context().close();
   const nw = await open(null); await nw.evaluate(() => SB.sheets.open('closemonth')); await nw.waitForTimeout(700);
-  check('closemonth refusal: nothing to close', (await vis(nw)).indexOf('There is nothing to close yet. Only finished days older than 35 days can be moved out, and none are left before that date. Nothing was removed.') >= 0);
+  check('closemonth refusal: nothing to close', (await vis(nw)).indexOf('There is nothing to close yet. Finished days can be moved out once they are older than the recent days that always stay.') >= 0);
   await nw.context().close();
 }
 

@@ -1360,7 +1360,7 @@ describe('discardSentence: the plain line above the weekly ledger', () => {
   it('says dollars, the change from last week, the biggest product and reason', () => {
     const tw = win(40, 3500, 3, { byProduct: [{ name: 'Brisket', cost: 36, g: 3000 }], byReason: [{ label: 'Expired', cost: 24, g: 2000 }, { label: 'Temperature', cost: 12, g: 1000 }] });
     const s = M.discardSentence({ thisWeek: tw, lastWeek: win(30, 2000, 1) });
-    assert.match(s, /You threw away \$40\.00 of food this week \(3\.50 kg\), up \$10\.00 from last week's \$30\.00\./);
+    assert.match(s, /You threw away \$40\.00 of food this week \(3\.5 kg\), up \$10\.00 from last week's \$30\.00\./);
     assert.match(s, /Most of it was brisket \(\$36\.00\), and the biggest reason was expired\./);
   });
   it('does not turn an unknown cost into zero dollars', () => {

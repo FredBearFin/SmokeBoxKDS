@@ -1462,9 +1462,9 @@
     const make = by((it) => it.status === 'displayed' && it.track !== 'two');
     const wait = its.filter((it) => it.status === 'queued').sort((a, b) => a.fireAt - b.fireAt);
     let text, tone;
-    if (check.length) { text = 'Check ' + list(check) + '. Tap DONE when ready.'; tone = 'check'; }
+    if (check.length) { text = 'Check ' + list(check) + '. Tap Done when ready.'; tone = 'check'; }
     else if (start.length) { text = 'Tap START on ' + list(start) + '.'; tone = 'act'; }
-    else if (make.length) { text = 'Make ' + list(make) + ', then tap DONE.'; tone = 'act'; }
+    else if (make.length) { text = 'Make ' + list(make) + ', then tap Done.'; tone = 'act'; }
     else if (run.length) {
       const soon = run.slice().sort((a, b) => cookOf(a, now).left - cookOf(b, now).left)[0], l = cookOf(soon, now).left;
       text = l == null ? nm(soon) + ' is cooking.' : nm(soon) + ': ' + mss(l) + ' left.'; tone = 'wait';
@@ -2139,7 +2139,7 @@
     // The empty board leaves out its own walkthrough button while the card (which has one) is up, so there is only one.
     if (wasShown !== show && m.empty && m.empty.dataset.sig) paintEmpty(store().select.counts());
     if (!show) return;
-    put(m.wText, 'Your menu has ' + n + ' ' + U.plural(n, 'dish', 'dishes') + '. Tap New ticket to take a first order. Tax, hours and PIN are under Settings, Dishes and prices.');
+    put(m.wText, 'Your menu has ' + n + ' ' + U.plural(n, 'dish', 'dishes') + '. Tap New ticket to take a first order. Tax, hours and PIN are under Settings, Tax, hours and PIN.');
   }
   // Hides the card for good, or shows it again (a restarted demo starts with it).
   F.setWelcome = function (on) {

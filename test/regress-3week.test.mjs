@@ -192,7 +192,7 @@ test('the thrown-out log CSV and the pilot report agree with the batches and the
   assert.equal(S.batches.filter((b) => b.status === 'discard').length, list.length, 'and no discard is listed twice');
   const out = parseCsv(SB.discardsPure.csv(list, rec, ''));
   assert.equal(out.length, list.length + 1); assert.deepEqual(out[0], ['Date', 'Food', 'Amount', 'Why', 'Initials']);
-  assert.ok(out.slice(1).every((r) => /^Slaw mix/.test(r[1]) && r[2] === '3.00 kg' && r[3].length > 0), JSON.stringify(out[1]));
+  assert.ok(out.slice(1).every((r) => /^Slaw mix/.test(r[1]) && r[2] === '3 kg' && r[3].length > 0), JSON.stringify(out[1]));
   const rep = SB.pilot.build(S, { from: at(0, 0), to: K.now + MIN, now: K.now });
   assert.equal(rep.discards.n, list.length, 'the pilot report counts the same discards');
   assert.equal(rep.discards.g, S.batches.filter((b) => b.status === 'discard').reduce((a, b) => a + (b.wasteG || 0), 0), 'and the same grams');
