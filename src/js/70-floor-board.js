@@ -287,7 +287,7 @@
     voiceLevel = level === 'light' || level === 'full' ? level : 'normal';
     U.storage.set(KEY_VLEVEL, voiceLevel);
     if (m) m.coPrimed = false;
-    if (sound && speech) playHere(() => speak(SB.deadlines.phrase('start', { name: '2 brisket sandwich', num: 12 })));
+    if (sound && speech) playHere(() => speak(sampleLine('start')));
     return voiceLevel;
   };
   // Tells whether warnings are spoken aloud right now.
@@ -368,10 +368,10 @@
     // The natural voice is made on the server, so the calls of the next 30 seconds are fetched now, before they are due.
     if (nat) { for (const w of wants) NV.prefetch(w.text, true); for (const w of D.calloutWants(store().getState(), now + 30000, m.zone, voiceLevel)) NV.prefetch(w.text); warmVoice(now); }
     if (performance.now() < voiceFreeAt) return;
-    // A call whose natural audio is still being made waits for it up to 4 seconds, then the device voice says it.
+    // A call whose natural audio is still being made waits for it up to 6 seconds, then the device voice says it.
     if (m.coHeld) {
       const hc = m.coHeld;
-      if (!nat || NV.ready(hc.text) || performance.now() - hc.since > 4000) { m.coHeld = null; speak(hc.text, true, hc.style); }
+      if (!nat || NV.ready(hc.text) || performance.now() - hc.since > 6000) { m.coHeld = null; speak(hc.text, true, hc.style); }
       return;
     }
     const c = m.co.next(now);
@@ -587,20 +587,34 @@
     return info ? Object.assign({ supported: true }, info) : { supported: true, name: '', lang: '', local: true };
   };
   // Speaks a sample ticket call in the chef voice and says which voice did it, so a cook can hear and see what this tablet will use.
-  F.testVoice = function () {
+  // A sample call with this kitchen's own next ticket number and first dish, so a test never names a ticket that does not exist.
+  function sampleLine(kind) {
+    const S = store().getState(), D = SB.deadlines;
+    const num = S.tickets.reduce((n, t) => Math.max(n, t.num || 0), 100) + 1;
+    const dish = S.menu.find((x) => !x.archived);
+    return kind === 'start' ? D.phrase('start', { name: dish ? (dish.short || dish.name) : 'the first dish', num }) : D.phrase('new_all', { num, count: 1 });
+  }
+  // onState(word) hears how the test goes: 'preparing' while the kitchen server makes the natural line, then 'natural' when it
+  // plays in the natural voice, or 'device' when the device voice says it instead (no server voice, or it took over 20 s).
+  F.testVoice = function (onState) {
+    const tell = (w) => { if (typeof onState === 'function') { try { onState(w); } catch (e) { /* ignore */ } } };
     if (!sound) F.setSound(true);
     if (!speech) F.setSpeech(true);
     hookAudioUnlock();
     resumeAudio();
-    const line = SB.deadlines.phrase('new_all', { num: 12, count: 3 }), NV = SB.natVoice;
-    // The natural voice's test line is made on the server first (a second or two), then played.
+    const line = sampleLine('new'), NV = SB.natVoice;
+    // The natural voice's test line is made on the server first (a few seconds for a voice not used yet), then played.
     if (NV && NV.enabled() && !NV.ready(line)) {
-      NV.prefetch(line);
+      NV.prefetch(line, true);
+      tell('preparing');
       let n = 0;
-      const t = setInterval(() => { if (NV.ready(line) || ++n > 40) { clearInterval(t); playHere(() => speak(line, false, 'new_all')); } }, 200);
+      const t = setInterval(() => {
+        if (NV.ready(line) || ++n > 100) { clearInterval(t); const ok = NV.ready(line); playHere(() => speak(line, false, 'new_all')); tell(ok ? 'natural' : 'device'); }
+      }, 200);
       return F.voiceInfo();
     }
     playHere(() => speak(line, false, 'new_all'));
+    tell(NV && NV.enabled() ? 'natural' : 'device');
     return F.voiceInfo();
   };
   // Whether this tablet can make sound right now: running, suspended (needs a tap), unsupported or off.
