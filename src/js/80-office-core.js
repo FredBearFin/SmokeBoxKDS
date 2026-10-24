@@ -1419,6 +1419,13 @@
     paintFilterSummary();
   }
 
+  // Switches every office surface to the Paper look while printing (on true), or back to the owner's chosen look (on false).
+  function paperForPrint(on) {
+    const want = on ? 'paper' : (SB.theme && SB.theme.office ? SB.theme.office() : 'ember');
+    doc.querySelectorAll('.office[data-otheme]').forEach((el) => el.setAttribute('data-otheme', want));
+    try { if (SB.charts && SB.charts.refreshTheme) SB.charts.refreshTheme(); } catch (e) { warnOnce('refreshTheme', e); }
+  }
+
   // Opens the office inside el: builds the frame and filters, subscribes to the store, theme and sample
   // switch, then shows the page.
   // WATCH OUT: everything made here (timers, subscriptions, listeners) is tracked so unmount removes all of it.
@@ -1438,6 +1445,10 @@
     scope.offs.push(tracked('subs', SB.store && SB.store.subscribe ? SB.store.subscribe(onStoreChange) : () => {}));
     scope.offs.push(tracked('subs', SB.sim && SB.sim.onSampleChange ? SB.sim.onSampleChange(onSampleChange) : () => {}));
     scope.on(doc, 'visibilitychange', () => { if (!doc.hidden && M && M.dirty) schedule(0); });
+    // Browser print (Ctrl+P) of an office page uses the light Paper look, so cards and chart labels stay dark on white paper
+    // (browsers drop the dark backgrounds when printing); the chosen look comes back after.
+    scope.on(g, 'beforeprint', () => paperForPrint(true));
+    scope.on(g, 'afterprint', () => paperForPrint(false));
     scope.on(doc, 'keydown', (e) => {
       if (!M || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key !== '[' && e.key !== ']') return;

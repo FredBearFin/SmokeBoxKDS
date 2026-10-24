@@ -73,7 +73,9 @@ test('start over takes a backup first, clears everything, keeps settings, and is
     assert.deepEqual(E.checkInvariants(s, S.now()), []);
     // same as a brand-new blank install (ids keep counting so they are never reused)
     const fresh = E.newState({ now: S.now(), blank: true, settings: s.settings, seq: s.seq });
-    assert.equal(body(s), body(Object.assign({}, fresh, { sanitize: s.sanitize, learned: s.learned })));
+    // except the food safety record, which outlives a start over
+    assert.ok(s.safetyKeep.length > 0 && s.safetyKeep.every((e) => e.type === 'batch_discard' || e.type === 'temp_logged' || e.type === 'sanitize_done' || e.type === 'batch_reheat'));
+    assert.equal(body(s), body(Object.assign({}, fresh, { sanitize: s.sanitize, learned: s.learned, safetyKeep: s.safetyKeep })));
     // the saved copy is the empty kitchen too
     assert.equal(E.validateBackup(b.m.get('smokebox.v1.state')).state.menu.length, 0);
     // the backup restores everything
@@ -227,6 +229,22 @@ test('clearing removes exactly those, keeps every real ticket, order and payment
   assert.deepEqual(v.repaired, []);
   // nothing to clear in a clean kitchen
   assert.equal(E.apply(E.newState({ now: T, starter: true }), 'clearDemoTickets', {}, T).report, 'nothingToDo');
+});
+
+test('clearing one demo ticket by id (the walkthrough cleaning up) removes only that ticket and its own order', () => {
+  const { s, out } = mixedKitchen();
+  const r = E.apply(s, 'clearDemoTickets', { ticketId: out.demoA.ticketId }, T + 700e3);
+  assert.equal(r.report, 'ok');
+  assert.deepEqual([r.info.tickets, r.info.orders], [1, 1]);
+  assert.equal(r.state.tickets.length, s.tickets.length - 1); assert.equal(r.state.orders.length, s.orders.length - 1);
+  assert.ok(!r.state.tickets.some((t) => t.id === out.demoA.ticketId));
+  assert.ok(r.state.tickets.some((t) => t.id === out.demoB.ticketId));
+  assert.deepEqual(E.checkInvariants(r.state, T + 700e3), []);
+  // a real ticket, an unknown id or a bad id is never removed
+  const real = s.tickets.find((t) => t.src === 'live');
+  assert.equal(E.apply(s, 'clearDemoTickets', { ticketId: real.id }, T + 700e3).report, 'nothingToDo');
+  assert.equal(E.apply(s, 'clearDemoTickets', { ticketId: 'nope' }, T + 700e3).report, 'nothingToDo');
+  assert.equal(E.apply(s, 'clearDemoTickets', { ticketId: 5 }, T + 700e3).report, 'badPatch');
 });
 
 test('the store offers the clean-up once, remembers "keep", and does nothing in the demo', () => {

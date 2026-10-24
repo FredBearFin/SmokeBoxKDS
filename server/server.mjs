@@ -170,16 +170,20 @@ export async function createHub(opts = {}) {
     const r = E.apply(state, type, payload, t);
     let reply;
     if (r.report === 'ok') {
-      state = r.state;
-      lastAt = t;
       const by = typeof clientId === 'string' ? clientId : null;
       const op = { seq: seq + 1, opId: typeof opId === 'string' ? opId : null, actionType: type, payload: payload ?? {}, now: t, by };
+      reply = { report: 'ok', info: r.info, seq: op.seq };
+      // WATCH OUT: the log line is written BEFORE the state changes or any screen hears of it. If the disk refuses it, the action is not applied
+      // and the sender is told so (503, and its opId is not remembered, so sending it again later works); "ok" always means it survives a restart.
+      if (!walAppend({ seq: op.seq, opId: op.opId, type, payload: payload ?? {}, at: t, by, reply })) {
+        return { status: 503, body: { report: 'badPatch', info: { error: 'the hub could not save this action to disk; nothing was changed' }, seq } };
+      }
+      state = r.state;
+      lastAt = t;
       op.bytes = JSON.stringify(op).length;
       ops.push(op); opsBytes += op.bytes;
       while (ops.length > MAX_OPS || (opsBytes > MAX_OPS_BYTES && ops.length > 1)) opsBytes -= ops.shift().bytes || 0;
       changed({ by, opId: op.opId, type, op });
-      reply = { report: 'ok', info: r.info, seq };
-      walAppend({ seq, opId: op.opId, type, payload: payload ?? {}, at: t, by, reply });
     } else {
       reply = { report: r.report, info: r.info, seq };
       if (typeof opId === 'string') walAppend({ ref: true, opId, reply });
