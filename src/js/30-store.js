@@ -375,8 +375,11 @@
       const s2 = lim ? E().prune(state, Object.assign({ now: v }, lim)) : state;
       try {
         const env = { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, ops: journal, era };
-        if (wantCompact(s2)) { env.fmt = 2; env.p = packer.pack(s2); } else env.state = s2;
-        ok = storage.set(KEY, env) !== false;
+        if (wantCompact(s2)) {
+          // The compact text is put together from remembered pieces and handed over as text, so a save costs the writing, not a second encoding.
+          if (typeof storage.setText === 'function') ok = storage.setText(KEY, JSON.stringify(env).slice(0, -1) + ',"fmt":2,"p":' + packer.packText(s2) + '}') !== false;
+          else { env.fmt = 2; env.p = packer.pack(s2); ok = storage.set(KEY, env) !== false; }
+        } else { env.state = s2; ok = storage.set(KEY, env) !== false; }
       } catch (e) { ok = false; }
       if (ok) { st.trimmed = !!lim; kept2 = s2; break; }
       // Under pressure the rolling copy goes first: it is only a convenience, the live save is the data.
@@ -552,10 +555,26 @@
     const ops = payload && Array.isArray(payload.ops) ? payload.ops.filter((x) => typeof x === 'string') : null;
     return { state: v.state, ops, era: payload && typeof payload.era === 'string' ? payload.era : '' };
   }
+  // The action ids listed near the start of the saved text, as a Set, or null when the text does not show them there (an older save, or no storage text).
+  function peekOps() {
+    try {
+      const raw = typeof storage.raw === 'function' ? storage.raw(KEY) : null;
+      if (typeof raw !== 'string') return null;
+      const i = raw.indexOf('"ops":[');
+      if (i < 0 || i > 400) return null;
+      const j = raw.indexOf(']', i);
+      if (j < 0) return null;
+      return new Set(JSON.parse(raw.slice(i + 6, j + 1)));
+    } catch (e) { return null; }
+  }
   // Checks the saved copy for this tab's own recent actions. If another tab overwrote the copy without them (it read an older copy), they are
   // applied again on top of what is there and saved. True when something was put back.
   function reconcile() {
     if (!storage || !state || writeBlocked || !tr) return false;
+    // Cheap first look: the list of action ids sits near the start of the saved text, so it is read without opening the whole save. Only when one
+    // of this tab's recent actions is missing from it is the save read in full.
+    const peek = peekOps();
+    if (peek && !recent.some((p) => !peek.has(p.opId))) return false;
     const full = loadStoredFull();
     if (!full || !full.ops) return false;
     const have = new Set(full.ops);

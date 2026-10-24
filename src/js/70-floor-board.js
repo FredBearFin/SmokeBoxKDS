@@ -477,6 +477,26 @@
     if (wakeState !== 'unsupported' && wakeState !== 'refused') return '';
     return 'This screen may go to sleep, and warnings stop while it sleeps. Keep the tablet plugged in with its screen set to stay on.';
   }
+  // Keeps the "went to the background" snapshot for this browser tab, so a page the browser threw away and reloaded can still say what changed.
+  function rememberSleep(at, snap) {
+    try {
+      if (!at || !snap) { g.sessionStorage.removeItem('smokebox.v1.sleepSnap'); return; }
+      g.sessionStorage.setItem('smokebox.v1.sleepSnap', JSON.stringify({ at, overdue: snap.overdue, past: Array.from(snap.past).slice(0, 200) }));
+    } catch (e) { /* private window or no storage: the live page still keeps it in memory */ }
+  }
+  // On a fresh start, reads the snapshot left by a page that went to the background and never came back (the browser discarded it) and
+  // sets the same "While this screen was asleep" line as a normal wake.
+  function restoreSleep() {
+    try {
+      const raw = g.sessionStorage.getItem('smokebox.v1.sleepSnap');
+      if (!raw) return;
+      const d = JSON.parse(raw), used = Number(d.used) || Date.now(), min = Math.round((used - d.at) / 60e3);
+      // Used once: the board may be set up again within ten minutes (it keeps the line), and after that the snapshot goes.
+      if (!(min >= 1) || min > 24 * 60 || !Array.isArray(d.past) || Date.now() - used > 10 * 60e3) { g.sessionStorage.removeItem('smokebox.v1.sleepSnap'); return; }
+      if (!d.used) g.sessionStorage.setItem('smokebox.v1.sleepSnap', JSON.stringify(Object.assign({}, d, { used })));
+      m.away = { at: used, min, summary: sleepSummary({ overdue: Number(d.overdue) || 0, past: new Set(d.past) }) };
+    } catch (e) { /* a damaged snapshot is ignored */ }
+  }
   // What was already late or past its limit when the page went to the background, so waking can say only what is new.
   function sleepSnapshot() {
     try {
@@ -497,6 +517,17 @@
       if (nt) bits.push(nt + ' ' + U.plural(nt, 'ticket') + ' went late');
       return bits.length ? 'While this screen was asleep: ' + bits.join(' and ') + '.' : '';
     } catch (e) { return ''; }
+  }
+  // The one-time words about the saved history filling up or being trimmed (from the store, when it has them), or ''. Asked about every few
+  // seconds; once it has been shown it is marked seen so it does not come back, and it stays up until the person clears it.
+  function historyWords() {
+    if (!m || !SB.store || typeof SB.store.historyNotice !== 'function') return '';
+    const t = Date.now();
+    if (!m.histNote && t - (m.histAsk || 0) > 5000) {
+      m.histAsk = t;
+      try { const n = SB.store.historyNotice(); if (n && n.words) { m.histNote = { kind: n.kind, words: String(n.words).slice(0, 300) }; m.histSeen = false; } } catch (e) { /* ignore */ }
+    }
+    return m.histNote ? m.histNote.words : '';
   }
   // A sentence shown for a while after the board comes back from the background, since warnings were silent in between.
   function awayNote() {
@@ -585,14 +616,15 @@
           const min = Math.round((Date.now() - m.hiddenAt) / 60e3);
           // The first look after waking: one tick right now (not a loop of missed seconds), then one summary of what changed while asleep.
           if (min >= 1) { try { store().tick(); } catch (e) { /* the next timer tick does it */ } m.away = { at: Date.now(), min, summary: sleepSummary(m.sleepSnap) }; }
-          m.hiddenAt = null; m.sleepSnap = null;
+          m.hiddenAt = null; m.sleepSnap = null; rememberSleep(0, null);
         }
-      } else if (m) { m.hiddenAt = Date.now(); m.sleepSnap = sleepSnapshot(); }
+      } else if (m && !m.hiddenAt) { m.hiddenAt = Date.now(); m.sleepSnap = sleepSnapshot(); rememberSleep(m.hiddenAt, m.sleepSnap); }
     };
     doc.addEventListener('visibilitychange', onVis);
     m.offs.push(() => { doc.removeEventListener('pointerdown', onGesture, true); doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
     if (sound) hookAudioUnlock();
     m.offs.push(joinLeadership());
+    restoreSleep();
     // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
     if (SB.discards) { SB.discards.persist(); setTimeout(() => { try { SB.discards.remind(); } catch (e) { /* optional */ } }, 4000); }
     if (SB.sim && SB.sim.live && typeof SB.sim.live.onChange === 'function') {
@@ -629,7 +661,15 @@
   };
 
   // How many slips a station switch builds before painting; the rest follow right after.
-  const FIRST_SCREEN = 36;
+  const FIRST_SCREEN = 18, REST_CHUNK = 30;
+  // Builds the slips a station switch left for later, a few frames' worth at a time (not all at once), until every ticket of that station is there.
+  function buildRest(z) {
+    setTimeout(() => {
+      if (!m || m.zone !== z) return;
+      m.first = true; m.buildLimit = REST_CHUNK; render(); m.buildLimit = 0; m.first = false;
+      if (m.deferred) { m.deferred = false; buildRest(z); }
+    }, 25);
+  }
   // Switches to another station tab and announces the result. Called by the shell when the address changes.
   F.setZone = function (zone) {
     const z = TABS.indexOf(zone) >= 0 ? zone : 'all';
@@ -647,10 +687,7 @@
     render();
     m.buildLimit = 0;
     m.first = false;
-    if (m.deferred) {
-      m.deferred = false;
-      setTimeout(() => { if (!m || m.zone !== z) return; m.first = true; render(); m.first = false; }, 25);
-    }
+    if (m.deferred) { m.deferred = false; buildRest(z); }
     const n = store().select.ticketsForZone(z).length, zn = z === 'all' ? 'All stations' : zoneById(z).name;
     say(zn + ': ' + (n ? n + ' ' + U.plural(n, 'ticket') : 'no tickets') + '.');
     return z;
@@ -899,10 +936,17 @@
   // Runs every second: refits the header only when its width or chip text changed, so most ticks cost nothing.
   function refit() {
     if (m && m.head && headKey() !== m.fitKey) fitHead();
-    measureToastTop();
+    queueToastTop();
   }
   // True when the header has moved the status chips or tool buttons into the Menu list.
   const headSqueezed = () => !!m.head && (m.head.dataset.fit === 'status' || m.head.dataset.fit === 'labels' || m.head.dataset.fit === 'toollabels' || m.head.dataset.fit === 'tools');
+  // Asks for the toast position to be measured once at the start of the next frame, so the reading happens after this tick's writes
+  // and shares one layout with the frame instead of forcing its own every second.
+  function queueToastTop() {
+    if (!m || m.ttQ) return;
+    if (typeof g.requestAnimationFrame !== 'function') { measureToastTop(); return; }
+    m.ttQ = g.requestAnimationFrame(() => { if (m) { m.ttQ = 0; measureToastTop(); } });
+  }
   // In the cabinet view toasts move to the top right, under the header and the attention strip, so they never cover a card's buttons.
   // This tells the stylesheet where the page below the strip starts (--fl-toast-top).
   function measureToastTop() {
@@ -961,7 +1005,7 @@
     m.cabOn = !!on;
     m.root.dataset.cabinet = on ? 'on' : 'off';
     doc.documentElement.dataset.cabinet = on ? 'on' : 'off';
-    measureToastTop();
+    queueToastTop();
     for (const el of [m.grid, m.empty, m.welcome, m.dock]) if (el) el.style.display = on ? 'none' : '';
     setHidden(m.cabEl, !on);
     m.seg.setValue(on ? 'cabinet' : m.zone);
@@ -1194,7 +1238,11 @@
     let n = 0;
     if (!m.cabOn && main.clientHeight > 0 && main.scrollHeight > main.clientHeight + 4) {
       const bottom = main.getBoundingClientRect().bottom;
-      for (const c of m.grid.children) { if (!c.classList.contains('fl-leaving') && c.getBoundingClientRect().top >= bottom - 8) n++; }
+      // The slips run row by row down the page, so the first one below the screen is found by halving (a few reads, not one per ticket).
+      const kids = m.grid.children;
+      let lo = 0, hi = kids.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (kids[mid].getBoundingClientRect().top >= bottom - 8) hi = mid; else lo = mid + 1; }
+      for (let i = lo; i < kids.length; i++) if (!kids[i].classList.contains('fl-leaving')) n++;
     }
     setHidden(m.below, n === 0);
     if (n) put(m.belowT, n + (n === 1 ? ' more ticket below' : ' more tickets below'));
@@ -1770,7 +1818,7 @@
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
-    const health = awayNote() || awakeNote();
+    const health = awayNote() || historyWords() || awakeNote();
     const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
@@ -1785,7 +1833,7 @@
       if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
     }
     setHidden(m.strip.clockBar, !clockShown);
-    measureToastTop();
+    queueToastTop();
     const soundShown = needSound && !m.dis.has('snd') && !clockShown;
     setHidden(m.strip.soundBar, !soundShown); // the clock notice goes first, so the sound bar waits behind it
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
@@ -1795,6 +1843,7 @@
     if (moreEl) { const t = (noWebAudio() ? 'This browser cannot play warning tones. Open Smokebox in another browser for sound.' : 'Tap here to turn on warning sounds. This browser needs one tap first.') + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
+    if (showNote && m.histNote && note === m.histNote.words && !m.histSeen) { m.histSeen = true; try { SB.store.historyNoticeSeen(m.histNote.kind); } catch (e) { /* the store has no such call */ } }
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote && !clockShown);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];

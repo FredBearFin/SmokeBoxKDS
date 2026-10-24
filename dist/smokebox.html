@@ -2908,6 +2908,9 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* A closed-day sale keeps a quiet, dashed Reopen button that explains itself; a tap still gives the full reason. */
 .ox-acts .ox-reopen.is-shut { border-style: dashed; color: var(--muted, inherit); white-space: normal; text-align: center; }
 
+/* Rows below the visible part of a long list are not drawn until they scroll near, which keeps a sheet with 200 orders quick to open on a slow tablet. */
+.ox-list > .ox-row { content-visibility: auto; contain-intrinsic-size: auto 150px; }
+
 /* ===== 24-guide.css ===== */
 /* WHAT THIS FILE IS: the look of the in-app Guide screen (#/guide): a page list on the left and the text on the right.
  * On narrow screens the list sits above the text. It uses only the shared tokens from 00-tokens.css, so Day and Night
@@ -3320,7 +3323,9 @@ a.of-nav:active { background: var(--press); }
   .of { --of-rail: 88px; --of-gut: var(--sp-5); }
   .of-rail { padding: var(--sp-4) var(--sp-2); }
   .of-rail-brand { justify-content: center; padding: 0 0 var(--sp-4); }
-  .of-rail-name, .of-nav-full, .of-soon { display: none; }
+  .of-rail-name, .of-soon { display: none; }
+  /* The full page name stays in the link for screen readers (clipped, not hidden) while the short name is drawn. */
+  .of-nav-full { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   .of-nav-short { display: block; }
   .of-nav { flex-direction: column; justify-content: center; gap: 4px; min-height: 58px; padding: var(--sp-2) 2px; text-align: center; font-size: 12px; }
   .of-nav-w { justify-items: center; }
@@ -4257,6 +4262,8 @@ a.of-nav:active { background: var(--press); }
 
 .ch-m { outline: none; }
 .ch-m:focus-visible { outline: 2px solid var(--ch-text); outline-offset: 2px; }
+/* The chart itself when it is a tab stop: the ring uses the chart's own text color, so it shows on the dark chart surface as on the light one. */
+.ch-svg:focus-visible { outline: 3px solid var(--ch-text); outline-offset: 2px; }
 .ch-hot { filter: brightness(1.16); }
 
 /* big numbers use the condensed display face, proportional figures */
@@ -4350,7 +4357,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
+window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -4471,6 +4478,8 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     // A reader for packed data with the given tables. It never touches this packer's own tables or remembered rows: a copy written by another tab
     // (or an earlier page) is numbered by that writer's tables, and mixing the two numberings would damage the next save.
     const reader = (dictR, schemasR) => {
+      // Which schemas hold a key named __proto__ (indexed by schema number + 1).
+      const protoKey = [false].concat(schemasR.map((k) => k.indexOf('__proto__') >= 0));
       // Reads a packed string back: a reference becomes the table entry, a doubled marker loses one marker.
       const decStr = (str) => {
         if (str.charCodeAt(0) !== 1) return str;
@@ -4491,8 +4500,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
         if (!keys || keys.length !== v.length - 1) throw new Error('packed object does not match its keys');
         const o = {};
         // A key named __proto__ is set as plain data (assigning it would change the prototype); the common case takes the quick path.
-        if (keys.hasProto === undefined) keys.hasProto = keys.indexOf('__proto__') >= 0;
-        if (!keys.hasProto) { for (let i = 0; i < keys.length; i++) o[keys[i]] = dec(v[i + 1]); return o; }
+        if (!protoKey[tag]) { for (let i = 0; i < keys.length; i++) o[keys[i]] = dec(v[i + 1]); return o; }
         for (let i = 0; i < keys.length; i++) {
           if (keys[i] === '__proto__') Object.defineProperty(o, '__proto__', { value: dec(v[i + 1]), enumerable: true, writable: true, configurable: true });
           else o[keys[i]] = dec(v[i + 1]);
@@ -4501,7 +4509,37 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       };
       return dec;
     };
+    // JSON text of packed values, remembered like the packed tree: an unchanged object, and a long array that was not changed, cost one lookup.
+    const textCache = new WeakMap();
+    // The JSON text of the packed form of one value; key is the key it sits under. Equal to JSON.stringify(enc(v, key)).
+    const txt = (v, key) => {
+      if (v && typeof v === 'object') {
+        const hit = textCache.get(v);
+        if (hit !== undefined) return hit;
+        let t;
+        if (Array.isArray(v)) {
+          if (!v.length) return '[]';
+          const parts = new Array(v.length);
+          for (let i = 0; i < v.length; i++) parts[i] = txt(v[i], undefined);
+          t = '[0,' + parts.join(',') + ']';
+          if (v.length >= 16) textCache.set(v, t);
+        } else { t = JSON.stringify(enc(v, key)); textCache.set(v, t); }
+        return t;
+      }
+      return JSON.stringify(enc(v, key));
+    };
     return {
+      // The packed tree as JSON text, built mostly from remembered pieces: the same text as JSON.stringify of pack(state), far cheaper on a big
+      // kitchen where little changed since the last save.
+      packText(state) {
+        const keys = Object.keys(state).filter((k) => state[k] !== undefined && typeof state[k] !== 'function' && typeof state[k] !== 'symbol'), sk = keys.join('\u0002');
+        let si = schemaIdx.get(sk);
+        if (si === undefined) { si = schemas.length; schemas.push(keys); schemaIdx.set(sk, si); }
+        const parts = new Array(keys.length);
+        for (let i = 0; i < keys.length; i++) parts[i] = txt(state[keys[i]], keys[i]);
+        const x = '[' + (si + 1) + (parts.length ? ',' + parts.join(',') : '') + ']';
+        return '{"d":' + JSON.stringify(dict) + ',"s":' + JSON.stringify(schemas) + ',"x":' + x + '}';
+      },
       // The packed tree and the tables it needs: { d, s, x }.
       pack(state) { const x = enc(state, undefined); return { d: dict.slice(), s: schemas.map((k) => k.slice()), x }; },
       // The original state from a packed tree and its tables, without changing this packer. Throws when the packed data is damaged.
@@ -4815,6 +4853,10 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       let raw; try { raw = JSON.stringify(val); } catch (e) { return false; }
       try { if (ls) ls.setItem(key, raw); else mem.set(key, raw); return true; } catch (e) { return false; }
     },
+    // Saves text that is already JSON (the caller built it), skipping the step that turns a value into text. Same answers as set.
+    setText(key, raw) {
+      try { if (ls) ls.setItem(key, raw); else mem.set(key, raw); return true; } catch (e) { return false; }
+    },
     // Deletes a saved value from the browser and from memory.
     remove(key) { try { if (ls) ls.removeItem(key); } catch (e) { /* ignore */ } mem.delete(key); },
     // Every saved key that starts with the prefix (browser and memory). Never throws.
@@ -4833,7 +4875,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
   const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'voicename', 'callouts', 'far', 'wall', 'dock'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
-  const DATA_KEYS = ['state', 'sid', 'writer', 'histtrim', 'histnotice', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
+  const DATA_KEYS = ['state', 'sid', 'writer', 'histtrim', 'histnotice', 'sleepSnap', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
     'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'lastgood2', 'corruptat', 'dropped', 'droppedat', 'corrupt.prev', 'corruptat.prev', 'dropped.prev', 'droppedat.prev', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
@@ -4872,6 +4914,8 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       raw: (key) => (typeof base.raw === 'function' ? base.raw(keyFor(key, m())) : null),
       // Saves a value through the translated key.
       set: (key, val) => base.set(keyFor(key, m()), val),
+      // Saves text that is already JSON through the translated key (false when the storage cannot).
+      setText: (key, raw) => (typeof base.setText === 'function' ? base.setText(keyFor(key, m()), raw) : base.set(keyFor(key, m()), JSON.parse(raw))),
       // Deletes a value through the translated key.
       remove: (key) => base.remove(keyFor(key, m())),
       // Every saved key with this prefix, exactly as named in the browser (not translated).
@@ -11270,7 +11314,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
   // The word that must be typed to start over with an empty menu, and the setup-progress keys that start over clears.
   const START_OVER_WORD = 'ERASE';
   // Neutral starter names for a new empty kitchen. The ids (pit, meat ...) never change, only what people read.
-  const STARTER_NAMES = { rename: { zones: { pit: 'Kitchen', sides: 'Prep', fry: 'Fryer' }, categories: { meat: 'Mains', sandwich: 'Sides', side: 'Snacks', fried: 'Desserts', cold: 'Drinks' } }, add: {} };
+  const STARTER_NAMES = { rename: { zones: { pit: 'Kitchen', sides: 'Prep', fry: 'Fryer' }, categories: { meat: 'Mains', sandwich: 'Sides', side: 'Snacks', fried: 'Desserts', cold: 'Cold food and drinks' } }, add: {} };
   // The half-built order on the New ticket screen: kept so a reload or closed tab loses nothing. At most 20,000 characters, and a
   // draft older than 12 hours is forgotten (yesterday's half-order should not come back).
   const DRAFT_KEY = 'smokebox.v1.orderdraft', DRAFT_MAX_CHARS = 20000, DRAFT_MAX_AGE_MS = 12 * 3600e3;
@@ -11615,8 +11659,11 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       const s2 = lim ? E().prune(state, Object.assign({ now: v }, lim)) : state;
       try {
         const env = { v: 1, savedAt: r, rev: s2.rev, clock: { virtual: v, real: r, speed: clk.speed }, ops: journal, era };
-        if (wantCompact(s2)) { env.fmt = 2; env.p = packer.pack(s2); } else env.state = s2;
-        ok = storage.set(KEY, env) !== false;
+        if (wantCompact(s2)) {
+          // The compact text is put together from remembered pieces and handed over as text, so a save costs the writing, not a second encoding.
+          if (typeof storage.setText === 'function') ok = storage.setText(KEY, JSON.stringify(env).slice(0, -1) + ',"fmt":2,"p":' + packer.packText(s2) + '}') !== false;
+          else { env.fmt = 2; env.p = packer.pack(s2); ok = storage.set(KEY, env) !== false; }
+        } else { env.state = s2; ok = storage.set(KEY, env) !== false; }
       } catch (e) { ok = false; }
       if (ok) { st.trimmed = !!lim; kept2 = s2; break; }
       // Under pressure the rolling copy goes first: it is only a convenience, the live save is the data.
@@ -11792,10 +11839,26 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     const ops = payload && Array.isArray(payload.ops) ? payload.ops.filter((x) => typeof x === 'string') : null;
     return { state: v.state, ops, era: payload && typeof payload.era === 'string' ? payload.era : '' };
   }
+  // The action ids listed near the start of the saved text, as a Set, or null when the text does not show them there (an older save, or no storage text).
+  function peekOps() {
+    try {
+      const raw = typeof storage.raw === 'function' ? storage.raw(KEY) : null;
+      if (typeof raw !== 'string') return null;
+      const i = raw.indexOf('"ops":[');
+      if (i < 0 || i > 400) return null;
+      const j = raw.indexOf(']', i);
+      if (j < 0) return null;
+      return new Set(JSON.parse(raw.slice(i + 6, j + 1)));
+    } catch (e) { return null; }
+  }
   // Checks the saved copy for this tab's own recent actions. If another tab overwrote the copy without them (it read an older copy), they are
   // applied again on top of what is there and saved. True when something was put back.
   function reconcile() {
     if (!storage || !state || writeBlocked || !tr) return false;
+    // Cheap first look: the list of action ids sits near the start of the saved text, so it is read without opening the whole save. Only when one
+    // of this tab's recent actions is missing from it is the save read in full.
+    const peek = peekOps();
+    if (peek && !recent.some((p) => !peek.has(p.opId))) return false;
     const full = loadStoredFull();
     if (!full || !full.ops) return false;
     const have = new Set(full.ops);
@@ -21445,6 +21508,26 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     if (wakeState !== 'unsupported' && wakeState !== 'refused') return '';
     return 'This screen may go to sleep, and warnings stop while it sleeps. Keep the tablet plugged in with its screen set to stay on.';
   }
+  // Keeps the "went to the background" snapshot for this browser tab, so a page the browser threw away and reloaded can still say what changed.
+  function rememberSleep(at, snap) {
+    try {
+      if (!at || !snap) { g.sessionStorage.removeItem('smokebox.v1.sleepSnap'); return; }
+      g.sessionStorage.setItem('smokebox.v1.sleepSnap', JSON.stringify({ at, overdue: snap.overdue, past: Array.from(snap.past).slice(0, 200) }));
+    } catch (e) { /* private window or no storage: the live page still keeps it in memory */ }
+  }
+  // On a fresh start, reads the snapshot left by a page that went to the background and never came back (the browser discarded it) and
+  // sets the same "While this screen was asleep" line as a normal wake.
+  function restoreSleep() {
+    try {
+      const raw = g.sessionStorage.getItem('smokebox.v1.sleepSnap');
+      if (!raw) return;
+      const d = JSON.parse(raw), used = Number(d.used) || Date.now(), min = Math.round((used - d.at) / 60e3);
+      // Used once: the board may be set up again within ten minutes (it keeps the line), and after that the snapshot goes.
+      if (!(min >= 1) || min > 24 * 60 || !Array.isArray(d.past) || Date.now() - used > 10 * 60e3) { g.sessionStorage.removeItem('smokebox.v1.sleepSnap'); return; }
+      if (!d.used) g.sessionStorage.setItem('smokebox.v1.sleepSnap', JSON.stringify(Object.assign({}, d, { used })));
+      m.away = { at: used, min, summary: sleepSummary({ overdue: Number(d.overdue) || 0, past: new Set(d.past) }) };
+    } catch (e) { /* a damaged snapshot is ignored */ }
+  }
   // What was already late or past its limit when the page went to the background, so waking can say only what is new.
   function sleepSnapshot() {
     try {
@@ -21465,6 +21548,17 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       if (nt) bits.push(nt + ' ' + U.plural(nt, 'ticket') + ' went late');
       return bits.length ? 'While this screen was asleep: ' + bits.join(' and ') + '.' : '';
     } catch (e) { return ''; }
+  }
+  // The one-time words about the saved history filling up or being trimmed (from the store, when it has them), or ''. Asked about every few
+  // seconds; once it has been shown it is marked seen so it does not come back, and it stays up until the person clears it.
+  function historyWords() {
+    if (!m || !SB.store || typeof SB.store.historyNotice !== 'function') return '';
+    const t = Date.now();
+    if (!m.histNote && t - (m.histAsk || 0) > 5000) {
+      m.histAsk = t;
+      try { const n = SB.store.historyNotice(); if (n && n.words) { m.histNote = { kind: n.kind, words: String(n.words).slice(0, 300) }; m.histSeen = false; } } catch (e) { /* ignore */ }
+    }
+    return m.histNote ? m.histNote.words : '';
   }
   // A sentence shown for a while after the board comes back from the background, since warnings were silent in between.
   function awayNote() {
@@ -21553,14 +21647,15 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
           const min = Math.round((Date.now() - m.hiddenAt) / 60e3);
           // The first look after waking: one tick right now (not a loop of missed seconds), then one summary of what changed while asleep.
           if (min >= 1) { try { store().tick(); } catch (e) { /* the next timer tick does it */ } m.away = { at: Date.now(), min, summary: sleepSummary(m.sleepSnap) }; }
-          m.hiddenAt = null; m.sleepSnap = null;
+          m.hiddenAt = null; m.sleepSnap = null; rememberSleep(0, null);
         }
-      } else if (m) { m.hiddenAt = Date.now(); m.sleepSnap = sleepSnapshot(); }
+      } else if (m && !m.hiddenAt) { m.hiddenAt = Date.now(); m.sleepSnap = sleepSnapshot(); rememberSleep(m.hiddenAt, m.sleepSnap); }
     };
     doc.addEventListener('visibilitychange', onVis);
     m.offs.push(() => { doc.removeEventListener('pointerdown', onGesture, true); doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
     if (sound) hookAudioUnlock();
     m.offs.push(joinLeadership());
+    restoreSleep();
     // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
     if (SB.discards) { SB.discards.persist(); setTimeout(() => { try { SB.discards.remind(); } catch (e) { /* optional */ } }, 4000); }
     if (SB.sim && SB.sim.live && typeof SB.sim.live.onChange === 'function') {
@@ -21597,7 +21692,15 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
   };
 
   // How many slips a station switch builds before painting; the rest follow right after.
-  const FIRST_SCREEN = 36;
+  const FIRST_SCREEN = 18, REST_CHUNK = 30;
+  // Builds the slips a station switch left for later, a few frames' worth at a time (not all at once), until every ticket of that station is there.
+  function buildRest(z) {
+    setTimeout(() => {
+      if (!m || m.zone !== z) return;
+      m.first = true; m.buildLimit = REST_CHUNK; render(); m.buildLimit = 0; m.first = false;
+      if (m.deferred) { m.deferred = false; buildRest(z); }
+    }, 25);
+  }
   // Switches to another station tab and announces the result. Called by the shell when the address changes.
   F.setZone = function (zone) {
     const z = TABS.indexOf(zone) >= 0 ? zone : 'all';
@@ -21615,10 +21718,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     render();
     m.buildLimit = 0;
     m.first = false;
-    if (m.deferred) {
-      m.deferred = false;
-      setTimeout(() => { if (!m || m.zone !== z) return; m.first = true; render(); m.first = false; }, 25);
-    }
+    if (m.deferred) { m.deferred = false; buildRest(z); }
     const n = store().select.ticketsForZone(z).length, zn = z === 'all' ? 'All stations' : zoneById(z).name;
     say(zn + ': ' + (n ? n + ' ' + U.plural(n, 'ticket') : 'no tickets') + '.');
     return z;
@@ -21867,10 +21967,17 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
   // Runs every second: refits the header only when its width or chip text changed, so most ticks cost nothing.
   function refit() {
     if (m && m.head && headKey() !== m.fitKey) fitHead();
-    measureToastTop();
+    queueToastTop();
   }
   // True when the header has moved the status chips or tool buttons into the Menu list.
   const headSqueezed = () => !!m.head && (m.head.dataset.fit === 'status' || m.head.dataset.fit === 'labels' || m.head.dataset.fit === 'toollabels' || m.head.dataset.fit === 'tools');
+  // Asks for the toast position to be measured once at the start of the next frame, so the reading happens after this tick's writes
+  // and shares one layout with the frame instead of forcing its own every second.
+  function queueToastTop() {
+    if (!m || m.ttQ) return;
+    if (typeof g.requestAnimationFrame !== 'function') { measureToastTop(); return; }
+    m.ttQ = g.requestAnimationFrame(() => { if (m) { m.ttQ = 0; measureToastTop(); } });
+  }
   // In the cabinet view toasts move to the top right, under the header and the attention strip, so they never cover a card's buttons.
   // This tells the stylesheet where the page below the strip starts (--fl-toast-top).
   function measureToastTop() {
@@ -21929,7 +22036,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     m.cabOn = !!on;
     m.root.dataset.cabinet = on ? 'on' : 'off';
     doc.documentElement.dataset.cabinet = on ? 'on' : 'off';
-    measureToastTop();
+    queueToastTop();
     for (const el of [m.grid, m.empty, m.welcome, m.dock]) if (el) el.style.display = on ? 'none' : '';
     setHidden(m.cabEl, !on);
     m.seg.setValue(on ? 'cabinet' : m.zone);
@@ -22162,7 +22269,11 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     let n = 0;
     if (!m.cabOn && main.clientHeight > 0 && main.scrollHeight > main.clientHeight + 4) {
       const bottom = main.getBoundingClientRect().bottom;
-      for (const c of m.grid.children) { if (!c.classList.contains('fl-leaving') && c.getBoundingClientRect().top >= bottom - 8) n++; }
+      // The slips run row by row down the page, so the first one below the screen is found by halving (a few reads, not one per ticket).
+      const kids = m.grid.children;
+      let lo = 0, hi = kids.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (kids[mid].getBoundingClientRect().top >= bottom - 8) hi = mid; else lo = mid + 1; }
+      for (let i = lo; i < kids.length; i++) if (!kids[i].classList.contains('fl-leaving')) n++;
     }
     setHidden(m.below, n === 0);
     if (n) put(m.belowT, n + (n === 1 ? ' more ticket below' : ' more tickets below'));
@@ -22738,7 +22849,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
-    const health = awayNote() || awakeNote();
+    const health = awayNote() || historyWords() || awakeNote();
     const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
@@ -22753,7 +22864,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
     }
     setHidden(m.strip.clockBar, !clockShown);
-    measureToastTop();
+    queueToastTop();
     const soundShown = needSound && !m.dis.has('snd') && !clockShown;
     setHidden(m.strip.soundBar, !soundShown); // the clock notice goes first, so the sound bar waits behind it
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
@@ -22763,6 +22874,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     if (moreEl) { const t = (noWebAudio() ? 'This browser cannot play warning tones. Open Smokebox in another browser for sound.' : 'Tap here to turn on warning sounds. This browser needs one tap first.') + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
+    if (showNote && m.histNote && note === m.histNote.words && !m.histSeen) { m.histSeen = true; try { SB.store.historyNoticeSeen(m.histNote.kind); } catch (e) { /* the store has no such call */ } }
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote && !clockShown);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
@@ -26761,6 +26873,18 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
     const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Tablet checks: screen, sound, home screen', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet: first steps', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
 
+    // The saved-history line: how full this tablet's saved history is, and a way to Close the month once it is getting full.
+    // Nothing shows in the demo or when the store cannot say.
+    const historyBlock = (() => {
+      let fill = null; try { fill = SB.store.historyFill && !(SB.store.isDemo && SB.store.isDemo()) ? SB.store.historyFill() : null; } catch (e) { fill = null; }
+      if (!fill || typeof fill.pct !== 'number') return null;
+      const parts = [];
+      // Closes Settings, then opens the Close the month flow (which asks for the PIN first).
+      const openFlow = () => closeThen(sheet, () => SB.setup && SB.setup.openCloseMonth && SB.setup.openCloseMonth());
+      if (fill.nearFull) parts.push(h('button', { type: 'button', class: 'btn', dataset: { act: 'history-close-month' }, onClick: openFlow }, 'Close the month...'));
+      const words = 'Saved history: ' + Math.round(fill.pct) + '% full.' + (fill.nearFull ? ' Close the month to save older days to files.' : '') + (fill.persisted === false ? ' Your browser may clear this data if the tablet is unused. Installing the app (Tablet checks, step 4) usually helps. Save a backup every day.' : '');
+      return settingBlock('Saved history', words, ...parts);
+    })();
     sheet.body.append(h('div', { class: 'mn' },
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
       SB.setup && SB.setup.leftoversCard ? SB.setup.leftoversCard() : null,
@@ -26774,6 +26898,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),
       settingBlock('Station on this tablet', 'The board opens on this station, and again after a reload.', stationSeg),
       clockBlock,
+      historyBlock,
       settingBlock('More', '', links),
       // Start over sits alone at the very bottom, away from the everyday buttons. In the demo it is replaced by the way back.
       SB.store.isDemo && SB.store.isDemo()
@@ -26912,16 +27037,22 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
   }
   // Keeps a list of rows in step with a list of items: makes rows for new ids, updates them all, drops rows whose item is
   // gone and puts the rest in order. Rows are reused, never rebuilt, so a button being pressed is never replaced.
-  function reconcile(listEl, rows, items, makeFn, updateFn) {
+  // Builds at most `cap` new rows per call (the rest next time) so a long list does not freeze a slow tablet; returns true when rows are still missing.
+  function reconcile(listEl, rows, items, makeFn, updateFn, cap) {
     const keep = new Set(items.map((it) => it.id));
     rows.forEach((rec, id) => { if (!keep.has(id)) { rec.el.remove(); rows.delete(id); } });
-    items.forEach((it, i) => {
+    let made = 0, pos = 0, more = false;
+    items.forEach((it) => {
       let rec = rows.get(it.id);
-      if (!rec) { rec = makeFn(it); rows.set(it.id, rec); }
+      if (!rec) {
+        if (cap && made >= cap) { more = true; return; }
+        rec = makeFn(it); rows.set(it.id, rec); made++;
+      }
       updateFn(rec, it);
-      const want = listEl.children[i];
+      const want = listEl.children[pos++];
       if (want !== rec.el) listEl.insertBefore(rec.el, want || null);
     });
+    return more;
   }
 
   /* ---------------------------------------------------------------------------------------------
@@ -27114,6 +27245,8 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       text(paidDrawer, paid.length ? C.payMethods.map((pm) => pm.name + ' ' + money(by[pm.id] || 0)).join(', ') + '. Cash is what should be in the drawer, besides the starting float.' : '');
       setHidden(paidSum, !paid.length); setHidden(paidDrawer, !paid.length);
     }
+    // The timer that builds the rest of a long list of open orders.
+    let moreT = 0;
     // Keeps both lists in step with the store.
     function update() {
       const state = st(), now = nowMs();
@@ -27122,7 +27255,9 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       // Paid today goes by the time of payment, as the day close counts it: a tab opened yesterday and paid today is today's.
       const paid = (state.orders || []).filter((o) => o.status === 'paid' && U.isNum(o.paidAt) && U.serviceDate(o.paidAt, state.settings.service.dayStartHour) === sd).sort((a, b) => b.paidAt - a.paidAt);
       const totals = E().openOrderTotals(state);
-      reconcile(openList, openRows, open, makeOpenRow, (rec, o) => updateOpenRow(rec, o, state, totals, now));
+      // A long list of open orders fills in over a few frames: the first screenful at once, then 30 more rows per frame.
+      const more = reconcile(openList, openRows, open, makeOpenRow, (rec, o) => updateOpenRow(rec, o, state, totals, now), openRows.size ? 30 : 16);
+      if (more && !moreT) moreT = setTimeout(() => { moreT = 0; if (offs.length) update(); }, 16);
       reconcile(paidList, paidRows, paid.slice(0, 80), makePaidRow, (rec, o) => updatePaidRow(rec, o, state));
       paintPaidSummary(paid);
       tabs.setCount('open', open.length); tabs.setCount('paid', paid.length);
@@ -27133,7 +27268,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     update();
     showTab(tabs.getValue());
     // Stops the store and clock listeners once the frame is closed.
-    const teardown = () => offs.splice(0).forEach((f) => f());
+    const teardown = () => { offs.splice(0).forEach((f) => f()); if (moreT) { clearTimeout(moreT); moreT = 0; } };
     return { teardown };
   }
 
@@ -28220,7 +28355,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     fry: { cat: 'fried', sec: 240, track: 'two' }, cold: { cat: 'cold', sec: 60, track: 'one' },
   };
   // Section names that fit each station best, in the old and the new starter names (lower case).
-  const SECTION_WORDS = { pit: ['meats', 'mains'], sides: ['hot sides', 'sides'], fry: ['fried', 'snacks'], cold: ['cold and drinks', 'drinks'] };
+  const SECTION_WORDS = { pit: ['meats', 'mains'], sides: ['hot sides', 'sides'], fry: ['fried', 'snacks'], cold: ['cold food and drinks', 'cold and drinks', 'drinks'] };
   // A short plain line under each station name on its tile.
   const ZONE_HINT = { pit: 'Grill, oven or main line', sides: 'Prep and sides', fry: 'Fried foods', cold: 'No cooking: drinks, cold items' };
   // The example menu. Columns: name, price in dollars, station id, category id. Made-up prices, owner to replace.
@@ -28818,18 +28953,18 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     const kind = SB.ui.segmented({ label: 'Is it kept hot or cold?', value: 'hot', options: [{ id: 'hot', label: 'Hot' }, { id: 'cold', label: 'Cold' }],
       // Shows the boxes that fit hot or cold food.
       onChange: () => paintKind() });
-    const hoursIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: '4', 'aria-label': 'Hours it may stay' });
+    const hoursIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', value: '4', 'aria-label': 'How long may it stay, in hours?' });
     const hoursField = SB.ui.field({ label: 'How long may it stay, in hours?', control: hoursIn, hint: '4 hours is a careful starting point. Your local health code decides what is allowed: ask your health department and change this to match.' });
     // Cold food: two optional limits the owner gets from their health department. Blank means no limit is set and Smokebox only shows the time.
-    const daysIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Days it may stay in the fridge' });
+    const daysIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'How many days may it stay in the fridge?' });
     const daysField = SB.ui.field({ label: 'How many days may it stay in the fridge?', control: daysIn });
-    const outIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Hours it may be out of the fridge' });
+    const outIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'How many hours may it be out of the fridge?' });
     const outField = SB.ui.field({ label: 'How many hours may it be out of the fridge?', control: outIn });
     const coldBox = h('div', { class: 'dp-cold', hidden: true }, daysField, outField,
       h('p', { class: 'fs-sub' }, 'Use the limits your local health department gives you. Leave a box empty for no limit set: Smokebox will then only show the time.'));
     // Shows the hours box for hot food and the two fridge boxes for cold food.
     function paintKind() { const cold = kind.getValue() === 'cold'; coldBox.hidden = !cold; hoursField.hidden = cold; }
-    const kgIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Usual batch size in kilograms' });
+    const kgIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'optional', 'aria-label': 'Usual batch size, in kg' });
     const kgField = SB.ui.field({ label: 'Usual batch size, in kg', control: kgIn, hint: 'A normal pan or batch, like 4. Leave it empty if you are not sure.' });
     // One checkbox row per dish: tick the dishes that use this food and say about how many grams each takes.
     const dishRows = activeDishes().map((m) => {
@@ -30464,7 +30599,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
      },
      {
       "t": "p",
-      "x": "Back up every day at close. If the browser data is cleared or the device is replaced, a copy on the same device goes with it."
+      "x": "Back up every day at close. A copy kept only on this device is lost with it."
      },
      {
       "t": "h",
@@ -30481,7 +30616,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
      },
      {
       "t": "p",
-      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. What was here is kept too, so you can undo once more. If the browser was short on room, the copy keeps only recent tickets, or none can be kept and the restore says so."
+      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. If the browser was short on room, the copy keeps only recent tickets, or the restore says none could be kept."
      },
      {
       "t": "p",
@@ -30489,11 +30624,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
      },
      {
       "t": "p",
-      "x": "A file that is not a valid backup is refused, and nothing is changed. A backup from the demo is refused too."
-     },
-     {
-      "t": "p",
-      "x": "Spreadsheet files, like the sales file, cannot be restored."
+      "x": "A file that is not a valid backup, a backup from the demo, or a spreadsheet file is refused, and nothing changes."
      },
      {
       "t": "h",
@@ -30509,7 +30640,15 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
      },
      {
       "t": "p",
-      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first."
+      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each asks you to type a word first. Back up before using either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first."
+     },
+     {
+      "t": "h",
+      "x": "How full the saved history is"
+     },
+     {
+      "t": "p",
+      "x": "Settings and the Data page show **Saved history**, how full this tablet is. When it is nearly full, **Close the month...** is offered there."
      }
     ]
    },
@@ -30782,6 +30921,22 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
      {
       "t": "p",
       "x": "If a message says some saved records could not be read and were left out, the data as it was is kept. Do not clear the browser data. Ask whoever set up Smokebox. If a full-screen message says the saved data could not be read, tap **Download the old data** or **Show the data so I can copy it**. Only then can you continue."
+     },
+     {
+      "t": "h",
+      "x": "A copy that was set aside"
+     },
+     {
+      "t": "p",
+      "x": "When Smokebox could not read your saved data at start-up, it kept the unreadable copy aside for 30 days and began with its last good copy. If that set-aside copy can be read now (for example after going back to a newer version), the Data page shows a card: **A copy of your kitchen was set aside**. It says when it was set aside and how many tickets and orders it holds."
+     },
+     {
+      "t": "p",
+      "x": "To bring it back, open Back office, Menu and settings, then Data. In the card, tap **Save a backup of what is here now first** and check that the file arrived. Then type **RESTORE** and tap **Bring the set-aside copy back**. If a PIN is set, Smokebox asks for it first. Everything on this device is replaced by the set-aside copy. What was here before is kept for 7 days: tap **Undo this restore** to put it back."
+     },
+     {
+      "t": "p",
+      "x": "To forget the set-aside copy, tap **Throw the set-aside copy away**. Your kitchen as it is now is not touched, and the copy cannot be brought back."
      }
     ]
    },
@@ -32506,10 +32661,9 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     const current = M && M.pageId === p.id;
     if (!r) {
       return h('li', { class: 'of-rail-li' }, h('span', { class: 'of-nav is-soon', role: 'link', 'aria-disabled': 'true', 'aria-label': title + ', coming soon', title: title + ' is coming soon' },
-        ico(icon, 22), h('span', { class: 'of-nav-w' }, h('span', { class: 'of-nav-full' }, title), h('span', { class: 'of-nav-short' }, p.short), h('span', { class: 'of-soon' }, 'Coming soon'))));
+        ico(icon, 22), h('span', { class: 'of-nav-w' }, h('span', { class: 'of-nav-full' }, title), h('span', { class: 'of-nav-short', 'aria-hidden': 'true' }, p.short), h('span', { class: 'of-soon' }, 'Coming soon'))));
     }
     const a = h('a', { class: 'of-nav', href: '#/office' + (p.id === 'pace' ? '' : '/' + p.id), dataset: { page: p.id }, title });
-    a.setAttribute('aria-label', title);
     if (current) a.setAttribute('aria-current', 'page');
     const off = pageIsOff(p.id);
     if (off) { a.classList.add('is-off'); a.title = title + (COUNTER_PAGES[p.id] && counterOn() ? ' (counter service: not measured)' : ' (not tracking cooked-ahead food)'); }
@@ -36406,7 +36560,9 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       // Runs the erase once, then closes the box.
       const run = () => { if (go.disabled) return; cancel(); o.run(); };
       go.addEventListener('click', run);
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); if (e.key === 'Escape') cancel(); });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+      // Escape anywhere in the box closes only the box (the page-wide Escape would otherwise leave the back office) and gives focus back to the erase button.
+      dangerBox.onkeydown = (e) => { if (e.key === 'Escape' && !dangerBox.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); } };
       const descId = U.uid('oddesc');
       input.setAttribute('aria-describedby', descId);
       dangerBox.replaceChildren(h('p', { class: 'od-danger-t' }, ico('alert', 20), h('strong', null, o.title)), h('div', { id: descId }, ...o.lines.map((t) => h('p', { class: 'od-p' }, t))),
@@ -36494,6 +36650,55 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
       else SB.ui.toast(rep === 'noCopy' ? 'The copy from before the restore is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings), { tone: 'warn' });
       paintUndo();
     }
+    // A copy that was set aside as unreadable (or by a newer build) can still be read: say what it holds and offer to bring it back or throw it away.
+    const parkedBox = h('div', { class: 'od-parked', 'data-region': 'parked-copy' });
+    const PARK_WORD = 'RESTORE';
+    // Draws the set-aside copy card again, or nothing when no readable copy is set aside.
+    function paintParked() {
+      const pc = SB.store.parkedCopy ? SB.store.parkedCopy() : null;
+      if (!pc || (SB.store.isHubClient && SB.store.isHubClient()) || (SB.store.isFollower && SB.store.isFollower())) { parkedBox.replaceChildren(); parkedBox.hidden = true; return; }
+      parkedBox.hidden = false;
+      let savedFirst = false;
+      const status = h('p', { class: 'od-p', role: 'status' });
+      const word = h('input', { class: 'input od-danger-in', type: 'text', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Type ' + PARK_WORD + ' to confirm' });
+      const go = btn('Bring the set-aside copy back', { icon: 'upload', cls: 'btn-danger' }); go.dataset.action = 'parked-restore'; go.disabled = true;
+      // The red button wakes only when the backup of what is here now was saved and the word was typed.
+      const sync = () => { go.disabled = !(savedFirst && word.value.trim().toUpperCase() === PARK_WORD); };
+      word.addEventListener('input', sync);
+      // Saves a backup file of what is on this device now, so bringing the other copy back can never lose it.
+      const saveFirst = btn('Save a backup of what is here now first', { icon: 'download', cls: 'btn-sm', onClick: () => {
+        let text = null; try { text = SB.store.exportAll(); } catch (e) { text = null; }
+        if (!text) { status.textContent = 'The backup could not be made, so nothing can be replaced. Nothing was changed.'; return; }
+        // Pads a number to two digits so the file name sorts by time.
+        const z = (n) => String(n).padStart(2, '0');
+        try { const d = new Date(); const fname = 'smokebox-backup-before-set-aside-restore-' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + '.json'; const url = URL.createObjectURL(new Blob([text], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = fname; a.style.display = 'none'; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000); savedFirst = true; status.textContent = 'Asked your browser to save ' + fname + '. Look in your downloads folder to be sure it is there, then type ' + PARK_WORD + '.'; sync(); }
+        catch (e) { status.textContent = 'This browser would not save the file. Nothing was changed.'; }
+      } }); saveFirst.dataset.action = 'parked-backup';
+      // After the PIN, brings the set-aside copy back; the kitchen it replaces is kept for 7 days (Undo this restore below).
+      go.addEventListener('click', async () => {
+        if (go.disabled) return;
+        if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
+        const rep = SB.store.restoreParked();
+        if (rep === 'ok') SB.ui.toast('The set-aside copy is back. What was here before is kept for 7 days: Undo this restore.', { tone: 'ok' });
+        else SB.ui.toast(rep === 'noCopy' ? 'The set-aside copy is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings) + ' Nothing was changed.', { tone: 'warn' });
+        paintParked(); paintUndo();
+      });
+      // Throws the set-aside copy away after asking; the current kitchen is not touched.
+      const drop = btn('Throw the set-aside copy away', { icon: 'trash', cls: 'btn-sm', onClick: async () => {
+        const ok = await SB.ui.confirm({ title: 'Throw the set-aside copy away?', tone: 'danger', confirmLabel: 'Throw it away', cancelLabel: 'Keep it', body: ['This removes the copy that was set aside. Your kitchen as it is now is not touched. It cannot be brought back.'] });
+        if (!ok) return;
+        if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
+        try { const k = SB.store.CORRUPT_KEY; SB.util.storage.remove(k); SB.util.storage.remove(k + 'at'); } catch (e) { /* the check below tells the truth */ }
+        SB.ui.toast(SB.store.parkedCopy && SB.store.parkedCopy() ? 'The copy could not be removed.' : 'The set-aside copy was thrown away.', { tone: 'ok' });
+        paintParked();
+      } }); drop.dataset.action = 'parked-drop';
+      const when = pc.at ? U.fmtDateShort(U.dateKey(pc.at)) + ' ' + U.fmtTime(pc.at) : 'earlier';
+      parkedBox.replaceChildren(
+        h('h3', { class: 'od-sub' }, 'A copy of your kitchen was set aside'),
+        h('p', { class: 'od-p' }, 'Smokebox set this copy aside on ' + when + ' because it could not read it then, or it came from a newer version. It can be read now and holds ' + U.fmtNum(pc.tickets) + ' ' + U.plural(pc.tickets, 'ticket') + ' and ' + U.fmtNum(pc.orders) + ' ' + U.plural(pc.orders, 'order') + '.'),
+        h('p', { class: 'od-p' }, 'Bringing it back replaces everything on this device. What is here now is kept for 7 days, and you can undo it. First save a backup file of what is here now, then type ' + PARK_WORD + '.'),
+        h('div', { class: 'od-actions' }, saveFirst), SB.ui.field({ label: 'Type ' + PARK_WORD, control: word }), h('div', { class: 'od-actions' }, go, drop), status);
+    }
     const pasteLabelId = U.uid('odpl');
     const pasteArea = h('textarea', { class: 'textarea od-paste', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-labelledby': pasteLabelId, placeholder: 'Paste the whole backup text here' });
     // Checks pasted text the same way as a chosen file.
@@ -36502,7 +36707,8 @@ window.SB_BUILD = { version: "0.2.0", id: "ae47154" };
     const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
     card2.body.append(
       para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
-      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
+      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox, parkedBox);
+    paintParked();
     // A month close, or the copy's 7 days running out, while this page is open shows here on the next refresh.
     P.syncs.push(() => paintUndo());
     card3.body.append(
