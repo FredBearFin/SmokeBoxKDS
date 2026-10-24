@@ -1576,17 +1576,22 @@
   // false resets those too. Returns { ok, report, info, backup? } with backup { text, filename, mime, savedAt, chars } for the
   // screen to download; the old last good copy and any set-aside damaged copy are dropped after the erase and the last good copy is retaken from the empty kitchen, so a damaged save can never bring the erased kitchen back.
   // WATCH OUT: the demo's keys are never read or written here.
+  // opts.quick: true is the one-step start over for a kitchen with nothing real to lose (see nothingToLose): it needs neither
+  // the typed word nor a saved backup file. Asked for while there are tickets, orders, batches or kept history, it is refused
+  // with 'backupRequired', so the careful steps are still needed whenever anything real would go.
   function startOver(opts) {
     opts = opts || {};
     // Records and returns a refusal; nothing has been changed when this is used.
     const fail = (report, info) => { last = { type: 'startOver', report, info: info || {}, events: [] }; return { ok: false, report, info: info || {} }; };
     if (!state) return fail('invalidBackup');
     if (mode === 'demo') return fail('notInDemo');
-    if (typeof opts.confirm !== 'string' || opts.confirm.trim().toUpperCase() !== START_OVER_WORD) return fail('confirmWord', { word: START_OVER_WORD });
+    const quick = opts.quick === true;
+    if (quick && !nothingToLose()) return fail('backupRequired', { quick: false });
+    if (!quick && (typeof opts.confirm !== 'string' || opts.confirm.trim().toUpperCase() !== START_OVER_WORD)) return fail('confirmWord', { word: START_OVER_WORD });
     if (opts.keepSettings != null && typeof opts.keepSettings !== 'boolean') return fail('badPatch', { key: 'keepSettings' });
     // The screen must say a backup file was really saved (its name and size) before anything is erased.
     const bs = opts.backupSaved;
-    if (!bs || typeof bs !== 'object' || typeof bs.filename !== 'string' || !bs.filename.trim() || !(Number.isFinite(bs.chars) && bs.chars > 0)) return fail('backupRequired');
+    if (!quick && (!bs || typeof bs !== 'object' || typeof bs.filename !== 'string' || !bs.filename.trim() || !(Number.isFinite(bs.chars) && bs.chars > 0))) return fail('backupRequired');
     const keep = opts.keepSettings !== false;
     const text = exportAll();
     if (text == null) { const lr = last || {}; return fail(lr.report || 'invalidBackup', lr.info); }
@@ -1617,6 +1622,12 @@
     // Two-digit number for the file name.
     const pad = (n) => (n < 10 ? '0' : '') + n;
     return { ok: true, report: 'ok', info: { keepSettings: keep }, backup: { text, filename: 'smokebox-before-start-over-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.json', mime: 'application/json', savedAt, chars: text.length } };
+  }
+  // True when this real kitchen holds nothing that cannot simply be typed in again: no tickets, orders, cooked batches or kept
+  // history (only dishes, cooked-ahead items and settings, or nothing at all). Start over may then be one step (opts.quick).
+  function nothingToLose() {
+    if (!state || mode === 'demo') return false;
+    return ['tickets', 'orders', 'batches', 'eventArchive', 'safetyKeep'].every((k) => !Array.isArray(state[k]) || state[k].length === 0);
   }
   // Counts the old demo and sample tickets in this kitchen's real reports (see the engine's demoLeftovers), and whether the
   // owner already chose to keep them. In the demo it counts nothing (demo tickets belong there). { tickets, orders, paidOrders,
@@ -1655,7 +1666,7 @@
     init, destroy, status, getState: () => state, now, tick: tickNow, dispatch, dispatchEx, lastResult: () => last,
     // Clock readers: speed gives the demo speed, clock gives the whole clock card.
     subscribe, subscribeTick, flushNotify, setSpeed, speed: () => clk.speed, clock: () => ({ now: now(), speed: clk.speed, base: clk.base, realBase: clk.realBase }),
-    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, reconcile, decodeSaved: openSaved, parkedCopy, restoreParked, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
+    acceptClockJump, damagedText: () => heldText, releaseHold: () => { writeBlocked = false; heldText = null; st.heldInMemory = false; schedulePersist(false); }, flush, reconcile, decodeSaved: openSaved, parkedCopy, restoreParked, historyFill, historyNotice, historyNoticeSeen, exportAll, importAll, closeMonthPreview, closeMonthExport, closeMonthPrune, beforeRestoreInfo, undoRestore, exportCsv, reset, resetLive, attachSim, dataset, select, isBlank, isOwn, createRecoveryCode, recoverPin, hasRecoveryCode, saveDraft, loadDraft, clearDraft, applyStarterNames, STARTER_NAMES, startOver, nothingToLose, START_OVER_WORD, demoLeftovers, keepDemoLeftovers, clearDemoLeftovers, mode: modeNow, isDemo, isolated, enterDemo, leaveDemo, KEY, CORRUPT_KEY,
     // Messages between the tabs of this browser (alert leader, played and acknowledged sounds).
     broadcast, onBroadcast, canBroadcast: () => !!tr, tabId,
     // Server-ready pieces: the transport interface is described above (search "TRANSPORT INTERFACE").

@@ -1005,7 +1005,8 @@
   // The word the owner types to confirm: the store's own word (ERASE), so the screen and the store always agree.
   const START_OVER_WORD = (SB.store && SB.store.START_OVER_WORD) || 'ERASE';
   // Opens "Start over with an empty menu": three plain steps (what goes and what stays, save a backup, type the word). This cannot
-  // be undone, so the screen says so first and offers a backup before anything is erased.
+  // be undone, so the screen says so first and offers a backup before anything is erased. A kitchen with nothing real to lose
+  // (no tickets, orders or history, only dishes or nothing) gets one plain confirm instead (the store's quick start over).
   function openStartOver() {
     // With a PIN set, the keypad comes first; the sheet opens only for the right PIN.
     if (SB.shell && SB.shell.hasPin && SB.shell.hasPin() && SB.shell.requirePin) { SB.shell.requirePin().then((ok) => { if (ok) buildStartOver(); }); return null; }
@@ -1015,6 +1016,7 @@
   function buildStartOver() {
     const sheet = SB.ui.sheet({ title: 'Start over with an empty menu', side: 'right', width: 'min(640px, 96vw)', name: 'startover' });
     const root = h('div', { class: 'dp so' });
+    const simple = !!(SB.store.nothingToLose && SB.store.nothingToLose());
     const keep = h('input', { type: 'checkbox', checked: true, id: 'so-keep' });
     const keepLabel = h('label', { class: 'dp-check-row', for: 'so-keep' }, keep, h('span', null, 'Keep my tax, hours, PIN and station names'));
     const step1 = h('section', { class: 'fs-section so-step' },
@@ -1023,9 +1025,13 @@
       h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device. The food safety record stays.'),
       h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and sections. Clear the box and those go back to how Smokebox starts.'),
       keepLabel,
-      h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'There is no undo. We are sorry to be blunt: once you confirm, the old menu and history cannot be brought back, except from a backup file you saved first.'));
+      simple ? h('p', { class: 'fs-note' }, 'You have no tickets, orders or sales yet, so only your dishes and their setup go. No backup is needed.')
+        : h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'This cannot be undone. Save a backup first: it is the only way to bring the old menu and history back.'));
     const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next1' } }, 'Next: about your backup');
-    step1.appendChild(next1);
+    // The one-step confirm for a kitchen with nothing real to lose.
+    const quickGo = h('button', { type: 'button', class: 'btn btn-danger btn-lg', dataset: { act: 'so-quick' } }, ico('trash', 22), h('span', null, 'Start over now'));
+    const quickSt = h('p', { class: 'fs-sub', role: 'status' });
+    if (simple) step1.append(quickGo, quickSt); else step1.appendChild(next1);
 
     const next2 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-next2' }, disabled: true }, 'Next: confirm');
     let backupInfo = null; // what the backup file was called and how big, once it was handed to the browser
@@ -1054,29 +1060,33 @@
       h('p', { class: 'fs-sub' }, 'To bring everything back later: Back office, Data, Restore.'), next2);
 
     const word = h('input', { class: 'input', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': 'Type ' + START_OVER_WORD + ' to confirm', placeholder: START_OVER_WORD });
-    const goSt = h('p', { class: 'fs-sub', role: 'status' });
+    const goStep3 = h('p', { class: 'fs-sub', role: 'status' });
     const go = h('button', { type: 'button', class: 'btn btn-danger btn-lg', dataset: { act: 'so-go' }, disabled: true }, ico('trash', 22), h('span', null, 'Erase everything and start over'));
     // The red button only wakes up when the exact word has been typed.
     word.addEventListener('input', () => { go.disabled = word.value.trim().toUpperCase() !== START_OVER_WORD; });
     const step3 = h('section', { class: 'fs-section so-step', hidden: true },
       h('h3', { class: 'fs-h' }, '3. Type ' + START_OVER_WORD),
       h('p', { class: 'fs-sub' }, 'To be sure this is what you want, type ' + START_OVER_WORD + ' in the box. Then the red button works.'),
-      SB.ui.field({ label: 'Type ' + START_OVER_WORD, control: word }), go, goSt);
+      SB.ui.field({ label: 'Type ' + START_OVER_WORD, control: word }), go, goStep3);
     const done = h('section', { class: 'fs-section so-step', hidden: true });
 
     // Shows one step and hides the others.
     const show = (which) => { [step1, step2, step3, done].forEach((s, i) => { s.hidden = i !== which; }); };
     next1.addEventListener('click', () => show(1));
     next2.addEventListener('click', () => show(2));
+    go.addEventListener('click', () => erase(false));
+    quickGo.addEventListener('click', () => erase(true));
     // Erases the kitchen: empty menu, optionally the settings too, then shows the done screen. Any refusal is shown in the same one-line style.
-    go.addEventListener('click', () => {
+    // quick is the one-step start over: no word and no backup file, and the store itself refuses it if anything real would go.
+    function erase(quick) {
       const keepIt = keep.checked;
+      const goSt = quick ? quickSt : goStep3;
       // The store makes its own backup first, clears the kitchen, my saved setup bits and (when asked) the settings and station names.
-      const res = SB.store.startOver({ confirm: word.value, keepSettings: keepIt, backupSaved: backupInfo });
+      const res = SB.store.startOver(quick ? { quick: true, keepSettings: keepIt } : { confirm: word.value, keepSettings: keepIt, backupSaved: backupInfo });
       if (!res.ok) {
         let w = res.report;
         try { w = SB.engine.describe(res.report, res.info, SB.store.getState().settings) || w; } catch (e) { /* keep the code */ }
-        if (res.report === 'backupRequired') w = 'Save the backup file first (step 2). Nothing was erased.';
+        if (res.report === 'backupRequired') w = quick ? 'Orders or tickets were added since this opened, so a backup comes first. Close this and open Start over again. Nothing was erased.' : 'Save the backup file first (step 2). Nothing was erased.';
         else if (res.report === 'confirmWord') w = 'Type ' + START_OVER_WORD + ' exactly, then try again. Nothing was erased.';
         else if (res.report === 'notInDemo') w = 'You are in the demo, so there is nothing of yours to erase here. Tap Back to my kitchen first.';
         tell(goSt, w + (res.report === 'confirmWord' || res.report === 'notInDemo' || res.report === 'backupRequired' ? '' : ' Nothing was erased.'), 'bad');
@@ -1086,18 +1096,18 @@
       const auto = res.backup;
       // The backup comes from the same call that erased: download it now, and keep a button for another copy.
       const saveAuto = () => { try { const url = g.URL.createObjectURL(new g.Blob([auto.text], { type: auto.mime })); const a = doc.createElement('a'); a.href = url; a.download = auto.filename; a.style.display = 'none'; doc.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); g.URL.revokeObjectURL(url); }, 1000); return true; } catch (e) { return false; } };
-      const savedOk = auto ? saveAuto() : false;
+      const savedOk = auto && !quick ? saveAuto() : false; // the one-step start over offers the copy but never forces a download
       if (SB.floor && SB.floor.setWelcome) SB.floor.setWelcome(true);
       U.clear(done);
       done.append(h('h3', { class: 'fs-h' }, 'Done. Your kitchen is empty.'),
-        h('p', { class: 'fs-sub' }, 'The menu, tickets and history are gone' + (keepIt ? '. Your tax, hours, PIN and station names stayed.' : ', and tax, hours, PIN and station names are back to how Smokebox starts.')),
+        h('p', { class: 'fs-sub' }, (quick ? 'The menu is gone' : 'The menu, tickets and history are gone') + (keepIt ? '. Your tax, hours, PIN and station names stayed.' : ', and tax, hours, PIN and station names are back to how Smokebox starts.')),
         // The backup made by the same call that erased: says whether it was saved, and offers another copy.
-        auto ? h('p', { class: 'fs-sub dp-msg', 'data-tone': savedOk ? 'ok' : 'bad', role: 'status' }, (savedOk ? 'Saved ' + auto.filename + ' (' + Math.max(1, Math.round(auto.chars / 1024)) + ' KB) to your downloads, from just before the erase. ' : 'Your browser blocked the backup download. ')) : null,
-        auto ? h('button', { type: 'button', class: 'btn', dataset: { act: 'so-auto-backup' }, onClick: () => saveAuto() }, 'Save the backup again') : null,
+        auto && !quick ? h('p', { class: 'fs-sub dp-msg', 'data-tone': savedOk ? 'ok' : 'bad', role: 'status' }, (savedOk ? 'Saved ' + auto.filename + ' (' + Math.max(1, Math.round(auto.chars / 1024)) + ' KB) to your downloads, from just before the erase. ' : 'Your browser blocked the backup download. ')) : null,
+        auto ? h('button', { type: 'button', class: 'btn', dataset: { act: 'so-auto-backup' }, onClick: () => saveAuto() }, quick ? 'Save a copy of the old menu' : 'Save the backup again') : null,
         // Goes to the first screen: closes the sheets (and reloads when station names were reset so every screen shows them).
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'so-finish' }, onClick: () => { if (needsReload) g.location.reload(); else SB.sheets.closeAll(); } }, 'Go to the first screen'));
       show(3);
-    });
+    }
     root.append(step1, step2, step3, done);
     sheet.body.appendChild(root); keepInView(root);
     return sheet;

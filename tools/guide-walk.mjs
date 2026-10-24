@@ -237,6 +237,8 @@ async function startOver(browser) {
   console.log('Start over with an empty menu');
   const p = await fresh(browser);
   await addDish(p, { name: 'Fries', short: 'Fries', zone: 'fry', price: 4 });
+  // One real ticket, so the careful steps show (a kitchen with only dishes gets a one-step confirm).
+  await p.evaluate(() => SB.store.dispatchEx('createTicket', { customer: 'Ann', items: [{ menuId: SB.store.getState().menu[0].id, qty: 1 }] }, { source: 'ui' }));
   await p.click('button.fl-menu'); await p.waitForTimeout(500);
   check('menu: Start over with an empty menu', await tap(p, 'Start over with an empty menu')); await p.waitForTimeout(600);
   const sh = '.sheet-root:last-of-type';
