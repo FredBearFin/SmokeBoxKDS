@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sets up the Smokebox prototype hub on a fresh Ubuntu 22.04 or 24.04 server, with automatic HTTPS and a password.
 # Usage (as root): bash setup-server.sh <time zone> <login name> <password> [domain]
-# If smokebox-server.tar.gz is not in the current folder, it is downloaded from the public GitHub repo (branch deploy).
+# If smokebox-server.tar.gz is not in the current folder, it is downloaded from the public GitHub repo (branch main).
 # Example: bash setup-server.sh America/New_York freddy 'a-long-password' smokebox.example.com
 # With no domain it uses <your-server-ip>.sslip.io, a free name that points at your IP, so HTTPS works at once.
 set -euo pipefail
@@ -17,7 +17,7 @@ DOMAIN="${4:-}"
 [ -z "$DOMAIN" ] || [[ "$DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$ ]] || { echo "'$DOMAIN' does not look like a web address name; stopping."; exit 1; }
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo bash ...)"; exit 1; }
 if [ ! -f smokebox-server.tar.gz ]; then
-  curl -fsSL --max-time 180 --retry 2 https://github.com/FredBearFin/SmokeBoxKDS/archive/refs/heads/deploy.tar.gz -o smokebox-server.tar.gz
+  curl -fsSL --max-time 180 --retry 2 https://github.com/FredBearFin/SmokeBoxKDS/archive/refs/heads/main.tar.gz -o smokebox-server.tar.gz
 fi
 [ "$(wc -c < smokebox-server.tar.gz)" -ge 100000 ] || { echo "smokebox-server.tar.gz is too small to be the app; stopping."; exit 1; }
 gzip -t smokebox-server.tar.gz

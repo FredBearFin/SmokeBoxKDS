@@ -10,7 +10,7 @@ TZNAME="${3:-America/New_York}"
 [ "$(id -u)" -eq 0 ] || { echo "Run as root"; exit 1; }
 [ -e "/usr/share/zoneinfo/$TZNAME" ] || { echo "Unknown time zone: $TZNAME (for example America/New_York); stopping."; exit 1; }
 cd /root
-curl -fsSL --max-time 180 --retry 2 https://github.com/FredBearFin/SmokeBoxKDS/archive/refs/heads/deploy.tar.gz -o smokebox-server.tar.gz
+curl -fsSL --max-time 180 --retry 2 https://github.com/FredBearFin/SmokeBoxKDS/archive/refs/heads/main.tar.gz -o smokebox-server.tar.gz
 [ "$(wc -c < smokebox-server.tar.gz)" -ge 100000 ] || { echo "The download is too small to be the app; stopping."; exit 1; }
 gzip -t smokebox-server.tar.gz
 NAMES="$(tar -tzf smokebox-server.tar.gz)"   # read fully first: a pipe into grep -q can cut tar off and look like "no match"

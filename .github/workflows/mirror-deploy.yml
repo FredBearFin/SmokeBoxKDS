@@ -1,0 +1,24 @@
+# Keeps the `deploy` branch an exact copy of `main`. Servers set up before Oct 24 2026 download `deploy`; everyone works only
+# with `main`, and this copies each change across so those servers update with the same commands as before.
+name: mirror-deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mirror-deploy
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Copy main to deploy
+        run: git push --force origin HEAD:refs/heads/deploy

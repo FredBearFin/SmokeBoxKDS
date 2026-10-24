@@ -1,4 +1,4 @@
-# GitHub's branch download (deploy.tar.gz) leaves out every path marked export-ignore. The server needs only: server/, src/js/ (the engine files
+# GitHub's branch download (main.tar.gz, and its copy deploy.tar.gz) leaves out every path marked export-ignore. The server needs only: server/, src/js/ (the engine files
 # the hub loads), dist/smokebox.html (the page it serves), the two install scripts and package.json. Everything else stays in the repository
 # but is not downloaded by go.sh or the nightly updater. After adding a file the server needs, make sure it is NOT matched here.
 /test export-ignore
@@ -14,3 +14,11 @@
 /dist/* export-ignore
 /dist/smokebox.html -export-ignore
 /engine export-ignore
+
+# Built and generated files: GitHub leaves them out of the repository's language count, so it shows the code people wrote
+# (the Rust engine, the JavaScript screens), not the 3 MB single-file build or the engine's base64 copy.
+dist/** linguist-generated=true
+src/js/18-engine-wasm.js linguist-generated=true
+src/js/78-guide.js linguist-generated=true
+test/fixtures/** linguist-vendored=true
+reference/** linguist-vendored=true

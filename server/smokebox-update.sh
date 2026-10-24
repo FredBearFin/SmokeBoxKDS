@@ -27,7 +27,7 @@ if [ -n "$REF" ]; then
   if printf '%s' "$REF" | grep -Eq '^[0-9a-f]{40}$'; then DEFAULT_URL="$REPO_ARCHIVE/$REF.tar.gz"; else DEFAULT_URL="$REPO_ARCHIVE/refs/tags/$REF.tar.gz"; fi
   say "pinned to $REF"
 else
-  DEFAULT_URL="$REPO_ARCHIVE/refs/heads/deploy.tar.gz"
+  DEFAULT_URL="$REPO_ARCHIVE/refs/heads/main.tar.gz"
 fi
 URL="${SMOKEBOX_UPDATE_URL:-$DEFAULT_URL}"
 
