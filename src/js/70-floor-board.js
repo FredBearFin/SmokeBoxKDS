@@ -2034,14 +2034,15 @@
       const b = sg.querySelector('[data-id="' + id + '"]');
       if (!b || id === 'all' || id === 'expo') return;
       // A station no dish is made at has nothing to show, so its tab waits until a dish is added there (once the menu has dishes).
-      const unused = menuNow.length > 0 && !menuNow.some((d) => d.zone === id);
+      const unused = !menuNow.some((d) => d.zone === id);
       const keep = (hid.indexOf(id) < 0 && !unused) || id === m.zone || (c.zones[id] || 0) > 0;
       b.style.display = keep ? '' : 'none';
     });
     // A one-station kitchen (a taco truck) has nothing to switch between: All, its one station and Expo would show the same tickets,
     // so those tabs go. The Cabinet tab stays when cooking ahead is on; with nothing left to pick the whole tab row hides.
     const shown = TABS.filter((id) => id !== 'all' && id !== 'expo' && sg.querySelector('[data-id="' + id + '"]') && sg.querySelector('[data-id="' + id + '"]').style.display !== 'none');
-    const single = m.zone === 'all' && shown.length <= 1 && hid.length > 0;
+    // A kitchen with no dishes yet has no stations to switch between either, so the whole tab row waits for the first dish.
+    const single = m.zone === 'all' && ((shown.length <= 1 && hid.length > 0) || (menuNow.length === 0 && !(c.all > 0)));
     const cab = sg.querySelector('[data-id="cabinet"]');
     const cabOn = !!cab && !cab.hidden;
     ['expo'].concat(shown).forEach((id) => { const b = sg.querySelector('[data-id="' + id + '"]'); if (b) b.style.display = single ? 'none' : (id === 'expo' ? '' : b.style.display); });
@@ -2065,7 +2066,7 @@
     const zone = m.zone, stationBusy = modeOf(zone) === 'station' && c && c.all > 0;
     const firstRun = !stationBusy && SB.setup && SB.setup.noDishes();
     const title = firstRun ? 'Welcome. Let\'s build your menu.' : stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
-    const text = firstRun ? 'It takes about two minutes. Nothing is filled in for you: you type your own dishes and prices.' : stationBusy
+    const text = firstRun ? 'Type your own dishes and prices (about two minutes), or first watch a busy night in a sample barbecue kitchen.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
       : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
     const cardUp = !!(m.welcome && !m.welcome.hidden);
@@ -2074,11 +2075,10 @@
     e.dataset.sig = sig;
     U.clear(e);
     const actions = h('div', { class: 'fl-empty-actions' });
-    // First run: one big friendly button, then two quiet links. No New ticket or demo button competes with it.
+    // First run: two big, plain choices and nothing else. The walkthrough needs a dish, so it waits until there is one.
     if (firstRun) {
-      actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'Add your first dish')),
-        h('button', { type: 'button', class: 'btn fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
-        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, 'Try the demo')));
+      actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'Add my menu')),
+        h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('play', 22), h('span', null, 'Watch the demo')));
       e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
       return;
     }

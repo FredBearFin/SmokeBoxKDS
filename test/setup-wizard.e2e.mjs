@@ -12,7 +12,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   // Reaches the blank first-run state whichever way this build starts (blank, or with old sample dishes to archive).
   await page.evaluate(() => { SB.store.getState().menu.filter((m) => !m.archived).forEach((m) => SB.store.dispatchEx('updateMenuItem', { id: m.id, patch: { archived: true } }, { source: 'ui' })); });
   await page.waitForTimeout(500);
-  check('first run shows one big Add your first dish button', await page.locator('.fl-first-dish').isVisible());
+  check('first run shows one big Add my menu button', await page.locator('.fl-first-dish').isVisible());
   check('no welcome card and no demo tickets on first run', !(await page.locator('.fl-welcome').isVisible()) && (await page.evaluate(() => SB.store.getState().tickets.length)) === 0);
   await page.screenshot({ path: SHOT + '/first-run.png' });
   check('New ticket with no dishes opens Dishes and prices', await (async () => { await page.click('.fl-new'); await page.waitForTimeout(300); return page.locator('.sheet:has-text("Dishes and prices")').isVisible(); })());
