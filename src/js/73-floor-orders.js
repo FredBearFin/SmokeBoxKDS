@@ -134,7 +134,9 @@
     built = buildOrders({ body: sheet.body, close: sheet.close, isPage: false }, opts);
     // The end-of-day screen lives in the back office code; the button only shows when it is part of this copy.
     if (SB.office && typeof SB.office.openCloseDay === 'function') {
-      sheet.footer.appendChild(h('button', { type: 'button', class: 'btn', dataset: { act: 'closeday' }, onClick: () => { sheet.close('closeday'); setTimeout(() => SB.office.openCloseDay(), 60); } }, ico('check-circle', 20), h('span', null, 'Close the day')));
+      sheet.footer.classList.add('ox-foot');
+      sheet.footer.append(h('p', { class: 'ox-foot-note' }, 'Service over? Close the day counts the money and offers a backup.'),
+        h('button', { type: 'button', class: 'btn', dataset: { act: 'closeday' }, onClick: () => { sheet.close('closeday'); setTimeout(() => SB.office.openCloseDay(), 60); } }, ico('check-circle', 20), h('span', null, 'Close the day')));
       sheet.footer.hidden = false;
     }
     return sheet;
@@ -206,8 +208,8 @@
       const total = h('span', { class: 'ox-total num' }), sub = h('span', { class: 'ox-sub num' });
       const add = h('button', { type: 'button', class: 'btn ox-add', dataset: { act: 'add' } }, ico('plus', 20), h('span', null, 'Add items'));
       const quick = h('button', { type: 'button', class: 'btn btn-primary ox-quick', dataset: { act: 'quickpay' } }, ico('dollar', 20), h('span', null, 'Pay'));
-      // Shows how Pay will record the money (Cash, Card or Other); one tap here changes it, so a card is never booked as cash by accident.
-      const how = h('button', { type: 'button', class: 'btn ox-how', dataset: { act: 'method' } }, h('span', { class: 'ox-how-k' }, 'Paid by'), h('span', { class: 'ox-how-v' }, ''), ico('chevron-down', 18));
+      // Shows how Pay will record the money (Pay with Cash, Card or Other); one tap here changes it, so a card is never booked as cash by accident.
+      const how = h('button', { type: 'button', class: 'btn ox-how', dataset: { act: 'method' } }, h('span', { class: 'ox-how-k' }, 'Pay with'), h('span', { class: 'ox-how-v' }, ''), ico('chevron-down', 18));
       const pay = h('button', { type: 'button', class: 'btn ox-take', dataset: { act: 'pay' } }, ico('receipt', 20), h('span', null, 'Tip or discount'));
       const del = h('button', { type: 'button', class: 'btn btn-ghost ox-void', dataset: { act: 'void' }, hidden: true }, ico('trash', 20), h('span', null, 'Void empty order'));
       const el = h('li', { class: 'ox-row', dataset: { order: o.id } },
@@ -224,7 +226,7 @@
       // Tip or discount opens the payment box; Pay marks it paid at once the usual way, with Undo.
       pay.addEventListener('click', () => openPay(rec.o.id));
       quick.addEventListener('click', () => quickPay(rec.o.id));
-      how.addEventListener('click', () => SB.ui.menu(how, C.payMethods.map((pm) => ({ label: pm.name, checked: pm.id === lastMethod, onClick: () => { setMethod(pm.id); update(); } })), { label: 'Paid by' }));
+      how.addEventListener('click', () => SB.ui.menu(how, C.payMethods.map((pm) => ({ label: pm.name, checked: pm.id === lastMethod, onClick: () => { setMethod(pm.id); update(); } })), { label: 'Pay with' }));
       // Void order closes an order that has no food left on it, and says so.
       del.addEventListener('click', () => {
         const r = run('voidOrder', { orderId: rec.o.id, reason: 'nothing ordered' });
@@ -245,14 +247,14 @@
       const live = state.tickets.filter((t) => t.orderId === o.id && t.status !== 'voided');
       const out = live.filter((t) => t.status === 'expedited').length;
       const kitchen = !live.length ? '' : live.length === 1 ? (out ? ' Out of the kitchen.' : ' Still in the kitchen.') : ' ' + out + ' of ' + live.length + ' rounds out of the kitchen.';
-      text(rec.meta, 'Opened ' + ago(now - o.createdAt) + '.' + kitchen);
+      text(rec.meta, 'Opened ' + U.fmtTime(o.createdAt) + ', ' + ago(now - o.createdAt) + '.' + kitchen);
       text(rec.total, money(tot.total));
       text(rec.sub, tot.tax > 0 ? money(tot.subtotal) + ' food + ' + money(tot.tax) + ' tax' : lines.length ? 'before tip' : '');
       rec.pay.disabled = !(tot.subtotal > 0);
       rec.quick.disabled = !(tot.subtotal > 0);
       text(rec.quick.lastChild, 'Pay ' + money(tot.total) + ' ' + methodWord(lastMethod));
       text(rec.how.querySelector('.ox-how-v'), C.payMethodById[lastMethod].name);
-      rec.how.setAttribute('aria-label', 'Paid by ' + methodWord(lastMethod) + '. Press to change how this is paid.');
+      rec.how.setAttribute('aria-label', 'Pay with ' + C.payMethodById[lastMethod].name + '. Press to change how this is paid.');
       setHidden(rec.how, live.length === 0);
       setHidden(rec.quick, live.length === 0);
       setHidden(rec.del, live.length > 0);
