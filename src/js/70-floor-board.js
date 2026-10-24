@@ -2073,7 +2073,7 @@
     const items = [
       // The back office is the first row so a manager never has to hunt for it.
       { hide: kit, label: 'Back office', icon: 'gauge', onClick: () => openOffice(anchor) },
-      // Menu and settings is one tap away too: add a dish, change a price or a prep time.
+      // Menu, prices and shop is one tap away too: add a dish, change a price or a prep time.
       { hide: kit, label: 'Edit the menu', icon: 'sliders', onClick: () => openOffice(anchor, 'data') },
       { separator: true },
       // Orders opens the open-orders screen, with how many are open.

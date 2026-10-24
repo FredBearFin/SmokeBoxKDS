@@ -3211,7 +3211,7 @@ a.of-nav:active { background: var(--press); }
 .of-soon { font-size: var(--fs-1); font-weight: var(--w-regular); color: var(--ink3); }
 .of-nav.is-soon .icon { opacity: 0.7; }
 
-/* The page title row with the theme button and Back to the line. */
+/* The page title row with the theme button and Back to the board. */
 .of-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3) var(--sp-4); padding: var(--sp-5) var(--of-gut) var(--sp-3); max-width: 1480px; margin: 0 auto; width: 100%; }
 .of-title { margin: 0; font: var(--w-semi) var(--fs-6)/1.05 var(--font-display); letter-spacing: 0.005em; color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
 .of-title:focus { outline: none; } /* a heading, not a control: it takes focus after a page change so screen readers start there, with no ring */
@@ -3241,6 +3241,7 @@ a.of-nav:active { background: var(--press); }
 .of-fnote { font-size: var(--fs-1); color: var(--ink3); }
 .of-banner { display: flex; align-items: center; gap: var(--sp-2); margin: 0 auto; padding: var(--sp-1) var(--of-gut) var(--sp-3); font-size: var(--fs-2); line-height: 1.35; color: var(--ink2); }
 .of-banner-t { min-width: 0; }
+.of-banner[hidden] { display: none; }
 .of-chip {
   flex: none; display: inline-flex; align-items: center; min-height: 22px; padding: 0 var(--sp-2); font-size: var(--fs-1); font-weight: var(--w-semi); line-height: 1;
   color: var(--amber-ink); border: 1px solid var(--amber); border-radius: var(--r-pill); white-space: nowrap;
@@ -3253,7 +3254,10 @@ a.of-nav:active { background: var(--press); }
 
 /* the headline is the typographic anchor: one plain sentence, numbers in the heavy weight */
 /* The "what to do next" message shown instead of blank tiles and charts when a range has no data. */
-.of-coach { max-width: 40em; padding: var(--sp-5) var(--sp-6); margin: 0 0 var(--sp-6); border: 1px dashed var(--line2, var(--line)); border-radius: var(--r-3, 12px); background: var(--ch-surface, transparent); }
+/* The empty-page message: a centered card with the page's icon, sitting in the middle of the page, not in a corner. */
+.of-coach { display: grid; justify-items: center; text-align: center; max-width: 34em; padding: var(--sp-6) var(--sp-6) var(--sp-5); margin: clamp(var(--sp-4), 8vh, var(--sp-8)) auto var(--sp-6); border: 1px solid var(--line-soft, var(--line)); border-radius: var(--r-3, 12px); background: var(--ch-surface, transparent); }
+.of-coach[hidden] { display: none; }
+.of-coach-i { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; margin-bottom: var(--sp-3); border-radius: 50%; color: var(--amber-ink, var(--ink2)); background: var(--sub, transparent); }
 .of-coach-t { margin: 0 0 var(--sp-2); font: var(--w-semi) var(--fs-5, 22px)/1.2 var(--font-display); color: var(--ink); }
 .of-coach-b { margin: 0; font-size: var(--fs-3, 16px); line-height: 1.5; color: var(--ink2); }
 .of-coach-sample { margin-top: var(--sp-4); }
@@ -3324,6 +3328,8 @@ a.of-nav:active { background: var(--press); }
 
 /* The boxes for no data yet and for a part that failed to draw. */
 .of-empty { display: grid; justify-items: center; align-content: center; gap: var(--sp-2); min-height: 150px; padding: var(--sp-6) var(--sp-4); text-align: center; color: var(--ink2); border: 1px dashed var(--line-soft); border-radius: var(--r-panel); }
+/* A switched-off page (no cook-ahead tracking, counter service) gets the same centered card as an empty page. */
+.of[data-gated="true"] .of-slot > .of-empty { max-width: 34em; margin: clamp(var(--sp-4), 8vh, var(--sp-8)) auto var(--sp-6); border-style: solid; background: var(--ch-surface, transparent); }
 .of-empty .icon { color: var(--ink3); }
 .of-empty-t { margin: 0; font: var(--w-semi) var(--fs-3)/1.25 var(--font-body); color: var(--ink); }
 .of-empty-b { margin: 0; max-width: 46ch; font-size: var(--fs-2); line-height: 1.4; color: var(--ink2); }
@@ -3489,11 +3495,11 @@ a.of-nav:active { background: var(--press); }
 @media (pointer: coarse), (max-width: 719px) {
   .of .of-seg .seg-opt, .of .of-card-actions .btn, .of .of-card-actions .ch-tbtn,
   .of .of-top-actions .btn, .of .of-sortbtn, .of .of-tpager .btn { min-height: 44px; }
-  .of .of-theme { width: 44px; }
+  .of .of-theme { min-width: 44px; }
 }
 /* Ticket numbers in the table are links; the padding grows the hit area without moving the rows. */
 .of-rowbtn { padding-block: 5px; margin-block: -5px; }
-/* Reset buttons in Menu and settings match the other big buttons. */
+/* Reset buttons in Menu, prices and shop match the other big buttons. */
 .of .btn-danger { min-height: 44px; }
 
 /* The at-a-glance panel (SB.office.glance): five cards in two columns on a phone, one row on a wide screen. */
@@ -3729,7 +3735,7 @@ a.of-nav:active { background: var(--press); }
 
 /* ===== 32-office-data.css ===== */
 /*
- * WHAT THIS FILE IS: The look of the back office page "Menu and settings" (84-office-data.js). Every class starts with od-.
+ * WHAT THIS FILE IS: The look of the back office page "Menu, prices and shop" (84-office-data.js). Every class starts with od-.
  * PARTS: headline, contents list, panels, number fields, lists and bills of materials, settings grids, notes and cards,
  *   PIN, data (counts, export, import), about, small screens.
  * Colours and sizes come only from the shared tokens (--ink, --paper, --amber, --sp-3 ...) so Ember and Paper both work.
@@ -3737,7 +3743,7 @@ a.of-nav:active { background: var(--press); }
  * USES / USED BY: 00-tokens.css, 10-base.css, 30-office.css  /  84-office-data.js.
  */
 
-/* the shared frame keeps a filter bar for the charts; this page has no charts, only the data banner is useful here */
+/* the shared frame keeps a filter bar for the charts; this page has no charts or range, so it shows none of it */
 .of[data-page="data"] .of-fsum,
 .of[data-page="data"] .of-fbody,
 .of[data-page="data"] .of-filters[data-open="true"] .of-fbody { display: none; }
@@ -3745,7 +3751,7 @@ a.of-nav:active { background: var(--press); }
 
 .od {
   --od-sticky-top: 0px;       /* set from the height of the frame's sticky bar */
-  --od-toc-h: 62px;           /* height of the table-of-contents strip on narrow pages */
+  --od-toc-h: 0px;            /* the narrow contents strip scrolls away with the page, so panels need no room for it */
   --od-gap: var(--sp-5);
   container: od / inline-size;
   min-width: 0;
@@ -3777,8 +3783,10 @@ a.of-nav:active { background: var(--press); }
   border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
   overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin;
 }
-.od-toc { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }   /* a soft right edge says the strip scrolls */
-.od-toc-list { display: flex; gap: var(--sp-2); width: max-content; min-width: 100%; }
+/* On a narrow page the contents wrap onto as many rows as they need (nothing hides off the edge), so the strip
+   scrolls away with the page instead of sticking. */
+.od-toc { position: static; overflow: visible; }
+.od-toc-list { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); list-style: none; margin: 0; padding: 0; }
 .od-toc-link {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-4); white-space: nowrap;
   font: var(--w-medium) var(--fs-2)/1 var(--font-body); color: var(--ink2); text-decoration: none;
@@ -3791,7 +3799,7 @@ a.of-nav:active { background: var(--press); }
   .od { --od-toc-h: 0px; }
   .od-layout { grid-template-columns: 184px minmax(0, 1fr); gap: var(--sp-8); align-items: start; }
   .od-toc {
-    top: calc(var(--od-sticky-top) + var(--sp-4)); margin: 0; padding: 0; overflow: visible;
+    position: sticky; top: calc(var(--od-sticky-top) + var(--sp-4)); margin: 0; padding: 0; overflow: visible;
     background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; -webkit-mask-image: none; mask-image: none;
   }
   .od-toc-list { display: grid; gap: 2px; width: auto; min-width: 0; }
@@ -3998,6 +4006,11 @@ a.of-nav:active { background: var(--press); }
 
 /* Settings groups: a small heading in the contents list, and the closed Advanced fold. */
 .od-toc-group { list-style: none; padding: var(--sp-2) var(--sp-3) 0; font: var(--w-bold) var(--fs-1, 0.75rem) / 1.2 var(--font-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+/* In the wrapping strip a group name is quiet text after a thin rule, so it never looks like a button. */
+@container od (max-width: 899.98px) {
+  .od-toc-group { display: flex; align-items: center; gap: var(--sp-2); padding: 0 0 0 var(--sp-1); font-size: 11px; }
+  .od-toc-group:not(:first-child) { margin-left: var(--sp-2); padding-left: var(--sp-3); border-left: 2px solid var(--line); }
+}
 .od-adv { border: var(--bw-thin) solid var(--line-soft); border-radius: var(--r-panel); padding: 0 var(--sp-3); }
 .od-adv > summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; font-weight: var(--w-bold); }
 
@@ -4434,7 +4447,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
+window.SB_BUILD = { version: "0.2.0", id: "dbed598" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -14499,6 +14512,12 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     return Object.keys(m).map((k) => m[k]).sort((a, b) => b.g - a.g || (a.reason < b.reason ? -1 : 1));
   };
 
+  // How late a temperature check or sanitize round may be and still count as on time in the reports: a few
+  // minutes is how long a busy cook needs to get to it, not a missed check.
+  M.CHECK_GRACE_MS = 5 * 60000;
+  // True when a check flagged late was logged within the grace above, so it counts as on time.
+  M.withinGrace = (e) => !!e && e.onTime === false && num(e.lateMs) && e.lateMs < M.CHECK_GRACE_MS;
+
   /**
    * Food-safety compliance from events (and batches for discards). onTimePct are fractions of events that say whether they were on time.
    * score = average of the available temperature-check and sanitise on-time shares (null when neither is known).
@@ -14509,10 +14528,10 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   M.compliance = (ds, opts) => {
     const ctx = makeCtx(ds, opts);
     // Counts events flagged on time or late (no flag counts for nothing: unknown is not on time) and how
-    // late the late ones were.
+    // late the late ones were. A check logged less than CHECK_GRACE_MS after it was due counts as on time.
     const chk = (evs) => {
       let on = 0, late = 0; const lm = [];
-      for (const e of evs) { if (e.onTime === true) on++; else if (e.onTime === false) { late++; if (num(e.lateMs) && e.lateMs > 0) lm.push(e.lateMs); } }
+      for (const e of evs) { if (e.onTime === true || M.withinGrace(e)) on++; else if (e.onTime === false) { late++; if (num(e.lateMs) && e.lateMs > 0) lm.push(e.lateMs); } }
       const n = on + late; return { count: n, onTime: on, late, onTimePct: n ? on / n : null, avgLateMs: lm.length ? mean(lm) : null, maxLateMs: lm.length ? Math.max.apply(null, lm) : null };
     };
     const tc = chk(ctx.ev('temp_logged')), sn = chk(ctx.ev('sanitize_done')), dl = discardList(ctx), il = intakeList(ctx);
@@ -14998,7 +15017,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       const planned = r.learnedSec !== null && Math.abs(r.learnedSec - r.observedSec) / r.observedSec <= 0.15 && c.pacingCfg.enabled !== false;
       const tail = others > 0 ? ' ' + others + ' other ' + U.plural(others, 'item') + ' also drift.' : '';
       if (r.drift === 'slow') return F(this.id, r.ratio >= 1.6 ? 'bad' : 'warn', 58 + Math.min(20, (r.ratio - 1) * 20), r.name + ' takes ' + mmss(r.observedSec * 1000) + ' on your line',
-        'That is ' + mmss(r.deltaSec * 1000) + ' over the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples). ' + (planned ? 'Finish together now plans for it.' : r.learnedSec !== null ? 'Pacing plans for ' + mmss(r.learnedSec * 1000) + ' so far; confirm the new time in Menu and settings.' : 'Confirm the new time in Menu and settings.') + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
+        'That is ' + mmss(r.deltaSec * 1000) + ' over the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples). ' + (planned ? 'Finish together now plans for it.' : r.learnedSec !== null ? 'Pacing plans for ' + mmss(r.learnedSec * 1000) + ' so far; confirm the new time in Menu, prices and shop.' : 'Confirm the new time in Menu, prices and shop.') + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
       return F(this.id, 'info', 40, r.name + ' is quicker than planned',
         r.name + ' takes ' + mmss(r.observedSec * 1000) + ', ' + mmss(-r.deltaSec * 1000) + ' under the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples), so Finish together may fire it too early.' + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
     } },
@@ -15184,7 +15203,10 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       }
       case 'safety': {
         const k = M.compliance(c); if (!k.tempChecks.count && !k.sanitize.count && !k.discards.count) return 'No food-safety records in this range yet.';
-        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + M.discardCostWords(k.discards, money) + ').' : 'nothing was discarded.');
+        // One check reads "the one sanitize round was late", never "0% of 1 ... was on time".
+        const share = (x, noun) => (x.count === 1 ? 'the one ' + noun + ' was ' + (x.onTime ? 'on time' : 'late') : pctTxt(x.onTimePct) + ' of ' + U.fmtNum(x.count) + ' ' + noun + 's were on time');
+        const temps = k.tempChecks.count ? share(k.tempChecks, 'temperature check') : 'No temperature checks logged';
+        return (k.tempChecks.count === 1 ? 'T' + temps.slice(1) : temps) + (k.sanitize.count ? ', ' + share(k.sanitize, 'sanitize round') : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + M.discardCostWords(k.discards, money) + ').' : 'nothing was discarded.');
       }
       case 'stock': {
         const so = M.sellOutClock(c), n = so.rows.length; if (!so.dayCount) return 'No sell-outs in this range yet.';
@@ -19300,13 +19322,16 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   /* ====================================================================================================================
    * Backup nudge: pure decision (works in Node)
    * ================================================================================================================== */
-  // Decides whether to nudge for the daily backup. a = {service, lastBackupAt, snoozeUntil, now, hasData}.
-  // It is due from closing time until 10 hours after, when no backup was made in the 2 hours before closing
-  // or since, and nothing is snoozed. An empty kitchen (no tickets or batches) has nothing to lose.
+  // Decides whether to nudge for the daily backup. a = {service, lastBackupAt, snoozeUntil, now, hasData,
+  // openWork, closedAt}. It is due from closing time (or from Close the day, closedAt, if that came first)
+  // until 10 hours after, when no backup was made in the 2 hours before or since, nothing is snoozed and
+  // service is really over: no ticket on the board and no order still open (openWork 0). An empty kitchen
+  // (no tickets or batches) has nothing to lose.
   // WATCH OUT: closeHour above 24 means after midnight, so last night's close is still checked at 12:30 am.
   function backupDue(a) {
     const H = 3600000, sv = a && a.service;
     if (!a || !sv || typeof sv.closeHour !== 'number' || !a.hasData) return false;
+    if (typeof a.openWork === 'number' && a.openWork > 0) return false;
     if (typeof a.snoozeUntil === 'number' && a.snoozeUntil > a.now) return false;
     let closeAt = null;
     for (const day of [0, -1]) {
@@ -19314,6 +19339,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       const at = d.getTime() + sv.closeHour * H;
       if (at <= a.now && (closeAt == null || at > closeAt)) closeAt = at;
     }
+    if (typeof a.closedAt === 'number' && a.closedAt <= a.now && (closeAt == null || a.closedAt > closeAt)) closeAt = a.closedAt;
     if (closeAt == null || a.now - closeAt > 10 * H) return false;
     return !(typeof a.lastBackupAt === 'number' && a.lastBackupAt >= closeAt - 2 * H);
   }
@@ -19326,15 +19352,14 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   const KEY = { theme: 'smokebox.v1.theme', otheme: 'smokebox.v1.otheme', text: 'smokebox.v1.textsize', density: 'smokebox.v1.density', hints: 'smokebox.v1.hints', zone: 'smokebox.v1.zone', role: 'smokebox.v1.role', pinlock: 'smokebox.v1.pinlock', lastBackup: 'smokebox.v1.lastbackup' };
   // Colour of the browser's top bar for each look; each matches that look's background colour.
   const THEME_COLOR = { day: '#F5F2EB', night: '#15181A', ember: '#181513', paper: '#F0ECE3' };
-  // Current choices: floor look, office look (ember dark / paper light), text size. themeSubs = listeners.
-  const cur = { theme: 'day', otheme: 'ember', text: 'normal', density: 'compact', hints: true }; // compact tickets by default: full-size ones were too big for a busy board
+  // Current choices: look (Day or Night, shared by the board and the back office), text size. themeSubs = listeners.
+  const cur = { theme: 'day', text: 'normal', density: 'compact', hints: true }; // compact tickets by default: full-size ones were too big for a busy board
   const themeSubs = [];
   // Reads the saved look and text size from the notebook; only known values are accepted.
   function loadTheme() {
     if (!U || !U.storage) return;
-    const t = U.storage.get(KEY.theme, null), o = U.storage.get(KEY.otheme, null), x = U.storage.get(KEY.text, null);
+    const t = U.storage.get(KEY.theme, null), x = U.storage.get(KEY.text, null);
     if (t === 'day' || t === 'night') cur.theme = t;
-    if (o === 'ember' || o === 'paper') cur.otheme = o;
     if (x === 'normal' || x === 'large') cur.text = x;
     const d = U.storage.get(KEY.density, null);
     if (d === 'auto' || d === 'large' || d === 'compact') cur.density = d;
@@ -19349,7 +19374,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     let meta = doc.querySelector('meta[name="theme-color"]');
     if (!meta) { meta = doc.createElement('meta'); meta.setAttribute('name', 'theme-color'); doc.head.appendChild(meta); }
     const inOff = !!(S && S.inOffice && S.inOffice());
-    meta.setAttribute('content', inOff ? THEME_COLOR[cur.otheme] : THEME_COLOR[cur.theme]);
+    meta.setAttribute('content', inOff ? THEME_COLOR[T.office()] : THEME_COLOR[cur.theme]);
   }
   // Puts the choices on the page: Day/Night on the top element, large-text class, office look, top bar.
   function applyTheme() {
@@ -19357,7 +19382,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const r = doc.documentElement;
     r.setAttribute('data-theme', cur.theme);
     r.classList.toggle('text-large', cur.text === 'large');
-    doc.querySelectorAll('.office[data-otheme]').forEach((el) => el.setAttribute('data-otheme', cur.otheme));
+    doc.querySelectorAll('.office[data-otheme]').forEach((el) => el.setAttribute('data-otheme', T.office()));
     updateThemeColor();
   }
   // Loads the saved choices and applies them. Returns a copy of the choices.
@@ -19367,18 +19392,18 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   // Switches the floor to 'day' or 'night': saves, applies, tells listeners. Other values are ignored.
   T.set = function (t) {
     if (t !== 'day' && t !== 'night') return cur.theme;
-    cur.theme = t; if (U) U.storage.set(KEY.theme, t); applyTheme(); emitTheme('theme'); return t;
+    cur.theme = t; if (U) U.storage.set(KEY.theme, t); applyTheme();
+    try { if (SB.charts && typeof SB.charts.refreshTheme === 'function') SB.charts.refreshTheme(); } catch (e) { console.error('[smokebox] charts.refreshTheme failed', e); }
+    emitTheme('theme'); emitTheme('office'); return t;
   };
   // Flips Day to Night, or Night to Day.
   T.toggle = () => T.set(cur.theme === 'day' ? 'night' : 'day');
-  // The current office look, 'ember' (dark) or 'paper' (light).
-  T.office = () => cur.otheme;
-  // Like T.set for the office look; also redraws charts, whose colours are set by code, not CSS.
+  // The back office follows the same Day/Night choice: its light look ('paper') for Day, dark ('ember') for Night.
+  T.office = () => (cur.theme === 'night' ? 'ember' : 'paper');
+  // Sets the shared look from an office look name ('paper' is Day, 'ember' is Night); charts are redrawn by T.set.
   T.setOffice = function (o) {
-    if (o !== 'ember' && o !== 'paper') return cur.otheme;
-    cur.otheme = o; if (U) U.storage.set(KEY.otheme, o); applyTheme();
-    try { if (SB.charts && typeof SB.charts.refreshTheme === 'function') SB.charts.refreshTheme(); } catch (e) { console.error('[smokebox] charts.refreshTheme failed', e); }
-    emitTheme('office'); return o;
+    if (o !== 'ember' && o !== 'paper') return T.office();
+    T.set(o === 'ember' ? 'night' : 'day'); return T.office();
   };
   // The current text size, 'normal' or 'large'.
   T.textSize = () => cur.text;
@@ -20674,7 +20699,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       console.error('[smokebox] office failed to mount', e);
       // Try again clears the flag and builds the office pages from scratch.
       U.clear(el); el.appendChild(ui.errorCard(e, { title: 'The back office could not open', module: 'office (80-*.js to 84-*.js)', onRetry: () => { st.officeContent = false; mountOfficeContent(st.officeSection); } }));
-      el.appendChild(h('div', { class: 'row', style: 'padding:0 16px 16px;justify-content:center' }, h('button', { type: 'button', class: 'btn', dataset: { backToLine: '' } }, ico('door', 20), h('span', null, 'Back to the line'))));
+      el.appendChild(h('div', { class: 'row', style: 'padding:0 16px 16px;justify-content:center' }, h('button', { type: 'button', class: 'btn', dataset: { backToLine: '' } }, ico('door', 20), h('span', null, 'Back to the board'))));
     }
   }
   // Tears the office pages down after closing and empties the layer.
@@ -20801,7 +20826,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       return openOffice(section);
     });
   };
-  // Back to the line: reverse wipe, then history steps back (or the entry is replaced). False if not open.
+  // Back to the board: reverse wipe, then history steps back (or the entry is replaced). False if not open.
   S.extinguish = function () {
     if (!st.mounted || !st.officeOpen) return Promise.resolve(false);
     const p = closeOffice();
@@ -20928,8 +20953,10 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       return { kind: 'clock', tone: 'warn', text: 'The clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(ss.clockSuspect.aheadMs / 3600000) + ' hours') + '. Still on the old time.', act: 'Use the new time', onAct: useNewTime, later: true, laterLabel: 'Keep the old time', onLater: keepOldTime };
     }
     if (!s) return null;
-    const due = backupDue({ service: s.settings && s.settings.service, lastBackupAt: S.lastBackupAt(), snoozeUntil: bn.snoozeUntil, now: Date.now(), hasData: s.tickets.length + s.batches.length > 0 });
-    return due ? { kind: 'nudge', tone: 'warn', text: 'Service is over. Save today\'s backup now and keep a copy off this device (email it or use a USB drive).', act: 'Back up now', later: true } : null;
+    // Service is over only when nothing is left on the board and no order is still open.
+    const openWork = s.tickets.filter((t) => t && t.status === 'active').length + (s.orders || []).filter((o) => o && o.status === 'open').length;
+    const due = backupDue({ service: s.settings && s.settings.service, lastBackupAt: S.lastBackupAt(), snoozeUntil: bn.snoozeUntil, now: Date.now(), hasData: s.tickets.length + s.batches.length > 0, openWork, closedAt: s.lastClose && s.lastClose.at });
+    return due ? { kind: 'nudge', tone: 'warn', text: 'Day is done: save today\'s backup.', act: 'Back up now', later: true } : null;
   }
   // Shows, updates or removes the strip at the top of the screen so a problem is seen from the kitchen board.
   function paintBanner() {
@@ -20995,17 +21022,17 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     st.ph.floor = { setZone: (z) => { label.textContent = 'Station: ' + (z === 'all' ? 'All' : z); seg.setValue(z); } };
     st.ph.floor.setZone(R.view().zone || 'all');
   }
-  // Stand-in office used when the office files are missing: page buttons, Ember/Paper switch, way back.
+  // Stand-in office used when the office files are missing: page buttons, Day/Night switch, way back.
   function renderOfficePlaceholder(el, section) {
     U.clear(el);
     const title = h('h2', null, 'Back office placeholder');
     const sec = h('p', { class: 't-muted' });
     // One button per office page; each goes to that page through the router.
     const nav = h('div', { class: 'row' }, SECTIONS.map((s) => h('button', { type: 'button', class: 'btn btn-sm', onClick: () => R.go({ kind: 'office', section: s }) }, s)));
-    // Switches the office between Ember (dark) and Paper (light).
-    const themeBtn = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => T.setOffice(T.office() === 'ember' ? 'paper' : 'ember') }, ico('sun', 18), h('span', null, 'Switch Ember and Paper'));
-    const back = h('button', { type: 'button', class: 'btn btn-primary', dataset: { backToLine: '' } }, ico('door', 22), h('span', null, 'Back to the line'));
-    el.appendChild(h('div', { class: 'ph' }, h('div', { class: 'ph-note' }, title, h('p', { class: 't-muted' }, 'The back office pages did not load. Use Back to the line to leave, then reload the page.'), sec), nav, h('div', { class: 'row' }, themeBtn, back)));
+    // Switches between Day and Night (the board and the back office share the look).
+    const themeBtn = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => T.toggle() }, ico('sun', 18), h('span', null, 'Switch Day and Night'));
+    const back = h('button', { type: 'button', class: 'btn btn-primary', dataset: { backToLine: '' } }, ico('door', 22), h('span', null, 'Back to the board'));
+    el.appendChild(h('div', { class: 'ph' }, h('div', { class: 'ph-note' }, title, h('p', { class: 't-muted' }, 'The back office pages did not load. Use Back to the board to leave, then reload the page.'), sec), nav, h('div', { class: 'row' }, themeBtn, back)));
     // Shows the name of the current office page.
     const setSection = (s) => { sec.textContent = 'Section: ' + s; };
     setSection(section);
@@ -23194,7 +23221,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const items = [
       // The back office is the first row so a manager never has to hunt for it.
       { hide: kit, label: 'Back office', icon: 'gauge', onClick: () => openOffice(anchor) },
-      // Menu and settings is one tap away too: add a dish, change a price or a prep time.
+      // Menu, prices and shop is one tap away too: add a dish, change a price or a prep time.
       { hide: kit, label: 'Edit the menu', icon: 'sliders', onClick: () => openOffice(anchor, 'data') },
       { separator: true },
       // Orders opens the open-orders screen, with how many are open.
@@ -30181,7 +30208,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
      },
      {
       "t": "p",
-      "x": "Tap **Back office**, then **Menu and settings**. Find Data, backup and reset and tap **Download backup (JSON)**. This saves a file. Keep a copy off this device: email it to yourself or put it on a USB drive."
+      "x": "Tap **Back office**, then **Menu, prices and shop**. Find Data, backup and reset and tap **Download backup (JSON)**. This saves a file. Keep a copy off this device: email it to yourself or put it on a USB drive."
      }
     ]
    },
@@ -30580,7 +30607,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
      },
      {
       "t": "p",
-      "x": "Some foods warn earlier. Change the times in Menu and settings, **Batch expiry warnings only**. A nearly empty batch stays quiet."
+      "x": "Some foods warn earlier. Change the times in Menu, prices and shop, **Batch expiry warnings only**. A nearly empty batch stays quiet."
      },
      {
       "t": "p",
@@ -30720,7 +30747,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
        "If your health department asks, save or print the thrown-out log. Open it from the **Settings** button on the board.",
        "Keep a copy of the backup off this device (see Backup and restore).",
        "Which weekday sells best? In **Back office**, open **Sales and money** and look at **Best day of the week**.",
-       "For your accountant: in **Menu and settings**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other."
+       "For your accountant: in **Menu, prices and shop**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other."
       ]
      }
     ]
@@ -30774,7 +30801,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
      {
       "t": "ol",
       "x": [
-       "Tap **Back office**, then **Menu and settings**.",
+       "Tap **Back office**, then **Menu, prices and shop**.",
        "Find Data, backup and reset. In the first card, **Back up now**, tap **Download backup (JSON)**. Or tap **Copy backup** and paste the text into an email to yourself.",
        "Keep a copy off this device."
       ]
@@ -30918,7 +30945,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
        "On the old device, if it still works, download a backup (see Backup and restore). Copy the file somewhere else: email it to yourself or use a USB drive.",
        "On the new device, copy the same smokebox.html file onto it and open it. Install it as an app: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app.",
        "Tap **Settings**, then **Tablet checks: screen, sound, home screen**. Sound and keeping the screen on are set on each device, so do them again here.",
-       "Tap **Back office**, then **Menu and settings**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
+       "Tap **Back office**, then **Menu, prices and shop**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
        "Check the board and your menu. Save a fresh backup from the new device, then retire the old one."
       ]
      },
@@ -31023,7 +31050,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       "x": [
        "A strip says the tablet's clock jumped ahead? Smokebox keeps the old time, so tickets and timers keep running. Tap **Keep the old time** to hide it for 10 minutes and fix the clock in the device settings. Tap **Use the new time** only if the new time is right. It asks once more before anything changes.",
        "Check the date range and the filters at the top of the Back office page.",
-       "Choose **Live only** to leave out the sample history, which is made up.",
+       "If sample days are switched on, choose **Your tickets only** to leave them out: sample days are made up.",
        "Unpaid orders are not counted as money collected.",
        "Starter estimates (prep times, yields, costs) are guesses until you confirm them."
       ]
@@ -31331,7 +31358,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
        "Bumped by mistake: Recall it from the board header",
        "Wrong ticket: cancel it with Void ticket in its small menu, and give a reason",
        "Dish missing: check the 86 board and Dishes and prices",
-       "Opened empty: restore the last backup (Back office, Menu and settings)",
+       "Opened empty: restore the last backup (Back office, Menu, prices and shop)",
        "Forgot the PIN: use your recovery code (Guide, Empty, lost or locked)"
       ]
      }
@@ -31869,7 +31896,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     { id: 'money', title: 'Sales and money', short: 'Money', icon: 'dollar' },
     { id: 'safety', title: 'Safety', short: 'Safety', icon: 'shield-check' },
     { id: 'stock', title: 'Stock and 86', short: 'Stock', icon: 'package' },
-    { id: 'data', title: 'Menu and settings', short: 'Settings', icon: 'sliders' },
+    { id: 'data', title: 'Menu, prices and shop', short: 'Menu & shop', icon: 'sliders' },
   ];
   const PAGE_IDS = PAGES.map((p) => p.id);
   // Turns any page name into one of the seven page ids. A name we do not know gives the Pace page.
@@ -31913,26 +31940,35 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   }
 
   // The plain next-step message for a page with nothing in its range, or null when the page has data (or
-  // is the settings page). f = {anyLive, tickets, batches, records, label}: whether any live ticket
-  // exists at all, and how many tickets, batches and safety records fall in the range.
+  // is the settings page). f = {anyLive, tickets, finished, onBoard, paid, batches, records, label}: whether
+  // any live ticket exists at all, and how many tickets (finished, still on the board, paid), batches and
+  // safety records fall in the range. Each page has its own words and next step.
   function coachText(pageId, f) {
     f = f || {};
     const never = !f.anyLive && !f.batches && !f.records;
     const where = f.label ? ' on ' + f.label : ' in this range';
-    if (pageId === 'pace' || pageId === 'tickets' || pageId === 'stations') {
+    // "3 tickets on the board now" when tickets are waiting, else '' (onBoard may be missing in old callers).
+    const board = isNum(f.onBoard) && f.onBoard > 0 ? f.onBoard + ' ' + (f.onBoard === 1 ? 'ticket is' : 'tickets are') + ' on the board now' : '';
+    const KITCHEN = {
+      pace: { first: 'No speed numbers yet', wait: 'times appear here once they are sent out.', start: 'Take an order on the board and tap Bump when it goes out. How fast your tickets go out shows here.' },
+      tickets: { first: 'No finished tickets yet', wait: 'they are listed here with their times once they are sent out.', start: 'Every ticket you send out is listed here with its times. Take an order on the board and tap Bump when it goes out.' },
+      stations: { first: 'No station times yet', wait: 'each station\'s times appear here once they are sent out.', start: 'Each station\'s speed shows here once its items are done. Take an order on the board and send it out.' },
+    };
+    if (KITCHEN[pageId]) {
+      const k = KITCHEN[pageId];
       // With a finished-ticket count, the page needs finished tickets to say anything; tickets still on the line are not enough.
       if (isNum(f.finished) ? f.finished > 0 : f.tickets > 0) return null;
-      if (isNum(f.finished) && f.tickets > 0) return { title: 'Nothing to show yet', body: 'The tickets on the line are not finished. Send one out and its times appear here.' };
+      if (isNum(f.finished) && f.tickets > 0) return { title: k.first, body: (board || 'The tickets so far are not finished') + '; ' + k.wait };
       return never || !f.anyLive
-        ? { title: 'Nothing to show yet', body: 'Take an order and send it out when it is done, and the times appear here.' }
+        ? { title: k.first, body: k.start }
         : { title: 'No tickets' + where, body: 'Nothing was ordered in this range. Use the arrows or the range buttons to look at a day you were open.' };
     }
     if (pageId === 'money') {
       // the thrown-away ledger on this page needs no sales, so a discard also counts as data here
       if (isNum(f.paid) ? f.paid > 0 || f.discards > 0 : f.tickets > 0 || f.discards > 0) return null;
-      if (isNum(f.paid) && f.tickets > 0) return { title: 'Nothing to show yet', body: 'The orders so far are not paid. Pay an order from Orders and the money shows up here.' };
+      if (isNum(f.paid) && f.tickets > 0) return { title: 'No paid orders yet', body: 'The orders so far are not paid. Tap the Orders button on the board, pay an order, and the money shows up here.' };
       return !f.anyLive
-        ? { title: 'Take your first order', body: 'Sales come from your own orders. Take an order on the kitchen board and pay it from Orders, and the money shows up here.' }
+        ? { title: 'Take your first order', body: 'Sales come from your own orders. Take an order on the board, pay it with the Orders button on the board, and the money shows up here.' }
         : { title: 'No sales' + where, body: 'Nothing was sold in this range. Use the arrows or the range buttons to look at a day you were open.' };
     }
     if (pageId === 'safety') {
@@ -32001,23 +32037,19 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   // by their presence.
   function sig(x) { try { return JSON.stringify(x, (k, v) => (typeof v === 'function' ? 'fn' : v)); } catch (e) { return 'x' + Math.random(); } }
 
-  // Honest one-line banner. info = {sampleDays, sampleTickets, live, demo, sampleOn, sampleLoaded,
-  // sampleWanted, total}.
+  // Honest one-line banner. info = {sampleDays, sampleTickets, live, demo, sampleEnabled, sampleLoaded,
+  // sampleWanted, total}. It only speaks when sample days exist and are switched on (then the Show
+  // buttons are on screen too); otherwise there is nothing to tell apart and the text is empty.
   function bannerText(info) {
     const pl = (n, a, b) => (n === 1 ? a : b || a + 's');
-    const parts = [];
-    // tickets in the range that are not sample: live ones, and the five demo ones a first run starts with
-    const own = [info.live > 0 ? info.live + ' live ' + pl(info.live, 'ticket') : '', info.demo > 0 ? info.demo + ' demo ' + pl(info.demo, 'ticket') : ''].filter(Boolean).join(' and ');
+    if (!info.sampleLoaded || !info.sampleEnabled) return { kind: 'live', text: '' };
+    // the owner's own tickets in the range, and the demo ones a first run starts with
+    const own = [info.live > 0 ? info.live + ' of your ' + pl(info.live, 'ticket') : '', info.demo > 0 ? info.demo + ' demo ' + pl(info.demo, 'ticket') : ''].filter(Boolean).join(' and ');
     if (info.sampleTickets > 0) {
-      parts.push(info.sampleDays + ' sample ' + pl(info.sampleDays, 'day'));
-      let tail = info.live > 0 ? ' plus ' + info.live + ' live ' + pl(info.live, 'ticket') : ' and no live tickets yet';
-      if (info.demo > 0) tail += (info.live > 0 ? ' and ' : ', with ') + info.demo + ' demo ' + pl(info.demo, 'ticket');
-      return { kind: 'sample', text: parts[0] + tail + '. Sample history is generated by the app.' };
+      return { kind: 'sample', text: info.sampleDays + ' sample ' + pl(info.sampleDays, 'day') + ' (made up by the app)' + (own ? ' plus ' + own : '') + '.' };
     }
-    if (!info.sampleLoaded) return { kind: 'live', text: (info.total ? own + ' in this range.' : 'No tickets in this range yet.') + ' No sample history is loaded.' };
-    if (!info.sampleEnabled) return { kind: 'live', text: (info.total ? own + ' in this range.' : 'No tickets in this range yet.') + ' Sample history is switched off in Menu and settings.' };
-    if (!info.sampleWanted) return { kind: 'live', text: 'Live data only: ' + (info.total ? own : 'no tickets') + ' in this range.' };
-    return { kind: 'live', text: (info.total ? own + ' in this range.' : 'No tickets in this range yet.') + ' Sample history is on but none of it falls in this range.' };
+    if (!info.sampleWanted) return { kind: 'live', text: 'Your tickets only: ' + (info.total ? own : 'none') + ' in this range.' };
+    return { kind: 'live', text: (info.total ? own + ' in this range.' : 'No tickets in this range.') + ' No sample days fall in this range.' };
   }
 
   // Delta between two numbers in the compare() shape, for tiles that supply their own previous value.
@@ -32050,6 +32082,10 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   }
   O.droppedRangeWords = droppedRangeWords;
 
+  // A weight in the owner's unit (g and kg, or oz and lb) without trailing zeros: "14 kg", "2.4 kg", "7 oz".
+  // Every back-office page shows weights through this, so a pounds kitchen sees pounds everywhere.
+  O.weightText = (g) => String(U.weightText ? U.weightText(g) : U.fmtG(g)).replace(/(\.\d*?)0+ (kg|lb|oz)$/, '$1 $2').replace(/\. (kg|lb|oz)$/, ' $1');
+
   O.pure = { PAGES, customRange, coachText, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
 
   if (!doc) return; // Node: the pure helpers are all the tests need
@@ -32081,8 +32117,9 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     // such as $12.40.
     pct: (x, d) => U.fmtPct(x, d == null ? (isNum(x) && Math.abs(x) > 0 && Math.abs(x) < 0.1 ? 1 : 0) : d),
     money: (n, d) => U.fmtMoney(n, d == null ? 2 : d),
-    // g gives grams or kilograms in words. num gives a plain number with the decimals asked for.
-    g: (n) => (U.weightText ? U.weightText(n) : U.fmtG(n)),
+    // g gives a weight in the owner's unit (g and kg, or oz and lb) without trailing zeros: "14 kg",
+    // "2.4 kg", "7 oz". num gives a plain number with the decimals asked for.
+    g: (n) => O.weightText(n),
     num: (n, d) => U.fmtNum(n, d || 0),
     // hour gives a service hour such as 7 pm. clock gives the time of day for a time stamp.
     hour: (hr) => (isNum(hr) ? U.fmtHour(hr) : '-'),
@@ -32116,7 +32153,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   const nowMs = () => { try { return SB.store.now(); } catch (e) { return Date.now(); } };
   // The order channels (dine-in, takeout and so on) from settings, or an empty list.
   const channelList = () => (SB.config && SB.config.channels) || [];
-  // True when sample history is switched on in Menu and settings. It counts as on when the simulator is
+  // True when sample history is switched on in Menu, prices and shop. It counts as on when the simulator is
   // missing.
   const sampleFlag = () => { const s = SB.sim; if (s && typeof s.sampleEnabled === 'function') { try { return !!s.sampleEnabled(); } catch (e) { return false; } } return true; };
   // The store's data with or without sample history. If the store fails, an empty dataset keeps pages in
@@ -32199,7 +32236,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       // removes it.
       onFilterChange(fn) { rec.listeners.push(fn); return () => { const i = rec.listeners.indexOf(fn); if (i >= 0) rec.listeners.splice(i, 1); }; },
       navigate: (id) => O.navigate(id),
-      // openSheet opens a sheet by name. theme says which office theme (Ember or Paper) is showing.
+      // openSheet opens a sheet by name. theme says which office look ('ember' for Night, 'paper' for Day) is showing.
       openSheet: (name, opts) => (SB.sheets ? SB.sheets.open(name, opts) : null),
       theme: () => (SB.theme ? SB.theme.office() : 'ember'),
       kit: O.kit,
@@ -32654,11 +32691,12 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     function coachFacts() {
       const ds = ctx.dataset(), r = ctx.filters.range, inR = (t) => isNum(t) && t >= r.from && t < r.to;
       let tickets = 0, batches = 0, records = 0, discards = 0, finished = 0, paid = 0;
-      for (const t of ds.tickets || []) if (inR(t.createdAt)) { tickets++; if (t.status !== 'active' && t.status !== 'voided') finished++; }
+      let onBoard = 0;
+      for (const t of ds.tickets || []) if (inR(t.createdAt)) { tickets++; if (t.status === 'active') onBoard++; else if (t.status !== 'voided') finished++; }
       for (const o of ds.orders || []) { if (inR(o.createdAt)) tickets++; if (o.status === 'paid' && inR(o.paidAt)) paid++; }
       for (const b of ds.batches || []) if (b.src !== 'starter' && inR(b.enteredAt)) batches++;
       for (const e of ds.events || []) if (e && (e.type === 'temp_logged' || e.type === 'sanitize_done' || e.type === 'batch_discard') && inR(e.t)) { records++; if (e.type === 'batch_discard') discards++; }
-      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, finished, paid, batches, records, discards, label: r.label };
+      return { anyLive: !!(ds.counts && ds.counts.live > 0), tickets, finished, onBoard, paid, batches, records, discards, label: r.label };
     }
     // Shows the "what to do next" message in place of blank tiles and charts when the range has no data.
     function paintCoach() {
@@ -32670,7 +32708,8 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       const key = c.title + '|' + c.body + '|' + canSample;
       if (coachEl.__key === key) return;
       coachEl.__key = key;
-      const kids = [h('h2', { class: 'of-coach-t' }, c.title), h('p', { class: 'of-coach-b' }, c.body)];
+      const pg = PAGES.find((x) => x.id === id);
+      const kids = [h('span', { class: 'of-coach-i', 'aria-hidden': 'true' }, ico(pg ? pg.icon : 'info', 28)), h('h2', { class: 'of-coach-t' }, c.title), h('p', { class: 'of-coach-b' }, c.body)];
       if (canSample) kids.push(h('button', { type: 'button', class: 'btn btn-sm of-coach-sample', onClick: showSampleNumbers }, 'Show sample numbers'),
         h('p', { class: 'of-coach-n' }, 'Sample numbers are generated so you can see what this page looks like. They are labeled sample and never mixed into your own.'));
       coachEl.replaceChildren(...kids);
@@ -32825,7 +32864,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
 
     const title = h('h1', { class: 'of-title', id: 'of-title', tabindex: '-1' }, 'Speed');
     const themeBtn = h('button', { type: 'button', class: 'btn btn-ghost of-theme' });
-    const backBtn = h('button', { type: 'button', class: 'btn of-back', dataset: { backToLine: '' } }, ico('door', 22), h('span', null, 'Back to the line'));
+    const backBtn = h('button', { type: 'button', class: 'btn of-back', dataset: { backToLine: '' } }, ico('door', 22), h('span', null, 'Back to the board'));
     const top = h('header', { class: 'of-top' }, title, h('div', { class: 'of-top-actions' }, themeBtn, backBtn));
 
     const filters = h('div', { class: 'of-filters', role: 'group', 'aria-label': 'Filters', dataset: { open: 'false' } });
@@ -32860,14 +32899,14 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     PAGES.forEach((p) => M.f.railList.appendChild(railItem(p)));
   }
 
-  // Shows the theme button for the theme you would switch to (sun for Paper, moon for Ember).
+  // Shows the Day/Night button for the look you would switch to (sun for Day, moon for Night), the same
+  // words as the board's Settings.
   function paintThemeBtn() {
     if (!M) return;
-    const cur = SB.theme ? SB.theme.office() : 'ember';
-    const next = cur === 'ember' ? 'paper' : 'ember';
+    const dark = (SB.theme ? SB.theme.office() : 'ember') === 'ember';
     const b = M.f.themeBtn; U.clear(b);
-    b.append(ico(cur === 'ember' ? 'sun' : 'moon', 20), h('span', { class: 'of-theme-w' }, cur === 'ember' ? 'Paper' : 'Ember'));
-    b.setAttribute('aria-label', 'Switch to the ' + (next === 'paper' ? 'Paper (light)' : 'Ember (dark)') + ' theme');
+    b.append(ico(dark ? 'sun' : 'moon', 20), h('span', { class: 'of-theme-w' }, dark ? 'Day' : 'Night'));
+    b.setAttribute('aria-label', 'Switch to ' + (dark ? 'Day (light)' : 'Night (dark)'));
   }
 
   // Builds the sticky filter bar: range buttons, two custom date boxes, channel menu, source buttons and
@@ -32876,7 +32915,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const F = M.filters, f = M.f, sc = M.scope;
     const summary = h('button', { type: 'button', class: 'of-fsum', 'aria-expanded': 'false', 'aria-controls': 'of-fbody' });
     const body = h('div', { class: 'of-fbody', id: 'of-fbody' });
-    const presets = [{ id: 'today', label: 'Today' }, { id: 'yesterday', label: 'Yesterday' }, { id: 'last7', label: 'Last 7 days' }, { id: 'last14', label: 'Last 14 days' }, { id: 'day', label: 'One day' }, { id: 'custom', label: 'Custom' }];
+    const presets = [{ id: 'today', label: 'Today' }, { id: 'yesterday', label: 'Yesterday' }, { id: 'last7', label: 'Last 7 days' }, { id: 'last14', label: 'Last 14 days' }, { id: 'day', label: 'Pick a day' }, { id: 'custom', label: 'Custom' }];
 
     // The range buttons: Today, Yesterday, Last 7 days, Last 14 days and Custom.
     const rangeSeg = SB.ui.segmented({ options: presets, value: F.range.id, label: 'Date range', onChange: (id) => setRange(id) });
@@ -32895,12 +32934,12 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const chanSel = h('select', { class: 'select of-select', id: 'of-channel', 'aria-label': 'Channel' },
       h('option', { value: 'all' }, 'All channels'), channelList().map((c) => h('option', { value: c.id }, c.name)));
     chanSel.value = F.channel;
-    // The source buttons: Live only, or Live plus sample history.
-    const srcSeg = SB.ui.segmented({ options: [{ id: 'live', label: 'Live only' }, { id: 'all', label: 'Live + sample' }], value: F.source, label: 'Data source', onChange: (id) => setSource(id) });
+    // The Show buttons: your own tickets only, or with the made-up sample days. Shown only while sample days exist.
+    const srcSeg = SB.ui.segmented({ options: [{ id: 'live', label: 'Your tickets only' }, { id: 'all', label: 'With sample days' }], value: F.source, label: 'Show', onChange: (id) => setSource(id) });
     srcSeg.classList.add('of-seg');
     const srcNote = h('span', { class: 'of-fnote', hidden: true });
 
-    // The Day group only shows for Yesterday or One day, so the other filters fit on one row.
+    // The Day group only shows for Yesterday or Pick a day, so the other filters fit on one row.
     // Seven weekday buttons: each jumps to the most recent such day (today counts once something was ordered), so "Friday" is one tap.
     const wdRow = h('div', { class: 'of-wdrow', role: 'group', 'aria-label': 'Jump to a weekday' });
     // Shows the most recent day with this weekday number (0 is Sunday), looking back up to a week.
@@ -32922,7 +32961,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       dayGroup,
       custom,
       h('div', { class: 'of-fg' }, h('label', { class: 'of-fl', for: 'of-channel' }, 'Channel'), chanSel),
-      h('div', { class: 'of-fg' }, h('span', { class: 'of-fl' }, 'Source'), srcSeg, srcNote));
+      h('div', { class: 'of-fg of-srcg' }, h('span', { class: 'of-fl' }, 'Show'), srcSeg, srcNote));
     const banner = h('p', { class: 'of-banner', role: 'status' }, h('span', { class: 'of-chip', hidden: true }, 'Sample data'), h('span', { class: 'of-banner-t' }));
     f.filters.append(summary, body, banner);
     Object.assign(M, { dayGroup, dayPrev, dayNext, dayIn, dayErr, rangeSeg, srcSeg, chanSel, dFrom, dTo, dErr, custom, banner, summary, srcNote, fbody: body });
@@ -32937,6 +32976,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     sc.on(dayNext, 'click', () => stepDay(1));
     sc.on(dayIn, 'change', () => pickDay(dayIn.value));
     paintDayPicker();
+    paintSourceNote();
     paintFilterSummary();
   }
 
@@ -32952,7 +32992,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     M.dayGroup.hidden = !(M.filters.range.id === 'day' || M.filters.range.id === 'yesterday');
   }
   // Shows exactly one service day. Stepping onto today gives the live Today preset so it keeps rolling
-  // forward; any other day (or the One day button, fixed = true) is a fixed 'day' range.
+  // forward; any other day (or the Pick a day button, fixed = true) is a fixed 'day' range.
   function showDay(key, fixed) {
     const dsh = svcHour(), F = M.filters;
     M.custom.hidden = true; M.dErr.hidden = true;
@@ -33014,26 +33054,28 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const F = M.filters;
     if (id === 'all' && !(sampleFlag() && sampleLoaded())) {
       M.srcSeg.setValue('live'); F.source = 'live';
-      if (SB.ui && SB.ui.announce) SB.ui.announce(sampleFlag() ? 'No sample history is loaded.' : 'Sample history is switched off in Menu and settings.');
+      if (SB.ui && SB.ui.announce) SB.ui.announce('There are no sample days to show.');
       paintSourceNote(); return;
     }
-    M.forcedLive = false; F.source = id; filtersChanged('Source: ' + (id === 'all' ? 'live and sample' : 'live only'));
+    M.forcedLive = false; F.source = id; filtersChanged(id === 'all' ? 'your tickets with sample days' : 'your tickets only');
   }
-  // Greys out the sample button and says why when sample history is off or missing, then falls back to
-  // live only.
+  // Hides the Show buttons when there are no sample days to mix in (none made, or switched off), and
+  // falls back to your own tickets only.
   function paintSourceNote() {
     const ok = sampleFlag() && sampleLoaded();
-    const all = M.srcSeg.querySelector('[data-id="all"]');
-    if (all) { all.setAttribute('aria-disabled', ok ? 'false' : 'true'); all.classList.toggle('is-off', !ok); all.title = ok ? '' : (sampleFlag() ? 'No sample history is loaded' : 'Sample history is switched off in Menu and settings'); }
-    M.srcNote.hidden = ok; M.srcNote.textContent = ok ? '' : (sampleFlag() ? 'No sample history loaded' : 'Sample history is off');
+    const grp = M.srcSeg.closest('.of-srcg');
+    if (grp) grp.hidden = !ok;
+    M.srcNote.hidden = true;
     if (!ok && M.filters.source === 'all') { M.filters.source = 'live'; M.forcedLive = true; M.srcSeg.setValue('live'); }
   }
   // The one-line summary of the filters that stands in for the filter bar on a phone.
   function paintFilterSummary() {
     const F = M.filters;
     const chan = F.channel === 'all' ? 'All channels' : ((channelList().find((c) => c.id === F.channel) || {}).name || F.channel);
-    M.summary.replaceChildren(h('span', { class: 'of-fsum-t' }, F.range.label + ', ' + chan + ', ' + (F.source === 'all' ? 'live and sample' : 'live only')), ico('chevron-down', 18, { class: 'of-fsum-i' }));
-    M.summary.setAttribute('aria-label', 'Filters: ' + F.range.label + ', ' + chan + ', ' + (F.source === 'all' ? 'live and sample' : 'live only') + '. Show or hide the filters');
+    // The sample choice is only named while sample days exist.
+    const src = sampleFlag() && sampleLoaded() ? ', ' + (F.source === 'all' ? 'with sample days' : 'your tickets only') : '';
+    M.summary.replaceChildren(h('span', { class: 'of-fsum-t' }, F.range.label + ', ' + chan + src), ico('chevron-down', 18, { class: 'of-fsum-i' }));
+    M.summary.setAttribute('aria-label', 'Filters: ' + F.range.label + ', ' + chan + src + '. Show or hide the filters');
   }
   // After any filter change: update the summary, redraw every card now and tell screen readers what is
   // showing.
@@ -33067,9 +33109,12 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     }
     const b = bannerText(info);
     // Pages that add up history say when the range reaches days that were cleared from this tablet (the safety record keeps its own).
-    if (M.pageId !== 'safety' && M.pageId !== 'data') { const aw = O.archivedWords(ds && ds.archivedBefore, F.range.from, svcHour()); if (aw) b.text += ' ' + aw; const dw = O.droppedRangeWords(ds && ds.droppedBefore, F.range.from, svcHour()); if (dw) b.text += ' ' + dw; }
+    if (M.pageId !== 'safety' && M.pageId !== 'data') { const aw = O.archivedWords(ds && ds.archivedBefore, F.range.from, svcHour()); if (aw) b.text += (b.text ? ' ' : '') + aw; const dw = O.droppedRangeWords(ds && ds.droppedBefore, F.range.from, svcHour()); if (dw) b.text += (b.text ? ' ' : '') + dw; }
+    // The Menu, prices and shop page has no range, so it gets no range line.
+    if (M.pageId === 'data') b.text = '';
     const t = M.banner.querySelector('.of-banner-t');
     if (t.textContent !== b.text) t.textContent = b.text;
+    M.banner.hidden = !b.text;
     M.banner.dataset.kind = b.kind;
     M.banner.querySelector('.of-chip').hidden = b.kind !== 'sample';
   }
@@ -33119,8 +33164,8 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   }
   // Pages that only make sense when the owner tracks cooked-ahead food (batches, hold cabinet, temperature checks).
   const GATED = {
-    safety: { title: 'Safety records are off', body: 'You are not tracking cooked-ahead food, so there are no batches, temperature checks or hold times to report on. Turn it on under Settings, Dishes and prices (Yes, I cook ahead) if you cook food ahead and hold it hot or cold.' },
-    stock: { title: 'Stock tracking is off', body: 'You are not tracking cooked-ahead food, so this page has no stock to show. Turn it on under Settings, Dishes and prices (Yes, I cook ahead) if you cook food ahead and want to know when it runs out.' },
+    safety: { title: 'Safety records are off', body: 'You are not tracking cooked-ahead food, so there are no batches, temperature checks or hold times to report on. If you cook food ahead and hold it hot or cold, tap Yes, I cook food ahead below.' },
+    stock: { title: 'Stock tracking is off', body: 'You are not tracking cooked-ahead food, so this page has no stock to show. If you cook food ahead and want to know when it runs out, tap Yes, I cook food ahead below.' },
   };
   // True when the cook-ahead module is on; a missing setting counts as on, so old saves and the demo are unchanged.
   function cookAheadOn() {
@@ -33147,7 +33192,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   function turnOnCookAhead(id) {
     let rep = 'error';
     try { rep = SB.store.dispatch('updateSettings', { patch: { modules: { cookAhead: true } } }); } catch (e) { /* shown below */ }
-    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. Open Settings, then Dishes and prices, and tap Yes, I cook ahead.', { tone: 'bad' }); return; }
+    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. On the board, tap Settings, then Dishes and prices, then Yes, I cook ahead.', { tone: 'bad' }); return; }
     if (M) showPage(id, { focus: false });
   }
 
@@ -33283,7 +33328,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     buildFilters();
     paintThemeBtn();
     paintRail();
-    scope.on(f.themeBtn, 'click', () => { if (SB.theme) SB.theme.setOffice(SB.theme.office() === 'ember' ? 'paper' : 'ember'); });
+    scope.on(f.themeBtn, 'click', () => { if (SB.theme) SB.theme.toggle(); });
     scope.offs.push(tracked('subs', SB.theme ? SB.theme.onChange((what) => { if (what === 'office') { paintThemeBtn(); try { if (SB.charts && SB.charts.refreshTheme) SB.charts.refreshTheme(); } catch (e) { warnOnce('refreshTheme', e); } } }) : () => {}));
     scope.offs.push(tracked('subs', SB.store && SB.store.subscribe ? SB.store.subscribe(onStoreChange) : () => {}));
     scope.offs.push(tracked('subs', SB.sim && SB.sim.onSampleChange ? SB.sim.onSampleChange(onSampleChange) : () => {}));
@@ -33437,7 +33482,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       container.insertBefore(glanceHost, page.el);
       const glance = typeof O.glance === 'function' ? O.glance(glanceHost) : null;
       page.headline();
-      page.how('These numbers come from tickets that were sent out in the range above. Ticket time runs from when the ticket was entered until it was sent out, and the middle ticket is the typical one: half the tickets were faster. Slowest 1 in 10 is the time that nine in ten tickets beat. On time means a ticket finished before its warning time, which depends on the order type (Menu and settings, Time limits). Tickets per hour is tickets placed divided by the hours in which at least one ticket was placed.');
+      page.how('These numbers come from tickets that were sent out in the range above. Ticket time runs from when the ticket was entered until it was sent out, and the middle ticket is the typical one: half the tickets were faster. Slowest 1 in 10 is the time that nine in ten tickets beat. On time means a ticket finished before its warning time, which depends on the order type (Menu, prices and shop, Time limits). Tickets per hour is tickets placed divided by the hours in which at least one ticket was placed.');
       page.tiles(paceTiles());
 
       page.card({
@@ -33750,7 +33795,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     render(container, ctx) {
       const page = K.page(container, ctx, { id: 'stations' });
       page.headline();
-      page.how('Each item on a ticket belongs to one station. A ticket counts at the station whose item finished last. Waiting means the time between an item being sent to the station and a cook starting it; work is the time the cook spent on it. Prep times are compared with the starter estimates in Menu and settings, and only items with at least 5 finished lines are judged.');
+      page.how('Each item on a ticket belongs to one station. A ticket counts at the station whose item finished last. Waiting means the time between an item being sent to the station and a cook starting it; work is the time the cook spent on it. Prep times are compared with the starter estimates in Menu, prices and shop, and only items with at least 5 finished lines are judged.');
       page.tiles([
         { id: 'overdue', kpi: 'overdue', label: 'Overdue tickets' },
         { id: 'spread', kpi: 'avgSpreadMs', label: 'First to last item' },
@@ -33819,7 +33864,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
         // The dumbbell card: starter, learned and observed prep time for each item. The subtitle counts
         // items with enough samples.
         type: 'dumbbell', span: 12, title: 'Prep times: starter, learned and observed', sub: (p) => { const n = M.calibration(p).filter((r) => !r.thin).length; return 'The dot you set against the dot the line really did. ' + (n ? 'Showing the ' + Math.min(12, n) + ' items that differ most' + (n > 12 ? ' of ' + n : '') + '. ' : '') + 'Items with fewer than 5 samples are left out.'; },
-        caption: 'A row marked slower or quicker is off the starter estimate by more than a quarter. Confirm the new time in Menu and settings and pacing will plan for it.',
+        caption: 'A row marked slower or quicker is off the starter estimate by more than a quarter. Confirm the new time in Menu, prices and shop and pacing will plan for it.',
         empty: { title: 'Not enough finished items to judge prep times', body: 'Each item needs at least 5 finished lines in this range. A longer range gives it more to work with.', icon: 'timer' },
         // The 12 items whose observed time differs most from the starter estimate. A flag marks those off
         // by a quarter or more.
@@ -33901,13 +33946,16 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
  * SB.officeB, the small helper set that the Safety and Stock pages share.
  * PARTS: 1 plain helpers (no screen needed), 2 screen helpers (menus, switches, verdict box), 3 the page.
  * USES: 40-metrics.js, 80-office-core.js.   USED BY: 83-office-safety.js, 85-office-stock.js, the office frame.
- * KEPT: g or kg only, money via kit.fmt.money, a missing cost is "not recorded", never 0.  TRAP: SB.metrics
+ * KEPT: weights via kit.fmt.g (kg or lb, as the owner chose), money via kit.fmt.money, a missing cost is "not recorded", never 0.  TRAP: SB.metrics
  * percents are fractions (0 to 1) except thermal() hotPct and chilledPct (0 to 100).
  */
 (function (g) {
   'use strict';
   const SB = (g.SB = g.SB || {});
   const U = SB.util;
+  // A cost per kilogram shown per pound when the owner weighs in pounds (settings, Weights), and the unit word to match.
+  const perW = (v) => (typeof v === 'number' && isFinite(v) && U.units && U.units.weight === 'lb' ? v * 0.45359237 : v);
+  const wWord = () => (U.units && U.units.weight === 'lb' ? 'lb' : 'kg');
   const B = (SB.officeB = SB.officeB || {});
   // True only for a real, finite number (not NaN, not text that looks like a number).
   const isNum = (n) => typeof n === 'number' && isFinite(n);
@@ -34075,7 +34123,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   B.setText = setText;
 
   /** Where the numbers on a card come from, in one line: the range, the channel (when it applies)
-   *  and whether sample data is in. */
+   *  and, only when they are mixed in, the sample days. */
   B.scopeText = (ctx, o) => {
     o = o || {};
     const F = ctx.filters; let ds = null;
@@ -34083,7 +34131,8 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const sample = ds && ds.counts ? ds.counts.sample : 0;
     const parts = [F.range.label];
     if (!o.noChannel && F.channel !== 'all') { const c = SB.config && SB.config.channelById && SB.config.channelById[F.channel]; parts.push(c ? c.name : F.channel); }
-    parts.push(F.source === 'all' && sample > 0 ? 'sample and live data' : 'live data only');
+    // Sample days are only named when they are mixed in; otherwise every number is the owner's own.
+    if (F.source === 'all' && sample > 0) parts.push('with sample days');
     return parts.join(', ');
   };
 
@@ -34282,19 +34331,19 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
             // A tiny gap prints as "less than 0.1" so the sentence never claims an exact 0.0 percent.
             const abs = Math.abs(err) * 100;
             setText(big, 'If you had priced ' + name + ' with the static yield you would have been off by ' + (abs < 0.05 ? 'less than 0.1' : abs.toFixed(1)) + '%.');
-            setText(detail, 'The static ' + fmt.pct(y.staticYield, 0) + ' yield puts ' + name + ' at ' + fmt.money(y.staticCostPerCookedKg, 2) + ' per cooked kg. The true figure is ' + fmt.money(y.trueCostPerCookedKg, 2) + ' per cooked kg, so the static yield ' + (err > 0 ? 'overstates' : err < 0 ? 'understates' : 'matches') + ' the cost.');
+            setText(detail, 'The static ' + fmt.pct(y.staticYield, 0) + ' yield puts ' + name + ' at ' + fmt.money(perW(y.staticCostPerCookedKg), 2) + ' per cooked ' + wWord() + '. The true figure is ' + fmt.money(perW(y.trueCostPerCookedKg), 2) + ' per cooked ' + wWord() + ', so the static yield ' + (err > 0 ? 'overstates' : err < 0 ? 'understates' : 'matches') + ' the cost.');
           } else {
-            setText(big, 'The cost of ' + name + ' per cooked kilogram could not be worked out.');
+            setText(big, 'The cost of ' + name + ' per cooked ' + (wWord() === 'lb' ? 'pound' : 'kilogram') + ' could not be worked out.');
             setText(detail, 'A raw cost per kilogram is needed for this comparison.');
           }
           stats.set([
-            { k: 'static', label: 'Static ' + (isNum(y.staticYield) ? fmt.pct(y.staticYield, 0) : ''), value: isNum(y.staticCostPerCookedKg) ? fmt.money(y.staticCostPerCookedKg, 2) : 'Not known', note: 'per cooked kg' },
-            { k: 'model', label: 'Model ' + (isNum(y.modelYield) ? fmt.pct(y.modelYield, 1) : ''), value: isNum(y.modelCostPerCookedKg) ? fmt.money(y.modelCostPerCookedKg, 2) : 'Not known', note: 'per cooked kg' },
-            { k: 'real', label: 'Your batches ' + (isNum(y.realisedYield) ? fmt.pct(y.realisedYield, 1) : ''), value: isNum(y.realisedCostPerCookedKg) ? fmt.money(y.realisedCostPerCookedKg, 2) : 'No weighed batches', note: isNum(y.realisedCostPerCookedKg) ? 'per cooked kg' : 'weigh raw and cooked to add this' },
+            { k: 'static', label: 'Static ' + (isNum(y.staticYield) ? fmt.pct(y.staticYield, 0) : ''), value: isNum(y.staticCostPerCookedKg) ? fmt.money(perW(y.staticCostPerCookedKg), 2) : 'Not known', note: 'per cooked ' + wWord() },
+            { k: 'model', label: 'Model ' + (isNum(y.modelYield) ? fmt.pct(y.modelYield, 1) : ''), value: isNum(y.modelCostPerCookedKg) ? fmt.money(perW(y.modelCostPerCookedKg), 2) : 'Not known', note: 'per cooked ' + wWord() },
+            { k: 'real', label: 'Your batches ' + (isNum(y.realisedYield) ? fmt.pct(y.realisedYield, 1) : ''), value: isNum(y.realisedCostPerCookedKg) ? fmt.money(perW(y.realisedCostPerCookedKg), 2) : 'No weighed batches', note: isNum(y.realisedCostPerCookedKg) ? 'per cooked ' + wWord() : 'weigh raw and cooked to add this' },
           ]);
           setText(src, y.truthSource === 'realised'
-            ? 'True cost per cooked kg: ' + fmt.money(y.trueCostPerCookedKg, 2) + ', from ' + y.batches + ' weighed ' + B.plural(y.batches, 'batch', 'batches') + ' (' + fmt.g(y.rawG) + ' raw became ' + fmt.g(y.cookedG) + ' cooked). Raw cost ' + fmt.money(y.costPerKgRaw, 2) + ' per kg is a starter figure.'
-            : 'True cost per cooked kg: ' + (isNum(y.trueCostPerCookedKg) ? fmt.money(y.trueCostPerCookedKg, 2) : 'not known') + ', from the Texas A&M model because no batch in this range was weighed. Raw cost is a starter figure.');
+            ? 'True cost per cooked ' + wWord() + ': ' + fmt.money(perW(y.trueCostPerCookedKg), 2) + ', from ' + y.batches + ' weighed ' + B.plural(y.batches, 'batch', 'batches') + ' (' + fmt.g(y.rawG) + ' raw became ' + fmt.g(y.cookedG) + ' cooked). Raw cost ' + fmt.money(perW(y.costPerKgRaw), 2) + ' per ' + wWord() + ' is a starter figure.'
+            : 'True cost per cooked ' + wWord() + ': ' + (isNum(y.trueCostPerCookedKg) ? fmt.money(perW(y.trueCostPerCookedKg), 2) : 'not known') + ', from the Texas A&M model because no batch in this range was weighed. Raw cost is a starter figure.');
         };
         paint(p0);
         return { update: paint };
@@ -34327,7 +34376,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
         const controls = h('div', { class: 'ob-wi-ctl' }, fld('End temperature, 75 to 90 \u00B0C', sT), fld('Hold time, 0 to 3 hours', sH), fld('Raw weight put in to cook', sW));
         // One result tile: returns its list item and the two text spans to fill in later.
         const out = (k, label) => { const v = h('span', { class: 'ob-stat-v num', 'data-out': k }), n = h('span', { class: 'ob-stat-n' }); return { li: h('li', { class: 'ob-stat' }, h('span', { class: 'ob-stat-l' }, label), v, n), v, n }; };
-        const oHot = out('hot', 'Hot yield'), oChill = out('chilled', 'Chilled yield'), oCooked = out('cooked', 'Cooked weight'), oCost = out('cost', 'True cost per cooked kg');
+        const oHot = out('hot', 'Hot yield'), oChill = out('chilled', 'Chilled yield'), oCooked = out('cooked', 'Cooked weight'), oCost = out('cost', 'True cost per cooked ' + wWord());
         const outs = h('ul', { class: 'ob-stats ob-stats--4', 'aria-live': 'polite', 'aria-label': 'What-if result' }, oHot.li, oChill.li, oCooked.li, oCost.li);
         const vs = h('p', { class: 'ob-text', 'data-out': 'vs' });
         const name = h('p', { class: 'ob-src' });
@@ -34349,11 +34398,11 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
           setText(oChill.v, t.chilledPct.toFixed(1) + '%'); setText(oChill.n, 'after chilling overnight');
           const cg = isNum(t.cookedG) ? Math.round(t.cookedG) : null;
           setText(oCooked.v, cg === null ? '-' : fmt.g(cg)); setText(oCooked.n, cg === null ? '' : fmt.g(cg) + ' from ' + fmt.g(rawG) + ' raw');
-          setText(oCost.v, isNum(t.trueCostPerCookedKg) ? fmt.money(t.trueCostPerCookedKg, 2) : 'Not known'); setText(oCost.n, isNum(rc.cost) ? 'raw cost ' + fmt.money(rc.cost, 2) + ' per kg' : 'no raw cost recorded');
+          setText(oCost.v, isNum(t.trueCostPerCookedKg) ? fmt.money(perW(t.trueCostPerCookedKg), 2) : 'Not known'); setText(oCost.n, isNum(rc.cost) ? 'raw cost ' + fmt.money(perW(rc.cost), 2) + ' per ' + wWord() : 'no raw cost recorded');
           if (isNum(rc.staticY) && cg !== null) {
             const sg = Math.round(rawG * rc.staticY);
             const diff = cg - sg;
-            setText(vs, 'The static ' + fmt.pct(rc.staticY, 0) + ' yield would give ' + fmt.g(sg) + ' cooked from the same ' + fmt.g(rawG) + ' raw' + (isNum(rc.cost) ? ' and a cost of ' + fmt.money(rc.cost / rc.staticY, 2) + ' per cooked kg' : '') + '. This cook gives ' + fmt.g(Math.abs(diff)) + (diff >= 0 ? ' more' : ' less') + '.');
+            setText(vs, 'The static ' + fmt.pct(rc.staticY, 0) + ' yield would give ' + fmt.g(sg) + ' cooked from the same ' + fmt.g(rawG) + ' raw' + (isNum(rc.cost) ? ' and a cost of ' + fmt.money(perW(rc.cost / rc.staticY), 2) + ' per cooked ' + wWord() : '') + '. This cook gives ' + fmt.g(Math.abs(diff)) + (diff >= 0 ? ' more' : ' less') + '.');
           } else setText(vs, '');
           setText(name, 'Source: Texas A&M regression, hot-hold yield; starter model, confirm against your own weighed batches. Chilled yield is the hot yield minus ' + YM.chilledDelta + ' points, never below ' + YM.chilledFloor + '%.');
         }
@@ -34423,8 +34472,8 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       render: (body, p0) => {
         const list = h('ul', { class: 'ob-list', 'aria-label': 'Items with no recorded cost' });
         const none = h('p', { class: 'ob-note', hidden: true });
-        // Opens the Menu and settings page, where a missing cost is entered.
-        const go = kit.button({ label: 'Open Menu and settings', icon: 'sliders', onClick: () => ctx.navigate('data') });
+        // Opens the Menu, prices and shop page, where a missing cost is entered.
+        const go = kit.button({ label: 'Open Menu, prices and shop', icon: 'sliders', onClick: () => ctx.navigate('data') });
         const goWrap = h('div', { class: 'ob-actions' }, go);
         // How much of what sold the Food cost tile really covers, since it leaves out items with no cost.
         const cov = h('p', { class: 'ob-note', hidden: true });
@@ -34565,7 +34614,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       caption: 'Sales is the food sold less discounts, and it is the number at the top of this page. Tax and tips are on top of it, and all three together are what was collected.',
       // Builds the figure rows and the notes under them; update repaints them in place.
       render: (body, p0) => {
-        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the kitchen board and the money shows up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
+        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Tap the Orders button on the board and pay an order, and the money shows up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
         const stats = B.stats(body, { cls: 'ob-stats--3' });
         const open = h('p', { class: 'ob-note' });
         body.append(empty, open);
@@ -34685,7 +34734,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
 
     const salesOf = B.memoP((p) => M.sales(p));
     page.headline();
-    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu and settings (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Food cost is ingredient cost as a share of menu price, counted only over items with a cost on file. Every figure is added up in whole cents from the paid orders themselves.');
+    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu, prices and shop (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Food cost is ingredient cost as a share of menu price, counted only over items with a cost on file. Every figure is added up in whole cents from the paid orders themselves.');
 
     page.tiles([
       // The one main money figure: sales after discounts from paid orders (blank until an order is paid).
@@ -34721,7 +34770,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const { marginCard, noCost } = buildMarginSection({ page, scope, st, M, fmt, kit, itemRows, ctx });
 
     /* ---------------------------------------------------------------- dollars thrown away */
-    page.section('Dollars thrown away', 'Food that was discarded, at the cost per cooked kg recorded on each batch. Always the last 7 days against the 7 days before, whatever range is picked above.');
+    page.section('Dollars thrown away', 'Food that was discarded, at the cooked cost recorded on each batch. Always the last 7 days against the 7 days before, whatever range is picked above.');
     const weeksOf = B.memoP((p) => M.discardWeeks(p, { now: ctx.now() }));
     page.panel({
       span: 12, title: 'This week against last week',
@@ -34855,8 +34904,10 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       for (const e of ds.events || []) {
         // Undone events and events outside the range are skipped; only checks with an on-time flag are counted.
         if (!e || e.reverted || !inRange(e.t)) continue;
-        if (e.type === 'temp_logged' && typeof e.onTime === 'boolean') { const r = dayRec(U.serviceDate(e.t, dsh)); r.tempN++; if (!e.onTime) { r.tempLate++; if (isNum(e.lateMs)) r.tempMaxLate = Math.max(r.tempMaxLate, e.lateMs); } }
-        else if (e.type === 'sanitize_done' && typeof e.onTime === 'boolean') { const r = dayRec(U.serviceDate(e.t, dsh)); r.sanN++; if (!e.onTime) { r.sanLate++; if (isNum(e.lateMs)) r.sanMaxLate = Math.max(r.sanMaxLate, e.lateMs); } }
+        // A check a few minutes past due counts as on time here too (SB.metrics.withinGrace), matching the totals.
+        const late = e.onTime === false && !(SB.metrics.withinGrace && SB.metrics.withinGrace(e));
+        if (e.type === 'temp_logged' && typeof e.onTime === 'boolean') { const r = dayRec(U.serviceDate(e.t, dsh)); r.tempN++; if (late) { r.tempLate++; if (isNum(e.lateMs)) r.tempMaxLate = Math.max(r.tempMaxLate, e.lateMs); } }
+        else if (e.type === 'sanitize_done' && typeof e.onTime === 'boolean') { const r = dayRec(U.serviceDate(e.t, dsh)); r.sanN++; if (late) { r.sanLate++; if (isNum(e.lateMs)) r.sanMaxLate = Math.max(r.sanMaxLate, e.lateMs); } }
         else if (e.type === 'batch_discard' && isNum(e.g) && e.g > 0) { seen.add(e.batchId); dis.push({ t: e.t, date: U.serviceDate(e.t, dsh), ing: e.ing, g: e.g, reason: e.reason || 'other', cost: isNum(e.cost) ? e.cost : null }); }
       }
       // Batches thrown away without a discard event are added from the batch record, so no waste is missed.
@@ -34950,9 +35001,12 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
 
       // The body sentence: on-time rates for both checks, then what was thrown away, then any short lockouts.
       const parts = [];
-      if (k.tempChecks.count) parts.push('Temperature checks were on time ' + fmt.pct(k.tempChecks.onTimePct, 0) + ' of the time (' + k.tempChecks.onTime + ' of ' + k.tempChecks.count + ')');
-      if (k.sanitize.count) parts.push('sanitize rounds ' + fmt.pct(k.sanitize.onTimePct, 0) + ' (' + k.sanitize.onTime + ' of ' + k.sanitize.count + ')');
-      let body = parts.length ? parts[0] + (parts[1] ? ', ' + parts[1] : '') + '.' : 'No temperature checks or sanitize rounds were logged.';
+      // "3 of 4 temperature checks were on time", in counts, so one check never reads as 0%.
+      const kept = (x, noun) => x.onTime + ' of ' + x.count + ' ' + noun + (x.count === 1 ? ' was' : 's were') + ' on time';
+      if (k.tempChecks.count) parts.push(kept(k.tempChecks, 'temperature check'));
+      if (k.sanitize.count) parts.push(kept(k.sanitize, 'sanitize round'));
+      if (parts[0]) parts[0] = parts[0][0].toUpperCase() + parts[0].slice(1);
+      let body = parts.length ? parts[0] + (parts[1] ? '; ' + parts[1] : '') + '.' : 'No temperature checks or sanitize rounds were logged.';
       if (k.discards.count) body += ' ' + k.discards.count + ' ' + B.plural(k.discards.count, 'batch was', 'batches were') + ' thrown out (' + kgWords(k.discards.g) + ', ' + SB.metrics.discardCostWords(k.discards, (v) => fmt.money(v, 0)) + '), ' + safetyDis.length + ' for time or temperature rules.';
       else body += ' Nothing was thrown out.';
       if (brief.length) body += brief.length === 1 ? ' A time or temperature limit also took an item off the menu once, for ' + fmt.ms(brief[0].openMs) + '.' : ' Time or temperature limits also took items off the menu ' + brief.length + ' times for a few minutes each, the longest ' + fmt.ms(Math.max.apply(null, brief.map((c) => c.openMs))) + '.';
@@ -34966,7 +35020,6 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const verdictOf = B.memoP((p) => judge(facts(p)));
     const verdict = page.panel({
       span: 12, title: 'How did the checks go?', sub: scope(),
-      caption: 'One plain answer, and the single day to look at first. The pages below show the evidence.',
       // Fills the verdict box. Its button jumps the timeline to the day named as the problem.
       render: (body, p0) => {
         const co = B.callout(body, kit);
@@ -34988,7 +35041,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     page.headline();
 
     // ---------- compliance: ring and the two meters ----------
-    page.section('How well the checks were kept', 'On time means the next check was logged before the interval you set ran out.');
+    page.section('How well the checks were kept', 'On time means the check was logged before the interval you set ran out, or within 5 minutes after.');
     // Check intervals are read live from settings, so a changed limit shows at the next refresh.
     const intervalTemp = () => B.settings(ctx.dataset()).safety.tempCheckEveryMin;
     const intervalSan = () => B.settings(ctx.dataset()).safety.sanitizeEveryH;
@@ -34996,7 +35049,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const WORDS = { ok: 'On track', warn: 'Slipping', bad: 'Needs attention' };
 
     const ringCard = page.card({
-      type: 'ring', span: 4, title: 'Checks kept on time', sub: 'Average of the measures beside it that have readings',
+      type: 'ring', span: 4, title: 'Checks kept on time', sub: 'Temperature checks and sanitize rounds together',
       caption: 'One number for the whole night. Green is 90% or better; below 75% a check or two were being skipped.',
       empty: { title: 'No score yet', body: 'The score needs temperature checks or sanitize rounds to be logged in this range.', icon: 'shield-check' },
       // Compliance ring: the average of the two on-time rates, empty until a check is logged.
@@ -35178,7 +35231,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     // ---------- the rules, live from settings ----------
     page.section('The limits behind all this', 'These are the limits the kitchen screens enforce right now. They come from your settings.');
     const rules = page.panel({
-      span: 12, title: 'What the rules are', sub: 'Read live from Menu and settings',
+      span: 12, title: 'What the rules are', sub: 'Read live from Menu, prices and shop',
       caption: 'The exact limits behind every green, amber and red above. If the limits do not match your local health code, change them in settings.',
       // Builds the list of limits once; update rewrites the text from the live settings.
       render: (body, p0) => {
@@ -35187,8 +35240,8 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
         const nodes = {};
         keys.forEach((k) => { const t = h('span', { class: 'ob-rule-t' }), d = h('span', { class: 'ob-rule-d' }); ul.appendChild(h('li', { class: 'ob-rule', dataset: { k } }, t, d)); nodes[k] = { t, d }; });
         const note = h('p', { class: 'ob-note ob-note--accent', dataset: { k: 'difference' } });
-        // Takes the owner to Menu and settings, where these limits are changed.
-        const go = kit.button({ label: 'Change these in Menu and settings', icon: 'sliders', onClick: () => ctx.navigate('data') });
+        // Takes the owner to Menu, prices and shop, where these limits are changed.
+        const go = kit.button({ label: 'Change these in Menu, prices and shop', icon: 'sliders', onClick: () => ctx.navigate('data') });
         const line = h('p', { class: 'ob-safetyline', dataset: { k: 'safetyline' } }, (SB.config && SB.config.safetyLine) || '');
         body.append(ul, note, h('div', { class: 'ob-actions' }, go), line);
         // Formats a temperature limit for display.
@@ -35239,7 +35292,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
 /* ===== 84-office-data.js ===== */
 ;try{
 /*
- * WHAT THIS FILE IS: The back office page "Menu and settings": edit the menu, ingredients, ticket time limits,
+ * WHAT THIS FILE IS: The back office page "Menu, prices and shop": edit the menu, ingredients, ticket time limits,
  *   pacing, food-safety limits, the PIN and display choices; back up, import or reset the data. Every edit goes
  *   through the engine, which can refuse it; the refusal shows beside the field and the old value stays.
  * PARTS: helpers, number field, nine panels (menu to about), then the page itself and its contents list.
@@ -35351,9 +35404,9 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   // Real finite numbers only, and an icon builder that never throws.
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 18 }); } catch (e) { return doc.createElement('span'); } };
-  // The current state (null if the store is not ready), and a m:ss clock text.
+  // The current state (null if the store is not ready), and a time in plain words (5 min, 2 min 5 s, 45 s).
   const cur = () => { try { return SB.store.getState(); } catch (e) { return null; } };
-  const mmss = (sec) => { const s = Math.max(0, Math.round(sec)); return Math.floor(s / 60) + ':' + U.pad2(s % 60); };
+  const mmss = (sec) => { const s = Math.max(0, Math.round(sec)), m = Math.floor(s / 60), r = s % 60; return m && r ? m + ' min ' + r + ' s' : m ? m + ' min' : r + ' s'; };
   // A trimmed number for display, and how many decimals a step has.
   const num = (n, d) => (isNum(n) ? String(+n.toFixed(d == null ? 2 : d)) : '-');
   const decs = (n) => { const s = String(n); const i = s.indexOf('.'); return i < 0 ? 0 : s.length - i - 1; };
@@ -35370,7 +35423,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   const patchFor = (path, v) => { const ks = path.split('.'); const root = {}; let c = root; ks.forEach((k, i) => { if (i === ks.length - 1) c[k] = v; else c = c[k] = {}; }); return root; };
   // The unit word for an ingredient, and an amount written with that unit.
   const unitWord = (ing) => (ing && ing.unit === 'ea' ? 'pieces' : 'g');
-  const amountText = (ing, v) => (ing && ing.unit === 'ea' ? num(v, 1) + ' ' + U.plural(v, 'piece') : U.weightText(v));
+  const amountText = (ing, v) => (ing && ing.unit === 'ea' ? num(v, 1) + ' ' + U.plural(v, 'piece') : ((SB.office && SB.office.weightText) || U.weightText)(v));
   // Dollars with cents, as shown in field messages.
   const money = (v) => U.fmtMoney(v, 2);
   // The currency symbol the shared formatter prints ($ unless another one was chosen).
@@ -35741,12 +35794,12 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
         else { trackSeg.setValue(getMi().track === 'two' ? 'two' : 'one'); status.bad(refusal(r, null)); }
       },
     });
-    const archChip = h('span', { class: 'od-archived' }, ico('package', 16), h('span', null, 'Archived'));
+    const archChip = h('span', { class: 'od-archived' }, ico('package', 16), h('span', null, 'Removed'));
     const archBtn = h('button', { type: 'button', class: 'btn btn-sm od-arch' });
     archBtn.addEventListener('click', () => {
       const to = !getMi().archived;
       const r = send('updateMenuItem', { id, patch: { archived: to } });
-      if (good(r)) status.ok(to ? 'Archived. It can no longer be ordered, and past tickets keep it. Unarchive it any time.' : 'Unarchived. It can be ordered again.');
+      if (good(r)) status.ok(to ? 'Removed. It can no longer be ordered, and past tickets keep it. Bring it back any time.' : 'Brought back. It can be ordered again.');
       else status.bad(refusal(r, null));
     });
 
@@ -35819,13 +35872,13 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
         trackSeg.setValue(mi.track === 'two' ? 'two' : 'one');
         root.dataset.zone = mi.zone;
         sumName.textContent = mi.name;
-        { const zn = C.zoneById[mi.zone] ? C.zoneById[mi.zone].name : '', cn = catName(mi.cat); sumMeta.textContent = (zn.toLowerCase() === cn.toLowerCase() ? zn : zn + ', ' + cn) + (mi.archived ? ', archived' : mi.prepConfirmed ? '' : ', starter prep time'); }
+        { const zn = C.zoneById[mi.zone] ? C.zoneById[mi.zone].name : '', cn = catName(mi.cat); sumMeta.textContent = (zn.toLowerCase() === cn.toLowerCase() ? zn : zn + ', ' + cn) + (mi.archived ? ', removed' : mi.prepConfirmed ? '' : ', starter prep time'); }
         sumPrice.textContent = money(mi.price); sumPrep.textContent = mmss(mi.prepSec);
         price.sync(mi.price); prep.sync(mi.prepSec);
         confSeg.setValue(mi.prepConfirmed ? 'confirmed' : 'starter');
         archChip.hidden = !mi.archived;
-        archBtn.replaceChildren(ico(mi.archived ? 'check' : 'ban', 18), h('span', null, mi.archived ? 'Unarchive' : 'Archive'));
-        archBtn.setAttribute('aria-label', (mi.archived ? 'Unarchive ' : 'Archive ') + mi.name);
+        archBtn.replaceChildren(ico(mi.archived ? 'check' : 'ban', 18), h('span', null, mi.archived ? 'Bring it back' : 'Remove'));
+        archBtn.setAttribute('aria-label', (mi.archived ? 'Bring back ' : 'Remove ') + mi.name);
         const l = s.learned && s.learned[id];
         if (l && isNum(l.est) && l.n >= 1 && mi.prepSec > 0) {
           const diff = (l.est - mi.prepSec) / mi.prepSec;
@@ -35922,7 +35975,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const filter = P.menuFilter;
     pn.body.append(
       para('Changes save as you make them. New tickets use the new price, prep time and ingredients; tickets already on the board keep theirs. There is no Undo for settings, so check a value before you move on.', 'od-intro'),
-      para('A prep time is a starter estimate until you have timed it on the line and marked it confirmed. Archived items cannot be ordered, and past tickets keep them.', 'od-intro'));
+      para('A prep time is a starter estimate until you have timed it on the line and marked it confirmed. Removed dishes cannot be ordered, and past tickets keep them.', 'od-intro'));
 
     // Add a dish, and a one-tap way to drop the made-up starter dishes. The form opens under the buttons.
     const addForm = addDishForm((id) => {
@@ -35933,9 +35986,9 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const addOpenBtn = btn('Add a dish', { icon: 'plus', cls: 'btn-primary' });
     addOpenBtn.addEventListener('click', () => addForm.open());
     const starterBtn = btn('Use only my own dishes', { icon: 'ban' });
-    const starterBox = h('div', { class: 'od-starter', hidden: true, role: 'group', 'aria-label': 'Archive the starter dishes' });
+    const starterBox = h('div', { class: 'od-starter', hidden: true, role: 'group', 'aria-label': 'Remove the starter dishes' });
     const starterMsg = h('p', { class: 'od-p' });
-    const starterYes = btn('Archive the starter dishes', { icon: 'ban', cls: 'btn-danger' });
+    const starterYes = btn('Remove the starter dishes', { icon: 'ban', cls: 'btn-danger' });
     const starterNo = btn('Keep them', { icon: 'x' });
     starterBox.append(starterMsg, h('div', { class: 'od-add-actions' }, starterYes, starterNo));
     const starterStatus = statusLine();
@@ -35943,7 +35996,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const liveStarters = () => { const s = cur(); return s ? s.menu.filter((m) => C.menuById[m.id] && !m.archived) : []; };
     starterBtn.addEventListener('click', () => {
       const n = liveStarters().length;
-      starterMsg.textContent = 'This archives the ' + n + ' demo starter ' + U.plural(n, 'dish', 'dishes') + ' that came with the app, so only the dishes you add can be ordered. Past tickets keep them. You can unarchive any of them later.';
+      starterMsg.textContent = 'This removes the ' + n + ' demo starter ' + U.plural(n, 'dish', 'dishes') + ' that came with the app, so only the dishes you add can be ordered. Past tickets keep them. You can bring any of them back later.';
       starterBox.hidden = false; starterYes.focus();
     });
     starterNo.addEventListener('click', () => { starterBox.hidden = true; starterBtn.focus(); });
@@ -35951,8 +36004,8 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       const list = liveStarters(); let failed = 0;
       list.forEach((m) => { if (!good(send('updateMenuItem', { id: m.id, patch: { archived: true } }))) failed++; });
       starterBox.hidden = true;
-      if (failed) starterStatus.bad('Archived ' + (list.length - failed) + ' of ' + list.length + ' starter dishes. ' + failed + ' could not be archived.');
-      else starterStatus.ok('Archived ' + list.length + ' starter ' + U.plural(list.length, 'dish', 'dishes') + '. Add your own with Add a dish.');
+      if (failed) starterStatus.bad('Removed ' + (list.length - failed) + ' of ' + list.length + ' starter dishes. ' + failed + ' could not be removed.');
+      else starterStatus.ok('Removed ' + list.length + ' starter ' + U.plural(list.length, 'dish', 'dishes') + '. Add your own with Add a dish.');
     });
     pn.body.append(h('div', { class: 'od-add-bar' }, addOpenBtn, starterBtn), starterBox, starterStatus.el, addForm.el);
     P.syncs.push(() => { const n = liveStarters().length; starterBtn.hidden = n === 0; if (!n) starterBox.hidden = true; });
@@ -35960,7 +36013,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
 
     const segStatus = SB.ui.segmented({
       label: 'Show items', value: filter.status,
-      options: [{ id: 'active', label: 'Active', count: 0 }, { id: 'archived', label: 'Archived', count: 0 }, { id: 'all', label: 'All', count: 0 }],
+      options: [{ id: 'active', label: 'Active', count: 0 }, { id: 'archived', label: 'Removed', count: 0 }, { id: 'all', label: 'All', count: 0 }],
       // Changes which items are listed by status.
       onChange: (v) => { filter.status = v; applyFilter(); },
     });
@@ -35984,7 +36037,10 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     function applyFilter() {
       const s = cur(); if (!s) return;
       let nA = 0, nR = 0, shown = 0;
-      for (const mi of s.menu) { if (mi.archived) nR++; else nA++; }
+      let nGuess = 0;
+      for (const mi of s.menu) { if (mi.archived) nR++; else { nA++; if (!mi.prepConfirmed) nGuess++; } }
+      // The starter-estimates filter only shows while there is a guessed prep time to find.
+      starterChip.hidden = !nGuess && !filter.starter;
       segStatus.setCount('active', nA); segStatus.setCount('archived', nR); segStatus.setCount('all', nA + nR);
       segStatus.setValue(filter.status); zoneSel.value = filter.zone;
       starterChip.setAttribute('aria-pressed', filter.starter ? 'true' : 'false');
@@ -36036,13 +36092,13 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     const thrMeta = { name: 'The sold-out amount', unit: pieces ? 'pieces' : 'g' };
     const par = numField({
       label: 'Opening amount (par)', aria: 'Opening amount of ' + nm, value: ing0.parG, min: 0, max: 1e7, step: pieces ? 1 : 100, big: pieces ? 10 : 1000, unit: pieces ? 'pieces' : 'g', meta: parMeta,
-      read: pieces ? null : (u) => U.weightText(u),
+      read: pieces ? null : (u) => ((SB.office && SB.office.weightText) || U.weightText)(u),
       // Par saves through the engine; the line under the row confirms it.
       save: (v) => mkPatch({ parG: v }, 'Saved. Par is ' + amountText(ing0, v) + '. After you erase tickets and records and keep settings, opening stock starts at this amount.', parMeta), onSaved: (t) => status.ok(t),
     });
     const thr = numField({
       label: 'Sold out at', aria: 'Sold out at, ' + nm, value: ing0.thresholdG, min: 0, max: 1e7, step: pieces ? 1 : 50, big: pieces ? 10 : 500, unit: pieces ? 'pieces' : 'g', meta: thrMeta,
-      read: pieces ? null : (u) => U.weightText(u), hint: 'Dishes that use this are marked sold out at or below this amount.',
+      read: pieces ? null : (u) => ((SB.office && SB.office.weightText) || U.weightText)(u), hint: 'Dishes that use this are marked sold out at or below this amount.',
       // The 86 point saves the same way.
       save: (v) => mkPatch({ thresholdG: v }, 'Saved. Items using ' + lower1(nm) + ' go 86 at ' + amountText(ing0, v) + ' or less.', thrMeta), onSaved: (t) => status.ok(t),
     });
@@ -36062,7 +36118,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       pull = numField({
         label: 'Amount per take-out', aria: 'Amount per take-out of ' + nm, value: ing0.pullG || 1000, min: 50, max: 50000, step: 100, big: 500, unit: 'g', meta: pullMeta,
         // Shows the pull size in kilograms next to the field once it reaches a kilogram.
-        read: (u) => U.weightText(u),
+        read: (u) => ((SB.office && SB.office.weightText) || U.weightText)(u),
         hint: 'What one tap on Pull takes out of the cabinet: one whole brisket, one rack, one pan.',
         // The pull size saves through the engine like the other fields.
         save: (v) => mkPatch({ pullG: v }, 'Saved. One tap on Pull takes ' + amountText(ing0, v) + ' out of the cabinet.', pullMeta), onSaved: (t) => status.ok(t),
@@ -36500,7 +36556,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
 
   // Panel 7: themes, text size, sound and service hours.
   function buildLook(P) {
-    const pn = panel(SECTIONS[6], 'Display choices are remembered on this device only. The floor and the back office have their own light and dark themes.');
+    const pn = panel(SECTIONS[6], 'Display choices are remembered on this device only.');
     // Builds the two options of a two-way switch, and one labelled switch with its hint.
     const themeOpts = (a, b) => [{ id: a[0], label: a[1] }, { id: b[0], label: b[1] }];
     const mkSeg = (label, hint, opts, get, set) => {
@@ -36514,8 +36570,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     // Saves a unit choice (temperature or weight) in the settings and redraws the back office numbers.
     const saveUnit = (key, v) => { const r = send('updateSettings', { patch: { ui: { [key]: v } } }); if (good(r)) { try { if (SB.office && SB.office.refresh) SB.office.refresh(); } catch (e) { /* the next refresh catches up */ } } };
     const segs = [
-      mkSeg('Back office theme', 'Ember is dark and warm, Paper is light. This page and every chart follow it.', themeOpts(['ember', 'Ember'], ['paper', 'Paper']), () => SB.theme.office(), (v) => SB.theme.setOffice(v)),
-      mkSeg('Line theme', 'Day is the anti-glare parchment for bright kitchens, Night is for a dim prep corner.', themeOpts(['day', 'Day'], ['night', 'Night']), () => SB.theme.get(), (v) => SB.theme.set(v)),
+      mkSeg('Day or Night', 'Day is the light, anti-glare look for bright kitchens, Night is dark for a dim prep corner. The board, these pages and every chart follow it.', themeOpts(['day', 'Day'], ['night', 'Night']), () => SB.theme.get(), (v) => SB.theme.set(v)),
       mkSeg('Text size', 'Large makes all text about 20% bigger on the line and in the back office.', themeOpts(['normal', 'Normal'], ['large', 'Large']), () => SB.theme.textSize(), (v) => SB.theme.setTextSize(v)),
       mkSeg('Temperatures', 'Shows temperatures in Fahrenheit or Celsius. The limits on the Food safety page are always entered in °F.', themeOpts(['F', '°F'], ['C', '°C']), () => ((cur() || {}).settings.ui || {}).tempUnit || 'F', (v) => saveUnit('tempUnit', v)),
       mkSeg('Weights', 'Shows food weights in kilograms and grams, or in pounds and ounces. Amounts you type on the Ingredients page are still in grams.', themeOpts(['kg', 'kg and g'], ['lb', 'lb and oz']), () => ((cur() || {}).settings.ui || {}).weightUnit || 'kg', (v) => saveUnit('weightUnit', v)),
@@ -36898,7 +36953,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
         h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
         h('li', null, 'On the new device: copy the same smokebox.html file onto it and open it. Install it as an app (Share, then Add to Home Screen, or Install app).'),
         h('li', null, 'Run Menu, then Set up this tablet. Sound, screen-on and loudness are per device and are redone here.'),
-        h('li', null, 'Open Back office, then Menu and settings, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.'),
+        h('li', null, 'Open Back office, then Menu, prices and shop, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.'),
         h('li', null, 'Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.')),
       h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
 
@@ -37248,7 +37303,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       const keeping = st.persistent !== false && st.lastSaveOk !== false;
       const n = starterCount(s);
       headline.textContent = (keeping ? 'Your settings are saved on this device.' : 'This browser is not keeping your changes, so they will be lost when you close the page. Allow site data for this page.') + ' ' +
-        (n.total ? n.total + ' starter ' + U.plural(n.total, 'estimate is', 'estimates are') + ' not confirmed yet.' : 'Every prep time and yield is confirmed.');
+        (n.total ? n.total + ' ' + U.plural(n.total, 'starter estimate is still a guess', 'starter estimates are still guesses') + ', not confirmed yet.' : s.menu.some((m) => !m.archived) ? 'Every prep time and yield is confirmed.' : '');
       headline.dataset.tone = keeping ? 'ok' : 'bad';
       headSub.textContent = n.total ? n.prep + ' prep ' + U.plural(n.prep, 'time') + ' and ' + n.yld + ' cooked ' + U.plural(n.yld, 'yield') + '. Starter estimates are fine to run on; confirm each one when you have timed or weighed it.' : '';
       showBtn.hidden = !n.prep;
@@ -37357,7 +37412,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   }
 
   SB.dataPage = { saveFile, inspectBackup, backupReason, starterCount, version: 1 };
-  if (SB.office && typeof SB.office.registerPage === 'function') SB.office.registerPage('data', { title: 'Menu and settings', icon: 'sliders', order: 7, render });
+  if (SB.office && typeof SB.office.registerPage === 'function') SB.office.registerPage('data', { title: 'Menu, prices and shop', icon: 'sliders', order: 7, render });
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 84-office-data.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'84-office-data.js',message:String(e&&e.message||e)});}
@@ -37910,7 +37965,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     b = b || {};
     const name = b.name ? String(b.name).toLowerCase() : 'cooked food';
     if (!isNum(b.onHandG) || b.onHandG <= 0) return { tone: 'bad', text: 'No ' + name + ' is ready to serve right now.' };
-    const kg = (U.weightText || U.fmtG)(b.onHandG) + ' on hand. ';
+    const kg = (O.weightText || U.weightText || U.fmtG)(b.onHandG) + ' on hand. ';
     if (isNum(b.shortfallAt) && b.shortfallAt > now) return { tone: 'warn', text: kg + 'At the current pace it runs out around ' + U.fmtTime(b.shortfallAt) + ' (an estimate from the last 2 hours of sales).' };
     if (b.rateKnown) return { tone: 'good', text: kg + 'At the current pace it should last until close (an estimate from the last 2 hours of sales).' };
     return { tone: 'info', text: kg + 'Not enough sales yet to estimate when it runs out.' };
@@ -38179,7 +38234,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       if (cookAheadOn() && m.leftovers.count > 0) {
         const headId = U.uid('cdleft');
         const sec = h('section', { class: 'cd-sec', role: 'radiogroup', 'aria-labelledby': headId }, h('h3', { id: headId }, 'Food still in the cabinet'),
-          h('p', { class: 'cd-note' }, m.leftovers.count + ' ' + U.plural(m.leftovers.count, 'batch', 'batches') + ', ' + U.weightText(m.leftovers.g) + ' in all. What should happen to it?'));
+          h('p', { class: 'cd-note' }, m.leftovers.count + ' ' + U.plural(m.leftovers.count, 'batch', 'batches') + ', ' + (O.weightText || U.weightText)(m.leftovers.g) + ' in all. What should happen to it?'));
         // One radio choice for what to do with the leftover food.
         const mk = (id, label, note) => {
           const input = h('input', { type: 'radio', name: 'cd-left', value: id, checked: leftovers === id });
@@ -38196,7 +38251,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       // True when closing will also throw out the food still in the cabinet.
       const throwing = () => cookAheadOn() && m.leftovers.count > 0 && leftovers === 'discard';
       // Names the food on the button when it will be thrown out, else the plain label.
-      setGoLabel = () => { go.textContent = throwing() ? 'Close the day and throw out ' + U.weightText(m.leftovers.g) : 'Close the day'; };
+      setGoLabel = () => { go.textContent = throwing() ? 'Close the day and throw out ' + (O.weightText || U.weightText)(m.leftovers.g) : 'Close the day'; };
       setGoLabel();
       go.addEventListener('click', () => {
         go.disabled = true;
@@ -38301,15 +38356,15 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
   function backupNow(status) {
     let text = null;
     try { text = SB.store.exportAll(); } catch (e) { text = null; }
-    if (text == null) { status.textContent = 'A backup could not be made. Nothing was saved. Open Menu and settings, then Data, to try again.'; return; }
+    if (text == null) { status.textContent = 'A backup could not be made. Nothing was saved. Open Menu, prices and shop, then Data, to try again.'; return; }
     const fname = 'smokebox-backup-' + U.dateKey(Date.now()) + '.json';
     try {
       const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
       const a = h('a', { href: url, download: fname }); document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 4000);
-      status.textContent = 'Download started: ' + fname + '. If nothing arrives, your browser may be blocking downloads: use Menu and settings, then Data, then Copy backup.';
+      status.textContent = 'Download started: ' + fname + '. If nothing arrives, your browser may be blocking downloads: use Menu, prices and shop, then Data, then Copy backup.';
       try { if (SB.shell && SB.shell.noteBackup) SB.shell.noteBackup(); } catch (e) { /* the reminder is optional */ }
-    } catch (e) { status.textContent = 'Your browser blocked the download. Use Menu and settings, then Data, then Copy backup.'; }
+    } catch (e) { status.textContent = 'Your browser blocked the download. Use Menu, prices and shop, then Data, then Copy backup.'; }
   }
 
   // ---- 3. Printing ----
@@ -38334,7 +38389,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
         ...m.methods.filter((x) => x.count > 0).map((x) => prow('  Paid with ' + x.name.toLowerCase(), x.count + ' ' + U.plural(x.count, 'order') + ', ' + money(x.collected))),
         prow('Cash payments today', money(m.cashExpected) + ' (add your starting cash to count the drawer)'),
         prow('Orders voided', String(m.voidedOrders)), prow('Tickets voided', String(m.voidedTickets)),
-        prow('Food thrown out', (thrown.count || 0) + ' ' + U.plural(thrown.count || 0, 'batch', 'batches') + ', ' + U.weightText(thrown.g || 0) + (thrown.cost > 0 ? ', about ' + money(thrown.cost) + ' (only items with a recorded cost)' : '')))),
+        prow('Food thrown out', (thrown.count || 0) + ' ' + U.plural(thrown.count || 0, 'batch', 'batches') + ', ' + (O.weightText || U.weightText)(thrown.g || 0) + (thrown.cost > 0 ? ', about ' + money(thrown.cost) + ' (only items with a recorded cost)' : '')))),
       h('p', { class: 'cd-pnote' }, 'Printed ' + U.fmtDateShort(U.dateKey(Date.now())) + ' ' + U.fmtTime(Date.now()) + '. Counter: ______   Checked by: ______'));
     document.body.appendChild(root);
     // Removes the print-only block once the print dialog is done (or at once when printing is not available).
@@ -38618,13 +38673,13 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
     switch (e.type) {
       case 'temp_logged': return (isNum(e.f) ? U.tempText(e.f) : '') + (lateWords(e) ? ', ' + lateWords(e) : '');
       case 'batch_reheat': return isNum(e.f) ? 'Reached ' + U.tempText(e.f) : '';
-      case 'batch_discard': return (isNum(e.g) ? U.weightText(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
+      case 'batch_discard': return (isNum(e.g) ? (O.weightText || U.weightText)(e.g) : '') + (REASON[e.reason] ? ', ' + REASON[e.reason].toLowerCase() : '') + (isNum(e.cost) && e.cost > 0 ? ', about ' + U.fmtMoney(e.cost, 2) : '') + (e.note ? ', ' + e.note : '');
       case 'safety_setting_changed': return changeLine(e);
       case 'month_closed': return 'Saved ' + (isNum(e.days) ? e.days + ' ' + (e.days === 1 ? 'day' : 'days') : 'old days') + ' before ' + (e.before ? U.fmtDateShort(e.before) : 'a set date') + ' to a backup and cleared them from this tablet' + (isNum(e.tickets) ? ' (' + e.tickets + ' tickets, ' + (isNum(e.orders) ? e.orders : 0) + ' orders)' : '');
       case 'equip_temp': return (UNIT[e.unit] || 'Equipment') + (e.label ? ' (' + e.label + ')' : '') + (isNum(e.f) ? ', ' + U.tempText(e.f) : '') + (e.outOfRange && isNum(e.maxF) ? ', above ' + U.tempText(e.maxF) : '');
       case 'thermometer_checked': return (isNum(e.f) ? 'Read ' + U.tempText(e.f) : '') + (METHOD[e.method] ? ' in ' + METHOD[e.method] : '') + (e.outOfRange && isNum(e.expectF) ? ', should read ' + U.tempText(e.expectF) : '');
       case 'batch_out': case 'batch_back': return isNum(e.outMs) ? spanWords(e.outMs) + ' out of the fridge so far' : '';
-      case 'cooling_started': return isNum(e.g) ? U.weightText(e.g) : '';
+      case 'cooling_started': return isNum(e.g) ? (O.weightText || U.weightText)(e.g) : '';
       case 'sanitize_done': return [lateWords(e), isNum(e.ppm) ? 'strip ' + e.ppm + ' ppm' : '', e.product || '', e.where ? 'at ' + e.where : ''].filter(Boolean).join(', ');
       case 'quality_extend': return isNum(e.until) ? 'Until ' + U.fmtTime(e.until) : '';
       default: return e.note || '';
@@ -38936,7 +38991,7 @@ window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
       SB.ui.toast('Smokebox could not read some saved records and left out ' + bits.join(', ') + ' while opening. The data as it was has been kept on this device. Ask whoever set up Smokebox to look at it before you close the page for good.', { tone: 'warn', ms: 20000 });
     }
     else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox updated a few saved settings while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
-    if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
+    if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu, prices and shop, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }
 
   // A real kitchen that still holds tickets made by an old in-place demo gets them removed at once: they are fake by
