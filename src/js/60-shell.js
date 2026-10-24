@@ -260,11 +260,17 @@
   let idx = 0, routerReady = false, pendingBacks = 0, flushTimer = 0, officePushed = false, officeEntry = null;
   const listeners = [], overlayStack = [], queued = [];
 
+  // True once the order page was opened from the board's Front counter button in this session: going back and forth
+  // to #/new after that is a visit, and never pins the tablet to order entry.
+  // The flag also lives in this browser tab's session storage, so reloading the order page during a visit does not pin.
+  const VISIT_KEY = 'smokebox.v1.countervisit';
+  let counterVisit = (() => { try { return g.sessionStorage.getItem(VISIT_KEY) === '1'; } catch (e) { return false; } })();
   // Remembers the last station viewed (memory and notebook) so a pinned tablet reopens on it.
-  // Also pins the device role when a role screen (#/kitchen, #/new) is opened.
+  // Also pins the device role when a role screen (#/kitchen, #/new) is opened, unless it is a Front counter visit.
   const rememberZone = (v) => {
     if (v.kind === 'floor') { lastZone = v.zone; if (U) U.storage.set(KEY.zone, v.zone); }
     const r = roleOfView(v);
+    if (r === 'front' && counterVisit) return;
     if (r && r !== role) { role = r; if (U) U.storage.set(KEY.role, r); }
   };
   // Our history number from the current history entry, or null if it has none. Never throws.
@@ -361,10 +367,12 @@
   R.onChange = function (fn) { listeners.push(fn); return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; };
   R.hashFor = hashFor; R.viewFor = viewFor;
   // Moves to a view (object or hash text). The same view again does nothing, so history never grows by
-  // repeating yourself. {replace:true} rewrites the current entry instead of adding one.
+  // repeating yourself. {replace:true} rewrites the current entry instead of adding one. {visit:true} opens the
+  // order page without pinning the device role to it (the board's Front counter button).
   // WATCH OUT: listeners hear at once, but the history write may wait behind a Back jump.
   R.go = function (view, o) {
     if (!routerReady) R.init();
+    if (o && o.visit) { counterVisit = true; try { g.sessionStorage.setItem(VISIT_KEY, '1'); } catch (e) { /* this tab only */ } }
     const v = normView(view), hsh = hashFor(v), replace = !!(o && o.replace);
     if (hsh === hashFor(current)) return R.view();
     const prev = current;
