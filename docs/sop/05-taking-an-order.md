@@ -8,7 +8,7 @@ Tap **New ticket**. Tap a dish to add it. Tap it again to add one more. A dish m
 
 ## Customer and order type
 
-Type a name or tap a quick name. Leave it blank for Walk-up. Choose how the order came in: Dine-in, Takeout, Drive-thru or Delivery app. Each type has its own time limit before a ticket turns amber and then red.
+Under **New or open order**, keep **New order**. Under **Customer**, type a name in the **Customer name** box or tap a quick name. Leave it blank for Walk-up. Choose how the order came in: Dine-in, Takeout, Drive-thru or Delivery app. Each type has its own time limit before a ticket turns amber and then red.
 
 ## Allergies and notes
 

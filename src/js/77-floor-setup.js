@@ -1563,7 +1563,7 @@
     { min: 2, what: 'Name stations and menu sections', how: 'Use their words. Hide stations they do not have (Change stations).' },
     { min: 1, what: 'Cook-ahead question', how: 'Ask whether they cook some dishes ahead. Answer Yes, No or Not sure; it can be changed later.' },
     { min: 2, what: 'One test ticket', how: 'New ticket, add two dishes, send it, then bump it. Watch that the right station sees it.' },
-    { min: 1, what: 'Backup and who to call', how: 'Show where to save a backup (Settings, Data). Leave a phone number.' }
+    { min: 1, what: 'Backup and who to call', how: 'Show where to save a backup (Back office, Menu and settings, Data). Leave a phone number.' }
   ];
   // Adds up the minutes of all the visit steps.
   function pilotMinutes() { return PILOT_STEPS.reduce((n, s) => n + s.min, 0); }
