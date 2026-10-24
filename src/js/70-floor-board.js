@@ -303,6 +303,7 @@
   // Stops any phrase being spoken now (sound or speech switched off, or another tab took over the sound).
   function hush() {
     try { if (g.speechSynthesis) g.speechSynthesis.cancel(); } catch (e) { /* speech is optional */ }
+    if (SB.natVoice) SB.natVoice.stop();
     lastUtter = null; voiceFreeAt = 0;
   }
   // When the tablet's voice is expected to be free again (browser clock, ms). A call-out waits for it, so it never talks
@@ -312,6 +313,14 @@
   // being said; a call-out (queued) waits its turn instead and never cuts anything off.
   function speak(text, queued, kind) {
     if (!audible() || !speech) return false;
+    // The natural voice from the kitchen server, when it is on and this line is ready; otherwise the device voice below.
+    const NV = SB.natVoice;
+    if (NV && NV.enabled()) {
+      if (!queued) { try { if (g.speechSynthesis) g.speechSynthesis.cancel(); } catch (e) { /* speech is optional */ } }
+      const ms = NV.play(text, volume);
+      if (ms) { voiceFreeAt = performance.now() + ms + 250; return true; }
+      NV.prefetch(text, true);
+    }
     try {
       const ss = g.speechSynthesis, U2 = g.SpeechSynthesisUtterance;
       if (!ss || !U2) return false;
@@ -332,6 +341,17 @@
       return true;
     } catch (e) { return false; /* speech is optional */ }
   }
+  // Once a minute, asks the kitchen server for the call pieces that will surely come: "Fire <dish> now!" for every dish on
+  // the menu, and "Ticket <n>!" and "Order up!" lines for the next 10 ticket numbers. The server keeps them, so after the first
+  // day every call plays at once in the natural voice.
+  function warmVoice(now) {
+    if (m.warmAt && now - m.warmAt < 60000 && now >= m.warmAt) return;
+    m.warmAt = now;
+    const S = store().getState(), D = SB.deadlines, NV = SB.natVoice;
+    const next = S.tickets.reduce((n, t) => Math.max(n, t.num || 0), 100) + 1;
+    for (const mi of S.menu) if (!mi.archived) NV.prefetch(D.phrase('start', { name: mi.short || mi.name, num: next }));
+    for (let k = 0; k < 10; k++) NV.prefetch(D.phrase('new_all', { num: next + k, count: 1 }) + ' ' + D.phrase('ready', { num: next + k }));
+  }
   // Speaks the next waiting call-out when the voice is free. Called every second from the header update.
   // WATCH OUT: with call-outs, sound or speech off, or when this tab is not the sound leader, nothing is queued, so
   // nothing old is read out when they come back on.
@@ -344,9 +364,20 @@
     const wants = D.calloutWants(store().getState(), now, m.zone, voiceLevel);
     if (!m.coPrimed || !audible() || !speech) { m.co.prime(wants); m.coPrimed = audible() && speech; return; }
     m.co.sync(wants, now);
+    const NV = SB.natVoice, nat = !!(NV && NV.enabled());
+    // The natural voice is made on the server, so the calls of the next 30 seconds are fetched now, before they are due.
+    if (nat) { for (const w of wants) NV.prefetch(w.text, true); for (const w of D.calloutWants(store().getState(), now + 30000, m.zone, voiceLevel)) NV.prefetch(w.text); warmVoice(now); }
     if (performance.now() < voiceFreeAt) return;
+    // A call whose natural audio is still being made waits for it up to 4 seconds, then the device voice says it.
+    if (m.coHeld) {
+      const hc = m.coHeld;
+      if (!nat || NV.ready(hc.text) || performance.now() - hc.since > 4000) { m.coHeld = null; speak(hc.text, true, hc.style); }
+      return;
+    }
     const c = m.co.next(now);
-    if (c) speak(c.text, true, c.style);
+    if (!c) return;
+    if (nat && !NV.ready(c.text)) { NV.prefetch(c.text, true); m.coHeld = { text: c.text, style: c.style, since: performance.now() }; return; }
+    speak(c.text, true, c.style);
   }
   // Plays the loud warning for the last minutes: three pairs of high and low notes, much louder than the chime.
   function alarmTone() {
@@ -546,6 +577,9 @@
   };
   // Which voice would speak a call on this tablet: { supported, name, lang, local } (name empty when only the default voice is there).
   F.voiceInfo = function () {
+    // The natural voice from the kitchen server, when it is the one speaking on this device.
+    const NV = SB.natVoice, nv = NV && NV.enabled() ? NV.current() : null;
+    if (nv) return { supported: true, name: (NV.list()[nv] || nv) + ', natural voice from the kitchen server', lang: 'en', local: true, natural: true };
     const ss = g.speechSynthesis;
     if (!ss || !g.SpeechSynthesisUtterance) return { supported: false };
     let info = null;
@@ -558,7 +592,15 @@
     if (!speech) F.setSpeech(true);
     hookAudioUnlock();
     resumeAudio();
-    playHere(() => speak(SB.deadlines.phrase('new_all', { num: 12, count: 3 }), false, 'new_all'));
+    const line = SB.deadlines.phrase('new_all', { num: 12, count: 3 }), NV = SB.natVoice;
+    // The natural voice's test line is made on the server first (a second or two), then played.
+    if (NV && NV.enabled() && !NV.ready(line)) {
+      NV.prefetch(line);
+      let n = 0;
+      const t = setInterval(() => { if (NV.ready(line) || ++n > 40) { clearInterval(t); playHere(() => speak(line, false, 'new_all')); } }, 200);
+      return F.voiceInfo();
+    }
+    playHere(() => speak(line, false, 'new_all'));
     return F.voiceInfo();
   };
   // Whether this tablet can make sound right now: running, suspended (needs a tap), unsupported or off.
@@ -580,6 +622,8 @@
   F.mount = function (el) {
     if (m) F.unmount();
     if (!el) return;
+    // The natural voice plays through the board's audio, which the first tap on the screen unlocks.
+    if (SB.natVoice) SB.natVoice.setContext(() => resumeAudio());
     // A half-loaded build shows a plain message instead of a blank screen.
     if (!SB.store || !SB.ui || !SB.icons) {
       U.clear(el);

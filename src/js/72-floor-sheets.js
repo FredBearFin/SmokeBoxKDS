@@ -2188,9 +2188,15 @@
       const en = all.filter((v) => /^en/i.test(String(v.lang || '').replace('_', '-')));
       const cur = U.storage.get('smokebox.v1.voicename', '');
       U.clear(voiceSel);
-      voiceSel.append(h('option', { value: '' }, 'Automatic (best on this device)'), ...en.map((v) => h('option', { value: v.name }, v.name + (v.localService === false ? ' (needs internet)' : ''))));
-      voiceSel.value = en.some((v) => v.name === cur) ? cur : '';
+      // The natural voices from the kitchen server come first (British Emma is the automatic choice when the server has them).
+      const NV = SB.natVoice, nat = NV ? NV.list() : {}, natIds = Object.keys(nat);
+      const natGroup = natIds.length ? h('optgroup', { label: 'Natural voices (kitchen server)' }, ...natIds.map((id) => h('option', { value: NV.choice(id) }, nat[id]))) : null;
+      const devGroup = h('optgroup', { label: 'Voices on this device' }, ...en.map((v) => h('option', { value: v.name }, v.name + (v.localService === false ? ' (needs internet)' : ''))));
+      voiceSel.append(h('option', { value: '' }, natIds.length ? 'Automatic (Emma, natural British voice)' : 'Automatic (best on this device)'), ...(natGroup ? [natGroup] : []), devGroup);
+      voiceSel.value = en.some((v) => v.name === cur) || (cur.indexOf('k:') === 0 && natIds.indexOf(cur.slice(2)) >= 0) ? cur : '';
     }
+    // The server's voice list arrives a moment after Settings opens, so the list is filled again then.
+    if (SB.natVoice) { SB.natVoice.refresh(); const nvT = setTimeout(fillVoices, 1500); offs.push(() => clearTimeout(nvT)); }
     fillVoices();
     if (g.speechSynthesis && typeof g.speechSynthesis.addEventListener === 'function') { g.speechSynthesis.addEventListener('voiceschanged', fillVoices); offs.push(() => g.speechSynthesis.removeEventListener('voiceschanged', fillVoices)); }
     voiceSel.addEventListener('change', () => {

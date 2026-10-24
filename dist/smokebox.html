@@ -4562,7 +4562,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "6f885a6" };
+window.SB_BUILD = { version: "0.2.0", id: "a8be834" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -11679,6 +11679,113 @@ window.SB_BUILD = { version: "0.2.0", id: "6f885a6" };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 25-deadlines.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'25-deadlines.js',message:String(e&&e.message||e)});}
+
+/* ===== 27-natvoice.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: SB.natVoice, the natural kitchen voice on the tablet side. When the page comes from the kitchen
+ *    server and the server's voice is on (server/voice.mjs), call-outs are played in a human-sounding voice (British
+ *    Emma by default) instead of the device's robot voice. Lines are fetched before they are due and kept, so a call is
+ *    not late; anything that is not ready in time, or a tablet without the server, uses the device voice as before.
+ * PARTS: which voice, is the server's voice on, fetch ahead, play, stop.
+ * USES: fetch and Web Audio (the board's audio context, handed in with setContext). USED BY: 70-floor-board.js
+ *    (speak, call-outs), 72-floor-sheets.js (the voice chooser in Settings).
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util;
+  const KEY = 'smokebox.v1.voicename';
+  // Voice ids from the server start with this mark in the saved choice ("k:bf_emma"); anything else is a device voice name.
+  const MARK = 'k:';
+  const DEFAULT = 'bf_emma';
+  const MAX_KEEP = 150;
+  const st = { on: false, list: {}, checkedAt: 0, getCtx: null, lines: new Map(), playing: null };
+
+  // True when the page was served by a kitchen server (not opened as a file), the only case with a server voice.
+  const served = () => { try { return /^https?:$/.test(g.location.protocol); } catch (e) { return false; } };
+  // Asks the server whether its voice is on and which voices it has; again every minute while it is off.
+  function check() {
+    if (!served() || typeof g.fetch !== 'function' || Date.now() - st.checkedAt < 60000) return;
+    st.checkedAt = Date.now();
+    g.fetch('/api/voices', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      const was = st.on;
+      st.on = !!(d && d.ready); st.list = d && d.voices ? d.voices : {};
+      if (st.on && !was) st.checkedAt = Date.now() + 3600e3; // on: no need to ask again for an hour
+    }, () => {});
+  }
+
+  // The server voice chosen on this device: its id, or null when the owner picked a device voice or it is not on.
+  function voice() {
+    if (!st.on) return null;
+    let v = '';
+    try { v = String(U.storage.get(KEY, '') || ''); } catch (e) { v = ''; }
+    if (!v) return st.list[DEFAULT] ? DEFAULT : null;
+    if (v.indexOf(MARK) !== 0) return null;
+    const id = v.slice(MARK.length);
+    return st.list[id] ? id : (st.list[DEFAULT] ? DEFAULT : null);
+  }
+  // A call split into its sentences ("Fire French fries now!", "Ticket one hundred one!"). Each sentence is made and kept on
+  // its own, so the pieces that repeat all day (a dish, a ticket number) are ready long before a call needs them.
+  const parts = (text) => (String(text || '').match(/[^!?.]+[!?.]*/g) || []).map((x) => x.trim()).filter(Boolean);
+  // Fetches a call ahead of time, one sentence at a time, each only once.
+  function prefetch(text, urgent) { for (const p of parts(text)) fetchPart(p, urgent); }
+  // Fetches one sentence in the chosen voice and decodes it, once per sentence. urgent: the call is due now, so the server
+  // makes it before the pieces fetched ahead of time.
+  function fetchPart(text, urgent) {
+    const v = voice(), ctx = st.getCtx && st.getCtx();
+    if (!v || !ctx || !text) return;
+    const key = v + '|' + text;
+    const have = st.lines.get(key);
+    // Already asked for: only a call that became due asks again, marked urgent, so the server moves it to the front.
+    if (have && (have.buf || !urgent || have.urgent)) return;
+    const line = have || { buf: null };
+    line.urgent = line.urgent || !!urgent;
+    if (!have) { st.lines.set(key, line); if (st.lines.size > MAX_KEEP) st.lines.delete(st.lines.keys().next().value); }
+    g.fetch('/api/voice?v=' + encodeURIComponent(v) + (urgent ? '&p=1' : '') + '&t=' + encodeURIComponent(text), { credentials: 'same-origin' })
+      .then((r) => { if (!r.ok) throw new Error('voice ' + r.status); return r.arrayBuffer(); })
+      .then((ab) => new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)))
+      .then((buf) => { if (!line.buf) line.buf = buf; }, () => { if (!line.buf && st.lines.get(key) === line) st.lines.delete(key); });
+  }
+  // The decoded sound of one sentence in the chosen voice, or null when it is not ready.
+  const bufOf = (text) => { const v = voice(), l = v && st.lines.get(v + '|' + text); return l && l.buf ? l.buf : null; };
+  // True when every sentence of the call is ready to play at once.
+  function ready(text) { const ps = parts(text); return ps.length > 0 && ps.every((p) => !!bufOf(p)); }
+  // Plays a ready call, its sentences back to back, at the given loudness (0 to 1); returns how long it lasts in ms, or 0
+  // when any sentence is not ready yet.
+  function play(text, volume) {
+    const ctx = st.getCtx && st.getCtx(), bufs = parts(text).map(bufOf);
+    if (!ctx || !bufs.length || bufs.some((b) => !b)) return 0;
+    try {
+      stop();
+      const gain = ctx.createGain();
+      gain.gain.value = typeof volume === 'number' ? Math.max(0, Math.min(1, volume)) : 1;
+      gain.connect(ctx.destination);
+      let at = ctx.currentTime + 0.02;
+      st.playing = bufs.map((b) => { const src = ctx.createBufferSource(); src.buffer = b; src.connect(gain); src.start(at); at += b.duration + 0.08; return src; });
+      return Math.round((at - ctx.currentTime) * 1000);
+    } catch (e) { return 0; }
+  }
+  // Stops the call being played now, if any.
+  function stop() { if (st.playing) { for (const s of st.playing) { try { s.stop(); } catch (e) { /* already ended */ } } st.playing = null; } }
+
+  SB.natVoice = {
+    // Hands in the board's audio context getter (it is unlocked by the first tap), then checks the server.
+    setContext(fn) { st.getCtx = fn; check(); },
+    // True when the natural voice will be used for call-outs on this device.
+    enabled: () => { check(); return !!voice(); },
+    // The server's voices as { id: 'Emma (British)' }, empty when it has none or is not on.
+    list: () => (st.on ? st.list : {}),
+    // The saved-choice value for a server voice id, for the voice chooser.
+    choice: (id) => MARK + id,
+    current: () => voice(),
+    prefetch, ready, play, stop,
+    // Asks the server again now (Settings opened, or a reconnect).
+    refresh() { st.checkedAt = 0; check(); },
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 27-natvoice.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'27-natvoice.js',message:String(e&&e.message||e)});}
 
 /* ===== 30-store.js ===== */
 ;try{
@@ -21898,6 +22005,7 @@ window.SB_BUILD = { version: "0.2.0", id: "6f885a6" };
   // Stops any phrase being spoken now (sound or speech switched off, or another tab took over the sound).
   function hush() {
     try { if (g.speechSynthesis) g.speechSynthesis.cancel(); } catch (e) { /* speech is optional */ }
+    if (SB.natVoice) SB.natVoice.stop();
     lastUtter = null; voiceFreeAt = 0;
   }
   // When the tablet's voice is expected to be free again (browser clock, ms). A call-out waits for it, so it never talks
@@ -21907,6 +22015,14 @@ window.SB_BUILD = { version: "0.2.0", id: "6f885a6" };
   // being said; a call-out (queued) waits its turn instead and never cuts anything off.
   function speak(text, queued, kind) {
     if (!audible() || !speech) return false;
+    // The natural voice from the kitchen server, when it is on and this line is ready; otherwise the device voice below.
+    const NV = SB.natVoice;
+    if (NV && NV.enabled()) {
+      if (!queued) { try { if (g.speechSynthesis) g.speechSynthesis.cancel(); } catch (e) { /* speech is optional */ } }
+      const ms = NV.play(text, volume);
+      if (ms) { voiceFreeAt = performance.now() + ms + 250; return true; }
+      NV.prefetch(text, true);
+    }
     try {
       const ss = g.speechSynthesis, U2 = g.SpeechSynthesisUtterance;
       if (!ss || !U2) return false;
@@ -21927,6 +22043,17 @@ window.SB_BUILD = { version: "0.2.0", id: "6f885a6" };
       return true;
     } catch (e) { return false; /* speech is optional */ }
   }
+  // Once a minute, asks the kitchen server for the call pieces that will surely come: "Fire <dish> now!" for every dish on
+  // the menu, and "Ticket <n>!" and "Order up!" lines for the next 10 ticket numbers. The server keeps them, so after the first
+  // day every call plays at once in the natural voice.
+  function warmVoice(now) {
+    if (m.warmAt && now - m.warmAt < 60000 && now >= m.warmAt) return;
+    m.warmAt = now;
+    const S = store().getState(), D = SB.deadlines, NV = SB.natVoice;
+    const next = S.tickets.reduce((n, t) => Math.max(n, t.num || 0), 100) + 1;
+    for (const mi of S.menu) if (!mi.archived) NV.prefetch(D.phrase('start', { name: mi.short || mi.name, num: next }));
+    for (let k = 0; k < 10; k++) NV.prefetch(D.phrase('new_all', { num: next + k, count: 1 }) + ' ' + D.phrase('ready', { num: next + k }));
+  }
   // Speaks the next waiting call-out when the voice is free. Called every second from the header update.
   // WATCH OUT: with call-outs, sound or speech off, or when this tab is not the sound leader, nothing is queued, so
   // nothing old is read out when they come back on.
@@ -21939,9 +22066,20 @@ window.SB_BUILD = { version: "0.2.0", id: "6f885a6" };
     const wants = D.calloutWants(store().getState(), now, m.zone, voiceLevel);
     if (!m.coPrimed || !audible() || !speech) { m.co.prime(wants); m.coPrimed = audible() && speech; return; }
     m.co.sync(wants, now);
+    const NV = SB.natVoice, nat = !!(NV && NV.enabled());
+    // The natural voice is made on the server, so the calls of the next 30 seconds are fetched now, before they are due.
+    if (nat) { for (const w of wants) NV.prefetch(w.text, true); for (const w of D.calloutWants(store().getState(), now + 30000, m.zone, voiceLevel)) NV.prefetch(w.text); warmVoice(now); }
     if (performance.now() < voiceFreeAt) return;
+    // A call whose natural audio is still being made waits for it up to 4 seconds, then the device voice says it.
+    if (m.coHeld) {
+      const hc = m.coHeld;
+      if (!nat || NV.ready(hc.text) || performance.now() - hc.since > 4000) { m.coHeld = null; speak(hc.text, true, hc.style); }
+      return;
+    }
     const c = m.co.next(now);
-    if (c) speak(c.text, true, c.style);
+    if (!c) return;
+    if (nat && !NV.ready(c.text)) { NV.prefetch(c.text, true); m.coHeld = { text: c.text, style: c.style, since: performance.now() }; return; }
+    speak(c.text, true, c.style);
   }
   // Plays the loud warning for the last minutes: three pairs of high and low notes, much louder than the chime.
   function alarmTone() {
@@ -22141,6 +22279,9 @@ window.SB_BUILD = { version: "0.2.0", id: "6f885a6" };
   };
   // Which voice would speak a call on this tablet: { supported, name, lang, local } (name empty when only the default voice is there).
   F.voiceInfo = function () {
+    // The natural voice from the kitchen server, when it is the one speaking on this device.
+    const NV = SB.natVoice, nv = NV && NV.enabled() ? NV.current() : null;
+    if (nv) return { supported: true, name: (NV.list()[nv] || nv) + ', natural voice from the kitchen server', lang: 'en', local: true, natural: true };
     const ss = g.speechSynthesis;
     if (!ss || !g.SpeechSynthesisUtterance) return { supported: false };
     let info = null;
@@ -22153,7 +22294,15 @@ window.SB_BUILD = { version: "0.2.0", id: "6f885a6" };
     if (!speech) F.setSpeech(true);
     hookAudioUnlock();
     resumeAudio();
-    playHere(() => speak(SB.deadlines.phrase('new_all', { num: 12, count: 3 }), false, 'new_all'));
+    const line = SB.deadlines.phrase('new_all', { num: 12, count: 3 }), NV = SB.natVoice;
+    // The natural voice's test line is made on the server first (a second or two), then played.
+    if (NV && NV.enabled() && !NV.ready(line)) {
+      NV.prefetch(line);
+      let n = 0;
+      const t = setInterval(() => { if (NV.ready(line) || ++n > 40) { clearInterval(t); playHere(() => speak(line, false, 'new_all')); } }, 200);
+      return F.voiceInfo();
+    }
+    playHere(() => speak(line, false, 'new_all'));
     return F.voiceInfo();
   };
   // Whether this tablet can make sound right now: running, suspended (needs a tap), unsupported or off.
@@ -22175,6 +22324,8 @@ window.SB_BUILD = { version: "0.2.0", id: "6f885a6" };
   F.mount = function (el) {
     if (m) F.unmount();
     if (!el) return;
+    // The natural voice plays through the board's audio, which the first tap on the screen unlocks.
+    if (SB.natVoice) SB.natVoice.setContext(() => resumeAudio());
     // A half-loaded build shows a plain message instead of a blank screen.
     if (!SB.store || !SB.ui || !SB.icons) {
       U.clear(el);
@@ -27667,9 +27818,15 @@ window.SB_BUILD = { version: "0.2.0", id: "6f885a6" };
       const en = all.filter((v) => /^en/i.test(String(v.lang || '').replace('_', '-')));
       const cur = U.storage.get('smokebox.v1.voicename', '');
       U.clear(voiceSel);
-      voiceSel.append(h('option', { value: '' }, 'Automatic (best on this device)'), ...en.map((v) => h('option', { value: v.name }, v.name + (v.localService === false ? ' (needs internet)' : ''))));
-      voiceSel.value = en.some((v) => v.name === cur) ? cur : '';
+      // The natural voices from the kitchen server come first (British Emma is the automatic choice when the server has them).
+      const NV = SB.natVoice, nat = NV ? NV.list() : {}, natIds = Object.keys(nat);
+      const natGroup = natIds.length ? h('optgroup', { label: 'Natural voices (kitchen server)' }, ...natIds.map((id) => h('option', { value: NV.choice(id) }, nat[id]))) : null;
+      const devGroup = h('optgroup', { label: 'Voices on this device' }, ...en.map((v) => h('option', { value: v.name }, v.name + (v.localService === false ? ' (needs internet)' : ''))));
+      voiceSel.append(h('option', { value: '' }, natIds.length ? 'Automatic (Emma, natural British voice)' : 'Automatic (best on this device)'), ...(natGroup ? [natGroup] : []), devGroup);
+      voiceSel.value = en.some((v) => v.name === cur) || (cur.indexOf('k:') === 0 && natIds.indexOf(cur.slice(2)) >= 0) ? cur : '';
     }
+    // The server's voice list arrives a moment after Settings opens, so the list is filled again then.
+    if (SB.natVoice) { SB.natVoice.refresh(); const nvT = setTimeout(fillVoices, 1500); offs.push(() => clearTimeout(nvT)); }
     fillVoices();
     if (g.speechSynthesis && typeof g.speechSynthesis.addEventListener === 'function') { g.speechSynthesis.addEventListener('voiceschanged', fillVoices); offs.push(() => g.speechSynthesis.removeEventListener('voiceschanged', fillVoices)); }
     voiceSel.addEventListener('change', () => {
