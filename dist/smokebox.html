@@ -2870,6 +2870,10 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* Close the month: the counts block and the list of files to save. */
 .cm-counts { display: grid; gap: var(--sp-2); } .cm-files { margin: 0; padding-left: var(--sp-5); display: grid; gap: var(--sp-1); overflow-wrap: anywhere; } .cm-files:empty { display: none; }
 
+/* The per-dish "I count what I made" link sits under its own dish as a quiet option, not as a bold heading between dishes. */
+.dp-countfold { margin: -2px 0 var(--sp-3) calc(2 * 44px + 2 * var(--sp-2)); }
+.dp-countfold > summary { min-height: 36px; font-weight: var(--w-regular, 400); font-size: var(--fs-1); color: var(--ink2); text-decoration: underline; text-underline-offset: 3px; }
+
 /* ===== 22-floor-tour.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the "Show me how it works" walkthrough: the pulsing ring and the caption card.
@@ -4469,7 +4473,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "567c417" };
+window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -28727,7 +28731,7 @@ window.SB_BUILD = { version: "0.2.0", id: "567c417" };
         if (!Number.isInteger(n) || n < 0) { tell(msg, 'Type a whole number, like 20.'); return; }
         say(send('setPortions', { menuId: m.id, on: true, count: n }));
       } }, 'Start counting');
-      const fold = h('details', { class: 'dp-fold' }, h('summary', null, h('span', null, 'I count what I made')), h('div', { class: 'fs-row' }, cnt, go, h('span', { class: 'fs-sub' }, 'Sells out when the count reaches zero.')));
+      const fold = h('details', { class: 'dp-fold dp-countfold' }, h('summary', null, h('span', null, 'I count what I made')), h('div', { class: 'fs-row' }, cnt, go, h('span', { class: 'fs-sub' }, 'Sells out when the count reaches zero.')));
       box.append(fold, msg);
       return box;
     }

@@ -208,7 +208,7 @@
         if (!Number.isInteger(n) || n < 0) { tell(msg, 'Type a whole number, like 20.'); return; }
         say(send('setPortions', { menuId: m.id, on: true, count: n }));
       } }, 'Start counting');
-      const fold = h('details', { class: 'dp-fold' }, h('summary', null, h('span', null, 'I count what I made')), h('div', { class: 'fs-row' }, cnt, go, h('span', { class: 'fs-sub' }, 'Sells out when the count reaches zero.')));
+      const fold = h('details', { class: 'dp-fold dp-countfold' }, h('summary', null, h('span', null, 'I count what I made')), h('div', { class: 'fs-row' }, cnt, go, h('span', { class: 'fs-sub' }, 'Sells out when the count reaches zero.')));
       box.append(fold, msg);
       return box;
     }
