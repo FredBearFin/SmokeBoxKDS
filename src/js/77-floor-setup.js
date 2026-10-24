@@ -41,16 +41,16 @@
     const btn = (label, icon, fn) => (status) => h('button', { type: 'button', class: 'btn', onClick: () => runStep(status, fn) }, ico(icon, 20), h('span', null, label));
 
     step('1. Sound', 'Warnings use tones and a spoken voice. Browsers only allow sound after a tap, so test it here. Turn the volume up, or plug in a cheap Bluetooth speaker: a tablet speaker is easy to miss in a loud kitchen.',
-      btn('Play a test warning', 'volume', () => { if (SB.floor && SB.floor.setSound) { SB.floor.setSound(true); if (SB.floor.setSpeech) SB.floor.setSpeech(true); return 'You should have heard a chime and a voice. If not, turn the tablet volume up and tap again.'; } return 'The kitchen board is not loaded.'; }));
+      btn('Play a test warning', 'volume', () => { if (SB.floor && SB.floor.setSound) { SB.floor.setSound(true); if (SB.floor.setSpeech) SB.floor.setSpeech(true); return 'Warning sounds and the spoken voice are now on for this tablet. You should have heard a chime and a voice. If not, turn the tablet volume up and tap again.'; } return 'The kitchen board is not loaded.'; }));
     const wake = SB.floor && SB.floor.wakeLock ? SB.floor.wakeLock() : 'unknown';
     step('2. Keep the screen on', 'The board asks the browser to keep the screen awake' + (wake === 'on' ? ' (it is on now).' : wake === 'unsupported' ? ', but this browser does not support that.' : ', but this browser has not allowed it.') + ' Also set the tablet itself: Settings, Display, Auto-Lock (iPad) or Screen timeout (Android), to Never. Plug the tablet into power.');
     const prot = step('3. Protect your data', 'Everything is saved in this browser only. Ask the browser to keep it safe, and save a backup every day (Menu and settings, then Data). If you cook ahead, save the thrown-out log too.',
-      btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Your browser agreed to keep this data. Still save a backup every day.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save a backup every day.'; }));
+      btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Your browser agreed to keep this data. Still save a backup every day.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }, () => { prot.textContent = 'The browser could not answer. Installing the app (step 4) usually helps. Save a backup every day.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save a backup every day.'; }));
     step('4. Install as an app', 'On an iPad: Share, then Add to Home Screen. In Chrome on Android or a computer: the menu, then Install app or Add to Home screen. An installed app opens full screen and the browser is less likely to clear its data.');
     step('5. Where the tablet sits', 'Put the tablet where the person at the cutting board can tap it without walking. If it is out of reach, batch times will not get logged and the waste numbers will be wrong.');
     // Closes this sheet and opens the Menu and settings page of the back office.
     const openData = () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); };
-    step('6. Your dishes', 'Add your dishes under Dishes and prices, in Settings. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them the dollar numbers are starter estimates.',
+    step('6. Your dishes', 'Add your dishes under Dishes and prices, in Settings. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them, all of these are starter values, the hold limits too.',
       () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu and settings')));
     step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a throw-out time. Ask your health department which applies to each food you hold, then set it in Settings.');
     sheet.body.appendChild(list); keepInView(sheet.body);
@@ -606,7 +606,10 @@
     // Paints the question until it is answered or skipped; after an answer it says what was set and where to change it.
     function paintServe(answer) {
       const answered = answer || U.storage.get(KEY_SERVEANS, '');
-      const show = activeDishes().length > 0 && !U.storage.get(KEY_SERVESKIP, false);
+      // An owner who already set How you serve (own order buttons, or counter service on) is not asked again.
+      const svc = SB.store.getState().settings.service || {};
+      const setUp = Array.isArray(svc.chips) || svc.counter === true;
+      const show = activeDishes().length > 0 && !U.storage.get(KEY_SERVESKIP, false) && (!!answered || !setUp);
       svBox.hidden = !show;
       if (!show) return;
       U.clear(svBox);
@@ -619,10 +622,11 @@
           // Remembers the owner skipped, so the question goes away.
           h('button', { type: 'button', class: 'btn btn-link', dataset: { act: 'serve-skip' }, onClick: () => { U.storage.set(KEY_SERVESKIP, true); paintServe(); } }, 'Skip')));
     }
-    // Saves one answer: counter service on or off, and the order buttons (the starting list when none are given).
+    // Saves one answer: counter service on or off, and the order buttons. WATCH OUT: the table answer has no buttons of
+    // its own, so it leaves any saved order buttons alone instead of wiping them back to the starting list.
     function answerServe(c) {
       const r1 = send('updateSettings', { patch: { service: { counter: c.sets.counter } } });
-      const r = r1.ok || r1.report === 'nothingToDo' ? send('setChips', { chips: c.sets.chips }) : r1;
+      const r = (r1.ok || r1.report === 'nothingToDo') && c.sets.chips ? send('setChips', { chips: c.sets.chips }) : r1;
       if (!r.ok && r.report !== 'nothingToDo') { svBox.appendChild(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'bad', role: 'alert' }, r.words)); return; }
       U.storage.set(KEY_SERVEANS, c.id); paintServe(c.id);
     }
@@ -1003,7 +1007,7 @@
     const step1 = h('section', { class: 'fs-section so-step' },
       h('h3', { class: 'fs-h' }, '1. What happens'),
       h('p', { class: 'fs-sub' }, 'This empties your kitchen so you can begin again with a blank menu.'),
-      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device.'),
+      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device. The food safety record stays.'),
       h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and sections. Clear the box and those go back to how Smokebox starts.'),
       keepLabel,
       h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'There is no undo. We are sorry to be blunt: once you confirm, the old menu and history cannot be brought back, except from a backup file you saved first.'));
@@ -1096,7 +1100,7 @@
     exportStale: 'Something changed since you saved the files (a new day started or a record changed). Save the files again in step 2, then close. Nothing was removed.',
     notInDemo: 'You are in the demo, so there is no real history to close here. Tap Back to my kitchen first. Nothing was removed.',
     hubKitchen: 'This tablet works through the main computer, so the month cannot be closed here. Do this on the main computer\'s own screen or the main tablet. Nothing was removed.',
-    nothingToDo: 'There is nothing to close yet. Only finished days older than 35 days can be moved out, and none are left before that date. Nothing was removed.',
+    nothingToDo: 'There is nothing to close yet. Only finished days older than the recent days that always stay can be moved out, and none are left before that date. Nothing was removed.',
     storageBlocked: 'This browser would not save the change, so nothing was removed. Your kitchen is exactly as it was. Allow site data or use a normal window, then try again.',
     badPatch: 'That date is not one Smokebox can use. Pick a date and try again. Nothing was removed.',
   };
@@ -1135,10 +1139,13 @@
       if (!p.tickets && !p.orders && !p.events) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords({ report: 'nothingToDo' }))); return; }
       // Writes a count with the right singular or plural word.
       const n = (x, one, many) => Number(x).toLocaleString() + ' ' + U.plural(x, one, many);
+      // How many recent days stay: 35, or fewer on a busy kitchen whose saved history is near its limits (engine adaptiveKeepDays).
+      let keep = 35;
+      try { const hf = store.historyFill ? store.historyFill() : null; if (hf && Number.isInteger(hf.keepDays)) keep = hf.keepDays; } catch (e) { /* 35 */ }
       counts.append(...[
         h('p', null, h('strong', null, 'This moves out of your kitchen: '), n(Array.isArray(p.days) ? p.days.length : p.days, 'day') + ' of history (' + monthDay(p.from) + ' up to, not including, ' + monthDay(p.before) + '), with ' + n(p.orders, 'order') + ', ' + n(p.tickets, 'ticket') + ' and ' + n(p.events, 'activity record', 'activity records') + '.'),
-        p.before !== before ? h('p', { class: 'fs-sub' }, 'You picked ' + monthDay(before) + ', but the last 35 days always stay, so it stops at ' + monthDay(p.before) + '.') : null,
-        h('p', null, h('strong', null, 'This stays: '), 'the last 35 days, today, every open order and open ticket' + (p.openOrdersKept || p.openTicketsKept ? ' (' + n(p.openOrdersKept || 0, 'open order') + ', ' + n(p.openTicketsKept || 0, 'open ticket') + ' right now)' : '') + ', your menu and settings, the end-of-day totals, and all food-safety records (' + n(p.safetyEventsKept || 0, 'record') + ').'),
+        p.before !== before ? h('p', { class: 'fs-sub' }, 'You picked ' + monthDay(before) + ', but the last ' + n(keep, 'day') + ' always stay, so it stops at ' + monthDay(p.before) + '.') : null,
+        h('p', null, h('strong', null, 'This stays: '), 'the last ' + n(keep, 'day') + ', today, every open order and open ticket' + (p.openOrdersKept || p.openTicketsKept ? ' (' + n(p.openOrdersKept || 0, 'open order') + ', ' + n(p.openTicketsKept || 0, 'open ticket') + ' right now)' : '') + ', your menu and settings, the end-of-day totals, and all food-safety records (' + n(p.safetyEventsKept || 0, 'record') + ').'),
         p.uncoveredDays && p.uncoveredDays.length ? h('p', { class: 'fs-sub' }, n(p.uncoveredDays.length, 'older day') + ' with records but no end-of-day close stay where they are.') : null].filter(Boolean));
       next1.disabled = false;
     }
@@ -1220,7 +1227,7 @@
           h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'cm-undo' }, onClick: () => {
             const rep = store.undoRestore();
             if (rep === 'ok' || (rep && rep.ok)) { tell(undoMsg, 'Undone. Your kitchen is back as it was, with all the history.', 'ok'); } else tell(undoMsg, 'The saved copy could not be put back (' + (rep && rep.report ? rep.report : rep) + '). Use the backup file you saved: Back office, Data, Restore.', 'bad');
-          } }, 'Undo')) : h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'No copy could be kept on this tablet, so the files you saved are the only way back: Back office, Data, Restore.'),
+          } }, 'Undo')) : h('p', { class: 'fs-note', 'data-tone': 'warn' }, (i.restoreCopyKept ? 'Your kitchen from before your recent restore is still kept, so no second copy was made here. ' : 'No copy could be kept on this tablet, so ') + 'the files you saved are the only way back from this close: Back office, Data, Restore.'),
         undoMsg,
         // Closes the sheet when the person is finished reading the result.
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'cm-finish' }, onClick: () => SB.sheets.closeAll() }, 'Done'));
@@ -1424,7 +1431,7 @@
   function openReady() {
     const sheet = SB.ui.sheet({ title: 'Tablet checks', side: 'right', width: 'min(720px, 96vw)', name: 'ready', onClose: () => { releaseWake(); } });
     const root = h('div', { class: 'dp rd' });
-    let sentinel = null, wakeNow = 'unknown', heard = null, played = false;
+    let sentinel = null, wakeNow = 'unknown', heard = null, played = false, loud = null;
     // Lets go of the screen hold this sheet took, when it closes.
     function releaseWake() { try { if (sentinel && sentinel.release) sentinel.release(); } catch (e) { /* already released */ } sentinel = null; }
     // One check card: an icon (tick or do this), a title, a plain line, and room for buttons.
@@ -1441,7 +1448,9 @@
       // Tapping asks the browser again, then redraws this card.
       const again = h('button', { type: 'button', class: 'btn', dataset: { act: 'awake-check' }, onClick: () => tryWake(true) }, 'Check again');
       const how = h('p', { class: 'fs-sub' }, 'Also set the tablet itself so it never sleeps in service. iPad: Settings, Display & Brightness, Auto-Lock, Never. Android: Settings, Display, Screen timeout, the longest or Never. Plug it into power.');
-      if (wakeNow === 'on' || boardState === 'on') cAwake.set(true, 'The board is holding the screen awake while it is open. Still set Auto-Lock to Never and keep the tablet plugged in.', again);
+      // Only the board's own hold keeps the screen on in service; this card's test hold ends when the sheet closes.
+      if (boardState === 'on') cAwake.set(true, 'The board is holding the screen awake while it is open. Still set Auto-Lock to Never and keep the tablet plugged in.', again);
+      else if (wakeNow === 'on') cAwake.set(true, 'This browser lets Smokebox hold the screen awake. The board asks for it each time it opens. Still set Auto-Lock to Never and keep the tablet plugged in.', again);
       else cAwake.set(false, wakeNow === 'unsupported' || boardState === 'unsupported' ? 'This browser cannot hold the screen awake by itself.' : 'The browser did not agree to hold the screen awake yet.', how, again);
       paintSummary();
     }
@@ -1466,11 +1475,19 @@
       } else cSound.set(null, 'Browsers only allow sound after a tap, so test it here. Turn the volume up first.', test);
       paintSummary();
     }
-    // 3. Volume: it cannot be read, so it follows the beep answer and tells the owner how loud to aim for.
-    // Shows the volume line: ticked once the beep was heard, with the aim for a loud kitchen.
+    // 3. Volume: it cannot be read, so the person is asked a second, separate question once the beep was heard.
+    // Shows the volume question: ticked only when the person says the beep carries to the pit or the line over the fans.
     function checkVol() {
       const line = 'Aim for a beep you can hear from the pit or the line over the fans. A tablet speaker is easy to miss in a loud kitchen: a cheap Bluetooth speaker near the cutting board helps.';
-      if (heard === true) cVol.set(true, line); else if (heard === false) cVol.set(false, line); else cVol.set(null, 'Test the sound above first. ' + line);
+      if (heard !== true) { loud = null; cVol.set(heard === false ? false : null, (heard === false ? '' : 'Test the sound above first. ') + line); paintSummary(); return; }
+      if (loud === true) cVol.set(true, 'You said it carries over the kitchen noise. ' + line);
+      else if (loud === false) cVol.set(false, 'Turn the volume up or add a speaker, then play the beep again. ' + line);
+      else {
+        cVol.set(null, 'Play the beep again from where the cooks stand, with the fans on. Could you hear it there?',
+          // Two answers: yes ticks the volume check, no says what to try.
+          h('div', { class: 'fs-row' }, h('button', { type: 'button', class: 'btn', dataset: { act: 'vol-yes' }, onClick: () => { loud = true; checkVol(); } }, 'Yes, loud enough'),
+            h('button', { type: 'button', class: 'btn', dataset: { act: 'vol-no' }, onClick: () => { loud = false; checkVol(); } }, 'No, too quiet')));
+      }
       paintSummary();
     }
     // 4. Home screen: the page can tell whether it was opened as an installed app.

@@ -99,10 +99,13 @@
       } catch (e) { box.hidden = false; box.focus(); hint.textContent = 'The download did not work here. Copy the data from the box below, then continue.'; unlock(); }
     });
     show.addEventListener('click', () => { box.hidden = false; box.focus(); box.select(); unlock(); });
-    go.addEventListener('click', () => { if (go.disabled) return; try { SB.store.releaseHold(); } catch (e) { /* ignore */ } wrap.remove(); });
+    // Everything behind this screen is made inert (no taps, no Tab), so no order can be entered while nothing is being saved.
+    const behind = Array.from(doc.body.children).filter((el) => el.tagName !== 'SCRIPT');
+    go.addEventListener('click', () => { if (go.disabled) return; try { SB.store.releaseHold(); } catch (e) { /* ignore */ } behind.forEach((el) => el.removeAttribute('inert')); wrap.remove(); });
     row.append(dl, show, go);
     card.append(h2, p, row, hint, box);
     wrap.appendChild(card);
+    behind.forEach((el) => el.setAttribute('inert', ''));
     doc.body.appendChild(wrap);
     try { dl.focus(); } catch (e) { /* ignore */ }
   }
@@ -158,11 +161,14 @@
       // A small hook so tests and developers can read the state from the console.
       if (SB.store && typeof SB.store.getState === 'function') SB.dev = { state: () => SB.store.getState() };
       SB.booted = true;
-      storageNotices();
-      watchClock();
+    } catch (e) { showBootError(e, stage); return; }
+    // The app is running from here on: a failure in these extras is logged, never shown as "could not start" over a working board.
+    try { storageNotices(); } catch (e) { console.error('[smokebox] start-up notices failed', e); }
+    try { watchClock(); } catch (e) { console.error('[smokebox] clock watcher failed', e); }
+    try {
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });
-    } catch (e) { showBootError(e, stage); }
+    } catch (e) { console.error('[smokebox] load warning failed', e); }
   }
 
   // Exposed so tests can run the start-up again or show the error card on purpose.

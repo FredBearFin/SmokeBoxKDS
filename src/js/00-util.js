@@ -452,11 +452,12 @@
     raw(key) {
       try { const raw = ls ? ls.getItem(key) : mem.get(key); return raw == null ? null : String(raw); } catch (e) { return null; }
     },
-    // Saves a value as text. Returns false if the value cannot be turned into text or the browser refused it
-    // (then it is kept in memory only, so the page still works until it is closed).
+    // Saves a value as text. Returns false if the value cannot be turned into text or the browser refused it.
+    // WATCH OUT: a refused value is NOT readable back through get(); the caller keeps its own copy (the store keeps the
+    // kitchen in memory and shows the failed save), and the last value the browser accepted stays what get() returns.
     set(key, val) {
       let raw; try { raw = JSON.stringify(val); } catch (e) { return false; }
-      try { if (ls) ls.setItem(key, raw); else mem.set(key, raw); return true; } catch (e) { mem.set(key, raw); return false; }
+      try { if (ls) ls.setItem(key, raw); else mem.set(key, raw); return true; } catch (e) { return false; }
     },
     // Deletes a saved value from the browser and from memory.
     remove(key) { try { if (ls) ls.removeItem(key); } catch (e) { /* ignore */ } mem.delete(key); },
@@ -477,7 +478,7 @@
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'writer', 'histtrim', 'histnotice', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
-    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'corruptat', 'dropped', 'droppedat', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
+    'setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.lastZone', 'setup.hiddenCategories', 'setup.lastCategory', 'setup.cookAheadSkipped', 'setup.serveSkipped', 'setup.serveAnswer', 'readings', 'lastproduct', 'lastgood', 'lastgood2', 'corruptat', 'dropped', 'droppedat', 'corrupt.prev', 'corruptat.prev', 'dropped.prev', 'droppedat.prev', 'orderdraft', 'office.startCash', 'pinrecovery', 'demoLeftoversKept'].map((k) => 'smokebox.v1.' + k);
   const MODE_KEY = 'smokebox.mode'; // sessionStorage: this tab is in the demo (per tab, gone when the tab closes)
   // Which kitchen this tab shows, decided once at load: a ?demo address or the tab's own saved choice means the demo.
   function detectMode() {

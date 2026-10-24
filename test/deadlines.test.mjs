@@ -501,6 +501,19 @@ test('planned batch: the shortfall row switches to the rescue wording, and back 
   assert.ok(/runs out at 6:10 pm\./.test(closeFeed(c.state, now).find((x) => x.kind === 'shortfall').consequence));
 });
 
+test('planned batch: grams it would leave at close are told as a smaller plan, never as cooked food to sell off', () => {
+  const s0 = closeKit('mac', 12000, closeAt(15), [[closeAt(15, 30), 2000], [closeAt(16), 2000], [closeAt(16, 30), 2000]]);
+  const now = closeAt(16, 40);
+  const r = E.apply(s0, 'planBatch', { ing: 'mac', grams: 30000, offAt: closeAt(17, 30) }, now);
+  assert.equal(r.report, 'ok');
+  const row = closeFeed(r.state, now).find((x) => x.kind === 'leftover');
+  assert.ok(row, 'a big plan raises a leftover row');
+  assert.equal(row.leftoverG, 0, 'no cooked food is left over');
+  assert.ok(row.plannedLeftG > 5000, String(row.plannedLeftG));
+  assert.match(row.consequence, /^The planned batch would leave about/);
+  assert.match(row.action, /Plan a smaller batch/);
+});
+
 test('planned batch: it is supply only, never stock: no 86 and no ledger movement', () => {
   const s0 = closeKit('mac', 12000, closeAt(15), [[closeAt(15, 30), 2000]]);
   const r = E.apply(s0, 'planBatch', { ing: 'mac', grams: 8000, offAt: closeAt(18, 30) }, closeAt(16));
@@ -520,4 +533,24 @@ test('thresholds: build uses the owner list from settings, and rungsFor still wo
   const f = D.build(s3, T0 + 4 * HR - 20 * MIN).find((x) => x.kind === 'expiry');
   assert.deepEqual(f.rungsMin, [50, 25, 8]);
   assert.equal(f.rung, 2, '20 minutes left is past the 50 and 25 minute rungs');
+});
+
+test('batch waste time-steps: a younger batch sells only after the older one runs out or expires', () => {
+  // 1 unit an hour. A: 10 units, in at 0, gone at 3 h. B: 10 units, in at 1 h, ready at 2 h, gone at 8 h.
+  // A sells 3 in its 3 hours; B sells 5 from 3 h to 8 h, so B wastes 5, not 7.
+  const w = D.batchWaste([
+    { id: 'A', remainingG: 10, enteredAt: T0, readyAt: T0, expAt: T0 + 3 * HR },
+    { id: 'B', remainingG: 10, enteredAt: T0 + HR, readyAt: T0 + 2 * HR, expAt: T0 + 8 * HR },
+  ], 1 / HR, T0);
+  assert.ok(Math.abs(w.A - 7) < 1e-6, 'A wastes 7: ' + w.A);
+  assert.ok(Math.abs(w.B - 5) < 1e-6, 'B wastes 5: ' + w.B);
+});
+
+test('close time sits at the clock hour set, also on a clock-change day (run with TZ=America/New_York to see it bite)', () => {
+  const st = { settings: { service: { closeHour: 21.5 } } };
+  for (const [y, m, d] of [[2026, 2, 8], [2026, 10, 1]]) {
+    const at = D.closeAtMs(st, new Date(y, m, d, 12, 0).getTime());
+    const c = new Date(at);
+    assert.equal(c.getDate(), d); assert.equal(c.getHours(), 21); assert.equal(c.getMinutes(), 30);
+  }
 });

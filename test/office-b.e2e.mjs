@@ -215,11 +215,11 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
 
   // top items: the switch changes the chart
   const topBefore = await svgLabel(page, 'Top items');
-  await card(page, 'Top items').locator('.seg-opt', { hasText: 'Sales' }).click();
+  await card(page, 'Top items').locator('.seg-opt', { hasText: 'Menu value' }).click();
   await wait(250);
   const topAfter = await svgLabel(page, 'Top items');
-  check('top items: the Sold/Sales switch changes the chart', topBefore !== topAfter && /by sales/.test(topAfter) && /by number sold/.test(topBefore), [topBefore, topAfter]);
-  check('top items: "Sales" shows money, "Sold" shows counts', /\$[\d,]+ in sales/.test(topAfter) && /[\d,]+ sold/.test(topBefore));
+  check('top items: the Sold/Menu value switch changes the chart', topBefore !== topAfter && /by menu value/.test(topAfter) && /by number sold/.test(topBefore), [topBefore, topAfter]);
+  check('top items: "Menu value" shows money, "Sold" shows counts', /\$[\d,]+ in menu value/.test(topAfter) && /[\d,]+ sold/.test(topBefore));
   const mBefore = await svgLabel(page, 'Margin by item');
   await card(page, 'Margin by item').locator('.seg-opt', { hasText: 'Percent of price' }).click();
   await wait(250);
@@ -228,7 +228,7 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
 
   // sections the owner asked for
   const t = await mainText(page);
-  for (const w of ['Top items', 'Sales by hour of the day', 'Average ticket value by channel', 'Food cost by day', 'Margin by item', 'Cost not recorded', 'Cooked yield: assumed, modeled and real', 'What a fixed yield costs you', 'Try it: what would a different cook do to the yield?']) check('section present: ' + w, t.indexOf(w) >= 0);
+  for (const w of ['Top items', 'Sales by hour of the day', 'Average order by channel', 'Food cost by day', 'Margin by item', 'Cost not recorded', 'Cooked yield: assumed, modeled and real', 'What a fixed yield costs you', 'Try it: what would a different cook do to the yield?']) check('section present: ' + w, t.indexOf(w) >= 0);
   check('food cost line has a labelled reference band and says it is a rule of thumb', /rule of thumb/i.test(t));
 
   // yield
