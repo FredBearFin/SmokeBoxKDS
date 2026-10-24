@@ -586,7 +586,7 @@
             // No and Not sure both leave cooking ahead off; Not sure says so, and says how to turn it on later.
             ['No', 'Not sure'].map((lbl) => h('button', { type: 'button', class: 'btn', dataset: { act: lbl === 'No' ? 'no-cooked' : 'notsure-cooked' }, onClick: () => {
               U.storage.set(KEY_CASKIP, true);
-              caNote = (lbl === 'No' ? 'Cooking ahead stays off. ' : 'Not sure counts as No for now. ') + 'Turning it on adds the Cabinet, batch timers and their warnings. Turn it on any time under Settings, Tax, hours and PIN.';
+              caNote = (lbl === 'No' ? 'Cooking ahead stays off. ' : 'Not sure counts as No for now. ') + 'Turning it on adds the Hold cabinet, batch timers and their warnings. Turn it on any time under Settings, Tax, hours and PIN.';
               paintCook();
             } }, lbl))));
       } else {
@@ -717,10 +717,12 @@
     // One checkbox row per dish: tick the dishes that use this food and say about how many grams each takes.
     const dishRows = activeDishes().map((m) => {
       const cb = h('input', { type: 'checkbox', 'aria-label': m.name + ' uses it', disabled: portionLeft(m) >= 0 });
-      const gIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', value: '150', 'aria-label': 'Grams of it in one ' + m.name });
+      // The grams box stays empty and off until its dish is ticked, so no dish looks filled in before the owner says so.
+      const gIn = h('input', { class: 'input dp-num', type: 'text', inputmode: 'numeric', placeholder: 'grams', disabled: true, 'aria-label': 'Grams of it in one ' + m.name });
+      cb.addEventListener('change', () => { gIn.disabled = !cb.checked; if (cb.checked) gIn.focus(); });
       return { m, cb, gIn, el: h('div', { class: 'dp-row' }, h('label', { class: 'grow' }, cb, ' ' + m.name + (portionLeft(m) >= 0 ? ' (counted by portions)' : '')), h('span', { class: 'fs-sub' }, 'grams in one:'), gIn) };
     });
-    const dishBox = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Which dishes use it?'), h('p', { class: 'fs-sub' }, 'Select each dish and enter the grams of it in one serving (150 is a starting guess). Smokebox takes that much off the batch when the dish is made.'), h('div', { class: 'dp-list' }, dishRows.map((r) => r.el)));
+    const dishBox = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Which dishes use it?'), h('p', { class: 'fs-sub' }, 'Select each dish that uses it, then type the grams of it in one serving. Smokebox takes that much off the batch when the dish is made.'), h('div', { class: 'dp-list' }, dishRows.map((r) => r.el)));
     const status = h('p', { class: 'fs-sub', role: 'status' });
     const after = h('div', { class: 'fs-row', hidden: true });
     let warnedNoDish = false;
@@ -744,6 +746,9 @@
         tell(status, 'No dish is selected, so nothing will use this item and it will not count down. Select a dish above, or tap Save again to keep it without one.', 'bad');
         return;
       }
+      // Every ticked dish needs its grams before anything is saved.
+      const noGrams = dishRows.find((x) => x.cb.checked && !(Number(x.gIn.value) > 0));
+      if (noGrams) { tell(status, 'Type the grams in one ' + noGrams.m.name + ', or untick it.', 'bad'); noGrams.gIn.focus(); return; }
       const payload = { name, unit: 'g', tcs: true, hold: kind.getValue(), maxHoldH: hrs == null ? 4 : hrs, holdBasis: 'safety' };
       if (isCold) payload.fridge = true; // a cold item is kept in a fridge, so it can be taken out and put back and its two limits can be set
       if (days != null) payload.fridgeDays = days;
@@ -759,10 +764,10 @@
         const bom = (cur.bom || []).concat([{ ing: r.info.id, qty: grams }]);
         if (send('updateMenuItem', { id: x.m.id, patch: { bom } }).ok) linked++;
       });
-      tell(status, 'Added ' + name + (linked ? ' and linked it to ' + linked + ' ' + U.plural(linked, 'dish', 'dishes') : '') + '. Log your first batch in the cabinet when you cook one.');
+      tell(status, 'Added ' + name + (linked ? ' and linked it to ' + linked + ' ' + U.plural(linked, 'dish', 'dishes') : '') + '. Log your first batch in the Hold cabinet when you cook one.');
       save.hidden = true; after.hidden = false;
       U.clear(after);
-      // Opens the cabinet on a new batch of the item just added.
+      // Opens the Hold cabinet on a new batch of the item just added.
       after.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-first-batch' }, onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('hold', { tab: 'new', ing: r.info.id }), 60); } }, 'Log a first batch'),
         // Closes the sheet without logging a batch.
         h('button', { type: 'button', class: 'btn btn-lg', onClick: () => sheet.close('done') }, 'Done for now'));
@@ -800,7 +805,7 @@
       kindField.hidden = true; kgField.hidden = true; dishBox.hidden = true; save.hidden = true;
     } else saveEdit.hidden = true;
     paintKind();
-    sheet.body.appendChild(h('div', { class: 'dp' }, h('p', { class: 'fs-sub' }, editing ? 'Change the limits or the name. Hot or cold stays as it was.' : 'Optional. Skip this and you can still take every order. Later you can add more from the Cabinet.'),
+    sheet.body.appendChild(h('div', { class: 'dp' }, h('p', { class: 'fs-sub' }, editing ? 'Change the limits or the name. Hot or cold stays as it was.' : 'Optional. Skip this and you can still take every order. Later you can add more from the Hold cabinet.'),
       h('div', { class: 'dp-form' }, nameField, kindField, hoursField, coldBox, kgField, dishBox, h('div', { class: 'fs-row' }, save, saveEdit), status, after)));
     keepInView(sheet.body);
     setTimeout(() => nameIn.focus(), 50);
@@ -1643,7 +1648,7 @@
       onChange: (v) => {
         const r = send('updateSettings', { patch: { modules: { cookAhead: v === 'yes' } } });
         if (!r.ok && r.report !== 'nothingToDo') { cook.setValue(v === 'yes' ? 'no' : 'yes'); tell(cookSt, r.words); return; }
-        tell(cookSt, v === 'yes' ? 'On. The Cabinet, cooked-batch times and their warnings are available. Change this any time here.' : 'Off. Batch tracking stays out of the way. Change this any time here.');
+        tell(cookSt, v === 'yes' ? 'On. The Hold cabinet, cooked-batch times and their warnings are available. Change this any time here.' : 'Off. Batch tracking stays out of the way. Change this any time here.');
       } });
     const cookSt = section('Cooking ahead', 'Some places cook a big batch in the morning and serve from it all day, or keep cold sides in a cooler. If you do, Smokebox can track those batches and warn you before they run out of time. Most new places start with No.', cook);
     sheet.body.appendChild(list); keepInView(list);

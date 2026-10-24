@@ -136,6 +136,7 @@ async function cooked(browser) {
   for (const t of ['What do you cook ahead?', 'Hot or cold', 'How long may it stay, in hours?', 'Usual batch size, in kg', 'Which dishes use it?', 'Save cooked-ahead item']) check('cooked-ahead form: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
   await p.fill('.sheet-root:last-of-type input >> nth=0', 'Pulled pork');
   await p.click('.sheet-root:last-of-type input[type=checkbox] >> nth=0').catch(() => {});
+  await p.fill('.sheet-root:last-of-type [aria-label^="Grams of it in one"]:enabled >> nth=0', '150').catch(() => {}); // a ticked dish needs its grams
   await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700);
   // With no dish picked the first save warns once; a second tap keeps the item anyway.
   if (!(await seen(p, 'Log a first batch', '.sheet-root:last-of-type'))) { await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700); }
@@ -404,6 +405,7 @@ async function coldItem(browser) {
   await p.fill('input[aria-label="Days it may stay in the fridge"]', '3');
   await p.fill('input[aria-label="Hours it may be out of the fridge"]', '2');
   await p.click(cs + ' input[type=checkbox] >> nth=0').catch(() => {});
+  await p.fill(cs + ' [aria-label^="Grams of it in one"]:enabled >> nth=0', '150').catch(() => {}); // a ticked dish needs its grams
   await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700);
   if (!(await seen(p, 'Log a first batch', cs))) { await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700); }
   check('cold: Log a first batch', await tap(p, 'Log a first batch')); await p.waitForTimeout(700);
