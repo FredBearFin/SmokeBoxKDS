@@ -16,7 +16,7 @@
   const MARK = 'k:';
   const DEFAULT = 'bf_emma';
   const MAX_KEEP = 150;
-  const st = { on: false, list: {}, checkedAt: 0, getCtx: null, lines: new Map(), playing: null };
+  const st = { on: false, list: {}, checkedAt: 0, getCtx: null, lines: new Map(), playing: null, queue: [], inFlight: 0, aheadInFlight: 0 };
 
   // True when the page was served by a kitchen server (not opened as a file), the only case with a server voice.
   const served = () => { try { return /^https?:$/.test(g.location.protocol); } catch (e) { return false; } };
@@ -58,10 +58,29 @@
     const line = have || { buf: null };
     line.urgent = line.urgent || !!urgent;
     if (!have) { st.lines.set(key, line); if (st.lines.size > MAX_KEEP) st.lines.delete(st.lines.keys().next().value); }
-    g.fetch('/api/voice?v=' + encodeURIComponent(v) + (urgent ? '&p=1' : '') + '&t=' + encodeURIComponent(text), { credentials: 'same-origin' })
+    // Waits in this device's own line, urgent ones first (see pump).
+    const job = { urgent: !!urgent, run: () => g.fetch('/api/voice?v=' + encodeURIComponent(v) + (urgent ? '&p=1' : '') + '&t=' + encodeURIComponent(text), { credentials: 'same-origin' })
       .then((r) => { if (!r.ok) throw new Error('voice ' + r.status); return r.arrayBuffer(); })
       .then((ab) => new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)))
-      .then((buf) => { if (!line.buf) line.buf = buf; }, () => { if (!line.buf && st.lines.get(key) === line) st.lines.delete(key); });
+      .then((buf) => { if (!line.buf) line.buf = buf; }, () => { if (!line.buf && st.lines.get(key) === line) st.lines.delete(key); }) };
+    if (urgent) st.queue.unshift(job); else st.queue.push(job);
+    pump();
+  }
+  // WATCH OUT: a browser opens at most 6 connections to one site, and the server makes lines one at a time. Firing every
+  // fetch at once let lines fetched ahead fill all 6, so a call that was due waited behind them inside the browser. So
+  // requests go out from a short line: at most 2 lines fetched ahead at a time, and urgent ones (calls due now, a voice
+  // test) always get a free slot, up to 4 in all.
+  function pump() {
+    while (st.queue.length) {
+      const i = st.queue.findIndex((j) => j.urgent);
+      const job = i >= 0 ? st.queue[i] : st.queue[0];
+      if (st.inFlight >= 4 || (!job.urgent && st.aheadInFlight >= 2)) return;
+      st.queue.splice(i >= 0 ? i : 0, 1);
+      st.inFlight++; if (!job.urgent) st.aheadInFlight++;
+      // Frees the slot when the line has arrived (or failed) and sends the next one.
+      const free = () => { st.inFlight--; if (!job.urgent) st.aheadInFlight--; pump(); };
+      job.run().then(free, free);
+    }
   }
   // The decoded sound of one sentence in the chosen voice, or null when it is not ready.
   const bufOf = (text) => { const v = voice(), l = v && st.lines.get(v + '|' + text); return l && l.buf ? l.buf : null; };

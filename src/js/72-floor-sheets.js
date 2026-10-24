@@ -2175,9 +2175,17 @@
     } }, ico('volume', 20), h('span', null, 'Test the sound'));
     // Test the voice: speaks a sample call and names the voice picked and where it lives (on the tablet or over the internet).
     const voiceSay = h('p', { class: 'fs-sub mn-test-voice', role: 'status' });
+    // Says how a voice test went: getting a natural voice ready on the kitchen server, then which voice spoke.
+    const voiceState = (v) => (w) => {
+      if (w === 'preparing') text(voiceSay, 'Getting ' + v.name.split(',')[0] + ' ready on the kitchen server (a few seconds the first time)...');
+      else if (w === 'natural') text(voiceSay, 'Voice: ' + v.name + '.');
+      else if (w === 'device' && v.natural) text(voiceSay, 'The kitchen server took too long, so the device voice spoke. Try again in a moment.');
+    };
+    // Test the voice: says a sample call in the chosen voice and reports which voice spoke.
     const voiceBtn = h('button', { type: 'button', class: 'btn', dataset: { act: 'test-voice' }, disabled: !floorOk, onClick: () => {
-      const v = SB.floor.testVoice ? SB.floor.testVoice() : { supported: false };
-      text(voiceSay, !v.supported ? 'This tablet cannot speak. Warnings will be tones only.' : v.name ? 'Voice: ' + v.name + (v.local ? ', stored on this tablet.' : ', needs the internet.') : 'Voice: the tablet\'s own default voice.');
+      const info = SB.floor.voiceInfo ? SB.floor.voiceInfo() : { supported: false };
+      const v = SB.floor.testVoice ? SB.floor.testVoice(voiceState(info)) : { supported: false };
+      if (!(v.natural && voiceSay.textContent.indexOf('Getting') === 0)) text(voiceSay, !v.supported ? 'This tablet cannot speak. Warnings will be tones only.' : v.name ? 'Voice: ' + v.name + (v.natural ? '.' : v.local ? ', stored on this tablet.' : ', needs the internet.') : 'Voice: the tablet\'s own default voice.');
     } }, ico('volume', 20), h('span', null, 'Test the voice'));
     // Voice chooser: every English voice this device has, so the owner can pick the one that sounds best. Saved on this device;
     // Automatic picks the best one by itself. A choice says a short sample at once.
@@ -2201,8 +2209,9 @@
     if (g.speechSynthesis && typeof g.speechSynthesis.addEventListener === 'function') { g.speechSynthesis.addEventListener('voiceschanged', fillVoices); offs.push(() => g.speechSynthesis.removeEventListener('voiceschanged', fillVoices)); }
     voiceSel.addEventListener('change', () => {
       U.storage.set('smokebox.v1.voicename', voiceSel.value);
-      const v = SB.floor.testVoice ? SB.floor.testVoice() : { supported: false };
-      text(voiceSay, v.name ? 'Voice: ' + v.name + '.' : 'Voice: the device\'s own default voice.');
+      const info = SB.floor.voiceInfo ? SB.floor.voiceInfo() : { supported: false };
+      text(voiceSay, info.name ? 'Voice: ' + info.name + '.' : 'Voice: the device\'s own default voice.');
+      if (SB.floor.testVoice) SB.floor.testVoice(voiceState(info));
     });
     const voiceRow = h('label', { class: 'mn-vol' }, h('span', null, 'Voice'), voiceSel);
     const testRow = h('div', { class: 'mn-test' }, testBtn, testSay, voiceBtn, voiceSay);
