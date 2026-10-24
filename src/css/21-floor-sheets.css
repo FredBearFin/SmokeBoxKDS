@@ -69,7 +69,7 @@
 .ord-search:focus-within { border-color: var(--amber); outline: var(--bw-focus) solid var(--focus); outline-offset: 2px; }
 .ord-search .icon { flex: none; }
 .ord-search-input { flex: 1 1 auto; min-width: 0; min-height: 48px; padding: 0; font-size: var(--fs-4); color: var(--ink); background: transparent; border: 0; outline: none; }
-.ord-search-input::placeholder { color: var(--ink3); opacity: 1; }
+.ord-search-input::placeholder { color: var(--ink3); color: color-mix(in srgb, var(--ink3) 85%, var(--paper)); opacity: 1; }
 .ord-hint { font-size: var(--fs-2); font-weight: var(--w-semi); color: var(--ink2); padding: 0 var(--sp-1); }
 .ord-cats { display: flex; width: 100%; }
 .ord-cats .seg-opt { flex: 1 1 auto; min-height: 44px; padding: 0 10px; font-size: var(--fs-2); }
@@ -541,6 +541,9 @@
 .dp-rmsg { flex-basis: 100%; margin: 0; }
 .dp-rmsg:empty { display: none; }
 .dp-h { margin-top: var(--sp-2); }
+/* The count of dishes and the Add a dish jump share the top line. */
+.dp-top { justify-content: space-between; }
+.dp-top > .dp-lead { flex: 1 1 260px; margin: 0; }
 .dp-links { gap: var(--sp-3); }
 .fl-first-dish { min-height: 72px; padding-inline: var(--sp-8, 40px); font-size: var(--fs-5, 1.4rem); }
 

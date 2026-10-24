@@ -261,7 +261,7 @@
 
   /* ---------- the Dishes and prices sheet ---------- */
 
-  // Opens "Dishes and prices": the add form on top, the dishes added so far, and a small fold of extra ways to start.
+  // Opens "Dishes and prices": the dishes so far (or the add form first on an empty menu), and a fold of extra ways to start.
   function openDishes() {
     const sheet = SB.ui.sheet({ title: 'Dishes and prices', side: 'right', width: 'min(880px, 96vw)', name: 'dishes', onClose: () => offs.splice(0).forEach((f) => f()) });
     const offs = [];
@@ -513,7 +513,7 @@
     }
     // The dishes so far: each row is a name box, a price box and Remove. Changes save when the box is left.
     const listBox = h('div', { class: 'dp-list' });
-    let listSig = '';
+    let listSig = null; // null so the first paint always runs, even for an empty menu
     // Rebuilds the list of dishes when it has changed and no box in it is being typed in.
     function paintList() {
       const mine = activeDishes();
@@ -524,7 +524,7 @@
       dishesHead.hidden = mine.length === 0;
       const ex = U.storage.get(KEY_EXAMPLES, []);
       U.clear(listBox);
-      lead.textContent = mine.length ? (mine.length + ' ' + U.plural(mine.length, 'dish', 'dishes') + ' on your menu. Change a name or price below and it saves when you tap away.') : 'Add the dishes you sell. Name, price and where it is made is all you need. Nothing here is pre-filled.';
+      lead.textContent = mine.length ? (mine.length + ' ' + U.plural(mine.length, 'dish', 'dishes') + ' on your menu. Change a name or price in the list and it saves when you tap away.') : 'Add the dishes you sell. Name, price and where it is made is all you need. Nothing here is pre-filled.';
       mine.forEach((m) => {
         const n = h('input', { class: 'input dp-rn', type: 'text', maxlength: 60, value: m.name, 'aria-label': 'Name of ' + m.name });
         const pr = h('input', { class: 'input dp-rp', type: 'text', inputmode: 'decimal', value: m.price.toFixed(2), 'aria-label': 'Price of ' + m.name });
@@ -671,7 +671,14 @@
     // Links to the other small settings and to the full menu editor in the back office.
     const shopBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('shop'), 60); } }, ico('sliders', 20), h('span', null, 'Tax, hours and PIN'));
     const fullBtn = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); } }, ico('gauge', 20), h('span', null, 'Full menu editor'));
-    root.append(lead, form, dishesHead, undoBar, listBox, goneFold, caBox, svBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
+    // A menu that already has dishes shows them first, with a button that jumps to the add form under them;
+    // an empty menu starts on the add form.
+    const addHead = h('h3', { class: 'fs-h dp-h dp-addh' }, 'Add a dish');
+    const hasDishes = activeDishes().length > 0;
+    const jump = h('button', { type: 'button', class: 'btn dp-jump', dataset: { act: 'jump-add' }, hidden: !hasDishes, onClick: () => { addHead.scrollIntoView({ block: 'start', behavior: 'smooth' }); nameIn.focus({ preventScroll: true }); } }, ico('plus', 20), h('span', null, 'Add a dish'));
+    const top = h('div', { class: 'fs-row dp-top' }, lead, jump);
+    if (hasDishes) root.append(top, dishesHead, undoBar, listBox, goneFold, addHead, form, caBox, svBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
+    else root.append(top, form, dishesHead, undoBar, listBox, goneFold, caBox, svBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
     sheet.body.appendChild(root); keepInView(root);
 
     // Restore a draft left by a closed tab, then the last station used.
@@ -679,7 +686,8 @@
     if (d && typeof d === 'object') { nameIn.value = String(d.name || ''); priceIn.value = String(d.price || ''); priceIn.dispatchEvent(new g.Event('input')); }
     const last = (d && d.zone) || U.storage.get(KEY_LAST, '');
     if (last && visibleStations().some((z) => z.id === last) && visibleStations().length > 1) pickZone(last);
-    setTimeout(() => nameIn.focus(), 50);
+    // The name box takes the cursor only when the form is on top (an empty menu, or a half-typed dish to finish).
+    if (!hasDishes || nameIn.value) setTimeout(() => nameIn.focus({ preventScroll: hasDishes }), 50);
     return sheet;
   }
 
