@@ -1600,7 +1600,7 @@
     const hourOpts = (from, to, sel) => { const out = []; for (let x = from; x <= to; x++) out.push(h('option', { value: String(x), selected: x === sel }, U.fmtHour(x) + (x >= 24 ? ' (next day)' : ''))); return out; };
     const openSel = h('select', { class: 'select', 'aria-label': 'Opens at' }, hourOpts(0, 23, set.service.openHour));
     const closeSel = h('select', { class: 'select', 'aria-label': 'Closes at' }, hourOpts(1, 30, set.service.closeHour));
-    const hoursSt = section('Opening hours', 'Warnings and the sell-out clock use these. The starting hours are only a guess.', h('label', { class: 'fs-row' }, h('span', null, 'Opens at'), openSel), h('label', { class: 'fs-row' }, h('span', null, 'Closes at'), closeSel),
+    const hoursSt = section('Opening hours', 'Warnings, and the back office charts of when dishes sold out, use these. The starting hours are only a guess: set your own.', h('label', { class: 'fs-row' }, h('span', null, 'Opens at'), openSel), h('label', { class: 'fs-row' }, h('span', null, 'Closes at'), closeSel),
       // Saves both hours, or says closing has to come after opening.
       h('button', { type: 'button', class: 'btn', onClick: () => {
         const o = Number(openSel.value), c = Number(closeSel.value);
@@ -1609,7 +1609,7 @@
         tell(hoursSt, r.ok ? 'Saved. Open ' + U.fmtHour(o) + ' to ' + U.fmtHour(c) + '.' : r.report === 'nothingToDo' ? 'Already set.' : r.words);
       } }, 'Save hours'));
     const pin = h('input', { class: 'input', type: 'password', inputmode: 'numeric', maxlength: 4, autocomplete: 'off', 'aria-label': 'Manager PIN, 4 digits' });
-    const pinSt = section('Manager PIN (optional)', 'A PIN keeps cooks out of the back office. It only keeps honest people out. Skip it if you do not want one.', h('label', { class: 'fs-row' }, h('span', null, '4 digits'), pin),
+    const pinSt = section('Manager PIN (optional)', 'A PIN keeps the back office for managers only. It stops casual taps, not a determined person. Skip it if you do not want one.', h('label', { class: 'fs-row' }, h('span', null, '4 digits'), pin),
       // Saves the four-digit PIN, or asks for exactly four digits.
       h('button', { type: 'button', class: 'btn', onClick: async () => {
         const v = pin.value.trim();
