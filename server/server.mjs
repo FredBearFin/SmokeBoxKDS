@@ -12,6 +12,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createVoice } from './voice.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -68,6 +69,8 @@ export async function createHub(opts = {}) {
   const now = opts.now || (() => Date.now());
   const tickMs = opts.tickMs ?? 1000, heartbeatMs = opts.heartbeatMs ?? 15000, saveMs = opts.saveMs ?? 500;
   const htmlFile = opts.htmlFile || process.env.SMOKEBOX_HTML || path.join(ROOT, 'dist/smokebox.html');
+  // The natural voice starts in the background (loading the model takes a while); until then tablets use their own voice.
+  const voice = opts.voice || createVoice({ log: (m) => console.log('[smokebox] ' + m) });
   const dataFile = opts.dataFile === undefined ? process.env.SMOKEBOX_DATA : opts.dataFile;
   const loaded = loadSaved(E, dataFile);
   const saved = loaded.state ? loaded : null;
@@ -263,6 +266,22 @@ export async function createHub(opts = {}) {
         res.writeHead(out.status, { 'content-type': 'application/json' });
         res.end(JSON.stringify(out.body));
       });
+      return;
+    }
+    // The natural kitchen voice: /api/voice?v=<voice>&t=<line> answers a WAV of that line (made once, then kept), 503 while
+    // the voice is off or still starting (the tablet then uses its own voice). /api/voices lists the voices and whether it is on.
+    if (req.method === 'GET' && url === '/api/voices') {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+      res.end(JSON.stringify({ ready: voice.ready(), voices: voice.voices }));
+      return;
+    }
+    if (req.method === 'GET' && url === '/api/voice') {
+      const q = new URL(req.url, 'http://x').searchParams;
+      voice.say(q.get('t'), q.get('v'), q.get('p') === '1').then((wav) => {
+        if (!wav) { res.writeHead(503, { 'content-type': 'text/plain', 'retry-after': '5' }); res.end('voice not available'); return; }
+        res.writeHead(200, { 'content-type': 'audio/wav', 'content-length': wav.length, 'cache-control': 'private, max-age=86400', 'x-content-type-options': 'nosniff' });
+        res.end(wav);
+      }, () => { res.writeHead(503, { 'content-type': 'text/plain' }); res.end('voice not available'); });
       return;
     }
     if (req.method === 'GET' && (url === '/' || url === '/smokebox.html')) {

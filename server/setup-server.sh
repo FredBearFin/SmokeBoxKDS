@@ -48,6 +48,19 @@ mkdir -p /var/lib/smokebox
 chown -R smokebox:smokebox /var/lib/smokebox
 chown -R root:root /opt/smokebox
 
+# The natural kitchen voice (server/voice.mjs): espeak-ng for pronunciation, the ONNX runtime and the free Kokoro voice
+# model (325 MB, downloaded once and kept in /opt/smokebox-voice across updates). If any step fails the app still runs and
+# the tablets use their own voice.
+echo "Setting up the natural voice (the first time downloads about 330 MB)..."
+apt-get install -y espeak-ng >/dev/null 2>&1 || echo "espeak-ng could not be installed; tablets will use their own voice."
+mkdir -p /opt/smokebox-voice
+[ -d /opt/smokebox-voice/node_modules/onnxruntime-node ] || npm install --prefix /opt/smokebox-voice --ignore-scripts --no-audit --no-fund onnxruntime-node@1.22.0 >/dev/null 2>&1 || echo "The voice runtime could not be installed; tablets will use their own voice."
+if [ ! -s /opt/smokebox-voice/kokoro-v1.0.onnx ]; then
+  curl -fsSL --max-time 900 --retry 2 https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx -o /opt/smokebox-voice/kokoro-v1.0.onnx.part \
+    && mv /opt/smokebox-voice/kokoro-v1.0.onnx.part /opt/smokebox-voice/kokoro-v1.0.onnx || { rm -f /opt/smokebox-voice/kokoro-v1.0.onnx.part; echo "The voice model could not be downloaded; tablets will use their own voice."; }
+fi
+chown -R root:root /opt/smokebox-voice
+
 cat > /etc/systemd/system/smokebox.service <<UNIT
 [Unit]
 Description=Smokebox prototype hub
