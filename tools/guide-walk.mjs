@@ -41,7 +41,7 @@ const seen = (page, text, scope) => page.evaluate(([t, sc]) => {
 async function blank(browser) {
   console.log('Blank kitchen');
   const p = await fresh(browser);
-  check('welcome: Add your first dish', await seen(p, 'Add your first dish'));
+  check('welcome: Add my menu', await seen(p, 'Add my menu'));
   check('welcome: Show me how it works', await seen(p, 'Show me how it works'));
   await p.click('[data-act="first-dish"]'); await p.waitForTimeout(500);
   const sh = '.sheet-root';
@@ -215,21 +215,21 @@ async function settings(browser) {
   await q.close();
 }
 
-// The Try the demo walk: the welcome button asks first, the demo has a bar with Back to my kitchen, and your own kitchen stays empty.
+// The Watch the demo walk: the welcome button asks first, the demo has a bar with Back to my kitchen, and your own kitchen stays empty.
 async function tryDemo(browser) {
-  console.log('Try the demo');
+  console.log('Watch the demo');
   const p = await fresh(browser);
-  check('welcome: Try the demo', await seen(p, 'Try the demo'));
-  await tap(p, 'Try the demo'); await p.waitForTimeout(700);
-  for (const t of ['Try the demo?', 'Not now']) check('demo dialog: ' + t, await seen(p, t, '.sheet-host'));
-  await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-host button')].find((x) => x.textContent.trim() === 'Try the demo'); if (b) b.click(); });
+  check('welcome: Watch the demo', await seen(p, 'Watch the demo'));
+  await tap(p, 'Watch the demo'); await p.waitForTimeout(700);
+  for (const t of ['Watch the demo?', 'Not now']) check('demo dialog: ' + t, await seen(p, t, '.sheet-host'));
+  await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-host button')].find((x) => x.textContent.trim() === 'Watch the demo'); if (b) b.click(); });
   await p.waitForTimeout(2200);
   check('demo bar: You are trying the demo', await has(p, 'You are trying the demo.'));
   check('demo bar: Back to my kitchen', await seen(p, 'Back to my kitchen'));
   check('demo: sample tickets on the board', (await p.evaluate(() => document.querySelectorAll('.fl-slip').length)) > 0);
   await tap(p, 'Back to my kitchen'); await p.waitForTimeout(2200);
   check('back in your own kitchen: empty menu', (await p.evaluate(() => SB.store.getState().menu.length)) === 0);
-  check('your own kitchen shows Add your first dish again', await seen(p, 'Add your first dish'));
+  check('your own kitchen shows Add my menu again', await seen(p, 'Add my menu'));
   await p.close();
 }
 

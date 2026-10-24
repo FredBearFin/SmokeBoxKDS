@@ -137,7 +137,7 @@
   }
   // The dishes the owner removed (archived), newest last, so they can be brought back.
   function removedDishes() { return SB.store.getState().menu.filter((m) => m.archived); }
-  // True when nothing can be ordered yet: the first-run state that shows the Add your first dish button.
+  // True when nothing can be ordered yet: the first-run state that shows the Add my menu button.
   function noDishes() { return activeDishes().length === 0; }
   // The stations a dish can be made at, in order: only the ones that receive items (not expo).
   function stations() { return SB.config.workZones.map((z) => SB.config.zoneById[z]).filter(Boolean); }
@@ -235,14 +235,14 @@
   // The cooked-ahead items the owner has made: cook-ahead food that is not archived.
   function cookItems() { return SB.store.getState().ingredients.filter((i) => i.tcs && !i.archived); }
 
-  /* ---------- Try the demo ---------- */
+  /* ---------- Watch the demo ---------- */
 
   // Asks once, in plain words, then opens the demo: a practice kitchen in this tab. The owner's own kitchen is saved first
   // and comes back with the Back to my kitchen button.
   async function tryDemo(skipAsk) {
     const store = SB.store;
     if (!store.enterDemo || store.isDemo()) return false;
-    const ok = skipAsk || !SB.ui.confirm ? true : await SB.ui.confirm({ title: 'Try the demo?', confirmLabel: 'Try the demo', cancelLabel: 'Not now',
+    const ok = skipAsk || !SB.ui.confirm ? true : await SB.ui.confirm({ title: 'Watch the demo?', confirmLabel: 'Watch the demo', cancelLabel: 'Not now',
       body: ['The demo has a sample menu and sample tickets. Nothing in it is your kitchen.', 'Your own dishes and orders are not touched. A bar at the top of every screen has a Back to my kitchen button.'] });
     if (!ok) return false;
     if (!store.enterDemo() && SB.ui.toast) SB.ui.toast('This browser would not open the demo. Try again, or add ?demo to the address.', { tone: 'warn' });
@@ -254,7 +254,7 @@
       h('p', { class: 'fs-sub' }, 'A demo kitchen with a sample menu, sample tickets and a crew that sends orders, so you can see Smokebox busy. Nothing in it is your kitchen, and nothing you do there reaches your real dishes, orders or numbers.'),
       h('p', { class: 'fs-sub' }, 'A bar at the top of every demo screen says so and has a Back to my kitchen button. Leaving erases the demo.'),
       // Opens the demo after the plain-words question.
-      h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'try-demo' }, onClick: () => tryDemo(true) }, ico('play', 22), h('span', null, 'Try the demo'))));
+      h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'try-demo' }, onClick: () => tryDemo(true) }, ico('play', 22), h('span', null, 'Watch the demo'))));
   }
 
   /* ---------- the Dishes and prices sheet ---------- */

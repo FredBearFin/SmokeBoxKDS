@@ -249,7 +249,7 @@
     let built = null, closed = false;
     const page = h('div', { class: 'ord-page', dataset: { name: 'order' } });
     // The page's own back button asks first when the order has items, like Esc does.
-    const backBtn = h('button', { type: 'button', class: 'btn btn-ghost ord-page-back', 'aria-label': 'Back to the board' }, ico('chevron-left', 22), h('span', null, 'Board'));
+    const backBtn = h('button', { type: 'button', class: 'btn btn-ghost ord-page-back', }, ico('chevron-left', 22), h('span', null, 'Back to the board'));
     const bar = h('header', { class: 'ord-page-bar' }, backBtn, h('h1', { class: 'ord-page-title' }, 'New ticket'), SB.guide && SB.guide.link ? SB.guide.link('taking-an-order', 'taking an order') : null);
     const body = h('div', { class: 'sheet-body ord-host' }), footer = h('footer', { class: 'sheet-foot' });
     page.append(bar, body, footer);
@@ -370,9 +370,9 @@
     // A kitchen with no dishes yet gets a friendly first step instead of a blank menu: the same setup wizard the welcome card opens.
     if (!menuNow.length) {
       setHidden(sticky, true); // no search box or category tabs for a menu with nothing in it
-      const firstDish = h('button', { type: 'button', class: 'btn btn-primary ord-first-dish' }, ico('plus', 20), h('span', null, 'Add your first dish'));
+      const firstDish = h('button', { type: 'button', class: 'btn btn-primary ord-first-dish' }, ico('plus', 20), h('span', null, 'Add my menu'));
       firstDish.addEventListener('click', () => { host.close('setup'); try { SB.sheets.open('dishes'); } catch (e) { console.error('[smokebox] setup failed', e); } });
-      tilesEl.appendChild(h('div', { class: 'empty ord-nodishes' }, ico('receipt', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your first dish and it shows up here, ready to tap.'), firstDish));
+      tilesEl.appendChild(h('div', { class: 'empty ord-nodishes' }, ico('receipt', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your dishes and they show up here, ready to tap.'), firstDish));
     }
 
     // RIGHT: order pane.

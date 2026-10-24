@@ -1,4 +1,4 @@
-// Quick browser check (about 15 s) of the first-run flow: the empty board with one "Add your first dish" button, the
+// Quick browser check (about 15 s) of the first-run flow: the empty board with one "Add my menu" button, the
 // Dishes and prices form (name, price, station tile, save and add another, remembered station, More options), editing
 // and removing a dish, the example menu fold, the Tax, hours and PIN sheet, no "New tablet?" toast, and that closing the
 // tab and coming back loses nothing. A brand-new install is blank once the blank-start data work is merged; before that

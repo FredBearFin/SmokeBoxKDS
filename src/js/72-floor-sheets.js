@@ -1266,7 +1266,7 @@
     const sheet = SB.ui.sheet({ title: '86 board and stock', side: 'right', width: 'min(1060px, 96vw)', name: 'board86', onClose: () => offs.splice(0).forEach((f) => f()) });
 
     // Filter: all items, or only the ones that are off the menu.
-    const filterSeg = SB.ui.segmented({ label: 'Show', class: 'bd-filter', value: filter, options: [{ id: 'all', label: 'All items', count: 0 }, { id: 'off', label: 'Off the menu', count: 0 }], onChange: (id) => { filter = id; applyFilter(); } });
+    const filterSeg = SB.ui.segmented({ label: 'Show', class: 'bd-filter', value: filter, options: [{ id: 'all', label: 'All items', count: 0 }, { id: 'off', label: 'Out now', count: 0 }], onChange: (id) => { filter = id; applyFilter(); } });
     const menuBox = h('section', { class: 'fs-section bd-menu', 'aria-label': 'Menu availability' }, h('div', { class: 'fs-row' }, h('h3', { class: 'fs-h grow' }, 'Menu'), filterSeg));
     const catHost = h('div', { class: 'bd-cats' });
     const noneOff = h('div', { class: 'empty bd-none', hidden: true }, ico('check-circle', 36), h('h3', null, 'Everything is on the menu'), h('p', null, 'Nothing is 86 right now. Tap 86 it on an item that has run out.'));
@@ -1367,7 +1367,7 @@
       if (ing.tcs) closeThen(sheet, () => SB.sheets.open('hold', { tab: 'new', ing: ingId }));
       else openRestock(ingId);
     }
-    // Applies the All items or Off the menu filter to the rows and hides empty categories.
+    // Applies the All items or Out now filter to the rows and hides empty categories.
     function applyFilter() {
       let shown = 0;
       rows.forEach((rec) => { const hide = filter === 'off' && !rec.off; setHidden(rec.el, hide); if (!hide) shown++; });
@@ -1468,8 +1468,8 @@
       h('p', { class: 'fs-sub' }, cookOn() ? 'Par and 86 levels are starter estimates. Cooked meat and cold sides live in the hold cabinet, so they are added as batches.' : 'Par and 86 levels are starter estimates.'),
       stockList, cookOn() ? safetyNote() : null);
     // With no dishes yet there is nothing to mark sold out: one friendly line and the one next step.
-    const noDishBtn = h('button', { type: 'button', class: 'btn btn-primary', onClick: () => closeThen(sheet, () => SB.sheets.open('dishes')) }, ico('plus', 20), h('span', null, 'Add your first dish'));
-    const noDishBox = h('div', { class: 'empty bd-nodishes', hidden: true }, ico('ban', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your first dish. Then you can mark it sold out here, and Smokebox marks it for you when stock runs low.'), noDishBtn);
+    const noDishBtn = h('button', { type: 'button', class: 'btn btn-primary', onClick: () => closeThen(sheet, () => SB.sheets.open('dishes')) }, ico('plus', 20), h('span', null, 'Add my menu'));
+    const noDishBox = h('div', { class: 'empty bd-nodishes', hidden: true }, ico('ban', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your menu. Then you can mark a dish sold out here, and Smokebox marks it for you when stock runs low.'), noDishBtn);
     const bdCols = h('div', { class: 'bd-cols' }, menuBox, stockBox);
     sheet.body.append(h('div', { class: 'bd' }, noDishBox, bdCols));
 
@@ -1685,7 +1685,7 @@
     // Listeners are removed when the sheet closes, so nothing keeps updating a screen that is gone.
     // In a real kitchen (not the demo tab) this sheet only explains the demo and opens it; the crew and clock live in the demo.
     const realKitchen = !!(SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() && SB.setup && SB.setup.demoIntro);
-    const sheet = SB.ui.sheet({ title: realKitchen ? 'Try the demo' : 'Demo and clock', side: 'right', width: 'min(640px, 96vw)', name: 'demo', onClose: () => offs.splice(0).forEach((f) => f()) });
+    const sheet = SB.ui.sheet({ title: realKitchen ? 'Watch the demo' : 'Demo and clock', side: 'right', width: 'min(640px, 96vw)', name: 'demo', onClose: () => offs.splice(0).forEach((f) => f()) });
     if (realKitchen) { sheet.body.appendChild(SB.setup.demoIntro()); return sheet; }
     const live = simLive();
 
@@ -2231,7 +2231,7 @@
     // The Guide opens only when the guide page is part of this copy of Smokebox.
     const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Device checks: screen, sound, home screen', 'ready'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this device: first steps', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Device checks: screen, sound, home screen', 'ready'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this device: first steps', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Watch the demo' : 'Demo and clock', 'demo'));
 
     sheet.body.append(h('div', { class: 'mn' },
       // The one-time offer to clear old demo tickets from real reports; null (nothing shown) when there are none.
