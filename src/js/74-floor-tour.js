@@ -148,7 +148,7 @@
       case 7: return slip() && slip().querySelector('.fl-bump')
         ? 'Everything is done, so Bump is green. Tap Bump to send the ticket away. The clock stops.'
         : 'Everything is done. Tap the All tab, then tap Bump to send the ticket away. The clock stops.';
-      default: return 'That is the whole loop: a ticket arrives, you start what is ready, tap Done, then Bump. The back office turns these taps into charts: tap Back office at the top of the screen. To add dishes and set prices and prep times, open Menu and settings there.';
+      default: return 'That is the whole loop: a ticket arrives, you start what is ready, tap Done, then Bump. The back office turns these taps into charts: tap Back office at the top of the screen. To add dishes and set prices and prep times, open Menu, prices and shop there.';
     }
   }
 
@@ -329,7 +329,7 @@
     const menu = (SB.store.getState().menu || []).filter((m) => !m.archived);
     if (menu.length) { toast('Every dish is sold out right now, so the walkthrough has nothing to order. Open the 86 board to see why, then try again.', { tone: 'warn' }); return; }
     // Opens the Dishes and prices sheet, where the first dish is added.
-    const open = h('button', { type: 'button', class: 'btn', onClick: () => { try { SB.sheets.open('dishes'); } catch (e) { /* the sheet is optional */ } } }, 'Add your first dish');
+    const open = h('button', { type: 'button', class: 'btn', onClick: () => { try { SB.sheets.open('dishes'); } catch (e) { /* the sheet is optional */ } } }, 'Add my menu');
     toast(h('span', null, 'The walkthrough needs a dish to show. Add one first (a name and a price is enough), then try again. ', open), { tone: 'warn', ms: 12000 });
   }
 

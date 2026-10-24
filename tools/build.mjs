@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -46,6 +47,12 @@ for (const f of jsFiles) {
 }
 
 const tpl = fs.readFileSync(tplPath, 'utf8');
+// The version people see in Settings: the number in package.json plus a short fingerprint of everything built, so two
+// builds of different code never show the same label. It comes from the files only (no git, no clock), so the same
+// sources always build the same page and CI's dist check still holds.
+const pkgVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+const buildId = crypto.createHash('sha256').update(tpl).update(css).update(js).digest('hex').slice(0, 7);
+js = `\nwindow.SB_BUILD = { version: ${JSON.stringify(pkgVersion)}, id: ${JSON.stringify(buildId)} };\n` + js;
 if (!tpl.includes('<!--SB:CSS-->') || !tpl.includes('<!--SB:JS-->')) { console.error('template needs <!--SB:CSS--> and <!--SB:JS--> markers'); process.exit(1); }
 // The replacements are given as functions so any dollar signs in the code are copied exactly as written.
 const html = tpl.replace('<!--SB:CSS-->', () => `<style>${css}\n</style>`).replace('<!--SB:JS-->', () => `<script>${js}\n</script>`);

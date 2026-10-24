@@ -18,14 +18,14 @@ test('rungs: brisket starts at 2 hours, others at 1 hour; the rung number counts
   assert.equal(D.rungOf(0, r), 4);
 });
 
-test('feed: a fresh staggered kitchen is quiet except brisket 25 minutes from expiry, which is bad and says it goes 86', () => {
+test('feed: a fresh staggered kitchen is quiet except brisket 25 minutes from expiry, which is bad and says it sells out', () => {
   const s = E.newState({ now: T0, stagger: true });
   const f = D.build(s, T0);
   const top = f[0];
   assert.equal(top.kind, 'expiry');
   assert.equal(top.ing, 'brisket');
   assert.equal(top.sev, 'bad', 'the last rung or the only batch left is bad');
-  assert.ok(/86/.test(top.consequence) || /No other/.test(top.consequence), top.consequence);
+  assert.ok(/sold out/.test(top.consequence) || /No other/.test(top.consequence), top.consequence);
   assert.equal(Math.round(top.msLeft / MIN), 25);
   assert.ok(f.every((x, i) => i === 0 || x.msLeft >= 0));
 });
@@ -50,7 +50,8 @@ test('feed: projected waste follows the sales pace, oldest batch first, and quie
 
 test('feed: a temperature check due soon, a late sanitize and late tickets appear; an empty kitchen is empty', () => {
   const s = E.newState({ now: T0, empty: true });
-  assert.deepEqual(D.build(s, T0).map((x) => x.kind), ['sanitize'], 'a fresh kitchen only has the first sanitize round due');
+  assert.deepEqual(D.build(s, T0).map((x) => x.kind), [], 'a fresh kitchen has nothing due: the first sanitize round is one interval away');
+  assert.deepEqual(D.build(s, T0 + 4 * HR - 10 * MIN).map((x) => x.kind), ['sanitize'], 'the first sanitize round shows once it is close');
   const withBatch = E.apply(s, 'addBatch', { ing: 'beans', tempF: 160, cookedG: 3000 }, T0).state;
   const f = D.build(withBatch, T0 + 110 * MIN);
   assert.ok(f.some((x) => x.kind === 'check'), f.map((x) => x.id).join());
@@ -220,7 +221,7 @@ test('pace: no pulls is unknown, never zero; a lone pull is not a pace until 120
   const row0 = D.build(s, at(440)).find((x) => x.kind === 'expiry');
   assert.equal(row0.unknown, true);
   assert.equal(row0.wasteG, null, 'no projected waste when the pace is unknown');
-  assert.ok(/Pace unknown/.test(row0.consequence), row0.consequence);
+  assert.ok(/^Up to /.test(row0.consequence), row0.consequence);
   // One pull at 11:30: not a pace before 120 minutes since opening, then the average since opening.
   s = E.apply(s, 'pullBatch', { ing: 'pork', g: 4500 }, at(30)).state;
   assert.equal(D.salesRate(s, at(60)).rate.pork, undefined);

@@ -131,7 +131,7 @@
     const left = state.batches.some((x) => x !== b && x.ing === b.ing && x.status !== 'discard' && x.canServe === true && x.remainingG > 0);
     const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' (' + U.currencySymbol() + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
     out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
-      consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Check it, then decide: keep serving or throw it out. Your food-safety plan comes first.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
+      consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is sold out.'), action: 'Check it, then decide: keep serving or throw it out. Your food-safety plan comes first.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
   }
   // The next closing time after now, in ms, from the service hours (a close above 24 means after midnight, so last
   // night's close can still be ahead at 12:30 am). Null once today's close has passed.
@@ -300,12 +300,12 @@
         const trivial = b.remainingG < TRIVIAL_G || (waste != null && waste < NOTABLE_G && waste < NOTABLE_SHARE * b.remainingG);
         const usd = waste != null && U.isNum(b.costPerCookedKg) ? waste / 1000 * b.costPerCookedKg : null;
         let consequence, action;
-        const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' (' + U.currencySymbol() + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
-        const goes86 = lastOne ? ' and ' + name + ' goes 86' : '';
-        const fate = q ? 'pass its quality limit' : 'be thrown out';
+        const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' (worth ' + U.currencySymbol() + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
+        const goes86 = lastOne ? ', and then ' + name + ' is sold out' : '';
+        const fate = q ? 'go past its quality limit' : 'be thrown out';
         if (msLeft <= 0) { consequence = 'Expired: ' + amount + ' must be thrown out' + goes86 + '.'; action = 'Discard and log it.'; }
-        else if (waste == null) { consequence = 'Pace unknown (nothing pulled yet): up to ' + amount + ' may ' + (q ? 'pass its quality limit' : 'be thrown out') + goes86 + '.'; action = 'Use it first, and log pulls so the pace can be worked out.'; }
-        else if (waste > 50) { consequence = 'About ' + U.weightText(waste) + ' of ' + U.weightText(b.remainingG) + ' will ' + fate + (usd != null ? ' (' + U.currencySymbol() + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
+        else if (waste == null) { consequence = 'Up to ' + amount + ' may ' + fate + ' when the time is up' + goes86 + '.'; action = 'Use it first.'; }
+        else if (waste > 50) { consequence = 'About ' + U.weightText(waste) + ' of ' + U.weightText(b.remainingG) + ' will ' + fate + (usd != null ? ' (worth ' + U.currencySymbol() + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
         else { consequence = 'On pace to sell all ' + U.weightText(b.remainingG) + ' in time.'; action = 'Nothing to do.'; }
         // A batch gets a row once a rung is crossed, or earlier when the pace says food will be thrown out within 2 hours.
         const isLim = !!lim && lim.limitBatchId === b.id;
@@ -384,7 +384,7 @@
       const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');
       const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' (' + U.currencySymbol() + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
       out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
-        consequence: (b.discardReason === 'expired' ? 'Expired and thrown out: ' : 'Past your limit and thrown out: ') + U.weightText(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
+        consequence: (b.discardReason === 'expired' ? 'Expired and thrown out: ' : 'Past your limit and thrown out: ') + U.weightText(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is sold out.'), action: 'Tap to confirm it is logged.', unknown: false });
     }
   }
   // Rows for batches that are being kept serving: shown from 15 minutes before the extension ends, or when the last
@@ -403,7 +403,8 @@
   // Rows for tickets and the sanitize timer.
   function otherRows(state, now, out) {
     const C0 = E().views.counts(state, now);
-    if (C0.overdue > 0) out.push({ id: 'late', kind: 'late', label: 'Late tickets', at: now, msLeft: 0, rung: 0, rungs: 0, sev: 'warn',
+    // One late ticket already says so itself (red, "Do this first"); a strip row for it would say the same thing twice.
+    if (C0.overdue > 1) out.push({ id: 'late', kind: 'late', label: 'Late tickets', at: now, msLeft: 0, rung: 0, rungs: 0, sev: 'warn',
       consequence: C0.overdue + ' ' + U.plural(C0.overdue, 'ticket is', 'tickets are') + ' past ' + U.plural(C0.overdue, 'its', 'their') + ' time limit.', action: 'Clear the oldest ticket first.', unknown: false });
     if (U.isNum(C0.sanitizeDueAt) && C0.sanitizeDueAt - now <= 15 * MIN) {
       const late = C0.sanitizeDueAt < now;
@@ -654,16 +655,19 @@
     else if (kind === 'summary') t = d.count + ' new tickets. First up, ticket ' + d.first + '.';
     else if (kind === 'start') t = 'Fire ' + d.name + ' now! Ticket ' + d.num + '!';
     else if (kind === 'start_again') t = 'Still waiting on ' + d.name + '! Fire it now! Ticket ' + d.num + '!';
+    else if (kind === 'step') t = d.name + ': ' + d.say + '! Ticket ' + d.num + '!';
     else if (kind === 'ready') t = 'Ticket ' + d.num + ' is up! Ring it out!';
     else if (kind === 'ready_again') t = 'Ticket ' + d.num + ' is waiting! Ring it out now!';
     else if (kind === 'past') t = d.who + (d.many ? ' are past quality!' : ' is past quality!') + ' Check it now!';
     else if (kind === 'expired') t = d.who + ' expired! Pull it and log it now!';
-    else t = 'Heads up! ' + d.who + (d.goes86 && !d.many ? ' goes 86' : d.many ? ' expire' : ' expires') + ' in ' + (d.approx ? 'about ' : '') + dur(d.mins) + '! Act now!';
+    else t = 'Heads up! ' + d.who + (d.goes86 && !d.many ? ' runs out' : d.many ? ' expire' : ' expires') + ' in ' + (d.approx ? 'about ' : '') + dur(d.mins) + '! Act now!';
     return clipWords(spoken(t), 14);
   }
-  // Picks the best-sounding English voice the device has: the natural, neural or online ones first, then premium, Google
-  // and well-known named voices; null when there is none, so the device default is used.
-  function pickVoice(voices) {
+  // Picks the voice that speaks: the one the owner chose in Settings when this device still has it, else the best-sounding
+  // English voice the device has (natural, neural or online ones first, then premium, Google and well-known named voices);
+  // null when there is none, so the device default is used.
+  function pickVoice(voices, chosen) {
+    if (typeof chosen === 'string' && chosen) { const c = (voices || []).find((v) => v && v.name === chosen); if (c) return c; }
     const NOVELTY = /bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|albert|fred|junior|ralph|kathy|princess|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley/i;
     const en = (voices || []).filter((v) => v && /^en/i.test(String(v.lang || '').replace('_', '-')) && !NOVELTY.test(String(v.name || '')));
     // How good a voice sounds for a kitchen call, higher is better. Voices stored on the tablet come first (a kitchen may be offline and
@@ -685,8 +689,8 @@
     return best;
   }
   // Which voice would speak right now and whether it lives on the tablet, for the Test the voice line: { name, lang, local } or null.
-  function voiceInfo(voices) {
-    const v = pickVoice(voices);
+  function voiceInfo(voices, chosen) {
+    const v = pickVoice(voices, chosen);
     return v ? { name: String(v.name || 'Default'), lang: String(v.lang || ''), local: v.localService !== false } : null;
   }
   // How much the voice talks, per level. repeatStartSec is the gap between "still waiting" reminders for a dish that is
@@ -737,6 +741,17 @@
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(it);
       }
+      // Cook steps: while a dish cooks, each step the owner set for it is called when its share of the cook time has passed.
+      const menuById = new Map((state.menu || []).map((x) => [x.id, x]));
+      for (const it of mine) {
+        if (it.status !== 'cooking' || !U.isNum(it.startedAt) || !(it.prepSec > 0)) continue;
+        const md = menuById.get(it.menuId);
+        if (!md || !Array.isArray(md.steps)) continue;
+        md.steps.forEach((st, i) => {
+          const at = it.startedAt + Math.round(it.prepSec * 10 * st.at);
+          if (now >= at) out.push({ id: 'c:' + t.id + ':' + it.id + ':' + i, kind: 'step', style: 'start', at, text: phrase('step', { name: it.short || it.name, say: st.say, num: t.num }), ticketNum: t.num });
+        });
+      }
       for (const [key, its] of groups) {
         const at = key * 1000, name = nameList(its);
         out.push({ id: 's:' + t.id + ':' + key, kind: 'start', style: 'start', at, text: phrase('start', { name, num: t.num }), ticketNum: t.num });
@@ -785,7 +800,7 @@
           return { id: 'burst:' + news[0].id, kind: 'new', style: 'summary', at: news[0].at, ticketNum: news[0].ticketNum, text: phrase('summary', { count: news.length, first: news[0].ticketNum }) };
         }
         // Dishes to fire come before a finished ticket, and a finished ticket before a new one; oldest first inside each.
-        const rank = (c) => (c.kind === 'start' ? 0 : c.kind === 'ready' ? 1 : 2);
+        const rank = (c) => (c.kind === 'start' || c.kind === 'step' ? 0 : c.kind === 'ready' ? 1 : 2);
         let bi = 0;
         for (let i = 1; i < q.length; i++) if (rank(q[i]) < rank(q[bi])) bi = i;
         return q.splice(bi, 1)[0];
