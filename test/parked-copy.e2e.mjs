@@ -1,5 +1,5 @@
 /*
- * WHAT THIS FILE IS: Browser check for the set-aside copy card on the Data page (Back office, Menu and settings, Data): a copy that was set aside as
+ * WHAT THIS FILE IS: Browser check for the set-aside copy card on the Data page (Back office, Menu, prices and shop, Data): a copy that was set aside as
  * unreadable but can be read is described (tickets, orders, when), bringing it back needs a saved backup of what is here, the typed word RESTORE and the
  * PIN when one is set, the kitchen it replaces is kept (Undo this restore puts it back), and it can be thrown away. Nothing shows without a readable copy.
  * USES: tools/pw.mjs, test/_load.mjs (builds kitchens with the engine), dist/smokebox.html. RUN: node test/parked-copy.e2e.mjs

@@ -259,7 +259,8 @@ button.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); bor
 }
 .textarea { min-height: 96px; resize: vertical; line-height: var(--lh-body); }
 .select { appearance: auto; }
-.input::placeholder, .textarea::placeholder { color: var(--ink3); opacity: 1; }
+/* Example text in an empty box is a lighter grey than typed text (about 4.5 to 1 on the box), so it never looks filled in. */
+.input::placeholder, .textarea::placeholder { color: var(--ink3); color: color-mix(in srgb, var(--ink3) 85%, var(--paper)); opacity: 1; }
 .input:focus, .select:focus, .textarea:focus { border-color: var(--amber); }
 .input[aria-invalid="true"], .select[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--crimson); }
 .input:disabled, .select:disabled, .textarea:disabled { background: var(--sub); color: var(--ink3); cursor: not-allowed; }

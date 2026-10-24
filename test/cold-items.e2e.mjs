@@ -25,6 +25,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   check('hours that are not a number are refused in plain words', /hours from 0.25 to 24/.test(await page.locator(sheet).innerText()));
   await page.fill(sheet + ' [aria-label="How many hours may it be out of the fridge?"]', '2');
   await page.locator(sheet + ' .dp-row', { hasText: 'Potato salad plate' }).locator('input[type=checkbox]').check();
+  await page.fill(sheet + ' [aria-label="Grams of it in one Potato salad plate"]', '150');
   await page.click('[data-act=save-cooked]'); await page.waitForTimeout(500);
   let it = await item(page, 'Potato salad');
   check('a cold item is saved with its fridge days and hours out', it && it.hold === 'cold' && it.days === 3 && it.out === 2, it);

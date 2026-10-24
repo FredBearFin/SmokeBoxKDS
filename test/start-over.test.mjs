@@ -335,3 +335,36 @@ test('a new empty kitchen gets neutral station and section names; old kitchens, 
   } finally { cleanNames(); }
   assert.deepEqual([zoneNames(), catNames()], orig);
 });
+
+test('quick start over: a kitchen with only dishes starts over in one step; any ticket, order or batch needs the careful steps', () => {
+  clock = T;
+  try {
+    // Only dishes: no word, no backup file, and it works.
+    const b = backend(); start(b);
+    assert.equal(S.nothingToLose(), true);                                                              // nothing at all
+    assert.equal(S.dispatch('addMenuItem', { name: 'Pie', zone: 'cold', cat: 'cold', price: 4, prepSec: 30, track: 'one' }), 'ok');
+    assert.equal(S.nothingToLose(), true);                                                              // dishes only
+    const r = S.startOver({ quick: true });
+    assert.equal(r.ok, true, r.report);
+    assert.equal(S.getState().menu.length, 0);
+    assert.ok(r.backup && r.backup.chars > 0);                                                          // a copy is still offered, never forced
+    S.destroy(); cleanNames();
+    // One ticket: quick is refused, nothing changes, and the full flow still works.
+    const b2 = backend(); start(b2);
+    S.dispatch('addMenuItem', { name: 'Pie', zone: 'cold', cat: 'cold', price: 4, prepSec: 30, track: 'one' });
+    S.dispatch('createTicket', { customer: 'Ann', channel: 'dine_in', items: [{ menuId: S.getState().menu[0].id, qty: 1 }] });
+    assert.equal(S.nothingToLose(), false);
+    const before = body(S.getState());
+    const q = S.startOver({ quick: true });
+    assert.deepEqual([q.ok, q.report], [false, 'backupRequired']);
+    assert.equal(body(S.getState()), before);
+    assert.equal(S.startOver({ quick: true, confirm: WORD }).report, 'backupRequired');               // the word alone is not enough
+    assert.equal(S.startOver({ backupSaved: { filename: 'b.json', chars: 1 }, confirm: WORD }).ok, true);
+    S.destroy(); cleanNames();
+    // A busy kitchen has plenty to lose; the demo never starts over.
+    const b3 = backend(); busyKitchen(b3);
+    assert.equal(S.nothingToLose(), false); assert.equal(S.startOver({ quick: true }).ok, false);
+    S.destroy(); cleanNames();
+    start(backend(), 'demo'); assert.equal(S.nothingToLose(), false); assert.equal(S.startOver({ quick: true }).report, 'notInDemo'); S.destroy();
+  } finally { cleanNames(); }
+});

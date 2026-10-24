@@ -1266,7 +1266,7 @@
     const sheet = SB.ui.sheet({ title: '86 board and stock', side: 'right', width: 'min(1060px, 96vw)', name: 'board86', onClose: () => offs.splice(0).forEach((f) => f()) });
 
     // Filter: all items, or only the ones that are off the menu.
-    const filterSeg = SB.ui.segmented({ label: 'Show', class: 'bd-filter', value: filter, options: [{ id: 'all', label: 'All items', count: 0 }, { id: 'off', label: 'Off the menu', count: 0 }], onChange: (id) => { filter = id; applyFilter(); } });
+    const filterSeg = SB.ui.segmented({ label: 'Show', class: 'bd-filter', value: filter, options: [{ id: 'all', label: 'All items', count: 0 }, { id: 'off', label: 'Out now', count: 0 }], onChange: (id) => { filter = id; applyFilter(); } });
     const menuBox = h('section', { class: 'fs-section bd-menu', 'aria-label': 'Menu availability' }, h('div', { class: 'fs-row' }, h('h3', { class: 'fs-h grow' }, 'Menu'), filterSeg));
     const catHost = h('div', { class: 'bd-cats' });
     const noneOff = h('div', { class: 'empty bd-none', hidden: true }, ico('check-circle', 36), h('h3', null, 'Everything is on the menu'), h('p', null, 'Nothing is 86 right now. Tap 86 it on an item that has run out.'));
@@ -1367,7 +1367,7 @@
       if (ing.tcs) closeThen(sheet, () => SB.sheets.open('hold', { tab: 'new', ing: ingId }));
       else openRestock(ingId);
     }
-    // Applies the All items or Off the menu filter to the rows and hides empty categories.
+    // Applies the All items or Out now filter to the rows and hides empty categories.
     function applyFilter() {
       let shown = 0;
       rows.forEach((rec) => { const hide = filter === 'off' && !rec.off; setHidden(rec.el, hide); if (!hide) shown++; });
@@ -1468,8 +1468,8 @@
       h('p', { class: 'fs-sub' }, cookOn() ? 'Par and 86 levels are starter estimates. Cooked meat and cold sides live in the hold cabinet, so they are added as batches.' : 'Par and 86 levels are starter estimates.'),
       stockList, cookOn() ? safetyNote() : null);
     // With no dishes yet there is nothing to mark sold out: one friendly line and the one next step.
-    const noDishBtn = h('button', { type: 'button', class: 'btn btn-primary', onClick: () => closeThen(sheet, () => SB.sheets.open('dishes')) }, ico('plus', 20), h('span', null, 'Add your first dish'));
-    const noDishBox = h('div', { class: 'empty bd-nodishes', hidden: true }, ico('ban', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your first dish. Then you can mark it sold out here, and Smokebox marks it for you when stock runs low.'), noDishBtn);
+    const noDishBtn = h('button', { type: 'button', class: 'btn btn-primary', onClick: () => closeThen(sheet, () => SB.sheets.open('dishes')) }, ico('plus', 20), h('span', null, 'Add my menu'));
+    const noDishBox = h('div', { class: 'empty bd-nodishes', hidden: true }, ico('ban', 40), h('h3', null, 'No dishes yet'), h('p', null, 'Add your menu. Then you can mark a dish sold out here, and Smokebox marks it for you when stock runs low.'), noDishBtn);
     const bdCols = h('div', { class: 'bd-cols' }, menuBox, stockBox);
     sheet.body.append(h('div', { class: 'bd' }, noDishBox, bdCols));
 
@@ -1685,7 +1685,7 @@
     // Listeners are removed when the sheet closes, so nothing keeps updating a screen that is gone.
     // In a real kitchen (not the demo tab) this sheet only explains the demo and opens it; the crew and clock live in the demo.
     const realKitchen = !!(SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() && SB.setup && SB.setup.demoIntro);
-    const sheet = SB.ui.sheet({ title: realKitchen ? 'Try the demo' : 'Demo and clock', side: 'right', width: 'min(640px, 96vw)', name: 'demo', onClose: () => offs.splice(0).forEach((f) => f()) });
+    const sheet = SB.ui.sheet({ title: realKitchen ? 'Watch the demo' : 'Demo and clock', side: 'right', width: 'min(640px, 96vw)', name: 'demo', onClose: () => offs.splice(0).forEach((f) => f()) });
     if (realKitchen) { sheet.body.appendChild(SB.setup.demoIntro()); return sheet; }
     const live = simLive();
 
@@ -1847,7 +1847,7 @@
   // Shortcut list (key, what it does) used when the board does not supply its own.
   // audit:data-start
   const FALLBACK_KEYS = [
-    { key: 'N', label: 'New ticket' }, { key: 'R', label: 'Recall a bumped ticket' }, { key: 'H', label: 'Hold cabinet' }, { key: '8', label: '86 board' },
+    { key: 'N', label: 'New ticket' }, { key: 'R', label: 'Recall a bumped ticket' }, { key: 'H', label: 'Hold cabinet' }, { key: '8', label: 'Sold out (86 board)' },
     { key: 'D', label: 'Demo' }, { key: '1 to 6', label: 'Station: All, PIT, HOT, FRY, CLD, EXP' }, { key: 'Z', label: 'Undo the last action' },
     { key: '?', label: 'Help' }, { key: 'Esc', label: 'Close a screen' },
   ];
@@ -1879,17 +1879,17 @@
       h('div', { class: 'fs-row hp-links' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'tour' }, onClick: () => closeThen(sheet, runTour) }, ico('play', 20), h('span', null, 'Show me how it works'))),
       helpList([
         helpItem('plus', 'Send a ticket', 'Tap New ticket, tap the items, tap Send to kitchen. Four lines take fewer than ten taps.'),
-        helpItem('check', 'Tap an item to work it', 'Tap an item row. A one-step item is done on that tap. A two-step item starts on the first tap, counts down from its usual cooking time, and finishes on the second.'),
-        helpItem('bell', 'Check it', 'When a dish reaches its usual cooking time, its row flashes Check it (and chimes if Sound is on). Smokebox never marks a dish done for you: look at the food, then tap the row.'),
+        helpItem('check', 'Start and Done', 'Each dish has a button on its row. A one-step dish shows Done: tap it when the dish is ready. A two-step dish shows Start: tap it when cooking starts, it counts down from its usual cooking time, then tap Done.'),
+        helpItem('bell', 'Check it', 'When a dish reaches its usual cooking time, its row flashes Check it (and chimes if Sound is on). Smokebox never marks a dish done for you: look at the food, then tap Done.'),
         helpItem('arrow-right', 'The line under each ticket', 'Says what to do next, such as Tap Start on a dish. You can turn it off in Settings.'),
         helpItem('check-circle', 'All done here', 'Finishes every item your station still has on that ticket.'),
         helpItem('zap', 'Start now', 'Starts a waiting item before its planned time. Waiting items are dimmed and show Start in 2:08, so the slow dishes start first and the whole order finishes together.'),
         helpItem('receipt', 'Bump', 'Sends the ticket out when everything is done. If items are not done, Smokebox asks first.'),
-        helpItem('undo', 'Undo', 'After a bump, done, void, 86 or discard, an Undo button stays for ' + undoS + ' seconds. The Z key does the same.'),
+        helpItem('undo', 'Undo', 'After a bump, done, void, 86 or discard, an Undo button stays for ' + undoS + ' seconds.' + (hasKeyboard() ? ' The Z key does the same.' : '')),
         helpItem('history', 'Recall', 'Brings a bumped ticket back. Open Recall, find the ticket and tap Recall.'),
         helpItem('list', 'The all-day bar', 'Counts what is still to make across every ticket. Tap an item to highlight it on the board.'),
         helpItem('thermometer', 'Hold cabinet', 'Log a temperature when food goes in and at every check. Smokebox warns before a batch runs out of time and locks one that has.'),
-        helpItem('ban', '86 board', 'Marks an item sold out. It also goes 86 by itself when stock runs low or a batch is held back.'),
+        helpItem('ban', 'Sold out (86 board)', 'The Sold out button marks an item sold out. It also goes 86 by itself when stock runs low or a batch is held back.'),
       ]));
   }
 
@@ -1987,20 +1987,23 @@
         demoOn() ? h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, () => SB.sheets.open('specs')) }, ico('book', 20), h('span', null, 'See the specs')) : null,
         // The demo sheet opens after Help closes.
         h('button', { type: 'button', class: 'btn', onClick: () => closeThen(sheet, () => SB.sheets.open('demo')) }, ico('play', 20), h('span', null, 'Demo and clock'))),
-      h('p', { class: 'fs-sub hp-tiny' }, 'Smokebox version ' + C.version + '. Managers: tap Back office at the top of the board, or press Ctrl+Shift+O. To add a dish or change a price, open Back office, then Menu and settings.'));
+      h('p', { class: 'fs-sub hp-tiny' }, 'Smokebox version ' + C.version + '. Managers: tap Back office at the top of the board, or press Ctrl+Shift+O. To add a dish or change a price, open Settings, then Dishes and prices.'));
   }
 
-  // Builds the Help sheet with its five tabs. opts.tab can pick the tab to open on.
+  // True when this device has a mouse or trackpad (a laptop or desktop), so keyboard shortcuts are worth showing.
+  // A touch-only tablet or phone answers false.
+  function hasKeyboard() { try { return !!(g.matchMedia && g.matchMedia('(any-pointer: fine)').matches); } catch (e) { return true; } }
+  // Builds the Help sheet with its tabs (Keys only on a device with a mouse or trackpad). opts.tab can pick the tab to open on.
   function openHelp(opts) {
     opts = opts || {};
     const sheet = SB.ui.sheet({ title: 'Help and about', side: 'right', width: 'min(720px, 96vw)', name: 'help' });
     const defs = [
       { id: 'basics', label: 'Basics', panel: h('div', null, helpBasics(sheet)) },
       { id: 'words', label: 'Words and colors', panel: h('div', null, helpWords()) },
-      { id: 'keys', label: 'Keys', panel: h('div', null, helpKeys()) },
+      hasKeyboard() ? { id: 'keys', label: 'Keys', panel: h('div', null, helpKeys()) } : null,
       { id: 'safety', label: 'Food safety', panel: h('div', null, helpSafety()) },
       { id: 'about', label: 'About', panel: h('div', null, helpAbout(sheet)) },
-    ];
+    ].filter(Boolean);
     const start = defs.some((d) => d.id === opts.tab) ? opts.tab : 'basics';
     const tabs = tabsWithPanels('Help topics', defs, start);
     sheet.body.append(h('div', { class: 'hp' }, tabs.seg, ...defs.map((d) => d.panel)));
@@ -2228,7 +2231,7 @@
     // The Guide opens only when the guide page is part of this copy of Smokebox.
     const guideLink = typeof SB.guide === 'object' && SB.guide && typeof SB.guide.open === 'function'
       ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'guide' }, onClick: () => closeThen(sheet, () => SB.guide.open()) }, ico('info', 22), h('span', { class: 'grow' }, 'Guide')) : null;
-    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Tablet checks: screen, sound, home screen', 'ready'), link('receipt', 'Pilot visit checklist', 'pilot'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this tablet: first steps', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Try the demo' : 'Demo and clock', 'demo'));
+    const links = h('div', { class: 'mn-links' }, officeLink, menuLink, tourLink, link('help', 'Help and about', 'help'), guideLink, cookOn() ? link('receipt', 'Thrown-out log', 'discards') : null, cookOn() ? link('thermometer', 'Readings', 'readings') : null, link('sliders', 'Tax, hours and PIN', 'shop'), link('check-circle', 'Device checks: screen, sound, home screen', 'ready'), link('sliders', 'How you serve', 'serve'), link('check-circle', 'Set up this device: first steps', 'setup'), demoOn() ? link('book', 'Specs', 'specs') : null, link('play', SB.store.isolated && SB.store.isolated() && !SB.store.isDemo() ? 'Watch the demo' : 'Demo and clock', 'demo'));
 
     // The saved-history line: how full this tablet's saved history is, and a way to Close the month once it is getting full.
     // Nothing shows in the demo or when the store cannot say.
