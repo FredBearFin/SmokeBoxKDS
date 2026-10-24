@@ -807,17 +807,20 @@
     return sheet;
   }
 
-  /* ---------- the Import a menu sheet ---------- */
+  /* ---------- the Import or export your menu sheet ---------- */
 
-  // Opens "Import a menu": choose a file or paste text, check it, fix the rows in a preview, then import the ticked ones.
+  // Opens "Import or export your menu": choose a file or paste text, preview it, fix the rows, then import the ticked ones.
   // Also has "Export my menu". Optional; the form is still the easy way to add dishes.
   function openImport() {
     const M = SB.menuImport;
-    const sheet = SB.ui.sheet({ title: 'Import a menu', side: 'right', width: 'min(900px, 96vw)', name: 'menuimport' });
+    const sheet = SB.ui.sheet({ title: 'Import or export your menu', side: 'right', width: 'min(900px, 96vw)', name: 'menuimport' });
     const root = h('div', { class: 'dp' });
     if (!M) { sheet.body.appendChild(h('p', { class: 'fs-sub' }, 'Menu import is not part of this copy of Smokebox.')); return sheet; }
     const area = h('textarea', { class: 'textarea', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Paste your menu here', placeholder: 'Paste your menu here, one dish per line like "Pulled pork plate 12.50", or the text of a spreadsheet.' });
-    const fileIn = h('input', { type: 'file', accept: '.csv,.tsv,.txt,text/csv,text/plain', 'aria-label': 'Choose a menu file' });
+    // The browser's own file picker is hidden inside a label that looks like the app's other buttons; the chosen name shows beside it.
+    const fileIn = h('input', { type: 'file', class: 'visually-hidden', accept: '.csv,.tsv,.txt,text/csv,text/plain', 'aria-label': 'Choose a menu file' });
+    const fileName = h('span', { class: 'fs-sub imp-name' }, 'No file chosen yet');
+    const fileBtn = h('label', { class: 'btn imp-file' }, fileIn, ico('upload', 20), h('span', null, 'Choose a menu file'));
     const status = h('p', { class: 'fs-sub', role: 'status' });
     const preview = h('div', { class: 'dp-preview' });
     let parsed = null, rows = [];
@@ -947,6 +950,7 @@
     fileIn.addEventListener('change', () => {
       const f = fileIn.files && fileIn.files[0];
       if (!f) return;
+      fileName.textContent = f.name;
       if (f.size > M.limits.textMax) { tell(status, 'That file is too big to read. Use a file under 1 MB.'); return; }
       const rd = new g.FileReader();
       // When the file is read, check its text; a failed read says so.
@@ -954,8 +958,8 @@
       rd.onerror = () => { tell(status, 'That file could not be read.'); };
       rd.readAsText(f);
     });
-    const checkBtn = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'import-check' } }, ico('check', 20), h('span', null, 'Check it'));
-    // Checks the pasted text.
+    const checkBtn = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'import-check' } }, ico('check', 20), h('span', null, 'Preview'));
+    // Shows the pasted text as a preview of the dishes, before anything is added.
     checkBtn.addEventListener('click', () => check(area.value, 'the pasted text', ''));
     // Export: the menu as a spreadsheet file, so it can be edited elsewhere or kept as a copy.
     const exp = h('button', { type: 'button', class: 'btn', dataset: { act: 'export-menu' } }, ico('download', 20), h('span', null, 'Export my menu'));
@@ -969,8 +973,8 @@
         tell(status, 'Saved smokebox-menu.csv. Open it in a spreadsheet, or import it again later.');
       } catch (e) { area.value = text; tell(status, 'Your browser blocked the download. The menu is in the box above: copy it into a file named smokebox-menu.csv.'); }
     });
-    root.append(h('p', { class: 'fs-sub' }, 'Optional. Choose a spreadsheet (CSV) or an item export from Square, Toast, Clover or Lightspeed, or paste a list. You will see every dish and can fix or clear any before anything is added. Adding dishes by hand in Dishes and prices is just as good.'),
-      h('div', { class: 'fs-row' }, fileIn), area, h('div', { class: 'fs-row' }, checkBtn, exp), status, preview);
+    root.append(h('p', { class: 'fs-sub' }, 'Optional. Choose a spreadsheet (CSV) or an item export from Square, Toast, Clover or Lightspeed, or paste a list. You will see every dish and can fix or clear any before anything is added. Adding dishes by hand in Dishes and prices is just as good. Export my menu saves your dishes as a spreadsheet file.'),
+      h('div', { class: 'fs-row' }, fileBtn, fileName), area, h('div', { class: 'fs-row' }, checkBtn, exp), status, preview);
     sheet.body.appendChild(root); keepInView(sheet.body);
     return sheet;
   }

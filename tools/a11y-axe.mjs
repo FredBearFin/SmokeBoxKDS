@@ -86,7 +86,7 @@ function screens(kitchen) {
     ['Help and about', sheet('help')],
     ['Demo and clock', sheet('demo')],
     ['Dishes and prices', sheet('dishes')],
-    ['Import preview', async (p) => { await sheet('menuimport')(p); await p.locator('textarea').first().fill('Lemonade 3\nChili 6.50\nBad row'); await p.locator('.sheet button', { hasText: 'Check it' }).first().click().catch(() => {}); await p.waitForTimeout(500); }],
+    ['Import preview', async (p) => { await sheet('menuimport')(p); await p.locator('textarea').first().fill('Lemonade 3\nChili 6.50\nBad row'); await p.locator('.sheet button', { hasText: 'Preview' }).first().click().catch(() => {}); await p.waitForTimeout(500); }],
     ['Cooked-ahead form', sheet('cookahead')],
     ['Tax, hours and PIN', sheet('shop')],
     ['How you serve', sheet('serve')],

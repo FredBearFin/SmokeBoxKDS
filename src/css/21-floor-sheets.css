@@ -575,6 +575,10 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* The two help links at the top of Set up this device: plain underlined words with a small ?, no button frame. */
 .setup-helps { gap: var(--sp-2) var(--sp-5); margin-bottom: var(--sp-2); }
 .btn-link.setup-help { box-shadow: none; gap: 6px; }
+/* Import: the hidden file picker's label is the button, and shows the focus ring when the picker inside has focus. */
+.imp-file { cursor: pointer; }
+.imp-file:focus-within { outline: var(--bw-focus) solid var(--focus); outline-offset: 2px; }
+.imp-name { overflow-wrap: anywhere; }
 
 
 /* ===== Round 5: one compact cabinet card =====

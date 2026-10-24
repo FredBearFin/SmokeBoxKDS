@@ -368,7 +368,7 @@ async function pinCode(browser) {
   await p.close();
 }
 
-// The import walk: paste a file, check it, and see the preview words the Import a menu page names.
+// The import walk: paste a file, preview it, and see the preview words the Import or export your menu page names.
 async function importMenu(browser) {
   console.log('Import a menu');
   const p = await fresh(browser);
@@ -379,7 +379,7 @@ async function importMenu(browser) {
   const is = '.sheet-root:last-of-type';
   check('import: intro names Lightspeed', await has(p, 'Lightspeed', is));
   await p.fill(is + ' textarea', 'Name,Price,Description,Calories\nLatte,450,Hot or iced,120\nScone,325,Fresh daily,300\nBagel,1400,With cream cheese,280');
-  check('import: Check it', await tap(p, 'Check it')); await p.waitForTimeout(700);
+  check('import: Preview', await tap(p, 'Preview')); await p.waitForTimeout(700);
   for (const t of ['Read as', 'These prices are in cents', 'Ignored column: Calories', 'Notes and descriptions in your file are not kept', 'Put all these dishes at', 'Import ']) check('import preview: ' + t, await has(p, t, is));
   check('import: tapping cents works', await tap(p, 'These prices are in cents')); await p.waitForTimeout(600);
   check('import preview: These prices are in dollars', await has(p, 'These prices are in dollars', is));
