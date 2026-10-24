@@ -80,8 +80,8 @@ async function blank(browser) {
   check('header: Recall and 86 board', (await seen(p, 'Recall', '.fl-head')) && (await seen(p, '86 board', '.fl-head')));
   // Back office: backup.
   await p.click('button:has-text("Back office")'); await p.waitForTimeout(2200);
-  for (const t of ['Sales and money', 'Safety', 'Menu and settings']) check('back office nav: ' + t, await seen(p, t, '#sb-office'));
-  await p.click('#sb-office nav >> text=Menu and settings'); await p.waitForTimeout(1400);
+  for (const t of ['Sales and money', 'Safety', 'Menu, prices and shop']) check('back office nav: ' + t, await seen(p, t, '#sb-office'));
+  await p.click('#sb-office nav >> text=Menu, prices and shop'); await p.waitForTimeout(1400);
   for (const t of ['Data, backup and reset', 'Back up now', 'Restore from a backup', 'Replacing this device', 'Danger zone: erase data']) check('data page: ' + t, await has(p, t, '#sb-office'));
   for (const t of ['Sales by day (for your accountant)', 'Download backup (JSON)', 'Copy backup', 'Choose a backup file', 'Check pasted backup', 'Erase tickets and records', 'Erase everything']) check('data page: ' + t, await seen(p, t, '#sb-office'));
   await p.close();
@@ -209,7 +209,7 @@ async function settings(browser) {
   await p.close();
   const q = await fresh(browser);
   await tap(q, 'Back office'); await q.waitForTimeout(2200);
-  await q.click('#sb-office nav >> text=Menu and settings'); await q.waitForTimeout(1400);
+  await q.click('#sb-office nav >> text=Menu, prices and shop'); await q.waitForTimeout(1400);
   for (const t of ['Temperatures', 'Weights']) check('units: ' + t, await seen(q, t, '#sb-office'));
   await q.close();
 }
@@ -451,7 +451,7 @@ async function restoreUndo(browser) {
   const backup = await p.evaluate(() => SB.store.exportAll());
   await addDish(p, { name: 'Wings', short: 'Wings', zone: 'fry', price: 9 });
   await tap(p, 'Back office'); await p.waitForTimeout(1200);
-  await p.click('#sb-office nav >> text=Menu and settings'); await p.waitForTimeout(1500);
+  await p.click('#sb-office nav >> text=Menu, prices and shop'); await p.waitForTimeout(1500);
   await p.evaluate((t) => { const b = [...document.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Check pasted backup'); let n = b; let a = null; while (n && !a) { n = n.parentElement; a = n && n.querySelector('textarea'); } if (a) { const d = a.closest('details'); if (d) d.open = true; a.value = t; a.dispatchEvent(new Event('input', { bubbles: true })); } }, backup);
   await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Check pasted backup'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } }); await p.waitForTimeout(1200);
   await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.getClientRects().length && e.textContent.trim() === 'Replace everything with this backup'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } }); await p.waitForTimeout(800);
@@ -597,7 +597,7 @@ async function notices(browser) {
   await p.keyboard.press('Escape'); await p.evaluate(() => SB.sheets.closeAll()); await p.waitForTimeout(300);
   await tap(p, 'Back office'); await p.waitForTimeout(800);
   check('PIN set: the back office asks for the PIN', await padUp(p)); await enter(p, '1234'); await p.waitForTimeout(1200);
-  await p.click('#sb-office nav >> text=Menu and settings'); await p.waitForTimeout(1500);
+  await p.click('#sb-office nav >> text=Menu, prices and shop'); await p.waitForTimeout(1500);
   await tap(p, 'Erase tickets and records'); await p.waitForTimeout(800);
   await p.fill('input[aria-label="Type ERASE to confirm"]', 'ERASE'); await p.waitForTimeout(300);
   await p.evaluate(() => { const b = [...document.querySelectorAll('button')].reverse().find((e) => e.getClientRects().length && e.textContent.trim() === 'Erase tickets and records'); if (b) { b.scrollIntoView({ block: 'center' }); b.click(); } });

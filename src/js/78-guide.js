@@ -92,7 +92,7 @@
      },
      {
       "t": "p",
-      "x": "Tap **Back office**, then **Menu and settings**. Find Data, backup and reset and tap **Download backup (JSON)**. This saves a file. Keep a copy off this device: email it to yourself or put it on a USB drive."
+      "x": "Tap **Back office**, then **Menu, prices and shop**. Find Data, backup and reset and tap **Download backup (JSON)**. This saves a file. Keep a copy off this device: email it to yourself or put it on a USB drive."
      }
     ]
    },
@@ -491,7 +491,7 @@
      },
      {
       "t": "p",
-      "x": "Some foods warn earlier. Change the times in Menu and settings, **Batch expiry warnings only**. A nearly empty batch stays quiet."
+      "x": "Some foods warn earlier. Change the times in Menu, prices and shop, **Batch expiry warnings only**. A nearly empty batch stays quiet."
      },
      {
       "t": "p",
@@ -631,7 +631,7 @@
        "If your health department asks, save or print the thrown-out log. Open it from the **Settings** button on the board.",
        "Keep a copy of the backup off this device (see Backup and restore).",
        "Which weekday sells best? In **Back office**, open **Sales and money** and look at **Best day of the week**.",
-       "For your accountant: in **Menu and settings**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other."
+       "For your accountant: in **Menu, prices and shop**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other."
       ]
      }
     ]
@@ -685,7 +685,7 @@
      {
       "t": "ol",
       "x": [
-       "Tap **Back office**, then **Menu and settings**.",
+       "Tap **Back office**, then **Menu, prices and shop**.",
        "Find Data, backup and reset. In the first card, **Back up now**, tap **Download backup (JSON)**. Or tap **Copy backup** and paste the text into an email to yourself.",
        "Keep a copy off this device."
       ]
@@ -829,7 +829,7 @@
        "On the old device, if it still works, download a backup (see Backup and restore). Copy the file somewhere else: email it to yourself or use a USB drive.",
        "On the new device, copy the same smokebox.html file onto it and open it. Install it as an app: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app.",
        "Tap **Settings**, then **Tablet checks: screen, sound, home screen**. Sound and keeping the screen on are set on each device, so do them again here.",
-       "Tap **Back office**, then **Menu and settings**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
+       "Tap **Back office**, then **Menu, prices and shop**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
        "Check the board and your menu. Save a fresh backup from the new device, then retire the old one."
       ]
      },
@@ -934,7 +934,7 @@
       "x": [
        "A strip says the tablet's clock jumped ahead? Smokebox keeps the old time, so tickets and timers keep running. Tap **Keep the old time** to hide it for 10 minutes and fix the clock in the device settings. Tap **Use the new time** only if the new time is right. It asks once more before anything changes.",
        "Check the date range and the filters at the top of the Back office page.",
-       "Choose **Live only** to leave out the sample history, which is made up.",
+       "If sample days are switched on, choose **Your tickets only** to leave them out: sample days are made up.",
        "Unpaid orders are not counted as money collected.",
        "Starter estimates (prep times, yields, costs) are guesses until you confirm them."
       ]
@@ -1242,7 +1242,7 @@
        "Bumped by mistake: Recall it from the board header",
        "Wrong ticket: cancel it with Void ticket in its small menu, and give a reason",
        "Dish missing: check the 86 board and Dishes and prices",
-       "Opened empty: restore the last backup (Back office, Menu and settings)",
+       "Opened empty: restore the last backup (Back office, Menu, prices and shop)",
        "Forgot the PIN: use your recovery code (Guide, Empty, lost or locked)"
       ]
      }

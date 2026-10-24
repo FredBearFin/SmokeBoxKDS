@@ -4,7 +4,7 @@ Everything Smokebox knows is saved in this browser on this device. A backup is a
 
 ## Make a backup
 
-1. Tap **Back office**, then **Menu and settings**.
+1. Tap **Back office**, then **Menu, prices and shop**.
 2. Find Data, backup and reset. In the first card, **Back up now**, tap **Download backup (JSON)**. Or tap **Copy backup** and paste the text into an email to yourself.
 3. Keep a copy off this device.
 

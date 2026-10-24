@@ -59,8 +59,10 @@
       for (const e of ds.events || []) {
         // Undone events and events outside the range are skipped; only checks with an on-time flag are counted.
         if (!e || e.reverted || !inRange(e.t)) continue;
-        if (e.type === 'temp_logged' && typeof e.onTime === 'boolean') { const r = dayRec(U.serviceDate(e.t, dsh)); r.tempN++; if (!e.onTime) { r.tempLate++; if (isNum(e.lateMs)) r.tempMaxLate = Math.max(r.tempMaxLate, e.lateMs); } }
-        else if (e.type === 'sanitize_done' && typeof e.onTime === 'boolean') { const r = dayRec(U.serviceDate(e.t, dsh)); r.sanN++; if (!e.onTime) { r.sanLate++; if (isNum(e.lateMs)) r.sanMaxLate = Math.max(r.sanMaxLate, e.lateMs); } }
+        // A check a few minutes past due counts as on time here too (SB.metrics.withinGrace), matching the totals.
+        const late = e.onTime === false && !(SB.metrics.withinGrace && SB.metrics.withinGrace(e));
+        if (e.type === 'temp_logged' && typeof e.onTime === 'boolean') { const r = dayRec(U.serviceDate(e.t, dsh)); r.tempN++; if (late) { r.tempLate++; if (isNum(e.lateMs)) r.tempMaxLate = Math.max(r.tempMaxLate, e.lateMs); } }
+        else if (e.type === 'sanitize_done' && typeof e.onTime === 'boolean') { const r = dayRec(U.serviceDate(e.t, dsh)); r.sanN++; if (late) { r.sanLate++; if (isNum(e.lateMs)) r.sanMaxLate = Math.max(r.sanMaxLate, e.lateMs); } }
         else if (e.type === 'batch_discard' && isNum(e.g) && e.g > 0) { seen.add(e.batchId); dis.push({ t: e.t, date: U.serviceDate(e.t, dsh), ing: e.ing, g: e.g, reason: e.reason || 'other', cost: isNum(e.cost) ? e.cost : null }); }
       }
       // Batches thrown away without a discard event are added from the batch record, so no waste is missed.
@@ -154,9 +156,12 @@
 
       // The body sentence: on-time rates for both checks, then what was thrown away, then any short lockouts.
       const parts = [];
-      if (k.tempChecks.count) parts.push('Temperature checks were on time ' + fmt.pct(k.tempChecks.onTimePct, 0) + ' of the time (' + k.tempChecks.onTime + ' of ' + k.tempChecks.count + ')');
-      if (k.sanitize.count) parts.push('sanitize rounds ' + fmt.pct(k.sanitize.onTimePct, 0) + ' (' + k.sanitize.onTime + ' of ' + k.sanitize.count + ')');
-      let body = parts.length ? parts[0] + (parts[1] ? ', ' + parts[1] : '') + '.' : 'No temperature checks or sanitize rounds were logged.';
+      // "3 of 4 temperature checks were on time", in counts, so one check never reads as 0%.
+      const kept = (x, noun) => x.onTime + ' of ' + x.count + ' ' + noun + (x.count === 1 ? ' was' : 's were') + ' on time';
+      if (k.tempChecks.count) parts.push(kept(k.tempChecks, 'temperature check'));
+      if (k.sanitize.count) parts.push(kept(k.sanitize, 'sanitize round'));
+      if (parts[0]) parts[0] = parts[0][0].toUpperCase() + parts[0].slice(1);
+      let body = parts.length ? parts[0] + (parts[1] ? '; ' + parts[1] : '') + '.' : 'No temperature checks or sanitize rounds were logged.';
       if (k.discards.count) body += ' ' + k.discards.count + ' ' + B.plural(k.discards.count, 'batch was', 'batches were') + ' thrown out (' + kgWords(k.discards.g) + ', ' + SB.metrics.discardCostWords(k.discards, (v) => fmt.money(v, 0)) + '), ' + safetyDis.length + ' for time or temperature rules.';
       else body += ' Nothing was thrown out.';
       if (brief.length) body += brief.length === 1 ? ' A time or temperature limit also took an item off the menu once, for ' + fmt.ms(brief[0].openMs) + '.' : ' Time or temperature limits also took items off the menu ' + brief.length + ' times for a few minutes each, the longest ' + fmt.ms(Math.max.apply(null, brief.map((c) => c.openMs))) + '.';
@@ -170,7 +175,6 @@
     const verdictOf = B.memoP((p) => judge(facts(p)));
     const verdict = page.panel({
       span: 12, title: 'How did the checks go?', sub: scope(),
-      caption: 'One plain answer, and the single day to look at first. The pages below show the evidence.',
       // Fills the verdict box. Its button jumps the timeline to the day named as the problem.
       render: (body, p0) => {
         const co = B.callout(body, kit);
@@ -192,7 +196,7 @@
     page.headline();
 
     // ---------- compliance: ring and the two meters ----------
-    page.section('How well the checks were kept', 'On time means the next check was logged before the interval you set ran out.');
+    page.section('How well the checks were kept', 'On time means the check was logged before the interval you set ran out, or within 5 minutes after.');
     // Check intervals are read live from settings, so a changed limit shows at the next refresh.
     const intervalTemp = () => B.settings(ctx.dataset()).safety.tempCheckEveryMin;
     const intervalSan = () => B.settings(ctx.dataset()).safety.sanitizeEveryH;
@@ -200,7 +204,7 @@
     const WORDS = { ok: 'On track', warn: 'Slipping', bad: 'Needs attention' };
 
     const ringCard = page.card({
-      type: 'ring', span: 4, title: 'Checks kept on time', sub: 'Average of the measures beside it that have readings',
+      type: 'ring', span: 4, title: 'Checks kept on time', sub: 'Temperature checks and sanitize rounds together',
       caption: 'One number for the whole night. Green is 90% or better; below 75% a check or two were being skipped.',
       empty: { title: 'No score yet', body: 'The score needs temperature checks or sanitize rounds to be logged in this range.', icon: 'shield-check' },
       // Compliance ring: the average of the two on-time rates, empty until a check is logged.
@@ -382,7 +386,7 @@
     // ---------- the rules, live from settings ----------
     page.section('The limits behind all this', 'These are the limits the kitchen screens enforce right now. They come from your settings.');
     const rules = page.panel({
-      span: 12, title: 'What the rules are', sub: 'Read live from Menu and settings',
+      span: 12, title: 'What the rules are', sub: 'Read live from Menu, prices and shop',
       caption: 'The exact limits behind every green, amber and red above. If the limits do not match your local health code, change them in settings.',
       // Builds the list of limits once; update rewrites the text from the live settings.
       render: (body, p0) => {
@@ -391,8 +395,8 @@
         const nodes = {};
         keys.forEach((k) => { const t = h('span', { class: 'ob-rule-t' }), d = h('span', { class: 'ob-rule-d' }); ul.appendChild(h('li', { class: 'ob-rule', dataset: { k } }, t, d)); nodes[k] = { t, d }; });
         const note = h('p', { class: 'ob-note ob-note--accent', dataset: { k: 'difference' } });
-        // Takes the owner to Menu and settings, where these limits are changed.
-        const go = kit.button({ label: 'Change these in Menu and settings', icon: 'sliders', onClick: () => ctx.navigate('data') });
+        // Takes the owner to Menu, prices and shop, where these limits are changed.
+        const go = kit.button({ label: 'Change these in Menu, prices and shop', icon: 'sliders', onClick: () => ctx.navigate('data') });
         const line = h('p', { class: 'ob-safetyline', dataset: { k: 'safetyline' } }, (SB.config && SB.config.safetyLine) || '');
         body.append(ul, note, h('div', { class: 'ob-actions' }, go), line);
         // Formats a temperature limit for display.
