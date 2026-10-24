@@ -308,7 +308,7 @@ test('a new empty kitchen gets neutral station and section names; old kitchens, 
     const b = backend(); start(b);
     assert.equal(S.applyStarterNames(), true);
     assert.equal(zoneNames(), 'Kitchen|Prep|Fryer|Cold and drinks|Expo');
-    assert.equal(catNames(), 'Mains|Sides|Snacks|Desserts|Drinks');
+    assert.equal(catNames(), 'Mains|Sides|Snacks|Desserts|Cold food and drinks');
     assert.deepEqual(C.zones.map((z) => z.id), ['pit', 'sides', 'fry', 'cold', 'expo']);                 // ids never change
     assert.equal(C.zoneById.pit.code, 'KIT');
     assert.deepEqual(JSON.parse(S.exportAll()).names, S.STARTER_NAMES);                                   // saved with the kitchen and carried in backups

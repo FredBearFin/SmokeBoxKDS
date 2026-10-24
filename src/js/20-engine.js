@@ -409,7 +409,11 @@
     const sv = settings && isObj(settings.service) ? settings.service : C.service;
     const p = U.serviceDate(isNum(now) ? now : sz.dueAt, sv.dayStartHour).split('-').map(Number);
     const openedAt = new Date(p[0], p[1] - 1, p[2], sv.openHour, 0, 0, 0).getTime();
-    return sz.dueAt >= openedAt ? sz.dueAt : openedAt + safetyOf(settings).sanitizeEveryH * H;
+    const every = safetyOf(settings).sanitizeEveryH * H;
+    // A kitchen that has never logged a round is not late the moment it opens: the first round is due one full
+    // interval after opening (or after the kitchen was set up, when that was later).
+    if (!isNum(sz.lastAt)) return Math.max(sz.dueAt, openedAt) + every;
+    return sz.dueAt >= openedAt ? sz.dueAt : openedAt + every;
   }
 
   /* ======================================================================================================

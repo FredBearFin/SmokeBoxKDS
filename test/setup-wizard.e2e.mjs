@@ -152,7 +152,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.evaluate(() => SB.sheets.open('cookahead')); await page.waitForTimeout(400);
   const csh = '.sheet:has-text("Cooked-ahead food")';
   await page.locator(csh + ' .seg-opt', { hasText: 'Cold' }).click(); await page.fill(csh + ' .dp-name', 'Chicken salad');
-  await page.fill(csh + ' [aria-label="Days it may stay in the fridge"]', '3'); await page.fill(csh + ' [aria-label="Hours it may be out of the fridge"]', '2');
+  await page.fill(csh + ' [aria-label="How many days may it stay in the fridge?"]', '3'); await page.fill(csh + ' [aria-label="How many hours may it be out of the fridge?"]', '2');
   await page.locator(csh + ' .dp-row').first().locator('input[type=checkbox]').check(); await page.fill(csh + ' [aria-label^="Grams of it in one"]:enabled >> nth=0', '150'); await page.click('[data-act=save-cooked]'); await page.waitForTimeout(500);
   const cold = await page.evaluate(() => { const i = SB.store.getState().ingredients.find((x) => x.name === 'Chicken salad'); return i && { hold: i.hold, fridge: i.fridge, d: i.fridgeDays, o: i.outHours }; });
   check('the cold item is saved as kept in a fridge with 3 days and 2 hours out', cold && cold.hold === 'cold' && cold.fridge === true && cold.d === 3 && cold.o === 2, cold);

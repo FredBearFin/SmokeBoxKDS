@@ -139,7 +139,7 @@
       SB.ui.toast('Smokebox could not read some saved records and left out ' + bits.join(', ') + ' while opening. The data as it was has been kept on this device. Ask whoever set up Smokebox to look at it before you close the page for good.', { tone: 'warn', ms: 20000 });
     }
     else if (s.repaired && s.repaired.length) SB.ui.toast('Smokebox updated a few saved settings while opening. Nothing else changed.', { tone: 'info', ms: 10000 });
-    if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
+    if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu, prices and shop, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }
 
   // A real kitchen that still holds tickets made by an old in-place demo gets them removed at once: they are fake by

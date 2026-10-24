@@ -22,6 +22,6 @@ No **Cabinet** tab? Say yes to cooking ahead first (see Cooked-ahead food and po
 3. 10 minutes left: a loud tone and voice. It repeats every 20 seconds until you tap the strip row.
 4. Time is up: a different sound, and the batch comes off the menu.
 
-Some foods warn earlier. Change the times in Menu and settings, **Batch expiry warnings only**. A nearly empty batch stays quiet.
+Some foods warn earlier. Change the times in Menu, prices and shop, **Batch expiry warnings only**. A nearly empty batch stays quiet.
 
 Warnings sound only while the screen is on and Smokebox is open on the board, with the volume up, inside your opening hours.

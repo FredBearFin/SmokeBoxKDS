@@ -92,7 +92,7 @@
      },
      {
       "t": "p",
-      "x": "Tap **Back office**, then **Menu and settings**. Find Data, backup and reset and tap **Download backup (JSON)**. This saves a file. Keep a copy off this device: email it to yourself or put it on a USB drive."
+      "x": "Tap **Back office**, then **Menu, prices and shop**. Find Data, backup and reset and tap **Download backup (JSON)**. This saves a file. Keep a copy off this device: email it to yourself or put it on a USB drive."
      }
     ]
    },
@@ -386,7 +386,15 @@
      },
      {
       "t": "p",
-      "x": "Tap **86 board**, find the dish and mark it sold out. Smokebox also does this by itself when a dish's food runs low."
+      "x": "Tap **Sold out** at the top (the 86 board), find the dish and mark it sold out. Smokebox also does this by itself when a dish's food runs low."
+     },
+     {
+      "t": "h",
+      "x": "Full screen and the front counter"
+     },
+     {
+      "t": "p",
+      "x": "On a tablet, tap **Full screen** at the bottom right to hide the browser's bars. **Front counter** at the top opens the order page on the whole screen; its **Board** link brings you back here."
      }
     ]
    },
@@ -491,7 +499,7 @@
      },
      {
       "t": "p",
-      "x": "Some foods warn earlier. Change the times in Menu and settings, **Batch expiry warnings only**. A nearly empty batch stays quiet."
+      "x": "Some foods warn earlier. Change the times in Menu, prices and shop, **Batch expiry warnings only**. A nearly empty batch stays quiet."
      },
      {
       "t": "p",
@@ -631,7 +639,7 @@
        "If your health department asks, save or print the thrown-out log. Open it from the **Settings** button on the board.",
        "Keep a copy of the backup off this device (see Backup and restore).",
        "Which weekday sells best? In **Back office**, open **Sales and money** and look at **Best day of the week**.",
-       "For your accountant: in **Menu and settings**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other."
+       "For your accountant: in **Menu, prices and shop**, under Spreadsheet files, tap **Sales by day (for your accountant)**. It saves one row for each day: sales, tax, tips and cash, card and other."
       ]
      }
     ]
@@ -685,14 +693,14 @@
      {
       "t": "ol",
       "x": [
-       "Tap **Back office**, then **Menu and settings**.",
+       "Tap **Back office**, then **Menu, prices and shop**.",
        "Find Data, backup and reset. In the first card, **Back up now**, tap **Download backup (JSON)**. Or tap **Copy backup** and paste the text into an email to yourself.",
        "Keep a copy off this device."
       ]
      },
      {
       "t": "p",
-      "x": "Back up every day at close. If the browser data is cleared or the device is replaced, a copy on the same device goes with it."
+      "x": "Back up every day at close. A copy kept only on this device is lost with it."
      },
      {
       "t": "h",
@@ -709,7 +717,7 @@
      },
      {
       "t": "p",
-      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. What was here is kept too, so you can undo once more. If the browser was short on room, the copy keeps only recent tickets, or none can be kept and the restore says so."
+      "x": "After a restore the Data page says \"Your kitchen before this restore is kept for\" some days, with **Undo this restore**. Tap it, then **Put my old kitchen back** (or **Keep what I have**), and enter the PIN if one is set. If the browser was short on room, the copy keeps only recent tickets, or the restore says none could be kept."
      },
      {
       "t": "p",
@@ -717,11 +725,7 @@
      },
      {
       "t": "p",
-      "x": "A file that is not a valid backup is refused, and nothing is changed. A backup from the demo is refused too."
-     },
-     {
-      "t": "p",
-      "x": "Spreadsheet files, like the sales file, cannot be restored."
+      "x": "A file that is not a valid backup, a backup from the demo, or a spreadsheet file is refused, and nothing changes."
      },
      {
       "t": "h",
@@ -737,7 +741,15 @@
      },
      {
       "t": "p",
-      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each one asks you to type a word first, so it cannot happen by accident. Back up before you use either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first."
+      "x": "The Danger zone has **Erase tickets and records** and **Erase everything**. Each asks you to type a word first. Back up before using either. With a PIN set, these and **Replace everything with this backup** ask for the PIN first."
+     },
+     {
+      "t": "h",
+      "x": "How full the saved history is"
+     },
+     {
+      "t": "p",
+      "x": "Settings and the Data page show **Saved history**, how full this tablet is. When it is nearly full, **Close the month...** is offered there."
      }
     ]
    },
@@ -837,7 +849,7 @@
        "On the old device, if it still works, download a backup (see Backup and restore). Copy the file somewhere else: email it to yourself or use a USB drive.",
        "On the new device, copy the same smokebox.html file onto it and open it. Install it as an app: on an iPad tap Share, then Add to Home Screen. In Chrome tap the menu, then Install app.",
        "Tap **Settings**, then **Device checks: screen, sound, home screen**. Sound and keeping the screen on are set on each device, so do them again here.",
-       "Tap **Back office**, then **Menu and settings**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
+       "Tap **Back office**, then **Menu, prices and shop**. In the **Restore from a backup** card, choose the backup file, check the summary and tap **Replace everything with this backup**.",
        "Check the board and your menu. Save a fresh backup from the new device, then retire the old one."
       ]
      },
@@ -904,7 +916,7 @@
      {
       "t": "ol",
       "x": [
-       "If the board says \"Tap here to turn on warning sounds\", tap it. Browsers need one tap first.",
+       "If the board says \"Tap to turn on sound\", tap it. Browsers need one tap first.",
        "Turn the tablet volume up and check its silent switch.",
        "Tap **Settings** and check that Sound is on and the loudness is not low.",
        "Tap **Settings**, then **Device checks: screen, sound, home screen**, then **Test the sound**.",
@@ -942,7 +954,7 @@
       "x": [
        "A strip says the tablet's clock jumped ahead? Smokebox keeps the old time, so tickets and timers keep running. Tap **Keep the old time** to hide it for 10 minutes and fix the clock in the device settings. Tap **Use the new time** only if the new time is right. It asks once more before anything changes.",
        "Check the date range and the filters at the top of the Back office page.",
-       "Choose **Live only** to leave out the sample history, which is made up.",
+       "If sample days are switched on, choose **Your tickets only** to leave them out: sample days are made up.",
        "Unpaid orders are not counted as money collected.",
        "Starter estimates (prep times, yields, costs) are guesses until you confirm them."
       ]
@@ -1022,6 +1034,22 @@
      {
       "t": "p",
       "x": "If a message says some saved records could not be read and were left out, the data as it was is kept. Do not clear the browser data. Ask whoever set up Smokebox. If a full-screen message says the saved data could not be read, tap **Download the old data** or **Show the data so I can copy it**. Only then can you continue."
+     },
+     {
+      "t": "h",
+      "x": "A copy that was set aside"
+     },
+     {
+      "t": "p",
+      "x": "When Smokebox could not read your saved data at start-up, it kept the unreadable copy aside for 30 days and began with its last good copy. If that set-aside copy can be read now (for example after going back to a newer version), the Data page shows a card: **A copy of your kitchen was set aside**. It says when it was set aside and how many tickets and orders it holds."
+     },
+     {
+      "t": "p",
+      "x": "To bring it back, open Back office, Menu and settings, then Data. In the card, tap **Save a backup of what is here now first** and check that the file arrived. Then type **RESTORE** and tap **Bring the set-aside copy back**. If a PIN is set, Smokebox asks for it first. Everything on this device is replaced by the set-aside copy. What was here before is kept for 7 days: tap **Undo this restore** to put it back."
+     },
+     {
+      "t": "p",
+      "x": "To forget the set-aside copy, tap **Throw the set-aside copy away**. Your kitchen as it is now is not touched, and the copy cannot be brought back."
      }
     ]
    },
@@ -1234,7 +1262,7 @@
        "Bumped by mistake: Recall it from the board header",
        "Wrong ticket: cancel it with Void ticket in its small menu, and give a reason",
        "Dish missing: check the 86 board and Dishes and prices",
-       "Opened empty: restore the last backup (Back office, Menu and settings)",
+       "Opened empty: restore the last backup (Back office, Menu, prices and shop)",
        "Forgot the PIN: use your recovery code (Guide, Empty, lost or locked)"
       ]
      }
@@ -1331,7 +1359,7 @@
        "Tap Done only when it is really finished",
        "Gray dish: waiting on purpose. Start now goes early",
        "Clock amber, then red: the order is late",
-       "Sold out: tap 86 board and mark it",
+       "Sold out: tap Sold out (the 86 board) and mark it",
        "Cooked food leaves the cabinet: tap Pull",
        "Wrong tap: Undo, within 10 seconds",
        "Bumped by mistake: Recall, in the header"

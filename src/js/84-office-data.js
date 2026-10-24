@@ -1,5 +1,5 @@
 /*
- * WHAT THIS FILE IS: The back office page "Menu and settings": edit the menu, ingredients, ticket time limits,
+ * WHAT THIS FILE IS: The back office page "Menu, prices and shop": edit the menu, ingredients, ticket time limits,
  *   pacing, food-safety limits, the PIN and display choices; back up, import or reset the data. Every edit goes
  *   through the engine, which can refuse it; the refusal shows beside the field and the old value stays.
  * PARTS: helpers, number field, nine panels (menu to about), then the page itself and its contents list.
@@ -111,9 +111,9 @@
   // Real finite numbers only, and an icon builder that never throws.
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 18 }); } catch (e) { return doc.createElement('span'); } };
-  // The current state (null if the store is not ready), and a m:ss clock text.
+  // The current state (null if the store is not ready), and a time in plain words (5 min, 2 min 5 s, 45 s).
   const cur = () => { try { return SB.store.getState(); } catch (e) { return null; } };
-  const mmss = (sec) => { const s = Math.max(0, Math.round(sec)); return Math.floor(s / 60) + ':' + U.pad2(s % 60); };
+  const mmss = (sec) => { const s = Math.max(0, Math.round(sec)), m = Math.floor(s / 60), r = s % 60; return m && r ? m + ' min ' + r + ' s' : m ? m + ' min' : r + ' s'; };
   // A trimmed number for display, and how many decimals a step has.
   const num = (n, d) => (isNum(n) ? String(+n.toFixed(d == null ? 2 : d)) : '-');
   const decs = (n) => { const s = String(n); const i = s.indexOf('.'); return i < 0 ? 0 : s.length - i - 1; };
@@ -130,7 +130,7 @@
   const patchFor = (path, v) => { const ks = path.split('.'); const root = {}; let c = root; ks.forEach((k, i) => { if (i === ks.length - 1) c[k] = v; else c = c[k] = {}; }); return root; };
   // The unit word for an ingredient, and an amount written with that unit.
   const unitWord = (ing) => (ing && ing.unit === 'ea' ? 'pieces' : 'g');
-  const amountText = (ing, v) => (ing && ing.unit === 'ea' ? num(v, 1) + ' ' + U.plural(v, 'piece') : U.weightText(v));
+  const amountText = (ing, v) => (ing && ing.unit === 'ea' ? num(v, 1) + ' ' + U.plural(v, 'piece') : ((SB.office && SB.office.weightText) || U.weightText)(v));
   // Dollars with cents, as shown in field messages.
   const money = (v) => U.fmtMoney(v, 2);
   // The currency symbol the shared formatter prints ($ unless another one was chosen).
@@ -501,12 +501,12 @@
         else { trackSeg.setValue(getMi().track === 'two' ? 'two' : 'one'); status.bad(refusal(r, null)); }
       },
     });
-    const archChip = h('span', { class: 'od-archived' }, ico('package', 16), h('span', null, 'Archived'));
+    const archChip = h('span', { class: 'od-archived' }, ico('package', 16), h('span', null, 'Removed'));
     const archBtn = h('button', { type: 'button', class: 'btn btn-sm od-arch' });
     archBtn.addEventListener('click', () => {
       const to = !getMi().archived;
       const r = send('updateMenuItem', { id, patch: { archived: to } });
-      if (good(r)) status.ok(to ? 'Archived. It can no longer be ordered, and past tickets keep it. Unarchive it any time.' : 'Unarchived. It can be ordered again.');
+      if (good(r)) status.ok(to ? 'Removed. It can no longer be ordered, and past tickets keep it. Bring it back any time.' : 'Brought back. It can be ordered again.');
       else status.bad(refusal(r, null));
     });
 
@@ -579,13 +579,13 @@
         trackSeg.setValue(mi.track === 'two' ? 'two' : 'one');
         root.dataset.zone = mi.zone;
         sumName.textContent = mi.name;
-        { const zn = C.zoneById[mi.zone] ? C.zoneById[mi.zone].name : '', cn = catName(mi.cat); sumMeta.textContent = (zn.toLowerCase() === cn.toLowerCase() ? zn : zn + ', ' + cn) + (mi.archived ? ', archived' : mi.prepConfirmed ? '' : ', starter prep time'); }
+        { const zn = C.zoneById[mi.zone] ? C.zoneById[mi.zone].name : '', cn = catName(mi.cat); sumMeta.textContent = (zn.toLowerCase() === cn.toLowerCase() ? zn : zn + ', ' + cn) + (mi.archived ? ', removed' : mi.prepConfirmed ? '' : ', starter prep time'); }
         sumPrice.textContent = money(mi.price); sumPrep.textContent = mmss(mi.prepSec);
         price.sync(mi.price); prep.sync(mi.prepSec);
         confSeg.setValue(mi.prepConfirmed ? 'confirmed' : 'starter');
         archChip.hidden = !mi.archived;
-        archBtn.replaceChildren(ico(mi.archived ? 'check' : 'ban', 18), h('span', null, mi.archived ? 'Unarchive' : 'Archive'));
-        archBtn.setAttribute('aria-label', (mi.archived ? 'Unarchive ' : 'Archive ') + mi.name);
+        archBtn.replaceChildren(ico(mi.archived ? 'check' : 'ban', 18), h('span', null, mi.archived ? 'Bring it back' : 'Remove'));
+        archBtn.setAttribute('aria-label', (mi.archived ? 'Bring back ' : 'Remove ') + mi.name);
         const l = s.learned && s.learned[id];
         if (l && isNum(l.est) && l.n >= 1 && mi.prepSec > 0) {
           const diff = (l.est - mi.prepSec) / mi.prepSec;
@@ -682,7 +682,7 @@
     const filter = P.menuFilter;
     pn.body.append(
       para('Changes save as you make them. New tickets use the new price, prep time and ingredients; tickets already on the board keep theirs. There is no Undo for settings, so check a value before you move on.', 'od-intro'),
-      para('A prep time is a starter estimate until you have timed it on the line and marked it confirmed. Archived items cannot be ordered, and past tickets keep them.', 'od-intro'));
+      para('A prep time is a starter estimate until you have timed it on the line and marked it confirmed. Removed dishes cannot be ordered, and past tickets keep them.', 'od-intro'));
 
     // Add a dish, and a one-tap way to drop the made-up starter dishes. The form opens under the buttons.
     const addForm = addDishForm((id) => {
@@ -693,9 +693,9 @@
     const addOpenBtn = btn('Add a dish', { icon: 'plus', cls: 'btn-primary' });
     addOpenBtn.addEventListener('click', () => addForm.open());
     const starterBtn = btn('Use only my own dishes', { icon: 'ban' });
-    const starterBox = h('div', { class: 'od-starter', hidden: true, role: 'group', 'aria-label': 'Archive the starter dishes' });
+    const starterBox = h('div', { class: 'od-starter', hidden: true, role: 'group', 'aria-label': 'Remove the starter dishes' });
     const starterMsg = h('p', { class: 'od-p' });
-    const starterYes = btn('Archive the starter dishes', { icon: 'ban', cls: 'btn-danger' });
+    const starterYes = btn('Remove the starter dishes', { icon: 'ban', cls: 'btn-danger' });
     const starterNo = btn('Keep them', { icon: 'x' });
     starterBox.append(starterMsg, h('div', { class: 'od-add-actions' }, starterYes, starterNo));
     const starterStatus = statusLine();
@@ -703,7 +703,7 @@
     const liveStarters = () => { const s = cur(); return s ? s.menu.filter((m) => C.menuById[m.id] && !m.archived) : []; };
     starterBtn.addEventListener('click', () => {
       const n = liveStarters().length;
-      starterMsg.textContent = 'This archives the ' + n + ' demo starter ' + U.plural(n, 'dish', 'dishes') + ' that came with the app, so only the dishes you add can be ordered. Past tickets keep them. You can unarchive any of them later.';
+      starterMsg.textContent = 'This removes the ' + n + ' demo starter ' + U.plural(n, 'dish', 'dishes') + ' that came with the app, so only the dishes you add can be ordered. Past tickets keep them. You can bring any of them back later.';
       starterBox.hidden = false; starterYes.focus();
     });
     starterNo.addEventListener('click', () => { starterBox.hidden = true; starterBtn.focus(); });
@@ -711,8 +711,8 @@
       const list = liveStarters(); let failed = 0;
       list.forEach((m) => { if (!good(send('updateMenuItem', { id: m.id, patch: { archived: true } }))) failed++; });
       starterBox.hidden = true;
-      if (failed) starterStatus.bad('Archived ' + (list.length - failed) + ' of ' + list.length + ' starter dishes. ' + failed + ' could not be archived.');
-      else starterStatus.ok('Archived ' + list.length + ' starter ' + U.plural(list.length, 'dish', 'dishes') + '. Add your own with Add a dish.');
+      if (failed) starterStatus.bad('Removed ' + (list.length - failed) + ' of ' + list.length + ' starter dishes. ' + failed + ' could not be removed.');
+      else starterStatus.ok('Removed ' + list.length + ' starter ' + U.plural(list.length, 'dish', 'dishes') + '. Add your own with Add a dish.');
     });
     pn.body.append(h('div', { class: 'od-add-bar' }, addOpenBtn, starterBtn), starterBox, starterStatus.el, addForm.el);
     P.syncs.push(() => { const n = liveStarters().length; starterBtn.hidden = n === 0; if (!n) starterBox.hidden = true; });
@@ -720,7 +720,7 @@
 
     const segStatus = SB.ui.segmented({
       label: 'Show items', value: filter.status,
-      options: [{ id: 'active', label: 'Active', count: 0 }, { id: 'archived', label: 'Archived', count: 0 }, { id: 'all', label: 'All', count: 0 }],
+      options: [{ id: 'active', label: 'Active', count: 0 }, { id: 'archived', label: 'Removed', count: 0 }, { id: 'all', label: 'All', count: 0 }],
       // Changes which items are listed by status.
       onChange: (v) => { filter.status = v; applyFilter(); },
     });
@@ -744,7 +744,10 @@
     function applyFilter() {
       const s = cur(); if (!s) return;
       let nA = 0, nR = 0, shown = 0;
-      for (const mi of s.menu) { if (mi.archived) nR++; else nA++; }
+      let nGuess = 0;
+      for (const mi of s.menu) { if (mi.archived) nR++; else { nA++; if (!mi.prepConfirmed) nGuess++; } }
+      // The starter-estimates filter only shows while there is a guessed prep time to find.
+      starterChip.hidden = !nGuess && !filter.starter;
       segStatus.setCount('active', nA); segStatus.setCount('archived', nR); segStatus.setCount('all', nA + nR);
       segStatus.setValue(filter.status); zoneSel.value = filter.zone;
       starterChip.setAttribute('aria-pressed', filter.starter ? 'true' : 'false');
@@ -796,13 +799,13 @@
     const thrMeta = { name: 'The sold-out amount', unit: pieces ? 'pieces' : 'g' };
     const par = numField({
       label: 'Opening amount (par)', aria: 'Opening amount of ' + nm, value: ing0.parG, min: 0, max: 1e7, step: pieces ? 1 : 100, big: pieces ? 10 : 1000, unit: pieces ? 'pieces' : 'g', meta: parMeta,
-      read: pieces ? null : (u) => U.weightText(u),
+      read: pieces ? null : (u) => ((SB.office && SB.office.weightText) || U.weightText)(u),
       // Par saves through the engine; the line under the row confirms it.
       save: (v) => mkPatch({ parG: v }, 'Saved. Par is ' + amountText(ing0, v) + '. After you erase tickets and records and keep settings, opening stock starts at this amount.', parMeta), onSaved: (t) => status.ok(t),
     });
     const thr = numField({
       label: 'Sold out at', aria: 'Sold out at, ' + nm, value: ing0.thresholdG, min: 0, max: 1e7, step: pieces ? 1 : 50, big: pieces ? 10 : 500, unit: pieces ? 'pieces' : 'g', meta: thrMeta,
-      read: pieces ? null : (u) => U.weightText(u), hint: 'Dishes that use this are marked sold out at or below this amount.',
+      read: pieces ? null : (u) => ((SB.office && SB.office.weightText) || U.weightText)(u), hint: 'Dishes that use this are marked sold out at or below this amount.',
       // The 86 point saves the same way.
       save: (v) => mkPatch({ thresholdG: v }, 'Saved. Items using ' + lower1(nm) + ' go 86 at ' + amountText(ing0, v) + ' or less.', thrMeta), onSaved: (t) => status.ok(t),
     });
@@ -822,7 +825,7 @@
       pull = numField({
         label: 'Amount per take-out', aria: 'Amount per take-out of ' + nm, value: ing0.pullG || 1000, min: 50, max: 50000, step: 100, big: 500, unit: 'g', meta: pullMeta,
         // Shows the pull size in kilograms next to the field once it reaches a kilogram.
-        read: (u) => U.weightText(u),
+        read: (u) => ((SB.office && SB.office.weightText) || U.weightText)(u),
         hint: 'What one tap on Pull takes out of the cabinet: one whole brisket, one rack, one pan.',
         // The pull size saves through the engine like the other fields.
         save: (v) => mkPatch({ pullG: v }, 'Saved. One tap on Pull takes ' + amountText(ing0, v) + ' out of the cabinet.', pullMeta), onSaved: (t) => status.ok(t),
@@ -1260,7 +1263,7 @@
 
   // Panel 7: themes, text size, sound and service hours.
   function buildLook(P) {
-    const pn = panel(SECTIONS[6], 'Display choices are remembered on this device only. The floor and the back office have their own light and dark themes.');
+    const pn = panel(SECTIONS[6], 'Display choices are remembered on this device only.');
     // Builds the two options of a two-way switch, and one labelled switch with its hint.
     const themeOpts = (a, b) => [{ id: a[0], label: a[1] }, { id: b[0], label: b[1] }];
     const mkSeg = (label, hint, opts, get, set) => {
@@ -1274,8 +1277,7 @@
     // Saves a unit choice (temperature or weight) in the settings and redraws the back office numbers.
     const saveUnit = (key, v) => { const r = send('updateSettings', { patch: { ui: { [key]: v } } }); if (good(r)) { try { if (SB.office && SB.office.refresh) SB.office.refresh(); } catch (e) { /* the next refresh catches up */ } } };
     const segs = [
-      mkSeg('Back office theme', 'Ember is dark and warm, Paper is light. This page and every chart follow it.', themeOpts(['ember', 'Ember'], ['paper', 'Paper']), () => SB.theme.office(), (v) => SB.theme.setOffice(v)),
-      mkSeg('Line theme', 'Day is the anti-glare parchment for bright kitchens, Night is for a dim prep corner.', themeOpts(['day', 'Day'], ['night', 'Night']), () => SB.theme.get(), (v) => SB.theme.set(v)),
+      mkSeg('Day or Night', 'Day is the light, anti-glare look for bright kitchens, Night is dark for a dim prep corner. The board, these pages and every chart follow it.', themeOpts(['day', 'Day'], ['night', 'Night']), () => SB.theme.get(), (v) => SB.theme.set(v)),
       mkSeg('Text size', 'Large makes all text about 20% bigger on the line and in the back office.', themeOpts(['normal', 'Normal'], ['large', 'Large']), () => SB.theme.textSize(), (v) => SB.theme.setTextSize(v)),
       mkSeg('Temperatures', 'Shows temperatures in Fahrenheit or Celsius. The limits on the Food safety page are always entered in °F.', themeOpts(['F', '°F'], ['C', '°C']), () => ((cur() || {}).settings.ui || {}).tempUnit || 'F', (v) => saveUnit('tempUnit', v)),
       mkSeg('Weights', 'Shows food weights in kilograms and grams, or in pounds and ounces. Amounts you type on the Ingredients page are still in grams.', themeOpts(['kg', 'kg and g'], ['lb', 'lb and oz']), () => ((cur() || {}).settings.ui || {}).weightUnit || 'kg', (v) => saveUnit('weightUnit', v)),
@@ -1502,7 +1504,9 @@
       // Runs the erase once, then closes the box.
       const run = () => { if (go.disabled) return; cancel(); o.run(); };
       go.addEventListener('click', run);
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); if (e.key === 'Escape') cancel(); });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+      // Escape anywhere in the box closes only the box (the page-wide Escape would otherwise leave the back office) and gives focus back to the erase button.
+      dangerBox.onkeydown = (e) => { if (e.key === 'Escape' && !dangerBox.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); } };
       const descId = U.uid('oddesc');
       input.setAttribute('aria-describedby', descId);
       dangerBox.replaceChildren(h('p', { class: 'od-danger-t' }, ico('alert', 20), h('strong', null, o.title)), h('div', { id: descId }, ...o.lines.map((t) => h('p', { class: 'od-p' }, t))),
@@ -1590,6 +1594,55 @@
       else SB.ui.toast(rep === 'noCopy' ? 'The copy from before the restore is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings), { tone: 'warn' });
       paintUndo();
     }
+    // A copy that was set aside as unreadable (or by a newer build) can still be read: say what it holds and offer to bring it back or throw it away.
+    const parkedBox = h('div', { class: 'od-parked', 'data-region': 'parked-copy' });
+    const PARK_WORD = 'RESTORE';
+    // Draws the set-aside copy card again, or nothing when no readable copy is set aside.
+    function paintParked() {
+      const pc = SB.store.parkedCopy ? SB.store.parkedCopy() : null;
+      if (!pc || (SB.store.isHubClient && SB.store.isHubClient()) || (SB.store.isFollower && SB.store.isFollower())) { parkedBox.replaceChildren(); parkedBox.hidden = true; return; }
+      parkedBox.hidden = false;
+      let savedFirst = false;
+      const status = h('p', { class: 'od-p', role: 'status' });
+      const word = h('input', { class: 'input od-danger-in', type: 'text', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Type ' + PARK_WORD + ' to confirm' });
+      const go = btn('Bring the set-aside copy back', { icon: 'upload', cls: 'btn-danger' }); go.dataset.action = 'parked-restore'; go.disabled = true;
+      // The red button wakes only when the backup of what is here now was saved and the word was typed.
+      const sync = () => { go.disabled = !(savedFirst && word.value.trim().toUpperCase() === PARK_WORD); };
+      word.addEventListener('input', sync);
+      // Saves a backup file of what is on this device now, so bringing the other copy back can never lose it.
+      const saveFirst = btn('Save a backup of what is here now first', { icon: 'download', cls: 'btn-sm', onClick: () => {
+        let text = null; try { text = SB.store.exportAll(); } catch (e) { text = null; }
+        if (!text) { status.textContent = 'The backup could not be made, so nothing can be replaced. Nothing was changed.'; return; }
+        // Pads a number to two digits so the file name sorts by time.
+        const z = (n) => String(n).padStart(2, '0');
+        try { const d = new Date(); const fname = 'smokebox-backup-before-set-aside-restore-' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + '.json'; const url = URL.createObjectURL(new Blob([text], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = fname; a.style.display = 'none'; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000); savedFirst = true; status.textContent = 'Asked your browser to save ' + fname + '. Look in your downloads folder to be sure it is there, then type ' + PARK_WORD + '.'; sync(); }
+        catch (e) { status.textContent = 'This browser would not save the file. Nothing was changed.'; }
+      } }); saveFirst.dataset.action = 'parked-backup';
+      // After the PIN, brings the set-aside copy back; the kitchen it replaces is kept for 7 days (Undo this restore below).
+      go.addEventListener('click', async () => {
+        if (go.disabled) return;
+        if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
+        const rep = SB.store.restoreParked();
+        if (rep === 'ok') SB.ui.toast('The set-aside copy is back. What was here before is kept for 7 days: Undo this restore.', { tone: 'ok' });
+        else SB.ui.toast(rep === 'noCopy' ? 'The set-aside copy is gone, so nothing was changed.' : SB.engine.describe(rep, (SB.store.lastResult() || {}).info, (stateNow() || {}).settings) + ' Nothing was changed.', { tone: 'warn' });
+        paintParked(); paintUndo();
+      });
+      // Throws the set-aside copy away after asking; the current kitchen is not touched.
+      const drop = btn('Throw the set-aside copy away', { icon: 'trash', cls: 'btn-sm', onClick: async () => {
+        const ok = await SB.ui.confirm({ title: 'Throw the set-aside copy away?', tone: 'danger', confirmLabel: 'Throw it away', cancelLabel: 'Keep it', body: ['This removes the copy that was set aside. Your kitchen as it is now is not touched. It cannot be brought back.'] });
+        if (!ok) return;
+        if (SB.shell.requirePin && !(await SB.shell.requirePin())) { SB.ui.toast('The PIN was not entered. Nothing was changed.', { tone: 'warn' }); return; }
+        try { const k = SB.store.CORRUPT_KEY; SB.util.storage.remove(k); SB.util.storage.remove(k + 'at'); } catch (e) { /* the check below tells the truth */ }
+        SB.ui.toast(SB.store.parkedCopy && SB.store.parkedCopy() ? 'The copy could not be removed.' : 'The set-aside copy was thrown away.', { tone: 'ok' });
+        paintParked();
+      } }); drop.dataset.action = 'parked-drop';
+      const when = pc.at ? U.fmtDateShort(U.dateKey(pc.at)) + ' ' + U.fmtTime(pc.at) : 'earlier';
+      parkedBox.replaceChildren(
+        h('h3', { class: 'od-sub' }, 'A copy of your kitchen was set aside'),
+        h('p', { class: 'od-p' }, 'Smokebox set this copy aside on ' + when + ' because it could not read it then, or it came from a newer version. It can be read now and holds ' + U.fmtNum(pc.tickets) + ' ' + U.plural(pc.tickets, 'ticket') + ' and ' + U.fmtNum(pc.orders) + ' ' + U.plural(pc.orders, 'order') + '.'),
+        h('p', { class: 'od-p' }, 'Bringing it back replaces everything on this device. What is here now is kept for 7 days, and you can undo it. First save a backup file of what is here now, then type ' + PARK_WORD + '.'),
+        h('div', { class: 'od-actions' }, saveFirst), SB.ui.field({ label: 'Type ' + PARK_WORD, control: word }), h('div', { class: 'od-actions' }, go, drop), status);
+    }
     const pasteLabelId = U.uid('odpl');
     const pasteArea = h('textarea', { class: 'textarea od-paste', rows: 5, spellcheck: 'false', autocomplete: 'off', 'aria-labelledby': pasteLabelId, placeholder: 'Paste the whole backup text here' });
     // Checks pasted text the same way as a chosen file.
@@ -1598,7 +1651,8 @@
     const pasteDet = h('details', { class: 'od-paste-det' }, h('summary', { id: pasteLabelId }, ico('chevron-down', 18), h('span', null, 'Paste a backup instead')), pasteArea, h('div', { class: 'od-actions' }, pasteBtn));
     card2.body.append(
       para('Choose a backup file. Smokebox shows what is inside it before anything changes, and refuses a file that is not a Smokebox backup or that belongs to another kind of kitchen (demo or real).', 'od-p'),
-      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox);
+      h('div', { class: 'od-actions' }, chooseBtn, fileIn), pasteDet, impResult, undoBox, parkedBox);
+    paintParked();
     // A month close, or the copy's 7 days running out, while this page is open shows here on the next refresh.
     P.syncs.push(() => paintUndo());
     card3.body.append(
@@ -1606,7 +1660,7 @@
         h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
         h('li', null, 'On the new device: copy the same smokebox.html file onto it and open it. Install it as an app (Share, then Add to Home Screen, or Install app).'),
         h('li', null, 'Run Menu, then Set up this tablet. Sound, screen-on and loudness are per device and are redone here.'),
-        h('li', null, 'Open Back office, then Menu and settings, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.'),
+        h('li', null, 'Open Back office, then Menu, prices and shop, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.'),
         h('li', null, 'Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.')),
       h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
 
@@ -1956,7 +2010,7 @@
       const keeping = st.persistent !== false && st.lastSaveOk !== false;
       const n = starterCount(s);
       headline.textContent = (keeping ? 'Your settings are saved on this device.' : 'This browser is not keeping your changes, so they will be lost when you close the page. Allow site data for this page.') + ' ' +
-        (n.total ? n.total + ' starter ' + U.plural(n.total, 'estimate is', 'estimates are') + ' not confirmed yet.' : 'Every prep time and yield is confirmed.');
+        (n.total ? n.total + ' ' + U.plural(n.total, 'starter estimate is still a guess', 'starter estimates are still guesses') + ', not confirmed yet.' : s.menu.some((m) => !m.archived) ? 'Every prep time and yield is confirmed.' : '');
       headline.dataset.tone = keeping ? 'ok' : 'bad';
       headSub.textContent = n.total ? n.prep + ' prep ' + U.plural(n.prep, 'time') + ' and ' + n.yld + ' cooked ' + U.plural(n.yld, 'yield') + '. Starter estimates are fine to run on; confirm each one when you have timed or weighed it.' : '';
       showBtn.hidden = !n.prep;
@@ -2065,5 +2119,5 @@
   }
 
   SB.dataPage = { saveFile, inspectBackup, backupReason, starterCount, version: 1 };
-  if (SB.office && typeof SB.office.registerPage === 'function') SB.office.registerPage('data', { title: 'Menu and settings', icon: 'sliders', order: 7, render });
+  if (SB.office && typeof SB.office.registerPage === 'function') SB.office.registerPage('data', { title: 'Menu, prices and shop', icon: 'sliders', order: 7, render });
 })(typeof globalThis !== 'undefined' ? globalThis : window);

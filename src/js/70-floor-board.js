@@ -477,6 +477,26 @@
     if (wakeState !== 'unsupported' && wakeState !== 'refused') return '';
     return 'This screen may go to sleep, and warnings stop while it sleeps. Keep the tablet plugged in with its screen set to stay on.';
   }
+  // Keeps the "went to the background" snapshot for this browser tab, so a page the browser threw away and reloaded can still say what changed.
+  function rememberSleep(at, snap) {
+    try {
+      if (!at || !snap) { g.sessionStorage.removeItem('smokebox.v1.sleepSnap'); return; }
+      g.sessionStorage.setItem('smokebox.v1.sleepSnap', JSON.stringify({ at, overdue: snap.overdue, past: Array.from(snap.past).slice(0, 200) }));
+    } catch (e) { /* private window or no storage: the live page still keeps it in memory */ }
+  }
+  // On a fresh start, reads the snapshot left by a page that went to the background and never came back (the browser discarded it) and
+  // sets the same "While this screen was asleep" line as a normal wake.
+  function restoreSleep() {
+    try {
+      const raw = g.sessionStorage.getItem('smokebox.v1.sleepSnap');
+      if (!raw) return;
+      const d = JSON.parse(raw), used = Number(d.used) || Date.now(), min = Math.round((used - d.at) / 60e3);
+      // Used once: the board may be set up again within ten minutes (it keeps the line), and after that the snapshot goes.
+      if (!(min >= 1) || min > 24 * 60 || !Array.isArray(d.past) || Date.now() - used > 10 * 60e3) { g.sessionStorage.removeItem('smokebox.v1.sleepSnap'); return; }
+      if (!d.used) g.sessionStorage.setItem('smokebox.v1.sleepSnap', JSON.stringify(Object.assign({}, d, { used })));
+      m.away = { at: used, min, summary: sleepSummary({ overdue: Number(d.overdue) || 0, past: new Set(d.past) }) };
+    } catch (e) { /* a damaged snapshot is ignored */ }
+  }
   // What was already late or past its limit when the page went to the background, so waking can say only what is new.
   function sleepSnapshot() {
     try {
@@ -497,6 +517,17 @@
       if (nt) bits.push(nt + ' ' + U.plural(nt, 'ticket') + ' went late');
       return bits.length ? 'While this screen was asleep: ' + bits.join(' and ') + '.' : '';
     } catch (e) { return ''; }
+  }
+  // The one-time words about the saved history filling up or being trimmed (from the store, when it has them), or ''. Asked about every few
+  // seconds; once it has been shown it is marked seen so it does not come back, and it stays up until the person clears it.
+  function historyWords() {
+    if (!m || !SB.store || typeof SB.store.historyNotice !== 'function') return '';
+    const t = Date.now();
+    if (!m.histNote && t - (m.histAsk || 0) > 5000) {
+      m.histAsk = t;
+      try { const n = SB.store.historyNotice(); if (n && n.words) { m.histNote = { kind: n.kind, words: String(n.words).slice(0, 300) }; m.histSeen = false; } } catch (e) { /* ignore */ }
+    }
+    return m.histNote ? m.histNote.words : '';
   }
   // A sentence shown for a while after the board comes back from the background, since warnings were silent in between.
   function awayNote() {
@@ -585,14 +616,15 @@
           const min = Math.round((Date.now() - m.hiddenAt) / 60e3);
           // The first look after waking: one tick right now (not a loop of missed seconds), then one summary of what changed while asleep.
           if (min >= 1) { try { store().tick(); } catch (e) { /* the next timer tick does it */ } m.away = { at: Date.now(), min, summary: sleepSummary(m.sleepSnap) }; }
-          m.hiddenAt = null; m.sleepSnap = null;
+          m.hiddenAt = null; m.sleepSnap = null; rememberSleep(0, null);
         }
-      } else if (m) { m.hiddenAt = Date.now(); m.sleepSnap = sleepSnapshot(); }
+      } else if (m && !m.hiddenAt) { m.hiddenAt = Date.now(); m.sleepSnap = sleepSnapshot(); rememberSleep(m.hiddenAt, m.sleepSnap); }
     };
     doc.addEventListener('visibilitychange', onVis);
     m.offs.push(() => { doc.removeEventListener('pointerdown', onGesture, true); doc.removeEventListener('visibilitychange', onVis); try { if (wakeSentinel) wakeSentinel.release(); } catch (e) { /* ignore */ } wakeSentinel = null; });
     if (sound) hookAudioUnlock();
     m.offs.push(joinLeadership());
+    restoreSleep();
     // Keep saved data safe from the browser's clean-up, and remind the owner to save the discard log.
     if (SB.discards) { SB.discards.persist(); setTimeout(() => { try { SB.discards.remind(); } catch (e) { /* optional */ } }, 4000); }
     if (SB.sim && SB.sim.live && typeof SB.sim.live.onChange === 'function') {
@@ -629,7 +661,15 @@
   };
 
   // How many slips a station switch builds before painting; the rest follow right after.
-  const FIRST_SCREEN = 36;
+  const FIRST_SCREEN = 18, REST_CHUNK = 30;
+  // Builds the slips a station switch left for later, a few frames' worth at a time (not all at once), until every ticket of that station is there.
+  function buildRest(z) {
+    setTimeout(() => {
+      if (!m || m.zone !== z) return;
+      m.first = true; m.buildLimit = REST_CHUNK; render(); m.buildLimit = 0; m.first = false;
+      if (m.deferred) { m.deferred = false; buildRest(z); }
+    }, 25);
+  }
   // Switches to another station tab and announces the result. Called by the shell when the address changes.
   F.setZone = function (zone) {
     const z = TABS.indexOf(zone) >= 0 ? zone : 'all';
@@ -647,10 +687,7 @@
     render();
     m.buildLimit = 0;
     m.first = false;
-    if (m.deferred) {
-      m.deferred = false;
-      setTimeout(() => { if (!m || m.zone !== z) return; m.first = true; render(); m.first = false; }, 25);
-    }
+    if (m.deferred) { m.deferred = false; buildRest(z); }
     const n = store().select.ticketsForZone(z).length, zn = z === 'all' ? 'All stations' : zoneById(z).name;
     say(zn + ': ' + (n ? n + ' ' + U.plural(n, 'ticket') : 'no tickets') + '.');
     return z;
@@ -658,6 +695,8 @@
 
   // The page: header, slip area and all-day strip.
 
+  // What the Expo tab shows, in plain words, for its tooltip and for screen readers.
+  const EXPO_WHAT = 'Expo: whole tickets, ready to send out';
   // Builds the whole page once. WATCH OUT: nothing built here is replaced later; updates change
   // text and attributes only.
   function buildDom() {
@@ -668,23 +707,31 @@
     const tabOptions = TABS.map((id) => {
       if (id === 'all') return { id, label: 'All', icon: 'grid', iconSize: 20, count: 0, alert: false, alertLabel: 'has overdue tickets' };
       const z = zoneById(id);
-      return { id, label: z.code, icon: z.icon, iconSize: 20, count: 0, alert: false, alertLabel: 'has overdue tickets' };
+      return { id, label: z.name, icon: z.icon, iconSize: 20, count: 0, alert: false, alertLabel: 'has overdue tickets' };
     });
     // The Cabinet tab is not a station: it swaps the tickets for the hold cabinet, on the same screen.
     tabOptions.push({ id: 'cabinet', label: 'Cabinet', icon: 'thermometer', iconSize: 20, count: 0, alert: false, alertLabel: 'needs attention' });
     const seg = SB.ui.segmented({ kind: 'tabs', label: 'Station', options: tabOptions, value: m.zone, onChange: goZone, class: 'fl-seg' });
-    // Screen readers get the full station name and what the count means; the eye sees an icon and a code.
+    // Screen readers get the full station name and what the count means. The eye sees the station's name, or its
+    // short code (PIT, FRY) where the tab is too narrow for the name (see fitTabs).
     TABS.forEach((id) => {
       const b = seg.querySelector('[data-id="' + id + '"]');
       if (!b) return;
       if (id !== 'all') b.dataset.zone = id;
-      b.insertBefore(h('span', { class: 'visually-hidden' }, (id === 'all' ? 'All stations' : zoneById(id).long) + ', '), b.firstChild);
+      const lab = b.querySelector('.seg-label');
+      if (lab && id !== 'all') { const z = zoneById(id); U.clear(lab); lab.append(h('span', { class: 'fl-tab-full' }, z.name), h('span', { class: 'fl-tab-code', 'aria-hidden': 'true' }, z.code)); }
+      // Expo is the one tab a new cook cannot guess, so it says what it is when pointed at or read aloud.
+      if (id === 'expo') b.title = EXPO_WHAT;
+      b.insertBefore(h('span', { class: 'visually-hidden' }, (id === 'all' ? 'All stations' : id === 'expo' ? EXPO_WHAT : zoneById(id).long) + ', '), b.firstChild);
       b.appendChild(h('span', { class: 'visually-hidden fl-tab-what', dataset: { here: id === 'all' || id === 'expo' ? 'no' : 'yes' } }, tabWhat(0, id)));
     });
     const tabs = h('div', { class: 'fl-tabs' }, seg);
 
-    // The sanitize chip opens a menu to log a check; the demo chip opens the demo sheet.
-    const sanChip = h('button', { type: 'button', class: 'chip fl-chip fl-san', dataset: { tone: 'info' }, onClick: (e) => sanitiseMenu(e.currentTarget) }, ico('shield-check', 18), h('span', { class: 'fl-chip-w' }, 'Sanitize'), h('span', { class: 'fl-chip-t' }, ''));
+    // The sanitize chip opens a menu to log a check.
+    // The word and the time sit in one label with a plain space between them, so it never reads "Sanitize  not logged".
+    const sanChip = h('button', { type: 'button', class: 'chip fl-chip fl-san', dataset: { tone: 'info' }, onClick: (e) => sanitiseMenu(e.currentTarget) }, ico('shield-check', 18),
+      h('span', { class: 'fl-san-l' }, h('span', { class: 'fl-chip-w' }, 'Sanitize'), ' ', h('span', { class: 'fl-chip-t' }, '')));
+    // The demo chip opens the demo sheet.
     const demoChip = h('button', { type: 'button', class: 'chip fl-chip fl-demo-chip', dataset: { tone: 'info' }, hidden: true, onClick: () => openSheet('demo') }, ico('fast-forward', 18), h('span', { class: 'fl-chip-t' }, 'Demo'));
     const status = h('div', { class: 'fl-status' }, sanChip, demoChip);
 
@@ -693,16 +740,20 @@
       const n = h('span', { class: 'fl-tool-n num', hidden: true });
       const lab = h('span', { class: 'fl-tool-label' }, short);
       // A tool button opens its sheet; the key in brackets in the tooltip is the shortcut.
-      const b = h('button', { type: 'button', class: 'btn fl-tool', dataset: { tool: id }, 'aria-keyshortcuts': key, onClick: () => (typeof sheet === 'function' ? sheet() : openSheet(sheet)) }, ico(icon, 24), lab, n);
-      try { SB.ui.tooltip(b, label + ' (' + key + ')'); } catch (e) { /* ignore */ }
+      const b = h('button', { type: 'button', class: 'btn fl-tool', dataset: { tool: id }, 'aria-keyshortcuts': key || null, onClick: () => (typeof sheet === 'function' ? sheet() : openSheet(sheet)) }, ico(icon, 24), lab, n);
+      try { SB.ui.tooltip(b, label + (key ? ' (' + key + ')' : '')); } catch (e) { /* ignore */ }
       return { b, n, lab, label };
     };
     const tRecall = tool('recall', 'history', 'Recall', 'Recall', 'R', 'recall');
     const tHold = tool('hold', 'thermometer', 'Hold cabinet', 'Hold', 'H', toggleCabinet);
-    const t86 = tool('board86', 'ban', '86 board', '86', '8', 'board86');
+    // "86" is kitchen slang a new cook may not know, so the button says Sold out with a small 86 beside the icon.
+    const t86 = tool('board86', 'ban', 'Sold out (86 board)', 'Sold out', '8', 'board86');
+    t86.b.insertBefore(h('span', { class: 'fl-tool-hint', 'aria-hidden': 'true' }, '86'), t86.lab);
     const tDemo = tool('demo', 'play', 'Demo', 'Demo', 'D', 'demo');
     // The Hold button is not in the header any more: the Cabinet tab next to the stations is that button, with its count.
-    const tools = h('div', { class: 'fl-tools' }, tRecall.b, t86.b, tDemo.b);
+    // Front counter opens the full-screen order page for a visit; it does not turn this tablet into an order-only one.
+    const tFront = tool('front', 'receipt', 'Front counter: the full-screen order page', 'Front counter', null, () => F.openCounter());
+    const tools = h('div', { class: 'fl-tools' }, tRecall.b, t86.b, tFront.b, tDemo.b);
     // Orders is a main button, not a tool: it stays in the header at every width, next to New ticket, because the counter
     // lives in it (open orders, add a round, take payment). The badge counts the orders still open.
     const tOrders = tool('orders', 'receipt', 'Open orders', 'Orders', 'O', 'orders');
@@ -743,10 +794,18 @@
     const dockClear = h('button', { type: 'button', class: 'btn fl-dock-clear', hidden: true, onClick: () => F.highlight(null) }, ico('x', 18), h('span', null, 'Clear highlight'));
     const dockList = h('div', { class: 'fl-dock-list', id: 'fl-dock-list', role: 'group', 'aria-label': 'Items still to make, tap one to highlight it on the board' });
     const dockEmpty = h('span', { class: 'fl-dock-empty' }, 'Nothing waiting.');
-    // A quiet stamp of the last time the board checked its warnings, so a frozen or sleeping screen shows an old time.
-    const checked = h('span', { class: 'fl-checked num', title: 'The last time this board checked its warnings' });
-    const dock = h('footer', { class: 'fl-dock' }, dockToggle, dockClear, dockList, dockEmpty, checked);
-    m.checked = checked;
+    // "+3 more" says how many dish chips did not fit on the strip's one line; tapping it shows them all (and again folds them).
+    const dockMore = h('button', { type: 'button', class: 'btn fl-dock-more', hidden: true, 'aria-controls': 'fl-dock-list', 'aria-expanded': 'false', onClick: () => { m.dockOpen = !m.dockOpen; fitDock(); measureDock(); } }, h('span', null, ''));
+    // A quiet stamp of the last time the board updated itself, so a frozen or sleeping screen shows an old time.
+    const checked = h('span', { class: 'fl-checked num', title: 'The board updates itself every second. If this time stops moving, reload the page.' });
+    // Full screen hides the browser's address bar and buttons on a tablet. It shows only where the browser can do it.
+    const fullBtn = h('button', { type: 'button', class: 'btn fl-full', hidden: true, onClick: goFull }, ico('maximize', 20), h('span', null, 'Full screen'));
+    const dock = h('footer', { class: 'fl-dock' }, dockToggle, dockClear, dockList, dockMore, dockEmpty, checked, fullBtn);
+    m.checked = checked; m.dockMore = dockMore; m.fullBtn = fullBtn;
+    // Leaving or entering full screen (also with the browser's own gesture) shows or hides the button.
+    const onFull = () => paintFull();
+    doc.addEventListener('fullscreenchange', onFull); doc.addEventListener('webkitfullscreenchange', onFull);
+    m.offs.push(() => { doc.removeEventListener('fullscreenchange', onFull); doc.removeEventListener('webkitfullscreenchange', onFull); });
     // While a pointer is over the strip its chips stay put, see renderDock.
     dock.addEventListener('pointerenter', () => { m.dockHover = true; });
     dock.addEventListener('pointerleave', () => { m.dockHover = false; });
@@ -772,7 +831,7 @@
     TABS.forEach((id) => { const b = seg.querySelector('[data-id="' + id + '"]'); if (b) m.tabParts[id] = { count: b.querySelector('.seg-count'), n: -1 }; });
     m.seg = seg; F.applyHiddenTabs();
     m.sanText = sanChip.querySelector('.fl-chip-t');
-    Object.assign(m, { wl, wr, head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
+    Object.assign(m, { wl, wr, head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders, front: tFront }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
 
     grid.addEventListener('click', onGridClick);
     dockList.addEventListener('click', (e) => {
@@ -784,8 +843,9 @@
     if (typeof IntersectionObserver === 'function') {
       m.io = new IntersectionObserver((entries) => { entries.forEach((en) => en.target.classList.toggle('is-off', !en.isIntersecting)); }, { root: main, rootMargin: '120px' });
     }
-    if (typeof ResizeObserver === 'function') { m.ro = new ResizeObserver(() => { measureDock(); paintDensity(); fitHead(); }); m.ro.observe(dock); m.ro.observe(main); }
+    if (typeof ResizeObserver === 'function') { m.ro = new ResizeObserver(() => { measureDock(); paintDensity(); fitHead(); fitDock(); }); m.ro.observe(dock); m.ro.observe(main); }
     paintDockToggle();
+    paintFull();
     paintWall();
     // The window width decides whether wall mode can show; check it again when the window is resized.
     const onWin = () => paintWall();
@@ -854,6 +914,22 @@
     setHidden(P.paidMore, gl.paid.length <= 6); if (gl.paid.length > 6) setTxt(P.paidMore, 'and ' + (gl.paid.length - 6) + ' more paid');
   }
 
+  // Shows the Full screen button only on a touch screen whose browser can go full screen and is not full screen already.
+  function paintFull() {
+    if (!m || !m.fullBtn) return;
+    const de = doc.documentElement;
+    const can = !!(de && (de.requestFullscreen || de.webkitRequestFullscreen)) && doc.fullscreenEnabled !== false;
+    const isFull = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+    setHidden(m.fullBtn, !(can && !isFull && mq('(pointer: coarse)')));
+  }
+  // Asks the browser for full screen (it allows this only right after a tap), then checks the button again.
+  function goFull() {
+    const de = doc.documentElement;
+    try { const r = (de.requestFullscreen || de.webkitRequestFullscreen).call(de); Promise.resolve(r).then(paintFull, paintFull); } catch (e) { paintFull(); }
+  }
+  // Opens the full-screen order page as a visit: the order page's back link returns to the board, and the tablet keeps its job.
+  F.openCounter = function () { if (SB.router && SB.router.go) SB.router.go({ kind: 'new' }, { visit: true }); };
+
   // Tests a CSS media query; false where matchMedia is missing.
   const mq = (q) => { try { return g.matchMedia(q).matches; } catch (e) { return false; } };
   // Orders the header parts for the current width (on a phone the tabs wrap under the buttons).
@@ -878,31 +954,55 @@
     return hi - lo > 24;
   }
   // A short fingerprint of what decides the header's fit: its width and the length of the chip text.
-  const headKey = () => [m.head.clientWidth, m.sanText.textContent.length, m.demoChip.hidden ? 0 : m.demoChip.textContent.length].join(':');
-  // Squeezes the header step by step until it fits on one row: first the tab icons go, then the status chips, then the
-  // tool buttons. Everything that goes is still in the Menu list.
+  const headKey = () => [m.head.clientWidth, m.sanText.textContent.length, m.demoChip.hidden ? 0 : m.demoChip.textContent.length, m.seg.querySelectorAll('.seg-opt:not([hidden])').length, m.root.dataset.tools || ''].join(':');
+  // Squeezes the header step by step until it fits on one row: first the station names become short codes, then the tab
+  // icons go, then the status chips, then the tool buttons. Everything that goes is still in the Menu list.
   // WATCH OUT: it always starts again from the full header, so a wider window gets everything back.
   function fitHead() {
     if (!m || !m.head) return;
     const hd = m.head;
     delete hd.dataset.fit;
     if (!m.narrow) {
-      for (const stage of ['icons', 'status', 'labels', 'toollabels', 'tools']) {
+      for (const stage of ['codes', 'icons', 'status', 'labels', 'toollabels', 'tools']) {
         if (!headWrapped()) break;
         hd.dataset.fit = stage;
       }
     }
+    fitTabs();
     m.fitKey = headKey();
+  }
+  // On the row of tabs under the buttons (tablets and phones), a tab whose station name does not fit shows its short
+  // code (PIT, FRY) instead; the others keep their names. All and Cabinet have no code, so a tight one drops its icon. Reads every width first, then writes, so it lays out once.
+  function fitTabs() {
+    const tabs = Array.from(m.seg.querySelectorAll('.seg-opt'));
+    tabs.forEach((b) => { if (b.dataset.short) delete b.dataset.short; });
+    if (!m.narrow) return;
+    // A tab is tight when its icon and name together are wider than the room inside its padding.
+    const tight = tabs.map((b) => {
+      if (!b.offsetWidth) return false;
+      const cs = g.getComputedStyle(b), lab = b.querySelector('.seg-label'), icon = b.querySelector('svg');
+      const room = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const iw = icon && cs.flexDirection !== 'column' && icon.getBoundingClientRect().width ? icon.getBoundingClientRect().width + (parseFloat(cs.columnGap) || 0) : 0;
+      return !!lab && lab.scrollWidth + iw > room + 0.5;
+    });
+    tabs.forEach((b, i) => { if (tight[i]) b.dataset.short = 'true'; });
   }
   // The hidden words after a tab's count: "ticket" for one, "tickets" for the rest, and "with work here" on a station tab.
   function tabWhat(n, id) { return ' ' + U.plural(n, 'ticket') + (id === 'all' || id === 'expo' ? '' : ' with work here'); }
   // Runs every second: refits the header only when its width or chip text changed, so most ticks cost nothing.
   function refit() {
     if (m && m.head && headKey() !== m.fitKey) fitHead();
-    measureToastTop();
+    queueToastTop();
   }
   // True when the header has moved the status chips or tool buttons into the Menu list.
   const headSqueezed = () => !!m.head && (m.head.dataset.fit === 'status' || m.head.dataset.fit === 'labels' || m.head.dataset.fit === 'toollabels' || m.head.dataset.fit === 'tools');
+  // Asks for the toast position to be measured once at the start of the next frame, so the reading happens after this tick's writes
+  // and shares one layout with the frame instead of forcing its own every second.
+  function queueToastTop() {
+    if (!m || m.ttQ) return;
+    if (typeof g.requestAnimationFrame !== 'function') { measureToastTop(); return; }
+    m.ttQ = g.requestAnimationFrame(() => { if (m) { m.ttQ = 0; measureToastTop(); } });
+  }
   // In the cabinet view toasts move to the top right, under the header and the attention strip, so they never cover a card's buttons.
   // This tells the stylesheet where the page below the strip starts (--fl-toast-top).
   function measureToastTop() {
@@ -961,7 +1061,7 @@
     m.cabOn = !!on;
     m.root.dataset.cabinet = on ? 'on' : 'off';
     doc.documentElement.dataset.cabinet = on ? 'on' : 'off';
-    measureToastTop();
+    queueToastTop();
     for (const el of [m.grid, m.empty, m.welcome, m.dock]) if (el) el.style.display = on ? 'none' : '';
     setHidden(m.cabEl, !on);
     m.seg.setValue(on ? 'cabinet' : m.zone);
@@ -1194,7 +1294,11 @@
     let n = 0;
     if (!m.cabOn && main.clientHeight > 0 && main.scrollHeight > main.clientHeight + 4) {
       const bottom = main.getBoundingClientRect().bottom;
-      for (const c of m.grid.children) { if (!c.classList.contains('fl-leaving') && c.getBoundingClientRect().top >= bottom - 8) n++; }
+      // The slips run row by row down the page, so the first one below the screen is found by halving (a few reads, not one per ticket).
+      const kids = m.grid.children;
+      let lo = 0, hi = kids.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (kids[mid].getBoundingClientRect().top >= bottom - 8) hi = mid; else lo = mid + 1; }
+      for (let i = lo; i < kids.length; i++) if (!kids[i].classList.contains('fl-leaving')) n++;
     }
     setHidden(m.below, n === 0);
     if (n) put(m.belowT, n + (n === 1 ? ' more ticket below' : ' more tickets below'));
@@ -1620,7 +1724,7 @@
     const el = h('section', { class: 'fl-strip', role: 'region', 'aria-label': 'Needs attention', 'aria-live': 'polite', hidden: true });
     // The sound check: shown while sound is on but the browser has not yet allowed it. One tap allows it and plays a test.
     const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); playHere(() => { chime(); speak('Sound is on.'); }); } },
-      ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
+      ico('bell', 24), h('span', null, 'Tap to turn on sound'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 24));
     // The clock notice: the tablet's clock jumped far ahead, the board keeps the old time and asks. Calm, two plain choices, and the board keeps working.
@@ -1731,7 +1835,7 @@
   // Rewrites the strip from the deadline feed: the top three rows, or hidden when the feed is empty.
   function updateStrip(now) {
     if (!m || !m.strip || !SB.deadlines) return;
-    if (m.checked) { const t = U.fmtTime(Date.now()); if (m.checkedT !== t) { m.checkedT = t; m.checked.textContent = 'Checked ' + t; } }
+    if (m.checked) { const t = U.fmtTime(Date.now()); if (m.checkedT !== t) { m.checkedT = t; m.checked.textContent = 'Updated ' + t; } }
     const all = SB.deadlines.build(store().getState(), now);
     m.feed = all;
     // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
@@ -1770,7 +1874,7 @@
     setHidden(m.strip.soundBar, !needSound || m.dis.has('snd'));
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
-    const health = awayNote() || awakeNote();
+    const health = awayNote() || historyWords() || awakeNote();
     const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
@@ -1785,16 +1889,17 @@
       if (m.strip.clockText.textContent !== t) m.strip.clockText.textContent = t;
     }
     setHidden(m.strip.clockBar, !clockShown);
-    measureToastTop();
+    queueToastTop();
     const soundShown = needSound && !m.dis.has('snd') && !clockShown;
     setHidden(m.strip.soundBar, !soundShown); // the clock notice goes first, so the sound bar waits behind it
     const noteWanted = !!note && (!sound || top.length > 0 || note === health) && !m.dis.has('pause:' + note);
     const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
-    if (moreEl) { const t = (noWebAudio() ? 'This browser cannot play warning tones. Open Smokebox in another browser for sound.' : 'Tap here to turn on warning sounds. This browser needs one tap first.') + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
+    if (moreEl) { const t = (noWebAudio() ? 'This browser cannot play warning sounds' : 'Tap to turn on sound') + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
+    if (showNote && m.histNote && note === m.histNote.words && !m.histSeen) { m.histSeen = true; try { SB.store.historyNoticeSeen(m.histNote.kind); } catch (e) { /* the store has no such call */ } }
     setHidden(m.strip.el, top.length === 0 && (!needSound || m.dis.has('snd')) && !showNote && !clockShown);
     m.strip.rows.forEach((r, i) => {
       const d = top[i];
@@ -1811,7 +1916,8 @@
       setTxt(r.when, d.kind === 'expired' ? 'OUT' : d.kind === 'past' ? 'PAST' : countdownText(d.msLeft));
       // How many more warnings wait behind this one goes on the short name line, where a long explanation cannot cut it off.
       setTxt(r.what, d.label + (i === top.length - 1 && moreRows > 0 ? '   +' + moreRows + ' more' : ''));
-      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action);
+      // What to do comes first ("Use it first."), then why, so the words a cook needs are the ones read first.
+      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.action + ' ' + d.consequence);
     });
   }
 
@@ -1859,6 +1965,8 @@
       else tabCount(z.id, c.zones[z.id] || 0, (c.overdueByZone[z.id] || 0) > 0);
     });
     F.applyHiddenTabs();
+    // An empty kitchen (no dishes, no tickets) has nothing to recall, sell out or take orders for, so those buttons wait.
+    { const v = hasWork() ? 'on' : 'off'; if (m.root.dataset.tools !== v) { m.root.dataset.tools = v; m.fitKey = null; } }
     // tools with counts
     const recentN = recentCount(S, now);
     toolCount(m.tool.recall, recentN, '', recentN ? recentN + ' recently bumped' : '');
@@ -1910,6 +2018,11 @@
     if (m.menuBtn.getAttribute('aria-label') !== menuName) m.menuBtn.setAttribute('aria-label', menuName);
     toolCount(m.tool.demo, demoOn ? 1 : 0, 'warn', demoOn ? (speed > 1 ? 'clock running at x' + (Math.round(speed * 10) / 10) : 'demo orders running') : '', demoOn ? (speed > 1 ? 'x' + (Math.round(speed * 10) / 10) : 'on') : '');
     refit();
+  }
+  // True once the kitchen has a dish on its menu or any ticket, open or recently bumped.
+  function hasWork() {
+    const st = store().getState();
+    return st.menu.some((d) => !d.archived) || (st.tickets && st.tickets.length > 0) || recentCount(store(), store().now()) > 0;
   }
   // Asks the demo simulator for its status; null when it is missing or fails.
   function safeStatus() { try { return SB.sim.live.status(); } catch (e) { return null; } }
@@ -1964,12 +2077,14 @@
       { hide: kit, label: 'Edit the menu', icon: 'sliders', onClick: () => openOffice(anchor, 'data') },
       { separator: true },
       // Orders opens the open-orders screen, with how many are open.
-      { hide: kit, label: 'Orders' + (m.openOrders ? ' (' + m.openOrders + ' open)' : ''), icon: 'receipt', onClick: () => openSheet('orders') },
+      { hide: kit || !hasWork(), label: 'Orders' + (m.openOrders ? ' (' + m.openOrders + ' open)' : ''), icon: 'receipt', onClick: () => openSheet('orders') },
+      // Front counter opens the full-screen order page; its back link returns here.
+      { hide: kit || !hasWork(), label: 'Front counter (full-screen orders)', icon: 'receipt', onClick: () => F.openCounter() },
       // Recall and Hold open the same sheets as their header buttons, with the same counts.
-      { label: 'Recall' + (recentCount(store(), store().now()) ? ' (' + recentCount(store(), store().now()) + ')' : ''), icon: 'history', onClick: () => openSheet('recall') },
+      { hide: !hasWork(), label: 'Recall' + (recentCount(store(), store().now()) ? ' (' + recentCount(store(), store().now()) + ')' : ''), icon: 'history', onClick: () => openSheet('recall') },
       { hide: front || !cookOn(), label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
       // 86 and Demo open their sheets too.
-      { label: '86 board' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
+      { hide: !hasWork(), label: 'Sold out (86 board)' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
       { hide: kit, label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
       // The sanitize entry opens its own small menu on the same anchor.
       { hide: !cookOn(), label: 'Readings', icon: 'thermometer', onClick: () => openSheet('readings') },
@@ -2361,6 +2476,24 @@
     const domOrder = Array.from(m.dockList.children).map((n) => n.dataset.menu).join('|');
     if (order !== domOrder && (!m.dockHover || nodes.length !== m.dockList.childElementCount)) reorder(m.dockList, nodes);
     paintHighlight();
+    fitDock();
+  }
+  // The strip shows one line of whole dish chips: a chip that does not fit drops out of sight (never cut mid-word) and
+  // "+N more" says how many are hidden. Opened, the strip shows every chip on as many lines as it needs.
+  function fitDock() {
+    if (!m || !m.dockMore) return;
+    const chips = Array.from(m.dockList.children);
+    m.dock.dataset.open = m.dockOpen ? 'true' : 'false';
+    // Measure with the button showing, so the chips that fit leave room for it.
+    m.dockMore.hidden = false;
+    const top0 = chips.length ? chips[0].offsetTop : 0, room = m.dockList.offsetLeft + m.dockList.clientWidth;
+    let off = 0;
+    // A chip is out of sight when it wrapped to a second line, or (one long name on a narrow strip) runs past the edge.
+    for (const c of chips) { const out = !m.dockOpen && (c.offsetTop > top0 + 4 || c.offsetLeft + c.offsetWidth > room + 1); if (out) off++; c.tabIndex = out ? -1 : 0; c.classList.toggle('is-out', out); }
+    setHidden(m.dockMore, !off && !m.dockOpen);
+    if (!off && !m.dockOpen) return;
+    setTxt(m.dockMore.firstChild, m.dockOpen ? 'Show less' : '+' + off + ' more');
+    m.dockMore.setAttribute('aria-expanded', m.dockOpen ? 'true' : 'false');
   }
   // Builds one dish chip for the strip. Returns the button and the parts that change.
   function buildDockChip(e) {

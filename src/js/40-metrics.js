@@ -1114,6 +1114,12 @@
     return Object.keys(m).map((k) => m[k]).sort((a, b) => b.g - a.g || (a.reason < b.reason ? -1 : 1));
   };
 
+  // How late a temperature check or sanitize round may be and still count as on time in the reports: a few
+  // minutes is how long a busy cook needs to get to it, not a missed check.
+  M.CHECK_GRACE_MS = 5 * 60000;
+  // True when a check flagged late was logged within the grace above, so it counts as on time.
+  M.withinGrace = (e) => !!e && e.onTime === false && num(e.lateMs) && e.lateMs < M.CHECK_GRACE_MS;
+
   /**
    * Food-safety compliance from events (and batches for discards). onTimePct are fractions of events that say whether they were on time.
    * score = average of the available temperature-check and sanitise on-time shares (null when neither is known).
@@ -1124,10 +1130,10 @@
   M.compliance = (ds, opts) => {
     const ctx = makeCtx(ds, opts);
     // Counts events flagged on time or late (no flag counts for nothing: unknown is not on time) and how
-    // late the late ones were.
+    // late the late ones were. A check logged less than CHECK_GRACE_MS after it was due counts as on time.
     const chk = (evs) => {
       let on = 0, late = 0; const lm = [];
-      for (const e of evs) { if (e.onTime === true) on++; else if (e.onTime === false) { late++; if (num(e.lateMs) && e.lateMs > 0) lm.push(e.lateMs); } }
+      for (const e of evs) { if (e.onTime === true || M.withinGrace(e)) on++; else if (e.onTime === false) { late++; if (num(e.lateMs) && e.lateMs > 0) lm.push(e.lateMs); } }
       const n = on + late; return { count: n, onTime: on, late, onTimePct: n ? on / n : null, avgLateMs: lm.length ? mean(lm) : null, maxLateMs: lm.length ? Math.max.apply(null, lm) : null };
     };
     const tc = chk(ctx.ev('temp_logged')), sn = chk(ctx.ev('sanitize_done')), dl = discardList(ctx), il = intakeList(ctx);
@@ -1613,7 +1619,7 @@
       const planned = r.learnedSec !== null && Math.abs(r.learnedSec - r.observedSec) / r.observedSec <= 0.15 && c.pacingCfg.enabled !== false;
       const tail = others > 0 ? ' ' + others + ' other ' + U.plural(others, 'item') + ' also drift.' : '';
       if (r.drift === 'slow') return F(this.id, r.ratio >= 1.6 ? 'bad' : 'warn', 58 + Math.min(20, (r.ratio - 1) * 20), r.name + ' takes ' + mmss(r.observedSec * 1000) + ' on your line',
-        'That is ' + mmss(r.deltaSec * 1000) + ' over the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples). ' + (planned ? 'Finish together now plans for it.' : r.learnedSec !== null ? 'Pacing plans for ' + mmss(r.learnedSec * 1000) + ' so far; confirm the new time in Menu and settings.' : 'Confirm the new time in Menu and settings.') + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
+        'That is ' + mmss(r.deltaSec * 1000) + ' over the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples). ' + (planned ? 'Finish together now plans for it.' : r.learnedSec !== null ? 'Pacing plans for ' + mmss(r.learnedSec * 1000) + ' so far; confirm the new time in Menu, prices and shop.' : 'Confirm the new time in Menu, prices and shop.') + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
       return F(this.id, 'info', 40, r.name + ' is quicker than planned',
         r.name + ' takes ' + mmss(r.observedSec * 1000) + ', ' + mmss(-r.deltaSec * 1000) + ' under the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples), so Finish together may fire it too early.' + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
     } },
@@ -1799,7 +1805,10 @@
       }
       case 'safety': {
         const k = M.compliance(c); if (!k.tempChecks.count && !k.sanitize.count && !k.discards.count) return 'No food-safety records in this range yet.';
-        return (k.tempChecks.count ? pctTxt(k.tempChecks.onTimePct) + ' of ' + U.fmtNum(k.tempChecks.count) + ' temperature checks were on time' : 'No temperature checks logged') + (k.sanitize.count ? ', ' + pctTxt(k.sanitize.onTimePct) + ' of ' + U.fmtNum(k.sanitize.count) + ' sanitize ' + U.plural(k.sanitize.count, 'round was', 'rounds were') + ' on time' : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + M.discardCostWords(k.discards, money) + ').' : 'nothing was discarded.');
+        // One check reads "the one sanitize round was late", never "0% of 1 ... was on time".
+        const share = (x, noun) => (x.count === 1 ? 'the one ' + noun + ' was ' + (x.onTime ? 'on time' : 'late') : pctTxt(x.onTimePct) + ' of ' + U.fmtNum(x.count) + ' ' + noun + 's were on time');
+        const temps = k.tempChecks.count ? share(k.tempChecks, 'temperature check') : 'No temperature checks logged';
+        return (k.tempChecks.count === 1 ? 'T' + temps.slice(1) : temps) + (k.sanitize.count ? ', ' + share(k.sanitize, 'sanitize round') : '') + '; ' + (k.discards.count ? k.discards.count + ' ' + U.plural(k.discards.count, 'batch', 'batches') + ' thrown out (' + kgTxt(k.discards.g) + ', ' + M.discardCostWords(k.discards, money) + ').' : 'nothing was discarded.');
       }
       case 'stock': {
         const so = M.sellOutClock(c), n = so.rows.length; if (!so.dayCount) return 'No sell-outs in this range yet.';
