@@ -378,7 +378,15 @@
      },
      {
       "t": "p",
-      "x": "Tap **86 board**, find the dish and mark it sold out. Smokebox also does this by itself when a dish's food runs low."
+      "x": "Tap **Sold out** at the top (the 86 board), find the dish and mark it sold out. Smokebox also does this by itself when a dish's food runs low."
+     },
+     {
+      "t": "h",
+      "x": "Full screen and the front counter"
+     },
+     {
+      "t": "p",
+      "x": "On a tablet, tap **Full screen** at the bottom right to hide the browser's bars. **Front counter** at the top opens the order page on the whole screen; its **Board** link brings you back here."
      }
     ]
    },
@@ -884,7 +892,7 @@
      {
       "t": "ol",
       "x": [
-       "If the board says \"Tap here to turn on warning sounds\", tap it. Browsers need one tap first.",
+       "If the board says \"Tap to turn on sound\", tap it. Browsers need one tap first.",
        "Turn the tablet volume up and check its silent switch.",
        "Tap **Settings** and check that Sound is on and the loudness is not low.",
        "Tap **Settings**, then **Tablet checks: screen, sound, home screen**, then **Test the sound**.",
@@ -1311,7 +1319,7 @@
        "Tap Done only when it is really finished",
        "Gray dish: waiting on purpose. Start now goes early",
        "Clock amber, then red: the order is late",
-       "Sold out: tap 86 board and mark it",
+       "Sold out: tap Sold out (the 86 board) and mark it",
        "Cooked food leaves the cabinet: tap Pull",
        "Wrong tap: Undo, within 10 seconds",
        "Bumped by mistake: Recall, in the header"

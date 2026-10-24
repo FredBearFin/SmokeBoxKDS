@@ -70,7 +70,7 @@ for (const min of [2, 20, 90]) {
   await hide(p); await p.clock.fastForward(20 * 60e3); await show(p); await p.clock.runFor(1500);
   const checkedNow = await p.evaluate(() => (document.querySelector('.fl-checked') || {}).textContent);
   const expect = await p.evaluate(() => new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase());
-  check('"Checked" shows the time of waking, not the time before the sleep', !!checkedNow && checkedNow.toLowerCase().replace(/\s/g, '').includes(expect.replace(/\s/g, '')), { checkedNow, expect });
+  check('"Updated" shows the time of waking, not the time before the sleep', !!checkedNow && checkedNow.toLowerCase().replace(/\s/g, '').includes(expect.replace(/\s/g, '')), { checkedNow, expect });
   await p.clock.runFor(11 * 60e3);
   t = (await strip(p)).join(' | ');
   check('ten minutes after waking the "while asleep" line has gone', !/While this screen was asleep/.test(t) && !/in the background/.test(t), t);
