@@ -142,6 +142,18 @@
     if (s.persistent === false) SB.ui.toast('This browser is not letting Smokebox save. Your board lasts only until you close the page. Open Back office, Menu and settings, then Data, to save a backup file.', { tone: 'warn', ms: 15000 });
   }
 
+  // A real kitchen that still holds tickets made by an old in-place demo gets them removed at once: they are fake by
+  // definition, and a board full of day-old demo tickets is the first thing a returning owner would otherwise see.
+  // An owner who already chose "keep" is left alone. Real tickets and the orders that hold them are never touched.
+  function clearOldDemo() {
+    const S = SB.store;
+    if (!S || !S.isolated || !S.isolated() || S.isDemo() || typeof S.demoLeftovers !== 'function') return;
+    const c = S.demoLeftovers();
+    if (!c.offer) return;
+    const r = S.clearDemoLeftovers();
+    if (r.ok && SB.ui && SB.ui.toast) SB.ui.toast('Removed ' + r.info.tickets + ' old demo ' + (r.info.tickets === 1 ? 'ticket' : 'tickets') + ' left from an earlier version. Your own data was not touched.', { tone: 'ok', ms: 8000 });
+  }
+
   // Runs the start-up steps in order and remembers which step it is on, so a failure can say where it
   // stopped. A missing shell is an error. Files that failed to load only raise a warning toast, because the
   // rest of the app still works.
@@ -165,6 +177,7 @@
     // The app is running from here on: a failure in these extras is logged, never shown as "could not start" over a working board.
     try { storageNotices(); } catch (e) { console.error('[smokebox] start-up notices failed', e); }
     try { watchClock(); } catch (e) { console.error('[smokebox] clock watcher failed', e); }
+    try { clearOldDemo(); } catch (e) { console.error('[smokebox] old demo clean-up failed', e); }
     try {
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });
