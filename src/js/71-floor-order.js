@@ -390,7 +390,7 @@
     notice.append(ico('info', 20), noticeText, noticeX);
 
     /* customer */
-    const custInput = h('input', { class: 'input ord-cust-input', type: 'text', autocomplete: 'off', autocapitalize: 'words', spellcheck: 'false', enterkeyhint: 'done', placeholder: 'Or type a name' });
+    const custInput = h('input', { class: 'input ord-cust-input', type: 'text', autocomplete: 'off', autocapitalize: 'words', spellcheck: 'false', enterkeyhint: 'done', placeholder: 'Customer name' });
     const custCount = h('span', { class: 'ord-counter num', hidden: true });
     const custField = SB.ui.field({ label: 'Customer', control: custInput, hint: 'Leave it blank for Walk-up.' });
     // The quick names come from the owner's list (settings.service.chips) when there is one; no list means the standard names,
@@ -454,7 +454,7 @@
     // Picking an order in the list makes this round part of it.
     orderSel.addEventListener('change', () => { D.orderId = orderSel.value || null; touched(); });
     const orderInfo = h('p', { class: 'ord-order-info t-muted', hidden: true });
-    const orderBox = h('div', { class: 'ord-block ord-orderbox' }, h('div', { class: 'ord-label' }, 'Order'), orderSeg, orderSel, orderInfo);
+    const orderBox = h('div', { class: 'ord-block ord-orderbox' }, h('div', { class: 'ord-label' }, 'New or open order'), orderSeg, orderSel, orderInfo);
 
     /* payment: take it now at the counter, or leave the order open */
     // Chooses how the guest pays right now, or leaves the order open to pay later.
@@ -575,8 +575,11 @@
     });
     noteField.querySelector('.field-label').after(tplRow);
 
-    const details = h('div', { class: 'ord-details', dataset: { add: 'false' } }, orderBox, custField, channelBox, payBox);
-    orderPane.append(head, notice, allergyBox, linesBox, details, plan, noteField, rushBox);
+    // Who the order is for sits high, under the allergy question, so its buttons are in view without scrolling;
+    // channel and payment follow the lines. Both halves hide the same boxes when adding to an open order.
+    const who = h('div', { class: 'ord-details ord-who', dataset: { add: 'false' } }, orderBox, custField);
+    const details = h('div', { class: 'ord-details', dataset: { add: 'false' } }, channelBox, payBox);
+    orderPane.append(head, notice, allergyBox, who, linesBox, details, plan, noteField, rushBox);
     root.append(paneSeg, menuPane, orderPane);
 
     // Footer: total, inline error, Send.
@@ -839,7 +842,7 @@
       const adding = !!D.orderId;
       orderSeg.setValue(adding ? 'add' : 'new');
       orderSeg.setCount('add', list.length);
-      details.dataset.add = adding ? 'true' : 'false';
+      details.dataset.add = who.dataset.add = adding ? 'true' : 'false';
       const sig = list.map((o) => o.id + ':' + orderName(o) + ':' + o.rounds).join('|');
       if (orderSel.dataset.sig !== sig) {
         orderSel.dataset.sig = sig; U.clear(orderSel);

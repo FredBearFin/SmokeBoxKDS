@@ -175,7 +175,7 @@
 .ord-editor-free .input { flex: 1 1 0; min-width: 0; min-height: 44px; }
 .ord-editor-free .btn { flex: none; min-width: 64px; white-space: nowrap; }
 .ord-editor-done { justify-self: end; }
-.ord-empty { display: grid; justify-items: center; gap: var(--sp-2); padding: var(--sp-6) var(--sp-3); text-align: center; color: var(--ink3); }
+.ord-empty { display: grid; justify-items: center; gap: var(--sp-2); padding: var(--sp-4) var(--sp-3); text-align: center; color: var(--ink3); }
 .ord-empty-title { font: var(--w-bold) var(--fs-4) / 1.2 var(--font-display); color: var(--ink); }
 .ord-to-menu { display: none; }
 
@@ -213,6 +213,12 @@
 .ord-total-sum { font: var(--w-heavy) var(--fs-6) / 1.05 var(--font-display); }
 .ord-send { flex: 1 1 260px; max-width: 440px; min-height: 60px; font-size: var(--fs-5); }
 .ord-review { display: none; flex: 1 1 200px; }
+
+/* Tablet landscape: a slimmer order pane leaves the menu room for more tiles across. A short screen gets
+   shorter tiles so the second row, prices included, is in view; a wide screen gets wider tiles. */
+@media (min-width: 820px) and (max-width: 1199px) { .ord { grid-template-columns: minmax(0, 1fr) minmax(320px, 380px); --tile-min: 136px; } }
+@media (min-width: 1200px) { .ord { --tile-min: 200px; } }
+@media (max-height: 700px) { .ord-tile { min-height: 76px; } .ord-empty { padding: var(--sp-2) var(--sp-3); } .ord-empty > .icon { display: none; } }
 
 /* narrow: one pane at a time, Menu | Order switch on top, a View order button in the footer */
 @media (max-width: 819px) {
