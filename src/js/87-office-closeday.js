@@ -150,7 +150,7 @@
       if (cookAheadOn() && m.leftovers.count > 0) {
         const headId = U.uid('cdleft');
         const sec = h('section', { class: 'cd-sec', role: 'radiogroup', 'aria-labelledby': headId }, h('h3', { id: headId }, 'Food still in the cabinet'),
-          h('p', { class: 'cd-note' }, m.leftovers.count + ' ' + U.plural(m.leftovers.count, 'batch', 'batches') + ', ' + U.weightText(m.leftovers.g) + ' in all. What should happen to it?'));
+          h('p', { class: 'cd-note' }, m.leftovers.count + ' ' + U.plural(m.leftovers.count, 'batch', 'batches') + ', ' + (O.weightText || U.weightText)(m.leftovers.g) + ' in all. What should happen to it?'));
         // One radio choice for what to do with the leftover food.
         const mk = (id, label, note) => {
           const input = h('input', { type: 'radio', name: 'cd-left', value: id, checked: leftovers === id });
@@ -167,7 +167,7 @@
       // True when closing will also throw out the food still in the cabinet.
       const throwing = () => cookAheadOn() && m.leftovers.count > 0 && leftovers === 'discard';
       // Names the food on the button when it will be thrown out, else the plain label.
-      setGoLabel = () => { go.textContent = throwing() ? 'Close the day and throw out ' + U.weightText(m.leftovers.g) : 'Close the day'; };
+      setGoLabel = () => { go.textContent = throwing() ? 'Close the day and throw out ' + (O.weightText || U.weightText)(m.leftovers.g) : 'Close the day'; };
       setGoLabel();
       go.addEventListener('click', () => {
         go.disabled = true;
@@ -305,7 +305,7 @@
         ...m.methods.filter((x) => x.count > 0).map((x) => prow('  Paid with ' + x.name.toLowerCase(), x.count + ' ' + U.plural(x.count, 'order') + ', ' + money(x.collected))),
         prow('Cash payments today', money(m.cashExpected) + ' (add your starting cash to count the drawer)'),
         prow('Orders voided', String(m.voidedOrders)), prow('Tickets voided', String(m.voidedTickets)),
-        prow('Food thrown out', (thrown.count || 0) + ' ' + U.plural(thrown.count || 0, 'batch', 'batches') + ', ' + U.weightText(thrown.g || 0) + (thrown.cost > 0 ? ', about ' + money(thrown.cost) + ' (only items with a recorded cost)' : '')))),
+        prow('Food thrown out', (thrown.count || 0) + ' ' + U.plural(thrown.count || 0, 'batch', 'batches') + ', ' + (O.weightText || U.weightText)(thrown.g || 0) + (thrown.cost > 0 ? ', about ' + money(thrown.cost) + ' (only items with a recorded cost)' : '')))),
       h('p', { class: 'cd-pnote' }, 'Printed ' + U.fmtDateShort(U.dateKey(Date.now())) + ' ' + U.fmtTime(Date.now()) + '. Counter: ______   Checked by: ______'));
     document.body.appendChild(root);
     // Removes the print-only block once the print dialog is done (or at once when printing is not available).

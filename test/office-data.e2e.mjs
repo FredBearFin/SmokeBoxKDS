@@ -366,7 +366,7 @@ group('3. Ingredients', async () => {
     check('every ingredient has a row (' + n + ')', (await page.locator('#od-ingredients .od-ing').count()) === n);
     await typeNum(page, 'Opening amount of Brisket', '16000');
     await waitFor(page, () => SB.store.getState().ingredients.find((i) => i.id === 'brisket').parG === 16000);
-    check('par saved in grams; the field also reads it as kilograms', (await text(page, '#od-ingredients .od-ing[data-id="brisket"] .od-read')).includes('16.00 kg'));
+    check('par saved in grams; the field also reads it as kilograms', (await text(page, '#od-ingredients .od-ing[data-id="brisket"] .od-read')).includes('16 kg'));
     await typeNum(page, 'Sold out at, Brisket', '800');
     await waitFor(page, () => SB.store.getState().ingredients.find((i) => i.id === 'brisket').thresholdG === 800);
     check('86 point saved', true);

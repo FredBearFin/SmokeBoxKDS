@@ -211,6 +211,10 @@
   }
   O.droppedRangeWords = droppedRangeWords;
 
+  // A weight in the owner's unit (g and kg, or oz and lb) without trailing zeros: "14 kg", "2.4 kg", "7 oz".
+  // Every back-office page shows weights through this, so a pounds kitchen sees pounds everywhere.
+  O.weightText = (g) => String(U.weightText ? U.weightText(g) : U.fmtG(g)).replace(/(\.\d*?)0+ (kg|lb|oz)$/, '$1 $2').replace(/\. (kg|lb|oz)$/, ' $1');
+
   O.pure = { PAGES, customRange, coachText, dayRange, stepDayKey, pickerKey, splitNumbers, tileParts, sortRows, sig, bannerText, makeDelta, dayStartMs };
 
   if (!doc) return; // Node: the pure helpers are all the tests need
@@ -242,8 +246,9 @@
     // such as $12.40.
     pct: (x, d) => U.fmtPct(x, d == null ? (isNum(x) && Math.abs(x) > 0 && Math.abs(x) < 0.1 ? 1 : 0) : d),
     money: (n, d) => U.fmtMoney(n, d == null ? 2 : d),
-    // g gives grams or kilograms in words. num gives a plain number with the decimals asked for.
-    g: (n) => (U.weightText ? U.weightText(n) : U.fmtG(n)),
+    // g gives a weight in the owner's unit (g and kg, or oz and lb) without trailing zeros: "14 kg",
+    // "2.4 kg", "7 oz". num gives a plain number with the decimals asked for.
+    g: (n) => O.weightText(n),
     num: (n, d) => U.fmtNum(n, d || 0),
     // hour gives a service hour such as 7 pm. clock gives the time of day for a time stamp.
     hour: (hr) => (isNum(hr) ? U.fmtHour(hr) : '-'),
