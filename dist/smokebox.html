@@ -1197,7 +1197,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .slip-item:active:not(:disabled) { background: var(--press); }
 .slip-item:focus-visible { outline-offset: -3px; }
 .slip-item[data-state="done"] { color: var(--ink3); }
-.slip-item[data-state="done"] .slip-name { text-decoration: line-through; text-decoration-thickness: 2px; }
+/* A done dish is muted with a green edge and a Done tick, never crossed out: a line through the letters makes the name hard to read when Expo checks the tray. */
+.slip-item[data-state="done"] { background: var(--tint-ok); box-shadow: inset 4px 0 0 var(--sage); }
 .slip-item[data-state="queued"] { color: var(--ink3); }
 .slip-qty { flex: none; width: var(--qty-w); font: var(--w-heavy) var(--fs-5) / 1 var(--font-display); font-variant-numeric: tabular-nums; text-align: right; }
 .slip-name { flex: 1 1 9ch; min-width: 0; }
@@ -1640,6 +1641,11 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
 .fl-chan { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); }
 .fl-count { color: var(--ink2); }
 .fl-count[data-ready="true"] { color: var(--sage-ink); font-weight: var(--w-heavy); }
+/* A ticket whose dishes are all done is waiting to be bumped, not cooking: green, not red, even when it is past its time. */
+.fl-slip[data-ready="true"] .slip-head { background: var(--tint-ok); }
+.fl-slip[data-ready="true"][data-level] .slip-head, .fl-slip[data-ready="true"][data-level] .slip-body, .fl-slip[data-ready="true"][data-level] .slip-tear { box-shadow: none; animation: none; }
+.fl-slip[data-ready="true"][data-tier] { outline: calc(4px * var(--fl-k)) solid var(--sage); outline-offset: calc(-4px * var(--fl-k)); --fl-esc: 1; }
+.fl-slip[data-ready="true"] .slip-timer { color: var(--ink); }
 .fl-demo-tag { padding: 0 6px; font-size: var(--fs-1); font-weight: var(--w-bold); color: var(--ink2); border: var(--bw-thin) dashed var(--slip-line); border-radius: var(--r-chip); }
 .fl-slip .slip-time { gap: var(--sp-2); }
 .fl-slip .slip-timer { font-size: calc(clamp(calc(24px * var(--fl-k)), calc(12cqw * var(--fl-tl)), calc(var(--fs-timer) * 1.5)) * var(--fl-esc, 1)); letter-spacing: 0.01em; white-space: nowrap; }
@@ -1720,6 +1726,14 @@ button.slip-item.fl-item { cursor: pointer; }
 @keyframes fl-check-tile { 0%, 100% { transform: none; } 50% { transform: scale(1.06); } }
 @media (prefers-reduced-motion: reduce) { .fl-row[data-cook="check"] > .slip-item, .fl-row[data-cook="check"] .fl-act[data-act="cook"] { animation: none; } }
 
+/* "Fire it now": a dish whose start time has come and nobody has started it. It is the dish the voice is calling, so the
+   row flashes red and its tile turns solid red until someone taps it; a cook who cannot read the words still sees which
+   dish to make. (Owner, Oct 2026: "what needs to be fired flashing red".) */
+.fl-row[data-kind="btn"][data-state="displayed"] > .slip-item { box-shadow: inset calc(8px * var(--fl-k)) 0 0 var(--crimson); animation: fl-fire-row 0.9s ease-in-out infinite; }
+.fl-row[data-kind="btn"][data-state="displayed"] .fl-act { color: var(--paper); background: var(--crimson); border-color: var(--crimson); box-shadow: 0 calc(3px * var(--fl-k)) 0 var(--ink); animation: fl-check-tile 0.9s ease-in-out infinite; }
+@keyframes fl-fire-row { 0%, 100% { background-color: var(--tint-bad); } 50% { background-color: var(--paper); } }
+@media (prefers-reduced-motion: reduce) { .fl-row[data-kind="btn"][data-state="displayed"] > .slip-item, .fl-row[data-kind="btn"][data-state="displayed"] .fl-act { animation: none; } .fl-row[data-kind="btn"][data-state="displayed"] > .slip-item { background: var(--tint-bad); } }
+
 /* The "do this next" line under a ticket's header. */
 .fl-main[data-hints="off"] .slip-next { display: none; }
 .slip-next { display: flex; align-items: flex-start; gap: var(--sp-2); margin: var(--sp-2) var(--sp-3) 0; padding: var(--sp-2) var(--sp-3); font-size: var(--fs-3); font-weight: var(--w-bold); line-height: 1.25; color: var(--ink); background: var(--slip-sub); border-radius: var(--r-chip); }
@@ -1733,7 +1747,7 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl-main[data-density="compact"] .slip-next .icon { width: 16px; height: 16px; }
 
 /* slip foot */
-.fl-slip .slip-foot { flex-wrap: nowrap; align-items: stretch; justify-content: flex-end; gap: var(--sp-2); padding: var(--sp-3); }
+.fl-slip .slip-foot { flex-wrap: nowrap; align-items: stretch; justify-content: flex-end; gap: calc(16px * var(--fl-k)); padding: var(--sp-3); }
 .fl-slip .slip-foot > .btn { flex: 1 1 auto; min-height: var(--tap-lg); }
 .fl-slip .slip-foot > .fl-more { flex: none; width: var(--tap-lg); min-width: var(--tap-lg); }
 .fl-zone, .fl-bump { font-size: var(--fs-3); font-weight: var(--w-bold); }
@@ -1811,6 +1825,26 @@ button.slip-item.fl-item { cursor: pointer; }
 .fl-main[data-density="compact"] .fl-slip .slip-foot { padding: calc(6px * var(--fl-k)) var(--sp-2); gap: var(--sp-2); }
 .fl-main[data-density="compact"] .fl-slip .slip-foot > .btn { min-height: var(--tap); }
 .fl-main[data-density="compact"] .fl-slip .slip-foot > .fl-more { width: var(--tap); min-width: var(--tap); }
+
+/* Tight tickets (owner, Oct 2026: "it runs out of space very quickly"). A compact ticket aims for one 44 px row per dish:
+   the "do this next" line is dropped (the voice says it and the called dish flashes), a waiting dish's Start now tile
+   becomes a square icon tile, the station chip is smaller, and the head is two short lines. */
+.fl-main[data-density="compact"] .slip-next { display: none; }
+.fl-main[data-density="compact"] .fl-slip .slip-head { padding-top: 2px; }
+.fl-main[data-density="compact"] .fl-slip .slip-num { font-size: calc(24px * var(--fl-k) * var(--fl-tl) * var(--fl-esc, 1)); }
+.fl-main[data-density="compact"] .fl-slip .slip-timer { font-size: calc(22px * var(--fl-k) * var(--fl-tl) * var(--fl-esc, 1)); }
+.fl-main[data-density="compact"] .fl-slip .slip-meta { font-size: var(--fs-1); margin-top: 0; }
+.fl-main[data-density="compact"] .fl-slip .slip-meta .icon { width: 14px; height: 14px; }
+.fl-main[data-density="compact"] .fl-row .slip-item { min-height: 44px; padding-block: 2px; row-gap: 0; }
+.fl-main[data-density="compact"] .fl-row .slip-name { line-height: 1.15; }
+.fl-main[data-density="compact"] .fl-sub { font-size: var(--fs-1); line-height: 1.1; }
+.fl-main[data-density="compact"] .fl-sub .icon { width: 13px; height: 13px; }
+.fl-main[data-density="compact"] .fl-sub .chip { min-height: 0; padding: 0 4px; font-size: var(--fs-1); line-height: 1.3; }
+.fl-main[data-density="compact"] .fl-fire { width: 44px; min-width: 44px; min-height: 44px; padding: 0; justify-content: center; }
+.fl-main[data-density="compact"] .fl-fire > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.fl-main[data-density="compact"] .fl-act { min-height: 44px; min-width: calc(56px * var(--fl-k)); }
+.fl-main[data-density="compact"] .fl-slip .slip-foot { padding: 4px var(--sp-2); gap: calc(16px * var(--fl-k)); }
+.fl-main[data-density="compact"] .fl-slip .slip-foot > .btn { min-height: 44px; }
 
 /* The all-day strip pinned under the slips: a fold button, the total, and a scrolling row of dish chips. */
 .fl-dock {
@@ -2192,7 +2226,48 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
   .fl-dock-toggle, .fl-dchip, .fl-dock-more, .fl-full, .fl-dock-clear { min-height: 44px; }
   .fl-dock-list { max-height: calc(44px + 9px * var(--fl-k)); }
   .fl-main, .fl-main[data-density="compact"] { padding-top: var(--sp-2); }
+  /* Tighter still (owner, Oct 2026: the bars took half of an 8-inch tablet): less padding around the 44 px buttons. */
+  .fl-head { padding-top: 4px; padding-bottom: 4px; row-gap: 4px; }
+  .fl-tabs { padding-top: 2px; }
+  .fl-strip-sound, .fl-strip-pause { min-height: 34px; }
+  .fl-strip-when { font-size: calc(22px * var(--fl-k) * var(--fl-far)); }
 }
+@media (max-height: 700px) {
+  .sb-banner { min-height: 34px; padding-block: 0; }
+  .sb-banner .btn { min-height: 30px; }
+}
+
+/* The coach bar: one plain instruction for the tab (the next thing to tap), above the tickets. The colour says the kind of job:
+   red to start or make a dish now, green to bump a finished ticket, amber to check a dish whose time is up, grey for what comes next. */
+.fl-coach {
+  flex: none; display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-height: 44px; padding: 4px var(--sp-4);
+  border: 0; border-bottom: 2px solid var(--line); text-align: left; cursor: pointer;
+  font: var(--w-heavy) calc(19px * var(--fl-k) * var(--fl-tl)) / 1.2 var(--font-body); color: var(--ink); background: var(--sub);
+}
+.fl-coach[hidden] { display: none; }
+.fl-coach-i { flex: none; display: inline-flex; }
+.fl-coach-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-coach[data-tone="fire"] { color: var(--paper); background: var(--crimson); }
+.fl-coach[data-tone="go"] { color: var(--sage-ink); background: var(--tint-ok); border-bottom-color: var(--sage); }
+.fl-coach[data-tone="check"] { color: var(--amber-ink); background: var(--tint-warn); border-bottom-color: var(--amber); }
+.fl-coach[data-tone="wait"] { color: var(--ink2); font-weight: var(--w-bold); }
+.fl-coach:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -4px; }
+/* The button the coach points at gets a pulsing ring for a moment after the bar is tapped. */
+.fl-spot { outline: 4px solid var(--focus); outline-offset: 2px; animation: fl-spot 0.65s ease-in-out 4; }
+@keyframes fl-spot { 0%, 100% { outline-color: var(--focus); } 50% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .fl-spot { animation: none; } }
+/* The Undo on a dish just marked done: it covers the right side of the row for 4 seconds, big enough for a gloved thumb. */
+.fl-row { position: relative; }
+.fl-row > .btn.fl-undo { position: absolute; top: 2px; right: 2px; bottom: 2px; z-index: 3; min-height: 44px; padding: 0 var(--sp-3); gap: 6px; opacity: 1; font-weight: var(--w-heavy);
+  --b-bg: var(--ink); --b-fg: var(--paper); --b-edge: var(--ink); color: var(--paper); background: var(--ink); border-color: var(--ink); }
+/* Special requests carry a picture and a colour, so a cook sees the kind before reading the words. */
+.chip-mod[data-kind="allergy"] { color: var(--paper); background: var(--crimson); border-color: var(--crimson); }
+.chip-mod[data-kind="no"] { color: var(--crimson); border-color: var(--crimson); }
+.chip-mod[data-kind="extra"] { color: var(--sage-ink); border-color: var(--sage); }
+.chip-mod[data-kind="swap"] { color: var(--amber-ink); border-color: var(--amber); }
+.slip-note[data-kind="allergy"] { color: var(--crimson); border-color: var(--crimson); }
+.slip-note[data-kind="allergy"] .icon { color: var(--crimson); }
+.slip-note-do { display: block; margin-top: 2px; font-weight: var(--w-heavy); }
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -2873,6 +2948,12 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* The per-dish "I count what I made" link sits under its own dish as a quiet option, not as a bold heading between dishes. */
 .dp-countfold { margin: -2px 0 var(--sp-3) calc(2 * 44px + 2 * var(--sp-2)); }
 .dp-countfold > summary { min-height: 36px; font-weight: var(--w-regular, 400); font-size: var(--fs-1); color: var(--ink2); text-decoration: underline; text-underline-offset: 3px; }
+/* A dish's optional cook steps, folded under its row in Dishes and prices. */
+.dp-steps { flex: 1 0 100%; margin-top: var(--sp-1); }
+.dp-steps > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: var(--w-semi); }
+.dp-st-line { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); }
+.dp-st-when { flex: 0 0 11rem; }
+.dp-st-say { flex: 1 1 auto; min-width: 0; }
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -4473,7 +4554,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
+window.SB_BUILD = { version: "0.2.0", id: "008ad0e" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -8795,7 +8876,21 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     bom: { t: 'bom' }, zone: { t: 'enum', v: C.workZones }, archived: { t: 'bool' },
     // cat is looked up at call time, so a category added after load is accepted.
     cat: { t: 'enum', vf: () => C.categories.map((c) => c.id) }, track: { t: 'enum', v: ['one', 'two'] },
+    // Cook steps the voice says while the dish cooks: up to 3 of { at: percent of the cook time, 0 to 95, say: up to 40 letters }.
+    steps: { t: 'steps', clearable: true },
   };
+  // Checks and cleans a dish's cook steps: a list of 1 to 3 { at, say }, sorted by when they come. Returns the clean list or null.
+  function cleanSteps(v) {
+    if (!Array.isArray(v) || v.length < 1 || v.length > 3) return null;
+    const out = [];
+    for (const x of v) {
+      if (!isObj(x) || !isInt(x.at) || x.at < 0 || x.at > 95 || typeof x.say !== 'string' || x.say.length > 400) return null;
+      const say = cleanText(x.say);
+      if (!say || say.length > 40) return null;
+      out.push({ at: x.at, say });
+    }
+    return out.sort((a, b) => a.at - b.at);
+  }
   // The most dishes a menu may hold, so a typing slip cannot fill the saved data.
   const MENU_MAX = 150;
   const ING_PATCH = {
@@ -8832,6 +8927,9 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
         if (typeof v !== 'string' || v.length > 400) { tx.info.key = key; return 'badPatch'; }
         nv = cleanText(v);
         if (!nv || nv.length > spec.max) { tx.info = { key, min: 1, max: spec.max }; return 'outOfBounds'; }
+      } else if (spec.t === 'steps') {
+        nv = cleanSteps(v);
+        if (!nv) { tx.info = { key, min: 1, max: 3 }; return 'badPatch'; }
       } else if (spec.t === 'bom') {
         if (!Array.isArray(v) || v.length > 12) { tx.info.key = key; return 'badPatch'; }
         const seen = new Set();
@@ -10215,6 +10313,7 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
           repaired.push('menu ' + x.id + '.bom repaired');
         }
         out.prepConfirmed = out.prepConfirmed === true; out.archived = out.archived === true;
+        if (out.steps !== undefined) { const cs = cleanSteps(out.steps); if (cs) out.steps = cs; else { delete out.steps; repaired.push('menu ' + x.id + '.steps dropped'); } }
         seenMenu.add(x.id);
         menu.push(out);
       }
@@ -10961,7 +11060,8 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
   // Rows for tickets and the sanitize timer.
   function otherRows(state, now, out) {
     const C0 = E().views.counts(state, now);
-    if (C0.overdue > 0) out.push({ id: 'late', kind: 'late', label: 'Late tickets', at: now, msLeft: 0, rung: 0, rungs: 0, sev: 'warn',
+    // One late ticket already says so itself (red, "Do this first"); a strip row for it would say the same thing twice.
+    if (C0.overdue > 1) out.push({ id: 'late', kind: 'late', label: 'Late tickets', at: now, msLeft: 0, rung: 0, rungs: 0, sev: 'warn',
       consequence: C0.overdue + ' ' + U.plural(C0.overdue, 'ticket is', 'tickets are') + ' past ' + U.plural(C0.overdue, 'its', 'their') + ' time limit.', action: 'Clear the oldest ticket first.', unknown: false });
     if (U.isNum(C0.sanitizeDueAt) && C0.sanitizeDueAt - now <= 15 * MIN) {
       const late = C0.sanitizeDueAt < now;
@@ -11212,6 +11312,7 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     else if (kind === 'summary') t = d.count + ' new tickets. First up, ticket ' + d.first + '.';
     else if (kind === 'start') t = 'Fire ' + d.name + ' now! Ticket ' + d.num + '!';
     else if (kind === 'start_again') t = 'Still waiting on ' + d.name + '! Fire it now! Ticket ' + d.num + '!';
+    else if (kind === 'step') t = d.name + ': ' + d.say + '! Ticket ' + d.num + '!';
     else if (kind === 'ready') t = 'Ticket ' + d.num + ' is up! Ring it out!';
     else if (kind === 'ready_again') t = 'Ticket ' + d.num + ' is waiting! Ring it out now!';
     else if (kind === 'past') t = d.who + (d.many ? ' are past quality!' : ' is past quality!') + ' Check it now!';
@@ -11297,6 +11398,17 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(it);
       }
+      // Cook steps: while a dish cooks, each step the owner set for it is called when its share of the cook time has passed.
+      const menuById = new Map((state.menu || []).map((x) => [x.id, x]));
+      for (const it of mine) {
+        if (it.status !== 'cooking' || !U.isNum(it.startedAt) || !(it.prepSec > 0)) continue;
+        const md = menuById.get(it.menuId);
+        if (!md || !Array.isArray(md.steps)) continue;
+        md.steps.forEach((st, i) => {
+          const at = it.startedAt + Math.round(it.prepSec * 10 * st.at);
+          if (now >= at) out.push({ id: 'c:' + t.id + ':' + it.id + ':' + i, kind: 'step', style: 'start', at, text: phrase('step', { name: it.short || it.name, say: st.say, num: t.num }), ticketNum: t.num });
+        });
+      }
       for (const [key, its] of groups) {
         const at = key * 1000, name = nameList(its);
         out.push({ id: 's:' + t.id + ':' + key, kind: 'start', style: 'start', at, text: phrase('start', { name, num: t.num }), ticketNum: t.num });
@@ -11345,7 +11457,7 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
           return { id: 'burst:' + news[0].id, kind: 'new', style: 'summary', at: news[0].at, ticketNum: news[0].ticketNum, text: phrase('summary', { count: news.length, first: news[0].ticketNum }) };
         }
         // Dishes to fire come before a finished ticket, and a finished ticket before a new one; oldest first inside each.
-        const rank = (c) => (c.kind === 'start' ? 0 : c.kind === 'ready' ? 1 : 2);
+        const rank = (c) => (c.kind === 'start' || c.kind === 'step' ? 0 : c.kind === 'ready' ? 1 : 2);
         let bi = 0;
         for (let i = 1; i < q.length; i++) if (rank(q[i]) < rank(q[bi])) bi = i;
         return q.splice(bi, 1)[0];
@@ -21978,7 +22090,7 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     // Clear highlight removes the all-day highlight.
     const dockClear = h('button', { type: 'button', class: 'btn fl-dock-clear', hidden: true, onClick: () => F.highlight(null) }, ico('x', 18), h('span', null, 'Clear highlight'));
     const dockList = h('div', { class: 'fl-dock-list', id: 'fl-dock-list', role: 'group', 'aria-label': 'Items still to make, tap one to highlight it on the board' });
-    const dockEmpty = h('span', { class: 'fl-dock-empty' }, 'Nothing waiting.');
+    const dockEmpty = h('span', { class: 'fl-dock-empty' }, 'Nothing to cook.');
     // "+3 more" says how many dish chips did not fit on the strip's one line; tapping it shows them all (and again folds them).
     const dockMore = h('button', { type: 'button', class: 'btn fl-dock-more', hidden: true, 'aria-controls': 'fl-dock-list', 'aria-expanded': 'false', onClick: () => { m.dockOpen = !m.dockOpen; fitDock(); measureDock(); } }, h('span', null, ''));
     // A quiet stamp of the last time the board updated itself, so a frozen or sleeping screen shows an old time.
@@ -22003,7 +22115,11 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     // A small pill that says how many tickets are out of sight below the screen; one tap scrolls down a screen.
     const belowT = h('span', null, '');
     const below = h('button', { type: 'button', class: 'btn fl-below', hidden: true, onClick: () => { main.scrollBy({ top: Math.round(main.clientHeight * 0.85), behavior: reduced() ? 'auto' : 'smooth' }); } }, ico('chevron-down', 20), belowT);
-    root.append(head, strip.el, wl.el, main, dock, wr.el, below);
+    // The coach bar: the one thing to do next on this tab, in plain words. A tap jumps to that button and rings it.
+    const coachT = h('span', { class: 'fl-coach-t' }, '');
+    const coach = h('button', { type: 'button', class: 'fl-coach', hidden: true, 'aria-live': 'polite', onClick: () => spotCoach() }, h('span', { class: 'fl-coach-i', 'aria-hidden': 'true' }), coachT);
+    m.coach = coach; m.coachT = coachT;
+    root.append(head, strip.el, coach, wl.el, main, dock, wr.el, below);
     m.below = below; m.belowT = belowT;
     // Scrolling the board refreshes the pill once per animation frame at most.
     let belowRaf = 0;
@@ -22541,7 +22657,10 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     const progI = h('i');
     const prog = h('div', { class: 'slip-progress', role: 'progressbar', 'aria-label': 'Progress', 'aria-valuemin': 0, 'aria-valuemax': 100 }, progI);
     const head = h('div', { class: 'slip-head' }, h('div', { class: 'slip-id' }, h('div', { class: 'fl-numrow' }, num, stampSlot), who, meta), h('div', { class: 'slip-time' }, timer, badge.el), prog);
-    const note = t.note ? h('div', { class: 'slip-note', role: 'note' }, ico('alert', 22), h('span', null, h('span', { class: 'visually-hidden' }, 'Note: '), t.note)) : null;
+    // A note that mentions an allergy gets the shield and one plain safety step under it.
+    const allergic = !!t.note && modKind(t.note) === 'allergy';
+    const note = t.note ? h('div', { class: 'slip-note', role: 'note', dataset: { kind: allergic ? 'allergy' : 'note' } }, ico(allergic ? 'shield' : 'alert', 22),
+      h('span', null, h('span', { class: 'visually-hidden' }, allergic ? 'Allergy note: ' : 'Note: '), t.note, allergic ? h('span', { class: 'slip-note-do' }, 'Change gloves and wipe the board before you make this.') : null)) : null;
     const list = h('ul', { class: 'fl-items' });
     const nextT = h('span', { class: 'sn-t' });
     const next = h('div', { class: 'slip-next', hidden: true, dataset: { tone: 'wait' } }, ico('arrow-right', 18), nextT);
@@ -22685,6 +22804,18 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     return it.status === 'done' ? 'ro' : 'btn';
   }
 
+  // Special requests are typed freely, so a few words decide the picture a cook sees before reading: an allergy (shield), leave
+  // something off (no sign), extra (plus) or a swap (arrow). Anything else stays a plain chip. Returns the kind or null.
+  function modKind(text) {
+    const t = String(text || '').toLowerCase().trim();
+    if (/allerg|gluten|celiac|coeliac|peanut|tree nut|\bnuts?\b|dairy|lactose|shellfish|sesame|\begg\b/.test(t)) return 'allergy';
+    if (/^(no|without|hold|plain|skip)\b/.test(t)) return 'no';
+    if (/^(add|extra|double|plus)\b|^\+/.test(t)) return 'extra';
+    if (/^(sub|swap|substitute)\b|\binstead\b|\bon (the )?side\b|->|→/.test(t)) return 'swap';
+    return null;
+  }
+  // The icon for each kind of special request.
+  const MOD_ICON = { allergy: 'shield', no: 'ban', extra: 'plus', swap: 'arrow-right' };
   // A small station chip (icon and code) for rows where the station is not obvious.
   function zoneChip(zoneId) {
     const z = zoneById(zoneId);
@@ -22708,7 +22839,7 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
       sub.appendChild(h('span', { class: 'fl-deck' }, ico('clock', 16), row.deckT));
     }
     if (rec.mode !== 'station') sub.appendChild(zoneChip(it.zone));
-    (it.mods || []).forEach((mod) => sub.appendChild(SB.ui.chip({ mod: true, label: mod })));
+    (it.mods || []).forEach((mod) => { const k = modKind(mod); const c = SB.ui.chip({ mod: true, label: mod, icon: k ? MOD_ICON[k] : null }); if (k) c.dataset.kind = k; sub.appendChild(c); });
     if (kind === 'btn') {
       // A two-step dish shows its countdown in the line under the name, like a waiting dish does.
       if (it.track === 'two') {
@@ -22729,7 +22860,8 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     } else {
       row.stateIcon = h('span', { class: 'fl-state-i', 'aria-hidden': 'true' });
       row.stateWord = h('span', { class: 'fl-state-w' });
-      const stateEl = h('span', { class: 'fl-state', dataset: { state: it.status } }, row.stateIcon, row.stateWord);
+      // The hidden words after the name already say the state, so the visible word is not read a second time ("done. Done").
+      const stateEl = h('span', { class: 'fl-state', dataset: { state: it.status }, 'aria-hidden': 'true' }, row.stateIcon, row.stateWord);
       row.stateEl = stateEl;
       row.main = h('div', { class: 'slip-item fl-item', dataset: { state: it.status } }, qty, name, stateEl, sub.childNodes.length ? sub : null);
       li.appendChild(row.main);
@@ -22749,11 +22881,22 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     const left = it.prepSec * 1000 - el;
     return left > 0 ? { check: false, left, time: mss(left) } : { check: true, left, time: '+' + mss(-left) };
   }
+  // The cook step a dish is on now (the latest one whose share of the cook time has passed), as its words, or '' when it has none.
+  function stepNow(it, now) {
+    if (it.startedAt == null || !(it.prepSec > 0)) return '';
+    const md = store().getState().menu.find((x) => x.id === it.menuId);
+    if (!md || !Array.isArray(md.steps)) return '';
+    const pct = ((now - it.startedAt) / (it.prepSec * 1000)) * 100;
+    let say = '';
+    for (const st of md.steps) if (pct >= st.at) say = st.say;
+    return say;
+  }
   // Writes a tappable cooking row: the countdown under the name and the flash flag. A change to "Check it" is
   // spoken once and, when sound is on, chimes (only when live, so a reload stays quiet).
   function paintCook(row, it, now, live) {
     const ck = cookOf(it, now);
-    const txt = ck.check ? 'Check it ' + ck.time : ck.left == null ? 'Cooking ' + ck.time : ck.time + ' left';
+    const stp = stepNow(it, now);
+    const txt = (stp && !ck.check ? stp + ' · ' : '') + (ck.check ? 'Check it ' + ck.time : ck.left == null ? 'Cooking ' + ck.time : ck.time + ' left');
     if (row.cookTT && txt !== row.timeText) { row.timeText = txt; put(row.cookTT, txt); setHidden(row.cookT, false); }
     if (row.chk === ck.check) return;
     const was = row.chk;
@@ -22819,9 +22962,10 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     const lvl = el >= th.breachMs ? 'breach' : el >= th.warnMs ? 'warn' : 'ok';
     // How long past its overdue time the slip is; 0 while it is not overdue. The ranking below uses it.
     rec.overMs = lvl === 'breach' ? el - th.breachMs : 0;
-    // An overdue slip says how late it is, in whole minutes, so the worst one is easy to pick out.
-    if (lvl === 'breach') put(rec.refs.bw, WORDS.breach + ' +' + Math.floor(rec.overMs / 60e3) + ' min');
-    const txt = U.fmtClock(el);
+    // One time per ticket: the timer. The badge says only "Overdue" (a second number beside the timer made people do sums),
+    // and past an hour the timer reads "1h 05m" instead of "65:00".
+    if (lvl === 'breach') put(rec.refs.bw, WORDS.breach);
+    const txt = el < 3600e3 ? U.fmtClock(el) : Math.floor(el / 3600e3) + 'h ' + U.pad2(Math.floor(el / 60e3) % 60) + 'm';
     if (txt !== rec.timerText) { rec.timerText = txt; put(rec.refs.timer, txt); }
     if (lvl !== rec.level) {
       const prev = rec.level;
@@ -22932,7 +23076,7 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
         when, h('span', { class: 'fl-strip-text' }, what, why));
       // Clearing a row counts as seeing it (the loud tone stops) and hides it until its next step on the ladder.
       const rowKey = () => { const r = rows[i]; return r && r.key ? 'row:' + r.key + ':' + (r.el.dataset.step || '') : ''; };
-      const xr = h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': 'Clear this warning until the next one', title: 'Clear until the next warning', onClick: (e) => { e.stopPropagation(); const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (m) { m.dis.add(rowKey()); updateStrip(store().now()); } } }, ico('check', 22), h('span', { class: 'fl-strip-x-t' }, 'Got it'));
+      const xr = h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': 'Got it: clear this warning until the next one', title: 'Clear until the next warning', onClick: (e) => { e.stopPropagation(); const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (m) { m.dis.add(rowKey()); updateStrip(store().now()); } } }, ico('check', 22), h('span', { class: 'fl-strip-x-t' }, 'Got it'));
       const wrap = h('div', { class: 'fl-strip-rowwrap', hidden: true, dataset: { i: String(i) } }, row, xr);
       rows.push({ el: row, wrap, when, what, why, key: '', batchId: null, rowKey });
       el.appendChild(wrap);
@@ -23063,7 +23207,7 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
-    // Only one notice shows at a time (the "tap for sound" bar first, then the note); the bar says how many more wait behind it, and
+    // Only one notice shows at a time (the "tap for sound" bar first, then the note, once sound is on); the bar never hints at a hidden notice, and
     // its X clears them all. Warning rows above are separate and always show.
     // A device clock that jumped ahead comes first: it changes every timer on the board. It never hides the tickets.
     const cs = store().status().clockSuspect;
@@ -23081,7 +23225,7 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
-    if (moreEl) { const t = (noWebAudio() ? 'This browser cannot play warning sounds' : 'Tap to turn on sound') + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
+    if (moreEl) { const t = noWebAudio() ? 'This browser cannot play warning sounds' : 'Tap to turn on sound'; if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
     if (showNote && m.histNote && note === m.histNote.words && !m.histSeen) { m.histSeen = true; try { SB.store.historyNoticeSeen(m.histNote.kind); } catch (e) { /* the store has no such call */ } }
@@ -23134,6 +23278,7 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     paintRole();
     updateStrip(now);
     driveCallouts(now);
+    paintCoach(now);
     if (m.root.dataset.wall === 'on') updateWall(now);
     // station tabs
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
@@ -23141,6 +23286,10 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
       m.seg.setCount(id, n, { alert });
       const what = m.seg.querySelector('[data-id="' + id + '"] .fl-tab-what');
       if (what) { const t = tabWhat(n, id); if (what.textContent !== t) what.textContent = t; }
+      // Read aloud as one clean phrase ("Expo 3: whole tickets, ready to send out, 3 tickets, some overdue"), not the pieces one after another.
+      const tb = m.seg.querySelector('[data-id="' + id + '"]');
+      // It starts with the words on the tab ("All 4"), so a person using voice control can say what they see.
+      if (tb) { const z = id === 'all' ? null : zoneById(id), al = (z ? z.name : 'All') + ' ' + n + ': ' + (id === 'all' ? 'All stations' : id === 'expo' ? 'whole tickets, ready to send out' : z.long) + ', ' + n + tabWhat(n, id) + (alert ? ', some overdue' : ''); if (tb.getAttribute('aria-label') !== al) tb.setAttribute('aria-label', al); }
       const p = m.tabParts[id];
       if (p && p.n !== n) { p.n = n; p.count.dataset.zero = n === 0 ? 'true' : 'false'; }
     };
@@ -23423,6 +23572,97 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     openSheet('demo');
   }
 
+  // The coach bar. One instruction for the whole tab, so a cook never has to scan every ticket for the next button.
+  // Order: a finished ticket to bump (All and Expo), then the dish whose start time came first, then a cooking dish whose time
+  // is up or nearly up (15 s), then the next dish waiting to start. Returns { tone, text, ticketId, itemId, target } or null.
+  // tone is go (bump), fire (start or make now), check (cooking, time up or nearly), or wait.
+  function coachNext(state, now, zone) {
+    if (!state || zone === 'cabinet') return null;
+    const act = state.tickets.filter((t) => t.status === 'active' && t.items.length);
+    if (!act.length) return null;
+    // True when a dish belongs on this tab (every dish on All and Expo).
+    const mine = (it) => zone === 'all' || zone === 'expo' || it.zone === zone;
+    // The dish as said aloud: "2 Brisket", or just "Brisket" for one.
+    const nm = (it) => (it.qty > 1 ? it.qty + ' ' : '') + (it.short || it.name);
+    if (zone === 'all' || zone === 'expo') {
+      const ready = act.filter((t) => t.items.every((it) => it.status === 'done')).sort((a, b) => a.createdAt - b.createdAt)[0];
+      if (ready) return { tone: 'go', text: 'Ticket ' + ready.num + ' is ready. Tap Bump.', ticketId: ready.id, target: 'bump' };
+      if (zone === 'expo') return null;
+    }
+    const due = [], cooking = [], waiting = [];
+    for (const t of act) for (const it of t.items) {
+      if (!mine(it)) continue;
+      if (it.status === 'displayed') due.push({ t, it });
+      else if (it.status === 'cooking') cooking.push({ t, it, left: cookOf(it, now).left });
+      else if (it.status === 'queued') waiting.push({ t, it });
+    }
+    // When a dish was (or will be) due to start; a dish with no plan counts from its ticket.
+    const at = (x) => (U.isNum(x.it.fireAt) ? x.it.fireAt : x.t.createdAt);
+    due.sort((a, b) => at(a) - at(b));
+    if (due.length) {
+      const { t, it } = due[0];
+      // The same dish due on other tickets now or within 45 seconds is started as one batch: one tap, one basket.
+      if (it.track === 'two') {
+        const same = due.filter((x) => x.it.menuId === it.menuId && x.it.track === 'two').concat(waiting.filter((x) => x.it.menuId === it.menuId && x.it.track === 'two' && at(x) - now <= 45000));
+        if (same.length > 1) {
+          const qty = same.reduce((n, x) => n + (x.it.qty || 1), 0), nums = Array.from(new Set(same.map((x) => x.t.num))).sort((a, b) => a - b);
+          return { tone: 'fire', text: 'Start ' + qty + ' ' + (it.short || it.name) + ' together: tickets ' + nums.join(', ') + '. Tap here.', ticketId: t.id, itemId: it.id, target: 'batch',
+            batch: same.map((x) => ({ ticketId: x.t.id, itemId: x.it.id, queued: x.it.status === 'queued' })) };
+        }
+      }
+      const text = it.track === 'two' ? 'Start ' + nm(it) + ' on ticket ' + t.num + '.' : 'Make ' + nm(it) + ' for ticket ' + t.num + ', then tap Done.';
+      return { tone: 'fire', text: text + (due.length > 1 ? ' (' + (due.length - 1) + ' more after)' : ''), ticketId: t.id, itemId: it.id, target: 'item' };
+    }
+    const soon = cooking.filter((x) => x.left != null && x.left <= 15000).sort((a, b) => a.left - b.left)[0];
+    if (soon) {
+      const { t, it, left } = soon;
+      return { tone: 'check', text: left <= 0 ? 'Check ' + nm(it) + ' on ticket ' + t.num + '. Tap Done when it is ready.' : nm(it) + ' on ticket ' + t.num + ' is done in ' + Math.ceil(left / 1000) + ' s.', ticketId: t.id, itemId: it.id, target: 'item' };
+    }
+    waiting.sort((a, b) => at(a) - at(b));
+    if (waiting.length) {
+      const { t, it } = waiting[0];
+      return { tone: 'wait', text: 'Next: ' + nm(it) + ' for ticket ' + t.num + ' starts in ' + mss(Math.max(0, at(waiting[0]) - now)) + '.', ticketId: t.id, itemId: it.id, target: 'item' };
+    }
+    return cooking.length ? { tone: 'wait', text: 'Everything is cooking. Watch the timers.', ticketId: null } : null;
+  }
+  // Writes the coach bar, only when its words or tone changed.
+  function paintCoach(now) {
+    if (!m || !m.coach) return;
+    const c = m.root.dataset.wall === 'on' ? null : coachNext(store().getState(), now, m.zone);
+    m.coachNow = c;
+    const text = c ? c.text : '', tone = c ? c.tone : '';
+    if (text !== m.coachText) { m.coachText = text; put(m.coachT, text); setHidden(m.coach, !text); }
+    if (tone !== m.coachTone) {
+      m.coachTone = tone; m.coach.dataset.tone = tone;
+      const icon = { go: 'check-circle', fire: 'zap', check: 'timer', wait: 'clock' }[tone] || 'arrow-right';
+      m.coach.querySelector('.fl-coach-i').replaceChildren(ico(icon, 24));
+    }
+  }
+  // Scrolls the coach bar's button into view and rings it for a moment, so the eye lands on the exact button to tap.
+  function spotCoach() {
+    const c = m && m.coachNow;
+    if (!c || !c.ticketId) return;
+    if (c.batch) { startBatch(c); return; }
+    const slip = m.grid.querySelector('.fl-slip[data-ticket="' + cssEsc(c.ticketId) + '"]');
+    if (!slip) return;
+    const el = c.target === 'bump' ? slip.querySelector('.fl-bump') : slip.querySelector('.fl-row[data-item="' + cssEsc(c.itemId) + '"] .slip-item') || slip;
+    try { el.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' }); } catch (e) { /* ignore */ }
+    el.classList.remove('fl-spot'); void el.offsetWidth; el.classList.add('fl-spot');
+    setTimeout(() => el.classList.remove('fl-spot'), 2600);
+  }
+
+  // Starts every dish of a coach batch in one go (dishes still waiting are fired early) and says how many started.
+  function startBatch(c) {
+    const S = store();
+    let n = 0;
+    for (const b of c.batch) {
+      const r = S.dispatchEx(b.queued ? 'fireNow' : 'advanceItem', b.queued ? { ticketId: b.ticketId, itemId: b.itemId, start: true } : { ticketId: b.ticketId, itemId: b.itemId }, { source: 'ui' });
+      if (r.report === 'ok') n++;
+    }
+    if (m) m.rowUndoFor = null;
+    toast(n ? 'Started ' + n + ' ' + U.plural(n, 'dish', 'dishes') + ' together.' : 'Nothing could be started. The tickets changed.', { tone: n ? 'ok' : 'warn' });
+  }
+
   // Actions: every tap becomes a store action.
 
   // One click handler for the whole grid (items, Start now, All done here, Bump, More).
@@ -23443,8 +23683,13 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
       if (nowMs - last < 450) return; // a gloved double tap must not start and finish an item
       m.lastTap.set(key, nowMs);
       if (m.lastTap.size > 200) m.lastTap.clear();
-      if (act === 'item') run('advanceItem', { ticketId: rec.id, itemId: id });
-      else run('fireNow', { ticketId: rec.id, itemId: id, start: true });
+      if (act === 'item') {
+        // Done tapped on a dish with more than a fifth of its cook time left is most likely the wrong row: offer an undo on it.
+        const t0 = E().findTicket(store().getState(), rec.id), it0 = t0 && t0.items.find((x) => x.id === id);
+        const early = !!it0 && it0.status === 'cooking' && it0.prepSec > 0 && it0.startedAt != null && store().now() - it0.startedAt < it0.prepSec * 800;
+        const r = run('advanceItem', { ticketId: rec.id, itemId: id });
+        if (early && r && r.report === 'ok') offerRowUndo(rec.id, id, r);
+      } else run('fireNow', { ticketId: rec.id, itemId: id, start: true });
     } else if (act === 'zone') run('completeZone', { ticketId: rec.id, zone: rec.zone });
     else if (act === 'bump') bump(rec);
     else if (act === 'more') moreMenu(rec, btn);
@@ -23506,6 +23751,7 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     o = o || {};
     const S = store();
     const r = S.dispatchEx(type, payload, { source: 'ui' });
+    if (m) m.rowUndoFor = null; // a row's Undo is only for the very last tap
     if (r.report === 'ok') {
       const label = r.info && r.info.undo;
       if (label && E().UNDOABLE.indexOf(type) >= 0) toast(label, { tone: 'ok', undo: undoLast });
@@ -23514,6 +23760,26 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     }
     toast(E().describe(r.report, r.info, settingsNow()), { tone: QUIET[r.report] ? 'info' : 'warn' });
     return r;
+  }
+  // Puts a big Undo button on one dish row for 4 seconds, right where the finger was. It undoes only if that tap is still the
+  // last thing done; if anything else happened since, it says so instead of undoing the wrong thing.
+  function offerRowUndo(ticketId, itemId, res) {
+    m.rowUndoFor = res;
+    setTimeout(() => {
+      if (!m || m.rowUndoFor !== res) return;
+      const li = m.grid.querySelector('.fl-slip[data-ticket="' + cssEsc(ticketId) + '"] .fl-row[data-item="' + cssEsc(itemId) + '"]');
+      if (!li) return;
+      m.grid.querySelectorAll('.fl-undo').forEach((x) => x.remove());
+      // Undoes the dish's Done, unless something else was done after it.
+      const onUndo = (e) => {
+        e.stopPropagation(); b.remove();
+        if (m.rowUndoFor !== res) { toast('Something else happened since, so this cannot be undone here. Use Undo on the message below.', { tone: 'warn' }); return; }
+        m.rowUndoFor = null; undoLast();
+      };
+      const b = h('button', { type: 'button', class: 'btn fl-undo', onClick: onUndo }, ico('undo', 20), h('span', null, 'Marked done. Undo'));
+      li.appendChild(b);
+      setTimeout(() => { b.remove(); if (m && m.rowUndoFor === res) m.rowUndoFor = null; }, 4000);
+    }, 0);
   }
   // Undoes the last undoable action (within the undo window) and says what was undone.
   function undoLast() {
@@ -23636,6 +23902,11 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     const sum = m.dockToggle.querySelector('.fl-dock-sum');
     setTxt(sum, totalReq ? totalReq + ' to make' : '');
     dockName();
+    // Nothing left to cook is not "nothing waiting" while finished tickets still wait to go out: say both.
+    if (!entries.length) {
+      const ready = (state.tickets || []).filter((t) => t.status === 'active' && t.items.length && t.items.every((it) => it.status === 'done')).length;
+      setTxt(m.dockEmpty, ready ? 'Nothing to cook. ' + ready + ' ' + U.plural(ready, 'ticket') + ' ready to bump.' : 'Nothing to cook.');
+    }
     setHidden(m.dockEmpty, entries.length > 0 || m.dockCollapsed);
     const keep = new Set();
     const nodes = [];
@@ -29035,10 +29306,32 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
     // The dishes so far: each row is a name box, a price box and Remove. Changes save when the box is left.
     const listBox = h('div', { class: 'dp-list' });
     let listSig = null; // null so the first paint always runs, even for an empty menu
+    // The optional cook steps of one dish: up to 3 lines of "when" and "what to say". While the dish cooks, the voice says each
+    // line at its moment and the dish row shows it. Saved with one button; all lines empty removes the steps.
+    function stepsBox(m) {
+      const WHEN = [[0, 'At the start'], [25, 'A quarter in'], [50, 'Halfway'], [75, 'Three quarters in'], [90, 'Near the end']];
+      const have = Array.isArray(m.steps) ? m.steps : [];
+      const lines = [0, 1, 2].map((i) => {
+        const cur = have[i];
+        const sel = h('select', { class: 'select dp-st-when', 'aria-label': 'When, step ' + (i + 1) + ' of ' + m.name }, WHEN.map(([v, l]) => h('option', { value: String(v), selected: cur ? cur.at === v : v === [0, 50, 90][i] }, l)));
+        const say = h('input', { class: 'input dp-st-say', type: 'text', maxlength: 40, value: cur ? cur.say : '', placeholder: ['Drop the basket', 'Shake the basket', 'Plate it'][i], 'aria-label': 'What to say, step ' + (i + 1) + ' of ' + m.name });
+        return { sel, say, el: h('div', { class: 'dp-st-line' }, sel, say) };
+      });
+      const msg = h('span', { class: 'fs-sub', role: 'status' });
+      // Saves the filled-in lines as this dish's steps (none filled in removes them) and says what happened.
+      const saveSteps = () => {
+        const steps = lines.filter((l) => l.say.value.trim()).map((l) => ({ at: Number(l.sel.value), say: l.say.value.trim() }));
+        const r = send('updateMenuItem', { id: m.id, patch: { steps: steps.length ? steps : null } });
+        tell(msg, r.ok ? (steps.length ? 'Saved. The voice says these while ' + m.name + ' cooks.' : 'Steps removed.') : 'Each step needs 1 to 40 letters.');
+      };
+      const btn = h('button', { type: 'button', class: 'btn btn-sm', onClick: saveSteps }, ico('check', 18), h('span', null, 'Save steps'));
+      return h('details', { class: 'dp-steps', open: have.length > 0 }, h('summary', null, 'Cook steps (optional)' + (have.length ? ': ' + have.length : '')),
+        h('p', { class: 'fs-sub' }, 'Short things to do while it cooks. The voice says each one at its moment, and the ticket shows it.'), ...lines.map((l) => l.el), h('div', { class: 'fs-row' }, btn, msg));
+    }
     // Rebuilds the list of dishes when it has changed and no box in it is being typed in.
     function paintList() {
       const mine = activeDishes();
-      const sig = mine.map((m) => m.id + '|' + m.name + '|' + m.price + '|' + m.zone + '|' + m.cat + '|' + portionLeft(m)).join(';');
+      const sig = mine.map((m) => m.id + '|' + m.name + '|' + m.price + '|' + m.zone + '|' + m.cat + '|' + portionLeft(m) + '|' + JSON.stringify(m.steps || [])).join(';');
       const typing = listBox.contains(doc.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(doc.activeElement.tagName);
       if (sig === listSig || typing) return;
       listSig = sig;
@@ -29077,7 +29370,7 @@ window.SB_BUILD = { version: "0.2.0", id: "d6353e2" };
         // Saves the new category for this dish and says so.
         catSelRow.addEventListener('change', () => { const r = send('updateMenuItem', { id: m.id, patch: { cat: catSelRow.value } }); tell(msg, r.ok ? 'Moved to ' + (SB.config.categoryById[catSelRow.value] || {}).name + '.' : r.words); });
         const z = SB.config.zoneById[m.zone];
-        listBox.appendChild(h('div', { class: 'dp-row' }, moveBox, n, pr, catSelRow, h('span', { class: 'chip dp-zone' }, z ? z.name : m.zone), ex.indexOf(m.id) >= 0 ? h('span', { class: 'chip dp-ex', 'data-tone': 'warn' }, 'Example') : null, rm, msg, portionsRow(m)));
+        listBox.appendChild(h('div', { class: 'dp-row' }, moveBox, n, pr, catSelRow, h('span', { class: 'chip dp-zone' }, z ? z.name : m.zone), ex.indexOf(m.id) >= 0 ? h('span', { class: 'chip dp-ex', 'data-tone': 'warn' }, 'Example') : null, rm, msg, portionsRow(m), m.track === 'two' ? stepsBox(m) : null));
       });
     }
     paintList(); paintGone();

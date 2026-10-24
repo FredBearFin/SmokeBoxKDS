@@ -793,7 +793,7 @@
     // Clear highlight removes the all-day highlight.
     const dockClear = h('button', { type: 'button', class: 'btn fl-dock-clear', hidden: true, onClick: () => F.highlight(null) }, ico('x', 18), h('span', null, 'Clear highlight'));
     const dockList = h('div', { class: 'fl-dock-list', id: 'fl-dock-list', role: 'group', 'aria-label': 'Items still to make, tap one to highlight it on the board' });
-    const dockEmpty = h('span', { class: 'fl-dock-empty' }, 'Nothing waiting.');
+    const dockEmpty = h('span', { class: 'fl-dock-empty' }, 'Nothing to cook.');
     // "+3 more" says how many dish chips did not fit on the strip's one line; tapping it shows them all (and again folds them).
     const dockMore = h('button', { type: 'button', class: 'btn fl-dock-more', hidden: true, 'aria-controls': 'fl-dock-list', 'aria-expanded': 'false', onClick: () => { m.dockOpen = !m.dockOpen; fitDock(); measureDock(); } }, h('span', null, ''));
     // A quiet stamp of the last time the board updated itself, so a frozen or sleeping screen shows an old time.
@@ -818,7 +818,11 @@
     // A small pill that says how many tickets are out of sight below the screen; one tap scrolls down a screen.
     const belowT = h('span', null, '');
     const below = h('button', { type: 'button', class: 'btn fl-below', hidden: true, onClick: () => { main.scrollBy({ top: Math.round(main.clientHeight * 0.85), behavior: reduced() ? 'auto' : 'smooth' }); } }, ico('chevron-down', 20), belowT);
-    root.append(head, strip.el, wl.el, main, dock, wr.el, below);
+    // The coach bar: the one thing to do next on this tab, in plain words. A tap jumps to that button and rings it.
+    const coachT = h('span', { class: 'fl-coach-t' }, '');
+    const coach = h('button', { type: 'button', class: 'fl-coach', hidden: true, 'aria-live': 'polite', onClick: () => spotCoach() }, h('span', { class: 'fl-coach-i', 'aria-hidden': 'true' }), coachT);
+    m.coach = coach; m.coachT = coachT;
+    root.append(head, strip.el, coach, wl.el, main, dock, wr.el, below);
     m.below = below; m.belowT = belowT;
     // Scrolling the board refreshes the pill once per animation frame at most.
     let belowRaf = 0;
@@ -1356,7 +1360,10 @@
     const progI = h('i');
     const prog = h('div', { class: 'slip-progress', role: 'progressbar', 'aria-label': 'Progress', 'aria-valuemin': 0, 'aria-valuemax': 100 }, progI);
     const head = h('div', { class: 'slip-head' }, h('div', { class: 'slip-id' }, h('div', { class: 'fl-numrow' }, num, stampSlot), who, meta), h('div', { class: 'slip-time' }, timer, badge.el), prog);
-    const note = t.note ? h('div', { class: 'slip-note', role: 'note' }, ico('alert', 22), h('span', null, h('span', { class: 'visually-hidden' }, 'Note: '), t.note)) : null;
+    // A note that mentions an allergy gets the shield and one plain safety step under it.
+    const allergic = !!t.note && modKind(t.note) === 'allergy';
+    const note = t.note ? h('div', { class: 'slip-note', role: 'note', dataset: { kind: allergic ? 'allergy' : 'note' } }, ico(allergic ? 'shield' : 'alert', 22),
+      h('span', null, h('span', { class: 'visually-hidden' }, allergic ? 'Allergy note: ' : 'Note: '), t.note, allergic ? h('span', { class: 'slip-note-do' }, 'Change gloves and wipe the board before you make this.') : null)) : null;
     const list = h('ul', { class: 'fl-items' });
     const nextT = h('span', { class: 'sn-t' });
     const next = h('div', { class: 'slip-next', hidden: true, dataset: { tone: 'wait' } }, ico('arrow-right', 18), nextT);
@@ -1500,6 +1507,18 @@
     return it.status === 'done' ? 'ro' : 'btn';
   }
 
+  // Special requests are typed freely, so a few words decide the picture a cook sees before reading: an allergy (shield), leave
+  // something off (no sign), extra (plus) or a swap (arrow). Anything else stays a plain chip. Returns the kind or null.
+  function modKind(text) {
+    const t = String(text || '').toLowerCase().trim();
+    if (/allerg|gluten|celiac|coeliac|peanut|tree nut|\bnuts?\b|dairy|lactose|shellfish|sesame|\begg\b/.test(t)) return 'allergy';
+    if (/^(no|without|hold|plain|skip)\b/.test(t)) return 'no';
+    if (/^(add|extra|double|plus)\b|^\+/.test(t)) return 'extra';
+    if (/^(sub|swap|substitute)\b|\binstead\b|\bon (the )?side\b|->|→/.test(t)) return 'swap';
+    return null;
+  }
+  // The icon for each kind of special request.
+  const MOD_ICON = { allergy: 'shield', no: 'ban', extra: 'plus', swap: 'arrow-right' };
   // A small station chip (icon and code) for rows where the station is not obvious.
   function zoneChip(zoneId) {
     const z = zoneById(zoneId);
@@ -1523,7 +1542,7 @@
       sub.appendChild(h('span', { class: 'fl-deck' }, ico('clock', 16), row.deckT));
     }
     if (rec.mode !== 'station') sub.appendChild(zoneChip(it.zone));
-    (it.mods || []).forEach((mod) => sub.appendChild(SB.ui.chip({ mod: true, label: mod })));
+    (it.mods || []).forEach((mod) => { const k = modKind(mod); const c = SB.ui.chip({ mod: true, label: mod, icon: k ? MOD_ICON[k] : null }); if (k) c.dataset.kind = k; sub.appendChild(c); });
     if (kind === 'btn') {
       // A two-step dish shows its countdown in the line under the name, like a waiting dish does.
       if (it.track === 'two') {
@@ -1544,7 +1563,8 @@
     } else {
       row.stateIcon = h('span', { class: 'fl-state-i', 'aria-hidden': 'true' });
       row.stateWord = h('span', { class: 'fl-state-w' });
-      const stateEl = h('span', { class: 'fl-state', dataset: { state: it.status } }, row.stateIcon, row.stateWord);
+      // The hidden words after the name already say the state, so the visible word is not read a second time ("done. Done").
+      const stateEl = h('span', { class: 'fl-state', dataset: { state: it.status }, 'aria-hidden': 'true' }, row.stateIcon, row.stateWord);
       row.stateEl = stateEl;
       row.main = h('div', { class: 'slip-item fl-item', dataset: { state: it.status } }, qty, name, stateEl, sub.childNodes.length ? sub : null);
       li.appendChild(row.main);
@@ -1564,11 +1584,22 @@
     const left = it.prepSec * 1000 - el;
     return left > 0 ? { check: false, left, time: mss(left) } : { check: true, left, time: '+' + mss(-left) };
   }
+  // The cook step a dish is on now (the latest one whose share of the cook time has passed), as its words, or '' when it has none.
+  function stepNow(it, now) {
+    if (it.startedAt == null || !(it.prepSec > 0)) return '';
+    const md = store().getState().menu.find((x) => x.id === it.menuId);
+    if (!md || !Array.isArray(md.steps)) return '';
+    const pct = ((now - it.startedAt) / (it.prepSec * 1000)) * 100;
+    let say = '';
+    for (const st of md.steps) if (pct >= st.at) say = st.say;
+    return say;
+  }
   // Writes a tappable cooking row: the countdown under the name and the flash flag. A change to "Check it" is
   // spoken once and, when sound is on, chimes (only when live, so a reload stays quiet).
   function paintCook(row, it, now, live) {
     const ck = cookOf(it, now);
-    const txt = ck.check ? 'Check it ' + ck.time : ck.left == null ? 'Cooking ' + ck.time : ck.time + ' left';
+    const stp = stepNow(it, now);
+    const txt = (stp && !ck.check ? stp + ' · ' : '') + (ck.check ? 'Check it ' + ck.time : ck.left == null ? 'Cooking ' + ck.time : ck.time + ' left');
     if (row.cookTT && txt !== row.timeText) { row.timeText = txt; put(row.cookTT, txt); setHidden(row.cookT, false); }
     if (row.chk === ck.check) return;
     const was = row.chk;
@@ -1634,9 +1665,10 @@
     const lvl = el >= th.breachMs ? 'breach' : el >= th.warnMs ? 'warn' : 'ok';
     // How long past its overdue time the slip is; 0 while it is not overdue. The ranking below uses it.
     rec.overMs = lvl === 'breach' ? el - th.breachMs : 0;
-    // An overdue slip says how late it is, in whole minutes, so the worst one is easy to pick out.
-    if (lvl === 'breach') put(rec.refs.bw, WORDS.breach + ' +' + Math.floor(rec.overMs / 60e3) + ' min');
-    const txt = U.fmtClock(el);
+    // One time per ticket: the timer. The badge says only "Overdue" (a second number beside the timer made people do sums),
+    // and past an hour the timer reads "1h 05m" instead of "65:00".
+    if (lvl === 'breach') put(rec.refs.bw, WORDS.breach);
+    const txt = el < 3600e3 ? U.fmtClock(el) : Math.floor(el / 3600e3) + 'h ' + U.pad2(Math.floor(el / 60e3) % 60) + 'm';
     if (txt !== rec.timerText) { rec.timerText = txt; put(rec.refs.timer, txt); }
     if (lvl !== rec.level) {
       const prev = rec.level;
@@ -1747,7 +1779,7 @@
         when, h('span', { class: 'fl-strip-text' }, what, why));
       // Clearing a row counts as seeing it (the loud tone stops) and hides it until its next step on the ladder.
       const rowKey = () => { const r = rows[i]; return r && r.key ? 'row:' + r.key + ':' + (r.el.dataset.step || '') : ''; };
-      const xr = h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': 'Clear this warning until the next one', title: 'Clear until the next warning', onClick: (e) => { e.stopPropagation(); const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (m) { m.dis.add(rowKey()); updateStrip(store().now()); } } }, ico('check', 22), h('span', { class: 'fl-strip-x-t' }, 'Got it'));
+      const xr = h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': 'Got it: clear this warning until the next one', title: 'Clear until the next warning', onClick: (e) => { e.stopPropagation(); const r = rows[i]; if (!r || !r.key) return; acknowledge(r.key); if (m) { m.dis.add(rowKey()); updateStrip(store().now()); } } }, ico('check', 22), h('span', { class: 'fl-strip-x-t' }, 'Got it'));
       const wrap = h('div', { class: 'fl-strip-rowwrap', hidden: true, dataset: { i: String(i) } }, row, xr);
       rows.push({ el: row, wrap, when, what, why, key: '', batchId: null, rowKey });
       el.appendChild(wrap);
@@ -1878,7 +1910,7 @@
     const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
-    // Only one notice shows at a time (the "tap for sound" bar first, then the note); the bar says how many more wait behind it, and
+    // Only one notice shows at a time (the "tap for sound" bar first, then the note, once sound is on); the bar never hints at a hidden notice, and
     // its X clears them all. Warning rows above are separate and always show.
     // A device clock that jumped ahead comes first: it changes every timer on the board. It never hides the tickets.
     const cs = store().status().clockSuspect;
@@ -1896,7 +1928,7 @@
     const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
-    if (moreEl) { const t = (noWebAudio() ? 'This browser cannot play warning sounds' : 'Tap to turn on sound') + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
+    if (moreEl) { const t = noWebAudio() ? 'This browser cannot play warning sounds' : 'Tap to turn on sound'; if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
     if (showNote && m.histNote && note === m.histNote.words && !m.histSeen) { m.histSeen = true; try { SB.store.historyNoticeSeen(m.histNote.kind); } catch (e) { /* the store has no such call */ } }
@@ -1949,6 +1981,7 @@
     paintRole();
     updateStrip(now);
     driveCallouts(now);
+    paintCoach(now);
     if (m.root.dataset.wall === 'on') updateWall(now);
     // station tabs
     // Sets one tab's count and overdue dot; the corner badge dims at zero.
@@ -1956,6 +1989,10 @@
       m.seg.setCount(id, n, { alert });
       const what = m.seg.querySelector('[data-id="' + id + '"] .fl-tab-what');
       if (what) { const t = tabWhat(n, id); if (what.textContent !== t) what.textContent = t; }
+      // Read aloud as one clean phrase ("Expo 3: whole tickets, ready to send out, 3 tickets, some overdue"), not the pieces one after another.
+      const tb = m.seg.querySelector('[data-id="' + id + '"]');
+      // It starts with the words on the tab ("All 4"), so a person using voice control can say what they see.
+      if (tb) { const z = id === 'all' ? null : zoneById(id), al = (z ? z.name : 'All') + ' ' + n + ': ' + (id === 'all' ? 'All stations' : id === 'expo' ? 'whole tickets, ready to send out' : z.long) + ', ' + n + tabWhat(n, id) + (alert ? ', some overdue' : ''); if (tb.getAttribute('aria-label') !== al) tb.setAttribute('aria-label', al); }
       const p = m.tabParts[id];
       if (p && p.n !== n) { p.n = n; p.count.dataset.zero = n === 0 ? 'true' : 'false'; }
     };
@@ -2238,6 +2275,97 @@
     openSheet('demo');
   }
 
+  // The coach bar. One instruction for the whole tab, so a cook never has to scan every ticket for the next button.
+  // Order: a finished ticket to bump (All and Expo), then the dish whose start time came first, then a cooking dish whose time
+  // is up or nearly up (15 s), then the next dish waiting to start. Returns { tone, text, ticketId, itemId, target } or null.
+  // tone is go (bump), fire (start or make now), check (cooking, time up or nearly), or wait.
+  function coachNext(state, now, zone) {
+    if (!state || zone === 'cabinet') return null;
+    const act = state.tickets.filter((t) => t.status === 'active' && t.items.length);
+    if (!act.length) return null;
+    // True when a dish belongs on this tab (every dish on All and Expo).
+    const mine = (it) => zone === 'all' || zone === 'expo' || it.zone === zone;
+    // The dish as said aloud: "2 Brisket", or just "Brisket" for one.
+    const nm = (it) => (it.qty > 1 ? it.qty + ' ' : '') + (it.short || it.name);
+    if (zone === 'all' || zone === 'expo') {
+      const ready = act.filter((t) => t.items.every((it) => it.status === 'done')).sort((a, b) => a.createdAt - b.createdAt)[0];
+      if (ready) return { tone: 'go', text: 'Ticket ' + ready.num + ' is ready. Tap Bump.', ticketId: ready.id, target: 'bump' };
+      if (zone === 'expo') return null;
+    }
+    const due = [], cooking = [], waiting = [];
+    for (const t of act) for (const it of t.items) {
+      if (!mine(it)) continue;
+      if (it.status === 'displayed') due.push({ t, it });
+      else if (it.status === 'cooking') cooking.push({ t, it, left: cookOf(it, now).left });
+      else if (it.status === 'queued') waiting.push({ t, it });
+    }
+    // When a dish was (or will be) due to start; a dish with no plan counts from its ticket.
+    const at = (x) => (U.isNum(x.it.fireAt) ? x.it.fireAt : x.t.createdAt);
+    due.sort((a, b) => at(a) - at(b));
+    if (due.length) {
+      const { t, it } = due[0];
+      // The same dish due on other tickets now or within 45 seconds is started as one batch: one tap, one basket.
+      if (it.track === 'two') {
+        const same = due.filter((x) => x.it.menuId === it.menuId && x.it.track === 'two').concat(waiting.filter((x) => x.it.menuId === it.menuId && x.it.track === 'two' && at(x) - now <= 45000));
+        if (same.length > 1) {
+          const qty = same.reduce((n, x) => n + (x.it.qty || 1), 0), nums = Array.from(new Set(same.map((x) => x.t.num))).sort((a, b) => a - b);
+          return { tone: 'fire', text: 'Start ' + qty + ' ' + (it.short || it.name) + ' together: tickets ' + nums.join(', ') + '. Tap here.', ticketId: t.id, itemId: it.id, target: 'batch',
+            batch: same.map((x) => ({ ticketId: x.t.id, itemId: x.it.id, queued: x.it.status === 'queued' })) };
+        }
+      }
+      const text = it.track === 'two' ? 'Start ' + nm(it) + ' on ticket ' + t.num + '.' : 'Make ' + nm(it) + ' for ticket ' + t.num + ', then tap Done.';
+      return { tone: 'fire', text: text + (due.length > 1 ? ' (' + (due.length - 1) + ' more after)' : ''), ticketId: t.id, itemId: it.id, target: 'item' };
+    }
+    const soon = cooking.filter((x) => x.left != null && x.left <= 15000).sort((a, b) => a.left - b.left)[0];
+    if (soon) {
+      const { t, it, left } = soon;
+      return { tone: 'check', text: left <= 0 ? 'Check ' + nm(it) + ' on ticket ' + t.num + '. Tap Done when it is ready.' : nm(it) + ' on ticket ' + t.num + ' is done in ' + Math.ceil(left / 1000) + ' s.', ticketId: t.id, itemId: it.id, target: 'item' };
+    }
+    waiting.sort((a, b) => at(a) - at(b));
+    if (waiting.length) {
+      const { t, it } = waiting[0];
+      return { tone: 'wait', text: 'Next: ' + nm(it) + ' for ticket ' + t.num + ' starts in ' + mss(Math.max(0, at(waiting[0]) - now)) + '.', ticketId: t.id, itemId: it.id, target: 'item' };
+    }
+    return cooking.length ? { tone: 'wait', text: 'Everything is cooking. Watch the timers.', ticketId: null } : null;
+  }
+  // Writes the coach bar, only when its words or tone changed.
+  function paintCoach(now) {
+    if (!m || !m.coach) return;
+    const c = m.root.dataset.wall === 'on' ? null : coachNext(store().getState(), now, m.zone);
+    m.coachNow = c;
+    const text = c ? c.text : '', tone = c ? c.tone : '';
+    if (text !== m.coachText) { m.coachText = text; put(m.coachT, text); setHidden(m.coach, !text); }
+    if (tone !== m.coachTone) {
+      m.coachTone = tone; m.coach.dataset.tone = tone;
+      const icon = { go: 'check-circle', fire: 'zap', check: 'timer', wait: 'clock' }[tone] || 'arrow-right';
+      m.coach.querySelector('.fl-coach-i').replaceChildren(ico(icon, 24));
+    }
+  }
+  // Scrolls the coach bar's button into view and rings it for a moment, so the eye lands on the exact button to tap.
+  function spotCoach() {
+    const c = m && m.coachNow;
+    if (!c || !c.ticketId) return;
+    if (c.batch) { startBatch(c); return; }
+    const slip = m.grid.querySelector('.fl-slip[data-ticket="' + cssEsc(c.ticketId) + '"]');
+    if (!slip) return;
+    const el = c.target === 'bump' ? slip.querySelector('.fl-bump') : slip.querySelector('.fl-row[data-item="' + cssEsc(c.itemId) + '"] .slip-item') || slip;
+    try { el.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' }); } catch (e) { /* ignore */ }
+    el.classList.remove('fl-spot'); void el.offsetWidth; el.classList.add('fl-spot');
+    setTimeout(() => el.classList.remove('fl-spot'), 2600);
+  }
+
+  // Starts every dish of a coach batch in one go (dishes still waiting are fired early) and says how many started.
+  function startBatch(c) {
+    const S = store();
+    let n = 0;
+    for (const b of c.batch) {
+      const r = S.dispatchEx(b.queued ? 'fireNow' : 'advanceItem', b.queued ? { ticketId: b.ticketId, itemId: b.itemId, start: true } : { ticketId: b.ticketId, itemId: b.itemId }, { source: 'ui' });
+      if (r.report === 'ok') n++;
+    }
+    if (m) m.rowUndoFor = null;
+    toast(n ? 'Started ' + n + ' ' + U.plural(n, 'dish', 'dishes') + ' together.' : 'Nothing could be started. The tickets changed.', { tone: n ? 'ok' : 'warn' });
+  }
+
   // Actions: every tap becomes a store action.
 
   // One click handler for the whole grid (items, Start now, All done here, Bump, More).
@@ -2258,8 +2386,13 @@
       if (nowMs - last < 450) return; // a gloved double tap must not start and finish an item
       m.lastTap.set(key, nowMs);
       if (m.lastTap.size > 200) m.lastTap.clear();
-      if (act === 'item') run('advanceItem', { ticketId: rec.id, itemId: id });
-      else run('fireNow', { ticketId: rec.id, itemId: id, start: true });
+      if (act === 'item') {
+        // Done tapped on a dish with more than a fifth of its cook time left is most likely the wrong row: offer an undo on it.
+        const t0 = E().findTicket(store().getState(), rec.id), it0 = t0 && t0.items.find((x) => x.id === id);
+        const early = !!it0 && it0.status === 'cooking' && it0.prepSec > 0 && it0.startedAt != null && store().now() - it0.startedAt < it0.prepSec * 800;
+        const r = run('advanceItem', { ticketId: rec.id, itemId: id });
+        if (early && r && r.report === 'ok') offerRowUndo(rec.id, id, r);
+      } else run('fireNow', { ticketId: rec.id, itemId: id, start: true });
     } else if (act === 'zone') run('completeZone', { ticketId: rec.id, zone: rec.zone });
     else if (act === 'bump') bump(rec);
     else if (act === 'more') moreMenu(rec, btn);
@@ -2321,6 +2454,7 @@
     o = o || {};
     const S = store();
     const r = S.dispatchEx(type, payload, { source: 'ui' });
+    if (m) m.rowUndoFor = null; // a row's Undo is only for the very last tap
     if (r.report === 'ok') {
       const label = r.info && r.info.undo;
       if (label && E().UNDOABLE.indexOf(type) >= 0) toast(label, { tone: 'ok', undo: undoLast });
@@ -2329,6 +2463,26 @@
     }
     toast(E().describe(r.report, r.info, settingsNow()), { tone: QUIET[r.report] ? 'info' : 'warn' });
     return r;
+  }
+  // Puts a big Undo button on one dish row for 4 seconds, right where the finger was. It undoes only if that tap is still the
+  // last thing done; if anything else happened since, it says so instead of undoing the wrong thing.
+  function offerRowUndo(ticketId, itemId, res) {
+    m.rowUndoFor = res;
+    setTimeout(() => {
+      if (!m || m.rowUndoFor !== res) return;
+      const li = m.grid.querySelector('.fl-slip[data-ticket="' + cssEsc(ticketId) + '"] .fl-row[data-item="' + cssEsc(itemId) + '"]');
+      if (!li) return;
+      m.grid.querySelectorAll('.fl-undo').forEach((x) => x.remove());
+      // Undoes the dish's Done, unless something else was done after it.
+      const onUndo = (e) => {
+        e.stopPropagation(); b.remove();
+        if (m.rowUndoFor !== res) { toast('Something else happened since, so this cannot be undone here. Use Undo on the message below.', { tone: 'warn' }); return; }
+        m.rowUndoFor = null; undoLast();
+      };
+      const b = h('button', { type: 'button', class: 'btn fl-undo', onClick: onUndo }, ico('undo', 20), h('span', null, 'Marked done. Undo'));
+      li.appendChild(b);
+      setTimeout(() => { b.remove(); if (m && m.rowUndoFor === res) m.rowUndoFor = null; }, 4000);
+    }, 0);
   }
   // Undoes the last undoable action (within the undo window) and says what was undone.
   function undoLast() {
@@ -2451,6 +2605,11 @@
     const sum = m.dockToggle.querySelector('.fl-dock-sum');
     setTxt(sum, totalReq ? totalReq + ' to make' : '');
     dockName();
+    // Nothing left to cook is not "nothing waiting" while finished tickets still wait to go out: say both.
+    if (!entries.length) {
+      const ready = (state.tickets || []).filter((t) => t.status === 'active' && t.items.length && t.items.every((it) => it.status === 'done')).length;
+      setTxt(m.dockEmpty, ready ? 'Nothing to cook. ' + ready + ' ' + U.plural(ready, 'ticket') + ' ready to bump.' : 'Nothing to cook.');
+    }
     setHidden(m.dockEmpty, entries.length > 0 || m.dockCollapsed);
     const keep = new Set();
     const nodes = [];
