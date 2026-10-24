@@ -546,7 +546,7 @@ step('day 8 restore and undo', async () => {
   const preCounts = { tickets: pre.tickets.length, orders: pre.orders.length };
   await toBoard();
   await tap('button:has-text("Back office")', 'Back office'); await sleep(500); await keypadIfShown();
-  await page.getByText('Menu and settings').first().click(); cnt('taps'); await sleep(800);
+  await page.getByText('Menu, prices and shop').first().click(); cnt('taps'); await sleep(800);
   await page.locator('input[type=file]').first().setInputFiles(LEDGER.backup5); cnt('taps'); await sleep(900);
   await shot('06-restore-preview');
   await tap('button:has-text("Replace everything with this backup")', 'Replace everything'); await sleep(500);
@@ -618,7 +618,7 @@ step('later days and Close the month', async () => {
   // Office pages still open and read the numbers.
   await tap('[data-act="cm-finish"]', 'Done');
   await tap('button:has-text("Back office")', 'Back office'); await sleep(500); await keypadIfShown();
-  const pages = ['Speed', 'Tickets', 'Stations', 'Sales and money', 'Safety', 'Stock and 86', 'Menu and settings'];
+  const pages = ['Speed', 'Tickets', 'Stations', 'Sales and money', 'Safety', 'Stock and 86', 'Menu, prices and shop'];
   for (const name of pages) {
     // The office navigation: a link or tab with the page's name (not other text that happens to say the same word).
     await page.locator('.of-nav-full').filter({ hasText: new RegExp('^\\s*' + name + '\\s*$') }).first().click(); cnt('taps'); await sleep(700);

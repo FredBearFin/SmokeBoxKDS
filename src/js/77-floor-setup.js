@@ -42,14 +42,14 @@
       btn('Play a test warning', 'volume', () => { if (SB.floor && SB.floor.setSound) { SB.floor.setSound(true); if (SB.floor.setSpeech) SB.floor.setSpeech(true); return 'Warning sounds and the spoken voice are now on for this device. You should have heard a chime and a voice. If not, turn the volume up and tap again.'; } return 'The kitchen board is not loaded.'; }));
     const wake = SB.floor && SB.floor.wakeLock ? SB.floor.wakeLock() : 'unknown';
     step('2. Keep the screen on', (wake === 'on' ? 'The board is keeping the screen awake now.' : 'The screen may go to sleep.') + ' Also set the device itself: Settings, Display, Auto-Lock (iPad) or Screen timeout (Android), to Never. Keep it plugged into power.');
-    const prot = step('3. Protect your data', 'Everything is saved in this browser only. Ask the browser to keep it safe, and save a backup every day (Back office, Menu and settings, then Data). If you cook ahead, save the thrown-out log too.',
+    const prot = step('3. Protect your data', 'Everything is saved in this browser only. Ask the browser to keep it safe, and save a backup every day (Back office, Menu, prices and shop, then Data). If you cook ahead, save the thrown-out log too.',
       btn('Protect saved data', 'shield-check', () => { try { if (g.navigator.storage && g.navigator.storage.persist) { g.navigator.storage.persist().then((ok) => { prot.textContent = ok ? 'Your browser agreed to keep this data. Still save a backup every day.' : 'The browser did not agree. Installing the app (step 4) usually helps.'; }, () => { prot.textContent = 'The browser could not answer. Installing the app (step 4) usually helps. Save a backup every day.'; }); return 'Asking the browser...'; } } catch (e) { /* fall through */ } return 'This browser cannot do that. Save a backup every day.'; }));
     step('4. Install as an app', 'On an iPad: Share, then Add to Home Screen. In Chrome on Android or a computer: the menu, then Install app or Add to Home screen. An installed app opens full screen and the browser is less likely to clear its data.');
     step('5. Where the device sits', 'Put the tablet or screen where the person at the cutting board can tap it without walking. If it is out of reach, batch times will not get logged and the waste numbers will be wrong.');
-    // Closes this sheet and opens the Menu and settings page of the back office.
+    // Closes this sheet and opens the Menu, prices and shop page of the back office.
     const openData = () => { sheet.close('link'); setTimeout(() => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({ section: 'data' }); }, 60); };
-    step('6. Your dishes', 'Add your dishes under Dishes and prices, in Settings. Then open Menu and settings to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them, all of these are starter values, the hold limits too.',
-      () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu and settings')));
+    step('6. Your dishes', 'Add your dishes under Dishes and prices, in Settings. Then open Menu, prices and shop to enter your real cost per kg, the amount at which a dish is sold out, the amount one take-out removes, the hold limit and the rest time for each product. Until you confirm them, all of these are starter values, the hold limits too.',
+      () => h('button', { type: 'button', class: 'btn btn-primary', onClick: openData }, ico('sliders', 20), h('span', null, 'Open Menu, prices and shop')));
     step('7. Hold limits', 'Each product has a hold limit, marked as a quality limit or a throw-out time. Ask your health department which applies to each food you hold, then set it in Settings.');
     sheet.body.appendChild(list); keepInView(sheet.body);
     return sheet;
@@ -1564,7 +1564,7 @@
     { min: 2, what: 'Name stations and menu sections', how: 'Use their words. Hide stations they do not have (Change stations).' },
     { min: 1, what: 'Cook-ahead question', how: 'Ask whether they cook some dishes ahead. Answer Yes, No or Not sure; it can be changed later.' },
     { min: 2, what: 'One test ticket', how: 'New ticket, add two dishes, send it, then bump it. Watch that the right station sees it.' },
-    { min: 1, what: 'Backup and who to call', how: 'Show where to save a backup (Back office, Menu and settings, Data). Leave a phone number.' }
+    { min: 1, what: 'Backup and who to call', how: 'Show where to save a backup (Back office, Menu, prices and shop, Data). Leave a phone number.' }
   ];
   // Adds up the minutes of all the visit steps.
   function pilotMinutes() { return PILOT_STEPS.reduce((n, s) => n + s.min, 0); }

@@ -1045,7 +1045,7 @@
      },
      {
       "t": "p",
-      "x": "To bring it back, open Back office, Menu and settings, then Data. In the card, tap **Save a backup of what is here now first** and check that the file arrived. Then type **RESTORE** and tap **Bring the set-aside copy back**. If a PIN is set, Smokebox asks for it first. Everything on this device is replaced by the set-aside copy. What was here before is kept for 7 days: tap **Undo this restore** to put it back."
+      "x": "To bring it back, open Back office, Menu, prices and shop, then Data. In the card, tap **Save a backup of what is here now first** and check that the file arrived. Then type **RESTORE** and tap **Bring the set-aside copy back**. If a PIN is set, Smokebox asks for it first. Everything on this device is replaced by the set-aside copy. What was here before is kept for 7 days: tap **Undo this restore** to put it back."
      },
      {
       "t": "p",

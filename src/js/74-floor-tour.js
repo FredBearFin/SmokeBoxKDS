@@ -148,7 +148,7 @@
       case 7: return slip() && slip().querySelector('.fl-bump')
         ? 'Everything is done, so Bump is green. Tap Bump to send the ticket away. The clock stops.'
         : 'Everything is done. Tap the All tab, then tap Bump to send the ticket away. The clock stops.';
-      default: return 'That is the whole loop: a ticket arrives, you start what is ready, tap Done, then Bump. The back office turns these taps into charts: tap Back office at the top of the screen. To add dishes and set prices and prep times, open Menu and settings there.';
+      default: return 'That is the whole loop: a ticket arrives, you start what is ready, tap Done, then Bump. The back office turns these taps into charts: tap Back office at the top of the screen. To add dishes and set prices and prep times, open Menu, prices and shop there.';
     }
   }
 

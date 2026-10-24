@@ -1847,7 +1847,7 @@
   // Shortcut list (key, what it does) used when the board does not supply its own.
   // audit:data-start
   const FALLBACK_KEYS = [
-    { key: 'N', label: 'New ticket' }, { key: 'R', label: 'Recall a bumped ticket' }, { key: 'H', label: 'Hold cabinet' }, { key: '8', label: '86 board' },
+    { key: 'N', label: 'New ticket' }, { key: 'R', label: 'Recall a bumped ticket' }, { key: 'H', label: 'Hold cabinet' }, { key: '8', label: 'Sold out (86 board)' },
     { key: 'D', label: 'Demo' }, { key: '1 to 6', label: 'Station: All, PIT, HOT, FRY, CLD, EXP' }, { key: 'Z', label: 'Undo the last action' },
     { key: '?', label: 'Help' }, { key: 'Esc', label: 'Close a screen' },
   ];
@@ -1889,7 +1889,7 @@
         helpItem('history', 'Recall', 'Brings a bumped ticket back. Open Recall, find the ticket and tap Recall.'),
         helpItem('list', 'The all-day bar', 'Counts what is still to make across every ticket. Tap an item to highlight it on the board.'),
         helpItem('thermometer', 'Hold cabinet', 'Log a temperature when food goes in and at every check. Smokebox warns before a batch runs out of time and locks one that has.'),
-        helpItem('ban', '86 board', 'Marks an item sold out. It also goes 86 by itself when stock runs low or a batch is held back.'),
+        helpItem('ban', 'Sold out (86 board)', 'The Sold out button marks an item sold out. It also goes 86 by itself when stock runs low or a batch is held back.'),
       ]));
   }
 
