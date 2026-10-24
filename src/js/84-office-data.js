@@ -111,9 +111,9 @@
   // Real finite numbers only, and an icon builder that never throws.
   const isNum = (n) => typeof n === 'number' && isFinite(n);
   const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 18 }); } catch (e) { return doc.createElement('span'); } };
-  // The current state (null if the store is not ready), and a m:ss clock text.
+  // The current state (null if the store is not ready), and a time in plain words (5 min, 2 min 5 s, 45 s).
   const cur = () => { try { return SB.store.getState(); } catch (e) { return null; } };
-  const mmss = (sec) => { const s = Math.max(0, Math.round(sec)); return Math.floor(s / 60) + ':' + U.pad2(s % 60); };
+  const mmss = (sec) => { const s = Math.max(0, Math.round(sec)), m = Math.floor(s / 60), r = s % 60; return m && r ? m + ' min ' + r + ' s' : m ? m + ' min' : r + ' s'; };
   // A trimmed number for display, and how many decimals a step has.
   const num = (n, d) => (isNum(n) ? String(+n.toFixed(d == null ? 2 : d)) : '-');
   const decs = (n) => { const s = String(n); const i = s.indexOf('.'); return i < 0 ? 0 : s.length - i - 1; };
@@ -501,12 +501,12 @@
         else { trackSeg.setValue(getMi().track === 'two' ? 'two' : 'one'); status.bad(refusal(r, null)); }
       },
     });
-    const archChip = h('span', { class: 'od-archived' }, ico('package', 16), h('span', null, 'Archived'));
+    const archChip = h('span', { class: 'od-archived' }, ico('package', 16), h('span', null, 'Removed'));
     const archBtn = h('button', { type: 'button', class: 'btn btn-sm od-arch' });
     archBtn.addEventListener('click', () => {
       const to = !getMi().archived;
       const r = send('updateMenuItem', { id, patch: { archived: to } });
-      if (good(r)) status.ok(to ? 'Archived. It can no longer be ordered, and past tickets keep it. Unarchive it any time.' : 'Unarchived. It can be ordered again.');
+      if (good(r)) status.ok(to ? 'Removed. It can no longer be ordered, and past tickets keep it. Bring it back any time.' : 'Brought back. It can be ordered again.');
       else status.bad(refusal(r, null));
     });
 
@@ -579,13 +579,13 @@
         trackSeg.setValue(mi.track === 'two' ? 'two' : 'one');
         root.dataset.zone = mi.zone;
         sumName.textContent = mi.name;
-        { const zn = C.zoneById[mi.zone] ? C.zoneById[mi.zone].name : '', cn = catName(mi.cat); sumMeta.textContent = (zn.toLowerCase() === cn.toLowerCase() ? zn : zn + ', ' + cn) + (mi.archived ? ', archived' : mi.prepConfirmed ? '' : ', starter prep time'); }
+        { const zn = C.zoneById[mi.zone] ? C.zoneById[mi.zone].name : '', cn = catName(mi.cat); sumMeta.textContent = (zn.toLowerCase() === cn.toLowerCase() ? zn : zn + ', ' + cn) + (mi.archived ? ', removed' : mi.prepConfirmed ? '' : ', starter prep time'); }
         sumPrice.textContent = money(mi.price); sumPrep.textContent = mmss(mi.prepSec);
         price.sync(mi.price); prep.sync(mi.prepSec);
         confSeg.setValue(mi.prepConfirmed ? 'confirmed' : 'starter');
         archChip.hidden = !mi.archived;
-        archBtn.replaceChildren(ico(mi.archived ? 'check' : 'ban', 18), h('span', null, mi.archived ? 'Unarchive' : 'Archive'));
-        archBtn.setAttribute('aria-label', (mi.archived ? 'Unarchive ' : 'Archive ') + mi.name);
+        archBtn.replaceChildren(ico(mi.archived ? 'check' : 'ban', 18), h('span', null, mi.archived ? 'Bring it back' : 'Remove'));
+        archBtn.setAttribute('aria-label', (mi.archived ? 'Bring back ' : 'Remove ') + mi.name);
         const l = s.learned && s.learned[id];
         if (l && isNum(l.est) && l.n >= 1 && mi.prepSec > 0) {
           const diff = (l.est - mi.prepSec) / mi.prepSec;
@@ -682,7 +682,7 @@
     const filter = P.menuFilter;
     pn.body.append(
       para('Changes save as you make them. New tickets use the new price, prep time and ingredients; tickets already on the board keep theirs. There is no Undo for settings, so check a value before you move on.', 'od-intro'),
-      para('A prep time is a starter estimate until you have timed it on the line and marked it confirmed. Archived items cannot be ordered, and past tickets keep them.', 'od-intro'));
+      para('A prep time is a starter estimate until you have timed it on the line and marked it confirmed. Removed dishes cannot be ordered, and past tickets keep them.', 'od-intro'));
 
     // Add a dish, and a one-tap way to drop the made-up starter dishes. The form opens under the buttons.
     const addForm = addDishForm((id) => {
@@ -693,9 +693,9 @@
     const addOpenBtn = btn('Add a dish', { icon: 'plus', cls: 'btn-primary' });
     addOpenBtn.addEventListener('click', () => addForm.open());
     const starterBtn = btn('Use only my own dishes', { icon: 'ban' });
-    const starterBox = h('div', { class: 'od-starter', hidden: true, role: 'group', 'aria-label': 'Archive the starter dishes' });
+    const starterBox = h('div', { class: 'od-starter', hidden: true, role: 'group', 'aria-label': 'Remove the starter dishes' });
     const starterMsg = h('p', { class: 'od-p' });
-    const starterYes = btn('Archive the starter dishes', { icon: 'ban', cls: 'btn-danger' });
+    const starterYes = btn('Remove the starter dishes', { icon: 'ban', cls: 'btn-danger' });
     const starterNo = btn('Keep them', { icon: 'x' });
     starterBox.append(starterMsg, h('div', { class: 'od-add-actions' }, starterYes, starterNo));
     const starterStatus = statusLine();
@@ -703,7 +703,7 @@
     const liveStarters = () => { const s = cur(); return s ? s.menu.filter((m) => C.menuById[m.id] && !m.archived) : []; };
     starterBtn.addEventListener('click', () => {
       const n = liveStarters().length;
-      starterMsg.textContent = 'This archives the ' + n + ' demo starter ' + U.plural(n, 'dish', 'dishes') + ' that came with the app, so only the dishes you add can be ordered. Past tickets keep them. You can unarchive any of them later.';
+      starterMsg.textContent = 'This removes the ' + n + ' demo starter ' + U.plural(n, 'dish', 'dishes') + ' that came with the app, so only the dishes you add can be ordered. Past tickets keep them. You can bring any of them back later.';
       starterBox.hidden = false; starterYes.focus();
     });
     starterNo.addEventListener('click', () => { starterBox.hidden = true; starterBtn.focus(); });
@@ -711,8 +711,8 @@
       const list = liveStarters(); let failed = 0;
       list.forEach((m) => { if (!good(send('updateMenuItem', { id: m.id, patch: { archived: true } }))) failed++; });
       starterBox.hidden = true;
-      if (failed) starterStatus.bad('Archived ' + (list.length - failed) + ' of ' + list.length + ' starter dishes. ' + failed + ' could not be archived.');
-      else starterStatus.ok('Archived ' + list.length + ' starter ' + U.plural(list.length, 'dish', 'dishes') + '. Add your own with Add a dish.');
+      if (failed) starterStatus.bad('Removed ' + (list.length - failed) + ' of ' + list.length + ' starter dishes. ' + failed + ' could not be removed.');
+      else starterStatus.ok('Removed ' + list.length + ' starter ' + U.plural(list.length, 'dish', 'dishes') + '. Add your own with Add a dish.');
     });
     pn.body.append(h('div', { class: 'od-add-bar' }, addOpenBtn, starterBtn), starterBox, starterStatus.el, addForm.el);
     P.syncs.push(() => { const n = liveStarters().length; starterBtn.hidden = n === 0; if (!n) starterBox.hidden = true; });
@@ -720,7 +720,7 @@
 
     const segStatus = SB.ui.segmented({
       label: 'Show items', value: filter.status,
-      options: [{ id: 'active', label: 'Active', count: 0 }, { id: 'archived', label: 'Archived', count: 0 }, { id: 'all', label: 'All', count: 0 }],
+      options: [{ id: 'active', label: 'Active', count: 0 }, { id: 'archived', label: 'Removed', count: 0 }, { id: 'all', label: 'All', count: 0 }],
       // Changes which items are listed by status.
       onChange: (v) => { filter.status = v; applyFilter(); },
     });
@@ -744,7 +744,10 @@
     function applyFilter() {
       const s = cur(); if (!s) return;
       let nA = 0, nR = 0, shown = 0;
-      for (const mi of s.menu) { if (mi.archived) nR++; else nA++; }
+      let nGuess = 0;
+      for (const mi of s.menu) { if (mi.archived) nR++; else { nA++; if (!mi.prepConfirmed) nGuess++; } }
+      // The starter-estimates filter only shows while there is a guessed prep time to find.
+      starterChip.hidden = !nGuess && !filter.starter;
       segStatus.setCount('active', nA); segStatus.setCount('archived', nR); segStatus.setCount('all', nA + nR);
       segStatus.setValue(filter.status); zoneSel.value = filter.zone;
       starterChip.setAttribute('aria-pressed', filter.starter ? 'true' : 'false');
@@ -1955,7 +1958,7 @@
       const keeping = st.persistent !== false && st.lastSaveOk !== false;
       const n = starterCount(s);
       headline.textContent = (keeping ? 'Your settings are saved on this device.' : 'This browser is not keeping your changes, so they will be lost when you close the page. Allow site data for this page.') + ' ' +
-        (n.total ? n.total + ' starter ' + U.plural(n.total, 'estimate is', 'estimates are') + ' not confirmed yet.' : 'Every prep time and yield is confirmed.');
+        (n.total ? n.total + ' ' + U.plural(n.total, 'starter estimate is still a guess', 'starter estimates are still guesses') + ', not confirmed yet.' : s.menu.some((m) => !m.archived) ? 'Every prep time and yield is confirmed.' : '');
       headline.dataset.tone = keeping ? 'ok' : 'bad';
       headSub.textContent = n.total ? n.prep + ' prep ' + U.plural(n.prep, 'time') + ' and ' + n.yld + ' cooked ' + U.plural(n.yld, 'yield') + '. Starter estimates are fine to run on; confirm each one when you have timed or weighed it.' : '';
       showBtn.hidden = !n.prep;

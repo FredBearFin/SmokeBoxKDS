@@ -165,7 +165,7 @@ group('1. Page, headline and contents list', async () => {
     const calc = await st(page, () => { const s = SB.store.getState(); return s.menu.filter((m) => !m.archived && !m.prepConfirmed).length + s.ingredients.filter((i) => i.tcs && typeof i.yield === 'number' && !i.yieldConfirmed).length; });
     const head = await text(page, '.od-headline');
     check('headline opens with the saved-on-this-device sentence', head.startsWith('Your settings are saved on this device.'), head);
-    check('headline counts starter estimates from the data (' + calc + ')', head.includes(calc + ' starter estimates are not confirmed yet.'), head);
+    check('headline counts starter estimates from the data (' + calc + ')', head.includes(calc + ' starter estimates are still guesses, not confirmed yet.'), head);
     check('headline has no ALL CAPS words, arrows or dot-separated meta strings', !/\b[A-Z]{4,}\b/.test(head) && !/[→←↑↓·]/.test(head), head);
 
     // table of contents: keyboard friendly, does not leave the office
@@ -246,7 +246,7 @@ group('2. Menu and bills of materials', async () => {
     // prep time and the starter / confirmed toggle
     await typeNum(page, 'Prep time of ' + MENU.name, '125');
     await waitFor(page, (id) => SB.store.getState().menu.find((m) => m.id === id).prepSec === 125, MENU.id);
-    check('prep time saved and shown as minutes and seconds beside the field', (await text(page, item(MENU.id) + ' .od-read:not(:empty)')) === '2:05');
+    check('prep time saved and shown as minutes and seconds beside the field', (await text(page, item(MENU.id) + ' .od-read:not(:empty)')) === '2 min 5 s');
     const seg = page.locator(item(MENU.id) + ' .seg:has([data-id="confirmed"])').first(); // the item also has Station, Category and How it is cooked segments
     check('prep time starts as a starter estimate', (await st(page, (id) => SB.store.getState().menu.find((m) => m.id === id).prepConfirmed, MENU.id)) === false);
     const headBefore = await text(page, '.od-headline');
@@ -323,13 +323,13 @@ group('2. Menu and bills of materials', async () => {
     check('an archived item leaves the Active list', !(await visible(page, item(AM))));
     await page.locator('#od-menu .seg [data-id="archived"]').first().click();
     await page.waitForTimeout(100);
-    check('it shows under Archived with an Archived chip and an Unarchive button', (await visible(page, item(AM))) && /Archived/.test(await text(page, item(AM) + ' .od-archived')) && /Unarchive/.test(await text(page, item(AM) + ' .od-arch')));
+    check('it shows under Removed with a Removed chip and a Bring it back button', (await visible(page, item(AM))) && /Removed/.test(await text(page, item(AM) + ' .od-archived')) && /Bring it back/.test(await text(page, item(AM) + ' .od-arch')));
     check('there is no Delete button anywhere in the menu panel', (await page.locator('#od-menu button', { hasText: /delete|remove item/i }).count()) === 0);
     await page.locator(`${item(AM)} .od-arch`).click();
     await waitFor(page, (id) => SB.store.getState().menu.find((m) => m.id === id).archived === false, AM);
     await page.locator('#od-menu .seg [data-id="active"]').first().click();
     await page.waitForTimeout(100);
-    check('Unarchive puts it back in the Active list', await visible(page, item(AM)));
+    check('Bring it back puts it back in the Active list', await visible(page, item(AM)));
 
     // filters
     await page.selectOption('#od-menu .od-filter-zone', 'cold');
@@ -407,7 +407,7 @@ group('4. Ticket time limits by channel', async () => {
     await typeNum(page, 'Dine-in turns amber at (seconds)', '600');
     await waitFor(page, () => SB.engine.channelThresholds(SB.store.getState().settings, 'dine_in').warnSec === 600);
     check('amber time saved through updateSettings (channels patch)', (await thr('dine_in')).warnSec === 600);
-    check('the stepper reads m:ss beside the seconds (10:00)', (await text(page, '#od-times .od-chan[data-channel="dine_in"] .od-read')).startsWith('10:00'));
+    check('the stepper reads minutes beside the seconds (10 min)', (await text(page, '#od-times .od-chan[data-channel="dine_in"] .od-read')).startsWith('10 min'));
     check('the preview line follows the new value', (await text(page, '#od-times .od-chan[data-channel="dine_in"] .od-preview')) === 'A dine-in ticket turns amber at 10:00 and overdue at 13:00.');
     check('only dine-in changed (takeout is still 8:00)', (await thr('takeout')).warnSec === 480);
     // amber has to stay before overdue
