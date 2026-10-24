@@ -661,9 +661,11 @@
     else t = 'Heads up! ' + d.who + (d.goes86 && !d.many ? ' goes 86' : d.many ? ' expire' : ' expires') + ' in ' + (d.approx ? 'about ' : '') + dur(d.mins) + '! Act now!';
     return clipWords(spoken(t), 14);
   }
-  // Picks the best-sounding English voice the device has: the natural, neural or online ones first, then premium, Google
-  // and well-known named voices; null when there is none, so the device default is used.
-  function pickVoice(voices) {
+  // Picks the voice that speaks: the one the owner chose in Settings when this device still has it, else the best-sounding
+  // English voice the device has (natural, neural or online ones first, then premium, Google and well-known named voices);
+  // null when there is none, so the device default is used.
+  function pickVoice(voices, chosen) {
+    if (typeof chosen === 'string' && chosen) { const c = (voices || []).find((v) => v && v.name === chosen); if (c) return c; }
     const NOVELTY = /bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|albert|fred|junior|ralph|kathy|princess|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley/i;
     const en = (voices || []).filter((v) => v && /^en/i.test(String(v.lang || '').replace('_', '-')) && !NOVELTY.test(String(v.name || '')));
     // How good a voice sounds for a kitchen call, higher is better. Voices stored on the tablet come first (a kitchen may be offline and
@@ -685,8 +687,8 @@
     return best;
   }
   // Which voice would speak right now and whether it lives on the tablet, for the Test the voice line: { name, lang, local } or null.
-  function voiceInfo(voices) {
-    const v = pickVoice(voices);
+  function voiceInfo(voices, chosen) {
+    const v = pickVoice(voices, chosen);
     return v ? { name: String(v.name || 'Default'), lang: String(v.lang || ''), local: v.localService !== false } : null;
   }
   // How much the voice talks, per level. repeatStartSec is the gap between "still waiting" reminders for a dish that is

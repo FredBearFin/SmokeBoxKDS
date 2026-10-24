@@ -2174,6 +2174,26 @@
       const v = SB.floor.testVoice ? SB.floor.testVoice() : { supported: false };
       text(voiceSay, !v.supported ? 'This tablet cannot speak. Warnings will be tones only.' : v.name ? 'Voice: ' + v.name + (v.local ? ', stored on this tablet.' : ', needs the internet.') : 'Voice: the tablet\'s own default voice.');
     } }, ico('volume', 20), h('span', null, 'Test the voice'));
+    // Voice chooser: every English voice this device has, so the owner can pick the one that sounds best. Saved on this device;
+    // Automatic picks the best one by itself. A choice says a short sample at once.
+    const voiceSel = h('select', { class: 'input mn-voice', dataset: { act: 'voice-pick' }, 'aria-label': 'Voice', disabled: !floorOk });
+    // Fills the voice list; browsers load their voices a moment after the page, so this runs again when they arrive.
+    function fillVoices() {
+      const ss = g.speechSynthesis, all = ss && ss.getVoices ? ss.getVoices() : [];
+      const en = all.filter((v) => /^en/i.test(String(v.lang || '').replace('_', '-')));
+      const cur = U.storage.get('smokebox.v1.voicename', '');
+      U.clear(voiceSel);
+      voiceSel.append(h('option', { value: '' }, 'Automatic (best on this device)'), ...en.map((v) => h('option', { value: v.name }, v.name + (v.localService === false ? ' (needs internet)' : ''))));
+      voiceSel.value = en.some((v) => v.name === cur) ? cur : '';
+    }
+    fillVoices();
+    if (g.speechSynthesis && typeof g.speechSynthesis.addEventListener === 'function') { g.speechSynthesis.addEventListener('voiceschanged', fillVoices); offs.push(() => g.speechSynthesis.removeEventListener('voiceschanged', fillVoices)); }
+    voiceSel.addEventListener('change', () => {
+      U.storage.set('smokebox.v1.voicename', voiceSel.value);
+      const v = SB.floor.testVoice ? SB.floor.testVoice() : { supported: false };
+      text(voiceSay, v.name ? 'Voice: ' + v.name + '.' : 'Voice: the device\'s own default voice.');
+    });
+    const voiceRow = h('label', { class: 'mn-vol' }, h('span', null, 'Voice'), voiceSel);
     const testRow = h('div', { class: 'mn-test' }, testBtn, testSay, voiceBtn, voiceSay);
     const soundHelp = floorOk ? 'On by default, because a missed warning can cost a whole batch. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
 
@@ -2217,7 +2237,7 @@
       settingBlock('Text size', 'Large makes everything 20 percent bigger.', textSeg),
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap Start on a dish.', hintsTog),
-      settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn), testRow),
+      settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn), voiceRow, testRow),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
       settingBlock('Voice call-outs', 'A chef calls the line out loud. Light: "Fire the pizza now! Ticket 12!" and "Ticket 12 is up! Ring it out!". Normal: adds "Order up!" for new tickets and one reminder if a dish is not started or a ticket not rung out. Full: keeps reminding until you start the dish or ring out the ticket. At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Not tried on a real tablet yet.', coTog, levelSeg),
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),

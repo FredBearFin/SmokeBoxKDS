@@ -4345,7 +4345,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "5e6bd40" };
+window.SB_BUILD = { version: "0.2.0", id: "7ea1caf" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -4825,7 +4825,7 @@ window.SB_BUILD = { version: "0.2.0", id: "5e6bd40" };
   // The settings that belong to the device, not to a kitchen (look, sound, which station this tablet shows). They
   // are the same in the demo and the real kitchen. Every other smokebox.v1 key is kitchen data and gets its own
   // copy in the demo (smokebox.demo.<name>), so the demo can never read or write the real kitchen's data.
-  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'callouts', 'far', 'wall', 'dock'].map((k) => 'smokebox.v1.' + k);
+  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'voicename', 'callouts', 'far', 'wall', 'dock'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'writer', 'histtrim', 'histnotice', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
@@ -11049,9 +11049,11 @@ window.SB_BUILD = { version: "0.2.0", id: "5e6bd40" };
     else t = 'Heads up! ' + d.who + (d.goes86 && !d.many ? ' goes 86' : d.many ? ' expire' : ' expires') + ' in ' + (d.approx ? 'about ' : '') + dur(d.mins) + '! Act now!';
     return clipWords(spoken(t), 14);
   }
-  // Picks the best-sounding English voice the device has: the natural, neural or online ones first, then premium, Google
-  // and well-known named voices; null when there is none, so the device default is used.
-  function pickVoice(voices) {
+  // Picks the voice that speaks: the one the owner chose in Settings when this device still has it, else the best-sounding
+  // English voice the device has (natural, neural or online ones first, then premium, Google and well-known named voices);
+  // null when there is none, so the device default is used.
+  function pickVoice(voices, chosen) {
+    if (typeof chosen === 'string' && chosen) { const c = (voices || []).find((v) => v && v.name === chosen); if (c) return c; }
     const NOVELTY = /bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|albert|fred|junior|ralph|kathy|princess|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley/i;
     const en = (voices || []).filter((v) => v && /^en/i.test(String(v.lang || '').replace('_', '-')) && !NOVELTY.test(String(v.name || '')));
     // How good a voice sounds for a kitchen call, higher is better. Voices stored on the tablet come first (a kitchen may be offline and
@@ -11073,8 +11075,8 @@ window.SB_BUILD = { version: "0.2.0", id: "5e6bd40" };
     return best;
   }
   // Which voice would speak right now and whether it lives on the tablet, for the Test the voice line: { name, lang, local } or null.
-  function voiceInfo(voices) {
-    const v = pickVoice(voices);
+  function voiceInfo(voices, chosen) {
+    const v = pickVoice(voices, chosen);
     return v ? { name: String(v.name || 'Default'), lang: String(v.lang || ''), local: v.localService !== false } : null;
   }
   // How much the voice talks, per level. repeatStartSec is the gap between "still waiting" reminders for a dish that is
@@ -21285,7 +21287,7 @@ window.SB_BUILD = { version: "0.2.0", id: "5e6bd40" };
       // Calm for a heads-up, brisk for a new ticket, fast and loud for "fire now": the style of the line sets rate, pitch and volume.
       const dl = SB.deadlines && SB.deadlines.delivery ? SB.deadlines.delivery(kind) : null;
       u.rate = dl ? dl.rate : cv.rate; u.pitch = dl ? dl.pitch : cv.pitch; u.volume = dl ? dl.volume : 1;
-      const pv = SB.deadlines && SB.deadlines.pickVoice && ss.getVoices ? SB.deadlines.pickVoice(ss.getVoices()) : null;
+      const pv = SB.deadlines && SB.deadlines.pickVoice && ss.getVoices ? SB.deadlines.pickVoice(ss.getVoices(), U.storage.get('smokebox.v1.voicename', '')) : null;
       if (pv) { u.voice = pv; if (pv.lang) u.lang = pv.lang; }
       ss.speak(u);
       // About 70 ms a letter plus a short gap; speech end events are not reliable on every tablet.
@@ -21479,7 +21481,7 @@ window.SB_BUILD = { version: "0.2.0", id: "5e6bd40" };
     const ss = g.speechSynthesis;
     if (!ss || !g.SpeechSynthesisUtterance) return { supported: false };
     let info = null;
-    try { info = SB.deadlines && SB.deadlines.voiceInfo ? SB.deadlines.voiceInfo(ss.getVoices()) : null; } catch (e) { info = null; }
+    try { info = SB.deadlines && SB.deadlines.voiceInfo ? SB.deadlines.voiceInfo(ss.getVoices(), U.storage.get('smokebox.v1.voicename', '')) : null; } catch (e) { info = null; }
     return info ? Object.assign({ supported: true }, info) : { supported: true, name: '', lang: '', local: true };
   };
   // Speaks a sample ticket call in the chef voice and says which voice did it, so a cook can hear and see what this tablet will use.
@@ -26686,6 +26688,26 @@ window.SB_BUILD = { version: "0.2.0", id: "5e6bd40" };
       const v = SB.floor.testVoice ? SB.floor.testVoice() : { supported: false };
       text(voiceSay, !v.supported ? 'This tablet cannot speak. Warnings will be tones only.' : v.name ? 'Voice: ' + v.name + (v.local ? ', stored on this tablet.' : ', needs the internet.') : 'Voice: the tablet\'s own default voice.');
     } }, ico('volume', 20), h('span', null, 'Test the voice'));
+    // Voice chooser: every English voice this device has, so the owner can pick the one that sounds best. Saved on this device;
+    // Automatic picks the best one by itself. A choice says a short sample at once.
+    const voiceSel = h('select', { class: 'input mn-voice', dataset: { act: 'voice-pick' }, 'aria-label': 'Voice', disabled: !floorOk });
+    // Fills the voice list; browsers load their voices a moment after the page, so this runs again when they arrive.
+    function fillVoices() {
+      const ss = g.speechSynthesis, all = ss && ss.getVoices ? ss.getVoices() : [];
+      const en = all.filter((v) => /^en/i.test(String(v.lang || '').replace('_', '-')));
+      const cur = U.storage.get('smokebox.v1.voicename', '');
+      U.clear(voiceSel);
+      voiceSel.append(h('option', { value: '' }, 'Automatic (best on this device)'), ...en.map((v) => h('option', { value: v.name }, v.name + (v.localService === false ? ' (needs internet)' : ''))));
+      voiceSel.value = en.some((v) => v.name === cur) ? cur : '';
+    }
+    fillVoices();
+    if (g.speechSynthesis && typeof g.speechSynthesis.addEventListener === 'function') { g.speechSynthesis.addEventListener('voiceschanged', fillVoices); offs.push(() => g.speechSynthesis.removeEventListener('voiceschanged', fillVoices)); }
+    voiceSel.addEventListener('change', () => {
+      U.storage.set('smokebox.v1.voicename', voiceSel.value);
+      const v = SB.floor.testVoice ? SB.floor.testVoice() : { supported: false };
+      text(voiceSay, v.name ? 'Voice: ' + v.name + '.' : 'Voice: the device\'s own default voice.');
+    });
+    const voiceRow = h('label', { class: 'mn-vol' }, h('span', null, 'Voice'), voiceSel);
     const testRow = h('div', { class: 'mn-test' }, testBtn, testSay, voiceBtn, voiceSay);
     const soundHelp = floorOk ? 'On by default, because a missed warning can cost a whole batch. Some browsers only play sound after you have tapped the screen once.' : 'The board is not loaded in this build, so there is no sound setting.';
 
@@ -26729,7 +26751,7 @@ window.SB_BUILD = { version: "0.2.0", id: "5e6bd40" };
       settingBlock('Text size', 'Large makes everything 20 percent bigger.', textSeg),
       settingBlock('Ticket size', 'Auto shows full-size tickets while they fit in one row, then switches to compact so a rush stays on one screen.', sizeSeg),
       settingBlock('Next step', 'A line under each ticket that says what to do next, such as Tap Start on a dish.', hintsTog),
-      settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn), testRow),
+      settingBlock('Sound', soundHelp, soundTog, speechTog, h('label', { class: 'mn-vol' }, h('span', null, 'Loudness on this tablet'), volIn), voiceRow, testRow),
       settingBlock('Far display', 'For a TV or a tablet read from across the kitchen: a much bigger warning strip and bigger tickets, no "On time" badges so only late tickets stand out, and overdue tickets get a heavy red outline. Try it from where the cook stands.', farTog),
       settingBlock('Voice call-outs', 'A chef calls the line out loud. Light: "Fire the pizza now! Ticket 12!" and "Ticket 12 is up! Ring it out!". Normal: adds "Order up!" for new tickets and one reminder if a dish is not started or a ticket not rung out. Full: keeps reminding until you start the dish or ring out the ticket. At a station tab it only calls that station\'s dishes. It needs sound and spoken warnings on, and old calls are dropped, not read late. Not tried on a real tablet yet.', coTog, levelSeg),
       settingBlock('Wall mode', 'For a wide screen or TV (1700 px and wider) in one window: the kitchen board in the middle, open orders and payments on the left, and a manager glance on the right (money so far, late tickets, the 86 list, when brisket runs out). Below that width nothing changes.', wallTog),

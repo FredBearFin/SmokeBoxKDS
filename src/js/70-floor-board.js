@@ -324,7 +324,7 @@
       // Calm for a heads-up, brisk for a new ticket, fast and loud for "fire now": the style of the line sets rate, pitch and volume.
       const dl = SB.deadlines && SB.deadlines.delivery ? SB.deadlines.delivery(kind) : null;
       u.rate = dl ? dl.rate : cv.rate; u.pitch = dl ? dl.pitch : cv.pitch; u.volume = dl ? dl.volume : 1;
-      const pv = SB.deadlines && SB.deadlines.pickVoice && ss.getVoices ? SB.deadlines.pickVoice(ss.getVoices()) : null;
+      const pv = SB.deadlines && SB.deadlines.pickVoice && ss.getVoices ? SB.deadlines.pickVoice(ss.getVoices(), U.storage.get('smokebox.v1.voicename', '')) : null;
       if (pv) { u.voice = pv; if (pv.lang) u.lang = pv.lang; }
       ss.speak(u);
       // About 70 ms a letter plus a short gap; speech end events are not reliable on every tablet.
@@ -518,7 +518,7 @@
     const ss = g.speechSynthesis;
     if (!ss || !g.SpeechSynthesisUtterance) return { supported: false };
     let info = null;
-    try { info = SB.deadlines && SB.deadlines.voiceInfo ? SB.deadlines.voiceInfo(ss.getVoices()) : null; } catch (e) { info = null; }
+    try { info = SB.deadlines && SB.deadlines.voiceInfo ? SB.deadlines.voiceInfo(ss.getVoices(), U.storage.get('smokebox.v1.voicename', '')) : null; } catch (e) { info = null; }
     return info ? Object.assign({ supported: true }, info) : { supported: true, name: '', lang: '', local: true };
   };
   // Speaks a sample ticket call in the chef voice and says which voice did it, so a cook can hear and see what this tablet will use.
