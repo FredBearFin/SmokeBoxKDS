@@ -1122,11 +1122,13 @@
     backupRequired: 'The files must be saved first. Go back to step 2 and save them again. Nothing was removed.',
     exportStale: 'Something changed since you saved the files (a new day started or a record changed). Save the files again in step 2, then close. Nothing was removed.',
     notInDemo: 'You are in the demo, so there is no real history to close here. Tap Back to my kitchen first. Nothing was removed.',
-    hubKitchen: 'This tablet works through the main computer, so the month cannot be closed here. Do this on the main computer\'s own screen or the main tablet. Nothing was removed.',
+    hubKitchen: 'This device works through the main computer, so the month cannot be closed here. Do this on the main computer\'s own screen or the main tablet. Nothing was removed.',
     nothingToDo: 'There is nothing to close yet. Only finished days older than the recent days that always stay can be moved out, and none are left before that date. Nothing was removed.',
     storageBlocked: 'This browser would not save the change, so nothing was removed. Your kitchen is exactly as it was. Allow site data or use a normal window, then try again.',
     badPatch: 'That date is not one Smokebox can use. Pick a date and try again. Nothing was removed.',
   };
+  // The calm line a sheet with nothing to close shows before the owner does anything.
+  const NOTHING_YET = 'There is nothing to close yet. Finished days can be moved out once they are older than the recent days that always stay.';
   // Turns a store answer that was refused into one plain sentence.
   function monthWords(r) { return MONTH_WORDS[r && r.report] || ((r && r.report) ? 'Smokebox could not do that (' + r.report + '). Nothing was removed.' : 'Smokebox could not do that. Nothing was removed.'); }
   // Writes a YYYY-MM-DD day as a short date like Mar 3, 2026.
@@ -1146,20 +1148,26 @@
     let before = /^\d{4}-\d{2}-\d{2}$/.test(String(opts.before || '')) ? opts.before : firstOfMonth();
     let exported = null; // the files of the last export: { files, backup: { filename, chars, sha256 } }
 
-    // Step 1: what happens, with the real counts.
+    // Step 1: what happens, with the real counts. The warning only shows when there is something to close.
+    const warnNote = h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'After step 3 the history leaves this device. For 7 days you can still undo it here; after that, the files you save in step 2 are the only copy.');
     const dateIn = h('input', { class: 'input', type: 'date', value: before, id: 'cm-before', dataset: { field: 'before' } });
     const counts = h('div', { class: 'cm-counts', role: 'status', dataset: { role: 'cm-counts' } });
     const next1 = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'cm-next1' }, disabled: true }, 'Next: save the files');
     // Redraws the counts for the chosen date. The store says what would move out and what stays; nothing changes here.
+    // Before the owner does anything, a sheet with nothing to close says so in one calm line, and the steps and the
+    // warning about them stay out of sight (Next is hidden, not just grey).
     function paintPreview() {
       before = /^\d{4}-\d{2}-\d{2}$/.test(dateIn.value) ? dateIn.value : before; exported = null;
-      U.clear(counts); next1.disabled = true;
-      if (store.isHubClient && store.isHubClient()) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords({ report: 'hubKitchen' }))); return; }
-      if (store.isDemo && store.isDemo()) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords({ report: 'notInDemo' }))); return; }
+      U.clear(counts); next1.disabled = true; next1.hidden = true; warnNote.hidden = true;
+      // One calm line in place of the counts.
+      const calm = (words) => counts.append(h('p', { class: 'fs-note' }, words));
+      if (store.isHubClient && store.isHubClient()) { calm(monthWords({ report: 'hubKitchen' }).replace(' Nothing was removed.', '')); return; }
+      if (store.isDemo && store.isDemo()) { calm(monthWords({ report: 'notInDemo' }).replace(' Nothing was removed.', '')); return; }
       const r = store.closeMonthPreview({ before });
+      if (!r.ok && r.report === 'nothingToDo') { calm(NOTHING_YET); return; }
       if (!r.ok) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords(r))); return; }
       const p = r.preview;
-      if (!p.tickets && !p.orders && !p.events) { counts.append(h('p', { class: 'fs-note', 'data-tone': 'warn' }, monthWords({ report: 'nothingToDo' }))); return; }
+      if (!p.tickets && !p.orders && !p.events) { calm(NOTHING_YET); return; }
       // Writes a count with the right singular or plural word.
       const n = (x, one, many) => Number(x).toLocaleString() + ' ' + U.plural(x, one, many);
       // How many recent days stay: 35, or fewer on a busy kitchen whose saved history is near its limits (engine adaptiveKeepDays).
@@ -1170,15 +1178,15 @@
         p.before !== before ? h('p', { class: 'fs-sub' }, 'You picked ' + monthDay(before) + ', but the last ' + n(keep, 'day') + ' always stay, so it stops at ' + monthDay(p.before) + '.') : null,
         h('p', null, h('strong', null, 'This stays: '), 'the last ' + n(keep, 'day') + ', today, every open order and open ticket' + (p.openOrdersKept || p.openTicketsKept ? ' (' + n(p.openOrdersKept || 0, 'open order') + ', ' + n(p.openTicketsKept || 0, 'open ticket') + ' right now)' : '') + ', your menu and settings, the end-of-day totals, and all food-safety records (' + n(p.safetyEventsKept || 0, 'record') + ').'),
         p.uncoveredDays && p.uncoveredDays.length ? h('p', { class: 'fs-sub' }, n(p.uncoveredDays.length, 'older day') + ' with records but no end-of-day close stay where they are.') : null].filter(Boolean));
-      next1.disabled = false;
+      next1.disabled = false; next1.hidden = false; warnNote.hidden = false;
     }
     dateIn.addEventListener('change', paintPreview);
     const step1 = h('section', { class: 'fs-section so-step' },
       h('h3', { class: 'fs-h' }, '1. What this does'),
-      h('p', { class: 'fs-sub' }, 'Close the month moves old, finished history out of this tablet so it stays quick. First you save everything to files. Nothing is removed until step 3.'),
+      h('p', { class: 'fs-sub' }, 'Close the month moves old, finished history out of this device so it stays quick. First you save everything to files. Nothing is removed until step 3.'),
       SB.ui.field({ label: 'Close everything before', control: dateIn }),
       counts,
-      h('p', { class: 'fs-note', 'data-tone': 'warn' }, 'After step 3 the history is gone from this tablet. Your files are the only copy of it. For 7 days Smokebox also keeps your kitchen as it was, and you can undo.'),
+      warnNote,
       next1);
 
     // Step 2: save the files.
@@ -1250,7 +1258,7 @@
           h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'cm-undo' }, onClick: () => {
             const rep = store.undoRestore();
             if (rep === 'ok' || (rep && rep.ok)) { tell(undoMsg, 'Undone. Your kitchen is back as it was, with all the history.', 'ok'); } else tell(undoMsg, 'The saved copy could not be put back (' + (rep && rep.report ? rep.report : rep) + '). Use the backup file you saved: Back office, Data, Restore.', 'bad');
-          } }, 'Undo')) : h('p', { class: 'fs-note', 'data-tone': 'warn' }, (i.restoreCopyKept ? 'Your kitchen from before your recent restore is still kept, so no second copy was made here. ' : 'No copy could be kept on this tablet, so ') + 'the files you saved are the only way back from this close: Back office, Data, Restore.'),
+          } }, 'Undo')) : h('p', { class: 'fs-note', 'data-tone': 'warn' }, (i.restoreCopyKept ? 'Your kitchen from before your recent restore is still kept, so no second copy was made here. ' : 'No copy could be kept on this device, so ') + 'the files you saved are the only way back from this close: Back office, Data, Restore.'),
         undoMsg,
         // Closes the sheet when the person is finished reading the result.
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'cm-finish' }, onClick: () => SB.sheets.closeAll() }, 'Done'));
