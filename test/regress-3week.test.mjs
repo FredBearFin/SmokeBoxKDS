@@ -36,6 +36,7 @@ function build(opts) {
   const r = rng(opts.seed || 5);
   const k = { now: at(opts.from, 7), log: { voidedOrders: 0, reopened: [], refusedReopen: [], closes: [], counterDays: [] } };
   k.s = E.newState({ now: k.now, blank: true });
+  k.s.settings.pacing.enabled = false;   // the script starts every dish at once; pacing has its own tests
   // Applies one action at time t (never earlier than the last one) and fails on any refusal unless `allow` names it.
   const go = (type, p, t, allow) => { k.now = Math.max(k.now + 1000, t == null ? k.now : t); const res = E.apply(k.s, type, p, k.now); if (res.report !== 'ok' && res.report !== allow) assert.fail(type + ' -> ' + res.report + ' ' + JSON.stringify(res.info)); if (res.report === 'ok') k.s = res.state; return res; };
   go('updateSettings', { patch: { service: { taxRatePct: 8.25 }, modules: { cookAhead: true } } });

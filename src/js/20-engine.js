@@ -368,7 +368,8 @@
   // WATCH OUT: defaultSettings itself must not change, because the barbecue demo and every old save rely on it.
   function blankSettings() {
     const S = defaultSettings();
-    S.pacing.enabled = false;
+    // Pacing stays on: holding back the quick dishes so a ticket finishes together is the point of the board, and the voice
+    // calls each dish at its own start time only when pacing gives it one. Prep times start as guesses and learn from real cooks.
     S.modules = { cookAhead: false };
     // No made-up customer buttons (Walk-up, Pickup, Table 1 to 6) in a new kitchen: the owner adds their own in How you serve.
     S.service.chips = [];
