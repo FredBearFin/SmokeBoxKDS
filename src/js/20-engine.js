@@ -370,6 +370,8 @@
     const S = defaultSettings();
     S.pacing.enabled = false;
     S.modules = { cookAhead: false };
+    // No made-up customer buttons (Walk-up, Pickup, Table 1 to 6) in a new kitchen: the owner adds their own in How you serve.
+    S.service.chips = [];
     return S;
   }
   // True when an optional module is switched on. A state with no modules setting (every save made before the

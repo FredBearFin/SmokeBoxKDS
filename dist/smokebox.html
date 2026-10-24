@@ -4341,7 +4341,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "1173cb9" };
+window.SB_BUILD = { version: "0.2.0", id: "6f898af" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -6336,6 +6336,8 @@ window.SB_BUILD = { version: "0.2.0", id: "1173cb9" };
     const S = defaultSettings();
     S.pacing.enabled = false;
     S.modules = { cookAhead: false };
+    // No made-up customer buttons (Walk-up, Pickup, Table 1 to 6) in a new kitchen: the owner adds their own in How you serve.
+    S.service.chips = [];
     return S;
   }
   // True when an optional module is switched on. A state with no modules setting (every save made before the
@@ -28683,9 +28685,10 @@ window.SB_BUILD = { version: "0.2.0", id: "1173cb9" };
     // Paints the question until it is answered or skipped; after an answer it says what was set and where to change it.
     function paintServe(answer) {
       const answered = answer || U.storage.get(KEY_SERVEANS, '');
-      // An owner who already set How you serve (own order buttons, or counter service on) is not asked again.
+      // An owner who already set How you serve (own order buttons, or counter service on) is not asked again. The empty list a new
+      // kitchen starts with is not an answer, so the question still comes.
       const svc = SB.store.getState().settings.service || {};
-      const setUp = Array.isArray(svc.chips) || svc.counter === true;
+      const setUp = (Array.isArray(svc.chips) && svc.chips.length > 0) || svc.counter === true;
       const show = activeDishes().length > 0 && !U.storage.get(KEY_SERVESKIP, false) && (!!answered || !setUp);
       svBox.hidden = !show;
       if (!show) return;
