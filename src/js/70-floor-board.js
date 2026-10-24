@@ -727,7 +727,14 @@
     const empty = h('div', { class: 'fl-empty', hidden: true });
     const welcome = buildWelcome();
     const cabEl = h('section', { class: 'fl-cabinet', hidden: true, 'aria-label': 'Hold cabinet' }, h('h2', { class: 'visually-hidden' }, 'Hold cabinet'));
-    const main = h('main', { class: 'fl-main', id: 'fl-board', tabindex: -1, 'aria-label': 'Tickets' }, h('h1', { class: 'visually-hidden' }, 'Smokebox kitchen board'), welcome, grid, empty, cabEl);
+    // While one station is showing, a bar says so in words, with a one-tap way back: a ticket on a station tab lists only that
+    // station's dishes, and without the bar a cook can take a five-dish order for a one-dish one.
+    const stationText = h('span', { class: 'fl-station-t' });
+    // Show all goes back to every station's tickets.
+    const showAll = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'show-all' }, onClick: () => goZone('all') }, ico('grid', 18), h('span', null, 'Show all'));
+    const stationBar = h('div', { class: 'fl-station-bar', hidden: true, role: 'status' }, ico('filter', 20), stationText, showAll);
+    m.stationBar = stationBar; m.stationText = stationText;
+    const main = h('main', { class: 'fl-main', id: 'fl-board', tabindex: -1, 'aria-label': 'Tickets' }, h('h1', { class: 'visually-hidden' }, 'Smokebox kitchen board'), welcome, stationBar, grid, empty, cabEl);
 
     // ----- dock
     const dockToggle = h('button', { type: 'button', class: 'fl-dock-toggle', 'aria-expanded': 'true', 'aria-controls': 'fl-dock-list', onClick: toggleDock },
@@ -1105,6 +1112,11 @@
     if (!m.first && added.length) added.forEach((rec, i) => printIn(rec, i));
     else added.forEach((rec) => { if (m.io) m.io.observe(rec.el); });
     m.first = false;
+
+    // the one-station bar
+    const oneStation = mode === 'station' && zone !== 'cabinet';
+    setHidden(m.stationBar, !oneStation);
+    if (oneStation) setTxt(m.stationText, 'Showing ' + zoneById(zone).name + ' only. Tickets list just this station\'s dishes.');
 
     // empty state
     const empty = m.slips.size === 0;

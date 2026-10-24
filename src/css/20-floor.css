@@ -811,3 +811,8 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
   .fl-bar-clock .btn { flex: 1 1 40%; align-self: stretch; }
   .fl-bar-clock > .icon { margin-left: 0; }
 }
+
+/* The one-station bar: says in words that the board shows one station, with a way back to every station. */
+.fl-station-bar { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) var(--sp-3) 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--ink); border-radius: var(--r-btn); background: var(--paper); color: var(--ink); font-weight: var(--w-heavy); font-size: var(--fs-2); }
+.fl-station-bar[hidden] { display: none; }
+.fl-station-t { flex: 1; min-width: 0; }

@@ -2111,6 +2111,11 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
   .fl-bar-clock > .icon { margin-left: 0; }
 }
 
+/* The one-station bar: says in words that the board shows one station, with a way back to every station. */
+.fl-station-bar { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) var(--sp-3) 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--ink); border-radius: var(--r-btn); background: var(--paper); color: var(--ink); font-weight: var(--w-heavy); font-size: var(--fs-2); }
+.fl-station-bar[hidden] { display: none; }
+.fl-station-t { flex: 1; min-width: 0; }
+
 /* ===== 21-floor-sheets.css ===== */
 /*
  * WHAT THIS FILE IS: Styles for the sheets built in 71-floor-order.js and 72-floor-sheets.js.
@@ -4345,7 +4350,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "7ea1caf" };
+window.SB_BUILD = { version: "0.2.0", id: "1a2a91c" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -21690,7 +21695,14 @@ window.SB_BUILD = { version: "0.2.0", id: "7ea1caf" };
     const empty = h('div', { class: 'fl-empty', hidden: true });
     const welcome = buildWelcome();
     const cabEl = h('section', { class: 'fl-cabinet', hidden: true, 'aria-label': 'Hold cabinet' }, h('h2', { class: 'visually-hidden' }, 'Hold cabinet'));
-    const main = h('main', { class: 'fl-main', id: 'fl-board', tabindex: -1, 'aria-label': 'Tickets' }, h('h1', { class: 'visually-hidden' }, 'Smokebox kitchen board'), welcome, grid, empty, cabEl);
+    // While one station is showing, a bar says so in words, with a one-tap way back: a ticket on a station tab lists only that
+    // station's dishes, and without the bar a cook can take a five-dish order for a one-dish one.
+    const stationText = h('span', { class: 'fl-station-t' });
+    // Show all goes back to every station's tickets.
+    const showAll = h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'show-all' }, onClick: () => goZone('all') }, ico('grid', 18), h('span', null, 'Show all'));
+    const stationBar = h('div', { class: 'fl-station-bar', hidden: true, role: 'status' }, ico('filter', 20), stationText, showAll);
+    m.stationBar = stationBar; m.stationText = stationText;
+    const main = h('main', { class: 'fl-main', id: 'fl-board', tabindex: -1, 'aria-label': 'Tickets' }, h('h1', { class: 'visually-hidden' }, 'Smokebox kitchen board'), welcome, stationBar, grid, empty, cabEl);
 
     // ----- dock
     const dockToggle = h('button', { type: 'button', class: 'fl-dock-toggle', 'aria-expanded': 'true', 'aria-controls': 'fl-dock-list', onClick: toggleDock },
@@ -22068,6 +22080,11 @@ window.SB_BUILD = { version: "0.2.0", id: "7ea1caf" };
     if (!m.first && added.length) added.forEach((rec, i) => printIn(rec, i));
     else added.forEach((rec) => { if (m.io) m.io.observe(rec.el); });
     m.first = false;
+
+    // the one-station bar
+    const oneStation = mode === 'station' && zone !== 'cabinet';
+    setHidden(m.stationBar, !oneStation);
+    if (oneStation) setTxt(m.stationText, 'Showing ' + zoneById(zone).name + ' only. Tickets list just this station\'s dishes.');
 
     // empty state
     const empty = m.slips.size === 0;
