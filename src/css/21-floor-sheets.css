@@ -572,6 +572,9 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dp-prob:empty { display: none; }
 @media (max-width: 640px) { .dp-prow { grid-template-columns: 44px minmax(0, 1fr) minmax(8ch, 14ch); } .dp-prow select { grid-column: 2 / -1; } }
 .btn-link { background: none; border: 0; text-decoration: underline; min-height: 44px; padding-inline: 0; }
+/* The two help links at the top of Set up this device: plain underlined words with a small ?, no button frame. */
+.setup-helps { gap: var(--sp-2) var(--sp-5); margin-bottom: var(--sp-2); }
+.btn-link.setup-help { box-shadow: none; gap: 6px; }
 
 
 /* ===== Round 5: one compact cabinet card =====

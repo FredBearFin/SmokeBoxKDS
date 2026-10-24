@@ -1,5 +1,5 @@
 /*
- * WHAT THIS FILE IS: Browser check for "Get this tablet ready": opens from the Settings sheet, shows five checks,
+ * WHAT THIS FILE IS: Browser check for "Device checks": opens from the Settings sheet, shows five checks,
  * the sound test asks "Did you hear it?", answering Yes ticks sound, and volume is its own question.
  * USES: tools/pw.mjs, dist/smokebox.html. RUN: node test/tablet-ready.e2e.mjs
  */
@@ -30,7 +30,9 @@ await withPage({ w: 1024, h: 768 }, async (page, logs) => {
   ok(await page.locator('[data-act="pilot-print"]').count() === 1, 'print button present');
   await page.evaluate(() => window.SB.sheets.open('setup'));
   await page.waitForSelector('[data-act="open-ready"]');
-  ok(await page.locator('[data-act="open-pilot"]').count() === 1, 'tablet checklist links both sheets');
+  ok(await page.locator('[data-act="open-pilot"]').count() === 0, 'the setup sheet links Device checks only: the installer checklist is not shown to the owner');
+  ok(await page.locator('.setup-help', { hasText: 'Help with setup' }).count() === 1 && await page.locator('.setup-help', { hasText: 'No sound?' }).count() === 1, 'the help links say what they open in words');
+  ok(!/tablet/i.test(await page.locator('.sheet-title').last().innerText()), 'the setup title says device, not tablet');
   ok(logs.pageErrors.length === 0, 'no page errors ' + logs.pageErrors.join('|').slice(0, 200));
 });
 process.exit(fails ? 1 : 0);
