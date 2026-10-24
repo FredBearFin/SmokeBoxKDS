@@ -1,5 +1,5 @@
 /*
- * WHAT THIS FILE IS: The back office page "Menu and settings": edit the menu, ingredients, ticket time limits,
+ * WHAT THIS FILE IS: The back office page "Menu, prices and shop": edit the menu, ingredients, ticket time limits,
  *   pacing, food-safety limits, the PIN and display choices; back up, import or reset the data. Every edit goes
  *   through the engine, which can refuse it; the refusal shows beside the field and the old value stays.
  * PARTS: helpers, number field, nine panels (menu to about), then the page itself and its contents list.
@@ -1605,7 +1605,7 @@
         h('li', null, 'On the old device, if it still works: tap Download backup (JSON) in card 1 and copy the file somewhere else (email it to yourself or use a USB drive).'),
         h('li', null, 'On the new device: copy the same smokebox.html file onto it and open it. Install it as an app (Share, then Add to Home Screen, or Install app).'),
         h('li', null, 'Run Menu, then Set up this tablet. Sound, screen-on and loudness are per device and are redone here.'),
-        h('li', null, 'Open Back office, then Menu and settings, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.'),
+        h('li', null, 'Open Back office, then Menu, prices and shop, then Data. In card 2 choose the backup file, read what is inside and tap Replace everything with this backup.'),
         h('li', null, 'Check the board and your dishes. Take a fresh backup from the new device, then retire the old one.')),
       h('p', { class: 'od-hint' }, 'If the old device is broken and you have no backup file, its data cannot be recovered. This is why a daily backup matters.'));
 
@@ -2064,5 +2064,5 @@
   }
 
   SB.dataPage = { saveFile, inspectBackup, backupReason, starterCount, version: 1 };
-  if (SB.office && typeof SB.office.registerPage === 'function') SB.office.registerPage('data', { title: 'Menu and settings', icon: 'sliders', order: 7, render });
+  if (SB.office && typeof SB.office.registerPage === 'function') SB.office.registerPage('data', { title: 'Menu, prices and shop', icon: 'sliders', order: 7, render });
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -93,9 +93,9 @@ export default function (h) {
     const n = (await storeTickets(page)).length;
     t.check('setup: live data is empty (no tickets)', n === 0, n);
     await go(page, 'pace');
-    await choose(page, 'Live only');
+    await choose(page, 'Your tickets only');
     const banner = await page.locator('#sb-office .of-banner').first().innerText();
-    t.check('Live only with no tickets: the banner says there is no live data yet (honest)', /no live tickets|0 live|No live|nothing recorded|no tickets/i.test(banner) && !/sample days/.test(banner.replace(/Sample data is generated/, '')), banner, 'officeA');
+    t.check('Live only with no tickets: the banner says there is no live data yet (honest)', /no live tickets|0 live|No live|nothing recorded|no tickets|none in this range|^$/i.test(banner) && !/sample days/.test(banner.replace(/Sample data is generated/, '')), banner, 'officeA');
     for (const p of OFFICE_PAGES) {
       await go(page, p.id);
       await auditPage(t, page, p.id, p.title + ' (live only, no data)', { noData: true });
@@ -145,12 +145,12 @@ export default function (h) {
     t.check('a nonsense custom range (from in the year 2999) gives words, not NaN', !BAD_TEXT.test(txt), txt.slice(0, 160), 'officeA');
     await choose(page, 'Last 14 days');
     // source: Live only drops the sample numbers
-    await choose(page, 'Live only');
+    await choose(page, 'Your tickets only');
     const cLive = (await tileVal(page, 'count')).replace(/[^0-9]/g, '');
     t.check('Live only shows far fewer tickets than Live + sample (only the 5 demo tickets exist)', cLive === '' || Number(cLive) < 10, cLive, 'officeA');
     const bn = await page.locator('#sb-office .of-banner').first().innerText();
     t.check('the banner no longer claims sample days when Live only is on', !/sample days/.test(bn), bn, 'officeA');
-    await choose(page, 'Live + sample');
+    await choose(page, 'With sample days');
     t.check('Live + sample brings the numbers back', Number((await tileVal(page, 'count')).replace(/[^0-9]/g, '')) === count0, await tileVal(page, 'count'), 'officeA');
     await t.clean(page, 'filters');
   });

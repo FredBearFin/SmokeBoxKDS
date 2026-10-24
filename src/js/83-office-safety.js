@@ -382,7 +382,7 @@
     // ---------- the rules, live from settings ----------
     page.section('The limits behind all this', 'These are the limits the kitchen screens enforce right now. They come from your settings.');
     const rules = page.panel({
-      span: 12, title: 'What the rules are', sub: 'Read live from Menu and settings',
+      span: 12, title: 'What the rules are', sub: 'Read live from Menu, prices and shop',
       caption: 'The exact limits behind every green, amber and red above. If the limits do not match your local health code, change them in settings.',
       // Builds the list of limits once; update rewrites the text from the live settings.
       render: (body, p0) => {
@@ -391,8 +391,8 @@
         const nodes = {};
         keys.forEach((k) => { const t = h('span', { class: 'ob-rule-t' }), d = h('span', { class: 'ob-rule-d' }); ul.appendChild(h('li', { class: 'ob-rule', dataset: { k } }, t, d)); nodes[k] = { t, d }; });
         const note = h('p', { class: 'ob-note ob-note--accent', dataset: { k: 'difference' } });
-        // Takes the owner to Menu and settings, where these limits are changed.
-        const go = kit.button({ label: 'Change these in Menu and settings', icon: 'sliders', onClick: () => ctx.navigate('data') });
+        // Takes the owner to Menu, prices and shop, where these limits are changed.
+        const go = kit.button({ label: 'Change these in Menu, prices and shop', icon: 'sliders', onClick: () => ctx.navigate('data') });
         const line = h('p', { class: 'ob-safetyline', dataset: { k: 'safetyline' } }, (SB.config && SB.config.safetyLine) || '');
         body.append(ul, note, h('div', { class: 'ob-actions' }, go), line);
         // Formats a temperature limit for display.

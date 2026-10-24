@@ -8,5 +8,5 @@ Print this card and keep it by the tablet.
 - [ ] Bumped by mistake: Recall it from the board header
 - [ ] Wrong ticket: cancel it with Void ticket in its small menu, and give a reason
 - [ ] Dish missing: check the 86 board and Dishes and prices
-- [ ] Opened empty: restore the last backup (Back office, Menu and settings)
+- [ ] Opened empty: restore the last backup (Back office, Menu, prices and shop)
 - [ ] Forgot the PIN: use your recovery code (Guide, Empty, lost or locked)

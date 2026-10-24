@@ -72,6 +72,7 @@ a.of-nav:active { background: var(--press); }
 .of-fnote { font-size: var(--fs-1); color: var(--ink3); }
 .of-banner { display: flex; align-items: center; gap: var(--sp-2); margin: 0 auto; padding: var(--sp-1) var(--of-gut) var(--sp-3); font-size: var(--fs-2); line-height: 1.35; color: var(--ink2); }
 .of-banner-t { min-width: 0; }
+.of-banner[hidden] { display: none; }
 .of-chip {
   flex: none; display: inline-flex; align-items: center; min-height: 22px; padding: 0 var(--sp-2); font-size: var(--fs-1); font-weight: var(--w-semi); line-height: 1;
   color: var(--amber-ink); border: 1px solid var(--amber); border-radius: var(--r-pill); white-space: nowrap;
@@ -322,7 +323,7 @@ a.of-nav:active { background: var(--press); }
 }
 /* Ticket numbers in the table are links; the padding grows the hit area without moving the rows. */
 .of-rowbtn { padding-block: 5px; margin-block: -5px; }
-/* Reset buttons in Menu and settings match the other big buttons. */
+/* Reset buttons in Menu, prices and shop match the other big buttons. */
 .of .btn-danger { min-height: 44px; }
 
 /* The at-a-glance panel (SB.office.glance): five cards in two columns on a phone, one row on a wide screen. */

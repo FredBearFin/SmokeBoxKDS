@@ -26,6 +26,6 @@ Warnings cannot sound while the screen is off. Smokebox asks the browser to keep
 
 - A strip says the tablet's clock jumped ahead? Smokebox keeps the old time, so tickets and timers keep running. Tap **Keep the old time** to hide it for 10 minutes and fix the clock in the device settings. Tap **Use the new time** only if the new time is right. It asks once more before anything changes.
 - Check the date range and the filters at the top of the Back office page.
-- Choose **Live only** to leave out the sample history, which is made up.
+- If sample days are switched on, choose **Your tickets only** to leave them out: sample days are made up.
 - Unpaid orders are not counted as money collected.
 - Starter estimates (prep times, yields, costs) are guesses until you confirm them.

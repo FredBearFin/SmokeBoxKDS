@@ -65,7 +65,7 @@ const PAGE_TABLE = [
   { id: 'pace', title: 'Speed', icon: 'gauge', order: 1 }, { id: 'tickets', title: 'Tickets', icon: 'receipt', order: 2 },
   { id: 'stations', title: 'Stations', icon: 'layers', order: 3 }, { id: 'money', title: 'Sales and money', icon: 'dollar', order: 4 },
   { id: 'safety', title: 'Safety', icon: 'shield-check', order: 5 }, { id: 'stock', title: 'Stock and 86', icon: 'package', order: 6 },
-  { id: 'data', title: 'Menu and settings', icon: 'sliders', order: 7 },
+  { id: 'data', title: 'Menu, prices and shop', icon: 'sliders', order: 7 },
 ];
 const PAGE_FILE = { pace: '81-office-pace.js', tickets: '81-office-pace.js', stations: '81-office-pace.js', money: '82-office-money.js', safety: '83-office-safety.js', stock: '85-office-stock.js', data: '84-office-data.js' };
 const SHEET_NAMES = 'order hold board86 recall demo help specs menu'.split(' ');

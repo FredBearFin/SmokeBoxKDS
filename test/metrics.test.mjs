@@ -904,7 +904,7 @@ describe('insights: structure, guards and determinism', () => {
   });
   it('without a matching learned estimate the finding tells the owner to confirm instead', () => {
     const d = craft(40); d.learned = {};
-    assert.match(find(d, 'calibration-drift').body, /Confirm the new time in Menu and settings/);
+    assert.match(find(d, 'calibration-drift').body, /Confirm the new time in Menu, prices and shop/);
   });
   it('sellout-early names the time, hours before close and a gram-based shortfall estimate', () => {
     const f = find(craft(40), 'sellout-early');

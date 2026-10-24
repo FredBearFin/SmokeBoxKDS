@@ -1613,7 +1613,7 @@
       const planned = r.learnedSec !== null && Math.abs(r.learnedSec - r.observedSec) / r.observedSec <= 0.15 && c.pacingCfg.enabled !== false;
       const tail = others > 0 ? ' ' + others + ' other ' + U.plural(others, 'item') + ' also drift.' : '';
       if (r.drift === 'slow') return F(this.id, r.ratio >= 1.6 ? 'bad' : 'warn', 58 + Math.min(20, (r.ratio - 1) * 20), r.name + ' takes ' + mmss(r.observedSec * 1000) + ' on your line',
-        'That is ' + mmss(r.deltaSec * 1000) + ' over the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples). ' + (planned ? 'Finish together now plans for it.' : r.learnedSec !== null ? 'Pacing plans for ' + mmss(r.learnedSec * 1000) + ' so far; confirm the new time in Menu and settings.' : 'Confirm the new time in Menu and settings.') + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
+        'That is ' + mmss(r.deltaSec * 1000) + ' over the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples). ' + (planned ? 'Finish together now plans for it.' : r.learnedSec !== null ? 'Pacing plans for ' + mmss(r.learnedSec * 1000) + ' so far; confirm the new time in Menu, prices and shop.' : 'Confirm the new time in Menu, prices and shop.') + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
       return F(this.id, 'info', 40, r.name + ' is quicker than planned',
         r.name + ' takes ' + mmss(r.observedSec * 1000) + ', ' + mmss(-r.deltaSec * 1000) + ' under the starter estimate of ' + mmss(r.starterSec * 1000) + ' (' + r.n + ' samples), so Finish together may fire it too early.' + tail, { label: 'Observed over starter', value: r.ratio, unit: 'ratio' });
     } },

@@ -272,15 +272,15 @@
   function backupNow(status) {
     let text = null;
     try { text = SB.store.exportAll(); } catch (e) { text = null; }
-    if (text == null) { status.textContent = 'A backup could not be made. Nothing was saved. Open Menu and settings, then Data, to try again.'; return; }
+    if (text == null) { status.textContent = 'A backup could not be made. Nothing was saved. Open Menu, prices and shop, then Data, to try again.'; return; }
     const fname = 'smokebox-backup-' + U.dateKey(Date.now()) + '.json';
     try {
       const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
       const a = h('a', { href: url, download: fname }); document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 4000);
-      status.textContent = 'Download started: ' + fname + '. If nothing arrives, your browser may be blocking downloads: use Menu and settings, then Data, then Copy backup.';
+      status.textContent = 'Download started: ' + fname + '. If nothing arrives, your browser may be blocking downloads: use Menu, prices and shop, then Data, then Copy backup.';
       try { if (SB.shell && SB.shell.noteBackup) SB.shell.noteBackup(); } catch (e) { /* the reminder is optional */ }
-    } catch (e) { status.textContent = 'Your browser blocked the download. Use Menu and settings, then Data, then Copy backup.'; }
+    } catch (e) { status.textContent = 'Your browser blocked the download. Use Menu, prices and shop, then Data, then Copy backup.'; }
   }
 
   // ---- 3. Printing ----

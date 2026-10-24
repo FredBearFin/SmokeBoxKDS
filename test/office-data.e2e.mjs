@@ -1,4 +1,4 @@
-// Office C end-to-end test: the back office page "Menu and settings" (src/js/84-office-data.js).
+// Office C end-to-end test: the back office page "Menu, prices and shop" (src/js/84-office-data.js).
 // Run: node test/office-data.e2e.mjs [--only=<group substring>] [--no-shots] [--vp=w280] (--vp redoes one screenshot size)
 //
 // Builds a private bundle dist/officeC.html with ONLY what this page needs (tokens, base CSS, util, config, icons, engine, store, metrics, charts, shell,
@@ -156,8 +156,8 @@ group('1. Page, headline and contents list', async () => {
       hasTestHook: typeof SB.dataPage.saveFile,
     }));
     check('84-office-data.js loads without a module error', !r.loadErrors.includes('84-office-data.js'), r.loadErrors);
-    check('registered as page "data", title "Menu and settings"', r.registered && r.registered.ready === true && r.registered.title === 'Menu and settings' && r.registered.icon === 'sliders', r.registered);
-    check('frame title row says Menu and settings', r.title === 'Menu and settings', r.title);
+    check('registered as page "data", title "Menu, prices and shop"', r.registered && r.registered.ready === true && r.registered.title === 'Menu, prices and shop' && r.registered.icon === 'sliders', r.registered);
+    check('frame title row says Menu, prices and shop', r.title === 'Menu, prices and shop', r.title);
     check('nine panels in order', JSON.stringify(r.panels) === JSON.stringify(['od-menu', 'od-look', 'od-pin', 'od-ingredients', 'od-times', 'od-safety', 'od-data', 'od-about', 'od-pacing']), r.panels);
     check('contents list has nine entries with plain words', r.toc.length === 9 && r.toc.every((t) => /^[A-Z][a-z]/.test(t) || t === 'PIN'), r.toc);
 
@@ -1179,7 +1179,7 @@ group('15. UI ranges match the engine (min, max, just outside)', async () => {
 /* ====================================================================================================================
  * run
  * ================================================================================================================== */
-console.log('Office C: Menu and settings, end-to-end');
+console.log('Office C: Menu, prices and shop, end-to-end');
 for (const g of groups) {
   if (ONLY && !g.title.toLowerCase().includes(ONLY)) continue;
   currentGroup = g.title;

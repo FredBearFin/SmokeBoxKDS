@@ -96,7 +96,7 @@
       container.insertBefore(glanceHost, page.el);
       const glance = typeof O.glance === 'function' ? O.glance(glanceHost) : null;
       page.headline();
-      page.how('These numbers come from tickets that were sent out in the range above. Ticket time runs from when the ticket was entered until it was sent out, and the middle ticket is the typical one: half the tickets were faster. Slowest 1 in 10 is the time that nine in ten tickets beat. On time means a ticket finished before its warning time, which depends on the order type (Menu and settings, Time limits). Tickets per hour is tickets placed divided by the hours in which at least one ticket was placed.');
+      page.how('These numbers come from tickets that were sent out in the range above. Ticket time runs from when the ticket was entered until it was sent out, and the middle ticket is the typical one: half the tickets were faster. Slowest 1 in 10 is the time that nine in ten tickets beat. On time means a ticket finished before its warning time, which depends on the order type (Menu, prices and shop, Time limits). Tickets per hour is tickets placed divided by the hours in which at least one ticket was placed.');
       page.tiles(paceTiles());
 
       page.card({
@@ -409,7 +409,7 @@
     render(container, ctx) {
       const page = K.page(container, ctx, { id: 'stations' });
       page.headline();
-      page.how('Each item on a ticket belongs to one station. A ticket counts at the station whose item finished last. Waiting means the time between an item being sent to the station and a cook starting it; work is the time the cook spent on it. Prep times are compared with the starter estimates in Menu and settings, and only items with at least 5 finished lines are judged.');
+      page.how('Each item on a ticket belongs to one station. A ticket counts at the station whose item finished last. Waiting means the time between an item being sent to the station and a cook starting it; work is the time the cook spent on it. Prep times are compared with the starter estimates in Menu, prices and shop, and only items with at least 5 finished lines are judged.');
       page.tiles([
         { id: 'overdue', kpi: 'overdue', label: 'Overdue tickets' },
         { id: 'spread', kpi: 'avgSpreadMs', label: 'First to last item' },
@@ -478,7 +478,7 @@
         // The dumbbell card: starter, learned and observed prep time for each item. The subtitle counts
         // items with enough samples.
         type: 'dumbbell', span: 12, title: 'Prep times: starter, learned and observed', sub: (p) => { const n = M.calibration(p).filter((r) => !r.thin).length; return 'The dot you set against the dot the line really did. ' + (n ? 'Showing the ' + Math.min(12, n) + ' items that differ most' + (n > 12 ? ' of ' + n : '') + '. ' : '') + 'Items with fewer than 5 samples are left out.'; },
-        caption: 'A row marked slower or quicker is off the starter estimate by more than a quarter. Confirm the new time in Menu and settings and pacing will plan for it.',
+        caption: 'A row marked slower or quicker is off the starter estimate by more than a quarter. Confirm the new time in Menu, prices and shop and pacing will plan for it.',
         empty: { title: 'Not enough finished items to judge prep times', body: 'Each item needs at least 5 finished lines in this range. A longer range gives it more to work with.', icon: 'timer' },
         // The 12 items whose observed time differs most from the starter estimate. A flag marks those off
         // by a quarter or more.

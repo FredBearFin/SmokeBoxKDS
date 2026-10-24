@@ -525,8 +525,8 @@
       render: (body, p0) => {
         const list = h('ul', { class: 'ob-list', 'aria-label': 'Items with no recorded cost' });
         const none = h('p', { class: 'ob-note', hidden: true });
-        // Opens the Menu and settings page, where a missing cost is entered.
-        const go = kit.button({ label: 'Open Menu and settings', icon: 'sliders', onClick: () => ctx.navigate('data') });
+        // Opens the Menu, prices and shop page, where a missing cost is entered.
+        const go = kit.button({ label: 'Open Menu, prices and shop', icon: 'sliders', onClick: () => ctx.navigate('data') });
         const goWrap = h('div', { class: 'ob-actions' }, go);
         // How much of what sold the Food cost tile really covers, since it leaves out items with no cost.
         const cov = h('p', { class: 'ob-note', hidden: true });
@@ -787,7 +787,7 @@
 
     const salesOf = B.memoP((p) => M.sales(p));
     page.headline();
-    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu and settings (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Food cost is ingredient cost as a share of menu price, counted only over items with a cost on file. Every figure is added up in whole cents from the paid orders themselves.');
+    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu, prices and shop (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Food cost is ingredient cost as a share of menu price, counted only over items with a cost on file. Every figure is added up in whole cents from the paid orders themselves.');
 
     page.tiles([
       // The one main money figure: sales after discounts from paid orders (blank until an order is paid).
