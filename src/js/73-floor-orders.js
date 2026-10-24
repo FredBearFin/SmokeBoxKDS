@@ -136,6 +136,7 @@
     if (SB.office && typeof SB.office.openCloseDay === 'function') {
       sheet.footer.classList.add('ox-foot');
       sheet.footer.append(h('p', { class: 'ox-foot-note' }, 'Service over? Close the day counts the money and offers a backup.'),
+        // Closes Orders, then opens the end-of-day screen from the back office code.
         h('button', { type: 'button', class: 'btn', dataset: { act: 'closeday' }, onClick: () => { sheet.close('closeday'); setTimeout(() => SB.office.openCloseDay(), 60); } }, ico('check-circle', 20), h('span', null, 'Close the day')));
       sheet.footer.hidden = false;
     }

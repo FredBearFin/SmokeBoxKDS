@@ -673,6 +673,7 @@
     // an empty menu starts on the add form.
     const addHead = h('h3', { class: 'fs-h dp-h dp-addh' }, 'Add a dish');
     const hasDishes = activeDishes().length > 0;
+    // Add a dish scrolls down to the form and puts the cursor in the name box.
     const jump = h('button', { type: 'button', class: 'btn dp-jump', dataset: { act: 'jump-add' }, hidden: !hasDishes, onClick: () => { addHead.scrollIntoView({ block: 'start', behavior: 'smooth' }); nameIn.focus({ preventScroll: true }); } }, ico('plus', 20), h('span', null, 'Add a dish'));
     const top = h('div', { class: 'fs-row dp-top' }, lead, jump);
     if (hasDishes) root.append(top, dishesHead, undoBar, listBox, goneFold, addHead, form, caBox, svBox, ways, h('div', { class: 'fs-row dp-links' }, shopBtn, fullBtn));
