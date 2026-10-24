@@ -290,14 +290,14 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   await boot(page, 'money', { ds: noCost });
   const nc = await card(page, 'Cost not recorded').textContent();
   check('cost not recorded: the item is listed with the words "Cost not recorded" and its sales', /Pit beans with burnt ends/.test(nc) && (nc.match(/Cost not recorded/g) || []).length >= 2 && /\d+ sold/.test(nc), nc.slice(0, 300));
-  check('cost not recorded: a button to Menu and settings is offered', /Open Menu and settings/.test(nc));
+  check('cost not recorded: a button to Menu, prices and shop is offered', /Open Menu, prices and shop/.test(nc));
   const lbl = await svgLabel(page, 'Margin by item');
   const tbl = await page.evaluate(() => { const c = [...document.querySelectorAll('.of-card')].find((x) => /Margin by item/.test(x.textContent) && x.dataset.type === 'bar'); c.querySelector('.ch-tbtn').click(); return c.querySelector('.ch-tblwrap').textContent; });
   check('margin chart leaves the item out; it is never shown as zero', tbl.indexOf('Pit beans') < 0 && !/Pit beans.*\$0\.00/.test(tbl), tbl.slice(0, 200));
   check('no NaN or undefined anywhere', !BAD_TEXT.test(await mainText(page)));
-  await page.locator('.of-card', { has: page.locator('.of-card-title', { hasText: 'Cost not recorded' }) }).locator('button', { hasText: 'Open Menu and settings' }).click();
+  await page.locator('.of-card', { has: page.locator('.of-card-title', { hasText: 'Cost not recorded' }) }).locator('button', { hasText: 'Open Menu, prices and shop' }).click();
   await wait(500);
-  check('the button goes to Menu and settings', (await page.evaluate(() => location.hash)) === '#/office/data', await page.evaluate(() => location.hash));
+  check('the button goes to Menu, prices and shop', (await page.evaluate(() => location.hash)) === '#/office/data', await page.evaluate(() => location.hash));
   noErrors('no-cost items', logs);
 });
 
@@ -390,9 +390,9 @@ await withPage({ file: FILE, w: 1280, h: 800, hash: '#/' }, async (page, logs) =
   const joined2 = await page.evaluate(() => [...document.querySelectorAll('.ob-rule')].map((r) => r.textContent).join(' | '));
   check('rules follow the settings live (140 F, every 20 minutes)', /140/.test(joined2) && /every 20 minutes/.test(joined2), joined2.slice(0, 200));
   check('the meter explanation follows the settings too', /within 20 minutes/.test(await card(page, 'Temperature checks on time').locator('.of-card-sub').textContent()));
-  await page.locator('.ob-actions .btn', { hasText: 'Change these in Menu and settings' }).click();
+  await page.locator('.ob-actions .btn', { hasText: 'Change these in Menu, prices and shop' }).click();
   await wait(500);
-  check('rules: the button goes to Menu and settings', (await page.evaluate(() => location.hash)) === '#/office/data');
+  check('rules: the button goes to Menu, prices and shop', (await page.evaluate(() => location.hash)) === '#/office/data');
   noErrors('safety', logs);
 });
 

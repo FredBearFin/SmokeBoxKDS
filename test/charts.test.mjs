@@ -237,7 +237,7 @@ describe('named formats', () => {
     assert.equal(F.compact.axis(999950), '1M', 'rounds up into the next unit, never 1000K'); assert.equal(F.compact.axis(999950000), '1B');
   });
   it('g switches to kg at 1000', () => {
-    assert.equal(F.g.full(700), '700 g'); assert.equal(F.g.full(9800), '9.80 kg'); assert.equal(F.g.axis(14000), '14 kg'); assert.equal(F.g.axis(500), '500 g');
+    assert.equal(F.g.full(700), '700 g'); assert.equal(F.g.full(9800), '9.8 kg'); assert.equal(F.g.axis(14000), '14 kg'); assert.equal(F.g.axis(500), '500 g');
   });
   it('hour formats decimal hours 0-30 as clock time, past midnight wraps', () => {
     assert.equal(F.hour.axis(13), '1 pm'); assert.equal(F.hour.axis(0), '12 am'); assert.equal(F.hour.axis(12), '12 pm'); assert.equal(F.hour.axis(25), '1 am');

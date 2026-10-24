@@ -3,13 +3,16 @@
  * SB.officeB, the small helper set that the Safety and Stock pages share.
  * PARTS: 1 plain helpers (no screen needed), 2 screen helpers (menus, switches, verdict box), 3 the page.
  * USES: 40-metrics.js, 80-office-core.js.   USED BY: 83-office-safety.js, 85-office-stock.js, the office frame.
- * KEPT: g or kg only, money via kit.fmt.money, a missing cost is "not recorded", never 0.  TRAP: SB.metrics
+ * KEPT: weights via kit.fmt.g (kg or lb, as the owner chose), money via kit.fmt.money, a missing cost is "not recorded", never 0.  TRAP: SB.metrics
  * percents are fractions (0 to 1) except thermal() hotPct and chilledPct (0 to 100).
  */
 (function (g) {
   'use strict';
   const SB = (g.SB = g.SB || {});
   const U = SB.util;
+  // A cost per kilogram shown per pound when the owner weighs in pounds (settings, Weights), and the unit word to match.
+  const perW = (v) => (typeof v === 'number' && isFinite(v) && U.units && U.units.weight === 'lb' ? v * 0.45359237 : v);
+  const wWord = () => (U.units && U.units.weight === 'lb' ? 'lb' : 'kg');
   const B = (SB.officeB = SB.officeB || {});
   // True only for a real, finite number (not NaN, not text that looks like a number).
   const isNum = (n) => typeof n === 'number' && isFinite(n);
@@ -177,7 +180,7 @@
   B.setText = setText;
 
   /** Where the numbers on a card come from, in one line: the range, the channel (when it applies)
-   *  and whether sample data is in. */
+   *  and, only when they are mixed in, the sample days. */
   B.scopeText = (ctx, o) => {
     o = o || {};
     const F = ctx.filters; let ds = null;
@@ -185,7 +188,8 @@
     const sample = ds && ds.counts ? ds.counts.sample : 0;
     const parts = [F.range.label];
     if (!o.noChannel && F.channel !== 'all') { const c = SB.config && SB.config.channelById && SB.config.channelById[F.channel]; parts.push(c ? c.name : F.channel); }
-    parts.push(F.source === 'all' && sample > 0 ? 'sample and live data' : 'live data only');
+    // Sample days are only named when they are mixed in; otherwise every number is the owner's own.
+    if (F.source === 'all' && sample > 0) parts.push('with sample days');
     return parts.join(', ');
   };
 
@@ -384,19 +388,19 @@
             // A tiny gap prints as "less than 0.1" so the sentence never claims an exact 0.0 percent.
             const abs = Math.abs(err) * 100;
             setText(big, 'If you had priced ' + name + ' with the static yield you would have been off by ' + (abs < 0.05 ? 'less than 0.1' : abs.toFixed(1)) + '%.');
-            setText(detail, 'The static ' + fmt.pct(y.staticYield, 0) + ' yield puts ' + name + ' at ' + fmt.money(y.staticCostPerCookedKg, 2) + ' per cooked kg. The true figure is ' + fmt.money(y.trueCostPerCookedKg, 2) + ' per cooked kg, so the static yield ' + (err > 0 ? 'overstates' : err < 0 ? 'understates' : 'matches') + ' the cost.');
+            setText(detail, 'The static ' + fmt.pct(y.staticYield, 0) + ' yield puts ' + name + ' at ' + fmt.money(perW(y.staticCostPerCookedKg), 2) + ' per cooked ' + wWord() + '. The true figure is ' + fmt.money(perW(y.trueCostPerCookedKg), 2) + ' per cooked ' + wWord() + ', so the static yield ' + (err > 0 ? 'overstates' : err < 0 ? 'understates' : 'matches') + ' the cost.');
           } else {
-            setText(big, 'The cost of ' + name + ' per cooked kilogram could not be worked out.');
+            setText(big, 'The cost of ' + name + ' per cooked ' + (wWord() === 'lb' ? 'pound' : 'kilogram') + ' could not be worked out.');
             setText(detail, 'A raw cost per kilogram is needed for this comparison.');
           }
           stats.set([
-            { k: 'static', label: 'Static ' + (isNum(y.staticYield) ? fmt.pct(y.staticYield, 0) : ''), value: isNum(y.staticCostPerCookedKg) ? fmt.money(y.staticCostPerCookedKg, 2) : 'Not known', note: 'per cooked kg' },
-            { k: 'model', label: 'Model ' + (isNum(y.modelYield) ? fmt.pct(y.modelYield, 1) : ''), value: isNum(y.modelCostPerCookedKg) ? fmt.money(y.modelCostPerCookedKg, 2) : 'Not known', note: 'per cooked kg' },
-            { k: 'real', label: 'Your batches ' + (isNum(y.realisedYield) ? fmt.pct(y.realisedYield, 1) : ''), value: isNum(y.realisedCostPerCookedKg) ? fmt.money(y.realisedCostPerCookedKg, 2) : 'No weighed batches', note: isNum(y.realisedCostPerCookedKg) ? 'per cooked kg' : 'weigh raw and cooked to add this' },
+            { k: 'static', label: 'Static ' + (isNum(y.staticYield) ? fmt.pct(y.staticYield, 0) : ''), value: isNum(y.staticCostPerCookedKg) ? fmt.money(perW(y.staticCostPerCookedKg), 2) : 'Not known', note: 'per cooked ' + wWord() },
+            { k: 'model', label: 'Model ' + (isNum(y.modelYield) ? fmt.pct(y.modelYield, 1) : ''), value: isNum(y.modelCostPerCookedKg) ? fmt.money(perW(y.modelCostPerCookedKg), 2) : 'Not known', note: 'per cooked ' + wWord() },
+            { k: 'real', label: 'Your batches ' + (isNum(y.realisedYield) ? fmt.pct(y.realisedYield, 1) : ''), value: isNum(y.realisedCostPerCookedKg) ? fmt.money(perW(y.realisedCostPerCookedKg), 2) : 'No weighed batches', note: isNum(y.realisedCostPerCookedKg) ? 'per cooked ' + wWord() : 'weigh raw and cooked to add this' },
           ]);
           setText(src, y.truthSource === 'realised'
-            ? 'True cost per cooked kg: ' + fmt.money(y.trueCostPerCookedKg, 2) + ', from ' + y.batches + ' weighed ' + B.plural(y.batches, 'batch', 'batches') + ' (' + fmt.g(y.rawG) + ' raw became ' + fmt.g(y.cookedG) + ' cooked). Raw cost ' + fmt.money(y.costPerKgRaw, 2) + ' per kg is a starter figure.'
-            : 'True cost per cooked kg: ' + (isNum(y.trueCostPerCookedKg) ? fmt.money(y.trueCostPerCookedKg, 2) : 'not known') + ', from the Texas A&M model because no batch in this range was weighed. Raw cost is a starter figure.');
+            ? 'True cost per cooked ' + wWord() + ': ' + fmt.money(perW(y.trueCostPerCookedKg), 2) + ', from ' + y.batches + ' weighed ' + B.plural(y.batches, 'batch', 'batches') + ' (' + fmt.g(y.rawG) + ' raw became ' + fmt.g(y.cookedG) + ' cooked). Raw cost ' + fmt.money(perW(y.costPerKgRaw), 2) + ' per ' + wWord() + ' is a starter figure.'
+            : 'True cost per cooked ' + wWord() + ': ' + (isNum(y.trueCostPerCookedKg) ? fmt.money(perW(y.trueCostPerCookedKg), 2) : 'not known') + ', from the Texas A&M model because no batch in this range was weighed. Raw cost is a starter figure.');
         };
         paint(p0);
         return { update: paint };
@@ -429,7 +433,7 @@
         const controls = h('div', { class: 'ob-wi-ctl' }, fld('End temperature, 75 to 90 \u00B0C', sT), fld('Hold time, 0 to 3 hours', sH), fld('Raw weight put in to cook', sW));
         // One result tile: returns its list item and the two text spans to fill in later.
         const out = (k, label) => { const v = h('span', { class: 'ob-stat-v num', 'data-out': k }), n = h('span', { class: 'ob-stat-n' }); return { li: h('li', { class: 'ob-stat' }, h('span', { class: 'ob-stat-l' }, label), v, n), v, n }; };
-        const oHot = out('hot', 'Hot yield'), oChill = out('chilled', 'Chilled yield'), oCooked = out('cooked', 'Cooked weight'), oCost = out('cost', 'True cost per cooked kg');
+        const oHot = out('hot', 'Hot yield'), oChill = out('chilled', 'Chilled yield'), oCooked = out('cooked', 'Cooked weight'), oCost = out('cost', 'True cost per cooked ' + wWord());
         const outs = h('ul', { class: 'ob-stats ob-stats--4', 'aria-live': 'polite', 'aria-label': 'What-if result' }, oHot.li, oChill.li, oCooked.li, oCost.li);
         const vs = h('p', { class: 'ob-text', 'data-out': 'vs' });
         const name = h('p', { class: 'ob-src' });
@@ -451,11 +455,11 @@
           setText(oChill.v, t.chilledPct.toFixed(1) + '%'); setText(oChill.n, 'after chilling overnight');
           const cg = isNum(t.cookedG) ? Math.round(t.cookedG) : null;
           setText(oCooked.v, cg === null ? '-' : fmt.g(cg)); setText(oCooked.n, cg === null ? '' : fmt.g(cg) + ' from ' + fmt.g(rawG) + ' raw');
-          setText(oCost.v, isNum(t.trueCostPerCookedKg) ? fmt.money(t.trueCostPerCookedKg, 2) : 'Not known'); setText(oCost.n, isNum(rc.cost) ? 'raw cost ' + fmt.money(rc.cost, 2) + ' per kg' : 'no raw cost recorded');
+          setText(oCost.v, isNum(t.trueCostPerCookedKg) ? fmt.money(perW(t.trueCostPerCookedKg), 2) : 'Not known'); setText(oCost.n, isNum(rc.cost) ? 'raw cost ' + fmt.money(perW(rc.cost), 2) + ' per ' + wWord() : 'no raw cost recorded');
           if (isNum(rc.staticY) && cg !== null) {
             const sg = Math.round(rawG * rc.staticY);
             const diff = cg - sg;
-            setText(vs, 'The static ' + fmt.pct(rc.staticY, 0) + ' yield would give ' + fmt.g(sg) + ' cooked from the same ' + fmt.g(rawG) + ' raw' + (isNum(rc.cost) ? ' and a cost of ' + fmt.money(rc.cost / rc.staticY, 2) + ' per cooked kg' : '') + '. This cook gives ' + fmt.g(Math.abs(diff)) + (diff >= 0 ? ' more' : ' less') + '.');
+            setText(vs, 'The static ' + fmt.pct(rc.staticY, 0) + ' yield would give ' + fmt.g(sg) + ' cooked from the same ' + fmt.g(rawG) + ' raw' + (isNum(rc.cost) ? ' and a cost of ' + fmt.money(perW(rc.cost / rc.staticY), 2) + ' per cooked ' + wWord() : '') + '. This cook gives ' + fmt.g(Math.abs(diff)) + (diff >= 0 ? ' more' : ' less') + '.');
           } else setText(vs, '');
           setText(name, 'Source: Texas A&M regression, hot-hold yield; starter model, confirm against your own weighed batches. Chilled yield is the hot yield minus ' + YM.chilledDelta + ' points, never below ' + YM.chilledFloor + '%.');
         }
@@ -525,8 +529,8 @@
       render: (body, p0) => {
         const list = h('ul', { class: 'ob-list', 'aria-label': 'Items with no recorded cost' });
         const none = h('p', { class: 'ob-note', hidden: true });
-        // Opens the Menu and settings page, where a missing cost is entered.
-        const go = kit.button({ label: 'Open Menu and settings', icon: 'sliders', onClick: () => ctx.navigate('data') });
+        // Opens the Menu, prices and shop page, where a missing cost is entered.
+        const go = kit.button({ label: 'Open Menu, prices and shop', icon: 'sliders', onClick: () => ctx.navigate('data') });
         const goWrap = h('div', { class: 'ob-actions' }, go);
         // How much of what sold the Food cost tile really covers, since it leaves out items with no cost.
         const cov = h('p', { class: 'ob-note', hidden: true });
@@ -667,7 +671,7 @@
       caption: 'Sales is the food sold less discounts, and it is the number at the top of this page. Tax and tips are on top of it, and all three together are what was collected.',
       // Builds the figure rows and the notes under them; update repaints them in place.
       render: (body, p0) => {
-        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Pay an order from Orders on the kitchen board and the money shows up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
+        const empty = kit.empty({ title: 'No paid orders in this range yet', body: 'Tap the Orders button on the board and pay an order, and the money shows up here. Take an order first if there is none to pay.', icon: 'dollar' }).el;
         const stats = B.stats(body, { cls: 'ob-stats--3' });
         const open = h('p', { class: 'ob-note' });
         body.append(empty, open);
@@ -787,7 +791,7 @@
 
     const salesOf = B.memoP((p) => M.sales(p));
     page.headline();
-    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu and settings (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Food cost is ingredient cost as a share of menu price, counted only over items with a cost on file. Every figure is added up in whole cents from the paid orders themselves.');
+    page.how('Sales is the food on paid orders, less discounts, before tax and tips. Collected is sales plus tax plus tips. An order counts on the day it was paid, and the day starts at the hour set in Menu, prices and shop (4 am to begin with). Open and voided orders are not counted. Average order is sales divided by paid orders. Food cost is ingredient cost as a share of menu price, counted only over items with a cost on file. Every figure is added up in whole cents from the paid orders themselves.');
 
     page.tiles([
       // The one main money figure: sales after discounts from paid orders (blank until an order is paid).
@@ -823,7 +827,7 @@
     const { marginCard, noCost } = buildMarginSection({ page, scope, st, M, fmt, kit, itemRows, ctx });
 
     /* ---------------------------------------------------------------- dollars thrown away */
-    page.section('Dollars thrown away', 'Food that was discarded, at the cost per cooked kg recorded on each batch. Always the last 7 days against the 7 days before, whatever range is picked above.');
+    page.section('Dollars thrown away', 'Food that was discarded, at the cooked cost recorded on each batch. Always the last 7 days against the 7 days before, whatever range is picked above.');
     const weeksOf = B.memoP((p) => M.discardWeeks(p, { now: ctx.now() }));
     page.panel({
       span: 12, title: 'This week against last week',
