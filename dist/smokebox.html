@@ -1502,15 +1502,16 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
   .fl-chip-w { display: inline; }
 }
 
-/* Phones (700 px or less): the tools and chips move into the Menu button's list; the tabs and New ticket stay. Every tablet, portrait too,
-   keeps the Sanitize chip, Recall and 86 in the header (the Cabinet tab sits with the stations), so a cook never opens a menu for them. */
-@media (max-width: 700px) {
+/* Phones (480 px or less): the tools and chips move into the Menu button's list; the tabs and New ticket stay. Every tablet, a 601 px
+   portrait one too, keeps the Sanitize chip, Recall and Sold out in the header (the Cabinet tab sits with the stations), so a cook never
+   opens a menu for them. */
+@media (max-width: 480px) {
   .fl-status, .fl-tools { display: none; }
 }
 
 /* When the header is too tight for one row, the script sets data-fit: first the tab icons go, then the status chips, then the tool buttons too (all stay in the Menu list). */
-.fl-head[data-fit] .fl-seg .seg-opt .icon { display: none; }
-.fl-head[data-fit] .fl-seg .seg-opt { padding: 0 calc(12px * var(--fl-k)); }
+.fl-head[data-fit]:not([data-fit="codes"]) .fl-seg .seg-opt .icon { display: none; }
+.fl-head[data-fit]:not([data-fit="codes"]) .fl-seg .seg-opt { padding: 0 calc(12px * var(--fl-k)); }
 .fl-head[data-fit="status"] .fl-status, .fl-head[data-fit="labels"] .fl-status, .fl-head[data-fit="toollabels"] .fl-status, .fl-head[data-fit="tools"] .fl-status, .fl-head[data-fit="tools"] .fl-tools { display: none; }
 /* Next the words on Orders and Back office go, and the Demo button (their icons and counts stay; Demo is still in the Menu). */
 .fl-head[data-fit="labels"] .fl-orders-label, .fl-head[data-fit="labels"] .fl-office-label, .fl-head[data-fit="toollabels"] .fl-orders-label, .fl-head[data-fit="toollabels"] .fl-office-label, .fl-head[data-fit="tools"] .fl-orders-label, .fl-head[data-fit="tools"] .fl-office-label,
@@ -1530,8 +1531,8 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
   /* The Demo button stays in the Menu list here (the demo is not a kitchen job), so Recall and 86 have the room. */
   .fl-tools [data-tool="demo"] { display: none; }
   /* The Sanitize chip puts its two words on two lines beside the icon, so the top row still fits on a 720 px tablet. */
-  .fl-san { display: inline-grid; grid-template-columns: auto auto; align-content: center; justify-content: start; row-gap: 0; text-align: left; }
-  .fl-san > .icon { grid-row: 1 / span 2; }
+  .fl-san .fl-chip-w { display: block; }
+  .fl-san .fl-chip-t:empty { display: none; }
 }
 /* On a phone the four buttons (New ticket, Orders, Back office, Menu) need the whole row, so the logo steps aside and New ticket may shrink to fit. */
 @media (max-width: 520px) {
@@ -1665,7 +1666,7 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
 .fl-row + .fl-row > .slip-item { border-top: var(--bw-thin) solid var(--slip-rule); }
 .fl-row .slip-item { --qty-w: calc(38px * var(--fl-k)); min-height: var(--tap-lg); padding: var(--sp-2) var(--sp-3); gap: var(--sp-1) var(--sp-3); align-items: center; }
 .fl-row .slip-qty { align-self: center; }
-.fl-row .slip-qty::after { content: "\00d7"; margin-left: 1px; font-size: 0.6em; font-weight: var(--w-bold); opacity: 0.8; }
+.fl-row .slip-qty::after { content: "\00d7"; margin-left: 1px; font-size: 0.8em; font-weight: var(--w-heavy); } /* "2×": a count, never a step number */
 /* A dish name never breaks inside a word: when the longest word will not fit beside the button, the button drops to its own line. */
 .fl-row .slip-item { flex-wrap: wrap; }
 .fl-row .slip-name { flex: 1 1 0; min-width: min-content; font-size: calc(var(--fs-item) * 1.1); font-weight: var(--w-bold); line-height: 1.15; overflow-wrap: break-word; }
@@ -1876,13 +1877,12 @@ button.slip-item.fl-item { cursor: pointer; }
 .sb-shell[data-view="floor"] .toast-host, .sb-shell[data-view="floor"] .toast { pointer-events: none; }
 .sb-shell[data-view="floor"] .toast .btn { pointer-events: auto; }
 
-/* Calmer header: the sanitize chip is only an icon until a check is due within 30 minutes or is late. */
-.fl-san[data-urgent="false"] .fl-chip-t, .fl-san[data-urgent="false"] .fl-chip-w { display: none; }
-.fl-san[data-urgent="false"] { min-width: var(--tap); padding-inline: 0; justify-content: center; opacity: 0.8; }
+/* Calmer header: until a check is due within 30 minutes or is late, the sanitize chip is quiet paper, but it always says "Sanitize". */
+.fl-san[data-urgent="false"] .fl-chip-w { display: inline; }
 /* Device roles: a kitchen device shows only the board, the cabinet, 86 and Recall (plus Menu for settings and help), so
    New ticket, Orders, Demo and Back office are hidden; a front device hides the Cabinet tab. All-in-one is unchanged. */
 .fl[data-role="kitchen"] .fl-new, .fl[data-role="kitchen"] .fl-orders, .fl[data-role="kitchen"] .fl-office,
-.fl[data-role="kitchen"] [data-tool="demo"], .fl[data-role="kitchen"] .fl-demo-chip,
+.fl[data-role="kitchen"] [data-tool="demo"], .fl[data-role="kitchen"] [data-tool="front"], .fl[data-role="kitchen"] .fl-demo-chip,
 .fl[data-role="kitchen"] .fl-empty .btn-primary, .fl[data-role="kitchen"] .fl-start-demo,
 .fl[data-role="front"] .fl-seg [data-id="cabinet"] { display: none; }
 /* Wall mode (a setting, and only at 1700 px and wider): the board turns into three panes in one window. The kitchen
@@ -1998,8 +1998,7 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 
 /* A station tab with nothing on it shows no "0" bubble; the tab alone says the station is quiet. */
 .fl-seg .seg-count[data-zero="true"] { display: none; }
-/* The all-day chips fade out at the right edge so a cut-off chip reads as "scroll for more", not as a mistake. */
-.fl-dock-list { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+/* The all-day chips sit on one line of whole chips; the ones that do not fit wait behind "+N more" (see fitDock). */
 /* Wall mode keeps one notice row and no sound-pause note: the TV is for glancing, and the three panes need the height. */
 .fl[data-wall="on"] .fl-bar-pause { display: none; }
 
@@ -2115,6 +2114,84 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-station-bar { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) var(--sp-3) 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--ink); border-radius: var(--r-btn); background: var(--paper); color: var(--ink); font-weight: var(--w-heavy); font-size: var(--fs-2); }
 .fl-station-bar[hidden] { display: none; }
 .fl-station-t { flex: 1; min-width: 0; }
+
+/* ===== Tablet polish: names on tabs, plain buttons, compact notices ===== */
+/* Station tabs show the station's name; a tab too narrow for it (fitTabs) or a squeezed header shows the short code. */
+.fl-tab-code { display: none; }
+.fl-seg .seg-opt[data-short="true"] .fl-tab-full, .fl-head[data-fit] .fl-tab-full { display: none; }
+.fl-seg .seg-opt[data-short="true"] .fl-tab-code, .fl-head[data-fit] .fl-tab-code { display: inline; }
+.fl-seg .seg-opt[data-short="true"]:not([data-zone]) .icon { display: none; }
+/* The sanitize chip always names itself: "Sanitize" and its time (or "not logged") as one label with one plain space. */
+.fl-head .fl-san .fl-chip-w { display: inline; }
+.fl-san-l { white-space: nowrap; text-align: left; line-height: 1.1; }
+@media (max-width: 999.98px) { .fl-head .fl-san .fl-chip-w { display: block; } }
+/* Sold out: the small "86" sits in the corner as a hint for those who know the word. */
+.fl-tool-hint { position: absolute; top: calc(5px * var(--fl-k)); right: calc(6px * var(--fl-k)); font: var(--w-heavy) calc(11px * var(--fl-k)) / 1 var(--font-display); color: var(--ink2); }
+.fl-tool[data-tool="board86"] { min-width: calc(62px * var(--fl-k)); }
+.fl-tool[data-tool="board86"][data-tone="bad"] .fl-tool-hint { display: none; } /* the red count badge takes the corner */
+/* An empty kitchen (no dishes, no tickets): Recall, Sold out, Orders and Front counter wait for the first dish. */
+.fl[data-tools="off"] [data-tool="recall"], .fl[data-tools="off"] [data-tool="board86"], .fl[data-tools="off"] [data-tool="front"], .fl[data-tools="off"] .fl-orders { display: none; }
+/* Front counter stays in the Menu list on narrow screens, where the header has no room for it. */
+@media (max-width: 699.98px) { .fl-tools [data-tool="front"] { display: none; } }
+/* A narrow tablet (601 px portrait) drops the logo so New ticket keeps room beside Recall and Sold out. */
+@media (max-width: 699.98px) { .fl-brand { display: none; } .fl-new { min-width: 0; padding: 0 var(--sp-3); } }
+
+/* Done on a dish is a button to press: a strong ink frame and the word, unlike a finished dish's quiet green "Done". */
+.fl-act[data-act="finish"] { color: var(--ink); background: var(--slip); border: calc(3px * var(--fl-k)) solid var(--ink); box-shadow: 0 calc(3px * var(--fl-k)) 0 var(--ink); }
+.fl-act[data-act="finish"] .fl-act-top { display: none; }
+.fl-act[data-act="finish"] .fl-act-word { font-size: var(--fs-4); font-weight: var(--w-heavy); letter-spacing: 0.02em; text-transform: none; }
+.fl-main[data-density="compact"] .fl-act[data-act="finish"] { box-shadow: 0 calc(2px * var(--fl-k)) 0 var(--ink); }
+
+/* RUSH on a ticket is a solid red label, readable at a glance, not a faint tilted stamp. */
+.fl-stamp-slot .stamp, .fl-main[data-density="compact"] .fl-stamp-slot .stamp {
+  transform: none; opacity: 1; -webkit-mask: none; mask: none; outline: 0; animation: none;
+  padding: calc(3px * var(--fl-k)) calc(9px * var(--fl-k)) calc(2px * var(--fl-k)); border: 0; border-radius: calc(4px * var(--fl-k));
+  font-size: var(--fs-3); letter-spacing: 0.08em; color: var(--on-danger, #fff); background: var(--stamp);
+}
+
+/* Warning rows: one compact line (a bold name, then what to do and why) that wraps onto a second line only when it must. */
+.fl-strip-row { min-height: 44px; padding-block: calc(3px * var(--fl-k)); gap: var(--sp-3); }
+.fl-strip-text { display: block; line-height: 1.25; }
+.fl-strip-what { font-size: calc(16px * var(--fl-k) * var(--fl-far)); font-weight: var(--w-heavy); }
+.fl-strip-what::after { content: "\00a0\2014\00a0"; font-weight: var(--w-semi); }
+.fl-strip-why { display: inline; font-size: calc(15px * var(--fl-k) * var(--fl-far)); -webkit-line-clamp: unset; overflow: visible; }
+.fl-strip-row .fl-strip-when { font-size: calc(22px * var(--fl-k) * var(--fl-far)); min-width: 3.6ch; }
+.fl-strip-rowwrap .fl-strip-x { margin-block: 4px; min-height: 40px; }
+.fl[data-far="on"] .fl-strip-what { font-size: calc(16px * var(--fl-k) * var(--fl-far) * 1.25); }
+.fl[data-far="on"] .fl-strip-why { font-size: calc(15px * var(--fl-k) * var(--fl-far) * 1.25); }
+/* The sound bar is one short line. */
+.fl-strip-sound { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The all-day strip: one line of whole chips, "+N more" for the rest; opened, it wraps and scrolls inside itself. */
+.fl-dock-list { flex-wrap: wrap; overflow: hidden; max-height: calc(var(--tap) + 9px * var(--fl-k)); scrollbar-width: none; }
+.fl-dock[data-open="true"] { align-items: flex-start; }
+.fl-dock[data-open="true"] .fl-dock-list { max-height: 40vh; overflow-y: auto; }
+.fl-dock-more { flex: none; min-height: var(--tap); padding: 0 var(--sp-3); font-weight: var(--w-heavy); font-size: var(--fs-3); }
+.fl-dock-more[hidden], .fl-full[hidden] { display: none; }
+.fl-full { flex: none; min-height: var(--tap); padding: 0 var(--sp-3); gap: 6px; font-size: var(--fs-2); }
+/* A chip that does not fit keeps its place but is not seen (it counts in "+N more"). */
+.fl-dchip.is-out { visibility: hidden; }
+/* On a narrow screen Full screen is its icon only (its name stays for screen readers). */
+@media (max-width: 699.98px) { .fl-dock-sum { display: none; } .fl-dock-more { padding: 0 var(--sp-2); } .fl-full { min-width: var(--tap); padding: 0; } .fl-full > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } }
+/* The Updated stamp is for laptops and wall screens; on a tablet the dishes and Full screen need the room. */
+@media (max-width: 1199.98px) { .fl-checked { display: none; } }
+
+/* A short screen (a landscape tablet, 601 px tall): the header, tabs, notices and strip tighten so a whole ticket fits. */
+@media (max-height: 700px) {
+  .fl-head { padding-top: calc(6px * var(--fl-k)); padding-bottom: calc(5px * var(--fl-k)); row-gap: calc(6px * var(--fl-k)); border-bottom-width: calc(4px * var(--fl-k)); }
+  .fl-tool, .fl-office, .fl-orders { min-height: var(--tap); padding-block: 2px; }
+  .fl-new, .fl-menu, .fl-head .fl-chip { min-height: var(--tap); }
+  .fl-tabs { padding-top: calc(6px * var(--fl-k)); }
+  .fl-seg .seg-opt { min-height: 44px; }
+  .fl-seg .seg-opt[aria-selected="true"] { border-bottom-width: calc(6px * var(--fl-k)); }
+  .fl-strip-sound, .fl-strip-pause { min-height: 40px; padding-block: 2px; }
+  .fl-strip-bar .fl-strip-x { min-height: 40px; }
+  .fl-strip-row { min-height: 40px; }
+  .fl-dock { padding-block: calc(4px * var(--fl-k)); padding-bottom: max(calc(4px * var(--fl-k)), env(safe-area-inset-bottom)); }
+  .fl-dock-toggle, .fl-dchip, .fl-dock-more, .fl-full, .fl-dock-clear { min-height: 44px; }
+  .fl-dock-list { max-height: calc(44px + 9px * var(--fl-k)); }
+  .fl-main, .fl-main[data-density="compact"] { padding-top: var(--sp-2); }
+}
 
 /* ===== 21-floor-sheets.css ===== */
 /*
@@ -4357,7 +4434,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
+window.SB_BUILD = { version: "0.2.0", id: "4672ce5" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -4872,7 +4949,7 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
   // The settings that belong to the device, not to a kitchen (look, sound, which station this tablet shows). They
   // are the same in the demo and the real kitchen. Every other smokebox.v1 key is kitchen data and gets its own
   // copy in the demo (smokebox.demo.<name>), so the demo can never read or write the real kitchen's data.
-  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'voicename', 'callouts', 'far', 'wall', 'dock'].map((k) => 'smokebox.v1.' + k);
+  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'voicename', 'callouts', 'far', 'wall', 'dock', 'countervisit'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'sid', 'writer', 'histtrim', 'histnotice', 'sleepSnap', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
@@ -5076,6 +5153,7 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     timer: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 3h5M12 3v3M18.5 6.5l1.2-1.2"/>',
     flag: '<path d="M5 21V4"/><path d="M5 4.5h11l-1.6 3.5 1.6 3.5H5"/>',
     ban: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+    maximize: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
     zap: '<path d="M13 2.5L5 13.5h6l-1 8 8-11h-6z"/>',
     layers: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 12.5l9 5 9-5M3 16.5l9 5 9-5"/>',
     menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
@@ -6428,7 +6506,11 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     const sv = settings && isObj(settings.service) ? settings.service : C.service;
     const p = U.serviceDate(isNum(now) ? now : sz.dueAt, sv.dayStartHour).split('-').map(Number);
     const openedAt = new Date(p[0], p[1] - 1, p[2], sv.openHour, 0, 0, 0).getTime();
-    return sz.dueAt >= openedAt ? sz.dueAt : openedAt + safetyOf(settings).sanitizeEveryH * H;
+    const every = safetyOf(settings).sanitizeEveryH * H;
+    // A kitchen that has never logged a round is not late the moment it opens: the first round is due one full
+    // interval after opening (or after the kitchen was set up, when that was later).
+    if (!isNum(sz.lastAt)) return Math.max(sz.dueAt, openedAt) + every;
+    return sz.dueAt >= openedAt ? sz.dueAt : openedAt + every;
   }
 
   /* ======================================================================================================
@@ -10568,7 +10650,7 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     const left = state.batches.some((x) => x !== b && x.ing === b.ing && x.status !== 'discard' && x.canServe === true && x.remainingG > 0);
     const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' (' + U.currencySymbol() + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
     out.push({ id: 'past:' + b.id + ':' + (U.isNum(b.keepUntil) ? b.keepUntil : 0), epoch: U.isNum(b.keepUntil) ? b.keepUntil : 0, kind: 'past', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.enteredAt + E()._internal.holdLimitMs(b, state.settings.safety ? Object.assign({}, C.safety, state.settings.safety) : C.safety), msLeft: 0, rung: 0, rungs: 0, sev: 'bad',
-      consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is 86.'), action: 'Check it, then decide: keep serving or throw it out. Your food-safety plan comes first.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
+      consequence: amount + ' is past its quality limit and off the menu' + (left ? '.' : ', so ' + name + ' is sold out.'), action: 'Check it, then decide: keep serving or throw it out. Your food-safety plan comes first.', trivial: b.remainingG < TRIVIAL_G, unknown: false });
   }
   // The next closing time after now, in ms, from the service hours (a close above 24 means after midnight, so last
   // night's close can still be ahead at 12:30 am). Null once today's close has passed.
@@ -10737,12 +10819,12 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
         const trivial = b.remainingG < TRIVIAL_G || (waste != null && waste < NOTABLE_G && waste < NOTABLE_SHARE * b.remainingG);
         const usd = waste != null && U.isNum(b.costPerCookedKg) ? waste / 1000 * b.costPerCookedKg : null;
         let consequence, action;
-        const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' (' + U.currencySymbol() + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
-        const goes86 = lastOne ? ' and ' + name + ' goes 86' : '';
-        const fate = q ? 'pass its quality limit' : 'be thrown out';
+        const amount = U.weightText(b.remainingG) + (U.isNum(b.costPerCookedKg) ? ' (worth ' + U.currencySymbol() + (b.remainingG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '');
+        const goes86 = lastOne ? ', and then ' + name + ' is sold out' : '';
+        const fate = q ? 'go past its quality limit' : 'be thrown out';
         if (msLeft <= 0) { consequence = 'Expired: ' + amount + ' must be thrown out' + goes86 + '.'; action = 'Discard and log it.'; }
-        else if (waste == null) { consequence = 'Pace unknown (nothing pulled yet): up to ' + amount + ' may ' + (q ? 'pass its quality limit' : 'be thrown out') + goes86 + '.'; action = 'Use it first, and log pulls so the pace can be worked out.'; }
-        else if (waste > 50) { consequence = 'About ' + U.weightText(waste) + ' of ' + U.weightText(b.remainingG) + ' will ' + fate + (usd != null ? ' (' + U.currencySymbol() + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
+        else if (waste == null) { consequence = 'Up to ' + amount + ' may ' + fate + ' when the time is up' + goes86 + '.'; action = 'Use it first.'; }
+        else if (waste > 50) { consequence = 'About ' + U.weightText(waste) + ' of ' + U.weightText(b.remainingG) + ' will ' + fate + (usd != null ? ' (worth ' + U.currencySymbol() + usd.toFixed(0) + ')' : '') + goes86 + '.'; action = 'Sell it: run a special, tell the front.'; }
         else { consequence = 'On pace to sell all ' + U.weightText(b.remainingG) + ' in time.'; action = 'Nothing to do.'; }
         // A batch gets a row once a rung is crossed, or earlier when the pace says food will be thrown out within 2 hours.
         const isLim = !!lim && lim.limitBatchId === b.id;
@@ -10821,7 +10903,7 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
       const left = state.batches.some((x) => x.ing === b.ing && x.status !== 'discard' && x.remainingG > 0 && x.kind !== 'cooling');
       const usd = U.isNum(b.costPerCookedKg) && b.wasteG > 0 ? ' (' + U.currencySymbol() + (b.wasteG / 1000 * b.costPerCookedKg).toFixed(0) + ')' : '';
       out.push({ id: 'expired:' + b.id + ':0', epoch: 0, kind: 'expired', step: 'last', ing: b.ing, batchId: b.id, label: b.label || name, at: b.discardedAt, msLeft: b.discardedAt - now, rung: 0, rungs: 0, sev: 'bad',
-        consequence: (b.discardReason === 'expired' ? 'Expired and thrown out: ' : 'Past your limit and thrown out: ') + U.weightText(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is 86.'), action: 'Tap to confirm it is logged.', unknown: false });
+        consequence: (b.discardReason === 'expired' ? 'Expired and thrown out: ' : 'Past your limit and thrown out: ') + U.weightText(b.wasteG) + usd + (left ? '.' : '. ' + name + ' is sold out.'), action: 'Tap to confirm it is logged.', unknown: false });
     }
   }
   // Rows for batches that are being kept serving: shown from 15 minutes before the extension ends, or when the last
@@ -11095,7 +11177,7 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     else if (kind === 'ready_again') t = 'Ticket ' + d.num + ' is waiting! Ring it out now!';
     else if (kind === 'past') t = d.who + (d.many ? ' are past quality!' : ' is past quality!') + ' Check it now!';
     else if (kind === 'expired') t = d.who + ' expired! Pull it and log it now!';
-    else t = 'Heads up! ' + d.who + (d.goes86 && !d.many ? ' goes 86' : d.many ? ' expire' : ' expires') + ' in ' + (d.approx ? 'about ' : '') + dur(d.mins) + '! Act now!';
+    else t = 'Heads up! ' + d.who + (d.goes86 && !d.many ? ' runs out' : d.many ? ' expire' : ' expires') + ' in ' + (d.approx ? 'about ' : '') + dur(d.mins) + '! Act now!';
     return clipWords(spoken(t), 14);
   }
   // Picks the voice that speaks: the one the owner chose in Settings when this device still has it, else the best-sounding
@@ -19335,11 +19417,17 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
   let idx = 0, routerReady = false, pendingBacks = 0, flushTimer = 0, officePushed = false, officeEntry = null;
   const listeners = [], overlayStack = [], queued = [];
 
+  // True once the order page was opened from the board's Front counter button in this session: going back and forth
+  // to #/new after that is a visit, and never pins the tablet to order entry.
+  // The flag also lives in this browser tab's session storage, so reloading the order page during a visit does not pin.
+  const VISIT_KEY = 'smokebox.v1.countervisit';
+  let counterVisit = (() => { try { return g.sessionStorage.getItem(VISIT_KEY) === '1'; } catch (e) { return false; } })();
   // Remembers the last station viewed (memory and notebook) so a pinned tablet reopens on it.
-  // Also pins the device role when a role screen (#/kitchen, #/new) is opened.
+  // Also pins the device role when a role screen (#/kitchen, #/new) is opened, unless it is a Front counter visit.
   const rememberZone = (v) => {
     if (v.kind === 'floor') { lastZone = v.zone; if (U) U.storage.set(KEY.zone, v.zone); }
     const r = roleOfView(v);
+    if (r === 'front' && counterVisit) return;
     if (r && r !== role) { role = r; if (U) U.storage.set(KEY.role, r); }
   };
   // Our history number from the current history entry, or null if it has none. Never throws.
@@ -19436,10 +19524,12 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
   R.onChange = function (fn) { listeners.push(fn); return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; };
   R.hashFor = hashFor; R.viewFor = viewFor;
   // Moves to a view (object or hash text). The same view again does nothing, so history never grows by
-  // repeating yourself. {replace:true} rewrites the current entry instead of adding one.
+  // repeating yourself. {replace:true} rewrites the current entry instead of adding one. {visit:true} opens the
+  // order page without pinning the device role to it (the board's Front counter button).
   // WATCH OUT: listeners hear at once, but the history write may wait behind a Back jump.
   R.go = function (view, o) {
     if (!routerReady) R.init();
+    if (o && o.visit) { counterVisit = true; try { g.sessionStorage.setItem(VISIT_KEY, '1'); } catch (e) { /* this tab only */ } }
     const v = normView(view), hsh = hashFor(v), replace = !!(o && o.replace);
     if (hsh === hashFor(current)) return R.view();
     const prev = current;
@@ -21726,6 +21816,8 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
 
   // The page: header, slip area and all-day strip.
 
+  // What the Expo tab shows, in plain words, for its tooltip and for screen readers.
+  const EXPO_WHAT = 'Expo: whole tickets, ready to send out';
   // Builds the whole page once. WATCH OUT: nothing built here is replaced later; updates change
   // text and attributes only.
   function buildDom() {
@@ -21736,23 +21828,31 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     const tabOptions = TABS.map((id) => {
       if (id === 'all') return { id, label: 'All', icon: 'grid', iconSize: 20, count: 0, alert: false, alertLabel: 'has overdue tickets' };
       const z = zoneById(id);
-      return { id, label: z.code, icon: z.icon, iconSize: 20, count: 0, alert: false, alertLabel: 'has overdue tickets' };
+      return { id, label: z.name, icon: z.icon, iconSize: 20, count: 0, alert: false, alertLabel: 'has overdue tickets' };
     });
     // The Cabinet tab is not a station: it swaps the tickets for the hold cabinet, on the same screen.
     tabOptions.push({ id: 'cabinet', label: 'Cabinet', icon: 'thermometer', iconSize: 20, count: 0, alert: false, alertLabel: 'needs attention' });
     const seg = SB.ui.segmented({ kind: 'tabs', label: 'Station', options: tabOptions, value: m.zone, onChange: goZone, class: 'fl-seg' });
-    // Screen readers get the full station name and what the count means; the eye sees an icon and a code.
+    // Screen readers get the full station name and what the count means. The eye sees the station's name, or its
+    // short code (PIT, FRY) where the tab is too narrow for the name (see fitTabs).
     TABS.forEach((id) => {
       const b = seg.querySelector('[data-id="' + id + '"]');
       if (!b) return;
       if (id !== 'all') b.dataset.zone = id;
-      b.insertBefore(h('span', { class: 'visually-hidden' }, (id === 'all' ? 'All stations' : zoneById(id).long) + ', '), b.firstChild);
+      const lab = b.querySelector('.seg-label');
+      if (lab && id !== 'all') { const z = zoneById(id); U.clear(lab); lab.append(h('span', { class: 'fl-tab-full' }, z.name), h('span', { class: 'fl-tab-code', 'aria-hidden': 'true' }, z.code)); }
+      // Expo is the one tab a new cook cannot guess, so it says what it is when pointed at or read aloud.
+      if (id === 'expo') b.title = EXPO_WHAT;
+      b.insertBefore(h('span', { class: 'visually-hidden' }, (id === 'all' ? 'All stations' : id === 'expo' ? EXPO_WHAT : zoneById(id).long) + ', '), b.firstChild);
       b.appendChild(h('span', { class: 'visually-hidden fl-tab-what', dataset: { here: id === 'all' || id === 'expo' ? 'no' : 'yes' } }, tabWhat(0, id)));
     });
     const tabs = h('div', { class: 'fl-tabs' }, seg);
 
-    // The sanitize chip opens a menu to log a check; the demo chip opens the demo sheet.
-    const sanChip = h('button', { type: 'button', class: 'chip fl-chip fl-san', dataset: { tone: 'info' }, onClick: (e) => sanitiseMenu(e.currentTarget) }, ico('shield-check', 18), h('span', { class: 'fl-chip-w' }, 'Sanitize'), h('span', { class: 'fl-chip-t' }, ''));
+    // The sanitize chip opens a menu to log a check.
+    // The word and the time sit in one label with a plain space between them, so it never reads "Sanitize  not logged".
+    const sanChip = h('button', { type: 'button', class: 'chip fl-chip fl-san', dataset: { tone: 'info' }, onClick: (e) => sanitiseMenu(e.currentTarget) }, ico('shield-check', 18),
+      h('span', { class: 'fl-san-l' }, h('span', { class: 'fl-chip-w' }, 'Sanitize'), ' ', h('span', { class: 'fl-chip-t' }, '')));
+    // The demo chip opens the demo sheet.
     const demoChip = h('button', { type: 'button', class: 'chip fl-chip fl-demo-chip', dataset: { tone: 'info' }, hidden: true, onClick: () => openSheet('demo') }, ico('fast-forward', 18), h('span', { class: 'fl-chip-t' }, 'Demo'));
     const status = h('div', { class: 'fl-status' }, sanChip, demoChip);
 
@@ -21761,16 +21861,20 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
       const n = h('span', { class: 'fl-tool-n num', hidden: true });
       const lab = h('span', { class: 'fl-tool-label' }, short);
       // A tool button opens its sheet; the key in brackets in the tooltip is the shortcut.
-      const b = h('button', { type: 'button', class: 'btn fl-tool', dataset: { tool: id }, 'aria-keyshortcuts': key, onClick: () => (typeof sheet === 'function' ? sheet() : openSheet(sheet)) }, ico(icon, 24), lab, n);
-      try { SB.ui.tooltip(b, label + ' (' + key + ')'); } catch (e) { /* ignore */ }
+      const b = h('button', { type: 'button', class: 'btn fl-tool', dataset: { tool: id }, 'aria-keyshortcuts': key || null, onClick: () => (typeof sheet === 'function' ? sheet() : openSheet(sheet)) }, ico(icon, 24), lab, n);
+      try { SB.ui.tooltip(b, label + (key ? ' (' + key + ')' : '')); } catch (e) { /* ignore */ }
       return { b, n, lab, label };
     };
     const tRecall = tool('recall', 'history', 'Recall', 'Recall', 'R', 'recall');
     const tHold = tool('hold', 'thermometer', 'Hold cabinet', 'Hold', 'H', toggleCabinet);
-    const t86 = tool('board86', 'ban', '86 board', '86', '8', 'board86');
+    // "86" is kitchen slang a new cook may not know, so the button says Sold out with a small 86 beside the icon.
+    const t86 = tool('board86', 'ban', 'Sold out (86 board)', 'Sold out', '8', 'board86');
+    t86.b.insertBefore(h('span', { class: 'fl-tool-hint', 'aria-hidden': 'true' }, '86'), t86.lab);
     const tDemo = tool('demo', 'play', 'Demo', 'Demo', 'D', 'demo');
     // The Hold button is not in the header any more: the Cabinet tab next to the stations is that button, with its count.
-    const tools = h('div', { class: 'fl-tools' }, tRecall.b, t86.b, tDemo.b);
+    // Front counter opens the full-screen order page for a visit; it does not turn this tablet into an order-only one.
+    const tFront = tool('front', 'receipt', 'Front counter: the full-screen order page', 'Front counter', null, () => F.openCounter());
+    const tools = h('div', { class: 'fl-tools' }, tRecall.b, t86.b, tFront.b, tDemo.b);
     // Orders is a main button, not a tool: it stays in the header at every width, next to New ticket, because the counter
     // lives in it (open orders, add a round, take payment). The badge counts the orders still open.
     const tOrders = tool('orders', 'receipt', 'Open orders', 'Orders', 'O', 'orders');
@@ -21811,10 +21915,18 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     const dockClear = h('button', { type: 'button', class: 'btn fl-dock-clear', hidden: true, onClick: () => F.highlight(null) }, ico('x', 18), h('span', null, 'Clear highlight'));
     const dockList = h('div', { class: 'fl-dock-list', id: 'fl-dock-list', role: 'group', 'aria-label': 'Items still to make, tap one to highlight it on the board' });
     const dockEmpty = h('span', { class: 'fl-dock-empty' }, 'Nothing waiting.');
-    // A quiet stamp of the last time the board checked its warnings, so a frozen or sleeping screen shows an old time.
-    const checked = h('span', { class: 'fl-checked num', title: 'The last time this board checked its warnings' });
-    const dock = h('footer', { class: 'fl-dock' }, dockToggle, dockClear, dockList, dockEmpty, checked);
-    m.checked = checked;
+    // "+3 more" says how many dish chips did not fit on the strip's one line; tapping it shows them all (and again folds them).
+    const dockMore = h('button', { type: 'button', class: 'btn fl-dock-more', hidden: true, 'aria-controls': 'fl-dock-list', 'aria-expanded': 'false', onClick: () => { m.dockOpen = !m.dockOpen; fitDock(); measureDock(); } }, h('span', null, ''));
+    // A quiet stamp of the last time the board updated itself, so a frozen or sleeping screen shows an old time.
+    const checked = h('span', { class: 'fl-checked num', title: 'The board updates itself every second. If this time stops moving, reload the page.' });
+    // Full screen hides the browser's address bar and buttons on a tablet. It shows only where the browser can do it.
+    const fullBtn = h('button', { type: 'button', class: 'btn fl-full', hidden: true, onClick: goFull }, ico('maximize', 20), h('span', null, 'Full screen'));
+    const dock = h('footer', { class: 'fl-dock' }, dockToggle, dockClear, dockList, dockMore, dockEmpty, checked, fullBtn);
+    m.checked = checked; m.dockMore = dockMore; m.fullBtn = fullBtn;
+    // Leaving or entering full screen (also with the browser's own gesture) shows or hides the button.
+    const onFull = () => paintFull();
+    doc.addEventListener('fullscreenchange', onFull); doc.addEventListener('webkitfullscreenchange', onFull);
+    m.offs.push(() => { doc.removeEventListener('fullscreenchange', onFull); doc.removeEventListener('webkitfullscreenchange', onFull); });
     // While a pointer is over the strip its chips stay put, see renderDock.
     dock.addEventListener('pointerenter', () => { m.dockHover = true; });
     dock.addEventListener('pointerleave', () => { m.dockHover = false; });
@@ -21840,7 +21952,7 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     TABS.forEach((id) => { const b = seg.querySelector('[data-id="' + id + '"]'); if (b) m.tabParts[id] = { count: b.querySelector('.seg-count'), n: -1 }; });
     m.seg = seg; F.applyHiddenTabs();
     m.sanText = sanChip.querySelector('.fl-chip-t');
-    Object.assign(m, { wl, wr, head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
+    Object.assign(m, { wl, wr, head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders, front: tFront }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
 
     grid.addEventListener('click', onGridClick);
     dockList.addEventListener('click', (e) => {
@@ -21852,8 +21964,9 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     if (typeof IntersectionObserver === 'function') {
       m.io = new IntersectionObserver((entries) => { entries.forEach((en) => en.target.classList.toggle('is-off', !en.isIntersecting)); }, { root: main, rootMargin: '120px' });
     }
-    if (typeof ResizeObserver === 'function') { m.ro = new ResizeObserver(() => { measureDock(); paintDensity(); fitHead(); }); m.ro.observe(dock); m.ro.observe(main); }
+    if (typeof ResizeObserver === 'function') { m.ro = new ResizeObserver(() => { measureDock(); paintDensity(); fitHead(); fitDock(); }); m.ro.observe(dock); m.ro.observe(main); }
     paintDockToggle();
+    paintFull();
     paintWall();
     // The window width decides whether wall mode can show; check it again when the window is resized.
     const onWin = () => paintWall();
@@ -21922,6 +22035,22 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     setHidden(P.paidMore, gl.paid.length <= 6); if (gl.paid.length > 6) setTxt(P.paidMore, 'and ' + (gl.paid.length - 6) + ' more paid');
   }
 
+  // Shows the Full screen button only on a touch screen whose browser can go full screen and is not full screen already.
+  function paintFull() {
+    if (!m || !m.fullBtn) return;
+    const de = doc.documentElement;
+    const can = !!(de && (de.requestFullscreen || de.webkitRequestFullscreen)) && doc.fullscreenEnabled !== false;
+    const isFull = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+    setHidden(m.fullBtn, !(can && !isFull && mq('(pointer: coarse)')));
+  }
+  // Asks the browser for full screen (it allows this only right after a tap), then checks the button again.
+  function goFull() {
+    const de = doc.documentElement;
+    try { const r = (de.requestFullscreen || de.webkitRequestFullscreen).call(de); Promise.resolve(r).then(paintFull, paintFull); } catch (e) { paintFull(); }
+  }
+  // Opens the full-screen order page as a visit: the order page's back link returns to the board, and the tablet keeps its job.
+  F.openCounter = function () { if (SB.router && SB.router.go) SB.router.go({ kind: 'new' }, { visit: true }); };
+
   // Tests a CSS media query; false where matchMedia is missing.
   const mq = (q) => { try { return g.matchMedia(q).matches; } catch (e) { return false; } };
   // Orders the header parts for the current width (on a phone the tabs wrap under the buttons).
@@ -21946,21 +22075,38 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     return hi - lo > 24;
   }
   // A short fingerprint of what decides the header's fit: its width and the length of the chip text.
-  const headKey = () => [m.head.clientWidth, m.sanText.textContent.length, m.demoChip.hidden ? 0 : m.demoChip.textContent.length].join(':');
-  // Squeezes the header step by step until it fits on one row: first the tab icons go, then the status chips, then the
-  // tool buttons. Everything that goes is still in the Menu list.
+  const headKey = () => [m.head.clientWidth, m.sanText.textContent.length, m.demoChip.hidden ? 0 : m.demoChip.textContent.length, m.seg.querySelectorAll('.seg-opt:not([hidden])').length, m.root.dataset.tools || ''].join(':');
+  // Squeezes the header step by step until it fits on one row: first the station names become short codes, then the tab
+  // icons go, then the status chips, then the tool buttons. Everything that goes is still in the Menu list.
   // WATCH OUT: it always starts again from the full header, so a wider window gets everything back.
   function fitHead() {
     if (!m || !m.head) return;
     const hd = m.head;
     delete hd.dataset.fit;
     if (!m.narrow) {
-      for (const stage of ['icons', 'status', 'labels', 'toollabels', 'tools']) {
+      for (const stage of ['codes', 'icons', 'status', 'labels', 'toollabels', 'tools']) {
         if (!headWrapped()) break;
         hd.dataset.fit = stage;
       }
     }
+    fitTabs();
     m.fitKey = headKey();
+  }
+  // On the row of tabs under the buttons (tablets and phones), a tab whose station name does not fit shows its short
+  // code (PIT, FRY) instead; the others keep their names. All and Cabinet have no code, so a tight one drops its icon. Reads every width first, then writes, so it lays out once.
+  function fitTabs() {
+    const tabs = Array.from(m.seg.querySelectorAll('.seg-opt'));
+    tabs.forEach((b) => { if (b.dataset.short) delete b.dataset.short; });
+    if (!m.narrow) return;
+    // A tab is tight when its icon and name together are wider than the room inside its padding.
+    const tight = tabs.map((b) => {
+      if (!b.offsetWidth) return false;
+      const cs = g.getComputedStyle(b), lab = b.querySelector('.seg-label'), icon = b.querySelector('svg');
+      const room = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const iw = icon && cs.flexDirection !== 'column' && icon.getBoundingClientRect().width ? icon.getBoundingClientRect().width + (parseFloat(cs.columnGap) || 0) : 0;
+      return !!lab && lab.scrollWidth + iw > room + 0.5;
+    });
+    tabs.forEach((b, i) => { if (tight[i]) b.dataset.short = 'true'; });
   }
   // The hidden words after a tab's count: "ticket" for one, "tickets" for the rest, and "with work here" on a station tab.
   function tabWhat(n, id) { return ' ' + U.plural(n, 'ticket') + (id === 'all' || id === 'expo' ? '' : ' with work here'); }
@@ -22699,7 +22845,7 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     const el = h('section', { class: 'fl-strip', role: 'region', 'aria-label': 'Needs attention', 'aria-live': 'polite', hidden: true });
     // The sound check: shown while sound is on but the browser has not yet allowed it. One tap allows it and plays a test.
     const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); playHere(() => { chime(); speak('Sound is on.'); }); } },
-      ico('bell', 24), h('span', null, 'Tap here to turn on warning sounds. This browser needs one tap first.'));
+      ico('bell', 24), h('span', null, 'Tap to turn on sound'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 24));
     // The clock notice: the tablet's clock jumped far ahead, the board keeps the old time and asks. Calm, two plain choices, and the board keeps working.
@@ -22810,7 +22956,7 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
   // Rewrites the strip from the deadline feed: the top three rows, or hidden when the feed is empty.
   function updateStrip(now) {
     if (!m || !m.strip || !SB.deadlines) return;
-    if (m.checked) { const t = U.fmtTime(Date.now()); if (m.checkedT !== t) { m.checkedT = t; m.checked.textContent = 'Checked ' + t; } }
+    if (m.checked) { const t = U.fmtTime(Date.now()); if (m.checkedT !== t) { m.checkedT = t; m.checked.textContent = 'Updated ' + t; } }
     const all = SB.deadlines.build(store().getState(), now);
     m.feed = all;
     // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
@@ -22871,7 +23017,7 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     const showNote = noteWanted && !soundShown && !clockShown;
     m.noteKey = noteWanted ? 'pause:' + note : '';
     const moreEl = m.strip.soundBar.querySelector('.fl-strip-sound span');
-    if (moreEl) { const t = (noWebAudio() ? 'This browser cannot play warning tones. Open Smokebox in another browser for sound.' : 'Tap here to turn on warning sounds. This browser needs one tap first.') + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
+    if (moreEl) { const t = (noWebAudio() ? 'This browser cannot play warning sounds' : 'Tap to turn on sound') + (soundShown && noteWanted ? ' (1 more notice)' : ''); if (moreEl.textContent !== t) moreEl.textContent = t; }
     setHidden(m.strip.pauseBar, !showNote);
     if (showNote) setTxt(m.strip.pauseBtn.querySelector('.fl-strip-pause-t'), note);
     if (showNote && m.histNote && note === m.histNote.words && !m.histSeen) { m.histSeen = true; try { SB.store.historyNoticeSeen(m.histNote.kind); } catch (e) { /* the store has no such call */ } }
@@ -22891,7 +23037,8 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
       setTxt(r.when, d.kind === 'expired' ? 'OUT' : d.kind === 'past' ? 'PAST' : countdownText(d.msLeft));
       // How many more warnings wait behind this one goes on the short name line, where a long explanation cannot cut it off.
       setTxt(r.what, d.label + (i === top.length - 1 && moreRows > 0 ? '   +' + moreRows + ' more' : ''));
-      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.consequence + ' ' + d.action);
+      // What to do comes first ("Use it first."), then why, so the words a cook needs are the ones read first.
+      setTxt(r.why, (d.snoozedUntil ? 'Reminder at ' + U.fmtTime(d.snoozedUntil) + '. ' : '') + d.action + ' ' + d.consequence);
     });
   }
 
@@ -22939,6 +23086,8 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
       else tabCount(z.id, c.zones[z.id] || 0, (c.overdueByZone[z.id] || 0) > 0);
     });
     F.applyHiddenTabs();
+    // An empty kitchen (no dishes, no tickets) has nothing to recall, sell out or take orders for, so those buttons wait.
+    { const v = hasWork() ? 'on' : 'off'; if (m.root.dataset.tools !== v) { m.root.dataset.tools = v; m.fitKey = null; } }
     // tools with counts
     const recentN = recentCount(S, now);
     toolCount(m.tool.recall, recentN, '', recentN ? recentN + ' recently bumped' : '');
@@ -22990,6 +23139,11 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     if (m.menuBtn.getAttribute('aria-label') !== menuName) m.menuBtn.setAttribute('aria-label', menuName);
     toolCount(m.tool.demo, demoOn ? 1 : 0, 'warn', demoOn ? (speed > 1 ? 'clock running at x' + (Math.round(speed * 10) / 10) : 'demo orders running') : '', demoOn ? (speed > 1 ? 'x' + (Math.round(speed * 10) / 10) : 'on') : '');
     refit();
+  }
+  // True once the kitchen has a dish on its menu or any ticket, open or recently bumped.
+  function hasWork() {
+    const st = store().getState();
+    return st.menu.some((d) => !d.archived) || (st.tickets && st.tickets.length > 0) || recentCount(store(), store().now()) > 0;
   }
   // Asks the demo simulator for its status; null when it is missing or fails.
   function safeStatus() { try { return SB.sim.live.status(); } catch (e) { return null; } }
@@ -23044,12 +23198,14 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
       { hide: kit, label: 'Edit the menu', icon: 'sliders', onClick: () => openOffice(anchor, 'data') },
       { separator: true },
       // Orders opens the open-orders screen, with how many are open.
-      { hide: kit, label: 'Orders' + (m.openOrders ? ' (' + m.openOrders + ' open)' : ''), icon: 'receipt', onClick: () => openSheet('orders') },
+      { hide: kit || !hasWork(), label: 'Orders' + (m.openOrders ? ' (' + m.openOrders + ' open)' : ''), icon: 'receipt', onClick: () => openSheet('orders') },
+      // Front counter opens the full-screen order page; its back link returns here.
+      { hide: kit || !hasWork(), label: 'Front counter (full-screen orders)', icon: 'receipt', onClick: () => F.openCounter() },
       // Recall and Hold open the same sheets as their header buttons, with the same counts.
-      { label: 'Recall' + (recentCount(store(), store().now()) ? ' (' + recentCount(store(), store().now()) + ')' : ''), icon: 'history', onClick: () => openSheet('recall') },
+      { hide: !hasWork(), label: 'Recall' + (recentCount(store(), store().now()) ? ' (' + recentCount(store(), store().now()) + ')' : ''), icon: 'history', onClick: () => openSheet('recall') },
       { hide: front || !cookOn(), label: 'Hold cabinet' + (c.hold ? ', ' + c.hold + ' need attention' : ''), icon: 'thermometer', onClick: () => showCabinet(true) },
       // 86 and Demo open their sheets too.
-      { label: '86 board' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
+      { hide: !hasWork(), label: 'Sold out (86 board)' + (c.out86 ? ', ' + c.out86 + ' off' : ''), icon: 'ban', onClick: () => openSheet('board86') },
       { hide: kit, label: 'Demo', icon: 'play', onClick: () => openSheet('demo') },
       // The sanitize entry opens its own small menu on the same anchor.
       { hide: !cookOn(), label: 'Readings', icon: 'thermometer', onClick: () => openSheet('readings') },
@@ -23441,6 +23597,24 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
     const domOrder = Array.from(m.dockList.children).map((n) => n.dataset.menu).join('|');
     if (order !== domOrder && (!m.dockHover || nodes.length !== m.dockList.childElementCount)) reorder(m.dockList, nodes);
     paintHighlight();
+    fitDock();
+  }
+  // The strip shows one line of whole dish chips: a chip that does not fit drops out of sight (never cut mid-word) and
+  // "+N more" says how many are hidden. Opened, the strip shows every chip on as many lines as it needs.
+  function fitDock() {
+    if (!m || !m.dockMore) return;
+    const chips = Array.from(m.dockList.children);
+    m.dock.dataset.open = m.dockOpen ? 'true' : 'false';
+    // Measure with the button showing, so the chips that fit leave room for it.
+    m.dockMore.hidden = false;
+    const top0 = chips.length ? chips[0].offsetTop : 0, room = m.dockList.offsetLeft + m.dockList.clientWidth;
+    let off = 0;
+    // A chip is out of sight when it wrapped to a second line, or (one long name on a narrow strip) runs past the edge.
+    for (const c of chips) { const out = !m.dockOpen && (c.offsetTop > top0 + 4 || c.offsetLeft + c.offsetWidth > room + 1); if (out) off++; c.tabIndex = out ? -1 : 0; c.classList.toggle('is-out', out); }
+    setHidden(m.dockMore, !off && !m.dockOpen);
+    if (!off && !m.dockOpen) return;
+    setTxt(m.dockMore.firstChild, m.dockOpen ? 'Show less' : '+' + off + ' more');
+    m.dockMore.setAttribute('aria-expanded', m.dockOpen ? 'true' : 'false');
   }
   // Builds one dish chip for the strip. Returns the button and the parts that change.
   function buildDockChip(e) {
@@ -30293,7 +30467,15 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
      },
      {
       "t": "p",
-      "x": "Tap **86 board**, find the dish and mark it sold out. Smokebox also does this by itself when a dish's food runs low."
+      "x": "Tap **Sold out** at the top (the 86 board), find the dish and mark it sold out. Smokebox also does this by itself when a dish's food runs low."
+     },
+     {
+      "t": "h",
+      "x": "Full screen and the front counter"
+     },
+     {
+      "t": "p",
+      "x": "On a tablet, tap **Full screen** at the bottom right to hide the browser's bars. **Front counter** at the top opens the order page on the whole screen; its **Board** link brings you back here."
      }
     ]
    },
@@ -30803,7 +30985,7 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
      {
       "t": "ol",
       "x": [
-       "If the board says \"Tap here to turn on warning sounds\", tap it. Browsers need one tap first.",
+       "If the board says \"Tap to turn on sound\", tap it. Browsers need one tap first.",
        "Turn the tablet volume up and check its silent switch.",
        "Tap **Settings** and check that Sound is on and the loudness is not low.",
        "Tap **Settings**, then **Tablet checks: screen, sound, home screen**, then **Test the sound**.",
@@ -31246,7 +31428,7 @@ window.SB_BUILD = { version: "0.2.0", id: "67791a9" };
        "Tap Done only when it is really finished",
        "Gray dish: waiting on purpose. Start now goes early",
        "Clock amber, then red: the order is late",
-       "Sold out: tap 86 board and mark it",
+       "Sold out: tap Sold out (the 86 board) and mark it",
        "Cooked food leaves the cabinet: tap Pull",
        "Wrong tap: Undo, within 10 seconds",
        "Bumped by mistake: Recall, in the header"
