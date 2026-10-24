@@ -203,15 +203,16 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
   .fl-chip-w { display: inline; }
 }
 
-/* Phones (700 px or less): the tools and chips move into the Menu button's list; the tabs and New ticket stay. Every tablet, portrait too,
-   keeps the Sanitize chip, Recall and 86 in the header (the Cabinet tab sits with the stations), so a cook never opens a menu for them. */
-@media (max-width: 700px) {
+/* Phones (480 px or less): the tools and chips move into the Menu button's list; the tabs and New ticket stay. Every tablet, a 601 px
+   portrait one too, keeps the Sanitize chip, Recall and Sold out in the header (the Cabinet tab sits with the stations), so a cook never
+   opens a menu for them. */
+@media (max-width: 480px) {
   .fl-status, .fl-tools { display: none; }
 }
 
 /* When the header is too tight for one row, the script sets data-fit: first the tab icons go, then the status chips, then the tool buttons too (all stay in the Menu list). */
-.fl-head[data-fit] .fl-seg .seg-opt .icon { display: none; }
-.fl-head[data-fit] .fl-seg .seg-opt { padding: 0 calc(12px * var(--fl-k)); }
+.fl-head[data-fit]:not([data-fit="codes"]) .fl-seg .seg-opt .icon { display: none; }
+.fl-head[data-fit]:not([data-fit="codes"]) .fl-seg .seg-opt { padding: 0 calc(12px * var(--fl-k)); }
 .fl-head[data-fit="status"] .fl-status, .fl-head[data-fit="labels"] .fl-status, .fl-head[data-fit="toollabels"] .fl-status, .fl-head[data-fit="tools"] .fl-status, .fl-head[data-fit="tools"] .fl-tools { display: none; }
 /* Next the words on Orders and Back office go, and the Demo button (their icons and counts stay; Demo is still in the Menu). */
 .fl-head[data-fit="labels"] .fl-orders-label, .fl-head[data-fit="labels"] .fl-office-label, .fl-head[data-fit="toollabels"] .fl-orders-label, .fl-head[data-fit="toollabels"] .fl-office-label, .fl-head[data-fit="tools"] .fl-orders-label, .fl-head[data-fit="tools"] .fl-office-label,
@@ -231,8 +232,8 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
   /* The Demo button stays in the Menu list here (the demo is not a kitchen job), so Recall and 86 have the room. */
   .fl-tools [data-tool="demo"] { display: none; }
   /* The Sanitize chip puts its two words on two lines beside the icon, so the top row still fits on a 720 px tablet. */
-  .fl-san { display: inline-grid; grid-template-columns: auto auto; align-content: center; justify-content: start; row-gap: 0; text-align: left; }
-  .fl-san > .icon { grid-row: 1 / span 2; }
+  .fl-san .fl-chip-w { display: block; }
+  .fl-san .fl-chip-t:empty { display: none; }
 }
 /* On a phone the four buttons (New ticket, Orders, Back office, Menu) need the whole row, so the logo steps aside and New ticket may shrink to fit. */
 @media (max-width: 520px) {
@@ -366,7 +367,7 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
 .fl-row + .fl-row > .slip-item { border-top: var(--bw-thin) solid var(--slip-rule); }
 .fl-row .slip-item { --qty-w: calc(38px * var(--fl-k)); min-height: var(--tap-lg); padding: var(--sp-2) var(--sp-3); gap: var(--sp-1) var(--sp-3); align-items: center; }
 .fl-row .slip-qty { align-self: center; }
-.fl-row .slip-qty::after { content: "\00d7"; margin-left: 1px; font-size: 0.6em; font-weight: var(--w-bold); opacity: 0.8; }
+.fl-row .slip-qty::after { content: "\00d7"; margin-left: 1px; font-size: 0.8em; font-weight: var(--w-heavy); } /* "2×": a count, never a step number */
 /* A dish name never breaks inside a word: when the longest word will not fit beside the button, the button drops to its own line. */
 .fl-row .slip-item { flex-wrap: wrap; }
 .fl-row .slip-name { flex: 1 1 0; min-width: min-content; font-size: calc(var(--fs-item) * 1.1); font-weight: var(--w-bold); line-height: 1.15; overflow-wrap: break-word; }
@@ -577,13 +578,12 @@ button.slip-item.fl-item { cursor: pointer; }
 .sb-shell[data-view="floor"] .toast-host, .sb-shell[data-view="floor"] .toast { pointer-events: none; }
 .sb-shell[data-view="floor"] .toast .btn { pointer-events: auto; }
 
-/* Calmer header: the sanitize chip is only an icon until a check is due within 30 minutes or is late. */
-.fl-san[data-urgent="false"] .fl-chip-t, .fl-san[data-urgent="false"] .fl-chip-w { display: none; }
-.fl-san[data-urgent="false"] { min-width: var(--tap); padding-inline: 0; justify-content: center; opacity: 0.8; }
+/* Calmer header: until a check is due within 30 minutes or is late, the sanitize chip is quiet paper, but it always says "Sanitize". */
+.fl-san[data-urgent="false"] .fl-chip-w { display: inline; }
 /* Device roles: a kitchen device shows only the board, the cabinet, 86 and Recall (plus Menu for settings and help), so
    New ticket, Orders, Demo and Back office are hidden; a front device hides the Cabinet tab. All-in-one is unchanged. */
 .fl[data-role="kitchen"] .fl-new, .fl[data-role="kitchen"] .fl-orders, .fl[data-role="kitchen"] .fl-office,
-.fl[data-role="kitchen"] [data-tool="demo"], .fl[data-role="kitchen"] .fl-demo-chip,
+.fl[data-role="kitchen"] [data-tool="demo"], .fl[data-role="kitchen"] [data-tool="front"], .fl[data-role="kitchen"] .fl-demo-chip,
 .fl[data-role="kitchen"] .fl-empty .btn-primary, .fl[data-role="kitchen"] .fl-start-demo,
 .fl[data-role="front"] .fl-seg [data-id="cabinet"] { display: none; }
 /* Wall mode (a setting, and only at 1700 px and wider): the board turns into three panes in one window. The kitchen
@@ -699,8 +699,7 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 
 /* A station tab with nothing on it shows no "0" bubble; the tab alone says the station is quiet. */
 .fl-seg .seg-count[data-zero="true"] { display: none; }
-/* The all-day chips fade out at the right edge so a cut-off chip reads as "scroll for more", not as a mistake. */
-.fl-dock-list { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+/* The all-day chips sit on one line of whole chips; the ones that do not fit wait behind "+N more" (see fitDock). */
 /* Wall mode keeps one notice row and no sound-pause note: the TV is for glancing, and the three panes need the height. */
 .fl[data-wall="on"] .fl-bar-pause { display: none; }
 
@@ -816,3 +815,81 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .fl-station-bar { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-2) var(--sp-3) 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--ink); border-radius: var(--r-btn); background: var(--paper); color: var(--ink); font-weight: var(--w-heavy); font-size: var(--fs-2); }
 .fl-station-bar[hidden] { display: none; }
 .fl-station-t { flex: 1; min-width: 0; }
+
+/* ===== Tablet polish: names on tabs, plain buttons, compact notices ===== */
+/* Station tabs show the station's name; a tab too narrow for it (fitTabs) or a squeezed header shows the short code. */
+.fl-tab-code { display: none; }
+.fl-seg .seg-opt[data-short="true"] .fl-tab-full, .fl-head[data-fit] .fl-tab-full { display: none; }
+.fl-seg .seg-opt[data-short="true"] .fl-tab-code, .fl-head[data-fit] .fl-tab-code { display: inline; }
+.fl-seg .seg-opt[data-short="true"]:not([data-zone]) .icon { display: none; }
+/* The sanitize chip always names itself: "Sanitize" and its time (or "not logged") as one label with one plain space. */
+.fl-head .fl-san .fl-chip-w { display: inline; }
+.fl-san-l { white-space: nowrap; text-align: left; line-height: 1.1; }
+@media (max-width: 999.98px) { .fl-head .fl-san .fl-chip-w { display: block; } }
+/* Sold out: the small "86" sits in the corner as a hint for those who know the word. */
+.fl-tool-hint { position: absolute; top: calc(5px * var(--fl-k)); right: calc(6px * var(--fl-k)); font: var(--w-heavy) calc(11px * var(--fl-k)) / 1 var(--font-display); color: var(--ink2); }
+.fl-tool[data-tool="board86"] { min-width: calc(62px * var(--fl-k)); }
+.fl-tool[data-tool="board86"][data-tone="bad"] .fl-tool-hint { display: none; } /* the red count badge takes the corner */
+/* An empty kitchen (no dishes, no tickets): Recall, Sold out, Orders and Front counter wait for the first dish. */
+.fl[data-tools="off"] [data-tool="recall"], .fl[data-tools="off"] [data-tool="board86"], .fl[data-tools="off"] [data-tool="front"], .fl[data-tools="off"] .fl-orders { display: none; }
+/* Front counter stays in the Menu list on narrow screens, where the header has no room for it. */
+@media (max-width: 699.98px) { .fl-tools [data-tool="front"] { display: none; } }
+/* A narrow tablet (601 px portrait) drops the logo so New ticket keeps room beside Recall and Sold out. */
+@media (max-width: 699.98px) { .fl-brand { display: none; } .fl-new { min-width: 0; padding: 0 var(--sp-3); } }
+
+/* Done on a dish is a button to press: a strong ink frame and the word, unlike a finished dish's quiet green "Done". */
+.fl-act[data-act="finish"] { color: var(--ink); background: var(--slip); border: calc(3px * var(--fl-k)) solid var(--ink); box-shadow: 0 calc(3px * var(--fl-k)) 0 var(--ink); }
+.fl-act[data-act="finish"] .fl-act-top { display: none; }
+.fl-act[data-act="finish"] .fl-act-word { font-size: var(--fs-4); font-weight: var(--w-heavy); letter-spacing: 0.02em; text-transform: none; }
+.fl-main[data-density="compact"] .fl-act[data-act="finish"] { box-shadow: 0 calc(2px * var(--fl-k)) 0 var(--ink); }
+
+/* RUSH on a ticket is a solid red label, readable at a glance, not a faint tilted stamp. */
+.fl-stamp-slot .stamp, .fl-main[data-density="compact"] .fl-stamp-slot .stamp {
+  transform: none; opacity: 1; -webkit-mask: none; mask: none; outline: 0; animation: none;
+  padding: calc(3px * var(--fl-k)) calc(9px * var(--fl-k)) calc(2px * var(--fl-k)); border: 0; border-radius: calc(4px * var(--fl-k));
+  font-size: var(--fs-3); letter-spacing: 0.08em; color: var(--on-danger, #fff); background: var(--stamp);
+}
+
+/* Warning rows: one compact line (a bold name, then what to do and why) that wraps onto a second line only when it must. */
+.fl-strip-row { min-height: 44px; padding-block: calc(3px * var(--fl-k)); gap: var(--sp-3); }
+.fl-strip-text { display: block; line-height: 1.25; }
+.fl-strip-what { font-size: calc(16px * var(--fl-k) * var(--fl-far)); font-weight: var(--w-heavy); }
+.fl-strip-what::after { content: "\00a0\2014\00a0"; font-weight: var(--w-semi); }
+.fl-strip-why { display: inline; font-size: calc(15px * var(--fl-k) * var(--fl-far)); -webkit-line-clamp: unset; overflow: visible; }
+.fl-strip-row .fl-strip-when { font-size: calc(22px * var(--fl-k) * var(--fl-far)); min-width: 3.6ch; }
+.fl-strip-rowwrap .fl-strip-x { margin-block: 4px; min-height: 40px; }
+.fl[data-far="on"] .fl-strip-what { font-size: calc(16px * var(--fl-k) * var(--fl-far) * 1.25); }
+.fl[data-far="on"] .fl-strip-why { font-size: calc(15px * var(--fl-k) * var(--fl-far) * 1.25); }
+/* The sound bar is one short line. */
+.fl-strip-sound { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The all-day strip: one line of whole chips, "+N more" for the rest; opened, it wraps and scrolls inside itself. */
+.fl-dock-list { flex-wrap: wrap; overflow: hidden; max-height: calc(var(--tap) + 9px * var(--fl-k)); scrollbar-width: none; }
+.fl-dock[data-open="true"] { align-items: flex-start; }
+.fl-dock[data-open="true"] .fl-dock-list { max-height: 40vh; overflow-y: auto; }
+.fl-dock-more { flex: none; min-height: var(--tap); padding: 0 var(--sp-3); font-weight: var(--w-heavy); font-size: var(--fs-3); }
+.fl-dock-more[hidden], .fl-full[hidden] { display: none; }
+.fl-full { flex: none; min-height: var(--tap); padding: 0 var(--sp-3); gap: 6px; font-size: var(--fs-2); }
+/* A chip that does not fit keeps its place but is not seen (it counts in "+N more"). */
+.fl-dchip.is-out { visibility: hidden; }
+/* On a narrow screen Full screen is its icon only (its name stays for screen readers). */
+@media (max-width: 699.98px) { .fl-dock-sum { display: none; } .fl-dock-more { padding: 0 var(--sp-2); } .fl-full { min-width: var(--tap); padding: 0; } .fl-full > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } }
+/* The Updated stamp is for laptops and wall screens; on a tablet the dishes and Full screen need the room. */
+@media (max-width: 1199.98px) { .fl-checked { display: none; } }
+
+/* A short screen (a landscape tablet, 601 px tall): the header, tabs, notices and strip tighten so a whole ticket fits. */
+@media (max-height: 700px) {
+  .fl-head { padding-top: calc(6px * var(--fl-k)); padding-bottom: calc(5px * var(--fl-k)); row-gap: calc(6px * var(--fl-k)); border-bottom-width: calc(4px * var(--fl-k)); }
+  .fl-tool, .fl-office, .fl-orders { min-height: var(--tap); padding-block: 2px; }
+  .fl-new, .fl-menu, .fl-head .fl-chip { min-height: var(--tap); }
+  .fl-tabs { padding-top: calc(6px * var(--fl-k)); }
+  .fl-seg .seg-opt { min-height: 44px; }
+  .fl-seg .seg-opt[aria-selected="true"] { border-bottom-width: calc(6px * var(--fl-k)); }
+  .fl-strip-sound, .fl-strip-pause { min-height: 40px; padding-block: 2px; }
+  .fl-strip-bar .fl-strip-x { min-height: 40px; }
+  .fl-strip-row { min-height: 40px; }
+  .fl-dock { padding-block: calc(4px * var(--fl-k)); padding-bottom: max(calc(4px * var(--fl-k)), env(safe-area-inset-bottom)); }
+  .fl-dock-toggle, .fl-dchip, .fl-dock-more, .fl-full, .fl-dock-clear { min-height: 44px; }
+  .fl-dock-list { max-height: calc(44px + 9px * var(--fl-k)); }
+  .fl-main, .fl-main[data-density="compact"] { padding-top: var(--sp-2); }
+}

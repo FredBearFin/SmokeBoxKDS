@@ -4,7 +4,7 @@ Plain fixes for sound, sleep, missing dishes and odd numbers. Lost data and the 
 
 ## No sound
 
-1. If the board says "Tap here to turn on warning sounds", tap it. Browsers need one tap first.
+1. If the board says "Tap to turn on sound", tap it. Browsers need one tap first.
 2. Turn the tablet volume up and check its silent switch.
 3. Tap **Settings** and check that Sound is on and the loudness is not low.
 4. Tap **Settings**, then **Tablet checks: screen, sound, home screen**, then **Test the sound**.
