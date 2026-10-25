@@ -2132,6 +2132,8 @@
     setHidden(m.menuBtn.querySelector('.fl-menu-dot'), !needs);
     const menuName = needs ? 'Settings, something needs a look' : 'Settings';
     if (m.menuBtn.getAttribute('aria-label') !== menuName) m.menuBtn.setAttribute('aria-label', menuName);
+    // The Demo button is in the header only in the demo (or while demo orders run); a working kitchen has Help there, and Demo in the Menu.
+    setHidden(m.tool.demo.b, !(demoOn || (store().isDemo && store().isDemo())));
     toolCount(m.tool.demo, demoOn ? 1 : 0, 'warn', demoOn ? (speed > 1 ? 'clock running at x' + (Math.round(speed * 10) / 10) : 'demo orders running') : '', demoOn ? (speed > 1 ? 'x' + (Math.round(speed * 10) / 10) : 'on') : '');
     refit();
   }

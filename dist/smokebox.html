@@ -4609,7 +4609,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "f77b823" };
+window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -23912,6 +23912,8 @@ window.SB_BUILD = { version: "0.2.0", id: "f77b823" };
     setHidden(m.menuBtn.querySelector('.fl-menu-dot'), !needs);
     const menuName = needs ? 'Settings, something needs a look' : 'Settings';
     if (m.menuBtn.getAttribute('aria-label') !== menuName) m.menuBtn.setAttribute('aria-label', menuName);
+    // The Demo button is in the header only in the demo (or while demo orders run); a working kitchen has Help there, and Demo in the Menu.
+    setHidden(m.tool.demo.b, !(demoOn || (store().isDemo && store().isDemo())));
     toolCount(m.tool.demo, demoOn ? 1 : 0, 'warn', demoOn ? (speed > 1 ? 'clock running at x' + (Math.round(speed * 10) / 10) : 'demo orders running') : '', demoOn ? (speed > 1 ? 'x' + (Math.round(speed * 10) / 10) : 'on') : '');
     refit();
   }
