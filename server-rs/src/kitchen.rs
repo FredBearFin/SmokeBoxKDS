@@ -29,7 +29,7 @@ SB.planner = {
 "#;
 const GLUE_AFTER: &str = r#"
 (function () {
-  const E = SB.engine, rooms = new Map();
+  const E = SB.engine, rooms = new Map(), pending = new Map();
   globalThis.__rooms = {
     create(id, opts) { rooms.set(id, E.newState(JSON.parse(opts))); },
     load(id, saved) { const v = E.validateBackup(saved); if (!v.ok) return JSON.stringify({ ok: false, error: String(v.error) }); rooms.set(id, v.state); return '{"ok":true}'; },
@@ -39,7 +39,17 @@ const GLUE_AFTER: &str = r#"
       let info = null; try { info = JSON.parse(JSON.stringify(r.info === undefined ? null : r.info)); } catch (e) { info = null; }
       return JSON.stringify({ report: r.report, info });
     },
-    tick(id, now) { rooms.set(id, E.tick(rooms.get(id), now).state); },
+    // An action tried but not yet kept: the server stores it first, then keeps (commit) or drops (discard) the new state.
+    tryApply(id, type, payload, now) {
+      const r = E.apply(rooms.get(id), type, JSON.parse(payload), now);
+      pending.set(id, r.state);
+      let info = null; try { info = JSON.parse(JSON.stringify(r.info === undefined ? null : r.info)); } catch (e) { info = null; }
+      return JSON.stringify({ report: r.report, info });
+    },
+    commit(id) { if (pending.has(id)) { rooms.set(id, pending.get(id)); pending.delete(id); } },
+    discard(id) { pending.delete(id); },
+    tick(id, now) { const before = rooms.get(id), t = E.tick(before, now); rooms.set(id, t.state); return t.state !== before; },
+    view(id) { return JSON.stringify(rooms.get(id)); },
     serialize(id) { return E.serialize(rooms.get(id)); },
     has(id) { return rooms.has(id); },
     drop(id) { rooms.delete(id); },
@@ -116,9 +126,31 @@ impl Kitchens {
         let r: String = self.call("apply", (id.to_string(), kind.to_string(), payload.to_string(), now as f64))?;
         serde_json::from_str(&r).map_err(|e| e.to_string())
     }
-    /// Moves the kitchen's clock to `now` (ms): timers, due dishes and warnings catch up.
-    pub fn tick(&self, id: &str, now: i64) -> Result<(), String> {
+    /// Tries one action without keeping it yet: the answer comes back, and `commit` keeps the new state or `discard` drops it.
+    /// The server stores the action on disk between the two, so a kitchen never changes unless its action was saved.
+    pub fn try_apply(&self, id: &str, kind: &str, payload: &serde_json::Value, now: i64) -> Result<Answer, String> {
+        let r: String = self.call("tryApply", (id.to_string(), kind.to_string(), payload.to_string(), now as f64))?;
+        serde_json::from_str(&r).map_err(|e| e.to_string())
+    }
+    /// Keeps the state from the last `try_apply`.
+    pub fn commit(&self, id: &str) -> Result<(), String> {
+        self.call("commit", (id.to_string(),))
+    }
+    /// Drops the state from the last `try_apply`; the kitchen stays as it was.
+    pub fn discard(&self, id: &str) -> Result<(), String> {
+        self.call("discard", (id.to_string(),))
+    }
+    /// Moves the kitchen's clock to `now` (ms): timers, due dishes and warnings catch up. True when anything changed.
+    pub fn tick(&self, id: &str, now: i64) -> Result<bool, String> {
         self.call("tick", (id.to_string(), now as f64))
+    }
+    /// The kitchen's whole state as JSON, as the screens receive it on the live stream.
+    pub fn view(&self, id: &str) -> Result<String, String> {
+        self.call("view", (id.to_string(),))
+    }
+    /// True when the kitchen is loaded in the runtime.
+    pub fn has(&self, id: &str) -> Result<bool, String> {
+        self.call("has", (id.to_string(),))
     }
     /// The kitchen's saved state as text, exactly as a tablet would save it.
     pub fn serialize(&self, id: &str) -> Result<String, String> {

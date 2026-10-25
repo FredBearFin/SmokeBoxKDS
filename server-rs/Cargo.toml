@@ -11,3 +11,17 @@ smokebox-engine = { path = "../engine" }
 rquickjs = { version = "0.14", features = ["loader"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+futures-util = "0.3"
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros"] }
+argon2 = "0.6"
+sha2 = "0.10"
+rand = "0.9"
+base64 = "0.22"
+hex = "0.4"
+
+[dev-dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "stream", "rustls-tls"] }
+bytes = "1"
