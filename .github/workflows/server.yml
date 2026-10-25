@@ -1,0 +1,65 @@
+# The hosted server (server-rs): tests it against a real Postgres on every change, and on main publishes the finished program as the
+# release "server-latest", which server/setup-server.sh downloads. The kitchen server then never has to compile anything.
+# Built on Ubuntu 22.04 so the program also runs on a 22.04 or 24.04 server.
+name: server
+
+on:
+  pull_request:
+    paths: ['server-rs/**', 'engine/**', 'src/js/00-util.js', 'src/js/10-config.js', 'src/js/20-engine.js', 'tools/make-replay.mjs', '.github/workflows/server.yml']
+  push:
+    branches: [main]
+    paths: ['server-rs/**', 'engine/**', 'src/js/00-util.js', 'src/js/10-config.js', 'src/js/20-engine.js', 'tools/make-replay.mjs', '.github/workflows/server.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: smokebox
+          POSTGRES_PASSWORD: dev
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U smokebox" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      # The replay test records kitchens with the JavaScript engine in Node.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Rust (the version in server-rs/rust-toolchain.toml)
+        run: rustup toolchain install 1.97.0 --profile minimal
+      - name: Server tests (engine replay, accounts, devices, sync, support)
+        working-directory: server-rs
+        env:
+          SMOKEBOX_TEST_PG: postgres://smokebox:dev@localhost:5432/postgres
+        run: cargo test --release --locked
+
+  release:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust (the version in server-rs/rust-toolchain.toml)
+        run: rustup toolchain install 1.97.0 --profile minimal
+      - name: Build the server program
+        working-directory: server-rs
+        run: cargo build --release --locked && strip target/release/smokebox-server
+      - name: Publish it as the release server-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp server-rs/target/release/smokebox-server smokebox-server
+          sha256sum smokebox-server > smokebox-server.sha256
+          gh release view server-latest >/dev/null 2>&1 || gh release create server-latest --prerelease --title "Server (latest main)" --notes "The hosted server program built from main. server/setup-server.sh downloads it."
+          gh release upload server-latest smokebox-server smokebox-server.sha256 --clobber

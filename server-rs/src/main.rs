@@ -13,6 +13,20 @@ async fn main() {
     }
     let url = std::env::var("DATABASE_URL").expect("DATABASE_URL is needed, like postgres://smokebox:pw@127.0.0.1/smokebox");
     let db = sqlx::postgres::PgPoolOptions::new().max_connections(10).connect(&url).await.expect("the database answers");
+    // smokebox-server owner-reset EMAIL: prints a one-hour link that sets a new owner password (no email needed while there is no mail sender).
+    let args0: Vec<String> = std::env::args().collect();
+    if args0.get(1).map(String::as_str) == Some("owner-reset") {
+        let Some(email) = args0.get(2) else { eprintln!("usage: smokebox-server owner-reset EMAIL"); std::process::exit(2) };
+        sqlx::migrate!("./migrations").run(&db).await.expect("migrations");
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+        let owner: Option<String> = sqlx::query_scalar("SELECT id FROM owners WHERE email = $1").bind(email.to_lowercase()).fetch_optional(&db).await.expect("database");
+        let Some(owner) = owner else { eprintln!("No kitchen has the owner email {}", email); std::process::exit(1) };
+        let token = smokebox_server::auth::new_token();
+        sqlx::query("INSERT INTO reset_tokens (token_hash, owner_id, expires_at) VALUES ($1,$2,$3)").bind(smokebox_server::auth::token_hash(&token)).bind(&owner).bind(now + 3600 * 1000).execute(&db).await.expect("database");
+        let base = std::env::var("PUBLIC_URL").unwrap_or_else(|_| "http://127.0.0.1:8790".into());
+        println!("Open this within one hour to set a new password:\n{}/reset?t={}", base.trim_end_matches('/'), token);
+        return;
+    }
     // smokebox-server staff-add EMAIL "NAME": adds a support staff member and prints their password and authenticator secret once.
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("staff-add") {

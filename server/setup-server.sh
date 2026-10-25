@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Sets up the Smokebox prototype hub on a fresh Ubuntu 22.04 or 24.04 server, with automatic HTTPS and a password.
+# Sets up the hosted Smokebox server on a fresh or existing Ubuntu 22.04 or 24.04 server: the Rust server (kitchens, devices, support) on
+# Postgres, the natural voice helper, automatic HTTPS and a password. Running it again updates everything and keeps the kitchens.
 # Usage (as root): bash setup-server.sh <time zone> <login name> <password> [domain]
 # If smokebox-server.tar.gz is not in the current folder, it is downloaded from the public GitHub repo (branch main).
 # Example: bash setup-server.sh America/New_York freddy 'a-long-password' smokebox.example.com
@@ -42,7 +43,13 @@ apt-get install -y caddy
 id smokebox >/dev/null 2>&1 || useradd --system --home /opt/smokebox --shell /usr/sbin/nologin smokebox
 rm -rf /opt/smokebox.new && mkdir -p /opt/smokebox.new
 tar -xzf smokebox-server.tar.gz -C /opt/smokebox.new --strip-components=1 --no-same-owner --no-same-permissions
-[ -s /opt/smokebox.new/server/server.mjs ] && [ -s /opt/smokebox.new/dist/smokebox.html ] || { echo "The download is missing app files; stopping."; exit 1; }
+[ -s /opt/smokebox.new/server/voice-server.mjs ] && [ -s /opt/smokebox.new/dist/smokebox.html ] || { echo "The download is missing app files; stopping."; exit 1; }
+# The server program, built by GitHub from the same main branch (release server-latest), checked against its published checksum.
+mkdir -p /opt/smokebox.new/bin
+curl -fsSL --max-time 300 --retry 2 https://github.com/FredBearFin/SmokeBoxKDS/releases/download/server-latest/smokebox-server -o /opt/smokebox.new/bin/smokebox-server
+curl -fsSL --max-time 60 --retry 2 https://github.com/FredBearFin/SmokeBoxKDS/releases/download/server-latest/smokebox-server.sha256 -o /opt/smokebox.new/bin/smokebox-server.sha256
+(cd /opt/smokebox.new/bin && sha256sum -c smokebox-server.sha256 >/dev/null) || { echo "The server program download is damaged; stopping. Nothing was changed."; exit 1; }
+chmod 755 /opt/smokebox.new/bin/smokebox-server
 rm -rf /opt/smokebox && mv /opt/smokebox.new /opt/smokebox
 mkdir -p /var/lib/smokebox
 chown -R smokebox:smokebox /var/lib/smokebox
@@ -61,19 +68,77 @@ if [ ! -s /opt/smokebox-voice/kokoro-v1.0.onnx ]; then
 fi
 chown -R root:root /opt/smokebox-voice
 
+# Name for HTTPS: your own domain, or <ip>.sslip.io
+if [ -z "$DOMAIN" ]; then
+  IP="$(curl -4 -fsS https://api.ipify.org)"
+  DOMAIN="${IP//./-}.sslip.io"
+fi
+
+# The database: Postgres on this server, one database "smokebox". Its password is made once, at random, and kept only in
+# /etc/smokebox/server.env (readable by root alone); running this script again keeps it, so the kitchens stay.
+apt-get install -y postgresql qrencode >/dev/null
+systemctl enable --now postgresql
+mkdir -p /etc/smokebox && chmod 700 /etc/smokebox
+if [ ! -s /etc/smokebox/server.env ]; then
+  DBPASS="$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  sudo -u postgres psql -qc "CREATE ROLE smokebox LOGIN PASSWORD '${DBPASS}';" >/dev/null 2>&1 || sudo -u postgres psql -qc "ALTER ROLE smokebox LOGIN PASSWORD '${DBPASS}';" >/dev/null
+  sudo -u postgres psql -qtAc "SELECT 1 FROM pg_database WHERE datname = 'smokebox'" | grep -q 1 || sudo -u postgres createdb -O smokebox smokebox
+  printf 'DATABASE_URL=postgres://smokebox:%s@127.0.0.1:5432/smokebox\n' "$DBPASS" > /etc/smokebox/server.env
+fi
+# The address in password links follows the site name, so it is written again each run.
+sed -i '/^PUBLIC_URL=/d' /etc/smokebox/server.env
+printf 'PUBLIC_URL=https://%s\n' "$DOMAIN" >> /etc/smokebox/server.env
+chmod 600 /etc/smokebox/server.env
+
+# The server program runs as the smokebox user with no files to write (everything is in Postgres).
 cat > /etc/systemd/system/smokebox.service <<UNIT
 [Unit]
-Description=Smokebox prototype hub
+Description=Smokebox server (kitchens, devices, support)
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+User=smokebox
+EnvironmentFile=/etc/smokebox/server.env
+Environment=PORT=8790
+Environment=HOST=127.0.0.1
+Environment=TZ=${TZNAME}
+Environment=SMOKEBOX_TZ=${TZNAME}
+Environment=SMOKEBOX_HTML=/opt/smokebox/dist/smokebox.html
+WorkingDirectory=/opt/smokebox
+ExecStart=/opt/smokebox/bin/smokebox-server
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+CapabilityBoundingSet=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+# The natural voice helper (server/voice-server.mjs): the web server sends /api/voice and /api/voices here.
+cat > /etc/systemd/system/smokebox-voice.service <<UNIT
+[Unit]
+Description=Smokebox natural kitchen voice
 After=network.target
 
 [Service]
 User=smokebox
-Environment=PORT=8787
+Environment=PORT=8788
 Environment=HOST=127.0.0.1
-Environment=SMOKEBOX_TZ=${TZNAME}
-Environment=SMOKEBOX_DATA=/var/lib/smokebox/state.json
 WorkingDirectory=/opt/smokebox
-ExecStart=/usr/bin/node /opt/smokebox/server/server.mjs
+ExecStart=/usr/bin/node /opt/smokebox/server/voice-server.mjs
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
@@ -94,15 +159,46 @@ UMask=0077
 [Install]
 WantedBy=multi-user.target
 UNIT
+# The old nightly updater swapped in the one-kitchen hub; updates are now this script, so it is switched off if it is there.
+systemctl disable --now smokebox-update.timer >/dev/null 2>&1 || true
 systemctl daemon-reload
-systemctl enable --now smokebox
-systemctl restart smokebox
+systemctl enable smokebox smokebox-voice >/dev/null 2>&1
+systemctl restart smokebox smokebox-voice
 
-# Name for HTTPS: your own domain, or <ip>.sslip.io
-if [ -z "$DOMAIN" ]; then
-  IP="$(curl -4 -fsS https://api.ipify.org)"
-  DOMAIN="${IP//./-}.sslip.io"
-fi
+# Short commands for the owner of the server (they read the database address from /etc/smokebox/server.env):
+#   smokebox-staff EMAIL NAME   adds a support staff member and shows the code to scan into a free authenticator app
+#   smokebox-reset EMAIL        prints a one-hour link that sets a new password for a kitchen owner
+cat > /usr/local/bin/smokebox-staff <<'CMD'
+#!/usr/bin/env bash
+set -euo pipefail
+[ $# -ge 2 ] || { echo "usage: smokebox-staff EMAIL NAME"; exit 2; }
+set -a; . /etc/smokebox/server.env; set +a
+OUT="$(/opt/smokebox/bin/smokebox-server staff-add "$1" "${*:2}")"
+echo "$OUT" | grep -v '^Or scan'
+URI="$(echo "$OUT" | sed -n 's/^Or scan: //p')"
+echo; echo "Scan this with Google Authenticator or Microsoft Authenticator (free apps), or type the secret above:"
+qrencode -t ANSI256 -m 2 "$URI" 2>/dev/null || qrencode -t ASCII "$URI"
+CMD
+cat > /usr/local/bin/smokebox-reset <<'CMD'
+#!/usr/bin/env bash
+set -euo pipefail
+[ $# -eq 1 ] || { echo "usage: smokebox-reset OWNER-EMAIL"; exit 2; }
+set -a; . /etc/smokebox/server.env; set +a
+/opt/smokebox/bin/smokebox-server owner-reset "$1"
+CMD
+chmod 700 /usr/local/bin/smokebox-staff /usr/local/bin/smokebox-reset
+
+# A copy of the database every night, kept 14 days, in /var/backups/smokebox.
+mkdir -p /var/backups/smokebox && chmod 700 /var/backups/smokebox
+cat > /etc/cron.daily/smokebox-backup <<'CMD'
+#!/bin/sh
+set -e
+cd /var/backups/smokebox
+sudo -u postgres pg_dump smokebox | gzip > "smokebox-$(date +%F).sql.gz.part" && mv "smokebox-$(date +%F).sql.gz.part" "smokebox-$(date +%F).sql.gz"
+find /var/backups/smokebox -name 'smokebox-*.sql.gz' -mtime +14 -delete
+CMD
+chmod 755 /etc/cron.daily/smokebox-backup
+
 # The password goes to Caddy on its input, not on the command line (where any user on the server could read it in the process list). An older Caddy
 # that cannot read it that way gets it on the command line as before.
 HASH="$(printf '%s\n' "$PASS" | caddy hash-password 2>/dev/null || true)"
@@ -140,8 +236,13 @@ ${DOMAIN} {
 	basic_auth {
 		${LOGIN} ${HASH}
 	}
-	reverse_proxy 127.0.0.1:8787 {
-		flush_interval -1
+	handle /api/voice* {
+		reverse_proxy 127.0.0.1:8788
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8790 {
+			flush_interval -1
+		}
 	}
 }
 CADDY
@@ -169,6 +270,7 @@ sleep 3
 echo
 echo "Done. Open https://${DOMAIN}/ and sign in as ${LOGIN}."
 echo "If your own domain was given, point its A record at this server's IP first."
-echo "Check:   systemctl status smokebox caddy"
+echo "Check:   systemctl status smokebox smokebox-voice caddy"
 echo "Logs:    journalctl -u smokebox -f"
-echo "Data:    /var/lib/smokebox/state.json (back this file up)"
+echo "Data:    Postgres database smokebox (copied every night to /var/backups/smokebox)"
+echo "Staff:   smokebox-staff you@example.com Freddy      Owner password link:   smokebox-reset owner@example.com"
