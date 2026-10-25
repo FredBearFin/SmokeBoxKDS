@@ -66,7 +66,7 @@ test('start over takes a backup first, clears everything, keeps settings, and is
     assert.deepEqual([s.menu.length, s.ingredients.length, s.batches.length, s.tickets.length, s.orders.length, Object.keys(s.stock).length, E.allEvents(s).length, s.catalog], [0, 0, 0, 0, 0, 0, 0, 'own']);
     assert.equal(S.isBlank(), true); assert.equal(S.isOwn(), true);
     assert.deepEqual([s.settings.service.taxRatePct, s.settings.office.pinHash], [8, 'sha256:' + 'ab12'.repeat(16)]);   // kept
-    assert.equal(E.moduleOn(s, 'cookAhead'), false);
+    assert.equal(E.moduleOn(s, 'cookAhead'), true);                                                               // the Hold cabinet starts on
     assert.deepEqual(C.customSpec(), { rename: { zones: { pit: 'Smoker' } }, add: {} });                               // station names kept
     for (const k of ['setup.draft', 'setup.examples', 'setup.hiddenStations', 'setup.hiddenCategories', 'setup.lastCategory', 'welcome', 'dlog']) assert.equal(b.m.has('smokebox.v1.' + k), false, k);
     assert.equal(b.get('smokebox.v1.theme', null), 'night'); assert.equal(b.get('smokebox.v1.lastbackup', null), 12345);

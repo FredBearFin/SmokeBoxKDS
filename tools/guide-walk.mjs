@@ -284,7 +284,7 @@ async function recipes(browser) {
   for (const t of ['Hold cabinet food', 'Add cabinet food']) check('cafe: ' + t, await has(p, t, sh));
   await p.reload(); await p.waitForTimeout(900);
   const t1 = await tabTexts(p);
-  check('cafe: one station in use shows no station tabs', t1.length === 0, t1);
+  check('cafe: one station in use shows no station tabs (only All and Cabinet)', t1.filter((x) => !/^(All|Cabinet)/.test(x)).length === 0, t1);
   await tap(p, 'New ticket'); await p.waitForTimeout(500);
   await tap(p, 'Latte'); await p.waitForTimeout(200);
   for (const t of ['Takeout', 'Dine-in', 'Cash', 'Card', 'Pay later', 'Allergy', 'Rush ticket', 'Send to kitchen']) check('order screen: ' + t, await seen(p, t));

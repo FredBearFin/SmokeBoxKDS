@@ -138,9 +138,9 @@ test('resetLive catalog rules across every start and option', () => {
     if (catalog === 'blank') assert.deepEqual([n.menu.length, n.ingredients.length], [0, 0], label);
     if (catalog === undefined) assert.equal(n.menu.length, keep ? s.menu.length : (own ? 0 : 21), label);
     assert.deepEqual([n.tickets.length, n.batches.length > 0 && catalog !== 'sample' && !own ? 'ok' : 'ok'], [0, 'ok'], label);
-    // the sample always comes with cook-ahead on (modules absent), a blank restart always with it off
+    // the sample always comes with cook-ahead on (modules absent), and a blank restart keeps the owner's setting
     if (catalog === 'sample') assert.equal(E.moduleOn(n, 'cookAhead'), name === 'sample' || name === 'legacy' ? E.moduleOn(s, 'cookAhead') : true, label);
-    if (catalog === 'blank') assert.equal(E.moduleOn(n, 'cookAhead'), false, label);
+    if (catalog === 'blank') assert.equal(E.moduleOn(n, 'cookAhead'), E.moduleOn(s, 'cookAhead'), label);
     const v = E.validateBackup(E.serialize(n));
     assert.deepEqual(v.repaired, [], label);
   }
@@ -222,7 +222,8 @@ function scenarios(Eng) {
   c = ok(Eng.apply(c, 'completeItem', { ticketId: c.tickets[0].id, itemId: c.tickets[0].items[0].id }, T0 + 101e3));
   if (!c || 'cost' in c.tickets[0].items[0]) bad.push('COST a dish with no recipe recorded a cost');
   // batches cannot start while cook-ahead is off
-  const r = Eng.apply(Eng.newState({ now: T0, blank: true }), 'addBatch', { ing: 'brisket', tempF: 160, cookedG: 100 }, T0);
+  const offK = Eng.apply(Eng.newState({ now: T0, blank: true }), 'updateSettings', { patch: { modules: { cookAhead: false } } }, T0).state;
+  const r = Eng.apply(offK, 'addBatch', { ing: 'brisket', tempF: 160, cookedG: 100 }, T0);
   if (r.report !== 'moduleOff') bad.push('MODULE a batch was started with cook-ahead off (' + r.report + ')');
   // a recipe line cannot point at a missing ingredient (invariant B1 sees it)
   const broken = JSON.parse(JSON.stringify(Eng.newState({ now: T0, blank: true })));

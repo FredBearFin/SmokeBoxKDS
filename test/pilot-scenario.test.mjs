@@ -11,11 +11,10 @@ const MIN = 60e3, HR = 60 * MIN, DAY = 24 * HR;
 const T0 = new Date(2026, 9, 19, 10, 0, 0).getTime();
 const ok = (r, w) => { assert.equal(r.report, 'ok', (w || '') + ' ' + r.report + ' ' + JSON.stringify(r.info)); return r; };
 
-// A blank own kitchen with cook-ahead on and two cooked products: one with a cost per kilogram, one without.
+// A blank own kitchen (the Hold cabinet starts on) and two cooked products: one with a cost per kilogram, one without.
 function kitchen() {
   let s = E.newState({ now: T0, empty: true, settings: E.blankSettings() });
   const go = (type, p, t) => { s = ok(E.apply(s, type, p, t), type).state; };
-  go('updateSettings', { patch: { modules: { cookAhead: true } } }, T0);
   go('addIngredient', { name: 'Pit pork', unit: 'g', tcs: true, hold: 'hot', costPerKg: 12 }, T0);
   go('addIngredient', { name: 'House ribs', unit: 'g', tcs: true, hold: 'hot' }, T0);
   return { get s() { return s; }, set s(v) { s = v; }, go };
