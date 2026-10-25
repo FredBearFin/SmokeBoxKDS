@@ -1304,7 +1304,6 @@
       { key: 'dayStartHour', name: 'Service day starts at', min: 0, max: 8, mean: 'A sale rung up before this hour counts toward the day before. A 12:45 am sale still belongs to last night.' },
       { key: 'openHour', name: 'Opens at', min: 0, max: 23, mean: 'The first hour of service.' },
       { key: 'closeHour', name: 'Closes at', min: 1, max: 30, mean: 'The last hour of service. 25 means 1 am the next day.' },
-      { key: 'soundStartHour', name: 'Warnings start at', min: 0, max: 23, mean: 'Warning sounds start at this hour, or at opening if that is earlier. Set it to when the pit master starts. Before it the strip says sound is paused.' },
     ];
     const hgrid = h('div', { class: 'od-fgrid' });
     const hf = hours.map((p) => {
@@ -1324,17 +1323,7 @@
       hgrid.appendChild(f.el);
       return { f, p };
     });
-    // Lets warning sounds play at any hour, not only between the start hour and closing.
-    const outTog = SB.ui.toggle({
-      label: 'Warnings may sound outside open hours', checked: !!((cur() || {}).settings.service || {}).soundOutsideHours,
-      // Saves the choice as a service setting and confirms it in words.
-      onChange: (v) => {
-        const r = send('updateSettings', { patch: { service: { soundOutsideHours: v } } });
-        if (good(r)) sst.ok(v ? 'Warnings may now sound at any hour.' : 'Warnings sound only from the start hour to closing.');
-        else { outTog.setValue(!v); sst.bad(refusal(r, { name: 'Sound outside open hours' })); }
-      },
-    });
-    pn.body.append(hgrid, h('div', { class: 'od-toggle-row' }, outTog), sst.el);
+    pn.body.append(hgrid, sst.el);
 
     // Sales tax: one rate that is added to every order when it is paid.
     pn.body.appendChild(sub('Sales tax'));

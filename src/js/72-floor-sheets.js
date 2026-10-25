@@ -1117,10 +1117,10 @@
     const addBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg hc-add', onClick: () => add() }, ico('plus', 22), h('span', null, 'Put in hold cabinet'));
     const footer = h('div', { class: 'hc-foot' }, err, addBtn);
 
-    // With no cooked-ahead item yet the Product list is empty, so say so and offer the way to add one.
-    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cooked-ahead items yet. Add the food you cook ahead, like pulled pork or chili, and then log a batch of it here.'),
-      // Opens the Cooked-ahead food sheet where the first item is added.
-      h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add a cooked-ahead item'))));
+    // With no cabinet food yet the Product list is empty, so say so and offer the way to add one.
+    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cabinet foods yet. Add the food you keep hot or cold, like pulled pork or chili, and then log a batch of it here.'),
+      // Opens the Hold cabinet food sheet where the first item is added.
+      h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add cabinet food'))));
     // With nothing to log yet, only the explanation and the Add button show; the weight steppers wait for a product.
     const el = h('div', { class: 'hc-panel hc-form' + (list().length ? '' : ' hc-noprod') },
       h('h3', { class: 'fs-h' }, 'New batch'),
@@ -1976,7 +1976,7 @@
   function helpAbout(sheet) {
     return h('div', { class: 'hp-pane' },
       helpList([
-        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants that cook food ahead: tickets, paced start times, a hold cabinet and a sold-out list.'),
+        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants and food trucks: tickets, paced start times, a hold cabinet and a sold-out list.'),
         helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
         helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
         helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
@@ -2264,9 +2264,11 @@
     })();
     // Signed in to the hosted server: which kitchen and account this device is on, and a way to sign this one device out.
     // Sign this device out: the kitchen and the other devices stay as they are.
-    const signOutBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'sign-out' }, onClick: () => SB.cloud.signOut() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Sign this device out'));
+    const signOutBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'sign-out' }, onClick: () => SB.cloud.signOut() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Take this device out of the kitchen'));
+    // Devices: add a tablet with a code, rename or remove one (behind the manager PIN when one is set).
+    const devicesBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'devices' }, onClick: () => closeThen(sheet, () => SB.sheets.open('devices')) }, ico('grid', 22), h('span', { class: 'grow' }, 'Devices: add, rename or remove'));
     const cloudBlock = SB.cloud && SB.cloud.on
-      ? settingBlock('Your kitchen', 'This device is signed in to ' + SB.cloud.kitchen.name + ' (' + SB.cloud.email + '). Every device signed in to it shows the same tickets.', signOutBtn)
+      ? settingBlock('Your kitchen', 'This device' + (SB.cloud.device ? ' (' + SB.cloud.device.name + ')' : '') + ' is joined to ' + SB.cloud.kitchen.name + '. Every joined device shows the same tickets.', devicesBtn, signOutBtn)
       : null;
     sheet.body.append(h('div', { class: 'mn' },
       cloudBlock,

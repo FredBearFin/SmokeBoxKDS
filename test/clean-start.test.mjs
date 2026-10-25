@@ -18,14 +18,14 @@ test('a blank state is empty, healthy and marked', () => {
   assert.equal(b.catalog, 'own');
   assert.equal(b.settings.service.taxRatePct, 0);
   assert.equal(b.settings.pacing.enabled, true);   // the timing engine is on from the start
-  assert.deepEqual(b.settings.modules, { cookAhead: false });
+  assert.deepEqual(b.settings.modules, { cookAhead: true });
   assert.deepEqual(E.checkInvariants(b, T), []);
   assert.equal(JSON.stringify(b).indexOf('brisket'), -1);
 });
 
 test('the module switch: absent means on, only an explicit false is off', () => {
   assert.equal(E.moduleOn(E.newState({ now: T }), 'cookAhead'), true);
-  assert.equal(E.moduleOn(E.newState({ now: T, blank: true }), 'cookAhead'), false);
+  assert.equal(E.moduleOn(E.newState({ now: T, blank: true }), 'cookAhead'), true);
   assert.equal(E.moduleOn(null, 'cookAhead'), true);
 });
 
@@ -34,7 +34,7 @@ test('a blank save round-trips with no repairs and the sample is not put back', 
   let v = E.validateBackup(E.serialize(b));
   assert.equal(v.ok, true); assert.deepEqual(v.repaired, []);
   assert.deepEqual([v.state.menu.length, v.state.ingredients.length, v.state.catalog], [0, 0, 'own']);
-  assert.deepEqual(v.state.settings.modules, { cookAhead: false });
+  assert.deepEqual(v.state.settings.modules, { cookAhead: true });
   b = E.apply(b, 'addMenuItem', pie, T).state;
   v = E.validateBackup(E.serialize(b));
   assert.deepEqual(v.repaired, []); assert.equal(v.state.menu.length, 1);
@@ -99,7 +99,7 @@ test('resetLive can load the sample catalog; it protects an owner kitchen that h
   const keep = E.apply(mine, 'resetLive', {}, T).state;
   assert.deepEqual([keep.menu.length, keep.catalog], [1, 'own']);
   const toBlank = E.apply(E.newState({ now: T }), 'resetLive', { catalog: 'blank' }, T).state;
-  assert.deepEqual([toBlank.menu.length, toBlank.ingredients.length, toBlank.catalog, toBlank.settings.modules], [0, 0, 'own', { cookAhead: false }]);
+  assert.deepEqual([toBlank.menu.length, toBlank.ingredients.length, toBlank.catalog, E.moduleOn(toBlank, 'cookAhead')], [0, 0, 'own', true]);
 });
 
 test('Sim.restartDemo-style sample load leaves the barbecue demo as before', () => {

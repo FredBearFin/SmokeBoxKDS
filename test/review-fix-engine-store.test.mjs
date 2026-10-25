@@ -17,7 +17,7 @@ function kitchen(opts) {
 
 test('Ada 3: a batch logged by raw weight for an ingredient with no price keeps no cost, and its discard records no cost', () => {
   const k = kitchen();
-  assert.equal(k.go('updateSettings', { patch: { modules: { cookAhead: true } } }).report, 'ok');
+  assert.equal(E.moduleOn(k.s, 'cookAhead'), true, 'the Hold cabinet starts on');
   const r = k.go('addIngredient', { name: 'Mystery pork', tcs: true, hold: 'hot' });
   assert.equal(r.report, 'ok', JSON.stringify(r.info));
   const ing = k.s.ingredients.find((i) => i.name === 'Mystery pork');
@@ -35,7 +35,6 @@ test('Ada 3: a batch logged by raw weight for an ingredient with no price keeps 
 
 test('Ada 3: with a price per kg, the raw-weight cost is still worked out', () => {
   const k = kitchen();
-  k.go('updateSettings', { patch: { modules: { cookAhead: true } } });
   k.go('addIngredient', { name: 'Priced pork', tcs: true, hold: 'hot', costPerKg: 10 });
   const ing = k.s.ingredients.find((i) => i.name === 'Priced pork');
   const b = k.go('addBatch', { ing: ing.id, rawG: 4000, cookedG: 2000, tempF: 165 });

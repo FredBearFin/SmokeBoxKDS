@@ -1,0 +1,3 @@
+# The same compiler as the engine crate, so both build the same way everywhere.
+[toolchain]
+channel = "1.97.0"

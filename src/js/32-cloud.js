@@ -29,7 +29,7 @@
     return { on: !!cfg, connected: since === Infinity, downMs: since === Infinity ? 0 : Date.now() - since, waiting };
   }
   // Sends the device to the sign-in page (used when the server says this device is signed out).
-  function toSignIn() { try { g.location.href = '/login'; } catch (e) { /* not in a browser */ } }
+  function toSignIn() { try { g.location.href = '/start'; } catch (e) { /* not in a browser */ } }
 
   // Builds the store transport. The stream reconnects by itself (EventSource does); a stream refused because the device was signed out
   // sends the person to sign in. Every push answered by the server (applied or refused) counts as done; no answer means "try later".
@@ -90,7 +90,7 @@
     };
   }
 
-  // Signs this device out (only this device; the kitchen and the other devices are not touched) and goes to the sign-in page.
+  // Takes this device out of the kitchen (only this device; the kitchen and the other devices are not touched) and goes to the start page.
   async function signOut() {
     try { await g.fetch('/api/logout', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' }); } catch (e) { /* signed out locally anyway */ }
     toSignIn();
@@ -113,7 +113,7 @@
   })();
 
   SB.cloud = {
-    on: !!cfg, kitchen: cfg ? cfg.kitchen : null, email: cfg ? cfg.email : null, deviceId,
+    on: !!cfg, kitchen: cfg ? cfg.kitchen : null, device: cfg && cfg.device ? cfg.device : null, deviceId,
     transport, status, signOut, guardKitchen,
     // Calls fn whenever the connection status changes; returns a function that stops it.
     onChange(fn) { st.listeners.add(fn); return () => st.listeners.delete(fn); },

@@ -1,6 +1,6 @@
 /*
  * WHAT THIS FILE IS: The "Close the day" flow. A plain sheet that checks nothing is still open, shows the day's
- * money by cash, card and other, asks what to do with leftover food (only when cooked-ahead food is tracked),
+ * money by cash, card and other, asks what to do with leftover food (only when cabinet food is tracked),
  * closes the day through the engine, offers a backup, and prints a one-page end-of-day summary.
  * PARTS: 1 pure model (runs in Node tests), 2 the sheet, 3 printing, 4 the public calls.
  * USES: SB.engine (closeDay, orderTotals), SB.store, SB.ui.sheet, SB.metrics (thrown-out food), SB.util.
@@ -94,7 +94,7 @@
 
   // Reads the saved state, or null when the store is not ready.
   function stateNow() { try { return SB.store.getState(); } catch (e) { return null; } }
-  // True when cooked-ahead food is tracked (a missing setting counts as on).
+  // True when cabinet food is tracked (a missing setting counts as on).
   function cookAheadOn() { try { return SB.engine.moduleOn(stateNow(), 'cookAhead'); } catch (e) { return true; } }
 
   // Opens the Close the day sheet and keeps it current while it is open. Returns the sheet.
@@ -146,7 +146,7 @@
       body.appendChild(countsBlock(m));
       // The closing button says when it will also throw food out, so that choice is never a surprise.
       let setGoLabel = () => {};
-      // Leftover food, only when cooked-ahead food is tracked and some is left.
+      // Leftover food, only when cabinet food is tracked and some is left.
       if (cookAheadOn() && m.leftovers.count > 0) {
         const headId = U.uid('cdleft');
         const sec = h('section', { class: 'cd-sec', role: 'radiogroup', 'aria-labelledby': headId }, h('h3', { id: headId }, 'Food still in the cabinet'),

@@ -1390,6 +1390,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .fl-strip-sound { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 4px var(--sp-4); border: 0; background: var(--ink); color: var(--bg); font: inherit; font-size: calc(15px * var(--fl-k)); font-weight: 700; text-align: left; cursor: pointer; }
 .fl-strip-sound[hidden] { display: none; }
 .fl-strip-pause { background: var(--sub); color: var(--ink); border-bottom: 1px solid var(--line); font-weight: 600; min-height: 28px; font-size: calc(13px * var(--fl-k)); }
+/* A long note wraps instead of running off a phone screen. */
+.fl-strip-pause-t { min-width: 0; white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .fl-strip-row:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -4px; }
 
 /* The header: brand, station tabs, status chips, tool buttons, New ticket and Menu. */
@@ -1482,6 +1484,10 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
   .fl-office { min-width: var(--tap); min-height: var(--tap); }
 }
 .fl-orders { flex: none; min-width: calc(62px * var(--fl-k)); white-space: nowrap; }
+.fl-help { flex: none; white-space: nowrap; }
+/* Help shows its icon only on small tablets, and on a phone it moves into the Menu (first row) so the header fits. */
+@media (max-width: 700px) { .fl-help .fl-tool-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; } .fl-help { min-width: var(--tap); min-height: var(--tap); } }
+@media (max-width: 480px) { .fl-help { display: none; } }
 @media (max-width: 700px) {
   .fl-orders-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
   .fl-orders { min-width: var(--tap); min-height: var(--tap); }
@@ -2981,6 +2987,28 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* "At once" (a station's limit) and "Portions in one basket" boxes: a short number box with its label. */
 .dp-capwrap { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .dp-cap { width: 5.5rem; text-align: center; }
+/* Devices (dv-): the big join code, and one row per joined device with its name, last use and Remove. */
+.dv { display: grid; gap: var(--sp-3); }
+.dv-code { padding: var(--sp-4); border: var(--bw) solid var(--amber); border-radius: var(--r-card); background: var(--paper); text-align: center; }
+.dv-digits { font: var(--w-heavy) 56px/1.1 var(--font-display); letter-spacing: 0.08em; margin: var(--sp-2) 0; }
+.dv-list { display: grid; gap: var(--sp-2); }
+.dv-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-top: var(--bw-thin) solid var(--line-soft); }
+.dv-main { flex: 1 1 auto; min-width: 0; display: grid; gap: 4px; }
+/* Help (hp-): Guide matches, the support request form and My requests with each conversation. */
+.hp { display: grid; gap: var(--sp-3); }
+.hp-hit { justify-content: flex-start; text-align: left; }
+.hp-hit .grow { display: grid; gap: 2px; }
+.hp-what { min-height: 7rem; resize: vertical; }
+.hp-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin: var(--sp-2) 0; }
+.hp-row textarea { flex: 1 1 16rem; }
+.hp-diag { max-height: 14rem; overflow: auto; font-size: 12px; white-space: pre-wrap; background: var(--sub); padding: var(--sp-2); border-radius: var(--r-chip); }
+.hp-req { border-top: var(--bw-thin) solid var(--line-soft); padding: var(--sp-2) 0; }
+.hp-req > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.hp-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--crimson); flex: none; }
+.hp-msg { border: var(--bw-thin) solid var(--line); border-radius: var(--r-chip); padding: var(--sp-2); margin: var(--sp-2) 0; background: var(--paper); }
+.hp-staff { border-color: var(--amber); border-width: var(--bw); }
+.hp-body { white-space: pre-wrap; }
+.hp-img { max-width: 100%; border-radius: var(--r-chip); margin-top: var(--sp-2); }
 
 /* ===== 22-floor-tour.css ===== */
 /*
@@ -4581,7 +4609,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
+window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -5096,7 +5124,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
   // The settings that belong to the device, not to a kitchen (look, sound, which station this tablet shows). They
   // are the same in the demo and the real kitchen. Every other smokebox.v1 key is kitchen data and gets its own
   // copy in the demo (smokebox.demo.<name>), so the demo can never read or write the real kitchen's data.
-  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'voicename', 'cloudKitchen', 'deviceId', 'callouts', 'far', 'wall', 'dock', 'countervisit'].map((k) => 'smokebox.v1.' + k);
+  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'voicename', 'cloudKitchen', 'deviceId', 'supportOutbox', 'callouts', 'far', 'wall', 'dock', 'countervisit'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'pacingFix1', 'sid', 'writer', 'histtrim', 'histnotice', 'sleepSnap', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
@@ -5588,8 +5616,8 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
   // compares 86 times with closeHour.
   // taxRatePct is the sales tax in percent added to an order when it is paid. 0 means no tax is added. The owner
   // sets the real local rate; Smokebox does not know it.
-  // soundStartHour is when warning sounds may start (never later than opening, so a pit master who starts at 4 am can
-  // hear them); soundOutsideHours lets them sound at any hour. Outside that window the strip shows a note instead.
+  // soundStartHour and soundOutsideHours are no longer used (sound follows each tablet's sound button at any hour); they
+  // stay in the settings so backups made with them still load.
   C.service = { dayStartHour: 4, openHour: 11, closeHour: 21, taxRatePct: 0, soundStartHour: 11, soundOutsideHours: false,
     // Minutes a sold-out-by-quality-limit dish waits before the channel update starts, in case it is kept serving.
     qualitySyncHoldMin: 10 };
@@ -6716,7 +6744,8 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     // calls each dish at its own start time only when pacing gives it one. Prep times start as guesses and learn from real cooks.
     // Extra portions of a dish cook side by side (one basket, one grill), so they add no time in a new kitchen.
     S.pacing.qtyFactor = 0;
-    S.modules = { cookAhead: false };
+    // Every kitchen holds some food hot or cold and logs temperatures, so the Hold cabinet and Readings are on from the start.
+    S.modules = { cookAhead: true };
     // No made-up customer buttons (Walk-up, Pickup, Table 1 to 6) in a new kitchen: the owner adds their own in How you serve.
     S.service.chips = [];
     return S;
@@ -9431,7 +9460,6 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     let settings;
     if (keep && !(sample && own)) {
       settings = s.settings;
-      if (p.catalog === 'blank') settings = Object.assign({}, settings, { modules: Object.assign({}, settings.modules, { cookAhead: false }) });
     }
     const ns = newState({
       now: tx.now, seq: s.seq, starter: p.starter !== false, stagger: p.stagger === true, blank, settings,
@@ -11266,41 +11294,9 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
         consequence: late ? 'Food-contact surfaces are overdue for sanitizing.' : 'Food-contact surfaces are due for sanitizing at ' + U.fmtTime(C0.sanitizeDueAt) + '.', action: 'Sanitize and tick it off.', unknown: false });
     }
   }
-  // The hour of day (0 to 24 and a fraction) that warning sounds may start: the sound start hour, or opening if that
-  // is earlier. Returns the service settings with it.
-  function soundWindow(state) {
-    const sv = state && state.settings && state.settings.service ? state.settings.service : C.service;
-    const start = Math.min(U.isNum(sv.soundStartHour) ? sv.soundStartHour : sv.openHour, sv.openHour);
-    return { start, end: sv.closeHour, all: sv.soundOutsideHours === true };
-  }
-  // True when warning sounds may play: from the sound start hour (opening unless set earlier) to closing, or any
-  // hour when the owner allows sound outside open hours. Before that and after closing the strip still shows the
-  // rows, but nothing beeps or speaks into an empty kitchen. Rungs missed while quiet sound once when it opens.
-  function soundsAllowed(state, now) {
-    if (!state || !U.isNum(now)) return false;
-    const w = soundWindow(state);
-    if (w.all) return true;
-    const d = new Date(now);
-    const hr = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
-    return (hr >= w.start && hr < w.end) || (hr + 24 >= w.start && hr + 24 < w.end);
-  }
-  // The next moment warning sounds start, or null when they may sound now.
-  function nextOpenAt(state, now) {
-    if (!state || !U.isNum(now) || soundsAllowed(state, now)) return null;
-    const w = soundWindow(state);
-    const whole = Math.floor(w.start), mins = Math.round((w.start - whole) * 60);
-    for (let day = 0; day < 3; day++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() + day); d.setHours(whole, mins, 0, 0);
-      if (d.getTime() > now) return d.getTime();
-    }
-    return null;
-  }
-  // The words for the strip while sounds are paused, for example "Sound paused: kitchen closed until 11:00 am", or null.
-  function pauseNote(state, now) {
-    const at = nextOpenAt(state, now);
-    return at == null ? null : 'Sound paused: kitchen closed until ' + U.fmtTime(at);
-  }
+  // True when warning sounds and call-outs may play. SmokeBox is call-out software: when a tablet's sound is on, it sounds at
+  // any hour (opening hours only shape the charts). Kept as a function so the board and the ladder ask one place.
+  function soundsAllowed(state, now) { return !!state && U.isNum(now); }
   // How long a loud tone waits before repeating while nobody has tapped the row: 20 seconds of kitchen time.
   const LOUD_REPEAT_MS = 20e3;
   // Ladder memory entries older than this (kitchen time) are dropped.
@@ -11706,7 +11702,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { spoken, clipWords, delivery, numWords, voiceInfo, build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, batchWaste, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
+  SB.deadlines = { spoken, clipWords, delivery, numWords, voiceInfo, build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, closeAtMs, sweepToClose, batchWaste, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 25-deadlines.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'25-deadlines.js',message:String(e&&e.message||e)});}
@@ -13301,6 +13297,9 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     if (mode === 'demo' || !state) return false;
     flush();
     try { g.sessionStorage.setItem(U.MODE_KEY, 'demo'); } catch (e) { return false; }
+    // The address says ?demo too: a browser that loses the tab's note on reload (seen with local files) still opens the demo.
+    // Leaving the demo takes it off the address again.
+    try { if (g.location && g.history && g.history.replaceState && !/[?&]demo(=|&|$)/.test(g.location.search || '')) g.history.replaceState(null, '', g.location.pathname + (g.location.search ? g.location.search + '&demo' : '?demo') + g.location.hash); } catch (e) { /* the tab's note still works */ }
     reloadPage();
     return true;
   }
@@ -13484,7 +13483,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     return { ok: true, report: 'ok', info: { keepSettings: keep }, backup: { text, filename: 'smokebox-before-start-over-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.json', mime: 'application/json', savedAt, chars: text.length } };
   }
   // True when this real kitchen holds nothing that cannot simply be typed in again: no tickets, orders, cooked batches or kept
-  // history (only dishes, cooked-ahead items and settings, or nothing at all). Start over may then be one step (opts.quick).
+  // history (only dishes, cabinet foods and settings, or nothing at all). Start over may then be one step (opts.quick).
   function nothingToLose() {
     if (!state || mode === 'demo') return false;
     return ['tickets', 'orders', 'batches', 'eventArchive', 'safetyKeep'].every((k) => !Array.isArray(state[k]) || state[k].length === 0);
@@ -13569,7 +13568,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     return { on: !!cfg, connected: since === Infinity, downMs: since === Infinity ? 0 : Date.now() - since, waiting };
   }
   // Sends the device to the sign-in page (used when the server says this device is signed out).
-  function toSignIn() { try { g.location.href = '/login'; } catch (e) { /* not in a browser */ } }
+  function toSignIn() { try { g.location.href = '/start'; } catch (e) { /* not in a browser */ } }
 
   // Builds the store transport. The stream reconnects by itself (EventSource does); a stream refused because the device was signed out
   // sends the person to sign in. Every push answered by the server (applied or refused) counts as done; no answer means "try later".
@@ -13630,7 +13629,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     };
   }
 
-  // Signs this device out (only this device; the kitchen and the other devices are not touched) and goes to the sign-in page.
+  // Takes this device out of the kitchen (only this device; the kitchen and the other devices are not touched) and goes to the start page.
   async function signOut() {
     try { await g.fetch('/api/logout', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' }); } catch (e) { /* signed out locally anyway */ }
     toSignIn();
@@ -13653,7 +13652,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
   })();
 
   SB.cloud = {
-    on: !!cfg, kitchen: cfg ? cfg.kitchen : null, email: cfg ? cfg.email : null, deviceId,
+    on: !!cfg, kitchen: cfg ? cfg.kitchen : null, device: cfg && cfg.device ? cfg.device : null, deviceId,
     transport, status, signOut, guardKitchen,
     // Calls fn whenever the connection status changes; returns a function that stops it.
     onChange(fn) { st.listeners.add(fn); return () => st.listeners.delete(fn); },
@@ -21531,7 +21530,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, kind: '', text: '', sub: null };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, staleSnooze: 0, kind: '', text: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -21544,6 +21543,25 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
   function useNewTime() { SB.store.acceptClockJump(); paintBanner(); }
   // Keeps the old time and stays quiet about the jump for ten minutes.
   function keepOldTime() { bn.clockSnooze = Date.now() + 10 * 60000; paintBanner(); }
+  // The open tickets made before today's service day began (the "service day starts at" hour, 4 am unless changed): food
+  // nobody will cook now. Paid orders are left out, since their food cannot be voided without reopening the order.
+  function staleTickets(s, now) {
+    const sv = (s.settings && s.settings.service) || {};
+    const start = new Date(now); start.setHours(U && U.isNum(sv.dayStartHour) ? sv.dayStartHour : 4, 0, 0, 0);
+    if (start.getTime() > now) start.setDate(start.getDate() - 1);
+    const paid = new Set((s.orders || []).filter((o) => o && o.status === 'paid').map((o) => o.id));
+    return s.tickets.filter((t) => t && t.status === 'active' && t.createdAt < start.getTime() && !(t.orderId && paid.has(t.orderId)));
+  }
+  // Voids each old ticket with the reason "Left from an earlier day" and offers one Undo that brings them all back.
+  function clearStale(old) {
+    let n = 0;
+    old.forEach((t) => { const r = SB.store.dispatchEx('voidTicket', { ticketId: t.id, reason: 'Left from an earlier day' }, { source: 'ui' }); if (r.report === 'ok') n++; });
+    paintBanner();
+    if (!n || !SB.ui || !SB.ui.toast) return;
+    // Undoes the voids one by one, newest first, through the engine's own undo.
+    const undoAll = () => { for (let i = 0; i < n; i++) SB.store.dispatchEx('undo', {}, { source: 'ui' }); paintBanner(); };
+    SB.ui.toast(h('span', null, 'Cleared ' + n + ' old ' + (n === 1 ? 'ticket' : 'tickets') + '. ', h('button', { type: 'button', class: 'btn btn-sm', onClick: undoAll }, 'Undo')), { tone: 'ok', ms: 10000 });
+  }
   // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
   function bannerWanted() {
     const store = SB.store;
@@ -21562,6 +21580,9 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       return { kind: 'clock', tone: 'warn', text: 'The clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(ss.clockSuspect.aheadMs / 3600000) + ' hours') + '. Still on the old time.', act: 'Use the new time', onAct: useNewTime, later: true, laterLabel: 'Keep the old time', onLater: keepOldTime };
     }
     if (!s) return null;
+    // Tickets still open from an earlier service day get one tap to clear them (each is voided, with Undo).
+    const old = staleTickets(s, store.now ? store.now() : Date.now());
+    if (old.length && Date.now() >= bn.staleSnooze) return { kind: 'stale', tone: 'warn', text: old.length + ' ' + (old.length === 1 ? 'ticket' : 'tickets') + ' left from an earlier day.', act: 'Clear them', onAct: () => clearStale(old), later: true, laterLabel: 'Hide for now', onLater: () => { bn.staleSnooze = Date.now() + 4 * 3600e3; paintBanner(); } };
     // With the hosted server the kitchen is kept there, so the daily "save a backup file" nudge is not needed.
     if (cs) return null;
     // Service is over only when nothing is left on the board and no order is still open.
@@ -21583,7 +21604,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
     const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: w.laterLabel || 'Hide for 45 minutes', onClick: () => { if (w.onLater) w.onLater(); else { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } } }, ico('x', 18), h('span', { class: 'visually-hidden' }, w.laterLabel || 'Later')) : null;
-    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : w.kind === 'stale' ? 'ticket' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
     st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip
@@ -22599,11 +22620,15 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     // Back office is a plain labeled button for managers: sales, speed, stock and the menu. It asks for the PIN when one is set.
     const officeBtn = h('button', { type: 'button', class: 'btn fl-tool fl-office', 'aria-label': 'Back office', 'aria-keyshortcuts': 'Control+Shift+O', onClick: (e) => openOffice(e.currentTarget) }, ico('gauge', 24), h('span', { class: 'fl-tool-label fl-office-label' }, 'Back office'));
     try { SB.ui.tooltip(officeBtn, 'Back office: sales, speed, stock and your menu'); } catch (e) { /* ignore */ }
+    // Help is always in the header: the Guide, and on a hosted kitchen SmokeBox support. A dot shows when support has answered.
+    const tHelp = tool('support', 'help', 'Help: the Guide and SmokeBox support', 'Help', null, 'support');
+    tHelp.b.classList.add('fl-help');
+    if (SB.support) SB.support.onUnread((n) => { tHelp.n.hidden = !n; tHelp.n.textContent = n ? String(n) : ''; tHelp.b.setAttribute('aria-label', 'Help' + (n ? ', ' + n + ' new ' + U.plural(n, 'reply', 'replies') : '')); });
     const brandBox = h('div', { class: 'fl-brand' }, brand);
     const spacer = h('div', { class: 'fl-spacer', 'aria-hidden': 'true' });
-    const head = h('header', { class: 'fl-head' }, brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn);
+    const head = h('header', { class: 'fl-head' }, brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, tHelp.b, officeBtn, menuBtn);
     // The same parts in two orders; layoutHead picks one so keyboard order matches what the eye sees.
-    m.headParts = { wide: [brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn], narrow: [brandBox, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn, tabs] };
+    m.headParts = { wide: [brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, tHelp.b, officeBtn, menuBtn], narrow: [brandBox, spacer, status, tools, newBtn, tOrders.b, tHelp.b, officeBtn, menuBtn, tabs] };
     // WATCH OUT: on a portrait tablet the Sanitize chip, Recall and 86 sit on the top row with New ticket, so a cook reaches them without the Menu.
     // On a phone (700 px or less) the stylesheet moves them into the Menu list.
 
@@ -22669,7 +22694,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     TABS.forEach((id) => { const b = seg.querySelector('[data-id="' + id + '"]'); if (b) m.tabParts[id] = { count: b.querySelector('.seg-count'), n: -1 }; });
     m.seg = seg; F.applyHiddenTabs();
     m.sanText = sanChip.querySelector('.fl-chip-t');
-    Object.assign(m, { wl, wr, head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders, front: tFront }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
+    Object.assign(m, { wl, wr, head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders, front: tFront, help: tHelp }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
 
     grid.addEventListener('click', onGridClick);
     dockList.addEventListener('click', (e) => {
@@ -23396,8 +23421,17 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 
   // Icon for each state on read-only rows.
   const STATE_ICON = { displayed: 'zap', cooking: 'flame', done: 'check-circle' };
-  // Words for an item still waiting, for example "Start in 2:34".
-  const deckText = (it, now) => (it.fireAt <= now ? 'Starting now' : (it.held ? 'Station full. Start in ' : 'Start in ') + mss(it.fireAt - now));
+  // Words for an item still waiting, for example "Start in 2:34 to finish with Fries": the dish it is timed to finish
+  // with is named, so nobody wonders why it waits. A full station says so instead.
+  const deckText = (it, now, lead) => (it.fireAt <= now ? 'Starting now' : it.held ? 'Station full. Start in ' + mss(it.fireAt - now) : 'Start in ' + mss(it.fireAt - now) + (lead ? ' to finish with ' + lead : ''));
+  // The dish on the same ticket that this one is timed to finish with: the open dish that starts first (the longest cook).
+  function leadOf(rec, it) {
+    let best = null;
+    for (const x of rec.itemsRef || []) if (x.id !== it.id && x.status !== 'done' && x.fireAt < it.fireAt && (!best || x.fireAt < best.fireAt)) best = x;
+    return best ? best.short || best.name : '';
+  }
+  // Words on a read-only row whose dish is due: where it is due, so a cook on the wrong screen knows which station has it.
+  const dueAt = (it) => { const z = zoneById(it.zone); return 'Due now at ' + (z ? z.name || z.code : it.zone); };
   // The cook countdown: the time left of the dish's usual time, then how far past it. Only a cue: nothing here
   // ever completes the item, a person still taps it.
   function cookOf(it, now) {
@@ -23456,13 +23490,14 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     } else if (row.kind === 'deck') {
       row.main.dataset.state = 'queued';
       row.sr.textContent = ', waiting to start.';
-      put(row.deckT, deckText(it, now));
+      row.lead = leadOf(rec, it);
+      put(row.deckT, deckText(it, now, row.lead));
     } else if (changed) {
       row.main.dataset.state = st;
       row.stateEl.dataset.state = st;
       row.stateIcon.replaceChildren(ico(STATE_ICON[st] || 'zap', 20));
-      put(row.stateWord, st === 'cooking' ? roText(it, now) : st === 'done' ? 'Done' : 'Not started');
-      row.sr.textContent = st === 'done' ? ', done.' : st === 'cooking' ? ', cooking.' : ', not started.';
+      put(row.stateWord, st === 'cooking' ? roText(it, now) : st === 'done' ? 'Done' : dueAt(it));
+      row.sr.textContent = st === 'done' ? ', done.' : st === 'cooking' ? ', cooking.' : ', ' + dueAt(it).toLowerCase() + '.';
     }
   }
   // Words on a read-only cooking row: time left, or "Check it" once the time is up.
@@ -23474,7 +23509,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     const wait = it.status === 'displayed' && it.freeAt > now ? 'full' : '';
     if ((row.li.dataset.wait || '') !== wait) { if (wait) row.li.dataset.wait = wait; else delete row.li.dataset.wait; }
     if (row.status === 'queued') {
-      const tx = deckText(it, now);
+      const tx = deckText(it, now, row.lead);
       if (tx !== row.deckTText) { row.deckTText = tx; put(row.deckT, tx); }
     } else if (row.status === 'cooking') {
       if (row.kind === 'btn') paintCook(row, it, now, true);
@@ -23592,7 +23627,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     el.appendChild(clockWrap);
     const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear all notices', () => { if (m && m.noteKey) m.dis.add(m.noteKey); return 'snd'; }));
     el.appendChild(soundWrap);
-    // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
+    // The note line: shown while sound is on and there is something worth saying (another tab has the sound, history, keep awake). Tap for settings.
     const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
     const pauseWrap = h('div', { class: 'fl-strip-bar fl-bar-pause', hidden: true }, pauseBar, clearBtn('Clear this notice', () => 'pause:' + (pauseBar.textContent || '')));
     el.appendChild(pauseWrap);
@@ -23695,7 +23730,6 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     if (m.checked) { const t = U.fmtTime(Date.now()); if (m.checkedT !== t) { m.checkedT = t; m.checked.textContent = 'Updated ' + t; } }
     const all = SB.deadlines.build(store().getState(), now);
     m.feed = all;
-    // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
     syncLeadership();
     if (SB.deadlines.soundsAllowed(store().getState(), now)) {
       const calls = ladder.decide(all, now, store().getState());
@@ -23732,7 +23766,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
     const health = awayNote() || historyWords() || awakeNote();
-    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
+    const note = sound ? health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
     // Only one notice shows at a time (the "tap for sound" bar first, then the note, once sound is on); the bar never hints at a hidden notice, and
@@ -23878,6 +23912,8 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     setHidden(m.menuBtn.querySelector('.fl-menu-dot'), !needs);
     const menuName = needs ? 'Settings, something needs a look' : 'Settings';
     if (m.menuBtn.getAttribute('aria-label') !== menuName) m.menuBtn.setAttribute('aria-label', menuName);
+    // The Demo button is in the header only in the demo (or while demo orders run); a working kitchen has Help there, and Demo in the Menu.
+    setHidden(m.tool.demo.b, !(demoOn || (store().isDemo && store().isDemo())));
     toolCount(m.tool.demo, demoOn ? 1 : 0, 'warn', demoOn ? (speed > 1 ? 'clock running at x' + (Math.round(speed * 10) / 10) : 'demo orders running') : '', demoOn ? (speed > 1 ? 'x' + (Math.round(speed * 10) / 10) : 'on') : '');
     refit();
   }
@@ -23933,6 +23969,8 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     // Kitchen devices skip order entry, orders, demo and the back office; front devices skip the cabinet.
     const kit = role === 'kitchen', front = role === 'front';
     const items = [
+      // Help is the first row on a phone, where it is not in the header.
+      { hide: !mq('(max-width: 480px)'), label: 'Help: the Guide and support', icon: 'help', onClick: () => openSheet('support') },
       // The back office is the first row so a manager never has to hunt for it.
       { hide: kit, label: 'Back office', icon: 'gauge', onClick: () => openOffice(anchor) },
       // Menu, prices and shop is one tap away too: add a dish, change a price or a prep time.
@@ -26846,10 +26884,10 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     const addBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg hc-add', onClick: () => add() }, ico('plus', 22), h('span', null, 'Put in hold cabinet'));
     const footer = h('div', { class: 'hc-foot' }, err, addBtn);
 
-    // With no cooked-ahead item yet the Product list is empty, so say so and offer the way to add one.
-    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cooked-ahead items yet. Add the food you cook ahead, like pulled pork or chili, and then log a batch of it here.'),
-      // Opens the Cooked-ahead food sheet where the first item is added.
-      h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add a cooked-ahead item'))));
+    // With no cabinet food yet the Product list is empty, so say so and offer the way to add one.
+    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cabinet foods yet. Add the food you keep hot or cold, like pulled pork or chili, and then log a batch of it here.'),
+      // Opens the Hold cabinet food sheet where the first item is added.
+      h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add cabinet food'))));
     // With nothing to log yet, only the explanation and the Add button show; the weight steppers wait for a product.
     const el = h('div', { class: 'hc-panel hc-form' + (list().length ? '' : ' hc-noprod') },
       h('h3', { class: 'fs-h' }, 'New batch'),
@@ -27705,7 +27743,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
   function helpAbout(sheet) {
     return h('div', { class: 'hp-pane' },
       helpList([
-        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants that cook food ahead: tickets, paced start times, a hold cabinet and a sold-out list.'),
+        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants and food trucks: tickets, paced start times, a hold cabinet and a sold-out list.'),
         helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
         helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
         helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
@@ -27993,9 +28031,11 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     })();
     // Signed in to the hosted server: which kitchen and account this device is on, and a way to sign this one device out.
     // Sign this device out: the kitchen and the other devices stay as they are.
-    const signOutBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'sign-out' }, onClick: () => SB.cloud.signOut() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Sign this device out'));
+    const signOutBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'sign-out' }, onClick: () => SB.cloud.signOut() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Take this device out of the kitchen'));
+    // Devices: add a tablet with a code, rename or remove one (behind the manager PIN when one is set).
+    const devicesBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'devices' }, onClick: () => closeThen(sheet, () => SB.sheets.open('devices')) }, ico('grid', 22), h('span', { class: 'grow' }, 'Devices: add, rename or remove'));
     const cloudBlock = SB.cloud && SB.cloud.on
-      ? settingBlock('Your kitchen', 'This device is signed in to ' + SB.cloud.kitchen.name + ' (' + SB.cloud.email + '). Every device signed in to it shows the same tickets.', signOutBtn)
+      ? settingBlock('Your kitchen', 'This device' + (SB.cloud.device ? ' (' + SB.cloud.device.name + ')' : '') + ' is joined to ' + SB.cloud.kitchen.name + '. Every joined device shows the same tickets.', devicesBtn, signOutBtn)
       : null;
     sheet.body.append(h('div', { class: 'mn' },
       cloudBlock,
@@ -28037,6 +28077,111 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 72-floor-sheets.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'72-floor-sheets.js',message:String(e&&e.message||e)});}
+
+/* ===== 73-floor-devices.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The Devices sheet, for a kitchen on the hosted server. Every tablet, phone or computer joined to the kitchen,
+ *    with its name and when it was last used. Add a device shows a 6-digit code to type on the new device's start page; Rename gives
+ *    a device a name people recognize; Remove signs a lost or stolen device out at once. Staff never get accounts: the device is
+ *    what is joined. Behind the manager PIN when one is set.
+ * PARTS: the server calls, the code box, the list.
+ * USES: 00-util.js, 05-icons.js, 32-cloud.js (SB.cloud), 60-shell.js (sheets, toasts, the PIN), 72-floor-sheets.js (sheet registry).
+ * USED BY: Settings (Your kitchen, Devices).
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util;
+  const doc = g.document;
+  if (!doc || !SB.sheets) return;
+  const h = U.h;
+  // Builds an icon element, or an empty span when icons are missing.
+  const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 20 }); } catch (e) { return doc.createElement('span'); } };
+
+  // Calls the server and returns { ok, status, body }. Never throws: no connection comes back as ok false with status 0.
+  async function api(path, body) {
+    try {
+      const r = await g.fetch(path, body === undefined ? { credentials: 'same-origin' } : { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      return { ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) };
+    } catch (e) { return { ok: false, status: 0, body: {} }; }
+  }
+  // Plain words for when a device was last used, like "now", "12 min ago" or "Oct 3".
+  function seen(t) {
+    const d = Date.now() - t;
+    if (d < 2 * 60e3) return 'now';
+    if (d < 60 * 60e3) return Math.round(d / 60e3) + ' min ago';
+    if (d < 24 * 3600e3) return Math.round(d / 3600e3) + ' h ago';
+    return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  // Opens the Devices sheet (after the manager PIN, when one is set).
+  async function openDevices() {
+    if (SB.shell && SB.shell.requirePin && !(await SB.shell.requirePin())) return null;
+    const sheet = SB.ui.sheet({ title: 'Devices', side: 'right', width: 'min(620px, 96vw)', name: 'devices' });
+    const status = h('p', { class: 'fs-sub', role: 'status' });
+    const codeBox = h('div', { class: 'dv-code', hidden: true });
+    const list = h('div', { class: 'dv-list' });
+    let timer = 0;
+    // Says what happened, in words, in the tone given.
+    const say = (words, tone) => { status.textContent = words; status.dataset.tone = tone || ''; };
+
+    // Makes a 6-digit code and shows it big, with the minutes it still works.
+    async function addDevice() {
+      const r = await api('/api/devices/code', {});
+      if (!r.ok) { say(r.body.words || 'No connection to the server. Try again when the internet is back.', 'bad'); return; }
+      clearInterval(timer);
+      const code = String(r.body.code), until = r.body.expiresAt;
+      const left = h('p', { class: 'fs-sub' });
+      // Counts down the minutes the code still works, and says when it ran out.
+      const paintLeft = () => { const m = Math.ceil((until - Date.now()) / 60e3); left.textContent = m > 0 ? 'Works once, for ' + m + ' more ' + U.plural(m, 'minute') + '.' : 'This code ran out. Make a new one.'; if (m <= 0) clearInterval(timer); };
+      U.clear(codeBox);
+      codeBox.append(h('p', null, 'On the new device, open Smokebox, tap ', h('strong', null, 'Join a kitchen'), ' and type:'),
+        h('div', { class: 'dv-digits num', 'aria-label': 'Code ' + code.split('').join(' ') }, code.slice(0, 3) + ' ' + code.slice(3)), left);
+      codeBox.hidden = false;
+      paintLeft(); timer = setInterval(paintLeft, 15e3);
+      say('');
+    }
+    // Draws the list of joined devices, this one first marked "This device".
+    async function paint() {
+      const r = await api('/api/devices');
+      U.clear(list);
+      if (!r.ok) { list.appendChild(h('p', { class: 'fs-sub' }, r.body.words || 'No connection to the server. The list shows when the internet is back.')); return; }
+      for (const d of r.body.devices || []) {
+        const name = h('input', { class: 'input', type: 'text', maxlength: '40', value: d.name, 'aria-label': 'Name of this device' });
+        // Saves a new name when the box is left with a change.
+        name.addEventListener('change', async () => {
+          const v = name.value.trim();
+          if (!v) { name.value = d.name; return; }
+          const x = await api('/api/devices/rename', { id: d.id, name: v });
+          if (x.ok) { d.name = v; say('Renamed to ' + v + '.', 'ok'); } else { name.value = d.name; say(x.body.words || 'Not renamed. Try again.', 'bad'); }
+        });
+        // Removes the device after a plain yes; removing this device signs it out here too.
+        const remove = async () => {
+          const ok = SB.ui.confirm ? await SB.ui.confirm({ title: 'Remove ' + d.name + '?', body: d.me ? 'This device leaves the kitchen now. To come back it needs a code from another screen, or the owner sign in.' : 'It is signed out at once. To come back it needs a new code.', confirmLabel: 'Remove', tone: 'danger' }) : g.confirm('Remove ' + d.name + '?');
+          if (!ok) return;
+          const x = await api('/api/devices/remove', { id: d.id });
+          if (!x.ok) { say(x.body.words || 'Not removed. Try again.', 'bad'); return; }
+          if (x.body.self) { g.location.href = '/start'; return; }
+          say(d.name + ' is removed and signed out.', 'ok'); paint();
+        };
+        list.appendChild(h('div', { class: 'dv-row' },
+          ico(/phone/i.test(d.name) ? 'phone' : 'grid', 22),
+          h('div', { class: 'dv-main' }, name, h('div', { class: 'fs-sub' }, (d.me ? 'This device. ' : '') + 'Last used ' + seen(d.lastSeen) + '.')),
+          h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'remove-device' }, onClick: remove }, ico('trash', 18), h('span', null, 'Remove'))));
+      }
+    }
+    sheet.body.append(h('div', { class: 'dv' },
+      h('p', { class: 'fs-sub' }, 'Every screen joined to ' + (SB.cloud && SB.cloud.kitchen ? SB.cloud.kitchen.name : 'this kitchen') + '. Cooks never need an account: join the device, and anyone on shift can use it.'),
+      h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'add-device' }, onClick: addDevice }, ico('plus', 22), h('span', null, 'Add a device')),
+      codeBox, status, h('h3', { class: 'fs-h' }, 'Joined devices'), list));
+    paint();
+    return sheet;
+  }
+  SB.sheets.register('devices', openDevices);
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 73-floor-devices.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'73-floor-devices.js',message:String(e&&e.message||e)});}
 
 /* ===== 73-floor-orders.js ===== */
 ;try{
@@ -28563,6 +28708,214 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 73-floor-orders.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'73-floor-orders.js',message:String(e&&e.message||e)});}
+
+/* ===== 74-floor-help.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The Help panel, opened from the Help button on the board. Search the Guide first; then, on a kitchen joined to
+ *    the hosted server, ask SmokeBox support: what happened, what kind of problem, "Kitchen is stuck right now", an optional photo,
+ *    and what this device can tell support (build, screen, recent errors), shown and untickable. No login: the kitchen is known
+ *    from the device. A request made offline waits on this device and sends itself when the internet is back. My requests shows
+ *    each conversation; a new reply puts a dot on the Help button.
+ * PARTS: the recent-trouble log (errors and refused actions), the request outbox, polling for replies, the Help sheet.
+ * USES: 00-util.js, 05-icons.js, 30-store.js (refused actions), 32-cloud.js (SB.cloud), 60-shell.js (sheets, toasts), 78-guide.js
+ *    (search and open). USED BY: the Help button in 70-floor-board.js (SB.support).
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util;
+  const doc = g.document;
+  if (!doc || !SB.sheets) return;
+  const h = U.h;
+  // Builds an icon element, or an empty span when icons are missing.
+  const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 20 }); } catch (e) { return doc.createElement('span'); } };
+  const OUTBOX = 'smokebox.v1.supportOutbox';
+  const CATS = [{ id: 'broken', label: 'Something is broken', icon: 'alert' }, { id: 'howto', label: 'How do I…', icon: 'help' }, { id: 'billing', label: 'Billing', icon: 'dollar' }, { id: 'idea', label: 'An idea', icon: 'sparkle' }];
+  const STATUS_WORD = { open: 'With support', waiting: 'Answered: waiting on you', solved: 'Solved' };
+
+  /* ---------- what this device can tell support ---------- */
+
+  // The last 20 page errors and refused actions, newest last, so support sees what went wrong without anyone reading error codes.
+  const trouble = [];
+  // Keeps one trouble line, dropping the oldest past 20.
+  const note = (kind, text) => { trouble.push({ t: Date.now(), kind, text: String(text).slice(0, 300) }); if (trouble.length > 20) trouble.shift(); };
+  g.addEventListener('error', (e) => note('error', (e.message || 'error') + (e.filename ? ' @' + String(e.filename).split('/').pop() + ':' + e.lineno : '')));
+  g.addEventListener('unhandledrejection', (e) => note('error', 'promise: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason))));
+  // Refused actions are noted by wrapping the store's dispatch once (the result is passed through untouched).
+  if (SB.store && typeof SB.store.dispatchEx === 'function' && !SB.store.__helpWrapped) {
+    const orig = SB.store.dispatchEx;
+    // Runs the action as before, and notes it when the engine refused it.
+    SB.store.dispatchEx = function (type, payload, opts) {
+      const r = orig.call(this, type, payload, opts);
+      if (r && r.report && r.report !== 'ok' && r.report !== 'nothingToDo') note('refused', type + ': ' + r.report);
+      return r;
+    };
+    SB.store.__helpWrapped = true;
+  }
+  // Everything this device can tell support, in one object.
+  function diagnostics() {
+    const s = SB.store && SB.store.getState ? SB.store.getState() : null;
+    return {
+      build: g.SB_BUILD ? String(g.SB_BUILD.id || g.SB_BUILD) : 'unknown', device: g.navigator ? g.navigator.userAgent : '', screen: g.innerWidth + '×' + g.innerHeight,
+      time: new Date().toString(), kitchen: SB.cloud && SB.cloud.kitchen ? SB.cloud.kitchen.id : null, online: g.navigator ? g.navigator.onLine : null,
+      openTickets: s ? s.tickets.filter((t) => t.status === 'active').length : null, dishes: s ? s.menu.filter((m) => !m.archived).length : null, recent: trouble.slice(),
+    };
+  }
+
+  /* ---------- talking to the server ---------- */
+
+  // Calls the server and returns { ok, status, body }. Never throws: no connection comes back as status 0.
+  async function api(path, body) {
+    try {
+      const r = await g.fetch(path, body === undefined ? { credentials: 'same-origin' } : { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      return { ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) };
+    } catch (e) { return { ok: false, status: 0, body: {} }; }
+  }
+  // Requests made while offline, kept on this device until they send.
+  const outbox = () => { const v = U.storage.get(OUTBOX, []); return Array.isArray(v) ? v : []; };
+  // Sends every waiting request, oldest first; stops at the first one that cannot go yet. Returns how many went.
+  async function flush() {
+    let sent = 0;
+    for (const req of outbox()) {
+      const r = await api('/api/support', req);
+      if (r.status === 0 || r.status >= 500) break;
+      U.storage.set(OUTBOX, outbox().filter((x) => x.clientId !== req.clientId));
+      if (r.ok) sent++;
+    }
+    return sent;
+  }
+
+  /* ---------- replies: the dot on the Help button ---------- */
+
+  const state = { tickets: [], unread: 0, listeners: new Set() };
+  // Fetches this kitchen's requests and tells the Help button how many have an unread reply.
+  async function refresh() {
+    if (!(SB.cloud && SB.cloud.on)) return;
+    await flush();
+    const r = await api('/api/support');
+    if (!r.ok) return;
+    state.tickets = r.body.tickets || [];
+    state.unread = state.tickets.filter((t) => t.unread).length;
+    state.listeners.forEach((fn) => { try { fn(state.unread); } catch (e) { /* a listener's problem stays its own */ } });
+  }
+  if (SB.cloud && SB.cloud.on) { setTimeout(refresh, 3000); setInterval(refresh, 120e3); g.addEventListener('online', () => refresh()); }
+
+  /* ---------- the Help sheet ---------- */
+
+  // Opens the Help panel: Guide search, Contact support and My requests.
+  function openHelpPanel() {
+    const sheet = SB.ui.sheet({ title: 'Help', side: 'right', width: 'min(640px, 96vw)', name: 'support' });
+    const body = h('div', { class: 'hp' });
+
+    // 1. Search the Guide: matching pages as you type; a tap opens the page.
+    const q = h('input', { class: 'input', type: 'search', placeholder: 'What do you need? Like "undo" or "fryer"', 'aria-label': 'Search the Guide', autocomplete: 'off' });
+    const found = h('div', { class: 'hp-found' });
+    // Lists the best Guide pages for what was typed.
+    const searchNow = () => {
+      U.clear(found);
+      const hits = SB.guide && SB.guide.search ? SB.guide.search(q.value).slice(0, 5) : [];
+      if (q.value.trim() && !hits.length) found.appendChild(h('p', { class: 'fs-sub' }, 'No Guide page matches. Ask support below.'));
+      // Each match opens its Guide page.
+      hits.forEach((x) => found.appendChild(h('button', { type: 'button', class: 'btn btn-block hp-hit', onClick: () => { sheet.close('guide'); SB.guide.open(x.page.id); } }, ico('book', 20), h('span', { class: 'grow' }, h('strong', null, x.page.title), h('span', { class: 'fs-sub' }, x.snippet)))));
+    };
+    q.addEventListener('input', searchNow);
+    // Opens the Guide at its first page.
+    const allGuide = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('guide'); SB.guide.open(); } }, ico('book', 20), h('span', null, 'Open the whole Guide'));
+    body.append(h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Search the Guide'), q, found, allGuide));
+
+    // 2. Ask support (only on the hosted server, where the request has somewhere to go).
+    if (!(SB.cloud && SB.cloud.on)) {
+      body.append(h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Ask SmokeBox support'), h('p', { class: 'fs-sub' }, 'Asking support from the app works when this tablet is joined to a hosted SmokeBox kitchen.')));
+      sheet.body.append(body);
+      return sheet;
+    }
+    let cat = 'broken', photo = null;
+    const what = h('textarea', { class: 'input hp-what', rows: '4', maxlength: '5000', placeholder: 'What happened? What did you tap, and what did the screen do?', 'aria-label': 'What happened' });
+    const catSeg = SB.ui.segmented({ label: 'What kind of problem', value: cat, options: CATS.map((c) => ({ id: c.id, label: c.label })),
+      // Remembers which kind of problem was picked.
+      onChange: (id) => { cat = id; } });
+    const urgency = SB.ui.segmented({ label: 'How urgent', value: 'later', options: [{ id: 'now', label: 'Kitchen is stuck right now' }, { id: 'later', label: 'When you can' }] });
+    const photoIn = h('input', { type: 'file', accept: 'image/*', class: 'visually-hidden', id: 'hp-photo' });
+    const photoNote = h('span', { class: 'fs-sub' });
+    // Shrinks a chosen photo to at most 1280 px on its long side (JPEG), so it sends quickly on a kitchen's internet.
+    photoIn.addEventListener('change', () => {
+      const f = photoIn.files && photoIn.files[0];
+      if (!f) return;
+      const img = new g.Image();
+      // Draws the photo smaller onto a canvas and keeps it as a JPEG.
+      img.onload = () => {
+        const k = Math.min(1, 1280 / Math.max(img.width, img.height)), c = doc.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        photo = c.toDataURL('image/jpeg', 0.8); photoNote.textContent = 'Photo added.';
+        URL.revokeObjectURL(img.src);
+      };
+      // A file the browser cannot read as a picture is not sent.
+      img.onerror = () => { photo = null; photoNote.textContent = 'That photo could not be read.'; };
+      img.src = URL.createObjectURL(f);
+    });
+    const photoBtn = h('label', { class: 'btn', for: 'hp-photo' }, ico('upload', 20), h('span', null, 'Add a photo'));
+    const attach = h('input', { type: 'checkbox', checked: true, id: 'hp-attach' });
+    const preview = h('pre', { class: 'hp-diag' });
+    const peek = h('details', null, h('summary', null, 'See what is sent'), preview);
+    peek.addEventListener('toggle', () => { if (peek.open) preview.textContent = JSON.stringify(diagnostics(), null, 2); });
+    const status = h('p', { class: 'fs-sub', role: 'status' });
+    // Sends the request now, or keeps it on this device until the internet is back.
+    const send = async () => {
+      const text = what.value.trim();
+      if (!text) { status.textContent = 'Say what happened, in a few words.'; what.focus(); return; }
+      const req = { clientId: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), category: cat, urgent: urgency.getValue ? urgency.getValue() === 'now' : false, body: text, photo, diagnostics: attach.checked ? diagnostics() : null };
+      sendBtn.disabled = true;
+      const r = await api('/api/support', req);
+      sendBtn.disabled = false;
+      if (r.ok) { what.value = ''; photo = null; photoNote.textContent = ''; status.textContent = 'Sent. Request ' + r.body.num + '. The answer shows in My requests, and the owner gets an email copy.'; refresh().then(paintMine); return; }
+      if (r.status === 0 || r.status >= 500) { U.storage.set(OUTBOX, outbox().concat([req])); what.value = ''; status.textContent = 'No internet right now. The request is saved on this tablet and sends by itself when the internet is back.'; return; }
+      status.textContent = r.body.words || 'It did not send. Try again.';
+    };
+    const sendBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'send-support' }, onClick: send }, ico('arrow-right', 22), h('span', null, 'Send to support'));
+    body.append(h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Ask SmokeBox support'),
+      h('p', { class: 'fs-sub' }, 'A real person answers. No account needed: support knows which kitchen this is.'),
+      what, h('div', { class: 'field-label' }, 'What kind of problem'), catSeg, h('div', { class: 'field-label' }, 'How urgent'), urgency,
+      h('div', { class: 'hp-row' }, photoBtn, photoIn, photoNote),
+      h('label', { class: 'hp-row', for: 'hp-attach' }, attach, h('span', null, 'Send what this tablet can tell support (version, screen, recent errors)')), peek,
+      sendBtn, status));
+
+    // 3. My requests: each conversation, newest change first; opening one clears its dot.
+    const mine = h('div', { class: 'hp-mine' });
+    // Draws the list of requests and their conversations.
+    function paintMine() {
+      U.clear(mine);
+      const waiting = outbox().length;
+      if (waiting) mine.appendChild(h('p', { class: 'fs-sub' }, waiting + ' ' + U.plural(waiting, 'request') + ' waiting for the internet on this tablet.'));
+      if (!state.tickets.length && !waiting) { mine.appendChild(h('p', { class: 'fs-sub' }, 'No requests yet.')); return; }
+      state.tickets.forEach((t) => {
+        const thread = h('div', { class: 'hp-thread' });
+        t.messages.forEach((m) => thread.appendChild(h('div', { class: 'hp-msg' + (m.fromStaff ? ' hp-staff' : '') }, h('div', { class: 'fs-sub' }, (m.fromStaff ? m.author + ', SmokeBox support' : m.author) + ' · ' + U.fmtTime(m.at)), h('div', { class: 'hp-body' }, m.body), m.photo ? h('img', { src: m.photo, alt: 'Photo sent with the request', class: 'hp-img' }) : null)));
+        const ans = h('textarea', { class: 'input', rows: '2', maxlength: '5000', 'aria-label': 'Your answer', placeholder: 'Answer support' });
+        // Sends an answer in this conversation.
+        const reply = async () => { if (!ans.value.trim()) return; const r = await api('/api/support/reply', { id: t.id, body: ans.value }); if (r.ok) { ans.value = ''; await refresh(); paintMine(); } };
+        const det = h('details', { class: 'hp-req' }, h('summary', null, t.unread ? h('span', { class: 'hp-dot', 'aria-label': 'New reply' }) : null, h('strong', null, 'Request ' + t.num + ': ' + t.subject), h('span', { class: 'fs-sub' }, ' · ' + (STATUS_WORD[t.status] || t.status))),
+          thread, t.status !== 'solved' ? h('div', { class: 'hp-row' }, ans, h('button', { type: 'button', class: 'btn', onClick: reply }, 'Send')) : null);
+        // Opening a conversation marks it read.
+        det.addEventListener('toggle', () => { if (det.open && t.unread) { t.unread = false; api('/api/support/seen', { id: t.id }).then(refresh); } });
+        mine.appendChild(det);
+      });
+    }
+    body.append(h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'My requests'), mine));
+    sheet.body.append(body);
+    paintMine(); refresh().then(paintMine);
+    return sheet;
+  }
+  SB.sheets.register('support', openHelpPanel);
+  SB.support = {
+    // Calls fn with the number of requests that have an unread reply, now and whenever it changes; returns a function that stops it.
+    onUnread(fn) { state.listeners.add(fn); try { fn(state.unread); } catch (e) { /* ignore */ } return () => state.listeners.delete(fn); },
+    diagnostics, refresh,
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 74-floor-help.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'74-floor-help.js',message:String(e&&e.message||e)});}
 
 /* ===== 74-floor-tour.js ===== */
 ;try{
@@ -29504,8 +29857,8 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     else if (/name$/.test(key) && (res.report === 'nameTaken' || res.report === 'badPatch')) words = 'That name is already taken. Pick another name.';
     else if (/name$/.test(key)) words = 'The name has to be 1 to 60 letters. Shorten it and try again.';
     else if (key === 'menu' || res.report === 'tooManyItems') words = 'Your menu is full (150 dishes). Remove one you no longer sell, then add this one.';
-    else if (res.report === 'tooManyIngredients') words = 'You have as many cooked-ahead items as Smokebox can hold. Remove one first.';
-    else if (res.report === 'moduleOff') words = 'Cooking ahead is switched off. Turn it on in Tax, hours and PIN, then try again.';
+    else if (res.report === 'tooManyIngredients') words = 'You have as many cabinet foods as Smokebox can hold. Remove one first.';
+    else if (res.report === 'moduleOff') words = 'The Hold cabinet is off. Turn it on in Tax, hours and PIN, then try again.';
     return { ok: false, info: res.info || {}, words, report: res.report };
   }
   // Reads a number from a text box; blank or junk gives null so nothing is ever invented.
@@ -29608,7 +29961,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
   }
   // True when the cook-ahead module is on (an old saved kitchen with no setting counts as on).
   function cookOn() { return SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : true; }
-  // A short plain line about one cooked-ahead item for the list: hot with its hours, or cold with the limits the owner entered.
+  // A short plain line about one cabinet food for the list: hot with its hours, or cold with the limits the owner entered.
   function coldText(i) {
     if (i.hold !== 'cold') return 'Hot, up to ' + i.maxHoldH + ' h';
     const bits = [];
@@ -29616,7 +29969,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     if (i.outHours != null) bits.push(i.outHours + ' h out');
     return 'Cold, ' + (bits.length ? bits.join(', ') : 'no limit set');
   }
-  // The cooked-ahead items the owner has made: cook-ahead food that is not archived.
+  // The cabinet foods the owner has made: cook-ahead food that is not archived.
   function cookItems() { return SB.store.getState().ingredients.filter((i) => i.tcs && !i.archived); }
 
   /* ---------- Watch the demo ---------- */
@@ -29996,9 +30349,9 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     paintList(); paintGone();
     offs.push(SB.store.subscribe(() => { paintList(); paintGone(); }));
 
-    // Cooked-ahead food: shown only when that module is on and there is a dish. Optional; never needed to order.
+    // Hold cabinet food: shown only when that module is on and there is a dish. Optional; never needed to order.
     const caBox = h('section', { class: 'fs-card dp-ca', hidden: true });
-    // Paints the question (before any item), or the list of cooked-ahead items with Add another.
+    // Paints the question (before any item), or the list of cabinet foods with Add another.
     let caNote = '';
     function paintCook() {
       const items = cookItems();
@@ -30009,24 +30362,29 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       U.clear(caBox);
       // After a No or Not sure: one line on what turning it on adds and where, shown until this sheet is closed.
       if (caNote && !items.length) { caBox.append(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'ok', role: 'status' }, caNote)); return; }
-      // Opens the sheet that adds one cooked-ahead item.
+      // Opens the sheet that adds one cabinet food.
       const add = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => {
         // Saying yes while the cook-ahead part is off turns it on first, then opens the sheet for the first item.
         if (!cookOn()) send('updateSettings', { patch: { modules: { cookAhead: true } } });
         SB.sheets.open('cookahead');
-      } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Yes, I cook ahead' : 'Yes, I cook ahead'));
-      if (!items.length) {
-        caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook food ahead?'),
-          h('p', { class: 'fs-sub' }, 'Soup in a warmer, salads in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. Please pick one: it only takes a tap, and you can change it later.'),
+      } }, ico('plus', 20), h('span', null, items.length ? 'Add more cabinet food' : cookOn() ? 'Add cabinet food' : 'Yes, use the Hold cabinet'));
+      if (!items.length && cookOn()) {
+        // The Hold cabinet is on (the default): no question, just what it is for and the way to add the first food.
+        caBox.append(h('h3', { class: 'fs-h' }, 'Hold cabinet food'),
+          h('p', { class: 'fs-sub' }, 'Food you keep hot or cold to serve later, like soup in a warmer, rice in a hot well or salad in a cooler. Add each one and Smokebox times every batch and warns you before its time runs out.'),
+          h('div', { class: 'fs-row' }, add));
+      } else if (!items.length) {
+        caBox.append(h('h3', { class: 'fs-h' }, 'Do you keep food hot or cold to serve later?'),
+          h('p', { class: 'fs-sub' }, 'Like soup in a warmer, rice in a hot well or salad in a cooler. Say Yes and you get the Hold cabinet: it times how long each batch has been held and warns you before its time runs out. Say No if you cook everything to order. You can change it later.'),
           h('div', { class: 'fs-row' }, add,
-            // No and Not sure both leave cooking ahead off; Not sure says so, and says how to turn it on later.
+            // No and Not sure both leave the Hold cabinet off; Not sure says so, and says how to turn it on later.
             ['No', 'Not sure'].map((lbl) => h('button', { type: 'button', class: 'btn', dataset: { act: lbl === 'No' ? 'no-cooked' : 'notsure-cooked' }, onClick: () => {
               U.storage.set(KEY_CASKIP, true);
-              caNote = (lbl === 'No' ? 'Cooking ahead stays off. ' : 'Not sure counts as No for now. ') + 'Turning it on adds the Hold cabinet, batch timers and their warnings. Turn it on any time under Settings, Tax, hours and PIN.';
+              caNote = (lbl === 'No' ? 'The Hold cabinet stays off. ' : 'Not sure counts as No for now. ') + 'Turning it on adds the Hold cabinet, batch timers and their warnings. Turn it on any time under Settings, Tax, hours and PIN.';
               paintCook();
             } }, lbl))));
       } else {
-        caBox.append(h('h3', { class: 'fs-h' }, 'Cooked-ahead food'),
+        caBox.append(h('h3', { class: 'fs-h' }, 'Hold cabinet food'),
           h('div', { class: 'dp-list' }, items.map((i) => h('div', { class: 'dp-row' }, h('strong', null, i.name), h('span', { class: 'chip' }, coldText(i)),
           // Opens the same form, filled in, to change the name or the limits.
           h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'edit-cooked' }, 'aria-label': 'Edit ' + i.name, onClick: () => SB.sheets.open('cookahead', { id: i.id }) }, 'Edit')))), h('div', { class: 'fs-row' }, add));
@@ -30126,15 +30484,15 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     return sheet;
   }
 
-  /* ---------- the Cooked-ahead food sheet ---------- */
+  /* ---------- the Hold cabinet food sheet ---------- */
 
-  // Opens "Cooked-ahead food": name, hot or cold, how long it may stay, a usual batch size and which dishes use it.
+  // Opens "Hold cabinet food": name, hot or cold, how long it may stay, a usual batch size and which dishes use it.
   // Saves the item with addIngredient, then gives each chosen dish a recipe line. Nothing here is needed to take orders.
   function openCookAhead(opts) {
     const editing = opts && opts.id ? SB.store.getState().ingredients.find((i) => i.id === opts.id && i.tcs) : null;
-    const sheet = SB.ui.sheet({ title: editing ? 'Edit cooked-ahead food' : 'Cooked-ahead food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
+    const sheet = SB.ui.sheet({ title: editing ? 'Edit cabinet food' : 'Hold cabinet food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
     const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Soup' });
-    const nameField = SB.ui.field({ label: 'What do you cook ahead?', control: nameIn });
+    const nameField = SB.ui.field({ label: 'What food goes in the cabinet?', control: nameIn });
     const kind = SB.ui.segmented({ label: 'Is it kept hot or cold?', value: 'hot', options: [{ id: 'hot', label: 'Hot' }, { id: 'cold', label: 'Cold' }],
       // Shows the boxes that fit hot or cold food.
       onChange: () => paintKind() });
@@ -30169,7 +30527,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     const save = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'save-cooked' }, onClick: () => {
       nameField.setError(null); hoursField.setError(null); tell(status, '');
       const name = nameIn.value.replace(/\s+/g, ' ').trim(), hrs = readNum(hoursIn), kg = kgIn.value.trim() ? readNum(kgIn) : null;
-      if (!name) { nameField.setError('Type what you cook ahead.'); return; }
+      if (!name) { nameField.setError('Type the food, like pulled pork or slaw.'); return; }
       const isCold = kind.getValue() === 'cold';
       daysField.setError(null); outField.setError(null);
       if (!isCold && (hrs == null || hrs < 0.5 || hrs > 12)) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
@@ -30208,13 +30566,13 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       after.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-first-batch' }, onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('hold', { tab: 'new', ing: r.info.id }), 60); } }, 'Log a first batch'),
         // Closes the sheet without logging a batch.
         h('button', { type: 'button', class: 'btn btn-lg', onClick: () => sheet.close('done') }, 'Done for now'));
-    } }, ico('check', 22), h('span', null, 'Save cooked-ahead item'));
+    } }, ico('check', 22), h('span', null, 'Save cabinet food'));
     const kindField = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Hot or cold'), kind);
     // Edit mode: the same boxes, filled in; hot or cold and the dish links stay as they were, and Save changes the limits and the name.
     const saveEdit = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'save-cooked-edit' }, onClick: () => {
       nameField.setError(null); daysField.setError(null); outField.setError(null); hoursField.setError(null); tell(status, '');
       const name = nameIn.value.replace(/\s+/g, ' ').trim();
-      if (!name) { nameField.setError('Type what you cook ahead.'); return; }
+      if (!name) { nameField.setError('Type the food, like pulled pork or slaw.'); return; }
       const patch = { name };
       if (editing.hold === 'cold') {
         const dv = daysIn.value.trim() ? readNum(daysIn) : null, ov = outIn.value.trim() ? readNum(outIn) : null;
@@ -30468,7 +30826,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     const step1 = h('section', { class: 'fs-section so-step' },
       h('h3', { class: 'fs-h' }, '1. What happens'),
       h('p', { class: 'fs-sub' }, 'This empties your kitchen so you can begin again with a blank menu.'),
-      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device. The food safety record stays.'),
+      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cabinet foods and their batches, portion counts, all tickets and orders, and all sales and history kept on this device. The food safety record stays.'),
       h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and sections. Clear the box and those go back to how Smokebox starts.'),
       keepLabel,
       simple ? h('p', { class: 'fs-note' }, 'You have no tickets, orders or sales yet, so only your dishes and their setup go. No backup is needed.')
@@ -31080,14 +31438,14 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     // Cook-ahead: one yes or no, kept in the real setting (settings.modules.cookAhead). A saved kitchen from before this
     // setting existed counts as Yes, so nothing disappears from it.
     const on0 = SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : false;
-    const cook = SB.ui.segmented({ label: 'Do you cook food ahead and hold it warm or cold?', value: on0 ? 'yes' : 'no', options: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }],
+    const cook = SB.ui.segmented({ label: 'Do you keep food hot or cold to serve later?', value: on0 ? 'yes' : 'no', options: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }],
       // Saves the answer and says what appears or goes away; puts the old answer back if the save fails.
       onChange: (v) => {
         const r = send('updateSettings', { patch: { modules: { cookAhead: v === 'yes' } } });
         if (!r.ok && r.report !== 'nothingToDo') { cook.setValue(v === 'yes' ? 'no' : 'yes'); tell(cookSt, r.words); return; }
         tell(cookSt, v === 'yes' ? 'On. The Hold cabinet, cooked-batch times and their warnings are available. Change this any time here.' : 'Off. Batch tracking stays out of the way. Change this any time here.');
       } });
-    const cookSt = section('Cooking ahead', 'Some places cook a big batch in the morning and serve from it all day, or keep cold sides in a cooler. If you do, Smokebox can track those batches and warn you before they run out of time. Most new places start with No.', cook);
+    const cookSt = section('Hold cabinet', 'Food you keep hot or cold to serve later: soup in a warmer, rice in a hot well, salad in a cooler. Every kitchen has some, so this starts on. Yes shows the Cabinet tab, which times each batch and warns you before its time runs out. No hides it.', cook);
     sheet.body.appendChild(list); keepInView(list);
     return sheet;
   }
@@ -31190,7 +31548,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
      },
      {
       "t": "p",
-      "x": "Dishes and prices asks if you cook food ahead. See Cooked-ahead food and portions."
+      "x": "Food you hold hot or cold goes in the Hold cabinet. See Hold cabinet food and portions."
      },
      {
       "t": "h",
@@ -31248,7 +31606,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       "t": "ul",
       "x": [
        "Stations: tap **Settings**, **Dishes and prices**, then **Change stations**. Rename one to \"Counter\" and tap **Not used** on the others.",
-       "Settings: set tax and hours in **Tax, hours and PIN**. Answer **No** to cooking ahead. For a batch you bake, like 24 croissants, tap **I count what I made**. In **Settings**, **How you serve**, turn on **Counter service**.",
+       "Settings: set tax and hours in **Tax, hours and PIN**. For a batch you bake, like 24 croissants, tap **I count what I made**. In **Settings**, **How you serve**, turn on **Counter service**.",
        "The board: one list of orders, no station tabs. Pay with **Cash** or **Card** as you send, and the ticket clears itself. With **Pay later**, tap **Bump** or pay from **Orders**."
       ]
      },
@@ -31284,7 +31642,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       "t": "ul",
       "x": [
        "Stations: as above.",
-       "Settings: in **Dishes and prices**, tap **Yes, I cook ahead**. Add each pot or tray as a cooked-ahead item, Hot or Cold, with the time limit your health department gives you.",
+       "Settings: in **Dishes and prices**, tap **Add cabinet food**. Add each pot or tray as a cabinet food, Hot or Cold, with the time limit your health department gives you.",
        "The board: a **Cabinet** tab appears. Tap **New batch** and **Log temp** at every check. See Cabinet and warnings."
       ]
      }
@@ -31535,8 +31893,8 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
    {
     "id": "cooked-ahead-and-portions",
     "group": "guide",
-    "title": "Cooked-ahead food and portions",
-    "summary": "Two ways to keep track of food you make before the order comes in. Skip this page if you cook everything to order.",
+    "title": "Hold cabinet food and portions",
+    "summary": "Two ways to keep track of food you make before the order comes in.",
     "blocks": [
      {
       "t": "h",
@@ -31570,16 +31928,16 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
      {
       "t": "ol",
       "x": [
-       "In **Dishes and prices**, find \"Do you cook food ahead?\" and tap **Yes, I cook ahead**. The cooked-ahead sheet opens.",
-       "Type what you cook ahead and choose Hot or Cold.",
+       "In **Dishes and prices**, find **Hold cabinet food** and tap **Add cabinet food**. The Hold cabinet food sheet opens.",
+       "Type the food, like pulled pork or slaw, and choose Hot or Cold.",
        "Set how long it may stay. Hot food takes one number of hours. Cold food has two optional boxes: days in the fridge, and hours out of the fridge. Use the limits your local health department gives you. Leave a box empty if none is set, and Smokebox will only show the time. See Cold items in the fridge.",
        "Select the dishes that use it, and type the grams of it in one serving for each. Smokebox takes that much off the batch for each dish made.",
-       "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**. To change an item later, open it from the list and tap **Save changes**."
+       "Tap **Save cabinet food**. Then tap **Log a first batch**, or **Done for now**. To change an item later, open it from the list and tap **Save changes**."
       ]
      },
      {
       "t": "p",
-      "x": "The question \"Do you cook food ahead?\" has three answers. Choose **No** if you cook everything to order. **Not sure** counts as No for now. You can turn it on later in **Settings**, then **Tax, hours and PIN**."
+      "x": "The Hold cabinet is on from the start, because every kitchen holds some food hot or cold. A kitchen that truly cooks everything to order can turn it off in **Settings**, then **Tax, hours and PIN**, under **Hold cabinet**."
      }
     ]
    },
@@ -31587,7 +31945,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     "id": "hold-cabinet-and-warnings",
     "group": "guide",
     "title": "Cabinet and warnings",
-    "summary": "For kitchens that cook food ahead, like pots of soup or trays of rice. Skip this page if you cook everything to order.",
+    "summary": "Food you hold hot or cold, like soup or rice. Each batch is timed, with a warning before its time runs out.",
     "blocks": [
      {
       "t": "h",
@@ -31601,7 +31959,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
      },
      {
       "t": "p",
-      "x": "No **Cabinet** tab? Say yes to cooking ahead first (see Cooked-ahead food and portions)."
+      "x": "No **Cabinet** tab? Turn it on in **Tax, hours and PIN**."
      },
      {
       "t": "ol",
@@ -31645,7 +32003,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     "id": "cold-items-in-the-fridge",
     "group": "guide",
     "title": "Cold items in the fridge",
-    "summary": "For cold food you keep in a fridge, like potato salad or a tray of dessert. Skip this page if you do not cook ahead.",
+    "summary": "For cold food you keep in a fridge, like potato salad or a tray of dessert.",
     "blocks": [
      {
       "t": "h",
@@ -31685,7 +32043,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     "id": "readings",
     "group": "guide",
     "title": "Readings",
-    "summary": "Write down fridge, thermometer and sanitizer strip readings in one place. You see Readings only if you cook food ahead.",
+    "summary": "Write down fridge, thermometer and sanitizer strip readings in one place.",
     "blocks": [
      {
       "t": "h",
@@ -31752,7 +32110,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       "x": [
        "Tap **Orders**, then **Close the day** at the bottom.",
        "If an order is still open, it is listed. Every order must be paid or cancelled first. Tap **Open Orders to pay or void**, then come back.",
-       "If you cook ahead and food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).",
+       "If food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).",
        "Read Money today: cash, card and other. If you like, type **Cash you started the day with**. Smokebox remembers it on this device and adds today's cash payments, and tips paid in cash, to say how much should be in the drawer. It is a helper for counting.",
        "Tap **Close the day**.",
        "Tap **Back up today's data now** and **Print today's summary**."
@@ -31769,7 +32127,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
      {
       "t": "ul",
       "x": [
-       "Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.",
+       "Wipe down food-contact surfaces and tap **Sanitize**.",
        "If your health department asks, save or print the thrown-out log. Open it from the **Settings** button on the board.",
        "Keep a copy of the backup off this device (see Backup and restore).",
        "Which weekday sells best? In **Back office**, open **Sales and money** and look at **Best day of the week**.",
@@ -32054,7 +32412,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
        "Turn the tablet volume up and check its silent switch.",
        "Tap **Settings** and check that Sound is on and the loudness is not low.",
        "Tap **Settings**, then **Device checks: screen, sound, home screen**, then **Test the sound**.",
-       "If the bar says \"Sound paused\", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.",
+       "Sound plays at any hour while it is on. If it is silent, use steps 2 to 4 again.",
        "Close any second Smokebox tab. Only the tab on screen makes sound."
       ]
      },
@@ -32076,7 +32434,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
        "Clear the search box and choose All on the New ticket screen.",
        "Open the **86 board**. A dish that is sold out or off the menu is listed there with the reason.",
        "Open **Dishes and prices** to see every dish you have added. A dish you removed is under **Removed dishes**: tap **Bring it back**.",
-       "No **Cabinet** tab or **Sanitize** button? They show only after you say **Yes, I cook ahead** in **Dishes and prices**."
+       "No **Cabinet** tab or **Sanitize** button? They are on from the start. If someone turned them off, turn them back on in **Tax, hours and PIN**, under **Hold cabinet**."
       ]
      },
      {
@@ -32224,7 +32582,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
      },
      {
       "t": "p",
-      "x": "No. A new Smokebox starts empty. You add your own dishes, rename the stations and choose whether you cook ahead. Only the demo is a barbecue kitchen."
+      "x": "No. A new Smokebox starts empty. You add your own dishes, rename the stations. The Hold cabinet starts empty too. Only the demo is a barbecue kitchen."
      },
      {
       "t": "h",
@@ -32288,7 +32646,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
      },
      {
       "t": "p",
-      "x": "The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Settings**, then **Dishes and prices**, and tap **Yes, I cook ahead**."
+      "x": "The Cabinet is on from the start. If someone turned it off, tap **Settings**, then **Tax, hours and PIN**, and set **Hold cabinet** to **Yes**."
      },
      {
       "t": "h",
@@ -32352,8 +32710,8 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
        "Counted dishes: how many did you make today?",
        "Hand sink works and is stocked. Anyone unwell? Tell the manager",
        "Thermometer checked in ice water. Cooler and freezer readings written down (Settings, Readings, or your paper log)",
-       "If you cook ahead: log a first temperature on each batch in the cabinet",
-       "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
+       "Log a first temperature on each batch in the cabinet",
+       "Wipe food-contact surfaces and tap Sanitize",
        "Yesterday's backup saved and a copy kept off the device"
       ]
      }
@@ -32369,8 +32727,8 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       "t": "check",
       "x": [
        "Orders: every open order paid or cancelled, then Close the day",
-       "If you cook ahead: every batch left in the cabinet decided (keep it, or throw it out)",
-       "If you cook ahead: surfaces wiped and Sanitize logged",
+       "Every batch left in the cabinet decided (keep it, or throw it out)",
+       "Surfaces wiped and Sanitize logged",
        "Food kept over a day: labeled with a date, as your local rule says",
        "Final cooler and freezer readings written down",
        "Sales and money looks right in the Back office",
@@ -33925,7 +34283,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     const a = h('a', { class: 'of-nav', href: '#/office' + (p.id === 'pace' ? '' : '/' + p.id), dataset: { page: p.id }, title });
     if (current) a.setAttribute('aria-current', 'page');
     const off = pageIsOff(p.id);
-    if (off) { a.classList.add('is-off'); a.title = title + (COUNTER_PAGES[p.id] && counterOn() ? ' (counter service: not measured)' : ' (not tracking cooked-ahead food)'); }
+    if (off) { a.classList.add('is-off'); a.title = title + (COUNTER_PAGES[p.id] && counterOn() ? ' (counter service: not measured)' : ' (not tracking cabinet food)'); }
     a.append(ico(icon, 22), h('span', { class: 'of-nav-w' }, h('span', { class: 'of-nav-full' }, title), h('span', { class: 'of-nav-short' }, p.short), off ? h('span', { class: 'of-nav-off' }, COUNTER_PAGES[p.id] ? 'Not measured' : 'Not tracking') : null));
     a.addEventListener('click', (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return; e.preventDefault(); O.navigate(p.id); });
     return h('li', { class: 'of-rail-li' }, a);
@@ -34195,21 +34553,21 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
         rec.inst = null;
       }
     }
-    // The Safety page gets a small bar to print the food safety record (only when cooked-ahead food is tracked).
+    // The Safety page gets a small bar to print the food safety record (only when cabinet food is tracked).
     if (id === 'safety' && !pageIsOff(id) && typeof O.safetyLogBar === 'function' && rec.container.firstChild) { try { rec.container.insertBefore(O.safetyLogBar(), rec.container.firstChild); } catch (e) { warnOnce('safety log bar', e); } }
     paintBanner(ctx);
     if (o.focus) { try { f.title.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   }
-  // Pages that only make sense when the owner tracks cooked-ahead food (batches, hold cabinet, temperature checks).
+  // Pages that only make sense when the owner tracks cabinet food (batches, hold cabinet, temperature checks).
   const GATED = {
-    safety: { title: 'Safety records are off', body: 'You are not tracking cooked-ahead food, so there are no batches, temperature checks or hold times to report on. If you cook food ahead and hold it hot or cold, tap Yes, I cook food ahead below.' },
-    stock: { title: 'Stock tracking is off', body: 'You are not tracking cooked-ahead food, so this page has no stock to show. If you cook food ahead and want to know when it runs out, tap Yes, I cook food ahead below.' },
+    safety: { title: 'Safety records are off', body: 'You are not tracking cabinet food, so there are no batches, temperature checks or hold times to report on. If you keep food hot or cold to serve later and hold it hot or cold, tap Yes, use the Hold cabinet below.' },
+    stock: { title: 'Stock tracking is off', body: 'You are not tracking cabinet food, so this page has no stock to show. If you keep food hot or cold to serve later and want to know when it runs out, tap Yes, use the Hold cabinet below.' },
   };
   // True when the cook-ahead module is on; a missing setting counts as on, so old saves and the demo are unchanged.
   function cookAheadOn() {
     try { return !(SB.engine && SB.store && typeof SB.engine.moduleOn === 'function') || SB.engine.moduleOn(SB.store.getState(), 'cookAhead'); } catch (e) { return true; }
   }
-  // True when this page is one of the gated pages and the owner is not tracking cooked-ahead food.
+  // True when this page is one of the gated pages and the owner is not tracking cabinet food.
   const pageIsOff = (id) => (!!GATED[id] && !cookAheadOn()) || (!!COUNTER_PAGES[id] && counterOn());
   // Pages about kitchen speed: with counter service the kitchen does not send tickets out one by one, so these times are not measured.
   const COUNTER_PAGES = { pace: 1, tickets: 1, stations: 1 };
@@ -34224,13 +34582,13 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     if (COUNTER_PAGES[id] && counterOn()) return { title: 'Counter service: kitchen times are not measured', body: 'With counter service an order is paid and handed over at the counter, so the kitchen does not send tickets out one by one. Speed numbers would be meaningless here, so this page is off. Your sales are on Sales and money.', action: { label: 'Open Sales and money', onClick: goMoney } };
     // Turns on cooked-ahead tracking for the page that was switched off.
     const turnOn = () => turnOnCookAhead(id);
-    return Object.assign({}, GATED[id], { action: { label: 'Yes, I cook food ahead', onClick: turnOn } });
+    return Object.assign({}, GATED[id], { action: { label: 'Yes, use the Hold cabinet', onClick: turnOn } });
   }
   // Turns the cook-ahead module on from the explanation card, then shows the page again.
   function turnOnCookAhead(id) {
     let rep = 'error';
     try { rep = SB.store.dispatch('updateSettings', { patch: { modules: { cookAhead: true } } }); } catch (e) { /* shown below */ }
-    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. On the board, tap Settings, then Dishes and prices, then Yes, I cook ahead.', { tone: 'bad' }); return; }
+    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. On the board, tap Settings, then Dishes and prices, then Yes, use the Hold cabinet.', { tone: 'bad' }); return; }
     if (M) showPage(id, { focus: false });
   }
 
@@ -35308,7 +35666,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     const yieldCard = page.card({
       type: 'bar', span: 7, title: 'Cooked yield: assumed, modeled and real', sub: scope(),
       caption: 'How far the static yield you price with sits from the Texas A&M model and from what your own weighed batches really gave.',
-      empty: { title: 'Nothing to compare yet', body: 'Your main cooked-ahead meat needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
+      empty: { title: 'Nothing to compare yet', body: 'Your main smoked meat needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
       // Up to three bars: the fixed yield, the Texas A&M model and your weighed batches (two or more needed).
       spec: (p) => {
         const y = yieldPrimary(p);
@@ -35346,7 +35704,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 
     const costOfWrong = page.panel({
       span: 5, title: 'What a fixed yield costs you', sub: scope(),
-      caption: 'The real price of a cooked kilogram of your main cooked-ahead meat, and how wrong a fixed yield would have made it.',
+      caption: 'The real price of a cooked kilogram of your main smoked meat, and how wrong a fixed yield would have made it.',
       // Builds the big sentence, the three cost figures and the source line; update repaints them in place.
       render: (body, p0) => {
         const big = h('p', { class: 'ob-bigline', 'data-k': 'misprice' });
@@ -35424,7 +35782,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
         function rawCost() {
           const y = yieldPrimary(ctx.prepared());
           if (y && isNum(y.costPerKgRaw)) return { cost: y.costPerKgRaw, name: y.name, staticY: y.staticYield };
-          return { cost: null, name: 'the main cooked-ahead meat', staticY: null };
+          return { cost: null, name: 'the main smoked meat', staticY: null };
         }
         // Runs the thermal model with the three stepper values and rewrites every result line.
         function paint() {
@@ -35852,7 +36210,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     /* ---------------------------------------------------------------- page result */
     const slots = [topCard, hourCard, chanCard, costCard, marginCard, noCost, yieldCard, costOfWrong, whatIf];
     const yieldBlock = [yieldSection, yieldCard.el, costOfWrong.el, whatIf.el];
-    // Shows the yield section only when cooked-ahead food is tracked and some ingredient has a yield to compare.
+    // Shows the yield section only when cabinet food is tracked and some ingredient has a yield to compare.
     const paintYieldVisible = (p) => {
       let on = true;
       try { on = SB.engine.moduleOn(SB.store.getState(), 'cookAhead') && !!yieldPrimary(p); } catch (e) { on = true; }
@@ -37635,7 +37993,6 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       { key: 'dayStartHour', name: 'Service day starts at', min: 0, max: 8, mean: 'A sale rung up before this hour counts toward the day before. A 12:45 am sale still belongs to last night.' },
       { key: 'openHour', name: 'Opens at', min: 0, max: 23, mean: 'The first hour of service.' },
       { key: 'closeHour', name: 'Closes at', min: 1, max: 30, mean: 'The last hour of service. 25 means 1 am the next day.' },
-      { key: 'soundStartHour', name: 'Warnings start at', min: 0, max: 23, mean: 'Warning sounds start at this hour, or at opening if that is earlier. Set it to when the pit master starts. Before it the strip says sound is paused.' },
     ];
     const hgrid = h('div', { class: 'od-fgrid' });
     const hf = hours.map((p) => {
@@ -37655,17 +38012,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       hgrid.appendChild(f.el);
       return { f, p };
     });
-    // Lets warning sounds play at any hour, not only between the start hour and closing.
-    const outTog = SB.ui.toggle({
-      label: 'Warnings may sound outside open hours', checked: !!((cur() || {}).settings.service || {}).soundOutsideHours,
-      // Saves the choice as a service setting and confirms it in words.
-      onChange: (v) => {
-        const r = send('updateSettings', { patch: { service: { soundOutsideHours: v } } });
-        if (good(r)) sst.ok(v ? 'Warnings may now sound at any hour.' : 'Warnings sound only from the start hour to closing.');
-        else { outTog.setValue(!v); sst.bad(refusal(r, { name: 'Sound outside open hours' })); }
-      },
-    });
-    pn.body.append(hgrid, h('div', { class: 'od-toggle-row' }, outTog), sst.el);
+    pn.body.append(hgrid, sst.el);
 
     // Sales tax: one rate that is added to every order when it is paid.
     pn.body.appendChild(sub('Sales tax'));
@@ -38980,7 +39327,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 ;try{
 /*
  * WHAT THIS FILE IS: The manager "at a glance" summary: money so far today, open orders, late tickets, the
- * 86 list and when the main cooked-ahead item runs out. Read only, live data only, built for a phone or a wall screen.
+ * 86 list and when the main cabinet food runs out. Read only, live data only, built for a phone or a wall screen.
  * PARTS: 1 pure model (runs in Node tests), 2 reading the live kitchen, 3 SB.office.glance(host).
  * USES: SB.util, SB.store, SB.metrics, SB.deadlines.   USED BY: 81-office-pace.js (top of the Pace page);
  * the board wall mode can call SB.office.glance(host) to draw the same panel.
@@ -39040,9 +39387,9 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 
   // ---- 2. Reading the live kitchen ----
 
-  // Picks the cooked-ahead item to show a run-out line for: the one that runs out soonest, else one with a known sales
+  // Picks the cabinet food to show a run-out line for: the one that runs out soonest, else one with a known sales
   // pace, else the one with the most on hand. Returns {name, onHandG, shortfallAt, rateKnown} or null when the kitchen
-  // is not tracking cooked-ahead food or nothing is ready to serve.
+  // is not tracking cabinet food or nothing is ready to serve.
   function pickRunout(state, now) {
     try {
       if (SB.engine && typeof SB.engine.moduleOn === 'function' && !SB.engine.moduleOn(state, 'cookAhead')) return null;
@@ -39122,7 +39469,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 ;try{
 /*
  * WHAT THIS FILE IS: The "Close the day" flow. A plain sheet that checks nothing is still open, shows the day's
- * money by cash, card and other, asks what to do with leftover food (only when cooked-ahead food is tracked),
+ * money by cash, card and other, asks what to do with leftover food (only when cabinet food is tracked),
  * closes the day through the engine, offers a backup, and prints a one-page end-of-day summary.
  * PARTS: 1 pure model (runs in Node tests), 2 the sheet, 3 printing, 4 the public calls.
  * USES: SB.engine (closeDay, orderTotals), SB.store, SB.ui.sheet, SB.metrics (thrown-out food), SB.util.
@@ -39216,7 +39563,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 
   // Reads the saved state, or null when the store is not ready.
   function stateNow() { try { return SB.store.getState(); } catch (e) { return null; } }
-  // True when cooked-ahead food is tracked (a missing setting counts as on).
+  // True when cabinet food is tracked (a missing setting counts as on).
   function cookAheadOn() { try { return SB.engine.moduleOn(stateNow(), 'cookAhead'); } catch (e) { return true; } }
 
   // Opens the Close the day sheet and keeps it current while it is open. Returns the sheet.
@@ -39268,7 +39615,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       body.appendChild(countsBlock(m));
       // The closing button says when it will also throw food out, so that choice is never a surprise.
       let setGoLabel = () => {};
-      // Leftover food, only when cooked-ahead food is tracked and some is left.
+      // Leftover food, only when cabinet food is tracked and some is left.
       if (cookAheadOn() && m.leftovers.count > 0) {
         const headId = U.uid('cdleft');
         const sec = h('section', { class: 'cd-sec', role: 'radiogroup', 'aria-labelledby': headId }, h('h3', { id: headId }, 'Food still in the cabinet'),

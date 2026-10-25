@@ -9,6 +9,6 @@ Print this card and keep it by the tablet.
 - [ ] Counted dishes: how many did you make today?
 - [ ] Hand sink works and is stocked. Anyone unwell? Tell the manager
 - [ ] Thermometer checked in ice water. Cooler and freezer readings written down (Settings, Readings, or your paper log)
-- [ ] If you cook ahead: log a first temperature on each batch in the cabinet
-- [ ] If you cook ahead: wipe food-contact surfaces and tap Sanitize
+- [ ] Log a first temperature on each batch in the cabinet
+- [ ] Wipe food-contact surfaces and tap Sanitize
 - [ ] Yesterday's backup saved and a copy kept off the device

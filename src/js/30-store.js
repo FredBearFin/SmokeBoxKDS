@@ -1460,6 +1460,9 @@
     if (mode === 'demo' || !state) return false;
     flush();
     try { g.sessionStorage.setItem(U.MODE_KEY, 'demo'); } catch (e) { return false; }
+    // The address says ?demo too: a browser that loses the tab's note on reload (seen with local files) still opens the demo.
+    // Leaving the demo takes it off the address again.
+    try { if (g.location && g.history && g.history.replaceState && !/[?&]demo(=|&|$)/.test(g.location.search || '')) g.history.replaceState(null, '', g.location.pathname + (g.location.search ? g.location.search + '&demo' : '?demo') + g.location.hash); } catch (e) { /* the tab's note still works */ }
     reloadPage();
     return true;
   }
@@ -1643,7 +1646,7 @@
     return { ok: true, report: 'ok', info: { keepSettings: keep }, backup: { text, filename: 'smokebox-before-start-over-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.json', mime: 'application/json', savedAt, chars: text.length } };
   }
   // True when this real kitchen holds nothing that cannot simply be typed in again: no tickets, orders, cooked batches or kept
-  // history (only dishes, cooked-ahead items and settings, or nothing at all). Start over may then be one step (opts.quick).
+  // history (only dishes, cabinet foods and settings, or nothing at all). Start over may then be one step (opts.quick).
   function nothingToLose() {
     if (!state || mode === 'demo') return false;
     return ['tickets', 'orders', 'batches', 'eventArchive', 'safetyKeep'].every((k) => !Array.isArray(state[k]) || state[k].length === 0);

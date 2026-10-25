@@ -80,12 +80,8 @@ test('hold window: brisket logged at 4:00 with the kitchen open 11:00 to 21:00 h
     const tk = E.tick(s, t);
     s = tk.state;
     assert.equal(tk.events.filter((e) => e.type === 'batch_discard').length, 0, 'no discard at ' + new Date(t).toTimeString());
-    assert.equal(D.soundsAllowed(s, t), false, 'no sound at ' + new Date(t).toTimeString());
   }
-  assert.equal(D.soundsAllowed(s, at(11)), true);
-  assert.equal(D.pauseNote(s, at(4)), 'Sound paused: kitchen closed until ' + SB.util.fmtTime(at(11)));
-  assert.equal(D.pauseNote(s, at(11)), null);
-  // The 2-hour rung is crossed at 10:00 but it is silent; it can sound once the kitchen opens, 1 hour before expiry at 12:00.
+  // The 2-hour rung is crossed at 10:00; at 11:00 the row is 1 hour before expiry at 12:00.
   const row = D.build(s, at(11)).find((x) => x.kind === 'expiry');
   assert.ok(row && row.rung >= 2 && Math.round(row.msLeft / 60e3) === 60, JSON.stringify(row && [row.rung, row.msLeft]));
   // Brisket has a quality limit: at 12:00, 8 hours after it went in, it is held off the menu (past), not thrown out.
@@ -137,31 +133,12 @@ test('feed: a batch past its quality limit gets a past row (off the menu, taste 
   assert.ok(!f.some((x) => x.kind === 'expiry' && x.batchId === row.batchId), 'no expiry projection for a batch that cannot sell');
 });
 
-test('sound pause: note while closed, next start time, early start hour, all-day setting, after-midnight close', () => {
+test('sound follows the sound button at any hour: opening hours never mute call-outs or warnings', () => {
   const at = (h, m = 0, d = 12) => new Date(2026, 9, d, h, m, 0).getTime();
-  const mk = (service) => { const settings = E.defaultSettings(); Object.assign(settings.service, service); return E.newState({ now: at(3), empty: true, settings }); };
-  const s = mk({ openHour: 11, closeHour: 21, soundStartHour: 11 });
-  assert.equal(D.pauseNote(s, at(4)), 'Sound paused: kitchen closed until ' + SB.util.fmtTime(at(11)));
-  assert.equal(D.nextOpenAt(s, at(4)), at(11));
-  assert.equal(D.pauseNote(s, at(11)), null);
-  assert.equal(D.nextOpenAt(s, at(11)), null);
-  // After closing the next start is tomorrow morning.
-  assert.equal(D.nextOpenAt(s, at(22)), at(11, 0, 13));
-  // The sound start hour can be earlier than opening (the pit master starts at 4), never later.
-  const early = mk({ openHour: 11, closeHour: 21, soundStartHour: 4 });
-  assert.equal(D.soundsAllowed(early, at(4, 30)), true);
-  assert.equal(D.soundsAllowed(early, at(3, 59)), false);
-  const late = mk({ openHour: 11, closeHour: 21, soundStartHour: 15 });
-  assert.equal(D.soundsAllowed(late, at(11, 30)), true, 'a start hour after opening does not delay the sounds');
-  // The all-day setting turns the pause off.
-  const all = mk({ soundOutsideHours: true });
-  assert.equal(D.soundsAllowed(all, at(2)), true);
-  assert.equal(D.pauseNote(all, at(2)), null);
-  // A close after midnight (25 = 1 am) keeps sound on at 00:30.
-  const night = mk({ openHour: 17, closeHour: 25, soundStartHour: 17 });
-  assert.equal(D.soundsAllowed(night, at(0, 30)), true);
-  assert.equal(D.soundsAllowed(night, at(2)), false);
-  assert.equal(D.nextOpenAt(night, at(2)), at(17));
+  const settings = E.defaultSettings(); Object.assign(settings.service, { openHour: 11, closeHour: 21 });
+  const s = E.newState({ now: at(3), empty: true, settings });
+  for (const t of [at(3), at(7), at(11), at(22), at(0, 30)]) assert.equal(D.soundsAllowed(s, t), true, new Date(t).toTimeString());
+  assert.equal(D.pauseNote, undefined, 'there is no "kitchen closed" sound pause any more');
 });
 
 test('sound settings: the engine accepts and keeps soundStartHour and soundOutsideHours; bad values are refused', () => {

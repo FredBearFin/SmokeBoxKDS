@@ -6,7 +6,7 @@ Close the day when the last order is paid. It saves the day's totals and gives y
 
 1. Tap **Orders**, then **Close the day** at the bottom.
 2. If an order is still open, it is listed. Every order must be paid or cancelled first. Tap **Open Orders to pay or void**, then come back.
-3. If you cook ahead and food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).
+3. If food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).
 4. Read Money today: cash, card and other. If you like, type **Cash you started the day with**. Smokebox remembers it on this device and adds today's cash payments, and tips paid in cash, to say how much should be in the drawer. It is a helper for counting.
 5. Tap **Close the day**.
 6. Tap **Back up today's data now** and **Print today's summary**.
@@ -15,7 +15,7 @@ Closing does not lock new orders, and closing again later includes them. A paid 
 
 ## Also
 
-- Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.
+- Wipe down food-contact surfaces and tap **Sanitize**.
 - If your health department asks, save or print the thrown-out log. Open it from the **Settings** button on the board.
 - Keep a copy of the backup off this device (see Backup and restore).
 - Which weekday sells best? In **Back office**, open **Sales and money** and look at **Best day of the week**.

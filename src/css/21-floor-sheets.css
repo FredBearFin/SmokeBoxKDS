@@ -699,3 +699,25 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* "At once" (a station's limit) and "Portions in one basket" boxes: a short number box with its label. */
 .dp-capwrap { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .dp-cap { width: 5.5rem; text-align: center; }
+/* Devices (dv-): the big join code, and one row per joined device with its name, last use and Remove. */
+.dv { display: grid; gap: var(--sp-3); }
+.dv-code { padding: var(--sp-4); border: var(--bw) solid var(--amber); border-radius: var(--r-card); background: var(--paper); text-align: center; }
+.dv-digits { font: var(--w-heavy) 56px/1.1 var(--font-display); letter-spacing: 0.08em; margin: var(--sp-2) 0; }
+.dv-list { display: grid; gap: var(--sp-2); }
+.dv-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-top: var(--bw-thin) solid var(--line-soft); }
+.dv-main { flex: 1 1 auto; min-width: 0; display: grid; gap: 4px; }
+/* Help (hp-): Guide matches, the support request form and My requests with each conversation. */
+.hp { display: grid; gap: var(--sp-3); }
+.hp-hit { justify-content: flex-start; text-align: left; }
+.hp-hit .grow { display: grid; gap: 2px; }
+.hp-what { min-height: 7rem; resize: vertical; }
+.hp-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin: var(--sp-2) 0; }
+.hp-row textarea { flex: 1 1 16rem; }
+.hp-diag { max-height: 14rem; overflow: auto; font-size: 12px; white-space: pre-wrap; background: var(--sub); padding: var(--sp-2); border-radius: var(--r-chip); }
+.hp-req { border-top: var(--bw-thin) solid var(--line-soft); padding: var(--sp-2) 0; }
+.hp-req > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.hp-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--crimson); flex: none; }
+.hp-msg { border: var(--bw-thin) solid var(--line); border-radius: var(--r-chip); padding: var(--sp-2); margin: var(--sp-2) 0; background: var(--paper); }
+.hp-staff { border-color: var(--amber); border-width: var(--bw); }
+.hp-body { white-space: pre-wrap; }
+.hp-img { max-width: 100%; border-radius: var(--r-chip); margin-top: var(--sp-2); }

@@ -372,7 +372,8 @@
     // calls each dish at its own start time only when pacing gives it one. Prep times start as guesses and learn from real cooks.
     // Extra portions of a dish cook side by side (one basket, one grill), so they add no time in a new kitchen.
     S.pacing.qtyFactor = 0;
-    S.modules = { cookAhead: false };
+    // Every kitchen holds some food hot or cold and logs temperatures, so the Hold cabinet and Readings are on from the start.
+    S.modules = { cookAhead: true };
     // No made-up customer buttons (Walk-up, Pickup, Table 1 to 6) in a new kitchen: the owner adds their own in How you serve.
     S.service.chips = [];
     return S;
@@ -3087,7 +3088,6 @@
     let settings;
     if (keep && !(sample && own)) {
       settings = s.settings;
-      if (p.catalog === 'blank') settings = Object.assign({}, settings, { modules: Object.assign({}, settings.modules, { cookAhead: false }) });
     }
     const ns = newState({
       now: tx.now, seq: s.seq, starter: p.starter !== false, stagger: p.stagger === true, blank, settings,

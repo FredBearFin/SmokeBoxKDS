@@ -10,7 +10,6 @@ const T = 1780326000000;
 let now = T;
 let s = E.newState({ now: T, blank: true });
 const ap = (type, p) => { const r = E.apply(s, type, p, now); assert.equal(r.report, 'ok', type + ' ' + r.report); s = r.state; };
-ap('updateSettings', { patch: { modules: { cookAhead: true } } });
 for (let i = 0; i < 80; i++) ap('addIngredient', { name: 'Ing ' + i, costPerKg: 3 });
 for (let i = 0; i < 150; i++) ap('addMenuItem', { name: 'Dish ' + i, zone: ['pit', 'sides', 'fry', 'cold'][i % 4], cat: ['meat', 'side', 'fried', 'cold'][i % 4], price: 5 + (i % 20), prepSec: 120, track: 'two' });
 for (let i = 0; i < 150; i++) ap('updateMenuItem', { id: s.menu[i].id, patch: { bom: [{ ing: s.ingredients[i % 80].id, qty: 100 }, { ing: s.ingredients[(i + 1) % 80].id, qty: 50 }] } });

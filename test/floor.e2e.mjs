@@ -257,7 +257,7 @@ await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
 
   // Start now on a waiting item
   const deck = await page.evaluate(() => { const r = T.row('Walk-up', 'pudding'); return { kind: r.dataset.kind, fire: !!r.querySelector('button[data-act="fire"]'), text: r.querySelector('.fl-deck-t').textContent, label: r.querySelector('button[data-act="fire"]').textContent.trim(), st: T.st('Walk-up', 'pudding') }; });
-  check('waiting item shows a "Start in m:ss" countdown and a visible Start now button', deck.kind === 'deck' && deck.fire && /^Start in \d+:\d\d$/.test(deck.text) && deck.st === 'queued' && deck.label === 'Start now', deck);
+  check('waiting item shows a "Start in m:ss" countdown and a visible Start now button', deck.kind === 'deck' && deck.fire && /^Start in \d+:\d\d( to finish with .+)?$/.test(deck.text) && deck.st === 'queued' && deck.label === 'Start now', deck);
   await page.locator('.fl-slip[data-ticket="' + await page.evaluate(() => T.id('Walk-up')) + '"] button[data-act="fire"]').click(); await settle(page, 250);
   const fired = await page.evaluate(() => ({ st: T.st('Walk-up', 'pudding'), kind: T.row('Walk-up', 'pudding').dataset.kind, toast: T.toast() }));
   check('Start now moves a one-step item to the screen and offers Undo', fired.st === 'displayed' && fired.kind === 'btn' && fired.toast.some((t) => /Start now/.test(t)), fired);
@@ -621,7 +621,7 @@ await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
   const h1 = await hint();
   check('every ticket says what to do next: "Tap START on Hush puppies. Brisket 1/2 starts in m:ss."', h1.shown && /^Tap START on Hush puppies\. Brisket 1\/2 starts in \d+:\d\d\.$/.test(h1.text) && h1.tone === 'act', h1);
   const w1 = await page.evaluate(() => ({ text: T.row('Plain', 'brisket_half').querySelector('.fl-deck-t').textContent, btn: T.row('Plain', 'brisket_half').querySelector('button[data-act="fire"]').getAttribute('aria-label') }));
-  check('the waiting dish says "Start in m:ss" and its button "Start now" (no "fire", no "on deck")', /^Start in \d+:\d\d$/.test(w1.text) && w1.btn === 'Start now: Brisket, 1/2 lb', w1);
+  check('the waiting dish says "Start in m:ss" and its button "Start now" (no "fire", no "on deck")', /^Start in \d+:\d\d( to finish with .+)?$/.test(w1.text) && w1.btn === 'Start now: Brisket, 1/2 lb', w1);
   // Start now cooks a two-step dish in one tap
   await page.locator('.fl-slip[data-ticket="' + await page.evaluate(() => T.id('Plain')) + '"] .fl-row[data-item="' + await page.evaluate(() => T.item('Plain', 'brisket_half').id) + '"] button[data-act="fire"]').click(); await settle(page, 300);
   const sn = await page.evaluate(() => ({ st: T.st('Plain', 'brisket_half'), left: T.row('Plain', 'brisket_half').querySelector('.fl-cook-t').textContent, override: T.item('Plain', 'brisket_half').override }));

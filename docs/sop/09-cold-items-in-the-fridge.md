@@ -1,6 +1,6 @@
 # Cold items in the fridge
 
-For cold food you keep in a fridge, like potato salad or a tray of dessert. Skip this page if you do not cook ahead.
+For cold food you keep in a fridge, like potato salad or a tray of dessert.
 
 ## Set it up
 

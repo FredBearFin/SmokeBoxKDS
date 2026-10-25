@@ -12,7 +12,6 @@ const T0 = new Date(2026, 9, 20, 8, 0).getTime(), MIN = 60e3;
 function kitchen() {
   const k = { now: T0, s: E.newState({ now: T0, blank: true }) };
   k.go = (type, p, dtMin = 1) => { k.now += dtMin * MIN; const r = E.apply(k.s, type, p, k.now); assert.equal(r.report, 'ok', type + ' ' + r.report + JSON.stringify(r.info)); k.s = r.state; return r; };
-  k.go('updateSettings', { patch: { modules: { cookAhead: true } } });
   return k;
 }
 const rows = (k) => IP.inspectorRows(k.s, T0 - 864e5, k.now + 864e5);

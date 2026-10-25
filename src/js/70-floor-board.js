@@ -840,11 +840,15 @@
     // Back office is a plain labeled button for managers: sales, speed, stock and the menu. It asks for the PIN when one is set.
     const officeBtn = h('button', { type: 'button', class: 'btn fl-tool fl-office', 'aria-label': 'Back office', 'aria-keyshortcuts': 'Control+Shift+O', onClick: (e) => openOffice(e.currentTarget) }, ico('gauge', 24), h('span', { class: 'fl-tool-label fl-office-label' }, 'Back office'));
     try { SB.ui.tooltip(officeBtn, 'Back office: sales, speed, stock and your menu'); } catch (e) { /* ignore */ }
+    // Help is always in the header: the Guide, and on a hosted kitchen SmokeBox support. A dot shows when support has answered.
+    const tHelp = tool('support', 'help', 'Help: the Guide and SmokeBox support', 'Help', null, 'support');
+    tHelp.b.classList.add('fl-help');
+    if (SB.support) SB.support.onUnread((n) => { tHelp.n.hidden = !n; tHelp.n.textContent = n ? String(n) : ''; tHelp.b.setAttribute('aria-label', 'Help' + (n ? ', ' + n + ' new ' + U.plural(n, 'reply', 'replies') : '')); });
     const brandBox = h('div', { class: 'fl-brand' }, brand);
     const spacer = h('div', { class: 'fl-spacer', 'aria-hidden': 'true' });
-    const head = h('header', { class: 'fl-head' }, brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn);
+    const head = h('header', { class: 'fl-head' }, brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, tHelp.b, officeBtn, menuBtn);
     // The same parts in two orders; layoutHead picks one so keyboard order matches what the eye sees.
-    m.headParts = { wide: [brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn], narrow: [brandBox, spacer, status, tools, newBtn, tOrders.b, officeBtn, menuBtn, tabs] };
+    m.headParts = { wide: [brandBox, tabs, spacer, status, tools, newBtn, tOrders.b, tHelp.b, officeBtn, menuBtn], narrow: [brandBox, spacer, status, tools, newBtn, tOrders.b, tHelp.b, officeBtn, menuBtn, tabs] };
     // WATCH OUT: on a portrait tablet the Sanitize chip, Recall and 86 sit on the top row with New ticket, so a cook reaches them without the Menu.
     // On a phone (700 px or less) the stylesheet moves them into the Menu list.
 
@@ -910,7 +914,7 @@
     TABS.forEach((id) => { const b = seg.querySelector('[data-id="' + id + '"]'); if (b) m.tabParts[id] = { count: b.querySelector('.seg-count'), n: -1 }; });
     m.seg = seg; F.applyHiddenTabs();
     m.sanText = sanChip.querySelector('.fl-chip-t');
-    Object.assign(m, { wl, wr, head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders, front: tFront }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
+    Object.assign(m, { wl, wr, head, seg, tabs, sanChip, demoChip, status, tools, tool: { recall: tRecall, hold: tHold, board86: t86, demo: tDemo, orders: tOrders, front: tFront, help: tHelp }, newBtn, officeBtn, menuBtn, strip, main, cabEl, grid, empty, dock, dockToggle, dockClear, dockList, dockEmpty, hlStyle });
 
     grid.addEventListener('click', onGridClick);
     dockList.addEventListener('click', (e) => {
@@ -1637,8 +1641,17 @@
 
   // Icon for each state on read-only rows.
   const STATE_ICON = { displayed: 'zap', cooking: 'flame', done: 'check-circle' };
-  // Words for an item still waiting, for example "Start in 2:34".
-  const deckText = (it, now) => (it.fireAt <= now ? 'Starting now' : (it.held ? 'Station full. Start in ' : 'Start in ') + mss(it.fireAt - now));
+  // Words for an item still waiting, for example "Start in 2:34 to finish with Fries": the dish it is timed to finish
+  // with is named, so nobody wonders why it waits. A full station says so instead.
+  const deckText = (it, now, lead) => (it.fireAt <= now ? 'Starting now' : it.held ? 'Station full. Start in ' + mss(it.fireAt - now) : 'Start in ' + mss(it.fireAt - now) + (lead ? ' to finish with ' + lead : ''));
+  // The dish on the same ticket that this one is timed to finish with: the open dish that starts first (the longest cook).
+  function leadOf(rec, it) {
+    let best = null;
+    for (const x of rec.itemsRef || []) if (x.id !== it.id && x.status !== 'done' && x.fireAt < it.fireAt && (!best || x.fireAt < best.fireAt)) best = x;
+    return best ? best.short || best.name : '';
+  }
+  // Words on a read-only row whose dish is due: where it is due, so a cook on the wrong screen knows which station has it.
+  const dueAt = (it) => { const z = zoneById(it.zone); return 'Due now at ' + (z ? z.name || z.code : it.zone); };
   // The cook countdown: the time left of the dish's usual time, then how far past it. Only a cue: nothing here
   // ever completes the item, a person still taps it.
   function cookOf(it, now) {
@@ -1697,13 +1710,14 @@
     } else if (row.kind === 'deck') {
       row.main.dataset.state = 'queued';
       row.sr.textContent = ', waiting to start.';
-      put(row.deckT, deckText(it, now));
+      row.lead = leadOf(rec, it);
+      put(row.deckT, deckText(it, now, row.lead));
     } else if (changed) {
       row.main.dataset.state = st;
       row.stateEl.dataset.state = st;
       row.stateIcon.replaceChildren(ico(STATE_ICON[st] || 'zap', 20));
-      put(row.stateWord, st === 'cooking' ? roText(it, now) : st === 'done' ? 'Done' : 'Not started');
-      row.sr.textContent = st === 'done' ? ', done.' : st === 'cooking' ? ', cooking.' : ', not started.';
+      put(row.stateWord, st === 'cooking' ? roText(it, now) : st === 'done' ? 'Done' : dueAt(it));
+      row.sr.textContent = st === 'done' ? ', done.' : st === 'cooking' ? ', cooking.' : ', ' + dueAt(it).toLowerCase() + '.';
     }
   }
   // Words on a read-only cooking row: time left, or "Check it" once the time is up.
@@ -1715,7 +1729,7 @@
     const wait = it.status === 'displayed' && it.freeAt > now ? 'full' : '';
     if ((row.li.dataset.wait || '') !== wait) { if (wait) row.li.dataset.wait = wait; else delete row.li.dataset.wait; }
     if (row.status === 'queued') {
-      const tx = deckText(it, now);
+      const tx = deckText(it, now, row.lead);
       if (tx !== row.deckTText) { row.deckTText = tx; put(row.deckT, tx); }
     } else if (row.status === 'cooking') {
       if (row.kind === 'btn') paintCook(row, it, now, true);
@@ -1833,7 +1847,7 @@
     el.appendChild(clockWrap);
     const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear all notices', () => { if (m && m.noteKey) m.dis.add(m.noteKey); return 'snd'; }));
     el.appendChild(soundWrap);
-    // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
+    // The note line: shown while sound is on and there is something worth saying (another tab has the sound, history, keep awake). Tap for settings.
     const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
     const pauseWrap = h('div', { class: 'fl-strip-bar fl-bar-pause', hidden: true }, pauseBar, clearBtn('Clear this notice', () => 'pause:' + (pauseBar.textContent || '')));
     el.appendChild(pauseWrap);
@@ -1936,7 +1950,6 @@
     if (m.checked) { const t = U.fmtTime(Date.now()); if (m.checkedT !== t) { m.checkedT = t; m.checked.textContent = 'Updated ' + t; } }
     const all = SB.deadlines.build(store().getState(), now);
     m.feed = all;
-    // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
     syncLeadership();
     if (SB.deadlines.soundsAllowed(store().getState(), now)) {
       const calls = ladder.decide(all, now, store().getState());
@@ -1973,7 +1986,7 @@
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
     const health = awayNote() || historyWords() || awakeNote();
-    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
+    const note = sound ? health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
     // Only one notice shows at a time (the "tap for sound" bar first, then the note, once sound is on); the bar never hints at a hidden notice, and
@@ -2119,6 +2132,8 @@
     setHidden(m.menuBtn.querySelector('.fl-menu-dot'), !needs);
     const menuName = needs ? 'Settings, something needs a look' : 'Settings';
     if (m.menuBtn.getAttribute('aria-label') !== menuName) m.menuBtn.setAttribute('aria-label', menuName);
+    // The Demo button is in the header only in the demo (or while demo orders run); a working kitchen has Help there, and Demo in the Menu.
+    setHidden(m.tool.demo.b, !(demoOn || (store().isDemo && store().isDemo())));
     toolCount(m.tool.demo, demoOn ? 1 : 0, 'warn', demoOn ? (speed > 1 ? 'clock running at x' + (Math.round(speed * 10) / 10) : 'demo orders running') : '', demoOn ? (speed > 1 ? 'x' + (Math.round(speed * 10) / 10) : 'on') : '');
     refit();
   }
@@ -2174,6 +2189,8 @@
     // Kitchen devices skip order entry, orders, demo and the back office; front devices skip the cabinet.
     const kit = role === 'kitchen', front = role === 'front';
     const items = [
+      // Help is the first row on a phone, where it is not in the header.
+      { hide: !mq('(max-width: 480px)'), label: 'Help: the Guide and support', icon: 'help', onClick: () => openSheet('support') },
       // The back office is the first row so a manager never has to hunt for it.
       { hide: kit, label: 'Back office', icon: 'gauge', onClick: () => openOffice(anchor) },
       // Menu, prices and shop is one tap away too: add a dish, change a price or a prep time.
