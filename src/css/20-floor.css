@@ -964,6 +964,11 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .chip-mod[data-kind="no"] { color: var(--crimson); border-color: var(--crimson); }
 .chip-mod[data-kind="extra"] { color: var(--sage-ink); border-color: var(--sage); }
 .chip-mod[data-kind="swap"] { color: var(--amber-ink); border-color: var(--amber); }
+/* In the order screen's request picker, the picture keeps its kind's colour before the chip is tapped. */
+.chip[data-kind="allergy"]:not(.chip-mod) .icon, .chip[data-kind="no"]:not(.chip-mod) .icon { color: var(--crimson); }
+.chip[data-kind="extra"]:not(.chip-mod) .icon { color: var(--sage-ink); }
+.chip[data-kind="swap"]:not(.chip-mod) .icon { color: var(--amber-ink); }
+.chip[aria-pressed="true"][data-kind]:not(.chip-mod) .icon { color: inherit; }
 .slip-note[data-kind="allergy"] { color: var(--crimson); border-color: var(--crimson); }
 .slip-note[data-kind="allergy"] .icon { color: var(--crimson); }
 .slip-note-do { display: block; margin-top: 2px; font-weight: var(--w-heavy); }

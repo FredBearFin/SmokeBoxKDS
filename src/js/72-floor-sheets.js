@@ -1916,7 +1916,7 @@
         h('ul', { class: 'hp-words' },
           wordRow(h('span', { class: 'stamp' }, 'RUSH'), 'Pacing is skipped: every item is ready to start now and the ticket goes to the front.'),
           wordRow(h('span', { class: 'chip' }, ico('clock', 16), h('span', null, 'Start in 2:10')), 'Waiting. Planned to start later so the order finishes together. Start now starts it early.'),
-          wordRow(h('span', { class: 'chip chip-mod' }, 'No pickles'), 'A modifier. Read these before you cook.'),
+          wordRow(SB.ui.modChip('No pickles'), 'A modifier. Read these before you cook.'),
           wordRow(h('span', { class: 'chip', dataset: { tone: 'warn' } }, ico('alert', 16), h('span', null, 'Allergy')), 'A ticket note. It sits above the items in an amber strip.'))),
       h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Availability'),
         h('ul', { class: 'hp-words' },

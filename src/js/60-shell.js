@@ -1135,6 +1135,13 @@
     el.appendChild(h('span', null, o.label == null ? '' : o.label));
     return el;
   };
+  // A special-request chip with its picture (shield, slashed circle, plus, arrow) and its kind for the color, as on the board.
+  ui.modChip = function (text) {
+    const k = U.modKind(text);
+    const c = ui.chip({ mod: true, label: text, icon: k ? U.MOD_ICON[k] : null });
+    if (k) c.dataset.kind = k;
+    return c;
+  };
   // Status badges: level -> [icon, word]; the word is always shown, never colour alone.
   const BADGE = { ok: ['check-circle', 'On time'], warn: ['clock', 'Running late'], breach: ['alert', 'Overdue'] };
   // Makes a status badge. Accepts 'ok', 'warn', 'breach' and the aliases 'bad', 'overdue' and 'warning'.

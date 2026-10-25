@@ -665,6 +665,20 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .rd-fix .input { flex: 1 1 180px; }
 .rd-fix[hidden] { display: none; }
 [data-tone="bad"].fs-sub { color: var(--crimson); }
+/* Readings (rd-) and the thrown-out log (dlog-): a picture beside every heading, result, entry and reason, in high contrast. */
+.rd-h { display: flex; align-items: center; gap: var(--sp-2); }
+.rd-h .icon { flex: none; color: var(--ink); }
+.rd-status { display: flex; align-items: flex-start; gap: var(--sp-2); font-weight: var(--w-semi); }
+.rd-status .icon { flex: none; }
+.rd-status[data-tone="ok"] { color: var(--sage-ink); }
+.rd-status[data-tone="warn"] { color: var(--amber-ink); }
+.rd-line { display: flex; align-items: center; gap: var(--sp-2); }
+.rd-line > .icon { flex: none; }
+.rd-flag { display: inline-flex; color: var(--crimson); }
+.rd-line[data-tone="warn"] .rd-what { color: var(--crimson); font-weight: var(--w-bold); }
+.dlog-reason { display: inline-flex; align-items: center; gap: 6px; font-weight: var(--w-semi); }
+.dlog-reason .icon { flex: none; }
+.dlog-reason[data-reason="temp"], .dlog-reason[data-reason="cooling"], .dlog-reason[data-reason="expired"] { color: var(--crimson); }
 .rd-state { white-space: nowrap; }
 /* Readings: the number box fills the row, so there is no empty gap beside the +5 button. */
 .rd .stepper { display: flex; width: 100%; }

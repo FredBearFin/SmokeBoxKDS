@@ -2265,6 +2265,11 @@ html[data-cabinet="on"] .sb-shell[data-view="floor"] .toast-host { bottom: auto;
 .chip-mod[data-kind="no"] { color: var(--crimson); border-color: var(--crimson); }
 .chip-mod[data-kind="extra"] { color: var(--sage-ink); border-color: var(--sage); }
 .chip-mod[data-kind="swap"] { color: var(--amber-ink); border-color: var(--amber); }
+/* In the order screen's request picker, the picture keeps its kind's colour before the chip is tapped. */
+.chip[data-kind="allergy"]:not(.chip-mod) .icon, .chip[data-kind="no"]:not(.chip-mod) .icon { color: var(--crimson); }
+.chip[data-kind="extra"]:not(.chip-mod) .icon { color: var(--sage-ink); }
+.chip[data-kind="swap"]:not(.chip-mod) .icon { color: var(--amber-ink); }
+.chip[aria-pressed="true"][data-kind]:not(.chip-mod) .icon { color: inherit; }
 .slip-note[data-kind="allergy"] { color: var(--crimson); border-color: var(--crimson); }
 .slip-note[data-kind="allergy"] .icon { color: var(--crimson); }
 .slip-note-do { display: block; margin-top: 2px; font-weight: var(--w-heavy); }
@@ -2942,6 +2947,20 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .rd-fix .input { flex: 1 1 180px; }
 .rd-fix[hidden] { display: none; }
 [data-tone="bad"].fs-sub { color: var(--crimson); }
+/* Readings (rd-) and the thrown-out log (dlog-): a picture beside every heading, result, entry and reason, in high contrast. */
+.rd-h { display: flex; align-items: center; gap: var(--sp-2); }
+.rd-h .icon { flex: none; color: var(--ink); }
+.rd-status { display: flex; align-items: flex-start; gap: var(--sp-2); font-weight: var(--w-semi); }
+.rd-status .icon { flex: none; }
+.rd-status[data-tone="ok"] { color: var(--sage-ink); }
+.rd-status[data-tone="warn"] { color: var(--amber-ink); }
+.rd-line { display: flex; align-items: center; gap: var(--sp-2); }
+.rd-line > .icon { flex: none; }
+.rd-flag { display: inline-flex; color: var(--crimson); }
+.rd-line[data-tone="warn"] .rd-what { color: var(--crimson); font-weight: var(--w-bold); }
+.dlog-reason { display: inline-flex; align-items: center; gap: 6px; font-weight: var(--w-semi); }
+.dlog-reason .icon { flex: none; }
+.dlog-reason[data-reason="temp"], .dlog-reason[data-reason="cooling"], .dlog-reason[data-reason="expired"] { color: var(--crimson); }
 .rd-state { white-space: nowrap; }
 /* Readings: the number box fills the row, so there is no empty gap beside the +5 button. */
 .rd .stepper { display: flex; width: 100%; }
@@ -4562,7 +4581,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
+window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -5173,6 +5192,18 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
   U.clear = (el) => { while (el.firstChild) el.removeChild(el.firstChild); return el; };
   // True when the device asks for less animation. False if the browser cannot say.
   U.prefersReducedMotion = () => { try { return g.matchMedia && g.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+  // Special requests are typed freely, so a few words decide the picture a cook sees before reading: an allergy (shield), leave
+  // something off (slashed circle), extra (plus) or a swap (arrow). Anything else stays a plain chip. Returns the kind or null.
+  U.modKind = function modKind(text) {
+    const t = String(text || '').toLowerCase().trim();
+    if (/allerg|gluten|celiac|coeliac|peanut|tree nut|\bnuts?\b|dairy|lactose|shellfish|sesame|\begg\b/.test(t)) return 'allergy';
+    if (/^(no|without|hold|plain|skip)\b/.test(t)) return 'no';
+    if (/^(add|extra|double|plus)\b|^\+/.test(t)) return 'extra';
+    if (/^(sub|swap|substitute)\b|\binstead\b|\bon (the )?side\b|->|→/.test(t)) return 'swap';
+    return null;
+  };
+  // The icon for each kind of special request.
+  U.MOD_ICON = { allergy: 'shield', no: 'ban', extra: 'plus', swap: 'arrow-right' };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 00-util.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'00-util.js',message:String(e&&e.message||e)});}
@@ -20882,6 +20913,13 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
     el.appendChild(h('span', null, o.label == null ? '' : o.label));
     return el;
   };
+  // A special-request chip with its picture (shield, slashed circle, plus, arrow) and its kind for the color, as on the board.
+  ui.modChip = function (text) {
+    const k = U.modKind(text);
+    const c = ui.chip({ mod: true, label: text, icon: k ? U.MOD_ICON[k] : null });
+    if (k) c.dataset.kind = k;
+    return c;
+  };
   // Status badges: level -> [icon, word]; the word is always shown, never colour alone.
   const BADGE = { ok: ['check-circle', 'On time'], warn: ['clock', 'Running late'], breach: ['alert', 'Overdue'] };
   // Makes a status badge. Accepts 'ok', 'warn', 'breach' and the aliases 'bad', 'overdue' and 'warning'.
@@ -23157,7 +23195,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
     const prog = h('div', { class: 'slip-progress', role: 'progressbar', 'aria-label': 'Progress', 'aria-valuemin': 0, 'aria-valuemax': 100 }, progI);
     const head = h('div', { class: 'slip-head' }, h('div', { class: 'slip-id' }, h('div', { class: 'fl-numrow' }, num, stampSlot), who, meta), h('div', { class: 'slip-time' }, timer, badge.el), prog);
     // A note that mentions an allergy gets the shield and one plain safety step under it.
-    const allergic = !!t.note && modKind(t.note) === 'allergy';
+    const allergic = !!t.note && U.modKind(t.note) === 'allergy';
     const note = t.note ? h('div', { class: 'slip-note', role: 'note', dataset: { kind: allergic ? 'allergy' : 'note' } }, ico(allergic ? 'shield' : 'alert', 22),
       h('span', null, h('span', { class: 'visually-hidden' }, allergic ? 'Allergy note: ' : 'Note: '), t.note, allergic ? h('span', { class: 'slip-note-do' }, 'Change gloves and wipe the board before you make this.') : null)) : null;
     const list = h('ul', { class: 'fl-items' });
@@ -23303,18 +23341,6 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
     return it.status === 'done' ? 'ro' : 'btn';
   }
 
-  // Special requests are typed freely, so a few words decide the picture a cook sees before reading: an allergy (shield), leave
-  // something off (no sign), extra (plus) or a swap (arrow). Anything else stays a plain chip. Returns the kind or null.
-  function modKind(text) {
-    const t = String(text || '').toLowerCase().trim();
-    if (/allerg|gluten|celiac|coeliac|peanut|tree nut|\bnuts?\b|dairy|lactose|shellfish|sesame|\begg\b/.test(t)) return 'allergy';
-    if (/^(no|without|hold|plain|skip)\b/.test(t)) return 'no';
-    if (/^(add|extra|double|plus)\b|^\+/.test(t)) return 'extra';
-    if (/^(sub|swap|substitute)\b|\binstead\b|\bon (the )?side\b|->|→/.test(t)) return 'swap';
-    return null;
-  }
-  // The icon for each kind of special request.
-  const MOD_ICON = { allergy: 'shield', no: 'ban', extra: 'plus', swap: 'arrow-right' };
   // A small station chip (icon and code) for rows where the station is not obvious.
   function zoneChip(zoneId) {
     const z = zoneById(zoneId);
@@ -23338,7 +23364,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
       sub.appendChild(h('span', { class: 'fl-deck' }, ico('clock', 16), row.deckT));
     }
     if (rec.mode !== 'station') sub.appendChild(zoneChip(it.zone));
-    (it.mods || []).forEach((mod) => { const k = modKind(mod); const c = SB.ui.chip({ mod: true, label: mod, icon: k ? MOD_ICON[k] : null }); if (k) c.dataset.kind = k; sub.appendChild(c); });
+    (it.mods || []).forEach((mod) => sub.appendChild(SB.ui.modChip(mod)));
     if (kind === 'btn') {
       // A two-step dish shows its countdown in the line under the name, like a waiting dish does.
       if (it.track === 'two') {
@@ -25371,7 +25397,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
         // chips are created once per label and then only flipped, so a tap is never lost to a rebuild
         all.forEach((m) => {
           let b = chipEls.get(m);
-          if (!b) { b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, m)); b.addEventListener('click', () => toggleMod(m)); chipEls.set(m, b); chipHost.appendChild(b); }
+          if (!b) { const k = U.modKind(m); b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, k ? ico(U.MOD_ICON[k], 16) : null, h('span', null, m)); if (k) b.dataset.kind = k; b.addEventListener('click', () => toggleMod(m)); chipEls.set(m, b); chipHost.appendChild(b); }
           b.setAttribute('aria-pressed', l.mods.indexOf(m) >= 0 ? 'true' : 'false');
         });
         chipEls.forEach((b, m) => { if (all.indexOf(m) < 0) { b.remove(); chipEls.delete(m); } });
@@ -25383,10 +25409,11 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
         if (mi) { text(nameEl, mi.name); text(priceEl, U.fmtMoney(mi.price * l.qty)); }
         if (stepper.getValue() !== l.qty) stepper.setValue(l.qty, { silent: true });
         // applied modifiers as bold chips under the name
-        const have = Array.from(modsEl.children).map((c) => c.textContent);
-        if (have.join('\u0001') !== l.mods.join('\u0001')) {
+        const sig = l.mods.join('\u0001');
+        if (modsEl.dataset.sig !== sig) {
           U.clear(modsEl);
-          l.mods.forEach((m) => modsEl.appendChild(h('span', { class: 'chip chip-mod' }, m)));
+          modsEl.dataset.sig = sig;
+          l.mods.forEach((m) => modsEl.appendChild(SB.ui.modChip(m)));
         }
         setHidden(modsEl, l.mods.length === 0);
         text(modsBtn.lastChild, l.mods.length ? 'Mods (' + l.mods.length + ')' : 'Mods');
@@ -27618,7 +27645,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
         h('ul', { class: 'hp-words' },
           wordRow(h('span', { class: 'stamp' }, 'RUSH'), 'Pacing is skipped: every item is ready to start now and the ticket goes to the front.'),
           wordRow(h('span', { class: 'chip' }, ico('clock', 16), h('span', null, 'Start in 2:10')), 'Waiting. Planned to start later so the order finishes together. Start now starts it early.'),
-          wordRow(h('span', { class: 'chip chip-mod' }, 'No pickles'), 'A modifier. Read these before you cook.'),
+          wordRow(SB.ui.modChip('No pickles'), 'A modifier. Read these before you cook.'),
           wordRow(h('span', { class: 'chip', dataset: { tone: 'warn' } }, ico('alert', 16), h('span', null, 'Allergy')), 'A ticket note. It sits above the items in an amber strip.'))),
       h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Availability'),
         h('ul', { class: 'hp-words' },
@@ -28969,22 +28996,28 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
   const UNITS = [{ id: 'cooler', label: 'Cooler', f: 38 }, { id: 'freezer', label: 'Freezer', f: 0 }, { id: 'display', label: 'Display case', f: 38 }, { id: 'other', label: 'Other', f: 38 }];
   const METHODS = [{ id: 'ice', label: 'Ice water', f: 32 }, { id: 'boiling', label: 'Boiling water', f: 212 }, { id: 'other', label: 'Other', f: 100 }];
   const KIND_WORD = { equip_temp: 'Fridge or freezer', thermometer_checked: 'Thermometer check', sanitize_done: 'Sanitizer' };
+  // The picture for each kind of reading, shown on its heading and on each saved entry, so it is known before reading.
+  const KIND_ICON = { equip_temp: 'snow', thermometer_checked: 'thermometer', sanitize_done: 'drop' };
+  // The picture beside the result line: saved, saved but out of range, or not saved.
+  const TONE_ICON = { ok: 'check-circle', warn: 'alert', bad: 'alert-circle' };
 
   // Opens the Readings sheet.
   // Opens the Readings sheet and builds its three forms.
   function openReadings() {
     const rec = load();
     const sheet = SB.ui.sheet({ title: 'Readings', side: 'right', width: 'min(640px, 96vw)', name: 'readings' });
-    const status = h('p', { class: 'fs-sub', role: 'status' });
+    const status = h('p', { class: 'fs-sub rd-status', role: 'status' });
     const recent = h('div', { class: 'rd-recent' });
     // Runs then(who) with the remembered initials (asked once per tablet), then says the result.
     const withWho = (verb, then) => { if (SB.who && SB.who.ask) SB.who.ask(null, verb, then); else then(''); };
     // Tells the cook what happened, in words, and refreshes the recent list.
     // A reading the engine flagged as out of range is saved, but the line says so in the warning color.
+    // Writes the result line: its picture, then the words.
+    const say = (tone, words) => { U.clear(status); status.append(ico(TONE_ICON[tone], 22), h('span', null, words)); status.dataset.tone = tone; };
     const done = (res, okText, warnText) => {
-      if (res.report !== 'ok') { status.textContent = SB.engine && SB.engine.describe ? (SB.engine.describe(res.report, res.info, SB.store.getState().settings) || 'That was not saved.') : 'That was not saved.'; status.dataset.tone = 'bad'; return; }
+      if (res.report !== 'ok') { say('bad', SB.engine && SB.engine.describe ? (SB.engine.describe(res.report, res.info, SB.store.getState().settings) || 'That was not saved.') : 'That was not saved.'); return; }
       const warn = res.info && res.info.outOfRange && warnText;
-      status.textContent = warn ? okText + ' ' + warnText : okText; status.dataset.tone = warn ? 'warn' : 'ok'; paintRecent();
+      say(warn ? 'warn' : 'ok', warn ? okText + ' ' + warnText : okText); paintRecent();
     };
     // A text box with the last names as one-tap chips under it.
     function nameField(label, key, placeholder) {
@@ -29031,7 +29064,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
         res.info && U.isNum(res.info.maxF) ? 'That is above ' + U.tempText(res.info.maxF) + '. Move the food somewhere colder, fix the unit, and check it again.' : '');
     }) }, ico('thermometer', 22), h('span', null, 'Log reading'));
     const eqGate = needsNumber(eqTemp, eqBtn);
-    const secEq = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Fridge, freezer or display case' }, h('h3', { class: 'fs-h' }, 'Fridge, freezer or display case'), unitSeg, eqName.el, h('div', { class: 'hc-fld' }, eqTemp), eqBtn);
+    const secEq = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Fridge, freezer or display case' }, h('h3', { class: 'fs-h rd-h' }, ico('snow', 28), h('span', null, 'Fridge, freezer or display case')), unitSeg, eqName.el, h('div', { class: 'hc-fld' }, eqTemp), eqBtn);
 
     // 2. Food thermometer check
     let method = 'ice';
@@ -29047,7 +29080,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
         res.info && U.isNum(res.info.expectF) ? 'It should read about ' + U.tempText(res.info.expectF) + '. Adjust the thermometer or replace it before you use it.' + (method === 'boiling' ? ' High up, water boils cooler, so a lower reading there can be fine.' : '') : '');
     }) }, ico('check-circle', 22), h('span', null, 'Log check'));
     const thGate = needsNumber(thTemp, thBtn);
-    const secTh = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Food thermometer check' }, h('h3', { class: 'fs-h' }, 'Food thermometer check'), methodSeg, h('div', { class: 'hc-fld' }, thTemp), thBtn);
+    const secTh = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Food thermometer check' }, h('h3', { class: 'fs-h rd-h' }, ico('thermometer', 28), h('span', null, 'Food thermometer check')), methodSeg, h('div', { class: 'hc-fld' }, thTemp), thBtn);
 
     // 3. Sanitizer strip
     const ppmStep = SB.ui.stepper({ value: rec.ppm, min: 0, max: 5000, step: 25, bigStep: 100, unit: 'ppm', label: 'Sanitizer strip reading in parts per million' });
@@ -29062,7 +29095,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
       done(res, 'Strip reading logged: ' + ppm + ' ppm. Surfaces are marked sanitized.');
     }) }, ico('shield-check', 22), h('span', null, 'Log strip reading'));
     const ppmGate = needsNumber(ppmStep, sanBtn);
-    const secSan = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Sanitizer strip' }, h('h3', { class: 'fs-h' }, 'Sanitizer strip'),
+    const secSan = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Sanitizer strip' }, h('h3', { class: 'fs-h rd-h' }, ico('drop', 28), h('span', null, 'Sanitizer strip')),
       h('p', { class: 'fs-sub' }, 'Type the number on the strip. Saving this also marks surfaces as sanitized.'), h('div', { class: 'hc-fld' }, ppmStep), prodF.el, whereF.el, sanBtn);
 
     // The last few readings with who wrote them. Fix adds a note next to the entry; nothing is erased.
@@ -29078,14 +29111,14 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
         const fixBox = h('div', { class: 'rd-fix', hidden: true });
         const note = h('input', { class: 'input', type: 'text', maxlength: '120', 'aria-label': 'What was wrong', placeholder: 'What was wrong' });
         // Shows or hides the box where a fix is typed.
-        const fixBtn = h('button', { type: 'button', class: 'btn btn-sm btn-ghost', onClick: () => { fixBox.hidden = !fixBox.hidden; if (!fixBox.hidden) note.focus(); } }, 'Fix');
+        const fixBtn = h('button', { type: 'button', class: 'btn btn-sm btn-ghost', onClick: () => { fixBox.hidden = !fixBox.hidden; if (!fixBox.hidden) note.focus(); } }, ico('edit', 18), h('span', null, 'Fix'));
         // Saves the fix as a note next to the entry.
         const saveFix = h('button', { type: 'button', class: 'btn btn-sm btn-primary', onClick: () => withWho('Save fix', (who) => {
           const res = run('correctSafety', { eventId: e.id, note: note.value, who: who || (SB.who && SB.who.get()) || 'NA' });
           done(res, 'Fix saved next to the entry.');
-        }) }, 'Save fix');
+        }) }, ico('save', 18), h('span', null, 'Save fix'));
         fixBox.append(note, saveFix);
-        recent.appendChild(h('div', { class: 'rd-row' }, h('div', { class: 'rd-line' }, h('span', { class: 'num' }, U.fmtTime(e.t)), h('span', { class: 'rd-what' }, what + (e.who ? ', ' + e.who : '') + fixed), fixBtn), fixBox));
+        recent.appendChild(h('div', { class: 'rd-row' }, h('div', { class: 'rd-line', dataset: { tone: e.outOfRange ? 'warn' : '' } }, ico(KIND_ICON[e.type], 22), e.outOfRange ? h('span', { class: 'rd-flag' }, ico('alert', 22), h('span', { class: 'visually-hidden' }, 'Out of range:')) : null, h('span', { class: 'num' }, U.fmtTime(e.t)), h('span', { class: 'rd-what' }, what + (e.who ? ', ' + e.who : '') + fixed), fixBtn), fixBox));
       });
     }
     paintRecent();
@@ -29126,6 +29159,8 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
   ];
   // Plain-words reasons for each reason code.
   const REASON = { expired: 'Hold time ran out', temp: 'Temperature out of range', cooling: 'Cooling missed', manual: 'Thrown out by hand', quality: 'Quality', other: 'Other' };
+  // The picture beside each reason on screen, so the reason is known before reading (print and spreadsheet stay words only).
+  const REASON_ICON = { expired: 'clock', temp: 'thermometer', cooling: 'snow', manual: 'trash', quality: 'eye', other: 'help' };
 
   // The saved log settings: column labels and visibility, initials and notes per batch, last save time. Always
   // returns a full, valid record.
@@ -29149,7 +29184,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
       seen.add(b.id);
       out.push({
         id: b.id, t: b.discardedAt, date: U.fmtDateShort(U.dateKey(b.discardedAt)), food: b.label || b.ing,
-        amount: U.weightText(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
+        amount: U.weightText(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other', reasonCode: REASON[b.discardReason] ? b.discardReason : 'other',
         initials: rec.initials[b.id] || (logged.get(b.id) && logged.get(b.id).event.who) || '', extra: rec.extra[b.id] || '',
         eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
@@ -29162,7 +29197,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
       if (seen.has(batchId) || !Number.isFinite(e.t)) continue;
       out.push({
         id: batchId, t: e.t, date: U.fmtDateShort(U.dateKey(e.t)), food: ingName(e.ing), amount: Number.isFinite(e.g) ? U.weightText(e.g) : '',
-        since: '', out: U.fmtTime(e.t), reason: REASON[e.reason] || 'Other',
+        since: '', out: U.fmtTime(e.t), reason: REASON[e.reason] || 'Other', reasonCode: REASON[e.reason] ? e.reason : 'other',
         initials: rec.initials[batchId] || e.who || '', extra: rec.extra[batchId] || e.note || '', eventId: e.id || '', fixes: row.corrections || [],
       });
     }
@@ -29257,7 +29292,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
       };
       // Cancel closes the box and changes nothing.
       const cancelFix = () => sh.close('cancel');
-      sh.footer.append(h('button', { type: 'button', class: 'btn', onClick: cancelFix }, 'Cancel'), h('button', { type: 'button', class: 'btn btn-primary', onClick: saveFix }, 'Save the fix'));
+      sh.footer.append(h('button', { type: 'button', class: 'btn', onClick: cancelFix }, ico('x', 20), h('span', null, 'Cancel')), h('button', { type: 'button', class: 'btn btn-primary', onClick: saveFix }, ico('save', 20), h('span', null, 'Save the fix')));
     }
     // Draws the table from the current state and column settings.
     function draw() {
@@ -29281,9 +29316,11 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
             cell.addEventListener('change', () => { bag[r.id] = cell.value.trim(); save(rec); });
           } else if (c.key === 'food' && r.fixes.length) {
             cell = h('div', null, r.food, ...r.fixes.map((f) => h('div', { class: 'fs-sub dlog-fix' }, 'Fixed by ' + f.who + ' at ' + U.fmtTime(f.t) + ': ' + f.note)));
+          } else if (c.key === 'reason') {
+            cell = h('span', { class: 'dlog-reason', dataset: { reason: r.reasonCode } }, ico(REASON_ICON[r.reasonCode], 22), h('span', null, r.reason));
           } else cell = doc.createTextNode(r[c.key]);
           return h('td', { style: 'padding:8px;border-bottom:1px solid var(--line);vertical-align:middle' }, cell);
-        }), h('td', { style: 'padding:8px;border-bottom:1px solid var(--line);vertical-align:middle' }, r.eventId ? h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'fix-entry' }, onClick: openFix }, 'Fix this entry') : null)));
+        }), h('td', { style: 'padding:8px;border-bottom:1px solid var(--line);vertical-align:middle' }, r.eventId ? h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'fix-entry' }, onClick: openFix }, ico('edit', 18), h('span', null, 'Fix this entry')) : null)));
       });
       table.appendChild(tb);
       wrap.appendChild(table);
@@ -29327,8 +29364,8 @@ window.SB_BUILD = { version: "0.2.0", id: "7c216e7" };
     reminded = true;
     // Opens the thrown-out log from the reminder.
     const openLog = () => SB.sheets.open('discards');
-    const open = h('button', { type: 'button', class: 'btn', onClick: openLog }, 'Open the log');
-    SB.ui.toast(h('span', null, unsaved + ' thrown-out ' + U.plural(unsaved, 'batch', 'batches') + ' not saved yet. ', open), { tone: 'warn', ms: 12000 });
+    const open = h('button', { type: 'button', class: 'btn', onClick: openLog }, ico('trash', 18), h('span', null, 'Open the log'));
+    SB.ui.toast(h('span', null, ico('alert', 20), ' ', unsaved + ' thrown-out ' + U.plural(unsaved, 'batch', 'batches') + ' not saved yet. ', open), { tone: 'warn', ms: 12000 });
   }
   // Asks the browser to keep this site's saved data even when space runs low. Ignored where unsupported.
   function persist() { try { if (g.navigator && g.navigator.storage && g.navigator.storage.persist) g.navigator.storage.persist(); } catch (e) { /* optional */ } }
