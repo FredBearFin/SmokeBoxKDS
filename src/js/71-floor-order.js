@@ -805,7 +805,7 @@
         // chips are created once per label and then only flipped, so a tap is never lost to a rebuild
         all.forEach((m) => {
           let b = chipEls.get(m);
-          if (!b) { b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, h('span', null, m)); b.addEventListener('click', () => toggleMod(m)); chipEls.set(m, b); chipHost.appendChild(b); }
+          if (!b) { const k = U.modKind(m); b = h('button', { type: 'button', class: 'chip', 'aria-pressed': 'false' }, k ? ico(U.MOD_ICON[k], 16) : null, h('span', null, m)); if (k) b.dataset.kind = k; b.addEventListener('click', () => toggleMod(m)); chipEls.set(m, b); chipHost.appendChild(b); }
           b.setAttribute('aria-pressed', l.mods.indexOf(m) >= 0 ? 'true' : 'false');
         });
         chipEls.forEach((b, m) => { if (all.indexOf(m) < 0) { b.remove(); chipEls.delete(m); } });
@@ -817,10 +817,11 @@
         if (mi) { text(nameEl, mi.name); text(priceEl, U.fmtMoney(mi.price * l.qty)); }
         if (stepper.getValue() !== l.qty) stepper.setValue(l.qty, { silent: true });
         // applied modifiers as bold chips under the name
-        const have = Array.from(modsEl.children).map((c) => c.textContent);
-        if (have.join('\u0001') !== l.mods.join('\u0001')) {
+        const sig = l.mods.join('\u0001');
+        if (modsEl.dataset.sig !== sig) {
           U.clear(modsEl);
-          l.mods.forEach((m) => modsEl.appendChild(h('span', { class: 'chip chip-mod' }, m)));
+          modsEl.dataset.sig = sig;
+          l.mods.forEach((m) => modsEl.appendChild(SB.ui.modChip(m)));
         }
         setHidden(modsEl, l.mods.length === 0);
         text(modsBtn.lastChild, l.mods.length ? 'Mods (' + l.mods.length + ')' : 'Mods');

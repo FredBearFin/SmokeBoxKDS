@@ -605,4 +605,16 @@
   U.clear = (el) => { while (el.firstChild) el.removeChild(el.firstChild); return el; };
   // True when the device asks for less animation. False if the browser cannot say.
   U.prefersReducedMotion = () => { try { return g.matchMedia && g.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+  // Special requests are typed freely, so a few words decide the picture a cook sees before reading: an allergy (shield), leave
+  // something off (slashed circle), extra (plus) or a swap (arrow). Anything else stays a plain chip. Returns the kind or null.
+  U.modKind = function modKind(text) {
+    const t = String(text || '').toLowerCase().trim();
+    if (/allerg|gluten|celiac|coeliac|peanut|tree nut|\bnuts?\b|dairy|lactose|shellfish|sesame|\begg\b/.test(t)) return 'allergy';
+    if (/^(no|without|hold|plain|skip)\b/.test(t)) return 'no';
+    if (/^(add|extra|double|plus)\b|^\+/.test(t)) return 'extra';
+    if (/^(sub|swap|substitute)\b|\binstead\b|\bon (the )?side\b|->|→/.test(t)) return 'swap';
+    return null;
+  };
+  // The icon for each kind of special request.
+  U.MOD_ICON = { allergy: 'shield', no: 'ban', extra: 'plus', swap: 'arrow-right' };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -25,6 +25,8 @@
   ];
   // Plain-words reasons for each reason code.
   const REASON = { expired: 'Hold time ran out', temp: 'Temperature out of range', cooling: 'Cooling missed', manual: 'Thrown out by hand', quality: 'Quality', other: 'Other' };
+  // The picture beside each reason on screen, so the reason is known before reading (print and spreadsheet stay words only).
+  const REASON_ICON = { expired: 'clock', temp: 'thermometer', cooling: 'snow', manual: 'trash', quality: 'eye', other: 'help' };
 
   // The saved log settings: column labels and visibility, initials and notes per batch, last save time. Always
   // returns a full, valid record.
@@ -48,7 +50,7 @@
       seen.add(b.id);
       out.push({
         id: b.id, t: b.discardedAt, date: U.fmtDateShort(U.dateKey(b.discardedAt)), food: b.label || b.ing,
-        amount: U.weightText(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other',
+        amount: U.weightText(b.wasteG), since: U.fmtTime(b.enteredAt), out: U.fmtTime(b.discardedAt), reason: REASON[b.discardReason] || 'Other', reasonCode: REASON[b.discardReason] ? b.discardReason : 'other',
         initials: rec.initials[b.id] || (logged.get(b.id) && logged.get(b.id).event.who) || '', extra: rec.extra[b.id] || '',
         eventId: logged.get(b.id) ? logged.get(b.id).event.id : '', fixes: logged.get(b.id) ? logged.get(b.id).corrections : [],
       });
@@ -61,7 +63,7 @@
       if (seen.has(batchId) || !Number.isFinite(e.t)) continue;
       out.push({
         id: batchId, t: e.t, date: U.fmtDateShort(U.dateKey(e.t)), food: ingName(e.ing), amount: Number.isFinite(e.g) ? U.weightText(e.g) : '',
-        since: '', out: U.fmtTime(e.t), reason: REASON[e.reason] || 'Other',
+        since: '', out: U.fmtTime(e.t), reason: REASON[e.reason] || 'Other', reasonCode: REASON[e.reason] ? e.reason : 'other',
         initials: rec.initials[batchId] || e.who || '', extra: rec.extra[batchId] || e.note || '', eventId: e.id || '', fixes: row.corrections || [],
       });
     }
@@ -156,7 +158,7 @@
       };
       // Cancel closes the box and changes nothing.
       const cancelFix = () => sh.close('cancel');
-      sh.footer.append(h('button', { type: 'button', class: 'btn', onClick: cancelFix }, 'Cancel'), h('button', { type: 'button', class: 'btn btn-primary', onClick: saveFix }, 'Save the fix'));
+      sh.footer.append(h('button', { type: 'button', class: 'btn', onClick: cancelFix }, ico('x', 20), h('span', null, 'Cancel')), h('button', { type: 'button', class: 'btn btn-primary', onClick: saveFix }, ico('save', 20), h('span', null, 'Save the fix')));
     }
     // Draws the table from the current state and column settings.
     function draw() {
@@ -180,9 +182,11 @@
             cell.addEventListener('change', () => { bag[r.id] = cell.value.trim(); save(rec); });
           } else if (c.key === 'food' && r.fixes.length) {
             cell = h('div', null, r.food, ...r.fixes.map((f) => h('div', { class: 'fs-sub dlog-fix' }, 'Fixed by ' + f.who + ' at ' + U.fmtTime(f.t) + ': ' + f.note)));
+          } else if (c.key === 'reason') {
+            cell = h('span', { class: 'dlog-reason', dataset: { reason: r.reasonCode } }, ico(REASON_ICON[r.reasonCode], 22), h('span', null, r.reason));
           } else cell = doc.createTextNode(r[c.key]);
           return h('td', { style: 'padding:8px;border-bottom:1px solid var(--line);vertical-align:middle' }, cell);
-        }), h('td', { style: 'padding:8px;border-bottom:1px solid var(--line);vertical-align:middle' }, r.eventId ? h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'fix-entry' }, onClick: openFix }, 'Fix this entry') : null)));
+        }), h('td', { style: 'padding:8px;border-bottom:1px solid var(--line);vertical-align:middle' }, r.eventId ? h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'fix-entry' }, onClick: openFix }, ico('edit', 18), h('span', null, 'Fix this entry')) : null)));
       });
       table.appendChild(tb);
       wrap.appendChild(table);
@@ -226,8 +230,8 @@
     reminded = true;
     // Opens the thrown-out log from the reminder.
     const openLog = () => SB.sheets.open('discards');
-    const open = h('button', { type: 'button', class: 'btn', onClick: openLog }, 'Open the log');
-    SB.ui.toast(h('span', null, unsaved + ' thrown-out ' + U.plural(unsaved, 'batch', 'batches') + ' not saved yet. ', open), { tone: 'warn', ms: 12000 });
+    const open = h('button', { type: 'button', class: 'btn', onClick: openLog }, ico('trash', 18), h('span', null, 'Open the log'));
+    SB.ui.toast(h('span', null, ico('alert', 20), ' ', unsaved + ' thrown-out ' + U.plural(unsaved, 'batch', 'batches') + ' not saved yet. ', open), { tone: 'warn', ms: 12000 });
   }
   // Asks the browser to keep this site's saved data even when space runs low. Ignored where unsupported.
   function persist() { try { if (g.navigator && g.navigator.storage && g.navigator.storage.persist) g.navigator.storage.persist(); } catch (e) { /* optional */ } }

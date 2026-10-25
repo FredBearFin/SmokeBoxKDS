@@ -37,22 +37,28 @@
   const UNITS = [{ id: 'cooler', label: 'Cooler', f: 38 }, { id: 'freezer', label: 'Freezer', f: 0 }, { id: 'display', label: 'Display case', f: 38 }, { id: 'other', label: 'Other', f: 38 }];
   const METHODS = [{ id: 'ice', label: 'Ice water', f: 32 }, { id: 'boiling', label: 'Boiling water', f: 212 }, { id: 'other', label: 'Other', f: 100 }];
   const KIND_WORD = { equip_temp: 'Fridge or freezer', thermometer_checked: 'Thermometer check', sanitize_done: 'Sanitizer' };
+  // The picture for each kind of reading, shown on its heading and on each saved entry, so it is known before reading.
+  const KIND_ICON = { equip_temp: 'snow', thermometer_checked: 'thermometer', sanitize_done: 'drop' };
+  // The picture beside the result line: saved, saved but out of range, or not saved.
+  const TONE_ICON = { ok: 'check-circle', warn: 'alert', bad: 'alert-circle' };
 
   // Opens the Readings sheet.
   // Opens the Readings sheet and builds its three forms.
   function openReadings() {
     const rec = load();
     const sheet = SB.ui.sheet({ title: 'Readings', side: 'right', width: 'min(640px, 96vw)', name: 'readings' });
-    const status = h('p', { class: 'fs-sub', role: 'status' });
+    const status = h('p', { class: 'fs-sub rd-status', role: 'status' });
     const recent = h('div', { class: 'rd-recent' });
     // Runs then(who) with the remembered initials (asked once per tablet), then says the result.
     const withWho = (verb, then) => { if (SB.who && SB.who.ask) SB.who.ask(null, verb, then); else then(''); };
     // Tells the cook what happened, in words, and refreshes the recent list.
     // A reading the engine flagged as out of range is saved, but the line says so in the warning color.
+    // Writes the result line: its picture, then the words.
+    const say = (tone, words) => { U.clear(status); status.append(ico(TONE_ICON[tone], 22), h('span', null, words)); status.dataset.tone = tone; };
     const done = (res, okText, warnText) => {
-      if (res.report !== 'ok') { status.textContent = SB.engine && SB.engine.describe ? (SB.engine.describe(res.report, res.info, SB.store.getState().settings) || 'That was not saved.') : 'That was not saved.'; status.dataset.tone = 'bad'; return; }
+      if (res.report !== 'ok') { say('bad', SB.engine && SB.engine.describe ? (SB.engine.describe(res.report, res.info, SB.store.getState().settings) || 'That was not saved.') : 'That was not saved.'); return; }
       const warn = res.info && res.info.outOfRange && warnText;
-      status.textContent = warn ? okText + ' ' + warnText : okText; status.dataset.tone = warn ? 'warn' : 'ok'; paintRecent();
+      say(warn ? 'warn' : 'ok', warn ? okText + ' ' + warnText : okText); paintRecent();
     };
     // A text box with the last names as one-tap chips under it.
     function nameField(label, key, placeholder) {
@@ -99,7 +105,7 @@
         res.info && U.isNum(res.info.maxF) ? 'That is above ' + U.tempText(res.info.maxF) + '. Move the food somewhere colder, fix the unit, and check it again.' : '');
     }) }, ico('thermometer', 22), h('span', null, 'Log reading'));
     const eqGate = needsNumber(eqTemp, eqBtn);
-    const secEq = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Fridge, freezer or display case' }, h('h3', { class: 'fs-h' }, 'Fridge, freezer or display case'), unitSeg, eqName.el, h('div', { class: 'hc-fld' }, eqTemp), eqBtn);
+    const secEq = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Fridge, freezer or display case' }, h('h3', { class: 'fs-h rd-h' }, ico('snow', 28), h('span', null, 'Fridge, freezer or display case')), unitSeg, eqName.el, h('div', { class: 'hc-fld' }, eqTemp), eqBtn);
 
     // 2. Food thermometer check
     let method = 'ice';
@@ -115,7 +121,7 @@
         res.info && U.isNum(res.info.expectF) ? 'It should read about ' + U.tempText(res.info.expectF) + '. Adjust the thermometer or replace it before you use it.' + (method === 'boiling' ? ' High up, water boils cooler, so a lower reading there can be fine.' : '') : '');
     }) }, ico('check-circle', 22), h('span', null, 'Log check'));
     const thGate = needsNumber(thTemp, thBtn);
-    const secTh = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Food thermometer check' }, h('h3', { class: 'fs-h' }, 'Food thermometer check'), methodSeg, h('div', { class: 'hc-fld' }, thTemp), thBtn);
+    const secTh = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Food thermometer check' }, h('h3', { class: 'fs-h rd-h' }, ico('thermometer', 28), h('span', null, 'Food thermometer check')), methodSeg, h('div', { class: 'hc-fld' }, thTemp), thBtn);
 
     // 3. Sanitizer strip
     const ppmStep = SB.ui.stepper({ value: rec.ppm, min: 0, max: 5000, step: 25, bigStep: 100, unit: 'ppm', label: 'Sanitizer strip reading in parts per million' });
@@ -130,7 +136,7 @@
       done(res, 'Strip reading logged: ' + ppm + ' ppm. Surfaces are marked sanitized.');
     }) }, ico('shield-check', 22), h('span', null, 'Log strip reading'));
     const ppmGate = needsNumber(ppmStep, sanBtn);
-    const secSan = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Sanitizer strip' }, h('h3', { class: 'fs-h' }, 'Sanitizer strip'),
+    const secSan = h('section', { class: 'fs-section rd-sec', 'aria-label': 'Sanitizer strip' }, h('h3', { class: 'fs-h rd-h' }, ico('drop', 28), h('span', null, 'Sanitizer strip')),
       h('p', { class: 'fs-sub' }, 'Type the number on the strip. Saving this also marks surfaces as sanitized.'), h('div', { class: 'hc-fld' }, ppmStep), prodF.el, whereF.el, sanBtn);
 
     // The last few readings with who wrote them. Fix adds a note next to the entry; nothing is erased.
@@ -146,14 +152,14 @@
         const fixBox = h('div', { class: 'rd-fix', hidden: true });
         const note = h('input', { class: 'input', type: 'text', maxlength: '120', 'aria-label': 'What was wrong', placeholder: 'What was wrong' });
         // Shows or hides the box where a fix is typed.
-        const fixBtn = h('button', { type: 'button', class: 'btn btn-sm btn-ghost', onClick: () => { fixBox.hidden = !fixBox.hidden; if (!fixBox.hidden) note.focus(); } }, 'Fix');
+        const fixBtn = h('button', { type: 'button', class: 'btn btn-sm btn-ghost', onClick: () => { fixBox.hidden = !fixBox.hidden; if (!fixBox.hidden) note.focus(); } }, ico('edit', 18), h('span', null, 'Fix'));
         // Saves the fix as a note next to the entry.
         const saveFix = h('button', { type: 'button', class: 'btn btn-sm btn-primary', onClick: () => withWho('Save fix', (who) => {
           const res = run('correctSafety', { eventId: e.id, note: note.value, who: who || (SB.who && SB.who.get()) || 'NA' });
           done(res, 'Fix saved next to the entry.');
-        }) }, 'Save fix');
+        }) }, ico('save', 18), h('span', null, 'Save fix'));
         fixBox.append(note, saveFix);
-        recent.appendChild(h('div', { class: 'rd-row' }, h('div', { class: 'rd-line' }, h('span', { class: 'num' }, U.fmtTime(e.t)), h('span', { class: 'rd-what' }, what + (e.who ? ', ' + e.who : '') + fixed), fixBtn), fixBox));
+        recent.appendChild(h('div', { class: 'rd-row' }, h('div', { class: 'rd-line', dataset: { tone: e.outOfRange ? 'warn' : '' } }, ico(KIND_ICON[e.type], 22), e.outOfRange ? h('span', { class: 'rd-flag' }, ico('alert', 22), h('span', { class: 'visually-hidden' }, 'Out of range:')) : null, h('span', { class: 'num' }, U.fmtTime(e.t)), h('span', { class: 'rd-what' }, what + (e.who ? ', ' + e.who : '') + fixed), fixBtn), fixBox));
       });
     }
     paintRecent();
