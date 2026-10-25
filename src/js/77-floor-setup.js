@@ -120,8 +120,8 @@
     else if (/name$/.test(key) && (res.report === 'nameTaken' || res.report === 'badPatch')) words = 'That name is already taken. Pick another name.';
     else if (/name$/.test(key)) words = 'The name has to be 1 to 60 letters. Shorten it and try again.';
     else if (key === 'menu' || res.report === 'tooManyItems') words = 'Your menu is full (150 dishes). Remove one you no longer sell, then add this one.';
-    else if (res.report === 'tooManyIngredients') words = 'You have as many cooked-ahead items as Smokebox can hold. Remove one first.';
-    else if (res.report === 'moduleOff') words = 'Cooking ahead is switched off. Turn it on in Tax, hours and PIN, then try again.';
+    else if (res.report === 'tooManyIngredients') words = 'You have as many cabinet foods as Smokebox can hold. Remove one first.';
+    else if (res.report === 'moduleOff') words = 'The Hold cabinet is off. Turn it on in Tax, hours and PIN, then try again.';
     return { ok: false, info: res.info || {}, words, report: res.report };
   }
   // Reads a number from a text box; blank or junk gives null so nothing is ever invented.
@@ -224,7 +224,7 @@
   }
   // True when the cook-ahead module is on (an old saved kitchen with no setting counts as on).
   function cookOn() { return SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : true; }
-  // A short plain line about one cooked-ahead item for the list: hot with its hours, or cold with the limits the owner entered.
+  // A short plain line about one cabinet food for the list: hot with its hours, or cold with the limits the owner entered.
   function coldText(i) {
     if (i.hold !== 'cold') return 'Hot, up to ' + i.maxHoldH + ' h';
     const bits = [];
@@ -232,7 +232,7 @@
     if (i.outHours != null) bits.push(i.outHours + ' h out');
     return 'Cold, ' + (bits.length ? bits.join(', ') : 'no limit set');
   }
-  // The cooked-ahead items the owner has made: cook-ahead food that is not archived.
+  // The cabinet foods the owner has made: cook-ahead food that is not archived.
   function cookItems() { return SB.store.getState().ingredients.filter((i) => i.tcs && !i.archived); }
 
   /* ---------- Watch the demo ---------- */
@@ -612,9 +612,9 @@
     paintList(); paintGone();
     offs.push(SB.store.subscribe(() => { paintList(); paintGone(); }));
 
-    // Cooked-ahead food: shown only when that module is on and there is a dish. Optional; never needed to order.
+    // Hold cabinet food: shown only when that module is on and there is a dish. Optional; never needed to order.
     const caBox = h('section', { class: 'fs-card dp-ca', hidden: true });
-    // Paints the question (before any item), or the list of cooked-ahead items with Add another.
+    // Paints the question (before any item), or the list of cabinet foods with Add another.
     let caNote = '';
     function paintCook() {
       const items = cookItems();
@@ -625,24 +625,29 @@
       U.clear(caBox);
       // After a No or Not sure: one line on what turning it on adds and where, shown until this sheet is closed.
       if (caNote && !items.length) { caBox.append(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'ok', role: 'status' }, caNote)); return; }
-      // Opens the sheet that adds one cooked-ahead item.
+      // Opens the sheet that adds one cabinet food.
       const add = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => {
         // Saying yes while the cook-ahead part is off turns it on first, then opens the sheet for the first item.
         if (!cookOn()) send('updateSettings', { patch: { modules: { cookAhead: true } } });
         SB.sheets.open('cookahead');
-      } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Yes, I cook ahead' : 'Yes, I cook ahead'));
-      if (!items.length) {
-        caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook food ahead?'),
-          h('p', { class: 'fs-sub' }, 'Soup in a warmer, salads in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. Please pick one: it only takes a tap, and you can change it later.'),
+      } }, ico('plus', 20), h('span', null, items.length ? 'Add more cabinet food' : cookOn() ? 'Add cabinet food' : 'Yes, use the Hold cabinet'));
+      if (!items.length && cookOn()) {
+        // The Hold cabinet is on (the default): no question, just what it is for and the way to add the first food.
+        caBox.append(h('h3', { class: 'fs-h' }, 'Hold cabinet food'),
+          h('p', { class: 'fs-sub' }, 'Food you keep hot or cold to serve later, like soup in a warmer, rice in a hot well or salad in a cooler. Add each one and Smokebox times every batch and warns you before its time runs out.'),
+          h('div', { class: 'fs-row' }, add));
+      } else if (!items.length) {
+        caBox.append(h('h3', { class: 'fs-h' }, 'Do you keep food hot or cold to serve later?'),
+          h('p', { class: 'fs-sub' }, 'Like soup in a warmer, rice in a hot well or salad in a cooler. Say Yes and you get the Hold cabinet: it times how long each batch has been held and warns you before its time runs out. Say No if you cook everything to order. You can change it later.'),
           h('div', { class: 'fs-row' }, add,
-            // No and Not sure both leave cooking ahead off; Not sure says so, and says how to turn it on later.
+            // No and Not sure both leave the Hold cabinet off; Not sure says so, and says how to turn it on later.
             ['No', 'Not sure'].map((lbl) => h('button', { type: 'button', class: 'btn', dataset: { act: lbl === 'No' ? 'no-cooked' : 'notsure-cooked' }, onClick: () => {
               U.storage.set(KEY_CASKIP, true);
-              caNote = (lbl === 'No' ? 'Cooking ahead stays off. ' : 'Not sure counts as No for now. ') + 'Turning it on adds the Hold cabinet, batch timers and their warnings. Turn it on any time under Settings, Tax, hours and PIN.';
+              caNote = (lbl === 'No' ? 'The Hold cabinet stays off. ' : 'Not sure counts as No for now. ') + 'Turning it on adds the Hold cabinet, batch timers and their warnings. Turn it on any time under Settings, Tax, hours and PIN.';
               paintCook();
             } }, lbl))));
       } else {
-        caBox.append(h('h3', { class: 'fs-h' }, 'Cooked-ahead food'),
+        caBox.append(h('h3', { class: 'fs-h' }, 'Hold cabinet food'),
           h('div', { class: 'dp-list' }, items.map((i) => h('div', { class: 'dp-row' }, h('strong', null, i.name), h('span', { class: 'chip' }, coldText(i)),
           // Opens the same form, filled in, to change the name or the limits.
           h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'edit-cooked' }, 'aria-label': 'Edit ' + i.name, onClick: () => SB.sheets.open('cookahead', { id: i.id }) }, 'Edit')))), h('div', { class: 'fs-row' }, add));
@@ -742,15 +747,15 @@
     return sheet;
   }
 
-  /* ---------- the Cooked-ahead food sheet ---------- */
+  /* ---------- the Hold cabinet food sheet ---------- */
 
-  // Opens "Cooked-ahead food": name, hot or cold, how long it may stay, a usual batch size and which dishes use it.
+  // Opens "Hold cabinet food": name, hot or cold, how long it may stay, a usual batch size and which dishes use it.
   // Saves the item with addIngredient, then gives each chosen dish a recipe line. Nothing here is needed to take orders.
   function openCookAhead(opts) {
     const editing = opts && opts.id ? SB.store.getState().ingredients.find((i) => i.id === opts.id && i.tcs) : null;
-    const sheet = SB.ui.sheet({ title: editing ? 'Edit cooked-ahead food' : 'Cooked-ahead food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
+    const sheet = SB.ui.sheet({ title: editing ? 'Edit cabinet food' : 'Hold cabinet food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
     const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Soup' });
-    const nameField = SB.ui.field({ label: 'What do you cook ahead?', control: nameIn });
+    const nameField = SB.ui.field({ label: 'What food goes in the cabinet?', control: nameIn });
     const kind = SB.ui.segmented({ label: 'Is it kept hot or cold?', value: 'hot', options: [{ id: 'hot', label: 'Hot' }, { id: 'cold', label: 'Cold' }],
       // Shows the boxes that fit hot or cold food.
       onChange: () => paintKind() });
@@ -785,7 +790,7 @@
     const save = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'save-cooked' }, onClick: () => {
       nameField.setError(null); hoursField.setError(null); tell(status, '');
       const name = nameIn.value.replace(/\s+/g, ' ').trim(), hrs = readNum(hoursIn), kg = kgIn.value.trim() ? readNum(kgIn) : null;
-      if (!name) { nameField.setError('Type what you cook ahead.'); return; }
+      if (!name) { nameField.setError('Type the food, like pulled pork or slaw.'); return; }
       const isCold = kind.getValue() === 'cold';
       daysField.setError(null); outField.setError(null);
       if (!isCold && (hrs == null || hrs < 0.5 || hrs > 12)) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
@@ -824,13 +829,13 @@
       after.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-first-batch' }, onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('hold', { tab: 'new', ing: r.info.id }), 60); } }, 'Log a first batch'),
         // Closes the sheet without logging a batch.
         h('button', { type: 'button', class: 'btn btn-lg', onClick: () => sheet.close('done') }, 'Done for now'));
-    } }, ico('check', 22), h('span', null, 'Save cooked-ahead item'));
+    } }, ico('check', 22), h('span', null, 'Save cabinet food'));
     const kindField = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Hot or cold'), kind);
     // Edit mode: the same boxes, filled in; hot or cold and the dish links stay as they were, and Save changes the limits and the name.
     const saveEdit = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'save-cooked-edit' }, onClick: () => {
       nameField.setError(null); daysField.setError(null); outField.setError(null); hoursField.setError(null); tell(status, '');
       const name = nameIn.value.replace(/\s+/g, ' ').trim();
-      if (!name) { nameField.setError('Type what you cook ahead.'); return; }
+      if (!name) { nameField.setError('Type the food, like pulled pork or slaw.'); return; }
       const patch = { name };
       if (editing.hold === 'cold') {
         const dv = daysIn.value.trim() ? readNum(daysIn) : null, ov = outIn.value.trim() ? readNum(outIn) : null;
@@ -1084,7 +1089,7 @@
     const step1 = h('section', { class: 'fs-section so-step' },
       h('h3', { class: 'fs-h' }, '1. What happens'),
       h('p', { class: 'fs-sub' }, 'This empties your kitchen so you can begin again with a blank menu.'),
-      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device. The food safety record stays.'),
+      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cabinet foods and their batches, portion counts, all tickets and orders, and all sales and history kept on this device. The food safety record stays.'),
       h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and sections. Clear the box and those go back to how Smokebox starts.'),
       keepLabel,
       simple ? h('p', { class: 'fs-note' }, 'You have no tickets, orders or sales yet, so only your dishes and their setup go. No backup is needed.')
@@ -1696,14 +1701,14 @@
     // Cook-ahead: one yes or no, kept in the real setting (settings.modules.cookAhead). A saved kitchen from before this
     // setting existed counts as Yes, so nothing disappears from it.
     const on0 = SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : false;
-    const cook = SB.ui.segmented({ label: 'Do you cook food ahead and hold it warm or cold?', value: on0 ? 'yes' : 'no', options: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }],
+    const cook = SB.ui.segmented({ label: 'Do you keep food hot or cold to serve later?', value: on0 ? 'yes' : 'no', options: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }],
       // Saves the answer and says what appears or goes away; puts the old answer back if the save fails.
       onChange: (v) => {
         const r = send('updateSettings', { patch: { modules: { cookAhead: v === 'yes' } } });
         if (!r.ok && r.report !== 'nothingToDo') { cook.setValue(v === 'yes' ? 'no' : 'yes'); tell(cookSt, r.words); return; }
         tell(cookSt, v === 'yes' ? 'On. The Hold cabinet, cooked-batch times and their warnings are available. Change this any time here.' : 'Off. Batch tracking stays out of the way. Change this any time here.');
       } });
-    const cookSt = section('Cooking ahead', 'Some places cook a big batch in the morning and serve from it all day, or keep cold sides in a cooler. If you do, Smokebox can track those batches and warn you before they run out of time. Most new places start with No.', cook);
+    const cookSt = section('Hold cabinet', 'Food you keep hot or cold to serve later: soup in a warmer, rice in a hot well, salad in a cooler. Every kitchen has some, so this starts on. Yes shows the Cabinet tab, which times each batch and warns you before its time runs out. No hides it.', cook);
     sheet.body.appendChild(list); keepInView(list);
     return sheet;
   }

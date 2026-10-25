@@ -18,7 +18,7 @@ Have your menu in a file? See Import or export your menu.
 
 Tap **Settings**, then **Tax, hours and PIN**. Enter your sales tax (0 if you charge none) and your opening hours. A PIN is optional. It keeps the back office for managers only.
 
-Dishes and prices asks if you cook food ahead. See Cooked-ahead food and portions.
+Food you hold hot or cold goes in the Hold cabinet. See Hold cabinet food and portions.
 
 ## 3. Send a test order
 

@@ -327,7 +327,7 @@
     const yieldCard = page.card({
       type: 'bar', span: 7, title: 'Cooked yield: assumed, modeled and real', sub: scope(),
       caption: 'How far the static yield you price with sits from the Texas A&M model and from what your own weighed batches really gave.',
-      empty: { title: 'Nothing to compare yet', body: 'Your main cooked-ahead meat needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
+      empty: { title: 'Nothing to compare yet', body: 'Your main smoked meat needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
       // Up to three bars: the fixed yield, the Texas A&M model and your weighed batches (two or more needed).
       spec: (p) => {
         const y = yieldPrimary(p);
@@ -365,7 +365,7 @@
 
     const costOfWrong = page.panel({
       span: 5, title: 'What a fixed yield costs you', sub: scope(),
-      caption: 'The real price of a cooked kilogram of your main cooked-ahead meat, and how wrong a fixed yield would have made it.',
+      caption: 'The real price of a cooked kilogram of your main smoked meat, and how wrong a fixed yield would have made it.',
       // Builds the big sentence, the three cost figures and the source line; update repaints them in place.
       render: (body, p0) => {
         const big = h('p', { class: 'ob-bigline', 'data-k': 'misprice' });
@@ -443,7 +443,7 @@
         function rawCost() {
           const y = yieldPrimary(ctx.prepared());
           if (y && isNum(y.costPerKgRaw)) return { cost: y.costPerKgRaw, name: y.name, staticY: y.staticYield };
-          return { cost: null, name: 'the main cooked-ahead meat', staticY: null };
+          return { cost: null, name: 'the main smoked meat', staticY: null };
         }
         // Runs the thermal model with the three stepper values and rewrites every result line.
         function paint() {
@@ -871,7 +871,7 @@
     /* ---------------------------------------------------------------- page result */
     const slots = [topCard, hourCard, chanCard, costCard, marginCard, noCost, yieldCard, costOfWrong, whatIf];
     const yieldBlock = [yieldSection, yieldCard.el, costOfWrong.el, whatIf.el];
-    // Shows the yield section only when cooked-ahead food is tracked and some ingredient has a yield to compare.
+    // Shows the yield section only when cabinet food is tracked and some ingredient has a yield to compare.
     const paintYieldVisible = (p) => {
       let on = true;
       try { on = SB.engine.moduleOn(SB.store.getState(), 'cookAhead') && !!yieldPrimary(p); } catch (e) { on = true; }

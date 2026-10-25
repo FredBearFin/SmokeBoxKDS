@@ -27,10 +27,8 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.click('.dp-tile[data-zone=pit]'); await page.click('[data-act=save-again]'); await page.waitForTimeout(200);
   const d1 = await page.evaluate(() => SB.store.getState().menu.filter((m) => !m.archived));
   check('first dish saved with its station, guessed prep time and price', d1.length === 1 && d1[0].zone === 'pit' && d1[0].price === 12.5 && d1[0].prepSec === 300 && d1[0].prepConfirmed === false, d1);
-  // The cooked-ahead question is Yes, No or Not sure (no Skip); Not sure counts as No and says what turning it on adds.
-  check('the cook-ahead question offers Yes, No and Not sure', await page.locator('.dp-ca [data-act=add-cooked]').isVisible() && await page.locator('.dp-ca [data-act=no-cooked]').isVisible() && await page.locator('.dp-ca [data-act=notsure-cooked]').isVisible() && !(await page.locator('[data-act=skip-cooked]').count()));
-  await page.click('.dp-ca [data-act=notsure-cooked]'); await page.waitForTimeout(250);
-  check('Not sure leaves it off and says what turning it on adds and where', /Not sure counts as No/.test(await page.locator('.dp-ca').innerText()) && /Settings, Tax, hours and PIN/.test(await page.locator('.dp-ca').innerText()) && (await page.evaluate(() => SB.engine.moduleOn(SB.store.getState(), 'cookAhead'))) === false);
+  // The Hold cabinet is on from the start: no Yes/No question, just a way to add the first cabinet food.
+  check('the Hold cabinet starts on with Add cabinet food and no question', await page.locator('.dp-ca [data-act=add-cooked]').isVisible() && !(await page.locator('.dp-ca [data-act=no-cooked]').count()) && (await page.evaluate(() => SB.engine.moduleOn(SB.store.getState(), 'cookAhead'))) === true);
   await page.evaluate(() => localStorage.removeItem('smokebox.v1.setup.cookAheadSkipped'));
   check('the station choice is remembered and the name box is empty', (await page.locator('.dp-tile[aria-checked=true]').getAttribute('data-zone')) === 'pit' && (await page.inputValue('.dp-name')) === '');
   await page.fill('.dp-name', 'Mac and cheese'); await page.fill('.dp-price', '4.5'); await page.click('.dp-tile[data-zone=sides]'); await page.click('[data-act=save-again]');
@@ -133,9 +131,9 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   check('with the module on, the cooked-ahead question shows after a dish', await page.locator('.dp-ca [data-act=add-cooked]').isVisible());
   await page.screenshot({ path: SHOT + '/ca-question.png' });
   await page.click('.dp-ca [data-act=add-cooked]'); await page.waitForTimeout(400);
-  await page.fill('.sheet:has-text("Cooked-ahead food") .dp-name', 'Brisket');
-  check('the grams boxes start empty and off until a dish is ticked', (await page.locator('.sheet:has-text("Cooked-ahead food") [aria-label^="Grams of it in one"]').evaluateAll((els) => els.every((e) => e.value === '' && e.disabled))));
-  await page.locator('.sheet:has-text("Cooked-ahead food") .dp-row', { hasText: 'Pulled pork plate' }).locator('input[type=checkbox]').check();
+  await page.fill('.sheet:has-text("Hold cabinet food") .dp-name', 'Brisket');
+  check('the grams boxes start empty and off until a dish is ticked', (await page.locator('.sheet:has-text("Hold cabinet food") [aria-label^="Grams of it in one"]').evaluateAll((els) => els.every((e) => e.value === '' && e.disabled))));
+  await page.locator('.sheet:has-text("Hold cabinet food") .dp-row', { hasText: 'Pulled pork plate' }).locator('input[type=checkbox]').check();
   await page.fill('[aria-label="Grams of it in one Pulled pork plate"]', '150');
   await page.click('[data-act=save-cooked]'); await page.waitForTimeout(400);
   const ca = await page.evaluate(() => { const s = SB.store.getState(); const i = s.ingredients.find((x) => x.name === 'Brisket'); const d = s.menu.find((m) => m.name === 'Pulled pork plate'); return { ing: i && [i.tcs, i.hold, i.maxHoldH], bom: d && d.bom }; });
@@ -150,7 +148,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.waitForTimeout(300);
   // A cold item end to end: set up with days and hours out, make a batch, Take out, Put back, Undo (A1's cabinet card).
   await page.evaluate(() => SB.sheets.open('cookahead')); await page.waitForTimeout(400);
-  const csh = '.sheet:has-text("Cooked-ahead food")';
+  const csh = '.sheet:has-text("Hold cabinet food")';
   await page.locator(csh + ' .seg-opt', { hasText: 'Cold' }).click(); await page.fill(csh + ' .dp-name', 'Chicken salad');
   await page.fill(csh + ' [aria-label="How many days may it stay in the fridge?"]', '3'); await page.fill(csh + ' [aria-label="How many hours may it be out of the fridge?"]', '2');
   await page.locator(csh + ' .dp-row').first().locator('input[type=checkbox]').check(); await page.fill(csh + ' [aria-label^="Grams of it in one"]:enabled >> nth=0', '150'); await page.click('[data-act=save-cooked]'); await page.waitForTimeout(500);

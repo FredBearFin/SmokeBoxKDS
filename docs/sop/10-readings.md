@@ -1,6 +1,6 @@
 # Readings
 
-Write down fridge, thermometer and sanitizer strip readings in one place. You see Readings only if you cook food ahead.
+Write down fridge, thermometer and sanitizer strip readings in one place.
 
 ## Open it
 

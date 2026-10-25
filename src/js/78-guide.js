@@ -56,7 +56,7 @@
      },
      {
       "t": "p",
-      "x": "Dishes and prices asks if you cook food ahead. See Cooked-ahead food and portions."
+      "x": "Food you hold hot or cold goes in the Hold cabinet. See Hold cabinet food and portions."
      },
      {
       "t": "h",
@@ -114,7 +114,7 @@
       "t": "ul",
       "x": [
        "Stations: tap **Settings**, **Dishes and prices**, then **Change stations**. Rename one to \"Counter\" and tap **Not used** on the others.",
-       "Settings: set tax and hours in **Tax, hours and PIN**. Answer **No** to cooking ahead. For a batch you bake, like 24 croissants, tap **I count what I made**. In **Settings**, **How you serve**, turn on **Counter service**.",
+       "Settings: set tax and hours in **Tax, hours and PIN**. For a batch you bake, like 24 croissants, tap **I count what I made**. In **Settings**, **How you serve**, turn on **Counter service**.",
        "The board: one list of orders, no station tabs. Pay with **Cash** or **Card** as you send, and the ticket clears itself. With **Pay later**, tap **Bump** or pay from **Orders**."
       ]
      },
@@ -150,7 +150,7 @@
       "t": "ul",
       "x": [
        "Stations: as above.",
-       "Settings: in **Dishes and prices**, tap **Yes, I cook ahead**. Add each pot or tray as a cooked-ahead item, Hot or Cold, with the time limit your health department gives you.",
+       "Settings: in **Dishes and prices**, tap **Add cabinet food**. Add each pot or tray as a cabinet food, Hot or Cold, with the time limit your health department gives you.",
        "The board: a **Cabinet** tab appears. Tap **New batch** and **Log temp** at every check. See Cabinet and warnings."
       ]
      }
@@ -401,8 +401,8 @@
    {
     "id": "cooked-ahead-and-portions",
     "group": "guide",
-    "title": "Cooked-ahead food and portions",
-    "summary": "Two ways to keep track of food you make before the order comes in. Skip this page if you cook everything to order.",
+    "title": "Hold cabinet food and portions",
+    "summary": "Two ways to keep track of food you make before the order comes in.",
     "blocks": [
      {
       "t": "h",
@@ -436,16 +436,16 @@
      {
       "t": "ol",
       "x": [
-       "In **Dishes and prices**, find \"Do you cook food ahead?\" and tap **Yes, I cook ahead**. The cooked-ahead sheet opens.",
-       "Type what you cook ahead and choose Hot or Cold.",
+       "In **Dishes and prices**, find **Hold cabinet food** and tap **Add cabinet food**. The Hold cabinet food sheet opens.",
+       "Type the food, like pulled pork or slaw, and choose Hot or Cold.",
        "Set how long it may stay. Hot food takes one number of hours. Cold food has two optional boxes: days in the fridge, and hours out of the fridge. Use the limits your local health department gives you. Leave a box empty if none is set, and Smokebox will only show the time. See Cold items in the fridge.",
        "Select the dishes that use it, and type the grams of it in one serving for each. Smokebox takes that much off the batch for each dish made.",
-       "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**. To change an item later, open it from the list and tap **Save changes**."
+       "Tap **Save cabinet food**. Then tap **Log a first batch**, or **Done for now**. To change an item later, open it from the list and tap **Save changes**."
       ]
      },
      {
       "t": "p",
-      "x": "The question \"Do you cook food ahead?\" has three answers. Choose **No** if you cook everything to order. **Not sure** counts as No for now. You can turn it on later in **Settings**, then **Tax, hours and PIN**."
+      "x": "The Hold cabinet is on from the start, because every kitchen holds some food hot or cold. A kitchen that truly cooks everything to order can turn it off in **Settings**, then **Tax, hours and PIN**, under **Hold cabinet**."
      }
     ]
    },
@@ -453,7 +453,7 @@
     "id": "hold-cabinet-and-warnings",
     "group": "guide",
     "title": "Cabinet and warnings",
-    "summary": "For kitchens that cook food ahead, like pots of soup or trays of rice. Skip this page if you cook everything to order.",
+    "summary": "Food you hold hot or cold, like soup or rice. Each batch is timed, with a warning before its time runs out.",
     "blocks": [
      {
       "t": "h",
@@ -467,7 +467,7 @@
      },
      {
       "t": "p",
-      "x": "No **Cabinet** tab? Say yes to cooking ahead first (see Cooked-ahead food and portions)."
+      "x": "No **Cabinet** tab? Turn it on in **Tax, hours and PIN**."
      },
      {
       "t": "ol",
@@ -511,7 +511,7 @@
     "id": "cold-items-in-the-fridge",
     "group": "guide",
     "title": "Cold items in the fridge",
-    "summary": "For cold food you keep in a fridge, like potato salad or a tray of dessert. Skip this page if you do not cook ahead.",
+    "summary": "For cold food you keep in a fridge, like potato salad or a tray of dessert.",
     "blocks": [
      {
       "t": "h",
@@ -551,7 +551,7 @@
     "id": "readings",
     "group": "guide",
     "title": "Readings",
-    "summary": "Write down fridge, thermometer and sanitizer strip readings in one place. You see Readings only if you cook food ahead.",
+    "summary": "Write down fridge, thermometer and sanitizer strip readings in one place.",
     "blocks": [
      {
       "t": "h",
@@ -618,7 +618,7 @@
       "x": [
        "Tap **Orders**, then **Close the day** at the bottom.",
        "If an order is still open, it is listed. Every order must be paid or cancelled first. Tap **Open Orders to pay or void**, then come back.",
-       "If you cook ahead and food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).",
+       "If food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).",
        "Read Money today: cash, card and other. If you like, type **Cash you started the day with**. Smokebox remembers it on this device and adds today's cash payments, and tips paid in cash, to say how much should be in the drawer. It is a helper for counting.",
        "Tap **Close the day**.",
        "Tap **Back up today's data now** and **Print today's summary**."
@@ -635,7 +635,7 @@
      {
       "t": "ul",
       "x": [
-       "Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.",
+       "Wipe down food-contact surfaces and tap **Sanitize**.",
        "If your health department asks, save or print the thrown-out log. Open it from the **Settings** button on the board.",
        "Keep a copy of the backup off this device (see Backup and restore).",
        "Which weekday sells best? In **Back office**, open **Sales and money** and look at **Best day of the week**.",
@@ -942,7 +942,7 @@
        "Clear the search box and choose All on the New ticket screen.",
        "Open the **86 board**. A dish that is sold out or off the menu is listed there with the reason.",
        "Open **Dishes and prices** to see every dish you have added. A dish you removed is under **Removed dishes**: tap **Bring it back**.",
-       "No **Cabinet** tab or **Sanitize** button? They show only after you say **Yes, I cook ahead** in **Dishes and prices**."
+       "No **Cabinet** tab or **Sanitize** button? They are on from the start. If someone turned them off, turn them back on in **Tax, hours and PIN**, under **Hold cabinet**."
       ]
      },
      {
@@ -1090,7 +1090,7 @@
      },
      {
       "t": "p",
-      "x": "No. A new Smokebox starts empty. You add your own dishes, rename the stations and choose whether you cook ahead. Only the demo is a barbecue kitchen."
+      "x": "No. A new Smokebox starts empty. You add your own dishes, rename the stations. The Hold cabinet starts empty too. Only the demo is a barbecue kitchen."
      },
      {
       "t": "h",
@@ -1154,7 +1154,7 @@
      },
      {
       "t": "p",
-      "x": "The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Settings**, then **Dishes and prices**, and tap **Yes, I cook ahead**."
+      "x": "The Cabinet is on from the start. If someone turned it off, tap **Settings**, then **Tax, hours and PIN**, and set **Hold cabinet** to **Yes**."
      },
      {
       "t": "h",
@@ -1218,8 +1218,8 @@
        "Counted dishes: how many did you make today?",
        "Hand sink works and is stocked. Anyone unwell? Tell the manager",
        "Thermometer checked in ice water. Cooler and freezer readings written down (Settings, Readings, or your paper log)",
-       "If you cook ahead: log a first temperature on each batch in the cabinet",
-       "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
+       "Log a first temperature on each batch in the cabinet",
+       "Wipe food-contact surfaces and tap Sanitize",
        "Yesterday's backup saved and a copy kept off the device"
       ]
      }
@@ -1235,8 +1235,8 @@
       "t": "check",
       "x": [
        "Orders: every open order paid or cancelled, then Close the day",
-       "If you cook ahead: every batch left in the cabinet decided (keep it, or throw it out)",
-       "If you cook ahead: surfaces wiped and Sanitize logged",
+       "Every batch left in the cabinet decided (keep it, or throw it out)",
+       "Surfaces wiped and Sanitize logged",
        "Food kept over a day: labeled with a date, as your local rule says",
        "Final cooler and freezer readings written down",
        "Sales and money looks right in the Back office",

@@ -204,28 +204,28 @@ step('day 0 serve, cook-ahead, checks, PIN', async () => {
   await closeSheets();
   // The cook-ahead question: Dishes and prices, "Yes, I cook ahead".
   await tap('.fl-menu', 'Settings'); await tap('button:has-text("Dishes and prices")', 'Dishes and prices');
-  await tap('[data-act="add-cooked"]', 'Yes, I cook ahead');
+  await tap('[data-act="add-cooked"]', 'Add cabinet food');
   await sleep(400);
   // Fills the cooked-ahead form for one item: its name, hot or cold, the hours it may stay, a batch size and the dish that uses it.
   async function cookedItem(name, kind, hours, kg, dish, grams, fridgeDays) {
     await type('input[aria-label="What do you cook ahead?"], .sheet input[placeholder="Soup"]', name, 'name');
-    await page.locator('.sheet', { hasText: 'Cooked-ahead food' }).last().getByText(kind, { exact: true }).click(); cnt('taps');
+    await page.locator('.sheet', { hasText: 'Hold cabinet food' }).last().getByText(kind, { exact: true }).click(); cnt('taps');
     if (kind === 'Cold' && fridgeDays) { const d = page.locator('input[aria-label="Days it may stay in the fridge"]'); await d.click(); await d.fill(String(fridgeDays)); cnt('taps'); cnt('typed'); }
     if (kind === 'Cold') { const f = page.locator('input[aria-label="Hours it may be out of the fridge"]'); await f.click(); await f.fill(String(hours)); cnt('taps'); cnt('typed'); }
     else await type('input[aria-label="Hours it may stay"]', String(hours), 'hours');
     await type('input[aria-label="Usual batch size in kilograms"]', String(kg), 'batch kg');
-    for (const other of (await page.locator('.sheet', { hasText: 'Cooked-ahead food' }).last().locator('input[type=checkbox]:checked').all())) { await other.uncheck(); cnt('taps'); }
+    for (const other of (await page.locator('.sheet', { hasText: 'Hold cabinet food' }).last().locator('input[type=checkbox]:checked').all())) { await other.uncheck(); cnt('taps'); }
     await tap('input[aria-label="' + dish + ' uses it"]', dish + ' uses it');
     await type('input[aria-label="Grams of it in one ' + dish + '"]', String(grams), 'grams');
-    await tap('[data-act="save-cooked"]', 'Save cooked-ahead item');
+    await tap('[data-act="save-cooked"]', 'Save cabinet food');
     await sleep(500);
   }
   await cookedItem('Pulled pork', 'Hot', 4, 3, 'Pulled pork plate', 180);
   const st1 = await state();
   check('the hot cooked-ahead item was saved and tracking is on', st1.ingredients.some((i) => i.name === 'Pulled pork') && st1.settings.modules.cookAhead === true, st1.ingredients.map((i) => i.name));
   // The saved item stays on screen with its next steps; the person closes it and taps Add another cooked-ahead item in Dishes and prices.
-  await page.locator('.sheet', { hasText: 'Cooked-ahead food' }).last().getByRole('button', { name: 'Close' }).click(); cnt('taps'); await sleep(400);
-  await tap('[data-act="add-cooked"]', 'Add another cooked-ahead item');
+  await page.locator('.sheet', { hasText: 'Hold cabinet food' }).last().getByRole('button', { name: 'Close' }).click(); cnt('taps'); await sleep(400);
+  await tap('[data-act="add-cooked"]', 'Add more cabinet food');
   await cookedItem('Coleslaw', 'Cold', 4, 2, 'Mac and cheese', 90, 2);
   check('the cold cooked-ahead item was saved', (await state()).ingredients.some((i) => i.name === 'Coleslaw'));
   await closeSheets();

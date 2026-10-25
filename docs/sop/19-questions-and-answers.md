@@ -4,7 +4,7 @@ Short answers to the questions owners ask first.
 
 ## Is it only for barbecue?
 
-No. A new Smokebox starts empty. You add your own dishes, rename the stations and choose whether you cook ahead. Only the demo is a barbecue kitchen.
+No. A new Smokebox starts empty. You add your own dishes, rename the stations. The Hold cabinet starts empty too. Only the demo is a barbecue kitchen.
 
 ## Does it need the internet?
 
@@ -36,7 +36,7 @@ No. For cold food in a fridge you type the days it may stay and the hours it may
 
 ## Why is there no Cabinet tab?
 
-The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Settings**, then **Dishes and prices**, and tap **Yes, I cook ahead**.
+The Cabinet is on from the start. If someone turned it off, tap **Settings**, then **Tax, hours and PIN**, and set **Hold cabinet** to **Yes**.
 
 ## Can I try it without risking my data?
 

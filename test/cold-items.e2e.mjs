@@ -11,7 +11,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.evaluate(() => { SB.store.dispatchEx('updateSettings', { patch: { modules: { cookAhead: true } } }, { source: 'ui' }); SB.store.dispatchEx('addMenuItem', { name: 'Potato salad plate', zone: 'cold', cat: 'cold', price: 5, prepSec: 60, track: 'one' }, { source: 'ui' }); });
   await page.waitForTimeout(400);
   await page.evaluate(() => SB.sheets.open('cookahead')); await page.waitForTimeout(400);
-  const sheet = '.sheet:has-text("Cooked-ahead food")';
+  const sheet = '.sheet:has-text("Hold cabinet food")';
   check('Hot is the start: the hours box shows, the fridge boxes do not', await page.locator(sheet + ' [aria-label="How long may it stay, in hours?"]').isVisible() && !(await page.locator(sheet + ' [aria-label="How many days may it stay in the fridge?"]').isVisible()));
   await page.locator(sheet + ' .seg-opt', { hasText: 'Cold' }).click(); await page.waitForTimeout(200);
   check('Cold shows the two fridge boxes and hides the hot hours box', await page.locator(sheet + ' [aria-label="How many days may it stay in the fridge?"]').isVisible() && await page.locator(sheet + ' [aria-label="How many hours may it be out of the fridge?"]').isVisible() && !(await page.locator(sheet + ' [aria-label="How long may it stay, in hours?"]').isVisible()));
@@ -41,7 +41,7 @@ await withPage({ w: 1280, h: 800, touch: true }, async (page, logs) => {
   await page.evaluate(() => SB.sheets.open('dishes')); await page.waitForTimeout(400);
   check('the list says "no limit set" for the item with none', /Cold, no limit set/.test(await page.locator('.dp-ca').innerText()));
   await page.locator('.dp-ca .dp-row', { hasText: 'Coleslaw' }).locator('[data-act=edit-cooked]').click(); await page.waitForTimeout(400);
-  const edit = '.sheet:has-text("Edit cooked-ahead food")';
+  const edit = '.sheet:has-text("Edit cabinet food")';
   check('Edit opens the same boxes, filled in, with hot or cold fixed', await page.locator(edit).isVisible() && (await page.inputValue(edit + ' .dp-name')) === 'Coleslaw' && await page.locator(edit + ' [aria-label="How many days may it stay in the fridge?"]').isVisible());
   await page.screenshot({ path: SHOT + '/cold-edit.png' });
   await page.fill(edit + ' [aria-label="How many days may it stay in the fridge?"]', '4'); await page.click('[data-act=save-cooked-edit]'); await page.waitForTimeout(900);

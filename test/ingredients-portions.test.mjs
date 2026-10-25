@@ -7,6 +7,8 @@ const SB = await loadSB(['00-util', '10-config', '20-engine', '25-deadlines', '3
 const E = SB.engine;
 const T = 1780326000000;
 const blank = () => E.newState({ now: T, blank: true });
+// A new kitchen with the Hold cabinet switched off (it starts on).
+const off = () => E.apply(blank(), 'updateSettings', { patch: { modules: { cookAhead: false } } }, T).state;
 const ok = (r, what) => { assert.equal(r.report, 'ok', what + ': ' + r.report + ' ' + JSON.stringify(r.info)); return r.state; };
 const dish = (s, name = 'Burger', extra = {}) => ok(E.apply(s, 'addMenuItem', Object.assign({ name, zone: 'pit', cat: 'meat', price: 9, prepSec: 60, track: 'one' }, extra), T), 'addMenuItem');
 // Orders one portion of a dish, lets it appear, and marks it done at time t.
@@ -47,7 +49,7 @@ test('a recipe can be set with updateMenuItem, stock depletes, cost is recorded,
 });
 
 test('addIngredient refusals carry their codes', () => {
-  let s = ok(E.apply(blank(), 'addIngredient', { name: 'Flour' }, T), 'add');
+  let s = ok(E.apply(off(), 'addIngredient', { name: 'Flour' }, T), 'add');
   const bad = (p, code) => assert.equal(E.apply(s, 'addIngredient', p, T).report, code, JSON.stringify(p));
   bad({ name: 'flour' }, 'nameTaken');
   bad({ name: '' }, 'outOfBounds');
@@ -66,7 +68,7 @@ test('addIngredient refusals carry their codes', () => {
 });
 
 test('cook-ahead ingredients default to careful hold rules and create no cost they do not have', () => {
-  let s = ok(E.apply(blank(), 'updateSettings', { patch: { modules: { cookAhead: true } } }, T), 'on');
+  let s = blank();
   s = ok(E.apply(s, 'addIngredient', { name: 'Chili', tcs: true }, T), 'add');
   const i = s.ingredients[0];
   assert.deepEqual([i.tcs, i.hold, i.maxHoldH, i.holdBasis], [true, 'hot', 4, 'safety']);
@@ -170,7 +172,7 @@ test('a category added after load is accepted, and the old names stay valid', ()
 /* ---------------- cook-ahead switch on the data side ---------------- */
 
 test('with cook-ahead off the engine refuses to start batches and raises no sanitize or batch rows', () => {
-  const s = blank();
+  const s = off();
   assert.equal(E.apply(s, 'addBatch', { ing: 'brisket', tempF: 160, cookedG: 1000 }, T).report, 'moduleOff');
   assert.equal(E.apply(s, 'planBatch', { ing: 'brisket', grams: 1000, offAt: T + 3600e3 }, T).report, 'moduleOff');
   const later = T + 6 * 3600e3;
@@ -185,7 +187,7 @@ test('with cook-ahead absent or on, everything works as before (sanitize row app
   const later = T + 6 * 3600e3;
   assert.equal(E.views.counts(legacy, later).sanitizeOverdue, true);
   assert.ok(SB.deadlines.build(legacy, later).some((r) => r.kind === 'sanitize'));
-  const on = ok(E.apply(blank(), 'updateSettings', { patch: { modules: { cookAhead: true } } }, T), 'on');
+  const on = blank();
   assert.equal(E.views.counts(on, later).sanitizeOverdue, true);
   assert.ok(SB.deadlines.build(on, later).some((r) => r.kind === 'sanitize'));
 });

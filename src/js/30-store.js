@@ -1643,7 +1643,7 @@
     return { ok: true, report: 'ok', info: { keepSettings: keep }, backup: { text, filename: 'smokebox-before-start-over-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.json', mime: 'application/json', savedAt, chars: text.length } };
   }
   // True when this real kitchen holds nothing that cannot simply be typed in again: no tickets, orders, cooked batches or kept
-  // history (only dishes, cooked-ahead items and settings, or nothing at all). Start over may then be one step (opts.quick).
+  // history (only dishes, cabinet foods and settings, or nothing at all). Start over may then be one step (opts.quick).
   function nothingToLose() {
     if (!state || mode === 'demo') return false;
     return ['tickets', 'orders', 'batches', 'eventArchive', 'safetyKeep'].every((k) => !Array.isArray(state[k]) || state[k].length === 0);

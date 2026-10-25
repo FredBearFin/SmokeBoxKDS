@@ -1016,7 +1016,7 @@
     const a = h('a', { class: 'of-nav', href: '#/office' + (p.id === 'pace' ? '' : '/' + p.id), dataset: { page: p.id }, title });
     if (current) a.setAttribute('aria-current', 'page');
     const off = pageIsOff(p.id);
-    if (off) { a.classList.add('is-off'); a.title = title + (COUNTER_PAGES[p.id] && counterOn() ? ' (counter service: not measured)' : ' (not tracking cooked-ahead food)'); }
+    if (off) { a.classList.add('is-off'); a.title = title + (COUNTER_PAGES[p.id] && counterOn() ? ' (counter service: not measured)' : ' (not tracking cabinet food)'); }
     a.append(ico(icon, 22), h('span', { class: 'of-nav-w' }, h('span', { class: 'of-nav-full' }, title), h('span', { class: 'of-nav-short' }, p.short), off ? h('span', { class: 'of-nav-off' }, COUNTER_PAGES[p.id] ? 'Not measured' : 'Not tracking') : null));
     a.addEventListener('click', (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return; e.preventDefault(); O.navigate(p.id); });
     return h('li', { class: 'of-rail-li' }, a);
@@ -1286,21 +1286,21 @@
         rec.inst = null;
       }
     }
-    // The Safety page gets a small bar to print the food safety record (only when cooked-ahead food is tracked).
+    // The Safety page gets a small bar to print the food safety record (only when cabinet food is tracked).
     if (id === 'safety' && !pageIsOff(id) && typeof O.safetyLogBar === 'function' && rec.container.firstChild) { try { rec.container.insertBefore(O.safetyLogBar(), rec.container.firstChild); } catch (e) { warnOnce('safety log bar', e); } }
     paintBanner(ctx);
     if (o.focus) { try { f.title.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   }
-  // Pages that only make sense when the owner tracks cooked-ahead food (batches, hold cabinet, temperature checks).
+  // Pages that only make sense when the owner tracks cabinet food (batches, hold cabinet, temperature checks).
   const GATED = {
-    safety: { title: 'Safety records are off', body: 'You are not tracking cooked-ahead food, so there are no batches, temperature checks or hold times to report on. If you cook food ahead and hold it hot or cold, tap Yes, I cook food ahead below.' },
-    stock: { title: 'Stock tracking is off', body: 'You are not tracking cooked-ahead food, so this page has no stock to show. If you cook food ahead and want to know when it runs out, tap Yes, I cook food ahead below.' },
+    safety: { title: 'Safety records are off', body: 'You are not tracking cabinet food, so there are no batches, temperature checks or hold times to report on. If you keep food hot or cold to serve later and hold it hot or cold, tap Yes, use the Hold cabinet below.' },
+    stock: { title: 'Stock tracking is off', body: 'You are not tracking cabinet food, so this page has no stock to show. If you keep food hot or cold to serve later and want to know when it runs out, tap Yes, use the Hold cabinet below.' },
   };
   // True when the cook-ahead module is on; a missing setting counts as on, so old saves and the demo are unchanged.
   function cookAheadOn() {
     try { return !(SB.engine && SB.store && typeof SB.engine.moduleOn === 'function') || SB.engine.moduleOn(SB.store.getState(), 'cookAhead'); } catch (e) { return true; }
   }
-  // True when this page is one of the gated pages and the owner is not tracking cooked-ahead food.
+  // True when this page is one of the gated pages and the owner is not tracking cabinet food.
   const pageIsOff = (id) => (!!GATED[id] && !cookAheadOn()) || (!!COUNTER_PAGES[id] && counterOn());
   // Pages about kitchen speed: with counter service the kitchen does not send tickets out one by one, so these times are not measured.
   const COUNTER_PAGES = { pace: 1, tickets: 1, stations: 1 };
@@ -1315,13 +1315,13 @@
     if (COUNTER_PAGES[id] && counterOn()) return { title: 'Counter service: kitchen times are not measured', body: 'With counter service an order is paid and handed over at the counter, so the kitchen does not send tickets out one by one. Speed numbers would be meaningless here, so this page is off. Your sales are on Sales and money.', action: { label: 'Open Sales and money', onClick: goMoney } };
     // Turns on cooked-ahead tracking for the page that was switched off.
     const turnOn = () => turnOnCookAhead(id);
-    return Object.assign({}, GATED[id], { action: { label: 'Yes, I cook food ahead', onClick: turnOn } });
+    return Object.assign({}, GATED[id], { action: { label: 'Yes, use the Hold cabinet', onClick: turnOn } });
   }
   // Turns the cook-ahead module on from the explanation card, then shows the page again.
   function turnOnCookAhead(id) {
     let rep = 'error';
     try { rep = SB.store.dispatch('updateSettings', { patch: { modules: { cookAhead: true } } }); } catch (e) { /* shown below */ }
-    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. On the board, tap Settings, then Dishes and prices, then Yes, I cook ahead.', { tone: 'bad' }); return; }
+    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. On the board, tap Settings, then Dishes and prices, then Yes, use the Hold cabinet.', { tone: 'bad' }); return; }
     if (M) showPage(id, { focus: false });
   }
 

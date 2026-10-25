@@ -4581,7 +4581,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
+window.SB_BUILD = { version: "0.2.0", id: "d1aac0b" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -6716,7 +6716,8 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     // calls each dish at its own start time only when pacing gives it one. Prep times start as guesses and learn from real cooks.
     // Extra portions of a dish cook side by side (one basket, one grill), so they add no time in a new kitchen.
     S.pacing.qtyFactor = 0;
-    S.modules = { cookAhead: false };
+    // Every kitchen holds some food hot or cold and logs temperatures, so the Hold cabinet and Readings are on from the start.
+    S.modules = { cookAhead: true };
     // No made-up customer buttons (Walk-up, Pickup, Table 1 to 6) in a new kitchen: the owner adds their own in How you serve.
     S.service.chips = [];
     return S;
@@ -9431,7 +9432,6 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     let settings;
     if (keep && !(sample && own)) {
       settings = s.settings;
-      if (p.catalog === 'blank') settings = Object.assign({}, settings, { modules: Object.assign({}, settings.modules, { cookAhead: false }) });
     }
     const ns = newState({
       now: tx.now, seq: s.seq, starter: p.starter !== false, stagger: p.stagger === true, blank, settings,
@@ -13452,7 +13452,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     return { ok: true, report: 'ok', info: { keepSettings: keep }, backup: { text, filename: 'smokebox-before-start-over-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.json', mime: 'application/json', savedAt, chars: text.length } };
   }
   // True when this real kitchen holds nothing that cannot simply be typed in again: no tickets, orders, cooked batches or kept
-  // history (only dishes, cooked-ahead items and settings, or nothing at all). Start over may then be one step (opts.quick).
+  // history (only dishes, cabinet foods and settings, or nothing at all). Start over may then be one step (opts.quick).
   function nothingToLose() {
     if (!state || mode === 'demo') return false;
     return ['tickets', 'orders', 'batches', 'eventArchive', 'safetyKeep'].every((k) => !Array.isArray(state[k]) || state[k].length === 0);
@@ -26845,10 +26845,10 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     const addBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg hc-add', onClick: () => add() }, ico('plus', 22), h('span', null, 'Put in hold cabinet'));
     const footer = h('div', { class: 'hc-foot' }, err, addBtn);
 
-    // With no cooked-ahead item yet the Product list is empty, so say so and offer the way to add one.
-    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cooked-ahead items yet. Add the food you cook ahead, like pulled pork or chili, and then log a batch of it here.'),
-      // Opens the Cooked-ahead food sheet where the first item is added.
-      h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add a cooked-ahead item'))));
+    // With no cabinet food yet the Product list is empty, so say so and offer the way to add one.
+    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cabinet foods yet. Add the food you keep hot or cold, like pulled pork or chili, and then log a batch of it here.'),
+      // Opens the Hold cabinet food sheet where the first item is added.
+      h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add cabinet food'))));
     // With nothing to log yet, only the explanation and the Add button show; the weight steppers wait for a product.
     const el = h('div', { class: 'hc-panel hc-form' + (list().length ? '' : ' hc-noprod') },
       h('h3', { class: 'fs-h' }, 'New batch'),
@@ -27704,7 +27704,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
   function helpAbout(sheet) {
     return h('div', { class: 'hp-pane' },
       helpList([
-        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants that cook food ahead: tickets, paced start times, a hold cabinet and a sold-out list.'),
+        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants and food trucks: tickets, paced start times, a hold cabinet and a sold-out list.'),
         helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
         helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
         helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
@@ -29503,8 +29503,8 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     else if (/name$/.test(key) && (res.report === 'nameTaken' || res.report === 'badPatch')) words = 'That name is already taken. Pick another name.';
     else if (/name$/.test(key)) words = 'The name has to be 1 to 60 letters. Shorten it and try again.';
     else if (key === 'menu' || res.report === 'tooManyItems') words = 'Your menu is full (150 dishes). Remove one you no longer sell, then add this one.';
-    else if (res.report === 'tooManyIngredients') words = 'You have as many cooked-ahead items as Smokebox can hold. Remove one first.';
-    else if (res.report === 'moduleOff') words = 'Cooking ahead is switched off. Turn it on in Tax, hours and PIN, then try again.';
+    else if (res.report === 'tooManyIngredients') words = 'You have as many cabinet foods as Smokebox can hold. Remove one first.';
+    else if (res.report === 'moduleOff') words = 'The Hold cabinet is off. Turn it on in Tax, hours and PIN, then try again.';
     return { ok: false, info: res.info || {}, words, report: res.report };
   }
   // Reads a number from a text box; blank or junk gives null so nothing is ever invented.
@@ -29607,7 +29607,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
   }
   // True when the cook-ahead module is on (an old saved kitchen with no setting counts as on).
   function cookOn() { return SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : true; }
-  // A short plain line about one cooked-ahead item for the list: hot with its hours, or cold with the limits the owner entered.
+  // A short plain line about one cabinet food for the list: hot with its hours, or cold with the limits the owner entered.
   function coldText(i) {
     if (i.hold !== 'cold') return 'Hot, up to ' + i.maxHoldH + ' h';
     const bits = [];
@@ -29615,7 +29615,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     if (i.outHours != null) bits.push(i.outHours + ' h out');
     return 'Cold, ' + (bits.length ? bits.join(', ') : 'no limit set');
   }
-  // The cooked-ahead items the owner has made: cook-ahead food that is not archived.
+  // The cabinet foods the owner has made: cook-ahead food that is not archived.
   function cookItems() { return SB.store.getState().ingredients.filter((i) => i.tcs && !i.archived); }
 
   /* ---------- Watch the demo ---------- */
@@ -29995,9 +29995,9 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     paintList(); paintGone();
     offs.push(SB.store.subscribe(() => { paintList(); paintGone(); }));
 
-    // Cooked-ahead food: shown only when that module is on and there is a dish. Optional; never needed to order.
+    // Hold cabinet food: shown only when that module is on and there is a dish. Optional; never needed to order.
     const caBox = h('section', { class: 'fs-card dp-ca', hidden: true });
-    // Paints the question (before any item), or the list of cooked-ahead items with Add another.
+    // Paints the question (before any item), or the list of cabinet foods with Add another.
     let caNote = '';
     function paintCook() {
       const items = cookItems();
@@ -30008,24 +30008,29 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
       U.clear(caBox);
       // After a No or Not sure: one line on what turning it on adds and where, shown until this sheet is closed.
       if (caNote && !items.length) { caBox.append(h('p', { class: 'fs-sub dp-msg', 'data-tone': 'ok', role: 'status' }, caNote)); return; }
-      // Opens the sheet that adds one cooked-ahead item.
+      // Opens the sheet that adds one cabinet food.
       const add = h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => {
         // Saying yes while the cook-ahead part is off turns it on first, then opens the sheet for the first item.
         if (!cookOn()) send('updateSettings', { patch: { modules: { cookAhead: true } } });
         SB.sheets.open('cookahead');
-      } }, ico('plus', 20), h('span', null, items.length ? 'Add another cooked-ahead item' : cookOn() ? 'Yes, I cook ahead' : 'Yes, I cook ahead'));
-      if (!items.length) {
-        caBox.append(h('h3', { class: 'fs-h' }, 'Do you cook food ahead?'),
-          h('p', { class: 'fs-sub' }, 'Soup in a warmer, salads in a cooler. If you do, Smokebox can track each batch and warn you before it runs out of time. Please pick one: it only takes a tap, and you can change it later.'),
+      } }, ico('plus', 20), h('span', null, items.length ? 'Add more cabinet food' : cookOn() ? 'Add cabinet food' : 'Yes, use the Hold cabinet'));
+      if (!items.length && cookOn()) {
+        // The Hold cabinet is on (the default): no question, just what it is for and the way to add the first food.
+        caBox.append(h('h3', { class: 'fs-h' }, 'Hold cabinet food'),
+          h('p', { class: 'fs-sub' }, 'Food you keep hot or cold to serve later, like soup in a warmer, rice in a hot well or salad in a cooler. Add each one and Smokebox times every batch and warns you before its time runs out.'),
+          h('div', { class: 'fs-row' }, add));
+      } else if (!items.length) {
+        caBox.append(h('h3', { class: 'fs-h' }, 'Do you keep food hot or cold to serve later?'),
+          h('p', { class: 'fs-sub' }, 'Like soup in a warmer, rice in a hot well or salad in a cooler. Say Yes and you get the Hold cabinet: it times how long each batch has been held and warns you before its time runs out. Say No if you cook everything to order. You can change it later.'),
           h('div', { class: 'fs-row' }, add,
-            // No and Not sure both leave cooking ahead off; Not sure says so, and says how to turn it on later.
+            // No and Not sure both leave the Hold cabinet off; Not sure says so, and says how to turn it on later.
             ['No', 'Not sure'].map((lbl) => h('button', { type: 'button', class: 'btn', dataset: { act: lbl === 'No' ? 'no-cooked' : 'notsure-cooked' }, onClick: () => {
               U.storage.set(KEY_CASKIP, true);
-              caNote = (lbl === 'No' ? 'Cooking ahead stays off. ' : 'Not sure counts as No for now. ') + 'Turning it on adds the Hold cabinet, batch timers and their warnings. Turn it on any time under Settings, Tax, hours and PIN.';
+              caNote = (lbl === 'No' ? 'The Hold cabinet stays off. ' : 'Not sure counts as No for now. ') + 'Turning it on adds the Hold cabinet, batch timers and their warnings. Turn it on any time under Settings, Tax, hours and PIN.';
               paintCook();
             } }, lbl))));
       } else {
-        caBox.append(h('h3', { class: 'fs-h' }, 'Cooked-ahead food'),
+        caBox.append(h('h3', { class: 'fs-h' }, 'Hold cabinet food'),
           h('div', { class: 'dp-list' }, items.map((i) => h('div', { class: 'dp-row' }, h('strong', null, i.name), h('span', { class: 'chip' }, coldText(i)),
           // Opens the same form, filled in, to change the name or the limits.
           h('button', { type: 'button', class: 'btn btn-sm', dataset: { act: 'edit-cooked' }, 'aria-label': 'Edit ' + i.name, onClick: () => SB.sheets.open('cookahead', { id: i.id }) }, 'Edit')))), h('div', { class: 'fs-row' }, add));
@@ -30125,15 +30130,15 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     return sheet;
   }
 
-  /* ---------- the Cooked-ahead food sheet ---------- */
+  /* ---------- the Hold cabinet food sheet ---------- */
 
-  // Opens "Cooked-ahead food": name, hot or cold, how long it may stay, a usual batch size and which dishes use it.
+  // Opens "Hold cabinet food": name, hot or cold, how long it may stay, a usual batch size and which dishes use it.
   // Saves the item with addIngredient, then gives each chosen dish a recipe line. Nothing here is needed to take orders.
   function openCookAhead(opts) {
     const editing = opts && opts.id ? SB.store.getState().ingredients.find((i) => i.id === opts.id && i.tcs) : null;
-    const sheet = SB.ui.sheet({ title: editing ? 'Edit cooked-ahead food' : 'Cooked-ahead food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
+    const sheet = SB.ui.sheet({ title: editing ? 'Edit cabinet food' : 'Hold cabinet food', side: 'right', width: 'min(720px, 96vw)', name: 'cookahead' });
     const nameIn = h('input', { class: 'input dp-name', type: 'text', maxlength: 60, autocomplete: 'off', placeholder: 'Soup' });
-    const nameField = SB.ui.field({ label: 'What do you cook ahead?', control: nameIn });
+    const nameField = SB.ui.field({ label: 'What food goes in the cabinet?', control: nameIn });
     const kind = SB.ui.segmented({ label: 'Is it kept hot or cold?', value: 'hot', options: [{ id: 'hot', label: 'Hot' }, { id: 'cold', label: 'Cold' }],
       // Shows the boxes that fit hot or cold food.
       onChange: () => paintKind() });
@@ -30168,7 +30173,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     const save = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'save-cooked' }, onClick: () => {
       nameField.setError(null); hoursField.setError(null); tell(status, '');
       const name = nameIn.value.replace(/\s+/g, ' ').trim(), hrs = readNum(hoursIn), kg = kgIn.value.trim() ? readNum(kgIn) : null;
-      if (!name) { nameField.setError('Type what you cook ahead.'); return; }
+      if (!name) { nameField.setError('Type the food, like pulled pork or slaw.'); return; }
       const isCold = kind.getValue() === 'cold';
       daysField.setError(null); outField.setError(null);
       if (!isCold && (hrs == null || hrs < 0.5 || hrs > 12)) { hoursField.setError('Type hours from 0.5 to 12.'); return; }
@@ -30207,13 +30212,13 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
       after.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'log-first-batch' }, onClick: () => { sheet.close('link'); setTimeout(() => SB.sheets.open('hold', { tab: 'new', ing: r.info.id }), 60); } }, 'Log a first batch'),
         // Closes the sheet without logging a batch.
         h('button', { type: 'button', class: 'btn btn-lg', onClick: () => sheet.close('done') }, 'Done for now'));
-    } }, ico('check', 22), h('span', null, 'Save cooked-ahead item'));
+    } }, ico('check', 22), h('span', null, 'Save cabinet food'));
     const kindField = h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Hot or cold'), kind);
     // Edit mode: the same boxes, filled in; hot or cold and the dish links stay as they were, and Save changes the limits and the name.
     const saveEdit = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'save-cooked-edit' }, onClick: () => {
       nameField.setError(null); daysField.setError(null); outField.setError(null); hoursField.setError(null); tell(status, '');
       const name = nameIn.value.replace(/\s+/g, ' ').trim();
-      if (!name) { nameField.setError('Type what you cook ahead.'); return; }
+      if (!name) { nameField.setError('Type the food, like pulled pork or slaw.'); return; }
       const patch = { name };
       if (editing.hold === 'cold') {
         const dv = daysIn.value.trim() ? readNum(daysIn) : null, ov = outIn.value.trim() ? readNum(outIn) : null;
@@ -30467,7 +30472,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     const step1 = h('section', { class: 'fs-section so-step' },
       h('h3', { class: 'fs-h' }, '1. What happens'),
       h('p', { class: 'fs-sub' }, 'This empties your kitchen so you can begin again with a blank menu.'),
-      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cooked-ahead items and their batches, portion counts, all tickets and orders, and all sales and history kept on this device. The food safety record stays.'),
+      h('p', null, h('strong', null, 'This goes: '), 'every dish and price, cabinet foods and their batches, portion counts, all tickets and orders, and all sales and history kept on this device. The food safety record stays.'),
       h('p', null, h('strong', null, 'This stays if the box is selected: '), 'your sales tax, opening hours, manager PIN, and the names you gave your stations and sections. Clear the box and those go back to how Smokebox starts.'),
       keepLabel,
       simple ? h('p', { class: 'fs-note' }, 'You have no tickets, orders or sales yet, so only your dishes and their setup go. No backup is needed.')
@@ -31079,14 +31084,14 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     // Cook-ahead: one yes or no, kept in the real setting (settings.modules.cookAhead). A saved kitchen from before this
     // setting existed counts as Yes, so nothing disappears from it.
     const on0 = SB.engine && SB.engine.moduleOn ? SB.engine.moduleOn(SB.store.getState(), 'cookAhead') : false;
-    const cook = SB.ui.segmented({ label: 'Do you cook food ahead and hold it warm or cold?', value: on0 ? 'yes' : 'no', options: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }],
+    const cook = SB.ui.segmented({ label: 'Do you keep food hot or cold to serve later?', value: on0 ? 'yes' : 'no', options: [{ id: 'no', label: 'No' }, { id: 'yes', label: 'Yes' }],
       // Saves the answer and says what appears or goes away; puts the old answer back if the save fails.
       onChange: (v) => {
         const r = send('updateSettings', { patch: { modules: { cookAhead: v === 'yes' } } });
         if (!r.ok && r.report !== 'nothingToDo') { cook.setValue(v === 'yes' ? 'no' : 'yes'); tell(cookSt, r.words); return; }
         tell(cookSt, v === 'yes' ? 'On. The Hold cabinet, cooked-batch times and their warnings are available. Change this any time here.' : 'Off. Batch tracking stays out of the way. Change this any time here.');
       } });
-    const cookSt = section('Cooking ahead', 'Some places cook a big batch in the morning and serve from it all day, or keep cold sides in a cooler. If you do, Smokebox can track those batches and warn you before they run out of time. Most new places start with No.', cook);
+    const cookSt = section('Hold cabinet', 'Food you keep hot or cold to serve later: soup in a warmer, rice in a hot well, salad in a cooler. Every kitchen has some, so this starts on. Yes shows the Cabinet tab, which times each batch and warns you before its time runs out. No hides it.', cook);
     sheet.body.appendChild(list); keepInView(list);
     return sheet;
   }
@@ -31189,7 +31194,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
      },
      {
       "t": "p",
-      "x": "Dishes and prices asks if you cook food ahead. See Cooked-ahead food and portions."
+      "x": "Food you hold hot or cold goes in the Hold cabinet. See Hold cabinet food and portions."
      },
      {
       "t": "h",
@@ -31247,7 +31252,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
       "t": "ul",
       "x": [
        "Stations: tap **Settings**, **Dishes and prices**, then **Change stations**. Rename one to \"Counter\" and tap **Not used** on the others.",
-       "Settings: set tax and hours in **Tax, hours and PIN**. Answer **No** to cooking ahead. For a batch you bake, like 24 croissants, tap **I count what I made**. In **Settings**, **How you serve**, turn on **Counter service**.",
+       "Settings: set tax and hours in **Tax, hours and PIN**. For a batch you bake, like 24 croissants, tap **I count what I made**. In **Settings**, **How you serve**, turn on **Counter service**.",
        "The board: one list of orders, no station tabs. Pay with **Cash** or **Card** as you send, and the ticket clears itself. With **Pay later**, tap **Bump** or pay from **Orders**."
       ]
      },
@@ -31283,7 +31288,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
       "t": "ul",
       "x": [
        "Stations: as above.",
-       "Settings: in **Dishes and prices**, tap **Yes, I cook ahead**. Add each pot or tray as a cooked-ahead item, Hot or Cold, with the time limit your health department gives you.",
+       "Settings: in **Dishes and prices**, tap **Add cabinet food**. Add each pot or tray as a cabinet food, Hot or Cold, with the time limit your health department gives you.",
        "The board: a **Cabinet** tab appears. Tap **New batch** and **Log temp** at every check. See Cabinet and warnings."
       ]
      }
@@ -31534,8 +31539,8 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
    {
     "id": "cooked-ahead-and-portions",
     "group": "guide",
-    "title": "Cooked-ahead food and portions",
-    "summary": "Two ways to keep track of food you make before the order comes in. Skip this page if you cook everything to order.",
+    "title": "Hold cabinet food and portions",
+    "summary": "Two ways to keep track of food you make before the order comes in.",
     "blocks": [
      {
       "t": "h",
@@ -31569,16 +31574,16 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
      {
       "t": "ol",
       "x": [
-       "In **Dishes and prices**, find \"Do you cook food ahead?\" and tap **Yes, I cook ahead**. The cooked-ahead sheet opens.",
-       "Type what you cook ahead and choose Hot or Cold.",
+       "In **Dishes and prices**, find **Hold cabinet food** and tap **Add cabinet food**. The Hold cabinet food sheet opens.",
+       "Type the food, like pulled pork or slaw, and choose Hot or Cold.",
        "Set how long it may stay. Hot food takes one number of hours. Cold food has two optional boxes: days in the fridge, and hours out of the fridge. Use the limits your local health department gives you. Leave a box empty if none is set, and Smokebox will only show the time. See Cold items in the fridge.",
        "Select the dishes that use it, and type the grams of it in one serving for each. Smokebox takes that much off the batch for each dish made.",
-       "Tap **Save cooked-ahead item**. Then tap **Log a first batch**, or **Done for now**. To change an item later, open it from the list and tap **Save changes**."
+       "Tap **Save cabinet food**. Then tap **Log a first batch**, or **Done for now**. To change an item later, open it from the list and tap **Save changes**."
       ]
      },
      {
       "t": "p",
-      "x": "The question \"Do you cook food ahead?\" has three answers. Choose **No** if you cook everything to order. **Not sure** counts as No for now. You can turn it on later in **Settings**, then **Tax, hours and PIN**."
+      "x": "The Hold cabinet is on from the start, because every kitchen holds some food hot or cold. A kitchen that truly cooks everything to order can turn it off in **Settings**, then **Tax, hours and PIN**, under **Hold cabinet**."
      }
     ]
    },
@@ -31586,7 +31591,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     "id": "hold-cabinet-and-warnings",
     "group": "guide",
     "title": "Cabinet and warnings",
-    "summary": "For kitchens that cook food ahead, like pots of soup or trays of rice. Skip this page if you cook everything to order.",
+    "summary": "Food you hold hot or cold, like soup or rice. Each batch is timed, with a warning before its time runs out.",
     "blocks": [
      {
       "t": "h",
@@ -31600,7 +31605,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
      },
      {
       "t": "p",
-      "x": "No **Cabinet** tab? Say yes to cooking ahead first (see Cooked-ahead food and portions)."
+      "x": "No **Cabinet** tab? Turn it on in **Tax, hours and PIN**."
      },
      {
       "t": "ol",
@@ -31644,7 +31649,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     "id": "cold-items-in-the-fridge",
     "group": "guide",
     "title": "Cold items in the fridge",
-    "summary": "For cold food you keep in a fridge, like potato salad or a tray of dessert. Skip this page if you do not cook ahead.",
+    "summary": "For cold food you keep in a fridge, like potato salad or a tray of dessert.",
     "blocks": [
      {
       "t": "h",
@@ -31684,7 +31689,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     "id": "readings",
     "group": "guide",
     "title": "Readings",
-    "summary": "Write down fridge, thermometer and sanitizer strip readings in one place. You see Readings only if you cook food ahead.",
+    "summary": "Write down fridge, thermometer and sanitizer strip readings in one place.",
     "blocks": [
      {
       "t": "h",
@@ -31751,7 +31756,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
       "x": [
        "Tap **Orders**, then **Close the day** at the bottom.",
        "If an order is still open, it is listed. Every order must be paid or cancelled first. Tap **Open Orders to pay or void**, then come back.",
-       "If you cook ahead and food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).",
+       "If food is left in the cabinet, choose **Keep it** (the timers keep running) or **Throw it all out** (logged as other).",
        "Read Money today: cash, card and other. If you like, type **Cash you started the day with**. Smokebox remembers it on this device and adds today's cash payments, and tips paid in cash, to say how much should be in the drawer. It is a helper for counting.",
        "Tap **Close the day**.",
        "Tap **Back up today's data now** and **Print today's summary**."
@@ -31768,7 +31773,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
      {
       "t": "ul",
       "x": [
-       "Wipe down food-contact surfaces and tap **Sanitize** if you cook ahead.",
+       "Wipe down food-contact surfaces and tap **Sanitize**.",
        "If your health department asks, save or print the thrown-out log. Open it from the **Settings** button on the board.",
        "Keep a copy of the backup off this device (see Backup and restore).",
        "Which weekday sells best? In **Back office**, open **Sales and money** and look at **Best day of the week**.",
@@ -32075,7 +32080,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
        "Clear the search box and choose All on the New ticket screen.",
        "Open the **86 board**. A dish that is sold out or off the menu is listed there with the reason.",
        "Open **Dishes and prices** to see every dish you have added. A dish you removed is under **Removed dishes**: tap **Bring it back**.",
-       "No **Cabinet** tab or **Sanitize** button? They show only after you say **Yes, I cook ahead** in **Dishes and prices**."
+       "No **Cabinet** tab or **Sanitize** button? They are on from the start. If someone turned them off, turn them back on in **Tax, hours and PIN**, under **Hold cabinet**."
       ]
      },
      {
@@ -32223,7 +32228,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
      },
      {
       "t": "p",
-      "x": "No. A new Smokebox starts empty. You add your own dishes, rename the stations and choose whether you cook ahead. Only the demo is a barbecue kitchen."
+      "x": "No. A new Smokebox starts empty. You add your own dishes, rename the stations. The Hold cabinet starts empty too. Only the demo is a barbecue kitchen."
      },
      {
       "t": "h",
@@ -32287,7 +32292,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
      },
      {
       "t": "p",
-      "x": "The Cabinet shows only when you tell Smokebox you cook food ahead. Tap **Settings**, then **Dishes and prices**, and tap **Yes, I cook ahead**."
+      "x": "The Cabinet is on from the start. If someone turned it off, tap **Settings**, then **Tax, hours and PIN**, and set **Hold cabinet** to **Yes**."
      },
      {
       "t": "h",
@@ -32351,8 +32356,8 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
        "Counted dishes: how many did you make today?",
        "Hand sink works and is stocked. Anyone unwell? Tell the manager",
        "Thermometer checked in ice water. Cooler and freezer readings written down (Settings, Readings, or your paper log)",
-       "If you cook ahead: log a first temperature on each batch in the cabinet",
-       "If you cook ahead: wipe food-contact surfaces and tap Sanitize",
+       "Log a first temperature on each batch in the cabinet",
+       "Wipe food-contact surfaces and tap Sanitize",
        "Yesterday's backup saved and a copy kept off the device"
       ]
      }
@@ -32368,8 +32373,8 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
       "t": "check",
       "x": [
        "Orders: every open order paid or cancelled, then Close the day",
-       "If you cook ahead: every batch left in the cabinet decided (keep it, or throw it out)",
-       "If you cook ahead: surfaces wiped and Sanitize logged",
+       "Every batch left in the cabinet decided (keep it, or throw it out)",
+       "Surfaces wiped and Sanitize logged",
        "Food kept over a day: labeled with a date, as your local rule says",
        "Final cooler and freezer readings written down",
        "Sales and money looks right in the Back office",
@@ -33924,7 +33929,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     const a = h('a', { class: 'of-nav', href: '#/office' + (p.id === 'pace' ? '' : '/' + p.id), dataset: { page: p.id }, title });
     if (current) a.setAttribute('aria-current', 'page');
     const off = pageIsOff(p.id);
-    if (off) { a.classList.add('is-off'); a.title = title + (COUNTER_PAGES[p.id] && counterOn() ? ' (counter service: not measured)' : ' (not tracking cooked-ahead food)'); }
+    if (off) { a.classList.add('is-off'); a.title = title + (COUNTER_PAGES[p.id] && counterOn() ? ' (counter service: not measured)' : ' (not tracking cabinet food)'); }
     a.append(ico(icon, 22), h('span', { class: 'of-nav-w' }, h('span', { class: 'of-nav-full' }, title), h('span', { class: 'of-nav-short' }, p.short), off ? h('span', { class: 'of-nav-off' }, COUNTER_PAGES[p.id] ? 'Not measured' : 'Not tracking') : null));
     a.addEventListener('click', (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return; e.preventDefault(); O.navigate(p.id); });
     return h('li', { class: 'of-rail-li' }, a);
@@ -34194,21 +34199,21 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
         rec.inst = null;
       }
     }
-    // The Safety page gets a small bar to print the food safety record (only when cooked-ahead food is tracked).
+    // The Safety page gets a small bar to print the food safety record (only when cabinet food is tracked).
     if (id === 'safety' && !pageIsOff(id) && typeof O.safetyLogBar === 'function' && rec.container.firstChild) { try { rec.container.insertBefore(O.safetyLogBar(), rec.container.firstChild); } catch (e) { warnOnce('safety log bar', e); } }
     paintBanner(ctx);
     if (o.focus) { try { f.title.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   }
-  // Pages that only make sense when the owner tracks cooked-ahead food (batches, hold cabinet, temperature checks).
+  // Pages that only make sense when the owner tracks cabinet food (batches, hold cabinet, temperature checks).
   const GATED = {
-    safety: { title: 'Safety records are off', body: 'You are not tracking cooked-ahead food, so there are no batches, temperature checks or hold times to report on. If you cook food ahead and hold it hot or cold, tap Yes, I cook food ahead below.' },
-    stock: { title: 'Stock tracking is off', body: 'You are not tracking cooked-ahead food, so this page has no stock to show. If you cook food ahead and want to know when it runs out, tap Yes, I cook food ahead below.' },
+    safety: { title: 'Safety records are off', body: 'You are not tracking cabinet food, so there are no batches, temperature checks or hold times to report on. If you keep food hot or cold to serve later and hold it hot or cold, tap Yes, use the Hold cabinet below.' },
+    stock: { title: 'Stock tracking is off', body: 'You are not tracking cabinet food, so this page has no stock to show. If you keep food hot or cold to serve later and want to know when it runs out, tap Yes, use the Hold cabinet below.' },
   };
   // True when the cook-ahead module is on; a missing setting counts as on, so old saves and the demo are unchanged.
   function cookAheadOn() {
     try { return !(SB.engine && SB.store && typeof SB.engine.moduleOn === 'function') || SB.engine.moduleOn(SB.store.getState(), 'cookAhead'); } catch (e) { return true; }
   }
-  // True when this page is one of the gated pages and the owner is not tracking cooked-ahead food.
+  // True when this page is one of the gated pages and the owner is not tracking cabinet food.
   const pageIsOff = (id) => (!!GATED[id] && !cookAheadOn()) || (!!COUNTER_PAGES[id] && counterOn());
   // Pages about kitchen speed: with counter service the kitchen does not send tickets out one by one, so these times are not measured.
   const COUNTER_PAGES = { pace: 1, tickets: 1, stations: 1 };
@@ -34223,13 +34228,13 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     if (COUNTER_PAGES[id] && counterOn()) return { title: 'Counter service: kitchen times are not measured', body: 'With counter service an order is paid and handed over at the counter, so the kitchen does not send tickets out one by one. Speed numbers would be meaningless here, so this page is off. Your sales are on Sales and money.', action: { label: 'Open Sales and money', onClick: goMoney } };
     // Turns on cooked-ahead tracking for the page that was switched off.
     const turnOn = () => turnOnCookAhead(id);
-    return Object.assign({}, GATED[id], { action: { label: 'Yes, I cook food ahead', onClick: turnOn } });
+    return Object.assign({}, GATED[id], { action: { label: 'Yes, use the Hold cabinet', onClick: turnOn } });
   }
   // Turns the cook-ahead module on from the explanation card, then shows the page again.
   function turnOnCookAhead(id) {
     let rep = 'error';
     try { rep = SB.store.dispatch('updateSettings', { patch: { modules: { cookAhead: true } } }); } catch (e) { /* shown below */ }
-    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. On the board, tap Settings, then Dishes and prices, then Yes, I cook ahead.', { tone: 'bad' }); return; }
+    if (rep !== 'ok' && SB.ui && SB.ui.toast) { SB.ui.toast('Could not turn it on. On the board, tap Settings, then Dishes and prices, then Yes, use the Hold cabinet.', { tone: 'bad' }); return; }
     if (M) showPage(id, { focus: false });
   }
 
@@ -35307,7 +35312,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     const yieldCard = page.card({
       type: 'bar', span: 7, title: 'Cooked yield: assumed, modeled and real', sub: scope(),
       caption: 'How far the static yield you price with sits from the Texas A&M model and from what your own weighed batches really gave.',
-      empty: { title: 'Nothing to compare yet', body: 'Your main cooked-ahead meat needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
+      empty: { title: 'Nothing to compare yet', body: 'Your main smoked meat needs a recorded cost to compare yields. Batches that are weighed raw and cooked add the real figure.', icon: 'scale' },
       // Up to three bars: the fixed yield, the Texas A&M model and your weighed batches (two or more needed).
       spec: (p) => {
         const y = yieldPrimary(p);
@@ -35345,7 +35350,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
 
     const costOfWrong = page.panel({
       span: 5, title: 'What a fixed yield costs you', sub: scope(),
-      caption: 'The real price of a cooked kilogram of your main cooked-ahead meat, and how wrong a fixed yield would have made it.',
+      caption: 'The real price of a cooked kilogram of your main smoked meat, and how wrong a fixed yield would have made it.',
       // Builds the big sentence, the three cost figures and the source line; update repaints them in place.
       render: (body, p0) => {
         const big = h('p', { class: 'ob-bigline', 'data-k': 'misprice' });
@@ -35423,7 +35428,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
         function rawCost() {
           const y = yieldPrimary(ctx.prepared());
           if (y && isNum(y.costPerKgRaw)) return { cost: y.costPerKgRaw, name: y.name, staticY: y.staticYield };
-          return { cost: null, name: 'the main cooked-ahead meat', staticY: null };
+          return { cost: null, name: 'the main smoked meat', staticY: null };
         }
         // Runs the thermal model with the three stepper values and rewrites every result line.
         function paint() {
@@ -35851,7 +35856,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
     /* ---------------------------------------------------------------- page result */
     const slots = [topCard, hourCard, chanCard, costCard, marginCard, noCost, yieldCard, costOfWrong, whatIf];
     const yieldBlock = [yieldSection, yieldCard.el, costOfWrong.el, whatIf.el];
-    // Shows the yield section only when cooked-ahead food is tracked and some ingredient has a yield to compare.
+    // Shows the yield section only when cabinet food is tracked and some ingredient has a yield to compare.
     const paintYieldVisible = (p) => {
       let on = true;
       try { on = SB.engine.moduleOn(SB.store.getState(), 'cookAhead') && !!yieldPrimary(p); } catch (e) { on = true; }
@@ -38968,7 +38973,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
 ;try{
 /*
  * WHAT THIS FILE IS: The manager "at a glance" summary: money so far today, open orders, late tickets, the
- * 86 list and when the main cooked-ahead item runs out. Read only, live data only, built for a phone or a wall screen.
+ * 86 list and when the main cabinet food runs out. Read only, live data only, built for a phone or a wall screen.
  * PARTS: 1 pure model (runs in Node tests), 2 reading the live kitchen, 3 SB.office.glance(host).
  * USES: SB.util, SB.store, SB.metrics, SB.deadlines.   USED BY: 81-office-pace.js (top of the Pace page);
  * the board wall mode can call SB.office.glance(host) to draw the same panel.
@@ -39028,9 +39033,9 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
 
   // ---- 2. Reading the live kitchen ----
 
-  // Picks the cooked-ahead item to show a run-out line for: the one that runs out soonest, else one with a known sales
+  // Picks the cabinet food to show a run-out line for: the one that runs out soonest, else one with a known sales
   // pace, else the one with the most on hand. Returns {name, onHandG, shortfallAt, rateKnown} or null when the kitchen
-  // is not tracking cooked-ahead food or nothing is ready to serve.
+  // is not tracking cabinet food or nothing is ready to serve.
   function pickRunout(state, now) {
     try {
       if (SB.engine && typeof SB.engine.moduleOn === 'function' && !SB.engine.moduleOn(state, 'cookAhead')) return null;
@@ -39110,7 +39115,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
 ;try{
 /*
  * WHAT THIS FILE IS: The "Close the day" flow. A plain sheet that checks nothing is still open, shows the day's
- * money by cash, card and other, asks what to do with leftover food (only when cooked-ahead food is tracked),
+ * money by cash, card and other, asks what to do with leftover food (only when cabinet food is tracked),
  * closes the day through the engine, offers a backup, and prints a one-page end-of-day summary.
  * PARTS: 1 pure model (runs in Node tests), 2 the sheet, 3 printing, 4 the public calls.
  * USES: SB.engine (closeDay, orderTotals), SB.store, SB.ui.sheet, SB.metrics (thrown-out food), SB.util.
@@ -39204,7 +39209,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
 
   // Reads the saved state, or null when the store is not ready.
   function stateNow() { try { return SB.store.getState(); } catch (e) { return null; } }
-  // True when cooked-ahead food is tracked (a missing setting counts as on).
+  // True when cabinet food is tracked (a missing setting counts as on).
   function cookAheadOn() { try { return SB.engine.moduleOn(stateNow(), 'cookAhead'); } catch (e) { return true; } }
 
   // Opens the Close the day sheet and keeps it current while it is open. Returns the sheet.
@@ -39256,7 +39261,7 @@ window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
       body.appendChild(countsBlock(m));
       // The closing button says when it will also throw food out, so that choice is never a surprise.
       let setGoLabel = () => {};
-      // Leftover food, only when cooked-ahead food is tracked and some is left.
+      // Leftover food, only when cabinet food is tracked and some is left.
       if (cookAheadOn() && m.leftovers.count > 0) {
         const headId = U.uid('cdleft');
         const sec = h('section', { class: 'cd-sec', role: 'radiogroup', 'aria-labelledby': headId }, h('h3', { id: headId }, 'Food still in the cabinet'),

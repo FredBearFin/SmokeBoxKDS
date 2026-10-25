@@ -57,9 +57,9 @@ async function blank(browser) {
   check('dishes sheet: Bring it back', await seen(p, 'Bring it back', sh));
   await p.click('text=Bring it back >> nth=0'); await p.waitForTimeout(400);
   await p.click(sh + ' >> text=Tax, hours and PIN'); await p.waitForTimeout(500);
-  for (const t of ['Sales tax', 'Opening hours', 'Manager PIN', 'Cooking ahead']) check('tax sheet: ' + t, await seen(p, t, sh));
+  for (const t of ['Sales tax', 'Opening hours', 'Manager PIN', 'Hold cabinet']) check('tax sheet: ' + t, await seen(p, t, sh));
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(300);
-  check('no Cabinet tab while Cooking ahead is No', !(await seen(p, 'Cabinet', '.fl-head')));
+  check('the Cabinet tab shows from the start', await seen(p, 'Cabinet', '.fl-head'));
   // Menu list.
   await p.click('button.fl-menu'); await p.waitForTimeout(500);
   for (const t of ['Dishes and prices', 'Tax, hours and PIN', 'Guide', 'Set up this device: first steps', 'Help and about', 'Back office', 'Show me how it works']) check('menu: ' + t, await seen(p, t, sh));
@@ -96,8 +96,8 @@ async function cookAhead(browser) {
   await p.click('.sheet-root >> text=Tax, hours and PIN'); await p.waitForTimeout(500);
   await p.click('.sheet-root >> text=Yes >> nth=0'); await p.waitForTimeout(400);
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(400);
-  check('Cabinet tab appears when Cooking ahead is Yes', await seen(p, 'Cabinet', '.fl-head'));
-  check('Sanitize button appears when Cooking ahead is Yes', await seen(p, 'Sanitize', '.fl-head'));
+  check('Cabinet tab shows with the Hold cabinet on', await seen(p, 'Cabinet', '.fl-head'));
+  check('Sanitize button shows with the Hold cabinet on', await seen(p, 'Sanitize', '.fl-head'));
   await p.click('text=Cabinet'); await p.waitForTimeout(500);
   for (const t of ['New batch', 'Hold cabinet']) check('cabinet: ' + t, await seen(p, t, '.fl-cabinet'));
   await p.close();
@@ -131,15 +131,15 @@ async function cooked(browser) {
   await p.keyboard.press('Escape'); await p.waitForTimeout(300);
   await p.click('button.fl-menu'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
   for (const t of ['20 left', '+10', 'Stop counting']) check('portions: ' + t, await seen(p, t, sh));
-  for (const t of ['Do you cook food ahead?', 'Yes, I cook ahead', 'No', 'Not sure']) check('cook ahead question: ' + t, await seen(p, t, sh));
-  check('cook ahead: Yes opens the cooked-ahead sheet', await tap(p, 'Yes, I cook ahead')); await p.waitForTimeout(700);
-  for (const t of ['What do you cook ahead?', 'Hot or cold', 'How long may it stay, in hours?', 'Usual batch size, in kg', 'Which dishes use it?', 'Save cooked-ahead item']) check('cooked-ahead form: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
+  for (const t of ['Hold cabinet food', 'Add cabinet food']) check('cabinet food: ' + t, await seen(p, t, sh));
+  check('cabinet food: Add opens the cabinet food sheet', await tap(p, 'Add cabinet food')); await p.waitForTimeout(700);
+  for (const t of ['What food goes in the cabinet?', 'Hot or cold', 'How long may it stay, in hours?', 'Usual batch size, in kg', 'Which dishes use it?', 'Save cabinet food']) check('cooked-ahead form: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
   await p.fill('.sheet-root:last-of-type input >> nth=0', 'Pulled pork');
   await p.click('.sheet-root:last-of-type input[type=checkbox] >> nth=0').catch(() => {});
   await p.fill('.sheet-root:last-of-type [aria-label^="Grams of it in one"]:enabled >> nth=0', '150').catch(() => {}); // a ticked dish needs its grams
-  await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700);
+  await tap(p, 'Save cabinet food'); await p.waitForTimeout(700);
   // With no dish picked the first save warns once; a second tap keeps the item anyway.
-  if (!(await seen(p, 'Log a first batch', '.sheet-root:last-of-type'))) { await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700); }
+  if (!(await seen(p, 'Log a first batch', '.sheet-root:last-of-type'))) { await tap(p, 'Save cabinet food'); await p.waitForTimeout(700); }
   for (const t of ['Log a first batch', 'Done for now']) check('cooked-ahead saved: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
   await tap(p, 'Log a first batch'); await p.waitForTimeout(700);
   for (const t of ['New batch', 'Product', 'Put in hold cabinet']) check('cabinet new batch: ' + t, await seen(p, t, '.sheet-root:last-of-type'));
@@ -281,8 +281,7 @@ async function recipes(browser) {
   check('cafe: Not used', await seen(p, 'Use again', sh));
   await tap(p, 'Save and add another'); await p.waitForTimeout(500);
   check('cafe: I count what I made', await has(p, 'I count what I made', sh));
-  for (const t of ['Do you cook food ahead?', 'Yes, I cook ahead', 'Not sure']) check('cafe: ' + t, await has(p, t, sh));
-  check('cafe: No', await seen(p, 'No', sh));
+  for (const t of ['Hold cabinet food', 'Add cabinet food']) check('cafe: ' + t, await has(p, t, sh));
   await p.reload(); await p.waitForTimeout(900);
   const t1 = await tabTexts(p);
   check('cafe: one station in use shows no station tabs', t1.length === 0, t1);
@@ -337,7 +336,7 @@ async function recipes(browser) {
   p = await fresh(browser);
   await addDish(p, { name: 'Chili', short: 'Chili', zone: 'sides', cat: 'side', price: 6 });
   await p.click('button.fl-menu'); await p.click('[data-act="menu-edit"]'); await p.waitForTimeout(600);
-  check('ahead: Yes, I cook ahead', await tap(p, 'Yes, I cook ahead')); await p.waitForTimeout(500);
+  check('ahead: Add cabinet food', await tap(p, 'Add cabinet food')); await p.waitForTimeout(500);
   const cs = '.sheet-root:last-of-type';
   check('ahead: Cold', await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-root:last-of-type button, .sheet-root:last-of-type [role=radio]')].find((e) => e.getClientRects().length && e.textContent.trim().indexOf('Cold') === 0); if (b) b.click(); return !!b; })); await p.waitForTimeout(300);
   for (const t of ['How many days may it stay in the fridge?', 'How many hours may it be out of the fridge?', 'Use the limits your local health department gives you']) check('ahead (cold): ' + t, await has(p, t, cs));
@@ -398,7 +397,7 @@ async function coldItem(browser) {
   await addDish(p, { name: 'Potato salad', short: 'Potato salad', zone: 'cold', cat: 'cold', price: 4 });
   await p.evaluate(() => document.querySelector('button.fl-menu').click()); await p.waitForTimeout(400);
   await p.evaluate(() => document.querySelector('[data-act="menu-edit"]').click()); await p.waitForTimeout(600);
-  check('cold: Yes, I cook ahead', await tap(p, 'Yes, I cook ahead')); await p.waitForTimeout(700);
+  check('cold: Add cabinet food', await tap(p, 'Add cabinet food')); await p.waitForTimeout(700);
   const cs = '.sheet-root:last-of-type';
   await p.fill(cs + ' input >> nth=0', 'House potato salad');
   await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-root:last-of-type button, .sheet-root:last-of-type [role=radio]')].find((e) => e.getClientRects().length && e.textContent.trim().indexOf('Cold') === 0); if (b) b.click(); }); await p.waitForTimeout(300);
@@ -406,8 +405,8 @@ async function coldItem(browser) {
   await p.fill('input[aria-label="How many hours may it be out of the fridge?"]', '2');
   await p.click(cs + ' input[type=checkbox] >> nth=0').catch(() => {});
   await p.fill(cs + ' [aria-label^="Grams of it in one"]:enabled >> nth=0', '150').catch(() => {}); // a ticked dish needs its grams
-  await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700);
-  if (!(await seen(p, 'Log a first batch', cs))) { await tap(p, 'Save cooked-ahead item'); await p.waitForTimeout(700); }
+  await tap(p, 'Save cabinet food'); await p.waitForTimeout(700);
+  if (!(await seen(p, 'Log a first batch', cs))) { await tap(p, 'Save cabinet food'); await p.waitForTimeout(700); }
   check('cold: Log a first batch', await tap(p, 'Log a first batch')); await p.waitForTimeout(700);
   check('cold: Put in hold cabinet', await tap(p, 'Put in hold cabinet')); await p.waitForTimeout(900);
   for (const t of ['In the fridge since', 'Use by', 'Not taken out yet', 'Take out']) check('cold card: ' + t, await has(p, t, cs));

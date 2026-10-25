@@ -6,7 +6,7 @@ Four ways to set up Smokebox. Pick the one closest to your place. Each uses only
 
 Every order makes a ticket. With Counter service on, a paid order's ticket clears itself.
 - Stations: tap **Settings**, **Dishes and prices**, then **Change stations**. Rename one to "Counter" and tap **Not used** on the others.
-- Settings: set tax and hours in **Tax, hours and PIN**. Answer **No** to cooking ahead. For a batch you bake, like 24 croissants, tap **I count what I made**. In **Settings**, **How you serve**, turn on **Counter service**.
+- Settings: set tax and hours in **Tax, hours and PIN**. For a batch you bake, like 24 croissants, tap **I count what I made**. In **Settings**, **How you serve**, turn on **Counter service**.
 - The board: one list of orders, no station tabs. Pay with **Cash** or **Card** as you send, and the ticket clears itself. With **Pay later**, tap **Bump** or pay from **Orders**.
 
 ## Food truck on one tablet
@@ -24,5 +24,5 @@ Every order makes a ticket. With Counter service on, a paid order's ticket clear
 ## Kitchen that cooks food ahead
 
 - Stations: as above.
-- Settings: in **Dishes and prices**, tap **Yes, I cook ahead**. Add each pot or tray as a cooked-ahead item, Hot or Cold, with the time limit your health department gives you.
+- Settings: in **Dishes and prices**, tap **Add cabinet food**. Add each pot or tray as a cabinet food, Hot or Cold, with the time limit your health department gives you.
 - The board: a **Cabinet** tab appears. Tap **New batch** and **Log temp** at every check. See Cabinet and warnings.

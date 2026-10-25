@@ -1,6 +1,6 @@
 /*
  * WHAT THIS FILE IS: The manager "at a glance" summary: money so far today, open orders, late tickets, the
- * 86 list and when the main cooked-ahead item runs out. Read only, live data only, built for a phone or a wall screen.
+ * 86 list and when the main cabinet food runs out. Read only, live data only, built for a phone or a wall screen.
  * PARTS: 1 pure model (runs in Node tests), 2 reading the live kitchen, 3 SB.office.glance(host).
  * USES: SB.util, SB.store, SB.metrics, SB.deadlines.   USED BY: 81-office-pace.js (top of the Pace page);
  * the board wall mode can call SB.office.glance(host) to draw the same panel.
@@ -60,9 +60,9 @@
 
   // ---- 2. Reading the live kitchen ----
 
-  // Picks the cooked-ahead item to show a run-out line for: the one that runs out soonest, else one with a known sales
+  // Picks the cabinet food to show a run-out line for: the one that runs out soonest, else one with a known sales
   // pace, else the one with the most on hand. Returns {name, onHandG, shortfallAt, rateKnown} or null when the kitchen
-  // is not tracking cooked-ahead food or nothing is ready to serve.
+  // is not tracking cabinet food or nothing is ready to serve.
   function pickRunout(state, now) {
     try {
       if (SB.engine && typeof SB.engine.moduleOn === 'function' && !SB.engine.moduleOn(state, 'cookAhead')) return null;

@@ -1,12 +1,12 @@
 # Cabinet and warnings
 
-For kitchens that cook food ahead, like pots of soup or trays of rice. Skip this page if you cook everything to order.
+Food you hold hot or cold, like soup or rice. Each batch is timed, with a warning before its time runs out.
 
 ## Food in the cabinet
 
 ![Steps for a batch in the hold cabinet: it goes in, it is checked, portions are pulled out, and it ends by being reheated or thrown out.](fig:cabinet "A batch in the hold cabinet.")
 
-No **Cabinet** tab? Say yes to cooking ahead first (see Cooked-ahead food and portions).
+No **Cabinet** tab? Turn it on in **Tax, hours and PIN**.
 
 1. Open the **Cabinet** tab. Tap **New batch**, choose the food, and enter the weight and a first temperature reading. Tap **Put in hold cabinet**.
 2. Each batch has a card with two main buttons. **Pull** takes out the usual amount, like Pull 4.50 kg, as food leaves the cabinet. **Log temp** writes down a temperature reading. Take one at every check. A reading in range keeps the batch on the menu.

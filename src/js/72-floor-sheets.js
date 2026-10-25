@@ -1117,10 +1117,10 @@
     const addBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg hc-add', onClick: () => add() }, ico('plus', 22), h('span', null, 'Put in hold cabinet'));
     const footer = h('div', { class: 'hc-foot' }, err, addBtn);
 
-    // With no cooked-ahead item yet the Product list is empty, so say so and offer the way to add one.
-    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cooked-ahead items yet. Add the food you cook ahead, like pulled pork or chili, and then log a batch of it here.'),
-      // Opens the Cooked-ahead food sheet where the first item is added.
-      h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add a cooked-ahead item'))));
+    // With no cabinet food yet the Product list is empty, so say so and offer the way to add one.
+    const noProd = h('div', { class: 'fs-note', hidden: list().length > 0 }, h('div', null, h('p', null, 'No cabinet foods yet. Add the food you keep hot or cold, like pulled pork or chili, and then log a batch of it here.'),
+      // Opens the Hold cabinet food sheet where the first item is added.
+      h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'add-cooked' }, onClick: () => SB.sheets.open('cookahead') }, ico('plus', 20), h('span', null, 'Add cabinet food'))));
     // With nothing to log yet, only the explanation and the Add button show; the weight steppers wait for a product.
     const el = h('div', { class: 'hc-panel hc-form' + (list().length ? '' : ' hc-noprod') },
       h('h3', { class: 'fs-h' }, 'New batch'),
@@ -1976,7 +1976,7 @@
   function helpAbout(sheet) {
     return h('div', { class: 'hp-pane' },
       helpList([
-        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants that cook food ahead: tickets, paced start times, a hold cabinet and a sold-out list.'),
+        helpItem('flame', 'What this is', 'Smokebox is a kitchen display for restaurants and food trucks: tickets, paced start times, a hold cabinet and a sold-out list.'),
         helpItem('download', 'Works offline', 'The whole app is one file. Your board is saved in this browser on this device.'),
         helpItem('users', 'Separate devices do not sync yet', 'Two tabs on the same device stay in step. A second tablet has its own board.'),
         helpItem('scale', 'Starter estimates', 'Prep times, yields, costs, par levels and 86 levels are starter numbers until the owner confirms them.'),
