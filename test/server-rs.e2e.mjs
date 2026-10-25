@@ -2,7 +2,8 @@
 // 6-digit code, and see a ticket made on one tablet appear on the other. Then remove the second tablet and see it sent to the
 // start page. Needs the release server (cd server-rs && cargo build --release), dist/smokebox.html and a Postgres database:
 //   SMOKEBOX_E2E_DB=postgres://smokebox:dev@127.0.0.1/smokebox_e2e node test/server-rs.e2e.mjs
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toolRequire } from '../tools/_deps.mjs';
@@ -15,6 +16,15 @@ let fail = 0;
 // Records one check and prints it.
 function check(name, ok, detail) { if (!ok) fail++; console.log((ok ? '  ok    ' : '  FAIL  ') + name + (ok ? '' : ' -> ' + JSON.stringify(detail))); }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// The 6-digit authenticator code for a base32 secret at a time (RFC 6238), as a staff member's phone would show it.
+function totp(secret, ms) {
+  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = '';
+  for (const c of secret) bits += A.indexOf(c).toString(2).padStart(5, '0');
+  const key = Buffer.from(bits.match(/.{8}/g).map((b) => parseInt(b, 2)));
+  const msg = Buffer.alloc(8); msg.writeBigUInt64BE(BigInt(Math.floor(ms / 30000)));
+  const hm = crypto.createHmac('sha1', key).update(msg).digest(), o = hm[hm.length - 1] & 15;
+  return String((hm.readUInt32BE(o) & 0x7fffffff) % 1000000).padStart(6, '0');
+}
 
 const srv = spawn(path.join(ROOT, 'server-rs/target/release/smokebox-server'), [], { env: Object.assign({}, process.env, { DATABASE_URL: DB, PORT: String(PORT), SMOKEBOX_HTML: path.join(ROOT, 'dist/smokebox.html') }), stdio: ['ignore', 'pipe', 'inherit'] });
 // Waits for the server to say it is listening.
@@ -59,6 +69,30 @@ try {
   await sleep(800);
   const me = await b.evaluate(() => fetch('/api/me').then((r) => r.status));
   check('the removed tablet is signed out', me === 401, me);
+  // Support: a cook asks from the Help panel; staff answer in the console (password and authenticator code); the tablet shows the dot.
+  await a.evaluate(() => SB.sheets.closeAll()); await sleep(300);
+  await a.click('.fl-help'); await a.waitForSelector('.hp-what');
+  await a.fill('.hp-what', 'The fryer tablet froze during lunch');
+  await a.click('text=Kitchen is stuck right now');
+  await a.click('[data-act="send-support"]');
+  await a.waitForFunction(() => /Sent\. Request/.test(document.querySelector('.sheet-root:last-of-type [role=status]:not(:empty)') ? [...document.querySelectorAll('.sheet-root:last-of-type [role=status]')].map((e) => e.textContent).join(' ') : ''), null, { timeout: 8000 }).catch(() => {});
+  const sentWords = await a.evaluate(() => [...document.querySelectorAll('.sheet-root:last-of-type [role=status]')].map((e) => e.textContent).join(' '));
+  check('the Help panel sends a request', /Sent\. Request \d+/.test(sentWords), sentWords);
+  await a.screenshot({ path: path.join(process.env.SHOTS || '/tmp', 'rs-help.png') });
+  const staffOut = execFileSync(path.join(ROOT, 'server-rs/target/release/smokebox-server'), ['staff-add', 'staff' + Date.now() + '@smokebox.example', 'Freddy'], { env: Object.assign({}, process.env, { DATABASE_URL: DB }) }).toString();
+  const sEmail = staffOut.match(/Staff added: (\S+)/)[1], sPass = staffOut.match(/Password: (\S+)/)[1], secret = staffOut.match(/Authenticator secret: (\S+)/)[1];
+  const st = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await st.goto(BASE + '/staff');
+  await st.fill('#em', sEmail); await st.fill('#pw', sPass); await st.fill('#cd', totp(secret, Date.now()));
+  await st.click('#lf button[type=submit]');
+  await st.waitForSelector('.t', { timeout: 8000 });
+  check('the staff inbox shows the stuck kitchen first', /STUCK/.test(await st.textContent('.t')));
+  await st.click('.t'); await st.waitForSelector('#view textarea');
+  await st.fill('#view textarea', 'Hold the power button for 10 seconds, then open Smokebox again.');
+  await st.click('#view .row button:first-child'); await sleep(800);
+  await st.screenshot({ path: path.join(process.env.SHOTS || '/tmp', 'rs-staff.png') });
+  await a.evaluate(() => SB.support.refresh()); await sleep(800);
+  check('the tablet shows a new-reply dot on Help', await a.evaluate(() => !document.querySelector('.fl-help .fl-tool-n').hidden));
 } finally {
   await browser.close();
   srv.kill('SIGINT');

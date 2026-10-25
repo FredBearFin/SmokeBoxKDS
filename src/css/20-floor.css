@@ -181,6 +181,7 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
   .fl-office { min-width: var(--tap); min-height: var(--tap); }
 }
 .fl-orders { flex: none; min-width: calc(62px * var(--fl-k)); white-space: nowrap; }
+.fl-help { flex: none; white-space: nowrap; }
 @media (max-width: 700px) {
   .fl-orders-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
   .fl-orders { min-width: var(--tap); min-height: var(--tap); }
