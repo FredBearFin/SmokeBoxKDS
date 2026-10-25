@@ -297,7 +297,7 @@
     speech = !!on;
     U.storage.set(KEY_SPEECH, speech);
     if (!speech) hush();
-    if (speech && sound) playHere(() => speak('Spoken warnings are on.'));
+    if (speech && sound) speakSoon('Spoken warnings are on.');
     return speech;
   };
   // Stops any phrase being spoken now (sound or speech switched off, or another tab took over the sound).
@@ -309,6 +309,14 @@
   // When the tablet's voice is expected to be free again (browser clock, ms). A call-out waits for it, so it never talks
   // over a warning or over the call before it.
   let voiceFreeAt = 0, lastUtter = null;
+  // Says a line right after a tap (sound on, a test): in the natural voice when it is ready within 3 seconds, else the device voice.
+  function speakSoon(line) {
+    const NV = SB.natVoice;
+    if (!(NV && NV.enabled()) || NV.ready(line)) { playHere(() => speak(line)); return; }
+    NV.prefetch(line, true);
+    const t0 = performance.now();
+    const t = setInterval(() => { if (NV.ready(line) || performance.now() - t0 > 3000) { clearInterval(t); playHere(() => speak(line)); } }, 150);
+  }
   // Says one short phrase with the tablet's voice when sound and speech are both on. A warning replaces whatever is
   // being said; a call-out (queued) waits its turn instead and never cuts anything off.
   function speak(text, queued, kind) {
@@ -351,6 +359,7 @@
     const next = S.tickets.reduce((n, t) => Math.max(n, t.num || 0), 100) + 1;
     for (const mi of S.menu) if (!mi.archived) NV.prefetch(D.phrase('start', { name: mi.short || mi.name, num: next }));
     for (let k = 0; k < 10; k++) NV.prefetch(D.phrase('new_all', { num: next + k, count: 1 }) + ' ' + D.phrase('ready', { num: next + k }));
+    NV.prefetch('Sound is on. This is a test.'); NV.prefetch('Spoken warnings are on.');
   }
   // Speaks the next waiting call-out when the voice is free. Called every second from the header update.
   // WATCH OUT: with call-outs, sound or speech off, or when this tab is not the sound leader, nothing is queued, so
@@ -375,7 +384,15 @@
       return;
     }
     const c = m.co.next(now);
-    if (!c) return;
+    if (!c) {
+      // No call-out waiting: the coach's line, if any (natural audio waits up to 6 seconds like a call).
+      if (m.coachSay && audible() && speech) {
+        const line = m.coachSay;
+        if (nat && !NV.ready(line)) { NV.prefetch(line, true); m.coHeld = { text: line, style: 'start', since: performance.now() }; m.coachSay = null; return; }
+        m.coachSay = null; speak(line, true, 'start');
+      }
+      return;
+    }
     if (nat && !NV.ready(c.text)) { NV.prefetch(c.text, true); m.coHeld = { text: c.text, style: c.style, since: performance.now() }; return; }
     speak(c.text, true, c.style);
   }
@@ -572,7 +589,7 @@
     if (!sound) F.setSound(true);
     hookAudioUnlock();
     const a = resumeAudio();
-    playHere(() => { chime(); speak('Sound is on. This is a test.'); });
+    playHere(() => chime()); speakSoon('Sound is on. This is a test.');
     return F.audioState();
   };
   // Which voice would speak a call on this tablet: { supported, name, lang, local } (name empty when only the default voice is there).
@@ -1816,7 +1833,7 @@
     const rows = [];
     const el = h('section', { class: 'fl-strip', role: 'region', 'aria-label': 'Needs attention', 'aria-live': 'polite', hidden: true });
     // The sound check: shown while sound is on but the browser has not yet allowed it. One tap allows it and plays a test.
-    const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); playHere(() => { chime(); speak('Sound is on.'); }); } },
+    const soundBar = h('button', { type: 'button', class: 'fl-strip-sound', onClick: () => { lastChime = 0; hookAudioUnlock(); resumeAudio(); playHere(() => chime()); speakSoon('Sound is on.'); } },
       ico('bell', 24), h('span', null, 'Tap to turn on sound'));
     // A clear (X) button for a notification: hides it until the thing it says changes. Notifications are not permanent.
     const clearBtn = (label, key) => h('button', { type: 'button', class: 'fl-strip-x', 'aria-label': label, title: label, onClick: (e) => { e.stopPropagation(); if (m) { m.dis.add(typeof key === 'function' ? key() : key); updateStrip(store().now()); } } }, ico('x', 24));
@@ -2350,7 +2367,7 @@
     const nm = (it) => (it.qty > 1 ? it.qty + ' ' : '') + (it.short || it.name);
     if (zone === 'all' || zone === 'expo') {
       const ready = act.filter((t) => t.items.every((it) => it.status === 'done')).sort((a, b) => a.createdAt - b.createdAt)[0];
-      if (ready) return { tone: 'go', text: 'Ticket ' + ready.num + ' is ready. Tap Bump.', ticketId: ready.id, target: 'bump' };
+      if (ready) return { tone: 'go', text: 'Ticket ' + ready.num + ' is ready. Tap Bump.', ticketId: ready.id, target: 'bump', say: 'Ticket ' + ready.num + ' is ready! Tap Bump!', sayKey: 'go:' + ready.id, sayLevel: 'full' };
       if (zone === 'expo') return null;
     }
     const due = [], cooking = [], waiting = [], full = [];
@@ -2371,7 +2388,10 @@
         const same = due.filter((x) => x.it.menuId === it.menuId && x.it.track === 'two').concat(waiting.filter((x) => x.it.menuId === it.menuId && x.it.track === 'two' && at(x) - now <= 45000));
         if (same.length > 1) {
           const qty = same.reduce((n, x) => n + (x.it.qty || 1), 0), nums = Array.from(new Set(same.map((x) => x.t.num))).sort((a, b) => a - b);
+          // Joins ticket numbers the way people say them: "101, 102 and 103".
+          const and = (a) => (a.length < 2 ? String(a[0]) : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
           return { tone: 'fire', text: 'Start ' + qty + ' ' + (it.short || it.name) + ' together: tickets ' + nums.join(', ') + '. Tap here.', ticketId: t.id, itemId: it.id, target: 'batch',
+            say: 'Start ' + qty + ' ' + (it.short || it.name) + ' together! Tickets ' + and(nums) + '!',
             batch: same.map((x) => ({ ticketId: x.t.id, itemId: x.it.id, queued: x.it.status === 'queued' })) };
         }
       }
@@ -2382,17 +2402,23 @@
     full.sort((a, b) => a.it.freeAt - b.it.freeAt);
     if (full.length) {
       const { t, it } = full[0], z = zoneById(it.zone);
-      return { tone: 'wait', text: (z ? z.name : 'Station') + ' is full. ' + nm(it) + ' for ticket ' + t.num + ' goes in ' + (it.freeAt - now <= 1000 ? 'now' : 'in ' + mss(it.freeAt - now)) + '.', ticketId: t.id, itemId: it.id, target: 'item' };
+      const mins = Math.max(1, Math.round((it.freeAt - now) / 60000));
+      return { tone: 'wait', text: (z ? z.name : 'Station') + ' is full. ' + nm(it) + ' for ticket ' + t.num + ' goes in ' + (it.freeAt - now <= 1000 ? 'now' : 'in ' + mss(it.freeAt - now)) + '.', ticketId: t.id, itemId: it.id, target: 'item',
+        // Said once when the station fills, in round minutes, so the voice does not count down every second.
+        say: (z ? z.name : 'Station') + ' is full! ' + nm(it) + ' for ticket ' + t.num + ' goes in about ' + mins + (mins === 1 ? ' minute.' : ' minutes.'), sayKey: 'full:' + it.id };
     }
     const soon = cooking.filter((x) => x.left != null && x.left <= 15000).sort((a, b) => a.left - b.left)[0];
     if (soon) {
       const { t, it, left } = soon;
-      return { tone: 'check', text: left <= 0 ? 'Check ' + nm(it) + ' on ticket ' + t.num + '. Tap Done when it is ready.' : nm(it) + ' on ticket ' + t.num + ' is done in ' + Math.ceil(left / 1000) + ' s.', ticketId: t.id, itemId: it.id, target: 'item' };
+      return { tone: 'check', text: left <= 0 ? 'Check ' + nm(it) + ' on ticket ' + t.num + '. Tap Done when it is ready.' : nm(it) + ' on ticket ' + t.num + ' is done in ' + Math.ceil(left / 1000) + ' s.', ticketId: t.id, itemId: it.id, target: 'item',
+        say: nm(it) + ' on ticket ' + t.num + ' is almost done! Get ready to pull it!', sayKey: 'soon:' + it.id, sayLevel: 'full' };
     }
     waiting.sort((a, b) => at(a) - at(b));
     if (waiting.length) {
       const { t, it } = waiting[0];
-      return { tone: 'wait', text: 'Next: ' + nm(it) + ' for ticket ' + t.num + ' starts in ' + mss(Math.max(0, at(waiting[0]) - now)) + '.', ticketId: t.id, itemId: it.id, target: 'item' };
+      const mins = Math.max(1, Math.round((at(waiting[0]) - now) / 60000));
+      return { tone: 'wait', text: 'Next: ' + nm(it) + ' for ticket ' + t.num + ' starts in ' + mss(Math.max(0, at(waiting[0]) - now)) + '.', ticketId: t.id, itemId: it.id, target: 'item',
+        say: 'Next up: ' + nm(it) + ' for ticket ' + t.num + ', in about ' + mins + (mins === 1 ? ' minute.' : ' minutes.'), sayKey: 'next:' + it.id, sayLevel: 'full' };
     }
     return cooking.length ? { tone: 'wait', text: 'Everything is cooking. Watch the timers.', ticketId: null } : null;
   }
@@ -2401,6 +2427,19 @@
     if (!m || !m.coach) return;
     const c = m.root.dataset.wall === 'on' ? null : coachNext(store().getState(), now, m.zone);
     m.coachNow = c;
+    // The coach talks too: an instruction the call-outs do not already say (a batch to start together, a full station) is
+    // said once, in the same voice, after any call-out being said. The same instruction is never said twice.
+    // How much the coach talks follows the call-out level: light never, normal for batches and full stations, full for every
+    // instruction it has words for (time almost up, ready to bump, what comes next).
+    if (c && c.say && voiceLevel !== 'light' && (c.sayLevel !== 'full' || voiceLevel === 'full')) {
+      const key = c.sayKey || c.say;
+      if (!m.coachSaid) m.coachSaid = new Set();
+      if (!m.coachSaid.has(key)) {
+        m.coachSaid.add(key); if (m.coachSaid.size > 200) m.coachSaid.delete(m.coachSaid.values().next().value);
+        m.coachSay = SB.deadlines.spoken(c.say);
+        if (SB.natVoice && SB.natVoice.enabled()) SB.natVoice.prefetch(m.coachSay, true);
+      }
+    }
     const text = c ? c.text : '', tone = c ? c.tone : '';
     if (text !== m.coachText) { m.coachText = text; put(m.coachT, text); setHidden(m.coach, !text); }
     if (tone !== m.coachTone) {
