@@ -4581,7 +4581,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
+window.SB_BUILD = { version: "0.2.0", id: "a4a11b7" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -5588,8 +5588,8 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
   // compares 86 times with closeHour.
   // taxRatePct is the sales tax in percent added to an order when it is paid. 0 means no tax is added. The owner
   // sets the real local rate; Smokebox does not know it.
-  // soundStartHour is when warning sounds may start (never later than opening, so a pit master who starts at 4 am can
-  // hear them); soundOutsideHours lets them sound at any hour. Outside that window the strip shows a note instead.
+  // soundStartHour and soundOutsideHours are no longer used (sound follows each tablet's sound button at any hour); they
+  // stay in the settings so backups made with them still load.
   C.service = { dayStartHour: 4, openHour: 11, closeHour: 21, taxRatePct: 0, soundStartHour: 11, soundOutsideHours: false,
     // Minutes a sold-out-by-quality-limit dish waits before the channel update starts, in case it is kept serving.
     qualitySyncHoldMin: 10 };
@@ -11266,41 +11266,9 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
         consequence: late ? 'Food-contact surfaces are overdue for sanitizing.' : 'Food-contact surfaces are due for sanitizing at ' + U.fmtTime(C0.sanitizeDueAt) + '.', action: 'Sanitize and tick it off.', unknown: false });
     }
   }
-  // The hour of day (0 to 24 and a fraction) that warning sounds may start: the sound start hour, or opening if that
-  // is earlier. Returns the service settings with it.
-  function soundWindow(state) {
-    const sv = state && state.settings && state.settings.service ? state.settings.service : C.service;
-    const start = Math.min(U.isNum(sv.soundStartHour) ? sv.soundStartHour : sv.openHour, sv.openHour);
-    return { start, end: sv.closeHour, all: sv.soundOutsideHours === true };
-  }
-  // True when warning sounds may play: from the sound start hour (opening unless set earlier) to closing, or any
-  // hour when the owner allows sound outside open hours. Before that and after closing the strip still shows the
-  // rows, but nothing beeps or speaks into an empty kitchen. Rungs missed while quiet sound once when it opens.
-  function soundsAllowed(state, now) {
-    if (!state || !U.isNum(now)) return false;
-    const w = soundWindow(state);
-    if (w.all) return true;
-    const d = new Date(now);
-    const hr = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
-    return (hr >= w.start && hr < w.end) || (hr + 24 >= w.start && hr + 24 < w.end);
-  }
-  // The next moment warning sounds start, or null when they may sound now.
-  function nextOpenAt(state, now) {
-    if (!state || !U.isNum(now) || soundsAllowed(state, now)) return null;
-    const w = soundWindow(state);
-    const whole = Math.floor(w.start), mins = Math.round((w.start - whole) * 60);
-    for (let day = 0; day < 3; day++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() + day); d.setHours(whole, mins, 0, 0);
-      if (d.getTime() > now) return d.getTime();
-    }
-    return null;
-  }
-  // The words for the strip while sounds are paused, for example "Sound paused: kitchen closed until 11:00 am", or null.
-  function pauseNote(state, now) {
-    const at = nextOpenAt(state, now);
-    return at == null ? null : 'Sound paused: kitchen closed until ' + U.fmtTime(at);
-  }
+  // True when warning sounds and call-outs may play. SmokeBox is call-out software: when a tablet's sound is on, it sounds at
+  // any hour (opening hours only shape the charts). Kept as a function so the board and the ladder ask one place.
+  function soundsAllowed(state, now) { return !!state && U.isNum(now); }
   // How long a loud tone waits before repeating while nobody has tapped the row: 20 seconds of kitchen time.
   const LOUD_REPEAT_MS = 20e3;
   // Ladder memory entries older than this (kitchen time) are dropped.
@@ -11706,7 +11674,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { spoken, clipWords, delivery, numWords, voiceInfo, build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, batchWaste, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
+  SB.deadlines = { spoken, clipWords, delivery, numWords, voiceInfo, build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, closeAtMs, sweepToClose, batchWaste, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 25-deadlines.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'25-deadlines.js',message:String(e&&e.message||e)});}
@@ -21531,7 +21499,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, kind: '', text: '', sub: null };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, staleSnooze: 0, kind: '', text: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -21544,6 +21512,25 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
   function useNewTime() { SB.store.acceptClockJump(); paintBanner(); }
   // Keeps the old time and stays quiet about the jump for ten minutes.
   function keepOldTime() { bn.clockSnooze = Date.now() + 10 * 60000; paintBanner(); }
+  // The open tickets made before today's service day began (the "service day starts at" hour, 4 am unless changed): food
+  // nobody will cook now. Paid orders are left out, since their food cannot be voided without reopening the order.
+  function staleTickets(s, now) {
+    const sv = (s.settings && s.settings.service) || {};
+    const start = new Date(now); start.setHours(U && U.isNum(sv.dayStartHour) ? sv.dayStartHour : 4, 0, 0, 0);
+    if (start.getTime() > now) start.setDate(start.getDate() - 1);
+    const paid = new Set((s.orders || []).filter((o) => o && o.status === 'paid').map((o) => o.id));
+    return s.tickets.filter((t) => t && t.status === 'active' && t.createdAt < start.getTime() && !(t.orderId && paid.has(t.orderId)));
+  }
+  // Voids each old ticket with the reason "Left from an earlier day" and offers one Undo that brings them all back.
+  function clearStale(old) {
+    let n = 0;
+    old.forEach((t) => { const r = SB.store.dispatchEx('voidTicket', { ticketId: t.id, reason: 'Left from an earlier day' }, { source: 'ui' }); if (r.report === 'ok') n++; });
+    paintBanner();
+    if (!n || !SB.ui || !SB.ui.toast) return;
+    // Undoes the voids one by one, newest first, through the engine's own undo.
+    const undoAll = () => { for (let i = 0; i < n; i++) SB.store.dispatchEx('undo', {}, { source: 'ui' }); paintBanner(); };
+    SB.ui.toast(h('span', null, 'Cleared ' + n + ' old ' + (n === 1 ? 'ticket' : 'tickets') + '. ', h('button', { type: 'button', class: 'btn btn-sm', onClick: undoAll }, 'Undo')), { tone: 'ok', ms: 10000 });
+  }
   // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
   function bannerWanted() {
     const store = SB.store;
@@ -21562,6 +21549,9 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       return { kind: 'clock', tone: 'warn', text: 'The clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(ss.clockSuspect.aheadMs / 3600000) + ' hours') + '. Still on the old time.', act: 'Use the new time', onAct: useNewTime, later: true, laterLabel: 'Keep the old time', onLater: keepOldTime };
     }
     if (!s) return null;
+    // Tickets still open from an earlier service day get one tap to clear them (each is voided, with Undo).
+    const old = staleTickets(s, store.now ? store.now() : Date.now());
+    if (old.length && Date.now() >= bn.staleSnooze) return { kind: 'stale', tone: 'warn', text: old.length + ' ' + (old.length === 1 ? 'ticket' : 'tickets') + ' left from an earlier day.', act: 'Clear them', onAct: () => clearStale(old), later: true, laterLabel: 'Hide for now', onLater: () => { bn.staleSnooze = Date.now() + 4 * 3600e3; paintBanner(); } };
     // With the hosted server the kitchen is kept there, so the daily "save a backup file" nudge is not needed.
     if (cs) return null;
     // Service is over only when nothing is left on the board and no order is still open.
@@ -21583,7 +21573,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
     const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: w.laterLabel || 'Hide for 45 minutes', onClick: () => { if (w.onLater) w.onLater(); else { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } } }, ico('x', 18), h('span', { class: 'visually-hidden' }, w.laterLabel || 'Later')) : null;
-    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : w.kind === 'stale' ? 'ticket' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
     st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip
@@ -23396,8 +23386,17 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
 
   // Icon for each state on read-only rows.
   const STATE_ICON = { displayed: 'zap', cooking: 'flame', done: 'check-circle' };
-  // Words for an item still waiting, for example "Start in 2:34".
-  const deckText = (it, now) => (it.fireAt <= now ? 'Starting now' : (it.held ? 'Station full. Start in ' : 'Start in ') + mss(it.fireAt - now));
+  // Words for an item still waiting, for example "Start in 2:34 to finish with Fries": the dish it is timed to finish
+  // with is named, so nobody wonders why it waits. A full station says so instead.
+  const deckText = (it, now, lead) => (it.fireAt <= now ? 'Starting now' : it.held ? 'Station full. Start in ' + mss(it.fireAt - now) : 'Start in ' + mss(it.fireAt - now) + (lead ? ' to finish with ' + lead : ''));
+  // The dish on the same ticket that this one is timed to finish with: the open dish that starts first (the longest cook).
+  function leadOf(rec, it) {
+    let best = null;
+    for (const x of rec.itemsRef || []) if (x.id !== it.id && x.status !== 'done' && x.fireAt < it.fireAt && (!best || x.fireAt < best.fireAt)) best = x;
+    return best ? best.short || best.name : '';
+  }
+  // Words on a read-only row whose dish is due: where it is due, so a cook on the wrong screen knows which station has it.
+  const dueAt = (it) => { const z = zoneById(it.zone); return 'Due now at ' + (z ? z.name || z.code : it.zone); };
   // The cook countdown: the time left of the dish's usual time, then how far past it. Only a cue: nothing here
   // ever completes the item, a person still taps it.
   function cookOf(it, now) {
@@ -23456,13 +23455,14 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     } else if (row.kind === 'deck') {
       row.main.dataset.state = 'queued';
       row.sr.textContent = ', waiting to start.';
-      put(row.deckT, deckText(it, now));
+      row.lead = leadOf(rec, it);
+      put(row.deckT, deckText(it, now, row.lead));
     } else if (changed) {
       row.main.dataset.state = st;
       row.stateEl.dataset.state = st;
       row.stateIcon.replaceChildren(ico(STATE_ICON[st] || 'zap', 20));
-      put(row.stateWord, st === 'cooking' ? roText(it, now) : st === 'done' ? 'Done' : 'Not started');
-      row.sr.textContent = st === 'done' ? ', done.' : st === 'cooking' ? ', cooking.' : ', not started.';
+      put(row.stateWord, st === 'cooking' ? roText(it, now) : st === 'done' ? 'Done' : dueAt(it));
+      row.sr.textContent = st === 'done' ? ', done.' : st === 'cooking' ? ', cooking.' : ', ' + dueAt(it).toLowerCase() + '.';
     }
   }
   // Words on a read-only cooking row: time left, or "Check it" once the time is up.
@@ -23474,7 +23474,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     const wait = it.status === 'displayed' && it.freeAt > now ? 'full' : '';
     if ((row.li.dataset.wait || '') !== wait) { if (wait) row.li.dataset.wait = wait; else delete row.li.dataset.wait; }
     if (row.status === 'queued') {
-      const tx = deckText(it, now);
+      const tx = deckText(it, now, row.lead);
       if (tx !== row.deckTText) { row.deckTText = tx; put(row.deckT, tx); }
     } else if (row.status === 'cooking') {
       if (row.kind === 'btn') paintCook(row, it, now, true);
@@ -23592,7 +23592,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     el.appendChild(clockWrap);
     const soundWrap = h('div', { class: 'fl-strip-bar fl-bar-sound', hidden: true }, soundBar, SB.guide && SB.guide.link ? SB.guide.link('troubleshooting', 'no sound') : null, clearBtn('Clear all notices', () => { if (m && m.noteKey) m.dis.add(m.noteKey); return 'snd'; }));
     el.appendChild(soundWrap);
-    // The pause note: shown while sound is on but warnings are held back because the kitchen is closed. Tap for settings.
+    // The note line: shown while sound is on and there is something worth saying (another tab has the sound, history, keep awake). Tap for settings.
     const pauseBar = h('button', { type: 'button', class: 'fl-strip-sound fl-strip-pause', onClick: () => { if (!sound) F.setSound(true); else openSheet('menu'); } }, ico('volume-off', 24), h('span', { class: 'fl-strip-pause-t' }));
     const pauseWrap = h('div', { class: 'fl-strip-bar fl-bar-pause', hidden: true }, pauseBar, clearBtn('Clear this notice', () => 'pause:' + (pauseBar.textContent || '')));
     el.appendChild(pauseWrap);
@@ -23695,7 +23695,6 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     if (m.checked) { const t = U.fmtTime(Date.now()); if (m.checkedT !== t) { m.checkedT = t; m.checked.textContent = 'Updated ' + t; } }
     const all = SB.deadlines.build(store().getState(), now);
     m.feed = all;
-    // Nothing sounds while the kitchen is closed; the rungs wait and sound once when it opens.
     syncLeadership();
     if (SB.deadlines.soundsAllowed(store().getState(), now)) {
       const calls = ladder.decide(all, now, store().getState());
@@ -23732,7 +23731,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
     // While sounds are held back the strip says so, so a quiet board is not mistaken for a broken one.
     // A board with sound switched off says so, so a silent board is not taken for a healthy quiet one.
     const health = awayNote() || historyWords() || awakeNote();
-    const note = sound ? SB.deadlines.pauseNote(store().getState(), now) || health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
+    const note = sound ? health : 'Warnings are silent: sound is off on this tablet. Tap to turn on.';
     // A closed kitchen is not news while nothing is due: the note only shows when sound is off or a row is up.
     // The sound bar and the pause note say nearly the same thing, so only one of them shows at a time (the sound bar wins).
     // Only one notice shows at a time (the "tap for sound" bar first, then the note, once sound is on); the bar never hints at a hidden notice, and
@@ -32054,7 +32053,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
        "Turn the tablet volume up and check its silent switch.",
        "Tap **Settings** and check that Sound is on and the loudness is not low.",
        "Tap **Settings**, then **Device checks: screen, sound, home screen**, then **Test the sound**.",
-       "If the bar says \"Sound paused\", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.",
+       "Sound plays at any hour while it is on. If it is silent, use steps 2 to 4 again.",
        "Close any second Smokebox tab. Only the tab on screen makes sound."
       ]
      },
@@ -37635,7 +37634,6 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       { key: 'dayStartHour', name: 'Service day starts at', min: 0, max: 8, mean: 'A sale rung up before this hour counts toward the day before. A 12:45 am sale still belongs to last night.' },
       { key: 'openHour', name: 'Opens at', min: 0, max: 23, mean: 'The first hour of service.' },
       { key: 'closeHour', name: 'Closes at', min: 1, max: 30, mean: 'The last hour of service. 25 means 1 am the next day.' },
-      { key: 'soundStartHour', name: 'Warnings start at', min: 0, max: 23, mean: 'Warning sounds start at this hour, or at opening if that is earlier. Set it to when the pit master starts. Before it the strip says sound is paused.' },
     ];
     const hgrid = h('div', { class: 'od-fgrid' });
     const hf = hours.map((p) => {
@@ -37655,17 +37653,7 @@ window.SB_BUILD = { version: "0.2.0", id: "7c3d8f6" };
       hgrid.appendChild(f.el);
       return { f, p };
     });
-    // Lets warning sounds play at any hour, not only between the start hour and closing.
-    const outTog = SB.ui.toggle({
-      label: 'Warnings may sound outside open hours', checked: !!((cur() || {}).settings.service || {}).soundOutsideHours,
-      // Saves the choice as a service setting and confirms it in words.
-      onChange: (v) => {
-        const r = send('updateSettings', { patch: { service: { soundOutsideHours: v } } });
-        if (good(r)) sst.ok(v ? 'Warnings may now sound at any hour.' : 'Warnings sound only from the start hour to closing.');
-        else { outTog.setValue(!v); sst.bad(refusal(r, { name: 'Sound outside open hours' })); }
-      },
-    });
-    pn.body.append(hgrid, h('div', { class: 'od-toggle-row' }, outTog), sst.el);
+    pn.body.append(hgrid, sst.el);
 
     // Sales tax: one rate that is added to every order when it is paid.
     pn.body.appendChild(sub('Sales tax'));

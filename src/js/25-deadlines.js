@@ -412,41 +412,9 @@
         consequence: late ? 'Food-contact surfaces are overdue for sanitizing.' : 'Food-contact surfaces are due for sanitizing at ' + U.fmtTime(C0.sanitizeDueAt) + '.', action: 'Sanitize and tick it off.', unknown: false });
     }
   }
-  // The hour of day (0 to 24 and a fraction) that warning sounds may start: the sound start hour, or opening if that
-  // is earlier. Returns the service settings with it.
-  function soundWindow(state) {
-    const sv = state && state.settings && state.settings.service ? state.settings.service : C.service;
-    const start = Math.min(U.isNum(sv.soundStartHour) ? sv.soundStartHour : sv.openHour, sv.openHour);
-    return { start, end: sv.closeHour, all: sv.soundOutsideHours === true };
-  }
-  // True when warning sounds may play: from the sound start hour (opening unless set earlier) to closing, or any
-  // hour when the owner allows sound outside open hours. Before that and after closing the strip still shows the
-  // rows, but nothing beeps or speaks into an empty kitchen. Rungs missed while quiet sound once when it opens.
-  function soundsAllowed(state, now) {
-    if (!state || !U.isNum(now)) return false;
-    const w = soundWindow(state);
-    if (w.all) return true;
-    const d = new Date(now);
-    const hr = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
-    return (hr >= w.start && hr < w.end) || (hr + 24 >= w.start && hr + 24 < w.end);
-  }
-  // The next moment warning sounds start, or null when they may sound now.
-  function nextOpenAt(state, now) {
-    if (!state || !U.isNum(now) || soundsAllowed(state, now)) return null;
-    const w = soundWindow(state);
-    const whole = Math.floor(w.start), mins = Math.round((w.start - whole) * 60);
-    for (let day = 0; day < 3; day++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() + day); d.setHours(whole, mins, 0, 0);
-      if (d.getTime() > now) return d.getTime();
-    }
-    return null;
-  }
-  // The words for the strip while sounds are paused, for example "Sound paused: kitchen closed until 11:00 am", or null.
-  function pauseNote(state, now) {
-    const at = nextOpenAt(state, now);
-    return at == null ? null : 'Sound paused: kitchen closed until ' + U.fmtTime(at);
-  }
+  // True when warning sounds and call-outs may play. SmokeBox is call-out software: when a tablet's sound is on, it sounds at
+  // any hour (opening hours only shape the charts). Kept as a function so the board and the ladder ask one place.
+  function soundsAllowed(state, now) { return !!state && U.isNum(now); }
   // How long a loud tone waits before repeating while nobody has tapped the row: 20 seconds of kitchen time.
   const LOUD_REPEAT_MS = 20e3;
   // Ladder memory entries older than this (kitchen time) are dropped.
@@ -852,5 +820,5 @@
     return out;
   }
   // Public API: build(state, now) gives the sorted feed; rungOf, rungsFor and soundsAllowed are shared with the sound ladder.
-  SB.deadlines = { spoken, clipWords, delivery, numWords, voiceInfo, build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, nextOpenAt, pauseNote, closeAtMs, sweepToClose, batchWaste, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
+  SB.deadlines = { spoken, clipWords, delivery, numWords, voiceInfo, build, coldLine, rungOf, rungsFor, salesRate, soundsAllowed, closeAtMs, sweepToClose, batchWaste, nextBatchFit, makeLadder, electLeader, makePending, calloutWants, makeCallouts, wallOrders, CHEF_VOICE, phrase, pickVoice, voiceLevel };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

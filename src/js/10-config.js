@@ -173,8 +173,8 @@
   // compares 86 times with closeHour.
   // taxRatePct is the sales tax in percent added to an order when it is paid. 0 means no tax is added. The owner
   // sets the real local rate; Smokebox does not know it.
-  // soundStartHour is when warning sounds may start (never later than opening, so a pit master who starts at 4 am can
-  // hear them); soundOutsideHours lets them sound at any hour. Outside that window the strip shows a note instead.
+  // soundStartHour and soundOutsideHours are no longer used (sound follows each tablet's sound button at any hour); they
+  // stay in the settings so backups made with them still load.
   C.service = { dayStartHour: 4, openHour: 11, closeHour: 21, taxRatePct: 0, soundStartHour: 11, soundOutsideHours: false,
     // Minutes a sold-out-by-quality-limit dish waits before the channel update starts, in case it is kept serving.
     qualitySyncHoldMin: 10 };

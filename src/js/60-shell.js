@@ -1753,7 +1753,7 @@
 
   /* ---------- banner: save failure and daily backup nudge ---------- */
   // Banner state: the strip element, the timer, and when the nudge was last put off with "Later".
-  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, kind: '', text: '', sub: null };
+  const bn = { el: null, timer: 0, snoozeUntil: 0, clockSnooze: 0, staleSnooze: 0, kind: '', text: '', sub: null };
   // Records that a backup was just made (called by the Data page), so tonight's nudge stays quiet.
   S.noteBackup = function (at) {
     const t = typeof at === 'number' ? at : Date.now();
@@ -1766,6 +1766,25 @@
   function useNewTime() { SB.store.acceptClockJump(); paintBanner(); }
   // Keeps the old time and stays quiet about the jump for ten minutes.
   function keepOldTime() { bn.clockSnooze = Date.now() + 10 * 60000; paintBanner(); }
+  // The open tickets made before today's service day began (the "service day starts at" hour, 4 am unless changed): food
+  // nobody will cook now. Paid orders are left out, since their food cannot be voided without reopening the order.
+  function staleTickets(s, now) {
+    const sv = (s.settings && s.settings.service) || {};
+    const start = new Date(now); start.setHours(U && U.isNum(sv.dayStartHour) ? sv.dayStartHour : 4, 0, 0, 0);
+    if (start.getTime() > now) start.setDate(start.getDate() - 1);
+    const paid = new Set((s.orders || []).filter((o) => o && o.status === 'paid').map((o) => o.id));
+    return s.tickets.filter((t) => t && t.status === 'active' && t.createdAt < start.getTime() && !(t.orderId && paid.has(t.orderId)));
+  }
+  // Voids each old ticket with the reason "Left from an earlier day" and offers one Undo that brings them all back.
+  function clearStale(old) {
+    let n = 0;
+    old.forEach((t) => { const r = SB.store.dispatchEx('voidTicket', { ticketId: t.id, reason: 'Left from an earlier day' }, { source: 'ui' }); if (r.report === 'ok') n++; });
+    paintBanner();
+    if (!n || !SB.ui || !SB.ui.toast) return;
+    // Undoes the voids one by one, newest first, through the engine's own undo.
+    const undoAll = () => { for (let i = 0; i < n; i++) SB.store.dispatchEx('undo', {}, { source: 'ui' }); paintBanner(); };
+    SB.ui.toast(h('span', null, 'Cleared ' + n + ' old ' + (n === 1 ? 'ticket' : 'tickets') + '. ', h('button', { type: 'button', class: 'btn btn-sm', onClick: undoAll }, 'Undo')), { tone: 'ok', ms: 10000 });
+  }
   // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
   function bannerWanted() {
     const store = SB.store;
@@ -1784,6 +1803,9 @@
       return { kind: 'clock', tone: 'warn', text: 'The clock jumped ahead by about ' + (dd >= 2 ? dd + ' days' : Math.round(ss.clockSuspect.aheadMs / 3600000) + ' hours') + '. Still on the old time.', act: 'Use the new time', onAct: useNewTime, later: true, laterLabel: 'Keep the old time', onLater: keepOldTime };
     }
     if (!s) return null;
+    // Tickets still open from an earlier service day get one tap to clear them (each is voided, with Undo).
+    const old = staleTickets(s, store.now ? store.now() : Date.now());
+    if (old.length && Date.now() >= bn.staleSnooze) return { kind: 'stale', tone: 'warn', text: old.length + ' ' + (old.length === 1 ? 'ticket' : 'tickets') + ' left from an earlier day.', act: 'Clear them', onAct: () => clearStale(old), later: true, laterLabel: 'Hide for now', onLater: () => { bn.staleSnooze = Date.now() + 4 * 3600e3; paintBanner(); } };
     // With the hosted server the kitchen is kept there, so the daily "save a backup file" nudge is not needed.
     if (cs) return null;
     // Service is over only when nothing is left on the board and no order is still open.
@@ -1805,7 +1827,7 @@
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
     const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: w.laterLabel || 'Hide for 45 minutes', onClick: () => { if (w.onLater) w.onLater(); else { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } } }, ico('x', 18), h('span', { class: 'visually-hidden' }, w.laterLabel || 'Later')) : null;
-    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : w.kind === 'stale' ? 'ticket' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
     st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip

@@ -8,7 +8,7 @@ Plain fixes for sound, sleep, missing dishes and odd numbers. Lost data and the 
 2. Turn the tablet volume up and check its silent switch.
 3. Tap **Settings** and check that Sound is on and the loudness is not low.
 4. Tap **Settings**, then **Device checks: screen, sound, home screen**, then **Test the sound**.
-5. If the bar says "Sound paused", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.
+5. Sound plays at any hour while it is on. If it is silent, use steps 2 to 4 again.
 6. Close any second Smokebox tab. Only the tab on screen makes sound.
 
 ## The screen went to sleep

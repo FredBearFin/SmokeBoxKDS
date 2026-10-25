@@ -920,7 +920,7 @@
        "Turn the tablet volume up and check its silent switch.",
        "Tap **Settings** and check that Sound is on and the loudness is not low.",
        "Tap **Settings**, then **Device checks: screen, sound, home screen**, then **Test the sound**.",
-       "If the bar says \"Sound paused\", it is outside your opening hours. Set the hours under **Tax, hours and PIN**.",
+       "Sound plays at any hour while it is on. If it is silent, use steps 2 to 4 again.",
        "Close any second Smokebox tab. Only the tab on screen makes sound."
       ]
      },
