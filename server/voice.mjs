@@ -26,7 +26,7 @@ const ACCENT = { a: 'en-us', b: 'en-gb' };
 const RATE = 24000;
 // Sentences every kitchen hears all day, in the exact words the tablets use (src/js/25-deadlines.js phrase()). Once the model
 // is loaded they are made for every voice in the background, so a voice test or a common call plays at once.
-const COMMON = ['Order up!', 'Ring it out!', 'Ring it out now!', 'Fire it now!', 'one item!', 'two items!', 'three items!', 'four items!'];
+const COMMON = ['Sound is on.', 'This is a test.', 'Spoken warnings are on.', 'Order up!', 'Ring it out!', 'Ring it out now!', 'Fire it now!', 'one item!', 'two items!', 'three items!', 'four items!'];
 const MAX_TEXT = 200;
 
 /**
