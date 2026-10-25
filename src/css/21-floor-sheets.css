@@ -699,3 +699,10 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* "At once" (a station's limit) and "Portions in one basket" boxes: a short number box with its label. */
 .dp-capwrap { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .dp-cap { width: 5.5rem; text-align: center; }
+/* Devices (dv-): the big join code, and one row per joined device with its name, last use and Remove. */
+.dv { display: grid; gap: var(--sp-3); }
+.dv-code { padding: var(--sp-4); border: var(--bw) solid var(--amber); border-radius: var(--r-card); background: var(--paper); text-align: center; }
+.dv-digits { font: var(--w-heavy) 56px/1.1 var(--font-display); letter-spacing: 0.08em; margin: var(--sp-2) 0; }
+.dv-list { display: grid; gap: var(--sp-2); }
+.dv-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-top: var(--bw-thin) solid var(--line-soft); }
+.dv-main { flex: 1 1 auto; min-width: 0; display: grid; gap: 4px; }

@@ -2264,9 +2264,11 @@
     })();
     // Signed in to the hosted server: which kitchen and account this device is on, and a way to sign this one device out.
     // Sign this device out: the kitchen and the other devices stay as they are.
-    const signOutBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'sign-out' }, onClick: () => SB.cloud.signOut() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Sign this device out'));
+    const signOutBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'sign-out' }, onClick: () => SB.cloud.signOut() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Take this device out of the kitchen'));
+    // Devices: add a tablet with a code, rename or remove one (behind the manager PIN when one is set).
+    const devicesBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'devices' }, onClick: () => closeThen(sheet, () => SB.sheets.open('devices')) }, ico('grid', 22), h('span', { class: 'grow' }, 'Devices: add, rename or remove'));
     const cloudBlock = SB.cloud && SB.cloud.on
-      ? settingBlock('Your kitchen', 'This device is signed in to ' + SB.cloud.kitchen.name + ' (' + SB.cloud.email + '). Every device signed in to it shows the same tickets.', signOutBtn)
+      ? settingBlock('Your kitchen', 'This device' + (SB.cloud.device ? ' (' + SB.cloud.device.name + ')' : '') + ' is joined to ' + SB.cloud.kitchen.name + '. Every joined device shows the same tickets.', devicesBtn, signOutBtn)
       : null;
     sheet.body.append(h('div', { class: 'mn' },
       cloudBlock,
