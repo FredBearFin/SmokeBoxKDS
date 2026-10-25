@@ -7,3 +7,5 @@ pub mod engine;
 pub mod kitchen;
 pub mod pages;
 pub mod rooms;
+pub mod support;
+pub mod totp;

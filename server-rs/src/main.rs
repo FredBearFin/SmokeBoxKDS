@@ -13,10 +13,27 @@ async fn main() {
     }
     let url = std::env::var("DATABASE_URL").expect("DATABASE_URL is needed, like postgres://smokebox:pw@127.0.0.1/smokebox");
     let db = sqlx::postgres::PgPoolOptions::new().max_connections(10).connect(&url).await.expect("the database answers");
+    // smokebox-server staff-add EMAIL "NAME": adds a support staff member and prints their password and authenticator secret once.
+    let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("staff-add") {
+        let (Some(email), Some(name)) = (args.get(2), args.get(3)) else { eprintln!("usage: smokebox-server staff-add EMAIL \"NAME\""); std::process::exit(2) };
+        sqlx::migrate!("./migrations").run(&db).await.expect("migrations");
+        let password = smokebox_server::auth::new_token()[..16].to_string();
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+        match smokebox_server::support::add_staff(&db, email, name, &password, now).await {
+            Ok(secret) => println!("Staff added: {}
+Password: {}
+Authenticator secret: {}
+Or scan: {}", email, password, secret, smokebox_server::totp::uri(&secret, email)),
+            Err(e) => { eprintln!("Not added: {}", e); std::process::exit(1) }
+        }
+        return;
+    }
     let cfg = app::Config {
         html_file: std::env::var("SMOKEBOX_HTML").unwrap_or_else(|_| "../dist/smokebox.html".into()).into(),
         public_url: std::env::var("PUBLIC_URL").unwrap_or_else(|_| "http://127.0.0.1:8790".into()),
         snapshot_every: 200,
+        staff_alert: std::env::var("STAFF_ALERT_EMAIL").ok(),
     };
     let clock: Arc<dyn Fn() -> i64 + Send + Sync> = Arc::new(|| std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0));
     let (router, st) = app::build(db, cfg, clock).await.expect("the server starts");

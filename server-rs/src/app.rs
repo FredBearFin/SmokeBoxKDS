@@ -29,6 +29,8 @@ pub struct Config {
     pub public_url: String,
     /// Actions between saved snapshots of a kitchen.
     pub snapshot_every: i64,
+    /// Where "Kitchen is stuck right now" support requests are emailed at once (SmokeBox staff), if anywhere.
+    pub staff_alert: Option<String>,
 }
 
 /// Everything a request handler needs.
@@ -71,6 +73,7 @@ pub async fn build(db: PgPool, cfg: Config, now: Arc<dyn Fn() -> i64 + Send + Sy
         .route("/api/devices/rename", post(rename_device))
         .route("/api/events", get(events))
         .route("/api/action", post(action))
+        .merge(crate::support::routes())
         .with_state(st.clone());
     Ok((router, st))
 }
@@ -98,7 +101,7 @@ pub fn spawn_timers(st: &AppState) {
 /* ---------- small helpers ---------- */
 
 // A JSON answer with the usual safety headers.
-fn reply(status: u16, body: Value) -> Response {
+pub(crate) fn reply(status: u16, body: Value) -> Response {
     let mut r = (StatusCode::from_u16(status).unwrap_or(StatusCode::OK), axum::Json(body)).into_response();
     let h = r.headers_mut();
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
@@ -106,18 +109,18 @@ fn reply(status: u16, body: Value) -> Response {
     r
 }
 // A plain-words refusal: a code for the app and words for the person.
-fn refuse(status: u16, report: &str, words: &str) -> Response {
+pub(crate) fn refuse(status: u16, report: &str, words: &str) -> Response {
     reply(status, json!({ "report": report, "words": words }))
 }
 // Adds a Set-Cookie header to an answer.
-fn with_cookie(mut r: Response, cookie: String) -> Response {
+pub(crate) fn with_cookie(mut r: Response, cookie: String) -> Response {
     if let Ok(v) = HeaderValue::from_str(&cookie) {
         r.headers_mut().append(header::SET_COOKIE, v);
     }
     r
 }
 // Marks a page as never cached and never framed.
-fn no_store(h: Html<String>) -> Response {
+pub(crate) fn no_store(h: Html<String>) -> Response {
     let mut r = h.into_response();
     let hs = r.headers_mut();
     hs.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
@@ -126,16 +129,16 @@ fn no_store(h: Html<String>) -> Response {
     r
 }
 // True when the request came over HTTPS (through the web server in front, which says so in X-Forwarded-Proto).
-fn secure(h: &HeaderMap) -> bool {
+pub(crate) fn secure(h: &HeaderMap) -> bool {
     h.get("x-forwarded-proto").and_then(|v| v.to_str().ok()).map(|v| v.split(',').next().unwrap_or("").trim() == "https").unwrap_or(false)
 }
 // The client's address as the web server in front saw it, for lockouts.
-fn client_ip(h: &HeaderMap) -> String {
+pub(crate) fn client_ip(h: &HeaderMap) -> String {
     h.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).unwrap_or("local").trim().to_string()
 }
 // Cross-site request forgery guard for every POST: the body must be JSON (another site cannot send that without a permission check
 // this server never grants), and a request that names another origin is refused. Returns the parsed object, or the refusal.
-fn same_site_json(h: &HeaderMap, body: &Bytes) -> Result<Value, Response> {
+pub(crate) fn same_site_json(h: &HeaderMap, body: &Bytes) -> Result<Value, Response> {
     let ct = h.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("").to_ascii_lowercase();
     let host = h.get(header::HOST).and_then(|v| v.to_str().ok()).unwrap_or("");
     let same = match h.get(header::ORIGIN).and_then(|v| v.to_str().ok()) {
@@ -157,7 +160,7 @@ fn same_site_json(h: &HeaderMap, body: &Bytes) -> Result<Value, Response> {
     }
 }
 // One text field from a request body, trimmed, or "".
-fn field(b: &Value, k: &str) -> String {
+pub(crate) fn field(b: &Value, k: &str) -> String {
     b.get(k).and_then(Value::as_str).unwrap_or("").trim().to_string()
 }
 // A short readable device name from what the browser says about itself.
@@ -176,16 +179,16 @@ fn device_name(b: &Value) -> String {
 }
 
 /// A joined device, found from its cookie.
-struct Device {
-    id: String,
-    name: String,
-    kitchen_id: String,
-    kitchen_name: String,
+pub(crate) struct Device {
+    pub id: String,
+    pub name: String,
+    pub kitchen_id: String,
+    pub kitchen_name: String,
 }
 
 // The device a request comes from, or None when it is not joined (or was removed). A device in use is kept alive: its last-seen
 // time moves at most once an hour.
-async fn device_of(st: &AppState, h: &HeaderMap) -> Option<Device> {
+pub(crate) async fn device_of(st: &AppState, h: &HeaderMap) -> Option<Device> {
     let cookie = h.get(header::COOKIE)?.to_str().ok()?;
     let token = cookie.split(';').filter_map(|p| p.trim().split_once('=')).find(|(k, _)| *k == auth::COOKIE).map(|(_, v)| v.to_string())?;
     let row = sqlx::query("SELECT d.id, d.name, d.last_seen, k.id AS kid, k.name AS kname FROM devices d JOIN kitchens k ON k.id = d.kitchen_id WHERE d.token_hash = $1 AND d.removed_at IS NULL")
@@ -222,7 +225,7 @@ async fn join_device(st: &AppState, kitchen_id: &str, name: &str, how: &str, sec
 }
 
 // Counts a failed try for a key (an email, an address). Lockouts last for the rest of the 15-minute window.
-async fn note_fail(st: &AppState, key: &str) {
+pub(crate) async fn note_fail(st: &AppState, key: &str) {
     let now = st.rooms.now();
     let _ = sqlx::query(
         "INSERT INTO login_fails (key, count, first_at) VALUES ($1, 1, $2) ON CONFLICT (key) DO UPDATE SET
@@ -236,7 +239,7 @@ async fn note_fail(st: &AppState, key: &str) {
     .await;
 }
 // True while a key has had too many failed tries in the window.
-async fn locked(st: &AppState, key: &str) -> bool {
+pub(crate) async fn locked(st: &AppState, key: &str) -> bool {
     let now = st.rooms.now();
     let r = sqlx::query("SELECT count, first_at FROM login_fails WHERE key = $1").bind(key).fetch_optional(&st.db).await.ok().flatten();
     match r {

@@ -30,7 +30,7 @@ async fn server() -> Srv {
     let c2 = clock.clone();
     let html = std::env::temp_dir().join(format!("{}.html", name));
     std::fs::write(&html, "<!doctype html><html><head><title>t</title></head><body>app</body></html>").unwrap();
-    let cfg = app::Config { html_file: html, public_url: "https://app.example".into(), snapshot_every: 5 };
+    let cfg = app::Config { html_file: html, public_url: "https://app.example".into(), snapshot_every: 5, staff_alert: Some("help@smokebox.example".into()) };
     let (router, st) = app::build(db, cfg, Arc::new(move || c2.load(Ordering::SeqCst))).await.unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
@@ -211,4 +211,60 @@ async fn requests_from_another_site_or_not_json_are_refused() {
     assert_eq!(r.status().as_u16(), 415);
     let r = a.post(format!("{}/api/devices/code", s.base)).header("content-type", "application/x-www-form-urlencoded").body("x=1").send().await.unwrap();
     assert_eq!(r.status().as_u16(), 415);
+}
+
+#[tokio::test]
+async fn a_support_request_goes_to_staff_and_the_answer_comes_back() {
+    let s = server().await;
+    let a = started(&s).await;
+    // The kitchen asks for help, with what the device attached; a resend after being offline is not a second request.
+    let req = json!({ "clientId": "c1", "category": "broken", "urgent": true, "body": "The fryer screen froze\nIt shows nothing", "diagnostics": { "build": "abc123", "errors": ["x"] } });
+    let (st, r) = post(&a, &s, "/api/support", req.clone()).await;
+    assert_eq!(st, 200, "{}", r);
+    let (_, again) = post(&a, &s, "/api/support", req).await;
+    assert_eq!((again["id"].clone(), again["duplicate"].clone()), (r["id"].clone(), json!(true)));
+    assert_eq!(post(&a, &s, "/api/support", json!({ "body": "   " })).await.0, 400);
+    assert_eq!(post(&a, &s, "/api/support", json!({ "body": "x", "photo": "javascript:alert(1)" })).await.0, 400);
+    // A stuck kitchen alerts staff by email at once.
+    let alert: String = sqlx::query_scalar("SELECT subject FROM outbox_emails WHERE to_addr = 'help@smokebox.example'").fetch_one(&s.st.db).await.unwrap();
+    assert!(alert.starts_with("STUCK: request"), "{}", alert);
+
+    // Staff: password and authenticator code are both needed.
+    let secret = smokebox_server::support::add_staff(&s.st.db, "freddy@smokebox.example", "Freddy", "staff-pass-123", T0).await.unwrap();
+    let staff = device();
+    let code = smokebox_server::totp::code_at(&secret, (T0 / 30_000) as u64).unwrap();
+    assert_eq!(post(&staff, &s, "/staff/api/login", json!({ "email": "freddy@smokebox.example", "password": "staff-pass-123", "code": "000000" })).await.0, 401);
+    assert_eq!(get(&staff, &s, "/staff/api/tickets").await.0, 401);
+    assert_eq!(post(&staff, &s, "/staff/api/login", json!({ "email": "freddy@smokebox.example", "password": "staff-pass-123", "code": code })).await.0, 200);
+    // A kitchen device is not staff.
+    assert_eq!(get(&a, &s, "/staff/api/tickets").await.0, 401);
+    let (_, inbox) = get(&staff, &s, "/staff/api/tickets").await;
+    let t = &inbox["tickets"][0];
+    assert_eq!((t["urgent"].clone(), t["subject"].clone(), t["kitchen"].clone()), (json!(true), json!("The fryer screen froze"), json!("Freddy's Franks")));
+    let id = t["id"].as_str().unwrap().to_string();
+    let (_, full) = get(&staff, &s, &format!("/staff/api/ticket?id={}", id)).await;
+    assert_eq!(full["diagnostics"]["build"], "abc123");
+    // A staff-only note stays hidden from the kitchen; the answer shows, with the "new reply" dot, and is emailed to the owner.
+    post(&staff, &s, "/staff/api/reply", json!({ "id": id, "body": "Owner seems new", "internal": true })).await;
+    s.clock.fetch_add(1000, Ordering::SeqCst);
+    assert_eq!(post(&staff, &s, "/staff/api/reply", json!({ "id": id, "body": "Reload the page with the round arrow." })).await.0, 200);
+    let (_, mine) = get(&a, &s, "/api/support").await;
+    let k = &mine["tickets"][0];
+    let bodies: Vec<&str> = k["messages"].as_array().unwrap().iter().map(|m| m["body"].as_str().unwrap()).collect();
+    assert_eq!(bodies, vec!["The fryer screen froze\nIt shows nothing", "Reload the page with the round arrow."]);
+    assert_eq!((k["status"].clone(), k["unread"].clone()), (json!("waiting"), json!(true)));
+    let copy: String = sqlx::query_scalar("SELECT body FROM outbox_emails WHERE to_addr = 'owner@example.com'").fetch_one(&s.st.db).await.unwrap();
+    assert!(copy.contains("Reload the page with the round arrow."));
+    s.clock.fetch_add(1000, Ordering::SeqCst);
+    post(&a, &s, "/api/support/seen", json!({ "id": id })).await;
+    assert_eq!(get(&a, &s, "/api/support").await.1["tickets"][0]["unread"], false);
+    // The kitchen answers: back to open for staff. Staff mark it solved.
+    assert_eq!(post(&a, &s, "/api/support/reply", json!({ "id": id, "body": "That fixed it, thanks" })).await.0, 200);
+    assert_eq!(get(&staff, &s, &format!("/staff/api/ticket?id={}", id)).await.1["status"], "open");
+    assert_eq!(post(&staff, &s, "/staff/api/status", json!({ "id": id, "status": "solved" })).await.0, 200);
+    // Another kitchen cannot read or answer this request.
+    let other = device();
+    post(&other, &s, "/api/start", json!({ "kitchen": "Other", "email": "other@example.com", "password": "12345678" })).await;
+    assert_eq!(get(&other, &s, "/api/support").await.1["tickets"].as_array().unwrap().len(), 0);
+    assert_eq!(post(&other, &s, "/api/support/reply", json!({ "id": id, "body": "hi" })).await.0, 404);
 }
