@@ -89,6 +89,8 @@
 .fl-strip-sound { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 4px var(--sp-4); border: 0; background: var(--ink); color: var(--bg); font: inherit; font-size: calc(15px * var(--fl-k)); font-weight: 700; text-align: left; cursor: pointer; }
 .fl-strip-sound[hidden] { display: none; }
 .fl-strip-pause { background: var(--sub); color: var(--ink); border-bottom: 1px solid var(--line); font-weight: 600; min-height: 28px; font-size: calc(13px * var(--fl-k)); }
+/* A long note wraps instead of running off a phone screen. */
+.fl-strip-pause-t { min-width: 0; white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .fl-strip-row:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -4px; }
 
 /* The header: brand, station tabs, status chips, tool buttons, New ticket and Menu. */
@@ -182,6 +184,9 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
 }
 .fl-orders { flex: none; min-width: calc(62px * var(--fl-k)); white-space: nowrap; }
 .fl-help { flex: none; white-space: nowrap; }
+/* Help shows its icon only on small tablets, and on a phone it moves into the Menu (first row) so the header fits. */
+@media (max-width: 700px) { .fl-help .fl-tool-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; } .fl-help { min-width: var(--tap); min-height: var(--tap); } }
+@media (max-width: 480px) { .fl-help { display: none; } }
 @media (max-width: 700px) {
   .fl-orders-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
   .fl-orders { min-width: var(--tap); min-height: var(--tap); }

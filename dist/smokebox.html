@@ -1390,6 +1390,8 @@ input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; accent-
 .fl-strip-sound { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 4px var(--sp-4); border: 0; background: var(--ink); color: var(--bg); font: inherit; font-size: calc(15px * var(--fl-k)); font-weight: 700; text-align: left; cursor: pointer; }
 .fl-strip-sound[hidden] { display: none; }
 .fl-strip-pause { background: var(--sub); color: var(--ink); border-bottom: 1px solid var(--line); font-weight: 600; min-height: 28px; font-size: calc(13px * var(--fl-k)); }
+/* A long note wraps instead of running off a phone screen. */
+.fl-strip-pause-t { min-width: 0; white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .fl-strip-row:focus-visible { outline: var(--bw-focus) solid var(--focus); outline-offset: -4px; }
 
 /* The header: brand, station tabs, status chips, tool buttons, New ticket and Menu. */
@@ -1483,6 +1485,9 @@ button.fl-chip[data-tone="bad"] { color: var(--crimson); background: var(--tint-
 }
 .fl-orders { flex: none; min-width: calc(62px * var(--fl-k)); white-space: nowrap; }
 .fl-help { flex: none; white-space: nowrap; }
+/* Help shows its icon only on small tablets, and on a phone it moves into the Menu (first row) so the header fits. */
+@media (max-width: 700px) { .fl-help .fl-tool-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; } .fl-help { min-width: var(--tap); min-height: var(--tap); } }
+@media (max-width: 480px) { .fl-help { display: none; } }
 @media (max-width: 700px) {
   .fl-orders-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
   .fl-orders { min-width: var(--tap); min-height: var(--tap); }
@@ -4604,7 +4609,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "ef3f65a" };
+window.SB_BUILD = { version: "0.2.0", id: "f77b823" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -5119,7 +5124,7 @@ window.SB_BUILD = { version: "0.2.0", id: "ef3f65a" };
   // The settings that belong to the device, not to a kitchen (look, sound, which station this tablet shows). They
   // are the same in the demo and the real kitchen. Every other smokebox.v1 key is kitchen data and gets its own
   // copy in the demo (smokebox.demo.<name>), so the demo can never read or write the real kitchen's data.
-  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'voicename', 'cloudKitchen', 'deviceId', 'callouts', 'far', 'wall', 'dock', 'countervisit'].map((k) => 'smokebox.v1.' + k);
+  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'voicename', 'cloudKitchen', 'deviceId', 'supportOutbox', 'callouts', 'far', 'wall', 'dock', 'countervisit'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'pacingFix1', 'sid', 'writer', 'histtrim', 'histnotice', 'sleepSnap', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
@@ -13292,6 +13297,9 @@ window.SB_BUILD = { version: "0.2.0", id: "ef3f65a" };
     if (mode === 'demo' || !state) return false;
     flush();
     try { g.sessionStorage.setItem(U.MODE_KEY, 'demo'); } catch (e) { return false; }
+    // The address says ?demo too: a browser that loses the tab's note on reload (seen with local files) still opens the demo.
+    // Leaving the demo takes it off the address again.
+    try { if (g.location && g.history && g.history.replaceState && !/[?&]demo(=|&|$)/.test(g.location.search || '')) g.history.replaceState(null, '', g.location.pathname + (g.location.search ? g.location.search + '&demo' : '?demo') + g.location.hash); } catch (e) { /* the tab's note still works */ }
     reloadPage();
     return true;
   }
@@ -23959,6 +23967,8 @@ window.SB_BUILD = { version: "0.2.0", id: "ef3f65a" };
     // Kitchen devices skip order entry, orders, demo and the back office; front devices skip the cabinet.
     const kit = role === 'kitchen', front = role === 'front';
     const items = [
+      // Help is the first row on a phone, where it is not in the header.
+      { hide: !mq('(max-width: 480px)'), label: 'Help: the Guide and support', icon: 'help', onClick: () => openSheet('support') },
       // The back office is the first row so a manager never has to hunt for it.
       { hide: kit, label: 'Back office', icon: 'gauge', onClick: () => openOffice(anchor) },
       // Menu, prices and shop is one tap away too: add a dish, change a price or a prep time.

@@ -1460,6 +1460,9 @@
     if (mode === 'demo' || !state) return false;
     flush();
     try { g.sessionStorage.setItem(U.MODE_KEY, 'demo'); } catch (e) { return false; }
+    // The address says ?demo too: a browser that loses the tab's note on reload (seen with local files) still opens the demo.
+    // Leaving the demo takes it off the address again.
+    try { if (g.location && g.history && g.history.replaceState && !/[?&]demo(=|&|$)/.test(g.location.search || '')) g.history.replaceState(null, '', g.location.pathname + (g.location.search ? g.location.search + '&demo' : '?demo') + g.location.hash); } catch (e) { /* the tab's note still works */ }
     reloadPage();
     return true;
   }

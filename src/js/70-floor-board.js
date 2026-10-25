@@ -2187,6 +2187,8 @@
     // Kitchen devices skip order entry, orders, demo and the back office; front devices skip the cabinet.
     const kit = role === 'kitchen', front = role === 'front';
     const items = [
+      // Help is the first row on a phone, where it is not in the header.
+      { hide: !mq('(max-width: 480px)'), label: 'Help: the Guide and support', icon: 'help', onClick: () => openSheet('support') },
       // The back office is the first row so a manager never has to hunt for it.
       { hide: kit, label: 'Back office', icon: 'gauge', onClick: () => openOffice(anchor) },
       // Menu, prices and shop is one tap away too: add a dish, change a price or a prep time.
