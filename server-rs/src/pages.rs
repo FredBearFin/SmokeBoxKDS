@@ -8,7 +8,7 @@ const STYLE: &str = r#"
 main{width:100%;max-width:460px;background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:28px}
 h1{font-size:28px;margin:0 0 6px}p{margin:0 0 16px;color:var(--ink2)}label{display:block;font-weight:600;margin:14px 0 6px}
 input{width:100%;font:inherit;padding:12px;border:2px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}input:focus{outline:3px solid var(--amber);outline-offset:1px}
-input.code{font-size:40px;letter-spacing:12px;text-align:center;font-variant-numeric:tabular-nums}
+input.code{font-size:36px;letter-spacing:6px;text-align:center;font-variant-numeric:tabular-nums}
 button{width:100%;margin-top:18px;min-height:56px;font:inherit;font-weight:700;color:#fff;background:var(--amber);border:0;border-radius:10px;cursor:pointer}
 button.big{min-height:72px;font-size:22px}button.plain{background:#fff;color:var(--ink);border:2px solid var(--line)}button:disabled{opacity:.6}
 .err{color:var(--bad);font-weight:600;min-height:1.4em;margin:12px 0 0}.ok{color:var(--ok);font-weight:600}
@@ -22,12 +22,12 @@ pub fn start_page() -> String {
 <title>Smokebox</title><style>{STYLE}</style></head><body><main>
 <section id="choose"><h1>Smokebox</h1><p>The kitchen coach. Pick one.</p>
 <button class="big" type="button" data-go="join">Join a kitchen</button>
-<p style="margin:8px 0 0;font-size:15px">Your kitchen already uses Smokebox. You need the 6-digit code from another screen.</p>
+<p style="margin:8px 0 0;font-size:15px">Your kitchen already uses Smokebox. You need the 8-digit code from another screen.</p>
 <button class="big plain" type="button" data-go="new">Start a new kitchen</button>
 <div class="links"><a href="#" data-go="owner">Owner sign in</a></div></section>
 
 <section id="join" hidden><h1>Join a kitchen</h1><p>On a screen that already shows your kitchen: Back office, Devices, Add a device. Type the code it shows.</p>
-<form data-api="/api/join"><label for="code">Code</label><input class="code" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+<form data-api="/api/join"><label for="code">Code</label><input class="code" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="9" required>
 <button type="submit">Join</button><p class="err" role="alert"></p></form><div class="links"><a href="#" data-go="choose">Back</a></div></section>
 
 <section id="new" hidden><h1>Start a new kitchen</h1><p>For the owner. Your email is only used for paying, a forgotten password and replies from support.</p>

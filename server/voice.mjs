@@ -28,6 +28,9 @@ const RATE = 24000;
 // is loaded they are made for every voice in the background, so a voice test or a common call plays at once.
 const COMMON = ['Sound is on.', 'This is a test.', 'Spoken warnings are on.', 'Order up!', 'Ring it out!', 'Ring it out now!', 'Fire it now!', 'one item!', 'two items!', 'three items!', 'four items!'];
 const MAX_TEXT = 200;
+const MAX_QUEUE = 200;
+// Lines kept on disk (about 100 KB each); past this the oldest are removed, so the disk Postgres shares never fills up.
+const MAX_CACHE_FILES = 5000;
 
 /**
  * Starts the voice in the background and returns { ready(), voices, say(text, voice) }. say() gives a Promise of a WAV
@@ -78,10 +81,13 @@ export function createVoice(opts = {}) {
     }
     return styles.get(voice);
   }
-  // The text as speech sounds (IPA), from espeak-ng in the voice's accent.
+  // The text as speech sounds (IPA), from espeak-ng in the voice's accent. The text goes in on stdin, never on the command line,
+  // so a line that starts with "-" is spoken, not taken as an espeak-ng option (like -f, which would read a file).
   function sounds(text, accent) {
     return new Promise((resolve, reject) => {
-      execFile('espeak-ng', ['-q', '--ipa', '-v', accent, text], { timeout: 5000 }, (err, out) => (err ? reject(err) : resolve(String(out).replace(/\s+/g, ' ').trim())));
+      const child = execFile('espeak-ng', ['-q', '--ipa', '-v', accent, '--stdin'], { timeout: 5000 }, (err, out) => (err ? reject(err) : resolve(String(out).replace(/\s+/g, ' ').trim())));
+      child.stdin.on('error', () => { /* the exit is reported above */ });
+      child.stdin.end(text);
     });
   }
   // Runs the model for one line and returns 16-bit mono WAV bytes at 24 kHz.
@@ -105,6 +111,17 @@ export function createVoice(opts = {}) {
   }
 
   // One line as speech: from memory, from disk, or made now (one at a time, so two tablets asking at once share the work).
+  let writes = 0;
+  // Every 100 new lines, removes the oldest cached lines past MAX_CACHE_FILES.
+  function trimCache() {
+    if (++writes % 100) return;
+    try {
+      const files = fs.readdirSync(cacheDir).filter((f) => f.endsWith('.wav'));
+      if (files.length <= MAX_CACHE_FILES) return;
+      const aged = files.map((f) => { const p = path.join(cacheDir, f); return { p, t: fs.statSync(p).mtimeMs }; }).sort((a, b) => a.t - b.t);
+      for (const f of aged.slice(0, files.length - MAX_CACHE_FILES)) fs.unlinkSync(f.p);
+    } catch (e) { log('voice cache trim failed: ' + e.message); }
+  }
   // prio: 2 due now, 1 fetched ahead by a tablet (the default), 0 the server's warm-up. true and false are taken as 2 and 1.
   async function say(text, voice, prio) {
     prio = prio === true ? 2 : prio === false || prio === undefined ? 1 : prio;
@@ -121,9 +138,11 @@ export function createVoice(opts = {}) {
       let wav = null;
       try { wav = fs.readFileSync(file); } catch (e) { wav = null; }
       if (!wav) {
+        // A full queue (more than 200 lines waiting) refuses new lines; the tablet then uses its own voice.
+        if (jobs.length >= MAX_QUEUE) return null;
         const job = new Promise((resolve, reject) => { jobs.push({ key, text: t, voice, prio, resolve, reject }); pump(); });
         wav = await job.catch((e) => { log('voice line failed: ' + e.message); return null; });
-        if (wav) { try { fs.writeFileSync(file, wav); } catch (e) { /* kept in memory only */ } }
+        if (wav) { try { fs.writeFileSync(file, wav); trimCache(); } catch (e) { /* kept in memory only */ } }
       }
       if (wav) { mem.set(key, wav); if (mem.size > 400) mem.delete(mem.keys().next().value); }
       return wav;

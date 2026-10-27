@@ -47,6 +47,10 @@ pub struct AppState {
 
 const MAX_BODY: usize = 256 * 1024;
 const MAX_SCREENS: usize = 50;
+/// The largest kitchen action (every real one is a few KB at most: one dish, one setting).
+const MAX_ACTION: usize = 64 * 1024;
+/// Devices one kitchen may have joined at once.
+const MAX_DEVICES: i64 = 60;
 const MAX_FAILS: i32 = 10;
 const FAIL_WINDOW_MS: i64 = 15 * 60 * 1000;
 const RESET_MS: i64 = 3600 * 1000;
@@ -147,7 +151,12 @@ pub(crate) fn secure(h: &HeaderMap) -> bool {
 // The client's address as the web server in front saw it, for lockouts and limits. The last address in X-Forwarded-For is the one
 // Caddy itself added; earlier ones could be typed by the client to dodge a lockout.
 pub(crate) fn client_ip(h: &HeaderMap) -> String {
-    h.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.rsplit(',').next()).map(str::trim).filter(|v| !v.is_empty()).unwrap_or("local").to_string()
+    let ip = h.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.rsplit(',').next()).map(str::trim).filter(|v| !v.is_empty()).unwrap_or("local");
+    // One IPv6 home or server gets a whole /64 of addresses, so those count as one address: the first four groups.
+    match ip.parse::<std::net::Ipv6Addr>() {
+        Ok(v6) if v6.to_ipv4_mapped().is_none() => { let s = v6.segments(); format!("{:x}:{:x}:{:x}:{:x}::/64", s[0], s[1], s[2], s[3]) }
+        _ => ip.to_string(),
+    }
 }
 // Takes one try from a rate-limit bucket; None when allowed, else the "wait" answer (429 with Retry-After).
 pub(crate) fn limit(st: &AppState, key: &str, rule: crate::limits::Rule) -> Option<Response> {
@@ -229,6 +238,13 @@ pub(crate) async fn device_of(st: &AppState, h: &HeaderMap) -> Option<Device> {
     }
     Some(Device { id, name: row.get("name"), kitchen_id: row.get("kid"), kitchen_name: row.get("kname") })
 }
+
+// True when a kitchen already has as many joined devices as allowed (old ones can be removed in Devices).
+async fn kitchen_full(st: &AppState, kitchen_id: &str) -> bool {
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM devices WHERE kitchen_id = $1 AND removed_at IS NULL").bind(kitchen_id).fetch_one(&st.db).await.unwrap_or(0);
+    n >= MAX_DEVICES
+}
+const FULL_WORDS: &str = "This kitchen has the most devices it can have. Remove an old one in Devices first.";
 
 // Joins this device to a kitchen and returns the cookie that keeps it joined.
 async fn join_device(st: &AppState, kitchen_id: &str, name: &str, how: &str, secure: bool) -> Result<String, sqlx::Error> {
@@ -381,17 +397,18 @@ async fn start_kitchen(State(st): State<AppState>, h: HeaderMap, body: Bytes) ->
     }
 }
 
-// Joins this device with a six-digit code from another screen of the kitchen. Ten wrong codes from one address lock it out for 15 minutes.
+// Joins this device with an eight-digit code from another screen of the kitchen. Ten wrong codes from one address (or one IPv6 /64)
+// lock it out for 15 minutes, and wrong codes from everywhere together are capped at 60 a minute, so many addresses do not help a guesser.
 async fn join_kitchen(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
     let b = match same_site_json(&h, &body) { Ok(b) => b, Err(r) => return r };
     let ip_key = format!("code:{}", client_ip(&h));
-    if locked(&st, &ip_key).await {
+    if locked(&st, &ip_key).await || st.limits.peek("join-fail:all", crate::limits::JOIN_FAILS_ALL, st.rooms.now()).is_err() {
         return refuse(429, "locked", "Too many wrong codes. Wait 15 minutes and try again.");
     }
     let code: String = field(&b, "code").chars().filter(char::is_ascii_digit).collect();
     let now = st.rooms.now();
     // Uses the code once: only an unused, unexpired code is marked used, so two devices can never both join with one code.
-    let kitchen: Option<String> = if code.len() == 6 {
+    let kitchen: Option<String> = if code.len() == 8 {
         sqlx::query_scalar("UPDATE pair_codes SET used_at = $1 WHERE code_hash = $2 AND used_at IS NULL AND expires_at > $1 RETURNING kitchen_id")
             .bind(now)
             .bind(auth::token_hash(&code))
@@ -404,8 +421,12 @@ async fn join_kitchen(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> 
     };
     let Some(kid) = kitchen else {
         note_fail(&st, &ip_key).await;
+        let _ = st.limits.take("join-fail:all", crate::limits::JOIN_FAILS_ALL, st.rooms.now());
         return refuse(400, "badCode", "That code did not work. Codes work once, for 10 minutes. Make a new one on the other screen.");
     };
+    if kitchen_full(&st, &kid).await {
+        return refuse(409, "full", FULL_WORDS);
+    }
     match join_device(&st, &kid, &device_name(&b), "code", secure(&h)).await {
         Ok(c) => with_cookie(reply(200, json!({ "ok": true, "go": "/" })), c),
         Err(_) => refuse(500, "error", "This device could not join. Try again."),
@@ -434,6 +455,9 @@ async fn owner_login(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> R
         return refuse(401, "wrong", "That email and password do not match.");
     }
     let _ = sqlx::query("DELETE FROM login_fails WHERE key = $1").bind(&em_key).execute(&st.db).await;
+    if kitchen_full(&st, &kid).await {
+        return refuse(409, "full", FULL_WORDS);
+    }
     match join_device(&st, &kid, &device_name(&b), "owner", secure(&h)).await {
         Ok(c) => with_cookie(reply(200, json!({ "ok": true, "go": "/" })), c),
         Err(_) => refuse(500, "error", "This device could not join. Try again."),
@@ -523,7 +547,7 @@ async fn devices(State(st): State<AppState>, h: HeaderMap) -> Response {
     reply(200, json!({ "devices": list }))
 }
 
-// A new six-digit code that joins one more device to this kitchen, for 10 minutes.
+// A new eight-digit code that joins one more device to this kitchen, for 10 minutes.
 async fn make_code(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
     if let Err(r) = same_site_json(&h, &body) {
         return r;
@@ -587,6 +611,10 @@ async fn rename_device(State(st): State<AppState>, h: HeaderMap, body: Bytes) ->
 // The live stream: the whole kitchen now, then every change and a heartbeat, for as long as the screen stays connected.
 async fn events(State(st): State<AppState>, h: HeaderMap) -> Response {
     let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    // Each connect sends the whole kitchen, which is real work for the engine: a device reconnecting in a loop is told to wait.
+    if let Some(r) = limit(&st, &format!("stream:{}", d.id), crate::limits::STREAM) {
+        return r;
+    }
     let room = match st.rooms.get(&d.kitchen_id).await {
         Ok(Some(r)) => r,
         _ => return refuse(404, "noKitchen", "Kitchen not found."),
@@ -617,6 +645,10 @@ async fn events(State(st): State<AppState>, h: HeaderMap) -> Response {
 async fn action(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
     let b = match same_site_json(&h, &body) { Ok(b) => b, Err(r) => return r };
     let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen. Join it again.") };
+    // Too big to be a real action: refused as an answer (200), so the tablet drops it instead of sending it again forever.
+    if body.len() > MAX_ACTION {
+        return reply(200, json!({ "report": "badPatch", "info": { "error": "action too large" } }));
+    }
     // A tablet told to slow down keeps the action and sends it again later, so nothing is lost.
     if let Some(r) = limit(&st, &format!("act:{}", d.id), crate::limits::ACTION) {
         return r;

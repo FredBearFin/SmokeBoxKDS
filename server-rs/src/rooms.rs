@@ -26,6 +26,9 @@ pub struct Room {
     since_snap: i64,
     idle_since: i64,
     pub tx: broadcast::Sender<Event>,
+    /// The engine's kitchen text for one change number: every screen that connects, and every broadcast, at the same change
+    /// number shares it, so reconnecting screens cost the engine nothing.
+    view_cache: std::sync::Mutex<Option<(i64, Arc<String>)>>,
 }
 
 /// What an action got back, and the HTTP status to send with it.
@@ -163,13 +166,22 @@ impl Rooms {
             since_snap: since,
             idle_since: now,
             tx,
+            view_cache: std::sync::Mutex::new(None),
         }))
     }
 
     /// What every screen gets: the whole kitchen, the server clock, the change counter and the recent action ids.
     pub async fn view(&self, room: &Room) -> Result<String, String> {
-        let id = room.id.clone();
-        let state = self.engine.run(move |k| k.view(&id)).await?;
+        let cached = room.view_cache.lock().unwrap_or_else(|e| e.into_inner()).as_ref().filter(|(seq, _)| *seq == room.seq).map(|(_, v)| v.clone());
+        let state = match cached {
+            Some(v) => v,
+            None => {
+                let id = room.id.clone();
+                let v = Arc::new(self.engine.run(move |k| k.view(&id)).await?);
+                *room.view_cache.lock().unwrap_or_else(|e| e.into_inner()) = Some((room.seq, v.clone()));
+                v
+            }
+        };
         let ops = serde_json::to_string(&room.op_ids).unwrap_or_else(|_| "[]".into());
         Ok(format!(r#"{{"state":{},"serverNow":{},"seq":{},"opIds":{}}}"#, state, self.now(), room.seq, ops))
     }
@@ -243,6 +255,12 @@ impl Rooms {
             }
         };
         let ok = ans.report == "ok";
+        // An engine crash's details (a stack trace) go to the server log, not back to the device.
+        let mut ans = ans;
+        if let Some(e) = ans.info.get("internalError").cloned() {
+            eprintln!("[server] engine error in {}: {}", room.id, e);
+            ans.info = json!({ "error": "internal" });
+        }
         let reply = if ok {
             json!({ "report": "ok", "info": ans.info, "seq": room.seq + 1 })
         } else {
@@ -254,7 +272,9 @@ impl Rooms {
             .bind(if ok { room.seq + 1 } else { room.seq })
             .bind(&op)
             .bind(kind)
-            .bind(payload.to_string())
+            // A refused action changed nothing, so only its type and answer are kept (repeats still get the same answer); keeping
+            // its payload would let anyone fill the disk with refused junk.
+            .bind(if ok { payload.to_string() } else { "{}".to_string() })
             .bind(t)
             .bind(device_id)
             .bind(ok)

@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 pub const COOKIE: &str = "sb_device";
 /// How long a device stays joined without being used: a year (every use moves it out again).
 pub const DEVICE_MS: i64 = 365 * 24 * 3600 * 1000;
-/// How long a six-digit join code works.
+/// How long an eight-digit join code works.
 pub const CODE_MS: i64 = 10 * 60 * 1000;
 
 /// Hashes an owner password with Argon2id and a fresh random salt.
@@ -50,9 +50,10 @@ pub fn new_id(prefix: &str) -> String {
     format!("{}_{}", prefix, hex::encode(b))
 }
 
-/// A new six-digit join code, like "048213". Every code is equally likely.
+/// A new eight-digit join code, like "04821377". Every code is equally likely (100 million of them, so guessing one is hopeless
+/// within the lockouts).
 pub fn new_code() -> String {
-    format!("{:06}", rand::rng().next_u32() % 1_000_000)
+    format!("{:08}", rand::rng().next_u32() % 100_000_000)
 }
 
 /// The Set-Cookie value that joins this device. `secure` is true behind HTTPS.

@@ -411,6 +411,39 @@ async fn limits_health_voice_gate_and_error_log() {
     s.clock.fetch_add(1000, Ordering::SeqCst);
     assert_eq!(post(&a, &s, "/api/action", fries()).await.0, 200);
 
+    // Join codes are 8 digits; wrong codes from many addresses together are capped, and one IPv6 /64 counts as one address.
+    s.clock.fetch_add(60_000, Ordering::SeqCst);
+    let (_, c) = post(&a, &s, "/api/devices/code", json!({})).await;
+    assert!(c["code"].as_str().map(|x| x.len() == 8 && x.chars().all(|d| d.is_ascii_digit())).unwrap_or(false), "{}", c);
+    let join = |code: &'static str, ip: String| {
+        let s = &s;
+        async move { device().post(format!("{}/api/join", s.base)).header("x-forwarded-for", ip).json(&json!({ "code": code })).send().await.unwrap().status().as_u16() }
+    };
+    for i in 0..10 {
+        assert_eq!(join("00000000", format!("2001:db8:1:2::{:x}", i + 1)).await, 400);
+    }
+    assert_eq!(join("00000000", "2001:db8:1:2::ffff".into()).await, 429, "a new address in the same /64 is still locked out");
+    for i in 0..60 {
+        join("00000000", format!("10.0.{}.{}", i / 200, i % 200 + 1)).await;
+    }
+    assert_eq!(join("00000000", "10.9.9.9".into()).await, 429, "60 wrong codes a minute from anywhere: everyone waits");
+
+    // A refused action keeps no payload, and one too big to be real is refused as an answer (so the tablet drops it).
+    let junk = "x".repeat(60_000);
+    let (st, r) = post(&a, &s, "/api/action", json!({ "type": "noSuchAction", "payload": { "junk": junk }, "opId": "junk-1" })).await;
+    assert_eq!(st, 200, "{}", r);
+    let kept: String = sqlx::query_scalar("SELECT payload FROM kitchen_actions WHERE op_id = 'junk-1'").fetch_one(&s.st.db).await.unwrap();
+    assert_eq!(kept, "{}");
+    let (st, r) = post(&a, &s, "/api/action", json!({ "type": "addMenuItem", "payload": { "name": "x".repeat(70_000) } })).await;
+    assert_eq!((st, r["report"].clone()), (200, json!("badPatch")), "{}", r);
+
+    // The live stream: a device reconnecting in a loop is told to wait.
+    let mut last = 0;
+    for _ in 0..21 {
+        last = a.get(format!("{}/api/events", s.base)).send().await.unwrap().status().as_u16();
+    }
+    assert_eq!(last, 429);
+
     // The voice helper answers only joined devices (Caddy asks /api/voice-ok first).
     assert_eq!(get(&device(), &s, "/api/voice-ok").await.0, 401);
     assert_eq!(get(&a, &s, "/api/voice-ok").await.0, 200);
