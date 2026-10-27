@@ -88,7 +88,7 @@ async fn start_a_kitchen_and_join_a_second_device_with_a_code() {
     // A second device joins with a code made on the first; the code works once.
     let (_, c) = post(&a, &s, "/api/devices/code", json!({})).await;
     let code = c["code"].as_str().unwrap().to_string();
-    assert_eq!(code.len(), 6);
+    assert_eq!(code.len(), 8);
     let b = device();
     assert_eq!(post(&b, &s, "/api/join", json!({ "code": code, "device": "Mozilla (iPhone; Mobile)" })).await.0, 200);
     assert_eq!(get(&b, &s, "/api/me").await.1["kitchen"]["name"], "Freddy's Franks");
