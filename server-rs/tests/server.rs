@@ -368,3 +368,63 @@ async fn with_billing_off_every_kitchen_is_free() {
     let r = reqwest::Client::new().post(format!("{}/api/stripe/webhook", s.base)).body("{}").send().await.unwrap();
     assert_eq!(r.status().as_u16(), 404);
 }
+
+#[tokio::test]
+async fn limits_health_voice_gate_and_error_log() {
+    let s = server().await;
+    // Health: the database answers and the engine thread is alive.
+    let (st, h) = get(&device(), &s, "/healthz").await;
+    assert_eq!((st, h["database"].clone(), h["engine"].clone()), (200, json!(true), json!(true)), "{}", h);
+
+    // Starting kitchens: 5 from one address, then a wait (with Retry-After), and the address Caddy added is the one counted.
+    let start = |n: u32, ip: &'static str| {
+        let s = &s;
+        async move {
+            device().post(format!("{}/api/start", s.base)).header("x-forwarded-for", ip)
+                .json(&json!({ "kitchen": format!("K{}", n), "email": format!("k{}@example.com", n), "password": "grill-master-1" })).send().await.unwrap()
+        }
+    };
+    for n in 0..5 {
+        assert_eq!(start(n, "9.9.9.9").await.status().as_u16(), 200);
+    }
+    let sixth = start(5, "1.2.3.4, 9.9.9.9").await;
+    assert_eq!(sixth.status().as_u16(), 429, "typing a fake first address does not dodge the limit");
+    assert!(sixth.headers().get("retry-after").is_some());
+    let b: Value = sixth.json().await.unwrap();
+    assert!(b["words"].as_str().unwrap().contains("Wait"), "{}", b);
+    assert_eq!(start(6, "8.8.8.8").await.status().as_u16(), 200, "another address has its own limit");
+
+    // Join codes: 10 from one device, then a wait.
+    let a = started(&s).await;
+    for _ in 0..10 {
+        assert_eq!(post(&a, &s, "/api/devices/code", json!({})).await.0, 200);
+    }
+    assert_eq!(post(&a, &s, "/api/devices/code", json!({})).await.0, 429);
+    s.clock.fetch_add(60_000, Ordering::SeqCst);
+    assert_eq!(post(&a, &s, "/api/devices/code", json!({})).await.0, 200, "one more a minute later");
+
+    // Kitchen actions: a burst of 300 goes through; past that the tablet is told to wait (and keeps the action).
+    for _ in 0..300 {
+        assert_ne!(post(&a, &s, "/api/action", json!({ "type": "noSuchAction", "payload": {} })).await.0, 429);
+    }
+    assert_eq!(post(&a, &s, "/api/action", fries()).await.0, 429);
+    s.clock.fetch_add(1000, Ordering::SeqCst);
+    assert_eq!(post(&a, &s, "/api/action", fries()).await.0, 200);
+
+    // The voice helper answers only joined devices (Caddy asks /api/voice-ok first).
+    assert_eq!(get(&device(), &s, "/api/voice-ok").await.0, 401);
+    assert_eq!(get(&a, &s, "/api/voice-ok").await.0, 200);
+
+    // Page errors from a tablet are kept for staff, and show on the staff console with the latest backup.
+    assert_eq!(post(&a, &s, "/api/client-error", json!({ "message": "TypeError: x is undefined", "detail": "0.2.0 abc\nboard.js:10" })).await.0, 200);
+    sqlx::query("INSERT INTO backup_runs (at, kind, ok, size_bytes, offsite) VALUES ($1, 'backup', TRUE, 4096, TRUE)").bind(T0).execute(&s.st.db).await.unwrap();
+    let secret = smokebox_server::support::add_staff(&s.st.db, "freddy@smokebox.example", "Freddy", "staff-pass-123", T0).await.unwrap();
+    let staff = device();
+    assert_eq!(get(&a, &s, "/staff/api/health").await.0, 401, "a kitchen device is not staff");
+    let code = smokebox_server::totp::code_at(&secret, (s.clock.load(Ordering::SeqCst) / 30_000) as u64).unwrap();
+    assert_eq!(post(&staff, &s, "/staff/api/login", json!({ "email": "freddy@smokebox.example", "password": "staff-pass-123", "code": code })).await.0, 200);
+    let (st, h) = get(&staff, &s, "/staff/api/health").await;
+    assert_eq!(st, 200, "{}", h);
+    assert_eq!((h["errors24h"].clone(), h["recent"][0]["kitchen"].clone(), h["backup"]["size"].clone()), (json!(1), json!("Freddy's Franks"), json!(4096)), "{}", h);
+    assert_eq!(h["restoreCheck"], Value::Null);
+}

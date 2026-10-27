@@ -42,6 +42,18 @@ impl Engine {
         Ok(Engine { tx })
     }
 
+    /// True when the engine thread is alive and answers within 2 seconds (for the health check).
+    pub async fn alive(&self) -> bool {
+        let (tx, rx) = oneshot::channel();
+        let job: Job = Box::new(move |_| {
+            let _ = tx.send(());
+        });
+        if self.tx.send(job).is_err() {
+            return false;
+        }
+        matches!(tokio::time::timeout(std::time::Duration::from_secs(2), rx).await, Ok(Ok(())))
+    }
+
     /// Runs `f` on the engine thread and waits for its answer without blocking the async runtime.
     pub async fn run<R, F>(&self, f: F) -> R
     where

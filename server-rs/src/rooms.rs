@@ -57,6 +57,11 @@ impl Rooms {
         (self.now)()
     }
 
+    /// True when the engine thread answers (for the health check).
+    pub async fn engine_ok(&self) -> bool {
+        self.engine.alive().await
+    }
+
     /// How many kitchens are in memory.
     pub async fn open_count(&self) -> usize {
         self.map.lock().await.len()

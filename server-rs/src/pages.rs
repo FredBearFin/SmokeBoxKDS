@@ -98,7 +98,7 @@ pub fn staff_page() -> String {
 body{{display:block;padding:0}}main{{max-width:none;border:0;border-radius:0;padding:0}}
 #login{{max-width:420px;margin:8vh auto;background:#fff;border:2px solid var(--line);border-radius:14px;padding:28px}}
 #app{{display:grid;grid-template-columns:minmax(300px,420px) 1fr;min-height:100vh}}#side{{border-right:2px solid var(--line);background:#fff;overflow:auto}}
-#tabs{{display:flex;gap:6px;padding:12px;position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line)}}#tabs button{{margin:0;min-height:40px;width:auto;flex:1;font-size:15px}}
+#health{{padding:10px 14px;font-size:14px;border-bottom:1px solid var(--line);background:#FBF7F2}}#health .bad{{color:var(--bad);font-weight:700}}#tabs{{display:flex;gap:6px;padding:12px;position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line)}}#tabs button{{margin:0;min-height:40px;width:auto;flex:1;font-size:15px}}
 #tabs button[aria-pressed=false]{{background:#fff;color:var(--ink);border:2px solid var(--line)}}
 .t{{display:block;width:100%;text-align:left;margin:0;border-radius:0;min-height:0;padding:12px 14px;background:#fff;color:var(--ink);border-bottom:1px solid var(--line);font-weight:400}}
 .t.sel{{background:#F3E4DA}}.t b{{display:block}}.t small{{color:var(--ink2)}}.stuck{{color:#fff;background:var(--bad);border-radius:6px;padding:1px 6px;font-size:13px;font-weight:700;margin-right:6px}}
@@ -112,7 +112,7 @@ textarea{{width:100%;min-height:120px;font:inherit;padding:12px;border:2px solid
 <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required>
 <label for="cd">Code from your authenticator app</label><input id="cd" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>
 <button type="submit">Sign in</button><p class="err" id="lerr" role="alert"></p></form></section>
-<div id="app" hidden><aside id="side"><div id="tabs"></div><div id="list"></div></aside><section id="view"><p>Pick a request.</p></section></div>
+<div id="app" hidden><aside id="side"><div id="health" role="status"></div><div id="tabs"></div><div id="list"></div></aside><section id="view"><p>Pick a request.</p></section></div>
 </main><script>
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {{ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }};
@@ -138,7 +138,19 @@ function tabs() {{
     b.onclick = () => {{ status = id; tabs(); list(); }}; t.appendChild(b);
   }}
 }}
+// The service line at the top: errors in the last day, the last backup and the last test restore. Red when something needs a look.
+async function health() {{
+  const b = await api('/staff/api/health'), box = $('#health'); box.textContent = '';
+  const day = 24 * 3600e3, now = Date.now();
+  const line = (bad, text) => box.appendChild(el('div', bad ? 'bad' : '', text));
+  line(b.errors24h > 0, b.errors24h + ' error' + (b.errors24h === 1 ? '' : 's') + ' in the last day' + (b.recent[0] ? ' (newest: ' + b.recent[0].what + (b.recent[0].kitchen ? ', ' + b.recent[0].kitchen : '') + ')' : ''));
+  const bk = b.backup;
+  line(!bk || !bk.ok || now - bk.at > 1.5 * day || !bk.offsite, bk ? 'Backup ' + when(bk.at) + (bk.ok ? ', ' + Math.round(bk.size / 1024) + ' KB' : ' FAILED') + (bk.offsite ? ', copied off the server' : ', not copied off the server') : 'No backup recorded yet');
+  const rc = b.restoreCheck;
+  line(!rc || !rc.ok || now - rc.at > 8 * day, rc ? 'Test restore ' + when(rc.at) + (rc.ok ? ': OK' : ': FAILED ' + rc.note) : 'No test restore yet');
+}}
 async function list() {{
+  health().catch(() => {{}});
   const b = await api('/staff/api/tickets?status=' + status), box = $('#list'); box.textContent = '';
   if (!b.tickets.length) box.appendChild(el('p', '', 'Nothing here.'));
   for (const t of b.tickets) {{

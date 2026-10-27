@@ -188,25 +188,112 @@ set -a; . /etc/smokebox/server.env; set +a
 CMD
 chmod 700 /usr/local/bin/smokebox-staff /usr/local/bin/smokebox-reset
 
-# A copy of the database every night, kept 14 days, in /var/backups/smokebox.
+# A copy of the database every night, kept 14 days in /var/backups/smokebox, and (once smokebox-offsite is set up) an encrypted copy
+# off this server, in a Backblaze B2 bucket (free up to 10 GB). Every run is written down, and the staff console shows the latest.
+# Once a week the newest copy is restored into a scratch database to prove it really works (smokebox-restore-check, also by hand).
+apt-get install -y rclone postgresql-client >/dev/null 2>&1 || apt-get install -y rclone
 mkdir -p /var/backups/smokebox && chmod 700 /var/backups/smokebox
+mkdir -p /etc/smokebox/offsite && chmod 700 /etc/smokebox/offsite
+cat > /usr/local/sbin/smokebox-note-backup <<'CMD'
+#!/bin/sh
+# smokebox-note-backup KIND OK SIZE OFFSITE NOTE: writes one row in backup_runs (KIND backup or restore-check, OK true or false).
+# (psql fills in :'name' only in SQL it reads from its input, which also keeps quotes in the note safe.)
+echo "INSERT INTO backup_runs (at, kind, ok, size_bytes, offsite, note) VALUES ((extract(epoch from now()) * 1000)::bigint, :'kind', :'ok', :'size', :'off', :'note');" |
+  sudo -u postgres psql -q -d smokebox -v ON_ERROR_STOP=1 -v kind="$1" -v ok="$2" -v size="$3" -v off="$4" -v note="$5" >/dev/null 2>&1 || true
+CMD
 cat > /etc/cron.daily/smokebox-backup <<'CMD'
 #!/bin/sh
-set -e
-cd /var/backups/smokebox
-sudo -u postgres pg_dump smokebox | gzip > "smokebox-$(date +%F).sql.gz.part" && mv "smokebox-$(date +%F).sql.gz.part" "smokebox-$(date +%F).sql.gz"
+cd /var/backups/smokebox || exit 1
+F="smokebox-$(date +%F).sql.gz"
+if sudo -u postgres pg_dump smokebox | gzip > "$F.part" && [ -s "$F.part" ] && mv "$F.part" "$F"; then
+  SIZE="$(wc -c < "$F")"; OFF=false; NOTE=""
+  if [ -s /etc/smokebox/offsite/rclone.conf ]; then
+    if rclone --config /etc/smokebox/offsite/rclone.conf copy "$F" smokebox-safe: >/tmp/smokebox-offsite.log 2>&1; then OFF=true; else NOTE="off-server copy failed: $(tail -c 300 /tmp/smokebox-offsite.log)"; fi
+    rclone --config /etc/smokebox/offsite/rclone.conf delete --min-age 60d smokebox-safe: >/dev/null 2>&1 || true
+  else
+    NOTE="no off-server copy: run smokebox-offsite"
+  fi
+  /usr/local/sbin/smokebox-note-backup backup true "$SIZE" "$OFF" "$NOTE"
+else
+  rm -f "$F.part"; /usr/local/sbin/smokebox-note-backup backup false 0 false "pg_dump failed"
+fi
 find /var/backups/smokebox -name 'smokebox-*.sql.gz' -mtime +14 -delete
 CMD
-chmod 755 /etc/cron.daily/smokebox-backup
+chmod 755 /etc/cron.daily/smokebox-backup /usr/local/sbin/smokebox-note-backup
+cat > /usr/local/bin/smokebox-restore-check <<'CMD'
+#!/usr/bin/env bash
+# Restores the newest nightly copy into a scratch database, checks the kitchens are there, then removes the scratch database.
+set -uo pipefail
+F="$(ls -1t /var/backups/smokebox/smokebox-*.sql.gz 2>/dev/null | head -1)"
+[ -n "$F" ] || { echo "No backup yet."; /usr/local/sbin/smokebox-note-backup restore-check false 0 false "no backup file"; exit 1; }
+sudo -u postgres dropdb --if-exists smokebox_restore_check
+sudo -u postgres createdb smokebox_restore_check
+if gunzip -c "$F" | sudo -u postgres psql -q -d smokebox_restore_check -v ON_ERROR_STOP=1 >/dev/null 2>/tmp/smokebox-restore.log; then
+  N="$(sudo -u postgres psql -tA -d smokebox_restore_check -c 'SELECT COUNT(*) FROM kitchens' 2>/dev/null || echo x)"
+  if [[ "$N" =~ ^[0-9]+$ ]]; then echo "Restore check OK: $(basename "$F") has $N kitchens."; /usr/local/sbin/smokebox-note-backup restore-check true "$(wc -c < "$F")" false "$N kitchens from $(basename "$F")"; R=0
+  else echo "Restore check FAILED: no kitchens table."; /usr/local/sbin/smokebox-note-backup restore-check false 0 false "no kitchens table"; R=1; fi
+else
+  echo "Restore check FAILED:"; tail -5 /tmp/smokebox-restore.log; /usr/local/sbin/smokebox-note-backup restore-check false 0 false "$(tail -c 300 /tmp/smokebox-restore.log)"; R=1
+fi
+sudo -u postgres dropdb --if-exists smokebox_restore_check
+exit $R
+CMD
+printf '#!/bin/sh\n/usr/local/bin/smokebox-restore-check >/dev/null 2>&1\n' > /etc/cron.weekly/smokebox-restore-check
+# smokebox-offsite: asks for a Backblaze B2 key and a backup passphrase, and sets up the encrypted off-server copy. The passphrase is
+# needed to read the copies if this server is ever lost, so it must be written down somewhere else.
+cat > /usr/local/bin/smokebox-offsite <<'CMD'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "Off-server backups go to your own Backblaze B2 bucket (free up to 10 GB), encrypted with a passphrase you choose."
+read -rp "B2 keyID: " KEYID; read -rsp "B2 applicationKey (hidden): " APPKEY; echo
+read -rp "Bucket name: " BUCKET
+read -rsp "Backup passphrase (hidden, write it down somewhere safe): " PHRASE; echo
+read -rsp "Same passphrase again: " PHRASE2; echo
+[ "$PHRASE" = "$PHRASE2" ] || { echo "The two passphrases differ. Nothing changed."; exit 1; }
+[ "${#PHRASE}" -ge 12 ] || { echo "Use a passphrase of at least 12 characters. Nothing changed."; exit 1; }
+C=/etc/smokebox/offsite/rclone.conf.new
+umask 077
+{ printf '[b2]\ntype = b2\naccount = %s\nkey = %s\n\n' "$KEYID" "$APPKEY"
+  printf '[smokebox-safe]\ntype = crypt\nremote = b2:%s/smokebox\npassword = %s\n' "$BUCKET" "$(rclone obscure "$PHRASE")"; } > "$C"
+echo test > /tmp/smokebox-offsite-test.txt
+if rclone --config "$C" copy /tmp/smokebox-offsite-test.txt smokebox-safe:check/ && rclone --config "$C" delete smokebox-safe:check/; then
+  mv "$C" /etc/smokebox/offsite/rclone.conf; rm -f /tmp/smokebox-offsite-test.txt
+  echo "Off-server backups are on. Tonight's copy goes to $BUCKET. Running one now..."; /etc/cron.daily/smokebox-backup && echo "Done."
+else
+  rm -f "$C" /tmp/smokebox-offsite-test.txt; echo "Backblaze refused the key or bucket. Check them and try again. Nothing changed."; exit 1
+fi
+CMD
+chmod 700 /usr/local/bin/smokebox-restore-check /usr/local/bin/smokebox-offsite; chmod 755 /etc/cron.weekly/smokebox-restore-check
 
 # The password goes to Caddy on its input, not on the command line (where any user on the server could read it in the process list). An older Caddy
-# that cannot read it that way gets it on the command line as before.
+# that cannot read it that way gets it on the command line as before. Only its hash is kept, in /etc/smokebox/site (root only).
 HASH="$(printf '%s\n' "$PASS" | caddy hash-password 2>/dev/null || true)"
 case "$HASH" in '$2'*) ;; *) HASH="$(caddy hash-password --plaintext "$PASS")" ;; esac
+mkdir -p /etc/smokebox/site && chmod 700 /etc/smokebox/site
+printf '%s\n' "$DOMAIN" > /etc/smokebox/site/domain
+printf '%s\n' "$LOGIN" > /etc/smokebox/site/login
+printf '%s\n' "$HASH" > /etc/smokebox/site/hash
+chmod 600 /etc/smokebox/site/*
 
-# Re-running (go.sh on an existing server) writes the site again, but keeps what beta.sh and harden.sh added to the old file: harden's snippet import
-# at the top and its "import smokebox_log" in the site, and every other top-level import line (the beta site) at the end. If Caddy refuses the
-# result, the plain site is installed and the old file is kept as Caddyfile.before-setup.
+# smokebox-site writes the web server's settings and restarts it. While the site is locked (the default) every page asks for the login
+# above, except what must reach the server without one: the health check (for the uptime monitor) and Stripe's payment messages.
+# smokebox-open removes the login for everyone (for launch: kitchens sign in with their own accounts); smokebox-lock puts it back.
+# The voice helper always answers joined kitchen devices only (Caddy asks the server first, which also limits how fast).
+cat > /usr/local/sbin/smokebox-site <<'CMD'
+#!/usr/bin/env bash
+set -euo pipefail
+DOMAIN="$(cat /etc/smokebox/site/domain)"; LOGIN="$(cat /etc/smokebox/site/login)"; HASH="$(cat /etc/smokebox/site/hash)"
+if [ -f /etc/smokebox/site/open ]; then
+  AUTH=""
+else
+  AUTH="	@locked not path /health /healthz /api/stripe/webhook
+	basic_auth @locked {
+		${LOGIN} ${HASH}
+	}"
+fi
+# Re-running keeps what beta.sh and harden.sh added to the old file: harden's snippet import at the top and its "import smokebox_log" in the
+# site, and every other top-level import line (the beta site) at the end. If Caddy refuses the result, the plain site is installed and the
+# old file is kept as Caddyfile.before-setup.
 keep_imports() {
   local old="$1" new="$2" body
   [ -f "$old" ] || return 0
@@ -228,15 +315,17 @@ ${DOMAIN} {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=()"
 		-Server
 	}
 	request_body {
-		max_size 2MB
+		max_size 4MB
 	}
-	basic_auth {
-		${LOGIN} ${HASH}
-	}
+${AUTH}
 	handle /api/voice* {
+		forward_auth 127.0.0.1:8790 {
+			uri /api/voice-ok
+		}
 		reverse_proxy 127.0.0.1:8788
 	}
 	handle {
@@ -258,6 +347,20 @@ if [ -f "$CADDYFILE" ]; then
 fi
 mv "$CADDYFILE.setup" "$CADDYFILE"; rm -f "$CADDYFILE.plain"
 systemctl restart caddy
+if [ -f /etc/smokebox/site/open ]; then echo "The site is OPEN: anyone can reach the start page; kitchens sign in with their own accounts."; else echo "The site is LOCKED: every page asks for the login ${LOGIN}."; fi
+CMD
+cat > /usr/local/bin/smokebox-open <<'CMD'
+#!/usr/bin/env bash
+set -euo pipefail
+touch /etc/smokebox/site/open && /usr/local/sbin/smokebox-site
+CMD
+cat > /usr/local/bin/smokebox-lock <<'CMD'
+#!/usr/bin/env bash
+set -euo pipefail
+rm -f /etc/smokebox/site/open && /usr/local/sbin/smokebox-site
+CMD
+chmod 700 /usr/local/sbin/smokebox-site /usr/local/bin/smokebox-open /usr/local/bin/smokebox-lock
+/usr/local/sbin/smokebox-site
 
 # The firewall lets in ssh on every port sshd really listens on (not only 22), so a server with ssh moved elsewhere does not lock its owner out.
 ufw allow OpenSSH >/dev/null
@@ -272,5 +375,6 @@ echo "Done. Open https://${DOMAIN}/ and sign in as ${LOGIN}."
 echo "If your own domain was given, point its A record at this server's IP first."
 echo "Check:   systemctl status smokebox smokebox-voice caddy"
 echo "Logs:    journalctl -u smokebox -f"
-echo "Data:    Postgres database smokebox (copied every night to /var/backups/smokebox)"
+echo "Data:    Postgres database smokebox (copied every night to /var/backups/smokebox; smokebox-offsite adds an encrypted copy off this server)"
+echo "Site:    smokebox-open lets kitchens in without the login above; smokebox-lock puts the login back"
 echo "Staff:   smokebox-staff you@example.com Freddy      Owner password link:   smokebox-reset owner@example.com"
