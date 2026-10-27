@@ -1747,7 +1747,7 @@
 
     // Restart demo: start over with fresh tickets, the way the app looks on its first day.
     const restartBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg dm-restart', onClick: () => doRestart() }, ico('refresh', 22), h('span', null, 'Restart demo'));
-    const tourBtn = h('button', { type: 'button', class: 'btn btn-lg', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', null, 'Show me how it works'));
+    const tourBtn = h('button', { type: 'button', class: 'btn btn-lg', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', null, 'Practice run (2 minutes)'));
     const startBox = h('section', { class: 'fs-section dm-start' }, h('h3', { class: 'fs-h' }, 'Load the demo'),
       h('p', { class: 'fs-sub' }, 'Demo only. Loads demo food in the cabinet and three demo tickets, and erases what is on this device now. Nothing runs by itself: you tap Start and Done, and the timers show when each dish should begin.'),
       h('div', { class: 'fs-row' }, restartBtn, tourBtn));
@@ -1878,7 +1878,7 @@
     return h('div', { class: 'hp-pane' },
       h('p', { class: 'fs-sub' }, 'Smokebox shows every order as a paper ticket. Each station sees only its own items, timed so the whole order finishes together.'),
       // Help closes first, so the walkthrough has the whole board to itself.
-      h('div', { class: 'fs-row hp-links' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'tour' }, onClick: () => closeThen(sheet, runTour) }, ico('play', 20), h('span', null, 'Show me how it works'))),
+      h('div', { class: 'fs-row hp-links' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'tour' }, onClick: () => closeThen(sheet, runTour) }, ico('play', 20), h('span', null, 'Practice run (2 minutes)'))),
       helpList([
         helpItem('plus', 'Send a ticket', 'Tap New ticket, tap the items, tap Send to kitchen. Four lines take fewer than ten taps.'),
         helpItem('check', 'Start and Done', 'Each dish has a button on its row. A one-step dish shows Done: tap it when the dish is ready. A two-step dish shows Start: tap it when cooking starts, it counts down from its usual cooking time, then tap Done.'),
@@ -2240,7 +2240,7 @@
 
     // Links to the other support sheets. Each closes this one first.
     const link = (icon, label, name) => h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, () => SB.sheets.open(name)) }, ico(icon, 22), h('span', { class: 'grow' }, label), ico('chevron-right', 20));
-    const tourLink = h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', { class: 'grow' }, 'Show me how it works'), ico('chevron-right', 20));
+    const tourLink = h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', { class: 'grow' }, 'Practice run (2 minutes)'), ico('chevron-right', 20));
     // Back office closes this sheet first, then opens the manager pages (the shell asks for the PIN if one is set).
     const officeLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'office' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({}); }) }, ico('gauge', 22), h('span', { class: 'grow' }, 'Back office'), ico('chevron-right', 20));
     // Opens Dishes and prices: add, rename, reprice or remove dishes without going to the back office.

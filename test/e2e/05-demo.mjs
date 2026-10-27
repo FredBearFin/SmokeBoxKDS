@@ -102,7 +102,7 @@ export default function (h) {
 
     // Restart demo: confirm first, then three fresh tickets, calm clock, welcome card back
     const d3 = await openKey(page, 'd', 'Demo and clock');
-    t.check('the Demo sheet offers Restart demo and the walkthrough under "Start over"', await d3.getByRole('button', { name: 'Restart demo' }).count() === 1 && await d3.getByRole('button', { name: /Show me how it works/ }).count() === 1);
+    t.check('the Demo sheet offers Restart demo and the walkthrough under "Start over"', await d3.getByRole('button', { name: 'Restart demo' }).count() === 1 && await d3.getByRole('button', { name: /Practice run (2 minutes)/ }).count() === 1);
     await d3.getByRole('button', { name: 'Restart demo' }).click();
     const rd = page.getByRole('alertdialog').or(page.getByRole('dialog', { name: 'Restart the demo?' }));
     await rd.first().waitFor({ state: 'visible', timeout: 8000 });

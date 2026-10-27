@@ -142,7 +142,7 @@ Known, not done:
 - **A hint of how many tickets are below the fold.** The tab count is the only hint. Needs a small "N more below" pill tied to the scroll position; not small enough to do safely this late.
 - **Countdown format.** The strip shows minutes ("25 min") until under 10 minutes, then mm:ss ("9:58"). It is consistent with itself, but the two forms look different at a glance. Left as the design.
 - **Bright slips at Night.** Paper slips stay light on the dark board. Readable (contrast checked) but bright in a dark kitchen. A dim-paper Night mode would be a design change.
-- "Show me how it works" shows twice when the setup card and the empty board are up together.
+- "Practice run (2 minutes)" shows twice when the setup card and the empty board are up together.
 - Wall list names that are too long end in an ellipsis.
 - A 32 in 2560x1440 monitor is too small for Far display from 10 feet (see `docs/ux-test-report.md`); the next-action line fails on a 43 in TV.
 - Nothing here was tested on a real tablet, TV or in a real kitchen.
@@ -152,7 +152,7 @@ Known, not done:
 - **1920 px header and the Demo clock chip (B5):** not reproducible on this build. I measured the header at 1704, 1760, 1800, 1920, 2000, 2199, 2200 and 2560 px with the Demo clock chip showing, with and without "Sanitize" needing attention: one row every time (the header drops the tab icons first when tight). Test: `board-round10`.
 - **Small touch targets (qa 09a/b/c/e):** the controls still under 44 px were the round "?" help link (28 px) and the "Back to my kitchen" demo bar button (34 px), plus the "Cabinet" tab text sticking out by 3 px at 390 px with Large text. The "?" link is now a 44 px target with the same 28 px circle, the demo bar buttons are 44 px on screens up to 1024 px wide and on touch, and the phone tabs have tighter padding. The old exemption list in `test/e2e/09-viewports.mjs` is switched off, so nothing is excused any more.
 - **Tour ringing a hidden element (qa 13e/13f):** the tour ring now skips elements with no box (the hidden "On time" badge). Edit in `74-floor-tour.js`, A4 told.
-- **Duplicate "Show me how it works":** the empty board leaves out its walkthrough button while the setup card is up, and puts it back when the card goes.
+- **Duplicate "Practice run (2 minutes)":** the empty board leaves out its walkthrough button while the setup card is up, and puts it back when the card goes.
 - **"N more tickets below":** a small pill at the bottom right of the board, above the all-day strip. It reads the position of every ticket only on scroll and about once a second, appears only when something is out of sight, scrolls down 85 percent of a screen when tapped, and is hidden in wall mode and the cabinet.
 
 ## Round 11: other kitchens and rough use

@@ -1353,7 +1353,7 @@ file	line	kind	area	text
 70-floor-board.js	1938	label	kitchen board > quickMenu	Settings and help
 70-floor-board.js	1942	label	kitchen board > quickMenu	Settings
 70-floor-board.js	1959	text	kitchen board > buildWelcome	Add more dishes
-70-floor-board.js	1961	text	kitchen board > buildWelcome	Show me how it works
+70-floor-board.js	1961	text	kitchen board > buildWelcome	Practice run (2 minutes)
 70-floor-board.js	1963	aria-label	kitchen board > buildWelcome	Hide this welcome
 70-floor-board.js	1966	text	kitchen board > buildWelcome	Your menu is ready
 70-floor-board.js	1985	text	kitchen board > paintWelcome	Your menu has
@@ -1364,11 +1364,11 @@ file	line	kind	area	text
 70-floor-board.js	2039	text	kitchen board > paintEmpty	open on other stations. Tickets appear here when they have an item for this station.
 70-floor-board.js	2040	text	kitchen board > paintEmpty	New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.
 70-floor-board.js	2049	text	kitchen board > paintEmpty	Add your first dish
-70-floor-board.js	2050	text	kitchen board > paintEmpty	Show me how it works
+70-floor-board.js	2050	text	kitchen board > paintEmpty	Practice run (2 minutes)
 70-floor-board.js	2051	text	kitchen board > paintEmpty	Try the demo
 70-floor-board.js	2056	text	kitchen board > paintEmpty	Show all stations
 70-floor-board.js	2057	text	kitchen board > paintEmpty	New ticket
-70-floor-board.js	2059	text	kitchen board > paintEmpty	Show me how it works
+70-floor-board.js	2059	text	kitchen board > paintEmpty	Practice run (2 minutes)
 70-floor-board.js	2060	text	kitchen board > paintEmpty	Busy-night crew
 70-floor-board.js	2060	text	kitchen board > paintEmpty	Try the demo
 70-floor-board.js	2077	toast	kitchen board > startDemo	Demo started. The orders and the crew are not real. Open Demo to stop it.
@@ -2055,7 +2055,7 @@ file	line	kind	area	text
 72-floor-sheets.js	1727	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openDemo	Back to real service
 72-floor-sheets.js	1727	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openDemo	Reset live data erases every ticket, batch and event on this device, including all demo orders, and puts the clock back to real time. The board and the cabinet start empty. Your settings and menu stay. This cannot be undone.
 72-floor-sheets.js	1730	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openDemo	Restart demo
-72-floor-sheets.js	1731	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openDemo	Show me how it works
+72-floor-sheets.js	1731	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openDemo	Practice run (2 minutes)
 72-floor-sheets.js	1732	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openDemo	Load the demo
 72-floor-sheets.js	1733	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openDemo	Demo only. Loads demo food in the cabinet and three demo tickets, and erases what is on this device now. Nothing runs by itself: you tap Start and Done, and the timers show when each dish should begin.
 72-floor-sheets.js	1736	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openDemo	Everything here is for the demo and is not real.
@@ -2102,7 +2102,7 @@ file	line	kind	area	text
 72-floor-sheets.js	1828	label	floor sheets (cabinet, 86, recall, help, menu, settings)	Close a screen
 72-floor-sheets.js	1835	toast	floor sheets (cabinet, 86, recall, help, menu, settings) > runTour	The walkthrough is not available in this build.
 72-floor-sheets.js	1853	text	floor sheets (cabinet, 86, recall, help, menu, settings) > helpBasics	Smokebox shows every order as a paper ticket. Each station sees only its own items, timed so the whole order finishes together.
-72-floor-sheets.js	1855	text	floor sheets (cabinet, 86, recall, help, menu, settings) > helpBasics	Show me how it works
+72-floor-sheets.js	1855	text	floor sheets (cabinet, 86, recall, help, menu, settings) > helpBasics	Practice run (2 minutes)
 72-floor-sheets.js	1857	text	floor sheets (cabinet, 86, recall, help, menu, settings) > helpBasics	Send a ticket
 72-floor-sheets.js	1857	text	floor sheets (cabinet, 86, recall, help, menu, settings) > helpBasics	Tap New ticket, tap the items, tap Send to kitchen. Four lines take fewer than ten taps.
 72-floor-sheets.js	1858	text	floor sheets (cabinet, 86, recall, help, menu, settings) > helpBasics	Tap an item to work it
@@ -2339,7 +2339,7 @@ file	line	kind	area	text
 72-floor-sheets.js	2170	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openMenu	Clock speed
 72-floor-sheets.js	2171	settingBlock	floor sheets (cabinet, 86, recall, help, menu, settings) > openMenu	Clock speed
 72-floor-sheets.js	2171	settingBlock	floor sheets (cabinet, 86, recall, help, menu, settings) > openMenu	Only for demos and training. Real service runs at x1.
-72-floor-sheets.js	2176	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openMenu	Show me how it works
+72-floor-sheets.js	2176	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openMenu	Practice run (2 minutes)
 72-floor-sheets.js	2178	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openMenu	Back office
 72-floor-sheets.js	2180	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openMenu	Dishes and prices
 72-floor-sheets.js	2183	text	floor sheets (cabinet, 86, recall, help, menu, settings) > openMenu	Guide

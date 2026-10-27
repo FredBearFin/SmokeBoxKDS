@@ -29,7 +29,7 @@
      {
       "t": "ol",
       "x": [
-       "A new Smokebox starts empty on purpose. Tap **Add my menu** on the welcome screen. To see a busy kitchen first, tap **Watch the demo**.",
+       "A new Smokebox starts empty on purpose. Tap **Add my menu** on the welcome screen. To learn it first, tap **Practice run (2 minutes)**.",
        "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made. The starting stations are Kitchen, Prep, Fryer and Cold and drinks. Rename or drop any (see Setup recipes).",
        "Tap **Save and add another** until your menu is in. Then tap **Save and finish**."
       ]
@@ -1056,13 +1056,29 @@
    {
     "id": "trying-the-demo",
     "group": "guide",
-    "title": "Watch the demo",
-    "summary": "See Smokebox with food on it, without touching your own kitchen.",
+    "title": "Practice run and the demo",
+    "summary": "Learn Smokebox by doing, without touching your own kitchen.",
     "blocks": [
+     {
+      "t": "h",
+      "x": "Practice run (2 minutes)"
+     },
      {
       "t": "ol",
       "x": [
-       "On the welcome screen, or in the **Settings**, tap **Watch the demo**. Then tap **Watch the demo** again to confirm. Tap **Not now** to stay where you are.",
+       "On the welcome screen, or in **Help**, tap **Practice run (2 minutes)**.",
+       "One practice ticket appears. A picture, a short line and a voice tell you each step, and a tapping finger shows the button. You tap Start, make one mistake on purpose and Undo it, tap Done, then Bump.",
+       "With no dishes yet, it runs in the practice kitchen. Tap **Now add my menu** at the end to go back."
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Watch a busy night"
+     },
+     {
+      "t": "ol",
+      "x": [
+       "On the welcome screen, tap **Watch a busy night**. Then tap **Watch the demo** again to confirm. Tap **Not now** to stay where you are.",
        "The demo opens with sample dishes, three fresh sample tickets and food in the cabinet, and it runs by itself: new orders arrive and a sample crew cooks and bumps them. A bar at the top says \"Demo\". Watch, or tap any dish to join in. A demo left open for hours starts fresh the next time.",
        "Nothing you do there reaches your own kitchen.",
        "Tap **Back to my kitchen** on the bar to return. Your own dishes and orders are as you left them."
@@ -1162,7 +1178,7 @@
      },
      {
       "t": "p",
-      "x": "Yes. See Watch the demo."
+      "x": "Yes. See Practice run and the demo."
      },
      {
       "t": "h",

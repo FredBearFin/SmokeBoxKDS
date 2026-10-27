@@ -1,7 +1,10 @@
 /*
- * WHAT THIS FILE IS: The "Show me how it works" walkthrough (SB.tour). It adds one demo ticket and guides a
- *    first-time user through it with a caption card and a pulsing ring, moving on only when the real ticket changes.
- *    The dishes come from the menu the owner has now (no fixed dish names), so it also works with their own menu.
+ * WHAT THIS FILE IS: The practice run (SB.tour): about two minutes of learning by doing. It adds one practice ticket and
+ *    guides a first-time cook through it, one action per step: a big picture, a few words that are also spoken aloud,
+ *    a pulsing ring and a hand that taps the button to press. It moves on only when the real ticket changes, and it
+ *    includes one deliberate mistake (Done too early, then Undo). The dishes come from the owner's menu; a kitchen with no
+ *    dishes yet practices in the demo kitchen (its own saved data), so nothing touches the real kitchen. See
+ *    docs/onboarding-plan.md for the research behind it.
  * PARTS: constants, ticket lookups, step logic, captions, ring and card placement, the check that runs four
  *    times a second, start and stop.
  * USES: 30-store.js (state, createTicket, clock speed), 60-shell.js (toast, office view), the board markup
@@ -18,7 +21,7 @@
   const C = () => SB.config || {};
 
   const POLL_MS = 250;      // four checks a second: quick enough to feel live, light enough to ignore
-  const LAST = 8;           // the number of steps
+  const LAST = 9;           // the number of steps
   const TOUR_SPEED = 30;    // 30x clock: a 5-minute fry takes 10 real seconds
   const SETTLE_MS = 2000;   // after a step starts the board may still shift (the hint line re-wraps), so the card keeps adjusting
   const MARGIN = 12;        // pixels kept free around the card
@@ -28,7 +31,7 @@
   // lead (the slowest, cooked in two steps), second (held back by pacing) and quick (finished with one tap).
   const PREFER = { lead: 'hushpuppies', second: 'brisket_sand', quick: 'tea' };
   // Steps that wait for the Next button because there is nothing for the person to tap.
-  const MANUAL = { 1: true, 2: true, 4: true, 5: true };
+  const MANUAL = { 1: true, 2: true, 6: true };
 
   let T = null; // the running walkthrough, or null when none is running
 
@@ -91,25 +94,29 @@
 
   // Moves to a step. The clock goes fast from step 5 and is put back as soon as the loop is complete.
   function goTo(n) {
-    T.step = n; T.at = Date.now(); T.shown = null;
-    if (n >= 5) ensureSpeed();
+    T.step = n; T.at = Date.now(); T.shown = null; T.said = null;
+    if (n >= 6) ensureSpeed();
     if (n === LAST) restoreSpeed(T);
   }
 
   // Moves the step forward when the real ticket has moved on. Steps only go forward, and a step the person
   // already did by themselves is skipped, so doing things in a different order never leaves the caption behind.
+  //   3 Start the slowest dish, 4 tap Done on it too early (on purpose), 5 tap Undo, 6 the gray dish waits,
+  //   7 finish every dish, 8 Bump, 9 the end. The mistake steps are skipped when there is no two-step dish, and step 5
+  //   is skipped once its 4-second Undo has gone by.
   function advance(t) {
     const hp = PICK.lead ? dish(t, PICK.lead.id) : null, bs = PICK.second ? dish(t, PICK.second.id) : null;
     const all = t.items.every((i) => i.status === 'done');
     let s = T.step;
-    for (let guard = 0; guard < 10; guard++) {
+    for (let guard = 0; guard < 12; guard++) {
       const before = s;
       if (t.status === 'expedited') s = LAST;
-      else if (all && s < 7) s = 7;
-      else if (begun(bs) && s >= 4 && s < 6) s = 6;
-      else if (begun(hp) && s < 4) s = 4;
-      else if (!hp && s >= 3 && s < 6) s = 6;            // no two-step dish: there is no Start to show
-      else if (!bs && s === 5) s = 6;                    // no second two-step dish: nothing is held back, skip the gray-dish step
+      else if (all && s < 8 && !(s === 5 && isDone(hp) && Date.now() - T.doneAt < 4500)) s = 8;
+      else if (!hp && s >= 3 && s <= 5) s = 6;                         // no two-step dish: no Start, no mistake to practice
+      else if (s === 3 && begun(hp)) s = isDone(hp) ? 6 : 4;
+      else if (s === 4 && isDone(hp)) { T.doneAt = Date.now(); s = 5; }
+      else if (s === 5 && hp && (hp.status === 'cooking' || Date.now() - T.doneAt > 4500)) s = 6;
+      else if (s === 6 && (!bs || begun(bs))) s = 7;
       if (s === before) break;
     }
     if (s !== T.step) goTo(s);
@@ -121,34 +128,26 @@
     return n && n.getClientRects().length ? n : null;
   }
 
-  // The words for the current step. They are chosen from the real ticket so they never ask for a button
-  // that is not there yet.
+  // The picture for each step, so a cook knows the step before reading it.
+  const STEP_ICON = { 1: 'ticket', 2: 'clock', 3: 'play', 4: 'check', 5: 'undo', 6: 'timer', 7: 'check-circle', 8: 'arrow-right', 9: 'sparkle' };
+  // The words for the current step: short (about ten words), chosen from the real ticket so they never ask for a button
+  // that is not there yet. The same words are spoken aloud.
   function words(t) {
     const hp = PICK.lead ? dish(t, PICK.lead.id) : null, bs = PICK.second ? dish(t, PICK.second.id) : null, tea = PICK.quick ? dish(t, PICK.quick.id) : null;
     const lead = nameOf(PICK.lead), second = nameOf(PICK.second), quick = nameOf(PICK.quick);
-    const zone = PICK.lead && C().zoneById ? C().zoneById[PICK.lead.zone] || null : null;
     switch (T.step) {
-      case 1: return "This is a ticket: one customer's order." + (hint() ? ' The line under the name says what to do next.' : '');
-      case 2: return 'The clock counts up from when the order came in. It turns amber, then red, when the order is taking too long.';
-      case 3: return 'Each dish belongs to a station' + (zone ? ' (' + zone.name + ' for ' + lead + ')' : '') + '. ' + lead + (second || quick ? ' is the slowest dish on this ticket, so it can start now.' : ' can start now.') + ' Tap Start when you begin cooking it.';
-      case 4: return 'The countdown under the dish is the cooking time left, as estimated. At zero the row flashes Check it. Smokebox cannot see your food, so it never marks a dish done by itself.';
-      case 5: return bs && bs.status === 'queued'
-        ? 'The other dishes are gray on purpose. Smokebox holds them back so everything finishes together. When the countdown reaches zero, Start appears on ' + second + '. You can also tap Start now to begin it early.'
-        : 'Its time has come. Tap Start on ' + second + '.';
-      case 6: {
-        const open = [];
-        if (hp && !isDone(hp)) open.push(lead);
-        if (bs && !isDone(bs)) open.push(second);
-        const teaReady = tea && tea.status === 'displayed';
-        let s = open.length || !teaReady ? 'When a dish is really finished, tap Done on it. You are the one who says it is done.' : '';
-        if (open.length) s += ' Finish ' + open.join(' and ') + '.';
-        if (tea && !isDone(tea)) s += teaReady ? (open.length ? ' Then tap Done on ' + quick + '.' : 'Tap Done on ' + quick + '.') : ' ' + quick + ' is still waiting its turn; it joins in a moment.';
-        return s;
+      case 1: return 'A new order. One ticket is one customer.';
+      case 2: return 'This clock counts up. Red means the order is late.';
+      case 3: return 'Tap Start on ' + lead + '. It takes longest, so it goes first.';
+      case 4: return 'Practice a mistake: tap Done on ' + lead + ' now.';
+      case 5: return 'Wrong tap? Tap Undo right away.';
+      case 6: return bs && bs.status === 'queued' ? 'Gray means wait. ' + second + ' starts later, to finish with ' + lead + '.' : 'Tap Start on ' + second + ' when it flashes red.';
+      case 7: {
+        const open = [hp, bs, tea].filter((x) => x && !isDone(x)).map((x) => nameOf(PICK.lead && x.menuId === PICK.lead.id ? PICK.lead : PICK.second && x.menuId === PICK.second.id ? PICK.second : PICK.quick));
+        return open.length ? 'When food is ready, tap Done: ' + open.join(', ') + '.' : 'Everything is done.';
       }
-      case 7: return slip() && slip().querySelector('.fl-bump')
-        ? 'Everything is done, so Bump is green. Tap Bump to send the ticket away. The clock stops.'
-        : 'Everything is done. Tap the All tab, then tap Bump to send the ticket away. The clock stops.';
-      default: return 'That is the whole loop: a ticket arrives, you start what is ready, tap Done, then Bump. The back office turns these taps into charts: tap Back office at the top of the screen. To add dishes and set prices and prep times, open Menu, prices and shop there.';
+      case 8: return slip() && slip().querySelector('.fl-bump') ? 'All done. Tap Bump to send it out.' : 'All done. Tap All, then Bump.';
+      default: return 'You are ready. That is the whole job.';
     }
   }
 
@@ -169,15 +168,30 @@
       case 1: return q('.slip-head').concat(hint() ? [hint()] : []);
       case 2: return q('.slip-timer, .fl-bw'); // the wrapper .slip-time has no box of its own, so ring the digits and the badge
       case 3: case 4: return PICK.lead ? row(PICK.lead.id) : [];
-      case 5: return PICK.second ? row(PICK.second.id) : [];
-      case 6: {
+      case 5: { const u = q('.fl-undo'); return u.length ? u : PICK.lead ? row(PICK.lead.id) : []; }
+      case 6: return PICK.second ? row(PICK.second.id) : [];
+      case 7: {
         const out = [];
         t.items.forEach((i) => { if (i.status === 'cooking' || (i.track === 'one' && i.status === 'displayed')) out.push(...row(i.menuId)); });
         return out.length ? out : (PICK.quick ? row(PICK.quick.id) : []);
       }
-      case 7: { const b = q('.fl-bump'); return b.length ? b : Array.from(doc.querySelectorAll('.fl-seg [data-id="all"]')); }
+      case 8: { const b = q('.fl-bump'); return b.length ? b : Array.from(doc.querySelectorAll('.fl-seg [data-id="all"]')); }
       default: return [];
     }
+  }
+
+  // Builds an icon element, or an empty span when icons are missing.
+  const icon = (name, size) => { try { return SB.icons.svg(name, { size: size || 24 }); } catch (e) { return doc.createElement('span'); } };
+  // Moves the tapping hand onto the middle of the button to press, or hides it when there is nothing to tap.
+  function pointAt(el) {
+    const hand = T.ui.hand;
+    if (!el) { hand.hidden = true; return; }
+    const r = el.getBoundingClientRect();
+    const b = el.querySelector('.fl-act, .fl-bump, .fl-undo') || el;
+    const rb = b.getBoundingClientRect().width ? b.getBoundingClientRect() : r;
+    hand.style.left = Math.round(rb.left + rb.width / 2) + 'px';
+    hand.style.top = Math.round(rb.top + rb.height / 2) + 'px';
+    hand.hidden = false;
   }
 
   // Puts the pulsing ring on exactly these elements and takes it off everything else.
@@ -255,14 +269,19 @@
     if (covered()) { if (!u.card.hidden) u.card.hidden = true; ring([]); T.shown = null; return; }
     if (u.card.hidden) u.card.hidden = false;
     const s = T.step;
-    put(u.step, 'Step ' + s + ' of ' + LAST);
-    put(u.text, words(t));
+    put(u.step, s === LAST ? 'Done' : 'Step ' + s + ' of ' + (LAST - 1));
+    const w = words(t);
+    put(u.text, w);
+    if (u.icon.dataset.icon !== STEP_ICON[s]) { u.icon.dataset.icon = STEP_ICON[s]; u.icon.replaceChildren(icon(STEP_ICON[s], 40)); }
+    // Each step is spoken once, in the kitchen voice, when the tablet's sound is on.
+    if (T.said !== s) { T.said = s; try { if (SB.floor && SB.floor.say) SB.floor.say(w); } catch (e) { /* the words are on screen */ } }
     u.skip.hidden = s === LAST;
     u.next.hidden = !MANUAL[s] || (s === 5 && !!PICK.second && (() => { const d = dish(t, PICK.second.id); return !!d && d.status !== 'queued'; })());
     u.mine.hidden = u.demo.hidden = u.done.hidden = s !== LAST;
     // Only elements that are on screen get the ring (the On time badge is hidden unless a ticket is late).
     const els = targets(t).filter((e) => e.getClientRects().length > 0);
     ring(els);
+    pointAt(MANUAL[s] || s === LAST ? null : els[0]);
     const fresh = T.shown !== s && els.length > 0;
     if (fresh) { bring(els[0]); T.shown = s; }
     place(els, Date.now() - T.at < SETTLE_MS);
@@ -302,19 +321,29 @@
   const onDemo = () => leaveTo(() => doc.querySelector('.fl-start-demo') || demoButton());
   // Ends the walkthrough from Skip or Done.
   const onEnd = () => stop();
+  // In the practice kitchen: runs the practice again with a fresh ticket.
+  const onAgain = () => { stop(true); start({ practice: true }); };
+  // In the practice kitchen: goes back to the real kitchen and opens Dishes and prices there.
+  // The note lives in the browser's lasting storage for a minute (the tab's own storage can be lost on this reload).
+  const onHome = () => { stop(true); try { g.localStorage.setItem(AFTER_KEY, String(Date.now())); } catch (e) { /* the board still offers Add my menu */ } SB.store.leaveDemo(); };
+  // The options of the walkthrough being built (read by buildCard).
+  let T0opts = {};
 
   // Builds the caption card with all its buttons; render() shows the ones each step needs.
   function buildCard() {
     const step = h('p', { class: 'tour-step' });
     const text = h('p', { class: 'tour-text' });
+    const pic = h('div', { class: 'tour-pic', 'aria-hidden': 'true' });
     const say = h('div', { class: 'tour-say', role: 'status', 'aria-live': 'polite' }, step, text);
+    const hand = h('div', { class: 'tour-hand', hidden: true, 'aria-hidden': 'true' });
     const skip = h('button', { type: 'button', class: 'btn tour-skip', onClick: onEnd }, 'Skip');
     const next = h('button', { type: 'button', class: 'btn btn-primary tour-next', onClick: onNext }, 'Next');
-    const mine = h('button', { type: 'button', class: 'btn tour-mine', hidden: true, onClick: onMine }, 'Add my own ticket');
-    const demo = h('button', { type: 'button', class: 'btn tour-demo', hidden: true, onClick: onDemo }, 'Start the demo');
-    const done = h('button', { type: 'button', class: 'btn btn-primary tour-done', hidden: true, onClick: onEnd }, 'Done');
-    const card = h('div', { class: 'tour-card', hidden: true, dataset: { dock: 'bottom' } }, say, h('div', { class: 'tour-actions' }, skip, next, mine, demo, done));
-    return { card, step, text, skip, next, mine, demo, done };
+    const practiceOnly = !!(SB.store && SB.store.isDemo && SB.store.isDemo() && T0opts.practice);
+    const mine = h('button', { type: 'button', class: 'btn tour-mine', hidden: true, onClick: practiceOnly ? onAgain : onMine }, practiceOnly ? 'Practice again' : 'Add my own ticket');
+    const demo = h('button', { type: 'button', class: 'btn tour-demo', hidden: true, onClick: onDemo }, 'Watch a busy night');
+    const done = h('button', { type: 'button', class: 'btn btn-primary tour-done', hidden: true, onClick: practiceOnly ? onHome : onEnd }, practiceOnly ? 'Now add my menu' : 'Done');
+    const card = h('div', { class: 'tour-card', hidden: true, dataset: { dock: 'bottom' } }, h('div', { class: 'tour-head' }, pic, say), h('div', { class: 'tour-actions' }, skip, next, mine, demo, done));
+    return { card, step, text, icon: pic, hand, skip, next, mine, demo, done };
   }
 
   // Shows the All tab, because Bump lives on the whole ticket and a station tab hides it.
@@ -333,6 +362,44 @@
     toast(h('span', null, 'The walkthrough needs a dish to show. Add one first (a name and a price is enough), then try again. ', open), { tone: 'warn', ms: 12000 });
   }
 
+  // The tab's notes that carry the practice run across the reload into the demo kitchen and back.
+  const PRACTICE_KEY = 'smokebox.v1.practice', AFTER_KEY = 'smokebox.v1.afterPractice';
+  // A kitchen with no dishes yet practices in the demo kitchen (its own saved data): notes it for after the reload and
+  // switches. Returns false when that is not possible (already in the demo, or no demo in this build).
+  function practiceInDemo() {
+    const S = SB.store;
+    if (!S || !S.enterDemo || (S.isDemo && S.isDemo()) || (S.isolated && !S.isolated())) return false;
+    try { g.sessionStorage.setItem(PRACTICE_KEY, '1'); } catch (e) { return false; }
+    // The address says ?practice too: a browser that loses the tab's note on reload still starts the practice.
+    try { if (g.history && g.history.replaceState && !/[?&]practice(=|&|$)/.test(g.location.search || '')) g.history.replaceState(null, '', g.location.pathname + (g.location.search ? g.location.search + '&practice' : '?practice') + g.location.hash); } catch (e) { /* the tab's note still works */ }
+    return S.enterDemo();
+  }
+  // True when a practice run is waiting to start after the reload: noted in the tab, or in the address (?practice).
+  function pending() {
+    try { if (g.sessionStorage.getItem(PRACTICE_KEY)) return true; } catch (e) { /* fall back to the address */ }
+    try { return /[?&]practice(=|&|$)/.test(g.location.search || ''); } catch (e) { return false; }
+  }
+  // Called once the board is up: in the demo kitchen with a practice note, sets out a quiet sample kitchen (no orders
+  // running, no tickets) and starts the practice; back in the real kitchen after "Now add my menu", opens Dishes and prices.
+  function resume() {
+    const S = SB.store;
+    let after = null;
+    const want = pending();
+    try { after = Number(g.localStorage.getItem(AFTER_KEY)) || 0; } catch (e) { after = 0; }
+    if (after && !(S.isDemo && S.isDemo())) {
+      try { g.localStorage.removeItem(AFTER_KEY); } catch (e) { /* ignore */ }
+      if (Date.now() - after < 60e3) { try { SB.sheets.open('dishes'); } catch (e) { /* optional */ } }
+      return false;
+    }
+    if (!want || !(S.isDemo && S.isDemo())) return false;
+    try { g.sessionStorage.removeItem(PRACTICE_KEY); } catch (e) { /* ignore */ }
+    try { if (g.history && g.history.replaceState) g.history.replaceState(null, '', g.location.pathname + (g.location.search || '').replace(/([?&])practice(=[^&]*)?(&|$)/, (m, a, b, c) => (c ? a : '')).replace(/[?&]$/, '') + g.location.hash); } catch (e) { /* the note is gone anyway */ }
+    try { if (SB.sim && SB.sim.live) { SB.sim.live.stop(); SB.sim.live.crew(false); } } catch (e) { /* no simulator */ }
+    S.setSpeed(1);
+    S.resetLive({ keepSettings: true, starter: true, catalog: 'sample', replaceOwn: true });
+    return start({ practice: true });
+  }
+
   // Adds the walkthrough ticket and starts the guide. Starting again while one is running begins again at
   // step 1 with a fresh ticket. Returns true when it started.
   function start(opts) {
@@ -341,6 +408,7 @@
     if (T) stop(true);
     // Choose the dishes from the owner's menu. With no usable dish the walkthrough says why instead of failing quietly.
     const pick = pickDishes();
+    if (!pick && practiceInDemo()) return true;
     if (!pick) { noDishNote(); return false; }
     PICK = pick;
     const items = [pick.lead, pick.second, pick.quick].filter(Boolean).map((m) => ({ menuId: m.id, qty: 1 }));
@@ -351,8 +419,10 @@
       return false;
     }
     goAll();
-    T = { id, step: 1, at: Date.now(), shown: null, fast: false, restored: false, prev: 1, ui: buildCard(), timer: 0, opts: opts || {} };
+    T0opts = opts || {};
+    T = { id, step: 1, at: Date.now(), shown: null, said: null, doneAt: 0, fast: false, restored: false, prev: 1, ui: buildCard(), timer: 0, opts: T0opts };
     doc.body.appendChild(T.ui.card);
+    doc.body.appendChild(T.ui.hand);
     doc.addEventListener('keydown', onKey);
     T.timer = setInterval(poll, POLL_MS);
     poll();
@@ -372,6 +442,7 @@
     restoreSpeed(was);
     doc.querySelectorAll('.tour-ring').forEach((e) => e.classList.remove('tour-ring'));
     was.ui.card.remove();
+    was.ui.hand.remove();
     if (!quiet && !doc.querySelector('.sheet-root')) {
       const main = doc.getElementById('fl-board');
       if (main) { try { main.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
@@ -381,6 +452,10 @@
 
   // True while a walkthrough is running.
   const active = () => !!T;
+  // True while a practice run is going on in the demo kitchen (the banner then says it is practice).
+  const practicing = () => !!T && !!T.opts.practice;
 
-  SB.tour = { start, stop, active, running: active };
+  // True when the practice can run on this kitchen's own dishes (otherwise it runs in the demo kitchen).
+  const ownDishes = () => !!pickDishes();
+  SB.tour = { start, stop, active, running: active, resume, ownDishes, pending, practicing };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

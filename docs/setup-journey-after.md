@@ -23,7 +23,7 @@ The 13 taps: Add your first dish (1); per dish a tap on the station tile when it
 
 ## What changed (screen by screen)
 
-1. First open: empty board, one big "Add your first dish" button, two quiet links (Show me how it works, Try the busy-night demo (pretend)). No welcome card, no 86 badge count, no demo tickets. (`01-A-first-open.png`; blank-start data comes from A5's branch.)
+1. First open: empty board, one big "Add your first dish" button, two quiet links (Practice run (2 minutes), Try the busy-night demo (pretend)). No welcome card, no 86 badge count, no demo tickets. (`01-A-first-open.png`; blank-start data comes from A5's branch.)
 2. "Dishes and prices" sheet: name, price, four big station tiles (Pit, Hot sides, Fry, Cold and drinks, each with a plain hint), Save and add another, Save and finish. The first dish needs a station tile tap; after that the last station stays chosen. Category, prep time and short ticket name are under "More options" and default from the station tile; a prep time the owner did not type is stored as a guess ("starter estimate"), fixing the old "Confirmed by default" oddity. Half-typed text is kept if the tab closes.
 3. Dishes so far appear in the same sheet as editable rows (name, price, Remove). Remove archives the dish. The main Menu sheet now has a clear "Dishes and prices" entry (the header Menu button itself is not renamed). The full back-office editor stays one tap away for ingredients and prep times.
 4. "More ways to add dishes" fold: "Start from an example menu" adds 8 dishes with made-up prices, each marked Example, with a one-tap "Remove all example dishes". Import is not built yet.

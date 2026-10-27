@@ -1,5 +1,5 @@
 /*
- * WHAT THIS FILE IS: Styles for the "Show me how it works" walkthrough: the pulsing ring and the caption card.
+ * WHAT THIS FILE IS: Styles for the practice run: the pulsing ring, the tapping finger and the caption card with its picture.
  * PARTS: the ring, the card, its text and buttons, small screens, reduced motion.
  * USES: tokens from 00-tokens.css (--amber, --inv-*, --sp-*, --fs-*). Custom properties set by 74-floor-tour.js:
  *    --tour-top (bottom edge of the header, where a top-docked card starts) and, when the card sits beside the
@@ -36,10 +36,33 @@
 /* Beside the ticket (wide screens): left, top and width come from the script so the whole ticket stays clear. */
 .tour-card[data-dock="side"] { left: var(--tour-x, 0px); top: var(--tour-y, 0px); transform: none; }
 
+/* The picture beside the words: a big icon in a round amber tile, so the step is known before it is read. */
+.tour-head { display: flex; align-items: center; gap: var(--sp-3); }
+.tour-pic { flex: none; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; color: var(--inv-bg); background: var(--inv-accent); }
+
+/* The tapping finger: a round fingertip that presses down on the button to tap, with a ripple each time, over and over.
+   It never takes taps itself (pointer-events none), so the button under it still works. */
+.tour-hand { position: fixed; z-index: var(--zi-fx); width: 0; height: 0; pointer-events: none; }
+.tour-hand[hidden] { display: none; }
+.tour-hand::before, .tour-hand::after { content: ''; position: absolute; left: 0; top: 0; border-radius: 50%; transform: translate(-50%, -50%); }
+.tour-hand::before { width: 30px; height: 30px; background: color-mix(in srgb, var(--ink) 70%, transparent); border: 3px solid var(--paper); box-shadow: 0 2px 6px rgb(0 0 0 / 0.35); animation: tour-tap 1.6s var(--ease-in-out) infinite; }
+.tour-hand::after { width: 30px; height: 30px; border: 3px solid var(--amber); animation: tour-ripple 1.6s ease-out infinite; }
+@keyframes tour-tap {
+  0%, 100% { transform: translate(-30%, -10%) scale(1); opacity: 0.9; }
+  40% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+  70% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+@keyframes tour-ripple {
+  0%, 45% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  55% { opacity: 1; transform: translate(-50%, -50%) scale(0.8); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2.4); }
+}
+
 /* The step label and the plain-language sentence. Both scale with the Large text setting through the tokens. */
 .tour-say { display: grid; gap: var(--sp-1); }
 .tour-step { margin: 0; font: var(--w-semi) var(--fs-2) / var(--lh-snug) var(--font-body); letter-spacing: 0.02em; color: var(--inv-accent); }
-.tour-text { margin: 0; max-width: var(--measure); font: var(--w-medium) var(--fs-4) / var(--lh-snug) var(--font-body); }
+.tour-text { margin: 0; max-width: var(--measure); font: var(--w-bold) var(--fs-5) / var(--lh-snug) var(--font-body); }
 
 /* The buttons: light on the dark card, the main one in amber. Every one is at least the 48 px touch size. */
 .tour-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); }
@@ -56,4 +79,4 @@
 }
 
 /* No pulse for people who asked for less motion; the ring itself stays. */
-@media (prefers-reduced-motion: reduce) { .tour-ring { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tour-ring, .tour-hand::before { animation: none; } .tour-hand::after { display: none; } }

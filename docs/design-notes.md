@@ -434,7 +434,7 @@ Lowest checked ratio among text/UI pairs per theme: Day 4.06 (amber on bg); Nigh
 
 <!--/CONTRAST-->
 
-## 6. The walkthrough ("Show me how it works")
+## 6. The walkthrough ("Practice run (2 minutes)")
 
 Why: a first-time owner opened the board, saw five overdue tickets and could not tell what the app was for. The fix is a guided loop on one fresh ticket instead of a manual.
 
@@ -454,7 +454,7 @@ Why: the same owner said the app was "not intuitive" and "crowded". These are th
 - **Start now is one tap.** The engine's `fireNow` takes `start:true`: a two-step dish goes straight to cooking (marked override, so it is not used for learning), a one-step dish just moves to the screen. Undo puts it back to waiting.
 - **The "do this next" line.** `.slip-next`, under the header, built by `nextFor` in `70-floor-board.js` from the ticket's own items. Priority: Check it, then START, then make-and-DONE, then time left, and the soonest waiting dish is added at the end. When everything is done it says "Everything is done. Tap Bump." It is written only when its words change and never adds a node in the 1 Hz tick (F-O1). A Settings switch (`SB.theme.hints`, saved) hides it.
 - **The cook countdown.** Under the dish name, in the place a waiting dish shows its start time: `4:59 left`, then `Check it +0:42` at zero. The row and tile flash (not when motion is reduced), Check it is spoken once, and a three-beep chime plays only when Sound is on. It is only a cue: nothing marks the dish done by itself, because the app cannot see the fryer.
-- **First screen.** Three fresh tickets (25, 12 and 3 seconds old, no rush, so pacing shows) and a welcome card with "Show me how it works" and "Start with an empty board". The card is not a modal, so the board stays usable behind it. It shows on the All tab only, offers to clear the board only when every ticket is a demo ticket, and is dismissed for good with the x. "Restart demo" in the Demo sheet clears the board, puts the clock back to real time and brings the card back. Nothing runs by itself unless the busy-night demo is started.
+- **First screen.** Three fresh tickets (25, 12 and 3 seconds old, no rush, so pacing shows) and a welcome card with "Practice run (2 minutes)" and "Start with an empty board". The card is not a modal, so the board stays usable behind it. It shows on the All tab only, offers to clear the board only when every ticket is a demo ticket, and is dismissed for good with the x. "Restart demo" in the Demo sheet clears the board, puts the clock back to real time and brings the card back. Nothing runs by itself unless the busy-night demo is started.
 - **Compact tickets.** `paintDensity` sets `data-density` on the board from the ticket count against `fullCols()`; Settings has Auto, Full size and Compact. Full-size tickets are untouched. In compact the short menu name is shown and the full name stays in the reading order for screen readers.
 
 

@@ -1,4 +1,4 @@
-// Journey 13: the "Show me how it works" walkthrough (SB.tour). A first-time user taps through one real ticket; the caption follows what
+// Journey 13: the "Practice run (2 minutes)" walkthrough (SB.tour). A first-time user taps through one real ticket; the caption follows what
 // they actually do. Checks the eight steps with real clicks, Skip and Escape cleanup, doing things out of order, pausing for sheets and the
 // office, and the card never covering what it points at (laptop, phone, Large text).
 import { clearBoard as clearBoardBlank, seedStandard, wait, settle, openKey, closeSheets, tapFlame, waitOffice, officeOpen } from './_lib.mjs';

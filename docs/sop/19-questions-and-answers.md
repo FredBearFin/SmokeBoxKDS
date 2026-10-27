@@ -40,7 +40,7 @@ The Cabinet is on from the start. If someone turned it off, tap **Settings**, th
 
 ## Can I try it without risking my data?
 
-Yes. See Watch the demo.
+Yes. See Practice run and the demo.
 
 ## Can I change a price on an open order?
 
