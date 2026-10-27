@@ -706,6 +706,13 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dv-list { display: grid; gap: var(--sp-2); }
 .dv-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-top: var(--bw-thin) solid var(--line-soft); }
 .dv-main { flex: 1 1 auto; min-width: 0; display: grid; gap: 4px; }
+/* Billing (bl-): the plan's state in a tinted box, then Stripe's buttons. */
+.bl { display: grid; gap: var(--sp-3); }
+.bl-state { padding: var(--sp-4); border: var(--bw) solid var(--line-soft); border-left-width: 6px; border-radius: var(--r-card); background: var(--paper); }
+.bl-state[data-tone="ok"] { border-left-color: var(--sage); }
+.bl-state[data-tone="warn"] { border-left-color: var(--amber); }
+.bl-state[data-tone="bad"] { border-left-color: var(--danger); }
+.bl-state p { margin: 4px 0 0; }
 /* Help (hp-): Guide matches, the support request form and My requests with each conversation. */
 .hp { display: grid; gap: var(--sp-3); }
 .hp-hit { justify-content: flex-start; text-align: left; }

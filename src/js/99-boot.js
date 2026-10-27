@@ -160,6 +160,8 @@
   function playDemo() {
     const S = SB.store, sim = SB.sim;
     if (!S || !S.isDemo || !S.isDemo() || !sim || !sim.live) return;
+    // A practice run waits for a quiet kitchen instead (SB.tour.resume sets it out).
+    if (SB.tour && SB.tour.pending && SB.tour.pending()) return;
     const now = S.now(), active = S.getState().tickets.filter((t) => t.status === 'active');
     const stale = active.some((t) => now - t.createdAt > 2 * 3600e3);
     if (stale && typeof sim.restartDemo === 'function') sim.restartDemo();
@@ -204,6 +206,8 @@
     try { watchClock(); } catch (e) { console.error('[smokebox] clock watcher failed', e); }
     try { clearOldDemo(); } catch (e) { console.error('[smokebox] old demo clean-up failed', e); }
     try { playDemo(); } catch (e) { console.error('[smokebox] demo start failed', e); }
+    // A practice run carried across a reload (into the demo kitchen, or back home to add the menu) picks up once the board is up.
+    setTimeout(() => { try { if (SB.tour && SB.tour.resume) SB.tour.resume(); } catch (e) { console.error('[smokebox] practice run failed', e); } }, 600);
     try {
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });

@@ -31,6 +31,8 @@ pub struct Config {
     pub snapshot_every: i64,
     /// Where "Kitchen is stuck right now" support requests are emailed at once (SmokeBox staff), if anywhere.
     pub staff_alert: Option<String>,
+    /// Stripe billing; off when its keys are not set.
+    pub stripe: crate::billing::Stripe,
 }
 
 /// Everything a request handler needs.
@@ -39,10 +41,16 @@ pub struct AppState {
     pub db: PgPool,
     pub rooms: Rooms,
     pub cfg: Arc<Config>,
+    /// Rate limits against floods and guessing (in memory).
+    pub limits: Arc<crate::limits::Limits>,
 }
 
 const MAX_BODY: usize = 256 * 1024;
 const MAX_SCREENS: usize = 50;
+/// The largest kitchen action (every real one is a few KB at most: one dish, one setting).
+const MAX_ACTION: usize = 64 * 1024;
+/// Devices one kitchen may have joined at once.
+const MAX_DEVICES: i64 = 60;
 const MAX_FAILS: i32 = 10;
 const FAIL_WINDOW_MS: i64 = 15 * 60 * 1000;
 const RESET_MS: i64 = 3600 * 1000;
@@ -52,9 +60,12 @@ pub async fn build(db: PgPool, cfg: Config, now: Arc<dyn Fn() -> i64 + Send + Sy
     sqlx::migrate!("./migrations").run(&db).await.map_err(|e| e.to_string())?;
     let engine = Engine::start()?;
     let rooms = Rooms::new(engine, db.clone(), now, cfg.snapshot_every);
-    let st = AppState { db, rooms, cfg: Arc::new(cfg) };
+    let st = AppState { db, rooms, cfg: Arc::new(cfg), limits: Arc::default() };
     let router = Router::new()
         .route("/health", get(health))
+        .route("/healthz", get(health))
+        .route("/api/voice-ok", get(voice_ok))
+        .route("/api/client-error", post(client_error))
         .route("/", get(app_page))
         .route("/smokebox.html", get(app_page))
         .route("/start", get(|| async { no_store(Html(pages::start_page())) }))
@@ -74,6 +85,11 @@ pub async fn build(db: PgPool, cfg: Config, now: Arc<dyn Fn() -> i64 + Send + Sy
         .route("/api/events", get(events))
         .route("/api/action", post(action))
         .merge(crate::support::routes())
+        .route("/api/billing", get(billing_get))
+        .route("/api/billing/checkout", post(billing_checkout))
+        .route("/api/billing/portal", post(billing_portal))
+        .route("/api/stripe/webhook", post(stripe_webhook))
+        .layer(axum::middleware::from_fn_with_state(st.clone(), log_errors))
         .with_state(st.clone());
     Ok((router, st))
 }
@@ -132,9 +148,24 @@ pub(crate) fn no_store(h: Html<String>) -> Response {
 pub(crate) fn secure(h: &HeaderMap) -> bool {
     h.get("x-forwarded-proto").and_then(|v| v.to_str().ok()).map(|v| v.split(',').next().unwrap_or("").trim() == "https").unwrap_or(false)
 }
-// The client's address as the web server in front saw it, for lockouts.
+// The client's address as the web server in front saw it, for lockouts and limits. The last address in X-Forwarded-For is the one
+// Caddy itself added; earlier ones could be typed by the client to dodge a lockout.
 pub(crate) fn client_ip(h: &HeaderMap) -> String {
-    h.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).unwrap_or("local").trim().to_string()
+    let ip = h.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.rsplit(',').next()).map(str::trim).filter(|v| !v.is_empty()).unwrap_or("local");
+    // One IPv6 home or server gets a whole /64 of addresses, so those count as one address: the first four groups.
+    match ip.parse::<std::net::Ipv6Addr>() {
+        Ok(v6) if v6.to_ipv4_mapped().is_none() => { let s = v6.segments(); format!("{:x}:{:x}:{:x}:{:x}::/64", s[0], s[1], s[2], s[3]) }
+        _ => ip.to_string(),
+    }
+}
+// Takes one try from a rate-limit bucket; None when allowed, else the "wait" answer (429 with Retry-After).
+pub(crate) fn limit(st: &AppState, key: &str, rule: crate::limits::Rule) -> Option<Response> {
+    let wait = st.limits.take(key, rule, st.rooms.now()).err()?;
+    let mut r = refuse(429, "slowDown", &format!("Too many tries. Wait {} and try again.", crate::limits::wait_words(wait)));
+    if let Ok(v) = HeaderValue::from_str(&((wait + 999) / 1000).to_string()) {
+        r.headers_mut().insert(header::RETRY_AFTER, v);
+    }
+    Some(r)
 }
 // Cross-site request forgery guard for every POST: the body must be JSON (another site cannot send that without a permission check
 // this server never grants), and a request that names another origin is refused. Returns the parsed object, or the refusal.
@@ -208,6 +239,13 @@ pub(crate) async fn device_of(st: &AppState, h: &HeaderMap) -> Option<Device> {
     Some(Device { id, name: row.get("name"), kitchen_id: row.get("kid"), kitchen_name: row.get("kname") })
 }
 
+// True when a kitchen already has as many joined devices as allowed (old ones can be removed in Devices).
+async fn kitchen_full(st: &AppState, kitchen_id: &str) -> bool {
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM devices WHERE kitchen_id = $1 AND removed_at IS NULL").bind(kitchen_id).fetch_one(&st.db).await.unwrap_or(0);
+    n >= MAX_DEVICES
+}
+const FULL_WORDS: &str = "This kitchen has the most devices it can have. Remove an old one in Devices first.";
+
 // Joins this device to a kitchen and returns the cookie that keeps it joined.
 async fn join_device(st: &AppState, kitchen_id: &str, name: &str, how: &str, secure: bool) -> Result<String, sqlx::Error> {
     let token = auth::new_token();
@@ -250,9 +288,49 @@ pub(crate) async fn locked(st: &AppState, key: &str) -> bool {
 
 /* ---------- pages ---------- */
 
-// Health check for the web server in front and for monitoring.
+// Health check for the web server in front and for the uptime monitor: the database answers and the engine thread is alive.
+// Anything wrong answers 503, which is what sets off the alert.
 async fn health(State(st): State<AppState>) -> Response {
-    reply(200, json!({ "ok": true, "kitchensOpen": st.rooms.open_count().await }))
+    let db = tokio::time::timeout(std::time::Duration::from_secs(3), sqlx::query_scalar::<_, i32>("SELECT 1").fetch_one(&st.db)).await.map(|r| r.is_ok()).unwrap_or(false);
+    let engine = st.rooms.engine_ok().await;
+    let ok = db && engine;
+    reply(if ok { 200 } else { 503 }, json!({ "ok": ok, "database": db, "engine": engine, "kitchensOpen": st.rooms.open_count().await }))
+}
+
+// Caddy asks this before passing a request to the voice helper: only a joined device, and at most a line a second after a burst
+// of 60, so nobody outside a kitchen can keep the server's voice busy.
+async fn voice_ok(State(st): State<AppState>, h: HeaderMap) -> Response {
+    let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    if let Some(r) = limit(&st, &format!("voice:{}", d.id), crate::limits::VOICE) {
+        return r;
+    }
+    reply(200, json!({ "ok": true }))
+}
+
+// A page error from a tablet, kept for SmokeBox staff (the staff console counts them). At most 20 then one a minute per device.
+async fn client_error(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
+    let b = match same_site_json(&h, &body) { Ok(b) => b, Err(r) => return r };
+    let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    if let Some(r) = limit(&st, &format!("report:{}", d.id), crate::limits::REPORT) {
+        return r;
+    }
+    let text: String = field(&b, "message").chars().take(500).collect();
+    let detail: String = field(&b, "detail").chars().take(4000).collect();
+    let _ = sqlx::query("INSERT INTO server_errors (at, source, kitchen_id, what, detail) VALUES ($1, 'tablet', $2, $3, $4)").bind(st.rooms.now()).bind(&d.kitchen_id).bind(&text).bind(&detail).execute(&st.db).await;
+    reply(200, json!({ "ok": true }))
+}
+
+// Every answer that went wrong on the server's side (500 and up, except a voice or Stripe outage it reports itself) is written
+// down for SmokeBox staff, with the method and path but never the body.
+async fn log_errors(State(st): State<AppState>, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    let what = format!("{} {}", req.method(), req.uri().path());
+    let r = next.run(req).await;
+    let code = r.status().as_u16();
+    if code >= 500 && code != 502 && code != 503 {
+        eprintln!("[server] {} answered {}", what, code);
+        let _ = sqlx::query("INSERT INTO server_errors (at, source, what, detail) VALUES ($1, 'server', $2, $3)").bind(st.rooms.now()).bind(&what).bind(code.to_string()).execute(&st.db).await;
+    }
+    r
 }
 
 // The app itself, with the kitchen and device written in so the page talks to this server. A device that is not joined goes to
@@ -263,7 +341,8 @@ async fn app_page(State(st): State<AppState>, h: HeaderMap) -> Response {
         Ok(s) => s,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "The app page is not built (dist/smokebox.html).").into_response(),
     };
-    let cfg = json!({ "kitchen": { "id": d.kitchen_id, "name": d.kitchen_name }, "device": { "id": d.id, "name": d.name } }).to_string().replace('<', "\\u003c");
+    let bill = crate::billing::state(&st.db, &st.cfg.stripe, &d.kitchen_id, st.rooms.now()).await;
+    let cfg = json!({ "kitchen": { "id": d.kitchen_id, "name": d.kitchen_name }, "device": { "id": d.id, "name": d.name }, "billing": bill.json() }).to_string().replace('<', "\\u003c");
     let html = html.replacen("<head>", &format!("<head><script>window.SB_CLOUD={};</script>", cfg), 1);
     let mut r = no_store(Html(html));
     r.headers_mut().insert("referrer-policy", HeaderValue::from_static("no-referrer"));
@@ -275,6 +354,9 @@ async fn app_page(State(st): State<AppState>, h: HeaderMap) -> Response {
 // Starts a new kitchen with its owner, and joins this device to it.
 async fn start_kitchen(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
     let b = match same_site_json(&h, &body) { Ok(b) => b, Err(r) => return r };
+    if let Some(r) = limit(&st, &format!("start:{}", client_ip(&h)), crate::limits::START) {
+        return r;
+    }
     let email = field(&b, "email").to_lowercase();
     let pw = b.get("password").and_then(Value::as_str).unwrap_or("").to_string();
     let name = field(&b, "kitchen").split_whitespace().collect::<Vec<_>>().join(" ");
@@ -300,22 +382,33 @@ async fn start_kitchen(State(st): State<AppState>, h: HeaderMap, body: Bytes) ->
         return refuse(500, "error", "The kitchen could not be started. Try again.");
     }
     match join_device(&st, &kid, &device_name(&b), "start", secure(&h)).await {
-        Ok(c) => with_cookie(reply(200, json!({ "ok": true, "go": "/", "kitchen": { "id": kid, "name": name } })), c),
+        Ok(c) => {
+            // With billing on, the owner goes straight to Stripe to add a card and start the 3 free weeks; if Stripe cannot be
+            // reached the kitchen opens anyway and the board asks for the card (3 days).
+            let mut go = "/".to_string();
+            if st.cfg.stripe.on() {
+                if let Ok(url) = st.cfg.stripe.checkout(&kid, &email, &st.cfg.public_url).await {
+                    go = url;
+                }
+            }
+            with_cookie(reply(200, json!({ "ok": true, "go": go, "kitchen": { "id": kid, "name": name } })), c)
+        }
         Err(_) => refuse(500, "error", "The kitchen was started, but this device could not join. Use Owner sign in."),
     }
 }
 
-// Joins this device with a six-digit code from another screen of the kitchen. Ten wrong codes from one address lock it out for 15 minutes.
+// Joins this device with an eight-digit code from another screen of the kitchen. Ten wrong codes from one address (or one IPv6 /64)
+// lock it out for 15 minutes, and wrong codes from everywhere together are capped at 60 a minute, so many addresses do not help a guesser.
 async fn join_kitchen(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
     let b = match same_site_json(&h, &body) { Ok(b) => b, Err(r) => return r };
     let ip_key = format!("code:{}", client_ip(&h));
-    if locked(&st, &ip_key).await {
+    if locked(&st, &ip_key).await || st.limits.peek("join-fail:all", crate::limits::JOIN_FAILS_ALL, st.rooms.now()).is_err() {
         return refuse(429, "locked", "Too many wrong codes. Wait 15 minutes and try again.");
     }
     let code: String = field(&b, "code").chars().filter(char::is_ascii_digit).collect();
     let now = st.rooms.now();
     // Uses the code once: only an unused, unexpired code is marked used, so two devices can never both join with one code.
-    let kitchen: Option<String> = if code.len() == 6 {
+    let kitchen: Option<String> = if code.len() == 8 {
         sqlx::query_scalar("UPDATE pair_codes SET used_at = $1 WHERE code_hash = $2 AND used_at IS NULL AND expires_at > $1 RETURNING kitchen_id")
             .bind(now)
             .bind(auth::token_hash(&code))
@@ -328,8 +421,12 @@ async fn join_kitchen(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> 
     };
     let Some(kid) = kitchen else {
         note_fail(&st, &ip_key).await;
+        let _ = st.limits.take("join-fail:all", crate::limits::JOIN_FAILS_ALL, st.rooms.now());
         return refuse(400, "badCode", "That code did not work. Codes work once, for 10 minutes. Make a new one on the other screen.");
     };
+    if kitchen_full(&st, &kid).await {
+        return refuse(409, "full", FULL_WORDS);
+    }
     match join_device(&st, &kid, &device_name(&b), "code", secure(&h)).await {
         Ok(c) => with_cookie(reply(200, json!({ "ok": true, "go": "/" })), c),
         Err(_) => refuse(500, "error", "This device could not join. Try again."),
@@ -358,6 +455,9 @@ async fn owner_login(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> R
         return refuse(401, "wrong", "That email and password do not match.");
     }
     let _ = sqlx::query("DELETE FROM login_fails WHERE key = $1").bind(&em_key).execute(&st.db).await;
+    if kitchen_full(&st, &kid).await {
+        return refuse(409, "full", FULL_WORDS);
+    }
     match join_device(&st, &kid, &device_name(&b), "owner", secure(&h)).await {
         Ok(c) => with_cookie(reply(200, json!({ "ok": true, "go": "/" })), c),
         Err(_) => refuse(500, "error", "This device could not join. Try again."),
@@ -421,7 +521,10 @@ async fn reset(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Respons
 // Which kitchen and device this is.
 async fn me(State(st): State<AppState>, h: HeaderMap) -> Response {
     match device_of(&st, &h).await {
-        Some(d) => reply(200, json!({ "kitchen": { "id": d.kitchen_id, "name": d.kitchen_name }, "device": { "id": d.id, "name": d.name } })),
+        Some(d) => {
+            let b = crate::billing::state(&st.db, &st.cfg.stripe, &d.kitchen_id, st.rooms.now()).await;
+            reply(200, json!({ "kitchen": { "id": d.kitchen_id, "name": d.kitchen_name }, "device": { "id": d.id, "name": d.name }, "billing": b.json() }))
+        }
         None => refuse(401, "signedOut", "This device is not joined to a kitchen. Join it again."),
     }
 }
@@ -444,12 +547,15 @@ async fn devices(State(st): State<AppState>, h: HeaderMap) -> Response {
     reply(200, json!({ "devices": list }))
 }
 
-// A new six-digit code that joins one more device to this kitchen, for 10 minutes.
+// A new eight-digit code that joins one more device to this kitchen, for 10 minutes.
 async fn make_code(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
     if let Err(r) = same_site_json(&h, &body) {
         return r;
     }
     let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    if let Some(r) = limit(&st, &format!("code:{}", d.id), crate::limits::CODE) {
+        return r;
+    }
     let now = st.rooms.now();
     let _ = sqlx::query("DELETE FROM pair_codes WHERE expires_at < $1").bind(now).execute(&st.db).await;
     // A fresh code that is not already waiting (a clash among a million codes is rare, but it is checked).
@@ -505,6 +611,10 @@ async fn rename_device(State(st): State<AppState>, h: HeaderMap, body: Bytes) ->
 // The live stream: the whole kitchen now, then every change and a heartbeat, for as long as the screen stays connected.
 async fn events(State(st): State<AppState>, h: HeaderMap) -> Response {
     let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    // Each connect sends the whole kitchen, which is real work for the engine: a device reconnecting in a loop is told to wait.
+    if let Some(r) = limit(&st, &format!("stream:{}", d.id), crate::limits::STREAM) {
+        return r;
+    }
     let room = match st.rooms.get(&d.kitchen_id).await {
         Ok(Some(r)) => r,
         _ => return refuse(404, "noKitchen", "Kitchen not found."),
@@ -535,11 +645,84 @@ async fn events(State(st): State<AppState>, h: HeaderMap) -> Response {
 async fn action(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
     let b = match same_site_json(&h, &body) { Ok(b) => b, Err(r) => return r };
     let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen. Join it again.") };
+    // Too big to be a real action: refused as an answer (200), so the tablet drops it instead of sending it again forever.
+    if body.len() > MAX_ACTION {
+        return reply(200, json!({ "report": "badPatch", "info": { "error": "action too large" } }));
+    }
+    // A tablet told to slow down keeps the action and sends it again later, so nothing is lost.
+    if let Some(r) = limit(&st, &format!("act:{}", d.id), crate::limits::ACTION) {
+        return r;
+    }
     let room = match st.rooms.get(&d.kitchen_id).await {
         Ok(Some(r)) => r,
         _ => return refuse(404, "noKitchen", "Kitchen not found."),
     };
+    // A kitchen whose billing countdown ran out takes no new orders (from the first 4 am after it ended); everything else works.
+    if b.get("type").and_then(Value::as_str) == Some("createTicket") && st.cfg.stripe.on() {
+        let bill = crate::billing::state(&st.db, &st.cfg.stripe, &d.kitchen_id, st.rooms.now()).await;
+        if bill.paused {
+            let seq = room.lock().await.seq;
+            return reply(200, json!({ "report": "billingPaused", "info": {}, "seq": seq }));
+        }
+    }
     let mut r = room.lock().await;
     let out = st.rooms.act(&mut r, &b, &d.id).await;
     reply(out.status, out.body)
+}
+
+/* ---------- billing ---------- */
+
+// The kitchen's billing: plan status, trial, the countdown and whether new orders have stopped.
+async fn billing_get(State(st): State<AppState>, h: HeaderMap) -> Response {
+    let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    reply(200, crate::billing::state(&st.db, &st.cfg.stripe, &d.kitchen_id, st.rooms.now()).await.json())
+}
+
+// A Stripe Checkout page to add a card (a kitchen with no card yet, or after a cancel). Answers its address.
+async fn billing_checkout(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
+    if let Err(r) = same_site_json(&h, &body) {
+        return r;
+    }
+    let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    if !st.cfg.stripe.on() {
+        return refuse(400, "billingOff", "Billing is not switched on for this server.");
+    }
+    let email: Option<String> = sqlx::query_scalar("SELECT email FROM owners WHERE kitchen_id = $1 LIMIT 1").bind(&d.kitchen_id).fetch_optional(&st.db).await.ok().flatten();
+    match st.cfg.stripe.checkout(&d.kitchen_id, &email.unwrap_or_default(), &st.cfg.public_url).await {
+        Ok(url) => reply(200, json!({ "url": url })),
+        Err(_) => refuse(502, "stripeDown", "The payment page could not be opened. Try again in a minute."),
+    }
+}
+
+// Stripe's customer portal for this kitchen: change the card, see receipts or cancel. Answers its address.
+async fn billing_portal(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
+    if let Err(r) = same_site_json(&h, &body) {
+        return r;
+    }
+    let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    let customer: Option<String> = sqlx::query_scalar("SELECT stripe_customer FROM kitchens WHERE id = $1").bind(&d.kitchen_id).fetch_optional(&st.db).await.ok().flatten().flatten();
+    let Some(customer) = customer else { return refuse(400, "noCard", "There is no card yet. Add one first.") };
+    match st.cfg.stripe.portal(&customer, &st.cfg.public_url).await {
+        Ok(url) => reply(200, json!({ "url": url })),
+        Err(_) => refuse(502, "stripeDown", "The billing page could not be opened. Try again in a minute."),
+    }
+}
+
+// Stripe's messages about payments. Not a browser request: it is trusted only when its signature checks out.
+async fn stripe_webhook(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
+    if !st.cfg.stripe.on() {
+        return refuse(404, "billingOff", "Billing is off.");
+    }
+    let sig = h.get("stripe-signature").and_then(|v| v.to_str().ok()).unwrap_or("");
+    if !st.cfg.stripe.verify(sig, &body, st.rooms.now() / 1000) {
+        return refuse(400, "badSignature", "Signature does not match.");
+    }
+    let Ok(ev) = serde_json::from_slice::<Value>(&body) else { return refuse(400, "badPatch", "Not JSON.") };
+    match crate::billing::handle(&st.db, &ev, st.rooms.now()).await {
+        Ok(fresh) => reply(200, json!({ "ok": true, "duplicate": !fresh })),
+        Err(e) => {
+            eprintln!("[server] stripe event failed: {}", e);
+            refuse(500, "error", "Not handled; Stripe will send it again.")
+        }
+    }
 }

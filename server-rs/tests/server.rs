@@ -18,8 +18,12 @@ struct Srv {
     st: app::AppState,
 }
 
-// Starts a server with a brand-new database.
+// Starts a server with a brand-new database (billing off).
 async fn server() -> Srv {
+    server_with(Default::default()).await
+}
+// Starts a server with a brand-new database and these Stripe settings.
+async fn server_with(stripe: smokebox_server::billing::Stripe) -> Srv {
     let admin = std::env::var("SMOKEBOX_TEST_PG").unwrap_or_else(|_| "postgres://smokebox:dev@127.0.0.1/postgres".into());
     let name = format!("sbtest_{}", smokebox_server::auth::new_id("x").replace("x_", ""));
     let pool = sqlx::PgPool::connect(&admin).await.expect("test Postgres answers");
@@ -30,7 +34,7 @@ async fn server() -> Srv {
     let c2 = clock.clone();
     let html = std::env::temp_dir().join(format!("{}.html", name));
     std::fs::write(&html, "<!doctype html><html><head><title>t</title></head><body>app</body></html>").unwrap();
-    let cfg = app::Config { html_file: html, public_url: "https://app.example".into(), snapshot_every: 5, staff_alert: Some("help@smokebox.example".into()) };
+    let cfg = app::Config { html_file: html, public_url: "https://app.example".into(), snapshot_every: 5, staff_alert: Some("help@smokebox.example".into()), stripe };
     let (router, st) = app::build(db, cfg, Arc::new(move || c2.load(Ordering::SeqCst))).await.unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
@@ -84,7 +88,7 @@ async fn start_a_kitchen_and_join_a_second_device_with_a_code() {
     // A second device joins with a code made on the first; the code works once.
     let (_, c) = post(&a, &s, "/api/devices/code", json!({})).await;
     let code = c["code"].as_str().unwrap().to_string();
-    assert_eq!(code.len(), 6);
+    assert_eq!(code.len(), 8);
     let b = device();
     assert_eq!(post(&b, &s, "/api/join", json!({ "code": code, "device": "Mozilla (iPhone; Mobile)" })).await.0, 200);
     assert_eq!(get(&b, &s, "/api/me").await.1["kitchen"]["name"], "Freddy's Franks");
@@ -267,4 +271,193 @@ async fn a_support_request_goes_to_staff_and_the_answer_comes_back() {
     post(&other, &s, "/api/start", json!({ "kitchen": "Other", "email": "other@example.com", "password": "12345678" })).await;
     assert_eq!(get(&other, &s, "/api/support").await.1["tickets"].as_array().unwrap().len(), 0);
     assert_eq!(post(&other, &s, "/api/support/reply", json!({ "id": id, "body": "hi" })).await.0, 404);
+}
+
+// A fake Stripe on a free port: answers Checkout and portal requests with made-up page addresses.
+async fn fake_stripe() -> String {
+    use axum::routing::post;
+    let app = axum::Router::new()
+        .route("/v1/checkout/sessions", post(|| async { axum::Json(json!({ "id": "cs_test_1", "url": "https://checkout.stripe.test/c/cs_test_1" })) }))
+        .route("/v1/billing_portal/sessions", post(|| async { axum::Json(json!({ "id": "bps_1", "url": "https://billing.stripe.test/p/bps_1" })) }));
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", l.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(l, app).await.unwrap() });
+    base
+}
+
+// Sends one Stripe event to the server, signed with the webhook secret at the server's clock.
+async fn stripe_event(s: &Srv, id: &str, kind: &str, object: Value, secret: &str) -> (u16, Value) {
+    let body = json!({ "id": id, "type": kind, "data": { "object": object } }).to_string();
+    let sig = smokebox_server::billing::sign(secret, s.clock.load(Ordering::SeqCst) / 1000, body.as_bytes());
+    let r = reqwest::Client::new().post(format!("{}/api/stripe/webhook", s.base)).header("stripe-signature", sig).header("content-type", "application/json").body(body).send().await.unwrap();
+    let st = r.status().as_u16();
+    (st, r.json().await.unwrap_or(json!({})))
+}
+
+#[tokio::test]
+async fn billing_trial_failed_payment_countdown_pause_at_4am_and_unlock() {
+    let stripe_base = fake_stripe().await;
+    let secret = "whsec_test_123";
+    let s = server_with(smokebox_server::billing::Stripe { secret_key: "sk_test_x".into(), webhook_secret: secret.into(), price_id: "price_test".into(), api_base: stripe_base }).await;
+    // Starting a kitchen sends the owner to Stripe's page to add a card; until then the board counts down 3 days.
+    let a = device();
+    let (_, b) = post(&a, &s, "/api/start", json!({ "kitchen": "Pay Kitchen", "email": "pay@example.com", "password": "grill-master-1" })).await;
+    assert!(b["go"].as_str().unwrap().starts_with("https://checkout.stripe.test/"), "{}", b);
+    let (_, me) = get(&a, &s, "/api/me").await;
+    let kid = me["kitchen"]["id"].as_str().unwrap().to_string();
+    assert_eq!(me["billing"]["status"], "setup");
+    assert_eq!(me["billing"]["graceEndsAt"].as_i64(), Some(T0 + smokebox_server::billing::GRACE_MS));
+    assert_eq!(me["billing"]["paused"], false);
+
+    // The card is added: the 3 free weeks start and the countdown goes away. The same event again changes nothing.
+    let done = json!({ "client_reference_id": kid, "customer": "cus_1", "subscription": "sub_1" });
+    assert_eq!(stripe_event(&s, "evt_1", "checkout.session.completed", done.clone(), secret).await.0, 200);
+    let (_, again) = stripe_event(&s, "evt_1", "checkout.session.completed", done, secret).await;
+    assert_eq!(again["duplicate"], true);
+    let bill = get(&a, &s, "/api/billing").await.1;
+    assert_eq!((bill["status"].clone(), bill["graceEndsAt"].clone(), bill["hasCard"].clone()), (json!("trialing"), Value::Null, json!(true)));
+    assert_eq!(bill["trialEndsAt"].as_i64(), Some(T0 + 21 * 24 * 3600 * 1000));
+    // A message not signed with the secret is refused.
+    assert_eq!(stripe_event(&s, "evt_x", "invoice.paid", json!({ "customer": "cus_1" }), "wrong").await.0, 400);
+
+    // A payment fails: 72 hours of countdown, then new orders stop at the next 4 am, never in the middle of service.
+    let (_, rep) = post(&a, &s, "/api/action", fries()).await;
+    let menu_id = rep["info"]["id"].as_str().unwrap().to_string();
+    let order = |n: u32| json!({ "type": "createTicket", "payload": { "customer": format!("G{}", n), "items": [{ "menuId": menu_id }] } });
+    assert_eq!(stripe_event(&s, "evt_2", "invoice.payment_failed", json!({ "customer": "cus_1" }), secret).await.0, 200);
+    let bill = get(&a, &s, "/api/billing").await.1;
+    let pause_at = bill["pauseAt"].as_i64().unwrap();
+    assert_eq!(bill["status"], "past_due");
+    assert_eq!(pause_at, smokebox_server::billing::next_pause_at(bill["graceEndsAt"].as_i64().unwrap()));
+    assert!(pause_at >= bill["graceEndsAt"].as_i64().unwrap() && pause_at - bill["graceEndsAt"].as_i64().unwrap() <= 24 * 3600 * 1000);
+    // A retry that fails again does not restart the countdown.
+    stripe_event(&s, "evt_3", "invoice.payment_failed", json!({ "customer": "cus_1" }), secret).await;
+    assert_eq!(get(&a, &s, "/api/billing").await.1["pauseAt"].as_i64(), Some(pause_at));
+    s.clock.store(pause_at - 60_000, Ordering::SeqCst);
+    let (_, r1) = post(&a, &s, "/api/action", order(1)).await;
+    assert_eq!(r1["report"], "ok", "orders still work during the countdown");
+    s.clock.store(pause_at + 1000, Ordering::SeqCst);
+    let (_, r2) = post(&a, &s, "/api/action", order(2)).await;
+    assert_eq!(r2["report"], "billingPaused", "new orders stop once the 4 am pause has come");
+    assert_eq!(get(&a, &s, "/api/billing").await.1["paused"], true);
+    // Finishing the order already on the board still works.
+    let tid = r1["info"]["ticketId"].as_str().unwrap().to_string();
+    let (_, bump) = post(&a, &s, "/api/action", json!({ "type": "voidTicket", "payload": { "ticketId": tid, "reason": "Test" } })).await;
+    assert_eq!(bump["report"], "ok", "work on open tickets is never blocked");
+
+    // The owner pays: new orders work again at once. The portal opens for card changes.
+    s.clock.fetch_add(1000, Ordering::SeqCst);
+    assert_eq!(stripe_event(&s, "evt_4", "invoice.paid", json!({ "customer": "cus_1", "lines": { "data": [{ "period": { "end": 1_900_000_000 } }] } }), secret).await.0, 200);
+    let bill = get(&a, &s, "/api/billing").await.1;
+    assert_eq!((bill["status"].clone(), bill["paused"].clone(), bill["paidThrough"].as_i64()), (json!("active"), json!(false), Some(1_900_000_000_000)));
+    assert_eq!(post(&a, &s, "/api/action", order(3)).await.1["report"], "ok");
+    let (_, portal) = post(&a, &s, "/api/billing/portal", json!({})).await;
+    assert!(portal["url"].as_str().unwrap().starts_with("https://billing.stripe.test/"));
+    // A cancelled plan starts the countdown again.
+    stripe_event(&s, "evt_5", "customer.subscription.deleted", json!({ "id": "sub_1", "customer": "cus_1", "status": "canceled" }), secret).await;
+    let bill = get(&a, &s, "/api/billing").await.1;
+    assert_eq!(bill["status"], "canceled");
+    assert!(bill["graceEndsAt"].as_i64().is_some());
+}
+
+#[tokio::test]
+async fn with_billing_off_every_kitchen_is_free() {
+    let s = server().await;
+    let a = started(&s).await;
+    assert_eq!(get(&a, &s, "/api/me").await.1["billing"]["status"], "off");
+    let r = reqwest::Client::new().post(format!("{}/api/stripe/webhook", s.base)).body("{}").send().await.unwrap();
+    assert_eq!(r.status().as_u16(), 404);
+}
+
+#[tokio::test]
+async fn limits_health_voice_gate_and_error_log() {
+    let s = server().await;
+    // Health: the database answers and the engine thread is alive.
+    let (st, h) = get(&device(), &s, "/healthz").await;
+    assert_eq!((st, h["database"].clone(), h["engine"].clone()), (200, json!(true), json!(true)), "{}", h);
+
+    // Starting kitchens: 5 from one address, then a wait (with Retry-After), and the address Caddy added is the one counted.
+    let start = |n: u32, ip: &'static str| {
+        let s = &s;
+        async move {
+            device().post(format!("{}/api/start", s.base)).header("x-forwarded-for", ip)
+                .json(&json!({ "kitchen": format!("K{}", n), "email": format!("k{}@example.com", n), "password": "grill-master-1" })).send().await.unwrap()
+        }
+    };
+    for n in 0..5 {
+        assert_eq!(start(n, "9.9.9.9").await.status().as_u16(), 200);
+    }
+    let sixth = start(5, "1.2.3.4, 9.9.9.9").await;
+    assert_eq!(sixth.status().as_u16(), 429, "typing a fake first address does not dodge the limit");
+    assert!(sixth.headers().get("retry-after").is_some());
+    let b: Value = sixth.json().await.unwrap();
+    assert!(b["words"].as_str().unwrap().contains("Wait"), "{}", b);
+    assert_eq!(start(6, "8.8.8.8").await.status().as_u16(), 200, "another address has its own limit");
+
+    // Join codes: 10 from one device, then a wait.
+    let a = started(&s).await;
+    for _ in 0..10 {
+        assert_eq!(post(&a, &s, "/api/devices/code", json!({})).await.0, 200);
+    }
+    assert_eq!(post(&a, &s, "/api/devices/code", json!({})).await.0, 429);
+    s.clock.fetch_add(60_000, Ordering::SeqCst);
+    assert_eq!(post(&a, &s, "/api/devices/code", json!({})).await.0, 200, "one more a minute later");
+
+    // Kitchen actions: a burst of 300 goes through; past that the tablet is told to wait (and keeps the action).
+    for _ in 0..300 {
+        assert_ne!(post(&a, &s, "/api/action", json!({ "type": "noSuchAction", "payload": {} })).await.0, 429);
+    }
+    assert_eq!(post(&a, &s, "/api/action", fries()).await.0, 429);
+    s.clock.fetch_add(1000, Ordering::SeqCst);
+    assert_eq!(post(&a, &s, "/api/action", fries()).await.0, 200);
+
+    // Join codes are 8 digits; wrong codes from many addresses together are capped, and one IPv6 /64 counts as one address.
+    s.clock.fetch_add(60_000, Ordering::SeqCst);
+    let (_, c) = post(&a, &s, "/api/devices/code", json!({})).await;
+    assert!(c["code"].as_str().map(|x| x.len() == 8 && x.chars().all(|d| d.is_ascii_digit())).unwrap_or(false), "{}", c);
+    let join = |code: &'static str, ip: String| {
+        let s = &s;
+        async move { device().post(format!("{}/api/join", s.base)).header("x-forwarded-for", ip).json(&json!({ "code": code })).send().await.unwrap().status().as_u16() }
+    };
+    for i in 0..10 {
+        assert_eq!(join("00000000", format!("2001:db8:1:2::{:x}", i + 1)).await, 400);
+    }
+    assert_eq!(join("00000000", "2001:db8:1:2::ffff".into()).await, 429, "a new address in the same /64 is still locked out");
+    for i in 0..60 {
+        join("00000000", format!("10.0.{}.{}", i / 200, i % 200 + 1)).await;
+    }
+    assert_eq!(join("00000000", "10.9.9.9".into()).await, 429, "60 wrong codes a minute from anywhere: everyone waits");
+
+    // A refused action keeps no payload, and one too big to be real is refused as an answer (so the tablet drops it).
+    let junk = "x".repeat(60_000);
+    let (st, r) = post(&a, &s, "/api/action", json!({ "type": "noSuchAction", "payload": { "junk": junk }, "opId": "junk-1" })).await;
+    assert_eq!(st, 200, "{}", r);
+    let kept: String = sqlx::query_scalar("SELECT payload FROM kitchen_actions WHERE op_id = 'junk-1'").fetch_one(&s.st.db).await.unwrap();
+    assert_eq!(kept, "{}");
+    let (st, r) = post(&a, &s, "/api/action", json!({ "type": "addMenuItem", "payload": { "name": "x".repeat(70_000) } })).await;
+    assert_eq!((st, r["report"].clone()), (200, json!("badPatch")), "{}", r);
+
+    // The live stream: a device reconnecting in a loop is told to wait.
+    let mut last = 0;
+    for _ in 0..21 {
+        last = a.get(format!("{}/api/events", s.base)).send().await.unwrap().status().as_u16();
+    }
+    assert_eq!(last, 429);
+
+    // The voice helper answers only joined devices (Caddy asks /api/voice-ok first).
+    assert_eq!(get(&device(), &s, "/api/voice-ok").await.0, 401);
+    assert_eq!(get(&a, &s, "/api/voice-ok").await.0, 200);
+
+    // Page errors from a tablet are kept for staff, and show on the staff console with the latest backup.
+    assert_eq!(post(&a, &s, "/api/client-error", json!({ "message": "TypeError: x is undefined", "detail": "0.2.0 abc\nboard.js:10" })).await.0, 200);
+    sqlx::query("INSERT INTO backup_runs (at, kind, ok, size_bytes, offsite) VALUES ($1, 'backup', TRUE, 4096, TRUE)").bind(T0).execute(&s.st.db).await.unwrap();
+    let secret = smokebox_server::support::add_staff(&s.st.db, "freddy@smokebox.example", "Freddy", "staff-pass-123", T0).await.unwrap();
+    let staff = device();
+    assert_eq!(get(&a, &s, "/staff/api/health").await.0, 401, "a kitchen device is not staff");
+    let code = smokebox_server::totp::code_at(&secret, (s.clock.load(Ordering::SeqCst) / 30_000) as u64).unwrap();
+    assert_eq!(post(&staff, &s, "/staff/api/login", json!({ "email": "freddy@smokebox.example", "password": "staff-pass-123", "code": code })).await.0, 200);
+    let (st, h) = get(&staff, &s, "/staff/api/health").await;
+    assert_eq!(st, 200, "{}", h);
+    assert_eq!((h["errors24h"].clone(), h["recent"][0]["kitchen"].clone(), h["backup"]["size"].clone()), (json!(1), json!("Freddy's Franks"), json!(4096)), "{}", h);
+    assert_eq!(h["restoreCheck"], Value::Null);
 }

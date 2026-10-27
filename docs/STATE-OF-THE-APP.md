@@ -11,7 +11,7 @@ Short version:
 
 How to open it: build with `node tools/build.mjs --quiet`, then open `dist/smokebox.html` in Chrome or Edge. Add `?demo` to the address for the demo kitchen. Menu paths below start from the board.
 
-**The board (first screen).** Header buttons: station tabs (a tab shows only when a dish is made there; with one station there are no tabs), **Recall**, **86 board**, **Demo**, **New ticket**, **Orders**, **Back office**, and the three-line **Settings** button. A strip under the header shows warnings. On an empty kitchen it offers **Add your first dish**, **Show me how it works** and **Try the demo**.
+**The board (first screen).** Header buttons: station tabs (a tab shows only when a dish is made there; with one station there are no tabs), **Recall**, **86 board**, **Demo**, **New ticket**, **Orders**, **Back office**, and the three-line **Settings** button. A strip under the header shows warnings. On an empty kitchen it offers **Add your first dish**, **Practice run (2 minutes)** and **Try the demo**.
 
 **Add dishes.** First screen button, or Settings, **Dishes and prices**. Name, price (it shows "Reads as $12.50"), station, **Save and add another**. Rows can be reordered, moved to another menu section, removed (with **Bring it back**), counted ("I count what I made"). **Change stations** renames or hides stations. **More ways to add dishes**: **Have a menu file? Import it** (spreadsheet, or Square, Toast, Clover, Lightspeed item exports) with a preview and **Remove these**.
 
@@ -27,7 +27,7 @@ How to open it: build with `node tools/build.mjs --quiet`, then open `dist/smoke
 
 **Guide.** Settings, **Guide**, or `#/guide`: 22 pages and 6 print cards, with search. Source is `docs/sop`; `tools/build-guide.mjs` builds it into the app.
 
-**Tour.** **Show me how it works** on an empty board, or Help and about, **Replay the walkthrough**: eight steps on one demo ticket.
+**Tour.** **Practice run (2 minutes)** on an empty board, or Help and about, **Replay the walkthrough**: eight steps on one demo ticket.
 
 **Demo.** **Try the demo**: a separate kitchen with sample dishes, tickets and history. Its data is kept apart from the real kitchen; **Back to my kitchen** returns.
 

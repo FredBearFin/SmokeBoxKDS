@@ -11,13 +11,13 @@ const goDemo = async (page) => { await page.goto(page.url().split('#')[0].split(
 
 await withPage({ w: 1280, h: 800, hash: '' }, async (page, logs) => {
   await ready(page);
-  // Setup card and empty board: only one "Show me how it works"
+  // Setup card and empty board: only one "Practice run (2 minutes)"
   await page.evaluate(() => { [['Wings', 'pit', 'meat', 14, 'two'], ['Slaw', 'cold', 'cold', 4, 'one']].forEach(([n, z, c, pr, tr]) => SB.store.dispatchEx('addMenuItem', { name: n, zone: z, cat: c, price: pr, prepSec: 240, track: tr }, { source: 'ui' })); SB.floor.setWelcome(true); });
   await page.waitForTimeout(1300);
-  const n = await page.locator('button:has-text("Show me how it works"):visible').count();
-  check('only one "Show me how it works" while the setup card is up', n === 1, n);
+  const n = await page.locator('button:has-text("Practice run (2 minutes)"):visible').count();
+  check('only one "Practice run (2 minutes)" while the setup card is up', n === 1, n);
   await page.evaluate(() => SB.floor.setWelcome(false)); await page.waitForTimeout(1300);
-  check('the empty board offers it again once the card is gone', (await page.locator('.fl-empty button:has-text("Show me how it works"):visible').count()) === 1);
+  check('the empty board offers it again once the card is gone', (await page.locator('.fl-empty button:has-text("Practice run (2 minutes)"):visible').count()) === 1);
   check('no page errors', logs.pageErrors.length === 0, logs.pageErrors);
 });
 

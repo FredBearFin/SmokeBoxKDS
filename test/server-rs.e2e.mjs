@@ -1,5 +1,5 @@
 // Browser check of the Rust server (about 30 s): start a kitchen on the start page, open Devices, add a second tablet with the
-// 6-digit code, and see a ticket made on one tablet appear on the other. Then remove the second tablet and see it sent to the
+// 8-digit code, and see a ticket made on one tablet appear on the other. Then remove the second tablet and see it sent to the
 // start page. Needs the release server (cd server-rs && cargo build --release), dist/smokebox.html and a Postgres database:
 //   SMOKEBOX_E2E_DB=postgres://smokebox:dev@127.0.0.1/smokebox_e2e node test/server-rs.e2e.mjs
 import { spawn, execFileSync } from 'node:child_process';
@@ -45,7 +45,7 @@ try {
   await a.evaluate(() => SB.sheets.open('devices')); await a.waitForSelector('[data-act="add-device"]');
   await a.click('[data-act="add-device"]'); await a.waitForSelector('.dv-digits');
   const code = (await a.textContent('.dv-digits')).replace(/\D/g, '');
-  check('Add a device shows a 6-digit code', /^\d{6}$/.test(code), code);
+  check('Add a device shows an 8-digit code', /^\d{8}$/.test(code), code);
   await a.screenshot({ path: path.join(process.env.SHOTS || '/tmp', 'rs-devices.png') });
   // A second tablet joins with the code.
   const b = await (await browser.newContext({ viewport: { width: 962, height: 601 } })).newPage();

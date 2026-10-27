@@ -109,6 +109,9 @@
     q.addEventListener('input', searchNow);
     // Opens the Guide at its first page.
     const allGuide = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('guide'); SB.guide.open(); } }, ico('book', 20), h('span', null, 'Open the whole Guide'));
+    // The practice run: two minutes of tapping through one practice ticket, with a voice and a hand that shows where.
+    const practice = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'practice' }, onClick: () => { sheet.close('practice'); if (SB.floor && SB.floor.startTour) SB.floor.startTour(); } }, ico('play', 22), h('span', null, 'Practice run (2 minutes)'));
+    body.append(h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'New here? Practice first'), h('p', { class: 'fs-sub' }, 'One practice ticket. You tap, it shows you where. Nothing is real.'), practice));
     body.append(h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Search the Guide'), q, found, allGuide));
 
     // 2. Ask support (only on the hosted server, where the request has somewhere to go).

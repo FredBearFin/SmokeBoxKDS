@@ -2994,6 +2994,13 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dv-list { display: grid; gap: var(--sp-2); }
 .dv-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-top: var(--bw-thin) solid var(--line-soft); }
 .dv-main { flex: 1 1 auto; min-width: 0; display: grid; gap: 4px; }
+/* Billing (bl-): the plan's state in a tinted box, then Stripe's buttons. */
+.bl { display: grid; gap: var(--sp-3); }
+.bl-state { padding: var(--sp-4); border: var(--bw) solid var(--line-soft); border-left-width: 6px; border-radius: var(--r-card); background: var(--paper); }
+.bl-state[data-tone="ok"] { border-left-color: var(--sage); }
+.bl-state[data-tone="warn"] { border-left-color: var(--amber); }
+.bl-state[data-tone="bad"] { border-left-color: var(--danger); }
+.bl-state p { margin: 4px 0 0; }
 /* Help (hp-): Guide matches, the support request form and My requests with each conversation. */
 .hp { display: grid; gap: var(--sp-3); }
 .hp-hit { justify-content: flex-start; text-align: left; }
@@ -3012,7 +3019,7 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 
 /* ===== 22-floor-tour.css ===== */
 /*
- * WHAT THIS FILE IS: Styles for the "Show me how it works" walkthrough: the pulsing ring and the caption card.
+ * WHAT THIS FILE IS: Styles for the practice run: the pulsing ring, the tapping finger and the caption card with its picture.
  * PARTS: the ring, the card, its text and buttons, small screens, reduced motion.
  * USES: tokens from 00-tokens.css (--amber, --inv-*, --sp-*, --fs-*). Custom properties set by 74-floor-tour.js:
  *    --tour-top (bottom edge of the header, where a top-docked card starts) and, when the card sits beside the
@@ -3049,10 +3056,33 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 /* Beside the ticket (wide screens): left, top and width come from the script so the whole ticket stays clear. */
 .tour-card[data-dock="side"] { left: var(--tour-x, 0px); top: var(--tour-y, 0px); transform: none; }
 
+/* The picture beside the words: a big icon in a round amber tile, so the step is known before it is read. */
+.tour-head { display: flex; align-items: center; gap: var(--sp-3); }
+.tour-pic { flex: none; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; color: var(--inv-bg); background: var(--inv-accent); }
+
+/* The tapping finger: a round fingertip that presses down on the button to tap, with a ripple each time, over and over.
+   It never takes taps itself (pointer-events none), so the button under it still works. */
+.tour-hand { position: fixed; z-index: var(--zi-fx); width: 0; height: 0; pointer-events: none; }
+.tour-hand[hidden] { display: none; }
+.tour-hand::before, .tour-hand::after { content: ''; position: absolute; left: 0; top: 0; border-radius: 50%; transform: translate(-50%, -50%); }
+.tour-hand::before { width: 30px; height: 30px; background: color-mix(in srgb, var(--ink) 70%, transparent); border: 3px solid var(--paper); box-shadow: 0 2px 6px rgb(0 0 0 / 0.35); animation: tour-tap 1.6s var(--ease-in-out) infinite; }
+.tour-hand::after { width: 30px; height: 30px; border: 3px solid var(--amber); animation: tour-ripple 1.6s ease-out infinite; }
+@keyframes tour-tap {
+  0%, 100% { transform: translate(-30%, -10%) scale(1); opacity: 0.9; }
+  40% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+  70% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+@keyframes tour-ripple {
+  0%, 45% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  55% { opacity: 1; transform: translate(-50%, -50%) scale(0.8); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2.4); }
+}
+
 /* The step label and the plain-language sentence. Both scale with the Large text setting through the tokens. */
 .tour-say { display: grid; gap: var(--sp-1); }
 .tour-step { margin: 0; font: var(--w-semi) var(--fs-2) / var(--lh-snug) var(--font-body); letter-spacing: 0.02em; color: var(--inv-accent); }
-.tour-text { margin: 0; max-width: var(--measure); font: var(--w-medium) var(--fs-4) / var(--lh-snug) var(--font-body); }
+.tour-text { margin: 0; max-width: var(--measure); font: var(--w-bold) var(--fs-5) / var(--lh-snug) var(--font-body); }
 
 /* The buttons: light on the dark card, the main one in amber. Every one is at least the 48 px touch size. */
 .tour-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); }
@@ -3069,7 +3099,7 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 }
 
 /* No pulse for people who asked for less motion; the ring itself stays. */
-@media (prefers-reduced-motion: reduce) { .tour-ring { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tour-ring, .tour-hand::before { animation: none; } .tour-hand::after { display: none; } }
 
 /* ===== 23-floor-orders.css ===== */
 /*
@@ -4609,7 +4639,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
+window.SB_BUILD = { version: "0.2.0", id: "63c34a1" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -5124,7 +5154,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
   // The settings that belong to the device, not to a kitchen (look, sound, which station this tablet shows). They
   // are the same in the demo and the real kitchen. Every other smokebox.v1 key is kitchen data and gets its own
   // copy in the demo (smokebox.demo.<name>), so the demo can never read or write the real kitchen's data.
-  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'voicename', 'cloudKitchen', 'deviceId', 'supportOutbox', 'callouts', 'far', 'wall', 'dock', 'countervisit'].map((k) => 'smokebox.v1.' + k);
+  const SHARED_KEYS = ['theme', 'otheme', 'textsize', 'density', 'hints', 'zone', 'role', 'sound', 'volume', 'speech', 'voicelevel', 'voicename', 'cloudKitchen', 'deviceId', 'supportOutbox', 'practice', 'afterPractice', 'callouts', 'far', 'wall', 'dock', 'countervisit'].map((k) => 'smokebox.v1.' + k);
   // The kitchen-data keys, listed so a test can prove every key in the code is classified. A key that is in neither list
   // is treated as kitchen data (the safe side).
   const DATA_KEYS = ['state', 'pacingFix1', 'sid', 'writer', 'histtrim', 'histnotice', 'sleepSnap', 'outbox', 'corrupt', 'names', 'sample', 'welcome', 'lastbackup', 'dlog', 'alertlog', 'lastbatch', 'initials', 'pinlock', 'paymethod',
@@ -6473,6 +6503,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     storageBlocked: 'This browser is blocking storage, so changes will not survive a reload. Allow site data or use a normal window.',
     unknownOrder: 'That order is no longer here. It may have been cleared; check the open orders list.',
     orderNotOpen: 'That order is already paid or voided. Reopen it first if it needs changing.',
+    billingPaused: 'New orders are paused: the SmokeBox payment is overdue. Open tickets still work. The owner can fix it in Settings, Billing.',
     orderNotPaid: 'Only a paid order can be reopened.',
     dayClosed: 'That sale belongs to a day that is already closed, so it cannot be opened again: it would move to another day and count twice. Make the correction in your own records, or ask whoever keeps the books.',
     orderEmpty: 'There is nothing on this order to pay. Add items first, or void the order.',
@@ -13567,6 +13598,43 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     const since = Math.min(st.connected || !st.downSince ? Infinity : st.downSince, st.sendFailSince || Infinity);
     return { on: !!cfg, connected: since === Infinity, downMs: since === Infinity ? 0 : Date.now() - since, waiting };
   }
+  // The kitchen's billing as the server last said (written into the page, then checked every five minutes): status, trial end,
+  // the countdown and whether new orders are paused. null when the server has no billing.
+  let billing = cfg && cfg.billing ? cfg.billing : null;
+  // Asks the server for the kitchen's billing again, and tells the listeners when it changed.
+  function refreshBilling() {
+    if (!cfg || typeof g.fetch !== 'function') return;
+    g.fetch('/api/billing', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : null)).then((b) => {
+      if (b && JSON.stringify(b) !== JSON.stringify(billing)) { billing = b; changed(); }
+    }, () => { /* offline: keep what we had */ });
+  }
+  if (cfg) setInterval(refreshBilling, 5 * 60e3);
+  // Page errors go to the server for SmokeBox staff (the staff console counts them): each different message once per page load, at
+  // most 5, with the build and where it happened. Nothing typed in the kitchen is sent.
+  const sentErrors = new Set();
+  // Sends one page error to the server, if it is new and the cap is not reached.
+  function reportError(message, detail) {
+    const m = String(message || 'error').slice(0, 300);
+    if (!cfg || sentErrors.has(m) || sentErrors.size >= 5 || typeof g.fetch !== 'function') return;
+    sentErrors.add(m);
+    const build = g.SB_BUILD ? g.SB_BUILD.version + ' ' + g.SB_BUILD.id : '';
+    g.fetch('/api/client-error', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: m, detail: (build + '\n' + String(detail || '')).slice(0, 4000) }) }).catch(() => { /* offline: dropped */ });
+  }
+  if (cfg && g.addEventListener) {
+    g.addEventListener('error', (e) => reportError(e.message, (e.filename ? String(e.filename).split('/').pop() + ':' + e.lineno + ':' + e.colno + '\n' : '') + (e.error && e.error.stack ? e.error.stack : '')));
+    g.addEventListener('unhandledrejection', (e) => reportError('promise: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)), e.reason && e.reason.stack));
+  }
+  // Opens a Stripe page for this kitchen: 'checkout' to add a card, 'portal' to change the card, see receipts or cancel.
+  // Resolves to words to show when it could not open.
+  async function openBillingPage(which) {
+    try {
+      const r = await g.fetch('/api/billing/' + which, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' });
+      const b = await r.json().catch(() => ({}));
+      if (r.ok && b.url) { g.location.href = b.url; return null; }
+      return b.words || 'The payment page could not be opened. Try again in a minute.';
+    } catch (e) { return 'No connection to the server. Try again when the internet is back.'; }
+  }
+
   // Sends the device to the sign-in page (used when the server says this device is signed out).
   function toSignIn() { try { g.location.href = '/start'; } catch (e) { /* not in a browser */ } }
 
@@ -13654,6 +13722,8 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
   SB.cloud = {
     on: !!cfg, kitchen: cfg ? cfg.kitchen : null, device: cfg && cfg.device ? cfg.device : null, deviceId,
     transport, status, signOut, guardKitchen,
+    // The kitchen's billing (or null), a way to check it again now, and the Stripe pages.
+    billing: () => billing, refreshBilling, openBillingPage,
     // Calls fn whenever the connection status changes; returns a function that stops it.
     onChange(fn) { st.listeners.add(fn); return () => st.listeners.delete(fn); },
   };
@@ -21562,16 +21632,43 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     const undoAll = () => { for (let i = 0; i < n; i++) SB.store.dispatchEx('undo', {}, { source: 'ui' }); paintBanner(); };
     SB.ui.toast(h('span', null, 'Cleared ' + n + ' old ' + (n === 1 ? 'ticket' : 'tickets') + '. ', h('button', { type: 'button', class: 'btn btn-sm', onClick: undoAll }, 'Undo')), { tone: 'ok', ms: 10000 });
   }
+  // The words for the billing strip, or null when billing needs nothing: { tone, text, act, page }. Times count down to the pause
+  // (the first 4 am after the 3 days), in hours, or minutes in the last hour.
+  function billingWords(b, now) {
+    if (!b || !b.pauseAt) return null;
+    const left = b.pauseAt - now, h = Math.ceil(left / 3600e3), m = Math.max(1, Math.ceil(left / 60e3));
+    const when = left <= 0 ? '' : left < 3600e3 ? m + ' ' + (m === 1 ? 'minute' : 'minutes') : h + ' ' + (h === 1 ? 'hour' : 'hours');
+    const page = b.status === 'past_due' && b.hasCard ? 'portal' : 'checkout';
+    const act = page === 'portal' ? 'Update the card' : 'Add a card';
+    if (b.paused) return { tone: 'bad', text: 'New orders are paused: the SmokeBox payment is overdue. Open tickets still work.', act, page };
+    if (b.status === 'setup') return { tone: 'warn', text: 'Add a card to start your 3 free weeks. New orders pause in ' + when + '.', act, page };
+    if (b.status === 'past_due') return { tone: 'bad', text: 'Payment failed. New orders pause in ' + when + '.', act, page };
+    if (b.status === 'canceled') return { tone: 'warn', text: 'Your SmokeBox plan was cancelled. New orders pause in ' + when + '.', act: 'Restart the plan', page: 'checkout' };
+    return null;
+  }
+  // Opens Stripe's page for the billing strip's button, after the manager PIN when one is set; says why when it cannot.
+  async function openBilling(page) {
+    if (S.requirePin && !(await S.requirePin())) return;
+    const why = await SB.cloud.openBillingPage(page);
+    if (why) ui.toast(why, { tone: 'warn' });
+  }
+  S.billingWords = billingWords;
   // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
   function bannerWanted() {
     const store = SB.store;
     if (!store || !store.status || !store.getState) return null;
     const ss = store.status(), s = store.getState();
     // In the demo this strip always shows, above every other message, and always has the Back button.
-    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'Demo: it runs by itself. Watch, or tap a dish to join in.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
+    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: SB.tour && SB.tour.practicing && SB.tour.practicing() ? 'Practice kitchen: nothing here is real.' : 'Demo: it runs by itself. Watch, or tap a dish to join in.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     // Signed in to the hosted server and the link has been down for a while: say so calmly; the board keeps working and catches up.
     const cs = SB.cloud && SB.cloud.on ? SB.cloud.status() : null;
     if (cs && !cs.connected && cs.downMs > 8000) return { kind: 'cloud', tone: 'warn', text: 'Not connected. Keep working: ' + (cs.waiting ? cs.waiting + ' change' + (cs.waiting === 1 ? '' : 's') + ' will' : 'changes will') + ' send when the internet is back.', act: 'Reload', onAct: () => g.location.reload() };
+    // Billing: a kitchen with no card yet, a failed payment or a cancelled plan sees a countdown to the pause on every screen, and
+    // once new orders are paused it says so plainly. It cannot be hidden. The button opens Stripe's page (behind the manager PIN).
+    const bill = SB.cloud && SB.cloud.billing ? SB.cloud.billing() : null;
+    const bw = bill ? billingWords(bill, Date.now()) : null;
+    // The strip's button opens the Stripe page that fixes this state.
+    if (bw) return { kind: 'billing', tone: bw.tone, text: bw.text, act: bw.act, onAct: () => openBilling(bw.page) };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
     // Off the board (a back-office page), a device clock that jumped far ahead is asked about here: a slim strip, not a box over the page.
@@ -21604,7 +21701,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
     const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: w.laterLabel || 'Hide for 45 minutes', onClick: () => { if (w.onLater) w.onLater(); else { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } } }, ico('x', 18), h('span', { class: 'visually-hidden' }, w.laterLabel || 'Later')) : null;
-    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : w.kind === 'stale' ? 'ticket' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : w.kind === 'billing' ? 'dollar' : w.kind === 'stale' ? 'ticket' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
     st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip
@@ -22071,6 +22168,8 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     return voiceLevel;
   };
   // Tells whether warnings are spoken aloud right now.
+  // Says one line now in the kitchen voice (the practice run uses it), when this tablet's sound and speech are on.
+  F.say = (line) => { if (sound && speech && line) speakSoon(String(line)); };
   F.speech = () => speech;
   // Switches spoken warnings on or off and remembers it. Speech only plays while sound is on.
   F.setSpeech = function (on) {
@@ -24015,7 +24114,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     // Opens the "Set up your kitchen" wizard; the card stays until the wizard is finished or it is closed.
     m.wBlank = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'setup' }, onClick: () => openSheet('dishes') }, ico('plus', 22), h('span', null, 'Add more dishes'));
     // Starting the walkthrough also puts this card away for good.
-    const tour = h('button', { type: 'button', class: 'btn btn-lg', dataset: { act: 'tour' }, onClick: () => { F.setWelcome(false); startTour(); } }, ico('play', 22), h('span', null, 'Show me how it works'));
+    const tour = h('button', { type: 'button', class: 'btn btn-lg', dataset: { act: 'tour' }, onClick: () => { F.setWelcome(false); startTour(); } }, ico('play', 22), h('span', null, 'Practice run (2 minutes)'));
     // The x puts the card away for good.
     const close = h('button', { type: 'button', class: 'btn btn-icon fl-welcome-x', 'aria-label': 'Hide this welcome', onClick: () => F.setWelcome(false) }, ico('x', 22));
     m.welcome = h('section', { class: 'fl-welcome', hidden: true, 'aria-labelledby': 'fl-welcome-h' },
@@ -24078,7 +24177,8 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     const row = sg.closest('.fl-tabs');
     if (row) row.hidden = single && !cabOn;
   };
-  // Starts the guided walkthrough when it is part of this build; otherwise opens the Help sheet instead.
+  // Starts the practice run when it is part of this build (in the demo kitchen when there are no dishes yet); otherwise
+  // opens the Help sheet instead.
   function startTour() {
     if (SB.tour && typeof SB.tour.start === 'function') SB.tour.start();
     else openSheet('help');
@@ -24093,9 +24193,9 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     const zone = m.zone, stationBusy = modeOf(zone) === 'station' && c && c.all > 0;
     const firstRun = !stationBusy && SB.setup && SB.setup.noDishes();
     const title = firstRun ? 'Welcome. Let\'s build your menu.' : stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
-    const text = firstRun ? 'Type your own dishes and prices (about two minutes), or first watch a busy night in a sample barbecue kitchen.' : stationBusy
+    const text = firstRun ? 'Start with a two-minute practice run: you tap, it shows you how. Nothing you do there is real.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
-      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
+      : 'New orders land here the moment they are sent. Add one yourself, do the two-minute practice run, or watch a busy night. Practice and demo orders are not real.';
     const cardUp = !!(m.welcome && !m.welcome.hidden);
     const sig = title + '|' + text + '|' + cardUp;
     if (e.dataset.sig === sig) return;
@@ -24104,8 +24204,10 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     const actions = h('div', { class: 'fl-empty-actions' });
     // First run: two big, plain choices and nothing else. The walkthrough needs a dish, so it waits until there is one.
     if (firstRun) {
-      actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'Add my menu')),
-        h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('play', 22), h('span', null, 'Watch the demo')));
+      actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-start-tour', dataset: { act: 'practice' }, onClick: startTour }, ico('play', 26), h('span', null, 'Practice run (2 minutes)')),
+        // Add my menu opens Dishes and prices straight away.
+        h('button', { type: 'button', class: 'btn btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 24, { stroke: 2.5 }), h('span', null, 'Add my menu')),
+        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 20), h('span', null, 'Watch a busy night')));
       e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
       return;
     }
@@ -24113,7 +24215,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     if (stationBusy) actions.appendChild(h('button', { type: 'button', class: 'btn btn-lg', onClick: () => goZone('all') }, ico('grid', 22), h('span', null, 'Show all stations')));
     actions.appendChild(h('button', { type: 'button', class: 'btn btn-primary', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket')));
     if (!stationBusy) actions.append(...[
-      cardUp ? null : h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
+      cardUp ? null : h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('play', 22), h('span', null, 'Practice run (2 minutes)')),
       h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, store().isDemo && store().isDemo() ? 'Busy-night crew' : 'Try the demo'))].filter(Boolean));
     e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
   }
@@ -24360,21 +24462,26 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
   // last thing done; if anything else happened since, it says so instead of undoing the wrong thing.
   function offerRowUndo(ticketId, itemId, res) {
     m.rowUndoFor = res;
-    setTimeout(() => {
-      if (!m || m.rowUndoFor !== res) return;
+    m.grid.querySelectorAll('.fl-undo').forEach((x) => x.remove());
+    // Undoes the dish's Done, unless something else was done after it.
+    const onUndo = (e) => {
+      e.stopPropagation(); stopAt(); b.remove();
+      if (m.rowUndoFor !== res) { toast('Something else happened since, so this cannot be undone here. Use Undo on the message below.', { tone: 'warn' }); return; }
+      m.rowUndoFor = null; undoLast();
+    };
+    const b = h('button', { type: 'button', class: 'btn fl-undo', onClick: onUndo }, ico('undo', 20), h('span', null, 'Marked done. Undo'));
+    // The board redraws the row as done right after the tap, which would throw the button away: it is put back on the
+    // current row a few times a second, for the whole 4 seconds.
+    const place = () => {
+      if (!m || m.rowUndoFor !== res) { stopAt(); b.remove(); return; }
       const li = m.grid.querySelector('.fl-slip[data-ticket="' + cssEsc(ticketId) + '"] .fl-row[data-item="' + cssEsc(itemId) + '"]');
-      if (!li) return;
-      m.grid.querySelectorAll('.fl-undo').forEach((x) => x.remove());
-      // Undoes the dish's Done, unless something else was done after it.
-      const onUndo = (e) => {
-        e.stopPropagation(); b.remove();
-        if (m.rowUndoFor !== res) { toast('Something else happened since, so this cannot be undone here. Use Undo on the message below.', { tone: 'warn' }); return; }
-        m.rowUndoFor = null; undoLast();
-      };
-      const b = h('button', { type: 'button', class: 'btn fl-undo', onClick: onUndo }, ico('undo', 20), h('span', null, 'Marked done. Undo'));
-      li.appendChild(b);
-      setTimeout(() => { b.remove(); if (m && m.rowUndoFor === res) m.rowUndoFor = null; }, 4000);
-    }, 0);
+      if (li && b.parentNode !== li) li.appendChild(b);
+    };
+    const timer = setInterval(place, 120);
+    // Stops putting the button back on the row.
+    function stopAt() { clearInterval(timer); }
+    setTimeout(place, 0);
+    setTimeout(() => { stopAt(); b.remove(); if (m && m.rowUndoFor === res) m.rowUndoFor = null; }, 4000);
   }
   // Undoes the last undoable action (within the undo window) and says what was undone.
   function undoLast() {
@@ -27514,7 +27621,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
 
     // Restart demo: start over with fresh tickets, the way the app looks on its first day.
     const restartBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg dm-restart', onClick: () => doRestart() }, ico('refresh', 22), h('span', null, 'Restart demo'));
-    const tourBtn = h('button', { type: 'button', class: 'btn btn-lg', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', null, 'Show me how it works'));
+    const tourBtn = h('button', { type: 'button', class: 'btn btn-lg', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', null, 'Practice run (2 minutes)'));
     const startBox = h('section', { class: 'fs-section dm-start' }, h('h3', { class: 'fs-h' }, 'Load the demo'),
       h('p', { class: 'fs-sub' }, 'Demo only. Loads demo food in the cabinet and three demo tickets, and erases what is on this device now. Nothing runs by itself: you tap Start and Done, and the timers show when each dish should begin.'),
       h('div', { class: 'fs-row' }, restartBtn, tourBtn));
@@ -27645,7 +27752,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     return h('div', { class: 'hp-pane' },
       h('p', { class: 'fs-sub' }, 'Smokebox shows every order as a paper ticket. Each station sees only its own items, timed so the whole order finishes together.'),
       // Help closes first, so the walkthrough has the whole board to itself.
-      h('div', { class: 'fs-row hp-links' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'tour' }, onClick: () => closeThen(sheet, runTour) }, ico('play', 20), h('span', null, 'Show me how it works'))),
+      h('div', { class: 'fs-row hp-links' }, h('button', { type: 'button', class: 'btn btn-primary', dataset: { act: 'tour' }, onClick: () => closeThen(sheet, runTour) }, ico('play', 20), h('span', null, 'Practice run (2 minutes)'))),
       helpList([
         helpItem('plus', 'Send a ticket', 'Tap New ticket, tap the items, tap Send to kitchen. Four lines take fewer than ten taps.'),
         helpItem('check', 'Start and Done', 'Each dish has a button on its row. A one-step dish shows Done: tap it when the dish is ready. A two-step dish shows Start: tap it when cooking starts, it counts down from its usual cooking time, then tap Done.'),
@@ -28007,7 +28114,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
 
     // Links to the other support sheets. Each closes this one first.
     const link = (icon, label, name) => h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, () => SB.sheets.open(name)) }, ico(icon, 22), h('span', { class: 'grow' }, label), ico('chevron-right', 20));
-    const tourLink = h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', { class: 'grow' }, 'Show me how it works'), ico('chevron-right', 20));
+    const tourLink = h('button', { type: 'button', class: 'btn btn-block mn-link', onClick: () => closeThen(sheet, runTour) }, ico('play', 22), h('span', { class: 'grow' }, 'Practice run (2 minutes)'), ico('chevron-right', 20));
     // Back office closes this sheet first, then opens the manager pages (the shell asks for the PIN if one is set).
     const officeLink = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'office' }, onClick: () => closeThen(sheet, () => { if (SB.shell && SB.shell.ignite) SB.shell.ignite({}); }) }, ico('gauge', 22), h('span', { class: 'grow' }, 'Back office'), ico('chevron-right', 20));
     // Opens Dishes and prices: add, rename, reprice or remove dishes without going to the back office.
@@ -28034,8 +28141,11 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     const signOutBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'sign-out' }, onClick: () => SB.cloud.signOut() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Take this device out of the kitchen'));
     // Devices: add a tablet with a code, rename or remove one (behind the manager PIN when one is set).
     const devicesBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'devices' }, onClick: () => closeThen(sheet, () => SB.sheets.open('devices')) }, ico('grid', 22), h('span', { class: 'grow' }, 'Devices: add, rename or remove'));
+    // Billing: the SmokeBox plan, and Stripe's pages to add or change the card (behind the manager PIN). Not shown when billing is off.
+    const bill = SB.cloud && SB.cloud.billing ? SB.cloud.billing() : null;
+    const billingBtn = bill && bill.status !== 'off' ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'billing' }, onClick: () => closeThen(sheet, () => SB.sheets.open('billing')) }, ico('dollar', 22), h('span', { class: 'grow' }, 'Billing: your plan and card')) : null;
     const cloudBlock = SB.cloud && SB.cloud.on
-      ? settingBlock('Your kitchen', 'This device' + (SB.cloud.device ? ' (' + SB.cloud.device.name + ')' : '') + ' is joined to ' + SB.cloud.kitchen.name + '. Every joined device shows the same tickets.', devicesBtn, signOutBtn)
+      ? settingBlock('Your kitchen', 'This device' + (SB.cloud.device ? ' (' + SB.cloud.device.name + ')' : '') + ' is joined to ' + SB.cloud.kitchen.name + '. Every joined device shows the same tickets.', devicesBtn, billingBtn, signOutBtn)
       : null;
     sheet.body.append(h('div', { class: 'mn' },
       cloudBlock,
@@ -28078,11 +28188,98 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
 
 }catch(e){console.error('[smokebox] module 72-floor-sheets.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'72-floor-sheets.js',message:String(e&&e.message||e)});}
 
+/* ===== 73-floor-billing.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The Billing sheet, for a kitchen on the hosted server. It says where the SmokeBox plan stands (free weeks
+ *    left, paid, payment failed, cancelled) and opens Stripe's own pages to add a card, change it, see receipts or cancel. No card
+ *    number ever touches SmokeBox. Behind the manager PIN when one is set. Also says thanks when the owner comes back from Stripe.
+ * PARTS: the words for each state, the sheet, the welcome back from Stripe.
+ * USES: 00-util.js, 05-icons.js, 32-cloud.js (SB.cloud), 60-shell.js (sheets, toasts, the PIN), 72-floor-sheets.js (sheet registry).
+ * USED BY: Settings (Your kitchen, Billing).
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util;
+  const doc = g.document;
+  if (!doc || !SB.sheets) return;
+  const h = U.h;
+  // Builds an icon element, or an empty span when icons are missing.
+  const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 20 }); } catch (e) { return doc.createElement('span'); } };
+  // A date in plain words, like "Nov 14".
+  const day = (t) => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+  // The heading and the sentence for a billing state, from what the server says.
+  function stateWords(b, now) {
+    const days = (t) => Math.max(0, Math.ceil((t - now) / 86400e3));
+    if (b.paused) return { tone: 'bad', head: 'New orders are paused', text: 'The SmokeBox payment is overdue. Open tickets, reports and backups still work. Fix the card and orders start again at once.' };
+    if (b.status === 'setup') return { tone: 'warn', head: 'Add a card to start', text: 'Your 3 free weeks start when you add a card. Nothing is charged until week 4, and you can cancel any time before.' };
+    if (b.status === 'trialing') return { tone: 'ok', head: 'Free weeks', text: (b.trialEndsAt ? days(b.trialEndsAt) + ' ' + U.plural(days(b.trialEndsAt), 'day') + ' left. The first charge is on ' + day(b.trialEndsAt) + '.' : 'Your free weeks have started.') + ' Cancel any time before then and nothing is charged.' };
+    if (b.status === 'active') return { tone: 'ok', head: 'Paid', text: b.paidThrough ? 'Paid through ' + day(b.paidThrough) + '. The next charge happens by itself.' : 'Your plan is paid. The next charge happens by itself.' };
+    if (b.status === 'past_due') return { tone: 'bad', head: 'Payment failed', text: 'Stripe could not charge the card. Update it before new orders pause' + (b.pauseAt ? ' at ' + new Date(b.pauseAt).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '') + '. A pause never starts in the middle of service.' };
+    if (b.status === 'canceled') return { tone: 'warn', head: 'Plan cancelled', text: 'Restart the plan to keep taking new orders. Your menu, reports and history are all still here.' };
+    return { tone: 'ok', head: 'No billing', text: 'This server does not charge for SmokeBox.' };
+  }
+
+  // Opens the Billing sheet (after the manager PIN, when one is set).
+  async function openBilling() {
+    if (SB.shell && SB.shell.requirePin && !(await SB.shell.requirePin())) return null;
+    let stop = null;
+    const sheet = SB.ui.sheet({ title: 'Billing', side: 'right', width: 'min(560px, 96vw)', name: 'billing', onClose: () => { if (stop) stop(); } });
+    const status = h('p', { class: 'fs-sub', role: 'status' });
+    const box = h('div', { class: 'bl' });
+    // Opens one of Stripe's pages, or says why it could not.
+    const go = async (page) => { status.textContent = 'Opening the secure Stripe page...'; const why = await SB.cloud.openBillingPage(page); if (why) status.textContent = why; };
+    // Draws the sheet from the latest billing state.
+    function paint() {
+      const b = (SB.cloud && SB.cloud.billing && SB.cloud.billing()) || { status: 'off' };
+      const w = stateWords(b, Date.now());
+      const buttons = [];
+      // Add a card (or restart a cancelled plan) opens Stripe Checkout.
+      if (b.status === 'setup' || b.status === 'canceled' || (!b.hasCard && b.status !== 'off'))
+        buttons.push(h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'billing-checkout' }, onClick: () => go('checkout') }, ico('dollar', 22), h('span', null, b.status === 'canceled' ? 'Restart the plan' : 'Add a card')));
+      // With a card on file, Stripe's own portal changes it, shows receipts or cancels.
+      if (b.hasCard && b.status !== 'canceled')
+        buttons.push(h('button', { type: 'button', class: 'btn ' + (b.status === 'past_due' ? 'btn-primary btn-lg' : 'btn-block'), dataset: { act: 'billing-portal' }, onClick: () => go('portal') }, ico('receipt', 22), h('span', null, 'Change the card, see receipts or cancel')));
+      U.clear(box);
+      box.append(h('div', { class: 'bl-state', dataset: { tone: w.tone } }, h('h3', { class: 'fs-h' }, w.head), h('p', null, w.text)), ...buttons, status,
+        h('p', { class: 'fs-sub' }, 'Card details are kept by Stripe, never by SmokeBox. Every device in the kitchen sees the same plan.'));
+    }
+    sheet.body.append(box);
+    paint();
+    if (SB.cloud && SB.cloud.refreshBilling) SB.cloud.refreshBilling();
+    stop = SB.cloud && SB.cloud.onChange ? SB.cloud.onChange(paint) : null;
+    return sheet;
+  }
+  SB.sheets.register('billing', openBilling);
+
+  // Coming back from Stripe (?billing=done or ?billing=later): say what happened once, fetch the new state and tidy the address.
+  function welcomeBack() {
+    let q = null;
+    try { q = new URLSearchParams(g.location.search).get('billing'); } catch (e) { return; }
+    if (!q) return;
+    try { const u = new URL(g.location.href); u.searchParams.delete('billing'); g.history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { /* old browser */ }
+    // Waits until the app has started, then shows the words.
+    const show = () => {
+      if (!(SB.booted && SB.ui && SB.ui.toast)) { setTimeout(show, 200); return; }
+      SB.ui.toast(q === 'done' ? 'Card added. Your 3 free weeks have started.' : 'No card added yet. Add one from Settings, Billing.', { tone: q === 'done' ? 'ok' : 'warn' });
+      // Stripe's confirmation usually lands within seconds: ask every 3 s for a minute so the strip does not lag behind.
+      if (SB.cloud && SB.cloud.refreshBilling) for (let i = 0; i <= 20; i++) setTimeout(SB.cloud.refreshBilling, i * 3000);
+    };
+    show();
+  }
+  SB.billingSheet = { stateWords };
+  welcomeBack();
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 73-floor-billing.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'73-floor-billing.js',message:String(e&&e.message||e)});}
+
 /* ===== 73-floor-devices.js ===== */
 ;try{
 /*
  * WHAT THIS FILE IS: The Devices sheet, for a kitchen on the hosted server. Every tablet, phone or computer joined to the kitchen,
- *    with its name and when it was last used. Add a device shows a 6-digit code to type on the new device's start page; Rename gives
+ *    with its name and when it was last used. Add a device shows an 8-digit code to type on the new device's start page; Rename gives
  *    a device a name people recognize; Remove signs a lost or stolen device out at once. Staff never get accounts: the device is
  *    what is joined. Behind the manager PIN when one is set.
  * PARTS: the server calls, the code box, the list.
@@ -28126,7 +28323,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     // Says what happened, in words, in the tone given.
     const say = (words, tone) => { status.textContent = words; status.dataset.tone = tone || ''; };
 
-    // Makes a 6-digit code and shows it big, with the minutes it still works.
+    // Makes an 8-digit code and shows it big, with the minutes it still works.
     async function addDevice() {
       const r = await api('/api/devices/code', {});
       if (!r.ok) { say(r.body.words || 'No connection to the server. Try again when the internet is back.', 'bad'); return; }
@@ -28137,7 +28334,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
       const paintLeft = () => { const m = Math.ceil((until - Date.now()) / 60e3); left.textContent = m > 0 ? 'Works once, for ' + m + ' more ' + U.plural(m, 'minute') + '.' : 'This code ran out. Make a new one.'; if (m <= 0) clearInterval(timer); };
       U.clear(codeBox);
       codeBox.append(h('p', null, 'On the new device, open Smokebox, tap ', h('strong', null, 'Join a kitchen'), ' and type:'),
-        h('div', { class: 'dv-digits num', 'aria-label': 'Code ' + code.split('').join(' ') }, code.slice(0, 3) + ' ' + code.slice(3)), left);
+        h('div', { class: 'dv-digits num', 'aria-label': 'Code ' + code.split('').join(' ') }, code.slice(0, 4) + ' ' + code.slice(4)), left);
       codeBox.hidden = false;
       paintLeft(); timer = setInterval(paintLeft, 15e3);
       say('');
@@ -28822,6 +29019,9 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     q.addEventListener('input', searchNow);
     // Opens the Guide at its first page.
     const allGuide = h('button', { type: 'button', class: 'btn', onClick: () => { sheet.close('guide'); SB.guide.open(); } }, ico('book', 20), h('span', null, 'Open the whole Guide'));
+    // The practice run: two minutes of tapping through one practice ticket, with a voice and a hand that shows where.
+    const practice = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'practice' }, onClick: () => { sheet.close('practice'); if (SB.floor && SB.floor.startTour) SB.floor.startTour(); } }, ico('play', 22), h('span', null, 'Practice run (2 minutes)'));
+    body.append(h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'New here? Practice first'), h('p', { class: 'fs-sub' }, 'One practice ticket. You tap, it shows you where. Nothing is real.'), practice));
     body.append(h('section', { class: 'fs-section' }, h('h3', { class: 'fs-h' }, 'Search the Guide'), q, found, allGuide));
 
     // 2. Ask support (only on the hosted server, where the request has somewhere to go).
@@ -28920,9 +29120,12 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
 /* ===== 74-floor-tour.js ===== */
 ;try{
 /*
- * WHAT THIS FILE IS: The "Show me how it works" walkthrough (SB.tour). It adds one demo ticket and guides a
- *    first-time user through it with a caption card and a pulsing ring, moving on only when the real ticket changes.
- *    The dishes come from the menu the owner has now (no fixed dish names), so it also works with their own menu.
+ * WHAT THIS FILE IS: The practice run (SB.tour): about two minutes of learning by doing. It adds one practice ticket and
+ *    guides a first-time cook through it, one action per step: a big picture, a few words that are also spoken aloud,
+ *    a pulsing ring and a hand that taps the button to press. It moves on only when the real ticket changes, and it
+ *    includes one deliberate mistake (Done too early, then Undo). The dishes come from the owner's menu; a kitchen with no
+ *    dishes yet practices in the demo kitchen (its own saved data), so nothing touches the real kitchen. See
+ *    docs/onboarding-plan.md for the research behind it.
  * PARTS: constants, ticket lookups, step logic, captions, ring and card placement, the check that runs four
  *    times a second, start and stop.
  * USES: 30-store.js (state, createTicket, clock speed), 60-shell.js (toast, office view), the board markup
@@ -28939,7 +29142,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
   const C = () => SB.config || {};
 
   const POLL_MS = 250;      // four checks a second: quick enough to feel live, light enough to ignore
-  const LAST = 8;           // the number of steps
+  const LAST = 9;           // the number of steps
   const TOUR_SPEED = 30;    // 30x clock: a 5-minute fry takes 10 real seconds
   const SETTLE_MS = 2000;   // after a step starts the board may still shift (the hint line re-wraps), so the card keeps adjusting
   const MARGIN = 12;        // pixels kept free around the card
@@ -28949,7 +29152,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
   // lead (the slowest, cooked in two steps), second (held back by pacing) and quick (finished with one tap).
   const PREFER = { lead: 'hushpuppies', second: 'brisket_sand', quick: 'tea' };
   // Steps that wait for the Next button because there is nothing for the person to tap.
-  const MANUAL = { 1: true, 2: true, 4: true, 5: true };
+  const MANUAL = { 1: true, 2: true, 6: true };
 
   let T = null; // the running walkthrough, or null when none is running
 
@@ -29012,25 +29215,29 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
 
   // Moves to a step. The clock goes fast from step 5 and is put back as soon as the loop is complete.
   function goTo(n) {
-    T.step = n; T.at = Date.now(); T.shown = null;
-    if (n >= 5) ensureSpeed();
+    T.step = n; T.at = Date.now(); T.shown = null; T.said = null;
+    if (n >= 6) ensureSpeed();
     if (n === LAST) restoreSpeed(T);
   }
 
   // Moves the step forward when the real ticket has moved on. Steps only go forward, and a step the person
   // already did by themselves is skipped, so doing things in a different order never leaves the caption behind.
+  //   3 Start the slowest dish, 4 tap Done on it too early (on purpose), 5 tap Undo, 6 the gray dish waits,
+  //   7 finish every dish, 8 Bump, 9 the end. The mistake steps are skipped when there is no two-step dish, and step 5
+  //   is skipped once its 4-second Undo has gone by.
   function advance(t) {
     const hp = PICK.lead ? dish(t, PICK.lead.id) : null, bs = PICK.second ? dish(t, PICK.second.id) : null;
     const all = t.items.every((i) => i.status === 'done');
     let s = T.step;
-    for (let guard = 0; guard < 10; guard++) {
+    for (let guard = 0; guard < 12; guard++) {
       const before = s;
       if (t.status === 'expedited') s = LAST;
-      else if (all && s < 7) s = 7;
-      else if (begun(bs) && s >= 4 && s < 6) s = 6;
-      else if (begun(hp) && s < 4) s = 4;
-      else if (!hp && s >= 3 && s < 6) s = 6;            // no two-step dish: there is no Start to show
-      else if (!bs && s === 5) s = 6;                    // no second two-step dish: nothing is held back, skip the gray-dish step
+      else if (all && s < 8 && !(s === 5 && isDone(hp) && Date.now() - T.doneAt < 4500)) s = 8;
+      else if (!hp && s >= 3 && s <= 5) s = 6;                         // no two-step dish: no Start, no mistake to practice
+      else if (s === 3 && begun(hp)) s = isDone(hp) ? 6 : 4;
+      else if (s === 4 && isDone(hp)) { T.doneAt = Date.now(); s = 5; }
+      else if (s === 5 && hp && (hp.status === 'cooking' || Date.now() - T.doneAt > 4500)) s = 6;
+      else if (s === 6 && (!bs || begun(bs))) s = 7;
       if (s === before) break;
     }
     if (s !== T.step) goTo(s);
@@ -29042,34 +29249,26 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     return n && n.getClientRects().length ? n : null;
   }
 
-  // The words for the current step. They are chosen from the real ticket so they never ask for a button
-  // that is not there yet.
+  // The picture for each step, so a cook knows the step before reading it.
+  const STEP_ICON = { 1: 'ticket', 2: 'clock', 3: 'play', 4: 'check', 5: 'undo', 6: 'timer', 7: 'check-circle', 8: 'arrow-right', 9: 'sparkle' };
+  // The words for the current step: short (about ten words), chosen from the real ticket so they never ask for a button
+  // that is not there yet. The same words are spoken aloud.
   function words(t) {
     const hp = PICK.lead ? dish(t, PICK.lead.id) : null, bs = PICK.second ? dish(t, PICK.second.id) : null, tea = PICK.quick ? dish(t, PICK.quick.id) : null;
     const lead = nameOf(PICK.lead), second = nameOf(PICK.second), quick = nameOf(PICK.quick);
-    const zone = PICK.lead && C().zoneById ? C().zoneById[PICK.lead.zone] || null : null;
     switch (T.step) {
-      case 1: return "This is a ticket: one customer's order." + (hint() ? ' The line under the name says what to do next.' : '');
-      case 2: return 'The clock counts up from when the order came in. It turns amber, then red, when the order is taking too long.';
-      case 3: return 'Each dish belongs to a station' + (zone ? ' (' + zone.name + ' for ' + lead + ')' : '') + '. ' + lead + (second || quick ? ' is the slowest dish on this ticket, so it can start now.' : ' can start now.') + ' Tap Start when you begin cooking it.';
-      case 4: return 'The countdown under the dish is the cooking time left, as estimated. At zero the row flashes Check it. Smokebox cannot see your food, so it never marks a dish done by itself.';
-      case 5: return bs && bs.status === 'queued'
-        ? 'The other dishes are gray on purpose. Smokebox holds them back so everything finishes together. When the countdown reaches zero, Start appears on ' + second + '. You can also tap Start now to begin it early.'
-        : 'Its time has come. Tap Start on ' + second + '.';
-      case 6: {
-        const open = [];
-        if (hp && !isDone(hp)) open.push(lead);
-        if (bs && !isDone(bs)) open.push(second);
-        const teaReady = tea && tea.status === 'displayed';
-        let s = open.length || !teaReady ? 'When a dish is really finished, tap Done on it. You are the one who says it is done.' : '';
-        if (open.length) s += ' Finish ' + open.join(' and ') + '.';
-        if (tea && !isDone(tea)) s += teaReady ? (open.length ? ' Then tap Done on ' + quick + '.' : 'Tap Done on ' + quick + '.') : ' ' + quick + ' is still waiting its turn; it joins in a moment.';
-        return s;
+      case 1: return 'A new order. One ticket is one customer.';
+      case 2: return 'This clock counts up. Red means the order is late.';
+      case 3: return 'Tap Start on ' + lead + '. It takes longest, so it goes first.';
+      case 4: return 'Practice a mistake: tap Done on ' + lead + ' now.';
+      case 5: return 'Wrong tap? Tap Undo right away.';
+      case 6: return bs && bs.status === 'queued' ? 'Gray means wait. ' + second + ' starts later, to finish with ' + lead + '.' : 'Tap Start on ' + second + ' when it flashes red.';
+      case 7: {
+        const open = [hp, bs, tea].filter((x) => x && !isDone(x)).map((x) => nameOf(PICK.lead && x.menuId === PICK.lead.id ? PICK.lead : PICK.second && x.menuId === PICK.second.id ? PICK.second : PICK.quick));
+        return open.length ? 'When food is ready, tap Done: ' + open.join(', ') + '.' : 'Everything is done.';
       }
-      case 7: return slip() && slip().querySelector('.fl-bump')
-        ? 'Everything is done, so Bump is green. Tap Bump to send the ticket away. The clock stops.'
-        : 'Everything is done. Tap the All tab, then tap Bump to send the ticket away. The clock stops.';
-      default: return 'That is the whole loop: a ticket arrives, you start what is ready, tap Done, then Bump. The back office turns these taps into charts: tap Back office at the top of the screen. To add dishes and set prices and prep times, open Menu, prices and shop there.';
+      case 8: return slip() && slip().querySelector('.fl-bump') ? 'All done. Tap Bump to send it out.' : 'All done. Tap All, then Bump.';
+      default: return 'You are ready. That is the whole job.';
     }
   }
 
@@ -29090,15 +29289,30 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
       case 1: return q('.slip-head').concat(hint() ? [hint()] : []);
       case 2: return q('.slip-timer, .fl-bw'); // the wrapper .slip-time has no box of its own, so ring the digits and the badge
       case 3: case 4: return PICK.lead ? row(PICK.lead.id) : [];
-      case 5: return PICK.second ? row(PICK.second.id) : [];
-      case 6: {
+      case 5: { const u = q('.fl-undo'); return u.length ? u : PICK.lead ? row(PICK.lead.id) : []; }
+      case 6: return PICK.second ? row(PICK.second.id) : [];
+      case 7: {
         const out = [];
         t.items.forEach((i) => { if (i.status === 'cooking' || (i.track === 'one' && i.status === 'displayed')) out.push(...row(i.menuId)); });
         return out.length ? out : (PICK.quick ? row(PICK.quick.id) : []);
       }
-      case 7: { const b = q('.fl-bump'); return b.length ? b : Array.from(doc.querySelectorAll('.fl-seg [data-id="all"]')); }
+      case 8: { const b = q('.fl-bump'); return b.length ? b : Array.from(doc.querySelectorAll('.fl-seg [data-id="all"]')); }
       default: return [];
     }
+  }
+
+  // Builds an icon element, or an empty span when icons are missing.
+  const icon = (name, size) => { try { return SB.icons.svg(name, { size: size || 24 }); } catch (e) { return doc.createElement('span'); } };
+  // Moves the tapping hand onto the middle of the button to press, or hides it when there is nothing to tap.
+  function pointAt(el) {
+    const hand = T.ui.hand;
+    if (!el) { hand.hidden = true; return; }
+    const r = el.getBoundingClientRect();
+    const b = el.querySelector('.fl-act, .fl-bump, .fl-undo') || el;
+    const rb = b.getBoundingClientRect().width ? b.getBoundingClientRect() : r;
+    hand.style.left = Math.round(rb.left + rb.width / 2) + 'px';
+    hand.style.top = Math.round(rb.top + rb.height / 2) + 'px';
+    hand.hidden = false;
   }
 
   // Puts the pulsing ring on exactly these elements and takes it off everything else.
@@ -29176,14 +29390,19 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     if (covered()) { if (!u.card.hidden) u.card.hidden = true; ring([]); T.shown = null; return; }
     if (u.card.hidden) u.card.hidden = false;
     const s = T.step;
-    put(u.step, 'Step ' + s + ' of ' + LAST);
-    put(u.text, words(t));
+    put(u.step, s === LAST ? 'Done' : 'Step ' + s + ' of ' + (LAST - 1));
+    const w = words(t);
+    put(u.text, w);
+    if (u.icon.dataset.icon !== STEP_ICON[s]) { u.icon.dataset.icon = STEP_ICON[s]; u.icon.replaceChildren(icon(STEP_ICON[s], 40)); }
+    // Each step is spoken once, in the kitchen voice, when the tablet's sound is on.
+    if (T.said !== s) { T.said = s; try { if (SB.floor && SB.floor.say) SB.floor.say(w); } catch (e) { /* the words are on screen */ } }
     u.skip.hidden = s === LAST;
     u.next.hidden = !MANUAL[s] || (s === 5 && !!PICK.second && (() => { const d = dish(t, PICK.second.id); return !!d && d.status !== 'queued'; })());
     u.mine.hidden = u.demo.hidden = u.done.hidden = s !== LAST;
     // Only elements that are on screen get the ring (the On time badge is hidden unless a ticket is late).
     const els = targets(t).filter((e) => e.getClientRects().length > 0);
     ring(els);
+    pointAt(MANUAL[s] || s === LAST ? null : els[0]);
     const fresh = T.shown !== s && els.length > 0;
     if (fresh) { bring(els[0]); T.shown = s; }
     place(els, Date.now() - T.at < SETTLE_MS);
@@ -29223,19 +29442,29 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
   const onDemo = () => leaveTo(() => doc.querySelector('.fl-start-demo') || demoButton());
   // Ends the walkthrough from Skip or Done.
   const onEnd = () => stop();
+  // In the practice kitchen: runs the practice again with a fresh ticket.
+  const onAgain = () => { stop(true); start({ practice: true }); };
+  // In the practice kitchen: goes back to the real kitchen and opens Dishes and prices there.
+  // The note lives in the browser's lasting storage for a minute (the tab's own storage can be lost on this reload).
+  const onHome = () => { stop(true); try { g.localStorage.setItem(AFTER_KEY, String(Date.now())); } catch (e) { /* the board still offers Add my menu */ } SB.store.leaveDemo(); };
+  // The options of the walkthrough being built (read by buildCard).
+  let T0opts = {};
 
   // Builds the caption card with all its buttons; render() shows the ones each step needs.
   function buildCard() {
     const step = h('p', { class: 'tour-step' });
     const text = h('p', { class: 'tour-text' });
+    const pic = h('div', { class: 'tour-pic', 'aria-hidden': 'true' });
     const say = h('div', { class: 'tour-say', role: 'status', 'aria-live': 'polite' }, step, text);
+    const hand = h('div', { class: 'tour-hand', hidden: true, 'aria-hidden': 'true' });
     const skip = h('button', { type: 'button', class: 'btn tour-skip', onClick: onEnd }, 'Skip');
     const next = h('button', { type: 'button', class: 'btn btn-primary tour-next', onClick: onNext }, 'Next');
-    const mine = h('button', { type: 'button', class: 'btn tour-mine', hidden: true, onClick: onMine }, 'Add my own ticket');
-    const demo = h('button', { type: 'button', class: 'btn tour-demo', hidden: true, onClick: onDemo }, 'Start the demo');
-    const done = h('button', { type: 'button', class: 'btn btn-primary tour-done', hidden: true, onClick: onEnd }, 'Done');
-    const card = h('div', { class: 'tour-card', hidden: true, dataset: { dock: 'bottom' } }, say, h('div', { class: 'tour-actions' }, skip, next, mine, demo, done));
-    return { card, step, text, skip, next, mine, demo, done };
+    const practiceOnly = !!(SB.store && SB.store.isDemo && SB.store.isDemo() && T0opts.practice);
+    const mine = h('button', { type: 'button', class: 'btn tour-mine', hidden: true, onClick: practiceOnly ? onAgain : onMine }, practiceOnly ? 'Practice again' : 'Add my own ticket');
+    const demo = h('button', { type: 'button', class: 'btn tour-demo', hidden: true, onClick: onDemo }, 'Watch a busy night');
+    const done = h('button', { type: 'button', class: 'btn btn-primary tour-done', hidden: true, onClick: practiceOnly ? onHome : onEnd }, practiceOnly ? 'Now add my menu' : 'Done');
+    const card = h('div', { class: 'tour-card', hidden: true, dataset: { dock: 'bottom' } }, h('div', { class: 'tour-head' }, pic, say), h('div', { class: 'tour-actions' }, skip, next, mine, demo, done));
+    return { card, step, text, icon: pic, hand, skip, next, mine, demo, done };
   }
 
   // Shows the All tab, because Bump lives on the whole ticket and a station tab hides it.
@@ -29254,6 +29483,44 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     toast(h('span', null, 'The walkthrough needs a dish to show. Add one first (a name and a price is enough), then try again. ', open), { tone: 'warn', ms: 12000 });
   }
 
+  // The tab's notes that carry the practice run across the reload into the demo kitchen and back.
+  const PRACTICE_KEY = 'smokebox.v1.practice', AFTER_KEY = 'smokebox.v1.afterPractice';
+  // A kitchen with no dishes yet practices in the demo kitchen (its own saved data): notes it for after the reload and
+  // switches. Returns false when that is not possible (already in the demo, or no demo in this build).
+  function practiceInDemo() {
+    const S = SB.store;
+    if (!S || !S.enterDemo || (S.isDemo && S.isDemo()) || (S.isolated && !S.isolated())) return false;
+    try { g.sessionStorage.setItem(PRACTICE_KEY, '1'); } catch (e) { return false; }
+    // The address says ?practice too: a browser that loses the tab's note on reload still starts the practice.
+    try { if (g.history && g.history.replaceState && !/[?&]practice(=|&|$)/.test(g.location.search || '')) g.history.replaceState(null, '', g.location.pathname + (g.location.search ? g.location.search + '&practice' : '?practice') + g.location.hash); } catch (e) { /* the tab's note still works */ }
+    return S.enterDemo();
+  }
+  // True when a practice run is waiting to start after the reload: noted in the tab, or in the address (?practice).
+  function pending() {
+    try { if (g.sessionStorage.getItem(PRACTICE_KEY)) return true; } catch (e) { /* fall back to the address */ }
+    try { return /[?&]practice(=|&|$)/.test(g.location.search || ''); } catch (e) { return false; }
+  }
+  // Called once the board is up: in the demo kitchen with a practice note, sets out a quiet sample kitchen (no orders
+  // running, no tickets) and starts the practice; back in the real kitchen after "Now add my menu", opens Dishes and prices.
+  function resume() {
+    const S = SB.store;
+    let after = null;
+    const want = pending();
+    try { after = Number(g.localStorage.getItem(AFTER_KEY)) || 0; } catch (e) { after = 0; }
+    if (after && !(S.isDemo && S.isDemo())) {
+      try { g.localStorage.removeItem(AFTER_KEY); } catch (e) { /* ignore */ }
+      if (Date.now() - after < 60e3) { try { SB.sheets.open('dishes'); } catch (e) { /* optional */ } }
+      return false;
+    }
+    if (!want || !(S.isDemo && S.isDemo())) return false;
+    try { g.sessionStorage.removeItem(PRACTICE_KEY); } catch (e) { /* ignore */ }
+    try { if (g.history && g.history.replaceState) g.history.replaceState(null, '', g.location.pathname + (g.location.search || '').replace(/([?&])practice(=[^&]*)?(&|$)/, (m, a, b, c) => (c ? a : '')).replace(/[?&]$/, '') + g.location.hash); } catch (e) { /* the note is gone anyway */ }
+    try { if (SB.sim && SB.sim.live) { SB.sim.live.stop(); SB.sim.live.crew(false); } } catch (e) { /* no simulator */ }
+    S.setSpeed(1);
+    S.resetLive({ keepSettings: true, starter: true, catalog: 'sample', replaceOwn: true });
+    return start({ practice: true });
+  }
+
   // Adds the walkthrough ticket and starts the guide. Starting again while one is running begins again at
   // step 1 with a fresh ticket. Returns true when it started.
   function start(opts) {
@@ -29262,6 +29529,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     if (T) stop(true);
     // Choose the dishes from the owner's menu. With no usable dish the walkthrough says why instead of failing quietly.
     const pick = pickDishes();
+    if (!pick && practiceInDemo()) return true;
     if (!pick) { noDishNote(); return false; }
     PICK = pick;
     const items = [pick.lead, pick.second, pick.quick].filter(Boolean).map((m) => ({ menuId: m.id, qty: 1 }));
@@ -29272,8 +29540,10 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
       return false;
     }
     goAll();
-    T = { id, step: 1, at: Date.now(), shown: null, fast: false, restored: false, prev: 1, ui: buildCard(), timer: 0, opts: opts || {} };
+    T0opts = opts || {};
+    T = { id, step: 1, at: Date.now(), shown: null, said: null, doneAt: 0, fast: false, restored: false, prev: 1, ui: buildCard(), timer: 0, opts: T0opts };
     doc.body.appendChild(T.ui.card);
+    doc.body.appendChild(T.ui.hand);
     doc.addEventListener('keydown', onKey);
     T.timer = setInterval(poll, POLL_MS);
     poll();
@@ -29293,6 +29563,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     restoreSpeed(was);
     doc.querySelectorAll('.tour-ring').forEach((e) => e.classList.remove('tour-ring'));
     was.ui.card.remove();
+    was.ui.hand.remove();
     if (!quiet && !doc.querySelector('.sheet-root')) {
       const main = doc.getElementById('fl-board');
       if (main) { try { main.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
@@ -29302,8 +29573,12 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
 
   // True while a walkthrough is running.
   const active = () => !!T;
+  // True while a practice run is going on in the demo kitchen (the banner then says it is practice).
+  const practicing = () => !!T && !!T.opts.practice;
 
-  SB.tour = { start, stop, active, running: active };
+  // True when the practice can run on this kitchen's own dishes (otherwise it runs in the demo kitchen).
+  const ownDishes = () => !!pickDishes();
+  SB.tour = { start, stop, active, running: active, resume, ownDishes, pending, practicing };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 74-floor-tour.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'74-floor-tour.js',message:String(e&&e.message||e)});}
@@ -31521,7 +31796,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
      {
       "t": "ol",
       "x": [
-       "A new Smokebox starts empty on purpose. Tap **Add my menu** on the welcome screen. To see a busy kitchen first, tap **Watch the demo**.",
+       "A new Smokebox starts empty on purpose. Tap **Add my menu** on the welcome screen. To learn it first, tap **Practice run (2 minutes)**.",
        "Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like \"Reads as $12.50\". Tap where it is made. The starting stations are Kitchen, Prep, Fryer and Cold and drinks. Rename or drop any (see Setup recipes).",
        "Tap **Save and add another** until your menu is in. Then tap **Save and finish**."
       ]
@@ -32548,13 +32823,29 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
    {
     "id": "trying-the-demo",
     "group": "guide",
-    "title": "Watch the demo",
-    "summary": "See Smokebox with food on it, without touching your own kitchen.",
+    "title": "Practice run and the demo",
+    "summary": "Learn Smokebox by doing, without touching your own kitchen.",
     "blocks": [
+     {
+      "t": "h",
+      "x": "Practice run (2 minutes)"
+     },
      {
       "t": "ol",
       "x": [
-       "On the welcome screen, or in the **Settings**, tap **Watch the demo**. Then tap **Watch the demo** again to confirm. Tap **Not now** to stay where you are.",
+       "On the welcome screen, or in **Help**, tap **Practice run (2 minutes)**.",
+       "One practice ticket appears. A picture, a short line and a voice tell you each step, and a tapping finger shows the button. You tap Start, make one mistake on purpose and Undo it, tap Done, then Bump.",
+       "With no dishes yet, it runs in the practice kitchen. Tap **Now add my menu** at the end to go back."
+      ]
+     },
+     {
+      "t": "h",
+      "x": "Watch a busy night"
+     },
+     {
+      "t": "ol",
+      "x": [
+       "On the welcome screen, tap **Watch a busy night**. Then tap **Watch the demo** again to confirm. Tap **Not now** to stay where you are.",
        "The demo opens with sample dishes, three fresh sample tickets and food in the cabinet, and it runs by itself: new orders arrive and a sample crew cooks and bumps them. A bar at the top says \"Demo\". Watch, or tap any dish to join in. A demo left open for hours starts fresh the next time.",
        "Nothing you do there reaches your own kitchen.",
        "Tap **Back to my kitchen** on the bar to return. Your own dishes and orders are as you left them."
@@ -32654,7 +32945,7 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
      },
      {
       "t": "p",
-      "x": "Yes. See Watch the demo."
+      "x": "Yes. See Practice run and the demo."
      },
      {
       "t": "h",
@@ -40397,6 +40688,8 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
   function playDemo() {
     const S = SB.store, sim = SB.sim;
     if (!S || !S.isDemo || !S.isDemo() || !sim || !sim.live) return;
+    // A practice run waits for a quiet kitchen instead (SB.tour.resume sets it out).
+    if (SB.tour && SB.tour.pending && SB.tour.pending()) return;
     const now = S.now(), active = S.getState().tickets.filter((t) => t.status === 'active');
     const stale = active.some((t) => now - t.createdAt > 2 * 3600e3);
     if (stale && typeof sim.restartDemo === 'function') sim.restartDemo();
@@ -40441,6 +40734,8 @@ window.SB_BUILD = { version: "0.2.0", id: "0bce9b0" };
     try { watchClock(); } catch (e) { console.error('[smokebox] clock watcher failed', e); }
     try { clearOldDemo(); } catch (e) { console.error('[smokebox] old demo clean-up failed', e); }
     try { playDemo(); } catch (e) { console.error('[smokebox] demo start failed', e); }
+    // A practice run carried across a reload (into the demo kitchen, or back home to add the menu) picks up once the board is up.
+    setTimeout(() => { try { if (SB.tour && SB.tour.resume) SB.tour.resume(); } catch (e) { console.error('[smokebox] practice run failed', e); } }, 600);
     try {
       const errs = loadErrors();
       if (errs.length && SB.ui && SB.ui.toast) SB.ui.toast('Some parts did not load (' + errs.map((e) => e.file).join(', ') + '). The rest still works. Reload the page to try again.', { tone: 'warn', ms: 12000 });

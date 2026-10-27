@@ -2,7 +2,7 @@
 //! conversation and reply. SmokeBox staff answer from the staff console at /staff, which needs a password and an authenticator
 //! code. Replies are emailed to the kitchen's owner; "Kitchen is stuck right now" requests are emailed to staff at once.
 
-use crate::app::{client_ip, device_of, field, locked, no_store, note_fail, refuse, reply, same_site_json, secure, with_cookie, AppState};
+use crate::app::{client_ip, device_of, field, limit, locked, no_store, note_fail, refuse, reply, same_site_json, secure, with_cookie, AppState};
 use crate::{auth, totp};
 use axum::body::Bytes;
 use axum::extract::{Query, State};
@@ -30,6 +30,7 @@ pub fn routes() -> Router<AppState> {
         .route("/staff/api/login", post(staff_login))
         .route("/staff/api/logout", post(staff_logout))
         .route("/staff/api/tickets", get(staff_list))
+        .route("/staff/api/health", get(staff_health))
         .route("/staff/api/ticket", get(staff_ticket))
         .route("/staff/api/reply", post(staff_reply))
         .route("/staff/api/status", post(staff_status))
@@ -59,6 +60,9 @@ async fn email(st: &AppState, to: &str, subject: &str, body: &str) {
 async fn kitchen_new(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
     let b = match same_site_json(&h, &body) { Ok(b) => b, Err(r) => return r };
     let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    if let Some(r) = limit(&st, &format!("report:{}", d.id), crate::limits::REPORT) {
+        return r;
+    }
     let Some(text) = text_of(&b) else { return refuse(400, "empty", "Say what happened, in a few words.") };
     let photo = match photo_of(&b) { Ok(p) => p, Err(r) => return r };
     let category = field(&b, "category");
@@ -128,6 +132,9 @@ async fn kitchen_list(State(st): State<AppState>, h: HeaderMap) -> Response {
 async fn kitchen_reply(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
     let b = match same_site_json(&h, &body) { Ok(b) => b, Err(r) => return r };
     let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    if let Some(r) = limit(&st, &format!("report:{}", d.id), crate::limits::REPORT) {
+        return r;
+    }
     let Some(text) = text_of(&b) else { return refuse(400, "empty", "Type your answer first.") };
     let photo = match photo_of(&b) { Ok(p) => p, Err(r) => return r };
     let now = st.rooms.now();
@@ -218,7 +225,7 @@ async fn staff_list(State(st): State<AppState>, h: HeaderMap, Query(q): Query<Ha
     }
     let status = q.get("status").map(String::as_str).unwrap_or("open");
     let rows = sqlx::query(
-        "SELECT t.id, t.num, t.category, t.urgent, t.status, t.subject, t.created_at, t.updated_at, k.name AS kitchen, k.plan,
+        "SELECT t.id, t.num, t.category, t.urgent, t.status, t.subject, t.created_at, t.updated_at, k.name AS kitchen, k.plan, k.billing_status,
            (SELECT o.email FROM owners o WHERE o.kitchen_id = k.id LIMIT 1) AS owner,
            (SELECT m.from_staff FROM support_messages m WHERE m.ticket_id = t.id AND m.internal = FALSE ORDER BY m.id DESC LIMIT 1) AS last_from_staff
          FROM support_tickets t JOIN kitchens k ON k.id = t.kitchen_id
@@ -229,9 +236,32 @@ async fn staff_list(State(st): State<AppState>, h: HeaderMap, Query(q): Query<Ha
         .iter()
         .map(|r| json!({ "id": r.get::<String, _>("id"), "num": r.get::<i64, _>("num"), "category": r.get::<String, _>("category"), "urgent": r.get::<bool, _>("urgent"),
             "status": r.get::<String, _>("status"), "subject": r.get::<String, _>("subject"), "createdAt": r.get::<i64, _>("created_at"), "updatedAt": r.get::<i64, _>("updated_at"),
-            "kitchen": r.get::<String, _>("kitchen"), "plan": r.get::<String, _>("plan"), "owner": r.get::<Option<String>, _>("owner"), "lastFromStaff": r.get::<Option<bool>, _>("last_from_staff").unwrap_or(false) }))
+            "kitchen": r.get::<String, _>("kitchen"), "plan": r.get::<String, _>("plan"), "billing": r.get::<String, _>("billing_status"), "owner": r.get::<Option<String>, _>("owner"), "lastFromStaff": r.get::<Option<bool>, _>("last_from_staff").unwrap_or(false) }))
         .collect();
     reply(200, json!({ "tickets": list }))
+}
+
+// How the service is doing, for the top of the staff console: errors in the last day (the newest few in full), and the latest
+// backup and test restore.
+async fn staff_health(State(st): State<AppState>, h: HeaderMap) -> Response {
+    if staff_of(&st, &h).await.is_none() {
+        return refuse(401, "signedOut", "Sign in.");
+    }
+    let since = st.rooms.now() - 24 * 3600 * 1000;
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM server_errors WHERE at > $1").bind(since).fetch_one(&st.db).await.unwrap_or(0);
+    let recent: Vec<Value> = sqlx::query("SELECT e.at, e.source, e.what, e.detail, k.name AS kitchen FROM server_errors e LEFT JOIN kitchens k ON k.id = e.kitchen_id WHERE e.at > $1 ORDER BY e.id DESC LIMIT 10")
+        .bind(since).fetch_all(&st.db).await.unwrap_or_default().iter()
+        .map(|r| json!({ "at": r.get::<i64, _>("at"), "source": r.get::<String, _>("source"), "what": r.get::<String, _>("what"), "detail": r.get::<String, _>("detail"), "kitchen": r.get::<Option<String>, _>("kitchen") }))
+        .collect();
+    // The newest run of one kind (backup or restore-check), or null.
+    let last = |kind: &'static str| {
+        let db = st.db.clone();
+        async move {
+            sqlx::query("SELECT at, ok, size_bytes, offsite, note FROM backup_runs WHERE kind = $1 ORDER BY id DESC LIMIT 1").bind(kind).fetch_optional(&db).await.ok().flatten()
+                .map(|r| json!({ "at": r.get::<i64, _>("at"), "ok": r.get::<bool, _>("ok"), "size": r.get::<i64, _>("size_bytes"), "offsite": r.get::<bool, _>("offsite"), "note": r.get::<String, _>("note") }))
+        }
+    };
+    reply(200, json!({ "errors24h": count, "recent": recent, "backup": last("backup").await, "restoreCheck": last("restore-check").await }))
 }
 
 // One request in full: what the device attached, the kitchen, and every message including staff notes.
@@ -241,7 +271,7 @@ async fn staff_ticket(State(st): State<AppState>, h: HeaderMap, Query(q): Query<
     }
     let id = q.get("id").cloned().unwrap_or_default();
     let Some(t) = sqlx::query(
-        "SELECT t.*, k.name AS kitchen, k.plan, k.created_at AS kitchen_since, (SELECT o.email FROM owners o WHERE o.kitchen_id = k.id LIMIT 1) AS owner,
+        "SELECT t.*, k.name AS kitchen, k.plan, k.billing_status, k.created_at AS kitchen_since, (SELECT o.email FROM owners o WHERE o.kitchen_id = k.id LIMIT 1) AS owner,
            (SELECT COUNT(*) FROM devices d WHERE d.kitchen_id = k.id AND d.removed_at IS NULL) AS devices
          FROM support_tickets t JOIN kitchens k ON k.id = t.kitchen_id WHERE t.id = $1",
     )
@@ -254,7 +284,7 @@ async fn staff_ticket(State(st): State<AppState>, h: HeaderMap, Query(q): Query<
     let diag: Value = t.get::<Option<String>, _>("diagnostics").and_then(|d| serde_json::from_str(&d).ok()).unwrap_or(Value::Null);
     reply(200, json!({ "id": id, "num": t.get::<i64, _>("num"), "category": t.get::<String, _>("category"), "urgent": t.get::<bool, _>("urgent"), "status": t.get::<String, _>("status"),
         "subject": t.get::<String, _>("subject"), "createdAt": t.get::<i64, _>("created_at"), "diagnostics": diag, "messages": messages,
-        "kitchen": { "name": t.get::<String, _>("kitchen"), "plan": t.get::<String, _>("plan"), "since": t.get::<i64, _>("kitchen_since"), "owner": t.get::<Option<String>, _>("owner"), "devices": t.get::<i64, _>("devices") } }))
+        "kitchen": { "name": t.get::<String, _>("kitchen"), "plan": t.get::<String, _>("plan"), "billing": t.get::<String, _>("billing_status"), "since": t.get::<i64, _>("kitchen_since"), "owner": t.get::<Option<String>, _>("owner"), "devices": t.get::<i64, _>("devices") } }))
 }
 
 // Staff answer (or a staff-only note). An answer marks the request as waiting on the kitchen and emails the owner a copy.

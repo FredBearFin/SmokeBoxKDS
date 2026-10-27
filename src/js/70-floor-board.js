@@ -291,6 +291,8 @@
     return voiceLevel;
   };
   // Tells whether warnings are spoken aloud right now.
+  // Says one line now in the kitchen voice (the practice run uses it), when this tablet's sound and speech are on.
+  F.say = (line) => { if (sound && speech && line) speakSoon(String(line)); };
   F.speech = () => speech;
   // Switches spoken warnings on or off and remembers it. Speech only plays while sound is on.
   F.setSpeech = function (on) {
@@ -2235,7 +2237,7 @@
     // Opens the "Set up your kitchen" wizard; the card stays until the wizard is finished or it is closed.
     m.wBlank = h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'setup' }, onClick: () => openSheet('dishes') }, ico('plus', 22), h('span', null, 'Add more dishes'));
     // Starting the walkthrough also puts this card away for good.
-    const tour = h('button', { type: 'button', class: 'btn btn-lg', dataset: { act: 'tour' }, onClick: () => { F.setWelcome(false); startTour(); } }, ico('play', 22), h('span', null, 'Show me how it works'));
+    const tour = h('button', { type: 'button', class: 'btn btn-lg', dataset: { act: 'tour' }, onClick: () => { F.setWelcome(false); startTour(); } }, ico('play', 22), h('span', null, 'Practice run (2 minutes)'));
     // The x puts the card away for good.
     const close = h('button', { type: 'button', class: 'btn btn-icon fl-welcome-x', 'aria-label': 'Hide this welcome', onClick: () => F.setWelcome(false) }, ico('x', 22));
     m.welcome = h('section', { class: 'fl-welcome', hidden: true, 'aria-labelledby': 'fl-welcome-h' },
@@ -2298,7 +2300,8 @@
     const row = sg.closest('.fl-tabs');
     if (row) row.hidden = single && !cabOn;
   };
-  // Starts the guided walkthrough when it is part of this build; otherwise opens the Help sheet instead.
+  // Starts the practice run when it is part of this build (in the demo kitchen when there are no dishes yet); otherwise
+  // opens the Help sheet instead.
   function startTour() {
     if (SB.tour && typeof SB.tour.start === 'function') SB.tour.start();
     else openSheet('help');
@@ -2313,9 +2316,9 @@
     const zone = m.zone, stationBusy = modeOf(zone) === 'station' && c && c.all > 0;
     const firstRun = !stationBusy && SB.setup && SB.setup.noDishes();
     const title = firstRun ? 'Welcome. Let\'s build your menu.' : stationBusy ? 'Nothing waiting at ' + zoneById(zone).name + '.' : 'No tickets right now.';
-    const text = firstRun ? 'Type your own dishes and prices (about two minutes), or first watch a busy night in a sample barbecue kitchen.' : stationBusy
+    const text = firstRun ? 'Start with a two-minute practice run: you tap, it shows you how. Nothing you do there is real.' : stationBusy
       ? c.all + ' ' + U.plural(c.all, 'ticket') + ' open on other stations. Tickets appear here when they have an item for this station.'
-      : 'New orders land here the moment they are sent. Add one yourself, take the one-minute walkthrough, or try the demo. Demo orders are not real.';
+      : 'New orders land here the moment they are sent. Add one yourself, do the two-minute practice run, or watch a busy night. Practice and demo orders are not real.';
     const cardUp = !!(m.welcome && !m.welcome.hidden);
     const sig = title + '|' + text + '|' + cardUp;
     if (e.dataset.sig === sig) return;
@@ -2324,8 +2327,10 @@
     const actions = h('div', { class: 'fl-empty-actions' });
     // First run: two big, plain choices and nothing else. The walkthrough needs a dish, so it waits until there is one.
     if (firstRun) {
-      actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'Add my menu')),
-        h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('play', 22), h('span', null, 'Watch the demo')));
+      actions.append(h('button', { type: 'button', class: 'btn btn-primary btn-lg fl-start-tour', dataset: { act: 'practice' }, onClick: startTour }, ico('play', 26), h('span', null, 'Practice run (2 minutes)')),
+        // Add my menu opens Dishes and prices straight away.
+        h('button', { type: 'button', class: 'btn btn-lg fl-first-dish', dataset: { act: 'first-dish' }, onClick: () => openSheet('dishes') }, ico('plus', 24, { stroke: 2.5 }), h('span', null, 'Add my menu')),
+        h('button', { type: 'button', class: 'btn fl-start-demo', onClick: startDemo }, ico('fast-forward', 20), h('span', null, 'Watch a busy night')));
       e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
       return;
     }
@@ -2333,7 +2338,7 @@
     if (stationBusy) actions.appendChild(h('button', { type: 'button', class: 'btn btn-lg', onClick: () => goZone('all') }, ico('grid', 22), h('span', null, 'Show all stations')));
     actions.appendChild(h('button', { type: 'button', class: 'btn btn-primary', onClick: () => openSheet('order') }, ico('plus', 26, { stroke: 2.5 }), h('span', null, 'New ticket')));
     if (!stationBusy) actions.append(...[
-      cardUp ? null : h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('help', 22), h('span', null, 'Show me how it works')),
+      cardUp ? null : h('button', { type: 'button', class: 'btn btn-lg fl-start-tour', onClick: startTour }, ico('play', 22), h('span', null, 'Practice run (2 minutes)')),
       h('button', { type: 'button', class: 'btn btn-lg fl-start-demo', onClick: startDemo }, ico('fast-forward', 22), h('span', null, store().isDemo && store().isDemo() ? 'Busy-night crew' : 'Try the demo'))].filter(Boolean));
     e.append(h('div', { class: 'fl-empty-mark', 'aria-hidden': 'true' }, ico('flame', 72, { stroke: 1.6 })), h('h2', null, title), h('p', null, text), actions);
   }
@@ -2580,21 +2585,26 @@
   // last thing done; if anything else happened since, it says so instead of undoing the wrong thing.
   function offerRowUndo(ticketId, itemId, res) {
     m.rowUndoFor = res;
-    setTimeout(() => {
-      if (!m || m.rowUndoFor !== res) return;
+    m.grid.querySelectorAll('.fl-undo').forEach((x) => x.remove());
+    // Undoes the dish's Done, unless something else was done after it.
+    const onUndo = (e) => {
+      e.stopPropagation(); stopAt(); b.remove();
+      if (m.rowUndoFor !== res) { toast('Something else happened since, so this cannot be undone here. Use Undo on the message below.', { tone: 'warn' }); return; }
+      m.rowUndoFor = null; undoLast();
+    };
+    const b = h('button', { type: 'button', class: 'btn fl-undo', onClick: onUndo }, ico('undo', 20), h('span', null, 'Marked done. Undo'));
+    // The board redraws the row as done right after the tap, which would throw the button away: it is put back on the
+    // current row a few times a second, for the whole 4 seconds.
+    const place = () => {
+      if (!m || m.rowUndoFor !== res) { stopAt(); b.remove(); return; }
       const li = m.grid.querySelector('.fl-slip[data-ticket="' + cssEsc(ticketId) + '"] .fl-row[data-item="' + cssEsc(itemId) + '"]');
-      if (!li) return;
-      m.grid.querySelectorAll('.fl-undo').forEach((x) => x.remove());
-      // Undoes the dish's Done, unless something else was done after it.
-      const onUndo = (e) => {
-        e.stopPropagation(); b.remove();
-        if (m.rowUndoFor !== res) { toast('Something else happened since, so this cannot be undone here. Use Undo on the message below.', { tone: 'warn' }); return; }
-        m.rowUndoFor = null; undoLast();
-      };
-      const b = h('button', { type: 'button', class: 'btn fl-undo', onClick: onUndo }, ico('undo', 20), h('span', null, 'Marked done. Undo'));
-      li.appendChild(b);
-      setTimeout(() => { b.remove(); if (m && m.rowUndoFor === res) m.rowUndoFor = null; }, 4000);
-    }, 0);
+      if (li && b.parentNode !== li) li.appendChild(b);
+    };
+    const timer = setInterval(place, 120);
+    // Stops putting the button back on the row.
+    function stopAt() { clearInterval(timer); }
+    setTimeout(place, 0);
+    setTimeout(() => { stopAt(); b.remove(); if (m && m.rowUndoFor === res) m.rowUndoFor = null; }, 4000);
   }
   // Undoes the last undoable action (within the undo window) and says what was undone.
   function undoLast() {

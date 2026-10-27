@@ -25,7 +25,7 @@ getting-started, taking-an-order, running-the-line, hold-cabinet-and-warnings, c
 | Screen (file, owner) | Put the "?" next to | Opens | Label |
 |---|---|---|---|
 | Board header (70-floor-board.js, A1) | the Menu button area, or inside the Settings sheet's "More" list as a Guide entry (that entry is A1's round 3) | `getting-started` | "Smokebox guide" |
-| Empty-board welcome card (70-floor-board.js, A1) | "Show me how it works" | `getting-started` | "getting started" |
+| Empty-board welcome card (70-floor-board.js, A1) | "Practice run (2 minutes)" | `getting-started` | "getting started" |
 | New ticket screen (71-floor-order.js, A1) | the screen title | `taking-an-order` | "taking an order" |
 | Kitchen board, a ticket's hint line or the board's first-run strip (70, A1) | the "Next step" line help | `running-the-line` | "reading a ticket" |
 | Orders sheet (73-floor-orders.js, A1) and the Take payment sheet title | the sheet title | `getting-started` (payment is step 4) | "taking payment" |

@@ -1785,16 +1785,43 @@
     const undoAll = () => { for (let i = 0; i < n; i++) SB.store.dispatchEx('undo', {}, { source: 'ui' }); paintBanner(); };
     SB.ui.toast(h('span', null, 'Cleared ' + n + ' old ' + (n === 1 ? 'ticket' : 'tickets') + '. ', h('button', { type: 'button', class: 'btn btn-sm', onClick: undoAll }, 'Undo')), { tone: 'ok', ms: 10000 });
   }
+  // The words for the billing strip, or null when billing needs nothing: { tone, text, act, page }. Times count down to the pause
+  // (the first 4 am after the 3 days), in hours, or minutes in the last hour.
+  function billingWords(b, now) {
+    if (!b || !b.pauseAt) return null;
+    const left = b.pauseAt - now, h = Math.ceil(left / 3600e3), m = Math.max(1, Math.ceil(left / 60e3));
+    const when = left <= 0 ? '' : left < 3600e3 ? m + ' ' + (m === 1 ? 'minute' : 'minutes') : h + ' ' + (h === 1 ? 'hour' : 'hours');
+    const page = b.status === 'past_due' && b.hasCard ? 'portal' : 'checkout';
+    const act = page === 'portal' ? 'Update the card' : 'Add a card';
+    if (b.paused) return { tone: 'bad', text: 'New orders are paused: the SmokeBox payment is overdue. Open tickets still work.', act, page };
+    if (b.status === 'setup') return { tone: 'warn', text: 'Add a card to start your 3 free weeks. New orders pause in ' + when + '.', act, page };
+    if (b.status === 'past_due') return { tone: 'bad', text: 'Payment failed. New orders pause in ' + when + '.', act, page };
+    if (b.status === 'canceled') return { tone: 'warn', text: 'Your SmokeBox plan was cancelled. New orders pause in ' + when + '.', act: 'Restart the plan', page: 'checkout' };
+    return null;
+  }
+  // Opens Stripe's page for the billing strip's button, after the manager PIN when one is set; says why when it cannot.
+  async function openBilling(page) {
+    if (S.requirePin && !(await S.requirePin())) return;
+    const why = await SB.cloud.openBillingPage(page);
+    if (why) ui.toast(why, { tone: 'warn' });
+  }
+  S.billingWords = billingWords;
   // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
   function bannerWanted() {
     const store = SB.store;
     if (!store || !store.status || !store.getState) return null;
     const ss = store.status(), s = store.getState();
     // In the demo this strip always shows, above every other message, and always has the Back button.
-    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: 'Demo: it runs by itself. Watch, or tap a dish to join in.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
+    if (store.isDemo && store.isDemo()) return { kind: 'demo', tone: 'warn', text: SB.tour && SB.tour.practicing && SB.tour.practicing() ? 'Practice kitchen: nothing here is real.' : 'Demo: it runs by itself. Watch, or tap a dish to join in.', act: 'Back to my kitchen', onAct: () => store.leaveDemo() };
     // Signed in to the hosted server and the link has been down for a while: say so calmly; the board keeps working and catches up.
     const cs = SB.cloud && SB.cloud.on ? SB.cloud.status() : null;
     if (cs && !cs.connected && cs.downMs > 8000) return { kind: 'cloud', tone: 'warn', text: 'Not connected. Keep working: ' + (cs.waiting ? cs.waiting + ' change' + (cs.waiting === 1 ? '' : 's') + ' will' : 'changes will') + ' send when the internet is back.', act: 'Reload', onAct: () => g.location.reload() };
+    // Billing: a kitchen with no card yet, a failed payment or a cancelled plan sees a countdown to the pause on every screen, and
+    // once new orders are paused it says so plainly. It cannot be hidden. The button opens Stripe's page (behind the manager PIN).
+    const bill = SB.cloud && SB.cloud.billing ? SB.cloud.billing() : null;
+    const bw = bill ? billingWords(bill, Date.now()) : null;
+    // The strip's button opens the Stripe page that fixes this state.
+    if (bw) return { kind: 'billing', tone: bw.tone, text: bw.text, act: bw.act, onAct: () => openBilling(bw.page) };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
     // Off the board (a back-office page), a device clock that jumped far ahead is asked about here: a slim strip, not a box over the page.
@@ -1827,7 +1854,7 @@
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
     const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: w.laterLabel || 'Hide for 45 minutes', onClick: () => { if (w.onLater) w.onLater(); else { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } } }, ico('x', 18), h('span', { class: 'visually-hidden' }, w.laterLabel || 'Later')) : null;
-    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : w.kind === 'stale' ? 'ticket' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : w.kind === 'billing' ? 'dollar' : w.kind === 'stale' ? 'ticket' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
     st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip

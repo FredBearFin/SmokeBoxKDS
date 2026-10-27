@@ -10,7 +10,7 @@ SCREEN 1: FIRST OPEN (empty board, no menu)
 |                                                                            |
 |            [ + ADD YOUR FIRST DISH ]    (big, the only loud button)        |
 |                                                                            |
-|      Show me how it works          Try the busy-night demo (pretend)       |
+|      Practice run (2 minutes)          Try the busy-night demo (pretend)       |
 +----------------------------------------------------------------------------+
 
 SCREEN 2: ADD A DISH (one friendly form; same screen repeats)

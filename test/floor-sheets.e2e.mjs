@@ -615,7 +615,7 @@ async function testMenu() {
     const nextSw = page.getByRole('switch', { name: /next step on each ticket/i });
     check('the Next step switch starts on and turning it off clears SB.theme.hints()', await nextSw.getAttribute('aria-checked') === 'true' && await (async () => { await nextSw.click(); await page.waitForTimeout(100); return (await page.evaluate(() => SB.theme.hints())) === false; })());
     await nextSw.click(); await page.waitForTimeout(100);
-    check('Settings has a "Show me how it works" button', await page.locator('.mn').getByRole('button', { name: /Show me how it works/ }).count() === 1);
+    check('Settings has a "Practice run (2 minutes)" button', await page.locator('.mn').getByRole('button', { name: /Practice run (2 minutes)/ }).count() === 1);
     const soundSw = page.getByRole('switch', { name: /Chime for new tickets/ });
     check('Sound switch is enabled, starts off and reflects SB.floor.sound()', await soundSw.isEnabled() && await soundSw.getAttribute('aria-checked') === 'false');
     await soundSw.click(); await page.waitForTimeout(100);

@@ -57,4 +57,4 @@ Read from the store on first open: **21 sample dishes** priced $3.50 to $29.00 (
 
 ## Not checked
 
-Closing the tab mid-wizard and returning; the PIN flow; adding ingredients to a cooked-meat dish and logging a batch; the "Show me how it works" tour; "Busy-night demo" and Reset live data; touch targets on a real tablet; phone widths; Night theme and Large text; Far display; what happens if two dishes share a name beyond the form's own error line.
+Closing the tab mid-wizard and returning; the PIN flow; adding ingredients to a cooked-meat dish and logging a batch; the "Practice run (2 minutes)" tour; "Busy-night demo" and Reset live data; touch targets on a real tablet; phone widths; Night theme and Large text; Far display; what happens if two dishes share a name beyond the form's own error line.

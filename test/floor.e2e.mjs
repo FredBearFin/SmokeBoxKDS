@@ -104,7 +104,7 @@ await withPage({ w: 1280, h: 800, file: OUT }, async (page, logs) => {
   await boot(page, { seed: false });
   const e0 = await page.evaluate(() => ({ empty: !document.querySelector('.fl-empty').hidden, title: document.querySelector('.fl-empty h2') && document.querySelector('.fl-empty h2').textContent, btns: Array.from(document.querySelectorAll('.fl-empty button')).map((b) => b.textContent.trim()), grid: document.querySelector('.fl-grid').hidden, dock: document.querySelector('.fl-dock').hidden, brand: !!document.querySelector('.fl-head [data-brand]'), mounted: SB.floor.isMounted && SB.floor.isMounted() }));
   check('floor mounts through the shell with a brand button', e0.mounted && e0.brand, e0);
-  check('empty state says "No tickets right now." with New ticket, Show me how it works and Busy-night demo', e0.empty && e0.title === 'No tickets right now.' && e0.btns.includes('New ticket') && e0.btns.includes('Show me how it works') && e0.btns.some((b) => /^Busy-night (demo|crew)/.test(b)) && e0.grid, e0); // the button is now called Busy-night crew
+  check('empty state says "No tickets right now." with New ticket, Practice run (2 minutes) and Busy-night demo', e0.empty && e0.title === 'No tickets right now.' && e0.btns.includes('New ticket') && e0.btns.includes('Practice run (2 minutes)') && e0.btns.some((b) => /^Busy-night (demo|crew)/.test(b)) && e0.grid, e0); // the button is now called Busy-night crew
   await shot(page, 'empty-1280x800');
   // Start demo without a simulator opens the Demo sheet
   await page.evaluate(() => { delete SB.sim; }); // the full build has a real simulator

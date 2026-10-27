@@ -4,7 +4,7 @@ Add dishes, send a test order, take payment and save a backup. About ten minutes
 
 ## 1. Add your menu
 
-1. A new Smokebox starts empty on purpose. Tap **Add my menu** on the welcome screen. To see a busy kitchen first, tap **Watch the demo**.
+1. A new Smokebox starts empty on purpose. Tap **Add my menu** on the welcome screen. To learn it first, tap **Practice run (2 minutes)**.
 2. Type what the dish is called and its price. As you type, a line shows how Smokebox reads it, like "Reads as $12.50". Tap where it is made. The starting stations are Kitchen, Prep, Fryer and Cold and drinks. Rename or drop any (see Setup recipes).
 3. Tap **Save and add another** until your menu is in. Then tap **Save and finish**.
 

@@ -1,6 +1,6 @@
 /*
  * WHAT THIS FILE IS: The Devices sheet, for a kitchen on the hosted server. Every tablet, phone or computer joined to the kitchen,
- *    with its name and when it was last used. Add a device shows a 6-digit code to type on the new device's start page; Rename gives
+ *    with its name and when it was last used. Add a device shows an 8-digit code to type on the new device's start page; Rename gives
  *    a device a name people recognize; Remove signs a lost or stolen device out at once. Staff never get accounts: the device is
  *    what is joined. Behind the manager PIN when one is set.
  * PARTS: the server calls, the code box, the list.
@@ -44,7 +44,7 @@
     // Says what happened, in words, in the tone given.
     const say = (words, tone) => { status.textContent = words; status.dataset.tone = tone || ''; };
 
-    // Makes a 6-digit code and shows it big, with the minutes it still works.
+    // Makes an 8-digit code and shows it big, with the minutes it still works.
     async function addDevice() {
       const r = await api('/api/devices/code', {});
       if (!r.ok) { say(r.body.words || 'No connection to the server. Try again when the internet is back.', 'bad'); return; }
@@ -55,7 +55,7 @@
       const paintLeft = () => { const m = Math.ceil((until - Date.now()) / 60e3); left.textContent = m > 0 ? 'Works once, for ' + m + ' more ' + U.plural(m, 'minute') + '.' : 'This code ran out. Make a new one.'; if (m <= 0) clearInterval(timer); };
       U.clear(codeBox);
       codeBox.append(h('p', null, 'On the new device, open Smokebox, tap ', h('strong', null, 'Join a kitchen'), ' and type:'),
-        h('div', { class: 'dv-digits num', 'aria-label': 'Code ' + code.split('').join(' ') }, code.slice(0, 3) + ' ' + code.slice(3)), left);
+        h('div', { class: 'dv-digits num', 'aria-label': 'Code ' + code.split('').join(' ') }, code.slice(0, 4) + ' ' + code.slice(4)), left);
       codeBox.hidden = false;
       paintLeft(); timer = setInterval(paintLeft, 15e3);
       say('');

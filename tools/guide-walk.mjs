@@ -42,7 +42,8 @@ async function blank(browser) {
   console.log('Blank kitchen');
   const p = await fresh(browser);
   check('welcome: Add my menu', await seen(p, 'Add my menu'));
-  check('welcome: Watch the demo', await seen(p, 'Watch the demo'));
+  check('welcome: Watch a busy night', await seen(p, 'Watch a busy night'));
+  check('welcome: Practice run (2 minutes)', await seen(p, 'Practice run (2 minutes)'));
   await p.click('[data-act="first-dish"]'); await p.waitForTimeout(500);
   const sh = '.sheet-root';
   for (const t of ['Dishes and prices', 'What is it called?', 'Price the customer pays', 'Which station makes it?', 'Kitchen', 'Prep', 'Fryer', 'Cold and drinks', 'Save and add another', 'Save and finish', 'Tax, hours and PIN']) check('dishes sheet: ' + t, await seen(p, t, sh));
@@ -62,7 +63,7 @@ async function blank(browser) {
   check('the Cabinet tab shows from the start', await seen(p, 'Cabinet', '.fl-head'));
   // Menu list.
   await p.click('button.fl-menu'); await p.waitForTimeout(500);
-  for (const t of ['Dishes and prices', 'Tax, hours and PIN', 'Guide', 'Set up this device: first steps', 'Help and about', 'Back office', 'Show me how it works']) check('menu: ' + t, await seen(p, t, sh));
+  for (const t of ['Dishes and prices', 'Tax, hours and PIN', 'Guide', 'Set up this device: first steps', 'Help and about', 'Back office', 'Practice run (2 minutes)']) check('menu: ' + t, await seen(p, t, sh));
   await p.keyboard.press('Escape'); await p.waitForTimeout(300);
   // Order, cook, pay.
   await p.click('.fl-new'); await p.waitForTimeout(600);
@@ -219,8 +220,8 @@ async function settings(browser) {
 async function tryDemo(browser) {
   console.log('Watch the demo');
   const p = await fresh(browser);
-  check('welcome: Watch the demo', await seen(p, 'Watch the demo'));
-  await tap(p, 'Watch the demo'); await p.waitForTimeout(700);
+  check('welcome: Watch a busy night', await seen(p, 'Watch a busy night'));
+  await tap(p, 'Watch a busy night'); await p.waitForTimeout(700);
   for (const t of ['Watch the demo?', 'Not now']) check('demo dialog: ' + t, await seen(p, t, '.sheet-host'));
   await p.evaluate(() => { const b = [...document.querySelectorAll('.sheet-host button')].find((x) => x.textContent.trim() === 'Watch the demo'); if (b) b.click(); });
   await p.waitForTimeout(2200);

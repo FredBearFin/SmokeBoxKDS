@@ -8,7 +8,7 @@ const STYLE: &str = r#"
 main{width:100%;max-width:460px;background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:28px}
 h1{font-size:28px;margin:0 0 6px}p{margin:0 0 16px;color:var(--ink2)}label{display:block;font-weight:600;margin:14px 0 6px}
 input{width:100%;font:inherit;padding:12px;border:2px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}input:focus{outline:3px solid var(--amber);outline-offset:1px}
-input.code{font-size:40px;letter-spacing:12px;text-align:center;font-variant-numeric:tabular-nums}
+input.code{font-size:36px;letter-spacing:6px;text-align:center;font-variant-numeric:tabular-nums}
 button{width:100%;margin-top:18px;min-height:56px;font:inherit;font-weight:700;color:#fff;background:var(--amber);border:0;border-radius:10px;cursor:pointer}
 button.big{min-height:72px;font-size:22px}button.plain{background:#fff;color:var(--ink);border:2px solid var(--line)}button:disabled{opacity:.6}
 .err{color:var(--bad);font-weight:600;min-height:1.4em;margin:12px 0 0}.ok{color:var(--ok);font-weight:600}
@@ -22,12 +22,12 @@ pub fn start_page() -> String {
 <title>Smokebox</title><style>{STYLE}</style></head><body><main>
 <section id="choose"><h1>Smokebox</h1><p>The kitchen coach. Pick one.</p>
 <button class="big" type="button" data-go="join">Join a kitchen</button>
-<p style="margin:8px 0 0;font-size:15px">Your kitchen already uses Smokebox. You need the 6-digit code from another screen.</p>
+<p style="margin:8px 0 0;font-size:15px">Your kitchen already uses Smokebox. You need the 8-digit code from another screen.</p>
 <button class="big plain" type="button" data-go="new">Start a new kitchen</button>
 <div class="links"><a href="#" data-go="owner">Owner sign in</a></div></section>
 
 <section id="join" hidden><h1>Join a kitchen</h1><p>On a screen that already shows your kitchen: Back office, Devices, Add a device. Type the code it shows.</p>
-<form data-api="/api/join"><label for="code">Code</label><input class="code" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+<form data-api="/api/join"><label for="code">Code</label><input class="code" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="9" required>
 <button type="submit">Join</button><p class="err" role="alert"></p></form><div class="links"><a href="#" data-go="choose">Back</a></div></section>
 
 <section id="new" hidden><h1>Start a new kitchen</h1><p>For the owner. Your email is only used for paying, a forgotten password and replies from support.</p>
@@ -98,7 +98,7 @@ pub fn staff_page() -> String {
 body{{display:block;padding:0}}main{{max-width:none;border:0;border-radius:0;padding:0}}
 #login{{max-width:420px;margin:8vh auto;background:#fff;border:2px solid var(--line);border-radius:14px;padding:28px}}
 #app{{display:grid;grid-template-columns:minmax(300px,420px) 1fr;min-height:100vh}}#side{{border-right:2px solid var(--line);background:#fff;overflow:auto}}
-#tabs{{display:flex;gap:6px;padding:12px;position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line)}}#tabs button{{margin:0;min-height:40px;width:auto;flex:1;font-size:15px}}
+#health{{padding:10px 14px;font-size:14px;border-bottom:1px solid var(--line);background:#FBF7F2}}#health .bad{{color:var(--bad);font-weight:700}}#tabs{{display:flex;gap:6px;padding:12px;position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line)}}#tabs button{{margin:0;min-height:40px;width:auto;flex:1;font-size:15px}}
 #tabs button[aria-pressed=false]{{background:#fff;color:var(--ink);border:2px solid var(--line)}}
 .t{{display:block;width:100%;text-align:left;margin:0;border-radius:0;min-height:0;padding:12px 14px;background:#fff;color:var(--ink);border-bottom:1px solid var(--line);font-weight:400}}
 .t.sel{{background:#F3E4DA}}.t b{{display:block}}.t small{{color:var(--ink2)}}.stuck{{color:#fff;background:var(--bad);border-radius:6px;padding:1px 6px;font-size:13px;font-weight:700;margin-right:6px}}
@@ -112,7 +112,7 @@ textarea{{width:100%;min-height:120px;font:inherit;padding:12px;border:2px solid
 <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required>
 <label for="cd">Code from your authenticator app</label><input id="cd" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>
 <button type="submit">Sign in</button><p class="err" id="lerr" role="alert"></p></form></section>
-<div id="app" hidden><aside id="side"><div id="tabs"></div><div id="list"></div></aside><section id="view"><p>Pick a request.</p></section></div>
+<div id="app" hidden><aside id="side"><div id="health" role="status"></div><div id="tabs"></div><div id="list"></div></aside><section id="view"><p>Pick a request.</p></section></div>
 </main><script>
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, text) => {{ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }};
@@ -138,7 +138,19 @@ function tabs() {{
     b.onclick = () => {{ status = id; tabs(); list(); }}; t.appendChild(b);
   }}
 }}
+// The service line at the top: errors in the last day, the last backup and the last test restore. Red when something needs a look.
+async function health() {{
+  const b = await api('/staff/api/health'), box = $('#health'); box.textContent = '';
+  const day = 24 * 3600e3, now = Date.now();
+  const line = (bad, text) => box.appendChild(el('div', bad ? 'bad' : '', text));
+  line(b.errors24h > 0, b.errors24h + ' error' + (b.errors24h === 1 ? '' : 's') + ' in the last day' + (b.recent[0] ? ' (newest: ' + b.recent[0].what + (b.recent[0].kitchen ? ', ' + b.recent[0].kitchen : '') + ')' : ''));
+  const bk = b.backup;
+  line(!bk || !bk.ok || now - bk.at > 1.5 * day || !bk.offsite, bk ? 'Backup ' + when(bk.at) + (bk.ok ? ', ' + Math.round(bk.size / 1024) + ' KB' : ' FAILED') + (bk.offsite ? ', copied off the server' : ', not copied off the server') : 'No backup recorded yet');
+  const rc = b.restoreCheck;
+  line(!rc || !rc.ok || now - rc.at > 8 * day, rc ? 'Test restore ' + when(rc.at) + (rc.ok ? ': OK' : ': FAILED ' + rc.note) : 'No test restore yet');
+}}
 async function list() {{
+  health().catch(() => {{}});
   const b = await api('/staff/api/tickets?status=' + status), box = $('#list'); box.textContent = '';
   if (!b.tickets.length) box.appendChild(el('p', '', 'Nothing here.'));
   for (const t of b.tickets) {{
@@ -155,7 +167,7 @@ async function show() {{
   const t = await api('/staff/api/ticket?id=' + encodeURIComponent(current)); v.textContent = '';
   if (!t.id) {{ v.appendChild(el('p', '', 'Not found.')); return; }}
   v.append(el('h1', '', '#' + t.num + ' ' + t.subject), el('p', '', (t.urgent ? 'Kitchen is stuck right now. ' : '') + CAT[t.category] + '. Status: ' + t.status + '.'));
-  v.appendChild(el('p', '', t.kitchen.name + ' · owner ' + (t.kitchen.owner || 'none') + ' · plan ' + t.kitchen.plan + ' · ' + t.kitchen.devices + ' devices · since ' + when(t.kitchen.since)));
+  v.appendChild(el('p', '', t.kitchen.name + ' · owner ' + (t.kitchen.owner || 'none') + ' · plan ' + t.kitchen.plan + ' (' + t.kitchen.billing + ')' + ' · ' + t.kitchen.devices + ' devices · since ' + when(t.kitchen.since)));
   if (t.diagnostics) {{ const d = el('details'); d.append(el('summary', '', 'What the device attached'), el('pre', '', JSON.stringify(t.diagnostics, null, 2))); v.appendChild(d); }}
   for (const m of t.messages) {{
     const box = el('div', 'msg' + (m.fromStaff ? ' staff' : '') + (m.internal ? ' note' : ''));
