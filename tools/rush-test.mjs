@@ -156,6 +156,16 @@ try {
   const doubled = [...counts].filter(([, c]) => c > 1).map(([x]) => x);
   check('orders were taken during the rush (' + made.size + ')', made.size >= TABLETS * 3, made.size);
   check('every tablet sent everything it queued (outboxes empty)', snaps.every((x) => x.waiting === 0), snaps.map((x) => x.waiting));
+  // For a tablet still holding actions: what the server answers when its oldest one is sent again by hand, so a stuck queue says why.
+  for (const [i, x] of snaps.entries()) {
+    if (!x.waiting) continue;
+    const why = await pages[i].evaluate(async () => {
+      const e = SB.store.outbox()[0];
+      const r = await fetch('/api/action', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: e.type, payload: e.payload, opId: e.opId, at: e.now }) });
+      return { type: e.type, opId: e.opId, status: r.status, answer: (await r.text()).slice(0, 300) };
+    });
+    console.log('    tablet ' + i + ' oldest unsent action: ' + JSON.stringify(why));
+  }
   check('every tablet is connected again after the outage and the restart', snaps.every((x) => x.connected), snaps.map((x) => x.connected));
   check('no order was lost (taken on a tablet but missing on the server)', lost.length === 0, lost.slice(0, 10));
   check('no order was doubled', doubled.length === 0, doubled.slice(0, 10));
