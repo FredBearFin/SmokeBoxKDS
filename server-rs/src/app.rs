@@ -31,6 +31,8 @@ pub struct Config {
     pub snapshot_every: i64,
     /// Where "Kitchen is stuck right now" support requests are emailed at once (SmokeBox staff), if anywhere.
     pub staff_alert: Option<String>,
+    /// Stripe billing; off when its keys are not set.
+    pub stripe: crate::billing::Stripe,
 }
 
 /// Everything a request handler needs.
@@ -74,6 +76,10 @@ pub async fn build(db: PgPool, cfg: Config, now: Arc<dyn Fn() -> i64 + Send + Sy
         .route("/api/events", get(events))
         .route("/api/action", post(action))
         .merge(crate::support::routes())
+        .route("/api/billing", get(billing_get))
+        .route("/api/billing/checkout", post(billing_checkout))
+        .route("/api/billing/portal", post(billing_portal))
+        .route("/api/stripe/webhook", post(stripe_webhook))
         .with_state(st.clone());
     Ok((router, st))
 }
@@ -263,7 +269,8 @@ async fn app_page(State(st): State<AppState>, h: HeaderMap) -> Response {
         Ok(s) => s,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "The app page is not built (dist/smokebox.html).").into_response(),
     };
-    let cfg = json!({ "kitchen": { "id": d.kitchen_id, "name": d.kitchen_name }, "device": { "id": d.id, "name": d.name } }).to_string().replace('<', "\\u003c");
+    let bill = crate::billing::state(&st.db, &st.cfg.stripe, &d.kitchen_id, st.rooms.now()).await;
+    let cfg = json!({ "kitchen": { "id": d.kitchen_id, "name": d.kitchen_name }, "device": { "id": d.id, "name": d.name }, "billing": bill.json() }).to_string().replace('<', "\\u003c");
     let html = html.replacen("<head>", &format!("<head><script>window.SB_CLOUD={};</script>", cfg), 1);
     let mut r = no_store(Html(html));
     r.headers_mut().insert("referrer-policy", HeaderValue::from_static("no-referrer"));
@@ -300,7 +307,17 @@ async fn start_kitchen(State(st): State<AppState>, h: HeaderMap, body: Bytes) ->
         return refuse(500, "error", "The kitchen could not be started. Try again.");
     }
     match join_device(&st, &kid, &device_name(&b), "start", secure(&h)).await {
-        Ok(c) => with_cookie(reply(200, json!({ "ok": true, "go": "/", "kitchen": { "id": kid, "name": name } })), c),
+        Ok(c) => {
+            // With billing on, the owner goes straight to Stripe to add a card and start the 3 free weeks; if Stripe cannot be
+            // reached the kitchen opens anyway and the board asks for the card (3 days).
+            let mut go = "/".to_string();
+            if st.cfg.stripe.on() {
+                if let Ok(url) = st.cfg.stripe.checkout(&kid, &email, &st.cfg.public_url).await {
+                    go = url;
+                }
+            }
+            with_cookie(reply(200, json!({ "ok": true, "go": go, "kitchen": { "id": kid, "name": name } })), c)
+        }
         Err(_) => refuse(500, "error", "The kitchen was started, but this device could not join. Use Owner sign in."),
     }
 }
@@ -421,7 +438,10 @@ async fn reset(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Respons
 // Which kitchen and device this is.
 async fn me(State(st): State<AppState>, h: HeaderMap) -> Response {
     match device_of(&st, &h).await {
-        Some(d) => reply(200, json!({ "kitchen": { "id": d.kitchen_id, "name": d.kitchen_name }, "device": { "id": d.id, "name": d.name } })),
+        Some(d) => {
+            let b = crate::billing::state(&st.db, &st.cfg.stripe, &d.kitchen_id, st.rooms.now()).await;
+            reply(200, json!({ "kitchen": { "id": d.kitchen_id, "name": d.kitchen_name }, "device": { "id": d.id, "name": d.name }, "billing": b.json() }))
+        }
         None => refuse(401, "signedOut", "This device is not joined to a kitchen. Join it again."),
     }
 }
@@ -539,7 +559,72 @@ async fn action(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Respon
         Ok(Some(r)) => r,
         _ => return refuse(404, "noKitchen", "Kitchen not found."),
     };
+    // A kitchen whose billing countdown ran out takes no new orders (from the first 4 am after it ended); everything else works.
+    if b.get("type").and_then(Value::as_str) == Some("createTicket") && st.cfg.stripe.on() {
+        let bill = crate::billing::state(&st.db, &st.cfg.stripe, &d.kitchen_id, st.rooms.now()).await;
+        if bill.paused {
+            let seq = room.lock().await.seq;
+            return reply(200, json!({ "report": "billingPaused", "info": {}, "seq": seq }));
+        }
+    }
     let mut r = room.lock().await;
     let out = st.rooms.act(&mut r, &b, &d.id).await;
     reply(out.status, out.body)
+}
+
+/* ---------- billing ---------- */
+
+// The kitchen's billing: plan status, trial, the countdown and whether new orders have stopped.
+async fn billing_get(State(st): State<AppState>, h: HeaderMap) -> Response {
+    let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    reply(200, crate::billing::state(&st.db, &st.cfg.stripe, &d.kitchen_id, st.rooms.now()).await.json())
+}
+
+// A Stripe Checkout page to add a card (a kitchen with no card yet, or after a cancel). Answers its address.
+async fn billing_checkout(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
+    if let Err(r) = same_site_json(&h, &body) {
+        return r;
+    }
+    let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    if !st.cfg.stripe.on() {
+        return refuse(400, "billingOff", "Billing is not switched on for this server.");
+    }
+    let email: Option<String> = sqlx::query_scalar("SELECT email FROM owners WHERE kitchen_id = $1 LIMIT 1").bind(&d.kitchen_id).fetch_optional(&st.db).await.ok().flatten();
+    match st.cfg.stripe.checkout(&d.kitchen_id, &email.unwrap_or_default(), &st.cfg.public_url).await {
+        Ok(url) => reply(200, json!({ "url": url })),
+        Err(_) => refuse(502, "stripeDown", "The payment page could not be opened. Try again in a minute."),
+    }
+}
+
+// Stripe's customer portal for this kitchen: change the card, see receipts or cancel. Answers its address.
+async fn billing_portal(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
+    if let Err(r) = same_site_json(&h, &body) {
+        return r;
+    }
+    let Some(d) = device_of(&st, &h).await else { return refuse(401, "signedOut", "This device is not joined to a kitchen.") };
+    let customer: Option<String> = sqlx::query_scalar("SELECT stripe_customer FROM kitchens WHERE id = $1").bind(&d.kitchen_id).fetch_optional(&st.db).await.ok().flatten().flatten();
+    let Some(customer) = customer else { return refuse(400, "noCard", "There is no card yet. Add one first.") };
+    match st.cfg.stripe.portal(&customer, &st.cfg.public_url).await {
+        Ok(url) => reply(200, json!({ "url": url })),
+        Err(_) => refuse(502, "stripeDown", "The billing page could not be opened. Try again in a minute."),
+    }
+}
+
+// Stripe's messages about payments. Not a browser request: it is trusted only when its signature checks out.
+async fn stripe_webhook(State(st): State<AppState>, h: HeaderMap, body: Bytes) -> Response {
+    if !st.cfg.stripe.on() {
+        return refuse(404, "billingOff", "Billing is off.");
+    }
+    let sig = h.get("stripe-signature").and_then(|v| v.to_str().ok()).unwrap_or("");
+    if !st.cfg.stripe.verify(sig, &body, st.rooms.now() / 1000) {
+        return refuse(400, "badSignature", "Signature does not match.");
+    }
+    let Ok(ev) = serde_json::from_slice::<Value>(&body) else { return refuse(400, "badPatch", "Not JSON.") };
+    match crate::billing::handle(&st.db, &ev, st.rooms.now()).await {
+        Ok(fresh) => reply(200, json!({ "ok": true, "duplicate": !fresh })),
+        Err(e) => {
+            eprintln!("[server] stripe event failed: {}", e);
+            refuse(500, "error", "Not handled; Stripe will send it again.")
+        }
+    }
 }

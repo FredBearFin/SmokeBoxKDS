@@ -155,7 +155,7 @@ async function show() {{
   const t = await api('/staff/api/ticket?id=' + encodeURIComponent(current)); v.textContent = '';
   if (!t.id) {{ v.appendChild(el('p', '', 'Not found.')); return; }}
   v.append(el('h1', '', '#' + t.num + ' ' + t.subject), el('p', '', (t.urgent ? 'Kitchen is stuck right now. ' : '') + CAT[t.category] + '. Status: ' + t.status + '.'));
-  v.appendChild(el('p', '', t.kitchen.name + ' · owner ' + (t.kitchen.owner || 'none') + ' · plan ' + t.kitchen.plan + ' · ' + t.kitchen.devices + ' devices · since ' + when(t.kitchen.since)));
+  v.appendChild(el('p', '', t.kitchen.name + ' · owner ' + (t.kitchen.owner || 'none') + ' · plan ' + t.kitchen.plan + ' (' + t.kitchen.billing + ')' + ' · ' + t.kitchen.devices + ' devices · since ' + when(t.kitchen.since)));
   if (t.diagnostics) {{ const d = el('details'); d.append(el('summary', '', 'What the device attached'), el('pre', '', JSON.stringify(t.diagnostics, null, 2))); v.appendChild(d); }}
   for (const m of t.messages) {{
     const box = el('div', 'msg' + (m.fromStaff ? ' staff' : '') + (m.internal ? ' note' : ''));
