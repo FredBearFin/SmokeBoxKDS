@@ -101,6 +101,7 @@
     storageBlocked: 'This browser is blocking storage, so changes will not survive a reload. Allow site data or use a normal window.',
     unknownOrder: 'That order is no longer here. It may have been cleared; check the open orders list.',
     orderNotOpen: 'That order is already paid or voided. Reopen it first if it needs changing.',
+    billingPaused: 'New orders are paused: the SmokeBox payment is overdue. Open tickets still work. The owner can fix it in Settings, Billing.',
     orderNotPaid: 'Only a paid order can be reopened.',
     dayClosed: 'That sale belongs to a day that is already closed, so it cannot be opened again: it would move to another day and count twice. Make the correction in your own records, or ask whoever keeps the books.',
     orderEmpty: 'There is nothing on this order to pay. Add items first, or void the order.',

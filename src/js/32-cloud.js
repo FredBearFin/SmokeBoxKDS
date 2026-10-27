@@ -28,6 +28,28 @@
     const since = Math.min(st.connected || !st.downSince ? Infinity : st.downSince, st.sendFailSince || Infinity);
     return { on: !!cfg, connected: since === Infinity, downMs: since === Infinity ? 0 : Date.now() - since, waiting };
   }
+  // The kitchen's billing as the server last said (written into the page, then checked every five minutes): status, trial end,
+  // the countdown and whether new orders are paused. null when the server has no billing.
+  let billing = cfg && cfg.billing ? cfg.billing : null;
+  // Asks the server for the kitchen's billing again, and tells the listeners when it changed.
+  function refreshBilling() {
+    if (!cfg || typeof g.fetch !== 'function') return;
+    g.fetch('/api/billing', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : null)).then((b) => {
+      if (b && JSON.stringify(b) !== JSON.stringify(billing)) { billing = b; changed(); }
+    }, () => { /* offline: keep what we had */ });
+  }
+  if (cfg) setInterval(refreshBilling, 5 * 60e3);
+  // Opens a Stripe page for this kitchen: 'checkout' to add a card, 'portal' to change the card, see receipts or cancel.
+  // Resolves to words to show when it could not open.
+  async function openBillingPage(which) {
+    try {
+      const r = await g.fetch('/api/billing/' + which, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' });
+      const b = await r.json().catch(() => ({}));
+      if (r.ok && b.url) { g.location.href = b.url; return null; }
+      return b.words || 'The payment page could not be opened. Try again in a minute.';
+    } catch (e) { return 'No connection to the server. Try again when the internet is back.'; }
+  }
+
   // Sends the device to the sign-in page (used when the server says this device is signed out).
   function toSignIn() { try { g.location.href = '/start'; } catch (e) { /* not in a browser */ } }
 
@@ -115,6 +137,8 @@
   SB.cloud = {
     on: !!cfg, kitchen: cfg ? cfg.kitchen : null, device: cfg && cfg.device ? cfg.device : null, deviceId,
     transport, status, signOut, guardKitchen,
+    // The kitchen's billing (or null), a way to check it again now, and the Stripe pages.
+    billing: () => billing, refreshBilling, openBillingPage,
     // Calls fn whenever the connection status changes; returns a function that stops it.
     onChange(fn) { st.listeners.add(fn); return () => st.listeners.delete(fn); },
   };

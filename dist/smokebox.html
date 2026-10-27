@@ -2994,6 +2994,13 @@ input.mn-volume { min-height: var(--tap, 44px); width: 100%; }
 .dv-list { display: grid; gap: var(--sp-2); }
 .dv-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-top: var(--bw-thin) solid var(--line-soft); }
 .dv-main { flex: 1 1 auto; min-width: 0; display: grid; gap: 4px; }
+/* Billing (bl-): the plan's state in a tinted box, then Stripe's buttons. */
+.bl { display: grid; gap: var(--sp-3); }
+.bl-state { padding: var(--sp-4); border: var(--bw) solid var(--line-soft); border-left-width: 6px; border-radius: var(--r-card); background: var(--paper); }
+.bl-state[data-tone="ok"] { border-left-color: var(--sage); }
+.bl-state[data-tone="warn"] { border-left-color: var(--amber); }
+.bl-state[data-tone="bad"] { border-left-color: var(--danger); }
+.bl-state p { margin: 4px 0 0; }
 /* Help (hp-): Guide matches, the support request form and My requests with each conversation. */
 .hp { display: grid; gap: var(--sp-3); }
 .hp-hit { justify-content: flex-start; text-align: left; }
@@ -4632,7 +4639,7 @@ a.of-nav:active { background: var(--press); }
 <div id="app" aria-live="off"></div>
 <noscript><p style="margin:16px;font:17px/1.4 system-ui,sans-serif">Smokebox needs JavaScript to run. Turn it on for this page and reload.</p></noscript>
 <script>
-window.SB_BUILD = { version: "0.2.0", id: "956fb43" };
+window.SB_BUILD = { version: "0.2.0", id: "94718a6" };
 
 /* ===== 00-util.js ===== */
 ;try{
@@ -6496,6 +6503,7 @@ window.SB_BUILD = { version: "0.2.0", id: "956fb43" };
     storageBlocked: 'This browser is blocking storage, so changes will not survive a reload. Allow site data or use a normal window.',
     unknownOrder: 'That order is no longer here. It may have been cleared; check the open orders list.',
     orderNotOpen: 'That order is already paid or voided. Reopen it first if it needs changing.',
+    billingPaused: 'New orders are paused: the SmokeBox payment is overdue. Open tickets still work. The owner can fix it in Settings, Billing.',
     orderNotPaid: 'Only a paid order can be reopened.',
     dayClosed: 'That sale belongs to a day that is already closed, so it cannot be opened again: it would move to another day and count twice. Make the correction in your own records, or ask whoever keeps the books.',
     orderEmpty: 'There is nothing on this order to pay. Add items first, or void the order.',
@@ -13590,6 +13598,28 @@ window.SB_BUILD = { version: "0.2.0", id: "956fb43" };
     const since = Math.min(st.connected || !st.downSince ? Infinity : st.downSince, st.sendFailSince || Infinity);
     return { on: !!cfg, connected: since === Infinity, downMs: since === Infinity ? 0 : Date.now() - since, waiting };
   }
+  // The kitchen's billing as the server last said (written into the page, then checked every five minutes): status, trial end,
+  // the countdown and whether new orders are paused. null when the server has no billing.
+  let billing = cfg && cfg.billing ? cfg.billing : null;
+  // Asks the server for the kitchen's billing again, and tells the listeners when it changed.
+  function refreshBilling() {
+    if (!cfg || typeof g.fetch !== 'function') return;
+    g.fetch('/api/billing', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : null)).then((b) => {
+      if (b && JSON.stringify(b) !== JSON.stringify(billing)) { billing = b; changed(); }
+    }, () => { /* offline: keep what we had */ });
+  }
+  if (cfg) setInterval(refreshBilling, 5 * 60e3);
+  // Opens a Stripe page for this kitchen: 'checkout' to add a card, 'portal' to change the card, see receipts or cancel.
+  // Resolves to words to show when it could not open.
+  async function openBillingPage(which) {
+    try {
+      const r = await g.fetch('/api/billing/' + which, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' });
+      const b = await r.json().catch(() => ({}));
+      if (r.ok && b.url) { g.location.href = b.url; return null; }
+      return b.words || 'The payment page could not be opened. Try again in a minute.';
+    } catch (e) { return 'No connection to the server. Try again when the internet is back.'; }
+  }
+
   // Sends the device to the sign-in page (used when the server says this device is signed out).
   function toSignIn() { try { g.location.href = '/start'; } catch (e) { /* not in a browser */ } }
 
@@ -13677,6 +13707,8 @@ window.SB_BUILD = { version: "0.2.0", id: "956fb43" };
   SB.cloud = {
     on: !!cfg, kitchen: cfg ? cfg.kitchen : null, device: cfg && cfg.device ? cfg.device : null, deviceId,
     transport, status, signOut, guardKitchen,
+    // The kitchen's billing (or null), a way to check it again now, and the Stripe pages.
+    billing: () => billing, refreshBilling, openBillingPage,
     // Calls fn whenever the connection status changes; returns a function that stops it.
     onChange(fn) { st.listeners.add(fn); return () => st.listeners.delete(fn); },
   };
@@ -21585,6 +21617,27 @@ window.SB_BUILD = { version: "0.2.0", id: "956fb43" };
     const undoAll = () => { for (let i = 0; i < n; i++) SB.store.dispatchEx('undo', {}, { source: 'ui' }); paintBanner(); };
     SB.ui.toast(h('span', null, 'Cleared ' + n + ' old ' + (n === 1 ? 'ticket' : 'tickets') + '. ', h('button', { type: 'button', class: 'btn btn-sm', onClick: undoAll }, 'Undo')), { tone: 'ok', ms: 10000 });
   }
+  // The words for the billing strip, or null when billing needs nothing: { tone, text, act, page }. Times count down to the pause
+  // (the first 4 am after the 3 days), in hours, or minutes in the last hour.
+  function billingWords(b, now) {
+    if (!b || !b.pauseAt) return null;
+    const left = b.pauseAt - now, h = Math.ceil(left / 3600e3), m = Math.max(1, Math.ceil(left / 60e3));
+    const when = left <= 0 ? '' : left < 3600e3 ? m + ' ' + (m === 1 ? 'minute' : 'minutes') : h + ' ' + (h === 1 ? 'hour' : 'hours');
+    const page = b.status === 'past_due' && b.hasCard ? 'portal' : 'checkout';
+    const act = page === 'portal' ? 'Update the card' : 'Add a card';
+    if (b.paused) return { tone: 'bad', text: 'New orders are paused: the SmokeBox payment is overdue. Open tickets still work.', act, page };
+    if (b.status === 'setup') return { tone: 'warn', text: 'Add a card to start your 3 free weeks. New orders pause in ' + when + '.', act, page };
+    if (b.status === 'past_due') return { tone: 'bad', text: 'Payment failed. New orders pause in ' + when + '.', act, page };
+    if (b.status === 'canceled') return { tone: 'warn', text: 'Your SmokeBox plan was cancelled. New orders pause in ' + when + '.', act: 'Restart the plan', page: 'checkout' };
+    return null;
+  }
+  // Opens Stripe's page for the billing strip's button, after the manager PIN when one is set; says why when it cannot.
+  async function openBilling(page) {
+    if (S.requirePin && !(await S.requirePin())) return;
+    const why = await SB.cloud.openBillingPage(page);
+    if (why) ui.toast(why, { tone: 'warn' });
+  }
+  S.billingWords = billingWords;
   // Works out which banner to show: a failed save first, else the daily backup nudge, else none.
   function bannerWanted() {
     const store = SB.store;
@@ -21595,6 +21648,12 @@ window.SB_BUILD = { version: "0.2.0", id: "956fb43" };
     // Signed in to the hosted server and the link has been down for a while: say so calmly; the board keeps working and catches up.
     const cs = SB.cloud && SB.cloud.on ? SB.cloud.status() : null;
     if (cs && !cs.connected && cs.downMs > 8000) return { kind: 'cloud', tone: 'warn', text: 'Not connected. Keep working: ' + (cs.waiting ? cs.waiting + ' change' + (cs.waiting === 1 ? '' : 's') + ' will' : 'changes will') + ' send when the internet is back.', act: 'Reload', onAct: () => g.location.reload() };
+    // Billing: a kitchen with no card yet, a failed payment or a cancelled plan sees a countdown to the pause on every screen, and
+    // once new orders are paused it says so plainly. It cannot be hidden. The button opens Stripe's page (behind the manager PIN).
+    const bill = SB.cloud && SB.cloud.billing ? SB.cloud.billing() : null;
+    const bw = bill ? billingWords(bill, Date.now()) : null;
+    // The strip's button opens the Stripe page that fixes this state.
+    if (bw) return { kind: 'billing', tone: bw.tone, text: bw.text, act: bw.act, onAct: () => openBilling(bw.page) };
     if (ss.persistent === false) return { kind: 'save', tone: 'bad', text: 'This browser is not saving your work. If you close this page, today\'s tickets and batches are lost. Allow site data for this page, then back up now.', act: 'Back up now' };
     if (ss.lastSaveOk === false) return { kind: 'save', tone: 'bad', text: 'The last save failed, so recent changes may be lost. Free some space or allow site data for this page, then back up now.', act: 'Back up now' };
     // Off the board (a back-office page), a device clock that jumped far ahead is asked about here: a slim strip, not a box over the page.
@@ -21627,7 +21686,7 @@ window.SB_BUILD = { version: "0.2.0", id: "956fb43" };
     const act = h('button', { type: 'button', class: 'btn btn-sm', onClick: () => (w.onAct ? w.onAct() : S.ignite({ section: 'data' })) }, w.act);
     // Puts the nudge off for 45 minutes.
     const later = w.later ? h('button', { type: 'button', class: 'btn btn-sm btn-icon sb-banner-x', title: w.laterLabel || 'Hide for 45 minutes', onClick: () => { if (w.onLater) w.onLater(); else { bn.snoozeUntil = Date.now() + 45 * 60000; paintBanner(); } } }, ico('x', 18), h('span', { class: 'visually-hidden' }, w.laterLabel || 'Later')) : null;
-    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : w.kind === 'stale' ? 'ticket' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
+    bn.el = h('div', { class: 'sb-banner', role: w.tone === 'bad' ? 'alert' : 'status', dataset: { tone: w.tone, kind: w.kind } }, ico(w.tone === 'bad' ? 'alert-circle' : w.kind === 'demo' ? 'play' : w.kind === 'billing' ? 'dollar' : w.kind === 'stale' ? 'ticket' : 'download', 20), h('span', { class: 'sb-banner-t', title: w.text }, w.text), act, later);
     st.shell.appendChild(bn.el);
     st.shell.setAttribute('data-banner', w.kind);
     st.shell.style.setProperty('--sb-banner-h', bn.el.offsetHeight + 'px'); // the layers start just below the strip
@@ -28067,8 +28126,11 @@ window.SB_BUILD = { version: "0.2.0", id: "956fb43" };
     const signOutBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'sign-out' }, onClick: () => SB.cloud.signOut() }, ico('arrow-right', 22), h('span', { class: 'grow' }, 'Take this device out of the kitchen'));
     // Devices: add a tablet with a code, rename or remove one (behind the manager PIN when one is set).
     const devicesBtn = h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'devices' }, onClick: () => closeThen(sheet, () => SB.sheets.open('devices')) }, ico('grid', 22), h('span', { class: 'grow' }, 'Devices: add, rename or remove'));
+    // Billing: the SmokeBox plan, and Stripe's pages to add or change the card (behind the manager PIN). Not shown when billing is off.
+    const bill = SB.cloud && SB.cloud.billing ? SB.cloud.billing() : null;
+    const billingBtn = bill && bill.status !== 'off' ? h('button', { type: 'button', class: 'btn btn-block mn-link', dataset: { act: 'billing' }, onClick: () => closeThen(sheet, () => SB.sheets.open('billing')) }, ico('dollar', 22), h('span', { class: 'grow' }, 'Billing: your plan and card')) : null;
     const cloudBlock = SB.cloud && SB.cloud.on
-      ? settingBlock('Your kitchen', 'This device' + (SB.cloud.device ? ' (' + SB.cloud.device.name + ')' : '') + ' is joined to ' + SB.cloud.kitchen.name + '. Every joined device shows the same tickets.', devicesBtn, signOutBtn)
+      ? settingBlock('Your kitchen', 'This device' + (SB.cloud.device ? ' (' + SB.cloud.device.name + ')' : '') + ' is joined to ' + SB.cloud.kitchen.name + '. Every joined device shows the same tickets.', devicesBtn, billingBtn, signOutBtn)
       : null;
     sheet.body.append(h('div', { class: 'mn' },
       cloudBlock,
@@ -28110,6 +28172,93 @@ window.SB_BUILD = { version: "0.2.0", id: "956fb43" };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
 }catch(e){console.error('[smokebox] module 72-floor-sheets.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'72-floor-sheets.js',message:String(e&&e.message||e)});}
+
+/* ===== 73-floor-billing.js ===== */
+;try{
+/*
+ * WHAT THIS FILE IS: The Billing sheet, for a kitchen on the hosted server. It says where the SmokeBox plan stands (free weeks
+ *    left, paid, payment failed, cancelled) and opens Stripe's own pages to add a card, change it, see receipts or cancel. No card
+ *    number ever touches SmokeBox. Behind the manager PIN when one is set. Also says thanks when the owner comes back from Stripe.
+ * PARTS: the words for each state, the sheet, the welcome back from Stripe.
+ * USES: 00-util.js, 05-icons.js, 32-cloud.js (SB.cloud), 60-shell.js (sheets, toasts, the PIN), 72-floor-sheets.js (sheet registry).
+ * USED BY: Settings (Your kitchen, Billing).
+ */
+(function (g) {
+  'use strict';
+  const SB = (g.SB = g.SB || {});
+  const U = SB.util;
+  const doc = g.document;
+  if (!doc || !SB.sheets) return;
+  const h = U.h;
+  // Builds an icon element, or an empty span when icons are missing.
+  const ico = (name, size) => { try { return SB.icons.svg(name, { size: size || 20 }); } catch (e) { return doc.createElement('span'); } };
+  // A date in plain words, like "Nov 14".
+  const day = (t) => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+  // The heading and the sentence for a billing state, from what the server says.
+  function stateWords(b, now) {
+    const days = (t) => Math.max(0, Math.ceil((t - now) / 86400e3));
+    if (b.paused) return { tone: 'bad', head: 'New orders are paused', text: 'The SmokeBox payment is overdue. Open tickets, reports and backups still work. Fix the card and orders start again at once.' };
+    if (b.status === 'setup') return { tone: 'warn', head: 'Add a card to start', text: 'Your 3 free weeks start when you add a card. Nothing is charged until week 4, and you can cancel any time before.' };
+    if (b.status === 'trialing') return { tone: 'ok', head: 'Free weeks', text: (b.trialEndsAt ? days(b.trialEndsAt) + ' ' + U.plural(days(b.trialEndsAt), 'day') + ' left. The first charge is on ' + day(b.trialEndsAt) + '.' : 'Your free weeks have started.') + ' Cancel any time before then and nothing is charged.' };
+    if (b.status === 'active') return { tone: 'ok', head: 'Paid', text: b.paidThrough ? 'Paid through ' + day(b.paidThrough) + '. The next charge happens by itself.' : 'Your plan is paid. The next charge happens by itself.' };
+    if (b.status === 'past_due') return { tone: 'bad', head: 'Payment failed', text: 'Stripe could not charge the card. Update it before new orders pause' + (b.pauseAt ? ' at ' + new Date(b.pauseAt).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '') + '. A pause never starts in the middle of service.' };
+    if (b.status === 'canceled') return { tone: 'warn', head: 'Plan cancelled', text: 'Restart the plan to keep taking new orders. Your menu, reports and history are all still here.' };
+    return { tone: 'ok', head: 'No billing', text: 'This server does not charge for SmokeBox.' };
+  }
+
+  // Opens the Billing sheet (after the manager PIN, when one is set).
+  async function openBilling() {
+    if (SB.shell && SB.shell.requirePin && !(await SB.shell.requirePin())) return null;
+    let stop = null;
+    const sheet = SB.ui.sheet({ title: 'Billing', side: 'right', width: 'min(560px, 96vw)', name: 'billing', onClose: () => { if (stop) stop(); } });
+    const status = h('p', { class: 'fs-sub', role: 'status' });
+    const box = h('div', { class: 'bl' });
+    // Opens one of Stripe's pages, or says why it could not.
+    const go = async (page) => { status.textContent = 'Opening the secure Stripe page...'; const why = await SB.cloud.openBillingPage(page); if (why) status.textContent = why; };
+    // Draws the sheet from the latest billing state.
+    function paint() {
+      const b = (SB.cloud && SB.cloud.billing && SB.cloud.billing()) || { status: 'off' };
+      const w = stateWords(b, Date.now());
+      const buttons = [];
+      // Add a card (or restart a cancelled plan) opens Stripe Checkout.
+      if (b.status === 'setup' || b.status === 'canceled' || (!b.hasCard && b.status !== 'off'))
+        buttons.push(h('button', { type: 'button', class: 'btn btn-primary btn-lg', dataset: { act: 'billing-checkout' }, onClick: () => go('checkout') }, ico('dollar', 22), h('span', null, b.status === 'canceled' ? 'Restart the plan' : 'Add a card')));
+      // With a card on file, Stripe's own portal changes it, shows receipts or cancels.
+      if (b.hasCard && b.status !== 'canceled')
+        buttons.push(h('button', { type: 'button', class: 'btn ' + (b.status === 'past_due' ? 'btn-primary btn-lg' : 'btn-block'), dataset: { act: 'billing-portal' }, onClick: () => go('portal') }, ico('receipt', 22), h('span', null, 'Change the card, see receipts or cancel')));
+      U.clear(box);
+      box.append(h('div', { class: 'bl-state', dataset: { tone: w.tone } }, h('h3', { class: 'fs-h' }, w.head), h('p', null, w.text)), ...buttons, status,
+        h('p', { class: 'fs-sub' }, 'Card details are kept by Stripe, never by SmokeBox. Every device in the kitchen sees the same plan.'));
+    }
+    sheet.body.append(box);
+    paint();
+    if (SB.cloud && SB.cloud.refreshBilling) SB.cloud.refreshBilling();
+    stop = SB.cloud && SB.cloud.onChange ? SB.cloud.onChange(paint) : null;
+    return sheet;
+  }
+  SB.sheets.register('billing', openBilling);
+
+  // Coming back from Stripe (?billing=done or ?billing=later): say what happened once, fetch the new state and tidy the address.
+  function welcomeBack() {
+    let q = null;
+    try { q = new URLSearchParams(g.location.search).get('billing'); } catch (e) { return; }
+    if (!q) return;
+    try { const u = new URL(g.location.href); u.searchParams.delete('billing'); g.history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { /* old browser */ }
+    // Waits until the app has started, then shows the words.
+    const show = () => {
+      if (!(SB.booted && SB.ui && SB.ui.toast)) { setTimeout(show, 200); return; }
+      SB.ui.toast(q === 'done' ? 'Card added. Your 3 free weeks have started.' : 'No card added yet. Add one from Settings, Billing.', { tone: q === 'done' ? 'ok' : 'warn' });
+      // Stripe's confirmation usually lands within seconds: ask every 3 s for a minute so the strip does not lag behind.
+      if (SB.cloud && SB.cloud.refreshBilling) for (let i = 0; i <= 20; i++) setTimeout(SB.cloud.refreshBilling, i * 3000);
+    };
+    show();
+  }
+  SB.billingSheet = { stateWords };
+  welcomeBack();
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+}catch(e){console.error('[smokebox] module 73-floor-billing.js failed to load:',e);window.__sbLoadErrors=(window.__sbLoadErrors||[]);window.__sbLoadErrors.push({file:'73-floor-billing.js',message:String(e&&e.message||e)});}
 
 /* ===== 73-floor-devices.js ===== */
 ;try{
